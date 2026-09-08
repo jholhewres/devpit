@@ -28,7 +28,7 @@ pub enum StoreError {
     NoDataDirectory,
 }
 
-pub use board::{CardRow, ColumnRow, RunRow, StepRow, DEFAULT_COLUMNS};
+pub use board::{CardRow, ColumnRow, RunRow, SessionLink, StepRow, DEFAULT_COLUMNS};
 pub use projects::{NoteRow, ProjectRow};
 pub use settings::key as preference;
 

@@ -23,6 +23,7 @@ pub use catalogue::{
     as_argument, read as read_agents, seed as seed_agents, Agent, Catalogue, Rejected,
 };
 pub use headless::{run_turn, validates, Outcome, Turn};
+// `start_background` and the argv builders live in this module.
 pub use session::{AgentSession, Kind, Status};
 pub use transcript::{read_cost, transcript_path, Cost};
 
@@ -101,6 +102,57 @@ pub fn background_argv(
         argv.push(model.to_owned());
     }
     argv
+}
+
+/// Starts a session in the background and returns the short id it printed.
+///
+/// The short id is what `attach`, `logs`, `stop` and `rm` all take, so it is
+/// the handle worth keeping. The CLI prints it alone on a line; anything else
+/// on stdout is noise from the same start-up the interactive session shows.
+pub fn start_background(
+    cwd: &Path,
+    session_id: Option<&str>,
+    worktree: Option<&str>,
+    model: Option<&str>,
+) -> Result<String, AgentError> {
+    let argv = background_argv(session_id, worktree, model);
+    let output = Command::new(PROGRAM)
+        .args(&argv[1..])
+        .current_dir(cwd)
+        .output()
+        .map_err(|_| AgentError::NotInstalled)?;
+
+    if !output.status.success() {
+        return Err(AgentError::Failed {
+            command: argv.join(" "),
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        });
+    }
+
+    short_id_in(&String::from_utf8_lossy(&output.stdout)).ok_or_else(|| {
+        AgentError::Unreadable(
+            "the CLI started a session but printed no id to attach to".to_owned(),
+        )
+    })
+}
+
+/// The short id out of what `--bg` printed.
+///
+/// Taken as the last bare token on its own line rather than the whole output:
+/// start-up chatter shares the stream, and a handle with a stray word attached
+/// fails later, at `attach`, where the cause is no longer visible.
+fn short_id_in(stdout: &str) -> Option<String> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .rfind(|line| {
+            !line.is_empty()
+                && line.len() <= 64
+                && line
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        })
+        .map(ToOwned::to_owned)
 }
 
 /// The argv that brings a background session into a terminal.
@@ -251,6 +303,30 @@ mod tests {
                 "opus"
             ]
         );
+    }
+
+    #[test]
+    fn the_short_id_is_read_off_the_line_it_is_printed_on() {
+        assert_eq!(
+            short_id_in("Starting a session…\nchecking auth\na1b2c3\n").as_deref(),
+            Some("a1b2c3")
+        );
+    }
+
+    /// Start-up chatter shares stdout. A handle with a stray word in it fails
+    /// later, at attach, where the cause is no longer on screen.
+    #[test]
+    fn a_line_of_prose_is_not_mistaken_for_an_id() {
+        assert_eq!(
+            short_id_in("session started in background\nxyz789\n").as_deref(),
+            Some("xyz789")
+        );
+        assert_eq!(short_id_in("nothing usable here at all\n"), None);
+    }
+
+    #[test]
+    fn no_output_means_no_handle() {
+        assert_eq!(short_id_in(""), None);
     }
 
     #[test]

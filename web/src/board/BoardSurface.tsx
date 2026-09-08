@@ -179,6 +179,8 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
                 <CardTile
                   key={card.id}
                   card={card}
+                  projectId={projectId}
+                  onProblem={setProblem}
                   expanded={open === card.id}
                   onToggle={() => setOpen(open === card.id ? null : card.id)}
                   onDragStart={() => setDragging(card.id)}

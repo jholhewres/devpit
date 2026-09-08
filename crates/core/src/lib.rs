@@ -14,7 +14,7 @@ pub mod tree;
 
 pub use bus::{Bus, Event, Severity};
 pub use store::{
-    preference, CardRow, ColumnRow, NoteRow, ProjectRow, RunRow, StepRow, Store, StoreError,
-    DEFAULT_COLUMNS,
+    preference, CardRow, ColumnRow, NoteRow, ProjectRow, RunRow, SessionLink, StepRow, Store,
+    StoreError, DEFAULT_COLUMNS,
 };
 pub use tree::TreeError;

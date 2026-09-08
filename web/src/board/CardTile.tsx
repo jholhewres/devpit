@@ -1,3 +1,4 @@
+import { commands } from '../gen/bindings'
 import type { Card, Run } from '../gen/bindings'
 
 /**
@@ -8,17 +9,34 @@ import type { Card, Run } from '../gen/bindings'
  */
 export function CardTile({
   card,
+  projectId,
   expanded,
   onToggle,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  onProblem
 }: {
   card: Card
+  projectId: string
   expanded: boolean
   onToggle: () => void
   onDragStart: () => void
   onDragEnd: () => void
+  onProblem: (message: string) => void
 }): React.JSX.Element {
+  /**
+   * Brings this card's session into the target terminal.
+   *
+   * One terminal per project: this swaps what is attached to it. The session
+   * that was there keeps running detached — it stops taking up the screen, not
+   * working.
+   */
+  const attach = async (event: React.MouseEvent): Promise<void> => {
+    event.stopPropagation()
+    const answer = await commands.terminalAttachAgent(projectId, card.id)
+    if (answer.status === 'error') onProblem(answer.error.message)
+  }
+
   return (
     <article
       className="card"
@@ -29,6 +47,9 @@ export function CardTile({
     >
       <div className="card__title">{card.title}</div>
       <div className="card__meta">
+        <button type="button" className="card__attach" onClick={(e) => void attach(e)}>
+          terminal
+        </button>
         {card.costUsd !== null && card.costUsd > 0 && (
           <span className="card__cost">${card.costUsd.toFixed(4)}</span>
         )}

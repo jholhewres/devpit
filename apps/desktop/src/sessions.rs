@@ -596,3 +596,43 @@ mod tests {
         assert!(!Arc::ptr_eq(&a, &b));
     }
 }
+
+/// `terminal.attach_agent` — brings a card's session into the target terminal.
+///
+/// This is the rule the product turns on: one target terminal per project, and
+/// switching cards switches what is attached to it. The session that was there
+/// keeps running detached; it stops taking up the screen, not working.
+///
+/// The command is typed into the focused pane, which means typing over
+/// whoever is sitting there — so this is only ever an action of the interface,
+/// with the text in front of the person, never a side effect of a drag.
+#[tauri::command]
+#[specta::specta]
+pub fn terminal_attach_agent(
+    state: State<SessionState>,
+    project_id: String,
+    card_id: String,
+) -> Result<String, RpcError> {
+    let lock = state.project_lock(&project_id)?;
+    let _guard = lock
+        .lock()
+        .map_err(|_| RpcError::internal("project session lock"))?;
+
+    let store = store()?;
+    let link = store
+        .session_link(&card_id)?
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this card has no session yet"))?;
+
+    let (tree, focused) = store
+        .pane_layout(&project_id)?
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this project has no terminal yet"))?;
+    let layout = decode(&project_id, &tree, &focused)?;
+
+    let session = quockpit_tmux::Server::session_name(&project_id);
+    let target = quockpit_tmux::Server::target(&session, &layout.focused_id);
+
+    let line = quockpit_agentcli::attach_argv(&link.short_id).join(" ");
+    tmux_server()?.send_keys(&target, &line).map_err(tmux_err)?;
+
+    Ok(line)
+}

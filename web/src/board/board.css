@@ -179,3 +179,14 @@
   max-height: 8em;
   overflow: auto;
 }
+
+.card__attach {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+}

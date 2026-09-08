@@ -76,6 +76,18 @@ export const commands = {
 	cardMove: (projectId: string, cardId: string, columnId: string, position: number, confirmed: boolean) => typedError<CardChanged, RpcError>(__TAURI_INVOKE("card_move", { projectId, cardId, columnId, position, confirmed })),
 	cardArchive: (projectId: string, cardId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("card_archive", { projectId, cardId })),
 	stepCreate: (projectId: string, kind: string, name: string, config: string, irreversible: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("step_create", { projectId, kind, name, config, irreversible })),
+	/**
+	 *  `terminal.attach_agent` — brings a card's session into the target terminal.
+	 * 
+	 *  This is the rule the product turns on: one target terminal per project, and
+	 *  switching cards switches what is attached to it. The session that was there
+	 *  keeps running detached; it stops taking up the screen, not working.
+	 * 
+	 *  The command is typed into the focused pane, which means typing over
+	 *  whoever is sitting there — so this is only ever an action of the interface,
+	 *  with the text in front of the person, never a side effect of a drag.
+	 */
+	terminalAttachAgent: (projectId: string, cardId: string) => typedError<string, RpcError>(__TAURI_INVOKE("terminal_attach_agent", { projectId, cardId })),
 	/**  `session.ensure` — a layout and a tmux window, created if they were missing. */
 	sessionEnsure: (projectId: string, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_ensure", { projectId, worktreeId })),
 	/**  `session.layout` — the tree as last persisted. */

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::Finding;
 
 /// Where the ceilings live. One `path limit` pair per line.
-const CEILINGS: &str = include_str!("../ceilings.txt");
+pub(crate) const CEILINGS: &str = include_str!("../ceilings.txt");
 
 /// Files may not grow past their ceiling, and a ceiling may not sit above the
 /// file it caps.
@@ -16,63 +16,6 @@ const CEILINGS: &str = include_str!("../ceilings.txt");
 /// down.
 pub fn files_only_get_shorter(root: &Path) -> Vec<Finding> {
     ceilings_in(CEILINGS, root)
-}
-
-/// Files at or above this many lines get a ceiling. Below it, the ratchet
-/// would be noise: short files churn, and every churn would be a failure.
-const WORTH_CAPPING: usize = 120;
-
-/// Rewrites `xtask/ceilings.txt` from what the tree measures now.
-///
-/// The guard fails when a ceiling sits above its file, which is correct and
-/// also relentless — every time a file gets shorter, a number has to follow it
-/// down. Doing that by hand across the whole list is how a guard earns enough
-/// resentment to be deleted, so `cargo xtask ceilings` does it.
-///
-/// It can only tighten in practice: a file that grew fails `check` before
-/// anyone gets to run this.
-pub fn reseed(root: &Path) -> std::io::Result<usize> {
-    let mut lines = vec![
-        "# Size ceilings. One \"path limit\" per line.".to_owned(),
-        "#".to_owned(),
-        "# The ratchet only tightens: a file over its ceiling fails the guard, and so".to_owned(),
-        "# does a ceiling above what the file needs. Regenerate with `cargo xtask ceilings`"
-            .to_owned(),
-        "# once a file has actually got shorter.".to_owned(),
-        String::new(),
-    ];
-
-    let mut capped = Vec::new();
-    for area in ["crates", "apps/desktop/src", "web/src", "xtask/src"] {
-        for entry in walkdir::WalkDir::new(root.join(area))
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| e.file_type().is_file())
-        {
-            let path = entry.path();
-            if path.components().any(|c| c.as_os_str() == "gen") {
-                continue;
-            }
-            if !path.extension().is_some_and(|e| e == "rs" || e == "tsx") {
-                continue;
-            }
-            let Ok(text) = std::fs::read_to_string(path) else {
-                continue;
-            };
-            let count = text.lines().count();
-            if count < WORTH_CAPPING {
-                continue;
-            }
-            let relative = path.strip_prefix(root).unwrap_or(path);
-            capped.push(format!("{} {count}", relative.display()));
-        }
-    }
-    capped.sort();
-
-    let total = capped.len();
-    lines.extend(capped);
-    std::fs::write(root.join("xtask/ceilings.txt"), lines.join("\n") + "\n")?;
-    Ok(total)
 }
 
 /// The guard over a given ceiling list, so a test can exercise it without

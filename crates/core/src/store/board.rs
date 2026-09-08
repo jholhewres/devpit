@@ -373,6 +373,45 @@ impl Store {
         Ok(rows)
     }
 
+    /// How many cards a column holds. Where a returning card lands.
+    pub fn cards_in_column(&self, column_id: &str) -> Result<i64, StoreError> {
+        Ok(self.conn.query_row(
+            "SELECT COUNT(*) FROM card WHERE column_id = ?1 AND archived_at IS NULL",
+            [column_id],
+            |row| row.get(0),
+        )?)
+    }
+
+    /// Appends a line to a card's body.
+    ///
+    /// A card sent back has to say why on the card itself. Putting the reason
+    /// only in the run would make the board show a card that moved for no
+    /// visible cause.
+    pub fn note_on_card(&self, card_id: &str, line: &str) -> Result<(), StoreError> {
+        self.conn.execute(
+            "UPDATE card SET body = CASE WHEN body = '' THEN ?2 \
+             ELSE body || char(10) || char(10) || ?2 END, updated_at = ?3 WHERE id = ?1",
+            rusqlite::params![card_id, line, now()],
+        )?;
+        Ok(())
+    }
+
+    /// The root path of the project a card belongs to.
+    ///
+    /// A session is started in the project's directory, and the card knows its
+    /// project — asking the caller to carry the path would let the two drift.
+    pub fn project_of_card(&self, card_id: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT p.root_path FROM card c JOIN project p ON p.id = c.project_id \
+                 WHERE c.id = ?1",
+                [card_id],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+
     /// What a card has cost across every run of it.
     pub fn card_cost(&self, card_id: &str) -> Result<f64, StoreError> {
         Ok(self.conn.query_row(
@@ -380,6 +419,77 @@ impl Store {
             [card_id],
             |row| row.get(0),
         )?)
+    }
+}
+
+/// The link between a card and the agent session working on it.
+///
+/// Only the link. Whether that session is idle or busy, and what it has spent,
+/// are answered by the agent CLI and its transcript — a copy here would be a
+/// second truth that drifts from the first.
+pub struct SessionLink {
+    pub card_id: String,
+    pub short_id: String,
+    pub session_id: String,
+    pub transcript_path: Option<String>,
+}
+
+impl Store {
+    pub fn link_session(
+        &self,
+        card_id: &str,
+        short_id: &str,
+        session_id: &str,
+        transcript_path: Option<&str>,
+    ) -> Result<(), StoreError> {
+        self.conn.execute(
+            "INSERT INTO session_link \
+             (card_id, short_id, session_id, transcript_path, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5) \
+             ON CONFLICT(card_id) DO UPDATE SET \
+               short_id = ?2, session_id = ?3, transcript_path = ?4",
+            rusqlite::params![card_id, short_id, session_id, transcript_path, now()],
+        )?;
+        Ok(())
+    }
+
+    pub fn session_link(&self, card_id: &str) -> Result<Option<SessionLink>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT card_id, short_id, session_id, transcript_path \
+                 FROM session_link WHERE card_id = ?1",
+                [card_id],
+                |row| {
+                    Ok(SessionLink {
+                        card_id: row.get(0)?,
+                        short_id: row.get(1)?,
+                        session_id: row.get(2)?,
+                        transcript_path: row.get(3)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
+    /// Every card of a project that has a session behind it.
+    pub fn session_links(&self, project_id: &str) -> Result<Vec<SessionLink>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT l.card_id, l.short_id, l.session_id, l.transcript_path \
+             FROM session_link l JOIN card c ON c.id = l.card_id \
+             WHERE c.project_id = ?1",
+        )?;
+        let rows = stmt
+            .query_map([project_id], |row| {
+                Ok(SessionLink {
+                    card_id: row.get(0)?,
+                    short_id: row.get(1)?,
+                    session_id: row.get(2)?,
+                    transcript_path: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 }
 

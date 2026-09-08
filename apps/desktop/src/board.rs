@@ -219,6 +219,24 @@ pub fn card_move(
     confirmed: bool,
 ) -> Result<CardChanged, RpcError> {
     let store = store()?;
+
+    // Read before the move: a step that sends the card back needs somewhere to
+    // send it, and after the write the previous column is gone.
+    let came_from = store.card(&card_id)?.map(|card| card.column_id);
+
+    // A run still going is work in flight. Moving the card out from under it
+    // is allowed, but only on purpose.
+    let in_flight = store
+        .runs(&card_id)?
+        .iter()
+        .any(|run| run.state == "running");
+    if in_flight && !confirmed {
+        return Err(RpcError::new(
+            ErrorCode::Conflict,
+            "a run is still going on this card — move it anyway?",
+        ));
+    }
+
     store.move_card(&card_id, &column_id, position as i64)?;
 
     let steps = steps_of(&store, &project_id)?;
@@ -236,7 +254,13 @@ pub fn card_move(
         None => None,
         // Irreversible and unconfirmed: the move stands, the work does not.
         Some(step) if step.irreversible && !confirmed => None,
-        Some(step) => Some(crate::runs::start(app, &store, &card_id, &step)?),
+        Some(step) => Some(crate::runs::start(
+            app,
+            &store,
+            &card_id,
+            &step,
+            came_from.as_deref(),
+        )?),
     };
 
     Ok(CardChanged {

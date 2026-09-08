@@ -13,6 +13,7 @@ mod agent_boundary;
 mod naming;
 mod platform_window;
 mod ratchet;
+mod reseed;
 mod shell_boundary;
 
 fn main() -> ExitCode {
@@ -32,7 +33,7 @@ fn main() -> ExitCode {
 
 /// Rewrites the size ceilings from what the tree measures now.
 fn ceilings() -> ExitCode {
-    match ratchet::reseed(&workspace_root()) {
+    match reseed::reseed(&workspace_root()) {
         Ok(count) => {
             println!("ceilings: {count} files");
             ExitCode::SUCCESS
