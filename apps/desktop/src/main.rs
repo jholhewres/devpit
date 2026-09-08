@@ -45,7 +45,7 @@ fn main() {
     // build. That is what stops the two sides from diverging: there is no
     // second place where the type is written.
     //
-    // quockpit to the manifest directory rather than the working directory:
+    // Anchored to the manifest directory rather than the working directory:
     // `tauri dev` and a bare `./quockpit-desktop` run from different places,
     // and a relative path would quietly write the contract somewhere else.
     #[cfg(debug_assertions)]

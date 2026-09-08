@@ -7,7 +7,8 @@
 apps/desktop/src/projects.rs 412
 apps/desktop/src/sessions.rs 598
 crates/agentcli/src/catalogue.rs 366
-crates/agentcli/src/lib.rs 292
+crates/agentcli/src/headless.rs 293
+crates/agentcli/src/lib.rs 294
 crates/agentcli/src/session.rs 124
 crates/agentcli/src/transcript.rs 134
 crates/core/src/store/board.rs 555
@@ -21,6 +22,7 @@ crates/git/src/lib.rs 146
 crates/git/src/status.rs 252
 crates/git/src/worktrees.rs 174
 crates/pty/src/lib.rs 279
+crates/rpc/src/board.rs 123
 crates/rpc/src/project.rs 165
 crates/rpc/src/session.rs 210
 crates/tmux/src/lib.rs 257

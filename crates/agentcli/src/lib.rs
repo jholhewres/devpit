@@ -15,12 +15,14 @@
 //! - `-p --output-format stream-json` runs one turn and reports what it cost.
 
 mod catalogue;
+mod headless;
 mod session;
 mod transcript;
 
 pub use catalogue::{
     as_argument, read as read_agents, seed as seed_agents, Agent, Catalogue, Rejected,
 };
+pub use headless::{run_turn, validates, Outcome, Turn};
 pub use session::{AgentSession, Kind, Status};
 pub use transcript::{read_cost, transcript_path, Cost};
 

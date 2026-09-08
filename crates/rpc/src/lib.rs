@@ -7,11 +7,13 @@
 //! declares the shape; `apps/desktop` adapts that shape to a transport, and
 //! tomorrow an HTTP server and a CLI do the same over the same types.
 
+pub mod board;
 pub mod error;
 pub mod project;
 pub mod session;
 pub mod settings;
 
+pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use error::{ErrorCode, RpcError};
 pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
