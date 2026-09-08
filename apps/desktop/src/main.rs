@@ -10,6 +10,7 @@ mod commands;
 // release should say so rather than warn about it on every build.
 #[cfg(any(debug_assertions, test))]
 mod contract;
+mod files;
 mod front;
 mod projects;
 mod pty_bridge;
@@ -67,6 +68,8 @@ fn main() {
             board::card_create,
             board::card_update,
             board::card_move,
+            files::file_read,
+            files::file_write,
             front::card_archive,
             front::card_diff,
             columns::step_create,

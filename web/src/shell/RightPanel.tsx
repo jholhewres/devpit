@@ -34,12 +34,14 @@ function TreeChildren({
   path,
   depth,
   projectId,
-  worktreeId
+  worktreeId,
+  onOpenFile
 }: {
   path: string
   depth: number
   projectId: string
   worktreeId: string | null
+  onOpenFile: (path: string) => void
 }): React.JSX.Element | null {
   const load = useCallback(
     () => commands.projectTree(projectId, worktreeId, path),
@@ -65,6 +67,7 @@ function TreeChildren({
           depth={depth}
           projectId={projectId}
           worktreeId={worktreeId}
+          onOpenFile={onOpenFile}
         />
       ))}
     </>
@@ -75,12 +78,14 @@ function TreeRow({
   node,
   depth,
   projectId,
-  worktreeId
+  worktreeId,
+  onOpenFile
 }: {
   node: FileNode
   depth: number
   projectId: string
   worktreeId: string | null
+  onOpenFile: (path: string) => void
 }): React.JSX.Element {
   const isDir = node.children !== null
   const [open, setOpen] = useState(false)
@@ -95,7 +100,7 @@ function TreeRow({
         data-open={isDir ? open : undefined}
         style={{ paddingLeft: 12 + depth * 13 }}
         title={node.path}
-        onClick={() => isDir && setOpen((was) => !was)}
+        onClick={() => (isDir ? setOpen((was) => !was) : onOpenFile(node.path))}
       >
         <span className="tree-row__twist">{isDir ? <ChevronGlyph /> : null}</span>
         <span className="tree-row__name">{node.name}</span>
@@ -107,6 +112,7 @@ function TreeRow({
           depth={depth + 1}
           projectId={projectId}
           worktreeId={worktreeId}
+          onOpenFile={onOpenFile}
         />
       ) : null}
     </>
@@ -218,12 +224,14 @@ export function RightPanel({
   project,
   worktreeId,
   onSelectWorktree,
-  onStartResize
+  onStartResize,
+  onOpenFile
 }: {
   project: Project
   worktreeId: string | null
   onSelectWorktree: (id: string) => void
   onStartResize: (event: React.PointerEvent) => void
+  onOpenFile: (path: string) => void
 }): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('files')
 
@@ -319,6 +327,7 @@ export function RightPanel({
                 depth={0}
                 projectId={project.id}
                 worktreeId={worktreeId}
+                onOpenFile={onOpenFile}
               />
             ))
           )

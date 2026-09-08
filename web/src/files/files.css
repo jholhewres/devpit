@@ -1,0 +1,79 @@
+.file {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.file__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--edge);
+  font-size: 11px;
+}
+
+.file__path {
+  font-family: var(--mono, monospace);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.file__dirty {
+  color: var(--ink-warn, #c96);
+}
+
+.file__spacer {
+  flex: 1;
+}
+
+.file__head button {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 7px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.file__head button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.file__problem,
+.file__not-shown {
+  margin: 0;
+  padding: 8px;
+  font-size: 11px;
+  color: var(--ink-warn, #c96);
+}
+
+.file__not-shown {
+  color: var(--ink-muted);
+}
+
+/* A textarea, not an editor. What this has to do is let someone fix a line
+   without leaving the window. */
+.file__text {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 2;
+  user-select: text;
+}

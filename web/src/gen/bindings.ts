@@ -74,6 +74,16 @@ export const commands = {
 	 *  not fired by dropping a card on a lane, it is fired by someone saying so.
 	 */
 	cardMove: (projectId: string, cardId: string, columnId: string, position: number, confirmed: boolean) => typedError<CardChanged, RpcError>(__TAURI_INVOKE("card_move", { projectId, cardId, columnId, position, confirmed })),
+	/**  `file.read` — the text of a file, or why it is not text. */
+	fileRead: (projectId: string, worktreeId: string | null, path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("file_read", { projectId, worktreeId, path })),
+	/**
+	 *  `file.write` — saves, and refuses to overwrite a change it never saw.
+	 * 
+	 *  `read_at` is the mtime the editor was handed. If the file has moved on
+	 *  since, the save is refused: silently winning that race is how someone
+	 *  loses work they did in another window.
+	 */
+	fileWrite: (projectId: string, worktreeId: string | null, path: string, text: string, readAt: number | null) => typedError<FileSaved, RpcError>(__TAURI_INVOKE("file_write", { projectId, worktreeId, path, text, readAt })),
 	/**
 	 *  `card.archive` — and it refuses while the front holds unsaved work.
 	 * 
@@ -304,6 +314,27 @@ export type ErrorCode = "unauthenticated" |
 "forbidden" | "not_found" | "conflict" | "rate_limited" | "invalid" | "unsupported" | "busy" | "internal";
 
 /**
+ *  What is in a file, or why it is not shown.
+ * 
+ *  A binary file is refused rather than rendered: a megabyte of bytes drawn as
+ *  replacement characters is worse than a sentence saying it is not text, and
+ *  saving it back would corrupt it.
+ */
+export type FileContents = {
+	/**  Relative to the worktree root, the same path the tree hands out. */
+	path: string,
+	text: string | null,
+	/**  Set when `text` is absent, and it says which reason. */
+	notShown: string | null,
+	bytes: number | null,
+	/**
+	 *  The mtime the read saw, given back on write so a save can refuse to
+	 *  overwrite a change it never saw.
+	 */
+	readAt: number | null,
+};
+
+/**
  *  One entry of the file tree.
  * 
  *  Children are `None` for a file and `Some` for a directory — including an
@@ -315,6 +346,13 @@ export type FileNode = {
 	path: string,
 	status: GitStatus,
 	children: FileNode[] | null,
+};
+
+/**  The answer to a write. */
+export type FileSaved = {
+	path: string,
+	bytes: number | null,
+	readAt: number | null,
 };
 
 /**

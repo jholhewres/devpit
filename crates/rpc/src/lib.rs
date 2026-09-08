@@ -10,6 +10,7 @@
 pub mod agents;
 pub mod board;
 pub mod error;
+pub mod file;
 pub mod front;
 pub mod project;
 pub mod session;
@@ -19,6 +20,7 @@ pub mod settings;
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use error::{ErrorCode, RpcError};
+pub use file::{FileContents, FileSaved};
 pub use front::Front;
 pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,

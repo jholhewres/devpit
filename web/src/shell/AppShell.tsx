@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { FileView } from '../files/FileView'
 import { Onboarding } from '../onboarding/Onboarding'
 import { SurfaceHost } from '../surfaces/SurfaceHost'
 import { commands } from '../gen/bindings'
@@ -36,6 +37,7 @@ export function AppShell(): React.JSX.Element {
   const [surfaceByProject, setSurfaceByProject] = useState<Record<string, SurfaceId | null>>({})
   const [addFailure, setAddFailure] = useState<string | null>(null)
   const [onboarded, setOnboarded] = useState(false)
+  const [openFile, setOpenFile] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panelOpen, setPanelOpen] = useState(true)
   const [layoutByProject, setLayoutByProject] = useState<Record<string, SessionLayout>>({})
@@ -265,6 +267,19 @@ export function AppShell(): React.JSX.Element {
           />
         )}
 
+        {project && openFile !== null ? (
+          // Over the stage like any other surface, and it hands the terminal
+          // back on close: the pane underneath keeps its process either way.
+          <div className="surface-host">
+            <FileView
+              projectId={project.id}
+              worktreeId={worktreeId}
+              path={openFile}
+              onClose={() => setOpenFile(null)}
+            />
+          </div>
+        ) : null}
+
         {project && activeSurface ? (
           <SurfaceHost
             // Remounting on change is what replays the entrance: without it,
@@ -286,6 +301,7 @@ export function AppShell(): React.JSX.Element {
           onSelectWorktree={(id) =>
             setWorktreeByProject((previous) => ({ ...previous, [project.id]: id }))
           }
+          onOpenFile={setOpenFile}
           onStartResize={startResize('panel')}
         />
       ) : (
