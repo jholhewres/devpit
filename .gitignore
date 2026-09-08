@@ -1,0 +1,45 @@
+# --- internal, never published ---
+# Research, planning, decision drafts. What is public lives in docs/.
+.project/
+.omc/
+.claude/settings.local.json
+
+# --- Rust ---
+/target
+**/*.rs.bk
+*.pdb
+
+# --- frontend ---
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# --- Tauri ---
+apps/desktop/gen/
+src-tauri/target/
+
+# --- runtime / local data ---
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+
+# --- credentials: none of this belongs in the repo ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
