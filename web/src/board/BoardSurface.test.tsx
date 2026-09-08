@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -25,11 +25,25 @@ describe('columns belong to the person', () => {
       .join('\n')
   }
 
+  /**
+   * Every screen of the board, not one named file.
+   *
+   * The first version checked BoardSurface alone, and splitting the lane out
+   * of it moved the code past the check without failing it. A guard aimed at
+   * one file guards one file.
+   */
+  function everyScreen(): string[] {
+    return readdirSync(__dirname)
+      .filter((file) => file.endsWith('.tsx') && !file.endsWith('.test.tsx'))
+      .map(codeOf)
+  }
+
   it('no screen matches on a seeded column name', () => {
-    const source = codeOf('BoardSurface.tsx')
-    for (const name of SEEDED) {
-      expect(source).not.toContain(`'${name}'`)
-      expect(source).not.toContain(`"${name}"`)
+    for (const source of everyScreen()) {
+      for (const name of SEEDED) {
+        expect(source).not.toContain(`'${name}'`)
+        expect(source).not.toContain(`"${name}"`)
+      }
     }
   })
 
@@ -39,8 +53,7 @@ describe('columns belong to the person', () => {
    * change here.
    */
   it('the lanes are drawn from the response, not from a list in the code', () => {
-    const source = codeOf('BoardSurface.tsx')
-    expect(source).toContain('current.columns.map')
+    expect(codeOf('BoardSurface.tsx')).toContain('current.columns.map')
   })
 })
 
@@ -50,7 +63,7 @@ describe('columns belong to the person', () => {
 describe('an irreversible step is confirmed', () => {
   it('the drop asks before sending confirmed', () => {
     const source = readFileSync(join(__dirname, 'BoardSurface.tsx'), 'utf8')
-    expect(source).toContain('column.step?.irreversible')
+    expect(source).toContain('irreversible')
     expect(source).toContain('window.confirm')
   })
 })

@@ -80,8 +80,13 @@
 .lane__step {
   font-size: 11px;
   color: var(--ink-muted);
+  border: none;
   border-top: 1px solid var(--edge);
-  padding-top: 6px;
+  background: none;
+  padding: 6px 0 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .lane__step--none {
@@ -189,4 +194,50 @@
   font: inherit;
   font-size: 11px;
   text-decoration: underline;
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.picker__existing,
+.picker__new {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.picker input[type='text'],
+.picker input:not([type]),
+.picker select {
+  font: inherit;
+  padding: 3px 5px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.picker button {
+  font: inherit;
+  text-align: left;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  padding: 3px 5px;
+  cursor: pointer;
+}
+
+.picker__warn {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--ink-warn, #c96);
 }

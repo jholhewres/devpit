@@ -12,6 +12,7 @@ quockpit-pty = { version = "0.1.0", path = "../../crates/pty" }
 quockpit-rpc = { version = "0.1.0", path = "../../crates/rpc" }
 quockpit-tmux = { version = "0.1.0", path = "../../crates/tmux" }
 quockpit-agentcli = { version = "0.1.0", path = "../../crates/agentcli" }
+quockpit-steps = { version = "0.1.0", path = "../../crates/steps" }
 portable-pty = "0.9.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"

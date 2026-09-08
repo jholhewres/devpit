@@ -5,10 +5,9 @@
 # once a file has actually got shorter.
 
 apps/desktop/src/board.rs 302
-apps/desktop/src/main.rs 158
 apps/desktop/src/projects.rs 412
-apps/desktop/src/runs.rs 390
 apps/desktop/src/sessions.rs 638
+apps/desktop/src/steps/mod.rs 144
 crates/agentcli/src/catalogue.rs 366
 crates/agentcli/src/headless.rs 293
 crates/agentcli/src/lib.rs 370
@@ -28,8 +27,12 @@ crates/pty/src/lib.rs 279
 crates/rpc/src/board.rs 126
 crates/rpc/src/project.rs 165
 crates/rpc/src/session.rs 210
+crates/steps/src/context.rs 126
+crates/steps/src/manifest.rs 130
+crates/steps/src/runner.rs 246
 crates/tmux/src/lib.rs 257
-web/src/board/BoardSurface.tsx 208
+web/src/board/BoardSurface.tsx 177
+web/src/board/StepPicker.tsx 120
 web/src/loadtest/LoadTest.tsx 149
 web/src/onboarding/ProjectStep.tsx 169
 web/src/shell/AppShell.tsx 301

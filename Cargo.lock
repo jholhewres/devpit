@@ -2610,6 +2610,7 @@ dependencies = [
  "quockpit-git",
  "quockpit-pty",
  "quockpit-rpc",
+ "quockpit-steps",
  "quockpit-tmux",
  "serde",
  "serde_json",
@@ -2650,6 +2651,16 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+]
+
+[[package]]
+name = "quockpit-steps"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { commands } from '../gen/bindings'
 import type { Board, Card, Column } from '../gen/bindings'
 import { messageOf, useLoad } from '../project/load'
-import { CardTile } from './CardTile'
+import { Lane } from './Lane'
 import './board.css'
 
 /**
@@ -22,6 +22,7 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
   const [dragging, setDragging] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
+  const [picking, setPicking] = useState<string | null>(null)
 
   const current = board ?? (load.status === 'ready' ? load.data : null)
 
@@ -142,57 +143,25 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
 
       <div className="board__lanes">
         {current.columns.map((column: Column) => (
-          <section
+          <Lane
             key={column.id}
-            className={dragging === null ? 'lane' : 'lane lane--target'}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => void drop(column)}
-          >
-            <header className="lane__head">
-              <button type="button" className="lane__name" onClick={() => void rename(column)}>
-                {column.name}
-              </button>
-              <span className="lane__count">{cardsIn(current, column.id).length}</span>
-              <button
-                type="button"
-                className="lane__remove"
-                title="Delete this column"
-                onClick={() => void remove(column)}
-              >
-                ×
-              </button>
-            </header>
-
-            {column.step !== null ? (
-              <div className="lane__step" title={`Runs ${column.step.name} on arrival`}>
-                {column.step.name}
-                {column.step.irreversible && <span className="lane__warn">no undo</span>}
-              </div>
-            ) : (
-              // A lane that runs nothing is a lane doing its job, so it says
-              // so rather than looking half-configured.
-              <div className="lane__step lane__step--none">runs nothing</div>
-            )}
-
-            <div className="lane__cards">
-              {cardsIn(current, column.id).map((card: Card) => (
-                <CardTile
-                  key={card.id}
-                  card={card}
-                  projectId={projectId}
-                  onProblem={setProblem}
-                  expanded={open === card.id}
-                  onToggle={() => setOpen(open === card.id ? null : card.id)}
-                  onDragStart={() => setDragging(card.id)}
-                  onDragEnd={() => setDragging(null)}
-                />
-              ))}
-            </div>
-
-            <button type="button" className="lane__add" onClick={() => void addCard(column)}>
-              + card
-            </button>
-          </section>
+            projectId={projectId}
+            column={column}
+            cards={cardsIn(current, column.id)}
+            steps={current.steps}
+            dragging={dragging}
+            picking={picking}
+            openCard={open}
+            onDrop={(c) => void drop(c)}
+            onRename={(c) => void rename(c)}
+            onRemove={(c) => void remove(c)}
+            onAddCard={(c) => void addCard(c)}
+            onPick={setPicking}
+            onOpenCard={setOpen}
+            onDragCard={setDragging}
+            onBoard={setBoard}
+            onProblem={setProblem}
+          />
         ))}
 
         <button type="button" className="board__add-lane" onClick={() => void addColumn()}>
