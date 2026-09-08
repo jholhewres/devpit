@@ -16,6 +16,7 @@
 
 mod catalogue;
 mod headless;
+mod hooks;
 mod session;
 mod transcript;
 
@@ -23,6 +24,7 @@ pub use catalogue::{
     as_argument, read as read_agents, seed as seed_agents, Agent, Catalogue, Rejected,
 };
 pub use headless::{run_turn, validates, Outcome, Turn};
+pub use hooks::{endpoint_file, read as read_hook, settings_json, Event, Happening};
 // `start_background` and the argv builders live in this module.
 pub use session::{AgentSession, Kind, Status};
 pub use transcript::{read_cost, transcript_path, Cost};
@@ -191,6 +193,7 @@ pub fn headless_argv(
     schema: Option<&str>,
     budget_usd: Option<f64>,
     model: Option<&str>,
+    settings: Option<&str>,
 ) -> Vec<String> {
     let mut argv = vec![
         PROGRAM.to_owned(),
@@ -215,6 +218,10 @@ pub fn headless_argv(
     if let Some(model) = model {
         argv.push("--model".to_owned());
         argv.push(model.to_owned());
+    }
+    if let Some(path) = settings {
+        argv.push("--settings".to_owned());
+        argv.push(path.to_owned());
     }
     argv
 }

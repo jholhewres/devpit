@@ -412,3 +412,14 @@
 .card__sent code {
   font-family: var(--mono, monospace);
 }
+
+/* What the agent says it is doing, in its own words, as it happens. */
+.card__doing {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--ink-muted);
+  font-family: var(--mono, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -56,7 +56,7 @@ fn attaching_takes_the_short_id() {
 /// cannot overspend is a step you can leave running.
 #[test]
 fn a_headless_turn_declares_its_cap() {
-    let argv = headless_argv(None, None, Some(0.5), None);
+    let argv = headless_argv(None, None, Some(0.5), None, None);
     let cap = argv
         .iter()
         .position(|a| a == "--max-budget-usd")
@@ -66,7 +66,7 @@ fn a_headless_turn_declares_its_cap() {
 
 #[test]
 fn a_headless_turn_streams_in_and_out() {
-    let argv = headless_argv(None, None, None, None);
+    let argv = headless_argv(None, None, None, None, None);
     assert!(argv.contains(&"--input-format".to_owned()));
     assert!(argv.contains(&"--output-format".to_owned()));
     assert_eq!(argv.iter().filter(|a| *a == "stream-json").count(), 2);

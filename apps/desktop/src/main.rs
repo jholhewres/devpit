@@ -12,6 +12,7 @@ mod commands;
 mod contract;
 mod files;
 mod front;
+mod listener;
 mod projects;
 mod pty_bridge;
 mod runs;
@@ -45,6 +46,15 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            // Hooks are how the board hears about work as it happens rather
+            // than a poll later. Started here so the endpoint is on disk before
+            // the first turn goes out.
+            if let Ok(root) = quockpit_core::Store::root() {
+                listener::start(app.handle().clone(), &root);
+            }
+            Ok(())
+        })
         .manage(sessions::SessionState::new())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
