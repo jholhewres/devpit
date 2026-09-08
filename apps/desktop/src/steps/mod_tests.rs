@@ -51,3 +51,98 @@ fn a_card_always_gets_the_same_session_id() {
     assert_eq!(first.len(), 36, "{first} is not shaped like a uuid");
     assert_eq!(first.matches('-').count(), 4);
 }
+
+/// The chain, end to end, with a real agent at the far side of it.
+///
+/// Every piece has a test of its own; this is the one that proves they add
+/// up — a card in a store, a step configured against it, the agent named from
+/// the catalogue on disk, and a run that comes back with an answer the schema
+/// accepts and a cost above zero.
+///
+/// Opt-in behind `QUOCKPIT_LIVE_TURN`: it spends money.
+#[test]
+fn a_card_and_a_step_produce_a_real_answer() {
+    if std::env::var_os("QUOCKPIT_LIVE_TURN").is_none() {
+        eprintln!("skipped: set QUOCKPIT_LIVE_TURN=1 to spend money on this one");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let column = store.columns(&project).expect("columns")[1].id.clone();
+
+    let card = store
+        .create_card(
+            &project,
+            &column,
+            "Add a retry to the upload",
+            "It fails on a flaky network and loses the file.",
+        )
+        .expect("card");
+
+    // The agent the step names has to be one that is actually on disk.
+    let catalogue = quockpit_agentcli::read_agents(&agents_dir().expect("agents dir"));
+    let Some(agent) = catalogue.agents.first() else {
+        eprintln!("skipped: no agents seeded on this machine");
+        return;
+    };
+
+    // The schema travels as a string inside the config, which is why it is
+    // built separately rather than nested: the step stores JSON, and one of
+    // its fields is itself JSON.
+    let schema = r#"{"type":"object",
+        "properties":{"verdict":{"type":"string"},"findings":{"type":"array"}},
+        "required":["verdict","findings"]}"#;
+    let config = serde_json::json!({
+        "agent": agent.name,
+        "prompt": "Reply with a verdict of \"approved\" and an empty findings array.",
+        "schema": schema,
+        "budgetUsd": 0.5,
+        "model": "claude-haiku-4-5-20251001"
+    })
+    .to_string();
+
+    let step_id = store
+        .create_step(&project, "agent", "review it", &config, false)
+        .expect("step");
+    store
+        .set_column_step(&column, Some(&step_id))
+        .expect("attach");
+
+    let step = quockpit_rpc::Step {
+        id: step_id.clone(),
+        kind: quockpit_rpc::StepKind::Agent,
+        name: "review it".to_owned(),
+        config,
+        irreversible: false,
+    };
+
+    let mut streamed = 0;
+    let finished = agent::run(&store, &card, &step, |_| streamed += 1).expect("the step ran");
+
+    assert!(finished.ok, "the step failed: {}", finished.output);
+    assert!(
+        finished.cost_usd > 0.0,
+        "a turn that cost nothing: {}",
+        finished.output
+    );
+    assert!(streamed > 0, "nothing reached the card while it worked");
+
+    // And the run lands on the card, which is where a person reads it.
+    let run = store.start_run(&card, &step_id).expect("start");
+    store
+        .finish_run(
+            &run,
+            "ok",
+            Some(&finished.output),
+            Some(finished.cost_usd),
+            Some(finished.duration_ms),
+            None,
+        )
+        .expect("finish");
+
+    assert_eq!(store.runs(&card).expect("runs").len(), 1);
+    assert!(store.card_cost(&card).expect("cost") > 0.0);
+}
