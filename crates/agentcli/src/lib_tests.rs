@@ -4,9 +4,9 @@ use super::*;
 
 #[test]
 fn a_background_session_carries_only_what_it_was_given() {
-    assert_eq!(background_argv(None, None, None), ["claude", "--bg"]);
+    assert_eq!(background_argv(None, None, None, None), ["claude", "--bg"]);
     assert_eq!(
-        background_argv(Some("uuid-1"), Some("fix-auth"), Some("opus")),
+        background_argv(Some("uuid-1"), Some("fix-auth"), Some("opus"), None),
         [
             "claude",
             "--bg",
@@ -107,7 +107,7 @@ fn a_real_background_session_can_be_started_and_stopped() {
             .expect("git");
     }
 
-    let short = start_background(dir.path(), None, None, None)
+    let short = start_background(dir.path(), None, None, None, None)
         .expect("the CLI started a session but no handle came back");
     assert!(is_handle(&short), "{short} is not a handle");
 

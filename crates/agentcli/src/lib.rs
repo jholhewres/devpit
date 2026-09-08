@@ -89,6 +89,7 @@ pub fn background_argv(
     session_id: Option<&str>,
     worktree: Option<&str>,
     model: Option<&str>,
+    settings: Option<&str>,
 ) -> Vec<String> {
     let mut argv = vec![PROGRAM.to_owned(), "--bg".to_owned()];
     if let Some(id) = session_id {
@@ -103,21 +104,29 @@ pub fn background_argv(
         argv.push("--model".to_owned());
         argv.push(model.to_owned());
     }
+    // The hooks matter more here than anywhere: a background session is the one
+    // running where nobody is looking, and without them its card has nothing to
+    // say between polls.
+    if let Some(path) = settings {
+        argv.push("--settings".to_owned());
+        argv.push(path.to_owned());
+    }
     argv
 }
 
 /// Starts a session in the background and returns the short id it printed.
 ///
 /// The short id is what `attach`, `logs`, `stop` and `rm` all take, so it is
-/// the handle worth keeping. The CLI prints it alone on a line; anything else
-/// on stdout is noise from the same start-up the interactive session shows.
+/// the handle worth keeping. It is not printed alone — see `short_id_in` for
+/// the block it arrives in and why it is read off the `attach` line.
 pub fn start_background(
     cwd: &Path,
     session_id: Option<&str>,
     worktree: Option<&str>,
     model: Option<&str>,
+    settings: Option<&str>,
 ) -> Result<String, AgentError> {
-    let argv = background_argv(session_id, worktree, model);
+    let argv = background_argv(session_id, worktree, model, settings);
     let output = Command::new(PROGRAM)
         .args(&argv[1..])
         .current_dir(cwd)

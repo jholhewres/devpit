@@ -50,6 +50,7 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
         Some(&session_id),
         worktree.as_deref(),
         config.model.as_deref(),
+        super::hook_settings().as_deref(),
     )
     .map_err(|err| err.to_string())?;
 

@@ -65,7 +65,7 @@ pub fn run(
 
     // The hooks reach us through a settings file written next to the state,
     // so a turn tells the board what it is doing while it does it.
-    let settings = hook_settings();
+    let settings = super::hook_settings();
 
     let outcome = agent::run_turn(
         &agent::Turn {
@@ -132,26 +132,6 @@ fn assistant_text(line: &str) -> Option<String> {
         .collect::<Vec<_>>()
         .join("");
     (!text.trim().is_empty()).then_some(text)
-}
-
-/// Writes the hook settings once and hands back their path.
-///
-/// Next to the state rather than in a temp file: a turn that outlives the app
-/// still has a file to read, and a path that changes every run would be a new
-/// file on disk for every card moved.
-fn hook_settings() -> Option<String> {
-    let root = Store::root().ok()?;
-    let endpoint = agent::endpoint_file(&root);
-    let path = root.join("hooks.json");
-    let wanted = agent::settings_json(&endpoint);
-
-    // Rewritten only when it differs, so a turn does not touch the disk for
-    // nothing.
-    if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
-        std::fs::create_dir_all(&root).ok()?;
-        std::fs::write(&path, &wanted).ok()?;
-    }
-    Some(path.display().to_string())
 }
 
 #[cfg(test)]

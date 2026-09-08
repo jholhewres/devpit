@@ -80,6 +80,26 @@ fn slug(title: &str) -> String {
     out.trim_matches('-').chars().take(40).collect()
 }
 
+/// Writes the hook settings once and hands back their path.
+///
+/// Next to the state rather than in a temp file: a turn that outlives the app
+/// still has a file to read, and a path that changes every run would be a new
+/// file on disk for every card moved.
+fn hook_settings() -> Option<String> {
+    let root = Store::root().ok()?;
+    let endpoint = quockpit_agentcli::endpoint_file(&root);
+    let path = root.join("hooks.json");
+    let wanted = quockpit_agentcli::settings_json(&endpoint);
+
+    // Rewritten only when it differs, so a turn does not touch the disk for
+    // nothing.
+    if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
+        std::fs::create_dir_all(&root).ok()?;
+        std::fs::write(&path, &wanted).ok()?;
+    }
+    Some(path.display().to_string())
+}
+
 /// Where the agents on this machine live.
 pub fn agents_dir() -> Result<PathBuf, RpcError> {
     Ok(Store::root()
