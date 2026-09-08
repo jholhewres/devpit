@@ -73,9 +73,13 @@ export function DiffView({
  *
  * `+++` and `---` are checked before `+` and `-`, or the two header lines of
  * every diff would be painted as one added and one removed line.
+ *
+ * With the space, because the header is always `--- <path>` or `+++ <path>`,
+ * never the marker alone. Without it, an added line of C whose content is
+ * `++i` arrives as `+++i` and gets drawn as a filename.
  */
-function kindOf(line: string): 'meta' | 'hunk' | 'added' | 'removed' | 'context' {
-  if (line.startsWith('+++') || line.startsWith('---')) return 'meta'
+export function kindOf(line: string): 'meta' | 'hunk' | 'added' | 'removed' | 'context' {
+  if (line.startsWith('+++ ') || line.startsWith('--- ')) return 'meta'
   if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('new file'))
     return 'meta'
   if (line.startsWith('@@')) return 'hunk'
