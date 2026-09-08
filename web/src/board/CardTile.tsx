@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { commands } from '../gen/bindings'
 import type { Board, Card, Front, Run } from '../gen/bindings'
+import { CardActions } from './CardActions'
 import { CardFront } from './CardFront'
 import { RunLine } from './RunLine'
 import { CardEditor } from './CardEditor'
@@ -40,6 +41,7 @@ export function CardTile({
    */
   const [front, setFront] = useState<Front | null>(null)
   const [editing, setEditing] = useState(false)
+  const [sent, setSent] = useState<string | null>(null)
   const [shown, setShown] = useState(card)
   const [progress, setProgress] = useState('')
 
@@ -98,7 +100,15 @@ export function CardTile({
   const attach = async (event: React.MouseEvent): Promise<void> => {
     event.stopPropagation()
     const answer = await commands.terminalAttachAgent(projectId, card.id)
-    if (answer.status === 'error') onProblem(answer.error.message)
+    if (answer.status === 'error') {
+      onProblem(answer.error.message)
+      return
+    }
+    // The first attach in a folder the agent has not seen opens its own trust
+    // prompt rather than the session. That is it protecting the machine, and
+    // saying so beforehand is the difference between a safeguard and a
+    // surprise in a terminal nobody asked to type into.
+    setSent(answer.data)
   }
 
   return (
@@ -130,24 +140,16 @@ export function CardTile({
         <button type="button" className="card__attach" onClick={(e) => void attach(e)}>
           terminal
         </button>
-        <button
-          type="button"
-          className="card__attach"
-          onClick={(event) => {
+        <CardActions
+          card={card}
+          onEdit={(event) => {
             event.stopPropagation()
             setEditing(true)
           }}
-        >
-          edit
-        </button>
-        <button type="button" className="card__attach" onClick={(e) => void archive(e)}>
-          archive
-        </button>
-        {card.worktreePath !== null && (
-          <button type="button" className="card__attach" onClick={(e) => void readFront(e)}>
-            changes
-          </button>
-        )}
+          onArchive={(event) => void archive(event)}
+          onAttach={(event) => void attach(event)}
+          onChanges={(event) => void readFront(event)}
+        />
         {card.costUsd !== null && card.costUsd > 0 && (
           <span className="card__cost">${card.costUsd.toFixed(4)}</span>
         )}
@@ -165,6 +167,13 @@ export function CardTile({
           onProblem={onProblem}
           onClose={() => setEditing(false)}
         />
+      )}
+
+      {sent !== null && (
+        <div className="card__sent">
+          <code>{sent}</code> is running in the terminal. A folder the agent has
+          not seen before asks you to trust it first.
+        </div>
       )}
 
       {running !== null && progress !== '' && (

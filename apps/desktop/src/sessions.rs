@@ -623,10 +623,16 @@ pub fn terminal_attach_agent(
         .session_link(&card_id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this card has no session yet"))?;
 
-    let (tree, focused) = store
-        .pane_layout(&project_id)?
-        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this project has no terminal yet"))?;
-    let layout = decode(&project_id, &tree, &focused)?;
+    // The terminal is made if it is not there yet. Refusing because nobody has
+    // opened one is refusing over a step the product can take itself — and the
+    // person clicking this on a card is asking for exactly that terminal.
+    let layout = match store.pane_layout(&project_id)? {
+        Some((tree, focused)) => decode(&project_id, &tree, &focused)?,
+        None => {
+            let cwd = locate_cwd(&project_id, None)?;
+            load_or_create(&project_id, &cwd)?
+        }
+    };
 
     let session = quockpit_tmux::Server::session_name(&project_id);
     let target = quockpit_tmux::Server::target(&session, &layout.focused_id);

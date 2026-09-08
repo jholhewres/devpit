@@ -9,4 +9,5 @@ license.workspace = true
 thiserror = "2.0.20"
 
 [dev-dependencies]
+quockpit-agentcli = { path = "../agentcli" }
 tempfile = "3.27.0"

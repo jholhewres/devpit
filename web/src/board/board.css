@@ -400,3 +400,15 @@
 .card__session--done {
   color: var(--ink-verified, #6a9);
 }
+
+.card__sent {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--edge);
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.card__sent code {
+  font-family: var(--mono, monospace);
+}
