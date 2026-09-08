@@ -101,42 +101,6 @@
   color: var(--ink);
 }
 
-/* Bars and not dots: at this width a dot is a speck, and a bar shows how much
-   of the flow is behind you rather than only which stop you are at. */
-.onboarding__progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  padding: 22px 30px 0;
-}
-
-.onboarding__bar {
-  height: 3px;
-  width: 44px;
-  border-radius: 999px;
-  background: var(--line-strong);
-  transition:
-    background-color var(--medium) var(--ease),
-    width var(--medium) var(--ease);
-}
-
-.onboarding__bar[data-state='done'] {
-  background: var(--sev-verified);
-}
-
-.onboarding__bar[data-state='here'] {
-  width: 68px;
-  background: var(--accent);
-}
-
-.onboarding__step-of {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-faint);
-}
-
 /* ── Step body ────────────────────────────────────────────────────────── */
 
 @keyframes step-in {
@@ -577,52 +541,6 @@
   cursor: default;
 }
 
-/* ── Footer ───────────────────────────────────────────────────────────── */
-
-.onboarding__foot {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  height: 58px;
-  padding: 0 22px;
-  border-top: 1px solid var(--line);
-  background: var(--ground);
-}
-
-.onboarding__back {
-  border: 0;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-dim);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  transition:
-    color var(--fast) var(--ease),
-    background-color var(--fast) var(--ease),
-    opacity var(--fast) var(--ease);
-}
-
-.onboarding__back:hover:not(:disabled) {
-  background: var(--raised);
-  color: var(--ink);
-}
-
-.onboarding__back:disabled {
-  opacity: 0;
-  cursor: default;
-}
-
-.onboarding__foot-spacer {
-  flex: 1;
-}
-
-.onboarding__where {
-  font-size: 14px;
-  color: var(--ink-faint);
-}
-
 /* A narrow window is still a window someone works in. The columns stack and
    the type steps down, rather than the card gaining a horizontal scrollbar. */
 /*
@@ -645,16 +563,5 @@
 
   .step__said {
     max-width: none;
-  }
-
-  .onboarding__head,
-  .onboarding__progress,
-  .onboarding__body {
-    padding-left: 22px;
-    padding-right: 22px;
-  }
-
-  .onboarding__foot {
-    padding: 0 16px;
   }
 }

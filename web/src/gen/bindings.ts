@@ -64,6 +64,7 @@ export const commands = {
 	 *  asking a question it cannot phrase.
 	 */
 	columnDelete: (projectId: string, columnId: string) => typedError<ColumnDeleted, RpcError>(__TAURI_INVOKE("column_delete", { projectId, columnId })),
+	/**  `column.set_step` — what this lane runs, or nothing. */
 	columnSetStep: (projectId: string, columnId: string, stepId: string | null) => typedError<Board, RpcError>(__TAURI_INVOKE("column_set_step", { projectId, columnId, stepId })),
 	cardCreate: (projectId: string, columnId: string, title: string, body: string) => typedError<Card, RpcError>(__TAURI_INVOKE("card_create", { projectId, columnId, title, body })),
 	cardUpdate: (projectId: string, cardId: string, title: string, body: string) => typedError<Card, RpcError>(__TAURI_INVOKE("card_update", { projectId, cardId, title, body })),

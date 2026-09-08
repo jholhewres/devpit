@@ -3,7 +3,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod board;
+mod columns;
 mod commands;
+// Only ever compiled where it is used. The contract exists to generate the
+// frontend's types — in a release build nothing calls it, and a module dead in
+// release should say so rather than warn about it on every build.
+#[cfg(any(debug_assertions, test))]
 mod contract;
 mod front;
 mod projects;
@@ -53,17 +58,17 @@ fn main() {
             projects::project_notes,
             projects::project_note_add,
             board::board_get,
-            board::column_create,
-            board::column_rename,
-            board::column_reorder,
-            board::column_delete,
-            board::column_set_step,
+            columns::column_create,
+            columns::column_rename,
+            columns::column_reorder,
+            columns::column_delete,
+            columns::column_set_step,
             board::card_create,
             board::card_update,
             board::card_move,
             front::card_archive,
             front::card_diff,
-            board::step_create,
+            columns::step_create,
             sessions::terminal_attach_agent,
             sessions::session_ensure,
             sessions::session_layout,

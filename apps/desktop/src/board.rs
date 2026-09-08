@@ -7,8 +7,7 @@
 
 use quockpit_core::Store;
 use quockpit_rpc::{
-    Board, Card, CardChanged, Column, ColumnDeleted, ErrorCode, RpcError, Run, RunState, Step,
-    StepKind,
+    Board, Card, CardChanged, Column, ErrorCode, RpcError, Run, RunState, Step, StepKind,
 };
 use tauri::AppHandle;
 
@@ -123,61 +122,6 @@ pub fn board_get(project_id: String) -> Result<Board, RpcError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn column_create(project_id: String, name: String) -> Result<Board, RpcError> {
-    let store = store()?;
-    let position = store.columns(&project_id)?.len() as i64;
-    store.create_column(&project_id, &name, position)?;
-    board_get(project_id)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn column_rename(
-    project_id: String,
-    column_id: String,
-    name: String,
-) -> Result<Board, RpcError> {
-    store()?.rename_column(&column_id, &name)?;
-    board_get(project_id)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn column_reorder(project_id: String, ids: Vec<String>) -> Result<Board, RpcError> {
-    store()?.reorder_columns(&project_id, &ids)?;
-    board_get(project_id)
-}
-
-/// `column.delete` — refuses while cards are in it, and says how many.
-///
-/// Refusing is the answer, but a refusal without the number leaves the screen
-/// asking a question it cannot phrase.
-#[tauri::command]
-#[specta::specta]
-pub fn column_delete(project_id: String, column_id: String) -> Result<ColumnDeleted, RpcError> {
-    let store = store()?;
-    let in_the_way = store
-        .cards(&project_id)?
-        .into_iter()
-        .filter(|card| card.column_id == column_id)
-        .count() as u32;
-
-    if in_the_way > 0 {
-        return Ok(ColumnDeleted {
-            deleted: false,
-            cards_in_the_way: in_the_way,
-        });
-    }
-
-    store.delete_column(&column_id)?;
-    Ok(ColumnDeleted {
-        deleted: true,
-        cards_in_the_way: 0,
-    })
-}
-
-#[tauri::command]
-#[specta::specta]
 pub fn card_create(
     project_id: String,
     column_id: String,
@@ -202,6 +146,21 @@ pub fn card_update(
     store.update_card(&card_id, &title, &body)?;
     let steps = steps_of(&store, &project_id)?;
     card_of(&store, &card_id, &steps)
+}
+
+/// What a card landing on a column sets off, if anything.
+///
+/// The rule the whole product turns on, kept as a function of its own so it
+/// can be read and tested without a window: a column with no step runs
+/// nothing, and an irreversible one runs nothing until someone says so.
+fn what_runs(step: Option<&Step>, confirmed: bool) -> Option<&Step> {
+    match step {
+        // No step on this column: moving the card is all that happened.
+        None => None,
+        // Irreversible and unconfirmed: the move stands, the work does not.
+        Some(step) if step.irreversible && !confirmed => None,
+        Some(step) => Some(step),
+    }
 }
 
 /// `card.move` — and the only place a step is ever started.
@@ -249,16 +208,13 @@ pub fn card_move(
         .and_then(|column| column.step_id)
         .and_then(|id| steps.iter().find(|s| s.id == id).cloned());
 
-    let started = match step {
-        // No step on this column: moving the card is all that happened.
+    let started = match what_runs(step.as_ref(), confirmed) {
         None => None,
-        // Irreversible and unconfirmed: the move stands, the work does not.
-        Some(step) if step.irreversible && !confirmed => None,
         Some(step) => Some(crate::runs::start(
             app,
             &store,
             &card_id,
-            &step,
+            step,
             came_from.as_deref(),
         )?),
     };
@@ -269,27 +225,6 @@ pub fn card_move(
     })
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn step_create(
-    project_id: String,
-    kind: String,
-    name: String,
-    config: String,
-    irreversible: bool,
-) -> Result<Board, RpcError> {
-    let store = store()?;
-    store.create_step(&project_id, &kind, &name, &config, irreversible)?;
-    board_get(project_id)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn column_set_step(
-    project_id: String,
-    column_id: String,
-    step_id: Option<String>,
-) -> Result<Board, RpcError> {
-    store()?.set_column_step(&column_id, step_id.as_deref())?;
-    board_get(project_id)
-}
+#[cfg(test)]
+#[path = "board_tests.rs"]
+mod tests;

@@ -35,8 +35,7 @@
   "bundle": {
     "active": true,
     "targets": [
-      "deb",
-      "appimage"
+      "deb"
     ],
     "icon": [
       "icons/icon.png"

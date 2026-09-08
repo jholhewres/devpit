@@ -4,7 +4,7 @@
 # does a ceiling above what the file needs. Regenerate with `cargo xtask ceilings`
 # once a file has actually got shorter.
 
-apps/desktop/src/board.rs 295
+apps/desktop/src/board.rs 230
 apps/desktop/src/projects.rs 412
 apps/desktop/src/sessions.rs 638
 apps/desktop/src/steps/mod.rs 144

@@ -22,6 +22,12 @@ dev: node_modules ## Run the app with hot reload
 build: node_modules ## Bundle a release binary, frontend included
 	$(TAURI) build
 
+# A .deb only. The AppImage bundler downloads linuxdeploy and its plugins at
+# bundle time, so a build that includes it needs the network and fails behind
+# anything that blocks those hosts. Ask for it explicitly when you want one:
+#
+#     ./node_modules/.bin/tauri build --bundles appimage
+
 test: node_modules ## Everything CI runs: guards, Rust, frontend
 	cargo fmt --all --check
 	cargo xtask check

@@ -40,3 +40,7 @@ jobs:
       # how CI and the Makefile drift apart.
       - run: make setup
       - run: make test
+
+      # `make test` builds in debug, so a module gated wrong for release
+      # compiles there and fails only when someone ships. It did once.
+      - run: make build
