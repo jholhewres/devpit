@@ -6,7 +6,7 @@
 
 use tauri_specta::{collect_commands, Builder};
 
-use crate::{board, columns, commands, front, projects, sessions, settings};
+use crate::{board, columns, commands, front, projects, sessions, settings, steps};
 
 /// Where the generated TypeScript lands.
 ///
@@ -45,6 +45,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         front::card_archive,
         front::card_diff,
         columns::step_create,
+        steps::agents_list,
         sessions::terminal_attach_agent,
         sessions::session_ensure,
         sessions::session_layout,

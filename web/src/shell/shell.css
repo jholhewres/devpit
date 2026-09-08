@@ -1359,3 +1359,9 @@
 .icon-button[data-active='true'] {
   color: var(--ink-dim);
 }
+
+.sidebar__add-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}

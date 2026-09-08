@@ -133,14 +133,18 @@ pub fn project_add(root_path: String) -> Result<Project, RpcError> {
 
 /// `project.clone` — clones a remote and registers where it landed.
 ///
-/// Into `~/.quockpit/repos/` rather than somewhere the person has to
-/// choose: at the moment they are deciding *whether* to add a project, asking
-/// them *where* is a question with no information behind it. Moving it later
-/// is a `git worktree` away, and the path is shown before the clone runs.
+/// `into` is the parent folder, and it is optional: someone deciding *whether*
+/// to add a project should not be stopped to answer *where*. Left out, it goes
+/// to `~/.quockpit/repos/`, and the path is shown before the clone runs.
 #[tauri::command]
 #[specta::specta]
-pub fn project_clone(url: String) -> Result<Project, RpcError> {
-    let parent = Store::root()?.join("repos");
+pub fn project_clone(url: String, into: Option<String>) -> Result<Project, RpcError> {
+    // Somewhere of their choosing when they chose one. The app's own folder is
+    // the answer to "I do not want to decide", not a place to be put.
+    let parent = match into.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
+        Some(chosen) => std::path::PathBuf::from(chosen),
+        None => Store::root()?.join("repos"),
+    };
 
     let into = quockpit_git::clone(url.trim(), &parent).map_err(|err| match err {
         quockpit_git::GitError::Missing => RpcError::new(ErrorCode::Unsupported, err.to_string()),

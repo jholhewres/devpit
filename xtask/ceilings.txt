@@ -6,7 +6,9 @@
 
 apps/desktop/src/board.rs 300
 apps/desktop/src/projects.rs 450
+apps/desktop/src/runs.rs 150
 apps/desktop/src/sessions.rs 650
+apps/desktop/src/steps/agent.rs 200
 apps/desktop/src/steps/mod.rs 150
 crates/agentcli/src/catalogue.rs 400
 crates/agentcli/src/headless.rs 300

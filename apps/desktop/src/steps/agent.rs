@@ -29,7 +29,12 @@ struct AgentConfig {
     sends_back_when: Option<String>,
 }
 
-pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String> {
+pub fn run(
+    store: &Store,
+    card_id: &str,
+    step: &Step,
+    mut on_progress: impl FnMut(&str),
+) -> Result<Finished, String> {
     let config: AgentConfig = serde_json::from_str(&step.config)
         .map_err(|err| format!("this step's config is not readable: {err}"))?;
 
@@ -67,7 +72,14 @@ pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String
             budget_usd: config.budget_usd,
             model: config.model.as_deref(),
         },
-        |_| {},
+        |line| {
+            // Only the assistant's own words. The stream also carries hook
+            // chatter and rate-limit notices, and a card relaying those reads
+            // as the agent talking about the machinery rather than the work.
+            if let Some(text) = assistant_text(line) {
+                on_progress(&text);
+            }
+        },
     )
     .map_err(|err| err.to_string())?;
 
@@ -95,4 +107,60 @@ pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String
         duration_ms: outcome.duration_ms,
         exit_code: None,
     })
+}
+
+/// The words an assistant fragment carries, if it carries any.
+///
+/// The stream interleaves hook events, init and rate-limit notices with the
+/// answer. Relaying all of it would make a card show the machinery instead of
+/// the work.
+fn assistant_text(line: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(line).ok()?;
+    if value.get("type")?.as_str()? != "assistant" {
+        return None;
+    }
+    let blocks = value.get("message")?.get("content")?.as_array()?;
+    let text: String = blocks
+        .iter()
+        .filter(|block| block.get("type").and_then(|t| t.as_str()) == Some("text"))
+        .filter_map(|block| block.get("text").and_then(|t| t.as_str()))
+        .collect::<Vec<_>>()
+        .join("");
+    (!text.trim().is_empty()).then_some(text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_assistant_fragment_yields_its_words() {
+        let line = r#"{"type":"assistant","message":{"content":[
+            {"type":"text","text":"Looking at the parser"}]}}"#;
+        assert_eq!(
+            assistant_text(line).as_deref(),
+            Some("Looking at the parser")
+        );
+    }
+
+    /// Thinking blocks and tool calls are not words to show.
+    #[test]
+    fn a_fragment_with_no_text_yields_nothing() {
+        let line = r#"{"type":"assistant","message":{"content":[
+            {"type":"thinking","thinking":"..."}]}}"#;
+        assert_eq!(assistant_text(line), None);
+    }
+
+    /// The machinery is not the work.
+    #[test]
+    fn the_other_lines_are_not_relayed() {
+        for line in [
+            r#"{"type":"system","subtype":"init"}"#,
+            r#"{"type":"rate_limit_event"}"#,
+            r#"{"type":"result","result":"done"}"#,
+            "not json at all",
+        ] {
+            assert_eq!(assistant_text(line), None, "{line}");
+        }
+    }
 }

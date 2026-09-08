@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { commands } from '../gen/bindings'
 import { messageOf } from '../project/load'
+import { open } from '@tauri-apps/plugin-dialog'
 import { FolderGlyph } from '../shell/glyphs'
 
 /**
@@ -27,6 +28,7 @@ export function ProjectStep({ onAdded }: { onAdded: () => void }): React.JSX.Ele
   const [url, setUrl] = useState('')
   const [failure, setFailure] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [into, setInto] = useState('')
 
   const run = async (call: Promise<{ status: 'ok' } | { status: 'error'; error: { message: string } }>) => {
     setBusy(true)
@@ -47,11 +49,25 @@ export function ProjectStep({ onAdded }: { onAdded: () => void }): React.JSX.Ele
 
   const name = folderFor(url)
 
+  /**
+   * Picks a folder, and puts it wherever the caller asked.
+   *
+   * A cancelled dialog answers null, and null is not an error — it is someone
+   * changing their mind, which needs no message.
+   */
+  const pick = async (title: string, put: (path: string) => void): Promise<void> => {
+    try {
+      const chosen = await open({ directory: true, multiple: false, title })
+      if (typeof chosen === 'string') put(chosen)
+    } catch (thrown) {
+      setFailure(messageOf(thrown))
+    }
+  }
+
   return (
     <div className="step">
       <div className="step__said">
-        <p className="step__eyebrow">Step four</p>
-        <h1 className="step__title">Add your first project</h1>
+        <h1 className="step__title">Add a project</h1>
         <p className="step__lead">
           The project is the unit — its checkouts, files and notes belong to it and travel
           with it.
@@ -102,14 +118,11 @@ export function ProjectStep({ onAdded }: { onAdded: () => void }): React.JSX.Ele
                 value={path}
                 onChange={(event) => setPath(event.target.value)}
               />
-              {/* Drawn and disabled rather than absent: the picker is the
-                  obvious control, and hiding it would make typing a path look
-                  like the only way this ever works. */}
               <button
                 type="button"
                 className="source__browse"
-                title="A folder picker is not wired in this build"
-                disabled
+                title="Choose a folder"
+                onClick={() => void pick('Choose the repository', setPath)}
               >
                 <FolderGlyph />
               </button>
@@ -134,7 +147,7 @@ export function ProjectStep({ onAdded }: { onAdded: () => void }): React.JSX.Ele
               className="step__form"
               onSubmit={(event) => {
                 event.preventDefault()
-                if (url.trim()) void run(commands.projectClone(url.trim()))
+                if (url.trim()) void run(commands.projectClone(url.trim(), into || null))
               }}
             >
               <input
@@ -157,7 +170,24 @@ export function ProjectStep({ onAdded }: { onAdded: () => void }): React.JSX.Ele
             {/* Where it will land, before it lands there. A destination
                 discovered afterwards is a folder someone goes looking for. */}
             <p className="source__into">
-              Clones into <em>~/.quockpit/repos/{name || '…'}</em>
+              Clones into <em>{(into || '~/.quockpit/repos') + '/' + (name || '…')}</em>
+              <button
+                type="button"
+                className="source__browse source__browse--inline"
+                title="Choose where to clone it"
+                onClick={() => void pick('Choose where to clone it', setInto)}
+              >
+                <FolderGlyph />
+              </button>
+              {into !== '' && (
+                <button
+                  type="button"
+                  className="source__reset"
+                  onClick={() => setInto('')}
+                >
+                  use the default
+                </button>
+              )}
             </p>
           </div>
         )}

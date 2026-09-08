@@ -23,12 +23,11 @@ export const commands = {
 	/**
 	 *  `project.clone` — clones a remote and registers where it landed.
 	 * 
-	 *  Into `~/.quockpit/repos/` rather than somewhere the person has to
-	 *  choose: at the moment they are deciding *whether* to add a project, asking
-	 *  them *where* is a question with no information behind it. Moving it later
-	 *  is a `git worktree` away, and the path is shown before the clone runs.
+	 *  `into` is the parent folder, and it is optional: someone deciding *whether*
+	 *  to add a project should not be stopped to answer *where*. Left out, it goes
+	 *  to `~/.quockpit/repos/`, and the path is shown before the clone runs.
 	 */
-	projectClone: (url: string) => typedError<Project, RpcError>(__TAURI_INVOKE("project_clone", { url })),
+	projectClone: (url: string, into: string | null) => typedError<Project, RpcError>(__TAURI_INVOKE("project_clone", { url, into })),
 	/**
 	 *  `project.open` — records that this is the project being worked in.
 	 * 
@@ -91,6 +90,15 @@ export const commands = {
 	cardDiff: (cardId: string) => typedError<Front, RpcError>(__TAURI_INVOKE("card_diff", { cardId })),
 	stepCreate: (projectId: string, kind: string, name: string, config: string, irreversible: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("step_create", { projectId, kind, name, config, irreversible })),
 	/**
+	 *  `agents.list` — the agents on this machine, and the files that would not
+	 *  load.
+	 * 
+	 *  The step picker needs the names: a step stores an agent by the name in its
+	 *  frontmatter, and a free-text field over twenty-eight files on disk is a
+	 *  typo waiting to fail at the moment the step runs.
+	 */
+	agentsList: () => typedError<Agents, RpcError>(__TAURI_INVOKE("agents_list")),
+	/**
 	 *  `terminal.attach_agent` — brings a card's session into the target terminal.
 	 * 
 	 *  This is the rule the product turns on: one target terminal per project, and
@@ -136,8 +144,30 @@ export const commands = {
 };
 
 /* Types */
+/**  An agent on this machine, as the step picker needs it. */
+export type Agent = {
+	/**  The name in the file's frontmatter — what a step stores. */
+	name: string,
+	description: string,
+	model: string | null,
+};
+
 /**  Who is running in the leaf. `none` is a plain shell. */
 export type AgentPresence = "none";
+
+/**
+ *  Response of `agents.list`.
+ * 
+ *  The files that would not load come back too, by name. A step pointing at an
+ *  agent that is silently missing fails at the moment it runs, which is the
+ *  worst time to find out it was a typo.
+ */
+export type Agents = {
+	agents: Agent[],
+	rejected: RejectedAgent[],
+	/**  Where they live, so the screen can say where to put another one. */
+	directory: string,
+};
 
 /**  Response of `app.health`. */
 export type AppHealth = {
@@ -378,6 +408,11 @@ export type ProjectNotes = {
 
 export type ProjectTree = {
 	nodes: FileNode[],
+};
+
+export type RejectedAgent = {
+	file: string,
+	reason: string,
 };
 
 export type RpcError = {

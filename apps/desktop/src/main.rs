@@ -43,6 +43,7 @@ fn main() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(sessions::SessionState::new())
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
@@ -69,6 +70,7 @@ fn main() {
             front::card_archive,
             front::card_diff,
             columns::step_create,
+            steps::agents_list,
             sessions::terminal_attach_agent,
             sessions::session_ensure,
             sessions::session_layout,

@@ -368,3 +368,25 @@
   opacity: 0.45;
   cursor: default;
 }
+
+.picker__hint {
+  color: var(--ink-muted);
+  opacity: 0.8;
+}
+
+/* What the agent is saying while it works. Muted, and capped: a card is a
+   card, not a log window — the whole output lands on the run when it ends. */
+.card__progress {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--edge);
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+  max-height: 7em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+}

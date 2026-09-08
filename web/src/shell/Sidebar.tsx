@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Project } from '../gen/bindings'
 import { currentWorktree } from '../project/surface'
 import type { SurfaceId } from '../project/surface'
+import { AddProject } from './AddProject'
 import {
   CanvasGlyph,
   ChevronGlyph,
@@ -235,14 +236,6 @@ export function Sidebar({
     ? projects.filter((project) => project.name.toLowerCase().includes(needle))
     : projects
 
-  const submit = (event: React.FormEvent): void => {
-    event.preventDefault()
-    const trimmed = path.trim()
-    if (!trimmed) return
-    onAddProject(trimmed)
-    setPath('')
-  }
-
   return (
     <aside className="sidebar">
       {/* Shares the window's top edge with the tab strip, so it drags too —
@@ -267,18 +260,12 @@ export function Sidebar({
       </div>
 
       {addOpen ? (
-        <form className="sidebar__add" onSubmit={submit}>
-          <input
-            className="find"
-            type="text"
-            placeholder="~/code/my-repo, then Enter"
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-          />
-          {/* The failure is shown where the attempt was made. A toast that
-              disappears is a message nobody gets to read twice. */}
-          {addFailure ? <p className="sidebar__add-failure">{addFailure}</p> : null}
-        </form>
+        <AddProject
+          path={path}
+          failure={addFailure}
+          onPath={setPath}
+          onAdd={onAddProject}
+        />
       ) : null}
 
       <div className="sidebar__find">

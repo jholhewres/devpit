@@ -52,7 +52,15 @@ pub fn start(
         };
 
         let outcome = match step.kind {
-            StepKind::Agent => steps::agent::run(&store, &card, &step),
+            StepKind::Agent => {
+                let progress = app.clone();
+                let run = id.clone();
+                steps::agent::run(&store, &card, &step, |text| {
+                    // The card shows work as it happens rather than a spinner
+                    // that ends in a wall of text.
+                    let _ = progress.emit("run:progress", (run.clone(), text.to_owned()));
+                })
+            }
             StepKind::Session => steps::session::start(&store, &card, &step),
             StepKind::Command => steps::command::run(&store, &card, &step),
         };

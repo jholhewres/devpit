@@ -22,6 +22,7 @@ tauri = { version = "2", features = [] }
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
 ulid = "3.0.0"
+tauri-plugin-dialog = "2.7.3"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

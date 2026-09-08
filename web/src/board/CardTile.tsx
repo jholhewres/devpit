@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { commands } from '../gen/bindings'
 import type { Board, Card, Front, Run } from '../gen/bindings'
 import { CardFront } from './CardFront'
@@ -40,6 +41,27 @@ export function CardTile({
   const [front, setFront] = useState<Front | null>(null)
   const [editing, setEditing] = useState(false)
   const [shown, setShown] = useState(card)
+  const [progress, setProgress] = useState('')
+
+  const running = card.runs.find((run) => run.state === 'running') ?? null
+  const runningId = running?.id ?? null
+
+  // What the agent is saying while it works. Kept only for the run in flight:
+  // once it lands, the output on the run is the record, and holding both would
+  // show the same words twice.
+  useEffect(() => {
+    if (runningId === null) {
+      setProgress('')
+      return
+    }
+    const stop = listen<[string, string]>('run:progress', (event) => {
+      const [id, text] = event.payload
+      if (id === runningId) setProgress((before) => (before + text).slice(-2000))
+    })
+    return () => {
+      void stop.then((unlisten) => unlisten())
+    }
+  }, [runningId])
 
   /**
    * What this line of work changed, against where it began.
@@ -139,6 +161,10 @@ export function CardTile({
           onProblem={onProblem}
           onClose={() => setEditing(false)}
         />
+      )}
+
+      {running !== null && progress !== '' && (
+        <div className="card__progress">{progress}</div>
       )}
 
       {front !== null && <CardFront front={front} />}

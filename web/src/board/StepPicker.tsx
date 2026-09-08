@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { commands } from '../gen/bindings'
-import type { Board, Column, Step } from '../gen/bindings'
+import type { Agents, Board, Column, Step } from '../gen/bindings'
 
 /**
  * What a column runs, chosen or written here.
@@ -30,6 +30,17 @@ export function StepPicker({
   const [agent, setAgent] = useState('')
   const [prompt, setPrompt] = useState('')
   const [irreversible, setIrreversible] = useState(false)
+  const [catalogue, setCatalogue] = useState<Agents | null>(null)
+
+  // Read when the picker opens rather than with the board: a file dropped into
+  // the directory while the app is running shows up the next time you look,
+  // which is the whole promise of agents being files.
+  useEffect(() => {
+    void commands.agentsList().then((answer) => {
+      if (answer.status === 'ok') setCatalogue(answer.data)
+      else onProblem(answer.error.message)
+    })
+  }, [onProblem])
 
   const answer = async (call: Promise<unknown>): Promise<void> => {
     const result = (await call) as { status: string; data?: Board; error?: { message: string } }
@@ -86,11 +97,27 @@ export function StepPicker({
           />
         ) : (
           <>
-            <input
-              placeholder="agent, by the name in its frontmatter"
-              value={agent}
-              onChange={(e) => setAgent(e.target.value)}
-            />
+            <select value={agent} onChange={(e) => setAgent(e.target.value)}>
+              <option value="">no agent — just the prompt</option>
+              {(catalogue?.agents ?? []).map((one) => (
+                <option key={one.name} value={one.name} title={one.description}>
+                  {one.name}
+                </option>
+              ))}
+            </select>
+            {catalogue !== null && catalogue.agents.length === 0 && (
+              <span className="picker__hint">
+                No agents in {catalogue.directory}. Drop a markdown file with
+                frontmatter there.
+              </span>
+            )}
+            {(catalogue?.rejected.length ?? 0) > 0 && (
+              // Named rather than counted: a file that will not load is a file
+              // someone has to open, and the name is what opens it.
+              <span className="picker__warn">
+                {catalogue?.rejected.map((one) => `${one.file}: ${one.reason}`).join('; ')}
+              </span>
+            )}
             <input
               placeholder="what to ask it"
               value={prompt}
