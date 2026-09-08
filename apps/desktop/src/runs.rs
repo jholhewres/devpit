@@ -15,10 +15,13 @@
 //! reason on it, and the next move is a person's.
 
 use quockpit_agentcli as agent;
+use std::sync::Arc;
+
 use quockpit_core::Store;
 use quockpit_rpc::{RpcError, Run, RunState, Step, StepKind};
 use tauri::{AppHandle, Emitter};
 
+use crate::in_flight::InFlight;
 use crate::steps;
 
 /// Runs a step against a card, and returns the run it opened.
@@ -29,6 +32,7 @@ use crate::steps;
 /// a review nobody acts on.
 pub fn start(
     app: AppHandle,
+    in_flight: Arc<InFlight>,
     store: &Store,
     card_id: &str,
     step: &Step,
@@ -55,11 +59,19 @@ pub fn start(
             StepKind::Agent => {
                 let progress = app.clone();
                 let run = id.clone();
-                steps::agent::run(&store, &card, &step, |text| {
-                    // The card shows work as it happens rather than a spinner
-                    // that ends in a wall of text.
-                    let _ = progress.emit("run:progress", (run.clone(), text.to_owned()));
-                })
+                let watching = Arc::clone(&in_flight);
+                let watched = id.clone();
+                steps::agent::run(
+                    &store,
+                    &card,
+                    &step,
+                    |text| {
+                        // The card shows work as it happens rather than a
+                        // spinner that ends in a wall of text.
+                        let _ = progress.emit("run:progress", (run.clone(), text.to_owned()));
+                    },
+                    |pid| watching.watch(&watched, pid),
+                )
             }
             StepKind::Session => steps::session::start(&store, &card, &step),
             StepKind::Command => steps::command::run(&store, &card, &step),
@@ -86,6 +98,7 @@ pub fn start(
         if let Err(err) = closed {
             eprintln!("could not record the end of run {id}: {err}");
         }
+        in_flight.forget(&id);
 
         // The verdict is the only thing in the product that moves a card on
         // its own, and it only ever moves it backwards.

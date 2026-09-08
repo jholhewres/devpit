@@ -10,7 +10,9 @@ use quockpit_rpc::{
     Board, Card, CardChanged, Column, ErrorCode, RpcError, Run, RunState, Session, SessionStatus,
     Step, StepKind,
 };
-use tauri::AppHandle;
+use std::sync::Arc;
+
+use tauri::{AppHandle, State};
 
 fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -219,6 +221,7 @@ fn what_runs(step: Option<&Step>, confirmed: bool) -> Option<&Step> {
 #[tauri::command]
 #[specta::specta]
 pub fn card_move(
+    in_flight: State<Arc<crate::in_flight::InFlight>>,
     app: AppHandle,
     project_id: String,
     card_id: String,
@@ -234,11 +237,11 @@ pub fn card_move(
 
     // A run still going is work in flight. Moving the card out from under it
     // is allowed, but only on purpose.
-    let in_flight = store
+    let still_running = store
         .runs(&card_id)?
         .iter()
         .any(|run| run.state == "running");
-    if in_flight && !confirmed {
+    if still_running && !confirmed {
         return Err(RpcError::new(
             ErrorCode::Conflict,
             "a run is still going on this card — move it anyway?",
@@ -261,6 +264,7 @@ pub fn card_move(
         None => None,
         Some(step) => Some(crate::runs::start(
             app,
+            Arc::clone(&in_flight),
             &store,
             &card_id,
             step,

@@ -34,6 +34,7 @@ pub fn run(
     card_id: &str,
     step: &Step,
     mut on_progress: impl FnMut(&str),
+    on_start: impl FnMut(u32),
 ) -> Result<Finished, String> {
     let config: AgentConfig = serde_json::from_str(&step.config)
         .map_err(|err| format!("this step's config is not readable: {err}"))?;
@@ -67,7 +68,7 @@ pub fn run(
     // so a turn tells the board what it is doing while it does it.
     let settings = super::hook_settings();
 
-    let outcome = agent::run_turn(
+    let outcome = agent::run_turn_cancellable(
         &agent::Turn {
             prompt: &prompt,
             cwd: &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
@@ -85,6 +86,7 @@ pub fn run(
                 on_progress(&text);
             }
         },
+        on_start,
     )
     .map_err(|err| err.to_string())?;
 

@@ -120,7 +120,8 @@ fn a_card_and_a_step_produce_a_real_answer() {
     };
 
     let mut streamed = 0;
-    let finished = agent::run(&store, &card, &step, |_| streamed += 1).expect("the step ran");
+    let finished =
+        agent::run(&store, &card, &step, |_| streamed += 1, |_| {}).expect("the step ran");
 
     assert!(finished.ok, "the step failed: {}", finished.output);
     assert!(

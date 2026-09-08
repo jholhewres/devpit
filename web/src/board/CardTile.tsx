@@ -21,7 +21,8 @@ export function CardTile({
   onToggle,
   onDragStart,
   onDragEnd,
-  onProblem
+  onProblem,
+  onBoardStale
 }: {
   card: Card
   projectId: string
@@ -31,6 +32,7 @@ export function CardTile({
   onDragStart: () => void
   onDragEnd: () => void
   onProblem: (message: string) => void
+  onBoardStale: () => void
 }): React.JSX.Element {
   /**
    * Brings this card's session into the target terminal.
@@ -172,7 +174,13 @@ export function CardTile({
       {expanded && card.runs.length > 0 && (
         <ol className="card__history">
           {card.runs.map((run: Run) => (
-            <RunLine key={run.id} run={run} />
+            <RunLine
+              key={run.id}
+              run={run}
+              cardId={card.id}
+              onProblem={onProblem}
+              onStopped={onBoardStale}
+            />
           ))}
         </ol>
       )}

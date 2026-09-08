@@ -70,7 +70,21 @@ enum Line {
 /// card can show work in progress rather than a spinner. A turn that produces
 /// no `result` line is a failure with the stderr attached: it means the CLI
 /// died rather than answered.
-pub fn run_turn(turn: &Turn<'_>, mut on_partial: impl FnMut(&str)) -> Result<Outcome, AgentError> {
+pub fn run_turn(turn: &Turn<'_>, on_partial: impl FnMut(&str)) -> Result<Outcome, AgentError> {
+    run_turn_cancellable(turn, on_partial, |_| {})
+}
+
+/// The same, handing the caller a way to stop it.
+///
+/// `on_start` is given the process id the moment the turn begins. Without it a
+/// turn that hangs is a run stuck at `running` for the life of the app, and a
+/// card stuck behind it — a step you cannot stop is a step you learn not to
+/// start.
+pub fn run_turn_cancellable(
+    turn: &Turn<'_>,
+    mut on_partial: impl FnMut(&str),
+    mut on_start: impl FnMut(u32),
+) -> Result<Outcome, AgentError> {
     let argv = headless_argv(
         turn.agents,
         turn.schema,
@@ -86,6 +100,8 @@ pub fn run_turn(turn: &Turn<'_>, mut on_partial: impl FnMut(&str)) -> Result<Out
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|_| AgentError::NotInstalled)?;
+
+    on_start(child.id());
 
     {
         let mut stdin = child.stdin.take().ok_or(AgentError::NotInstalled)?;

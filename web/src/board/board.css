@@ -423,3 +423,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.run__stop {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 10px;
+  color: var(--ink-warn, #c96);
+  cursor: pointer;
+  text-decoration: underline;
+}

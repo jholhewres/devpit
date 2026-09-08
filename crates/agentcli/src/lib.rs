@@ -23,7 +23,7 @@ mod transcript;
 pub use catalogue::{
     as_argument, read as read_agents, seed as seed_agents, Agent, Catalogue, Rejected,
 };
-pub use headless::{run_turn, validates, Outcome, Turn};
+pub use headless::{run_turn, run_turn_cancellable, validates, Outcome, Turn};
 pub use hooks::{endpoint_file, read as read_hook, settings_json, Event, Happening};
 // `start_background` and the argv builders live in this module.
 pub use session::{AgentSession, Kind, Status};

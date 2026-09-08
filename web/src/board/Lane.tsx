@@ -24,7 +24,8 @@ export function Lane({
   onOpenCard,
   onDragCard,
   onBoard,
-  onProblem
+  onProblem,
+  onBoardStale
 }: {
   projectId: string
   column: Column
@@ -42,6 +43,7 @@ export function Lane({
   onDragCard: (cardId: string | null) => void
   onBoard: (board: Board) => void
   onProblem: (message: string) => void
+  onBoardStale: () => void
 }): React.JSX.Element {
   return (
         <section
@@ -102,6 +104,7 @@ export function Lane({
                 projectId={projectId}
                 onBoard={onBoard}
                 onProblem={onProblem}
+                onBoardStale={onBoardStale}
                 expanded={openCard === card.id}
                 onToggle={() => onOpenCard(openCard === card.id ? null : card.id)}
                 onDragStart={() => onDragCard(card.id)}

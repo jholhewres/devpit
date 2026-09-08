@@ -179,6 +179,7 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
             onDragCard={setDragging}
             onBoard={setBoard}
             onProblem={setProblem}
+            onBoardStale={() => void read()}
           />
         ))}
 

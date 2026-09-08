@@ -12,6 +12,7 @@ mod commands;
 mod contract;
 mod files;
 mod front;
+mod in_flight;
 mod listener;
 mod projects;
 mod pty_bridge;
@@ -56,6 +57,7 @@ fn main() {
             Ok(())
         })
         .manage(sessions::SessionState::new())
+        .manage(std::sync::Arc::new(in_flight::InFlight::new()))
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::app_health,
@@ -80,6 +82,7 @@ fn main() {
             board::card_move,
             files::file_read,
             files::file_write,
+            in_flight::run_cancel,
             front::card_archive,
             front::card_diff,
             columns::step_create,

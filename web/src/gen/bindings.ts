@@ -85,6 +85,14 @@ export const commands = {
 	 */
 	fileWrite: (projectId: string, worktreeId: string | null, path: string, text: string, readAt: number | null) => typedError<FileSaved, RpcError>(__TAURI_INVOKE("file_write", { projectId, worktreeId, path, text, readAt })),
 	/**
+	 *  `run.cancel` — stops a run, and says so on the card.
+	 * 
+	 *  The row goes to `cancelled` rather than `failed`: a person stopping work is
+	 *  not the work going wrong, and a board that cannot tell them apart teaches
+	 *  you to distrust every red row on it.
+	 */
+	runCancel: (cardId: string, runId: string) => typedError<null, RpcError>(__TAURI_INVOKE("run_cancel", { cardId, runId })),
+	/**
 	 *  `card.archive` — and it refuses while the front holds unsaved work.
 	 * 
 	 *  `force` is the person saying they know. Nothing here decides on its own
