@@ -74,7 +74,20 @@ export const commands = {
 	 *  not fired by dropping a card on a lane, it is fired by someone saying so.
 	 */
 	cardMove: (projectId: string, cardId: string, columnId: string, position: number, confirmed: boolean) => typedError<CardChanged, RpcError>(__TAURI_INVOKE("card_move", { projectId, cardId, columnId, position, confirmed })),
-	cardArchive: (projectId: string, cardId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("card_archive", { projectId, cardId })),
+	/**
+	 *  `card.archive` — and it refuses while the front holds unsaved work.
+	 * 
+	 *  `force` is the person saying they know. Nothing here decides on its own
+	 *  that work nobody committed was not worth keeping.
+	 */
+	cardArchive: (projectId: string, cardId: string, force: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("card_archive", { projectId, cardId, force })),
+	/**
+	 *  `card.diff` — what this front changed, against the ref it began from.
+	 * 
+	 *  Never against HEAD: that answers a different question, and drifts further
+	 *  from this one with every commit anyone lands on the base branch.
+	 */
+	cardDiff: (cardId: string) => typedError<Front, RpcError>(__TAURI_INVOKE("card_diff", { cardId })),
 	stepCreate: (projectId: string, kind: string, name: string, config: string, irreversible: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("step_create", { projectId, kind, name, config, irreversible })),
 	/**
 	 *  `terminal.attach_agent` — brings a card's session into the target terminal.
@@ -269,6 +282,24 @@ export type FileNode = {
 	path: string,
 	status: GitStatus,
 	children: FileNode[] | null,
+};
+
+/**
+ *  Response of `card.diff` — what this front changed, against where it began.
+ * 
+ *  `baseRef` travels with it so the screen can say what the diff is against.
+ *  A diff with no stated base is a diff nobody can check.
+ */
+export type Front = {
+	worktreePath: string | null,
+	baseRef: string | null,
+	files: string[],
+	diff: string,
+	/**
+	 *  Work no commit holds. Named rather than counted, because the question
+	 *  it answers is "what would I lose".
+	 */
+	unsaved: string[],
 };
 
 /**

@@ -5,6 +5,7 @@
 mod board;
 mod commands;
 mod contract;
+mod front;
 mod projects;
 mod pty_bridge;
 mod runs;
@@ -60,7 +61,8 @@ fn main() {
             board::card_create,
             board::card_update,
             board::card_move,
-            board::card_archive,
+            front::card_archive,
+            front::card_diff,
             board::step_create,
             sessions::terminal_attach_agent,
             sessions::session_ensure,

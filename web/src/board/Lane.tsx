@@ -100,6 +100,7 @@ export function Lane({
                 key={card.id}
                 card={card}
                 projectId={projectId}
+                onBoard={onBoard}
                 onProblem={onProblem}
                 expanded={openCard === card.id}
                 onToggle={() => onOpenCard(openCard === card.id ? null : card.id)}

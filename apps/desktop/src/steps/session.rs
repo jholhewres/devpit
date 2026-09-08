@@ -57,6 +57,18 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
         .map(PathBuf::from)
         .map(|home| agent::transcript_path(&home, &cwd, &session_id));
 
+    // Where this front began, recorded now because it cannot be recovered
+    // later: once the base branch moves, nothing on disk remembers.
+    if let Some(name) = &worktree {
+        let path = cwd.join("..").join(name);
+        let base = quockpit_git::head_of(&cwd).unwrap_or_default();
+        let _ = store.set_card_front(
+            card_id,
+            path.to_str(),
+            (!base.is_empty()).then_some(base.as_str()),
+        );
+    }
+
     store
         .link_session(
             card_id,

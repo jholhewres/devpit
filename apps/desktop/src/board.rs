@@ -271,13 +271,6 @@ pub fn card_move(
 
 #[tauri::command]
 #[specta::specta]
-pub fn card_archive(project_id: String, card_id: String) -> Result<Board, RpcError> {
-    store()?.archive_card(&card_id)?;
-    board_get(project_id)
-}
-
-#[tauri::command]
-#[specta::specta]
 pub fn step_create(
     project_id: String,
     kind: String,

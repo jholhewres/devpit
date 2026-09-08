@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { commands } from '../gen/bindings'
-import type { Card, Run } from '../gen/bindings'
+import type { Board, Card, Front, Run } from '../gen/bindings'
 
 /**
  * A card, and what it has cost.
@@ -10,6 +11,7 @@ import type { Card, Run } from '../gen/bindings'
 export function CardTile({
   card,
   projectId,
+  onBoard,
   expanded,
   onToggle,
   onDragStart,
@@ -18,6 +20,7 @@ export function CardTile({
 }: {
   card: Card
   projectId: string
+  onBoard: (board: Board) => void
   expanded: boolean
   onToggle: () => void
   onDragStart: () => void
@@ -31,6 +34,40 @@ export function CardTile({
    * that was there keeps running detached — it stops taking up the screen, not
    * working.
    */
+  const [front, setFront] = useState<Front | null>(null)
+
+  /**
+   * What this line of work changed, against where it began.
+   *
+   * Never against HEAD: that answers a different question, and drifts further
+   * from this one every time anyone commits to the base branch.
+   */
+  const readFront = async (event: React.MouseEvent): Promise<void> => {
+    event.stopPropagation()
+    const answer = await commands.cardDiff(card.id)
+    if (answer.status === 'ok') setFront(answer.data)
+    else onProblem(answer.error.message)
+  }
+
+  /**
+   * Puts the card away, and refuses while its front holds unsaved work.
+   *
+   * The refusal comes back as a message naming how much would be lost; saying
+   * yes to it is the person deciding, never this screen deciding for them.
+   */
+  const archive = async (event: React.MouseEvent): Promise<void> => {
+    event.stopPropagation()
+    const first = await commands.cardArchive(projectId, card.id, false)
+    if (first.status === 'ok') {
+      onBoard(first.data)
+      return
+    }
+    if (!window.confirm(`${first.error.message}`)) return
+    const forced = await commands.cardArchive(projectId, card.id, true)
+    if (forced.status === 'ok') onBoard(forced.data)
+    else onProblem(forced.error.message)
+  }
+
   const attach = async (event: React.MouseEvent): Promise<void> => {
     event.stopPropagation()
     const answer = await commands.terminalAttachAgent(projectId, card.id)
@@ -50,6 +87,14 @@ export function CardTile({
         <button type="button" className="card__attach" onClick={(e) => void attach(e)}>
           terminal
         </button>
+        <button type="button" className="card__attach" onClick={(e) => void archive(e)}>
+          archive
+        </button>
+        {card.worktreePath !== null && (
+          <button type="button" className="card__attach" onClick={(e) => void readFront(e)}>
+            changes
+          </button>
+        )}
         {card.costUsd !== null && card.costUsd > 0 && (
           <span className="card__cost">${card.costUsd.toFixed(4)}</span>
         )}
@@ -59,6 +104,27 @@ export function CardTile({
           </span>
         )}
       </div>
+      {front !== null && (
+        <div className="card__front">
+          <div className="card__front-base">against {front.baseRef ?? 'nothing recorded'}</div>
+          {front.files.length === 0 ? (
+            <div>nothing changed here yet</div>
+          ) : (
+            <ul>
+              {front.files.map((file: string) => (
+                <li key={file}>{file}</li>
+              ))}
+            </ul>
+          )}
+          {front.unsaved.length > 0 && (
+            <div className="card__front-unsaved">
+              {front.unsaved.length} change{front.unsaved.length === 1 ? '' : 's'} nothing has
+              saved yet
+            </div>
+          )}
+        </div>
+      )}
+
       {expanded && card.runs.length > 0 && (
         <ol className="card__history">
           {card.runs.map((run: Run) => (

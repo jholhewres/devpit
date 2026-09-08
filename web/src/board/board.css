@@ -241,3 +241,28 @@
   align-items: center;
   color: var(--ink-warn, #c96);
 }
+
+.card__front {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--edge);
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.card__front ul {
+  margin: 4px 0 0;
+  padding-left: 14px;
+}
+
+.card__front-base {
+  font-family: var(--mono, monospace);
+  opacity: 0.75;
+}
+
+/* Work nothing has saved is the one thing here worth a colour: it is what
+   would be lost, not what was done. */
+.card__front-unsaved {
+  margin-top: 4px;
+  color: var(--ink-warn, #c96);
+}

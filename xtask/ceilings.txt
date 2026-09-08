@@ -4,7 +4,7 @@
 # does a ceiling above what the file needs. Regenerate with `cargo xtask ceilings`
 # once a file has actually got shorter.
 
-apps/desktop/src/board.rs 302
+apps/desktop/src/board.rs 295
 apps/desktop/src/projects.rs 412
 apps/desktop/src/sessions.rs 638
 apps/desktop/src/steps/mod.rs 144
@@ -13,14 +13,15 @@ crates/agentcli/src/headless.rs 293
 crates/agentcli/src/lib.rs 370
 crates/agentcli/src/session.rs 124
 crates/agentcli/src/transcript.rs 134
-crates/core/src/store/board.rs 665
+crates/core/src/store/board.rs 515
+crates/core/src/store/board_tests.rs 172
 crates/core/src/store/migrations.rs 251
 crates/core/src/store/mod.rs 239
 crates/core/src/store/projects.rs 279
 crates/core/src/store/settings.rs 129
 crates/core/src/tree.rs 220
 crates/git/src/clone.rs 150
-crates/git/src/lib.rs 146
+crates/git/src/front.rs 213
 crates/git/src/status.rs 252
 crates/git/src/worktrees.rs 174
 crates/pty/src/lib.rs 279
@@ -29,9 +30,10 @@ crates/rpc/src/project.rs 165
 crates/rpc/src/session.rs 210
 crates/steps/src/context.rs 126
 crates/steps/src/manifest.rs 130
-crates/steps/src/runner.rs 246
+crates/steps/src/runner.rs 141
 crates/tmux/src/lib.rs 257
 web/src/board/BoardSurface.tsx 177
+web/src/board/CardTile.tsx 151
 web/src/board/StepPicker.tsx 120
 web/src/loadtest/LoadTest.tsx 149
 web/src/onboarding/ProjectStep.tsx 169

@@ -9,12 +9,14 @@
 
 pub mod board;
 pub mod error;
+pub mod front;
 pub mod project;
 pub mod session;
 pub mod settings;
 
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use error::{ErrorCode, RpcError};
+pub use front::Front;
 pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
     ProjectList, ProjectNotes, ProjectTree, Worktree,
