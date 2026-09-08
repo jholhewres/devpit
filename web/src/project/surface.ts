@@ -7,7 +7,7 @@ import type { Project, Worktree } from '../gen/bindings'
  * a backend answering a question nobody asks is the same defect as a button
  * that does nothing, read from the other side.
  */
-export type SurfaceId = 'overview' | 'canvas' | 'notes' | 'wiki' | 'diagnostics'
+export type SurfaceId = 'board' | 'overview' | 'canvas' | 'notes' | 'wiki' | 'diagnostics'
 
 /** The checkout a project opens into, and the one its chrome describes. */
 export function currentWorktree(project: Project): Worktree | null {

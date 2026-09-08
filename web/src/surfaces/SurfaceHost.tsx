@@ -5,10 +5,12 @@ import type { Project, Worktree } from '../gen/bindings'
 import { ageOf, messageOf, useLoad } from '../project/load'
 import type { SurfaceId } from '../project/surface'
 import { CloseGlyph } from '../shell/glyphs'
+import { BoardSurface } from '../board/BoardSurface'
 import { BuildReadout } from './BuildReadout'
 import './surfaces.css'
 
 const TITLE: Record<SurfaceId, string> = {
+  board: 'Board',
   overview: 'Overview',
   canvas: 'Canvas',
   notes: 'Notes',
@@ -245,6 +247,7 @@ export function SurfaceHost({
       </div>
 
       <div className="surface__body scroll">
+        {surface === 'board' ? <BoardSurface projectId={project.id} /> : null}
         {surface === 'overview' ? (
           <OverviewSurface project={project} worktree={worktree} worktreeId={worktreeId} />
         ) : null}

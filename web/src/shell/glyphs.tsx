@@ -141,3 +141,14 @@ export function TerminalGlyph(props: GlyphProps): React.JSX.Element {
     </Svg>
   )
 }
+
+/** Three lanes: the board, drawn as what it is. */
+export function BoardGlyph(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="3.5" height="11" rx="1" fill="none" stroke="currentColor" />
+      <rect x="6.25" y="2.5" width="3.5" height="7.5" rx="1" fill="none" stroke="currentColor" />
+      <rect x="11" y="2.5" width="3.5" height="9" rx="1" fill="none" stroke="currentColor" />
+    </svg>
+  )
+}

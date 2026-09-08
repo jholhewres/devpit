@@ -7,6 +7,7 @@ import {
   ChevronGlyph,
   DiagnosticsGlyph,
   NotesGlyph,
+  BoardGlyph,
   OverviewGlyph,
   PlusGlyph,
   SettingsGlyph,
@@ -23,6 +24,7 @@ import {
  */
 
 const RESOURCES: { id: SurfaceId; label: string; glyph: React.ComponentType }[] = [
+  { id: 'board', label: 'Board', glyph: BoardGlyph },
   { id: 'overview', label: 'Overview', glyph: OverviewGlyph },
   { id: 'canvas', label: 'Canvas', glyph: CanvasGlyph },
   { id: 'notes', label: 'Notes', glyph: NotesGlyph },

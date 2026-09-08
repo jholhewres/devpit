@@ -52,6 +52,30 @@ export const commands = {
 	projectNotes: (projectId: string) => typedError<ProjectNotes, RpcError>(__TAURI_INVOKE("project_notes", { projectId })),
 	/**  `project.note_add` — capture, in one keystroke and no form. */
 	projectNoteAdd: (projectId: string, body: string) => typedError<ProjectNotes, RpcError>(__TAURI_INVOKE("project_note_add", { projectId, body })),
+	/**  `board.get` — the columns, the cards and the steps of a project. */
+	boardGet: (projectId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("board_get", { projectId })),
+	columnCreate: (projectId: string, name: string) => typedError<Board, RpcError>(__TAURI_INVOKE("column_create", { projectId, name })),
+	columnRename: (projectId: string, columnId: string, name: string) => typedError<Board, RpcError>(__TAURI_INVOKE("column_rename", { projectId, columnId, name })),
+	columnReorder: (projectId: string, ids: string[]) => typedError<Board, RpcError>(__TAURI_INVOKE("column_reorder", { projectId, ids })),
+	/**
+	 *  `column.delete` — refuses while cards are in it, and says how many.
+	 * 
+	 *  Refusing is the answer, but a refusal without the number leaves the screen
+	 *  asking a question it cannot phrase.
+	 */
+	columnDelete: (projectId: string, columnId: string) => typedError<ColumnDeleted, RpcError>(__TAURI_INVOKE("column_delete", { projectId, columnId })),
+	columnSetStep: (projectId: string, columnId: string, stepId: string | null) => typedError<Board, RpcError>(__TAURI_INVOKE("column_set_step", { projectId, columnId, stepId })),
+	cardCreate: (projectId: string, columnId: string, title: string, body: string) => typedError<Card, RpcError>(__TAURI_INVOKE("card_create", { projectId, columnId, title, body })),
+	cardUpdate: (projectId: string, cardId: string, title: string, body: string) => typedError<Card, RpcError>(__TAURI_INVOKE("card_update", { projectId, cardId, title, body })),
+	/**
+	 *  `card.move` — and the only place a step is ever started.
+	 * 
+	 *  `confirmed` is how an irreversible step stays out of a drag: a deploy is
+	 *  not fired by dropping a card on a lane, it is fired by someone saying so.
+	 */
+	cardMove: (projectId: string, cardId: string, columnId: string, position: number, confirmed: boolean) => typedError<CardChanged, RpcError>(__TAURI_INVOKE("card_move", { projectId, cardId, columnId, position, confirmed })),
+	cardArchive: (projectId: string, cardId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("card_archive", { projectId, cardId })),
+	stepCreate: (projectId: string, kind: string, name: string, config: string, irreversible: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("step_create", { projectId, kind, name, config, irreversible })),
 	/**  `session.ensure` — a layout and a tmux window, created if they were missing. */
 	sessionEnsure: (projectId: string, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_ensure", { projectId, worktreeId })),
 	/**  `session.layout` — the tree as last persisted. */
@@ -121,6 +145,19 @@ export type AppInfo = {
 };
 
 /**
+ *  Response of `board.get`.
+ * 
+ *  An object rather than a bare list of columns: the board will grow a field,
+ *  and a bare list has nowhere to put it.
+ */
+export type Board = {
+	projectId: string,
+	columns: Column[],
+	cards: Card[],
+	steps: Step[],
+};
+
+/**
  *  What this build can do. Governs the UI.
  * 
  *  Memory, cloud and vault are optional dependencies: without them the
@@ -134,11 +171,50 @@ export type Capabilities = {
 	tmux: boolean,
 };
 
+export type Card = {
+	id: string,
+	columnId: string,
+	title: string,
+	body: string,
+	position: number,
+	worktreePath: string | null,
+	/**  What every run of this card has cost, added up. */
+	costUsd: number | null,
+	/**  Most recent first. */
+	runs: Run[],
+};
+
+/**  Response of `card.create` and `card.move`. */
+export type CardChanged = {
+	card: Card,
+	/**  The run this move started, when the column it landed in has a step. */
+	started: Run | null,
+};
+
 export type Change = {
 	path: string,
 	status: GitStatus,
 	added: number,
 	removed: number,
+};
+
+export type Column = {
+	id: string,
+	name: string,
+	position: number,
+	/**  `null` means the column runs nothing, which is a column doing its job. */
+	step: Step | null,
+};
+
+/**
+ *  Response of `board.column_delete` when the column still holds cards.
+ * 
+ *  Refusing is the answer, but refusing without saying how many would leave
+ *  the screen asking a question it cannot phrase.
+ */
+export type ColumnDeleted = {
+	deleted: boolean,
+	cardsInTheWay: number,
 };
 
 export type Commit = {
@@ -265,6 +341,33 @@ export type RpcError = {
 	details: string | null,
 };
 
+/**
+ *  One execution of a step, and what it cost.
+ * 
+ *  The cost is on the record rather than derived later: "the agent is doing
+ *  something" stops being an acceptable answer once the card can say what it
+ *  spent.
+ */
+export type Run = {
+	id: string,
+	stepId: string,
+	stepName: string,
+	state: RunState,
+	output: string | null,
+	exitCode: number | null,
+	costUsd: number | null,
+	/**
+	 *  `f64` and not `i64` throughout, because this crosses into a JavaScript
+	 *  number and that is what a JavaScript number is — see
+	 *  `Commit::committed_at` for the same reason stated once.
+	 */
+	durationMs: number | null,
+	startedAt: number | null,
+};
+
+/**  How a run ended, or that it has not. */
+export type RunState = "running" | "ok" | "failed" | "cancelled";
+
 /**  Response of `session.layout` / `session.ensure` / `session.split`. */
 export type SessionLayout = {
 	projectId: string,
@@ -287,6 +390,33 @@ export type Settings = {
 
 /**  Orca's names: horizontal is left/right, vertical is top/bottom. */
 export type SplitDirection = "horizontal" | "vertical";
+
+export type Step = {
+	id: string,
+	kind: StepKind,
+	name: string,
+	/**
+	 *  Shaped by `kind`. Opaque here on purpose: the contract would otherwise
+	 *  have to grow a variant every time a step learns an option.
+	 */
+	config: string,
+	/**  A deploy has no undo, so it is confirmed rather than fired by a drag. */
+	irreversible: boolean,
+};
+
+/**
+ *  What a column runs when a card arrives in it.
+ * 
+ *  Three kinds because they behave in opposite ways, and the difference is
+ *  visible on screen: only `Session` takes the terminal.
+ */
+export type StepKind = 
+/**  One headless turn. Returns schema-validated JSON, takes no terminal. */
+"agent" | 
+/**  A session you drive. This one takes the target terminal. */
+"session" | 
+/**  A command of yours: tests, a build, a deploy. */
+"command";
 
 /**
  *  The appearance the window uses.

@@ -70,8 +70,11 @@ pub struct Run {
     pub output: Option<String>,
     pub exit_code: Option<i32>,
     pub cost_usd: Option<f64>,
-    pub duration_ms: Option<i64>,
-    pub started_at: i64,
+    /// `f64` and not `i64` throughout, because this crosses into a JavaScript
+    /// number and that is what a JavaScript number is — see
+    /// `Commit::committed_at` for the same reason stated once.
+    pub duration_ms: Option<f64>,
+    pub started_at: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

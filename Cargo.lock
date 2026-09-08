@@ -2605,6 +2605,7 @@ name = "quockpit-desktop"
 version = "0.1.0"
 dependencies = [
  "portable-pty",
+ "quockpit-agentcli",
  "quockpit-core",
  "quockpit-git",
  "quockpit-pty",

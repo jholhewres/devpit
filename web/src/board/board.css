@@ -1,0 +1,181 @@
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.board--waiting,
+.board--failed {
+  padding: 24px;
+  color: var(--ink-muted);
+}
+
+.board__problem {
+  padding: 8px 12px;
+  border: 1px solid var(--edge-warn, #a86);
+  border-radius: 6px;
+  color: var(--ink-warn, #c96);
+  font-size: 13px;
+}
+
+.board__lanes {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+  max-width: 220px;
+  padding: 10px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+/* Only while something is being dragged, so the board is not permanently
+   drawn as a set of drop targets. */
+.lane--target {
+  border-style: dashed;
+}
+
+.lane__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lane__name {
+  flex: 1;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: text;
+}
+
+.lane__count {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.lane__remove {
+  border: none;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lane__step {
+  font-size: 11px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--edge);
+  padding-top: 6px;
+}
+
+.lane__step--none {
+  opacity: 0.55;
+}
+
+.lane__warn {
+  margin-left: 6px;
+  color: var(--ink-warn, #c96);
+}
+
+.lane__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.lane__add {
+  border: none;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  padding: 2px 0;
+}
+
+.board__add-lane {
+  align-self: flex-start;
+  border: 1px dashed var(--edge);
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 10px 14px;
+}
+
+.card {
+  padding: 8px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--surface-raised, var(--surface));
+  cursor: grab;
+}
+
+.card__title {
+  font-size: 13px;
+}
+
+.card__meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.card__history {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.run {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--edge);
+  padding-top: 6px;
+}
+
+/* Colour is reserved for a claim with something behind it: a run that failed,
+   and a run that finished. Work in progress is neutral, or a board with five
+   live fronts becomes an alarm panel. */
+.run--failed .run__state {
+  color: var(--ink-danger, #c66);
+}
+
+.run--ok .run__state {
+  color: var(--ink-verified, #6a9);
+}
+
+.run__output {
+  flex-basis: 100%;
+  white-space: pre-wrap;
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  opacity: 0.8;
+  max-height: 8em;
+  overflow: auto;
+}

@@ -4,7 +4,10 @@
 # does a ceiling above what the file needs. Regenerate with `cargo xtask ceilings`
 # once a file has actually got shorter.
 
+apps/desktop/src/board.rs 280
+apps/desktop/src/main.rs 156
 apps/desktop/src/projects.rs 412
+apps/desktop/src/runs.rs 191
 apps/desktop/src/sessions.rs 598
 crates/agentcli/src/catalogue.rs 366
 crates/agentcli/src/headless.rs 293
@@ -22,18 +25,19 @@ crates/git/src/lib.rs 146
 crates/git/src/status.rs 252
 crates/git/src/worktrees.rs 174
 crates/pty/src/lib.rs 279
-crates/rpc/src/board.rs 123
+crates/rpc/src/board.rs 126
 crates/rpc/src/project.rs 165
 crates/rpc/src/session.rs 210
 crates/tmux/src/lib.rs 257
+web/src/board/BoardSurface.tsx 195
 web/src/loadtest/LoadTest.tsx 149
 web/src/onboarding/ProjectStep.tsx 169
 web/src/shell/AppShell.tsx 301
 web/src/shell/RightPanel.tsx 358
-web/src/shell/Sidebar.tsx 338
+web/src/shell/Sidebar.tsx 340
 web/src/shell/WindowChrome.tsx 145
-web/src/shell/glyphs.tsx 143
-web/src/surfaces/SurfaceHost.tsx 266
+web/src/shell/glyphs.tsx 154
+web/src/surfaces/SurfaceHost.tsx 269
 xtask/src/platform_window.rs 141
 xtask/src/ratchet.rs 189
 xtask/src/shell_boundary.rs 154
