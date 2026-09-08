@@ -6,6 +6,7 @@ members = [
     "crates/git",
     "crates/pty",
     "crates/tmux",
+    "crates/agentcli",
     "apps/desktop",
     "xtask",
 ]
@@ -23,6 +24,7 @@ quockpit-rpc = { path = "crates/rpc" }
 quockpit-git = { path = "crates/git" }
 quockpit-pty = { path = "crates/pty" }
 quockpit-tmux = { path = "crates/tmux" }
+quockpit-agentcli = { path = "crates/agentcli" }
 
 # The binary stays open all day with several fronts live. Size and startup are
 # not vanity here.

@@ -9,6 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+mod agent_boundary;
 mod naming;
 mod platform_window;
 mod ratchet;
@@ -51,6 +52,7 @@ fn check() -> ExitCode {
     findings.extend(platform_window::platform_window_matches_the_base(&root));
     findings.extend(naming::nothing_is_named_after_nothing(&root));
     findings.extend(ratchet::files_only_get_shorter(&root));
+    findings.extend(agent_boundary::only_one_crate_drives_the_agent(&root));
 
     if findings.is_empty() {
         println!("guards: ok");

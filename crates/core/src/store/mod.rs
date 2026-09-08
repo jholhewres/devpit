@@ -2,6 +2,7 @@
 //!
 //! WAL because the access pattern is a window drawing while a watcher writes.
 
+mod board;
 mod layouts;
 mod migrations;
 mod projects;
@@ -27,6 +28,7 @@ pub enum StoreError {
     NoDataDirectory,
 }
 
+pub use board::{CardRow, ColumnRow, RunRow, StepRow, DEFAULT_COLUMNS};
 pub use projects::{NoteRow, ProjectRow};
 pub use settings::key as preference;
 
@@ -97,7 +99,7 @@ mod tests {
 
     /// Checked against the database: a table renamed in the SQL without going
     /// through this test is a migration that breaks whoever has data.
-    const EXPECTED: [&str; 7] = [
+    const EXPECTED: [&str; 12] = [
         "trust_workspace",
         "project",
         "scratch",
@@ -105,6 +107,11 @@ mod tests {
         "event",
         "pane_layout",
         "preference",
+        "board_column",
+        "step",
+        "card",
+        "run",
+        "session_link",
     ];
 
     fn tables(store: &Store) -> Vec<String> {
@@ -179,5 +186,54 @@ mod tests {
             [],
         );
         assert!(orphan.is_err(), "foreign_keys is off");
+    }
+
+    /// The migration has to be additive over real rows, not over an empty
+    /// file: that is the case where a mistake costs someone their data.
+    #[test]
+    fn version_four_leaves_older_rows_untouched() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("state.db");
+
+        // A database as it stood before the board existed, with rows in it.
+        {
+            let conn = Connection::open(&path).expect("open raw");
+            conn.pragma_update(None, "foreign_keys", "ON").expect("fk");
+            migrations::run_up_to(&conn, 3).expect("migrate to 3");
+            conn.execute_batch(
+                "INSERT INTO trust_workspace                    (id, slug, label, color, vault_namespace, is_default, created_at)                  VALUES ('tw_1', 'p', 'P', '#fff', 'p', 1, 0);                  INSERT INTO project (id, trust_workspace_id, name, root_path, created_at)                  VALUES ('prj_1', 'tw_1', 'demo', '/tmp/demo', 0);                  INSERT INTO pane_layout (project_id, tree, focused_id, updated_at)                  VALUES ('prj_1', '{\"leaf\":1}', 'leaf_1', 0);",
+            )
+            .expect("seed rows");
+        }
+
+        let store = Store::open(&path).expect("migrate to latest");
+
+        let version: i64 = store
+            .conn()
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .expect("version");
+        assert_eq!(version, 4);
+
+        let name: String = store
+            .conn()
+            .query_row("SELECT name FROM project WHERE id = 'prj_1'", [], |row| {
+                row.get(0)
+            })
+            .expect("the project survived");
+        assert_eq!(name, "demo");
+
+        let focused: String = store
+            .conn()
+            .query_row(
+                "SELECT focused_id FROM pane_layout WHERE project_id = 'prj_1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("the layout survived");
+        assert_eq!(focused, "leaf_1");
+
+        // And the board tables arrived alongside them.
+        store.ensure_board("prj_1").expect("seed the board");
+        assert_eq!(store.columns("prj_1").expect("columns").len(), 6);
     }
 }
