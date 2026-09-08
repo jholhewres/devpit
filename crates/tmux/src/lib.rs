@@ -84,9 +84,7 @@ impl Server {
 
         let cwd = cwd.to_string_lossy().into_owned();
         self.require(&["new-session", "-d", "-s", session, "-n", window, "-c", &cwd])?;
-        // A status bar inside a pane we already chrome is noise, and it steals
-        // a row from the agent's TUI.
-        let _ = self.require(&["set-option", "-t", session, "status", "off"]);
+        self.quiet_chrome()?;
         self.ensure_client_session(session, window)?;
         Ok(())
     }
@@ -107,6 +105,34 @@ impl Server {
             self.require(&["new-session", "-d", "-t", session, "-s", &client])?;
         }
         self.require(&["select-window", "-t", &format!("{client}:{window}")])?;
+        Ok(())
+    }
+
+    /// Everything tmux draws that this app draws better itself.
+    ///
+    /// Set on the server rather than per session, and that is the fix rather
+    /// than a shortcut: a grouped session does not inherit another session's
+    /// options, so setting them on the group left the client session — the one
+    /// a pane actually attaches to — with a green tmux bar along the bottom.
+    /// The server is ours, on our own socket, so a global here reaches every
+    /// session including the ones made later.
+    fn quiet_chrome(&self) -> Result<(), TmuxError> {
+        for option in [
+            // A status bar inside a pane we already chrome is noise, and it
+            // steals a row from the agent's TUI.
+            ["status", "off"],
+            // Otherwise a shell's title escape renames the window under us, and
+            // the layout is keyed by window name.
+            ["allow-rename", "off"],
+            ["automatic-rename", "off"],
+            // A message that hangs around covers the last line of output.
+            ["display-time", "1500"],
+            // The default half-second swallows an Escape meant for the program
+            // inside, which is most of them.
+            ["escape-time", "10"],
+        ] {
+            let _ = self.require(&["set-option", "-g", option[0], option[1]]);
+        }
         Ok(())
     }
 
