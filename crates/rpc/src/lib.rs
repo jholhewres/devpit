@@ -13,13 +13,11 @@ pub mod error;
 pub mod front;
 pub mod project;
 pub mod session;
+pub mod session_status;
 pub mod settings;
 
 pub use agents::{Agent, Agents, RejectedAgent};
-pub use board::{
-    Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Session, SessionStatus, Step,
-    StepKind,
-};
+pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use error::{ErrorCode, RpcError};
 pub use front::Front;
 pub use project::{
@@ -27,6 +25,7 @@ pub use project::{
     ProjectList, ProjectNotes, ProjectTree, Worktree,
 };
 pub use session::{AgentPresence, LayoutNode, PaneKind, SessionLayout, SplitDirection};
+pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
 
 use serde::{Deserialize, Serialize};

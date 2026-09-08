@@ -116,11 +116,15 @@ export function CardTile({
           // Busy is the one state worth a mark: it is the only one that will
           // change on its own while you are looking at something else.
           <span className={`card__session card__session--${card.session.status}`}>
-            {card.session.status === 'busy'
-              ? 'working'
-              : card.session.status === 'gone'
-                ? 'session ended'
-                : 'waiting'}
+            {
+              {
+                busy: 'working',
+                blocked: 'waiting on you',
+                done: 'finished',
+                idle: 'idle',
+                gone: 'session ended'
+              }[card.session.status]
+            }
           </span>
         )}
         <button type="button" className="card__attach" onClick={(e) => void attach(e)}>

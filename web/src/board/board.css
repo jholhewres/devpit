@@ -390,3 +390,13 @@
   -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
 }
+
+/* Waiting on you is the one that needs to be noticed: nothing moves until you
+   come back, and it looks exactly like working if it is not marked. */
+.card__session--blocked {
+  color: var(--ink-warn, #c96);
+}
+
+.card__session--done {
+  color: var(--ink-verified, #6a9);
+}

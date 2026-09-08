@@ -93,7 +93,12 @@ fn session_of(
         .find(|session| session.session_id == link.session_id)
         .map_or(SessionStatus::Gone, |session| match session.status {
             quockpit_agentcli::Status::Busy => SessionStatus::Busy,
+            quockpit_agentcli::Status::Blocked => SessionStatus::Blocked,
+            quockpit_agentcli::Status::Done => SessionStatus::Done,
             quockpit_agentcli::Status::Idle => SessionStatus::Idle,
+            // A state this build does not know is not a state to invent one
+            // for. Idle is the quiet answer, and quiet is right for a word
+            // nobody here has an opinion about.
             quockpit_agentcli::Status::Unknown => SessionStatus::Idle,
         });
     Ok(Some(Session {

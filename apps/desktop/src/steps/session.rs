@@ -1,6 +1,6 @@
 //! The session step: a detached session for the card, attached on request.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use quockpit_agentcli as agent;
 use quockpit_core::Store;
@@ -60,7 +60,7 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
     // Where this front began, recorded now because it cannot be recovered
     // later: once the base branch moves, nothing on disk remembers.
     if let Some(name) = &worktree {
-        let path = cwd.join("..").join(name);
+        let path = worktree_path(&cwd, name);
         let base = quockpit_git::head_of(&cwd).unwrap_or_default();
         let _ = store.set_card_front(
             card_id,
@@ -85,4 +85,27 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
         duration_ms: 0,
         exit_code: None,
     })
+}
+
+/// Where `--worktree <name>` puts the checkout.
+///
+/// Under the project, in `.claude/worktrees/<name>` — read off a real run
+/// rather than guessed. The first guess here was `../<name>`, which recorded a
+/// path that does not exist and would have made every diff on a card fail with
+/// a directory error, some way from the line that caused it.
+fn worktree_path(project: &Path, name: &str) -> PathBuf {
+    project.join(".claude").join("worktrees").join(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_front_lands_under_the_project_not_beside_it() {
+        assert_eq!(
+            worktree_path(Path::new("/home/x/repo"), "fix-auth"),
+            Path::new("/home/x/repo/.claude/worktrees/fix-auth")
+        );
+    }
 }

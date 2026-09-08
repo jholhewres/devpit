@@ -138,21 +138,43 @@ pub fn start_background(
 
 /// The short id out of what `--bg` printed.
 ///
-/// Taken as the last bare token on its own line rather than the whole output:
-/// start-up chatter shares the stream, and a handle with a stray word attached
-/// fails later, at `attach`, where the cause is no longer visible.
+/// The output is a small help block, not a bare id:
+///
+/// ```text
+/// backgrounded · fa35a378
+///   claude agents             list sessions
+///   claude attach fa35a378    open in this terminal
+/// ```
+///
+/// Read off the `attach` line rather than the first: that line exists to be
+/// copied, so its second-to-last token is the handle by construction. A guess
+/// at "the last bare word" matched nothing here and failed at attach time,
+/// where the cause is no longer on screen.
 fn short_id_in(stdout: &str) -> Option<String> {
-    stdout
-        .lines()
-        .map(str::trim)
-        .rfind(|line| {
-            !line.is_empty()
-                && line.len() <= 64
-                && line
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    let from_attach = stdout.lines().find_map(|line| {
+        let mut words = line.split_whitespace();
+        (words.next()? == PROGRAM && words.next()? == "attach")
+            .then(|| words.next())
+            .flatten()
+    });
+    from_attach
+        .or_else(|| {
+            // Or the announcement itself, when the help block is not printed.
+            stdout
+                .lines()
+                .find(|line| line.starts_with("backgrounded"))
+                .and_then(|line| line.split_whitespace().next_back())
         })
+        .filter(|id| is_handle(id))
         .map(ToOwned::to_owned)
+}
+
+fn is_handle(token: &str) -> bool {
+    !token.is_empty()
+        && token.len() <= 64
+        && token
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 /// The argv that brings a background session into a terminal.
@@ -284,87 +306,5 @@ fn run(args: &[&str]) -> Result<String, AgentError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_background_session_carries_only_what_it_was_given() {
-        assert_eq!(background_argv(None, None, None), ["claude", "--bg"]);
-        assert_eq!(
-            background_argv(Some("uuid-1"), Some("fix-auth"), Some("opus")),
-            [
-                "claude",
-                "--bg",
-                "--session-id",
-                "uuid-1",
-                "--worktree",
-                "fix-auth",
-                "--model",
-                "opus"
-            ]
-        );
-    }
-
-    #[test]
-    fn the_short_id_is_read_off_the_line_it_is_printed_on() {
-        assert_eq!(
-            short_id_in("Starting a session…\nchecking auth\na1b2c3\n").as_deref(),
-            Some("a1b2c3")
-        );
-    }
-
-    /// Start-up chatter shares stdout. A handle with a stray word in it fails
-    /// later, at attach, where the cause is no longer on screen.
-    #[test]
-    fn a_line_of_prose_is_not_mistaken_for_an_id() {
-        assert_eq!(
-            short_id_in("session started in background\nxyz789\n").as_deref(),
-            Some("xyz789")
-        );
-        assert_eq!(short_id_in("nothing usable here at all\n"), None);
-    }
-
-    #[test]
-    fn no_output_means_no_handle() {
-        assert_eq!(short_id_in(""), None);
-    }
-
-    #[test]
-    fn attaching_takes_the_short_id() {
-        assert_eq!(attach_argv("a1b2"), ["claude", "attach", "a1b2"]);
-    }
-
-    /// The spending cap is the contour the whole product turns on: a step that
-    /// cannot overspend is a step you can leave running.
-    #[test]
-    fn a_headless_turn_declares_its_cap() {
-        let argv = headless_argv(None, None, Some(0.5), None);
-        let cap = argv
-            .iter()
-            .position(|a| a == "--max-budget-usd")
-            .expect("no cap in the line");
-        assert_eq!(argv[cap + 1], "0.5");
-    }
-
-    #[test]
-    fn a_headless_turn_streams_in_and_out() {
-        let argv = headless_argv(None, None, None, None);
-        assert!(argv.contains(&"--input-format".to_owned()));
-        assert!(argv.contains(&"--output-format".to_owned()));
-        assert_eq!(argv.iter().filter(|a| *a == "stream-json").count(), 2);
-    }
-
-    /// Runs against the installed binary, and steps aside when there is none
-    /// so CI does not depend on it.
-    #[test]
-    fn the_installed_cli_answers_with_the_shape_we_decode() {
-        if !available() {
-            eprintln!("skipped: the agent CLI is not on PATH");
-            return;
-        }
-        let sessions = list(None).expect("agents --json");
-        for session in &sessions {
-            assert!(!session.session_id.is_empty(), "a session with no id");
-        }
-    }
-}
+#[path = "lib_tests.rs"]
+mod tests;

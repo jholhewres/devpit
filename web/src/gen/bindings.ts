@@ -453,11 +453,6 @@ export type RunState = "running" | "ok" | "failed" | "cancelled";
 export type Session = {
 	/**  What `attach`, `logs` and `stop` all take. */
 	shortId: string,
-	/**
-	 *  `busy` while it works, `idle` when it is waiting for you, `gone` once
-	 *  the CLI stops listing it — which is how a card notices a session that
-	 *  ended without anyone watching.
-	 */
 	status: SessionStatus,
 };
 
@@ -468,7 +463,16 @@ export type SessionLayout = {
 	tree: LayoutNode,
 };
 
-export type SessionStatus = "idle" | "busy" | 
+/**
+ *  What a card's session is doing.
+ * 
+ *  `Blocked` is separate from `Busy` because it is the one state where nothing
+ *  happens until a person comes back — a board that cannot tell them apart
+ *  shows five cards working when one has been waiting on you for an hour.
+ */
+export type SessionStatus = "busy" | 
+/**  Waiting on you. */
+"blocked" | "done" | "idle" | 
 /**  The link is on the card but the CLI no longer lists it. */
 "gone";
 

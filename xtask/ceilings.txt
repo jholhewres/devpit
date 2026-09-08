@@ -12,8 +12,8 @@ apps/desktop/src/steps/agent.rs 200
 apps/desktop/src/steps/mod.rs 150
 crates/agentcli/src/catalogue.rs 400
 crates/agentcli/src/headless.rs 300
-crates/agentcli/src/lib.rs 400
-crates/agentcli/src/session.rs 150
+crates/agentcli/src/lib.rs 350
+crates/agentcli/src/lib_tests.rs 200
 crates/agentcli/src/transcript.rs 150
 crates/core/src/store/board.rs 550
 crates/core/src/store/board_tests.rs 200

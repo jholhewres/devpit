@@ -5,6 +5,8 @@
 //! "review" breaks the moment they do.
 
 use serde::{Deserialize, Serialize};
+
+use crate::session_status::Session;
 use specta::Type;
 
 /// What a column runs when a card arrives in it.
@@ -92,27 +94,6 @@ pub struct Card {
     pub runs: Vec<Run>,
     /// The session working on this card, if one is.
     pub session: Option<Session>,
-}
-
-/// A background agent session, as the board needs to draw it.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Session {
-    /// What `attach`, `logs` and `stop` all take.
-    pub short_id: String,
-    /// `busy` while it works, `idle` when it is waiting for you, `gone` once
-    /// the CLI stops listing it — which is how a card notices a session that
-    /// ended without anyone watching.
-    pub status: SessionStatus,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum SessionStatus {
-    Idle,
-    Busy,
-    /// The link is on the card but the CLI no longer lists it.
-    Gone,
 }
 
 /// Response of `board.get`.

@@ -4,15 +4,30 @@ use serde::Deserialize;
 
 use crate::AgentError;
 
-/// Whether a session is working right now.
+/// What a session is doing.
 ///
-/// An unknown value decodes to `Unknown` rather than failing: the vendor is
-/// free to add a state, and a listing that refuses to render because of one
-/// new word is worse than a session shown as unknown.
+/// Read off a real listing rather than guessed. The two kinds of session speak
+/// differently: an interactive one reports `status: idle|busy`, a background
+/// one reports `state: working|blocked|done` — and it reports `status: idle`
+/// alongside, so reading `status` first would call a working session idle.
+///
+/// `Blocked` earns its own variant instead of folding into busy: it is the
+/// agent waiting on a person, and it is the only state where nothing happens
+/// until someone comes back. A board that cannot tell those apart shows five
+/// cards working when one of them has been waiting on you for an hour.
+///
+/// An unknown word decodes to `Unknown` rather than failing: a listing that
+/// refuses to render because of one new state is worse than one unknown row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
-    Idle,
+    /// Working right now.
     Busy,
+    /// Waiting on a person.
+    Blocked,
+    /// Finished, and still listed.
+    Done,
+    /// Idle: attached and waiting for input, or between turns.
+    Idle,
     Unknown,
 }
 
@@ -27,6 +42,8 @@ pub enum Kind {
 #[derive(Debug, Clone)]
 pub struct AgentSession {
     pub session_id: String,
+    /// The short handle `attach`, `logs` and `stop` take. Background only.
+    pub short_id: Option<String>,
     pub name: Option<String>,
     pub cwd: String,
     pub pid: Option<i64>,
@@ -35,10 +52,21 @@ pub struct AgentSession {
     pub status: Status,
 }
 
+/// The two shapes the CLI answers with.
+///
+/// An interactive session reports `status: idle|busy`; a background one
+/// reports `state: working` and carries a short `id` as well. Reading only the
+/// first left every background session decoding as unknown — which is exactly
+/// the session a card most needs to be honest about.
 #[derive(Deserialize)]
 struct Raw {
     #[serde(rename = "sessionId")]
     session_id: String,
+    /// The short handle, on background sessions only.
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    state: String,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -69,9 +97,15 @@ pub(crate) fn parse_list(bytes: &[u8]) -> Result<Vec<AgentSession>, AgentError> 
                 "background" => Kind::Background,
                 _ => Kind::Unknown,
             },
-            status: match row.status.as_str() {
-                "idle" => Status::Idle,
-                "busy" => Status::Busy,
+            short_id: row.id,
+            // `state` first: a background session carries both, and its
+            // `status` is `idle` even while it works.
+            status: match (row.state.as_str(), row.status.as_str()) {
+                ("working", _) => Status::Busy,
+                ("blocked", _) => Status::Blocked,
+                ("done", _) => Status::Done,
+                (_, "busy") => Status::Busy,
+                (_, "idle") => Status::Idle,
                 _ => Status::Unknown,
             },
         })
@@ -79,46 +113,5 @@ pub(crate) fn parse_list(bytes: &[u8]) -> Result<Vec<AgentSession>, AgentError> 
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Recorded from the installed CLI, not written from the documentation.
-    const REAL: &[u8] = br#"[
-      {"pid":843661,"cwd":"/home/x/p","kind":"interactive",
-       "startedAt":1788877447347,"sessionId":"7ebf5e9c","name":"p-17","status":"busy"}
-    ]"#;
-
-    #[test]
-    fn the_recorded_listing_decodes() {
-        let sessions = parse_list(REAL).expect("decode");
-        assert_eq!(sessions.len(), 1);
-        assert_eq!(sessions[0].session_id, "7ebf5e9c");
-        assert_eq!(sessions[0].status, Status::Busy);
-        assert_eq!(sessions[0].kind, Kind::Interactive);
-        assert_eq!(sessions[0].pid, Some(843661));
-    }
-
-    /// The vendor adding a state must not empty the screen.
-    #[test]
-    fn an_unknown_status_decodes_instead_of_failing() {
-        let sessions =
-            parse_list(br#"[{"sessionId":"a","status":"hibernating","kind":"orbital"}]"#)
-                .expect("decode");
-        assert_eq!(sessions[0].status, Status::Unknown);
-        assert_eq!(sessions[0].kind, Kind::Unknown);
-    }
-
-    /// No sessions is a normal answer, not a failure.
-    #[test]
-    fn an_empty_listing_is_not_an_error() {
-        assert!(parse_list(b"[]").expect("decode").is_empty());
-    }
-
-    #[test]
-    fn output_that_is_not_a_listing_is_reported_not_guessed() {
-        assert!(matches!(
-            parse_list(b"claude: command not found"),
-            Err(AgentError::Unreadable(_))
-        ));
-    }
-}
+#[path = "session_tests.rs"]
+mod tests;
