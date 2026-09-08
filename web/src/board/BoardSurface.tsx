@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { commands } from '../gen/bindings'
 import type { Board, Card, Column } from '../gen/bindings'
 import { messageOf, useLoad } from '../project/load'
@@ -23,6 +24,21 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
   const [open, setOpen] = useState<string | null>(null)
 
   const current = board ?? (load.status === 'ready' ? load.data : null)
+
+  const read = useCallback(async (): Promise<void> => {
+    const fresh = await commands.boardGet(projectId)
+    if (fresh.status === 'ok') setBoard(fresh.data)
+  }, [projectId])
+
+  // A run finishes on its own thread, so the card that started it has to be
+  // told. Without this the row sits at `running` until something else happens
+  // to reload the board — which reads as work that never ended.
+  useEffect(() => {
+    const stop = listen<string>('run:changed', () => void read())
+    return () => {
+      void stop.then((unlisten) => unlisten())
+    }
+  }, [read])
 
   const refresh = async (run: () => Promise<unknown>): Promise<void> => {
     setProblem(null)
@@ -68,12 +84,8 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
         cardsIn(current, column.id).length,
         confirmed
       )
-      if (answer.status === 'ok') {
-        const fresh = await commands.boardGet(projectId)
-        if (fresh.status === 'ok') setBoard(fresh.data)
-      } else {
-        setProblem(answer.error.message)
-      }
+      if (answer.status === 'ok') await read()
+      else setProblem(answer.error.message)
     } catch (thrown) {
       setProblem(messageOf(thrown))
     }
@@ -118,8 +130,7 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
         )
         return
       }
-      const fresh = await commands.boardGet(projectId)
-      if (fresh.status === 'ok') setBoard(fresh.data)
+      await read()
     } catch (thrown) {
       setProblem(messageOf(thrown))
     }

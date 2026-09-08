@@ -5,6 +5,12 @@
 //! process dies mid-run the row stays `running` and says so — which is honest,
 //! and better than a row that silently reports success.
 //!
+//! **The work happens off the command's thread.** A turn takes seconds; doing
+//! it inline would freeze the drag that started it for exactly as long, and a
+//! board that locks up while it thinks is a board nobody drags things onto.
+//! The command returns a `running` row and the thread finishes it, announcing
+//! itself on `run:changed` so the card can catch up.
+//!
 //! Nothing here retries. A failed run leaves the card where it is with the
 //! reason on it, and the next move is a person's.
 
@@ -14,9 +20,7 @@ use quockpit_agentcli as agent;
 use quockpit_core::Store;
 use quockpit_rpc::{ErrorCode, RpcError, Run, RunState, Step, StepKind};
 use serde::Deserialize;
-use tauri::State;
-
-use crate::sessions::SessionState;
+use tauri::{AppHandle, Emitter};
 
 /// What an `agent` step needs to know, out of `step.config`.
 #[derive(Deserialize, Default)]
@@ -40,61 +44,60 @@ struct AgentConfig {
 /// failed run naming what is missing rather than silently doing nothing: a
 /// card that looks like it started work and did not is worse than one that
 /// says the step is not implemented yet.
-pub fn start(
-    store: &Store,
-    _state: State<'_, SessionState>,
-    card_id: &str,
-    step: &Step,
-) -> Result<Run, RpcError> {
+pub fn start(app: AppHandle, store: &Store, card_id: &str, step: &Step) -> Result<Run, RpcError> {
     let run_id = store.start_run(card_id, &step.id)?;
 
-    let outcome = match step.kind {
-        StepKind::Agent => run_agent(store, card_id, step),
-        StepKind::Session => Err("session steps arrive with the target terminal".to_owned()),
-        StepKind::Command => Err("command steps arrive with tests and deploys".to_owned()),
-    };
+    let card = card_id.to_owned();
+    let id = run_id.clone();
+    // Read before the move: the row the command returns describes the step
+    // that is about to run, and the thread takes ownership of the step itself.
+    let step_id = step.id.clone();
+    let step_name = step.name.clone();
+    let step = step.clone();
+    std::thread::spawn(move || {
+        // The thread opens its own connection: SQLite handles are not shared
+        // across threads, and the row it has to close is already committed.
+        let Ok(store) = Store::open_default() else {
+            return;
+        };
 
-    match outcome {
-        Ok(finished) => {
-            store.finish_run(
-                &run_id,
+        let outcome = match step.kind {
+            StepKind::Agent => run_agent(&store, &card, &step),
+            StepKind::Session => Err("session steps arrive with the target terminal".to_owned()),
+            StepKind::Command => Err("command steps arrive with tests and deploys".to_owned()),
+        };
+
+        let closed = match outcome {
+            Ok(finished) => store.finish_run(
+                &id,
                 if finished.ok { "ok" } else { "failed" },
                 Some(&finished.output),
                 Some(finished.cost_usd),
                 Some(finished.duration_ms),
                 None,
-            )?;
-            Ok(Run {
-                id: run_id,
-                step_id: step.id.clone(),
-                step_name: step.name.clone(),
-                state: if finished.ok {
-                    RunState::Ok
-                } else {
-                    RunState::Failed
-                },
-                output: Some(finished.output),
-                exit_code: None,
-                cost_usd: Some(finished.cost_usd),
-                duration_ms: Some(finished.duration_ms as f64),
-                started_at: 0.0,
-            })
+            ),
+            Err(reason) => store.finish_run(&id, "failed", Some(&reason), None, None, None),
+        };
+
+        // A failure to record is worth saying out loud: the run finished and
+        // the screen would otherwise show it running forever.
+        if let Err(err) = closed {
+            eprintln!("could not record the end of run {id}: {err}");
         }
-        Err(reason) => {
-            store.finish_run(&run_id, "failed", Some(&reason), None, None, None)?;
-            Ok(Run {
-                id: run_id,
-                step_id: step.id.clone(),
-                step_name: step.name.clone(),
-                state: RunState::Failed,
-                output: Some(reason),
-                exit_code: None,
-                cost_usd: None,
-                duration_ms: None,
-                started_at: 0.0,
-            })
-        }
-    }
+        let _ = app.emit("run:changed", &card);
+    });
+
+    Ok(Run {
+        id: run_id,
+        step_id,
+        step_name,
+        state: RunState::Running,
+        output: None,
+        exit_code: None,
+        cost_usd: None,
+        duration_ms: None,
+        started_at: 0.0,
+    })
 }
 
 struct Finished {

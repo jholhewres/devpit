@@ -10,9 +10,7 @@ use quockpit_rpc::{
     Board, Card, CardChanged, Column, ColumnDeleted, ErrorCode, RpcError, Run, RunState, Step,
     StepKind,
 };
-use tauri::State;
-
-use crate::sessions::SessionState;
+use tauri::AppHandle;
 
 fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -213,7 +211,7 @@ pub fn card_update(
 #[tauri::command]
 #[specta::specta]
 pub fn card_move(
-    state: State<'_, SessionState>,
+    app: AppHandle,
     project_id: String,
     card_id: String,
     column_id: String,
@@ -238,7 +236,7 @@ pub fn card_move(
         None => None,
         // Irreversible and unconfirmed: the move stands, the work does not.
         Some(step) if step.irreversible && !confirmed => None,
-        Some(step) => Some(crate::runs::start(&store, state, &card_id, &step)?),
+        Some(step) => Some(crate::runs::start(app, &store, &card_id, &step)?),
     };
 
     Ok(CardChanged {
