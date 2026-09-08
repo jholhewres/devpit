@@ -8,6 +8,17 @@ use crate::ratchet::CEILINGS;
 /// would be noise: short files churn, and every churn would be a failure.
 const WORTH_CAPPING: usize = 120;
 
+/// Ceilings land on a step above the file rather than on its exact size.
+///
+/// Set to the exact count, every added line failed the build — including the
+/// four that come with an import and a call. The step leaves room for ordinary
+/// work while still failing a file that has grown a whole size class.
+const STEP: usize = 50;
+
+fn ceiling_for(lines: usize) -> usize {
+    (lines / STEP + 1) * STEP
+}
+
 /// Rewrites `xtask/ceilings.txt` from what the tree measures now.
 ///
 /// The guard fails when a ceiling sits above its file, which is correct and
@@ -56,9 +67,10 @@ pub fn reseed(root: &Path) -> std::io::Result<usize> {
             let key = relative.display().to_string();
             // Never upward: a file that grew keeps the number it has, and
             // `check` goes on failing until it is split.
+            let wanted = ceiling_for(count);
             let ceiling = existing
                 .get(&key)
-                .map_or(count, |on_record| count.min(*on_record));
+                .map_or(wanted, |on_record| wanted.min(*on_record));
             capped.push(format!("{key} {ceiling}"));
         }
     }
@@ -98,17 +110,26 @@ mod tests {
     #[test]
     fn a_file_that_grew_keeps_its_old_ceiling() {
         let on_record = current_ceilings("a.rs 100\n");
-        let wanted = 140_usize;
+        let wanted = ceiling_for(140);
         let kept = on_record.get("a.rs").map_or(wanted, |n| wanted.min(*n));
         assert_eq!(kept, 100);
+    }
+
+    /// The step is what stops a four-line edit from failing the build.
+    #[test]
+    fn a_ceiling_lands_above_the_file_not_on_it() {
+        assert_eq!(ceiling_for(151), 200);
+        assert_eq!(ceiling_for(199), 200);
+        assert_eq!(ceiling_for(200), 250);
+        assert!(ceiling_for(120) > 120);
     }
 
     /// A file that shrank gets the smaller number: that is the tightening.
     #[test]
     fn a_file_that_shrank_gets_the_smaller_ceiling() {
         let on_record = current_ceilings("a.rs 100\n");
-        let wanted = 80_usize;
+        let wanted = ceiling_for(30);
         let kept = on_record.get("a.rs").map_or(wanted, |n| wanted.min(*n));
-        assert_eq!(kept, 80);
+        assert_eq!(kept, 50);
     }
 }

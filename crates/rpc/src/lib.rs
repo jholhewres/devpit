@@ -14,7 +14,10 @@ pub mod project;
 pub mod session;
 pub mod settings;
 
-pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
+pub use board::{
+    Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Session, SessionStatus, Step,
+    StepKind,
+};
 pub use error::{ErrorCode, RpcError};
 pub use front::Front;
 pub use project::{

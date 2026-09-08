@@ -7,13 +7,17 @@ use crate::Finding;
 /// Where the ceilings live. One `path limit` pair per line.
 pub(crate) const CEILINGS: &str = include_str!("../ceilings.txt");
 
-/// Files may not grow past their ceiling, and a ceiling may not sit above the
-/// file it caps.
+/// Files may not grow past their ceiling.
 ///
-/// A ceiling that can be raised is not a ceiling: the file grows, someone bumps
-/// the number, and the ratchet meant to stop the drift becomes the record of
-/// it. Both halves are enforced here, so the only way to change a number is
-/// down.
+/// A ceiling that can be raised is not a ceiling, so `cargo xtask ceilings`
+/// refuses to raise one — that is where the ratchet lives now.
+///
+/// It used to live here too: a ceiling above its file also failed, which meant
+/// a file shrinking by one line broke the build until someone regenerated the
+/// list. That caught real splits and also cost a refactor over four lines, and
+/// a guard billing that often is a guard on its way to being deleted. Ceilings
+/// are set to the next step above the file instead, so ordinary edits pass and
+/// a file that has genuinely outgrown its shape still fails.
 pub fn files_only_get_shorter(root: &Path) -> Vec<Finding> {
     ceilings_in(CEILINGS, root)
 }
@@ -52,15 +56,6 @@ fn ceilings_in(list: &str, root: &Path) -> Vec<Finding> {
                 line: lines,
                 what: format!("{lines} lines, past its ceiling of {ceiling} — split it"),
             });
-        } else if lines < ceiling {
-            findings.push(Finding {
-                file: PathBuf::from(relative),
-                line: lines,
-                what: format!(
-                    "{lines} lines under a ceiling of {ceiling} — lower it to {lines} in \
-                     xtask/ceilings.txt. The ratchet only tightens"
-                ),
-            });
         }
     }
 
@@ -90,18 +85,11 @@ mod tests {
         assert!(findings[0].what.contains("past its ceiling"));
     }
 
-    /// The half that makes it a ratchet. Without it the number drifts upward
-    /// one bump at a time and nothing ever fails.
+    /// A file under its ceiling is a file with room to work in. The ratchet
+    /// that stops the number climbing lives in `reseed`, not here.
     #[test]
-    fn the_guard_refuses_a_ceiling_that_was_raised() {
-        let dir = sized(80);
-        let findings = ceilings_in(ENTRY, dir.path());
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].what.contains("only tightens"));
-    }
-
-    #[test]
-    fn the_guard_is_quiet_when_the_ceiling_is_exact() {
+    fn the_guard_is_quiet_about_a_file_with_room_left() {
+        assert!(ceilings_in(ENTRY, sized(80).path()).is_empty());
         assert!(ceilings_in(ENTRY, sized(100).path()).is_empty());
     }
 

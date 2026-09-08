@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { commands } from '../gen/bindings'
 import type { Board, Card, Front, Run } from '../gen/bindings'
+import { CardFront } from './CardFront'
+import { RunLine } from './RunLine'
+import { CardEditor } from './CardEditor'
 
 /**
  * A card, and what it has cost.
@@ -35,6 +38,8 @@ export function CardTile({
    * working.
    */
   const [front, setFront] = useState<Front | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [shown, setShown] = useState(card)
 
   /**
    * What this line of work changed, against where it began.
@@ -82,10 +87,32 @@ export function CardTile({
       onDragEnd={onDragEnd}
       onClick={onToggle}
     >
-      <div className="card__title">{card.title}</div>
+      <div className="card__id">{card.id.replace('card_', '').slice(0, 8).toLowerCase()}</div>
+      <div className="card__title">{shown.title}</div>
       <div className="card__meta">
+        {card.session !== null && (
+          // Busy is the one state worth a mark: it is the only one that will
+          // change on its own while you are looking at something else.
+          <span className={`card__session card__session--${card.session.status}`}>
+            {card.session.status === 'busy'
+              ? 'working'
+              : card.session.status === 'gone'
+                ? 'session ended'
+                : 'waiting'}
+          </span>
+        )}
         <button type="button" className="card__attach" onClick={(e) => void attach(e)}>
           terminal
+        </button>
+        <button
+          type="button"
+          className="card__attach"
+          onClick={(event) => {
+            event.stopPropagation()
+            setEditing(true)
+          }}
+        >
+          edit
         </button>
         <button type="button" className="card__attach" onClick={(e) => void archive(e)}>
           archive
@@ -104,26 +131,17 @@ export function CardTile({
           </span>
         )}
       </div>
-      {front !== null && (
-        <div className="card__front">
-          <div className="card__front-base">against {front.baseRef ?? 'nothing recorded'}</div>
-          {front.files.length === 0 ? (
-            <div>nothing changed here yet</div>
-          ) : (
-            <ul>
-              {front.files.map((file: string) => (
-                <li key={file}>{file}</li>
-              ))}
-            </ul>
-          )}
-          {front.unsaved.length > 0 && (
-            <div className="card__front-unsaved">
-              {front.unsaved.length} change{front.unsaved.length === 1 ? '' : 's'} nothing has
-              saved yet
-            </div>
-          )}
-        </div>
+      {editing && (
+        <CardEditor
+          projectId={projectId}
+          card={shown}
+          onSaved={setShown}
+          onProblem={onProblem}
+          onClose={() => setEditing(false)}
+        />
       )}
+
+      {front !== null && <CardFront front={front} />}
 
       {expanded && card.runs.length > 0 && (
         <ol className="card__history">
@@ -133,19 +151,5 @@ export function CardTile({
         </ol>
       )}
     </article>
-  )
-}
-
-function RunLine({ run }: { run: Run }): React.JSX.Element {
-  return (
-    <li className={`run run--${run.state}`}>
-      <span className="run__step">{run.stepName}</span>
-      <span className="run__state">{run.state}</span>
-      {run.costUsd !== null && <span className="run__cost">${run.costUsd.toFixed(4)}</span>}
-      {run.durationMs !== null && (
-        <span className="run__time">{(run.durationMs / 1000).toFixed(1)}s</span>
-      )}
-      {run.output !== null && <div className="run__output">{run.output}</div>}
-    </li>
   )
 }

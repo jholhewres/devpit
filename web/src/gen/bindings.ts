@@ -208,6 +208,8 @@ export type Card = {
 	costUsd: number | null,
 	/**  Most recent first. */
 	runs: Run[],
+	/**  The session working on this card, if one is. */
+	session: Session | null,
 };
 
 /**  Response of `card.create` and `card.move`. */
@@ -412,12 +414,28 @@ export type Run = {
 /**  How a run ended, or that it has not. */
 export type RunState = "running" | "ok" | "failed" | "cancelled";
 
+/**  A background agent session, as the board needs to draw it. */
+export type Session = {
+	/**  What `attach`, `logs` and `stop` all take. */
+	shortId: string,
+	/**
+	 *  `busy` while it works, `idle` when it is waiting for you, `gone` once
+	 *  the CLI stops listing it — which is how a card notices a session that
+	 *  ended without anyone watching.
+	 */
+	status: SessionStatus,
+};
+
 /**  Response of `session.layout` / `session.ensure` / `session.split`. */
 export type SessionLayout = {
 	projectId: string,
 	focusedId: string,
 	tree: LayoutNode,
 };
+
+export type SessionStatus = "idle" | "busy" | 
+/**  The link is on the card but the CLI no longer lists it. */
+"gone";
 
 export type Settings = {
 	/**

@@ -7,7 +7,8 @@
 
 use quockpit_core::Store;
 use quockpit_rpc::{
-    Board, Card, CardChanged, Column, ErrorCode, RpcError, Run, RunState, Step, StepKind,
+    Board, Card, CardChanged, Column, ErrorCode, RpcError, Run, RunState, Session, SessionStatus,
+    Step, StepKind,
 };
 use tauri::AppHandle;
 
@@ -51,6 +52,7 @@ fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, RpcError> {
         .card(id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such card"))?;
     Ok(Card {
+        session: session_of(store, &row.id, &live_sessions())?,
         id: row.id.clone(),
         column_id: row.column_id,
         title: row.title,
@@ -60,6 +62,44 @@ fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, RpcError> {
         cost_usd: store.card_cost(&row.id)?,
         runs: runs_of(store, &row.id, steps)?,
     })
+}
+
+/// Every session the agent CLI currently lists.
+///
+/// Read once per board rather than once per card: it costs a process, and a
+/// board with twenty cards would pay for it twenty times.
+///
+/// A CLI that is missing answers with nothing, and every card then reports its
+/// session as gone — which is true from the board's point of view.
+fn live_sessions() -> Vec<quockpit_agentcli::AgentSession> {
+    quockpit_agentcli::list(None).unwrap_or_default()
+}
+
+/// What the card should say about its session, if it has one.
+///
+/// `Gone` rather than dropping the session: a card that had one and lost it is
+/// a different thing from a card that never had one, and only the first is
+/// worth telling someone about.
+fn session_of(
+    store: &Store,
+    card_id: &str,
+    live: &[quockpit_agentcli::AgentSession],
+) -> Result<Option<Session>, RpcError> {
+    let Some(link) = store.session_link(card_id)? else {
+        return Ok(None);
+    };
+    let status = live
+        .iter()
+        .find(|session| session.session_id == link.session_id)
+        .map_or(SessionStatus::Gone, |session| match session.status {
+            quockpit_agentcli::Status::Busy => SessionStatus::Busy,
+            quockpit_agentcli::Status::Idle => SessionStatus::Idle,
+            quockpit_agentcli::Status::Unknown => SessionStatus::Idle,
+        });
+    Ok(Some(Session {
+        short_id: link.short_id,
+        status,
+    }))
 }
 
 fn runs_of(store: &Store, card_id: &str, steps: &[Step]) -> Result<Vec<Run>, RpcError> {
@@ -107,9 +147,13 @@ pub fn board_get(project_id: String) -> Result<Board, RpcError> {
         })
         .collect();
 
+    // One listing for the whole board, not one per card.
+    let live = live_sessions();
     let mut cards = Vec::new();
     for row in store.cards(&project_id)? {
-        cards.push(card_of(&store, &row.id, &steps)?);
+        let mut card = card_of(&store, &row.id, &steps)?;
+        card.session = session_of(&store, &row.id, &live)?;
+        cards.push(card);
     }
 
     Ok(Board {

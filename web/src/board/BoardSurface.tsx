@@ -23,6 +23,7 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
   const [problem, setProblem] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
   const [picking, setPicking] = useState<string | null>(null)
+  const [filter, setFilter] = useState('')
 
   const current = board ?? (load.status === 'ready' ? load.data : null)
 
@@ -82,7 +83,7 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
         projectId,
         cardId,
         column.id,
-        cardsIn(current, column.id).length,
+        cardsIn(matching(current, filter), column.id).length,
         confirmed
       )
       if (answer.status === 'ok') await read()
@@ -141,13 +142,30 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
     <div className="board">
       {problem !== null && <div className="board__problem">{problem}</div>}
 
+      <div className="board__bar">
+        <input
+          className="board__filter"
+          placeholder="filter cards"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+        {filter !== '' && (
+          <button type="button" className="board__clear" onClick={() => setFilter('')}>
+            clear
+          </button>
+        )}
+        <span className="board__count">
+          {matching(current, filter).length} of {current.cards.length}
+        </span>
+      </div>
+
       <div className="board__lanes">
         {current.columns.map((column: Column) => (
           <Lane
             key={column.id}
             projectId={projectId}
             column={column}
-            cards={cardsIn(current, column.id)}
+            cards={cardsIn(matching(current, filter), column.id)}
             steps={current.steps}
             dragging={dragging}
             picking={picking}
@@ -172,6 +190,21 @@ export function BoardSurface({ projectId }: { projectId: string }): React.JSX.El
   )
 }
 
-function cardsIn(board: Board, columnId: string): Card[] {
-  return board.cards.filter((card) => card.columnId === columnId)
+function cardsIn(cards: Card[], columnId: string): Card[] {
+  return cards.filter((card) => card.columnId === columnId)
+}
+
+/**
+ * The cards a filter leaves.
+ *
+ * Title and body both, because half of what a card is about is written in the
+ * body — searching only titles finds the cards you already remember.
+ */
+function matching(board: Board, filter: string): Card[] {
+  const needle = filter.trim().toLowerCase()
+  if (needle === '') return board.cards
+  return board.cards.filter(
+    (card) =>
+      card.title.toLowerCase().includes(needle) || card.body.toLowerCase().includes(needle)
+  )
 }

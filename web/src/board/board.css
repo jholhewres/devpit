@@ -266,3 +266,105 @@
   margin-top: 4px;
   color: var(--ink-warn, #c96);
 }
+
+.board__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board__filter {
+  flex: 0 1 240px;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.board__clear,
+.board__count {
+  font-size: 11px;
+  color: var(--ink-muted);
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.board__count {
+  cursor: default;
+  margin-left: auto;
+}
+
+/* An empty lane says so. A blank space reads as a lane that failed to load. */
+.lane__empty {
+  font-size: 11px;
+  color: var(--ink-muted);
+  opacity: 0.6;
+  padding: 6px 0;
+}
+
+.card__id {
+  font-family: var(--mono, monospace);
+  font-size: 9px;
+  color: var(--ink-muted);
+  opacity: 0.6;
+  margin-bottom: 2px;
+}
+
+/* Working is the only state that changes while you are looking elsewhere, so
+   it is the only one that gets a colour. */
+.card__session--busy {
+  color: var(--ink-active, #7a9);
+}
+
+.card__session--gone {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--edge);
+  cursor: default;
+}
+
+.editor__title,
+.editor__body {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.editor__foot {
+  display: flex;
+  gap: 6px;
+}
+
+.editor__foot button {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.editor__foot button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
