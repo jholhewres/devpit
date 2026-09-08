@@ -85,6 +85,14 @@ export const commands = {
 	 */
 	fileWrite: (projectId: string, worktreeId: string | null, path: string, text: string, readAt: number | null) => typedError<FileSaved, RpcError>(__TAURI_INVOKE("file_write", { projectId, worktreeId, path, text, readAt })),
 	/**
+	 *  `file.diff` — what is uncommitted in one file, right now.
+	 * 
+	 *  A different question from a card's front, which asks what changed on that
+	 *  line of work. This one is the Changes panel: the diff against HEAD, in the
+	 *  checkout as it stands.
+	 */
+	fileDiff: (projectId: string, worktreeId: string | null, path: string) => typedError<string, RpcError>(__TAURI_INVOKE("file_diff", { projectId, worktreeId, path })),
+	/**
 	 *  `run.cancel` — stops a run, and says so on the card.
 	 * 
 	 *  The row goes to `cancelled` rather than `failed`: a person stopping work is

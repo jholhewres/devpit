@@ -20,7 +20,7 @@ fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
 }
 
-fn root_of(project_id: &str, worktree_id: Option<&str>) -> Result<PathBuf, RpcError> {
+pub(crate) fn root_of(project_id: &str, worktree_id: Option<&str>) -> Result<PathBuf, RpcError> {
     let store = store()?;
     let row = store
         .project(project_id)?

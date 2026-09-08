@@ -28,10 +28,10 @@ use std::path::PathBuf;
 
 #[cfg(test)]
 pub(crate) use invoke::fixture;
-pub(crate) use invoke::{identify, run};
+pub(crate) use invoke::{identify, run, run_diffing};
 
 pub use clone::{clone, folder_for};
-pub use front::{changed_since, diff_since, head_of, remove_front, unsaved_in};
+pub use front::{changed_since, diff_file, diff_since, head_of, remove_front, unsaved_in};
 pub use log::history;
 pub use status::{changes, status, Status};
 pub use worktrees::{worktree_path, worktrees};

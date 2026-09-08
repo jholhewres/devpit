@@ -13,6 +13,38 @@ use crate::GitError;
 /// `-c core.quotepath=false` is not optional: without it git escapes any byte
 /// over 0x7f in a path, so a file named `créditos.ts` comes back as
 /// `cr\303\251ditos.ts` and every path comparison downstream misses.
+/// Runs git and keeps the output whichever way it exits.
+///
+/// `git diff` says "they differ" with exit 1 and the diff on stdout, so
+/// treating a non-zero exit as failure there throws away the answer. Only the
+/// commands where that is the contract use this; everything else goes through
+/// `run`, which is strict.
+pub(crate) fn run_diffing(root: &Path, args: &[&str]) -> Result<String, GitError> {
+    let output = Command::new("git")
+        .arg("-c")
+        .arg("core.quotepath=false")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => GitError::Missing,
+            _ => GitError::Failed {
+                command: args.join(" "),
+                stderr: err.to_string(),
+            },
+        })?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    if stdout.is_empty() && !output.status.success() {
+        return Err(GitError::Failed {
+            command: args.join(" "),
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        });
+    }
+    Ok(stdout)
+}
+
 pub(crate) fn run(root: &Path, args: &[&str]) -> Result<String, GitError> {
     let output = Command::new("git")
         .arg("-c")

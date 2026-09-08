@@ -10,6 +10,7 @@ mod commands;
 // release should say so rather than warn about it on every build.
 #[cfg(any(debug_assertions, test))]
 mod contract;
+mod diffs;
 mod files;
 mod front;
 mod in_flight;
@@ -82,6 +83,7 @@ fn main() {
             board::card_move,
             files::file_read,
             files::file_write,
+            diffs::file_diff,
             in_flight::run_cancel,
             front::card_archive,
             front::card_diff,

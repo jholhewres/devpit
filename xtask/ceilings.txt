@@ -28,7 +28,8 @@ crates/core/src/store/projects.rs 300
 crates/core/src/store/settings.rs 150
 crates/core/src/tree.rs 250
 crates/git/src/clone.rs 200
-crates/git/src/front.rs 250
+crates/git/src/front_tests.rs 200
+crates/git/src/invoke.rs 150
 crates/git/src/status.rs 300
 crates/git/src/worktrees.rs 200
 crates/pty/src/lib.rs 300

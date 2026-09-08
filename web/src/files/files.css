@@ -77,3 +77,78 @@
   tab-size: 2;
   user-select: text;
 }
+
+.diff {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.diff__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--edge);
+  font-size: 11px;
+}
+
+.diff__path {
+  font-family: var(--mono, monospace);
+}
+
+.diff__against {
+  color: var(--ink-muted);
+}
+
+.diff__head button {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 7px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.diff__body {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 0;
+  overflow: auto;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+.diff__line {
+  display: block;
+  padding: 0 8px;
+  white-space: pre;
+}
+
+/* Colour on the two lines that carry the change, and a tint behind them so a
+   line reads as added or removed without depending on colour alone. */
+.diff__line--added {
+  color: var(--ink-verified, #8fbf7f);
+  background: rgba(120, 190, 120, 0.08);
+}
+
+.diff__line--removed {
+  color: var(--ink-danger, #e06c75);
+  background: rgba(220, 110, 120, 0.08);
+}
+
+.diff__line--hunk {
+  color: var(--ink-muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.diff__line--meta {
+  color: var(--ink-muted);
+  opacity: 0.7;
+}

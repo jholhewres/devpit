@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DiffView } from '../files/DiffView'
 import { FileView } from '../files/FileView'
 import { Onboarding } from '../onboarding/Onboarding'
 import { SurfaceHost } from '../surfaces/SurfaceHost'
@@ -38,6 +39,7 @@ export function AppShell(): React.JSX.Element {
   const [addFailure, setAddFailure] = useState<string | null>(null)
   const [onboarded, setOnboarded] = useState(false)
   const [openFile, setOpenFile] = useState<string | null>(null)
+  const [openDiff, setOpenDiff] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panelOpen, setPanelOpen] = useState(true)
   const [layoutByProject, setLayoutByProject] = useState<Record<string, SessionLayout>>({})
@@ -267,6 +269,17 @@ export function AppShell(): React.JSX.Element {
           />
         )}
 
+        {project && openDiff !== null ? (
+          <div className="surface-host">
+            <DiffView
+              projectId={project.id}
+              worktreeId={worktreeId}
+              path={openDiff}
+              onClose={() => setOpenDiff(null)}
+            />
+          </div>
+        ) : null}
+
         {project && openFile !== null ? (
           // Over the stage like any other surface, and it hands the terminal
           // back on close: the pane underneath keeps its process either way.
@@ -301,7 +314,14 @@ export function AppShell(): React.JSX.Element {
           onSelectWorktree={(id) =>
             setWorktreeByProject((previous) => ({ ...previous, [project.id]: id }))
           }
-          onOpenFile={setOpenFile}
+          onOpenFile={(path) => {
+            setOpenDiff(null)
+            setOpenFile(path)
+          }}
+          onOpenDiff={(path) => {
+            setOpenFile(null)
+            setOpenDiff(path)
+          }}
           onStartResize={startResize('panel')}
         />
       ) : (

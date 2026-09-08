@@ -7,7 +7,7 @@
 use tauri_specta::{collect_commands, Builder};
 
 use crate::{
-    board, columns, commands, files, front, in_flight, projects, sessions, settings, steps,
+    board, columns, commands, diffs, files, front, in_flight, projects, sessions, settings, steps,
 };
 
 /// Where the generated TypeScript lands.
@@ -46,6 +46,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         board::card_move,
         files::file_read,
         files::file_write,
+        diffs::file_diff,
         in_flight::run_cancel,
         front::card_archive,
         front::card_diff,

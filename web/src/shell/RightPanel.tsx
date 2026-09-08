@@ -135,7 +135,15 @@ const MARK: Record<Change['status'], string> = {
  * while scanning twenty rows. Widths are shares of the largest row, so a
  * one-line fix stays small next to a rewrite.
  */
-function ChangeRow({ change, of }: { change: Change; of: number }): React.JSX.Element {
+function ChangeRow({
+  change,
+  of,
+  onOpen
+}: {
+  change: Change
+  of: number
+  onOpen: () => void
+}): React.JSX.Element {
   // The separator travels with the filename, never with the directory.
   // Clipping the directory from the front needs `direction: rtl`, and bidi
   // moves a trailing slash to the other end — `/web/src/shellAppShell.tsx`.
@@ -147,7 +155,13 @@ function ChangeRow({ change, of }: { change: Change; of: number }): React.JSX.El
   const share = of === 0 ? 0 : touched / of
 
   return (
-    <button type="button" className="change" data-status={change.status} title={change.path}>
+    <button
+      type="button"
+      className="change"
+      data-status={change.status}
+      title={change.path}
+      onClick={onOpen}
+    >
       <span className="change__mark">{MARK[change.status]}</span>
       <span className="change__path">
         {dir ? <span className="change__dir">{dir}</span> : null}
@@ -225,13 +239,15 @@ export function RightPanel({
   worktreeId,
   onSelectWorktree,
   onStartResize,
-  onOpenFile
+  onOpenFile,
+  onOpenDiff
 }: {
   project: Project
   worktreeId: string | null
   onSelectWorktree: (id: string) => void
   onStartResize: (event: React.PointerEvent) => void
   onOpenFile: (path: string) => void
+  onOpenDiff: (path: string) => void
 }): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('files')
 
@@ -342,7 +358,12 @@ export function RightPanel({
             <p className="empty">Nothing has changed since the last commit.</p>
           ) : (
             changes.state.data.changes.map((change) => (
-              <ChangeRow key={change.path} change={change} of={largest} />
+              <ChangeRow
+                key={change.path}
+                change={change}
+                of={largest}
+                onOpen={() => onOpenDiff(change.path)}
+              />
             ))
           )
         ) : null}
