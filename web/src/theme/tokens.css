@@ -1,0 +1,167 @@
+/*
+ * The whole visual vocabulary, in one place.
+ *
+ * Two groups that must not be confused: surfaces, type, spacing and motion are
+ * taste and can be retuned; severity is contract. A screen never picks a
+ * severity — it renders the one the event carried, and green is emitted only
+ * by something that stored an artifact.
+ *
+ * Dark only. A light theme is a second design, not a token swap, and shipping
+ * a half-considered one costs more than not having it.
+ */
+
+/* Variable faces, vendored rather than fetched: the app has to draw correctly
+   on a machine with no network, and a fallback metric shift on every cold
+   start is the kind of flicker people read as slowness. */
+@font-face {
+  font-family: 'Geist';
+  src: url('../assets/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('../assets/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, darkest frame outward to the lifted card. */
+  --ground: #0c0c0e;
+  --panel: #131316;
+  --raised: #1a1a1f;
+  --raised-hover: #202027;
+  --sunken: #08080a;
+
+  /* Hairlines. Alpha rather than a grey so a line over a lifted panel and the
+     same line over the canvas read as the same line. */
+  --line: rgb(255 255 255 / 0.07);
+  --line-strong: rgb(255 255 255 / 0.13);
+
+  --ink: #ececef;
+  --ink-dim: #9d9da8;
+  --ink-faint: #6c6c78;
+  --terminal-ink: #cdcdd4;
+
+  /* The house accent. Every project overrides it on the shell root with its
+     own colour; chrome that draws before a project exists — the first run —
+     reads this one, so nothing depends on the shell being mounted. */
+  --accent: #6f8fbf;
+
+  /* Severity — four, and the UI does not choose. Green never comes from
+     activity; only from something that stored an artifact. */
+  --sev-neutral: #8e8e99;
+  --sev-attention: #dda94a;
+  --sev-failure: #e26a66;
+  --sev-verified: #5fae78;
+
+  /* Git status. Deliberately dimmer than severity: a file being modified is
+     not a claim about the work. */
+  --git-modified: #b99548;
+  --git-added: #5f9268;
+  --git-deleted: #b8615e;
+  --git-untracked: #7b7b86;
+
+  /* ── Type ──────────────────────────────────────────────────────────────
+     A five-step scale and nothing between. Sizes that drift by half a pixel
+     per component are what makes a dense UI read as noise rather than as a
+     table. Tracking opens as size drops, which is what keeps 10px legible. */
+  --font-ui: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-micro: 10px; /* section labels, uppercase */
+  --text-meta: 11px; /* ages, counts, deltas — always mono */
+  --text-small: 12px; /* secondary lines, chips */
+  --text-body: 13px; /* rows, the default */
+  --text-title: 14px; /* project names, surface titles */
+
+  --track-micro: 0.085em;
+  --track-tight: -0.012em;
+
+  /* ── Space ─────────────────────────────────────────────────────────────
+     A 4px grid with two half-steps, and every padding in the app comes from
+     here. The rule that matters: generous between blocks, tight inside them.
+     A row that breathes internally stops reading as one thing. */
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 12px;
+  --s6: 16px;
+  --s7: 24px;
+  --s8: 32px;
+
+  /* ── Geometry ─────────────────────────────────────────────────────────
+     Column widths are overwritten inline while a divider is dragged, so these
+     are the starting point rather than the law. */
+  --sidebar-w: 288px;
+  --right-w: 312px;
+  --chrome-h: 36px;
+  /* The window's own corner. Slight on purpose: enough to soften the frame
+     against the desktop, not enough to eat a pixel of the sidebar. */
+  --window-radius: 10px;
+  /* Three 30px controls plus their padding. Whatever sits under the corner
+     reserves this much so nothing lands beneath an unclickable strip. */
+  --window-controls-w: 104px;
+  --status-h: 24px;
+  --row-h: 28px;
+  /* Reserved on every scroll container so a thumb never lands on a control. */
+  --gutter: 10px;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 9px;
+
+  /* ── Motion ───────────────────────────────────────────────────────────
+     Two durations and two curves, used everywhere. `--ease-out` for anything
+     appearing, `--ease` for a state change in place. Only opacity, transform
+     and colour are animated — the webview composites those without relayout,
+     and animating geometry in a system webview is where the jank lives. */
+  --fast: 110ms;
+  --medium: 180ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: 1.45;
+}
+
+/*
+ * Narrow windows.
+ *
+ * The app is a desktop window and gets dragged small on a laptop; the columns
+ * give up width in the order they can afford to. The panel goes first because
+ * a file tree survives being narrow, the sidebar second, and the terminal
+ * never — it is what the window is for.
+ */
+@media (max-width: 1240px) {
+  :root {
+    --right-w: 268px;
+  }
+}
+
+@media (max-width: 1080px) {
+  :root {
+    --sidebar-w: 252px;
+    --right-w: 240px;
+  }
+}
+
+/* Motion here is feedback, not decoration, so it is dropped wholesale rather
+   than tuned down when the system asks for less of it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

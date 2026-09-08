@@ -1,0 +1,1361 @@
+/*
+ * The window chrome.
+ *
+ * Three columns declared once on the grid root: projects, stage, panel. A
+ * surface is painted over the stage rather than taking a track, so opening one
+ * never resizes the terminal underneath it.
+ */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--right-w);
+  height: 100vh;
+  overflow: hidden;
+  background: var(--ground);
+  border-radius: var(--window-radius);
+  /* The panel closing is the one geometry change a person asks for directly,
+     so it is the one that may animate. Suppressed mid-drag below, where the
+     width has to track the pointer exactly. */
+  transition: grid-template-columns var(--medium) var(--ease);
+}
+
+.shell[data-panel='closed'] {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) 0px;
+}
+
+.shell[data-sidebar='closed'] {
+  grid-template-columns: 0px minmax(0, 1fr) var(--right-w);
+}
+
+.shell[data-sidebar='closed'][data-panel='closed'] {
+  grid-template-columns: 0px minmax(0, 1fr) 0px;
+}
+
+/* A hidden column still occupies its grid track; the stub keeps the track
+   count constant so the columns never renumber mid-animation. */
+.sidebar-stub,
+.panel-stub {
+  overflow: hidden;
+}
+
+.shell[data-dragging='true'] {
+  transition: none;
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* Straddles the seam so the target covers the border rather than sitting
+   beside it, and paints nothing until the pointer is on it. */
+.divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  z-index: 20;
+  cursor: col-resize;
+}
+
+.divider::after {
+  content: '';
+  position: absolute;
+  inset: 0 4px;
+  background: transparent;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.divider:hover::after,
+.shell[data-dragging='true'] .divider::after {
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.divider[data-edge='sidebar'] {
+  right: -5px;
+}
+
+.divider[data-edge='panel'] {
+  left: -5px;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+
+.sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+
+.sidebar__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  height: var(--chrome-h);
+  flex-shrink: 0;
+  padding: 0 var(--s3) 0 var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+
+.sidebar__mark {
+  font-size: var(--text-small);
+  font-weight: 620;
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+}
+
+.sidebar__nav-spacer {
+  flex: 1;
+}
+
+/* The add form drops in under the nav, where the button that opened it is. */
+.sidebar__add {
+  flex-shrink: 0;
+  padding: var(--s4) var(--s4) var(--s4) var(--s5);
+  border-bottom: 1px solid var(--line);
+  animation: rise var(--medium) var(--ease-out) both;
+}
+
+.sidebar__add-failure {
+  margin-top: var(--s3);
+  font-size: var(--text-small);
+  line-height: 1.4;
+  color: var(--sev-failure);
+}
+
+.sidebar__find {
+  flex-shrink: 0;
+  padding: var(--s4) var(--s4) var(--s4) var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+
+.find {
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-small);
+  transition:
+    border-color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+
+.find::placeholder {
+  color: var(--ink-faint);
+}
+
+.find:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  background: var(--raised);
+}
+
+/*
+ * Every scroll container reserves its gutter.
+ *
+ * Without it the thumb is painted on top of whatever is at the right edge —
+ * a chevron, a count — and the row it lands on becomes unclickable exactly
+ * when the list is long enough to matter.
+ */
+.scroll {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.sidebar__list {
+  flex: 1;
+  min-height: 0;
+  padding: var(--s2) 0 var(--s5);
+}
+
+.sidebar__group {
+  padding: var(--s5) var(--s5) var(--s2);
+  color: var(--ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 680;
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+}
+
+.sidebar__foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  height: 42px;
+  padding: 0 var(--s3) 0 var(--s5);
+  border-top: 1px solid var(--line);
+}
+
+.sidebar__avatar {
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+
+.sidebar__account {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-small);
+  color: var(--ink-dim);
+}
+
+/* ── Project ──────────────────────────────────────────────────────────── */
+
+/* The list is the deck. A project is a place you go to, and it carries its
+   name, its branch and what is happening inside it on one row — an icon rail
+   made you open something to learn any of that. */
+.project {
+  --accent: var(--sev-neutral);
+  padding: 0 var(--s3);
+}
+
+.project + .project {
+  margin-top: var(--s1);
+}
+
+.project__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s3) var(--s3) var(--s3) var(--s3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.project__head:hover {
+  background: var(--raised);
+}
+
+.project[data-active='true'] .project__head {
+  background: color-mix(in srgb, var(--accent) 11%, var(--raised));
+  border-color: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.project__swatch {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: color-mix(in srgb, var(--accent) 85%, var(--ink));
+  font-size: var(--text-micro);
+  font-weight: 680;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.project[data-active='true'] .project__swatch {
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  color: var(--ink);
+}
+
+.project__ident {
+  flex: 1;
+  min-width: 0;
+}
+
+.project__name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  font-weight: 520;
+  letter-spacing: var(--track-tight);
+  color: var(--ink-dim);
+  transition: color var(--fast) var(--ease);
+}
+
+.project[data-active='true'] .project__name,
+.project__head:hover .project__name {
+  color: var(--ink);
+}
+
+/* The branch changes under you; the folder path does not. So the second line
+   carries the branch and how much is uncommitted, and never the path. */
+.project__branch {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  margin-top: 1px;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+  min-width: 0;
+}
+
+.project__branch em {
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The git-status family, not the severity one. Uncommitted work is a fact
+   about the tree, never a claim about the work — spending amber on it would
+   spend the colour that has to mean "you are blocking this". */
+.project__dirty {
+  flex-shrink: 0;
+  color: var(--git-modified);
+}
+
+.project__dirty[data-unread='true'] {
+  color: var(--ink-faint);
+}
+
+.project__tally {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.project__twist {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--ink-faint);
+  transition: transform var(--medium) var(--ease);
+}
+
+.project[data-open='true'] .project__twist {
+  transform: rotate(90deg);
+}
+
+.project__body {
+  padding: var(--s1) 0 var(--s5) var(--s4);
+  margin-left: 17px;
+  /* Tinted with the project's own colour: the block is a continuation of the
+     row above it, not a generic indent. */
+  border-left: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+/* Rows arrive rather than appear. The stagger is small enough to read as one
+   movement and long enough to show the order of the list. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.project__body > * {
+  animation: rise var(--medium) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+
+.project__subhead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: var(--s5) var(--s4) var(--s2);
+  color: var(--ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 680;
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+}
+
+.project__subhead:first-child {
+  padding-top: var(--s3);
+}
+
+.project__empty {
+  padding: var(--s1) var(--s4) var(--s3);
+  color: var(--ink-faint);
+  font-size: var(--text-small);
+}
+
+/* ── Session rows ─────────────────────────────────────────────────────── */
+
+.session {
+  display: block;
+  width: 100%;
+  padding: var(--s3) var(--s4) var(--s3);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.session:hover {
+  background: var(--raised);
+}
+
+.session[data-active='true'] {
+  background: var(--raised-hover);
+  border-color: var(--line);
+}
+
+.session__line {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.session__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  color: var(--ink-dim);
+  transition: color var(--fast) var(--ease);
+}
+
+.session[data-active='true'] .session__title,
+.session:hover .session__title {
+  color: var(--ink);
+}
+
+.session__age {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* The agent lives inside the terminal row, so it is drawn inside it — a chip
+   on the second line, not a sibling entry pretending to be another process. */
+.session__agent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s3);
+  margin: var(--s2) 0 0 15px;
+  padding: 1px var(--s3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-dim);
+}
+
+.session__claim {
+  display: block;
+  margin: var(--s2) 0 0 15px;
+  font-size: var(--text-small);
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+
+/* ── Severity dot ─────────────────────────────────────────────────────── */
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--sev-neutral);
+  transition: background-color var(--medium) var(--ease);
+}
+
+.dot[data-severity='attention'] {
+  background: var(--sev-attention);
+}
+
+.dot[data-severity='failure'] {
+  background: var(--sev-failure);
+}
+
+.dot[data-severity='verified'] {
+  background: var(--sev-verified);
+}
+
+/*
+ * Motion, not colour, reports that something is running.
+ *
+ * An agent working stays neutral — that rule is the whole point of the palette
+ * — but a still grey dot and a dead grey dot are the same picture. The breath
+ * separates them without spending a colour that has to mean something else.
+ */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.32;
+  }
+}
+
+.dot[data-live='true'] {
+  animation: breathe 1.9s var(--ease) infinite;
+}
+
+/* ── Resource list ────────────────────────────────────────────────────── */
+
+/* A list, not a tile grid. Five tiles in a row is a puzzle; five lines is
+   five words. */
+.resource {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  height: var(--row-h);
+  padding: 0 var(--s4);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.resource:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.resource[data-active='true'] {
+  background: color-mix(in srgb, var(--accent) 13%, var(--raised));
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--ink);
+}
+
+.resource__glyph {
+  width: 15px;
+  display: flex;
+  justify-content: center;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+  transition: color var(--fast) var(--ease);
+}
+
+.resource:hover .resource__glyph,
+.resource[data-active='true'] .resource__glyph {
+  color: var(--ink-dim);
+}
+
+.rule {
+  height: 1px;
+  margin: var(--s3) var(--s4);
+  background: var(--line);
+}
+
+/* ── Stage ────────────────────────────────────────────────────────────── */
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* What the strip says while no terminal is running. */
+.tabs__idle {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--s4);
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-button:disabled:hover {
+  background: transparent;
+  color: var(--ink-faint);
+}
+
+/* Terminals are tabs; a surface is not. A tab owns a process, and that is
+   exactly what distinguishes the two — so the strip lists processes and
+   nothing else. */
+.tabs {
+  display: flex;
+  align-items: stretch;
+  height: var(--chrome-h);
+  flex-shrink: 0;
+  padding: 0 var(--s3) 0 var(--s2);
+  gap: var(--s1);
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  max-width: 208px;
+  min-width: 0;
+  margin: var(--s2) 0;
+  padding: 0 var(--s4);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: var(--text-small);
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.tab:hover {
+  background: var(--raised);
+  color: var(--ink-dim);
+}
+
+.tab[data-active='true'] {
+  background: var(--raised-hover);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabs__spacer {
+  flex: 1;
+}
+
+.tabs__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+/* Never unmounted. A surface covers it and hands it back untouched — same
+   process, same scrollback, same cursor column. */
+.terminal-stage {
+  flex: 1;
+  min-height: 0;
+  padding: var(--s5) var(--s6);
+  background: var(--sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  line-height: 1.65;
+  color: var(--terminal-ink);
+}
+
+.terminal-stage--live {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.terminal-stage--live > .pty-split,
+.terminal-stage--live > .pty-leaf {
+  flex: 1;
+  min-height: 0;
+}
+
+.pty-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.pty-split[data-direction='horizontal'] {
+  flex-direction: row;
+}
+
+.pty-split[data-direction='vertical'] {
+  flex-direction: column;
+}
+
+.pty-split__side {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pty-split__rule {
+  flex-shrink: 0;
+  background: var(--line);
+}
+
+.pty-split__rule[data-direction='horizontal'] {
+  width: 1px;
+}
+
+.pty-split__rule[data-direction='vertical'] {
+  height: 1px;
+}
+
+.pty-leaf {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.pty-leaf[data-focused='true']::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  pointer-events: none;
+  content: '';
+}
+
+.pty-leaf .xterm,
+.pty-leaf .xterm-viewport,
+.pty-leaf .xterm-screen {
+  height: 100%;
+}
+
+.line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* The shell prompt is chrome inside the output: dim marker, bright command,
+   so a long scrollback can be skimmed by where the commands are. */
+.line[data-kind='prompt'] {
+  margin-top: var(--s5);
+  color: var(--ink);
+}
+
+.line[data-kind='prompt']:first-child {
+  margin-top: 0;
+}
+
+.line[data-kind='prompt']::before {
+  content: '$ ';
+  color: var(--sev-verified);
+}
+
+.line[data-kind='dim'] {
+  color: var(--ink-faint);
+}
+
+.line[data-kind='error'] {
+  color: var(--sev-failure);
+}
+
+.line[data-kind='ok']::before {
+  content: '✓ ';
+  color: var(--sev-verified);
+}
+
+/* A block of prose from the program gets air above it, so a wall of scrollback
+   still has a shape when skimmed. */
+.line[data-kind='out'] {
+  margin-top: var(--s3);
+}
+
+.line[data-kind='out'] + .line[data-kind='out'] {
+  margin-top: 0;
+}
+
+/* An agent's own line, marked so it is not read as program output. */
+.line[data-kind='agent'] {
+  margin-top: var(--s5);
+  color: var(--ink);
+}
+
+.line[data-kind='agent']::before {
+  content: '● ';
+  color: var(--ink-faint);
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  vertical-align: text-bottom;
+  background: var(--ink-dim);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+/* The row of facts a terminal never shows but you always want: which checkout
+   this is rooted in, and what the pty is actually sized to. */
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  height: var(--status-h);
+  flex-shrink: 0;
+  padding: 0 var(--s6);
+  background: var(--ground);
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.status__spacer {
+  flex: 1;
+}
+
+.status em {
+  font-style: normal;
+  color: var(--ink-dim);
+}
+
+/* Covers the whole column, header included: two stacked 36px strips would
+   spend a bar saying the same thing twice. */
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.surface {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  animation: surface-in var(--medium) var(--ease-out) both;
+}
+
+.surface__body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Right panel ──────────────────────────────────────────────────────── */
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+}
+
+/* The right end is reserved for the window controls that float above it, so a
+   tab never ends up underneath an unclickable corner. */
+.panel__tabs {
+  display: flex;
+  align-items: stretch;
+  height: var(--chrome-h);
+  flex-shrink: 0;
+  padding: 0 var(--window-controls-w) 0 var(--s2);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+
+/* Same reservation for the stage strip, which owns the right edge whenever the
+   panel is closed. */
+.shell[data-panel='closed'] .tabs {
+  padding-right: var(--window-controls-w);
+}
+
+.panel__tab {
+  position: relative;
+  padding: 0 var(--s4);
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: var(--text-small);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--fast) var(--ease);
+}
+
+.panel__tab::after {
+  content: '';
+  position: absolute;
+  left: var(--s3);
+  right: var(--s3);
+  bottom: -1px;
+  height: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform var(--medium) var(--ease-out);
+}
+
+.panel__tab:hover {
+  color: var(--ink-dim);
+}
+
+.panel__tab[data-active='true'] {
+  color: var(--ink);
+}
+
+.panel__tab[data-active='true']::after {
+  transform: scaleX(1);
+}
+
+.panel__count {
+  margin-left: var(--s2);
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.panel__body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--s2) 0 var(--s5);
+}
+
+/* A summary the tab label cannot hold: how much is in flight, in one line. */
+.panel__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s5) var(--s4);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.panel__summary-spacer {
+  flex: 1;
+}
+
+/* ── File tree ────────────────────────────────────────────────────────── */
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  height: 25px;
+  padding-right: var(--s5);
+  border: 0;
+  background: transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: var(--text-body);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.tree-row:hover {
+  background: var(--raised);
+}
+
+.tree-row__twist {
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--ink-faint);
+  display: flex;
+  justify-content: center;
+  transition: transform var(--fast) var(--ease);
+}
+
+.tree-row[data-open='true'] .tree-row__twist {
+  transform: rotate(90deg);
+}
+
+.tree-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-row[data-status='modified'] .tree-row__name {
+  color: var(--git-modified);
+}
+
+.tree-row[data-status='added'] .tree-row__name {
+  color: var(--git-added);
+}
+
+.tree-row[data-status='deleted'] .tree-row__name {
+  color: var(--git-deleted);
+  text-decoration: line-through;
+}
+
+.tree-row[data-status='untracked'] .tree-row__name {
+  color: var(--git-untracked);
+}
+
+.tree-row[data-kind='dir'] .tree-row__name {
+  color: var(--ink);
+}
+
+/* ── Changes ──────────────────────────────────────────────────────────── */
+
+.change {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  height: 27px;
+  padding: 0 var(--s5);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.change:hover {
+  background: var(--raised);
+}
+
+.change__mark {
+  width: 11px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  text-align: center;
+}
+
+.change[data-status='modified'] .change__mark {
+  color: var(--git-modified);
+}
+
+.change[data-status='added'] .change__mark {
+  color: var(--git-added);
+}
+
+.change[data-status='deleted'] .change__mark {
+  color: var(--git-deleted);
+}
+
+.change[data-status='untracked'] .change__mark {
+  color: var(--git-untracked);
+}
+
+.change__path {
+  display: flex;
+  align-items: baseline;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-small);
+  white-space: nowrap;
+}
+
+/* The directory is the part that may be cut, and it is cut at the front:
+   `…/shell/` still locates the file, `web/src/she…` does not. The filename
+   never shrinks. */
+.change__dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  color: var(--ink-faint);
+}
+
+.change__file {
+  flex: 0 0 auto;
+  color: var(--ink);
+}
+
+/*
+ * The bar is the size of the edit, not its sign.
+ *
+ * Two numbers side by side are read one at a time; a bar answers "how big is
+ * this change" before you have read anything, which is the question you have
+ * while scanning a list of twenty.
+ */
+.change__bar {
+  display: flex;
+  gap: 1px;
+  width: 34px;
+  flex-shrink: 0;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.change__bar i {
+  background: var(--git-added);
+}
+
+.change__bar b {
+  background: var(--git-deleted);
+}
+
+.change__delta {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s3);
+  width: 62px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.change__delta i {
+  font-style: normal;
+  color: var(--git-added);
+}
+
+.change__delta b {
+  font-weight: 400;
+  color: var(--git-deleted);
+}
+
+/* ── Worktrees ────────────────────────────────────────────────────────── */
+
+/* Real git worktrees, so the row reports git's own facts: the branch, the
+   drift from its base, and how much is uncommitted. Nothing this app made up. */
+.worktree {
+  display: block;
+  width: 100%;
+  padding: var(--s4) var(--s5);
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.worktree:hover {
+  background: var(--raised);
+}
+
+.worktree[data-current='true'] {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border-left-color: var(--accent);
+}
+
+.worktree__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.worktree__branch {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  color: var(--ink-dim);
+}
+
+.worktree[data-current='true'] .worktree__branch {
+  color: var(--ink);
+}
+
+.worktree__meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s5);
+  margin-top: var(--s1);
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.worktree__folder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drift {
+  display: inline-flex;
+  gap: var(--s3);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+}
+
+.drift i {
+  font-style: normal;
+  color: var(--git-added);
+}
+
+.drift b {
+  font-weight: 400;
+  color: var(--git-deleted);
+}
+
+.drift[data-clean='true'] {
+  color: var(--ink-faint);
+}
+
+/* ── Window frame ─────────────────────────────────────────────────────── */
+
+/*
+ * The eight grab edges of an undecorated window.
+ *
+ * Above everything, so a pointer at the very edge always gets the resize
+ * rather than whatever row happens to end there. They are transparent but not
+ * empty: an element with size receives the pointer, which is the whole job.
+ */
+.resize-edge {
+  position: fixed;
+  z-index: 200;
+}
+
+/*
+ * The window needs an edge of its own.
+ *
+ * With the system frame gone there is no shadow and no outline, so a dark app
+ * on a dark desktop has no visible boundary — you cannot see where to grab
+ * because you cannot see where it ends. This hairline is that boundary; it is
+ * drawn over the top and cannot be clicked, so the grab regions above it stay
+ * reachable.
+ */
+.window-edge {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  pointer-events: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--window-radius);
+}
+
+/*
+ * Pinned to the window's own top-right corner.
+ *
+ * Fixed and not part of the grid, because every column under it can be closed,
+ * dragged narrower or left empty — and the corner is the one place a person
+ * looks for these on every desktop they have ever used.
+ */
+.window-controls {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--chrome-h);
+  padding: 0 6px 0 var(--s4);
+}
+
+.window-control {
+  width: 30px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.window-control:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Close is the one control worth telling apart, because it is the one that
+   loses work if it is hit by accident. */
+.window-control[data-close='true']:hover {
+  background: var(--sev-failure);
+  color: #fff;
+}
+
+/* ── Shared chrome bits ───────────────────────────────────────────────── */
+
+.icon-button {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.icon-button:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.icon-button[data-active='true'] {
+  color: var(--ink-dim);
+}

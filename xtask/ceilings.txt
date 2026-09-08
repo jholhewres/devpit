@@ -1,0 +1,32 @@
+# Size ceilings. One "path limit" per line.
+#
+# The ratchet only tightens: a file over its ceiling fails the guard, and so
+# does a ceiling above what the file needs. Regenerate with `cargo xtask ceilings`
+# once a file has actually got shorter.
+
+apps/desktop/src/projects.rs 412
+apps/desktop/src/sessions.rs 598
+crates/core/src/store/migrations.rs 150
+crates/core/src/store/mod.rs 183
+crates/core/src/store/projects.rs 279
+crates/core/src/store/settings.rs 129
+crates/core/src/tree.rs 220
+crates/git/src/clone.rs 150
+crates/git/src/lib.rs 146
+crates/git/src/status.rs 252
+crates/git/src/worktrees.rs 174
+crates/pty/src/lib.rs 279
+crates/rpc/src/project.rs 165
+crates/rpc/src/session.rs 210
+crates/tmux/src/lib.rs 257
+web/src/loadtest/LoadTest.tsx 149
+web/src/onboarding/ProjectStep.tsx 169
+web/src/shell/AppShell.tsx 301
+web/src/shell/RightPanel.tsx 358
+web/src/shell/Sidebar.tsx 338
+web/src/shell/WindowChrome.tsx 145
+web/src/shell/glyphs.tsx 143
+web/src/surfaces/SurfaceHost.tsx 266
+xtask/src/platform_window.rs 141
+xtask/src/ratchet.rs 189
+xtask/src/shell_boundary.rs 154

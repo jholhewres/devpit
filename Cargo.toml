@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/rpc",
+    "crates/git",
+    "crates/pty",
+    "crates/tmux",
+    "apps/desktop",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.93"
+license = "Apache-2.0"
+repository = "https://github.com/jholhewres/quockpit"
+
+[workspace.dependencies]
+quockpit-core = { path = "crates/core" }
+quockpit-rpc = { path = "crates/rpc" }
+quockpit-git = { path = "crates/git" }
+quockpit-pty = { path = "crates/pty" }
+quockpit-tmux = { path = "crates/tmux" }
+
+# The binary stays open all day with several fronts live. Size and startup are
+# not vanity here.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "s"
+
+# The shell rebuilds on every screen change in dev; without this the webview
+# wait dominates the cycle.
+[profile.dev.package."*"]
+opt-level = 2
