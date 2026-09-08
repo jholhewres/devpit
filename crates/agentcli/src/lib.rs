@@ -14,9 +14,13 @@
 //!   TTY, which is what makes it usable as a status source;
 //! - `-p --output-format stream-json` runs one turn and reports what it cost.
 
+mod catalogue;
 mod session;
 mod transcript;
 
+pub use catalogue::{
+    as_argument, read as read_agents, seed as seed_agents, Agent, Catalogue, Rejected,
+};
 pub use session::{AgentSession, Kind, Status};
 pub use transcript::{read_cost, transcript_path, Cost};
 
@@ -156,6 +160,59 @@ pub fn remove(short_id: &str) -> Result<(), AgentError> {
 
 pub fn respawn(short_id: &str) -> Result<(), AgentError> {
     run(&["respawn", short_id]).map(|_| ())
+}
+
+/// Where to seed the first set of agents from.
+///
+/// Whatever the person already has installed, rather than a copy vendored
+/// here: their set is the one they trust, and a vendored copy would be stale
+/// the week after it was taken.
+///
+/// Every directory, not the best one. Picking a single "best" needs a rule for
+/// which plugin wins, and any such rule is wrong for someone — one install had
+/// a plugin with a single agent sorting above the set of nineteen. Seeding
+/// from all of them and never overwriting gets the union with no rule at all.
+pub fn seed_sources() -> Vec<std::path::PathBuf> {
+    let Some(home) = dirs_home() else {
+        return Vec::new();
+    };
+    let mut dirs = walk_agent_dirs(&home.join(".claude/plugins/cache"));
+    let own = home.join(".claude/agents");
+    if own.is_dir() {
+        dirs.push(own);
+    }
+    dirs.sort();
+    dirs
+}
+
+fn dirs_home() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME").map(std::path::PathBuf::from)
+}
+
+/// Every `agents/` directory under a plugin cache, at any depth.
+fn walk_agent_dirs(root: &Path) -> Vec<std::path::PathBuf> {
+    fn visit(dir: &Path, depth: usize, found: &mut Vec<std::path::PathBuf>) {
+        if depth > 4 {
+            return;
+        }
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if path.file_name().is_some_and(|n| n == "agents") {
+                found.push(path);
+            } else {
+                visit(&path, depth + 1, found);
+            }
+        }
+    }
+    let mut found = Vec::new();
+    visit(root, 0, &mut found);
+    found
 }
 
 fn run(args: &[&str]) -> Result<String, AgentError> {

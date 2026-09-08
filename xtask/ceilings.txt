@@ -6,7 +6,8 @@
 
 apps/desktop/src/projects.rs 412
 apps/desktop/src/sessions.rs 598
-crates/agentcli/src/lib.rs 235
+crates/agentcli/src/catalogue.rs 366
+crates/agentcli/src/lib.rs 292
 crates/agentcli/src/session.rs 124
 crates/agentcli/src/transcript.rs 134
 crates/core/src/store/board.rs 555
