@@ -5,36 +5,17 @@
 //! terminals and writes files: reaching it is reaching the machine, and a
 //! relative path from a screen is not a path to trust.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use quockpit_core::Store;
 use quockpit_rpc::{ErrorCode, FileContents, FileSaved, RpcError};
+
+use crate::roots::root_of;
 
 /// Read no more than this in one go.
 ///
 /// A file past it is refused with its size rather than truncated: half a file
 /// in an editor is a file about to be saved with the other half gone.
 const MOST_BYTES: u64 = 2 * 1024 * 1024;
-
-fn store() -> Result<Store, RpcError> {
-    Ok(Store::open_default()?)
-}
-
-pub(crate) fn root_of(project_id: &str, worktree_id: Option<&str>) -> Result<PathBuf, RpcError> {
-    let store = store()?;
-    let row = store
-        .project(project_id)?
-        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that project is not registered"))?;
-    let root = PathBuf::from(&row.root_path);
-    if let Some(id) = worktree_id {
-        if let Some(path) = quockpit_git::worktree_path(&root, id)
-            .map_err(|err| RpcError::internal(err.to_string()))?
-        {
-            return Ok(path);
-        }
-    }
-    Ok(root)
-}
 
 fn modified(path: &Path) -> f64 {
     std::fs::metadata(path)
@@ -43,6 +24,23 @@ fn modified(path: &Path) -> f64 {
         .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|since| since.as_millis() as f64)
         .unwrap_or_default()
+}
+
+/// Why a file is too big to open, or nothing.
+///
+/// A function of its own for the same reason as `is_stale`: a test that
+/// re-states the comparison passes whether or not `file_read` still applies
+/// it, and this ceiling is what keeps a window from reading a gigabyte into
+/// memory to draw it.
+fn past_the_ceiling(path: &str, bytes: u64) -> Option<String> {
+    if bytes <= MOST_BYTES {
+        return None;
+    }
+    Some(format!(
+        "{path} is {:.1} MB — past the {} MB this opens",
+        bytes as f64 / 1_048_576.0,
+        MOST_BYTES / 1_048_576
+    ))
 }
 
 /// `file.read` — the text of a file, or why it is not text.
@@ -61,16 +59,7 @@ pub fn file_read(
         .map(|meta| meta.len())
         .unwrap_or_default();
 
-    let not_shown = if bytes > MOST_BYTES {
-        Some(format!(
-            "{} is {:.1} MB — past the {} MB this opens",
-            path,
-            bytes as f64 / 1_048_576.0,
-            MOST_BYTES / 1_048_576
-        ))
-    } else {
-        None
-    };
+    let not_shown = past_the_ceiling(&path, bytes);
 
     let text = match not_shown {
         Some(_) => None,

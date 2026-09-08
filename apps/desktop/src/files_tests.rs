@@ -1,5 +1,7 @@
 //! The rules a file read has to keep, tested against a real directory.
 
+use quockpit_core::Store;
+
 use super::*;
 
 /// A project registered in a temp store, and its root.
@@ -107,5 +109,39 @@ mod saving {
     #[test]
     fn a_file_with_no_recorded_mtime_is_saveable() {
         assert!(!is_stale(0.0, 1_700_000_000_000.0));
+    }
+}
+
+/// The read ceiling, called rather than restated.
+///
+/// Nothing else stops `file_read` from pulling a whole file into memory and
+/// handing it to a window that then has to draw it, so the threshold and the
+/// sentence it produces are both worth a test.
+mod opening {
+    use super::*;
+
+    #[test]
+    fn a_small_file_is_opened() {
+        assert_eq!(past_the_ceiling("a.txt", 4_096), None);
+    }
+
+    /// Exactly at the ceiling still opens: the rule is "past it", and an
+    /// off-by-one here would refuse a file the message says is allowed.
+    #[test]
+    fn a_file_exactly_at_the_ceiling_is_opened() {
+        assert_eq!(past_the_ceiling("a.txt", MOST_BYTES), None);
+    }
+
+    #[test]
+    fn a_file_past_the_ceiling_is_refused_with_its_size() {
+        let said = past_the_ceiling("big.bin", MOST_BYTES + 1).expect("refused");
+        assert!(
+            said.contains("big.bin"),
+            "the sentence lost the path: {said}"
+        );
+        assert!(
+            said.contains("2 MB"),
+            "the sentence lost the ceiling: {said}"
+        );
     }
 }

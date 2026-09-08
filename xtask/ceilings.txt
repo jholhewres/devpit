@@ -6,6 +6,7 @@
 
 apps/desktop/src/board.rs 300
 apps/desktop/src/files.rs 150
+apps/desktop/src/files_tests.rs 150
 apps/desktop/src/listener.rs 150
 apps/desktop/src/projects.rs 450
 apps/desktop/src/runs.rs 150

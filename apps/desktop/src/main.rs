@@ -17,6 +17,7 @@ mod in_flight;
 mod listener;
 mod projects;
 mod pty_bridge;
+mod roots;
 mod runs;
 mod sessions;
 mod settings;

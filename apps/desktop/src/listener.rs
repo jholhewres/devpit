@@ -9,7 +9,7 @@
 //! something the window draws; binding it anywhere reachable would be a way in
 //! to a process that runs terminals.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::Path;
 
@@ -95,7 +95,16 @@ fn describe(happening: &Happening) -> (String, String) {
 /// caller on loopback. A dependency here would be several thousand lines to
 /// parse a request this already refuses to over-read.
 fn read_request(stream: &mut TcpStream) -> Option<String> {
-    let mut reader = BufReader::new(stream.try_clone().ok()?);
+    read_post(BufReader::new(stream.try_clone().ok()?))
+}
+
+/// The same, from anything that yields bytes.
+///
+/// Split off the socket so a test can hand it a request instead of opening a
+/// port. The ceiling below is the only thing between a `content-length`
+/// somebody else wrote and an allocation of exactly that size, and a rule a
+/// test cannot call is a rule the test cannot guard.
+fn read_post(mut reader: impl BufRead) -> Option<String> {
     let mut length = 0usize;
 
     loop {
@@ -119,3 +128,7 @@ fn read_request(stream: &mut TcpStream) -> Option<String> {
     reader.read_exact(&mut body).ok()?;
     String::from_utf8(body).ok()
 }
+
+#[cfg(test)]
+#[path = "listener_tests.rs"]
+mod tests;

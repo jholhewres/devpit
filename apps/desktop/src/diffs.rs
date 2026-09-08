@@ -6,7 +6,7 @@
 
 use quockpit_rpc::{ErrorCode, RpcError};
 
-use crate::files::root_of;
+use crate::roots::root_of;
 
 /// `file.diff` — what is uncommitted in one file, right now.
 ///
