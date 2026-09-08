@@ -41,6 +41,13 @@ impl RingBuffer {
         if data.len() <= until_end {
             self.buf[self.head..self.head + data.len()].copy_from_slice(data);
             self.head += data.len();
+            // Keeps head inside 0..cap. Nothing downstream needs it: at
+            // head == cap every write takes the branch below, which lands on
+            // the same contents, and both `contents` and `len` answer the
+            // same either way — a mutation sweep found this and it took a
+            // property test over a thousand writes to be sure. It stays
+            // because the invariant is what makes the slicing here obviously
+            // in bounds, but it is a normalisation, not a fix.
             if self.head == cap {
                 self.head = 0;
                 self.wrapped = true;
@@ -105,6 +112,54 @@ mod tests {
         let mut ring = RingBuffer::new(4);
         ring.write(b"abcdefghij");
         assert_eq!(ring.contents(), b"ghij");
+    }
+
+    /// The buffer against the obvious model of it: keep everything, then take
+    /// the last `cap` bytes.
+    ///
+    /// The single cases above each pin one path. This walks a long sequence of
+    /// writes of every size around the capacity — under it, exactly it, over
+    /// it, and zero — and compares after each one, so a wrap that is right in
+    /// isolation and wrong in sequence has somewhere to fail.
+    ///
+    /// The sequence is generated rather than typed, and seeded, so it covers
+    /// far more than anyone writes by hand and still fails the same way twice.
+    #[test]
+    fn it_holds_the_last_bytes_written_whatever_the_sizes() {
+        for cap in [1usize, 2, 3, 4, 7, 8, 16] {
+            let mut ring = RingBuffer::new(cap);
+            let mut model: Vec<u8> = Vec::new();
+            let mut seed = 0x2545_F491_4F6C_DD1Du64;
+            let mut next = 0u8;
+
+            for _ in 0..200 {
+                // xorshift, so the sizes are spread rather than cycling.
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                let len = (seed % (cap as u64 * 2 + 2)) as usize;
+
+                let chunk: Vec<u8> = (0..len)
+                    .map(|_| {
+                        next = next.wrapping_add(1);
+                        next
+                    })
+                    .collect();
+
+                ring.write(&chunk);
+                model.extend_from_slice(&chunk);
+
+                let kept = model.len().min(cap);
+                let expected = &model[model.len() - kept..];
+                assert_eq!(
+                    ring.contents(),
+                    expected,
+                    "cap {cap}, after writing {len} bytes"
+                );
+                assert_eq!(ring.len(), kept, "cap {cap}, len after {len} bytes");
+                assert_eq!(ring.is_empty(), kept == 0, "cap {cap}");
+            }
+        }
     }
 
     #[test]

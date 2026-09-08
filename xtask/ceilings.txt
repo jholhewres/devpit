@@ -34,6 +34,7 @@ crates/git/src/invoke.rs 150
 crates/git/src/status.rs 300
 crates/git/src/worktrees.rs 200
 crates/pty/src/lib.rs 300
+crates/pty/src/ring.rs 200
 crates/rpc/src/board.rs 150
 crates/rpc/src/project.rs 200
 crates/rpc/src/session.rs 250
