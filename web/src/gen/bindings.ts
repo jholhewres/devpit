@@ -92,6 +92,27 @@ export const commands = {
 	 */
 	chatAttach: (projectId: string, path: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_attach", { projectId, path })),
 	/**
+	 *  `worktree.list` — every checkout this project's cards have, with the disk
+	 *  each one takes and the work each one is holding.
+	 */
+	worktreeList: (projectId: string) => typedError<Worktrees, RpcError>(__TAURI_INVOKE("worktree_list", { projectId })),
+	/**
+	 *  `worktree.remove` — the folder goes, the branch stays.
+	 * 
+	 *  Refuses a checkout with uncommitted work unless `even_dirty`, and the
+	 *  refusal names what would be lost rather than saying "it is dirty".
+	 */
+	worktreeRemove: (projectId: string, cardId: string, evenDirty: boolean) => typedError<Removed, RpcError>(__TAURI_INVOKE("worktree_remove", { projectId, cardId, evenDirty })),
+	/**  `worktree.prime.read` — what this project does to a fresh checkout. */
+	worktreePrimeRead: (projectId: string) => typedError<Preparation, RpcError>(__TAURI_INVOKE("worktree_prime_read", { projectId })),
+	/**
+	 *  `worktree.prime.write` — save it, refusing a command that is not installed.
+	 * 
+	 *  Refused here rather than when a card lands on a column: a typo should be
+	 *  answered while the person is still looking at what they typed.
+	 */
+	worktreePrimeWrite: (projectId: string, preparation: Preparation) => typedError<Preparation, RpcError>(__TAURI_INVOKE("worktree_prime_write", { projectId, preparation })),
+	/**
 	 *  `project.tree` — one level of the file tree, from a given worktree.
 	 * 
 	 *  One level rather than the whole tree: a monorepo has hundreds of thousands
@@ -414,6 +435,25 @@ export type CardChanged = {
 	started: Run | null,
 };
 
+/**  One checkout belonging to a card, or left over from one. */
+export type CardWorktree = {
+	/**  The card it belongs to, which is the folder's name. */
+	cardId: string,
+	/**  Present when a card by that id still exists. */
+	cardTitle: string | null,
+	folder: string,
+	branch: string | null,
+	/**
+	 *  Bytes on disk. A feature that quietly eats forty gigabytes is a feature
+	 *  people uninstall.
+	 */
+	diskBytes: number | null,
+	uncommittedFiles: number,
+	uncommittedLines: number,
+	/**  True when the folder is there and the card is not. */
+	orphan: boolean,
+};
+
 export type Change = {
 	path: string,
 	status: GitStatus,
@@ -651,6 +691,13 @@ call_id: string; output: string; is_error: boolean } |
  */
 { kind: "unknown"; text: string };
 
+/**  The preparation a project declares for a fresh checkout. */
+export type Preparation = {
+	link: string[],
+	share: ([string, string])[],
+	run: string[],
+};
+
 export type Profile = {
 	id: string,
 	/**  What the person calls this account. */
@@ -724,6 +771,17 @@ export type ProjectTree = {
 export type RejectedAgent = {
 	file: string,
 	reason: string,
+};
+
+/**  What removing a worktree would cost, when it refuses. */
+export type Removed = {
+	uncommittedFiles: number,
+	uncommittedLines: number,
+	/**
+	 *  The branch that stayed behind. The folder is disposable; the commits
+	 *  in it are not.
+	 */
+	branchKept: string | null,
 };
 
 /**  Who said it. */
@@ -877,6 +935,12 @@ export type Worktree = {
 	dirtyFiles: number | null,
 	/**  The checkout the project opens into. */
 	current: boolean,
+};
+
+export type Worktrees = {
+	worktrees: CardWorktree[],
+	/**  The whole set, so the screen can say it in one number. */
+	diskBytes: number | null,
 };
 
 /* Tauri Specta runtime */

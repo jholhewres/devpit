@@ -1,20 +1,17 @@
 //! The session step: a detached session for the card, attached on request.
-
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use devpit_agentcli as agent;
 use devpit_core::Store;
 use devpit_rpc::Step;
 use serde::Deserialize;
 
-use super::{slug, uuid_like, Finished};
+use super::{uuid_like, Finished};
 
 /// What a `session` step needs to know, out of `step.config`.
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 struct SessionConfig {
-    /// Give the session its own git worktree, named after the card.
-    worktree: bool,
     model: Option<String>,
 }
 
@@ -28,27 +25,21 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
     let config: SessionConfig = serde_json::from_str(&step.config)
         .map_err(|err| format!("this step's config is not readable: {err}"))?;
 
-    let card = store
-        .card(card_id)
-        .map_err(|err| err.to_string())?
-        .ok_or("no such card")?;
-
-    let project = store
-        .project_of_card(card_id)
-        .map_err(|err| err.to_string())?
-        .ok_or("this card has no project on disk")?;
-    let cwd = PathBuf::from(&project);
+    // The card's own checkout, created here if this is the first step that
+    // needs one. The CLI's `--worktree` is deliberately not used: it puts the
+    // checkout inside the repository, where it shows up in the file tree, in
+    // ripgrep, and one day in a commit.
+    let cwd = crate::checkout::cwd_for(store, card_id, step, |_| {})?;
 
     // A stable id chosen here rather than discovered later: it is what names
     // the transcript, and the transcript is where a session the person drove
     // by hand reports what it spent.
     let session_id = uuid_like(card_id);
-    let worktree = config.worktree.then(|| slug(&card.title));
 
     let short_id = agent::start_background(
         &cwd,
         Some(&session_id),
-        worktree.as_deref(),
+        None,
         config.model.as_deref(),
         super::hook_settings().as_deref(),
     )
@@ -57,18 +48,6 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
     let transcript = std::env::var_os("HOME")
         .map(PathBuf::from)
         .map(|home| agent::transcript_path(&home, &cwd, &session_id));
-
-    // Where this front began, recorded now because it cannot be recovered
-    // later: once the base branch moves, nothing on disk remembers.
-    if let Some(name) = &worktree {
-        let path = worktree_path(&cwd, name);
-        let base = devpit_git::head_of(&cwd).unwrap_or_default();
-        let _ = store.set_card_front(
-            card_id,
-            path.to_str(),
-            (!base.is_empty()).then_some(base.as_str()),
-        );
-    }
 
     store
         .link_session(
@@ -86,27 +65,4 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
         duration_ms: 0,
         exit_code: None,
     })
-}
-
-/// Where `--worktree <name>` puts the checkout.
-///
-/// Under the project, in `.claude/worktrees/<name>` — read off a real run
-/// rather than guessed. The first guess here was `../<name>`, which recorded a
-/// path that does not exist and would have made every diff on a card fail with
-/// a directory error, some way from the line that caused it.
-fn worktree_path(project: &Path, name: &str) -> PathBuf {
-    project.join(".claude").join("worktrees").join(name)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_front_lands_under_the_project_not_beside_it() {
-        assert_eq!(
-            worktree_path(Path::new("/home/x/repo"), "fix-auth"),
-            Path::new("/home/x/repo/.claude/worktrees/fix-auth")
-        );
-    }
 }

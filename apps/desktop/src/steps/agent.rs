@@ -1,12 +1,11 @@
 //! The agent step: one headless turn, with a schema and a ceiling.
 
-use std::path::PathBuf;
-
 use devpit_agentcli as agent;
 use devpit_core::Store;
 use devpit_rpc::Step;
 use serde::Deserialize;
 
+use super::context::{injected, Context};
 use super::{agents_dir, Finished};
 
 /// What an `agent` step needs to know, out of `step.config`.
@@ -18,11 +17,19 @@ struct AgentConfig {
     /// What to ask. The card's title and body are appended to it.
     prompt: String,
     /// A JSON Schema the answer has to satisfy.
+    #[serde(alias = "expects")]
     schema: Option<String>,
-    /// The ceiling. Absent means no ceiling, which is a choice the step makes
-    /// explicitly rather than one it falls into.
+    /// The ceiling. A step without one does not run: an agent with no ceiling
+    /// is a bill nobody agreed to.
+    #[serde(alias = "capUsd")]
     budget_usd: Option<f64>,
     model: Option<String>,
+    /// Skills this step allows. Only these; a skill the step never named does
+    /// not reach the command.
+    skills: Vec<String>,
+    /// Context to put in front of the agent, by key. Reaches the process as
+    /// environment variables and never as text pasted into a command.
+    inject: Vec<String>,
     /// The field of the answer that carries the verdict, and the value that
     /// means "not yet". Absent means this step never sends a card back.
     verdict_field: Option<String>,
@@ -38,6 +45,11 @@ pub fn run(
 ) -> Result<Finished, String> {
     let config: AgentConfig = serde_json::from_str(&step.config)
         .map_err(|err| format!("this step's config is not readable: {err}"))?;
+
+    // No ceiling, no run. Said here rather than after the money is spent.
+    let Some(cap) = config.budget_usd else {
+        return Err("this step declares no spending cap, so it does not run".to_owned());
+    };
 
     let card = store
         .card(card_id)
@@ -64,6 +76,20 @@ pub fn run(
         .as_ref()
         .map(|a| agent::as_argument(std::slice::from_ref(a)));
 
+    // The card's checkout when this step wants one, the project otherwise.
+    let cwd = crate::checkout::cwd_for(store, card_id, step, &mut on_progress)?;
+    let context = injected(
+        &Context {
+            card: card.id.clone(),
+            card_title: card.title.clone(),
+            card_body: card.body.clone(),
+            branch: card.base_ref.clone(),
+            worktree_path: Some(cwd.display().to_string()),
+            project_path: store.project_of_card(card_id).ok().flatten(),
+        },
+        &config.inject,
+    );
+
     // The hooks reach us through a settings file written next to the state,
     // so a turn tells the board what it is doing while it does it.
     let settings = super::hook_settings();
@@ -71,12 +97,13 @@ pub fn run(
     let outcome = agent::run_turn_cancellable(
         &agent::Turn {
             prompt: &prompt,
-            cwd: &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            cwd: &cwd,
             agents: argument.as_deref(),
             schema: config.schema.as_deref(),
-            budget_usd: config.budget_usd,
+            budget_usd: Some(cap),
             model: config.model.as_deref(),
             settings: settings.as_deref(),
+            env: &context,
         },
         |line| {
             // Only the assistant's own words. The stream also carries hook
@@ -137,37 +164,5 @@ fn assistant_text(line: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn an_assistant_fragment_yields_its_words() {
-        let line = r#"{"type":"assistant","message":{"content":[
-            {"type":"text","text":"Looking at the parser"}]}}"#;
-        assert_eq!(
-            assistant_text(line).as_deref(),
-            Some("Looking at the parser")
-        );
-    }
-
-    /// Thinking blocks and tool calls are not words to show.
-    #[test]
-    fn a_fragment_with_no_text_yields_nothing() {
-        let line = r#"{"type":"assistant","message":{"content":[
-            {"type":"thinking","thinking":"..."}]}}"#;
-        assert_eq!(assistant_text(line), None);
-    }
-
-    /// The machinery is not the work.
-    #[test]
-    fn the_other_lines_are_not_relayed() {
-        for line in [
-            r#"{"type":"system","subtype":"init"}"#,
-            r#"{"type":"rate_limit_event"}"#,
-            r#"{"type":"result","result":"done"}"#,
-            "not json at all",
-        ] {
-            assert_eq!(assistant_text(line), None, "{line}");
-        }
-    }
-}
+#[path = "agent_tests.rs"]
+mod tests;

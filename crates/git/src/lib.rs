@@ -20,6 +20,9 @@
 mod clone;
 mod front;
 mod invoke;
+pub mod lifecycle;
+#[cfg(test)]
+mod lifecycle_tests;
 mod log;
 mod status;
 mod worktrees;
@@ -32,6 +35,10 @@ pub(crate) use invoke::{identify, run, run_diffing};
 
 pub use clone::{clone, folder_for};
 pub use front::{changed_since, diff_file, diff_since, head_of, remove_front, unsaved_in};
+pub use lifecycle::{
+    assignable, branch_for, create, disk_usage, orphans, remove, uncommitted, worktree_home, Loss,
+    Made,
+};
 pub use log::history;
 pub use status::{changes, status, Status};
 pub use worktrees::{worktree_path, worktrees};

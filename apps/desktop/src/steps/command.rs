@@ -1,6 +1,6 @@
 //! The command step: your own command, as a lane of the board.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use devpit_core::Store;
 use devpit_rpc::Step;
@@ -25,13 +25,8 @@ pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String
         .map_err(|err| err.to_string())?
         .ok_or("this card has no project on disk")?;
 
-    // The worktree when the card has one, the project otherwise: a command
-    // about this line of work should run where that work is.
-    let cwd = PathBuf::from(
-        card.worktree_path
-            .clone()
-            .unwrap_or_else(|| project.clone()),
-    );
+    // The card's own checkout, created on the first step that needs one.
+    let cwd = crate::checkout::cwd_for(store, card_id, step, |_| {})?;
 
     let context = steps::Context {
         project: name_of(&project),

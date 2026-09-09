@@ -7,6 +7,8 @@
 
 pub mod agent;
 pub mod command;
+pub mod context;
+pub mod recipe;
 pub mod session;
 
 use std::path::PathBuf;
@@ -65,19 +67,6 @@ fn uuid_like(card_id: &str) -> String {
         &hex[16..20],
         &hex[20..32]
     )
-}
-
-/// A branch-safe name from a card title.
-fn slug(title: &str) -> String {
-    let mut out = String::new();
-    for ch in title.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-        } else if !out.ends_with('-') {
-            out.push('-');
-        }
-    }
-    out.trim_matches('-').chars().take(40).collect()
 }
 
 /// Writes the hook settings once and hands back their path.

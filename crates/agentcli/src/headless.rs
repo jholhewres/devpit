@@ -40,6 +40,11 @@ pub struct Turn<'a> {
     pub model: Option<&'a str>,
     /// A settings file for this turn — the hooks that report what it is doing.
     pub settings: Option<&'a str>,
+    /// Context the step declared, as environment variables.
+    ///
+    /// Variables and never interpolation: a branch named `fix;rm -rf /` has to
+    /// become a value, not shell syntax.
+    pub env: &'a [(String, String)],
 }
 
 #[derive(Deserialize)]
@@ -95,6 +100,7 @@ pub fn run_turn_cancellable(
     let mut child = Command::new(PROGRAM)
         .args(&argv[1..])
         .current_dir(turn.cwd)
+        .envs(turn.env.iter().map(|(key, value)| (key, value)))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -148,48 +154,6 @@ pub fn run_turn_cancellable(
         command: "headless turn".to_owned(),
         stderr: format!("the run ended with {status} before reporting a result"),
     })
-}
-
-/// Whether the answer satisfies the schema the step declared.
-///
-/// Deliberately shallow: required keys and their types, not a full JSON Schema
-/// engine. A step's schema is written next to the step, and the failure that
-/// matters is "the agent answered prose where the card expected fields".
-pub fn validates(answer: &str, schema: &str) -> Result<(), String> {
-    let answer: serde_json::Value =
-        serde_json::from_str(answer).map_err(|_| "the answer is not JSON".to_owned())?;
-    let schema: serde_json::Value =
-        serde_json::from_str(schema).map_err(|_| "the schema is not JSON".to_owned())?;
-
-    let Some(required) = schema.get("required").and_then(|r| r.as_array()) else {
-        return Ok(());
-    };
-    let properties = schema.get("properties");
-
-    for key in required.iter().filter_map(|k| k.as_str()) {
-        let Some(value) = answer.get(key) else {
-            return Err(format!("the answer has no `{key}`"));
-        };
-        let expected = properties
-            .and_then(|p| p.get(key))
-            .and_then(|p| p.get("type"))
-            .and_then(|t| t.as_str());
-        let matches = match expected {
-            Some("string") => value.is_string(),
-            Some("number") => value.is_number(),
-            Some("boolean") => value.is_boolean(),
-            Some("array") => value.is_array(),
-            Some("object") => value.is_object(),
-            _ => true,
-        };
-        if !matches {
-            return Err(format!(
-                "`{key}` should be {} and is {value}",
-                expected.unwrap_or("something else")
-            ));
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

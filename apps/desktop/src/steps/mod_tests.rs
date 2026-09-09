@@ -33,14 +33,6 @@ fn an_answer_that_is_not_json_moves_nothing() {
     assert_eq!(sends_back(REVIEW, "I think you should revise this"), None);
 }
 
-/// A branch name has to survive a title with punctuation in it.
-#[test]
-fn a_card_title_becomes_a_branch_safe_name() {
-    assert_eq!(slug("Fix the OAuth flow!"), "fix-the-oauth-flow");
-    assert_eq!(slug("  spaces  everywhere  "), "spaces-everywhere");
-    assert!(slug(&"x".repeat(80)).len() <= 40);
-}
-
 /// The same card keeps the same session id across restarts, which is what
 /// makes its transcript findable later.
 #[test]

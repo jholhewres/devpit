@@ -12,16 +12,18 @@ apps/desktop/src/files_tests.rs 150
 apps/desktop/src/listener.rs 150
 apps/desktop/src/main.rs 150
 apps/desktop/src/panes.rs 300
+apps/desktop/src/prime.rs 150
+apps/desktop/src/prime_tests.rs 150
 apps/desktop/src/projects.rs 450
 apps/desktop/src/runs.rs 150
 apps/desktop/src/sessions.rs 450
 apps/desktop/src/steps/agent.rs 200
 apps/desktop/src/steps/mod.rs 150
 apps/desktop/src/steps/mod_tests.rs 150
+apps/desktop/src/worktrees.rs 200
 crates/agentcli/src/catalogue.rs 400
 crates/agentcli/src/driver.rs 200
 crates/agentcli/src/headless.rs 200
-crates/agentcli/src/headless_tests.rs 150
 crates/agentcli/src/hooks.rs 150
 crates/agentcli/src/lib.rs 350
 crates/agentcli/src/lib_tests.rs 200
@@ -37,6 +39,8 @@ crates/core/src/tree.rs 200
 crates/git/src/clone.rs 200
 crates/git/src/front_tests.rs 200
 crates/git/src/invoke.rs 150
+crates/git/src/lifecycle.rs 250
+crates/git/src/lifecycle_tests.rs 200
 crates/git/src/status.rs 300
 crates/git/src/worktrees.rs 200
 crates/pty/src/lib.rs 250
@@ -61,7 +65,7 @@ web/src/shell/Palette.tsx 150
 web/src/shell/Panes.tsx 500
 web/src/shell/ProjectPicker.tsx 150
 web/src/shell/RightPanel.tsx 150
-web/src/shell/Settings.tsx 400
+web/src/shell/Settings.tsx 350
 web/src/shell/Sidebar.tsx 250
 web/src/shell/Tree.tsx 150
 web/src/shell/useShell.tsx 150

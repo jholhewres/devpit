@@ -429,6 +429,22 @@ impl Store {
             .optional()?)
     }
 
+    /// The id of the project a card belongs to.
+    ///
+    /// Separate from `project_of_card`, which answers with the path: the id is
+    /// what names a folder in the devpit workspace, and the path is what git
+    /// is run in.
+    pub fn project_id_of_card(&self, card_id: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT project_id FROM card WHERE id = ?1",
+                [card_id],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+
     /// What a card has cost across every run of it.
     pub fn card_cost(&self, card_id: &str) -> Result<f64, StoreError> {
         Ok(self.conn.query_row(

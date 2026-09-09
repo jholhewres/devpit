@@ -10,6 +10,7 @@ mod commands;
 // frontend's types — in a release build nothing calls it, and a module dead in
 // release should say so rather than warn about it on every build.
 mod chat;
+mod checkout;
 #[cfg(any(debug_assertions, test))]
 mod contract;
 mod diffs;
@@ -19,6 +20,7 @@ mod happening;
 mod in_flight;
 mod listener;
 mod panes;
+mod prime;
 mod projects;
 mod pty_bridge;
 mod roots;
@@ -26,6 +28,7 @@ mod runs;
 mod sessions;
 mod settings;
 mod steps;
+mod worktrees;
 
 fn main() {
     // Regenerated on every dev run so `make dev` keeps the frontend types in
@@ -82,6 +85,10 @@ fn main() {
             chat::chat_frames,
             chat::agent_profiles,
             chat::chat_attach,
+            worktrees::worktree_list,
+            worktrees::worktree_remove,
+            worktrees::worktree_prime_read,
+            worktrees::worktree_prime_write,
             projects::project_tree,
             projects::project_changes,
             projects::project_history,

@@ -1203,3 +1203,7 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 
 .tab--new { flex: none; width: 28px; padding: 0; justify-content: center; color: var(--text-3); }
 .tab--new:hover { color: var(--text); }
+
+/* A word that qualifies the row it sits in — an orphaned worktree, a stale
+   branch. Never the row's only content. */
+.pill { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--overlay); color: var(--text-3); font-size: 11px; }
