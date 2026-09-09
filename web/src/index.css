@@ -24,7 +24,9 @@ body,
 body {
   margin: 0;
   background: transparent;
-  color: var(--ink);
+  color: var(--text);
+  font-family: var(--ui);
+  font-size: 13px;
   overflow: hidden;
   /* Geist at 12–13px is drawn for this: greyscale antialiasing keeps the stems
      even, where subpixel smearing at these sizes reads as a colour fringe. */
@@ -44,15 +46,15 @@ body {
 }
 
 /* Where text is content rather than furniture. */
-.terminal-stage,
-.pty-leaf,
-.note__body,
-.change__path,
-.row__main,
-.row__meta,
-.figure__value,
+.termbody,
+.code,
+.chat__msg,
+.card__t,
+.diff,
+.ex__q,
 input,
-textarea {
+textarea,
+[contenteditable] {
   user-select: text;
   -webkit-user-select: text;
 }
@@ -77,22 +79,29 @@ ol {
 input,
 button,
 textarea {
-  font-family: inherit;
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  cursor: default;
+}
+
+svg {
+  display: block;
+  flex: none;
 }
 
 /* Scrollbars are chrome, not content: thin, and only where something scrolls. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
-}
-
 ::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
+  background: var(--scroll-thumb);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -110,122 +119,16 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 :focus-visible {
-  outline: 1px solid var(--ink-faint);
-  outline-offset: 1px;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
-.empty {
-  padding: 8px 12px;
-  color: var(--ink-faint);
-  font-size: var(--text-small);
-}
-
-.failure {
-  color: var(--sev-failure);
-  font-size: var(--text-small);
-}
-
-/*
- * The phase-zero harness, scoped.
- *
- * These rules dressed the whole window when the window was one page. They are
- * kept because the measurement they present is real, and confined to the
- * diagnostics surface so they cannot reach the shell.
- */
-
-.diagnostics .capabilities {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.diagnostics .capabilities li {
-  padding: 2px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--ink-faint);
-  font-size: var(--text-small);
-}
-
-.diagnostics .capabilities li[data-on='true'] {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--sev-verified) 45%, transparent);
-}
-
-.diagnostics header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.diagnostics .actions {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.diagnostics button {
-  padding: 4px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: var(--raised);
-  color: var(--ink);
-  font: inherit;
-  font-size: var(--text-small);
-  cursor: pointer;
-  transition:
-    border-color var(--fast) var(--ease),
-    background-color var(--fast) var(--ease);
-}
-
-.diagnostics button:hover:not(:disabled) {
-  border-color: var(--ink-faint);
-  background: var(--raised-hover);
-}
-
-.diagnostics button:disabled {
-  color: var(--ink-faint);
-  cursor: default;
-}
-
-.diagnostics .measured {
-  display: grid;
-  grid-template-columns: 11rem 1fr;
-  gap: 5px 20px;
-  margin: 12px 0;
-  padding: 12px 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-small);
-}
-
-.diagnostics .measured dt {
-  color: var(--ink-faint);
-}
-
-.diagnostics .measured dd {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-/* A bad number is drawn as bad. The gate is only useful if a failure is
-   impossible to read as a pass. */
-.diagnostics .measured dd[data-bad='true'] {
-  color: var(--sev-failure);
-}
-
-.diagnostics .terminal {
-  height: 220px;
-  margin-top: 12px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--sunken);
-  overflow: hidden;
-}
-
-.diagnostics h2 {
-  font-size: var(--text-body);
-  font-weight: 600;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

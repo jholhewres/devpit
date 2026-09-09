@@ -46,3 +46,7 @@ Thumbs.db
 
 # --- OMX ---
 .omx/
+
+# --- Python bytecode (the brand render script) ---
+__pycache__/
+*.pyc
