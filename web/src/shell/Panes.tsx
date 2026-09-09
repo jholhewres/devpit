@@ -7,9 +7,8 @@ import { useShell } from './useShell'
 /*
  * One pane visible at a time, in the order the strip gives them.
  *
- * The content here is the prototype's, and it stays in the markup rather
- * than in `mock/data.ts`: a board column's cards are what the backend will
- * replace wholesale, not field by field.
+ * The panes still holding prototype markup — skills, capabilities, MCPs,
+ * workspace, chat, diagram, excalidraw — are the M9 and M7 list.
  */
 
 export function Panes({ openFile }: { openFile: string | null }): React.JSX.Element {

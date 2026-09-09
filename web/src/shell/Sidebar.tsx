@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 
-import { ACCOUNT } from '../mock/data'
 import type { PaneName } from './paneList'
 import { useShell, type PrefsPane } from './useShell'
 
@@ -19,6 +18,7 @@ export function Sidebar({
   onSignIn: () => void
 }): React.JSX.Element {
   const shell = useShell()
+  const account = shell.account
   const [menu, setMenu] = useState<'new' | 'kit' | 'acct' | null>(null)
   const [synced, setSynced] = useState('Synced 2 minutes ago')
 
@@ -185,19 +185,19 @@ export function Sidebar({
 
           <div className="acct">
             <button className="acct__row" aria-haspopup="true" aria-expanded={menu === 'acct'} onClick={(event) => { event.stopPropagation(); setMenu(menu === 'acct' ? null : 'acct') }}>
-              <span className="acct__av">{ACCOUNT.initials}</span>
+              <span className="acct__av">{account.initials}</span>
               <span className="acct__body">
-                <span className="acct__n">{ACCOUNT.name}</span>
-                <span className="acct__e">{ACCOUNT.email}</span>
+                <span className="acct__n">{account.name}</span>
+                <span className="acct__e">{account.email ?? 'no address yet'}</span>
               </span>
               <span className="acct__chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m7 15 5-5 5 5" /></svg></span>
             </button>
             <div className="acct__pop" role="menu" hidden={menu !== 'acct'}>
               <div className="acct__head">
-                <span className="acct__av acct__av--lg">{ACCOUNT.initials}</span>
+                <span className="acct__av acct__av--lg">{account.initials}</span>
                 <span className="acct__body">
-                  <span className="acct__n">{ACCOUNT.name}</span>
-                  <span className="acct__e">{ACCOUNT.email}</span>
+                  <span className="acct__n">{account.name}</span>
+                  <span className="acct__e">{account.email ?? 'no address yet'}</span>
                 </span>
               </div>
               <div className="acct__sync"><span className="acct__dot"></span><span>{synced}</span></div>

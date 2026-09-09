@@ -1,8 +1,8 @@
 import mark from '../assets/brand/mark.png'
-import { BRANCH } from '../mock/data'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
 import { useShell } from './useShell'
+import { useTree } from './useTree'
 import { close, minimize, toggleMaximize } from './window'
 
 /*
@@ -19,7 +19,9 @@ import { close, minimize, toggleMaximize } from './window'
  * the buttons still take their own clicks.
  */
 export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
-  const { side, files, toggleSide, toggleFiles } = useShell()
+  const { side, files, toggleSide, toggleFiles, project } = useShell()
+  const { totals } = useTree(project?.id ?? null)
+  const here = project?.worktrees.find((tree) => tree.current) ?? project?.worktrees[0]
 
   return (
     <header className="top" data-tauri-drag-region>
@@ -34,19 +36,21 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
 
       <span className="drag" data-tauri-drag-region />
 
-      <button className="branch" title="Switch branch">
+      <button className="branch" title="Switch branch" hidden={!here}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
           <line x1="6" y1="3" x2="6" y2="15" />
           <circle cx="18" cy="6" r="3" />
           <circle cx="6" cy="18" r="3" />
           <path d="M18 9a9 9 0 0 1-9 9" />
         </svg>
-        <span className="branch__n">{BRANCH.name}</span>
-        <span className="branch__ahead">&uarr;{BRANCH.ahead}</span>
+        <span className="branch__n">{here?.branch}</span>
+        {here !== undefined && here.ahead > 0 && (
+          <span className="branch__ahead">&uarr;{here.ahead}</span>
+        )}
       </button>
-      <span className="netstat">
-        <span className="add">+{BRANCH.added}</span>
-        <span className="del">&minus;{BRANCH.deleted}</span>
+      <span className="netstat" hidden={totals.added + totals.removed === 0}>
+        <span className="add">+{totals.added}</span>
+        <span className="del">&minus;{totals.removed}</span>
       </span>
 
       <button

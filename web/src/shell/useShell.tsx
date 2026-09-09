@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
+import { who, type Who } from './account'
 import type { Project, Theme as StoredTheme } from '../gen/bindings'
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
@@ -51,6 +52,7 @@ interface Shell {
   reloadProjects: () => void
 
   readonly signedIn: boolean
+  readonly account: Who
   signIn: () => void
   signOut: () => void
 
@@ -73,6 +75,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [files, setFiles] = useState(true)
   const [theme, setThemeState] = useState<Theme>('dark')
   const [signedIn, setSignedIn] = useState(false)
+  const [account, setAccount] = useState<Who>(who(null))
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
   const projects = useProjects()
 
@@ -91,7 +94,10 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
 
   useEffect(() => {
     void ask(() => commands.settingsRead()).then((asked) => {
-      if (asked.data) setThemeState(asked.data.theme)
+      if (!asked.data) return
+      setThemeState(asked.data.theme)
+      setAccount(who(asked.data.account))
+      setSignedIn(asked.data.account !== null)
     })
   }, [])
 
@@ -110,6 +116,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       setTheme,
       ...projects,
       signedIn,
+      account,
       signIn: () => setSignedIn(true),
       signOut: () => {
         setSignedIn(false)
@@ -119,7 +126,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       openPrefs: (pane: PrefsPane = 'account') => setPrefs(pane),
       closePrefs: () => setPrefs(null),
     }),
-    [open, active, show, close, move, side, files, theme, setTheme, projects, signedIn, prefs],
+    [open, active, show, close, move, side, files, theme, setTheme, projects, signedIn, account, prefs],
   )
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>

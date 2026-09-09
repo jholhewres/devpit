@@ -1,6 +1,5 @@
 import { useState } from 'react'
 
-import { ACCOUNT } from '../mock/data'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 
@@ -16,7 +15,7 @@ export function Settings({
   onAddProject: () => void
   onRemove: (project: string) => void
 }): React.JSX.Element {
-  const { closePrefs, openPrefs, theme, setTheme, signOut } = useShell()
+  const { closePrefs, openPrefs, theme, setTheme, signOut, account } = useShell()
   const [synced, setSynced] = useState('Synced 2 minutes ago')
 
   const sync = (): void => {
@@ -45,10 +44,10 @@ export function Settings({
             <h1 className="prefs__h">Account</h1>
 
             <div className="acc__grid">
-              <span className="acc__big">{ACCOUNT.initials}</span>
+              <span className="acc__big">{account.initials}</span>
               <div className="acc__fields">
                 <label className="fld"><span className="fld__l">Display name</span>
-                  <span className="fld__b" contentEditable="true" role="textbox">{ACCOUNT.name}</span></label>
+                  <span className="fld__b" contentEditable="true" role="textbox">{account.name}</span></label>
                 <label className="fld"><span className="fld__l">Handle</span>
                   <span className="fld__b" contentEditable="true" role="textbox">jholhewres</span></label>
               </div>
@@ -61,7 +60,7 @@ export function Settings({
             <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8h5a5 5 0 1 1-1.5-3" /></svg><span className="acc__body">
               <span className="acc__t">Google</span><span className="acc__d">Not connected</span></span><button className="acc__act">Connect</button></div>
             <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg><span className="acc__body">
-              <span className="acc__t">Email</span><span className="acc__d">{ACCOUNT.email}</span></span><button className="acc__act">Change</button></div>
+              <span className="acc__t">Email</span><span className="acc__d">{account.email ?? 'no address yet'}</span></span><button className="acc__act">Change</button></div>
 
             <div className="acc__sub">Saved to your account</div>
             <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M15 4v16" /></svg><span className="acc__body">
