@@ -97,7 +97,22 @@ Never commit unless asked.
 
 ## Style
 
-Match the surrounding code: its comment density, its naming, its idioms.
-Comments in this repo explain *why*, not *what* — a comment restating the line
-below it is noise, and a comment recording the reason a decision went one way
-is the only durable form of that reason.
+Match the surrounding code: its naming and its idioms.
+
+Comments explain *why*, not *what*, and they are **short**. One or two lines.
+A comment restating the line below it is noise; a paragraph explaining a
+three-line function is worse, because the next reader skips both. Record the
+reason a decision went one way, then stop.
+
+Commit messages the same: a subject line that says what changed, and a body
+only when there is a reason someone would otherwise have to guess at.
+
+## Tests
+
+Fast unit tests, and visual checks where the thing is visual. Nothing that
+takes minutes, nothing that reaches the network, nothing that exercises
+GitHub.
+
+**CI is not the job until release.** `make test` passing locally is the bar.
+Do not add workflows, do not tune the ones that exist, do not chase a red
+badge — that work happens once, when there is something to release.
