@@ -39,6 +39,17 @@ fn parse(raw: &str) -> Vec<Commit> {
         .collect()
 }
 
+/// The diff one commit introduced.
+///
+/// `--first-parent` on a merge, so a merge shows what it brought in rather
+/// than replaying every commit of the branch it took.
+pub fn show(root: &Path, sha: &str) -> Result<String, GitError> {
+    run(
+        root,
+        &["show", "--format=", "--patch", "--first-parent", sha],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -6,6 +6,7 @@
 
 use tauri_specta::{collect_commands, Builder};
 
+use crate::branches;
 use crate::chat;
 use crate::mcp;
 use crate::reveal;
@@ -57,6 +58,8 @@ pub fn contract() -> Builder<tauri::Wry> {
         projects::project_tree,
         projects::project_changes,
         projects::project_history,
+        branches::branch_list,
+        branches::branch_switch,
         projects::project_notes,
         projects::project_note_add,
         board::board_get,
@@ -74,6 +77,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         staging::changes_commit,
         saves::file_write,
         diffs::file_diff,
+        diffs::commit_diff,
         in_flight::run_cancel,
         front::card_archive,
         front::card_diff,

@@ -26,14 +26,21 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
   const [split, setSplit] = useState(false)
   const [shown, setShown] = useState(HUNKS_AT_ONCE)
 
+  /* A commit's diff and a file's diff are two questions, and the tab says
+     which one it is asking. */
+  const ofCommit = tab.id.startsWith('commit:')
+
   useEffect(() => {
     if (!project || !path) return
     setShown(HUNKS_AT_ONCE)
-    void ask(() => commands.fileDiff(project.id, null, path)).then((answer) => {
+    const call = ofCommit
+      ? () => commands.commitDiff(project.id, null, path)
+      : () => commands.fileDiff(project.id, null, path)
+    void ask(call).then((answer) => {
       setRaw(answer.data ?? '')
       setError(answer.error)
     })
-  }, [project, path])
+  }, [project, path, ofCommit])
 
   const files = parse(raw)
   const hunks = files.flatMap((file) => file.hunks)
@@ -45,7 +52,7 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
       <div className="pane__bar">
         <span className="pane__t">
           <b>{path?.split('/').pop() ?? 'Diff'}</b>
-          {' · against HEAD'}
+          {ofCommit ? ' · this commit' : ' · against HEAD'}
         </span>
         <span className="drag" />
         <button className="chip" onClick={() => setSplit((was) => !was)}>
@@ -65,7 +72,9 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
         )}
         {binary && <div className="exempty__t">This file is binary; there is nothing to line up.</div>}
         {!error && !binary && hunks.length === 0 && (
-          <div className="exempty__t">No change against HEAD.</div>
+          <div className="exempty__t">
+            {ofCommit ? 'This commit changed nothing.' : 'No change against HEAD.'}
+          </div>
         )}
 
         {hunks.slice(0, shown).map((hunk, at) =>

@@ -147,6 +147,15 @@ export const commands = {
 	projectChanges: (projectId: string, worktreeId: string | null) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("project_changes", { projectId, worktreeId })),
 	/**  `project.history` — the last few commits of a checkout. */
 	projectHistory: (projectId: string, worktreeId: string | null) => typedError<ProjectHistory, RpcError>(__TAURI_INVOKE("project_history", { projectId, worktreeId })),
+	/**  `branch.list` — the local branches, the current one first. */
+	branchList: (projectId: string, worktreeId: string | null) => typedError<Branches, RpcError>(__TAURI_INVOKE("branch_list", { projectId, worktreeId })),
+	/**
+	 *  `branch.switch` — moves the checkout, or says why git would not.
+	 * 
+	 *  git's own refusal is passed through: it names the files that would be
+	 *  lost, and a summary here would name fewer.
+	 */
+	branchSwitch: (projectId: string, worktreeId: string | null, name: string) => typedError<Branches, RpcError>(__TAURI_INVOKE("branch_switch", { projectId, worktreeId, name })),
 	/**  `project.notes` — the notes pinned to a project. */
 	projectNotes: (projectId: string) => typedError<ProjectNotes, RpcError>(__TAURI_INVOKE("project_notes", { projectId })),
 	/**  `project.note_add` — capture, in one keystroke and no form. */
@@ -204,6 +213,8 @@ export const commands = {
 	 *  checkout as it stands.
 	 */
 	fileDiff: (projectId: string, worktreeId: string | null, path: string) => typedError<string, RpcError>(__TAURI_INVOKE("file_diff", { projectId, worktreeId, path })),
+	/**  `commit.diff` — the patch one commit introduced. */
+	commitDiff: (projectId: string, worktreeId: string | null, sha: string) => typedError<string, RpcError>(__TAURI_INVOKE("commit_diff", { projectId, worktreeId, sha })),
 	/**
 	 *  `run.cancel` — stops a run, and says so on the card.
 	 * 
@@ -434,6 +445,20 @@ export type Board = {
 	columns: Column[],
 	cards: Card[],
 	steps: Step[],
+};
+
+export type Branch = {
+	name: string,
+	current: boolean,
+	/**
+	 *  The subject of its last commit, so a name nobody remembers still says
+	 *  what it is.
+	 */
+	subject: string,
+};
+
+export type Branches = {
+	branches: Branch[],
 };
 
 /**  How a tool call ended, or that it has not. */

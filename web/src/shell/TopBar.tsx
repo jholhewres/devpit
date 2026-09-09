@@ -1,4 +1,5 @@
 import mark from '../assets/brand/mark.png'
+import { BranchPicker } from './BranchPicker'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
 import { useShell } from './useShell'
@@ -36,20 +37,7 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
 
       <span className="drag" data-tauri-drag-region />
 
-      {/* A label, not a control: switching branch is not built, and a button
-          titled "Switch branch" that does nothing is worse than the name. */}
-      <span className="branch" title="The branch this checkout is on" hidden={!here}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="6" y1="3" x2="6" y2="15" />
-          <circle cx="18" cy="6" r="3" />
-          <circle cx="6" cy="18" r="3" />
-          <path d="M18 9a9 9 0 0 1-9 9" />
-        </svg>
-        <span className="branch__n">{here?.branch}</span>
-        {here !== undefined && here.ahead > 0 && (
-          <span className="branch__ahead">&uarr;{here.ahead}</span>
-        )}
-      </span>
+      {here && <BranchPicker branch={here.branch} ahead={here.ahead} />}
       <span className="netstat" hidden={totals.added + totals.removed === 0}>
         <span className="add">+{totals.added}</span>
         <span className="del">&minus;{totals.removed}</span>

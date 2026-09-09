@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { Changes } from './Changes'
+import { History } from './History'
 import { Tree } from './Tree'
 import { useShell } from './useShell'
 import { useTree } from './useTree'
@@ -14,6 +15,7 @@ const Icon = ({ d, size = 15 }: { d: string; size?: number }): React.JSX.Element
 const FOLDER = 'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
 const UPLOAD = 'M12 16V4M8 8l4-4 4 4M4 20h16'
 const COLLAPSE = 'M4 7h16M4 12h16M4 17h16'
+const CLOCK = 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'
 const REFRESH = 'M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5'
 const SEARCH = 'm21 21-4.3-4.3'
 
@@ -22,7 +24,7 @@ const SEARCH = 'm21 21-4.3-4.3'
 export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void }): React.JSX.Element {
   const { project } = useShell()
   const tree = useTree(project?.id ?? null)
-  const [view, setView] = useState<'tree' | 'changes'>('tree')
+  const [view, setView] = useState<'tree' | 'changes' | 'history'>('tree')
   const [mode, setMode] = useState<'names' | 'contents'>('names')
   const [query, setQuery] = useState('')
   const [flags, setFlags] = useState({ case: false, word: false, regex: false })
@@ -45,6 +47,10 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
           <Icon d={UPLOAD} size={14} />
           Changes
           <span className="rtab__n">{tree.changes.length}</span>
+        </button>
+        <button className="rtab" aria-selected={view === 'history'} onClick={() => setView('history')}>
+          <Icon d={CLOCK} size={14} />
+          History
         </button>
       </div>
 
@@ -96,6 +102,12 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
 
       <div className="rview" data-rview="changes" data-open={String(view === 'changes')}>
         <Changes tree={tree} />
+      </div>
+
+      <div className="rview" data-rview="history" data-open={String(view === 'history')}>
+        <div className="git__body">
+          <History />
+        </div>
       </div>
     </aside>
   )

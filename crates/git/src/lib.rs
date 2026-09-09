@@ -47,7 +47,7 @@ pub use lifecycle::{
     assignable, branch_for, create, disk_usage, orphans, remove, uncommitted, worktree_home, Loss,
     Made,
 };
-pub use log::history;
+pub use log::{history, show};
 pub use status::{changes, status, Status};
 pub use worktrees::{worktree_path, worktrees};
 

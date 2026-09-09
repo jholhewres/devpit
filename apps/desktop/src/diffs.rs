@@ -28,3 +28,15 @@ pub fn file_diff(
 
     devpit_git::diff_file(&root, &path).map_err(|err| RpcError::internal(err.to_string()))
 }
+
+/// `commit.diff` — the patch one commit introduced.
+#[tauri::command]
+#[specta::specta]
+pub fn commit_diff(
+    project_id: String,
+    worktree_id: Option<String>,
+    sha: String,
+) -> Result<String, RpcError> {
+    let root = root_of(&project_id, worktree_id.as_deref())?;
+    devpit_git::show(&root, &sha).map_err(|err| RpcError::new(ErrorCode::Conflict, err.to_string()))
+}

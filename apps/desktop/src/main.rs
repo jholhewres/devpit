@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod board;
+mod branches;
 mod claims;
 mod columns;
 mod commands;
@@ -97,6 +98,8 @@ fn main() {
             projects::project_tree,
             projects::project_changes,
             projects::project_history,
+            branches::branch_list,
+            branches::branch_switch,
             projects::project_notes,
             projects::project_note_add,
             board::board_get,
@@ -114,6 +117,7 @@ fn main() {
             staging::changes_commit,
             saves::file_write,
             diffs::file_diff,
+            diffs::commit_diff,
             in_flight::run_cancel,
             front::card_archive,
             front::card_diff,
