@@ -42,6 +42,8 @@ work stands, and a number on every agent call.
   already have open, not in a new one.
 - **Your columns.** Rename them, reorder them, add your own, decide which one
   runs what.
+- **Each column composes its own step** — which agent, on which model, with
+  which skills and which slice of the card's context.
 - **A spending cap on every agent call**, and the real cost written on the card
   when it finishes.
 - **Agents are files** — markdown with frontmatter in `~/.devpit/agents/`. Write
@@ -53,14 +55,15 @@ work stands, and a number on every agent call.
 ## How the board works
 
 ```
-      [inbox]      [refine]      [review]       [doing]       [check]       [ship]
-         │             │             │             │             │             │
-     you write       agent         agent       a session       agent       your own
-     the card      headless      headless      you drive     headless       command
-                       └─────────────┘                           └─────────────┘
-                         no terminal                               no terminal
-                                                   ▲
-                                        the one target terminal
+      [inbox]       [refine]       [review]        [doing]        [check]        [ship]
+         │              │              │              │              │              │
+     you write       planner        critic        executor       verifier       your own
+     the card        · opus         · opus        · sonnet       · sonnet        command
+         —            agent          agent         session         agent         command
+                        └──────────────┘                             └──────────────┘
+                          no terminal                                  no terminal
+                                                      ▲
+                                           the one target terminal
 ```
 
 A column either does nothing, or runs one of three kinds of step:
@@ -73,6 +76,39 @@ A column either does nothing, or runs one of three kinds of step:
 | How many at once | several | **one** | several |
 
 The flow above is just the default board for a new project.
+
+### A column composes the step
+
+A step is not "call an agent". It is a recipe the column holds, and moving a
+card resolves it into one invocation:
+
+| | |
+|---|---|
+| `agent` | who does it — `architect`, `executor`, `reviewer` |
+| `model` | which model that call runs on |
+| `skills` | what knowledge is loaded for it, and nothing else |
+| `inject` | which of the card's context reaches it |
+| `capUsd` | the ceiling it may spend |
+| `expects` | the shape the answer has to satisfy |
+
+Agents come from your machine — the ones you wrote in `~/.devpit/agents/`, and
+the ones your tooling already installed. devpit **references them, never copies
+them**: whatever owns a catalogue keeps owning it.
+
+The point is scope. Twenty agents and forty skills that are available everywhere
+end up loaded everywhere, and you pay for all of it on every call. A column says
+*this* step is that one agent, on that model, with those two skills — and that
+is all that gets sent.
+
+### Nothing advances on its own
+
+A step that finishes does not push the card. It writes down what happened —
+output, exit code, real cost — and stops. The next move is yours.
+
+There is no orchestrator in devpit because the orchestrator is you. That absence
+is the product, not a gap in it: orchestration that keeps itself going is
+orchestration you cannot see, and losing sight of the work is the problem this
+attacks.
 
 **No card, just a terminal.** Open devpit, type into it, and your agent CLI
 behaves exactly as it always has. The board is an optional source of work, not a

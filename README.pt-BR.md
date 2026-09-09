@@ -43,6 +43,8 @@ está, e um número em cada chamada de agente.
   terminal que você já tem aberto, não em um novo.
 - **As colunas são suas.** Renomeie, reordene, crie as suas, decida qual executa
   o quê.
+- **Cada coluna compõe a própria etapa** — qual agente, em qual modelo, com
+  quais skills e com que fatia do contexto do card.
 - **Teto de gasto em toda chamada de agente**, e o custo real escrito no card
   quando ela termina.
 - **Agentes são arquivos** — markdown com frontmatter em `~/.devpit/agents/`.
@@ -55,15 +57,15 @@ está, e um número em cada chamada de agente.
 ## Como o quadro funciona
 
 ```
-     [inbox]     [refinar]    [revisar]     [fazendo]   [conferir]   [entregar]
-        │            │            │             │            │            │
-   você escreve    agente       agente       uma sessão    agente     comando seu
-     o card       headless     headless      que você     headless    (testes,
-                                              conduz                    deploy)
-                      └────────────┘                          └────────────┘
-                       sem terminal                            sem terminal
-                                                 ▲
-                                      o único terminal alvo
+      [inbox]       [refinar]      [revisar]      [fazendo]     [conferir]     [entregar]
+         │              │              │              │              │              │
+   você escreve      planner        critic        executor       verifier        comando
+      o card         · opus         · opus        · sonnet       · sonnet          seu
+         —            agent          agent         session         agent         command
+                        └──────────────┘                             └──────────────┘
+                         sem terminal                                 sem terminal
+                                                      ▲
+                                            o único terminal alvo
 ```
 
 Uma coluna ou não faz nada, ou executa um de três tipos de etapa:
@@ -76,6 +78,39 @@ Uma coluna ou não faz nada, ou executa um de três tipos de etapa:
 | Quantos por vez | vários | **um** | vários |
 
 O fluxo acima é só o quadro padrão de um projeto novo.
+
+### A coluna compõe a etapa
+
+Uma etapa não é "chama um agente". É uma receita que a coluna guarda, e mover
+o card a resolve numa invocação:
+
+| | |
+|---|---|
+| `agent` | **quem** faz — `architect`, `executor`, `reviewer` |
+| `model` | em **qual modelo** aquela chamada roda |
+| `skills` | que conhecimento é carregado para ela, e nada além |
+| `inject` | que parte do contexto do card chega nela |
+| `capUsd` | o teto que ela pode gastar |
+| `expects` | o formato que a resposta tem que cumprir |
+
+Os agentes vêm da sua máquina — os que você escreveu em `~/.devpit/agents/` e os
+que sua ferramenta já instalou. O devpit **referencia, nunca copia**: quem é
+dono de um catálogo continua sendo.
+
+O ponto é escopo. Vinte agentes e quarenta skills disponíveis em todo lugar
+acabam carregados em todo lugar, e você paga por tudo isso em cada chamada. A
+coluna diz que *esta* etapa é aquele agente, naquele modelo, com aquelas duas
+skills — e é só isso que é enviado.
+
+### Nada avança sozinho
+
+Uma etapa que termina não empurra o card. Ela anota o que aconteceu — saída,
+código de saída, custo real — e para. O próximo movimento é seu.
+
+Não existe orquestrador no devpit porque o orquestrador é você. Essa ausência é
+o produto, não uma lacuna nele: orquestração que se mantém sozinha é
+orquestração que você não vê, e perder de vista o trabalho é o problema que isto
+ataca.
 
 **Sem card, só o terminal.** Abra o devpit, digite, e sua CLI de agente se
 comporta exatamente como sempre se comportou. O quadro é uma fonte opcional de
