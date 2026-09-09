@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc;
 
-use crate::{Counters, RingBuffer, BETWEEN_READS, FRAME};
+use crate::{Counters, RingBuffer, Scanner, Told, BETWEEN_READS, FRAME};
 
 /// What a failed read means for the session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,12 +57,14 @@ const EIO: i32 = 5;
 
 /// Starts the thread that drains `reader` into frames, scrollback and
 /// whatever the terminal said about itself along the way.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn start(
     mut reader: Box<dyn Read + Send>,
     mut child: Box<dyn portable_pty::Child + Send + Sync>,
     counters: Arc<Counters>,
     ring: Arc<Mutex<RingBuffer>>,
     tx: mpsc::Sender<Vec<u8>>,
+    told_tx: mpsc::Sender<Told>,
 ) {
     // A blocking thread, not a tokio task: reading a pty fd blocks, and
     // blocking inside the runtime starves every other task on that worker.
@@ -70,6 +72,7 @@ pub(crate) fn start(
         let mut buf = [0u8; 64 * 1024];
         let mut pending: Vec<u8> = Vec::with_capacity(64 * 1024);
         let mut last_flush = std::time::Instant::now();
+        let mut scanner = Scanner::new();
 
         loop {
             let mut had_nothing = false;
@@ -81,6 +84,11 @@ pub(crate) fn start(
                     if let Ok(mut ring) = ring.lock() {
                         ring.write(chunk);
                     }
+                    // Read here rather than in the terminal widget, so a
+                    // session with no open tab still knows its command failed.
+                    scanner.scan(chunk, |one| {
+                        let _ = told_tx.try_send(one);
+                    });
                     pending.extend_from_slice(chunk);
                 }
                 Err(error) => {

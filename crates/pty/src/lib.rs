@@ -22,9 +22,11 @@
 //!
 //! Points 3 and 4 are not built yet; the shape here is what they attach to.
 
+mod osc;
 mod reader;
 mod ring;
 
+pub use osc::{Scanner, Told, MOST_CARRIED};
 pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;
 
@@ -78,6 +80,14 @@ pub struct Counters {
 pub struct Session {
     /// Frames of raw bytes, already coalesced.
     pub frames: mpsc::Receiver<Vec<u8>>,
+    /// What the terminal said about itself while producing those bytes.
+    ///
+    /// A separate channel from the frames because the two have opposite
+    /// deadlines: a frame is late if it misses the next paint, and a title is
+    /// late if it misses the next glance. Dropping one must never delay the
+    /// other. Taken with [`Session::take_told`], because relaying it happens
+    /// somewhere other than where the frames are drained.
+    told: Option<mpsc::Receiver<Told>>,
     pub counters: Arc<Counters>,
     pub ring: Arc<std::sync::Mutex<RingBuffer>>,
     writer: Option<Box<dyn Write + Send>>,
@@ -109,6 +119,14 @@ impl Session {
         master
             .resize(size)
             .map_err(|err| PtyError::Open(err.to_string()))
+    }
+
+    /// Hands over what the terminal says about itself, once.
+    ///
+    /// Once because there is one stream of it: two takers would each get a
+    /// share of the sequences and both would draw a pane half told.
+    pub fn take_told(&mut self) -> Option<mpsc::Receiver<Told>> {
+        self.told.take()
     }
 
     /// Hands the io ends to whoever will serve `session.write` while frames drain.
@@ -151,13 +169,25 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
     // the reader waits, which is backpressure reaching the writing process —
     // exactly what a terminal is supposed to do.
     let (tx, frames) = mpsc::channel::<Vec<u8>>(256);
+    // Small, and dropped when full rather than waited on. These are things the
+    // screen would like to know; a listener that stopped draining must not be
+    // able to stall the bytes of a terminal.
+    let (told_tx, told) = mpsc::channel::<Told>(64);
     let counters = Arc::new(Counters::default());
     let ring = Arc::new(std::sync::Mutex::new(RingBuffer::new(RING_BYTES)));
 
-    reader::start(reader, child, Arc::clone(&counters), Arc::clone(&ring), tx);
+    reader::start(
+        reader,
+        child,
+        Arc::clone(&counters),
+        Arc::clone(&ring),
+        tx,
+        told_tx,
+    );
 
     Ok(Session {
         frames,
+        told: Some(told),
         counters,
         ring,
         writer: Some(writer),

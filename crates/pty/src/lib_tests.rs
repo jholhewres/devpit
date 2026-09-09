@@ -53,6 +53,35 @@ async fn bytes_written_to_the_pty_come_back_in_frames() {
     );
 }
 
+/// The scanner has to be on the byte path, not beside it.
+///
+/// Its own tests feed it slices. This one runs a real process that prints a
+/// real escape sequence and reads what came back out of the session, which is
+/// the only way to catch it being wired up to nothing.
+#[tokio::test]
+async fn what_the_terminal_says_about_itself_reaches_the_session() {
+    let mut cmd = CommandBuilder::new("sh");
+    cmd.arg("-c");
+    cmd.arg(r"printf '\033]7;file:///tmp\007\033]133;D;3\007'");
+
+    let mut session = spawn(cmd, size()).expect("spawn");
+    while session.frames.recv().await.is_some() {}
+
+    let mut telling = session.take_told().expect("the session says nothing");
+    let mut told = Vec::new();
+    while let Ok(one) = telling.try_recv() {
+        told.push(one);
+    }
+    assert_eq!(
+        told,
+        vec![
+            Told::Cwd("/tmp".to_owned()),
+            Told::CommandEnded { code: Some(3) }
+        ],
+        "the scanner is not reading the stream"
+    );
+}
+
 /// The point of coalescing: a flood must not become one message per read.
 #[tokio::test]
 async fn a_flood_is_coalesced_into_far_fewer_frames_than_reads() {
