@@ -1,6 +1,7 @@
 import mark from '../assets/brand/mark.png'
 import { BoardPane } from './BoardPane'
 import { FilePane } from './FilePane'
+import { TerminalPane } from './TerminalPane'
 import { useShell } from './useShell'
 
 /*
@@ -499,22 +500,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
 
             {/* Terminal */}
             <div className="pane pane--term" data-pane="term" data-show={String(active === 'term')}>
-              <div className="pane__bar">
-                <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m4 17 6-6-6-6M12 19h8" /></svg></span>
-                <span className="pane__t"><b>&hellip;vate/devpit</b></span>
-                <span className="drag"></span>
-                <button className="sq26 tip" data-tip="New terminal" aria-label="New terminal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></button>
-                <button className="sq26" onClick={() => close('term')} aria-label="Close terminal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
-              </div>
-              <div className="termbody"><span className="t-arrow">&#10230;</span>  <span className="t-dir">devpit</span> <span className="t-git">git:(</span><span className="t-branch">main</span><span className="t-git">)</span> <span className="t-dirty">&#10007;</span> make test
-
-    <span className="t-ok">running 37 tests</span>
-    .....................................
-    test result: <span className="t-ok">ok</span>. 37 passed
-
-    <span className="t-warn">all green</span>
-
-    <span className="t-arrow">&#10230;</span>  <span className="t-dir">devpit</span> <span className="t-git">git:(</span><span className="t-branch">main</span><span className="t-git">)</span> <span className="t-dirty">&#10007;</span> <span className="caret"></span></div>
+              <TerminalPane />
             </div>
 
           </div>

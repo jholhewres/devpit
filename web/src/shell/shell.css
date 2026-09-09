@@ -1186,3 +1186,6 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .row__g--modified { color: var(--warning); }
 .row__g--added, .row__g--untracked { color: var(--success); }
 .row__g--deleted { color: var(--danger); }
+
+.termhost { flex: 1; min-height: 0; padding: 8px 4px 8px 12px; }
+.termhost .xterm { height: 100%; }
