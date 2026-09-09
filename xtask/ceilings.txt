@@ -5,12 +5,14 @@
 # once a file has actually got shorter.
 
 apps/desktop/src/board.rs 300
+apps/desktop/src/claims.rs 200
 apps/desktop/src/files.rs 150
 apps/desktop/src/files_tests.rs 150
 apps/desktop/src/listener.rs 150
+apps/desktop/src/panes.rs 300
 apps/desktop/src/projects.rs 450
 apps/desktop/src/runs.rs 150
-apps/desktop/src/sessions.rs 650
+apps/desktop/src/sessions.rs 450
 apps/desktop/src/steps/agent.rs 200
 apps/desktop/src/steps/mod.rs 150
 apps/desktop/src/steps/mod_tests.rs 150
@@ -33,15 +35,19 @@ crates/git/src/front_tests.rs 200
 crates/git/src/invoke.rs 150
 crates/git/src/status.rs 300
 crates/git/src/worktrees.rs 200
-crates/pty/src/lib.rs 300
-crates/pty/src/ring.rs 200
+crates/pty/src/lib.rs 250
+crates/pty/src/osc.rs 250
+crates/pty/src/osc_tests.rs 200
+crates/pty/src/reader.rs 150
+crates/pty/src/ring_tests.rs 150
 crates/rpc/src/board.rs 150
 crates/rpc/src/project.rs 200
-crates/rpc/src/session.rs 250
+crates/rpc/src/session_tree.rs 300
+crates/rpc/src/session_tree_tests.rs 250
 crates/steps/src/context.rs 150
 crates/steps/src/manifest.rs 150
 crates/steps/src/runner.rs 150
-crates/tmux/src/lib.rs 300
+crates/tmux/src/lib.rs 250
 web/src/board/BoardSurface.tsx 250
 web/src/board/CardTile.tsx 200
 web/src/board/Lane.tsx 150

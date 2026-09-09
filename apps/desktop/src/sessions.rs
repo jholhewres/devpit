@@ -1,40 +1,43 @@
-//! Session commands: tmux owns the process, this layer attaches a client.
+//! The pane tree of a project: what is open, where, and which one has focus.
+//!
+//! tmux owns the processes. This layer owns the shape they are arranged in,
+//! and [`crate::panes`] owns a single live one. The split follows the two
+//! questions: a drag changes the tree, and typing changes a pane.
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use devpit_core::Store;
 use devpit_git::worktree_path;
 use devpit_rpc::{ErrorCode, LayoutNode, RpcError, SessionLayout, SplitDirection};
-use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize};
-use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::State;
 use ulid::Ulid;
 
+use crate::claims::Claims;
+
 pub struct SessionState {
-    lives: Mutex<HashMap<String, Arc<Live>>>,
-    claims: Mutex<HashMap<String, String>>,
-    latest_clients: Mutex<HashMap<String, String>>,
+    /// The handle a pane relays what it hears through.
+    app: tauri::AppHandle,
+    /// Who owns each pane right now. See [`crate::claims`].
+    pub(crate) claims: Claims,
+    /// One lock per project, so two windows arranging two different projects
+    /// do not queue behind each other.
     project_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
 }
 
-struct Live {
-    client_id: String,
-    writer: Mutex<Box<dyn Write + Send>>,
-    master: Mutex<Box<dyn MasterPty + Send>>,
-    killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
-}
-
 impl SessionState {
-    pub fn new() -> Self {
+    pub fn new(app: tauri::AppHandle) -> Self {
         Self {
-            lives: Mutex::new(HashMap::new()),
-            claims: Mutex::new(HashMap::new()),
-            latest_clients: Mutex::new(HashMap::new()),
+            app,
+            claims: Claims::new(),
             project_locks: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Where a pane's news goes.
+    pub(crate) fn app(&self) -> &tauri::AppHandle {
+        &self.app
     }
 
     fn project_lock(&self, project_id: &str) -> Result<Arc<Mutex<()>>, RpcError> {
@@ -47,75 +50,6 @@ impl SessionState {
                 .entry(project_id.to_owned())
                 .or_insert_with(|| Arc::new(Mutex::new(()))),
         ))
-    }
-
-    /// Claims the pane for a newer UI mount and returns its previous client.
-    fn claim_client(&self, pane_id: &str, client_id: &str) -> Result<Option<Arc<Live>>, RpcError> {
-        let mut latest = self
-            .latest_clients
-            .lock()
-            .map_err(|_| RpcError::internal("client generation lock"))?;
-        if latest
-            .get(pane_id)
-            .is_some_and(|current| current.as_str() >= client_id)
-        {
-            return Err(RpcError::new(
-                ErrorCode::Conflict,
-                "a newer client already owns that pane",
-            ));
-        }
-        latest.insert(pane_id.to_owned(), client_id.to_owned());
-        let mut claims = self
-            .claims
-            .lock()
-            .map_err(|_| RpcError::internal("session claim lock"))?;
-        claims.insert(pane_id.to_owned(), client_id.to_owned());
-        drop(claims);
-        drop(latest);
-
-        Ok(self
-            .lives
-            .lock()
-            .map_err(|_| RpcError::internal("session lock"))?
-            .remove(pane_id))
-    }
-
-    fn install_client(
-        &self,
-        pane_id: &str,
-        client_id: &str,
-        live: Arc<Live>,
-    ) -> Result<bool, RpcError> {
-        let claims = self
-            .claims
-            .lock()
-            .map_err(|_| RpcError::internal("session claim lock"))?;
-        if claims
-            .get(pane_id)
-            .is_none_or(|current| current != client_id)
-        {
-            return Ok(false);
-        }
-        self.lives
-            .lock()
-            .map_err(|_| RpcError::internal("session lock"))?
-            .insert(pane_id.to_owned(), live);
-        Ok(true)
-    }
-
-    fn release_claim(&self, pane_id: &str, client_id: &str) -> Result<bool, RpcError> {
-        let mut claims = self
-            .claims
-            .lock()
-            .map_err(|_| RpcError::internal("session claim lock"))?;
-        if claims
-            .get(pane_id)
-            .is_some_and(|current| current == client_id)
-        {
-            claims.remove(pane_id);
-            return Ok(true);
-        }
-        Ok(false)
     }
 }
 
@@ -169,14 +103,39 @@ fn encode(layout: &SessionLayout) -> Result<String, RpcError> {
     serde_json::to_string(&layout.tree).map_err(|err| RpcError::internal(err.to_string()))
 }
 
+/// Reads a stored tree, naming any boundary that predates boundary ids.
+///
+/// The naming happens on every read and costs one walk. Persisting it is the
+/// caller's business: `decode` is used from paths that only look, and a read
+/// that writes would turn opening a window into a disk write.
 fn decode(project_id: &str, tree: &str, focused_id: &str) -> Result<SessionLayout, RpcError> {
-    let tree: LayoutNode =
+    let mut tree: LayoutNode =
         serde_json::from_str(tree).map_err(|err| RpcError::internal(err.to_string()))?;
+    tree.name_the_splits(&mut || format!("sp_{}", Ulid::generate()));
     Ok(SessionLayout {
         project_id: project_id.to_owned(),
         focused_id: focused_id.to_owned(),
         tree,
     })
+}
+
+/// The layout a project has, or the error that says it has none yet.
+///
+/// One place, because four commands asked the same question in four ways and
+/// two of them phrased the missing case differently.
+pub(crate) fn layout_of(project_id: &str) -> Result<SessionLayout, RpcError> {
+    let Some((tree, focused)) = store()?.pane_layout(project_id)? else {
+        return Err(RpcError::new(
+            ErrorCode::NotFound,
+            "this project has no session yet",
+        ));
+    };
+    decode(project_id, &tree, &focused)
+}
+
+/// The argv a pty spawns to become a client of this leaf's tmux window.
+pub(crate) fn attach_argv(project_id: &str, leaf_id: &str) -> Result<Vec<String>, RpcError> {
+    Ok(tmux_server()?.attach_argv(&devpit_tmux::Server::session_name(project_id), leaf_id))
 }
 
 fn persist(store: &Store, layout: &SessionLayout) -> Result<(), RpcError> {
@@ -245,14 +204,7 @@ pub fn session_ensure(
 #[tauri::command]
 #[specta::specta]
 pub fn session_layout(project_id: String) -> Result<SessionLayout, RpcError> {
-    let store = store()?;
-    let Some((tree, focused)) = store.pane_layout(&project_id)? else {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            "this project has no session yet",
-        ));
-    };
-    decode(&project_id, &tree, &focused)
+    layout_of(&project_id)
 }
 
 /// `session.focus` — persists which leaf receives the next split or action.
@@ -267,21 +219,15 @@ pub fn session_focus(
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let store = store()?;
-    let Some((tree, _)) = store.pane_layout(&project_id)? else {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            "this project has no session yet",
-        ));
-    };
-    let layout = decode(&project_id, &tree, &leaf_id)?;
+    let mut layout = layout_of(&project_id)?;
+    layout.focused_id = leaf_id.clone();
     if !layout.tree.contains_leaf(&leaf_id) {
         return Err(RpcError::new(
             ErrorCode::NotFound,
             "that pane is not in this project's layout",
         ));
     }
-    persist(&store, &layout)?;
+    persist(&store()?, &layout)?;
     Ok(layout)
 }
 
@@ -300,17 +246,10 @@ pub fn session_split(
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
     let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
-    let store = store()?;
     let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(&project_id);
 
-    let Some((tree, focused)) = store.pane_layout(&project_id)? else {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            "this project has no session yet",
-        ));
-    };
-    let current = decode(&project_id, &tree, &focused)?;
+    let current = layout_of(&project_id)?;
     if !current.tree.contains_leaf(&leaf_id) {
         return Err(RpcError::new(
             ErrorCode::NotFound,
@@ -336,265 +275,131 @@ pub fn session_split(
         focused_id: new_id,
         tree,
     };
-    persist(&store, &layout)?;
+    persist(&store()?, &layout)?;
     Ok(layout)
 }
 
-/// `session.write` — bytes into the attached client of a leaf.
-#[tauri::command]
-#[specta::specta]
-pub fn session_write(
-    state: State<SessionState>,
-    pane_id: String,
-    data: String,
-) -> Result<(), RpcError> {
-    let live = {
-        let lives = state
-            .lives
-            .lock()
-            .map_err(|_| RpcError::internal("session lock"))?;
-        lives
-            .get(&pane_id)
-            .cloned()
-            .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that pane is not attached"))?
-    };
-    let mut writer = live
-        .writer
-        .lock()
-        .map_err(|_| RpcError::internal("writer lock"))?;
-    writer
-        .write_all(data.as_bytes())
-        .and_then(|_| writer.flush())
-        .map_err(|err| RpcError::internal(err.to_string()))
-}
-
-/// `session.resize` — the pty size of an attached leaf.
-#[tauri::command]
-#[specta::specta]
-pub fn session_resize(
-    state: State<SessionState>,
-    pane_id: String,
-    rows: u16,
-    cols: u16,
-) -> Result<(), RpcError> {
-    let live = {
-        let lives = state
-            .lives
-            .lock()
-            .map_err(|_| RpcError::internal("session lock"))?;
-        lives
-            .get(&pane_id)
-            .cloned()
-            .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that pane is not attached"))?
-    };
-    let result = live
-        .master
-        .lock()
-        .map_err(|_| RpcError::internal("master lock"))?
-        .resize(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|err| RpcError::internal(err.to_string()));
-    result
-}
-
-/// `session.detach` — closes only this app's client; tmux keeps the shell.
-#[tauri::command]
-#[specta::specta]
-pub fn session_detach(
-    state: State<SessionState>,
-    pane_id: String,
-    client_id: String,
-) -> Result<(), RpcError> {
-    let owns_claim = state.release_claim(&pane_id, &client_id)?;
-    if !owns_claim {
-        return Ok(());
-    }
-    let live = {
-        let mut lives = state
-            .lives
-            .lock()
-            .map_err(|_| RpcError::internal("session lock"))?;
-        match lives.get(&pane_id) {
-            Some(live) if live.client_id == client_id => lives.remove(&pane_id),
-            _ => None,
-        }
-    };
-    if let Some(live) = live {
-        live.killer
-            .lock()
-            .map_err(|_| RpcError::internal("killer lock"))?
-            .kill()
-            .map_err(|err| RpcError::internal(err.to_string()))?;
-    }
-    Ok(())
-}
-
-/// Attaches a client pty to the tmux window for this leaf and streams frames.
+/// `session.close_leaf` — the pane goes, and its tmux window with it.
 ///
-/// Not in the generated contract: the binary channel cannot be described by
-/// specta. The wrapper lives next to the xterm host, like `pty_drain`.
+/// The hole this fills: `session.split` could only ever add. A tree that only
+/// grows is a leak wearing a layout's clothes.
+///
+/// Refuses the last pane. A session with no pane is not a layout, and the
+/// refusal says so rather than persisting an empty tree the screen cannot draw.
 #[tauri::command]
-pub async fn session_attach(
-    state: State<'_, SessionState>,
+#[specta::specta]
+pub fn session_close_leaf(
+    state: State<SessionState>,
     project_id: String,
-    pane_id: String,
-    client_id: String,
-    rows: u16,
-    cols: u16,
-    on_frame: Channel<InvokeResponseBody>,
-) -> Result<(), RpcError> {
-    let store = store()?;
-    let Some((tree, focused)) = store.pane_layout(&project_id)? else {
+    leaf_id: String,
+) -> Result<SessionLayout, RpcError> {
+    let lock = state.project_lock(&project_id)?;
+    let _guard = lock
+        .lock()
+        .map_err(|_| RpcError::internal("project session lock"))?;
+
+    let current = layout_of(&project_id)?;
+    if !current.tree.contains_leaf(&leaf_id) {
         return Err(RpcError::new(
             ErrorCode::NotFound,
-            "this project has no session yet",
-        ));
-    };
-    let layout = decode(&project_id, &tree, &focused)?;
-    if !layout.tree.contains_leaf(&pane_id) {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            "that pane is not in this layout",
+            "that pane is not in this project's layout",
         ));
     }
-
-    let server = tmux_server()?;
-    let argv = server.attach_argv(&devpit_tmux::Server::session_name(&project_id), &pane_id);
-
-    let mut builder = CommandBuilder::new(&argv[0]);
-    for arg in &argv[1..] {
-        builder.arg(arg);
-    }
-    builder.env("TERM", "xterm-256color");
-
-    if let Some(previous) = state.claim_client(&pane_id, &client_id)? {
-        let _ = previous
-            .killer
-            .lock()
-            .map_err(|_| RpcError::internal("killer lock"))?
-            .kill();
-    }
-
-    let mut session = match devpit_pty::spawn(
-        builder,
-        PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        },
-    ) {
-        Ok(session) => session,
-        Err(err) => {
-            state.release_claim(&pane_id, &client_id)?;
-            return Err(RpcError::internal(err.to_string()));
-        }
-    };
-
-    let Some(io) = session.take_io() else {
-        state.release_claim(&pane_id, &client_id)?;
-        return Err(RpcError::internal("the pty did not expose its io handles"));
-    };
-    let live = Arc::new(Live {
-        client_id: client_id.clone(),
-        writer: Mutex::new(io.writer),
-        master: Mutex::new(io.master),
-        killer: Mutex::new(io.killer),
-    });
-    if !state.install_client(&pane_id, &client_id, Arc::clone(&live))? {
-        let _ = live
-            .killer
-            .lock()
-            .map_err(|_| RpcError::internal("killer lock"))?
-            .kill();
-        return Err(RpcError::new(
+    let tree = current.tree.close_leaf(&leaf_id).ok_or_else(|| {
+        RpcError::new(
             ErrorCode::Conflict,
-            "a newer client already owns that pane",
-        ));
-    }
+            "that is the only pane left — close the project instead",
+        )
+    })?;
 
-    while let Some(frame) = session.frames.recv().await {
-        if on_frame.send(InvokeResponseBody::Raw(frame)).is_err() {
-            break;
-        }
-    }
+    // The window goes after the tree is known to be closable, so a refusal
+    // never leaves a session whose layout and tmux disagree.
+    let session = devpit_tmux::Server::session_name(&project_id);
+    tmux_server()?
+        .kill_window(&session, &leaf_id)
+        .map_err(tmux_err)?;
 
-    if let Ok(mut lives) = state.lives.lock() {
-        let still_ours = lives
-            .get(&pane_id)
-            .is_some_and(|current| Arc::ptr_eq(current, &live));
-        if still_ours {
-            lives.remove(&pane_id);
-        }
-    }
-    let _ = state.release_claim(&pane_id, &client_id);
-    Ok(())
+    // Focus follows the tree when it pointed at what just left.
+    let focused_id = if current.focused_id == leaf_id {
+        tree.first_leaf_id().to_owned()
+    } else {
+        current.focused_id
+    };
+    let layout = SessionLayout {
+        project_id,
+        focused_id,
+        tree,
+    };
+    persist(&store()?, &layout)?;
+    Ok(layout)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// `session.rename_leaf` — the name the person gave this pane.
+///
+/// An empty name clears it, which is how a pane goes back to showing what the
+/// program running in it calls itself. The person's name always wins over the
+/// program's: a title escape arriving later must not undo a rename.
+#[tauri::command]
+#[specta::specta]
+pub fn session_rename_leaf(
+    state: State<SessionState>,
+    project_id: String,
+    leaf_id: String,
+    name: String,
+) -> Result<SessionLayout, RpcError> {
+    let lock = state.project_lock(&project_id)?;
+    let _guard = lock
+        .lock()
+        .map_err(|_| RpcError::internal("project session lock"))?;
 
-    #[test]
-    fn an_older_attach_cannot_replace_a_newer_claim() {
-        let state = SessionState::new();
-        assert!(state
-            .claim_client("leaf", "0000000000000100")
-            .expect("first claim")
-            .is_none());
+    let current = layout_of(&project_id)?;
+    let tree = current.tree.rename_leaf(&leaf_id, &name).ok_or_else(|| {
+        RpcError::new(
+            ErrorCode::NotFound,
+            "that pane is not in this project's layout",
+        )
+    })?;
+    let layout = SessionLayout {
+        project_id,
+        focused_id: current.focused_id,
+        tree,
+    };
+    persist(&store()?, &layout)?;
+    Ok(layout)
+}
 
-        let stale = state.claim_client("leaf", "0000000000000099");
-        assert!(matches!(
-            stale,
-            Err(RpcError {
-                code: ErrorCode::Conflict,
-                ..
-            })
-        ));
+/// `session.set_ratio` — where a boundary was dragged to.
+///
+/// Persisted because Orca's rule is the right one: boundaries stay where you
+/// put them, and resizing the window does not shuffle a layout someone
+/// arranged. The tree clamps, so neither side can be dragged out of reach.
+#[tauri::command]
+#[specta::specta]
+pub fn session_set_ratio(
+    state: State<SessionState>,
+    project_id: String,
+    split_id: String,
+    ratio: f64,
+) -> Result<SessionLayout, RpcError> {
+    let lock = state.project_lock(&project_id)?;
+    let _guard = lock
+        .lock()
+        .map_err(|_| RpcError::internal("project session lock"))?;
 
-        assert!(state
-            .claim_client("leaf", "0000000000000101")
-            .expect("newer claim")
-            .is_none());
-        assert!(state
-            .release_claim("leaf", "0000000000000101")
-            .expect("release"));
-        assert!(
-            state.claim_client("leaf", "0000000000000100").is_err(),
-            "an old invoke arrived after detach and reclaimed the pane"
-        );
-    }
-
-    /// The guard that keeps the socket reachable.
-    ///
-    /// Moving it under a per-project directory is the tempting change that
-    /// breaks it, and `connect(2)` reports that as "File name too long"
-    /// without naming the cause.
-    #[test]
-    fn the_tmux_socket_path_stays_short() {
-        let path = socket_path().expect("socket path");
-        let bytes = path.as_os_str().len();
-        assert!(
-            bytes <= 100,
-            "the tmux socket path is {bytes} bytes, past the ~108 the kernel allows: {}",
-            path.display()
-        );
-    }
-
-    #[test]
-    fn projects_have_independent_mutation_locks() {
-        let state = SessionState::new();
-        let a = state.project_lock("a").expect("a");
-        let a_again = state.project_lock("a").expect("a again");
-        let b = state.project_lock("b").expect("b");
-
-        assert!(Arc::ptr_eq(&a, &a_again));
-        assert!(!Arc::ptr_eq(&a, &b));
-    }
+    let current = layout_of(&project_id)?;
+    let tree = current.tree.set_ratio(&split_id, ratio).ok_or_else(|| {
+        RpcError::new(
+            ErrorCode::NotFound,
+            "no such boundary in this project's layout",
+        )
+    })?;
+    let layout = SessionLayout {
+        project_id,
+        focused_id: current.focused_id,
+        tree,
+    };
+    persist(&store()?, &layout)?;
+    Ok(layout)
 }
 
 /// `terminal.attach_agent` — brings a card's session into the target terminal.
@@ -626,9 +431,9 @@ pub fn terminal_attach_agent(
     // The terminal is made if it is not there yet. Refusing because nobody has
     // opened one is refusing over a step the product can take itself — and the
     // person clicking this on a card is asking for exactly that terminal.
-    let layout = match store.pane_layout(&project_id)? {
-        Some((tree, focused)) => decode(&project_id, &tree, &focused)?,
-        None => {
+    let layout = match layout_of(&project_id) {
+        Ok(layout) => layout,
+        Err(_) => {
             let cwd = locate_cwd(&project_id, None)?;
             load_or_create(&project_id, &cwd)?
         }

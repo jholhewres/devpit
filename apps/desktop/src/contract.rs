@@ -7,7 +7,8 @@
 use tauri_specta::{collect_commands, Builder};
 
 use crate::{
-    board, columns, commands, diffs, files, front, in_flight, projects, sessions, settings, steps,
+    board, columns, commands, diffs, files, front, in_flight, panes, projects, sessions, settings,
+    steps,
 };
 
 /// Where the generated TypeScript lands.
@@ -57,9 +58,13 @@ pub fn contract() -> Builder<tauri::Wry> {
         sessions::session_layout,
         sessions::session_focus,
         sessions::session_split,
-        sessions::session_write,
-        sessions::session_resize,
-        sessions::session_detach,
+        sessions::session_close_leaf,
+        sessions::session_rename_leaf,
+        sessions::session_set_ratio,
+        panes::session_write,
+        panes::session_resize,
+        panes::pane_scrollback,
+        panes::session_detach,
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,
