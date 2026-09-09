@@ -4,8 +4,8 @@ import { who, type Who } from './account'
 import type { Project, Theme as StoredTheme } from '../gen/bindings'
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
-import { closed, moved, opened, type Strip } from './strip'
-import { empty, remember, remembered } from './tabs'
+import type { Tab } from './strip'
+import { useTabs } from './useTabs'
 import { useProjects } from './useProjects'
 
 export type Theme = StoredTheme
@@ -31,11 +31,15 @@ export type PrefsPane =
  *             order from the strip and the reason these are two lists.
  */
 interface Shell {
-  readonly open: readonly PaneName[]
-  readonly active: PaneName | null
-  show: (name: PaneName) => void
-  close: (name: PaneName) => void
-  move: (name: PaneName, to: number) => void
+  readonly open: readonly Tab[]
+  readonly active: Tab | null
+  /** Opens a new one of a kind you can have several of; focuses the rest. */
+  show: (kind: PaneName, tab?: Partial<Tab>) => void
+  close: (id: string) => void
+  focus: (id: string) => void
+  move: (id: string, to: number) => void
+  rename: (id: string, title: string) => void
+  attach: (id: string, paneId: string) => void
 
   readonly side: boolean
   readonly files: boolean
@@ -71,7 +75,6 @@ export function useShell(): Shell {
 }
 
 export function ShellProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const [{ open, active }, setStrip] = useState<Strip>(empty)
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
   const [theme, setThemeState] = useState<Theme>('system')
@@ -79,17 +82,8 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [account, setAccount] = useState<Who>(who(null))
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
   const projects = useProjects()
-  const here = projects.project?.id ?? null
+  const tabs = useTabs(projects.project?.id ?? null)
 
-  /* The strip belongs to the project. Switching restores what that one had
-     open; the window itself opens on the empty state. */
-  useEffect(() => setStrip(remembered(here)), [here])
-  useEffect(() => remember(here, { open, active }), [here, open, active])
-
-  /* The three strip rules live in strip.ts so the tests can call them. */
-  const show = useCallback((name: PaneName) => setStrip((was) => opened(was, name)), [])
-  const close = useCallback((name: PaneName) => setStrip((was) => closed(was, name)), [])
-  const move = useCallback((name: PaneName, to: number) => setStrip((was) => moved(was, name, to)), [])
 
   /* The choice is written where the next launch will find it; the window
      paints from local state so the click does not wait on disk. */
@@ -111,11 +105,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
 
   const value = useMemo<Shell>(
     () => ({
-      open,
-      active,
-      show,
-      close,
-      move,
+      ...tabs,
       side,
       files,
       toggleSide: () => setSide((was) => !was),
@@ -138,7 +128,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       openPrefs: (pane: PrefsPane = 'account') => setPrefs(pane),
       closePrefs: () => setPrefs(null),
     }),
-    [open, active, show, close, move, side, files, theme, setTheme, projects, signedIn, account, prefs],
+    [tabs, side, files, theme, setTheme, projects, signedIn, account, prefs],
   )
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>

@@ -22,11 +22,11 @@ export function Sidebar({
   const [menu, setMenu] = useState<'new' | 'kit' | 'acct' | null>(null)
   const [synced, setSynced] = useState('Synced 2 minutes ago')
 
-  const open = (name: PaneName): void => {
-    shell.show(name)
+  const open = (kind: PaneName): void => {
+    shell.show(kind)
     setMenu(null)
   }
-  const isOpen = (name: PaneName): boolean => shell.open.includes(name)
+  const isOpen = (kind: PaneName): boolean => shell.open.some((tab) => tab.kind === kind)
   const openPrefs = (pane: PrefsPane): void => {
     shell.openPrefs(pane)
     setMenu(null)

@@ -1,57 +1,80 @@
 import { describe, expect, it } from 'vitest'
 
-import { closed, moved, opened, type Strip } from './strip'
+import { closed, focused, many, moved, opened, renamed, type Strip, type Tab } from './strip'
 
-const strip = (open: string[], active: string | null = open[0] ?? null): Strip =>
-  ({ open, active }) as Strip
+const tab = (id: string, kind = 'term'): Tab => ({ id, kind: kind as Tab['kind'] })
+const strip = (tabs: Tab[], active: string | null = tabs[0]?.id ?? null): Strip =>
+  ({ open: tabs, active })
 
-describe('opening a pane', () => {
-  it('appends it and looks at it', () => {
-    expect(opened(strip([]), 'board' as never)).toEqual({ open: ['board'], active: 'board' })
+describe('which kinds you can have several of', () => {
+  it('lets you open many terminals and chats', () => {
+    expect(many('term')).toBe(true)
+    expect(many('chat')).toBe(true)
   })
 
-  it('does not move one that is already open', () => {
-    /* Clicking a tab must not reshuffle the row under the pointer. */
-    const before = strip(['board', 'term', 'chat'] as never[], 'chat' as never)
-    expect(opened(before, 'board' as never).open).toEqual(['board', 'term', 'chat'])
+  it('keeps one board', () => {
+    expect(many('board')).toBe(false)
   })
 })
 
-describe('closing a pane', () => {
+describe('opening a tab', () => {
+  it('appends it and looks at it', () => {
+    expect(opened(strip([]), tab('t1'))).toEqual({ open: [tab('t1')], active: 't1' })
+  })
+
+  it('opens a second terminal rather than focusing the first', () => {
+    const after = opened(strip([tab('t1')]), tab('t2'))
+    expect(after.open.map((t) => t.id)).toEqual(['t1', 't2'])
+    expect(after.active).toBe('t2')
+  })
+
+  it('focuses the board that is already open instead of adding another', () => {
+    const before = strip([tab('b1', 'board'), tab('t1')], 't1')
+    const after = opened(before, tab('b2', 'board'))
+    expect(after.open).toHaveLength(2)
+    expect(after.active).toBe('b1')
+  })
+})
+
+describe('closing a tab', () => {
   it('lands on the neighbour when it was the active one', () => {
-    const before = strip(['board', 'term', 'chat'] as never[], 'term' as never)
-    expect(closed(before, 'term' as never)).toEqual({ open: ['board', 'chat'], active: 'chat' })
+    const after = closed(strip([tab('a'), tab('b'), tab('c')], 'b'), 'b')
+    expect(after.active).toBe('c')
   })
 
   it('leaves you where you were when it was not', () => {
-    const before = strip(['board', 'term', 'chat'] as never[], 'chat' as never)
-    expect(closed(before, 'board' as never).active).toBe('chat')
+    expect(closed(strip([tab('a'), tab('b')], 'b'), 'a').active).toBe('b')
   })
 
   it('empties the strip when the last one goes', () => {
-    /* This is the case that shipped broken in the prototype: closing the only
-       tab threw before the redraw, so the window froze on a pane that was
-       already gone from the state. */
-    expect(closed(strip(['board'] as never[]), 'board' as never)).toEqual({
-      open: [],
-      active: null,
-    })
+    expect(closed(strip([tab('a')]), 'a')).toEqual({ open: [], active: null })
   })
 
-  it('ignores a pane that is not open', () => {
-    const before = strip(['board'] as never[])
-    expect(closed(before, 'term' as never)).toBe(before)
+  it('ignores a tab that is not open', () => {
+    const before = strip([tab('a')])
+    expect(closed(before, 'zz')).toBe(before)
   })
 })
 
 describe('dragging a tab', () => {
   it('puts it where it was dropped', () => {
-    const before = strip(['board', 'term', 'chat'] as never[])
-    expect(moved(before, 'chat' as never, 0).open).toEqual(['chat', 'board', 'term'])
+    const after = moved(strip([tab('a'), tab('b'), tab('c')]), 'c', 0)
+    expect(after.open.map((t) => t.id)).toEqual(['c', 'a', 'b'])
   })
 
   it('refuses a landing spot outside the strip', () => {
-    const before = strip(['board', 'term'] as never[])
-    expect(moved(before, 'board' as never, 5)).toBe(before)
+    const before = strip([tab('a'), tab('b')])
+    expect(moved(before, 'a', 5)).toBe(before)
+  })
+})
+
+describe('what a tab says', () => {
+  it('takes the title the terminal reports', () => {
+    const after = renamed(strip([tab('a')]), 'a', '~/devpit')
+    expect(after.open[0]!.title).toBe('~/devpit')
+  })
+
+  it('names the one you are looking at', () => {
+    expect(focused(strip([tab('a'), tab('b')], 'b'))?.id).toBe('b')
   })
 })

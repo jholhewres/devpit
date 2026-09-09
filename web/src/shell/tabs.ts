@@ -1,5 +1,4 @@
-import type { PaneName } from './paneList'
-import type { Strip } from './strip'
+import type { Strip, Tab } from './strip'
 
 /* Which tabs a project had open, per project.
  *
@@ -7,7 +6,7 @@ import type { Strip } from './strip'
  * project — a fixed starting tab is the app deciding what you were doing. */
 const KEY = 'devpit.tabs'
 
-type Saved = Record<string, { open: PaneName[]; active: PaneName | null }>
+type Saved = Record<string, { open: Tab[]; active: string | null }>
 
 function all(): Saved {
   try {

@@ -1,43 +1,41 @@
 import { useLayoutEffect, useRef } from 'react'
 
-import { paneMeta, type PaneName } from './paneList'
+import { paneMeta } from './paneList'
+import type { Tab } from './strip'
 import { useShell } from './useShell'
 
 /*
- * The strip is the order. A tab is appended when its pane opens and only moves
- * when it is dragged — clicking one must never reshuffle the row under the
- * pointer.
+ * The strip is the order. A tab is appended when it opens and only moves when
+ * it is dragged — clicking one must never reshuffle the row under the pointer.
  *
- * The drag is on pointer events rather than HTML5 drag-and-drop, which cannot
- * be styled and fires a ghost image nobody asked for.
+ * Pointer events rather than HTML5 drag-and-drop, which cannot be styled and
+ * fires a ghost image nobody asked for.
  */
 export function TabStrip(): React.JSX.Element {
-  const { open, active, show, close, move } = useShell()
+  const { open, active, focus, close, move } = useShell()
   const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
-  const moving = useRef<{ name: PaneName; at: number; moved: boolean } | null>(null)
+  const moving = useRef<{ id: string; at: number; moved: boolean } | null>(null)
 
   /* FLIP: the tabs that did not move animate from where they were. */
   useLayoutEffect(() => {
     const row = strip.current
     if (!row) return
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    /* Forget the tabs that are gone. A remembered position from before a tab
-       was closed would animate it in from wherever it used to sit. */
-    const here = new Set(open as readonly string[])
-    for (const name of before.current.keys()) {
-      if (!here.has(name)) before.current.delete(name)
+    const here = new Set(open.map((tab) => tab.id))
+    for (const id of before.current.keys()) {
+      if (!here.has(id)) before.current.delete(id)
     }
-    for (const tab of Array.from(row.children) as HTMLElement[]) {
-      const name = tab.dataset.toggle ?? ''
-      const was = before.current.get(name)
-      const now = tab.getBoundingClientRect().left
-      before.current.set(name, now)
+    for (const el of Array.from(row.children) as HTMLElement[]) {
+      const id = el.dataset.tab ?? ''
+      const was = before.current.get(id)
+      const now = el.getBoundingClientRect().left
+      before.current.set(id, now)
       if (was === undefined || was === now || calm) continue
-      tab.animate(
-        [{ transform: `translateX(${was - now}px)` }, { transform: 'none' }],
-        { duration: 170, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' },
-      )
+      el.animate([{ transform: `translateX(${was - now}px)` }, { transform: 'none' }], {
+        duration: 170,
+        easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)',
+      })
     }
   }, [open])
 
@@ -45,65 +43,62 @@ export function TabStrip(): React.JSX.Element {
     const drag = moving.current
     const row = strip.current
     if (!drag || !row) return
-    /* A few pixels of jitter is a click with a shaky hand, not a drag. Below
-       the threshold nothing moves, and the click that follows still counts. */
     if (Math.abs(event.clientX - drag.at) <= 4) return
     drag.moved = true
     const tabs = Array.from(row.children) as HTMLElement[]
-    const to = tabs.findIndex((tab) => {
-      const box = tab.getBoundingClientRect()
+    const to = tabs.findIndex((el) => {
+      const box = el.getBoundingClientRect()
       return event.clientX < box.left + box.width / 2
     })
-    move(drag.name, to === -1 ? tabs.length - 1 : to)
+    move(drag.id, to === -1 ? tabs.length - 1 : to)
   }
+
+  const label = (tab: Tab): string => tab.title ?? paneMeta(tab.kind).label
 
   return (
     <div className="tabs" role="group" aria-label="Panes" ref={strip} onPointerMove={onMove}>
-      {open.map((name) => {
-        const meta = paneMeta(name)
-        return (
-          <button
-            key={name}
-            className="tab"
-            data-toggle={name}
-            data-active={String(active === name)}
-            aria-pressed={true}
-            title={meta.title}
-            onPointerDown={(event) => {
-              /* The cross is a target of its own. Capturing the pointer for a
-                 drag would redirect the click that follows to the tab, and
-                 closing would quietly become selecting. */
-              if (event.button !== 0 || (event.target as HTMLElement).closest('.tab__x')) return
-              moving.current = { name, at: event.clientX, moved: false }
-              event.currentTarget.setPointerCapture(event.pointerId)
-            }}
-            onPointerUp={() => {
-              moving.current = null
-            }}
-            onClick={() => {
-              /* A drag ends in a click the browser sends anyway. */
-              if (moving.current?.moved) return
-              show(name)
+      {open.map((tab) => (
+        <button
+          key={tab.id}
+          className="tab"
+          data-tab={tab.id}
+          data-toggle={tab.kind}
+          data-active={String(active?.id === tab.id)}
+          aria-pressed={true}
+          title={label(tab)}
+          onPointerDown={(event) => {
+            /* The cross is a target of its own: capturing the pointer would
+               redirect the click that follows to the tab, and closing would
+               quietly become selecting. */
+            if (event.button !== 0 || (event.target as HTMLElement).closest('.tab__x')) return
+            moving.current = { id: tab.id, at: event.clientX, moved: false }
+            event.currentTarget.setPointerCapture(event.pointerId)
+          }}
+          onPointerUp={() => {
+            moving.current = null
+          }}
+          onClick={() => {
+            if (moving.current?.moved) return
+            focus(tab.id)
+          }}
+        >
+          {paneMeta(tab.kind).icon}
+          {label(tab)}
+          <span
+            className="tab__x"
+            role="button"
+            aria-label="Close"
+            onClick={(event) => {
+              event.stopPropagation()
+              close(tab.id)
             }}
           >
-            {meta.icon}
-            {meta.label}
-            <span
-              className="tab__x"
-              role="button"
-              aria-label="Close"
-              onClick={(event) => {
-                event.stopPropagation()
-                close(name)
-              }}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </span>
-          </button>
-        )
-      })}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </span>
+        </button>
+      ))}
     </div>
   )
 }

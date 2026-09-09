@@ -41,7 +41,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
 
 
             {/* Board */}
-            <div className="pane" data-pane="board" data-show={String(active === 'board')}>
+            <div className="pane" data-pane="board" data-show={String(active?.kind === 'board')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
                 <span className="pane__t"><b>Board</b></span>
@@ -52,7 +52,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
             </div>
 
             {/* Skills */}
-            <div className="pane" data-pane="skills" data-show={String(active === 'skills')}>
+            <div className="pane" data-pane="skills" data-show={String(active?.kind === 'skills')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
                 <span className="pane__t"><b>Skills</b> · 5 agents</span>
@@ -121,7 +121,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
               </div>
             </div>
 
-            <div className="pane" data-pane="caps" data-show={String(active === 'caps')}>
+            <div className="pane" data-pane="caps" data-show={String(active?.kind === 'caps')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 4 6v6c0 5 3.4 9.1 8 10 4.6-.9 8-5 8-10V6Z" /><path d="m9 12 2 2 4-4" /></svg></span>
                 <span className="pane__t"><b>Capabilities</b> · 3 installed, 2 on</span>
@@ -203,7 +203,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
               </div>
             </div>
 
-            <div className="pane" data-pane="mcps" data-show={String(active === 'mcps')}>
+            <div className="pane" data-pane="mcps" data-show={String(active?.kind === 'mcps')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2v6M15 2v6" /><path d="M6 8h12v4a6 6 0 0 1-12 0Z" /><path d="M12 18v4" /></svg></span>
                 <span className="pane__t"><b>MCPs</b> · 2 of 4 connected</span>
@@ -269,7 +269,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
               </div>
             </div>
 
-            <div className="pane" data-pane="files" data-show={String(active === 'files')}>
+            <div className="pane" data-pane="files" data-show={String(active?.kind === 'files')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg></span>
                 <span className="pane__t"><b>Files</b> · devpit</span>
@@ -304,7 +304,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
               </div>
             </div>
 
-            <div className="pane" data-pane="workspace" data-show={String(active === 'workspace')}>
+            <div className="pane" data-pane="workspace" data-show={String(active?.kind === 'workspace')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg></span>
                 <span className="pane__t"><b>Workspace</b> · devpit</span>
@@ -358,7 +358,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
               </div>
             </div>
 
-            <div className="pane" data-pane="diagram" data-show={String(active === 'diagram')}>
+            <div className="pane" data-pane="diagram" data-show={String(active?.kind === 'diagram')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6z" /><path d="M10 7h4a3 3 0 0 1 3 3v4" /></svg></span>
                 <span className="pane__t"><b>Diagram</b> &middot; board-flow.mmd</span>
@@ -377,7 +377,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
               </div>
             </div>
 
-            <div className="pane" data-pane="excalidraw" data-show={String(active === 'excalidraw')}>
+            <div className="pane" data-pane="excalidraw" data-show={String(active?.kind === 'excalidraw')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3Z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18Z" /><path d="M2 2l7.6 7.6" /><circle cx="11" cy="11" r="2" /></svg></span>
                 <span className="pane__t"><b>Excalidraw</b> &middot; gpui-shell.excalidraw</span>
@@ -420,7 +420,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
             </div>
 
             {/* Chat */}
-            <div className="pane" data-pane="chat" data-show={String(active === 'chat')}>
+            <div className="pane" data-pane="chat" data-show={String(active?.kind === 'chat')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" /></svg></span>
                 <span className="pane__t"><b>Chat</b> · working 3m</span>
@@ -495,12 +495,21 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
             </div>
 
             {/* A file, open in the middle */}
-            <FilePane path={openFile} show={active === 'file'} />
+            <FilePane path={openFile} show={active?.kind === 'file'} />
 
             {/* Terminal */}
-            <div className="pane pane--term" data-pane="term" data-show={String(active === 'term')}>
-              <TerminalPane />
-            </div>
+            {open
+              .filter((tab) => tab.kind === 'term')
+              .map((tab) => (
+                <div
+                  key={tab.id}
+                  className="pane pane--term"
+                  data-pane="term"
+                  data-show={String(active?.id === tab.id)}
+                >
+                  <TerminalPane tab={tab} />
+                </div>
+              ))}
 
           </div>
         </div>
