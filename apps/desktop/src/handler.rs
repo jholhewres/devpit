@@ -1,16 +1,17 @@
-//! The command list, and the TypeScript generated from it.
+//! Every command the window may call, at runtime.
 //!
-//! Separate from the window: which commands exist is not a question about how
-//! the window is drawn, and keeping the list here means adding one does not
-//! touch the file that opens the app.
-
-use tauri_specta::{collect_commands, Builder};
+//! Separate from the contract on purpose, and the difference is the point:
+//! one command cannot be in the *contract*, because specta cannot describe
+//! the channel it streams over — and leaving it out of the *handler* would
+//! mean the screen cannot call it at all. This list is what exists; that one
+//! is what is typed.
 
 use crate::asking;
 use crate::branches;
 use crate::chat;
 use crate::index;
 use crate::mcp;
+use crate::pty_bridge;
 use crate::reveal;
 use crate::saves;
 use crate::staging;
@@ -21,19 +22,8 @@ use crate::{
     steps,
 };
 
-/// Where the generated TypeScript lands.
-///
-/// Anchored to the manifest directory rather than the working directory:
-/// `tauri dev` and a bare `./devpit-desktop` run from different places, and a
-/// relative path would quietly write the contract somewhere else.
-pub const BINDINGS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/src/gen/bindings.ts");
-
-/// The commands whose types are generated into TypeScript.
-///
-/// Separate from the invoke handler on purpose: one command cannot be in the
-/// contract, because specta cannot describe the channel it streams over.
-pub fn contract() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![
+pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
+    tauri::generate_handler![
         commands::app_info,
         commands::app_health,
         commands::app_capabilities,
@@ -43,6 +33,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         projects::project_open,
         projects::project_forget,
         chat::chat_history,
+        chat::chat_send,
         chat::chat_cancel,
         chat::chat_frames,
         chat::agent_profiles,
@@ -101,42 +92,10 @@ pub fn contract() -> Builder<tauri::Wry> {
         panes::session_resize,
         panes::pane_scrollback,
         panes::session_detach,
+        panes::session_attach,
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,
-    ])
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Writes the TypeScript contract, and fails when it was out of date.
-    ///
-    /// Generating from `main` meant the frontend types were only refreshed by
-    /// someone opening the window — a command could reach `main` and never
-    /// reach the screen, which is the drift this rule exists to stop. As a
-    /// test it runs in `make test` and in CI, so a contract change that was
-    /// not regenerated fails the build rather than the next screen.
-    #[test]
-    fn the_typescript_contract_is_up_to_date() {
-        let before = std::fs::read_to_string(BINDINGS).unwrap_or_default();
-
-        contract()
-            .export(specta_typescript::Typescript::default(), BINDINGS)
-            .expect("export the contract");
-
-        let after = std::fs::read_to_string(BINDINGS).expect("read back");
-
-        // Compared as a boolean, not with assert_eq: the two sides are the
-        // whole file, and printing them turns one stale line into a thousand
-        // lines of noise nobody reads.
-        assert!(
-            before == after,
-            "web/src/gen/bindings.ts was stale — it has just been regenerated, commit it \
-             ({} lines before, {} after)",
-            before.lines().count(),
-            after.lines().count()
-        );
-    }
+        pty_bridge::pty_drain,
+    ]
 }

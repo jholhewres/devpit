@@ -9,19 +9,16 @@
 //! something the window draws; binding it anywhere reachable would be a way in
 //! to a process that runs terminals.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::Path;
 
 use devpit_agentcli::{read_hook, Event, Happening};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
-/// A payload bigger than this is not one of ours.
-///
-/// A `Stop` carries the last thing the agent said, which can be long, so the
-/// ceiling is generous — but a ceiling there is, because this reads from a
-/// socket and an unbounded read is a way to spend all the memory on the box.
-const MOST_BYTES: usize = 256 * 1024;
+use crate::asking::{decision, Asking};
+use crate::post::read_request;
+use crate::question::question_in;
 
 /// Starts listening, and writes the address where the hook will look for it.
 ///
@@ -65,15 +62,46 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
         return;
     };
 
-    // Answered before the payload is looked at. The agent is waiting on this
-    // reply with a 1.5 second budget, and nothing it says changes what we
-    // reply with.
-    let _ = stream.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n");
-    let _ = stream.flush();
+    // A tool this session wants to be asked about holds the connection until
+    // a person answers. Everything else is answered at once and empty, which
+    // leaves the CLI's own permission mode in charge — a board step running
+    // where nobody is watching must never wait on a window.
+    let held = question_in(&body).filter(|question| {
+        app.try_state::<Asking>()
+            .map(|asking| asking.asks(&question.session_id))
+            .unwrap_or(false)
+    });
 
+    if let Some(question) = held {
+        if let Some(happening) = read_hook(&body) {
+            let _ = app.emit("agent:happening", describe(&happening));
+        }
+        let asking = app.state::<Asking>();
+        let hear = asking.opened(&question.id);
+        let _ = app.emit("permission:asked", &question);
+        let said = decision(asking.wait(&question.id, hear));
+        reply(&mut stream, &said);
+        return;
+    }
+
+    // Answered before the payload is looked at. The agent is waiting on this
+    // reply with a short budget, and nothing it says changes what we reply
+    // with.
+    reply(&mut stream, "");
     if let Some(happening) = read_hook(&body) {
         let _ = app.emit("agent:happening", describe(&happening));
     }
+}
+
+fn reply(stream: &mut TcpStream, body: &str) {
+    let _ = stream.write_all(
+        format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        )
+        .as_bytes(),
+    );
+    let _ = stream.flush();
 }
 
 /// What the window is told, in the words it draws.
@@ -88,47 +116,3 @@ fn describe(happening: &Happening) -> (String, String) {
     };
     (happening.session_id.clone(), said)
 }
-
-/// The body of a POST, or nothing.
-///
-/// Written by hand rather than with an HTTP crate: one route, one method, one
-/// caller on loopback. A dependency here would be several thousand lines to
-/// parse a request this already refuses to over-read.
-fn read_request(stream: &mut TcpStream) -> Option<String> {
-    read_post(BufReader::new(stream.try_clone().ok()?))
-}
-
-/// The same, from anything that yields bytes.
-///
-/// Split off the socket so a test can hand it a request instead of opening a
-/// port. The ceiling below is the only thing between a `content-length`
-/// somebody else wrote and an allocation of exactly that size, and a rule a
-/// test cannot call is a rule the test cannot guard.
-fn read_post(mut reader: impl BufRead) -> Option<String> {
-    let mut length = 0usize;
-
-    loop {
-        let mut line = String::new();
-        if reader.read_line(&mut line).ok()? == 0 {
-            return None;
-        }
-        let line = line.trim_end();
-        if line.is_empty() {
-            break;
-        }
-        if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
-            length = value.trim().parse().ok()?;
-        }
-    }
-
-    if length == 0 || length > MOST_BYTES {
-        return None;
-    }
-    let mut body = vec![0u8; length];
-    reader.read_exact(&mut body).ok()?;
-    String::from_utf8(body).ok()
-}
-
-#[cfg(test)]
-#[path = "listener_tests.rs"]
-mod tests;

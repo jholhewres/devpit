@@ -103,44 +103,6 @@ pub fn endpoint_file(root: &Path) -> PathBuf {
     root.join("hook-endpoint")
 }
 
-/// The settings a turn is launched with, so its hooks reach us.
-///
-/// `curl` rather than a helper binary: it is already on the machine, and a
-/// helper would be one more thing to ship, find and keep in step.
-///
-/// The timeouts are the point. This runs before every tool call the agent
-/// makes, so an app that has gone away has to cost it a second and a half,
-/// not a hang. `--noproxy` because a proxy in the environment must not be
-/// consulted for a loopback address.
-pub fn settings_json(endpoint_file: &Path) -> String {
-    let file = endpoint_file.display();
-    let post = format!(
-        "E=$(cat {file} 2>/dev/null) && [ -n \"$E\" ] && \
-         curl -sS -X POST --noproxy '*' --connect-timeout 0.5 --max-time 1.5 \
-         -H 'content-type: application/json' --data-binary @- \"$E\" >/dev/null 2>&1 || true"
-    );
-
-    let events = [
-        "PreToolUse",
-        "PostToolUse",
-        "Stop",
-        "SubagentStop",
-        "Notification",
-    ];
-    let hooks: Vec<String> = events
-        .iter()
-        .map(|event| {
-            format!(
-                "\"{event}\":[{{\"matcher\":\"*\",\"hooks\":[{{\"type\":\"command\",\
-                 \"command\":{}}}]}}]",
-                serde_json::to_string(&post).unwrap_or_else(|_| "\"true\"".to_owned())
-            )
-        })
-        .collect();
-
-    format!("{{\"hooks\":{{{}}}}}", hooks.join(","))
-}
-
 #[cfg(test)]
 #[path = "hooks_tests.rs"]
 mod tests;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Attachment, Conversation, Frame, Message, Profile } from '../gen/bindings'
-import { applied, choices, fixedTo, money, ready, withFiles } from './chat'
+import { applied, ASKS, choices, fixedTo, money, MODES, ready, withFiles } from './chat'
 
 const message = (id: string, streaming = true): Message =>
   ({ id, turnId: null, role: 'assistant', parts: [], createdAt: 0, streaming })
@@ -142,5 +142,17 @@ describe('what the agent is actually sent', () => {
     expect(withFiles('why?', [file('src/a.rs'), file('src/b.rs')])).toBe(
       '@src/a.rs @src/b.rs\nwhy?',
     )
+  })
+})
+
+describe('what the agent may do without asking', () => {
+  it('offers the mode that stops to ask, now that there is somewhere to answer', () => {
+    expect(MODES.map((mode) => mode.id)).toContain('manual')
+  })
+
+  it('knows which mode stops to ask', () => {
+    expect(ASKS('manual')).toBe(true)
+    expect(ASKS('acceptEdits')).toBe(false)
+    expect(ASKS('bypassPermissions')).toBe(false)
   })
 })

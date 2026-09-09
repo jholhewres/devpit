@@ -12,6 +12,7 @@ pub mod board;
 pub mod chat;
 pub mod error;
 pub mod file;
+mod frame;
 pub mod front;
 pub mod profile;
 pub mod project;
@@ -22,9 +23,10 @@ pub mod settings;
 
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
-pub use chat::{Ask, Attachment, CallState, Conversation, Frame, Message, Part, Role, TurnEnd};
+pub use chat::{Ask, Attachment, CallState, Conversation, Message, Part, Role, TurnEnd};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
+pub use frame::Frame;
 pub use front::Front;
 pub use profile::Profile;
 pub use project::{

@@ -96,23 +96,12 @@ pub struct Conversation {
     pub profile: String,
     /// The model within that provider, which the composer may change.
     pub model: Option<String>,
+    /// The CLI's own id for this thread, once it has run a turn. It is what
+    /// ties a permission question back to the conversation that raised it.
+    pub session_id: Option<String>,
     pub messages: Vec<Message>,
     pub cost_usd: f64,
     pub created_at: f64,
-}
-
-/// What the stream carries, one frame at a time.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Frame {
-    /// A message opened; parts follow.
-    Opened { message: Message },
-    /// More of the message that is open.
-    Part { message_id: String, part: Part },
-    /// A tool call moved on.
-    CallState { call_id: String, state: CallState },
-    /// The turn is over. Absence of frames is not an ending.
-    Ended { end: TurnEnd },
 }
 
 /// What one turn needs to run. One object because the composer sends these

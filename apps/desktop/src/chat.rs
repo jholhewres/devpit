@@ -63,6 +63,7 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
             .map(|head| head.profile.clone())
             .unwrap_or_default(),
         model: head.as_ref().and_then(|head| head.model.clone()),
+        session_id: head.as_ref().and_then(|head| head.session_id.clone()),
         cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
         created_at: head
             .map(|head| head.created_at)

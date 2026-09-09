@@ -4,7 +4,7 @@
 //! that decide how much memory a request gets to ask for, and those do not
 //! need a port to exercise.
 
-use super::*;
+use crate::post::{read_post, MOST_BYTES};
 
 /// A request, assembled the way `curl --data-binary` sends one.
 fn post(body: &str) -> Vec<u8> {

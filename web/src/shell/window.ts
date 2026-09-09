@@ -1,5 +1,8 @@
+import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+
+import type { Question } from '../gen/bindings'
 
 /*
  * The window, for a window that draws its own frame.
@@ -98,6 +101,27 @@ export function onFilesDropped(then: (paths: readonly string[]) => void): () => 
       if (dropped) unlisten()
       else drop = unlisten
     })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}
+
+/**
+ * Calls back when an agent asks to be allowed to do something.
+ *
+ * Every conversation hears every question; matching it to the session that
+ * raised it is the caller's job, because only the caller knows which session
+ * it is showing.
+ */
+export function onPermissionAsked(then: (question: Question) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void listen<Question>('permission:asked', (event) => then(event.payload)).then((unlisten) => {
+    if (dropped) unlisten()
+    else drop = unlisten
+  })
   return () => {
     dropped = true
     drop?.()

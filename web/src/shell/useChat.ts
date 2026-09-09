@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { Ask, Attachment, Message, Profile } from '../gen/bindings'
-import { applied, fixedTo, MODES, send, withFiles } from './chat'
+import type { Ask, Attachment, Message, Profile, Question } from '../gen/bindings'
+import { applied, ASKS, fixedTo, MODES, send, withFiles } from './chat'
 import { ask, commands } from './live'
+import { onPermissionAsked } from './window'
 import { useShell } from './useShell'
 
 export interface Chat {
@@ -16,6 +17,8 @@ export interface Chat {
   readonly cost: number
   readonly permission: string
   readonly files: readonly Attachment[]
+  /** What the agent is waiting to be allowed to do. */
+  readonly asked: readonly Question[]
   readonly sending: boolean
   readonly error: string | null
   pick: (profileId: string) => void
@@ -23,6 +26,7 @@ export interface Chat {
   setPermission: (mode: string) => void
   attach: (paths: readonly string[]) => void
   detach: (path: string) => void
+  answer: (id: string, allow: boolean) => void
   say: (prompt: string) => void
   stop: () => void
 }
@@ -37,6 +41,8 @@ export function useChat(conversationId: string): Chat {
   const [cost, setCost] = useState(0)
   const [permission, setPermission] = useState(MODES[0].id)
   const [files, setFiles] = useState<readonly Attachment[]>([])
+  const [asked, setAsked] = useState<readonly Question[]>([])
+  const [session, setSession] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const live = useRef(true)
@@ -57,6 +63,7 @@ export function useChat(conversationId: string): Chat {
         setProfileId(belongs)
         setModel(past.data.model)
         setCost(past.data.costUsd ?? 0)
+        setSession(past.data.sessionId)
       }
       const installed = (found.data ?? []).filter((profile) => profile.path !== null)
       setProfiles(installed)
@@ -69,6 +76,28 @@ export function useChat(conversationId: string): Chat {
       live.current = false
     }
   }, [project, conversationId])
+
+  /* The session is told to hold its tools only in the mode that asks. Holding
+     them in a mode that never asks would wait for a question nobody sends. */
+  useEffect(() => {
+    if (!session) return
+    void ask(() => commands.permissionAskFromNow(session, ASKS(permission)))
+  }, [session, permission])
+
+  /* Questions arrive for every conversation; this one keeps its own. */
+  useEffect(() => {
+    if (!session) return
+    return onPermissionAsked((question) => {
+      if (question.sessionId === session) setAsked((was) => [...was, question])
+    })
+  }, [session])
+
+  const answer = useCallback((id: string, allow: boolean) => {
+    /* Taken off the list first: the question is answered either way, and a
+       row that lingers invites a second click that has nothing to answer. */
+    setAsked((was) => was.filter((one) => one.id !== id))
+    void ask(() => commands.permissionAnswer(id, allow ? 'allow' : 'deny'))
+  }, [])
 
   const say = useCallback(
     (prompt: string) => {
@@ -140,6 +169,7 @@ export function useChat(conversationId: string): Chat {
     cost,
     permission,
     files,
+    asked,
     sending,
     error,
     pick: setProfileId,
@@ -147,6 +177,7 @@ export function useChat(conversationId: string): Chat {
     setPermission,
     attach,
     detach,
+    answer,
     say,
     stop,
   }

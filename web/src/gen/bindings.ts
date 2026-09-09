@@ -91,6 +91,22 @@ export const commands = {
 	 *  than read.
 	 */
 	chatAttach: (projectId: string, path: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_attach", { projectId, path })),
+	/**  `permission.answer` — what the person said. */
+	permissionAnswer: (id: string, answer: Answer) => typedError<null, RpcError>(__TAURI_INVOKE("permission_answer", { id, answer })),
+	/**
+	 *  `permission.ask_from_now` — whether this conversation stops to ask.
+	 * 
+	 *  Per session rather than global: a board step running unattended must not
+	 *  start waiting because a chat window asked to be consulted.
+	 */
+	permissionAskFromNow: (sessionId: string, on: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("permission_ask_from_now", { sessionId, on })),
+	/**
+	 *  `permission.questions` — the shape the stream carries.
+	 * 
+	 *  It exists so the generated contract carries `Question`: the questions
+	 *  themselves arrive on an event, which specta does not describe.
+	 */
+	permissionQuestions: () => typedError<Question[], RpcError>(__TAURI_INVOKE("permission_questions")),
 	/**  `mcp.list` — what the CLI resolved for this project. */
 	mcpList: (projectId: string | null) => typedError<Servers, RpcError>(__TAURI_INVOKE("mcp_list", { projectId })),
 	/**  `skills.list` — the skills installed on this machine. */
@@ -371,6 +387,14 @@ export type Agents = {
 	directory: string,
 };
 
+/**  What a person answered. */
+export type Answer = "allow" | 
+/**
+ *  Refused. The refusal goes back to the agent as a tool result rather
+ *  than killing the turn — an agent told "no" can try something else.
+ */
+"deny";
+
 /**  Response of `app.health`. */
 export type AppHealth = {
 	ok: boolean,
@@ -584,6 +608,11 @@ export type Conversation = {
 	profile: string,
 	/**  The model within that provider, which the composer may change. */
 	model: string | null,
+	/**
+	 *  The CLI's own id for this thread, once it has run a turn. It is what
+	 *  ties a permission question back to the conversation that raised it.
+	 */
+	sessionId: string | null,
 	messages: Message[],
 	costUsd: number | null,
 	createdAt: number | null,
@@ -882,6 +911,21 @@ export type ProjectNotes = {
 
 export type ProjectTree = {
 	nodes: FileNode[],
+};
+
+/**  What the agent wants to do, as the screen puts it. */
+export type Question = {
+	/**  This question, so the answer can name it. */
+	id: string,
+	/**  The CLI's session, which is what ties it to a conversation. */
+	sessionId: string,
+	tool: string,
+	/**
+	 *  The tool's input, verbatim. Parsing it here would be guessing at a
+	 *  shape the provider changes without asking.
+	 */
+	input: string,
+	cwd: string,
 };
 
 export type RejectedAgent = {

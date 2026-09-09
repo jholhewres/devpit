@@ -94,13 +94,20 @@ export function money(usd: number): string | null {
 
 /* What the agent may do without asking.
 
-   The CLI's `default` mode is missing on purpose: it stops and asks, and this
-   screen has nowhere to answer yet. Offering it would be a control that hangs
-   the turn. */
+   `manual` stops and asks, and the question arrives in the thread with accept
+   and refuse on it — which is what makes it an option at all. It was left out
+   while there was nowhere to answer. */
 export const MODES: readonly { readonly id: string; readonly label: string }[] = [
+  { id: 'manual', label: 'Ask' },
   { id: 'acceptEdits', label: 'Edits' },
   { id: 'bypassPermissions', label: 'Full access' },
 ]
+
+/* Which mode stops to ask. The session is told to hold its tools only in that
+   one — a turn held in a mode that never asks would wait for a question that
+   never comes. */
+export const ASKS = (mode: string): boolean => mode === 'manual'
+
 
 /* The prompt the agent actually receives: what was typed, with each
    attachment named as a path it can open. The paths lead rather than trail,

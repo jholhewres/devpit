@@ -62,38 +62,3 @@ fn an_event_this_build_has_no_use_for_is_ignored() {
 fn a_payload_with_no_session_is_dropped() {
     assert_eq!(read(r#"{"hook_event_name":"Stop"}"#), None);
 }
-
-/// The two rules the settings exist to keep.
-#[test]
-fn the_hook_command_gives_up_rather_than_holding_the_agent() {
-    let settings = settings_json(Path::new("/home/x/.devpit/hook-endpoint"));
-    assert!(settings.contains("--connect-timeout 0.5"), "{settings}");
-    assert!(settings.contains("--max-time 1.5"), "{settings}");
-    // A proxy in the environment must not be consulted for loopback.
-    assert!(settings.contains("--noproxy"), "{settings}");
-}
-
-#[test]
-fn the_endpoint_is_read_from_disk_on_every_invocation() {
-    let settings = settings_json(Path::new("/home/x/.devpit/hook-endpoint"));
-    // `cat` inside the command, not the address baked into it: a pty that
-    // outlived a restart would otherwise post to a dead port forever.
-    assert!(
-        settings.contains("cat /home/x/.devpit/hook-endpoint"),
-        "{settings}"
-    );
-}
-
-#[test]
-fn the_settings_are_json_the_cli_can_read() {
-    let settings = settings_json(Path::new("/tmp/endpoint"));
-    let parsed: serde_json::Value = serde_json::from_str(&settings).expect("valid JSON");
-    let hooks = parsed
-        .get("hooks")
-        .expect("hooks")
-        .as_object()
-        .expect("object");
-    for event in ["PreToolUse", "PostToolUse", "Stop", "Notification"] {
-        assert!(hooks.contains_key(event), "no {event} in {settings}");
-    }
-}

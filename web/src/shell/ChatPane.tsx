@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { Asked } from './Asked'
 import { MODES, money, ready } from './chat'
 import type { Tab } from './strip'
 import { Turn } from './Turn'
@@ -66,6 +67,8 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           {chat.messages.map((message) => (
             <Turn key={message.id} message={message} />
           ))}
+
+          <Asked questions={chat.asked} onAnswer={chat.answer} />
         </div>
       </div>
 
