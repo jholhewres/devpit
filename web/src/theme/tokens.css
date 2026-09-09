@@ -32,22 +32,45 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces, darkest frame outward to the lifted card. */
-  --ground: #0c0c0e;
-  --panel: #131316;
-  --raised: #1a1a1f;
-  --raised-hover: #202027;
-  --sunken: #08080a;
+  /* Surfaces, darkest frame outward to the lifted card.
+
+     The steps are wide on purpose. An earlier ramp put the sidebar seven
+     points above the canvas, which reads as one flat sheet with hairlines
+     drawn on it — the panels stopped being panels. Orca separates its canvas
+     and its sidebar by about thirty (#0a0a0a against #2a2a2a) and says in its
+     own source that the lift is deliberate. These follow that distance while
+     keeping the cool cast that is this app's rather than Orca's neutral grey. */
+  --ground: #0a0a0b;
+  --panel: #151519;
+  --raised: #232329;
+  --raised-hover: #2b2b32;
+  --sunken: #070708;
+
+  /* The left column, lifted clear of the canvas rather than sharing --panel
+     with cards. It is the one surface always on screen, so it is what sets
+     how deep the window reads. */
+  --sidebar: #26262c;
+
+  /* Mixed from the sidebar's own background rather than taken from --raised.
+     A shared elevation token only works while every surface it lands on sits
+     at the same depth; once the sidebar lifted, --raised was darker than the
+     rows drawn on it and hover read as a dent. Orca solves it the same way,
+     mixing foreground into the sidebar's background for accent and border. */
+  --sidebar-hover: color-mix(in srgb, var(--ink) 7%, var(--sidebar));
+  --sidebar-active: color-mix(in srgb, var(--ink) 12%, var(--sidebar));
 
   /* Hairlines. Alpha rather than a grey so a line over a lifted panel and the
      same line over the canvas read as the same line. */
   --line: rgb(255 255 255 / 0.07);
   --line-strong: rgb(255 255 255 / 0.13);
 
-  --ink: #ececef;
-  --ink-dim: #9d9da8;
-  --ink-faint: #6c6c78;
-  --terminal-ink: #cdcdd4;
+  /* Brighter than they were. The old --ink sat at #ececef against a canvas
+     that has since gone darker, and dim text a shade under it is what makes a
+     dense list read as uniformly grey. */
+  --ink: #fafafa;
+  --ink-dim: #a1a1a8;
+  --ink-faint: #71717c;
+  --terminal-ink: #d4d4da;
 
   /* The house accent. Every project overrides it on the shell root with its
      own colour; chrome that draws before a project exists — the first run —
