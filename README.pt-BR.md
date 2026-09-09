@@ -5,7 +5,7 @@
 <h1 align="center">devpit</h1>
 
 <p align="center">
-  Um espaço de trabalho desktop para tocar agentes de código.
+  Um app nativo para controlar seus agentes de código.
 </p>
 
 <p align="center">

@@ -5,7 +5,7 @@
 <h1 align="center">devpit</h1>
 
 <p align="center">
-  A desktop workspace for working with coding agents.
+  A native app for controlling your coding agents.
 </p>
 
 <p align="center">
