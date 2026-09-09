@@ -6,7 +6,7 @@ import { useShell } from './useShell'
 
 /* The skeleton is held for a beat even when the read is instant: shape then
    text reads as loading, where text appearing with no warning reads as a jump. */
-export function FilePane({ path }: { path: string | null }): React.JSX.Element {
+export function FilePane({ path, show }: { path: string | null; show: boolean }): React.JSX.Element {
   const { project } = useShell()
   const [file, setFile] = useState<FileContents | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -23,26 +23,21 @@ export function FilePane({ path }: { path: string | null }): React.JSX.Element {
     return () => window.clearTimeout(settle)
   }, [project, path])
 
-  if (!path) {
-    return (
-      <div className="exempty">
-        <span className="exempty__t">No file open</span>
-        <span className="exempty__d">Pick one in the Explorer.</span>
-      </div>
-    )
-  }
-
-  const name = path.split('/').pop() ?? path
+  const name = path?.split('/').pop() ?? null
 
   return (
-    <div className="pane pane--file" data-pane="file" data-show="true">
+    <div className="pane pane--file" data-pane="file" data-show={String(show)}>
       <div className="pane__bar">
-        <span className="pane__t">
-          <b>{name}</b> · {path}
-        </span>
+        <span className="pane__t">{name ? <><b>{name}</b> · {path}</> : 'No file open'}</span>
         <span className="drag" />
       </div>
       <div className={reading ? 'code loading' : 'code'}>
+        {!path && (
+          <div className="exempty">
+            <span className="exempty__t">No file open</span>
+            <span className="exempty__d">Pick one in the Explorer.</span>
+          </div>
+        )}
         {error && <div className="exempty__t">{error}</div>}
         {!error && file?.notShown && (
           <div className="exempty">

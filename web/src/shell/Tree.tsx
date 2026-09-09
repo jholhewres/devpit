@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { ask, commands } from './live'
+
 import type { FileNode } from '../gen/bindings'
 import { mark, matching, ordered } from './tree'
 
@@ -23,12 +25,14 @@ const Dir = (): React.JSX.Element => (
 )
 
 export function Tree({
+  projectId,
   nodes,
   query,
   current,
   collapsed,
   onOpen,
 }: {
+  projectId: string
   nodes: readonly FileNode[]
   query: string
   current: string | null
@@ -41,6 +45,7 @@ export function Tree({
       {ordered(nodes).map((node) => (
         <Row
           key={node.path}
+          projectId={projectId}
           node={node}
           depth={0}
           keep={keep}
@@ -55,6 +60,7 @@ export function Tree({
 }
 
 function Row({
+  projectId,
   node,
   depth,
   keep,
@@ -63,6 +69,7 @@ function Row({
   collapsed,
   onOpen,
 }: {
+  projectId: string
   node: FileNode
   depth: number
   keep: Set<string>
@@ -73,8 +80,13 @@ function Row({
 }): React.JSX.Element | null {
   /* `collapsed` is a counter, not a flag: Collapse all bumps it and every row
      re-reads it, which shuts folders the reader opened by hand. */
-  const [open, setOpen] = useState(depth === 0)
+  const [open, setOpen] = useState(false)
   const [shutAt, setShutAt] = useState(collapsed)
+  /* The tree arrives a level at a time, so a folder fetches its own children
+     the first time it is opened. */
+  const [children, setChildren] = useState<readonly FileNode[] | null>(
+    node.children?.length ? node.children : null,
+  )
   const folded = collapsed !== shutAt ? false : open
 
   if (filtering && !keep.has(node.path)) return null
@@ -83,6 +95,18 @@ function Row({
   const letter = mark(node.status)
   const showing = filtering ? true : folded
 
+  function toggle(): void {
+    if (!folder) return onOpen(node.path)
+    setShutAt(collapsed)
+    const next = !folded
+    setOpen(next)
+    if (next && children === null) {
+      void ask(() => commands.projectTree(projectId, null, node.path)).then((asked) => {
+        if (asked.data) setChildren(asked.data.nodes)
+      })
+    }
+  }
+
   return (
     <>
       <button
@@ -90,11 +114,7 @@ function Row({
         data-ctx="file"
         aria-current={node.path === current}
         style={{ paddingLeft: 8 + depth * 13 }}
-        onClick={() => {
-          if (!folder) return onOpen(node.path)
-          setShutAt(collapsed)
-          setOpen(!folded)
-        }}
+        onClick={toggle}
       >
         <span className="row__chev">{folder && <Chev open={showing} />}</span>
         <span className="row__ico">{folder ? <Dir /> : <Doc />}</span>
@@ -103,9 +123,10 @@ function Row({
       </button>
       {folder &&
         showing &&
-        ordered(node.children ?? []).map((child) => (
+        ordered(children ?? []).map((child) => (
           <Row
             key={child.path}
+            projectId={projectId}
             node={child}
             depth={depth + 1}
             keep={keep}

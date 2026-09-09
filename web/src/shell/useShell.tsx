@@ -5,6 +5,7 @@ import type { Project, Theme as StoredTheme } from '../gen/bindings'
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
 import { closed, moved, opened, type Strip } from './strip'
+import { empty, remember, remembered } from './tabs'
 import { useProjects } from './useProjects'
 
 export type Theme = StoredTheme
@@ -70,7 +71,7 @@ export function useShell(): Shell {
 }
 
 export function ShellProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const [{ open, active }, setStrip] = useState<Strip>({ open: ['board'], active: 'board' })
+  const [{ open, active }, setStrip] = useState<Strip>(empty)
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
   const [theme, setThemeState] = useState<Theme>('system')
@@ -78,6 +79,12 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [account, setAccount] = useState<Who>(who(null))
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
   const projects = useProjects()
+  const here = projects.project?.id ?? null
+
+  /* The strip belongs to the project. Switching restores what that one had
+     open; the window itself opens on the empty state. */
+  useEffect(() => setStrip(remembered(here)), [here])
+  useEffect(() => remember(here, { open, active }), [here, open, active])
 
   /* The three strip rules live in strip.ts so the tests can call them. */
   const show = useCallback((name: PaneName) => setStrip((was) => opened(was, name)), [])
@@ -116,6 +123,10 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       theme,
       setTheme,
       ...projects,
+      setProject: (id: string) => {
+        projects.setProject(id)
+        setPrefs(null)
+      },
       signedIn,
       account,
       signIn: () => setSignedIn(true),

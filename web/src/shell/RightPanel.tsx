@@ -88,7 +88,7 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
 
         {tree.error && <div className="exempty"><span className="exempty__t">{tree.error}</span></div>}
         {!tree.error && mode === 'names' && (
-          <Tree nodes={tree.nodes} query={query} current={current} collapsed={collapsed} onOpen={open} />
+          <Tree projectId={project?.id ?? ''} nodes={tree.nodes} query={query} current={current} collapsed={collapsed} onOpen={open} />
         )}
         {!tree.error && mode === 'contents' && (
           <div className="exempty">

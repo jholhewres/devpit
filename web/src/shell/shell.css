@@ -1191,3 +1191,7 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 
 .termhost { flex: 1; min-height: 0; padding: 8px 4px 8px 12px; }
 .termhost .xterm { height: 100%; }
+
+.addpj__box .fld__b { width: 100%; text-align: left; }
+.addpj__box .fld__b:disabled { color: var(--ghost); }
+.btn--go:disabled { opacity: 0.5; }

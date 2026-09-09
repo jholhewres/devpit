@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
-import { forgotten, found, type Open } from './projects'
+import { found, type Open } from './projects'
 
 /* The project list, apart from the rest of the shell state: it is the only
    part that talks to disk, and it was pushing useShell past its ceiling. */
@@ -37,7 +37,19 @@ export function useProjects(): Projects {
     void ask(() => commands.projectOpen(id))
   }, [])
 
-  const forgetProject = useCallback((id: string) => setOpen((was) => forgotten(was, id)), [])
+  /* Forgetting is a backend fact, not a screen one: a list that only forgets
+     locally brings the project back on the next launch. */
+  const forgetProject = useCallback((id: string) => {
+    void ask(() => commands.projectForget(id)).then((asked) => {
+      setProjectsError(asked.error)
+      if (!asked.data) return
+      setOpen((was) => ({
+        projects: asked.data!.projects,
+        current: was.current === id ? (asked.data!.projects[0]?.id ?? null) : was.current,
+      }))
+    })
+  }, [])
+
 
   return {
     project: found(open),

@@ -31,6 +31,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         projects::project_add,
         projects::project_clone,
         projects::project_open,
+        projects::project_forget,
         projects::project_tree,
         projects::project_changes,
         projects::project_history,

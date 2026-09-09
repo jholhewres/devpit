@@ -147,6 +147,24 @@ impl Store {
     }
 
     /// Marks a project as the one being worked in, which is what orders the list.
+    /// Takes a project out of the list without touching the folder.
+    ///
+    /// Archived rather than deleted: the board, the cards and their history
+    /// hang off this row, and dropping it would take work with it that the
+    /// person only asked to stop seeing.
+    pub fn forget_project(&self, id: &str) -> Result<bool, StoreError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|since| since.as_secs() as i64)
+            .unwrap_or_default();
+        let changed = self.conn.execute(
+            "UPDATE project SET archived_at = ?2, revision = revision + 1 \
+             WHERE id = ?1 AND archived_at IS NULL",
+            rusqlite::params![id, now],
+        )?;
+        Ok(changed > 0)
+    }
+
     pub fn touch_project(&self, id: &str) -> Result<(), StoreError> {
         self.conn.execute(
             "UPDATE project SET last_opened_at = ?2 WHERE id = ?1",

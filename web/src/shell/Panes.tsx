@@ -44,7 +44,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
             <div className="pane" data-pane="board" data-show={String(active === 'board')}>
               <div className="pane__bar">
                 <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
-                <span className="pane__t"><b>Board</b> · 11 cards</span>
+                <span className="pane__t"><b>Board</b></span>
                 <span className="drag"></span>
                 <button className="sq26" onClick={() => close('board')} aria-label="Close board"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
               </div>
@@ -495,7 +495,7 @@ export function Panes({ openFile }: { openFile: string | null }): React.JSX.Elem
             </div>
 
             {/* A file, open in the middle */}
-            <FilePane path={openFile} />
+            <FilePane path={openFile} show={active === 'file'} />
 
             {/* Terminal */}
             <div className="pane pane--term" data-pane="term" data-show={String(active === 'term')}>

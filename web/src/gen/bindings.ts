@@ -36,6 +36,14 @@ export const commands = {
 	 */
 	projectOpen: (projectId: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_open", { projectId })),
 	/**
+	 *  `project.forget` — takes a project out of the list.
+	 * 
+	 *  The folder, its git and its worktrees are untouched: this only stops
+	 *  devpit listing it. Answers with the list that is left, so the screen does
+	 *  not have to guess which project it is standing in now.
+	 */
+	projectForget: (projectId: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_forget", { projectId })),
+	/**
 	 *  `project.tree` — one level of the file tree, from a given worktree.
 	 * 
 	 *  One level rather than the whole tree: a monorepo has hundreds of thousands

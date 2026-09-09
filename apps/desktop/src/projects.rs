@@ -191,6 +191,21 @@ pub fn project_open(project_id: String) -> Result<ProjectList, RpcError> {
     project_list()
 }
 
+/// `project.forget` — takes a project out of the list.
+///
+/// The folder, its git and its worktrees are untouched: this only stops
+/// devpit listing it. Answers with the list that is left, so the screen does
+/// not have to guess which project it is standing in now.
+#[tauri::command]
+#[specta::specta]
+pub fn project_forget(project_id: String) -> Result<ProjectList, RpcError> {
+    let store = store()?;
+    if !store.forget_project(&project_id)? {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
+    }
+    project_list()
+}
+
 /// `project.tree` — one level of the file tree, from a given worktree.
 ///
 /// One level rather than the whole tree: a monorepo has hundreds of thousands
