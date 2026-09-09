@@ -1,4 +1,5 @@
 import mark from '../assets/brand/mark.png'
+import { BoardPane } from './BoardPane'
 import { useShell } from './useShell'
 
 /*
@@ -46,93 +47,7 @@ export function Panes(): React.JSX.Element {
                 <span className="drag"></span>
                 <button className="sq26" onClick={() => close('board')} aria-label="Close board"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
               </div>
-              <div className="board" id="board">
-                <div className="blane" data-lane="inbox">
-                  <div className="blane__top">
-                    <span className="blane__label">Inbox</span>
-                    <span className="blane__n">3</span>
-                  </div>
-                  <div className="blane__list">
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card">
-                    <div className="tile__t">Persist the sidebar width</div>
-                    <div className="tile__m"><span className="tile__time">2d</span></div>
-                  </div>
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card">
-                    <div className="tile__t">File-type icons in the tree</div>
-                    <div className="tile__m"><span className="tile__time">2d</span></div>
-                  </div>
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card">
-                    <div className="tile__t">Split the middle horizontally</div>
-                    <div className="tile__m"><span className="tile__time">1d</span></div>
-                  </div>
-                  </div>
-                  <button className="tile__add">+ Add card</button>
-                  <div className="blane__fill"></div>
-                </div>
-                <div className="blane" data-lane="refine" data-agent="planner">
-                  <div className="blane__top">
-                    <span className="blane__label">Refine</span>
-                    <span className="blane__n">1</span>
-                    <span className="blane__agent"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg>planner</span>
-                  </div>
-                  <div className="blane__list">
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card">
-                    <div className="tile__t">Board opens in the content</div>
-                    <div className="tile__m"><span className="st-wait"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg></span><span className="tile__agent">planner</span><span className="tile__time">needs you</span></div>
-                  </div>
-                  </div>
-                  <button className="tile__add">+ Add card</button>
-                  <div className="blane__fill"></div>
-                </div>
-                <div className="blane" data-lane="doing" data-agent="executor">
-                  <div className="blane__top">
-                    <span className="blane__label">Doing</span>
-                    <span className="blane__n">1</span>
-                    <span className="blane__agent"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg>executor</span>
-                  </div>
-                  <div className="blane__list">
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card" aria-current="true">
-                    <div className="tile__t">Rebuild the shell on GPUI</div>
-                    <div className="tile__m"><span className="st-work spin"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.6" /></svg></span><span className="tile__agent">executor</span><span className="tile__time">3m</span></div>
-                  </div>
-                  </div>
-                  <button className="tile__add">+ Add card</button>
-                  <div className="blane__fill"></div>
-                </div>
-                <div className="blane" data-lane="check" data-agent="reviewer">
-                  <div className="blane__top">
-                    <span className="blane__label">Check</span>
-                    <span className="blane__n">1</span>
-                    <span className="blane__agent"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg>reviewer</span>
-                  </div>
-                  <div className="blane__list">
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card">
-                    <div className="tile__t">Two read ceilings were guarding nothing</div>
-                    <div className="tile__m"><span className="stat"><span className="add">+70</span> <span className="del">−35</span></span><span className="tile__time">28m</span></div>
-                  </div>
-                  </div>
-                  <button className="tile__add">+ Add card</button>
-                  <div className="blane__fill"></div>
-                </div>
-                <div className="blane" data-lane="ship">
-                  <div className="blane__top">
-                    <span className="blane__label">Ship</span>
-                    <span className="blane__n">2</span>
-                  </div>
-                  <div className="blane__list">
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card">
-                    <div className="tile__t">The Changes panel opens a diff</div>
-                    <div className="tile__m"><span className="tile__time">merged · 3h</span></div>
-                  </div>
-                  <div className="tile" role="button" tabIndex={0} data-ctx="card">
-                    <div className="tile__t">Background sessions get hooks too</div>
-                    <div className="tile__m"><span className="tile__time">merged · 5h</span></div>
-                  </div>
-                  </div>
-                  <button className="tile__add">+ Add card</button>
-                  <div className="blane__fill"></div>
-                </div>
-              </div>
+              <BoardPane />
             </div>
 
             {/* Skills */}

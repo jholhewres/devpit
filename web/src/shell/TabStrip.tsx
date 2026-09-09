@@ -15,7 +15,7 @@ export function TabStrip(): React.JSX.Element {
   const { open, active, show, close, move } = useShell()
   const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
-  const moving = useRef<{ name: PaneName; from: number; moved: boolean } | null>(null)
+  const moving = useRef<{ name: PaneName; at: number; moved: boolean } | null>(null)
 
   /* FLIP: the tabs that did not move animate from where they were. */
   useLayoutEffect(() => {
@@ -39,7 +39,10 @@ export function TabStrip(): React.JSX.Element {
     const drag = moving.current
     const row = strip.current
     if (!drag || !row) return
-    if (Math.abs(event.movementX) > 0) drag.moved = true
+    /* A few pixels of jitter is a click with a shaky hand, not a drag. Below
+       the threshold nothing moves, and the click that follows still counts. */
+    if (Math.abs(event.clientX - drag.at) <= 4) return
+    drag.moved = true
     const tabs = Array.from(row.children) as HTMLElement[]
     const to = tabs.findIndex((tab) => {
       const box = tab.getBoundingClientRect()
@@ -61,8 +64,11 @@ export function TabStrip(): React.JSX.Element {
             aria-pressed={true}
             title={meta.title}
             onPointerDown={(event) => {
-              if (event.button !== 0) return
-              moving.current = { name, from: open.indexOf(name), moved: false }
+              /* The cross is a target of its own. Capturing the pointer for a
+                 drag would redirect the click that follows to the tab, and
+                 closing would quietly become selecting. */
+              if (event.button !== 0 || (event.target as HTMLElement).closest('.tab__x')) return
+              moving.current = { name, at: event.clientX, moved: false }
               event.currentTarget.setPointerCapture(event.pointerId)
             }}
             onPointerUp={() => {

@@ -1,7 +1,34 @@
 /* The window is one project, so the project sits above the columns
    rather than inside one of them. It gets the whole width, the logo, and
    the branch — the three things you check before you touch anything. */
-.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+/* The window draws its own frame.
+ *
+ * A rounded corner on a frameless window only works because the page behind
+ * it is transparent — painted over an opaque square the radius comes out as
+ * four black notches. `transparent: true` in tauri.conf.json is the other
+ * half of this, and it wants a compositing window manager.
+ *
+ * Maximised, the corners square off: a rounded rectangle floating in the
+ * middle of a screen it is supposed to fill reads as a bug. */
+.app { position: relative; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--canvas); border: 1px solid var(--border-strong); border-radius: 11px; }
+.app[data-max='true'] { border-radius: 0; border-color: transparent; }
+
+/* Invisible, and only the cursor says they are there — which is what a window
+   edge does. Corners are drawn after the edges so they win the overlap.
+   
+   Below the overlays on purpose: a sheet covering the window has to cover the
+   edges too, or a drag near the border of a dialog resizes the window instead
+   of doing what the dialog says. */
+.grip { position: fixed; z-index: 200; }
+.app[data-max='true'] .grip { display: none; }
+.grip[data-edge='North'] { top: 0; left: 6px; right: 6px; height: 5px; cursor: ns-resize; }
+.grip[data-edge='South'] { bottom: 0; left: 6px; right: 6px; height: 5px; cursor: ns-resize; }
+.grip[data-edge='West'] { left: 0; top: 6px; bottom: 6px; width: 5px; cursor: ew-resize; }
+.grip[data-edge='East'] { right: 0; top: 6px; bottom: 6px; width: 5px; cursor: ew-resize; }
+.grip[data-edge='NorthWest'] { top: 0; left: 0; width: 11px; height: 11px; cursor: nwse-resize; }
+.grip[data-edge='NorthEast'] { top: 0; right: 0; width: 11px; height: 11px; cursor: nesw-resize; }
+.grip[data-edge='SouthWest'] { bottom: 0; left: 0; width: 11px; height: 11px; cursor: nesw-resize; }
+.grip[data-edge='SouthEast'] { bottom: 0; right: 0; width: 11px; height: 11px; cursor: nwse-resize; }
 
 .top { height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 0; border-bottom: 1px solid var(--border); }
 /* The project block is exactly as wide as the sidebar under it, so the
@@ -202,23 +229,23 @@
 body[data-account='in'] .signin { display: none; }
 body[data-account='out'] .acct { display: none; }
 
-.gear { width: 32px; height: 32px; flex: none; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text-3); transition: background-color 120ms ease, color 120ms ease; }
+.gear { width: 30px; height: 30px; flex: none; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text-3); transition: background-color 120ms ease, color 120ms ease; }
 .gear:hover { background: var(--sidebar-item); color: var(--text); }
 
 /* Signed out: the invitation, and the reason for it on the second line —
    a bare "Sign in" asks for something without saying what it buys. */
-.signin { flex: 1; min-width: 0; height: 44px; padding: 0 10px; border-radius: 10px; display: flex; align-items: center; gap: 10px; text-align: left; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent); transition: background-color 130ms ease, border-color 130ms ease; }
+.signin { flex: 1; min-width: 0; height: 38px; padding: 0 9px; border-radius: 10px; display: flex; align-items: center; gap: 10px; text-align: left; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent); transition: background-color 130ms ease, border-color 130ms ease; }
 .signin:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .signin__ico { flex: none; color: var(--accent); display: flex; }
 .signin__body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.signin__t { font-size: 13px; font-weight: 550; color: var(--text); }
-.signin__d { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signin__t { font-size: 12.5px; font-weight: 550; color: var(--text); }
+.signin__d { font-size: 10.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Signed in: the same footprint, so the sidebar does not jump. */
 .acct { flex: 1; min-width: 0; position: relative; }
-.acct__row { width: 100%; height: 44px; padding: 0 8px; border-radius: 10px; display: flex; align-items: center; gap: 9px; text-align: left; transition: background-color 120ms ease; }
+.acct__row { width: 100%; height: 38px; padding: 0 8px; border-radius: 10px; display: flex; align-items: center; gap: 9px; text-align: left; transition: background-color 120ms ease; }
 .acct__row:hover, .acct__row[aria-expanded='true'] { background: var(--sidebar-item); }
-.acct__av { width: 26px; height: 26px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--on-accent); background: var(--accent); }
+.acct__av { width: 24px; height: 24px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--on-accent); background: var(--accent); }
 .acct__av--lg { width: 34px; height: 34px; font-size: 12.5px; }
 .acct__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .acct__n { font-size: 12.5px; font-weight: 550; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1115,3 +1142,28 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .row__g { flex: none; margin-left: auto; padding-left: 6px; font-family: var(--mono); font-size: 10px; }
 .g-m { color: var(--warning); }
 .g-a { color: var(--success); }
+
+/* The first run, and the empty state. One screen, because they are one
+   situation: devpit with no project has nothing to show. */
+.onb { position: fixed; inset: 0; z-index: 480; display: flex; align-items: center; justify-content: center; background: var(--canvas); animation: fade-in 180ms ease both; }
+.onb__box { width: 460px; max-width: calc(100vw - 48px); display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* The mark's corners are in the file. Clipping it again to a different
+   radius cuts a second, mismatched edge just inside the first. */
+.onb__mark { width: 76px; height: 76px; box-shadow: 0 16px 44px color-mix(in srgb, var(--accent) 24%, transparent); border-radius: 11px; }
+.onb__mark .mark { width: 100%; height: 100%; display: block; }
+
+/* Three steps, and which one you are on. A rail rather than a count, because
+   "2 of 3" says how far but not what is left. */
+.onb__rail { display: flex; align-items: center; gap: 8px; margin: 24px 0 26px; padding: 0; list-style: none; }
+.onb__dot { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-3); }
+.onb__dot + .onb__dot::before { content: ''; width: 22px; height: 1px; background: var(--border-strong); }
+.onb__dot[data-state='now'] { color: var(--accent); }
+.onb__dot[data-state='done'] { color: var(--text-2); }
+
+.onb__t { margin: 0; font-size: 20px; font-weight: 560; letter-spacing: -0.015em; color: var(--text); }
+.onb__d { margin: 9px 0 22px; font-size: 12.5px; line-height: 1.6; color: var(--text-3); max-width: 400px; }
+.onb__go { height: 38px; min-width: 190px; padding: 0 20px; border-radius: 9px; font-size: 13px; font-weight: 550; color: var(--on-accent); background: var(--accent); transition: filter 130ms ease; }
+.onb__go:hover { filter: brightness(1.07); }
+.onb__skip { margin-top: 10px; height: 30px; padding: 0 12px; border-radius: 8px; font-size: 12px; color: var(--text-3); }
+.onb__skip:hover { color: var(--text); background: var(--overlay); }
+.onb .thm { width: 100%; margin-bottom: 22px; }

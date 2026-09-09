@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react'
 
 import './shell.css'
 import { AddProject } from './AddProject'
+import { ContextMenu } from './ContextMenu'
+import { Onboarding } from './Onboarding'
 import { Palette } from './Palette'
 import { Panes } from './Panes'
 import { RemoveProject } from './RemoveProject'
+import { ResizeEdges } from './ResizeEdges'
 import { RightPanel } from './RightPanel'
 import { Settings } from './Settings'
 import { Sidebar } from './Sidebar'
 import { SignIn } from './SignIn'
 import { TopBar } from './TopBar'
 import { ShellProvider, useShell } from './useShell'
+import { isMaximized, onResized } from './window'
 
 export function AppShell(): React.JSX.Element {
   return (
@@ -30,11 +34,20 @@ export function AppShell(): React.JSX.Element {
  */
 function Window(): React.JSX.Element {
   const shell = useShell()
-  const { side, files, signedIn, prefs, forgetProject } = shell
+  const { side, files, signedIn, prefs, projects, forgetProject } = shell
   const [palette, setPalette] = useState(false)
   const [signIn, setSignIn] = useState(false)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [maximized, setMaximized] = useState(false)
+
+  /* Maximised, the rounded corners square off — a rounded rectangle floating
+     in the middle of a screen it should fill reads as a bug. */
+  useEffect(() => {
+    const check = (): void => void isMaximized().then(setMaximized)
+    check()
+    return onResized(check)
+  }, [])
 
   /* The account state is read by CSS, which decides which half of the
      sidebar foot exists. */
@@ -66,7 +79,9 @@ function Window(): React.JSX.Element {
   }, [shell])
 
   return (
-    <div className="app">
+    <div className="app" data-max={String(maximized)}>
+      <ResizeEdges />
+      <ContextMenu />
       <TopBar onAddProject={() => setAdding(true)} />
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
@@ -74,6 +89,9 @@ function Window(): React.JSX.Element {
         <Panes />
         <RightPanel />
       </div>
+
+      {/* No project, nothing to show: the setup screen is the empty state. */}
+      {projects.length === 0 && <Onboarding onAddProject={() => setAdding(true)} />}
 
       {palette && <Palette onClose={() => setPalette(false)} />}
       {signIn && (

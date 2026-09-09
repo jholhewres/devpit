@@ -3,6 +3,7 @@ import { BRANCH } from '../mock/data'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
 import { useShell } from './useShell'
+import { close, minimize, toggleMaximize } from './window'
 
 /*
  * The window is one project, so the project sits above the columns rather than
@@ -12,12 +13,16 @@ import { useShell } from './useShell'
  * The two panel toggles sit together on the right, next to the window
  * controls: they are one job — showing and hiding the columns — and split
  * apart they read as two unrelated buttons.
+ *
+ * The bar carries `data-tauri-drag-region`, so it is the window's handle.
+ * Everything interactive in it is a child without the attribute, which is why
+ * the buttons still take their own clicks.
  */
 export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
   const { side, files, toggleSide, toggleFiles } = useShell()
 
   return (
-    <header className="top">
+    <header className="top" data-tauri-drag-region>
       <div className="top__lead">
         <span className="logo">
           <img className="mark" alt="devpit" src={mark} />
@@ -27,7 +32,7 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
 
       <TabStrip />
 
-      <span className="drag" />
+      <span className="drag" data-tauri-drag-region />
 
       <button className="branch" title="Switch branch">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -70,17 +75,17 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
       {/* A frameless window still has to be minimised, maximised and closed;
           these are ours to draw because the system's are not there. */}
       <span className="wctl">
-        <button className="wbtn" aria-label="Minimize">
+        <button className="wbtn" aria-label="Minimize" onClick={minimize}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
             <path d="M5 12h14" />
           </svg>
         </button>
-        <button className="wbtn" aria-label="Maximize">
+        <button className="wbtn" aria-label="Maximize" onClick={toggleMaximize}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
             <rect x="5" y="5" width="14" height="14" rx="1.5" />
           </svg>
         </button>
-        <button className="wbtn wbtn--x" aria-label="Close">
+        <button className="wbtn wbtn--x" aria-label="Close" onClick={close}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>

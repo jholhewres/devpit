@@ -123,6 +123,14 @@ input[type='search']::-webkit-search-cancel-button {
   outline-offset: -1px;
 }
 
+/* A field that sits inside its own bordered row already shows focus; the
+   ring on the input draws a second edge just inside the first. */
+.cmd__in:focus-visible,
+.pickpop__in:focus-visible,
+.fld__b:focus-visible {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
