@@ -15,6 +15,7 @@ use crate::pty_bridge;
 use crate::reveal;
 use crate::saves;
 use crate::staging;
+use crate::threads;
 use crate::workspace;
 use crate::worktrees;
 use crate::{
@@ -33,6 +34,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         projects::project_open,
         projects::project_forget,
         chat::chat_history,
+        threads::chat_list,
         chat::chat_send,
         chat::chat_cancel,
         chat::chat_frames,

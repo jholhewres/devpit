@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Asked } from './Asked'
-import { MODES, money, ready } from './chat'
+import { Threads } from './Threads'
+import { MODES, modelName, money, ready } from './chat'
 import type { Tab } from './strip'
 import { Turn } from './Turn'
 import { useChat } from './useChat'
@@ -61,9 +62,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
       <div className="scroll" ref={box}>
         <div className="thread">
           {chat.error && <div className="exempty__t">{chat.error}</div>}
-          {chat.messages.length === 0 && !chat.error && (
-            <div className="exempty__t">Nothing said yet.</div>
-          )}
+          {chat.messages.length === 0 && !chat.error && <Threads hide={tab.id} />}
           {chat.messages.map((message) => (
             <Turn key={message.id} message={message} />
           ))}
@@ -182,7 +181,7 @@ function Model({ chat }: { chat: ReturnType<typeof useChat> }): React.JSX.Elemen
     >
       {models.map((model) => (
         <option key={model} value={model}>
-          {model}
+          {modelName(model)}
         </option>
       ))}
     </select>

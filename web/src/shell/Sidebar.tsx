@@ -27,7 +27,10 @@ export function Sidebar({
     shell.show(kind)
     setMenu(null)
   }
-  const isOpen = (kind: PaneName): boolean => shell.open.some((tab) => tab.kind === kind)
+  /* What you are looking at, not what exists. Marking every open pane lit
+     Board and Files at once, which reads as two places being current — and
+     the tab strip already says what is open. */
+  const showing = (kind: PaneName): boolean => shell.active?.kind === kind
   const openPrefs = (pane: PrefsPane): void => {
     shell.openPrefs(pane)
     setMenu(null)
@@ -93,12 +96,12 @@ export function Sidebar({
             </button>
           </div>
 
-          <button className="act" onClick={() => open('board')} aria-pressed={isOpen('board')}>
+          <button className="act" onClick={() => open('board')} aria-pressed={showing('board')}>
             <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
             <span className="act__label">Board</span>
           </button>
 
-          <button className="act" onClick={() => open('files')} aria-pressed={isOpen('files')}>
+          <button className="act" onClick={() => open('files')} aria-pressed={showing('files')}>
             <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg></span>
             <span className="act__label">Files</span>
           </button>

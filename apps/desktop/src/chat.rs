@@ -24,7 +24,7 @@ pub struct Talking {
     running: Arc<Mutex<HashMap<String, u32>>>,
 }
 
-fn home() -> PathBuf {
+pub(crate) fn home() -> PathBuf {
     devpit_core::Store::root().unwrap_or_default()
 }
 

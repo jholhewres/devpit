@@ -39,6 +39,7 @@ mod sessions;
 mod settings;
 mod staging;
 mod steps;
+mod threads;
 mod workspace;
 mod worktrees;
 

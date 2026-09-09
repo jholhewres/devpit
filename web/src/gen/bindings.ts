@@ -46,6 +46,13 @@ export const commands = {
 	/**  `chat.history` — everything said in this conversation, in order. */
 	chatHistory: (projectId: string, conversationId: string) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId })),
 	/**
+	 *  `chat.list` — every conversation this project has had.
+	 * 
+	 *  The transcripts were always on disk; nothing listed them, so closing a tab
+	 *  left a file nobody could reach again.
+	 */
+	chatList: (projectId: string) => typedError<Conversations, RpcError>(__TAURI_INVOKE("chat_list", { projectId })),
+	/**
 	 *  `chat.cancel` — stops the turn in flight, keeping what already arrived.
 	 * 
 	 *  Answers with the ending it caused, or nothing when no turn was running.
@@ -618,6 +625,10 @@ export type Conversation = {
 	createdAt: number | null,
 };
 
+export type Conversations = {
+	conversations: Thread[],
+};
+
 export type ErrorCode = "unauthenticated" | 
 /**
  *  Used when a path falls outside the registered project root. Distinct
@@ -1121,6 +1132,26 @@ export type StepKind =
  *  whichever of the two the machine is already using.
  */
 export type Theme = "system" | "light" | "dark";
+
+/**
+ *  One conversation, as a row in a list.
+ * 
+ *  A summary, not a `Conversation`: that one carries every message, and a
+ *  list of them would read the whole history to draw a sidebar.
+ */
+export type Thread = {
+	id: string,
+	/**
+	 *  The first thing the person said. Their words, not a summary written
+	 *  by a model — the row exists to be recognised.
+	 */
+	title: string,
+	profile: string,
+	model: string | null,
+	costUsd: number | null,
+	/**  Unix seconds, when it was last spoken in. */
+	lastAt: number | null,
+};
 
 /**  What a turn cost and why it stopped. */
 export type TurnEnd = {

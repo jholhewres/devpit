@@ -116,3 +116,10 @@ export function withFiles(prompt: string, files: readonly Attachment[]): string 
   if (files.length === 0) return prompt
   return `${files.map((file) => `@${file.path}`).join(' ')}\n${prompt}`
 }
+
+/* What a model is called on screen.
+
+   `default` is what the CLI is passed when nobody picked, and it is a fine
+   argument and a useless label — it names no model to the person reading it. */
+export const modelName = (model: string): string =>
+  model === 'default' ? "The account's default" : model

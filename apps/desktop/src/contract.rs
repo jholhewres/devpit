@@ -14,6 +14,7 @@ use crate::mcp;
 use crate::reveal;
 use crate::saves;
 use crate::staging;
+use crate::threads;
 use crate::workspace;
 use crate::worktrees;
 use crate::{
@@ -43,6 +44,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         projects::project_open,
         projects::project_forget,
         chat::chat_history,
+        threads::chat_list,
         chat::chat_cancel,
         chat::chat_frames,
         chat::agent_profiles,

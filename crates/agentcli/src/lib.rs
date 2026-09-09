@@ -30,6 +30,7 @@ pub use headless::{run_turn, run_turn_cancellable, Outcome, Turn};
 pub use hook_settings::settings_json;
 pub use hooks::{endpoint_file, read as read_hook, Event, Happening};
 pub use schema::validates;
+pub use sources::seed_sources;
 // `start_background` and the argv builders live in this module.
 pub use session::{AgentSession, Kind, Status};
 pub use transcript::{read_cost, transcript_path, Cost};
@@ -259,61 +260,6 @@ pub fn respawn(short_id: &str) -> Result<(), AgentError> {
     run(&["respawn", short_id]).map(|_| ())
 }
 
-/// Every directory on this machine that holds agents, the person's own set
-/// first.
-///
-/// Every directory, not the best one. Picking a single "best" needs a rule for
-/// which plugin wins, and any such rule is wrong for someone — one install had
-/// a plugin with a single agent sorting above the set of nineteen. Reading all
-/// of them, first-wins, gets the union with no rule at all.
-pub fn seed_sources() -> Vec<std::path::PathBuf> {
-    let Some(home) = dirs_home() else {
-        return Vec::new();
-    };
-    let mut dirs = walk_agent_dirs(&home.join(".claude/plugins/cache"));
-    dirs.sort();
-
-    // Yours first, so it shadows a plugin's rather than the other way round.
-    let mut all = Vec::new();
-    for own in [home.join(".devpit/agents"), home.join(".claude/agents")] {
-        if own.is_dir() {
-            all.push(own);
-        }
-    }
-    all.extend(dirs);
-    all
-}
-
-fn dirs_home() -> Option<std::path::PathBuf> {
-    std::env::var_os("HOME").map(std::path::PathBuf::from)
-}
-
-/// Every `agents/` directory under a plugin cache, at any depth.
-fn walk_agent_dirs(root: &Path) -> Vec<std::path::PathBuf> {
-    fn visit(dir: &Path, depth: usize, found: &mut Vec<std::path::PathBuf>) {
-        if depth > 4 {
-            return;
-        }
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for entry in entries.filter_map(Result::ok) {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            if path.file_name().is_some_and(|n| n == "agents") {
-                found.push(path);
-            } else {
-                visit(&path, depth + 1, found);
-            }
-        }
-    }
-    let mut found = Vec::new();
-    visit(root, 0, &mut found);
-    found
-}
-
 fn run(args: &[&str]) -> Result<String, AgentError> {
     let output = Command::new(PROGRAM)
         .args(args)
@@ -338,10 +284,14 @@ mod driver_tests;
 pub mod head;
 #[cfg(test)]
 mod head_tests;
+pub mod history;
+#[cfg(test)]
+mod history_tests;
 pub mod profile;
 #[cfg(test)]
 mod profile_tests;
 pub mod skills;
+mod sources;
 pub mod store;
 #[cfg(test)]
 mod store_tests;

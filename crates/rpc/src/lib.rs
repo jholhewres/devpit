@@ -20,6 +20,7 @@ pub mod session;
 pub mod session_status;
 pub mod session_tree;
 pub mod settings;
+mod threads;
 
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
@@ -36,6 +37,7 @@ pub use project::{
 pub use session::{AgentPresence, LayoutNode, PaneKind, PaneSize, SessionLayout, SplitDirection};
 pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
+pub use threads::{Conversations, Thread};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
