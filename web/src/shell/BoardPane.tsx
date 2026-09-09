@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import { LANES, type Card, type Lane } from '../mock/board'
+import type { Card } from '../gen/bindings'
+import { useBoard } from './useBoard'
+import { useShell } from './useShell'
 
 /*
  * The board, and the one gesture that is the whole point of it.
@@ -41,31 +43,32 @@ const Spark = (): React.JSX.Element => (
 )
 
 function Tile({ card }: { card: Card }): React.JSX.Element {
+  const run = card.runs[0]
   return (
     <>
       <div className="tile__t">{card.title}</div>
       <div className="tile__m">
-        {card.agent && (
-          <span className={card.warn ? 'tile__agent tile__agent--warn' : 'tile__agent'}>
+        {run && (
+          <span className={run.state === 'failed' ? 'tile__agent tile__agent--warn' : 'tile__agent'}>
             <Spark />
-            {card.agent}
+            {run.stepName}
           </span>
         )}
-        {card.added !== undefined && <span className="add">+{card.added}</span>}
-        {card.deleted !== undefined && <span className="del">&minus;{card.deleted}</span>}
-        {card.merged && <span className="tile__time">{card.merged}</span>}
-        {card.note && <span className="tile__time">{card.note}</span>}
+        {card.costUsd !== null && <span className="tile__time">${card.costUsd.toFixed(2)}</span>}
+        {card.session && <span className="tile__time">{card.session.status}</span>}
       </div>
     </>
   )
 }
 
 export function BoardPane(): React.JSX.Element {
-  const [lanes, setLanes] = useState<Lane[]>(() => LANES.map((lane) => ({ ...lane })))
+  const { project } = useShell()
+  const live = useBoard(project?.id ?? null)
+  const lanes = live.lanes
   const [held, setHeld] = useState<Held | null>(null)
   const [landing, setLanding] = useState<Landing | null>(null)
   const [landed, setLanded] = useState<string | null>(null)
-  const board = useRef<HTMLDivElement>(null)
+  const surface = useRef<HTMLDivElement>(null)
 
   /* The cursor belongs to the whole window while a card is in the air — and
      the cleanup matters: unmounting mid-drag would leave every cursor in the
@@ -138,17 +141,7 @@ export function BoardPane(): React.JSX.Element {
       setLanding(null)
       return
     }
-    setLanes((was) => {
-      const without = was.map((lane) => ({
-        ...lane,
-        cards: lane.cards.filter((other) => other.id !== card.id),
-      }))
-      return without.map((lane) =>
-        lane.name === landing.lane
-          ? { ...lane, cards: [...lane.cards.slice(0, landing.index), card, ...lane.cards.slice(landing.index)] }
-          : lane,
-      )
-    })
+    live.move(card.id, landing.lane, landing.index)
     setLanding(null)
     if (landing.lane !== from) {
       setLanded(card.id)
@@ -157,24 +150,24 @@ export function BoardPane(): React.JSX.Element {
   }
 
   return (
-    <div className="board" ref={board} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+    <div className="board" ref={surface} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
       {lanes.map((lane) => {
-        const dropping = landing?.lane === lane.name
+        const dropping = landing?.lane === lane.column.id
         return (
           <div
-            key={lane.name}
+            key={lane.column.id}
             className="blane"
-            data-lane={lane.name}
-            data-agent={lane.agent}
+            data-lane={lane.column.id}
+            data-agent={lane.column.step?.name}
             data-over={String(Boolean(held?.moved && dropping))}
           >
             <div className="blane__top">
-              <span className="blane__label">{lane.label}</span>
+              <span className="blane__label">{lane.column.name}</span>
               <span className="blane__n">{lane.cards.length}</span>
-              {lane.agent && (
+              {lane.column.step && (
                 <span className="blane__agent">
                   <Spark />
-                  {lane.agent}
+                  {lane.column.step.name}
                 </span>
               )}
             </div>
@@ -192,7 +185,7 @@ export function BoardPane(): React.JSX.Element {
                     data-ctx="card"
                     data-card={card.id}
                     data-ghost={String(held?.card.id === card.id && held.moved)}
-                    onPointerDown={(event) => onDown(event, card, lane.name)}
+                    onPointerDown={(event) => onDown(event, card, lane.column.id)}
                   >
                     <Tile card={card} />
                   </div>
@@ -203,7 +196,12 @@ export function BoardPane(): React.JSX.Element {
               )}
             </div>
 
-            <button className="tile__add">+ Add card</button>
+            <button
+              className="tile__add"
+              onClick={() => live.addCard(lane.column.id, 'New card')}
+            >
+              + Add card
+            </button>
             <div className="blane__fill" />
           </div>
         )
