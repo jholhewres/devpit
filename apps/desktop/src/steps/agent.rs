@@ -6,7 +6,7 @@ use devpit_rpc::Step;
 use serde::Deserialize;
 
 use super::context::{injected, Context};
-use super::{agents_dir, Finished};
+use super::Finished;
 
 /// What an `agent` step needs to know, out of `step.config`.
 #[derive(Deserialize, Default)]
@@ -64,13 +64,13 @@ pub fn run(
     // Only the agent this step names is passed. Handing the CLI the whole
     // catalogue would make every step's behaviour depend on files it never
     // mentions.
-    let catalogue = agent::read_agents(&agents_dir().map_err(|err| err.to_string())?);
+    let catalogue = agent::read_every_agent(&agent::seed_sources());
     let named = config
         .agent
         .as_ref()
         .and_then(|name| catalogue.agents.iter().find(|a| &a.name == name).cloned());
     if let (Some(name), None) = (&config.agent, &named) {
-        return Err(format!("no agent named `{name}` in ~/.devpit/agents"));
+        return Err(format!("no agent named `{name}` on this machine"));
     }
     let argument = named
         .as_ref()

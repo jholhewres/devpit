@@ -22,7 +22,8 @@ mod session;
 mod transcript;
 
 pub use catalogue::{
-    as_argument, read as read_agents, seed as seed_agents, Agent, Catalogue, Rejected,
+    as_argument, read as read_agents, read_all as read_every_agent, source_of, Agent, Catalogue,
+    Rejected,
 };
 pub use headless::{run_turn, run_turn_cancellable, Outcome, Turn};
 pub use hooks::{endpoint_file, read as read_hook, settings_json, Event, Happening};
@@ -256,27 +257,29 @@ pub fn respawn(short_id: &str) -> Result<(), AgentError> {
     run(&["respawn", short_id]).map(|_| ())
 }
 
-/// Where to seed the first set of agents from.
-///
-/// Whatever the person already has installed, rather than a copy vendored
-/// here: their set is the one they trust, and a vendored copy would be stale
-/// the week after it was taken.
+/// Every directory on this machine that holds agents, the person's own set
+/// first.
 ///
 /// Every directory, not the best one. Picking a single "best" needs a rule for
 /// which plugin wins, and any such rule is wrong for someone — one install had
-/// a plugin with a single agent sorting above the set of nineteen. Seeding
-/// from all of them and never overwriting gets the union with no rule at all.
+/// a plugin with a single agent sorting above the set of nineteen. Reading all
+/// of them, first-wins, gets the union with no rule at all.
 pub fn seed_sources() -> Vec<std::path::PathBuf> {
     let Some(home) = dirs_home() else {
         return Vec::new();
     };
     let mut dirs = walk_agent_dirs(&home.join(".claude/plugins/cache"));
-    let own = home.join(".claude/agents");
-    if own.is_dir() {
-        dirs.push(own);
-    }
     dirs.sort();
-    dirs
+
+    // Yours first, so it shadows a plugin's rather than the other way round.
+    let mut all = Vec::new();
+    for own in [home.join(".devpit/agents"), home.join(".claude/agents")] {
+        if own.is_dir() {
+            all.push(own);
+        }
+    }
+    all.extend(dirs);
+    all
 }
 
 fn dirs_home() -> Option<std::path::PathBuf> {

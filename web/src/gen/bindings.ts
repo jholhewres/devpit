@@ -299,6 +299,11 @@ export type Agent = {
 	name: string,
 	description: string,
 	model: string | null,
+	/**
+	 *  Where it came from — `omc`, `claude`, `yours`. Shown beside the name so
+	 *  two agents that share one can be told apart.
+	 */
+	source: string,
 };
 
 /**  Who is running in the leaf. `none` is a plain shell. */

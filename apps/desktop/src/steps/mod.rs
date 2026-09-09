@@ -106,7 +106,7 @@ pub fn agents_dir() -> Result<PathBuf, RpcError> {
 #[specta::specta]
 pub fn agents_list() -> Result<devpit_rpc::Agents, RpcError> {
     let dir = agents_dir()?;
-    let catalogue = devpit_agentcli::read_agents(&dir);
+    let catalogue = devpit_agentcli::read_every_agent(&devpit_agentcli::seed_sources());
     Ok(devpit_rpc::Agents {
         agents: catalogue
             .agents
@@ -115,6 +115,7 @@ pub fn agents_list() -> Result<devpit_rpc::Agents, RpcError> {
                 name: agent.name,
                 description: agent.description,
                 model: agent.model,
+                source: agent.source,
             })
             .collect(),
         rejected: catalogue

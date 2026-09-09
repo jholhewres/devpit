@@ -63,6 +63,14 @@ fn a_card_crosses_the_board_and_the_runs_stay_on_it() {
     assert_eq!(runs[0].exit_code, Some(0));
     assert_eq!(store.card_cost(&card).expect("cost"), 0.25);
 
+    // A run that ends does not move the card. Nothing in this product advances
+    // a card on its own — the orchestrator is the person.
+    assert_eq!(
+        store.card(&card).expect("card").expect("card").column_id,
+        columns[4].id,
+        "a finished run moved the card"
+    );
+
     // The lane it came from can be renamed under it without anything breaking.
     store
         .rename_column(&columns[0].id, "somewhere else")

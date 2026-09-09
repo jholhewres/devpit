@@ -11,6 +11,9 @@ pub struct Agent {
     pub name: String,
     pub description: String,
     pub model: Option<String>,
+    /// Where it came from — `omc`, `claude`, `yours`. Shown beside the name so
+    /// two agents that share one can be told apart.
+    pub source: String,
 }
 
 /// Response of `agents.list`.

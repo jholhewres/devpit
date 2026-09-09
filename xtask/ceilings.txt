@@ -21,7 +21,8 @@ apps/desktop/src/steps/agent.rs 200
 apps/desktop/src/steps/mod.rs 150
 apps/desktop/src/steps/mod_tests.rs 150
 apps/desktop/src/worktrees.rs 200
-crates/agentcli/src/catalogue.rs 400
+crates/agentcli/src/catalogue.rs 250
+crates/agentcli/src/catalogue_tests.rs 200
 crates/agentcli/src/driver.rs 200
 crates/agentcli/src/headless.rs 200
 crates/agentcli/src/hooks.rs 150

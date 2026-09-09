@@ -47,13 +47,6 @@ fn main() {
     // rather than JSON. specta cannot describe that enum; their wrappers are
     // hand-written. Everything else about a session — ensure, split, write,
     // resize — is in the generated contract.
-    // The agents already installed on this machine become the starting set,
-    // once, without ever overwriting one that has been edited.
-    let seeded = runs::seed_agents();
-    if seeded > 0 {
-        println!("seeded {seeded} agents into ~/.devpit/agents");
-    }
-
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(chat::Talking::default())

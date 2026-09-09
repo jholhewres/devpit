@@ -14,7 +14,6 @@
 //! Nothing here retries. A failed run leaves the card where it is with the
 //! reason on it, and the next move is a person's.
 
-use devpit_agentcli as agent;
 use std::sync::Arc;
 
 use devpit_core::Store;
@@ -123,18 +122,4 @@ pub fn start(
         duration_ms: None,
         started_at: 0.0,
     })
-}
-
-/// Copies the agents already installed on this machine into `~/.devpit`.
-///
-/// Runs on every start and never overwrites, so an agent the person edited
-/// stays theirs.
-pub fn seed_agents() -> usize {
-    let Ok(dir) = crate::steps::agents_dir() else {
-        return 0;
-    };
-    agent::seed_sources()
-        .iter()
-        .filter_map(|source| agent::seed_agents(&dir, source).ok())
-        .sum()
 }

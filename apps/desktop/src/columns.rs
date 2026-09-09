@@ -106,9 +106,10 @@ fn refused(kind: &str, config: &str) -> Option<String> {
         "session" => StepKind::Session,
         _ => return Some(format!("there is no kind of step called `{kind}`")),
     };
-    let agents: Vec<String> = crate::steps::agents_dir()
-        .map(|dir| devpit_agentcli::read_agents(&dir))
-        .map(|catalogue| catalogue.agents.into_iter().map(|one| one.name).collect())
-        .unwrap_or_default();
+    let agents: Vec<String> = devpit_agentcli::read_every_agent(&devpit_agentcli::seed_sources())
+        .agents
+        .into_iter()
+        .map(|one| one.name)
+        .collect();
     crate::steps::recipe::refuse(kind, config, &agents, &devpit_agentcli::skills::skills())
 }
