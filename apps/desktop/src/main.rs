@@ -31,6 +31,7 @@ mod runs;
 mod saves;
 mod sessions;
 mod settings;
+mod staging;
 mod steps;
 mod workspace;
 mod worktrees;
@@ -108,6 +109,9 @@ fn main() {
             board::card_update,
             board::card_move,
             files::file_read,
+            staging::changes_stage,
+            staging::changes_unstage,
+            staging::changes_commit,
             saves::file_write,
             diffs::file_diff,
             in_flight::run_cancel,

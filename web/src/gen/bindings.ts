@@ -177,6 +177,18 @@ export const commands = {
 	/**  `file.read` — the text of a file, or why it is not text. */
 	fileRead: (projectId: string, worktreeId: string | null, path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("file_read", { projectId, worktreeId, path })),
 	/**
+	 *  `changes.stage` — puts these paths in the index, and answers with the list
+	 *  as it now stands.
+	 * 
+	 *  Answering with the whole list rather than nothing: the screen would
+	 *  otherwise have to predict what staging did to every other row.
+	 */
+	changesStage: (projectId: string, worktreeId: string | null, paths: string[]) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("changes_stage", { projectId, worktreeId, paths })),
+	/**  `changes.unstage` — takes them back out. The file on disk is not touched. */
+	changesUnstage: (projectId: string, worktreeId: string | null, paths: string[]) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("changes_unstage", { projectId, worktreeId, paths })),
+	/**  `changes.commit` — commits what is staged. */
+	changesCommit: (projectId: string, worktreeId: string | null, message: string) => typedError<Commit, RpcError>(__TAURI_INVOKE("changes_commit", { projectId, worktreeId, message })),
+	/**
 	 *  `file.write` — saves, and refuses to overwrite a change it never saw.
 	 * 
 	 *  `read_at` is the mtime the editor was handed. If the file has moved on
@@ -487,6 +499,8 @@ export type Change = {
 	status: GitStatus,
 	added: number,
 	removed: number,
+	/**  True when the change is in the index — what a commit would take. */
+	staged: boolean,
 };
 
 export type Column = {

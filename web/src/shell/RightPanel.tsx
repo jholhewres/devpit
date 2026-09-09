@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { mark } from './tree'
+import { Changes } from './Changes'
 import { Tree } from './Tree'
 import { useShell } from './useShell'
 import { useTree } from './useTree'
@@ -95,31 +95,7 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
       </div>
 
       <div className="rview" data-rview="changes" data-open={String(view === 'changes')}>
-        <div className="git__head">
-          <span className="git__branch">Changes</span>
-          <span className="git__up">
-            <span className="add">+{tree.totals.added}</span>
-            <span className="del">&minus;{tree.totals.removed}</span>
-          </span>
-          <button className="sq26 tip" data-tip="Refresh" aria-label="Refresh" onClick={tree.reload}>
-            <Icon d={REFRESH} />
-          </button>
-        </div>
-        <div className="git__body">
-          {tree.changes.length === 0 && (
-            <div className="exempty"><span className="exempty__t">Nothing changed.</span></div>
-          )}
-          {tree.changes.map((change) => (
-            <button key={change.path} className="gitrow gitrow--file" data-ctx="file" onClick={() => open(change.path)}>
-              <span className="gitrow__n">{change.path}</span>
-              <span className="gitrow__end">
-                {change.added > 0 && <span className="add">+{change.added}</span>}
-                {change.removed > 0 && <span className="del">&minus;{change.removed}</span>}
-                <span className={`row__g row__g--${change.status}`}>{mark(change.status)}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+        <Changes tree={tree} />
       </div>
     </aside>
   )

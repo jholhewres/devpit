@@ -10,6 +10,7 @@ use crate::chat;
 use crate::mcp;
 use crate::reveal;
 use crate::saves;
+use crate::staging;
 use crate::workspace;
 use crate::worktrees;
 use crate::{
@@ -68,6 +69,9 @@ pub fn contract() -> Builder<tauri::Wry> {
         board::card_update,
         board::card_move,
         files::file_read,
+        staging::changes_stage,
+        staging::changes_unstage,
+        staging::changes_commit,
         saves::file_write,
         diffs::file_diff,
         in_flight::run_cancel,

@@ -1243,3 +1243,27 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .md__img { max-width: 100%; border-radius: 6px; }
 .md__a { display: inline; padding: 0; color: var(--accent); text-decoration: underline; font: inherit; }
 .md__diagram { margin: 0 0 12px; display: flex; justify-content: center; }
+
+/* Changes: three groups, because a commit takes one of them. */
+.git__group { padding: 8px 12px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); display: flex; gap: 6px; }
+.git__group span { color: var(--ghost); }
+.gitrow__open { flex: 1; min-width: 0; display: flex; text-align: left; padding: 0; background: none; color: inherit; font: inherit; }
+.gitrow__act { width: 18px; height: 18px; border-radius: 4px; color: var(--text-3); font-size: 13px; line-height: 1; }
+.gitrow__act:hover { background: var(--overlay); color: var(--text); }
+.gitrow__act:disabled { opacity: .4; }
+.git__commit { flex: none; padding: 8px 12px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.git__msg { min-height: 56px; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--composer); color: var(--text); font-family: inherit; font-size: 12.5px; resize: vertical; outline: none; }
+.git__msg::placeholder { color: var(--ghost); }
+.btn:disabled, .btn--go:disabled { opacity: .45; cursor: default; }
+
+/* A diff. The four kinds of line get their own ground rather than their own
+   prefix, because the prefix is what lies. */
+.diff { margin: 0 0 12px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; }
+.diff__at { padding: 4px 12px; background: var(--overlay); color: var(--text-3); }
+.diff__l { padding: 0 12px; white-space: pre; color: var(--text-2); }
+.diff__l[data-d='add'] { background: color-mix(in srgb, var(--success) 14%, transparent); }
+.diff__l[data-d='del'] { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.diff__l[data-d='gap'] { background: var(--inset); }
+.diff__two { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+.diff__two > div { background: var(--bg); overflow-x: auto; }
+.diff__moved { padding: 6px 12px; font-size: 12px; color: var(--text-3); }

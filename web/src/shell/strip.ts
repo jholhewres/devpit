@@ -24,7 +24,7 @@ export interface Strip {
 }
 
 /** Kinds you can have several of. Everything else focuses what is open. */
-const MANY: ReadonlySet<PaneName> = new Set<PaneName>(['term', 'chat', 'file'])
+const MANY: ReadonlySet<PaneName> = new Set<PaneName>(['term', 'chat', 'file', 'diff'])
 
 export const many = (kind: PaneName): boolean => MANY.has(kind)
 

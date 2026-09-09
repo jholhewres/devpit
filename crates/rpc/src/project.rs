@@ -57,6 +57,8 @@ pub struct Change {
     pub status: GitStatus,
     pub added: u32,
     pub removed: u32,
+    /// True when the change is in the index — what a commit would take.
+    pub staged: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

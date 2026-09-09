@@ -2,6 +2,7 @@ import mark from '../assets/brand/mark.png'
 import { BoardPane } from './BoardPane'
 import { ChatPane } from './ChatPane'
 import { SkillsPane } from './SkillsPane'
+import { DiffPane } from './DiffPane'
 import { FilePane } from './FilePane'
 import { FilesPane } from './FilesPane'
 import { McpPane } from './McpPane'
@@ -93,6 +94,20 @@ export function Panes({
                   data-show={String(active?.id === tab.id)}
                 >
                   <ChatPane tab={tab} />
+                </div>
+              ))}
+
+            {/* A diff, one pane per file being read */}
+            {open
+              .filter((tab) => tab.kind === 'diff')
+              .map((tab) => (
+                <div
+                  key={tab.id}
+                  className="pane pane--file"
+                  data-pane="diff"
+                  data-show={String(active?.id === tab.id)}
+                >
+                  <DiffPane tab={tab} />
                 </div>
               ))}
 

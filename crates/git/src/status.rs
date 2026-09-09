@@ -4,7 +4,7 @@
 //! the branch has drifted from its upstream, and it reports a rename in a way
 //! that has to be guessed at. v2 states both.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use devpit_rpc::{Change, GitStatus};
@@ -20,6 +20,12 @@ pub struct Status {
     pub behind: u32,
     /// Path relative to the worktree root → how it stands.
     pub paths: BTreeMap<String, GitStatus>,
+    /// The paths whose change is in the index — what a commit would take.
+    ///
+    /// Apart from `paths` because a file can be both: edited, staged, then
+    /// edited again. One flag per path would have to pick a side and would
+    /// pick wrong for exactly that file.
+    pub staged: BTreeSet<String>,
 }
 
 impl Status {
@@ -65,6 +71,9 @@ fn parse_status(raw: &str) -> Status {
             "1" => {
                 if let Some((code, path)) = split_after(rest, 7) {
                     status.paths.insert(path.to_owned(), from_code(code));
+                    if is_staged(code) {
+                        status.staged.insert(path.to_owned());
+                    }
                 }
             }
             // `2 <xy> … <X><score> <path>` and then the original path as its
@@ -73,6 +82,9 @@ fn parse_status(raw: &str) -> Status {
             "2" => {
                 if let Some((code, path)) = split_after(rest, 8) {
                     status.paths.insert(path.to_owned(), from_code(code));
+                    if is_staged(code) {
+                        status.staged.insert(path.to_owned());
+                    }
                 }
                 records.next();
             }
@@ -133,6 +145,14 @@ fn split_after(rest: &str, count: usize) -> Option<(&str, &str)> {
     Some((first, rest.get(offset..)?))
 }
 
+/// Whether the index column of `<index><worktree>` says anything.
+///
+/// A dot means the index matches HEAD for this path, so there is nothing
+/// staged. Anything else is a change a commit would take.
+fn is_staged(code: &str) -> bool {
+    code.chars().next().is_some_and(|index| index != '.')
+}
+
 /// The two-letter code is `<index><worktree>`.
 ///
 /// The worktree column wins when it says anything, because it describes the
@@ -158,6 +178,7 @@ fn from_code(code: &str) -> GitStatus {
 /// `status` knows about untracked files and counts nothing.
 pub fn changes(root: &Path) -> Result<Vec<Change>, GitError> {
     let status = status(root)?;
+    let status_staged = status.staged.clone();
     let mut counted = BTreeMap::new();
 
     // `HEAD` fails on a repository with no commits, which is a normal state
@@ -181,6 +202,7 @@ pub fn changes(root: &Path) -> Result<Vec<Change>, GitError> {
         .map(|(path, status)| {
             let (added, removed) = counted.get(&path).copied().unwrap_or((0, 0));
             Change {
+                staged: status_staged.contains(&path),
                 path,
                 status,
                 added,
