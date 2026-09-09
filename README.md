@@ -37,7 +37,8 @@ work stands, and a number on every agent call.
   taking up the screen.
 - **Sessions that outlive the window.** Close devpit, reopen it, and what was
   running is still running.
-- **A git worktree per line of work**, created and cleaned up for you.
+- **A git worktree per line of work**, made when a step needs a checkout and
+  removed when you say so — never while it still holds uncommitted work.
 - **A board per project.** Moving a card runs real work — in the terminal you
   already have open, not in a new one.
 - **Your columns.** Rename them, reorder them, add your own, decide which one

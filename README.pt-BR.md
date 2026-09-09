@@ -37,8 +37,9 @@ está, e um número em cada chamada de agente.
   tela.
 - **Sessões que sobrevivem à janela.** Feche o devpit, abra de novo, e o que
   estava rodando continua rodando.
-- **Uma worktree do git por frente de trabalho**, criada e removida sem você
-  pedir.
+- **Uma worktree do git por frente de trabalho**, criada quando uma etapa
+  precisa de checkout e removida quando você mandar — nunca com trabalho não
+  commitado dentro.
 - **Um quadro por projeto.** Mover um card executa trabalho de verdade — no
   terminal que você já tem aberto, não em um novo.
 - **As colunas são suas.** Renomeie, reordene, crie as suas, decida qual executa
