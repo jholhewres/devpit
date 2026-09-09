@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/images/devpit-mark.png" alt="" width="128">
+  <img src="web/src/assets/brand/mark.png" alt="" width="128">
 </p>
 
 <h1 align="center">devpit</h1>
 
 <p align="center">
-  A desktop workspace for working with coding agents.
+  A native app for controlling your coding agents.
 </p>
 
 <p align="center">

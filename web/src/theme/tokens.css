@@ -1,18 +1,17 @@
 /*
- * The whole visual vocabulary, in one place.
+ * The palette, taken from the approved prototype.
  *
- * Two groups that must not be confused: surfaces, type, spacing and motion are
- * taste and can be retuned; severity is contract. A screen never picks a
- * severity — it renders the one the event carried, and green is emitted only
- * by something that stored an artifact.
+ * Dark lives on bare `:root`, so it paints before any script runs. Light is
+ * `[data-theme='light']`, and `[data-theme='system']` borrows whichever the
+ * machine is using. Every token exists in all three — a colour defined in only
+ * one of them is the classic unreadable-window bug.
  *
- * Dark only. A light theme is a second design, not a token swap, and shipping
- * a half-considered one costs more than not having it.
+ * The terminal is the deliberate exception and pins its own values in
+ * shell.css: a shell paints ANSI colours for a dark ground.
  */
 
-/* Variable faces, vendored rather than fetched: the app has to draw correctly
-   on a machine with no network, and a fallback metric shift on every cold
-   start is the kind of flicker people read as slowness. */
+/* Geist, shipped rather than fetched: a desktop app that needs the network to
+   draw its own text is a desktop app that looks broken on a plane. */
 @font-face {
   font-family: 'Geist';
   src: url('../assets/fonts/Geist-Variable.woff2') format('woff2');
@@ -29,162 +28,152 @@
   font-display: block;
 }
 
+/* ────────────────────────────────────────────────────────────────────
+   Waku's chrome, devpit's contents.
+
+   Kept from Waku (theme.rs:104-145, app.rs:80-99, sidebar.rs:208-220):
+     every colour, the 48px titlebar, 252px sidebar, 32px action rows,
+     28px group headers, the 15px group guide, 7px row radius, the
+     720px transcript measure.
+
+   Changed, because the window is one project's workspace: the middle
+   holds any number of panes — a chat, a terminal, the board, a file —
+   and opening a second one splits rather than replaces. The sidebars
+   are navigation only; nothing opens inside them.
+   ──────────────────────────────────────────────────────────────────── */
 :root {
+  --canvas: #1a1a1a;
+  --sidebar: #181818;
+  --sidebar-item: hsla(0, 0%, 94.1%, 0.06);
+  --surface: #1a1a1a;
+  --raised: #232323;
+  --composer: #212121;
+  --inset: #151515;
+  --terminal: #151515;
+  --overlay: hsla(220, 10%, 90%, 0.05);
+  --overlay-strong: hsla(220, 10%, 90%, 0.09);
+
+  --border: hsla(220, 10%, 90%, 0.07);
+  --border-strong: hsla(220, 10%, 90%, 0.14);
+
+  --text: #e2e2e2;
+  --text-2: #a3a3a3;
+  --text-3: #7d7d7d;
+  --ghost: #575757;
+
+  --accent: #e2795b;
+  --gauge: #3b82f6;
+  --code-text: #e0a882;
+  --code-wash: hsla(220, 10%, 90%, 0.08);
+  --inverse: #e7e9ec;
+  --on-inverse: #17181c;
+
+  --warning: #e0b36a;
+  --success: #62c987;
+  --danger: #e2726a;
+
+  --on-accent: #2a1109;
+  --scroll-thumb: #333333;
+  --scrim: rgb(0 0 0 / 0.5);
+  --shade: rgb(0 0 0 / 0.5);
+  --shade-deep: rgb(0 0 0 / 0.6);
+  --dots: hsla(220, 10%, 90%, 0.055);
+
+  --sidebar-w: 252px;
+  --content-max: 720px;
+  --files-w: 340px;
+
+  --ui: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
   color-scheme: dark;
-
-  /* Surfaces, darkest frame outward to the lifted card.
-
-     The steps are wide on purpose. An earlier ramp put the sidebar seven
-     points above the canvas, which reads as one flat sheet with hairlines
-     drawn on it — the panels stopped being panels. Orca separates its canvas
-     and its sidebar by about thirty (#0a0a0a against #2a2a2a) and says in its
-     own source that the lift is deliberate. These follow that distance while
-     keeping the cool cast that is this app's rather than Orca's neutral grey. */
-  --ground: #0a0a0b;
-  --panel: #151519;
-  --raised: #232329;
-  --raised-hover: #2b2b32;
-  --sunken: #070708;
-
-  /* The left column, lifted clear of the canvas rather than sharing --panel
-     with cards. It is the one surface always on screen, so it is what sets
-     how deep the window reads. */
-  --sidebar: #26262c;
-
-  /* Mixed from the sidebar's own background rather than taken from --raised.
-     A shared elevation token only works while every surface it lands on sits
-     at the same depth; once the sidebar lifted, --raised was darker than the
-     rows drawn on it and hover read as a dent. Orca solves it the same way,
-     mixing foreground into the sidebar's background for accent and border. */
-  --sidebar-hover: color-mix(in srgb, var(--ink) 7%, var(--sidebar));
-  --sidebar-active: color-mix(in srgb, var(--ink) 12%, var(--sidebar));
-
-  /* Hairlines. Alpha rather than a grey so a line over a lifted panel and the
-     same line over the canvas read as the same line. */
-  --line: rgb(255 255 255 / 0.07);
-  --line-strong: rgb(255 255 255 / 0.13);
-
-  /* Brighter than they were. The old --ink sat at #ececef against a canvas
-     that has since gone darker, and dim text a shade under it is what makes a
-     dense list read as uniformly grey. */
-  --ink: #fafafa;
-  --ink-dim: #a1a1a8;
-  --ink-faint: #71717c;
-  --terminal-ink: #d4d4da;
-
-  /* The house accent. Every project overrides it on the shell root with its
-     own colour; chrome that draws before a project exists — the first run —
-     reads this one, so nothing depends on the shell being mounted. */
-  --accent: #6f8fbf;
-
-  /* Severity — four, and the UI does not choose. Green never comes from
-     activity; only from something that stored an artifact. */
-  --sev-neutral: #8e8e99;
-  --sev-attention: #dda94a;
-  --sev-failure: #e26a66;
-  --sev-verified: #5fae78;
-
-  /* Git status. Deliberately dimmer than severity: a file being modified is
-     not a claim about the work. */
-  --git-modified: #b99548;
-  --git-added: #5f9268;
-  --git-deleted: #b8615e;
-  --git-untracked: #7b7b86;
-
-  /* ── Type ──────────────────────────────────────────────────────────────
-     A five-step scale and nothing between. Sizes that drift by half a pixel
-     per component are what makes a dense UI read as noise rather than as a
-     table. Tracking opens as size drops, which is what keeps 10px legible. */
-  --font-ui: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  --text-micro: 10px; /* section labels, uppercase */
-  --text-meta: 11px; /* ages, counts, deltas — always mono */
-  --text-small: 12px; /* secondary lines, chips */
-  --text-body: 13px; /* rows, the default */
-  --text-title: 14px; /* project names, surface titles */
-
-  --track-micro: 0.085em;
-  --track-tight: -0.012em;
-
-  /* ── Space ─────────────────────────────────────────────────────────────
-     A 4px grid with two half-steps, and every padding in the app comes from
-     here. The rule that matters: generous between blocks, tight inside them.
-     A row that breathes internally stops reading as one thing. */
-  --s1: 2px;
-  --s2: 4px;
-  --s3: 6px;
-  --s4: 8px;
-  --s5: 12px;
-  --s6: 16px;
-  --s7: 24px;
-  --s8: 32px;
-
-  /* ── Geometry ─────────────────────────────────────────────────────────
-     Column widths are overwritten inline while a divider is dragged, so these
-     are the starting point rather than the law. */
-  --sidebar-w: 288px;
-  --right-w: 312px;
-  --chrome-h: 36px;
-  /* The window's own corner. Slight on purpose: enough to soften the frame
-     against the desktop, not enough to eat a pixel of the sidebar. */
-  --window-radius: 10px;
-  /* Three 30px controls plus their padding. Whatever sits under the corner
-     reserves this much so nothing lands beneath an unclickable strip. */
-  --window-controls-w: 104px;
-  --status-h: 24px;
-  --row-h: 28px;
-  /* Reserved on every scroll container so a thumb never lands on a control. */
-  --gutter: 10px;
-
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-lg: 9px;
-
-  /* ── Motion ───────────────────────────────────────────────────────────
-     Two durations and two curves, used everywhere. `--ease-out` for anything
-     appearing, `--ease` for a state change in place. Only opacity, transform
-     and colour are animated — the webview composites those without relayout,
-     and animating geometry in a system webview is where the jank lives. */
-  --fast: 110ms;
-  --medium: 180ms;
-  --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-
-  font-family: var(--font-ui);
-  font-size: var(--text-body);
-  line-height: 1.45;
 }
 
-/*
- * Narrow windows.
- *
- * The app is a desktop window and gets dragged small on a laptop; the columns
- * give up width in the order they can afford to. The panel goes first because
- * a file tree survives being narrow, the sidebar second, and the terminal
- * never — it is what the window is for.
- */
-@media (max-width: 1240px) {
-  :root {
-    --right-w: 268px;
-  }
+/* Light is not the dark palette inverted. The two rules that have to hold
+   in both: the sidebar recedes from the canvas, and a raised surface comes
+   forward from it. In dark that means darker and lighter; in light it means
+   darker and whiter — same relationships, opposite arithmetic.
+
+   The terminal is the deliberate exception. A shell renders its own ANSI
+   palette, tuned for a dark ground; repainting it white would leave the
+   colours the program chose sitting on the wrong background. Editors keep
+   the terminal dark in light themes for exactly this reason, and so do we. */
+:root[data-theme='light'] {
+  --canvas: #f7f6f3;
+  --sidebar: #efede9;
+  --sidebar-item: hsla(30, 12%, 20%, 0.07);
+  --surface: #f7f6f3;
+  --raised: #ffffff;
+  --composer: #ffffff;
+  --inset: #eae7e2;
+  --terminal: #151515;
+  --overlay: hsla(30, 12%, 20%, 0.05);
+  --overlay-strong: hsla(30, 12%, 20%, 0.10);
+
+  --border: hsla(30, 12%, 20%, 0.12);
+  --border-strong: hsla(30, 12%, 20%, 0.22);
+
+  --text: #24211d;
+  --text-2: #56514a;
+  --text-3: #6b655b;
+  --ghost: #8e877c;
+
+  --accent: #c0522f;
+  --gauge: #2563eb;
+  --code-text: #9c4a22;
+  --code-wash: hsla(30, 12%, 20%, 0.07);
+  --inverse: #24211d;
+  --on-inverse: #f7f6f3;
+
+  --warning: #9a6a14;
+  --success: #2c8551;
+  --danger: #bb4038;
+
+  --on-accent: #fff6f2;
+  --scroll-thumb: #c8c2b8;
+  --scrim: rgb(38 32 26 / 0.34);
+  --shade: rgb(64 54 44 / 0.14);
+  --shade-deep: rgb(64 54 44 / 0.20);
+  --dots: hsla(30, 12%, 20%, 0.10);
+
+  color-scheme: light;
 }
 
-@media (max-width: 1080px) {
-  :root {
-    --sidebar-w: 252px;
-    --right-w: 240px;
-  }
-}
-
-/* Motion here is feedback, not decoration, so it is dropped wholesale rather
-   than tuned down when the system asks for less of it. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+/* "System" is the third setting, not a third palette: it borrows whichever
+   of the two the machine is already using. */
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    --canvas: #f7f6f3;
+    --sidebar: #efede9;
+    --sidebar-item: hsla(30, 12%, 20%, 0.07);
+    --surface: #f7f6f3;
+    --raised: #ffffff;
+    --composer: #ffffff;
+    --inset: #eae7e2;
+    --terminal: #151515;
+    --overlay: hsla(30, 12%, 20%, 0.05);
+    --overlay-strong: hsla(30, 12%, 20%, 0.10);
+    --border: hsla(30, 12%, 20%, 0.12);
+    --border-strong: hsla(30, 12%, 20%, 0.22);
+    --text: #24211d;
+    --text-2: #56514a;
+    --text-3: #6b655b;
+    --ghost: #8e877c;
+    --accent: #c0522f;
+    --gauge: #2563eb;
+    --code-text: #9c4a22;
+    --code-wash: hsla(30, 12%, 20%, 0.07);
+    --inverse: #24211d;
+    --on-inverse: #f7f6f3;
+    --warning: #9a6a14;
+    --success: #2c8551;
+    --danger: #bb4038;
+    --on-accent: #fff6f2;
+    --scroll-thumb: #c8c2b8;
+    --scrim: rgb(38 32 26 / 0.34);
+    --shade: rgb(64 54 44 / 0.14);
+    --shade-deep: rgb(64 54 44 / 0.20);
+    --dots: hsla(30, 12%, 20%, 0.10);
+    color-scheme: light;
   }
 }
