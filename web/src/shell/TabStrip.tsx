@@ -12,7 +12,7 @@ import { useShell } from './useShell'
  * fires a ghost image nobody asked for.
  */
 export function TabStrip(): React.JSX.Element {
-  const { open, active, focus, close, move } = useShell()
+  const { open, active, show, focus, close, move } = useShell()
   const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
   const moving = useRef<{ id: string; at: number; moved: boolean } | null>(null)
@@ -99,6 +99,13 @@ export function TabStrip(): React.JSX.Element {
           </span>
         </button>
       ))}
+
+      {/* Another terminal, where every terminal app puts it. */}
+      <button className="tab tab--new" title="New terminal (⌘T)" aria-label="New terminal" onClick={() => show('term')}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
     </div>
   )
 }

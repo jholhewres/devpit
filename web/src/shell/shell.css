@@ -1195,3 +1195,6 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .addpj__box .fld__b { width: 100%; text-align: left; }
 .addpj__box .fld__b:disabled { color: var(--ghost); }
 .btn--go:disabled { opacity: 0.5; }
+
+.tab--new { flex: none; width: 28px; padding: 0; justify-content: center; color: var(--text-3); }
+.tab--new:hover { color: var(--text); }

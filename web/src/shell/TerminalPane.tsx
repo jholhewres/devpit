@@ -33,7 +33,15 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(box)
-    fit.fit()
+
+    /* The pane is `display: none` until its tab is active and animates in on
+       a transform, so a fit in this tick measures nothing and xterm ends up
+       with zero columns. Fit only once the box has a size. */
+    const refit = (): void => {
+      if (box.clientWidth < 2 || box.clientHeight < 2) return
+      fit.fit()
+    }
+    requestAnimationFrame(refit)
 
     /* The shell reports where it is; the tab says what the shell said. */
     term.onTitleChange((title) => rename(tab.id, title))
@@ -77,7 +85,7 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
     })()
 
     const watch = new ResizeObserver(() => {
-      fit.fit()
+      refit()
       void live?.resize(term.rows, term.cols).then((applied) => {
         /* The pty clamps; the grid follows what it actually got. */
         if (applied && (applied.rows !== term.rows || applied.cols !== term.cols)) {

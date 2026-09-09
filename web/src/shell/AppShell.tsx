@@ -68,6 +68,14 @@ function Window(): React.JSX.Element {
         event.preventDefault()
         setPalette((was) => !was)
       }
+      if (meta && event.key.toLowerCase() === 't') {
+        event.preventDefault()
+        shell.show('term')
+      }
+      if (meta && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        shell.show('chat')
+      }
       if (event.key === 'Escape') {
         setPalette(false)
         setSignIn(false)
