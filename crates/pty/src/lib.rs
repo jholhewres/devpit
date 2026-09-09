@@ -25,10 +25,12 @@
 mod osc;
 mod reader;
 mod ring;
+mod stopping;
 
 pub use osc::{Scanner, Told, MOST_CARRIED};
 pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;
+pub use stopping::{stop, Stopped, GRACE};
 
 use std::io::Write;
 use std::sync::atomic::AtomicU64;
@@ -90,6 +92,7 @@ pub struct Session {
     told: Option<mpsc::Receiver<Told>>,
     pub counters: Arc<Counters>,
     pub ring: Arc<std::sync::Mutex<RingBuffer>>,
+    pid: Option<u32>,
     writer: Option<Box<dyn Write + Send>>,
     master: Option<Box<dyn MasterPty + Send>>,
     killer: Option<Box<dyn ChildKiller + Send + Sync>>,
@@ -99,6 +102,10 @@ pub struct SessionIo {
     pub writer: Box<dyn Write + Send>,
     pub master: Box<dyn MasterPty + Send>,
     pub killer: Box<dyn ChildKiller + Send + Sync>,
+    /// What to ask about, and to insist to, when this session is ended.
+    ///
+    /// `None` on a platform that does not report one. See [`stop`].
+    pub pid: Option<u32>,
 }
 
 impl Session {
@@ -135,6 +142,7 @@ impl Session {
             writer: self.writer.take()?,
             master: self.master.take()?,
             killer: self.killer.take()?,
+            pid: self.pid,
         })
     }
 }
@@ -154,6 +162,7 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
             source,
         })?;
     let killer = child.clone_killer();
+    let pid = child.process_id();
 
     let reader = pty
         .master
@@ -190,6 +199,7 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
         told: Some(told),
         counters,
         ring,
+        pid,
         writer: Some(writer),
         master: Some(pty.master),
         killer: Some(killer),
