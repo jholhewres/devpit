@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/images/devpit-mark.png" alt="" width="128">
+  <img src="web/src/assets/brand/mark.png" alt="" width="128">
 </p>
 
 <h1 align="center">devpit</h1>
