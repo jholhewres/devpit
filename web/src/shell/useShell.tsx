@@ -1,10 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 
 import type { Project } from '../gen/bindings'
-import { ask, commands } from './live'
 import type { PaneName } from './paneList'
-import { forgotten, found, type Open } from './projects'
 import { closed, moved, opened, type Strip } from './strip'
+import { useProjects } from './useProjects'
 
 export type Theme = 'system' | 'light' | 'dark'
 export type PrefsPane =
@@ -72,54 +71,18 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
   const [theme, setThemeState] = useState<Theme>('dark')
-  const [open_, setOpenProjects] = useState<Open>({ projects: [], current: null })
-  const [projectsError, setProjectsError] = useState<string | null>(null)
-  const { projects } = open_
-  const project = found(open_)
-
-  /* The list comes from disk. A project whose git cannot be read still comes
-     back, marked — missing from the list would read as never added. */
-  const reloadProjects = useCallback(() => {
-    void ask(() => commands.projectList()).then((asked) => {
-      setProjectsError(asked.error)
-      if (!asked.data) return
-      setOpenProjects((was) => ({
-        projects: asked.data!.projects,
-        current: was.current ?? asked.data!.projects[0]?.id ?? null,
-      }))
-    })
-  }, [])
-
-  useEffect(reloadProjects, [reloadProjects])
-
-  const setProject = useCallback((id: string) => {
-    setOpenProjects((was) => ({ ...was, current: id }))
-    void ask(() => commands.projectOpen(id))
-  }, [])
   const [signedIn, setSignedIn] = useState(false)
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
+  const projects = useProjects()
 
-  /* The three rules live in `strip.ts` so the tests can call them rather
-     than restate them. */
-  const show = useCallback((name: PaneName) => {
-    setStrip((was) => opened(was, name))
-  }, [])
-
-  const close = useCallback((name: PaneName) => {
-    setStrip((was) => closed(was, name))
-  }, [])
-
-  const move = useCallback((name: PaneName, to: number) => {
-    setStrip((was) => moved(was, name, to))
-  }, [])
+  /* The three strip rules live in strip.ts so the tests can call them. */
+  const show = useCallback((name: PaneName) => setStrip((was) => opened(was, name)), [])
+  const close = useCallback((name: PaneName) => setStrip((was) => closed(was, name)), [])
+  const move = useCallback((name: PaneName, to: number) => setStrip((was) => moved(was, name, to)), [])
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     document.documentElement.dataset.theme = next
-  }, [])
-
-  const forgetProject = useCallback((id: string) => {
-    setOpenProjects((was) => forgotten(was, id))
   }, [])
 
   const value = useMemo<Shell>(
@@ -135,12 +98,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       toggleFiles: () => setFiles((was) => !was),
       theme,
       setTheme,
-      project,
-      projects,
-      projectsError,
-      setProject,
-      forgetProject,
-      reloadProjects,
+      ...projects,
       signedIn,
       signIn: () => setSignedIn(true),
       signOut: () => {
@@ -151,7 +109,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       openPrefs: (pane: PrefsPane = 'account') => setPrefs(pane),
       closePrefs: () => setPrefs(null),
     }),
-    [open, active, show, close, move, side, files, theme, setTheme, project, projects, projectsError, setProject, forgetProject, reloadProjects, signedIn, prefs],
+    [open, active, show, close, move, side, files, theme, setTheme, projects, signedIn, prefs],
   )
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>
