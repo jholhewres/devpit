@@ -84,7 +84,7 @@
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: var(--panel);
+  background: var(--sidebar);
   border-right: 1px solid var(--line);
 }
 
@@ -152,7 +152,7 @@
 .find:focus {
   outline: none;
   border-color: var(--line-strong);
-  background: var(--raised);
+  background: var(--sidebar-hover);
 }
 
 /*
@@ -199,7 +199,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--raised);
+  background: var(--sidebar-active);
   border: 1px solid var(--line);
   font-size: var(--text-micro);
   font-weight: 600;
@@ -249,11 +249,11 @@
 }
 
 .project__head:hover {
-  background: var(--raised);
+  background: var(--sidebar-hover);
 }
 
 .project[data-active='true'] .project__head {
-  background: color-mix(in srgb, var(--accent) 11%, var(--raised));
+  background: color-mix(in srgb, var(--accent) 11%, var(--sidebar-active));
   border-color: color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
@@ -419,11 +419,11 @@
 }
 
 .session:hover {
-  background: var(--raised);
+  background: var(--sidebar-hover);
 }
 
 .session[data-active='true'] {
-  background: var(--raised-hover);
+  background: var(--sidebar-active);
   border-color: var(--line);
 }
 
@@ -550,12 +550,12 @@
 }
 
 .resource:hover {
-  background: var(--raised);
+  background: var(--sidebar-hover);
   color: var(--ink);
 }
 
 .resource[data-active='true'] {
-  background: color-mix(in srgb, var(--accent) 13%, var(--raised));
+  background: color-mix(in srgb, var(--accent) 13%, var(--sidebar-active));
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   color: var(--ink);
 }

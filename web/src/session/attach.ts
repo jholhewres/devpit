@@ -2,17 +2,17 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import { commands } from '../gen/bindings'
 
 type GenerationHost = typeof globalThis & {
-  __quockpitAttachGeneration?: number
+  __devpitAttachGeneration?: number
 }
 
 function nextClientId(): string {
   const host = globalThis as GenerationHost
   const floor = Date.now() * 1000
-  host.__quockpitAttachGeneration = Math.max(
+  host.__devpitAttachGeneration = Math.max(
     floor,
-    (host.__quockpitAttachGeneration ?? floor) + 1
+    (host.__devpitAttachGeneration ?? floor) + 1
   )
-  return String(host.__quockpitAttachGeneration).padStart(16, '0')
+  return String(host.__devpitAttachGeneration).padStart(16, '0')
 }
 
 /**

@@ -4,7 +4,7 @@
 //! gets a board, a card is written, a lane is given a step, the card lands on
 //! it, and the run that follows stays on the card with what it cost.
 
-use quockpit_core::Store;
+use devpit_core::Store;
 
 #[test]
 fn a_card_crosses_the_board_and_the_runs_stay_on_it() {

@@ -1,4 +1,4 @@
-//! Where state lives: a SQLite file at `~/.quockpit/state.db`, in WAL.
+//! Where state lives: a SQLite file at `~/.devpit/state.db`, in WAL.
 //!
 //! WAL because the access pattern is a window drawing while a watcher writes.
 
@@ -81,7 +81,7 @@ impl Store {
     pub fn root() -> Result<PathBuf, StoreError> {
         Ok(dirs::home_dir()
             .ok_or(StoreError::NoDataDirectory)?
-            .join(".quockpit"))
+            .join(".devpit"))
     }
 
     pub fn default_path() -> Result<PathBuf, StoreError> {

@@ -1,4 +1,4 @@
-# quockpit
+# devpit
 #
 # Seven targets, and each one does the whole job it names. The Tauri CLI finds
 # its project by searching subfolders of the working directory, so every target

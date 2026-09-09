@@ -81,8 +81,8 @@ fn a_headless_turn_streams_in_and_out() {
 /// worktree lands under the project.
 #[test]
 fn a_real_background_session_can_be_started_and_stopped() {
-    if std::env::var_os("QUOCKPIT_LIVE_TURN").is_none() || !available() {
-        eprintln!("skipped: set QUOCKPIT_LIVE_TURN=1 to start a real session");
+    if std::env::var_os("DEVPIT_LIVE_TURN").is_none() || !available() {
+        eprintln!("skipped: set DEVPIT_LIVE_TURN=1 to start a real session");
         return;
     }
 

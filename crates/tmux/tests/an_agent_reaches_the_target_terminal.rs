@@ -4,7 +4,7 @@
 //! typed into that pane. Everything else about the board is arrangement; this
 //! is the part that either works or the product does not exist.
 //!
-//! Opt-in behind `QUOCKPIT_LIVE_TURN`: it starts a real agent session, which
+//! Opt-in behind `DEVPIT_LIVE_TURN`: it starts a real agent session, which
 //! costs money, and a test that quietly bills someone is a test that gets
 //! deleted.
 
@@ -18,11 +18,11 @@ fn skip(why: &str) -> bool {
 
 #[test]
 fn a_session_typed_into_the_target_pane_attaches_to_it() {
-    if std::env::var_os("QUOCKPIT_LIVE_TURN").is_none() {
-        assert!(skip("set QUOCKPIT_LIVE_TURN=1 to start a real session"));
+    if std::env::var_os("DEVPIT_LIVE_TURN").is_none() {
+        assert!(skip("set DEVPIT_LIVE_TURN=1 to start a real session"));
         return;
     }
-    if !quockpit_tmux::Server::available() || !quockpit_agentcli::available() {
+    if !devpit_tmux::Server::available() || !devpit_agentcli::available() {
         assert!(skip("tmux or the agent CLI is not installed"));
         return;
     }
@@ -51,21 +51,21 @@ fn a_session_typed_into_the_target_pane_attaches_to_it() {
     // A short socket path, for the reason `Store::root` documents: the kernel
     // caps a unix socket at ~108 bytes and a tempdir path is nowhere near it,
     // but a per-test directory under one would be.
-    let socket = std::env::temp_dir().join("quockpit-attach-test.sock");
-    let server = quockpit_tmux::Server::new(socket.clone());
-    let session = quockpit_tmux::Server::session_name("attach_test");
+    let socket = std::env::temp_dir().join("devpit-attach-test.sock");
+    let server = devpit_tmux::Server::new(socket.clone());
+    let session = devpit_tmux::Server::session_name("attach_test");
     let leaf = "leaf_attach";
 
     server
         .ensure_session(&session, leaf, dir.path())
         .expect("the target terminal");
-    let target = quockpit_tmux::Server::target(&session, leaf);
+    let target = devpit_tmux::Server::target(&session, leaf);
 
-    let short = quockpit_agentcli::start_background(dir.path(), None, None, None, None)
+    let short = devpit_agentcli::start_background(dir.path(), None, None, None, None)
         .expect("start a session");
 
     // Exactly what the product types, built by the same function.
-    let line = quockpit_agentcli::attach_argv(&short).join(" ");
+    let line = devpit_agentcli::attach_argv(&short).join(" ");
     server.send_keys(&target, &line).expect("send the attach");
 
     // What counts as arrival.
@@ -91,7 +91,7 @@ fn a_session_typed_into_the_target_pane_attaches_to_it() {
         }
     }
 
-    let _ = quockpit_agentcli::stop(&short);
+    let _ = devpit_agentcli::stop(&short);
     let _ = Command::new("tmux")
         .args(["-S", socket.to_str().expect("utf-8"), "kill-server"])
         .output();

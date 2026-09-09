@@ -11,8 +11,8 @@ pub mod session;
 
 use std::path::PathBuf;
 
-use quockpit_core::Store;
-use quockpit_rpc::{ErrorCode, RpcError};
+use devpit_core::Store;
+use devpit_rpc::{ErrorCode, RpcError};
 use serde::Deserialize;
 
 /// What a step produced, whichever kind it was.
@@ -87,9 +87,9 @@ fn slug(title: &str) -> String {
 /// file on disk for every card moved.
 fn hook_settings() -> Option<String> {
     let root = Store::root().ok()?;
-    let endpoint = quockpit_agentcli::endpoint_file(&root);
+    let endpoint = devpit_agentcli::endpoint_file(&root);
     let path = root.join("hooks.json");
-    let wanted = quockpit_agentcli::settings_json(&endpoint);
+    let wanted = devpit_agentcli::settings_json(&endpoint);
 
     // Rewritten only when it differs, so a turn does not touch the disk for
     // nothing.
@@ -115,14 +115,14 @@ pub fn agents_dir() -> Result<PathBuf, RpcError> {
 /// typo waiting to fail at the moment the step runs.
 #[tauri::command]
 #[specta::specta]
-pub fn agents_list() -> Result<quockpit_rpc::Agents, RpcError> {
+pub fn agents_list() -> Result<devpit_rpc::Agents, RpcError> {
     let dir = agents_dir()?;
-    let catalogue = quockpit_agentcli::read_agents(&dir);
-    Ok(quockpit_rpc::Agents {
+    let catalogue = devpit_agentcli::read_agents(&dir);
+    Ok(devpit_rpc::Agents {
         agents: catalogue
             .agents
             .into_iter()
-            .map(|agent| quockpit_rpc::Agent {
+            .map(|agent| devpit_rpc::Agent {
                 name: agent.name,
                 description: agent.description,
                 model: agent.model,
@@ -131,7 +131,7 @@ pub fn agents_list() -> Result<quockpit_rpc::Agents, RpcError> {
         rejected: catalogue
             .rejected
             .into_iter()
-            .map(|one| quockpit_rpc::RejectedAgent {
+            .map(|one| devpit_rpc::RejectedAgent {
                 file: one.file,
                 reason: one.reason,
             })

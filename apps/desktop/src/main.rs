@@ -44,7 +44,7 @@ fn main() {
     // once, without ever overwriting one that has been edited.
     let seeded = runs::seed_agents();
     if seeded > 0 {
-        println!("seeded {seeded} agents into ~/.quockpit/agents");
+        println!("seeded {seeded} agents into ~/.devpit/agents");
     }
 
     tauri::Builder::default()
@@ -53,7 +53,7 @@ fn main() {
             // Hooks are how the board hears about work as it happens rather
             // than a poll later. Started here so the endpoint is on disk before
             // the first turn goes out.
-            if let Ok(root) = quockpit_core::Store::root() {
+            if let Ok(root) = devpit_core::Store::root() {
                 listener::start(app.handle().clone(), &root);
             }
             Ok(())

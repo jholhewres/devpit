@@ -62,8 +62,8 @@ impl std::error::Error for RpcError {}
 
 /// Store errors cross into the contract without leaking SQLite detail to the
 /// screen: "database is locked" helps nobody.
-impl From<quockpit_core::StoreError> for RpcError {
-    fn from(err: quockpit_core::StoreError) -> Self {
+impl From<devpit_core::StoreError> for RpcError {
+    fn from(err: devpit_core::StoreError) -> Self {
         Self::internal(err.to_string())
     }
 }

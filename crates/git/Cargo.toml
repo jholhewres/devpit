@@ -1,12 +1,12 @@
 [package]
-name = "quockpit-git"
+name = "devpit-git"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-quockpit-rpc = { version = "0.1.0", path = "../rpc" }
+devpit-rpc = { version = "0.1.0", path = "../rpc" }
 sha2 = "0.11.0"
 thiserror = "2.0.20"
 

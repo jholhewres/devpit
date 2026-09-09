@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "quockpit",
+  "productName": "devpit",
   "version": "0.1.0",
-  "identifier": "dev.quockpit.app",
+  "identifier": "dev.devpit.app",
   "build": {
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:17800",
@@ -18,7 +18,7 @@
   "app": {
     "windows": [
       {
-        "title": "quockpit",
+        "title": "devpit",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

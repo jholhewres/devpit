@@ -1,5 +1,5 @@
 [package]
-name = "quockpit-tmux"
+name = "devpit-tmux"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,5 +9,5 @@ license.workspace = true
 thiserror = "2.0.20"
 
 [dev-dependencies]
-quockpit-agentcli = { path = "../agentcli" }
+devpit-agentcli = { path = "../agentcli" }
 tempfile = "3.27.0"

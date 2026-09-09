@@ -7,8 +7,8 @@
 
 use std::path::PathBuf;
 
-use quockpit_core::Store;
-use quockpit_rpc::{ErrorCode, RpcError};
+use devpit_core::Store;
+use devpit_rpc::{ErrorCode, RpcError};
 
 fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -26,7 +26,7 @@ pub(crate) fn root_of(project_id: &str, worktree_id: Option<&str>) -> Result<Pat
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that project is not registered"))?;
     let root = PathBuf::from(&row.root_path);
     if let Some(id) = worktree_id {
-        if let Some(path) = quockpit_git::worktree_path(&root, id)
+        if let Some(path) = devpit_git::worktree_path(&root, id)
             .map_err(|err| RpcError::internal(err.to_string()))?
         {
             return Ok(path);

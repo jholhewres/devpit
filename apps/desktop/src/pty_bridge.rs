@@ -7,8 +7,8 @@
 
 use std::sync::atomic::Ordering;
 
+use devpit_rpc::{ErrorCode, RpcError};
 use portable_pty::{CommandBuilder, PtySize};
-use quockpit_rpc::{ErrorCode, RpcError};
 use tauri::ipc::{Channel, InvokeResponseBody};
 
 /// What the load test measured. Every field is counted, none estimated.
@@ -35,7 +35,7 @@ pub async fn pty_drain(
     builder.arg("-c");
     builder.arg(&command);
 
-    let mut session = quockpit_pty::spawn(
+    let mut session = devpit_pty::spawn(
         builder,
         PtySize {
             rows: 24,

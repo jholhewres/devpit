@@ -242,8 +242,8 @@ mod tests {
         // The reason this exists: the same repository cloned over ssh on one
         // machine and https on another has to converge on one project.
         assert_eq!(
-            origin_hash("git@github.com:jholhewres/quockpit.git"),
-            origin_hash("https://github.com/jholhewres/quockpit")
+            origin_hash("git@github.com:jholhewres/devpit.git"),
+            origin_hash("https://github.com/jholhewres/devpit")
         );
     }
 

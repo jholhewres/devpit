@@ -1,6 +1,6 @@
 //! The rules a file read has to keep, tested against a real directory.
 
-use quockpit_core::Store;
+use devpit_core::Store;
 
 use super::*;
 
@@ -16,7 +16,7 @@ fn project() -> (tempfile::TempDir, String) {
 fn a_text_file_comes_back_with_its_text() {
     let (dir, _) = project();
     std::fs::write(dir.path().join("a.txt"), "hello\n").expect("write");
-    let resolved = quockpit_core::tree::resolve(dir.path(), "a.txt").expect("resolve");
+    let resolved = devpit_core::tree::resolve(dir.path(), "a.txt").expect("resolve");
     assert_eq!(std::fs::read_to_string(&resolved).expect("read"), "hello\n");
 }
 
@@ -30,7 +30,7 @@ fn a_path_climbing_out_of_the_project_is_refused() {
 
     for escape in ["../../../etc/passwd", "..", "a/../../../etc/hosts"] {
         assert!(
-            quockpit_core::tree::resolve(dir.path(), escape).is_err(),
+            devpit_core::tree::resolve(dir.path(), escape).is_err(),
             "{escape} was allowed out of the project"
         );
     }
@@ -50,7 +50,7 @@ fn a_symlink_pointing_out_is_refused_too() {
 
     #[cfg(unix)]
     assert!(
-        quockpit_core::tree::resolve(dir.path(), "link").is_err(),
+        devpit_core::tree::resolve(dir.path(), "link").is_err(),
         "a symlink walked out of the project"
     );
 }

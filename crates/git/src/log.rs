@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use quockpit_rpc::Commit;
+use devpit_rpc::Commit;
 
 use crate::{run, GitError};
 

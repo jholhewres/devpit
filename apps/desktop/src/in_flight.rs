@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use quockpit_core::Store;
-use quockpit_rpc::{ErrorCode, RpcError};
+use devpit_core::Store;
+use devpit_rpc::{ErrorCode, RpcError};
 use std::sync::Arc;
 use tauri::State;
 

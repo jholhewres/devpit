@@ -17,16 +17,16 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.93"
 license = "Apache-2.0"
-repository = "https://github.com/jholhewres/quockpit"
+repository = "https://github.com/jholhewres/devpit"
 
 [workspace.dependencies]
-quockpit-core = { path = "crates/core" }
-quockpit-rpc = { path = "crates/rpc" }
-quockpit-git = { path = "crates/git" }
-quockpit-pty = { path = "crates/pty" }
-quockpit-tmux = { path = "crates/tmux" }
-quockpit-agentcli = { path = "crates/agentcli" }
-quockpit-steps = { path = "crates/steps" }
+devpit-core = { path = "crates/core" }
+devpit-rpc = { path = "crates/rpc" }
+devpit-git = { path = "crates/git" }
+devpit-pty = { path = "crates/pty" }
+devpit-tmux = { path = "crates/tmux" }
+devpit-agentcli = { path = "crates/agentcli" }
+devpit-steps = { path = "crates/steps" }
 
 # The binary stays open all day with several fronts live. Size and startup are
 # not vanity here.

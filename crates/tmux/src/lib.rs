@@ -44,7 +44,7 @@ impl Server {
 
     /// Session names tmux will accept. Anything else is turned into `_`.
     pub fn session_name(project_id: &str) -> String {
-        let mut name = String::from("quockpit_");
+        let mut name = String::from("devpit_");
         for ch in project_id.chars() {
             if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
                 name.push(ch);
@@ -216,12 +216,12 @@ mod tests {
 
     #[test]
     fn session_names_are_safe_for_tmux() {
-        assert_eq!(Server::session_name("prj_01HXYZ"), "quockpit_prj_01HXYZ");
+        assert_eq!(Server::session_name("prj_01HXYZ"), "devpit_prj_01HXYZ");
         assert_eq!(
             Server::session_name("prj/weird:name"),
-            "quockpit_prj_weird_name"
+            "devpit_prj_weird_name"
         );
-        assert!(Server::session_name("x").starts_with("quockpit_"));
+        assert!(Server::session_name("x").starts_with("devpit_"));
     }
 
     #[test]
@@ -242,7 +242,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let socket = dir.path().join("tmux.sock");
         let server = Server::new(socket);
-        let session = "quockpit_test_session";
+        let session = "devpit_test_session";
         let window = "leaf_test";
 
         server
@@ -260,7 +260,7 @@ mod tests {
 
         let target = Server::target(session, window);
         server
-            .send_keys(&target, "echo quockpit-tmux-ok")
+            .send_keys(&target, "echo devpit-tmux-ok")
             .expect("send");
 
         // The shell needs a beat to print. A tight loop would flake on a
@@ -268,7 +268,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(200));
         let shot = server.capture_pane(&target).expect("capture");
         assert!(
-            shot.contains("quockpit-tmux-ok"),
+            shot.contains("devpit-tmux-ok"),
             "capture missed the echo: {shot:?}"
         );
 

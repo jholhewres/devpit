@@ -2,9 +2,9 @@
 
 use std::path::PathBuf;
 
-use quockpit_agentcli as agent;
-use quockpit_core::Store;
-use quockpit_rpc::Step;
+use devpit_agentcli as agent;
+use devpit_core::Store;
+use devpit_rpc::Step;
 use serde::Deserialize;
 
 use super::{agents_dir, Finished};
@@ -58,7 +58,7 @@ pub fn run(
         .as_ref()
         .and_then(|name| catalogue.agents.iter().find(|a| &a.name == name).cloned());
     if let (Some(name), None) = (&config.agent, &named) {
-        return Err(format!("no agent named `{name}` in ~/.quockpit/agents"));
+        return Err(format!("no agent named `{name}` in ~/.devpit/agents"));
     }
     let argument = named
         .as_ref()

@@ -93,11 +93,11 @@ fn the_other_lines_are_fragments_not_failures() {
 /// Opt-in rather than skip-if-missing, and the difference matters: this
 /// one spends money. A test that quietly bills someone on every `make
 /// test` is a test that gets deleted. Run it with
-/// `QUOCKPIT_LIVE_TURN=1 cargo test -p quockpit-agentcli`.
+/// `DEVPIT_LIVE_TURN=1 cargo test -p devpit-agentcli`.
 #[test]
 fn a_real_turn_answers_the_schema_and_reports_its_cost() {
-    if std::env::var_os("QUOCKPIT_LIVE_TURN").is_none() {
-        eprintln!("skipped: set QUOCKPIT_LIVE_TURN=1 to spend money on this one");
+    if std::env::var_os("DEVPIT_LIVE_TURN").is_none() {
+        eprintln!("skipped: set DEVPIT_LIVE_TURN=1 to spend money on this one");
         return;
     }
 

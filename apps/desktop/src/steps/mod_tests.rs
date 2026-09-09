@@ -59,11 +59,11 @@ fn a_card_always_gets_the_same_session_id() {
 /// the catalogue on disk, and a run that comes back with an answer the schema
 /// accepts and a cost above zero.
 ///
-/// Opt-in behind `QUOCKPIT_LIVE_TURN`: it spends money.
+/// Opt-in behind `DEVPIT_LIVE_TURN`: it spends money.
 #[test]
 fn a_card_and_a_step_produce_a_real_answer() {
-    if std::env::var_os("QUOCKPIT_LIVE_TURN").is_none() {
-        eprintln!("skipped: set QUOCKPIT_LIVE_TURN=1 to spend money on this one");
+    if std::env::var_os("DEVPIT_LIVE_TURN").is_none() {
+        eprintln!("skipped: set DEVPIT_LIVE_TURN=1 to spend money on this one");
         return;
     }
 
@@ -83,7 +83,7 @@ fn a_card_and_a_step_produce_a_real_answer() {
         .expect("card");
 
     // The agent the step names has to be one that is actually on disk.
-    let catalogue = quockpit_agentcli::read_agents(&agents_dir().expect("agents dir"));
+    let catalogue = devpit_agentcli::read_agents(&agents_dir().expect("agents dir"));
     let Some(agent) = catalogue.agents.first() else {
         eprintln!("skipped: no agents seeded on this machine");
         return;
@@ -111,9 +111,9 @@ fn a_card_and_a_step_produce_a_real_answer() {
         .set_column_step(&column, Some(&step_id))
         .expect("attach");
 
-    let step = quockpit_rpc::Step {
+    let step = devpit_rpc::Step {
         id: step_id.clone(),
-        kind: quockpit_rpc::StepKind::Agent,
+        kind: devpit_rpc::StepKind::Agent,
         name: "review it".to_owned(),
         config,
         irreversible: false,

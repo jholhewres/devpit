@@ -5,8 +5,8 @@
 //! no other way to start a step: no schedule, no retry, no loop that keeps
 //! itself going.
 
-use quockpit_core::Store;
-use quockpit_rpc::{
+use devpit_core::Store;
+use devpit_rpc::{
     Board, Card, CardChanged, Column, ErrorCode, RpcError, Run, RunState, Session, SessionStatus,
     Step, StepKind,
 };
@@ -73,8 +73,8 @@ fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, RpcError> {
 ///
 /// A CLI that is missing answers with nothing, and every card then reports its
 /// session as gone — which is true from the board's point of view.
-fn live_sessions() -> Vec<quockpit_agentcli::AgentSession> {
-    quockpit_agentcli::list(None).unwrap_or_default()
+fn live_sessions() -> Vec<devpit_agentcli::AgentSession> {
+    devpit_agentcli::list(None).unwrap_or_default()
 }
 
 /// What the card should say about its session, if it has one.
@@ -85,7 +85,7 @@ fn live_sessions() -> Vec<quockpit_agentcli::AgentSession> {
 fn session_of(
     store: &Store,
     card_id: &str,
-    live: &[quockpit_agentcli::AgentSession],
+    live: &[devpit_agentcli::AgentSession],
 ) -> Result<Option<Session>, RpcError> {
     let Some(link) = store.session_link(card_id)? else {
         return Ok(None);
@@ -94,14 +94,14 @@ fn session_of(
         .iter()
         .find(|session| session.session_id == link.session_id)
         .map_or(SessionStatus::Gone, |session| match session.status {
-            quockpit_agentcli::Status::Busy => SessionStatus::Busy,
-            quockpit_agentcli::Status::Blocked => SessionStatus::Blocked,
-            quockpit_agentcli::Status::Done => SessionStatus::Done,
-            quockpit_agentcli::Status::Idle => SessionStatus::Idle,
+            devpit_agentcli::Status::Busy => SessionStatus::Busy,
+            devpit_agentcli::Status::Blocked => SessionStatus::Blocked,
+            devpit_agentcli::Status::Done => SessionStatus::Done,
+            devpit_agentcli::Status::Idle => SessionStatus::Idle,
             // A state this build does not know is not a state to invent one
             // for. Idle is the quiet answer, and quiet is right for a word
             // nobody here has an opinion about.
-            quockpit_agentcli::Status::Unknown => SessionStatus::Idle,
+            devpit_agentcli::Status::Unknown => SessionStatus::Idle,
         });
     Ok(Some(Session {
         short_id: link.short_id,

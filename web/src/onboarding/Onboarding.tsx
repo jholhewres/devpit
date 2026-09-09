@@ -55,7 +55,7 @@ export function Onboarding({
           <span className="onboarding__mark" aria-hidden="true">
             q
           </span>
-          <span className="onboarding__wordmark">quockpit</span>
+          <span className="onboarding__wordmark">devpit</span>
         </div>
 
         <div className="onboarding__body scroll">

@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use quockpit_rpc::Worktree;
+use devpit_rpc::Worktree;
 
 use crate::{identify, run, status::status, GitError};
 

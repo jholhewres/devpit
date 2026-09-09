@@ -10,19 +10,19 @@ use std::process::Command;
 
 #[test]
 fn no_session_on_our_server_draws_a_status_bar() {
-    if !quockpit_tmux::Server::available() {
+    if !devpit_tmux::Server::available() {
         eprintln!("skipped: tmux is not installed");
         return;
     }
 
     // Short and fixed, for the reason `Store::root` documents: a unix socket
     // path is capped at ~108 bytes.
-    let socket = std::env::temp_dir().join("quockpit-chrome-test.sock");
+    let socket = std::env::temp_dir().join("devpit-chrome-test.sock");
     let _ = Command::new("tmux")
         .args(["-S", socket.to_str().expect("utf-8"), "kill-server"])
         .output();
 
-    let server = quockpit_tmux::Server::new(socket.clone());
+    let server = devpit_tmux::Server::new(socket.clone());
     server
         .ensure_session("chrome_test", "leaf", &std::env::temp_dir())
         .expect("the session");

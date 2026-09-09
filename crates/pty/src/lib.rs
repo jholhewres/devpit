@@ -217,7 +217,7 @@ mod tests {
     #[tokio::test]
     async fn a_command_output_arrives_as_frames() {
         let mut cmd = CommandBuilder::new("echo");
-        cmd.arg("quockpit");
+        cmd.arg("devpit");
 
         let mut session = spawn(cmd, size()).expect("spawn");
 
@@ -227,7 +227,7 @@ mod tests {
         }
 
         assert!(
-            String::from_utf8_lossy(&seen).contains("quockpit"),
+            String::from_utf8_lossy(&seen).contains("devpit"),
             "output did not reach the frames: {:?}",
             String::from_utf8_lossy(&seen)
         );
@@ -239,7 +239,7 @@ mod tests {
         let cmd = CommandBuilder::new("cat");
         let mut session = spawn(cmd, size()).expect("spawn");
 
-        session.write(b"quockpit-stdin\n").expect("write");
+        session.write(b"devpit-stdin\n").expect("write");
         // Closing stdin is what makes `cat` exit. Dropping the writer is that close.
         let io = session.take_io().expect("io");
         drop(io.writer);
@@ -249,7 +249,7 @@ mod tests {
             seen.extend_from_slice(&frame);
         }
         assert!(
-            String::from_utf8_lossy(&seen).contains("quockpit-stdin"),
+            String::from_utf8_lossy(&seen).contains("devpit-stdin"),
             "stdin did not echo: {:?}",
             String::from_utf8_lossy(&seen)
         );
@@ -260,7 +260,7 @@ mod tests {
     async fn a_flood_is_coalesced_into_far_fewer_frames_than_reads() {
         let mut cmd = CommandBuilder::new("sh");
         cmd.arg("-c");
-        cmd.arg("yes quockpit | head -c 2000000");
+        cmd.arg("yes devpit | head -c 2000000");
 
         let mut session = spawn(cmd, size()).expect("spawn");
 

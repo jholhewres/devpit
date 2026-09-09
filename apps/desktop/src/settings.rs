@@ -1,7 +1,7 @@
 //! Contract commands for what the person chose.
 
-use quockpit_core::{preference, Store};
-use quockpit_rpc::{RpcError, Settings, Theme};
+use devpit_core::{preference, Store};
+use devpit_rpc::{RpcError, Settings, Theme};
 
 fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)

@@ -4,7 +4,7 @@
 //! This is the one that proves the loop closes: settings written by us, read by
 //! the agent, posted back to a port we are listening on, while the turn runs.
 //!
-//! Opt-in behind `QUOCKPIT_LIVE_TURN`: it runs a real turn, which costs money.
+//! Opt-in behind `DEVPIT_LIVE_TURN`: it runs a real turn, which costs money.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, TcpListener};
@@ -12,8 +12,8 @@ use std::sync::mpsc;
 
 #[test]
 fn a_real_turn_posts_its_hooks_to_us() {
-    if std::env::var_os("QUOCKPIT_LIVE_TURN").is_none() || !quockpit_agentcli::available() {
-        eprintln!("skipped: set QUOCKPIT_LIVE_TURN=1 to run a real turn");
+    if std::env::var_os("DEVPIT_LIVE_TURN").is_none() || !devpit_agentcli::available() {
+        eprintln!("skipped: set DEVPIT_LIVE_TURN=1 to run a real turn");
         return;
     }
 
@@ -49,14 +49,14 @@ fn a_real_turn_posts_its_hooks_to_us() {
 
     // The endpoint on disk, exactly as the app publishes it.
     let dir = tempfile::tempdir().expect("tempdir");
-    let endpoint = quockpit_agentcli::endpoint_file(dir.path());
+    let endpoint = devpit_agentcli::endpoint_file(dir.path());
     std::fs::write(&endpoint, format!("http://{address}/hook")).expect("publish");
 
     let settings = dir.path().join("hooks.json");
-    std::fs::write(&settings, quockpit_agentcli::settings_json(&endpoint)).expect("settings");
+    std::fs::write(&settings, devpit_agentcli::settings_json(&endpoint)).expect("settings");
 
-    let outcome = quockpit_agentcli::run_turn(
-        &quockpit_agentcli::Turn {
+    let outcome = devpit_agentcli::run_turn(
+        &devpit_agentcli::Turn {
             prompt: "Run the shell command `echo hello`, then reply with the word done.",
             cwd: dir.path(),
             agents: None,
@@ -72,7 +72,7 @@ fn a_real_turn_posts_its_hooks_to_us() {
     // Whatever arrived by the time the turn ended.
     let mut heard = Vec::new();
     while let Ok(payload) = rx.try_recv() {
-        if let Some(happening) = quockpit_agentcli::read_hook(&payload) {
+        if let Some(happening) = devpit_agentcli::read_hook(&payload) {
             heard.push(happening);
         }
     }

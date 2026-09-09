@@ -5,10 +5,10 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use devpit_core::Store;
+use devpit_git::worktree_path;
+use devpit_rpc::{ErrorCode, LayoutNode, RpcError, SessionLayout, SplitDirection};
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize};
-use quockpit_core::Store;
-use quockpit_git::worktree_path;
-use quockpit_rpc::{ErrorCode, LayoutNode, RpcError, SessionLayout, SplitDirection};
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::State;
 use ulid::Ulid;
@@ -123,14 +123,14 @@ fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
 }
 
-fn tmux_server() -> Result<quockpit_tmux::Server, RpcError> {
-    if !quockpit_tmux::Server::available() {
+fn tmux_server() -> Result<devpit_tmux::Server, RpcError> {
+    if !devpit_tmux::Server::available() {
         return Err(RpcError::new(
             ErrorCode::Unsupported,
             "tmux is not installed, or not on PATH",
         ));
     }
-    Ok(quockpit_tmux::Server::new(socket_path()?))
+    Ok(devpit_tmux::Server::new(socket_path()?))
 }
 
 /// The tmux socket, at the state root and never under a per-project directory.
@@ -187,7 +187,7 @@ fn persist(store: &Store, layout: &SessionLayout) -> Result<(), RpcError> {
 fn load_or_create(project_id: &str, cwd: &Path) -> Result<SessionLayout, RpcError> {
     let store = store()?;
     let server = tmux_server()?;
-    let session = quockpit_tmux::Server::session_name(project_id);
+    let session = devpit_tmux::Server::session_name(project_id);
 
     if let Some((tree, focused)) = store.pane_layout(project_id)? {
         let layout = decode(project_id, &tree, &focused)?;
@@ -208,16 +208,16 @@ fn load_or_create(project_id: &str, cwd: &Path) -> Result<SessionLayout, RpcErro
         focused_id: leaf_id.clone(),
         tree: LayoutNode::leaf(
             leaf_id.clone(),
-            quockpit_tmux::Server::target(&session, &leaf_id),
+            devpit_tmux::Server::target(&session, &leaf_id),
         ),
     };
     persist(&store, &layout)?;
     Ok(layout)
 }
 
-fn tmux_err(err: quockpit_tmux::TmuxError) -> RpcError {
+fn tmux_err(err: devpit_tmux::TmuxError) -> RpcError {
     match err {
-        quockpit_tmux::TmuxError::Missing => RpcError::new(
+        devpit_tmux::TmuxError::Missing => RpcError::new(
             ErrorCode::Unsupported,
             "tmux is not installed, or not on PATH",
         ),
@@ -302,7 +302,7 @@ pub fn session_split(
     let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
     let store = store()?;
     let server = tmux_server()?;
-    let session = quockpit_tmux::Server::session_name(&project_id);
+    let session = devpit_tmux::Server::session_name(&project_id);
 
     let Some((tree, focused)) = store.pane_layout(&project_id)? else {
         return Err(RpcError::new(
@@ -324,7 +324,7 @@ pub fn session_split(
         .map_err(tmux_err)?;
     let new_leaf = LayoutNode::leaf(
         new_id.clone(),
-        quockpit_tmux::Server::target(&session, &new_id),
+        devpit_tmux::Server::target(&session, &new_id),
     );
     let tree = current
         .tree
@@ -463,7 +463,7 @@ pub async fn session_attach(
     }
 
     let server = tmux_server()?;
-    let argv = server.attach_argv(&quockpit_tmux::Server::session_name(&project_id), &pane_id);
+    let argv = server.attach_argv(&devpit_tmux::Server::session_name(&project_id), &pane_id);
 
     let mut builder = CommandBuilder::new(&argv[0]);
     for arg in &argv[1..] {
@@ -479,7 +479,7 @@ pub async fn session_attach(
             .kill();
     }
 
-    let mut session = match quockpit_pty::spawn(
+    let mut session = match devpit_pty::spawn(
         builder,
         PtySize {
             rows,
@@ -634,10 +634,10 @@ pub fn terminal_attach_agent(
         }
     };
 
-    let session = quockpit_tmux::Server::session_name(&project_id);
-    let target = quockpit_tmux::Server::target(&session, &layout.focused_id);
+    let session = devpit_tmux::Server::session_name(&project_id);
+    let target = devpit_tmux::Server::target(&session, &layout.focused_id);
 
-    let line = quockpit_agentcli::attach_argv(&link.short_id).join(" ");
+    let line = devpit_agentcli::attach_argv(&link.short_id).join(" ");
     tmux_server()?.send_keys(&target, &line).map_err(tmux_err)?;
 
     Ok(line)

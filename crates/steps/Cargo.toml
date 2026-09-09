@@ -1,5 +1,5 @@
 [package]
-name = "quockpit-steps"
+name = "devpit-steps"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

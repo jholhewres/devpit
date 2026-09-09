@@ -66,7 +66,7 @@ fn a_payload_with_no_session_is_dropped() {
 /// The two rules the settings exist to keep.
 #[test]
 fn the_hook_command_gives_up_rather_than_holding_the_agent() {
-    let settings = settings_json(Path::new("/home/x/.quockpit/hook-endpoint"));
+    let settings = settings_json(Path::new("/home/x/.devpit/hook-endpoint"));
     assert!(settings.contains("--connect-timeout 0.5"), "{settings}");
     assert!(settings.contains("--max-time 1.5"), "{settings}");
     // A proxy in the environment must not be consulted for loopback.
@@ -75,11 +75,11 @@ fn the_hook_command_gives_up_rather_than_holding_the_agent() {
 
 #[test]
 fn the_endpoint_is_read_from_disk_on_every_invocation() {
-    let settings = settings_json(Path::new("/home/x/.quockpit/hook-endpoint"));
+    let settings = settings_json(Path::new("/home/x/.devpit/hook-endpoint"));
     // `cat` inside the command, not the address baked into it: a pty that
     // outlived a restart would otherwise post to a dead port forever.
     assert!(
-        settings.contains("cat /home/x/.quockpit/hook-endpoint"),
+        settings.contains("cat /home/x/.devpit/hook-endpoint"),
         "{settings}"
     );
 }

@@ -2,7 +2,7 @@
   "app": {
     "windows": [
       {
-        "title": "quockpit",
+        "title": "devpit",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

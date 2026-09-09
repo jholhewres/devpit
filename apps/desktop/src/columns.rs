@@ -1,8 +1,8 @@
 //! The column commands: a lane is created, renamed, reordered and deleted by
 //! the person using it.
 
-use quockpit_core::Store;
-use quockpit_rpc::{Board, ColumnDeleted, RpcError};
+use devpit_core::Store;
+use devpit_rpc::{Board, ColumnDeleted, RpcError};
 
 use crate::board::board_get;
 

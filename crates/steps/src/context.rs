@@ -45,14 +45,14 @@ impl Context {
 
     /// The environment a command is run with: one variable per key.
     ///
-    /// `QUOCKPIT_` prefixed so a command can tell them from its own, and
+    /// `DEVPIT_` prefixed so a command can tell them from its own, and
     /// upper-snake because that is what a shell script expects to read.
     pub fn environment(&self) -> Vec<(String, String)> {
         CONTEXT_KEYS
             .iter()
             .map(|key| {
                 (
-                    format!("QUOCKPIT_{}", screaming_snake(key)),
+                    format!("DEVPIT_{}", screaming_snake(key)),
                     self.get(key).unwrap_or_default().to_owned(),
                 )
             })
@@ -77,9 +77,9 @@ mod tests {
 
     fn sample() -> Context {
         Context {
-            project: "quockpit".to_owned(),
-            project_path: "/home/x/quockpit".to_owned(),
-            worktree_path: "/home/x/quockpit".to_owned(),
+            project: "devpit".to_owned(),
+            project_path: "/home/x/devpit".to_owned(),
+            worktree_path: "/home/x/devpit".to_owned(),
             branch: "main".to_owned(),
             card: "card_1".to_owned(),
             card_title: "Ship it".to_owned(),
@@ -103,9 +103,9 @@ mod tests {
     fn the_environment_names_are_what_a_shell_script_expects() {
         let environment = sample().environment();
         let names: Vec<&str> = environment.iter().map(|(k, _)| k.as_str()).collect();
-        assert!(names.contains(&"QUOCKPIT_PROJECT_PATH"));
-        assert!(names.contains(&"QUOCKPIT_CARD_TITLE"));
-        assert!(names.contains(&"QUOCKPIT_BRANCH"));
+        assert!(names.contains(&"DEVPIT_PROJECT_PATH"));
+        assert!(names.contains(&"DEVPIT_CARD_TITLE"));
+        assert!(names.contains(&"DEVPIT_BRANCH"));
         assert_eq!(names.len(), CONTEXT_KEYS.len());
     }
 
@@ -119,7 +119,7 @@ mod tests {
         let environment = context.environment();
         let (_, branch) = environment
             .iter()
-            .find(|(k, _)| k == "QUOCKPIT_BRANCH")
+            .find(|(k, _)| k == "DEVPIT_BRANCH")
             .expect("no branch in the environment");
         assert_eq!(branch, "x; rm -rf /tmp/proof");
     }

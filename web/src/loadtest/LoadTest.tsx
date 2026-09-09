@@ -87,7 +87,7 @@ export function LoadTest(): React.JSX.Element {
     const started = performance.now()
     try {
       const report = await invoke<Throughput>('pty_drain', {
-        command: `yes quockpit | head -c ${megabytes * MEGABYTE}`,
+        command: `yes devpit | head -c ${megabytes * MEGABYTE}`,
         onFrame
       })
 

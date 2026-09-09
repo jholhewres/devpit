@@ -1,6 +1,6 @@
 //! The agents on this machine, as files.
 //!
-//! An agent is a markdown file with frontmatter in `~/.quockpit/agents/`. That
+//! An agent is a markdown file with frontmatter in `~/.devpit/agents/`. That
 //! is the whole format: writing a new one is adding a file, and it reaches the
 //! next run without a restart, a registry or a recompile.
 //!

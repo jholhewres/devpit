@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use quockpit_rpc::{ErrorCode, FileContents, FileSaved, RpcError};
+use devpit_rpc::{ErrorCode, FileContents, FileSaved, RpcError};
 
 use crate::roots::root_of;
 
@@ -52,7 +52,7 @@ pub fn file_read(
     path: String,
 ) -> Result<FileContents, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
-    let resolved = quockpit_core::tree::resolve(&root, &path)
+    let resolved = devpit_core::tree::resolve(&root, &path)
         .map_err(|err| RpcError::new(ErrorCode::Forbidden, err.to_string()))?;
 
     let bytes = std::fs::metadata(&resolved)
@@ -113,7 +113,7 @@ pub fn file_write(
     read_at: f64,
 ) -> Result<FileSaved, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
-    let resolved = quockpit_core::tree::resolve(&root, &path)
+    let resolved = devpit_core::tree::resolve(&root, &path)
         .map_err(|err| RpcError::new(ErrorCode::Forbidden, err.to_string()))?;
 
     if is_stale(read_at, modified(&resolved)) {

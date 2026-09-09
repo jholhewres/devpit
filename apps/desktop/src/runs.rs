@@ -14,11 +14,11 @@
 //! Nothing here retries. A failed run leaves the card where it is with the
 //! reason on it, and the next move is a person's.
 
-use quockpit_agentcli as agent;
+use devpit_agentcli as agent;
 use std::sync::Arc;
 
-use quockpit_core::Store;
-use quockpit_rpc::{RpcError, Run, RunState, Step, StepKind};
+use devpit_core::Store;
+use devpit_rpc::{RpcError, Run, RunState, Step, StepKind};
 use tauri::{AppHandle, Emitter};
 
 use crate::in_flight::InFlight;
@@ -125,7 +125,7 @@ pub fn start(
     })
 }
 
-/// Copies the agents already installed on this machine into `~/.quockpit`.
+/// Copies the agents already installed on this machine into `~/.devpit`.
 ///
 /// Runs on every start and never overwrites, so an agent the person edited
 /// stays theirs.

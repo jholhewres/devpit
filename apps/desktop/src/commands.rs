@@ -4,8 +4,8 @@
 //! with a product answer is answered by `crates/`, which is why the same
 //! contract will serve an HTTP server and a CLI without a rewrite.
 
-use quockpit_core::Store;
-use quockpit_rpc::{AppHealth, AppInfo, Capabilities, RpcError};
+use devpit_core::Store;
+use devpit_rpc::{AppHealth, AppInfo, Capabilities, RpcError};
 
 /// `app.info` — version, platform, and where state lives.
 #[tauri::command]
@@ -42,6 +42,6 @@ pub fn app_capabilities() -> Capabilities {
         memory: false,
         cloud: false,
         vault: false,
-        tmux: quockpit_tmux::Server::available(),
+        tmux: devpit_tmux::Server::available(),
     }
 }

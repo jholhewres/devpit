@@ -1,4 +1,4 @@
-//! Core of quockpit.
+//! Core of devpit.
 //!
 //! All product logic lives here and in the other `crates/`. The desktop shell,
 //! the HTTP server and the CLI are thin adapters over it.

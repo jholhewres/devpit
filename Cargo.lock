@@ -626,6 +626,104 @@ dependencies = [
 ]
 
 [[package]]
+name = "devpit-agentcli"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "devpit-core"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "rusqlite",
+ "serde",
+ "sha2 0.11.0",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "ulid",
+]
+
+[[package]]
+name = "devpit-desktop"
+version = "0.1.0"
+dependencies = [
+ "devpit-agentcli",
+ "devpit-core",
+ "devpit-git",
+ "devpit-pty",
+ "devpit-rpc",
+ "devpit-steps",
+ "devpit-tmux",
+ "portable-pty",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-specta",
+ "tempfile",
+ "tokio",
+ "ulid",
+]
+
+[[package]]
+name = "devpit-git"
+version = "0.1.0"
+dependencies = [
+ "devpit-rpc",
+ "sha2 0.11.0",
+ "tempfile",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "devpit-pty"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "portable-pty",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "devpit-rpc"
+version = "0.1.0"
+dependencies = [
+ "devpit-core",
+ "serde",
+ "serde_json",
+ "specta",
+]
+
+[[package]]
+name = "devpit-steps"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "devpit-tmux"
+version = "0.1.0"
+dependencies = [
+ "devpit-agentcli",
+ "tempfile",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2575,104 +2673,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "quockpit-agentcli"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "quockpit-core"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "rusqlite",
- "serde",
- "sha2 0.11.0",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "ulid",
-]
-
-[[package]]
-name = "quockpit-desktop"
-version = "0.1.0"
-dependencies = [
- "portable-pty",
- "quockpit-agentcli",
- "quockpit-core",
- "quockpit-git",
- "quockpit-pty",
- "quockpit-rpc",
- "quockpit-steps",
- "quockpit-tmux",
- "serde",
- "serde_json",
- "specta",
- "specta-typescript",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-specta",
- "tempfile",
- "tokio",
- "ulid",
-]
-
-[[package]]
-name = "quockpit-git"
-version = "0.1.0"
-dependencies = [
- "quockpit-rpc",
- "sha2 0.11.0",
- "tempfile",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "quockpit-pty"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "portable-pty",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "quockpit-rpc"
-version = "0.1.0"
-dependencies = [
- "quockpit-core",
- "serde",
- "serde_json",
- "specta",
-]
-
-[[package]]
-name = "quockpit-steps"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "quockpit-tmux"
-version = "0.1.0"
-dependencies = [
- "quockpit-agentcli",
- "tempfile",
- "thiserror 2.0.20",
 ]
 
 [[package]]

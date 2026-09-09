@@ -92,8 +92,11 @@ mod tests {
     #[test]
     fn keeps_everything_while_it_fits() {
         let mut ring = RingBuffer::new(16);
-        ring.write(b"quockpit");
-        assert_eq!(ring.contents(), b"quockpit");
+        // Deliberately not a word from the project: this used to spell the
+        // product name, and renaming it silently changed the byte count the
+        // assertion below depends on.
+        ring.write(b"abcdefgh");
+        assert_eq!(ring.contents(), b"abcdefgh");
         assert_eq!(ring.len(), 8);
     }
 

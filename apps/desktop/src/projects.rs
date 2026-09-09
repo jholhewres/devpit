@@ -6,8 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
-use quockpit_core::{tree, Store};
-use quockpit_rpc::{
+use devpit_core::{tree, Store};
+use devpit_rpc::{
     ErrorCode, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory, ProjectList,
     ProjectNotes, ProjectTree, RpcError,
 };
@@ -27,7 +27,7 @@ fn store() -> Result<Store, RpcError> {
 /// Both, because every command below needs both and a project whose folder has
 /// been moved or deleted must fail as `not_found` with a sentence, rather than
 /// as a filesystem error nobody can act on.
-fn locate(store: &Store, id: &str) -> Result<(quockpit_core::ProjectRow, PathBuf), RpcError> {
+fn locate(store: &Store, id: &str) -> Result<(devpit_core::ProjectRow, PathBuf), RpcError> {
     let row = store
         .project(id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that project is not registered"))?;
@@ -43,12 +43,12 @@ fn locate(store: &Store, id: &str) -> Result<(quockpit_core::ProjectRow, PathBuf
     Ok((row, root))
 }
 
-fn tree_error(err: quockpit_core::TreeError) -> RpcError {
+fn tree_error(err: devpit_core::TreeError) -> RpcError {
     match err {
         // Its own code, not a generic one: the screen says something different
         // for a path that escaped than for a folder it could not read, and
         // this process runs terminals — reaching it is reaching the machine.
-        quockpit_core::TreeError::Outside { .. } => RpcError::forbidden(err.to_string()),
+        devpit_core::TreeError::Outside { .. } => RpcError::forbidden(err.to_string()),
         other => RpcError::internal(other.to_string()),
     }
 }
@@ -68,7 +68,7 @@ pub fn project_list() -> Result<ProjectList, RpcError> {
         .into_iter()
         .map(|row| {
             let root = PathBuf::from(&row.root_path);
-            let (worktrees, unreadable) = match quockpit_git::worktrees(&root) {
+            let (worktrees, unreadable) = match devpit_git::worktrees(&root) {
                 Ok(found) => (found, None),
                 Err(err) => (Vec::new(), Some(err.to_string())),
             };
@@ -111,7 +111,7 @@ pub fn project_add(root_path: String) -> Result<Project, RpcError> {
     let origin = origin_url(&root);
     let id = store.add_project(&root, origin.as_deref())?;
 
-    let (worktrees, unreadable) = match quockpit_git::worktrees(&root) {
+    let (worktrees, unreadable) = match devpit_git::worktrees(&root) {
         Ok(found) => (found, None),
         Err(err) => (Vec::new(), Some(err.to_string())),
     };
@@ -135,7 +135,7 @@ pub fn project_add(root_path: String) -> Result<Project, RpcError> {
 ///
 /// `into` is the parent folder, and it is optional: someone deciding *whether*
 /// to add a project should not be stopped to answer *where*. Left out, it goes
-/// to `~/.quockpit/repos/`, and the path is shown before the clone runs.
+/// to `~/.devpit/repos/`, and the path is shown before the clone runs.
 #[tauri::command]
 #[specta::specta]
 pub fn project_clone(url: String, into: Option<String>) -> Result<Project, RpcError> {
@@ -146,11 +146,11 @@ pub fn project_clone(url: String, into: Option<String>) -> Result<Project, RpcEr
         None => Store::root()?.join("repos"),
     };
 
-    let into = quockpit_git::clone(url.trim(), &parent).map_err(|err| match err {
-        quockpit_git::GitError::Missing => RpcError::new(ErrorCode::Unsupported, err.to_string()),
+    let into = devpit_git::clone(url.trim(), &parent).map_err(|err| match err {
+        devpit_git::GitError::Missing => RpcError::new(ErrorCode::Unsupported, err.to_string()),
         // A clone that failed because the folder is taken is a conflict the
         // person can act on, not an internal error.
-        quockpit_git::GitError::Failed { ref stderr, .. } if stderr.contains("already exists") => {
+        devpit_git::GitError::Failed { ref stderr, .. } if stderr.contains("already exists") => {
             RpcError::new(ErrorCode::Conflict, err.to_string())
         }
         other => RpcError::internal(other.to_string()),
@@ -162,7 +162,7 @@ pub fn project_clone(url: String, into: Option<String>) -> Result<Project, RpcEr
         .project(&id)?
         .ok_or_else(|| RpcError::internal("the project vanished between write and read"))?;
 
-    let (worktrees, unreadable) = match quockpit_git::worktrees(&into) {
+    let (worktrees, unreadable) = match devpit_git::worktrees(&into) {
         Ok(found) => (found, None),
         Err(err) => (Vec::new(), Some(err.to_string())),
     };
@@ -207,7 +207,7 @@ pub fn project_tree(
     let (_, root) = locate(&store, &project_id)?;
     let root = checkout(&root, worktree_id.as_deref());
 
-    let status = quockpit_git::status(&root)
+    let status = devpit_git::status(&root)
         .map(|status| status.paths)
         .unwrap_or_default();
 
@@ -304,8 +304,7 @@ pub fn project_changes(
     let (_, root) = locate(&store, &project_id)?;
     let root = checkout(&root, worktree_id.as_deref());
 
-    let changes =
-        quockpit_git::changes(&root).map_err(|err| RpcError::internal(err.to_string()))?;
+    let changes = devpit_git::changes(&root).map_err(|err| RpcError::internal(err.to_string()))?;
 
     // Summed here rather than on the screen, so the totals stay right if this
     // list is ever paged.
@@ -331,7 +330,7 @@ pub fn project_history(
     let root = checkout(&root, worktree_id.as_deref());
 
     let commits =
-        quockpit_git::history(&root, HISTORY).map_err(|err| RpcError::internal(err.to_string()))?;
+        devpit_git::history(&root, HISTORY).map_err(|err| RpcError::internal(err.to_string()))?;
 
     Ok(ProjectHistory { commits })
 }
@@ -382,7 +381,7 @@ pub fn project_note_add(project_id: String, body: String) -> Result<ProjectNotes
 /// has since been removed — a stale id should reopen the project, not fail.
 fn checkout(root: &Path, worktree_id: Option<&str>) -> PathBuf {
     worktree_id
-        .and_then(|id| quockpit_git::worktree_path(root, id).ok().flatten())
+        .and_then(|id| devpit_git::worktree_path(root, id).ok().flatten())
         .unwrap_or_else(|| root.to_path_buf())
 }
 

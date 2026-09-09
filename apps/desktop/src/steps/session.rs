@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use quockpit_agentcli as agent;
-use quockpit_core::Store;
-use quockpit_rpc::Step;
+use devpit_agentcli as agent;
+use devpit_core::Store;
+use devpit_rpc::Step;
 use serde::Deserialize;
 
 use super::{slug, uuid_like, Finished};
@@ -62,7 +62,7 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
     // later: once the base branch moves, nothing on disk remembers.
     if let Some(name) = &worktree {
         let path = worktree_path(&cwd, name);
-        let base = quockpit_git::head_of(&cwd).unwrap_or_default();
+        let base = devpit_git::head_of(&cwd).unwrap_or_default();
         let _ = store.set_card_front(
             card_id,
             path.to_str(),

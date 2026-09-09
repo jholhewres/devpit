@@ -13,7 +13,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::Path;
 
-use quockpit_agentcli::{read_hook, Event, Happening};
+use devpit_agentcli::{read_hook, Event, Happening};
 use tauri::{AppHandle, Emitter};
 
 /// A payload bigger than this is not one of ours.
@@ -40,7 +40,7 @@ pub fn start(app: AppHandle, root: &Path) {
     let Ok(address) = listener.local_addr() else {
         return;
     };
-    let endpoint = quockpit_agentcli::endpoint_file(root);
+    let endpoint = devpit_agentcli::endpoint_file(root);
     if let Some(parent) = endpoint.parent() {
         let _ = std::fs::create_dir_all(parent);
     }

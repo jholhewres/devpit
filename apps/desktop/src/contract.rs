@@ -13,7 +13,7 @@ use crate::{
 /// Where the generated TypeScript lands.
 ///
 /// Anchored to the manifest directory rather than the working directory:
-/// `tauri dev` and a bare `./quockpit-desktop` run from different places, and a
+/// `tauri dev` and a bare `./devpit-desktop` run from different places, and a
 /// relative path would quietly write the contract somewhere else.
 pub const BINDINGS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/src/gen/bindings.ts");
 

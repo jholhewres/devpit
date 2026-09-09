@@ -46,7 +46,7 @@ fn stderr_reaches_the_card_too() {
 /// The context is readable, and only from the environment.
 #[test]
 fn the_command_reads_its_context_from_the_environment() {
-    let (_, lines) = collected("echo \"$QUOCKPIT_BRANCH/$QUOCKPIT_CARD_TITLE\"", None);
+    let (_, lines) = collected("echo \"$DEVPIT_BRANCH/$DEVPIT_CARD_TITLE\"", None);
     assert_eq!(lines, ["main/a card"]);
 }
 
@@ -62,7 +62,7 @@ fn a_branch_full_of_shell_syntax_runs_nothing() {
         ..Context::default()
     };
     run(
-        "echo \"$QUOCKPIT_BRANCH\" > /dev/null",
+        "echo \"$DEVPIT_BRANCH\" > /dev/null",
         dir.path(),
         &context,
         None,

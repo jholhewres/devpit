@@ -1,4 +1,4 @@
-# quockpit
+# devpit
 
 A desktop workspace for working with coding agents.
 
@@ -39,7 +39,7 @@ attention. One. Switching lines of work switches what is attached to it; the
 previous session keeps running in the background, it just stops taking up the
 screen.
 
-**No card, just a terminal.** Open quockpit, type into it, and your agent CLI
+**No card, just a terminal.** Open devpit, type into it, and your agent CLI
 behaves exactly as it always has. The board is an optional source of work, not a
 toll gate.
 
@@ -65,7 +65,7 @@ of injection.
 
 ## Agents are files
 
-Agents live in `~/.quockpit/agents/` as markdown with frontmatter. Ship a set to
+Agents live in `~/.devpit/agents/` as markdown with frontmatter. Ship a set to
 start from, then write your own next to them. A custom agent is a new file in
 that directory — nothing to recompile, nothing to register.
 

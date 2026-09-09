@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use quockpit_core::Store;
-use quockpit_rpc::Step;
-use quockpit_steps as steps;
+use devpit_core::Store;
+use devpit_rpc::Step;
+use devpit_steps as steps;
 
 use super::Finished;
 

@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report privately through GitHub's
-[security advisory form](https://github.com/jholhewres/quockpit/security/advisories/new)
+[security advisory form](https://github.com/jholhewres/devpit/security/advisories/new)
 rather than a public issue.
 
 Include what you did, what happened, and what you expected. A proof of concept

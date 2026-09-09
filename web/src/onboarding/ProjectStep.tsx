@@ -170,7 +170,7 @@ export function ProjectStep({ onAdded }: { onAdded: () => void }): React.JSX.Ele
             {/* Where it will land, before it lands there. A destination
                 discovered afterwards is a folder someone goes looking for. */}
             <p className="source__into">
-              Clones into <em>{(into || '~/.quockpit/repos') + '/' + (name || '…')}</em>
+              Clones into <em>{(into || '~/.devpit/repos') + '/' + (name || '…')}</em>
               <button
                 type="button"
                 className="source__browse source__browse--inline"

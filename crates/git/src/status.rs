@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use quockpit_rpc::{Change, GitStatus};
+use devpit_rpc::{Change, GitStatus};
 
 use crate::{run, GitError};
 

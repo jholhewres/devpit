@@ -242,7 +242,7 @@ export function Sidebar({
           otherwise the left third of the titlebar would be dead. */}
       <div className="sidebar__nav" data-tauri-drag-region>
         <span className="sidebar__mark" data-tauri-drag-region>
-          quockpit
+          devpit
         </span>
         <span className="sidebar__nav-spacer" data-tauri-drag-region />
         <button

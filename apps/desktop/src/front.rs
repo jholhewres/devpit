@@ -1,7 +1,7 @@
 //! What a line of work changed, and putting it away safely.
 
-use quockpit_core::Store;
-use quockpit_rpc::{Board, ErrorCode, Front, RpcError};
+use devpit_core::Store;
+use devpit_rpc::{Board, ErrorCode, Front, RpcError};
 
 use crate::board::board_get;
 
@@ -35,11 +35,11 @@ pub fn card_diff(card_id: String) -> Result<Front, RpcError> {
 
     let worktree = std::path::Path::new(path);
     Ok(Front {
-        files: quockpit_git::changed_since(worktree, base)
+        files: devpit_git::changed_since(worktree, base)
             .map_err(|err| RpcError::internal(err.to_string()))?,
-        diff: quockpit_git::diff_since(worktree, base)
+        diff: devpit_git::diff_since(worktree, base)
             .map_err(|err| RpcError::internal(err.to_string()))?,
-        unsaved: quockpit_git::unsaved_in(worktree)
+        unsaved: devpit_git::unsaved_in(worktree)
             .map_err(|err| RpcError::internal(err.to_string()))?,
         worktree_path: card.worktree_path,
         base_ref: card.base_ref,
@@ -57,7 +57,7 @@ pub fn card_archive(project_id: String, card_id: String, force: bool) -> Result<
 
     if !force {
         if let Some(path) = store.card(&card_id)?.and_then(|card| card.worktree_path) {
-            let unsaved = quockpit_git::unsaved_in(std::path::Path::new(&path))
+            let unsaved = devpit_git::unsaved_in(std::path::Path::new(&path))
                 .map_err(|err| RpcError::internal(err.to_string()))?;
             if !unsaved.is_empty() {
                 return Err(RpcError::new(

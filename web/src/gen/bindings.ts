@@ -25,7 +25,7 @@ export const commands = {
 	 * 
 	 *  `into` is the parent folder, and it is optional: someone deciding *whether*
 	 *  to add a project should not be stopped to answer *where*. Left out, it goes
-	 *  to `~/.quockpit/repos/`, and the path is shown before the clone runs.
+	 *  to `~/.devpit/repos/`, and the path is shown before the clone runs.
 	 */
 	projectClone: (url: string, into: string | null) => typedError<Project, RpcError>(__TAURI_INVOKE("project_clone", { url, into })),
 	/**
