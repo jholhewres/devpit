@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+
 import type { Card } from '../gen/bindings'
+import { LaneFoot, LaneHead, Tile } from './Lane'
 import { useBoard } from './useBoard'
 import { useShell } from './useShell'
 
@@ -33,32 +35,6 @@ interface Held {
 interface Landing {
   readonly lane: string
   readonly index: number
-}
-
-const Spark = (): React.JSX.Element => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" />
-    <rect x="7" y="12" width="10" height="9" rx="2" />
-  </svg>
-)
-
-function Tile({ card }: { card: Card }): React.JSX.Element {
-  const run = card.runs[0]
-  return (
-    <>
-      <div className="tile__t">{card.title}</div>
-      <div className="tile__m">
-        {run && (
-          <span className={run.state === 'failed' ? 'tile__agent tile__agent--warn' : 'tile__agent'}>
-            <Spark />
-            {run.stepName}
-          </span>
-        )}
-        {card.costUsd !== null && <span className="tile__time">${card.costUsd.toFixed(2)}</span>}
-        {card.session && <span className="tile__time">{card.session.status}</span>}
-      </div>
-    </>
-  )
 }
 
 export function BoardPane(): React.JSX.Element {
@@ -161,16 +137,7 @@ export function BoardPane(): React.JSX.Element {
             data-agent={lane.column.step?.name}
             data-over={String(Boolean(held?.moved && dropping))}
           >
-            <div className="blane__top">
-              <span className="blane__label">{lane.column.name}</span>
-              <span className="blane__n">{lane.cards.length}</span>
-              {lane.column.step && (
-                <span className="blane__agent">
-                  <Spark />
-                  {lane.column.step.name}
-                </span>
-              )}
-            </div>
+            <LaneHead lane={lane} onRename={(name) => live.renameColumn(lane.column.id, name)} />
 
             <div className="blane__list">
               {lane.cards.map((card, index) => (
@@ -196,13 +163,11 @@ export function BoardPane(): React.JSX.Element {
               )}
             </div>
 
-            <button
-              className="tile__add"
-              onClick={() => live.addCard(lane.column.id, 'New card')}
-            >
-              + Add card
-            </button>
-            <div className="blane__fill" />
+            <LaneFoot
+              lane={lane}
+              onAddCard={() => live.addCard(lane.column.id, 'New card')}
+              onDelete={() => live.deleteColumn(lane.column.id)}
+            />
           </div>
         )
       })}
@@ -212,6 +177,11 @@ export function BoardPane(): React.JSX.Element {
           that ancestor instead of the window, and the pane's entrance
           animation is exactly such an ancestor — which puts the card in the
           air nowhere near the pointer. */}
+      <button className="blane__new" onClick={() => live.addColumn('New column')}>
+        + Column
+      </button>
+
+
       {held?.moved &&
         createPortal(
           <div

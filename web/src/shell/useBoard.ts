@@ -10,6 +10,10 @@ export interface UseBoard {
   readonly cards: number
   move: (cardId: string, columnId: string, at: number) => void
   addCard: (columnId: string, title: string) => void
+  addColumn: (name: string) => void
+  renameColumn: (columnId: string, name: string) => void
+  reorderColumns: (ids: string[]) => void
+  deleteColumn: (columnId: string) => void
   reload: () => void
 }
 
@@ -56,5 +60,46 @@ export function useBoard(projectId: string | null): UseBoard {
     [projectId, reload],
   )
 
-  return { lanes: lanes(board), error, cards: board?.cards.length ?? 0, move, addCard, reload }
+  /* Every column edit is the same shape: call, then reload from the source
+     of truth rather than guessing what the backend did. */
+  const then = useCallback(
+    (call: () => Promise<unknown>) => {
+      void ask(call).then((asked) => {
+        setError(asked.error)
+        if (!asked.error) reload()
+      })
+    },
+    [reload],
+  )
+
+  const addColumn = useCallback(
+    (name: string) => projectId && then(() => commands.columnCreate(projectId, name)),
+    [projectId, then],
+  )
+  const renameColumn = useCallback(
+    (columnId: string, name: string) =>
+      projectId && then(() => commands.columnRename(projectId, columnId, name)),
+    [projectId, then],
+  )
+  const reorderColumns = useCallback(
+    (ids: string[]) => projectId && then(() => commands.columnReorder(projectId, ids)),
+    [projectId, then],
+  )
+  const deleteColumn = useCallback(
+    (columnId: string) => projectId && then(() => commands.columnDelete(projectId, columnId)),
+    [projectId, then],
+  )
+
+  return {
+    lanes: lanes(board),
+    error,
+    cards: board?.cards.length ?? 0,
+    move,
+    addCard,
+    addColumn,
+    renameColumn,
+    reorderColumns,
+    deleteColumn,
+    reload,
+  }
 }
