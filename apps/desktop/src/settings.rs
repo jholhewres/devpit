@@ -21,6 +21,8 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
             .preference(preference::ONBOARDED_AT)?
             .and_then(|value| value.parse::<i64>().ok())
             .map(|seconds| seconds as f64),
+        automatic_updates: store.preference_flag(preference::AUTO_UPDATE)?,
+        keep_transcripts: store.preference_flag(preference::KEEP_TRANSCRIPTS)?,
     })
 }
 
@@ -37,13 +39,24 @@ pub fn settings_read() -> Result<Settings, RpcError> {
 /// has to predict what a write did to the rest of it.
 #[tauri::command]
 #[specta::specta]
-pub fn settings_write(telemetry: Option<bool>, theme: Option<Theme>) -> Result<Settings, RpcError> {
+pub fn settings_write(
+    telemetry: Option<bool>,
+    theme: Option<Theme>,
+    automatic_updates: Option<bool>,
+    keep_transcripts: Option<bool>,
+) -> Result<Settings, RpcError> {
     let store = store()?;
     if let Some(allowed) = telemetry {
         store.set_preference_flag(preference::TELEMETRY, allowed)?;
     }
     if let Some(chosen) = theme {
         store.set_preference(preference::THEME, chosen.stored())?;
+    }
+    if let Some(automatic) = automatic_updates {
+        store.set_preference_flag(preference::AUTO_UPDATE, automatic)?;
+    }
+    if let Some(keep) = keep_transcripts {
+        store.set_preference_flag(preference::KEEP_TRANSCRIPTS, keep)?;
     }
     read(&store)
 }

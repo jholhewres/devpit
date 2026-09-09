@@ -36,7 +36,9 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
 
       <span className="drag" data-tauri-drag-region />
 
-      <button className="branch" title="Switch branch" hidden={!here}>
+      {/* A label, not a control: switching branch is not built, and a button
+          titled "Switch branch" that does nothing is worse than the name. */}
+      <span className="branch" title="The branch this checkout is on" hidden={!here}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
           <line x1="6" y1="3" x2="6" y2="15" />
           <circle cx="18" cy="6" r="3" />
@@ -47,7 +49,7 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
         {here !== undefined && here.ahead > 0 && (
           <span className="branch__ahead">&uarr;{here.ahead}</span>
         )}
-      </button>
+      </span>
       <span className="netstat" hidden={totals.added + totals.removed === 0}>
         <span className="add">+{totals.added}</span>
         <span className="del">&minus;{totals.removed}</span>

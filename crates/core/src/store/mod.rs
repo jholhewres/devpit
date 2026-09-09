@@ -7,6 +7,7 @@ mod layouts;
 mod migrations;
 mod projects;
 pub mod settings;
+mod spend;
 
 use std::path::{Path, PathBuf};
 

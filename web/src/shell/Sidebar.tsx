@@ -123,21 +123,6 @@ export function Sidebar({
                 <span className="newmenu__label">MCPs</span>
                 <span className="newmenu__key">2/4</span>
               </button>
-              <button className="newmenu__item" role="menuitem" onClick={() => open('caps')}>
-                <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 4 6v6c0 5 3.4 9.1 8 10 4.6-.9 8-5 8-10V6Z" /><path d="m9 12 2 2 4-4" /></svg></span>
-                <span className="newmenu__label">Capabilities</span>
-                <span className="newmenu__key">2 on</span>
-              </button>
-              <div className="newmenu__rule"></div>
-              <button className="newmenu__item newmenu__item--live" role="menuitem" onClick={() => open('diagram')}>
-                <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6z" /><path d="M10 7h4a3 3 0 0 1 3 3v4" /></svg></span>
-                <span className="newmenu__label">Diagram</span>
-              </button>
-              <button className="newmenu__item newmenu__item--live" role="menuitem" onClick={() => open('excalidraw')}>
-                <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3Z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18Z" /><path d="M2 2l7.6 7.6" /><circle cx="11" cy="11" r="2" /></svg></span>
-                <span className="newmenu__label">Excalidraw</span>
-              </button>
-              <div className="newmenu__rule"></div>
               <button className="newmenu__item" role="menuitem" onClick={() => open('workspace')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg></span>
                 <span className="newmenu__label">Workspace folder</span>

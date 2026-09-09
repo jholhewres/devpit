@@ -15,7 +15,6 @@ const FOLDER = 'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.
 const UPLOAD = 'M12 16V4M8 8l4-4 4 4M4 20h16'
 const COLLAPSE = 'M4 7h16M4 12h16M4 17h16'
 const REFRESH = 'M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5'
-const MORE = 'M12 12v.01M19 12v.01M5 12v.01'
 const SEARCH = 'm21 21-4.3-4.3'
 
 /* Explorer or Changes: two questions about the same tree, so one is answered
@@ -57,9 +56,6 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
           </button>
           <button className="sq26 tip" data-tip="Refresh" aria-label="Refresh" onClick={tree.reload}>
             <Icon d={REFRESH} />
-          </button>
-          <button className="sq26 tip" data-tip="More" aria-label="More">
-            <Icon d={MORE} />
           </button>
         </div>
 

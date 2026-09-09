@@ -91,7 +91,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     document.documentElement.dataset.theme = next
-    void ask(() => commands.settingsWrite(null, next))
+    void ask(() => commands.settingsWrite(null, next, null, null))
   }, [])
 
   useEffect(() => {

@@ -444,15 +444,6 @@ impl Store {
             )
             .optional()?)
     }
-
-    /// What a card has cost across every run of it.
-    pub fn card_cost(&self, card_id: &str) -> Result<f64, StoreError> {
-        Ok(self.conn.query_row(
-            "SELECT COALESCE(SUM(cost_usd), 0.0) FROM run WHERE card_id = ?1",
-            [card_id],
-            |row| row.get(0),
-        )?)
-    }
 }
 
 /// The link between a card and the agent session working on it.

@@ -19,15 +19,18 @@ mod front;
 mod happening;
 mod in_flight;
 mod listener;
+mod mcp;
 mod panes;
 mod prime;
 mod projects;
 mod pty_bridge;
+mod reveal;
 mod roots;
 mod runs;
 mod sessions;
 mod settings;
 mod steps;
+mod workspace;
 mod worktrees;
 
 fn main() {
@@ -78,6 +81,12 @@ fn main() {
             chat::chat_frames,
             chat::agent_profiles,
             chat::chat_attach,
+            mcp::mcp_list,
+            workspace::skills_list,
+            workspace::workspace_read,
+            workspace::usage_read,
+            reveal::path_open,
+            reveal::path_reveal,
             worktrees::worktree_list,
             worktrees::worktree_remove,
             worktrees::worktree_prime_read,

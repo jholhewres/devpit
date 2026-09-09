@@ -52,6 +52,11 @@ pub struct Settings {
     pub account: Option<String>,
     /// Unix seconds, or null while the first run has not been finished.
     pub onboarded_at: Option<f64>,
+    /// Null is "never asked", like telemetry. Updates default to on when the
+    /// person has not said otherwise.
+    pub automatic_updates: Option<bool>,
+    /// Whether a turn is written to disk. Null is "never asked".
+    pub keep_transcripts: Option<bool>,
 }
 
 #[cfg(test)]

@@ -91,6 +91,29 @@ export const commands = {
 	 *  than read.
 	 */
 	chatAttach: (projectId: string, path: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_attach", { projectId, path })),
+	/**  `mcp.list` — what the CLI resolved for this project. */
+	mcpList: (projectId: string | null) => typedError<Servers, RpcError>(__TAURI_INVOKE("mcp_list", { projectId })),
+	/**  `skills.list` — the skills installed on this machine. */
+	skillsList: () => typedError<Skills, RpcError>(__TAURI_INVOKE("skills_list")),
+	/**  `workspace.read` — the devpit workspace, row by row, with real sizes. */
+	workspaceRead: (projectId: string | null) => typedError<Workspace, RpcError>(__TAURI_INVOKE("workspace_read", { projectId })),
+	/**
+	 *  `usage.read` — what this project has spent, measured.
+	 * 
+	 *  Only what the runs recorded. There is no daily series and no per-model
+	 *  split because nothing records either yet, and a chart of numbers nobody
+	 *  measured is the thing this milestone exists to delete.
+	 */
+	usageRead: (projectId: string) => typedError<Spend, RpcError>(__TAURI_INVOKE("usage_read", { projectId })),
+	/**  `path.open` — opens a file or folder in whatever the desktop uses for it. */
+	pathOpen: (path: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("path_open", { path })),
+	/**
+	 *  `path.reveal` — shows a file in the file manager, selected.
+	 * 
+	 *  Different from opening it: opening a `.rs` launches an editor, and what
+	 *  was asked for was the folder with the file highlighted in it.
+	 */
+	pathReveal: (path: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("path_reveal", { path })),
 	/**
 	 *  `worktree.list` — every checkout this project's cards have, with the disk
 	 *  each one takes and the work each one is holding.
@@ -281,7 +304,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme })),
+	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, keepTranscripts: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme, automaticUpdates, keepTranscripts })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -612,6 +635,22 @@ export type Front = {
  */
 export type GitStatus = "clean" | "modified" | "added" | "deleted" | "untracked";
 
+/**  One thing the workspace holds, measured. */
+export type Held = {
+	name: string,
+	path: string,
+	/**  Bytes, measured now. */
+	bytes: number | null,
+	/**  How many things are in it, for a directory. Absent for a file. */
+	count: number | null,
+	isDir: boolean,
+	/**
+	 *  False when the workspace has not made it yet — a row that says "not
+	 *  yet" is honest; a row that says 0 B is not.
+	 */
+	exists: boolean,
+};
+
 export type LayoutNode = { type: "leaf"; id: string; 
 /**  `session:window` on our private tmux server. */
 tmuxTarget: string; kind: PaneKind; agent: AgentPresence; 
@@ -650,6 +689,14 @@ export type Note = {
 	body: string,
 	/**  Seconds since the epoch; see `Commit::committed_at` for why `f64`. */
 	createdAt: number | null,
+};
+
+export type Opened = {
+	/**
+	 *  What was handed over, resolved. The screen shows it when opening fails
+	 *  so the person can go there themselves.
+	 */
+	path: string,
 };
 
 /**  What a leaf shows. Only `terminal` in this slice. */
@@ -826,6 +873,30 @@ export type Run = {
 /**  How a run ended, or that it has not. */
 export type RunState = "running" | "ok" | "failed" | "cancelled";
 
+export type Server = {
+	name: string,
+	/**  `project` or `user` — which file names it. */
+	scope: string,
+	/**  The command or URL it is reached by, for the row's second line. */
+	reachedBy: string,
+};
+
+export type Servers = {
+	servers: Server[],
+	/**
+	 *  The files this was read from, so the panel can say whose catalogue it
+	 *  is showing.
+	 */
+	sources: string[],
+	/**
+	 *  Why nothing could be read. A panel that says why beats a panel that
+	 *  looks empty.
+	 */
+	problem: string | null,
+	/**  The command that manages them, to copy. Never run from here. */
+	manageWith: string,
+};
+
 /**  A background agent session, as the board needs to draw it. */
 export type Session = {
 	/**  What `attach`, `logs` and `stop` all take. */
@@ -864,6 +935,44 @@ export type Settings = {
 	account: string | null,
 	/**  Unix seconds, or null while the first run has not been finished. */
 	onboardedAt: number | null,
+	/**
+	 *  Null is "never asked", like telemetry. Updates default to on when the
+	 *  person has not said otherwise.
+	 */
+	automaticUpdates: boolean | null,
+	/**  Whether a turn is written to disk. Null is "never asked". */
+	keepTranscripts: boolean | null,
+};
+
+export type Skill = {
+	name: string,
+	/**  Where it came from — `omc`, `claude`, `yours`. */
+	source: string,
+	/**  The `SKILL.md` itself, so Open and Reveal have something to hand over. */
+	path: string,
+	/**  The first line of prose in the file, when there is one. */
+	description: string,
+};
+
+export type Skills = {
+	skills: Skill[],
+	/**
+	 *  Why nothing could be read, when nothing could. Present and non-empty
+	 *  means the panel says this instead of looking empty.
+	 */
+	problem: string | null,
+};
+
+/**  What a project has actually spent. */
+export type Spend = {
+	usd: number | null,
+	/**
+	 *  How many runs reported a cost. Zero means nothing has been measured,
+	 *  which the screen says rather than drawing a zero.
+	 */
+	runs: number,
+	/**  Title and cost, most expensive first. */
+	cards: ([string, number | null])[],
 };
 
 /**  Orca's names: horizontal is left/right, vertical is top/bottom. */
@@ -913,6 +1022,16 @@ export type TurnEnd = {
 	/**  The CLI's own word, kept rather than flattened into "failed". */
 	stopReason: string | null,
 	isError: boolean,
+};
+
+export type Workspace = {
+	directory: string,
+	held: Held[],
+	/**
+	 *  Everything above, added up. Worktrees and transcripts grow without
+	 *  announcing themselves.
+	 */
+	bytes: number | null,
 };
 
 /**

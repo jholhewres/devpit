@@ -14,6 +14,8 @@ pub mod key {
     pub const TELEMETRY: &str = "telemetry.enabled";
     pub const ONBOARDED_AT: &str = "onboarding.completed_at";
     pub const THEME: &str = "appearance.theme";
+    pub const AUTO_UPDATE: &str = "general.automatic_updates";
+    pub const KEEP_TRANSCRIPTS: &str = "storage.keep_transcripts";
 }
 
 fn now() -> i64 {

@@ -31,7 +31,7 @@ CI runs `setup`, `test` and `build`.
 
 ## Guards that fail the build
 
-`cargo xtask check` enforces five rules. Each reports file and line, because
+`cargo xtask check` enforces six rules. Each reports file and line, because
 "the guard failed" sends someone looking and a location sends someone fixing.
 
 | Guard | Rule |
@@ -41,10 +41,18 @@ CI runs `setup`, `test` and `build`.
 | `nothing_is_named_after_nothing` | no enum variant, command or type that nothing draws or calls |
 | `platform_window_matches_the_base` | the per-platform Tauri config cannot drift from the base |
 | `files_only_get_shorter` | every file listed in `xtask/ceilings.txt` stays under its line count |
+| `a_control_either_works_or_goes` | no `<button>` in `web/src` without a handler |
 
 The ratchet only tightens. A file over its ceiling fails, and so does a ceiling
 set higher than the file needs. After a file genuinely shrinks, regenerate with
 `cargo xtask ceilings`.
+
+**A control either works or leaves the screen.** `xtask/dead-controls.txt` is
+now empty, so the budget is zero everywhere: a button with no handler fails the
+build. A control that cannot be wired yet gets deleted, not disabled and left
+looking clickable — the markup is in git and in the prototype when it becomes
+real. `cargo xtask controls` regenerates the file and, like the ceilings, only
+ever tightens.
 
 ## Tests
 

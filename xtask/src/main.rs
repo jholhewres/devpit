@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 mod agent_boundary;
+mod dead_controls;
 mod naming;
 mod platform_window;
 mod ratchet;
@@ -24,8 +25,9 @@ fn main() -> ExitCode {
     match command.as_str() {
         "check" => check(),
         "ceilings" => ceilings(),
+        "controls" => controls(),
         other => {
-            eprintln!("unknown command: {other}\n\nusage: cargo xtask check | ceilings");
+            eprintln!("unknown command: {other}\n\nusage: cargo xtask check | ceilings | controls");
             ExitCode::FAILURE
         }
     }
@@ -45,6 +47,23 @@ fn ceilings() -> ExitCode {
     }
 }
 
+/// Rewrites the dead-control budgets from what the tree has now.
+///
+/// Tightening only, for the same reason as the ceilings: a command that can
+/// raise a budget is the way around the guard it serves.
+fn controls() -> ExitCode {
+    match dead_controls::reseed(&workspace_root()) {
+        Ok(count) => {
+            println!("dead controls: {count} left");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("could not write the budgets: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn check() -> ExitCode {
     let root = workspace_root();
     let mut findings = Vec::new();
@@ -54,6 +73,7 @@ fn check() -> ExitCode {
     findings.extend(naming::nothing_is_named_after_nothing(&root));
     findings.extend(ratchet::files_only_get_shorter(&root));
     findings.extend(agent_boundary::only_one_crate_drives_the_agent(&root));
+    findings.extend(dead_controls::a_control_either_works_or_goes(&root));
 
     if findings.is_empty() {
         println!("guards: ok");

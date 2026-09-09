@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import type { Settings as Stored } from '../gen/bindings'
+import { ask, commands } from './live'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
+import { ProviderRows } from './ProviderRows'
+import { SkillsPane } from './SkillsPane'
 import { Usage } from './Usage'
 import { Worktrees } from './Worktrees'
 
@@ -18,12 +22,29 @@ export function Settings({
   onRemove: (project: string) => void
 }): React.JSX.Element {
   const { closePrefs, openPrefs, theme, setTheme, signOut, account } = useShell()
-  const [synced, setSynced] = useState('Synced 2 minutes ago')
+  const [flags, setFlags] = useState<Stored | null>(null)
 
-  const sync = (): void => {
-    setSynced('Syncing…')
-    window.setTimeout(() => setSynced('Synced just now'), 900)
+  useEffect(() => {
+    void ask(() => commands.settingsRead()).then((answer) => setFlags(answer.data))
+  }, [])
+
+  /* Each toggle writes only its own field: the command takes null for
+     "leave this one alone", so one switch cannot overwrite another. */
+  const set = (field: 'automaticUpdates' | 'keepTranscripts' | 'telemetry', next: boolean): void => {
+    void ask(() =>
+      commands.settingsWrite(
+        field === 'telemetry' ? next : null,
+        null,
+        field === 'automaticUpdates' ? next : null,
+        field === 'keepTranscripts' ? next : null,
+      ),
+    ).then((answer) => setFlags(answer.data ?? flags))
   }
+
+  /* Null is "never asked". Updates and transcripts default to on; sharing
+     data defaults to off, because nobody opted into it. */
+  const on = (field: 'automaticUpdates' | 'keepTranscripts' | 'telemetry'): boolean =>
+    flags?.[field] ?? field !== 'telemetry'
 
   return (
     <div className="prefs" data-open="true">
@@ -49,44 +70,33 @@ export function Settings({
             <div className="acc__grid">
               <span className="acc__big">{account.initials}</span>
               <div className="acc__fields">
-                <label className="fld"><span className="fld__l">Display name</span>
-                  <span className="fld__b" contentEditable="true" role="textbox">{account.name}</span></label>
-                <label className="fld"><span className="fld__l">Handle</span>
-                  <span className="fld__b" contentEditable="true" role="textbox">jholhewres</span></label>
+                <div className="acc__t">{account.name}</div>
+                <div className="acc__d">{account.email ?? 'no address yet'}</div>
               </div>
-              <button className="acc__act">Change photo</button>
             </div>
 
-            <div className="acc__sub">Sign-in</div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.94.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.03a9.5 9.5 0 0 1 5 0c1.91-1.3 2.75-1.03 2.75-1.03.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.95.36.31.68.92.68 1.85v2.74c0 .26.18.58.69.48A10 10 0 0 0 12 2Z" /></svg><span className="acc__body">
-              <span className="acc__t">GitHub</span><span className="acc__d">jholhewres &middot; connected</span></span><span className="acc__tag">Primary</span></div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8h5a5 5 0 1 1-1.5-3" /></svg><span className="acc__body">
-              <span className="acc__t">Google</span><span className="acc__d">Not connected</span></span><button className="acc__act">Connect</button></div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg><span className="acc__body">
-              <span className="acc__t">Email</span><span className="acc__d">{account.email ?? 'no address yet'}</span></span><button className="acc__act">Change</button></div>
-
-            <div className="acc__sub">Saved to your account</div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M15 4v16" /></svg><span className="acc__body">
-              <span className="acc__t">Board columns and cards</span><span className="acc__d">Every project's board, as you left it</span></span><span className="acc__tag">On</span></div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3v6M15 3v6" /><path d="M6 9h12v3a6 6 0 0 1-12 0Z" /><path d="M12 18v3" /></svg><span className="acc__body">
-              <span className="acc__t">Capabilities you turned on</span><span className="acc__d">So a new machine starts with the same set</span></span><span className="acc__tag">On</span></div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /></svg><span className="acc__body">
-              <span className="acc__t">Appearance and shortcuts</span><span className="acc__d">Theme, sidebar widths, key bindings</span></span><span className="acc__tag">On</span></div>
-            <p className="acc__note">Projects, conversations, terminal history and files stay on
-              this computer. The account saves the workspace around them, not the work itself.</p>
-            <div className="acc__row" style={{marginTop: '8px'}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2" /><path d="M3 20v-5h5M21 4v5h-5" /></svg><span className="acc__body">
-              <span className="acc__t">Sync</span><span className="acc__d">{synced}</span></span>
-              <button className="acc__act" onClick={sync}>Sync now</button></div>
-
-            <div className="acc__sub">Devices</div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M2 20h20" /></svg><span className="acc__body">
-              <span className="acc__t">This computer</span><span className="acc__d">Ubuntu &middot; active now</span></span><span className="acc__tag">Current</span></div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 7h4M12 16v.01" /></svg><span className="acc__body">
-              <span className="acc__t">Work desktop</span><span className="acc__d">macOS &middot; 3 days ago</span></span><button className="acc__act">Sign out</button></div>
+            {/* Everything an account does needs a server, and there is not one
+                yet. The fields, the connected providers and the device list
+                were drawn from nothing; a profile showing a handle nobody
+                signed in with is worse than a panel that says "not yet". */}
+            <p className="acc__note">
+              Accounts are not live yet. When they are, signing in will save the workspace around
+              your work &mdash; board columns and cards, what you turned on, appearance and
+              shortcuts.
+            </p>
+            <p className="acc__note">
+              Projects, conversations, terminal history and files stay on this computer. The
+              account saves the workspace around them, not the work itself.
+            </p>
 
             <div className="acc__sub">Leaving</div>
-            <div className="acc__row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></svg><span className="acc__body">
-              <span className="acc__t">Sign out everywhere</span><span className="acc__d">Ends every session, including this one</span></span><button className="acc__act acc__act--danger" onClick={signOut}>Sign out</button></div>
+            <div className="acc__row">
+              <span className="acc__body">
+                <span className="acc__t">Sign out</span>
+                <span className="acc__d">Clears the signed-in state on this computer</span>
+              </span>
+              <button className="acc__act acc__act--danger" onClick={signOut}>Sign out</button>
+            </div>
           </section>
 
           <section className="prefs__in" hidden={pane !== 'projects'}>
@@ -104,11 +114,11 @@ export function Settings({
             <div className="pref">
               <span className="pref__body"><span className="pref__t">Local by default</span><span className="pref__d">Projects, conversations and settings are kept on this computer.</span></span>
             </div>
-            <button className="pref" role="switch" aria-checked="false">
+            <button className="pref" role="switch" aria-checked={on('telemetry')} onClick={() => set('telemetry', !on('telemetry'))}>
               <span className="pref__body"><span className="pref__t">Share anonymous usage data</span><span className="pref__d">Feature use and reliability only. Prompts, replies, project names and file paths are never sent.</span></span>
               <span className="sw"></span>
             </button>
-            <button className="pref" role="switch" aria-checked="true">
+            <button className="pref" role="switch" aria-checked={on('automaticUpdates')} onClick={() => set('automaticUpdates', !on('automaticUpdates'))}>
               <span className="pref__body"><span className="pref__t">Automatic updates</span><span className="pref__d">Check in the background and offer to install.</span></span>
               <span className="sw"></span>
             </button>
@@ -116,58 +126,7 @@ export function Settings({
 
           <section className="prefs__in" hidden={pane !== 'providers'}>
             <h1 className="prefs__h">Providers</h1>
-            <div className="card2">
-              <div className="card2__top">
-                <div style={{flex: '1', minWidth: '0'}}>
-                  <div className="card2__t">Coding agents</div>
-                  <div className="card2__d">devpit drives agent CLIs installed on this computer. Install or sign in with each agent&rsquo;s own CLI, then refresh.</div>
-                </div>
-                <div>
-                  <button className="card2__go"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" /></svg>Refresh</button>
-                  <div className="card2__when">Checked 3h ago</div>
-                </div>
-              </div>
-              <button className="prov" role="switch" aria-checked="true">
-                <span className="prov__ico">CC<span className="prov__dot" style={{background: 'var(--success)'}}></span></span>
-                <span className="prov__body">
-                  <span className="prov__top"><span className="prov__n">Claude Code</span><span className="prov__v">v2.1.263</span></span>
-                  <span className="prov__sub">~/.local/bin/claude · 5 models</span>
-                </span>
-                <span className="sw"></span>
-              </button>
-              <button className="prov" role="switch" aria-checked="true">
-                <span className="prov__ico">CX<span className="prov__dot" style={{background: 'var(--success)'}}></span></span>
-                <span className="prov__body">
-                  <span className="prov__top"><span className="prov__n">Codex CLI</span><span className="prov__v">v0.149.1</span></span>
-                  <span className="prov__sub">~/.local/bin/codex · 4 models</span>
-                </span>
-                <span className="sw"></span>
-              </button>
-              <div className="prov prov--off">
-                <span className="prov__ico">CU<span className="prov__dot" style={{background: 'var(--ghost)'}}></span></span>
-                <span className="prov__body">
-                  <span className="prov__top"><span className="prov__n">Cursor CLI</span></span>
-                  <span className="prov__sub">Not detected on PATH as cursor-agent</span>
-                </span>
-                <span className="prov__chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg></span>
-              </div>
-              <div className="prov prov--off">
-                <span className="prov__ico">OC<span className="prov__dot" style={{background: 'var(--ghost)'}}></span></span>
-                <span className="prov__body">
-                  <span className="prov__top"><span className="prov__n">OpenCode</span></span>
-                  <span className="prov__sub">Not detected on PATH as opencode</span>
-                </span>
-                <span className="prov__chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg></span>
-              </div>
-              <div className="prov prov--off">
-                <span className="prov__ico">AM<span className="prov__dot" style={{background: 'var(--ghost)'}}></span></span>
-                <span className="prov__body">
-                  <span className="prov__top"><span className="prov__n">Amp</span></span>
-                  <span className="prov__sub">Not detected on PATH as amp</span>
-                </span>
-                <span className="prov__chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg></span>
-              </div>
-            </div>
+            <ProviderRows />
           </section>
 
           <section className="prefs__in" hidden={pane !== 'storage'}>
@@ -175,8 +134,8 @@ export function Settings({
             <div className="pref">
               <span className="pref__body"><span className="pref__t">Workspace directory</span><span className="pref__d">Each project gets one, holding its board, skills, capabilities, transcripts and worktrees. None of it is in the repository.<br /><code>~/.devpit/workspaces/devpit</code></span></span>
             </div>
-            <button className="pref" role="switch" aria-checked="true">
-              <span className="pref__body"><span className="pref__t">Keep transcripts</span><span className="pref__d">Every turn is written to disk so a session survives a restart.</span></span>
+            <button className="pref" role="switch" aria-checked={on('keepTranscripts')} onClick={() => set('keepTranscripts', !on('keepTranscripts'))}>
+              <span className="pref__body"><span className="pref__t">Keep transcripts</span><span className="pref__d">Every turn is written to disk so a session survives a restart. Turning this off leaves the ones already written where they are &mdash; nothing is deleted.</span></span>
               <span className="sw"></span>
             </button>
           </section>
@@ -213,104 +172,7 @@ export function Settings({
           </section>
 
           <section className="prefs__in prefs__in--wide" hidden={pane !== 'skills'}>
-            <div className="sk">
-              <div className="sk__list">
-                <div className="sk__find"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>Search skills…</div>
-                <div className="sk__pick"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg>All providers<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></div>
-                <div className="sk__h">Workspace <span>8</span></div>
-                <div className="sk__rows">
-                <button className="skrow">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">planner</span><span className="skrow__d">Reads the card, asks what is missing, writes the plan back</span></span>
-                </button>
-                <button className="skrow">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">executor</span><span className="skrow__d">Takes the plan and writes the code in the card&rsquo;s worktree</span></span>
-                </button>
-                <button className="skrow" aria-current="true">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">reviewer</span><span className="skrow__d">Reads the diff against the plan; reports, never edits</span></span>
-                </button>
-                <button className="skrow">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">test-runner</span><span className="skrow__d">Runs the project&rsquo;s own test command, attaches the output</span></span>
-                </button>
-                <button className="skrow">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">summariser</span><span className="skrow__d">Condenses a long session into what the next one needs</span></span>
-                </button>
-                <button className="skrow">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">brancher</span><span className="skrow__d">Names and opens the worktree a card runs in</span></span>
-                </button>
-                <button className="skrow">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">committer</span><span className="skrow__d">Writes the message from the diff and the card</span></span>
-                </button>
-                <button className="skrow">
-                  <span className="skrow__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <span className="skrow__b"><span className="skrow__n">triager</span><span className="skrow__d">Sorts an inbox card into a lane, or asks why it cannot</span></span>
-                </button>
-                </div>
-                <div className="sk__foot">8 of 8 shown</div>
-              </div>
-
-              <div className="sk__doc">
-                <div className="sk__top">
-                  <span className="sk__mark"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
-                  <div style={{flex: '1', minWidth: '0'}}>
-                    <div className="sk__name">reviewer</div>
-                    <div className="sk__from">Claude Code · runs when a card lands in Check</div>
-                  </div>
-                  <button className="sksw" role="switch" aria-checked="true" aria-label="Enabled">
-                    <span className="sw"></span>
-                  </button>
-                </div>
-
-                <p className="sk__what">Reads the diff a card produced against the plan that card carries, and reports what it cannot verify. It never edits: a reviewer that fixes what it finds has no independent reading left to give.</p>
-
-                <dl className="facts2">
-                  <dt>Invoke</dt><dd>/reviewer</dd>
-                  <dt>Lane</dt><dd>Check</dd>
-                  <dt>Model</dt><dd>claude-opus-5</dd>
-                  <dt>Tools</dt><dd>Read, Grep, Bash</dd>
-                  <dt>Contents</dt><dd>4.2 kB</dd>
-                  <dt>Updated</dt><dd>2 days ago</dd>
-                </dl>
-
-                <div className="sk__acts">
-              <button className="btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>Open SKILL.md</button>
-              <button className="btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>Show in the finder</button>
-              <button className="btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Copy path</button>
-                </div>
-
-                <div className="sk__file">SKILL.md</div>
-                <h2>Reviewer</h2>
-                <p>Reads a finished card and answers one question: <em>does the diff do what the plan said, and what in it cannot be checked from here?</em></p>
-
-                <h3>When it runs</h3>
-                <ul>
-                  <li>A card is dropped into <b>Check</b>.</li>
-                  <li>Someone asks for it by name in a chat.</li>
-                </ul>
-
-                <h3>What it may not do</h3>
-                <ul>
-                  <li>Edit a file. If the fix is obvious, it says so and stops.</li>
-                  <li>Move the card. Passing review is not the same as shipping.</li>
-                  <li>Run anything that writes — tests are the test-runner&rsquo;s job.</li>
-                </ul>
-
-                <h3>What a report has to contain</h3>
-                <ul>
-                  <li>Every claim in the plan, marked verified, unverified, or contradicted.</li>
-                  <li>For each unverified one, what would settle it.</li>
-                  <li>Nothing about style unless the project&rsquo;s own guard would have caught it.</li>
-                </ul>
-
-                <p>A review that only says &ldquo;looks good&rdquo; is a review that was not read. If there is genuinely nothing to raise, say which claims were checked and how.</p>
-              </div>
-            </div>
+            <SkillsPane />
           </section>
           <section className="prefs__in prefs__in--wide" hidden={pane !== 'usage'}>
             <Usage />
