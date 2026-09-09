@@ -40,14 +40,11 @@ function Window(): React.JSX.Element {
   const [signIn, setSignIn] = useState(false)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
-  const [openFile, setOpenFile] = useState<string | null>(null)
-
   /* Opening a file is the same act wherever it was clicked: the tree on the
-     right, the Files pane, or the palette. */
-  const openInTab = (path: string): void => {
-    setOpenFile(path)
-    shell.show('file')
-  }
+     right, the Files pane, or the palette. The id is the path, so the same
+     file twice lands on the tab you already have. */
+  const openInTab = (path: string): void =>
+    shell.show('file', { id: `file:${path}`, path, title: path.split('/').pop() })
   const [maximized, setMaximized] = useState(false)
 
   /* Maximised, the rounded corners square off — a rounded rectangle floating
@@ -103,7 +100,7 @@ function Window(): React.JSX.Element {
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
         <Sidebar onSearch={() => setPalette(true)} onSignIn={() => setSignIn(true)} />
-        <Panes openFile={openFile} onOpenFile={openInTab} />
+        <Panes onOpenFile={openInTab} />
         <RightPanel onOpenFile={openInTab} />
       </div>
 

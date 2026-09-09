@@ -9,7 +9,6 @@ apps/desktop/src/chat.rs 350
 apps/desktop/src/claims.rs 200
 apps/desktop/src/contract.rs 150
 apps/desktop/src/files.rs 150
-apps/desktop/src/files_tests.rs 150
 apps/desktop/src/listener.rs 150
 apps/desktop/src/main.rs 150
 apps/desktop/src/mcp.rs 150
@@ -64,6 +63,8 @@ crates/tmux/src/lib.rs 250
 web/src/shell/AppShell.tsx 150
 web/src/shell/BoardPane.tsx 200
 web/src/shell/ChatPane.tsx 200
+web/src/shell/FilePane.tsx 150
+web/src/shell/Markdown.tsx 200
 web/src/shell/Onboarding.tsx 150
 web/src/shell/Palette.tsx 150
 web/src/shell/Panes.tsx 150

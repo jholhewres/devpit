@@ -7,7 +7,12 @@
 
 use std::path::Path;
 
-use devpit_rpc::{ErrorCode, FileContents, FileSaved, RpcError};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
+
+use devpit_rpc::{ErrorCode, FileContents, FileKind, RpcError};
+
+use crate::kinds::{kind_of, media_type};
 
 use crate::roots::root_of;
 
@@ -17,7 +22,7 @@ use crate::roots::root_of;
 /// in an editor is a file about to be saved with the other half gone.
 const MOST_BYTES: u64 = 2 * 1024 * 1024;
 
-fn modified(path: &Path) -> f64 {
+pub(crate) fn modified(path: &Path) -> f64 {
     std::fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
@@ -43,6 +48,12 @@ fn past_the_ceiling(path: &str, bytes: u64) -> Option<String> {
     ))
 }
 
+/// The most a picture or a PDF may be to travel inline.
+///
+/// Smaller than the text ceiling on purpose: a data URL is a third bigger
+/// than the bytes it carries, and it crosses the IPC boundary as a string.
+const MOST_MEDIA_BYTES: u64 = 8 * 1024 * 1024;
+
 /// `file.read` — the text of a file, or why it is not text.
 #[tauri::command]
 #[specta::specta]
@@ -59,77 +70,57 @@ pub fn file_read(
         .map(|meta| meta.len())
         .unwrap_or_default();
 
-    let not_shown = past_the_ceiling(&path, bytes);
+    let raw = match std::fs::read(&resolved) {
+        Ok(raw) => raw,
+        Err(err) => return Err(RpcError::internal(err.to_string())),
+    };
+    let head = &raw[..raw.len().min(512)];
+    let kind = kind_of(&path, head);
 
-    let text = match not_shown {
-        Some(_) => None,
-        None => match std::fs::read(&resolved) {
+    let mut not_shown = past_the_ceiling(&path, bytes);
+    let mut text = None;
+    let mut data_url = None;
+
+    match kind {
+        FileKind::Image | FileKind::Pdf if not_shown.is_none() => {
+            if bytes > MOST_MEDIA_BYTES {
+                not_shown = Some(format!(
+                    "{path} is {:.1} MB — past the {} MB this draws",
+                    bytes as f64 / 1_048_576.0,
+                    MOST_MEDIA_BYTES / 1_048_576
+                ));
+            } else {
+                data_url = Some(format!(
+                    "data:{};base64,{}",
+                    media_type(&path, kind, head),
+                    BASE64.encode(&raw)
+                ));
+            }
+        }
+        FileKind::Binary => {
+            not_shown = not_shown.or_else(|| Some(format!("{path} is not text")));
+        }
+        _ if not_shown.is_none() => {
             // Refused rather than rendered: a megabyte of bytes drawn as
             // replacement characters is worse than a sentence saying it is not
             // text, and saving it back would corrupt the file.
-            Ok(raw) => String::from_utf8(raw).ok(),
-            Err(err) => return Err(RpcError::internal(err.to_string())),
-        },
-    };
-
-    let not_shown = match (&text, not_shown) {
-        (None, None) => Some(format!("{path} is not text")),
-        (_, given) => given,
-    };
+            text = String::from_utf8(raw).ok();
+            if text.is_none() {
+                not_shown = Some(format!("{path} is not text"));
+            }
+        }
+        _ => {}
+    }
 
     Ok(FileContents {
+        full_path: resolved.display().to_string(),
+        read_at: modified(&resolved),
         path,
         text,
         not_shown,
         bytes: bytes as f64,
-        read_at: modified(&resolved),
-    })
-}
-
-/// Whether a save is built on a read the file has moved on from.
-///
-/// A function of its own so the test calls the rule rather than a copy of it:
-/// the first version of these tests re-stated the comparison, which meant a
-/// change to the rule left them green.
-///
-/// A file with no recorded mtime on either side is saveable — refusing there
-/// would make a new file unsaveable, which is not what this protects.
-fn is_stale(read_at: f64, on_disk: f64) -> bool {
-    read_at > 0.0 && on_disk > 0.0 && (on_disk - read_at).abs() > 1.0
-}
-
-/// `file.write` — saves, and refuses to overwrite a change it never saw.
-///
-/// `read_at` is the mtime the editor was handed. If the file has moved on
-/// since, the save is refused: silently winning that race is how someone
-/// loses work they did in another window.
-#[tauri::command]
-#[specta::specta]
-pub fn file_write(
-    project_id: String,
-    worktree_id: Option<String>,
-    path: String,
-    text: String,
-    read_at: f64,
-) -> Result<FileSaved, RpcError> {
-    let root = root_of(&project_id, worktree_id.as_deref())?;
-    let resolved = devpit_core::tree::resolve(&root, &path)
-        .map_err(|err| RpcError::new(ErrorCode::Forbidden, err.to_string()))?;
-
-    if is_stale(read_at, modified(&resolved)) {
-        return Err(RpcError::new(
-            ErrorCode::Conflict,
-            format!("{path} changed on disk since it was opened — reopen it first"),
-        ));
-    }
-
-    std::fs::write(&resolved, text.as_bytes())
-        .map_err(|err| RpcError::internal(err.to_string()))?;
-
-    Ok(FileSaved {
-        bytes: text.len() as f64,
-        read_at: modified(&resolved),
-        path,
+        kind,
+        data_url,
     })
 }
 

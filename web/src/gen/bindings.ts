@@ -575,7 +575,20 @@ export type FileContents = {
 	 *  overwrite a change it never saw.
 	 */
 	readAt: number | null,
+	kind: FileKind,
+	/**
+	 *  The bytes, as a `data:` URL, for an image or a PDF small enough to
+	 *  carry. Absent for everything else — text goes in `text`.
+	 */
+	dataUrl: string | null,
+	/**  The absolute path, for revealing in the file manager. Never drawn. */
+	fullPath: string,
 };
+
+/**  What a file is, so the screen knows what to draw rather than guessing. */
+export type FileKind = "text" | "markdown" | "image" | "pdf" | 
+/**  Nothing this window can draw. The screen says which type and how big. */
+"binary";
 
 /**
  *  One entry of the file tree.

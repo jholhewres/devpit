@@ -654,6 +654,7 @@ dependencies = [
 name = "devpit-desktop"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "devpit-agentcli",
  "devpit-core",
  "devpit-git",

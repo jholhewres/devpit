@@ -14,6 +14,8 @@ export interface Tab {
   readonly title?: string
   /** The backend leaf a terminal is attached to. */
   readonly paneId?: string
+  /** The file a `file` tab is showing, relative to the project root. */
+  readonly path?: string
 }
 
 export interface Strip {
@@ -22,11 +24,17 @@ export interface Strip {
 }
 
 /** Kinds you can have several of. Everything else focuses what is open. */
-const MANY: ReadonlySet<PaneName> = new Set<PaneName>(['term', 'chat'])
+const MANY: ReadonlySet<PaneName> = new Set<PaneName>(['term', 'chat', 'file'])
 
 export const many = (kind: PaneName): boolean => MANY.has(kind)
 
 export function opened(strip: Strip, tab: Tab): Strip {
+  /* An id that is already open focuses it. A file tab's id is its path, so
+     opening the same file twice lands on the tab you already have rather than
+     giving you two views of one file that can disagree. */
+  const same = strip.open.find((other) => other.id === tab.id)
+  if (same) return { ...strip, active: same.id }
+
   if (!many(tab.kind)) {
     const already = strip.open.find((other) => other.kind === tab.kind)
     /* Appended, never moved: a tab keeps the place it was given. */

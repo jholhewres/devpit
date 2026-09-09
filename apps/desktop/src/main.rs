@@ -18,6 +18,7 @@ mod files;
 mod front;
 mod happening;
 mod in_flight;
+mod kinds;
 mod listener;
 mod mcp;
 mod panes;
@@ -27,6 +28,7 @@ mod pty_bridge;
 mod reveal;
 mod roots;
 mod runs;
+mod saves;
 mod sessions;
 mod settings;
 mod steps;
@@ -106,7 +108,7 @@ fn main() {
             board::card_update,
             board::card_move,
             files::file_read,
-            files::file_write,
+            saves::file_write,
             diffs::file_diff,
             in_flight::run_cancel,
             front::card_archive,

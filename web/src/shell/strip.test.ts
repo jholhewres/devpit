@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { closed, focused, many, moved, opened, renamed, type Strip, type Tab } from './strip'
+import { empty } from './tabs'
 
 const tab = (id: string, kind = 'term'): Tab => ({ id, kind: kind as Tab['kind'] })
 const strip = (tabs: Tab[], active: string | null = tabs[0]?.id ?? null): Strip =>
@@ -76,5 +77,23 @@ describe('what a tab says', () => {
 
   it('names the one you are looking at', () => {
     expect(focused(strip([tab('a'), tab('b')], 'b'))?.id).toBe('b')
+  })
+})
+
+describe('a file is one tab', () => {
+  const file = (path: string): Tab => ({ id: `file:${path}`, kind: 'file', path })
+
+  it('opens a second file beside the first', () => {
+    const one = opened(empty, file('a.rs'))
+    const two = opened(one, file('b.rs'))
+    expect(two.open).toHaveLength(2)
+    expect(two.active).toBe('file:b.rs')
+  })
+
+  it('focuses the tab it already has rather than opening the file twice', () => {
+    const one = opened(opened(empty, file('a.rs')), file('b.rs'))
+    const again = opened(one, file('a.rs'))
+    expect(again.open).toHaveLength(2)
+    expect(again.active).toBe('file:a.rs')
   })
 })

@@ -9,6 +9,7 @@ use tauri_specta::{collect_commands, Builder};
 use crate::chat;
 use crate::mcp;
 use crate::reveal;
+use crate::saves;
 use crate::workspace;
 use crate::worktrees;
 use crate::{
@@ -67,7 +68,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         board::card_update,
         board::card_move,
         files::file_read,
-        files::file_write,
+        saves::file_write,
         diffs::file_diff,
         in_flight::run_cancel,
         front::card_archive,

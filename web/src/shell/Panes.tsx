@@ -19,10 +19,8 @@ import { useShell } from './useShell'
  */
 
 export function Panes({
-  openFile,
   onOpenFile,
 }: {
-  openFile: string | null
   onOpenFile: (path: string) => void
 }): React.JSX.Element {
   const { open, active, show, close, project } = useShell()
@@ -98,8 +96,19 @@ export function Panes({
                 </div>
               ))}
 
-            {/* A file, open in the middle */}
-            <FilePane path={openFile} show={active?.kind === 'file'} />
+            {/* A file, one pane per tab */}
+            {open
+              .filter((tab) => tab.kind === 'file')
+              .map((tab) => (
+                <div
+                  key={tab.id}
+                  className="pane pane--file"
+                  data-pane="file"
+                  data-show={String(active?.id === tab.id)}
+                >
+                  <FilePane tab={tab} />
+                </div>
+              ))}
 
             {/* Terminal */}
             {open
