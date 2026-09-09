@@ -14,7 +14,9 @@
 .app[data-max='true'] { border-radius: 0; border-color: transparent; }
 
 /* Invisible, and only the cursor says they are there — which is what a window
-   edge does. Corners are drawn after the edges so they win the overlap.
+   edge does. Fixed rather than absolute: these sit on the window boundary and
+   must not be clipped away by the rounded corner.
+   Corners are drawn after the edges so they win the overlap.
    
    Below the overlays on purpose: a sheet covering the window has to cover the
    edges too, or a drag near the border of a dialog resizes the window instead
@@ -82,7 +84,7 @@
    A modal rather than a pane: opening a card is a detour you come back
    from, and giving it a column would push the board off screen for
    something you close in ten seconds. */
-.scrim { position: fixed; inset: 0; z-index: 300; background: var(--scrim); display: flex; align-items: center; justify-content: center; padding: 32px; animation: fade 140ms ease-out both; }
+.scrim { position: absolute; inset: 0; z-index: 300; background: var(--scrim); display: flex; align-items: center; justify-content: center; padding: 32px; animation: fade 140ms ease-out both; }
 .scrim[hidden] { display: none; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
@@ -317,7 +319,7 @@ body[data-account='out'] .acct { display: none; }
 /* Search: one field over everything, because the thing you are looking for
    might be a session, a card, a file or a command, and you do not know
    which before you start typing. */
-.cmd { position: fixed; inset: 0; z-index: 420; display: none; justify-content: center; padding-top: 12vh; background: var(--scrim); }
+.cmd { position: absolute; inset: 0; z-index: 420; display: none; justify-content: center; padding-top: 12vh; background: var(--scrim); }
 .cmd[data-open='true'] { display: flex; animation: fade-in 120ms ease both; }
 .cmd__box { width: 560px; max-width: calc(100vw - 40px); max-height: 60vh; display: flex; flex-direction: column; border-radius: 14px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 30px 80px var(--shade-deep); overflow: hidden; animation: pop-in 150ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .cmd__q { flex: none; height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border); }
@@ -375,7 +377,7 @@ body[data-account='out'] .acct { display: none; }
 /* Confirming something that cannot be undone. The body says what the
    word actually does, because "remove" and "delete" are the same word
    to most people and only one of them is true here. */
-.ask { position: fixed; inset: 0; z-index: 460; display: none; align-items: center; justify-content: center; background: var(--scrim); }
+.ask { position: absolute; inset: 0; z-index: 460; display: none; align-items: center; justify-content: center; background: var(--scrim); }
 .ask[data-open='true'] { display: flex; animation: fade-in 130ms ease both; }
 .ask__box { width: 400px; padding: 22px 22px 18px; border-radius: 16px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 30px 80px var(--shade-deep); animation: pop-in 160ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .ask__t { margin: 0 0 8px; font-size: 15px; font-weight: 560; color: var(--text); }
@@ -397,7 +399,7 @@ body[data-account='out'] .acct { display: none; }
 
 /* The sign-in sheet. Nothing is collected here in the prototype — the
    three buttons stand in for the identity providers. */
-.auth { position: fixed; inset: 0; z-index: 400; display: none; align-items: center; justify-content: center; background: var(--scrim); }
+.auth { position: absolute; inset: 0; z-index: 400; display: none; align-items: center; justify-content: center; background: var(--scrim); }
 .auth[data-open='true'] { display: flex; animation: fade-in 140ms ease both; }
 .auth__box { position: relative; width: 348px; padding: 28px 26px 22px; border-radius: 18px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 30px 80px var(--shade-deep); display: flex; flex-direction: column; align-items: center; animation: pop-in 170ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .auth__mark { width: 56px; height: 56px; border-radius: 17px; overflow: hidden; box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 24%, transparent); }
@@ -548,7 +550,7 @@ body[data-account='out'] .acct { display: none; }
    A full takeover rather than a pane: settings are not work you do
    beside the work, and giving them a column would invite fiddling with
    the machine while an agent is mid-turn behind it. */
-.prefs { position: fixed; inset: 0; z-index: 350; display: none; background: var(--canvas); }
+.prefs { position: absolute; inset: 0; z-index: 350; display: none; background: var(--canvas); }
 .prefs[data-open='true'] { display: grid; grid-template-columns: 240px 1fr; animation: pane-in 160ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 
 .prefs__side { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); padding: 10px; }
@@ -1145,7 +1147,7 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 
 /* The first run, and the empty state. One screen, because they are one
    situation: devpit with no project has nothing to show. */
-.onb { position: fixed; inset: 0; z-index: 480; display: flex; align-items: center; justify-content: center; background: var(--canvas); animation: fade-in 180ms ease both; }
+.onb { position: absolute; inset: 0; z-index: 380; display: flex; align-items: center; justify-content: center; background: var(--canvas); animation: fade-in 180ms ease both; }
 .onb__box { width: 460px; max-width: calc(100vw - 48px); display: flex; flex-direction: column; align-items: center; text-align: center; }
 /* The mark's corners are in the file. Clipping it again to a different
    radius cuts a second, mismatched edge just inside the first. */

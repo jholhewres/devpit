@@ -73,7 +73,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [{ open, active }, setStrip] = useState<Strip>({ open: ['board'], active: 'board' })
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
-  const [theme, setThemeState] = useState<Theme>('dark')
+  const [theme, setThemeState] = useState<Theme>('system')
   const [signedIn, setSignedIn] = useState(false)
   const [account, setAccount] = useState<Who>(who(null))
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
@@ -93,6 +93,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   }, [])
 
   useEffect(() => {
+    document.documentElement.dataset.theme = theme
     void ask(() => commands.settingsRead()).then((asked) => {
       if (!asked.data) return
       setThemeState(asked.data.theme)
