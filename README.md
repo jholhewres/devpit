@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/devpit-mascot.png" alt="devpit" width="150">
+</p>
+
 # devpit
 
 A desktop workspace for working with coding agents.
