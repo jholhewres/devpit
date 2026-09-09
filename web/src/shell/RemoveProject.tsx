@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { PROJECTS } from '../mock/data'
+import { useShell } from './useShell'
 
 /*
  * "Remove" and "delete" are the same word to most people, and only one of them
@@ -17,7 +17,10 @@ export function RemoveProject({
   onConfirm: () => void
 }): React.JSX.Element {
   const [wipe, setWipe] = useState(false)
-  const live = PROJECTS.find((row) => row.name === project)?.live ?? 0
+  const { projects } = useShell()
+  const row = projects.find((other) => other.id === project)
+  const name = row?.name ?? project
+  const live = row?.worktrees.length ?? 0
 
   return (
     <div
@@ -26,7 +29,7 @@ export function RemoveProject({
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
       <div className="ask__box" role="dialog" aria-modal="true" aria-labelledby="askT">
-        <h2 className="ask__t" id="askT">Remove &ldquo;{project}&rdquo;?</h2>
+        <h2 className="ask__t" id="askT">Remove &ldquo;{name}&rdquo;?</h2>
         <p className="ask__d">
           devpit stops listing this project. <b>The folder stays on disk</b> &mdash; your code,
           your git history and your worktrees are not touched.
@@ -38,8 +41,8 @@ export function RemoveProject({
             <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
           </svg>
           <span>
-            {live} session{live === 1 ? '' : 's'} running in it. Removing stops{' '}
-            {live === 1 ? 'it' : 'them'}.
+            {live} worktree{live === 1 ? '' : 's'} in it. Removing leaves{' '}
+            {live === 1 ? 'it' : 'them'} on disk.
           </span>
         </div>
 

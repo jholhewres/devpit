@@ -1,22 +1,21 @@
-/*
- * What removing a project does to the list, and to where you are standing.
- *
- * A function rather than lines inside the hook, so the test can call it: the
- * case that matters is removing the project you are *in*, and a test that
- * restates "it lands on another one" passes whether or not the window still
- * does that.
- */
+import type { Project } from '../gen/bindings'
+
+/* What removing a project does to the list and to where you are standing.
+   A function, so the test calls the rule instead of restating it. */
 export interface Open {
-  readonly projects: readonly string[]
-  readonly current: string
+  readonly projects: readonly Project[]
+  readonly current: string | null
 }
 
-export function forgotten(open: Open, name: string): Open {
-  const projects = open.projects.filter((other) => other !== name)
+export function forgotten(open: Open, id: string): Open {
+  const projects = open.projects.filter((other) => other.id !== id)
   return {
     projects,
-    /* Removing the ground you are standing on has to land somewhere, or the
-       window keeps naming a project that is no longer listed. */
-    current: open.current === name ? (projects[0] ?? '') : open.current,
+    /* Removing the ground you stand on has to land somewhere, or the window
+       keeps naming a project that is no longer listed. */
+    current: open.current === id ? (projects[0]?.id ?? null) : open.current,
   }
 }
+
+export const found = (open: Open): Project | null =>
+  open.projects.find((project) => project.id === open.current) ?? null

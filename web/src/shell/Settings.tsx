@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { ACCOUNT } from '../mock/data'
+import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 
 /* Settings takes the window. Back and Escape leave; the gear and every
@@ -15,7 +16,7 @@ export function Settings({
   onAddProject: () => void
   onRemove: (project: string) => void
 }): React.JSX.Element {
-  const { closePrefs, openPrefs, theme, setTheme, project, setProject, projects, signOut } = useShell()
+  const { closePrefs, openPrefs, theme, setTheme, signOut } = useShell()
   const [synced, setSynced] = useState('Synced 2 minutes ago')
 
   const sync = (): void => {
@@ -91,56 +92,7 @@ export function Settings({
               <h1 className="prefs__h">Projects</h1>
               <button className="btn btn--go" onClick={onAddProject}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>Add project</button>
             </div>
-            <div className="pj" data-live="2" hidden={!projects.includes('devpit')}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-              <span className="pj__b">
-                <span className="pj__n">devpit</span>
-                <span className="pj__p">~/Workspace/private/devpit</span>
-              </span>
-              <span className="pj__live" data-live="2"><span className="prow__dot"></span>2 running</span>
-              <span className="pj__when">open now</span>
-              <span className="pj__acts"><button className="btn" onClick={() => onRemove('devpit')}>Remove</button></span>
-            </div>
-            <div className="pj" data-live="0" hidden={!projects.includes('orca')}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-              <span className="pj__b">
-                <span className="pj__n">orca</span>
-                <span className="pj__p">~/Workspace/private/sources/orca</span>
-              </span>
-              <span className="pj__live" data-live="0"><span className="prow__dot"></span>0 running</span>
-              <span className="pj__when">yesterday</span>
-              <span className="pj__acts"><button className="btn" hidden={project === 'orca'} onClick={() => setProject('orca')}>Open</button><button className="btn" onClick={() => onRemove('orca')}>Remove</button></span>
-            </div>
-            <div className="pj" data-live="1" hidden={!projects.includes('anchored')}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-              <span className="pj__b">
-                <span className="pj__n">anchored</span>
-                <span className="pj__p">~/Workspace/private/anchored</span>
-              </span>
-              <span className="pj__live" data-live="1"><span className="prow__dot"></span>1 running</span>
-              <span className="pj__when">2 days ago</span>
-              <span className="pj__acts"><button className="btn" hidden={project === 'anchored'} onClick={() => setProject('anchored')}>Open</button><button className="btn" onClick={() => onRemove('anchored')}>Remove</button></span>
-            </div>
-            <div className="pj" data-live="0" hidden={!projects.includes('waku')}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-              <span className="pj__b">
-                <span className="pj__n">waku</span>
-                <span className="pj__p">~/Workspace/private/sources/waku</span>
-              </span>
-              <span className="pj__live" data-live="0"><span className="prow__dot"></span>0 running</span>
-              <span className="pj__when">5 days ago</span>
-              <span className="pj__acts"><button className="btn" hidden={project === 'waku'} onClick={() => setProject('waku')}>Open</button><button className="btn" onClick={() => onRemove('waku')}>Remove</button></span>
-            </div>
-            <div className="pj" data-live="0" hidden={!projects.includes('hg-portal')}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-              <span className="pj__b">
-                <span className="pj__n">hg-portal</span>
-                <span className="pj__p">~/HostGator/portal</span>
-              </span>
-              <span className="pj__live" data-live="0"><span className="prow__dot"></span>0 running</span>
-              <span className="pj__when">3 weeks ago</span>
-              <span className="pj__acts"><button className="btn" hidden={project === 'hg-portal'} onClick={() => setProject('hg-portal')}>Open</button><button className="btn" onClick={() => onRemove('hg-portal')}>Remove</button></span>
-            </div>
+        <ProjectRows onRemove={onRemove} />
             <p className="acc__note">Removing a project takes it out of devpit. The folder, the git
               repository and your code are never touched &mdash; devpit only forgets where it was.</p>
           </section>

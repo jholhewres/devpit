@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { PROJECTS } from '../mock/data'
 import { useShell } from './useShell'
 
 const Search = (): React.JSX.Element => (
@@ -26,7 +25,7 @@ const Tick = (): React.JSX.Element => (
  * not stop it. No other project switcher has to carry that; this one does.
  */
 export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Element {
-  const { project, setProject, projects } = useShell()
+  const { project, setProject, projects, projectsError } = useShell()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const field = useRef<HTMLInputElement>(null)
@@ -49,10 +48,8 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
     }
   }, [open])
 
-  const listed = PROJECTS.filter(
-    (row) =>
-      projects.includes(row.name) &&
-      `${row.name} ${row.path}`.toLowerCase().includes(query.trim().toLowerCase()),
+  const listed = projects.filter((row) =>
+    `${row.name} ${row.rootPath}`.toLowerCase().includes(query.trim().toLowerCase()),
   )
 
   return (
@@ -68,7 +65,7 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
           setOpen((was) => !was)
         }}
       >
-        <span className="pick__name">{project}</span>
+        <span className="pick__name">{project?.name ?? 'No project'}</span>
         <span className="pick__chev">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m8 9 4-4 4 4M8 15l4 4 4-4" />
@@ -95,27 +92,32 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
           {listed.length > 0 && <div className="pickpop__g">Projects</div>}
           {listed.map((row) => (
             <button
-              key={row.name}
+              key={row.id}
               className="prow"
               onClick={() => {
-                setProject(row.name)
+                setProject(row.id)
                 setOpen(false)
               }}
             >
-              <span className="prow__tick" data-on={String(row.name === project)}>
+              <span className="prow__tick" data-on={String(row.id === project?.id)}>
                 <Tick />
               </span>
               <span className="prow__b">
                 <span className="prow__n">{row.name}</span>
-                <span className="prow__p">{row.path}</span>
+                <span className="prow__p">{row.unreadable ?? row.rootPath}</span>
               </span>
-              <span className="prow__live" data-live={row.live}>
+              {/* A repository that cannot be read stays listed and says so;
+                  dropping it out would read as never having been added. */}
+              <span className="prow__live" data-live={row.unreadable ? 1 : row.worktrees.length}>
                 <span className="prow__dot" />
-                {row.live} running
+                {row.unreadable ? 'unreadable' : `${row.worktrees.length} worktrees`}
               </span>
             </button>
           ))}
-          {listed.length === 0 && <div className="pickpop__none">No project by that name.</div>}
+          {projectsError && <div className="pickpop__none">{projectsError}</div>}
+          {!projectsError && listed.length === 0 && (
+            <div className="pickpop__none">No project by that name.</div>
+          )}
 
           <div className="pickpop__sep" />
           <button

@@ -20,7 +20,7 @@ export function Panes(): React.JSX.Element {
           <div className="panes" data-empty={String(open.length === 0)}>
             <div className="blank">
               <span className="blank__mark"><img className="mark" alt="" src={mark} /></span>
-              <div className="blank__name">{project}</div>
+              <div className="blank__name">{project?.name ?? 'devpit'}</div>
               <div className="blank__sub">Nothing open. Pick something on the left, or start here.</div>
               <div className="blank__keys">
                 <button className="blank__k" onClick={() => show('chat')}>
