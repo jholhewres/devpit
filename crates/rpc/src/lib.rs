@@ -15,6 +15,7 @@ pub mod front;
 pub mod project;
 pub mod session;
 pub mod session_status;
+pub mod session_tree;
 pub mod settings;
 
 pub use agents::{Agent, Agents, RejectedAgent};
@@ -26,7 +27,7 @@ pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
     ProjectList, ProjectNotes, ProjectTree, Worktree,
 };
-pub use session::{AgentPresence, LayoutNode, PaneKind, SessionLayout, SplitDirection};
+pub use session::{AgentPresence, LayoutNode, PaneKind, PaneSize, SessionLayout, SplitDirection};
 pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
 

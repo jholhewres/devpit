@@ -144,10 +144,56 @@ export const commands = {
 	sessionFocus: (projectId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_focus", { projectId, leafId })),
 	/**  `session.split` — a new tmux window and a split node in the tree. */
 	sessionSplit: (projectId: string, leafId: string, direction: SplitDirection, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_split", { projectId, leafId, direction, worktreeId })),
-	/**  `session.write` — bytes into the attached client of a leaf. */
-	sessionWrite: (paneId: string, data: string) => typedError<null, RpcError>(__TAURI_INVOKE("session_write", { paneId, data })),
-	/**  `session.resize` — the pty size of an attached leaf. */
-	sessionResize: (paneId: string, rows: number, cols: number) => typedError<null, RpcError>(__TAURI_INVOKE("session_resize", { paneId, rows, cols })),
+	/**
+	 *  `session.close_leaf` — the pane goes, and its tmux window with it.
+	 * 
+	 *  The hole this fills: `session.split` could only ever add. A tree that only
+	 *  grows is a leak wearing a layout's clothes.
+	 * 
+	 *  Refuses the last pane. A session with no pane is not a layout, and the
+	 *  refusal says so rather than persisting an empty tree the screen cannot draw.
+	 */
+	sessionCloseLeaf: (projectId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_close_leaf", { projectId, leafId })),
+	/**
+	 *  `session.rename_leaf` — the name the person gave this pane.
+	 * 
+	 *  An empty name clears it, which is how a pane goes back to showing what the
+	 *  program running in it calls itself. The person's name always wins over the
+	 *  program's: a title escape arriving later must not undo a rename.
+	 */
+	sessionRenameLeaf: (projectId: string, leafId: string, name: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_rename_leaf", { projectId, leafId, name })),
+	/**
+	 *  `session.set_ratio` — where a boundary was dragged to.
+	 * 
+	 *  Persisted because Orca's rule is the right one: boundaries stay where you
+	 *  put them, and resizing the window does not shuffle a layout someone
+	 *  arranged. The tree clamps, so neither side can be dragged out of reach.
+	 */
+	sessionSetRatio: (projectId: string, splitId: string, ratio: number | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_set_ratio", { projectId, splitId, ratio })),
+	/**
+	 *  `session.write` — bytes into the attached client of a leaf.
+	 * 
+	 *  The count comes back rather than a bare unit: a keystroke that went nowhere
+	 *  and a keystroke that landed look identical from the screen otherwise, and
+	 *  the first is the one worth telling someone about.
+	 */
+	sessionWrite: (paneId: string, data: string) => typedError<PaneWritten, RpcError>(__TAURI_INVOKE("session_write", { paneId, data })),
+	/**
+	 *  `session.resize` — the pty size of an attached leaf, and what it became.
+	 * 
+	 *  Reports the size the pty is at afterwards rather than the one asked for.
+	 *  A pane that believes it has two hundred columns when it has eighty draws
+	 *  wrongly, and the cause is a long way from the symptom.
+	 */
+	sessionResize: (paneId: string, rows: number, cols: number) => typedError<PaneSize, RpcError>(__TAURI_INVOKE("session_resize", { paneId, rows, cols })),
+	/**
+	 *  `pane.scrollback` — what this pane has printed, oldest kept byte first.
+	 * 
+	 *  This is what makes reopening a window show a terminal rather than an empty
+	 *  one. It comes from the ring the reader fills, so it survives the webview
+	 *  going away and dying with it — the pty never stopped.
+	 */
+	paneScrollback: (paneId: string) => typedError<PaneScrollback, RpcError>(__TAURI_INVOKE("pane_scrollback", { paneId })),
 	/**  `session.detach` — closes only this app's client; tmux keeps the shell. */
 	sessionDetach: (paneId: string, clientId: string) => typedError<null, RpcError>(__TAURI_INVOKE("session_detach", { paneId, clientId })),
 	/**  `settings.read` — everything the first run and the settings screen need. */
@@ -399,7 +445,25 @@ export type GitStatus = "clean" | "modified" | "added" | "deleted" | "untracked"
 
 export type LayoutNode = { type: "leaf"; id: string; 
 /**  `session:window` on our private tmux server. */
-tmuxTarget: string; kind: PaneKind; agent: AgentPresence } | { type: "split"; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
+tmuxTarget: string; kind: PaneKind; agent: AgentPresence; 
+/**
+ *  The name the person gave this pane, or empty when they have not.
+ * 
+ *  Empty rather than absent so the screen has one field to read: a
+ *  pane titled by an OSC sequence is showing what the program called
+ *  itself, and a pane titled here is showing what its owner called it.
+ *  The second always wins, and only a rename clears or sets it.
+ */
+title?: string } | { type: "split"; 
+/**
+ *  What a dragged boundary is addressed by.
+ * 
+ *  Defaulted rather than migrated: a tree persisted before splits had
+ *  ids loads with this empty, and [`LayoutNode::name_the_splits`]
+ *  fills it on the first read. A migration would have to rewrite every
+ *  stored tree to add a field nothing had asked for yet.
+ */
+id?: string; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
 
 export type Note = {
 	id: string,
@@ -410,6 +474,30 @@ export type Note = {
 
 /**  What a leaf shows. Only `terminal` in this slice. */
 export type PaneKind = "terminal";
+
+/**  Response of `pane.scrollback`. */
+export type PaneScrollback = {
+	text: string,
+	/**  Older output has been dropped to make room. */
+	truncated: boolean,
+};
+
+/**
+ *  Response of `pane.resize`.
+ * 
+ *  The size that ended up applied, which is not always the size asked for: a
+ *  pty clamps, and a pane that believes it has two hundred columns when it has
+ *  eighty draws wrongly a long way from the line that caused it.
+ */
+export type PaneSize = {
+	rows: number,
+	cols: number,
+};
+
+/**  Response of `session.write`. */
+export type PaneWritten = {
+	bytes: number,
+};
 
 /**
  *  A project as the window needs it.

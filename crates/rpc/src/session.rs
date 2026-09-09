@@ -3,6 +3,12 @@
 //! The tree is the Orca answer: nested splits, one process per leaf. The axis
 //! is the project, not the worktree. Leaves are terminals today; a later leaf
 //! kind does not need a tmux window.
+//!
+//! The shapes live here and the operations on them live in [`session_tree`],
+//! because the two are read for different reasons: this file answers "what
+//! crosses to the screen", and that one answers "what a drag does to the tree".
+//!
+//! [`session_tree`]: crate::session_tree
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -39,8 +45,24 @@ pub enum LayoutNode {
         tmux_target: String,
         kind: PaneKind,
         agent: AgentPresence,
+        /// The name the person gave this pane, or empty when they have not.
+        ///
+        /// Empty rather than absent so the screen has one field to read: a
+        /// pane titled by an OSC sequence is showing what the program called
+        /// itself, and a pane titled here is showing what its owner called it.
+        /// The second always wins, and only a rename clears or sets it.
+        #[serde(default)]
+        title: String,
     },
     Split {
+        /// What a dragged boundary is addressed by.
+        ///
+        /// Defaulted rather than migrated: a tree persisted before splits had
+        /// ids loads with this empty, and [`LayoutNode::name_the_splits`]
+        /// fills it on the first read. A migration would have to rewrite every
+        /// stored tree to add a field nothing had asked for yet.
+        #[serde(default)]
+        id: String,
         direction: SplitDirection,
         ratio: f64,
         first: Box<LayoutNode>,
@@ -57,154 +79,14 @@ pub struct SessionLayout {
     pub tree: LayoutNode,
 }
 
-impl LayoutNode {
-    pub fn leaf(id: impl Into<String>, tmux_target: impl Into<String>) -> Self {
-        Self::Leaf {
-            id: id.into(),
-            tmux_target: tmux_target.into(),
-            kind: PaneKind::Terminal,
-            agent: AgentPresence::None,
-        }
-    }
-
-    pub fn leaves(&self) -> Vec<(&str, &str)> {
-        let mut out = Vec::new();
-        self.collect_leaves(&mut out);
-        out
-    }
-
-    fn collect_leaves<'a>(&'a self, out: &mut Vec<(&'a str, &'a str)>) {
-        match self {
-            Self::Leaf {
-                id, tmux_target, ..
-            } => out.push((id, tmux_target)),
-            Self::Split { first, second, .. } => {
-                first.collect_leaves(out);
-                second.collect_leaves(out);
-            }
-        }
-    }
-
-    pub fn first_leaf_id(&self) -> &str {
-        match self {
-            Self::Leaf { id, .. } => id,
-            Self::Split { first, .. } => first.first_leaf_id(),
-        }
-    }
-
-    pub fn contains_leaf(&self, leaf_id: &str) -> bool {
-        self.leaves().iter().any(|(id, _)| *id == leaf_id)
-    }
-
-    /// Replaces `leaf_id` with a split: existing leaf on `first`, `new_leaf` on `second`.
-    pub fn split_leaf(
-        &self,
-        leaf_id: &str,
-        direction: SplitDirection,
-        new_leaf: LayoutNode,
-    ) -> Option<LayoutNode> {
-        match self {
-            Self::Leaf { id, .. } if id == leaf_id => Some(Self::Split {
-                direction,
-                ratio: 0.5,
-                first: Box::new(self.clone()),
-                second: Box::new(new_leaf),
-            }),
-            Self::Leaf { .. } => None,
-            Self::Split {
-                direction: dir,
-                ratio,
-                first,
-                second,
-            } => {
-                if let Some(next) = first.split_leaf(leaf_id, direction, new_leaf.clone()) {
-                    return Some(Self::Split {
-                        direction: *dir,
-                        ratio: *ratio,
-                        first: Box::new(next),
-                        second: second.clone(),
-                    });
-                }
-                let next = second.split_leaf(leaf_id, direction, new_leaf)?;
-                Some(Self::Split {
-                    direction: *dir,
-                    ratio: *ratio,
-                    first: first.clone(),
-                    second: Box::new(next),
-                })
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_fresh_tree_is_one_leaf() {
-        let tree = LayoutNode::leaf("leaf_a", "sess:leaf_a");
-        assert_eq!(tree.leaves(), vec![("leaf_a", "sess:leaf_a")]);
-        assert_eq!(tree.first_leaf_id(), "leaf_a");
-    }
-
-    #[test]
-    fn split_leaf_puts_the_new_pane_on_the_second_side() {
-        let tree = LayoutNode::leaf("leaf_a", "sess:leaf_a");
-        let split = tree
-            .split_leaf(
-                "leaf_a",
-                SplitDirection::Horizontal,
-                LayoutNode::leaf("leaf_b", "sess:leaf_b"),
-            )
-            .expect("split");
-
-        match &split {
-            LayoutNode::Split {
-                direction,
-                ratio,
-                first,
-                second,
-            } => {
-                assert_eq!(*direction, SplitDirection::Horizontal);
-                assert_eq!(*ratio, 0.5);
-                assert_eq!(first.first_leaf_id(), "leaf_a");
-                assert_eq!(second.first_leaf_id(), "leaf_b");
-            }
-            LayoutNode::Leaf { .. } => panic!("expected a split"),
-        }
-
-        assert_eq!(split.leaves().len(), 2);
-    }
-
-    #[test]
-    fn nested_split_finds_the_inner_leaf() {
-        let tree = LayoutNode::leaf("a", "s:a")
-            .split_leaf(
-                "a",
-                SplitDirection::Horizontal,
-                LayoutNode::leaf("b", "s:b"),
-            )
-            .unwrap()
-            .split_leaf("b", SplitDirection::Vertical, LayoutNode::leaf("c", "s:c"))
-            .unwrap();
-
-        assert_eq!(
-            tree.leaves()
-                .into_iter()
-                .map(|(id, _)| id)
-                .collect::<Vec<_>>(),
-            vec!["a", "b", "c"]
-        );
-    }
-
-    #[test]
-    fn json_roundtrip_keeps_the_tag() {
-        let tree = LayoutNode::leaf("leaf_a", "sess:leaf_a");
-        let json = serde_json::to_value(&tree).expect("serialize");
-        assert_eq!(json["type"], "leaf");
-        assert_eq!(json["tmuxTarget"], "sess:leaf_a");
-        let back: LayoutNode = serde_json::from_value(json).expect("deserialize");
-        assert_eq!(back.first_leaf_id(), "leaf_a");
-    }
+/// Response of `pane.resize`.
+///
+/// The size that ended up applied, which is not always the size asked for: a
+/// pty clamps, and a pane that believes it has two hundred columns when it has
+/// eighty draws wrongly a long way from the line that caused it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PaneSize {
+    pub rows: u16,
+    pub cols: u16,
 }

@@ -22,12 +22,18 @@
 //!
 //! Points 3 and 4 are not built yet; the shape here is what they attach to.
 
+mod osc;
+mod reader;
 mod ring;
+mod stopping;
 
+pub use osc::{Scanner, Told, MOST_CARRIED};
+pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;
+pub use stopping::{stop, Stopped, GRACE};
 
-use std::io::{Read, Write};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::io::Write;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
@@ -35,6 +41,12 @@ use tokio::sync::mpsc;
 
 /// One frame's worth of coalesced output.
 pub const FRAME: std::time::Duration = std::time::Duration::from_millis(16);
+
+/// How long to wait before reading again when the pty had nothing to say.
+///
+/// Short enough not to be felt, long enough that a pty which answers `EAGAIN`
+/// in a tight sequence does not become a spinning core.
+pub const BETWEEN_READS: std::time::Duration = std::time::Duration::from_millis(4);
 
 /// How much scrollback is held in memory before the oldest is dropped.
 ///
@@ -70,8 +82,17 @@ pub struct Counters {
 pub struct Session {
     /// Frames of raw bytes, already coalesced.
     pub frames: mpsc::Receiver<Vec<u8>>,
+    /// What the terminal said about itself while producing those bytes.
+    ///
+    /// A separate channel from the frames because the two have opposite
+    /// deadlines: a frame is late if it misses the next paint, and a title is
+    /// late if it misses the next glance. Dropping one must never delay the
+    /// other. Taken with [`Session::take_told`], because relaying it happens
+    /// somewhere other than where the frames are drained.
+    told: Option<mpsc::Receiver<Told>>,
     pub counters: Arc<Counters>,
     pub ring: Arc<std::sync::Mutex<RingBuffer>>,
+    pid: Option<u32>,
     writer: Option<Box<dyn Write + Send>>,
     master: Option<Box<dyn MasterPty + Send>>,
     killer: Option<Box<dyn ChildKiller + Send + Sync>>,
@@ -81,6 +102,10 @@ pub struct SessionIo {
     pub writer: Box<dyn Write + Send>,
     pub master: Box<dyn MasterPty + Send>,
     pub killer: Box<dyn ChildKiller + Send + Sync>,
+    /// What to ask about, and to insist to, when this session is ended.
+    ///
+    /// `None` on a platform that does not report one. See [`stop`].
+    pub pid: Option<u32>,
 }
 
 impl Session {
@@ -103,12 +128,21 @@ impl Session {
             .map_err(|err| PtyError::Open(err.to_string()))
     }
 
+    /// Hands over what the terminal says about itself, once.
+    ///
+    /// Once because there is one stream of it: two takers would each get a
+    /// share of the sequences and both would draw a pane half told.
+    pub fn take_told(&mut self) -> Option<mpsc::Receiver<Told>> {
+        self.told.take()
+    }
+
     /// Hands the io ends to whoever will serve `session.write` while frames drain.
     pub fn take_io(&mut self) -> Option<SessionIo> {
         Some(SessionIo {
             writer: self.writer.take()?,
             master: self.master.take()?,
             killer: self.killer.take()?,
+            pid: self.pid,
         })
     }
 }
@@ -120,7 +154,7 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
         .map_err(|e| PtyError::Open(e.to_string()))?;
 
     let label = format!("{command:?}");
-    let mut child = pty
+    let child = pty
         .slave
         .spawn_command(command)
         .map_err(|source| PtyError::Spawn {
@@ -128,8 +162,9 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
             source,
         })?;
     let killer = child.clone_killer();
+    let pid = child.process_id();
 
-    let mut reader = pty
+    let reader = pty
         .master
         .try_clone_reader()
         .map_err(|e| PtyError::Open(e.to_string()))?;
@@ -143,58 +178,28 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
     // the reader waits, which is backpressure reaching the writing process —
     // exactly what a terminal is supposed to do.
     let (tx, frames) = mpsc::channel::<Vec<u8>>(256);
+    // Small, and dropped when full rather than waited on. These are things the
+    // screen would like to know; a listener that stopped draining must not be
+    // able to stall the bytes of a terminal.
+    let (told_tx, told) = mpsc::channel::<Told>(64);
     let counters = Arc::new(Counters::default());
     let ring = Arc::new(std::sync::Mutex::new(RingBuffer::new(RING_BYTES)));
 
-    let reader_counters = Arc::clone(&counters);
-    let reader_ring = Arc::clone(&ring);
-
-    // A blocking thread, not a tokio task: reading a pty fd blocks, and
-    // blocking inside the runtime starves every other task on that worker.
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 64 * 1024];
-        let mut pending: Vec<u8> = Vec::with_capacity(64 * 1024);
-        let mut last_flush = std::time::Instant::now();
-
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let chunk = &buf[..n];
-                    reader_counters.bytes.fetch_add(n as u64, Ordering::Relaxed);
-                    if let Ok(mut ring) = reader_ring.lock() {
-                        ring.write(chunk);
-                    }
-                    pending.extend_from_slice(chunk);
-                }
-                Err(_) => break,
-            }
-
-            // Coalesce: hand over a frame's worth at a time rather than every
-            // read. Under a flood this turns tens of thousands of tiny
-            // messages into about sixty per second.
-            if last_flush.elapsed() >= FRAME && !pending.is_empty() {
-                reader_counters.frames.fetch_add(1, Ordering::Relaxed);
-                if tx.blocking_send(std::mem::take(&mut pending)).is_err() {
-                    break;
-                }
-                pending = Vec::with_capacity(64 * 1024);
-                last_flush = std::time::Instant::now();
-            }
-        }
-
-        if !pending.is_empty() {
-            reader_counters.frames.fetch_add(1, Ordering::Relaxed);
-            let _ = tx.blocking_send(pending);
-        }
-
-        let _ = child.wait();
-    });
+    reader::start(
+        reader,
+        child,
+        Arc::clone(&counters),
+        Arc::clone(&ring),
+        tx,
+        told_tx,
+    );
 
     Ok(Session {
         frames,
+        told: Some(told),
         counters,
         ring,
+        pid,
         writer: Some(writer),
         master: Some(pty.master),
         killer: Some(killer),
@@ -202,78 +207,5 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn size() -> PtySize {
-        PtySize {
-            rows: 24,
-            cols: 80,
-            pixel_width: 0,
-            pixel_height: 0,
-        }
-    }
-
-    #[tokio::test]
-    async fn a_command_output_arrives_as_frames() {
-        let mut cmd = CommandBuilder::new("echo");
-        cmd.arg("devpit");
-
-        let mut session = spawn(cmd, size()).expect("spawn");
-
-        let mut seen = Vec::new();
-        while let Some(frame) = session.frames.recv().await {
-            seen.extend_from_slice(&frame);
-        }
-
-        assert!(
-            String::from_utf8_lossy(&seen).contains("devpit"),
-            "output did not reach the frames: {:?}",
-            String::from_utf8_lossy(&seen)
-        );
-        assert!(session.counters.bytes.load(Ordering::Relaxed) > 0);
-    }
-
-    #[tokio::test]
-    async fn bytes_written_to_the_pty_come_back_in_frames() {
-        let cmd = CommandBuilder::new("cat");
-        let mut session = spawn(cmd, size()).expect("spawn");
-
-        session.write(b"devpit-stdin\n").expect("write");
-        // Closing stdin is what makes `cat` exit. Dropping the writer is that close.
-        let io = session.take_io().expect("io");
-        drop(io.writer);
-
-        let mut seen = Vec::new();
-        while let Some(frame) = session.frames.recv().await {
-            seen.extend_from_slice(&frame);
-        }
-        assert!(
-            String::from_utf8_lossy(&seen).contains("devpit-stdin"),
-            "stdin did not echo: {:?}",
-            String::from_utf8_lossy(&seen)
-        );
-    }
-
-    /// The point of coalescing: a flood must not become one message per read.
-    #[tokio::test]
-    async fn a_flood_is_coalesced_into_far_fewer_frames_than_reads() {
-        let mut cmd = CommandBuilder::new("sh");
-        cmd.arg("-c");
-        cmd.arg("yes devpit | head -c 2000000");
-
-        let mut session = spawn(cmd, size()).expect("spawn");
-
-        let mut bytes = 0usize;
-        while let Some(frame) = session.frames.recv().await {
-            bytes += frame.len();
-        }
-
-        let frames = session.counters.frames.load(Ordering::Relaxed);
-        assert!(bytes >= 2_000_000, "only {bytes} bytes arrived");
-        assert!(
-            frames < 400,
-            "{frames} frames for {bytes} bytes — coalescing is not working"
-        );
-    }
-}
+#[path = "lib_tests.rs"]
+mod tests;

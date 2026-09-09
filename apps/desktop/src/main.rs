@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod board;
+mod claims;
 mod columns;
 mod commands;
 // Only ever compiled where it is used. The contract exists to generate the
@@ -13,8 +14,10 @@ mod contract;
 mod diffs;
 mod files;
 mod front;
+mod happening;
 mod in_flight;
 mod listener;
+mod panes;
 mod projects;
 mod pty_bridge;
 mod roots;
@@ -50,6 +53,9 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // Managed here and not in the builder because it holds the handle
+            // it relays through, and the handle does not exist until now.
+            tauri::Manager::manage(app, sessions::SessionState::new(app.handle().clone()));
             // Hooks are how the board hears about work as it happens rather
             // than a poll later. Started here so the endpoint is on disk before
             // the first turn goes out.
@@ -58,7 +64,6 @@ fn main() {
             }
             Ok(())
         })
-        .manage(sessions::SessionState::new())
         .manage(std::sync::Arc::new(in_flight::InFlight::new()))
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
@@ -95,10 +100,14 @@ fn main() {
             sessions::session_layout,
             sessions::session_focus,
             sessions::session_split,
-            sessions::session_write,
-            sessions::session_resize,
-            sessions::session_detach,
-            sessions::session_attach,
+            sessions::session_close_leaf,
+            sessions::session_rename_leaf,
+            sessions::session_set_ratio,
+            panes::session_write,
+            panes::session_resize,
+            panes::pane_scrollback,
+            panes::session_detach,
+            panes::session_attach,
             settings::settings_read,
             settings::settings_write,
             settings::settings_finish_onboarding,

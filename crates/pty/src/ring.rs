@@ -72,6 +72,28 @@ impl RingBuffer {
         out
     }
 
+    /// The contents from the first whole character onward.
+    ///
+    /// The buffer drops bytes by count, so once it has wrapped the oldest byte
+    /// is as likely as not to be the middle of a multi-byte character. Handing
+    /// that to a terminal draws a replacement character at the top of the
+    /// replay, and on a screen full of accented text it draws several.
+    ///
+    /// The fix is to start one character later, not to teach the buffer about
+    /// text: a ring that understood encodings would have to decode on every
+    /// write, and this one is on the read path of every byte a pty produces.
+    pub fn replay(&self) -> Vec<u8> {
+        let mut bytes = self.contents();
+        // Continuation bytes are `10xxxxxx`. Anything else starts a character,
+        // and the first one of those is where a decoder can begin.
+        let start = bytes
+            .iter()
+            .position(|byte| byte & 0xc0 != 0x80)
+            .unwrap_or(bytes.len());
+        bytes.drain(..start);
+        bytes
+    }
+
     pub fn len(&self) -> usize {
         if self.wrapped {
             self.buf.len()
@@ -86,91 +108,5 @@ impl RingBuffer {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn keeps_everything_while_it_fits() {
-        let mut ring = RingBuffer::new(16);
-        // Deliberately not a word from the project: this used to spell the
-        // product name, and renaming it silently changed the byte count the
-        // assertion below depends on.
-        ring.write(b"abcdefgh");
-        assert_eq!(ring.contents(), b"abcdefgh");
-        assert_eq!(ring.len(), 8);
-    }
-
-    #[test]
-    fn drops_the_oldest_once_it_wraps() {
-        let mut ring = RingBuffer::new(8);
-        ring.write(b"abcdefgh");
-        ring.write(b"XY");
-        // The two oldest bytes are gone, and the order of the rest holds.
-        assert_eq!(ring.contents(), b"cdefghXY");
-        assert_eq!(ring.len(), 8);
-    }
-
-    #[test]
-    fn a_write_larger_than_the_buffer_leaves_its_tail() {
-        let mut ring = RingBuffer::new(4);
-        ring.write(b"abcdefghij");
-        assert_eq!(ring.contents(), b"ghij");
-    }
-
-    /// The buffer against the obvious model of it: keep everything, then take
-    /// the last `cap` bytes.
-    ///
-    /// The single cases above each pin one path. This walks a long sequence of
-    /// writes of every size around the capacity — under it, exactly it, over
-    /// it, and zero — and compares after each one, so a wrap that is right in
-    /// isolation and wrong in sequence has somewhere to fail.
-    ///
-    /// The sequence is generated rather than typed, and seeded, so it covers
-    /// far more than anyone writes by hand and still fails the same way twice.
-    #[test]
-    fn it_holds_the_last_bytes_written_whatever_the_sizes() {
-        for cap in [1usize, 2, 3, 4, 7, 8, 16] {
-            let mut ring = RingBuffer::new(cap);
-            let mut model: Vec<u8> = Vec::new();
-            let mut seed = 0x2545_F491_4F6C_DD1Du64;
-            let mut next = 0u8;
-
-            for _ in 0..200 {
-                // xorshift, so the sizes are spread rather than cycling.
-                seed ^= seed << 13;
-                seed ^= seed >> 7;
-                seed ^= seed << 17;
-                let len = (seed % (cap as u64 * 2 + 2)) as usize;
-
-                let chunk: Vec<u8> = (0..len)
-                    .map(|_| {
-                        next = next.wrapping_add(1);
-                        next
-                    })
-                    .collect();
-
-                ring.write(&chunk);
-                model.extend_from_slice(&chunk);
-
-                let kept = model.len().min(cap);
-                let expected = &model[model.len() - kept..];
-                assert_eq!(
-                    ring.contents(),
-                    expected,
-                    "cap {cap}, after writing {len} bytes"
-                );
-                assert_eq!(ring.len(), kept, "cap {cap}, len after {len} bytes");
-                assert_eq!(ring.is_empty(), kept == 0, "cap {cap}");
-            }
-        }
-    }
-
-    #[test]
-    fn a_write_that_lands_exactly_on_the_end_does_not_lose_a_byte() {
-        let mut ring = RingBuffer::new(4);
-        ring.write(b"abcd");
-        assert_eq!(ring.contents(), b"abcd");
-        ring.write(b"e");
-        assert_eq!(ring.contents(), b"bcde");
-    }
-}
+#[path = "ring_tests.rs"]
+mod tests;
