@@ -19,6 +19,7 @@ mod files;
 mod front;
 mod happening;
 mod in_flight;
+mod index;
 mod kinds;
 mod listener;
 mod mcp;
@@ -96,6 +97,7 @@ fn main() {
             worktrees::worktree_prime_read,
             worktrees::worktree_prime_write,
             projects::project_tree,
+            index::project_files,
             projects::project_changes,
             projects::project_history,
             branches::branch_list,

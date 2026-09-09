@@ -1,0 +1,57 @@
+import { useMemo } from 'react'
+
+import type { Card } from '../gen/bindings'
+import { CARD, DOC } from './paletteIcons'
+import { ranked } from './search'
+import type { PaneName } from './paneList'
+import type { Tab } from './strip'
+
+export interface Row {
+  readonly key: string
+  readonly name: string
+  readonly meta: string
+  readonly icon: React.JSX.Element
+  readonly go: () => void
+}
+
+/* Which groups the field shows, and in which order. Panes first because they
+   always exist; files last because there are thousands of them. */
+export function useGroups({
+  panes,
+  sessions,
+  cards,
+  files,
+  query,
+  show,
+}: {
+  panes: Row[]
+  sessions: Row[]
+  cards: readonly Card[]
+  files: readonly string[]
+  query: string
+  show: (kind: PaneName, tab?: Partial<Tab>) => void
+}): [string, Row[]][] {
+  return useMemo(() => {
+    const asRows = {
+      Panes: ranked(panes, query, (row) => row.name),
+      Sessions: ranked(sessions, query, (row) => row.name),
+      Cards: ranked(cards, query, (card) => card.title).map((card) => ({
+        key: `card:${card.id}`,
+        name: card.title,
+        meta: 'card',
+        icon: CARD,
+        go: () => show('board'),
+      })),
+      Files: ranked(files, query, (path) => path).map((path) => ({
+        key: `file:${path}`,
+        name: path.split('/').pop() ?? path,
+        meta: path,
+        icon: DOC,
+        go: () => show('file', { id: `file:${path}`, path, title: path.split('/').pop() }),
+      })),
+    }
+    /* A group with nothing in it leaves rather than showing a heading over
+       nothing. */
+    return Object.entries(asRows).filter(([, rows]) => rows.length > 0)
+  }, [panes, sessions, cards, files, query, show])
+}

@@ -143,6 +143,8 @@ export const commands = {
 	 *  the root.
 	 */
 	projectTree: (projectId: string, worktreeId: string | null, path: string) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("project_tree", { projectId, worktreeId, path })),
+	/**  `project.files` — every file in the project, for the search field. */
+	projectFiles: (projectId: string, worktreeId: string | null) => typedError<FileIndex, RpcError>(__TAURI_INVOKE("project_files", { projectId, worktreeId })),
 	/**  `project.changes` — what has changed in a checkout, with the size of each edit. */
 	projectChanges: (projectId: string, worktreeId: string | null) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("project_changes", { projectId, worktreeId })),
 	/**  `project.history` — the last few commits of a checkout. */
@@ -622,6 +624,16 @@ export type FileContents = {
 	dataUrl: string | null,
 	/**  The absolute path, for revealing in the file manager. Never drawn. */
 	fullPath: string,
+};
+
+export type FileIndex = {
+	/**  Paths relative to the project root. */
+	paths: string[],
+	/**
+	 *  True when the walk stopped at the ceiling. The screen says the list is
+	 *  partial rather than letting a missing file read as "not there".
+	 */
+	partial: boolean,
 };
 
 /**  What a file is, so the screen knows what to draw rather than guessing. */

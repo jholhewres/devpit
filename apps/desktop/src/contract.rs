@@ -8,6 +8,7 @@ use tauri_specta::{collect_commands, Builder};
 
 use crate::branches;
 use crate::chat;
+use crate::index;
 use crate::mcp;
 use crate::reveal;
 use crate::saves;
@@ -56,6 +57,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         worktrees::worktree_prime_read,
         worktrees::worktree_prime_write,
         projects::project_tree,
+        index::project_files,
         projects::project_changes,
         projects::project_history,
         branches::branch_list,
