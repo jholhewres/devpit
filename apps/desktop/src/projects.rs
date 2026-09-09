@@ -18,7 +18,7 @@ use devpit_rpc::{
 /// and the surface shows four.
 const HISTORY: u32 = 8;
 
-fn store() -> Result<Store, RpcError> {
+pub(crate) fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
 }
 
@@ -27,7 +27,10 @@ fn store() -> Result<Store, RpcError> {
 /// Both, because every command below needs both and a project whose folder has
 /// been moved or deleted must fail as `not_found` with a sentence, rather than
 /// as a filesystem error nobody can act on.
-fn locate(store: &Store, id: &str) -> Result<(devpit_core::ProjectRow, PathBuf), RpcError> {
+pub(crate) fn locate(
+    store: &Store,
+    id: &str,
+) -> Result<(devpit_core::ProjectRow, PathBuf), RpcError> {
     let row = store
         .project(id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that project is not registered"))?;

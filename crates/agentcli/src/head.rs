@@ -17,6 +17,18 @@ pub struct Head {
     pub card_id: Option<String>,
     /// Unix seconds.
     pub created_at: f64,
+    /// What every turn so far actually cost, from the CLI's own report.
+    #[serde(default)]
+    pub cost_usd: f64,
+    /// A ceiling for the whole conversation, when one was declared.
+    #[serde(default)]
+    pub budget_usd: Option<f64>,
+    /// The CLI's id for this thread, so the next turn resumes it.
+    #[serde(default)]
+    pub session_id: Option<String>,
+    /// What the agent may do without asking.
+    #[serde(default)]
+    pub permission: Option<String>,
 }
 
 pub fn head_path(home: &Path, project_id: &str, conversation_id: &str) -> PathBuf {
@@ -49,4 +61,13 @@ pub fn settled<'a>(head: Option<&'a Head>, asked: &str) -> Result<(), &'a str> {
         Some(head) if head.profile != asked => Err(&head.profile),
         _ => Ok(()),
     }
+}
+
+/// What is left of a conversation's cap, or nothing when it has none.
+///
+/// Checked before the turn starts: the CLI's own cap stops one part way
+/// through, which is a turn too late to be a ceiling.
+pub fn remaining(head: Option<&Head>) -> Option<f64> {
+    let head = head?;
+    head.budget_usd.map(|cap| cap - head.cost_usd)
 }

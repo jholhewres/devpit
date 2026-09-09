@@ -31,6 +31,12 @@ pub trait Driver: Send + Sync {
 
     /// Reads one line of output.
     fn read(&self, line: &str) -> Read;
+
+    /// The CLI's own id for this conversation, if the line carries it.
+    ///
+    /// Kept so the next turn resumes the same thread: without it the agent
+    /// starts over and the transcript on screen is the only memory left.
+    fn session(&self, line: &str) -> Option<String>;
 }
 
 /// The Claude Code CLI, which prints one JSON object per line.
@@ -75,6 +81,14 @@ impl Driver for Claude {
             Some("user") => Read::Parts(tool_results(&value)),
             _ => Read::Nothing,
         }
+    }
+
+    fn session(&self, line: &str) -> Option<String> {
+        serde_json::from_str::<serde_json::Value>(line)
+            .ok()?
+            .get("session_id")?
+            .as_str()
+            .map(str::to_owned)
     }
 }
 

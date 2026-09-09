@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { Ask, Message, Profile } from '../gen/bindings'
-import { applied, fixedTo, send } from './chat'
+import type { Ask, Attachment, Message, Profile } from '../gen/bindings'
+import { applied, fixedTo, MODES, send, withFiles } from './chat'
 import { ask, commands } from './live'
 import { useShell } from './useShell'
 
@@ -12,10 +12,17 @@ export interface Chat {
   readonly fixed: string | null
   readonly profileId: string | null
   readonly model: string | null
+  /** What every turn so far has cost. */
+  readonly cost: number
+  readonly permission: string
+  readonly files: readonly Attachment[]
   readonly sending: boolean
   readonly error: string | null
   pick: (profileId: string) => void
   setModel: (model: string | null) => void
+  setPermission: (mode: string) => void
+  attach: (paths: readonly string[]) => void
+  detach: (path: string) => void
   say: (prompt: string) => void
   stop: () => void
 }
@@ -27,6 +34,9 @@ export function useChat(conversationId: string): Chat {
   const [fixed, setFixed] = useState<string | null>(null)
   const [profileId, setProfileId] = useState<string | null>(null)
   const [model, setModel] = useState<string | null>(null)
+  const [cost, setCost] = useState(0)
+  const [permission, setPermission] = useState(MODES[0].id)
+  const [files, setFiles] = useState<readonly Attachment[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const live = useRef(true)
@@ -46,6 +56,7 @@ export function useChat(conversationId: string): Chat {
         setFixed(belongs)
         setProfileId(belongs)
         setModel(past.data.model)
+        setCost(past.data.costUsd ?? 0)
       }
       const installed = (found.data ?? []).filter((profile) => profile.path !== null)
       setProfiles(installed)
@@ -67,15 +78,18 @@ export function useChat(conversationId: string): Chat {
         conversationId,
         profileId,
         model,
-        prompt,
+        prompt: withFiles(prompt, files),
         cwd: project.rootPath,
         budgetUsd: null,
+        permission,
       }
       const started = send(turn, (frame) => setMessages((was) => applied(was, frame)))
       if (!started) return setError('not running in the app')
       setSending(true)
       setError(null)
+      setFiles([])
       void started.end
+        .then((end) => setCost((was) => was + (end.costUsd ?? 0)))
         .catch((thrown: { message?: string }) => setError(thrown.message ?? 'the turn failed'))
         .finally(() => {
           if (!live.current) return
@@ -84,7 +98,33 @@ export function useChat(conversationId: string): Chat {
           setFixed(profileId)
         })
     },
-    [project, conversationId, profileId, model],
+    [project, conversationId, profileId, model, permission, files],
+  )
+
+  /* A dropped file is resolved against the project root before it is shown:
+     a path outside the project is refused there, not here. */
+  const attach = useCallback(
+    (paths: readonly string[]) => {
+      if (!project) return
+      void (async () => {
+        const resolved = await Promise.all(
+          paths.map((path) => ask(() => commands.chatAttach(project.id, path))),
+        )
+        const kept = resolved.flatMap((one) => (one.data ? [one.data] : []))
+        const refused = resolved.find((one) => one.error)
+        if (refused) setError(refused.error)
+        setFiles((was) => [
+          ...was,
+          ...kept.filter((file) => !was.some((had) => had.path === file.path)),
+        ])
+      })()
+    },
+    [project],
+  )
+
+  const detach = useCallback(
+    (path: string) => setFiles((was) => was.filter((file) => file.path !== path)),
+    [],
   )
 
   const stop = useCallback(() => {
@@ -97,10 +137,16 @@ export function useChat(conversationId: string): Chat {
     fixed,
     profileId,
     model,
+    cost,
+    permission,
+    files,
     sending,
     error,
     pick: setProfileId,
     setModel,
+    setPermission,
+    attach,
+    detach,
     say,
     stop,
   }

@@ -11,6 +11,8 @@
 pub mod bus;
 pub mod store;
 pub mod tree;
+#[cfg(test)]
+mod tree_tests;
 
 pub use bus::{Bus, Event, Severity};
 pub use store::{

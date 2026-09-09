@@ -127,5 +127,22 @@ pub struct Ask {
     pub model: Option<String>,
     pub prompt: String,
     pub cwd: String,
+    /// A ceiling for the whole conversation, not for this turn.
     pub budget_usd: Option<f64>,
+    /// What the agent may do without asking, in the CLI's own words.
+    /// Absent keeps whatever the conversation already had.
+    pub permission: Option<String>,
+}
+
+/// A file the person put in front of the agent.
+///
+/// The path is relative to the project root, because that is the only form
+/// the agent can use and the only form that survives another machine.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Attachment {
+    pub name: String,
+    pub path: String,
+    /// The extension, lowercased, or empty. What the chip draws.
+    pub kind: String,
 }

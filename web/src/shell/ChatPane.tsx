@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { ready } from './chat'
+import { MODES, money, ready } from './chat'
 import type { Tab } from './strip'
 import { Turn } from './Turn'
 import { useChat } from './useChat'
 import { useShell } from './useShell'
+import { onFilesDropped } from './window'
 
 /*
  * One conversation, per tab.
@@ -14,10 +15,18 @@ import { useShell } from './useShell'
  */
 
 export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { close } = useShell()
+  const { close, active } = useShell()
   const chat = useChat(tab.id)
   const [prompt, setPrompt] = useState('')
   const box = useRef<HTMLDivElement>(null)
+
+  /* A drop lands on the window, not on a pane, so only the chat in front
+     takes it. */
+  const mine = active?.id === tab.id
+  useEffect(() => {
+    if (!mine) return
+    return onFilesDropped(chat.attach)
+  }, [mine, chat.attach])
 
   /* New output belongs at the bottom, where the eye already is. */
   useEffect(() => {
@@ -32,6 +41,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   }
 
   const picked = chat.profiles.find((profile) => profile.id === chat.profileId)
+  const spent = money(chat.cost)
 
   return (
     <>
@@ -39,6 +49,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         <span className="pane__t">
           <b>Chat</b>
           {picked ? ` · ${picked.label}` : ''}
+          {spent ? ` · ${spent}` : ''}
         </span>
         <span className="drag"></span>
         <button className="sq26" onClick={() => close(tab.id)} aria-label="Close chat">
@@ -73,9 +84,35 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               }
             }}
           />
+          {chat.files.length > 0 && (
+            <div className="composer__row">
+              {chat.files.map((file) => (
+                <button
+                  key={file.path}
+                  className="chip"
+                  onClick={() => chat.detach(file.path)}
+                  title={`${file.path} — click to remove`}
+                >
+                  {file.name} ✕
+                </button>
+              ))}
+            </div>
+          )}
           <div className="composer__row">
             <Account chat={chat} />
             <Model chat={chat} />
+            <select
+              className="chip"
+              value={chat.permission}
+              onChange={(event) => chat.setPermission(event.target.value)}
+              aria-label="Permission"
+            >
+              {MODES.map((mode) => (
+                <option key={mode.id} value={mode.id}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
             {chat.sending ? (
               <button className="send" onClick={chat.stop} aria-label="Stop">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>

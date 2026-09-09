@@ -23,6 +23,15 @@ pub struct Say<'a> {
     pub budget_usd: Option<f64>,
     /// Carried forward so the CLI continues the same session.
     pub session_id: Option<&'a str>,
+    /// What the agent may do without asking. The CLI's own word for it.
+    pub permission: Option<&'a str>,
+}
+
+/// A turn, and the thread it belongs to on the CLI's side.
+pub struct Said {
+    pub end: TurnEnd,
+    /// The CLI's id for this conversation, to resume it next turn.
+    pub session_id: Option<String>,
 }
 
 /// Runs one turn, handing every part to `on_part` as it is read.
@@ -35,7 +44,7 @@ pub fn say(
     turn: &Say<'_>,
     mut on_part: impl FnMut(Part),
     mut on_start: impl FnMut(u32),
-) -> Result<TurnEnd, AgentError> {
+) -> Result<Said, AgentError> {
     let mut argv = vec![
         "--print".to_owned(),
         "--output-format".to_owned(),
@@ -55,6 +64,10 @@ pub fn say(
     if let Some(session) = turn.session_id {
         argv.push("--resume".to_owned());
         argv.push(session.to_owned());
+    }
+    if let Some(mode) = turn.permission {
+        argv.push("--permission-mode".to_owned());
+        argv.push(mode.to_owned());
     }
 
     let mut child = Command::new(turn.command)
@@ -80,8 +93,12 @@ pub fn say(
     let stdout = child.stdout.take().ok_or(AgentError::NotInstalled)?;
     let started = std::time::Instant::now();
     let mut ended = None;
+    let mut session_id = None;
 
     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+        if session_id.is_none() {
+            session_id = driver.session(&line);
+        }
         match driver.read(&line) {
             Read::Parts(parts) => parts.into_iter().for_each(&mut on_part),
             Read::Ended {
@@ -105,11 +122,14 @@ pub fn say(
         (Some("interrupted".to_owned()), None, !status.success())
     });
 
-    Ok(TurnEnd {
-        turn_id: String::new(),
-        cost_usd,
-        duration_ms: Some(started.elapsed().as_millis() as f64),
-        stop_reason,
-        is_error,
+    Ok(Said {
+        end: TurnEnd {
+            turn_id: String::new(),
+            cost_usd,
+            duration_ms: Some(started.elapsed().as_millis() as f64),
+            stop_reason,
+            is_error,
+        },
+        session_id,
     })
 }

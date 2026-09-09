@@ -73,10 +73,24 @@ export const commands = {
 	model: string | null,
 	prompt: string,
 	cwd: string,
+	/**  A ceiling for the whole conversation, not for this turn. */
 	budgetUsd: number | null,
+	/**
+	 *  What the agent may do without asking, in the CLI's own words.
+	 *  Absent keeps whatever the conversation already had.
+	 */
+	permission: string | null,
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
+	/**
+	 *  `chat.attach` — a dropped file, as something the agent can be pointed at.
+	 * 
+	 *  The absolute path never reaches the screen or the prompt: it says nothing
+	 *  on another machine, and a path outside the project is refused here rather
+	 *  than read.
+	 */
+	chatAttach: (projectId: string, path: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_attach", { projectId, path })),
 	/**
 	 *  `project.tree` — one level of the file tree, from a given worktree.
 	 * 
@@ -326,7 +340,26 @@ export type Ask = {
 	model: string | null,
 	prompt: string,
 	cwd: string,
+	/**  A ceiling for the whole conversation, not for this turn. */
 	budgetUsd: number | null,
+	/**
+	 *  What the agent may do without asking, in the CLI's own words.
+	 *  Absent keeps whatever the conversation already had.
+	 */
+	permission: string | null,
+};
+
+/**
+ *  A file the person put in front of the agent.
+ * 
+ *  The path is relative to the project root, because that is the only form
+ *  the agent can use and the only form that survives another machine.
+ */
+export type Attachment = {
+	name: string,
+	path: string,
+	/**  The extension, lowercased, or empty. What the chip draws. */
+	kind: string,
 };
 
 /**

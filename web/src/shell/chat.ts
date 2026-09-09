@@ -1,6 +1,15 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 
-import type { Ask, Conversation, Frame, Message, Part, Profile, TurnEnd } from '../gen/bindings'
+import type {
+  Ask,
+  Attachment,
+  Conversation,
+  Frame,
+  Message,
+  Part,
+  Profile,
+  TurnEnd,
+} from '../gen/bindings'
 import { inTauri } from './window'
 
 /* chat.send streams over a Channel, like the pty, so it is hand-written for
@@ -74,4 +83,29 @@ export function choices(
 /* Whether the send button does anything. */
 export function ready(prompt: string, sending: boolean, profileId: string | null): boolean {
   return !sending && profileId !== null && prompt.trim().length > 0
+}
+
+/* What a conversation has cost, or nothing when it has cost nothing yet.
+   A `$0.00` on screen is noise wearing the clothes of information. */
+export function money(usd: number): string | null {
+  if (!(usd > 0)) return null
+  return usd < 0.01 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`
+}
+
+/* What the agent may do without asking.
+
+   The CLI's `default` mode is missing on purpose: it stops and asks, and this
+   screen has nowhere to answer yet. Offering it would be a control that hangs
+   the turn. */
+export const MODES: readonly { readonly id: string; readonly label: string }[] = [
+  { id: 'acceptEdits', label: 'Edits' },
+  { id: 'bypassPermissions', label: 'Full access' },
+]
+
+/* The prompt the agent actually receives: what was typed, with each
+   attachment named as a path it can open. The paths lead rather than trail,
+   because the CLI reads them as context for what follows. */
+export function withFiles(prompt: string, files: readonly Attachment[]): string {
+  if (files.length === 0) return prompt
+  return `${files.map((file) => `@${file.path}`).join(' ')}\n${prompt}`
 }

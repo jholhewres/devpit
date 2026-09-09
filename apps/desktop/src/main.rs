@@ -81,6 +81,7 @@ fn main() {
             chat::chat_cancel,
             chat::chat_frames,
             chat::agent_profiles,
+            chat::chat_attach,
             projects::project_tree,
             projects::project_changes,
             projects::project_history,

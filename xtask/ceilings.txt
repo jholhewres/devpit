@@ -5,10 +5,12 @@
 # once a file has actually got shorter.
 
 apps/desktop/src/board.rs 300
+apps/desktop/src/chat.rs 350
 apps/desktop/src/claims.rs 200
 apps/desktop/src/files.rs 150
 apps/desktop/src/files_tests.rs 150
 apps/desktop/src/listener.rs 150
+apps/desktop/src/main.rs 150
 apps/desktop/src/panes.rs 300
 apps/desktop/src/projects.rs 450
 apps/desktop/src/runs.rs 150
@@ -17,11 +19,13 @@ apps/desktop/src/steps/agent.rs 200
 apps/desktop/src/steps/mod.rs 150
 apps/desktop/src/steps/mod_tests.rs 150
 crates/agentcli/src/catalogue.rs 400
+crates/agentcli/src/driver.rs 200
 crates/agentcli/src/headless.rs 200
 crates/agentcli/src/headless_tests.rs 150
 crates/agentcli/src/hooks.rs 150
 crates/agentcli/src/lib.rs 350
 crates/agentcli/src/lib_tests.rs 200
+crates/agentcli/src/talk.rs 150
 crates/agentcli/src/transcript.rs 150
 crates/core/src/store/board.rs 550
 crates/core/src/store/board_tests.rs 200
@@ -29,7 +33,7 @@ crates/core/src/store/migrations.rs 300
 crates/core/src/store/mod.rs 250
 crates/core/src/store/projects.rs 300
 crates/core/src/store/settings.rs 150
-crates/core/src/tree.rs 250
+crates/core/src/tree.rs 200
 crates/git/src/clone.rs 200
 crates/git/src/front_tests.rs 200
 crates/git/src/invoke.rs 150
@@ -41,6 +45,7 @@ crates/pty/src/osc_tests.rs 200
 crates/pty/src/reader.rs 150
 crates/pty/src/ring_tests.rs 150
 crates/rpc/src/board.rs 150
+crates/rpc/src/chat.rs 150
 crates/rpc/src/project.rs 200
 crates/rpc/src/session_tree.rs 300
 crates/rpc/src/session_tree_tests.rs 250
@@ -49,14 +54,16 @@ crates/steps/src/manifest.rs 150
 crates/steps/src/runner.rs 150
 crates/tmux/src/lib.rs 250
 web/src/shell/AppShell.tsx 150
-web/src/shell/BoardPane.tsx 250
+web/src/shell/BoardPane.tsx 200
+web/src/shell/ChatPane.tsx 200
 web/src/shell/Onboarding.tsx 150
 web/src/shell/Palette.tsx 150
-web/src/shell/Panes.tsx 600
+web/src/shell/Panes.tsx 500
 web/src/shell/ProjectPicker.tsx 150
 web/src/shell/RightPanel.tsx 150
-web/src/shell/Settings.tsx 450
+web/src/shell/Settings.tsx 400
 web/src/shell/Sidebar.tsx 250
+web/src/shell/Tree.tsx 150
 web/src/shell/useShell.tsx 150
 xtask/src/platform_window.rs 150
 xtask/src/ratchet.rs 150

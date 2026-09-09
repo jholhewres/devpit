@@ -8,11 +8,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use devpit_agentcli::driver::driver;
-use devpit_agentcli::head::{head_path, read_head, settled, write_head, Head};
+use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head, Head};
 use devpit_agentcli::profile::profiles;
 use devpit_agentcli::store::{append, conversation_path, read};
-use devpit_agentcli::talk::{say, Say};
-use devpit_rpc::{Ask, Conversation, ErrorCode, Frame, Message, Part, Role, RpcError, TurnEnd};
+use devpit_agentcli::talk::{say, Said, Say};
+use devpit_rpc::{
+    Ask, Attachment, Conversation, ErrorCode, Frame, Message, Part, Role, RpcError, TurnEnd,
+};
 use tauri::ipc::Channel;
 use tauri::State;
 
@@ -61,7 +63,7 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
             .map(|head| head.profile.clone())
             .unwrap_or_default(),
         model: head.as_ref().and_then(|head| head.model.clone()),
-        cost_usd: 0.0,
+        cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
         created_at: head
             .map(|head| head.created_at)
             .or_else(|| messages.first().map(|first| first.created_at))
@@ -86,6 +88,7 @@ pub async fn chat_send(
         prompt,
         cwd,
         budget_usd,
+        permission,
     } = ask;
     let home = home();
     let head_file = head_path(&home, &project_id, &conversation_id);
@@ -94,6 +97,14 @@ pub async fn chat_send(
         return Err(RpcError::new(
             ErrorCode::Conflict,
             format!("this conversation belongs to {fixed}"),
+        ));
+    }
+    // Refused here rather than half way through: a cap that only stops a turn
+    // mid-answer is not a ceiling.
+    if remaining(head.as_ref()).is_some_and(|left| left <= 0.0) {
+        return Err(RpcError::new(
+            ErrorCode::Conflict,
+            "this conversation has spent its budget".to_owned(),
         ));
     }
 
@@ -124,15 +135,27 @@ pub async fn chat_send(
 
     // Written before the turn runs: an interrupted first turn still leaves the
     // conversation tied to the account that opened it.
-    let _ = write_head(
-        &head_file,
-        &Head {
-            profile: profile_id.clone(),
-            model: model.clone(),
-            card_id: head.as_ref().and_then(|head| head.card_id.clone()),
-            created_at: head.map(|head| head.created_at).unwrap_or_else(now),
-        },
-    );
+    let opening = Head {
+        profile: profile_id.clone(),
+        model: model.clone(),
+        created_at: head
+            .as_ref()
+            .map(|head| head.created_at)
+            .unwrap_or_else(now),
+        card_id: head.as_ref().and_then(|head| head.card_id.clone()),
+        cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
+        budget_usd: budget_usd.or(head.as_ref().and_then(|head| head.budget_usd)),
+        session_id: head.as_ref().and_then(|head| head.session_id.clone()),
+        permission: permission
+            .or_else(|| head.as_ref().and_then(|head| head.permission.clone()))
+            // Nothing to ask with yet: a turn left waiting on a prompt this
+            // screen cannot draw would hang with no way to answer it.
+            .or_else(|| Some("acceptEdits".to_owned())),
+    };
+    let _ = write_head(&head_file, &opening);
+    let resuming = opening.session_id.clone();
+    let mode = opening.permission.clone();
+    let left = remaining(Some(&opening));
 
     let asked = Message {
         id: id("msg"),
@@ -167,7 +190,7 @@ pub async fn chat_send(
     let sink = on_frame.clone();
     let answer = answer_id.clone();
 
-    let end = tauri::async_runtime::spawn_blocking(move || {
+    let said = tauri::async_runtime::spawn_blocking(move || {
         say(
             driver.as_ref(),
             &Say {
@@ -175,8 +198,11 @@ pub async fn chat_send(
                 prompt: &prompt,
                 cwd: std::path::Path::new(&cwd),
                 model: model.as_deref(),
-                budget_usd,
-                session_id: None,
+                // What is left of the cap, not the cap: a resumed conversation
+                // may not spend its whole budget again.
+                budget_usd: left,
+                session_id: resuming.as_deref(),
+                permission: mode.as_deref(),
             },
             |part| {
                 collected
@@ -206,12 +232,22 @@ pub async fn chat_send(
         .map(|mut held| held.remove(&conversation_id))
         .ok();
 
-    let said = Message {
+    let answered = Message {
         parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
         streaming: false,
         ..opened
     };
-    let _ = append(&file, &said);
+    let _ = append(&file, &answered);
+
+    let Said { end, session_id } = said;
+    let _ = write_head(
+        &head_file,
+        &Head {
+            cost_usd: opening.cost_usd + end.cost_usd.unwrap_or_default(),
+            session_id: session_id.or(opening.session_id.clone()),
+            ..opening
+        },
+    );
 
     let end = TurnEnd { turn_id, ..end };
     let _ = on_frame.send(Frame::Ended { end: end.clone() });
@@ -265,4 +301,30 @@ pub fn agent_profiles() -> Result<Vec<devpit_rpc::Profile>, RpcError> {
 #[specta::specta]
 pub fn chat_frames(_ask: Option<Ask>) -> Result<Vec<Frame>, RpcError> {
     Ok(Vec::new())
+}
+
+/// `chat.attach` — a dropped file, as something the agent can be pointed at.
+///
+/// The absolute path never reaches the screen or the prompt: it says nothing
+/// on another machine, and a path outside the project is refused here rather
+/// than read.
+#[tauri::command]
+#[specta::specta]
+pub fn chat_attach(project_id: String, path: String) -> Result<Attachment, RpcError> {
+    let store = crate::projects::store()?;
+    let (_, root) = crate::projects::locate(&store, &project_id)?;
+    let absolute = PathBuf::from(&path);
+    let relative = devpit_core::tree::relative_to(&root, &absolute)
+        .map_err(|_| RpcError::new(ErrorCode::Invalid, "that file is not in the project"))?;
+    Ok(Attachment {
+        name: absolute
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| relative.clone()),
+        kind: absolute
+            .extension()
+            .map(|ext| ext.to_string_lossy().to_lowercase())
+            .unwrap_or_default(),
+        path: relative,
+    })
 }

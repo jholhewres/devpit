@@ -1,3 +1,4 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 /*
@@ -69,6 +70,30 @@ export function onResized(then: () => void): () => void {
   let drop: (() => void) | undefined
   void getCurrentWindow()
     .onResized(() => then())
+    .then((unlisten) => {
+      if (dropped) unlisten()
+      else drop = unlisten
+    })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}
+
+/**
+ * Calls back with the paths of files dropped on the window.
+ *
+ * The webview's own drop event carries a `File` with no path, which is no use
+ * to an agent that has to open it. Tauri's event carries the real paths.
+ */
+export function onFilesDropped(then: (paths: readonly string[]) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void getCurrentWebview()
+    .onDragDropEvent((event) => {
+      if (event.payload.type === 'drop') then(event.payload.paths)
+    })
     .then((unlisten) => {
       if (dropped) unlisten()
       else drop = unlisten

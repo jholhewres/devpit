@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Conversation, Frame, Message, Profile } from '../gen/bindings'
-import { applied, choices, fixedTo, ready } from './chat'
+import type { Attachment, Conversation, Frame, Message, Profile } from '../gen/bindings'
+import { applied, choices, fixedTo, money, ready, withFiles } from './chat'
 
 const message = (id: string, streaming = true): Message =>
   ({ id, turnId: null, role: 'assistant', parts: [], createdAt: 0, streaming })
@@ -114,5 +114,33 @@ describe('whether the send button does anything', () => {
 
   it('sends when there is a profile and something to say', () => {
     expect(ready('hello', false, 'claude')).toBe(true)
+  })
+})
+
+describe('what a conversation cost', () => {
+  it('says nothing before anything was spent', () => {
+    expect(money(0)).toBeNull()
+  })
+
+  it('keeps four places while the number is smaller than a cent', () => {
+    expect(money(0.0042)).toBe('$0.0042')
+  })
+
+  it('rounds to cents once there are cents to round', () => {
+    expect(money(1.239)).toBe('$1.24')
+  })
+})
+
+describe('what the agent is actually sent', () => {
+  const file = (path: string): Attachment => ({ name: path, path, kind: 'rs' })
+
+  it('sends the prompt untouched when nothing is attached', () => {
+    expect(withFiles('why is this slow?', [])).toBe('why is this slow?')
+  })
+
+  it('names each attached file as a path the agent can open', () => {
+    expect(withFiles('why?', [file('src/a.rs'), file('src/b.rs')])).toBe(
+      '@src/a.rs @src/b.rs\nwhy?',
+    )
   })
 })
