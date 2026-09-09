@@ -204,7 +204,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (telemetry: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry })),
+	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -665,11 +665,10 @@ export type StepKind =
  *  The appearance the window uses.
  * 
  *  An enum and not a string, so a build that does not ship a theme cannot be
- *  asked for one. `Light` is absent on purpose: shipping half a light theme
- *  costs more than not having one, and the screen says "coming soon" rather
- *  than offering a switch that lands somewhere unfinished.
+ *  asked for one. `System` is a third setting, not a third palette: it borrows
+ *  whichever of the two the machine is already using.
  */
-export type Theme = "dark";
+export type Theme = "system" | "light" | "dark";
 
 /**
  *  A checkout of the project.

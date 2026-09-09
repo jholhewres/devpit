@@ -13,6 +13,7 @@ use crate::store::{Store, StoreError};
 pub mod key {
     pub const TELEMETRY: &str = "telemetry.enabled";
     pub const ONBOARDED_AT: &str = "onboarding.completed_at";
+    pub const THEME: &str = "appearance.theme";
 }
 
 fn now() -> i64 {

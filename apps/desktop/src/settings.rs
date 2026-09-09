@@ -10,10 +10,9 @@ fn store() -> Result<Store, RpcError> {
 fn read(store: &Store) -> Result<Settings, RpcError> {
     Ok(Settings {
         telemetry: store.preference_flag(preference::TELEMETRY)?,
-        // One theme ships, so there is nothing to parse back: a stored value
-        // naming a theme this build does not have would be a setting that
-        // renders as nothing.
-        theme: Theme::Dark,
+        theme: store
+            .preference(preference::THEME)?
+            .map_or(Theme::Dark, |stored| Theme::parse(&stored)),
         // Filled in when there is an account to be signed into. Absent rather
         // than an empty string: "not signed in" and "signed in as nobody" are
         // different, and only one of them is real.
@@ -38,10 +37,13 @@ pub fn settings_read() -> Result<Settings, RpcError> {
 /// has to predict what a write did to the rest of it.
 #[tauri::command]
 #[specta::specta]
-pub fn settings_write(telemetry: Option<bool>) -> Result<Settings, RpcError> {
+pub fn settings_write(telemetry: Option<bool>, theme: Option<Theme>) -> Result<Settings, RpcError> {
     let store = store()?;
     if let Some(allowed) = telemetry {
         store.set_preference_flag(preference::TELEMETRY, allowed)?;
+    }
+    if let Some(chosen) = theme {
+        store.set_preference(preference::THEME, chosen.stored())?;
     }
     read(&store)
 }

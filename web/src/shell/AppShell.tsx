@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import './shell.css'
 import { AddProject } from './AddProject'
 import { ContextMenu } from './ContextMenu'
+import { ask, commands } from './live'
 import { Onboarding } from './Onboarding'
 import { Palette } from './Palette'
 import { Panes } from './Panes'
@@ -97,7 +98,12 @@ function Window(): React.JSX.Element {
       </div>
 
       {/* No project, nothing to show: the setup screen is the empty state. */}
-      {projects.length === 0 && <Onboarding onAddProject={() => setAdding(true)} />}
+      {projects.length === 0 && (
+        <Onboarding
+          onAddProject={() => setAdding(true)}
+          onDone={() => void ask(() => commands.settingsFinishOnboarding())}
+        />
+      )}
 
       {palette && <Palette onClose={() => setPalette(false)} />}
       {signIn && (

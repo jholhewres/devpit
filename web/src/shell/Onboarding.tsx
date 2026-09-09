@@ -15,7 +15,13 @@ import { useShell } from './useShell'
  * reachable long after the first run, and asking a signed-in person to sign
  * in is the app admitting it was not paying attention.
  */
-export function Onboarding({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
+export function Onboarding({
+  onAddProject,
+  onDone,
+}: {
+  onAddProject: () => void
+  onDone: () => void
+}): React.JSX.Element {
   const { signedIn, signIn, theme, setTheme } = useShell()
   const [step, setStep] = useState(signedIn ? 1 : 0)
 
@@ -124,7 +130,13 @@ export function Onboarding({ onAddProject }: { onAddProject: () => void }): Reac
             <p className="onb__d">
               A folder with a git repository in it. devpit reads it where it is and never moves it.
             </p>
-            <button className="onb__go" onClick={onAddProject}>
+            <button
+              className="onb__go"
+              onClick={() => {
+                onDone()
+                onAddProject()
+              }}
+            >
               Add a project
             </button>
             <button className="onb__skip" onClick={() => setStep(1)}>

@@ -1,11 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
-import type { Project } from '../gen/bindings'
+import type { Project, Theme as StoredTheme } from '../gen/bindings'
+import { ask, commands } from './live'
 import type { PaneName } from './paneList'
 import { closed, moved, opened, type Strip } from './strip'
 import { useProjects } from './useProjects'
 
-export type Theme = 'system' | 'light' | 'dark'
+export type Theme = StoredTheme
 export type PrefsPane =
   | 'account'
   | 'projects'
@@ -80,9 +81,18 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const close = useCallback((name: PaneName) => setStrip((was) => closed(was, name)), [])
   const move = useCallback((name: PaneName, to: number) => setStrip((was) => moved(was, name, to)), [])
 
+  /* The choice is written where the next launch will find it; the window
+     paints from local state so the click does not wait on disk. */
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     document.documentElement.dataset.theme = next
+    void ask(() => commands.settingsWrite(null, next))
+  }, [])
+
+  useEffect(() => {
+    void ask(() => commands.settingsRead()).then((asked) => {
+      if (asked.data) setThemeState(asked.data.theme)
+    })
   }, [])
 
   const value = useMemo<Shell>(
