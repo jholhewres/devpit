@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import type { PaneName } from './paneList'
+import { SessionRows } from './SessionRows'
 import { useShell, type PrefsPane } from './useShell'
 
 /*
@@ -132,31 +133,7 @@ export function Sidebar({
 
           <div className="navsep"></div>
 
-          <div className="heading">Sessions <span className="heading__n">6</span></div>
-          <button className="card" data-ctx="session" onClick={() => open('chat')} aria-pressed={isOpen('chat')}>
-            <span className="card__l1"><span className="card__t">Rebuild the shell on GPUI</span><span className="st-work spin"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.6" /></svg></span></span>
-            <span className="card__l2"><span className="card__kind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" /></svg></span><span className="card__link"><span className="card__lane">Doing</span></span><span className="card__state card__state--work">Working 3m</span></span>
-          </button>
-          <button className="card" data-ctx="session" onClick={() => open('term')} aria-pressed={isOpen('term')}>
-            <span className="card__l1"><span className="card__t">make test</span><span className="st-work spin"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.6" /></svg></span></span>
-            <span className="card__l2"><span className="card__kind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m4 17 6-6-6-6M12 19h8" /></svg></span><span className="card__link"><span className="card__lane">Doing</span><span className="card__task">Rebuild the shell on GPUI</span></span><span className="card__state card__state--work">running</span></span>
-          </button>
-          <button className="card" data-ctx="session" onClick={() => open('chat')} aria-pressed={isOpen('chat')}>
-            <span className="card__l1"><span className="card__t">Board opens in the content</span><span className="st-wait"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg></span></span>
-            <span className="card__l2"><span className="card__kind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" /></svg></span><span className="card__link"><span className="card__lane">Refine</span></span><span className="card__state card__state--wait">Waiting</span></span>
-          </button>
-          <button className="card" data-ctx="session" onClick={() => open('chat')} aria-pressed={isOpen('chat')}>
-            <span className="card__l1"><span className="card__t">Two read ceilings were guarding nothing</span></span>
-            <span className="card__l2"><span className="card__kind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" /></svg></span><span className="card__link"><span className="card__lane">Check</span></span><span className="card__state card__state--idle">28m</span></span>
-          </button>
-          <button className="card" data-ctx="session" onClick={() => open('term')} aria-pressed={isOpen('term')}>
-            <span className="card__l1"><span className="card__t">cargo watch</span></span>
-            <span className="card__l2"><span className="card__kind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m4 17 6-6-6-6M12 19h8" /></svg></span><span className="card__loose">~/devpit</span><span className="card__state card__state--idle">12m</span></span>
-          </button>
-          <button className="card" data-ctx="session" onClick={() => open('term')} aria-pressed={isOpen('term')}>
-            <span className="card__l1"><span className="card__t">git rebase -i main</span><span className="st-fail"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></span></span>
-            <span className="card__l2"><span className="card__kind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m4 17 6-6-6-6M12 19h8" /></svg></span><span className="card__loose">~/devpit</span><span className="card__state card__state--fail">Failed</span></span>
-          </button>
+          <SessionRows />
         </div>
 
         <div className="side__foot">
