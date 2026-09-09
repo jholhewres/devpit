@@ -730,7 +730,12 @@ code { font-family: var(--mono); font-size: 0.87em; color: var(--code-text); bac
 
 .composer { flex: none; padding: 0 16px 8px; }
 .composer__in { max-width: var(--content-max); margin: 0 auto; border-radius: 13px; border: 1px solid var(--border); background: var(--composer); padding: 11px 12px 9px; }
-.composer__ph { font-size: 13.5px; color: var(--ghost); min-height: 34px; }
+.composer__ph { font-size: 13.5px; color: var(--text); min-height: 34px; width: 100%; border: 0; background: none; resize: none; font-family: inherit; line-height: 1.5; outline: none; }
+.composer__ph::placeholder { color: var(--ghost); }
+/* The chips are buttons and selects side by side; the select has to give up
+   its native arrow and box to sit level with them. */
+select.chip { appearance: none; border: 0; background: none; font-family: inherit; cursor: pointer; }
+.send:disabled { opacity: .45; cursor: default; }
 .composer__row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .chip { display: flex; align-items: center; gap: 5px; height: 25px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--text-3); }
 .chip:hover { background: var(--overlay); color: var(--text-2); }

@@ -43,6 +43,40 @@ export const commands = {
 	 *  not have to guess which project it is standing in now.
 	 */
 	projectForget: (projectId: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_forget", { projectId })),
+	/**  `chat.history` — everything said in this conversation, in order. */
+	chatHistory: (projectId: string, conversationId: string) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId })),
+	/**
+	 *  `chat.cancel` — stops the turn in flight, keeping what already arrived.
+	 * 
+	 *  Answers with the ending it caused, or nothing when no turn was running.
+	 */
+	chatCancel: (conversationId: string) => typedError<{
+	turnId: string,
+	costUsd: number | null,
+	durationMs: number | null,
+	/**  The CLI's own word, kept rather than flattened into "failed". */
+	stopReason: string | null,
+	isError: boolean,
+} | null, RpcError>(__TAURI_INVOKE("chat_cancel", { conversationId })),
+	/**
+	 *  `chat.frames` — the shapes `chat.send` uses, on both sides.
+	 * 
+	 *  It exists so the generated contract carries `Ask` and `Frame`: `chat.send`
+	 *  streams over a Channel, which specta cannot describe, so it is left out of
+	 *  the contract and its types would go with it.
+	 */
+	chatFrames: (ask: {
+	projectId: string,
+	conversationId: string,
+	/**  Which profile — the account, and the binary it names. */
+	profileId: string,
+	model: string | null,
+	prompt: string,
+	cwd: string,
+	budgetUsd: number | null,
+} | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
+	/**  `agent.profiles` — the accounts this machine can talk to. */
+	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
 	 *  `project.tree` — one level of the file tree, from a given worktree.
 	 * 
@@ -281,6 +315,21 @@ export type AppInfo = {
 };
 
 /**
+ *  What one turn needs to run. One object because the composer sends these
+ *  together, and because tomorrow's field needs somewhere to live.
+ */
+export type Ask = {
+	projectId: string,
+	conversationId: string,
+	/**  Which profile — the account, and the binary it names. */
+	profileId: string,
+	model: string | null,
+	prompt: string,
+	cwd: string,
+	budgetUsd: number | null,
+};
+
+/**
  *  Response of `board.get`.
  * 
  *  An object rather than a bare list of columns: the board will grow a field,
@@ -292,6 +341,9 @@ export type Board = {
 	cards: Card[],
 	steps: Step[],
 };
+
+/**  How a tool call ended, or that it has not. */
+export type CallState = "running" | "ok" | "failed";
 
 /**
  *  What this build can do. Governs the UI.
@@ -375,6 +427,26 @@ export type Commit = {
 	committedAt: number | null,
 };
 
+export type Conversation = {
+	id: string,
+	projectId: string,
+	cardId: string | null,
+	/**
+	 *  The profile — account and driver — this conversation belongs to, for
+	 *  its whole life.
+	 * 
+	 *  Fixed on purpose: the transcript, the shape of a message and the way
+	 *  cost is counted all belong to one account. Changing it is starting
+	 *  another conversation, not continuing this one.
+	 */
+	profile: string,
+	/**  The model within that provider, which the composer may change. */
+	model: string | null,
+	messages: Message[],
+	costUsd: number | null,
+	createdAt: number | null,
+};
+
 export type ErrorCode = "unauthenticated" | 
 /**
  *  Used when a path falls outside the registered project root. Distinct
@@ -425,6 +497,17 @@ export type FileSaved = {
 	readAt: number | null,
 };
 
+/**  What the stream carries, one frame at a time. */
+export type Frame = 
+/**  A message opened; parts follow. */
+{ type: "opened"; message: Message } | 
+/**  More of the message that is open. */
+{ type: "part"; message_id: string; part: Part } | 
+/**  A tool call moved on. */
+{ type: "call_state"; call_id: string; state: CallState } | 
+/**  The turn is over. Absence of frames is not an ending. */
+{ type: "ended"; end: TurnEnd };
+
 /**
  *  Response of `card.diff` — what this front changed, against where it began.
  * 
@@ -473,6 +556,17 @@ title?: string } | { type: "split";
  */
 id?: string; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
 
+export type Message = {
+	id: string,
+	turnId: string | null,
+	role: Role,
+	parts: Part[],
+	/**  Unix seconds. */
+	createdAt: number | null,
+	/**  True while more of it is still arriving. */
+	streaming: boolean,
+};
+
 export type Note = {
 	id: string,
 	body: string,
@@ -505,6 +599,40 @@ export type PaneSize = {
 /**  Response of `session.write`. */
 export type PaneWritten = {
 	bytes: number,
+};
+
+/**  One piece of a message. */
+export type Part = { kind: "text"; text: string } | 
+/**  Reasoning the model showed. Separate because it is not the answer. */
+{ kind: "thinking"; text: string } | { kind: "tool_call"; id: string; name: string; 
+/**
+ *  Verbatim. Parsing it here would be this crate guessing at a shape
+ *  the provider is free to change.
+ */
+input: string; state: CallState } | { kind: "tool_result"; 
+/**  The call this answers. */
+call_id: string; output: string; is_error: boolean } | 
+/**
+ *  A line the driver did not recognise. Kept rather than dropped: losing
+ *  output is worse than showing it plain.
+ */
+{ kind: "unknown"; text: string };
+
+export type Profile = {
+	id: string,
+	/**  What the person calls this account. */
+	label: string,
+	/**  The binary to run. Two accounts differ here and nowhere else. */
+	command: string,
+	/**  Which driver reads its output. */
+	driver: string,
+	/**  Absent means the command is not on the PATH right now. */
+	path: string | null,
+	/**
+	 *  The models the composer may pick from. They belong to the driver, and
+	 *  are carried here so one call answers the whole selector.
+	 */
+	models?: string[],
 };
 
 /**
@@ -564,6 +692,9 @@ export type RejectedAgent = {
 	file: string,
 	reason: string,
 };
+
+/**  Who said it. */
+export type Role = "user" | "assistant" | "system";
 
 export type RpcError = {
 	code: ErrorCode,
@@ -677,6 +808,16 @@ export type StepKind =
  *  whichever of the two the machine is already using.
  */
 export type Theme = "system" | "light" | "dark";
+
+/**  What a turn cost and why it stopped. */
+export type TurnEnd = {
+	turnId: string,
+	costUsd: number | null,
+	durationMs: number | null,
+	/**  The CLI's own word, kept rather than flattened into "failed". */
+	stopReason: string | null,
+	isError: boolean,
+};
 
 /**
  *  A checkout of the project.

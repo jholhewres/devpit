@@ -9,6 +9,7 @@ mod commands;
 // Only ever compiled where it is used. The contract exists to generate the
 // frontend's types — in a release build nothing calls it, and a module dead in
 // release should say so rather than warn about it on every build.
+mod chat;
 #[cfg(any(debug_assertions, test))]
 mod contract;
 mod diffs;
@@ -52,6 +53,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(chat::Talking::default())
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.
@@ -74,6 +76,11 @@ fn main() {
             projects::project_clone,
             projects::project_open,
             projects::project_forget,
+            chat::chat_history,
+            chat::chat_send,
+            chat::chat_cancel,
+            chat::chat_frames,
+            chat::agent_profiles,
             projects::project_tree,
             projects::project_changes,
             projects::project_history,

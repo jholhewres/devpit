@@ -6,6 +6,7 @@
 
 use tauri_specta::{collect_commands, Builder};
 
+use crate::chat;
 use crate::{
     board, columns, commands, diffs, files, front, in_flight, panes, projects, sessions, settings,
     steps,
@@ -32,6 +33,10 @@ pub fn contract() -> Builder<tauri::Wry> {
         projects::project_clone,
         projects::project_open,
         projects::project_forget,
+        chat::chat_history,
+        chat::chat_cancel,
+        chat::chat_frames,
+        chat::agent_profiles,
         projects::project_tree,
         projects::project_changes,
         projects::project_history,

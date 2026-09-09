@@ -324,3 +324,17 @@ fn run(args: &[&str]) -> Result<String, AgentError> {
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod tests;
+
+pub mod driver;
+#[cfg(test)]
+mod driver_tests;
+pub mod head;
+#[cfg(test)]
+mod head_tests;
+pub mod profile;
+#[cfg(test)]
+mod profile_tests;
+pub mod store;
+#[cfg(test)]
+mod store_tests;
+pub mod talk;

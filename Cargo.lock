@@ -629,6 +629,7 @@ dependencies = [
 name = "devpit-agentcli"
 version = "0.1.0"
 dependencies = [
+ "devpit-rpc",
  "serde",
  "serde_json",
  "tempfile",
