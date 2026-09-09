@@ -62,11 +62,19 @@ export async function isMaximized(): Promise<boolean> {
 /** Calls back whenever the window is resized, so the corners keep up. */
 export function onResized(then: () => void): () => void {
   if (!inTauri()) return () => {}
+  /* Registering is asynchronous, so the caller can be gone before the
+     listener exists. Dropping it then has to be remembered, or the listener
+     arrives with nobody left to unsubscribe it. */
+  let dropped = false
   let drop: (() => void) | undefined
   void getCurrentWindow()
     .onResized(() => then())
     .then((unlisten) => {
-      drop = unlisten
+      if (dropped) unlisten()
+      else drop = unlisten
     })
-  return () => drop?.()
+  return () => {
+    dropped = true
+    drop?.()
+  }
 }

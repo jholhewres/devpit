@@ -56,10 +56,16 @@ export function ContextMenu(): React.JSX.Element | null {
 
   useEffect(() => {
     const open = (event: MouseEvent): void => {
-      /* Off first, and unconditionally: a path that forgets to preventDefault
-         is a path where the browser menu appears. */
+      /* A text field keeps the system's menu: cut, copy and paste are the
+         reason right-click exists there, and this window has nothing better
+         to offer in their place. */
+      const on = event.target as HTMLElement | null
+      if (on?.closest('input, textarea, [contenteditable="true"]')) return
+
+      /* Everywhere else it is off, and unconditionally: a path that forgets
+         to preventDefault is a path where Reload and View Source appear. */
       event.preventDefault()
-      const target = (event.target as HTMLElement | null)?.closest('[data-ctx]')
+      const target = on?.closest('[data-ctx]')
       const kind = (target as HTMLElement | null)?.dataset.ctx
       setAt(kind && MENUS[kind] ? { kind, x: event.clientX, y: event.clientY } : null)
     }

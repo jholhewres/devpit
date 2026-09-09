@@ -67,10 +67,15 @@ export function BoardPane(): React.JSX.Element {
   const [landed, setLanded] = useState<string | null>(null)
   const board = useRef<HTMLDivElement>(null)
 
-  /* The cursor belongs to the whole window while a card is in the air. */
+  /* The cursor belongs to the whole window while a card is in the air — and
+     the cleanup matters: unmounting mid-drag would leave every cursor in the
+     app stuck on `grabbing` with nothing to release it. */
   useEffect(() => {
     if (held) document.body.dataset.dragging = 'true'
     else delete document.body.dataset.dragging
+    return () => {
+      delete document.body.dataset.dragging
+    }
   }, [held])
 
   function onDown(event: React.PointerEvent, card: Card, from: string): void {

@@ -22,6 +22,12 @@ export function TabStrip(): React.JSX.Element {
     const row = strip.current
     if (!row) return
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    /* Forget the tabs that are gone. A remembered position from before a tab
+       was closed would animate it in from wherever it used to sit. */
+    const here = new Set(open as readonly string[])
+    for (const name of before.current.keys()) {
+      if (!here.has(name)) before.current.delete(name)
+    }
     for (const tab of Array.from(row.children) as HTMLElement[]) {
       const name = tab.dataset.toggle ?? ''
       const was = before.current.get(name)

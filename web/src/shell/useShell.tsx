@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 
 import type { PaneName } from './paneList'
+import { forgotten, type Open } from './projects'
 import { closed, moved, opened, type Strip } from './strip'
 
 export type Theme = 'system' | 'light' | 'dark'
@@ -69,8 +70,14 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
   const [theme, setThemeState] = useState<Theme>('dark')
-  const [project, setProject] = useState('devpit')
-  const [projects, setProjects] = useState<string[]>(FIRST_PROJECTS)
+  const [{ projects, current: project }, setOpenProjects] = useState<Open>({
+    projects: FIRST_PROJECTS,
+    current: 'devpit',
+  })
+  const setProject = useCallback(
+    (name: string) => setOpenProjects((was) => ({ ...was, current: name })),
+    [],
+  )
   const [signedIn, setSignedIn] = useState(false)
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
 
@@ -93,16 +100,9 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
     document.documentElement.dataset.theme = next
   }, [])
 
-  const forgetProject = useCallback(
-    (name: string) =>
-      setProjects((was) => {
-        const left = was.filter((other) => other !== name)
-        /* Removing the one you are standing in has to land somewhere. */
-        setProject((current) => (current === name ? (left[0] ?? '') : current))
-        return left
-      }),
-    [],
-  )
+  const forgetProject = useCallback((name: string) => {
+    setOpenProjects((was) => forgotten(was, name))
+  }, [])
 
   const value = useMemo<Shell>(
     () => ({
