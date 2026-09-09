@@ -121,6 +121,8 @@ pub struct Ask {
     /// What the agent may do without asking, in the CLI's own words.
     /// Absent keeps whatever the conversation already had.
     pub permission: Option<String>,
+    /// How hard to think. Absent keeps what the conversation already had.
+    pub effort: Option<String>,
 }
 
 /// A file the person put in front of the agent.

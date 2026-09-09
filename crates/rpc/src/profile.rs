@@ -23,6 +23,12 @@ pub struct Profile {
     /// are carried here so one call answers the whole selector.
     #[serde(default)]
     pub models: Vec<String>,
+    /// How hard the agent may be asked to think. Empty when the CLI has no
+    /// such control, and the composer then draws no chip at all.
+    #[serde(default)]
+    pub efforts: Vec<String>,
+    #[serde(default)]
+    pub effort_default: Option<String>,
 }
 
 impl Profile {

@@ -87,6 +87,8 @@ export const commands = {
 	 *  Absent keeps whatever the conversation already had.
 	 */
 	permission: string | null,
+	/**  How hard to think. Absent keeps what the conversation already had. */
+	effort: string | null,
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
@@ -452,6 +454,8 @@ export type Ask = {
 	 *  Absent keeps whatever the conversation already had.
 	 */
 	permission: string | null,
+	/**  How hard to think. Absent keeps what the conversation already had. */
+	effort: string | null,
 };
 
 /**
@@ -869,6 +873,12 @@ export type Profile = {
 	 *  are carried here so one call answers the whole selector.
 	 */
 	models?: string[],
+	/**
+	 *  How hard the agent may be asked to think. Empty when the CLI has no
+	 *  such control, and the composer then draws no chip at all.
+	 */
+	efforts?: string[],
+	effortDefault?: string | null,
 };
 
 /**

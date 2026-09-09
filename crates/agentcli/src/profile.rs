@@ -35,6 +35,17 @@ fn models_of(name: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+fn efforts_of(name: &str) -> (Vec<String>, Option<String>) {
+    driver(name)
+        .map(|found| {
+            (
+                found.efforts().iter().map(|&e| e.to_owned()).collect(),
+                found.effort_default().map(ToOwned::to_owned),
+            )
+        })
+        .unwrap_or_default()
+}
+
 /// The commands worth looking for when nothing has been declared.
 const KNOWN: &[(&str, &str, &str)] = &[
     ("claude", "Claude Code", "claude"),
@@ -46,10 +57,15 @@ const KNOWN: &[(&str, &str, &str)] = &[
 pub fn profiles(declared: &[Profile]) -> Vec<Profile> {
     let mut all: Vec<Profile> = declared
         .iter()
-        .map(|profile| Profile {
-            path: found(&profile.command),
-            models: models_of(&profile.driver),
-            ..profile.clone()
+        .map(|profile| {
+            let (efforts, effort_default) = efforts_of(&profile.driver);
+            Profile {
+                path: found(&profile.command),
+                models: models_of(&profile.driver),
+                efforts,
+                effort_default,
+                ..profile.clone()
+            }
         })
         .collect();
 
@@ -58,6 +74,7 @@ pub fn profiles(declared: &[Profile]) -> Vec<Profile> {
             continue;
         }
         if let Some(path) = found(command) {
+            let (efforts, effort_default) = efforts_of(driver);
             all.push(Profile {
                 id: (*command).to_owned(),
                 label: (*label).to_owned(),
@@ -65,6 +82,8 @@ pub fn profiles(declared: &[Profile]) -> Vec<Profile> {
                 driver: (*driver).to_owned(),
                 path: Some(path),
                 models: models_of(driver),
+                efforts,
+                effort_default,
             });
         }
     }

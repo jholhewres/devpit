@@ -6,8 +6,10 @@ import {
   ASKS,
   choices,
   fixedTo,
+  effortName,
   MODES,
   modelName,
+  modeName,
   money,
   ready,
   withFiles,
@@ -175,5 +177,30 @@ describe('what a model is called on screen', () => {
 
   it('leaves a real model name alone', () => {
     expect(modelName('opus')).toBe('opus')
+  })
+})
+
+describe('what a permission mode says it does', () => {
+  /* "Ask" names nothing on its own; the row exists so you know what you are
+     agreeing to. */
+  it('every mode explains itself', () => {
+    for (const mode of MODES) {
+      expect(mode.what.length).toBeGreaterThan(10)
+    }
+  })
+
+  it('names a mode by its label rather than the CLI token', () => {
+    expect(modeName('bypassPermissions')).toBe('Full access')
+    expect(modeName('manual')).toBe('Supervised')
+  })
+})
+
+describe('how hard the agent is asked to think', () => {
+  it('says Extra high rather than xhigh, which is an argument', () => {
+    expect(effortName('xhigh')).toBe('Extra high')
+  })
+
+  it('leaves a level it does not know alone', () => {
+    expect(effortName('ultracode')).toBe('ultracode')
   })
 })

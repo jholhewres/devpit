@@ -90,6 +90,7 @@ pub async fn chat_send(
         cwd,
         budget_usd,
         permission,
+        effort,
     } = ask;
     let home = home();
     let head_file = head_path(&home, &project_id, &conversation_id);
@@ -152,10 +153,12 @@ pub async fn chat_send(
             // Nothing to ask with yet: a turn left waiting on a prompt this
             // screen cannot draw would hang with no way to answer it.
             .or_else(|| Some("acceptEdits".to_owned())),
+        effort: effort.or_else(|| head.as_ref().and_then(|head| head.effort.clone())),
     };
     let _ = write_head(&head_file, &opening);
     let resuming = opening.session_id.clone();
     let mode = opening.permission.clone();
+    let thinking = opening.effort.clone();
     let left = remaining(Some(&opening));
 
     let asked = Message {
@@ -204,6 +207,7 @@ pub async fn chat_send(
                 budget_usd: left,
                 session_id: resuming.as_deref(),
                 permission: mode.as_deref(),
+                effort: thinking.as_deref(),
             },
             |part| {
                 collected

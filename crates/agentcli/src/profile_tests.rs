@@ -8,6 +8,8 @@ fn declared(id: &str, command: &str) -> Profile {
         driver: "claude".to_owned(),
         path: None,
         models: Vec::new(),
+        efforts: Vec::new(),
+        effort_default: None,
     }
 }
 

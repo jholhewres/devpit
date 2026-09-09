@@ -97,11 +97,34 @@ export function money(usd: number): string | null {
    `manual` stops and asks, and the question arrives in the thread with accept
    and refuse on it — which is what makes it an option at all. It was left out
    while there was nowhere to answer. */
-export const MODES: readonly { readonly id: string; readonly label: string }[] = [
-  { id: 'manual', label: 'Ask' },
-  { id: 'acceptEdits', label: 'Edits' },
-  { id: 'bypassPermissions', label: 'Full access' },
+export interface Mode {
+  readonly id: string
+  readonly label: string
+  /* What it actually does. "Ask" names nothing on its own — the whole point
+     of the row is knowing what you are agreeing to. */
+  readonly what: string
+}
+
+export const MODES: readonly Mode[] = [
+  { id: 'manual', label: 'Supervised', what: 'Ask before commands and file changes' },
+  { id: 'acceptEdits', label: 'Accept edits', what: 'Edits go through; ask before anything else' },
+  { id: 'bypassPermissions', label: 'Full access', what: 'Commands and edits without asking' },
 ]
+
+export const modeName = (id: string): string =>
+  MODES.find((mode) => mode.id === id)?.label ?? id
+
+/* How hard the agent is asked to think, as words rather than the CLI's own
+   tokens: `xhigh` is an argument, not a label. */
+const EFFORTS: Readonly<Record<string, string>> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Extra high',
+  max: 'Max',
+}
+
+export const effortName = (effort: string): string => EFFORTS[effort] ?? effort
 
 /* Which mode stops to ask. The session is told to hold its tools only in that
    one — a turn held in a mode that never asks would wait for a question that

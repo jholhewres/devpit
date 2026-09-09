@@ -28,6 +28,7 @@ fn head(profile: &str, cost: f64) -> Head {
         budget_usd: None,
         session_id: None,
         permission: None,
+        effort: None,
     }
 }
 

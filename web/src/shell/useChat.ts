@@ -16,6 +16,7 @@ export interface Chat {
   /** What every turn so far has cost. */
   readonly cost: number
   readonly permission: string
+  readonly effort: string | null
   readonly files: readonly Attachment[]
   /** What the agent is waiting to be allowed to do. */
   readonly asked: readonly Question[]
@@ -24,6 +25,7 @@ export interface Chat {
   pick: (profileId: string) => void
   setModel: (model: string | null) => void
   setPermission: (mode: string) => void
+  setEffort: (effort: string) => void
   attach: (paths: readonly string[]) => void
   detach: (path: string) => void
   answer: (id: string, allow: boolean) => void
@@ -40,6 +42,7 @@ export function useChat(conversationId: string): Chat {
   const [model, setModel] = useState<string | null>(null)
   const [cost, setCost] = useState(0)
   const [permission, setPermission] = useState(MODES[0].id)
+  const [effort, setEffort] = useState<string | null>(null)
   const [files, setFiles] = useState<readonly Attachment[]>([])
   const [asked, setAsked] = useState<readonly Question[]>([])
   const [session, setSession] = useState<string | null>(null)
@@ -67,6 +70,8 @@ export function useChat(conversationId: string): Chat {
       }
       const installed = (found.data ?? []).filter((profile) => profile.path !== null)
       setProfiles(installed)
+      /* The driver's own default, until someone picks otherwise. */
+      setEffort((was) => was ?? installed[0]?.effortDefault ?? null)
       /* Nothing picked and only one account installed: pick it. Asking which
          of one is a question with no answer. */
       setProfileId((was) => was ?? (installed.length === 1 ? installed[0].id : null))
@@ -111,6 +116,7 @@ export function useChat(conversationId: string): Chat {
         cwd: project.rootPath,
         budgetUsd: null,
         permission,
+        effort,
       }
       const started = send(turn, (frame) => setMessages((was) => applied(was, frame)))
       if (!started) return setError('not running in the app')
@@ -127,7 +133,7 @@ export function useChat(conversationId: string): Chat {
           setFixed(profileId)
         })
     },
-    [project, conversationId, profileId, model, permission, files],
+    [project, conversationId, profileId, model, permission, effort, files],
   )
 
   /* A dropped file is resolved against the project root before it is shown:
@@ -168,6 +174,7 @@ export function useChat(conversationId: string): Chat {
     model,
     cost,
     permission,
+    effort,
     files,
     asked,
     sending,
@@ -175,6 +182,7 @@ export function useChat(conversationId: string): Chat {
     pick: setProfileId,
     setModel,
     setPermission,
+    setEffort,
     attach,
     detach,
     answer,

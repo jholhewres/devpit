@@ -10,6 +10,7 @@ fn head(profile: &str) -> Head {
         budget_usd: None,
         session_id: None,
         permission: None,
+        effort: None,
     }
 }
 

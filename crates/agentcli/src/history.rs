@@ -101,6 +101,7 @@ pub fn conversations(home: &Path, project_id: &str) -> Vec<Summary> {
                 budget_usd: None,
                 session_id: None,
                 permission: None,
+                effort: None,
             });
             Some(Summary {
                 title: title_of(&opened_with(&path).unwrap_or_default()),

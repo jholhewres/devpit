@@ -29,6 +29,18 @@ pub trait Driver: Send + Sync {
     /// driver, because that is fixed for the conversation's life.
     fn models(&self) -> &'static [&'static str];
 
+    /// How hard it may be asked to think, and what it does by default.
+    ///
+    /// Empty for a CLI with no such control — the composer draws no chip
+    /// rather than a chip with one option in it.
+    fn efforts(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    fn effort_default(&self) -> Option<&'static str> {
+        None
+    }
+
     /// Reads one line of output.
     fn read(&self, line: &str) -> Read;
 
@@ -49,6 +61,15 @@ impl Driver for Claude {
 
     fn models(&self) -> &'static [&'static str] {
         &["default", "opus", "sonnet", "haiku"]
+    }
+
+    /// `--effort`, as the CLI's own help lists it.
+    fn efforts(&self) -> &'static [&'static str] {
+        &["low", "medium", "high", "xhigh", "max"]
+    }
+
+    fn effort_default(&self) -> Option<&'static str> {
+        Some("high")
     }
 
     fn read(&self, line: &str) -> Read {

@@ -25,6 +25,8 @@ pub struct Say<'a> {
     pub session_id: Option<&'a str>,
     /// What the agent may do without asking. The CLI's own word for it.
     pub permission: Option<&'a str>,
+    /// How hard to think. One of what the driver's `efforts` lists.
+    pub effort: Option<&'a str>,
 }
 
 /// A turn, and the thread it belongs to on the CLI's side.
@@ -68,6 +70,10 @@ pub fn say(
     if let Some(mode) = turn.permission {
         argv.push("--permission-mode".to_owned());
         argv.push(mode.to_owned());
+    }
+    if let Some(effort) = turn.effort {
+        argv.push("--effort".to_owned());
+        argv.push(effort.to_owned());
     }
 
     let mut child = Command::new(turn.command)

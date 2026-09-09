@@ -29,6 +29,9 @@ pub struct Head {
     /// What the agent may do without asking.
     #[serde(default)]
     pub permission: Option<String>,
+    /// How hard it is asked to think.
+    #[serde(default)]
+    pub effort: Option<String>,
 }
 
 pub fn head_path(home: &Path, project_id: &str, conversation_id: &str) -> PathBuf {
