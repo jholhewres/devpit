@@ -1,5 +1,6 @@
 import mark from '../assets/brand/mark.png'
 import { BoardPane } from './BoardPane'
+import { FilePane } from './FilePane'
 import { useShell } from './useShell'
 
 /*
@@ -10,7 +11,7 @@ import { useShell } from './useShell'
  * replace wholesale, not field by field.
  */
 
-export function Panes(): React.JSX.Element {
+export function Panes({ openFile }: { openFile: string | null }): React.JSX.Element {
   const { open, active, show, close, project } = useShell()
 
   return (
@@ -494,40 +495,7 @@ export function Panes(): React.JSX.Element {
             </div>
 
             {/* A file, open in the middle */}
-            <div className="pane pane--file" data-pane="file" data-show={String(active === 'file')}>
-              <div className="pane__bar">
-                <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v5h5" /></svg></span>
-                <span className="pane__t" id="fileTitle"><b>files.rs</b> · apps/desktop/src</span>
-                <span className="drag"></span>
-                <span className="netstat"><span className="add">+12</span><span className="del">−3</span></span>
-                <button className="sq26" onClick={() => close('file')} aria-label="Close file"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
-              </div>
-              <div className="skel">
-                <div className="skel__ln" style={{width: '62%'}}></div>
-                <div className="skel__ln" style={{width: '38%'}}></div>
-                <div className="skel__ln" style={{width: '78%'}}></div>
-                <div className="skel__ln" style={{width: '54%'}}></div>
-                <div className="skel__ln" style={{width: '70%'}}></div>
-                <div className="skel__ln" style={{width: '44%'}}></div>
-                <div className="skel__ln" style={{width: '66%'}}></div>
-              </div>
-              <div className="code">
-    <div className="ln"><span className="ln__n">100</span><span className="ln__c"><span className="cm">/// Why a file is too big to open, or nothing.</span></span></div>
-    <div className="ln"><span className="ln__n">101</span><span className="ln__c"><span className="cm">///</span></span></div>
-    <div className="ln"><span className="ln__n">102</span><span className="ln__c"><span className="cm">/// A function of its own so the test calls the</span></span></div>
-    <div className="ln"><span className="ln__n">103</span><span className="ln__c"><span className="cm">/// rule rather than a copy of it.</span></span></div>
-    <div className="ln"><span className="ln__n">104</span><span className="ln__c"><span className="kw">fn</span> <span className="fn">past_the_ceiling</span>(path: &<span className="kw">str</span>, bytes: <span className="kw">u64</span>) -&gt; Option&lt;String&gt; {'{'}</span></div>
-    <div className="ln"><span className="ln__n">105</span><span className="ln__c">    <span className="kw">if</span> bytes &lt;= MOST_BYTES {'{'}</span></div>
-    <div className="ln"><span className="ln__n">106</span><span className="ln__c">        <span className="kw">return</span> None;</span></div>
-    <div className="ln"><span className="ln__n">107</span><span className="ln__c">    {'}'}</span></div>
-    <div className="ln"><span className="ln__n">108</span><span className="ln__c">    Some(<span className="fn">format!</span>(</span></div>
-    <div className="ln"><span className="ln__n">109</span><span className="ln__c">        <span className="st">"{'{'}path{'}'} is {'{'}:.1{'}'} MB — past the {'{'}{'}'} MB this opens"</span>,</span></div>
-    <div className="ln"><span className="ln__n">110</span><span className="ln__c">        bytes <span className="kw">as</span> <span className="kw">f64</span> / <span className="st">1_048_576.0</span>,</span></div>
-    <div className="ln"><span className="ln__n">111</span><span className="ln__c">        MOST_BYTES / <span className="st">1_048_576</span></span></div>
-    <div className="ln"><span className="ln__n">112</span><span className="ln__c">    ))</span></div>
-    <div className="ln"><span className="ln__n">113</span><span className="ln__c">{'}'}</span></div>
-              </div>
-            </div>
+            <FilePane path={openFile} />
 
             {/* Terminal */}
             <div className="pane pane--term" data-pane="term" data-show={String(active === 'term')}>

@@ -39,6 +39,7 @@ function Window(): React.JSX.Element {
   const [signIn, setSignIn] = useState(false)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [openFile, setOpenFile] = useState<string | null>(null)
   const [maximized, setMaximized] = useState(false)
 
   /* Maximised, the rounded corners square off — a rounded rectangle floating
@@ -86,8 +87,13 @@ function Window(): React.JSX.Element {
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
         <Sidebar onSearch={() => setPalette(true)} onSignIn={() => setSignIn(true)} />
-        <Panes />
-        <RightPanel />
+        <Panes openFile={openFile} />
+        <RightPanel
+          onOpenFile={(path) => {
+            setOpenFile(path)
+            shell.show('file')
+          }}
+        />
       </div>
 
       {/* No project, nothing to show: the setup screen is the empty state. */}
