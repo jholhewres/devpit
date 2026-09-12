@@ -10,17 +10,22 @@ use std::sync::{Arc, Mutex};
 
 use devpit_core::Store;
 use devpit_git::worktree_path;
-use devpit_rpc::{ErrorCode, LayoutNode, RpcError, SessionLayout, SplitDirection};
+use devpit_rpc::{ErrorCode, LayoutNode, RpcError, SessionLayout};
 use tauri::State;
 use ulid::Ulid;
 
 use crate::claims::Claims;
+use crate::shell_launch::wrapped_shell;
+use crate::tap::listen;
 
 pub struct SessionState {
     /// The handle a pane relays what it hears through.
     app: tauri::AppHandle,
     /// Who owns each pane right now. See [`crate::claims`].
     pub(crate) claims: Claims,
+    /// The panes being listened to whether or not anyone is looking.
+    /// See [`crate::tap`].
+    pub(crate) taps: crate::tap::Taps,
     /// One lock per project, so two windows arranging two different projects
     /// do not queue behind each other.
     project_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
@@ -31,6 +36,7 @@ impl SessionState {
         Self {
             app,
             claims: Claims::new(),
+            taps: crate::tap::Taps::new(),
             project_locks: Mutex::new(HashMap::new()),
         }
     }
@@ -40,7 +46,7 @@ impl SessionState {
         &self.app
     }
 
-    fn project_lock(&self, project_id: &str) -> Result<Arc<Mutex<()>>, RpcError> {
+    pub(crate) fn project_lock(&self, project_id: &str) -> Result<Arc<Mutex<()>>, RpcError> {
         let mut locks = self
             .project_locks
             .lock()
@@ -53,18 +59,18 @@ impl SessionState {
     }
 }
 
-fn store() -> Result<Store, RpcError> {
+pub(crate) fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
 }
 
-fn tmux_server() -> Result<devpit_tmux::Server, RpcError> {
+pub(crate) fn tmux_server() -> Result<devpit_tmux::Server, RpcError> {
     if !devpit_tmux::Server::available() {
         return Err(RpcError::new(
             ErrorCode::Unsupported,
             "tmux is not installed, or not on PATH",
         ));
     }
-    Ok(devpit_tmux::Server::new(socket_path()?))
+    Ok(devpit_tmux::Server::new(socket_path()?).with_shell(wrapped_shell()?))
 }
 
 /// The tmux socket, at the state root and never under a per-project directory.
@@ -77,7 +83,7 @@ fn socket_path() -> Result<PathBuf, RpcError> {
     Ok(Store::root()?.join("tmux.sock"))
 }
 
-fn locate_cwd(project_id: &str, worktree_id: Option<&str>) -> Result<PathBuf, RpcError> {
+pub(crate) fn locate_cwd(project_id: &str, worktree_id: Option<&str>) -> Result<PathBuf, RpcError> {
     let store = store()?;
     let row = store
         .project(project_id)?
@@ -99,7 +105,7 @@ fn locate_cwd(project_id: &str, worktree_id: Option<&str>) -> Result<PathBuf, Rp
     Ok(root)
 }
 
-fn encode(layout: &SessionLayout) -> Result<String, RpcError> {
+pub(crate) fn encode(layout: &SessionLayout) -> Result<String, RpcError> {
     serde_json::to_string(&layout.tree).map_err(|err| RpcError::internal(err.to_string()))
 }
 
@@ -108,7 +114,11 @@ fn encode(layout: &SessionLayout) -> Result<String, RpcError> {
 /// The naming happens on every read and costs one walk. Persisting it is the
 /// caller's business: `decode` is used from paths that only look, and a read
 /// that writes would turn opening a window into a disk write.
-fn decode(project_id: &str, tree: &str, focused_id: &str) -> Result<SessionLayout, RpcError> {
+pub(crate) fn decode(
+    project_id: &str,
+    tree: &str,
+    focused_id: &str,
+) -> Result<SessionLayout, RpcError> {
     let mut tree: LayoutNode =
         serde_json::from_str(tree).map_err(|err| RpcError::internal(err.to_string()))?;
     tree.name_the_splits(&mut || format!("sp_{}", Ulid::generate()));
@@ -123,8 +133,8 @@ fn decode(project_id: &str, tree: &str, focused_id: &str) -> Result<SessionLayou
 ///
 /// One place, because four commands asked the same question in four ways and
 /// two of them phrased the missing case differently.
-pub(crate) fn layout_of(project_id: &str) -> Result<SessionLayout, RpcError> {
-    let Some((tree, focused)) = store()?.pane_layout(project_id)? else {
+pub(crate) fn layout_of(project_id: &str, tab_id: &str) -> Result<SessionLayout, RpcError> {
+    let Some((tree, focused)) = store()?.pane_layout(project_id, tab_id)? else {
         return Err(RpcError::new(
             ErrorCode::NotFound,
             "this project has no session yet",
@@ -138,17 +148,22 @@ pub(crate) fn attach_argv(project_id: &str, leaf_id: &str) -> Result<Vec<String>
     Ok(tmux_server()?.attach_argv(&devpit_tmux::Server::session_name(project_id), leaf_id))
 }
 
-fn persist(store: &Store, layout: &SessionLayout) -> Result<(), RpcError> {
-    store.set_pane_layout(&layout.project_id, &encode(layout)?, &layout.focused_id)?;
+pub(crate) fn persist(store: &Store, tab_id: &str, layout: &SessionLayout) -> Result<(), RpcError> {
+    store.set_pane_layout(
+        &layout.project_id,
+        tab_id,
+        &encode(layout)?,
+        &layout.focused_id,
+    )?;
     Ok(())
 }
 
-fn load_or_create(project_id: &str, cwd: &Path) -> Result<SessionLayout, RpcError> {
+fn load_or_create(project_id: &str, tab_id: &str, cwd: &Path) -> Result<SessionLayout, RpcError> {
     let store = store()?;
     let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(project_id);
 
-    if let Some((tree, focused)) = store.pane_layout(project_id)? {
+    if let Some((tree, focused)) = store.pane_layout(project_id, tab_id)? {
         let layout = decode(project_id, &tree, &focused)?;
         for (leaf_id, _) in layout.tree.leaves() {
             server
@@ -170,11 +185,11 @@ fn load_or_create(project_id: &str, cwd: &Path) -> Result<SessionLayout, RpcErro
             devpit_tmux::Server::target(&session, &leaf_id),
         ),
     };
-    persist(&store, &layout)?;
+    persist(&store, tab_id, &layout)?;
     Ok(layout)
 }
 
-fn tmux_err(err: devpit_tmux::TmuxError) -> RpcError {
+pub(crate) fn tmux_err(err: devpit_tmux::TmuxError) -> RpcError {
     match err {
         devpit_tmux::TmuxError::Missing => RpcError::new(
             ErrorCode::Unsupported,
@@ -185,11 +200,19 @@ fn tmux_err(err: devpit_tmux::TmuxError) -> RpcError {
 }
 
 /// `session.ensure` — a layout and a tmux window, created if they were missing.
+///
+/// Async so it does not run on the thread that draws the window.
+///
+/// It opens the store and spawns tmux several times — a handful of
+/// milliseconds each, and all of them on the main thread while somebody
+/// watches an empty pane. There is no `await` in the body, so the work still
+/// happens in one go; it just happens somewhere the window can paint through.
 #[tauri::command]
 #[specta::specta]
-pub fn session_ensure(
-    state: State<SessionState>,
+pub async fn session_ensure(
+    state: State<'_, SessionState>,
     project_id: String,
+    tab_id: String,
     worktree_id: Option<String>,
 ) -> Result<SessionLayout, RpcError> {
     let lock = state.project_lock(&project_id)?;
@@ -197,14 +220,16 @@ pub fn session_ensure(
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
     let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
-    load_or_create(&project_id, &cwd)
+    let layout = load_or_create(&project_id, &tab_id, &cwd)?;
+    listen(&state, &project_id, &layout);
+    Ok(layout)
 }
 
 /// `session.layout` — the tree as last persisted.
 #[tauri::command]
 #[specta::specta]
-pub fn session_layout(project_id: String) -> Result<SessionLayout, RpcError> {
-    layout_of(&project_id)
+pub fn session_layout(project_id: String, tab_id: String) -> Result<SessionLayout, RpcError> {
+    layout_of(&project_id, &tab_id)
 }
 
 /// `session.focus` — persists which leaf receives the next split or action.
@@ -213,13 +238,14 @@ pub fn session_layout(project_id: String) -> Result<SessionLayout, RpcError> {
 pub fn session_focus(
     state: State<SessionState>,
     project_id: String,
+    tab_id: String,
     leaf_id: String,
 ) -> Result<SessionLayout, RpcError> {
     let lock = state.project_lock(&project_id)?;
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let mut layout = layout_of(&project_id)?;
+    let mut layout = layout_of(&project_id, &tab_id)?;
     layout.focused_id = leaf_id.clone();
     if !layout.tree.contains_leaf(&leaf_id) {
         return Err(RpcError::new(
@@ -227,178 +253,7 @@ pub fn session_focus(
             "that pane is not in this project's layout",
         ));
     }
-    persist(&store()?, &layout)?;
-    Ok(layout)
-}
-
-/// `session.split` — a new tmux window and a split node in the tree.
-#[tauri::command]
-#[specta::specta]
-pub fn session_split(
-    state: State<SessionState>,
-    project_id: String,
-    leaf_id: String,
-    direction: SplitDirection,
-    worktree_id: Option<String>,
-) -> Result<SessionLayout, RpcError> {
-    let lock = state.project_lock(&project_id)?;
-    let _guard = lock
-        .lock()
-        .map_err(|_| RpcError::internal("project session lock"))?;
-    let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
-    let server = tmux_server()?;
-    let session = devpit_tmux::Server::session_name(&project_id);
-
-    let current = layout_of(&project_id)?;
-    if !current.tree.contains_leaf(&leaf_id) {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            "that pane is not in this project's layout",
-        ));
-    }
-
-    let new_id = format!("leaf_{}", Ulid::generate());
-    server
-        .new_window(&session, &new_id, &cwd)
-        .map_err(tmux_err)?;
-    let new_leaf = LayoutNode::leaf(
-        new_id.clone(),
-        devpit_tmux::Server::target(&session, &new_id),
-    );
-    let tree = current
-        .tree
-        .split_leaf(&leaf_id, direction, new_leaf)
-        .ok_or_else(|| RpcError::internal("the leaf vanished while splitting"))?;
-
-    let layout = SessionLayout {
-        project_id,
-        focused_id: new_id,
-        tree,
-    };
-    persist(&store()?, &layout)?;
-    Ok(layout)
-}
-
-/// `session.close_leaf` — the pane goes, and its tmux window with it.
-///
-/// The hole this fills: `session.split` could only ever add. A tree that only
-/// grows is a leak wearing a layout's clothes.
-///
-/// Refuses the last pane. A session with no pane is not a layout, and the
-/// refusal says so rather than persisting an empty tree the screen cannot draw.
-#[tauri::command]
-#[specta::specta]
-pub fn session_close_leaf(
-    state: State<SessionState>,
-    project_id: String,
-    leaf_id: String,
-) -> Result<SessionLayout, RpcError> {
-    let lock = state.project_lock(&project_id)?;
-    let _guard = lock
-        .lock()
-        .map_err(|_| RpcError::internal("project session lock"))?;
-
-    let current = layout_of(&project_id)?;
-    if !current.tree.contains_leaf(&leaf_id) {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            "that pane is not in this project's layout",
-        ));
-    }
-    let tree = current.tree.close_leaf(&leaf_id).ok_or_else(|| {
-        RpcError::new(
-            ErrorCode::Conflict,
-            "that is the only pane left — close the project instead",
-        )
-    })?;
-
-    // The window goes after the tree is known to be closable, so a refusal
-    // never leaves a session whose layout and tmux disagree.
-    let session = devpit_tmux::Server::session_name(&project_id);
-    tmux_server()?
-        .kill_window(&session, &leaf_id)
-        .map_err(tmux_err)?;
-
-    // Focus follows the tree when it pointed at what just left.
-    let focused_id = if current.focused_id == leaf_id {
-        tree.first_leaf_id().to_owned()
-    } else {
-        current.focused_id
-    };
-    let layout = SessionLayout {
-        project_id,
-        focused_id,
-        tree,
-    };
-    persist(&store()?, &layout)?;
-    Ok(layout)
-}
-
-/// `session.rename_leaf` — the name the person gave this pane.
-///
-/// An empty name clears it, which is how a pane goes back to showing what the
-/// program running in it calls itself. The person's name always wins over the
-/// program's: a title escape arriving later must not undo a rename.
-#[tauri::command]
-#[specta::specta]
-pub fn session_rename_leaf(
-    state: State<SessionState>,
-    project_id: String,
-    leaf_id: String,
-    name: String,
-) -> Result<SessionLayout, RpcError> {
-    let lock = state.project_lock(&project_id)?;
-    let _guard = lock
-        .lock()
-        .map_err(|_| RpcError::internal("project session lock"))?;
-
-    let current = layout_of(&project_id)?;
-    let tree = current.tree.rename_leaf(&leaf_id, &name).ok_or_else(|| {
-        RpcError::new(
-            ErrorCode::NotFound,
-            "that pane is not in this project's layout",
-        )
-    })?;
-    let layout = SessionLayout {
-        project_id,
-        focused_id: current.focused_id,
-        tree,
-    };
-    persist(&store()?, &layout)?;
-    Ok(layout)
-}
-
-/// `session.set_ratio` — where a boundary was dragged to.
-///
-/// Persisted because Orca's rule is the right one: boundaries stay where you
-/// put them, and resizing the window does not shuffle a layout someone
-/// arranged. The tree clamps, so neither side can be dragged out of reach.
-#[tauri::command]
-#[specta::specta]
-pub fn session_set_ratio(
-    state: State<SessionState>,
-    project_id: String,
-    split_id: String,
-    ratio: f64,
-) -> Result<SessionLayout, RpcError> {
-    let lock = state.project_lock(&project_id)?;
-    let _guard = lock
-        .lock()
-        .map_err(|_| RpcError::internal("project session lock"))?;
-
-    let current = layout_of(&project_id)?;
-    let tree = current.tree.set_ratio(&split_id, ratio).ok_or_else(|| {
-        RpcError::new(
-            ErrorCode::NotFound,
-            "no such boundary in this project's layout",
-        )
-    })?;
-    let layout = SessionLayout {
-        project_id,
-        focused_id: current.focused_id,
-        tree,
-    };
-    persist(&store()?, &layout)?;
+    persist(&store()?, &tab_id, &layout)?;
     Ok(layout)
 }
 
@@ -431,11 +286,15 @@ pub fn terminal_attach_agent(
     // The terminal is made if it is not there yet. Refusing because nobody has
     // opened one is refusing over a step the product can take itself — and the
     // person clicking this on a card is asking for exactly that terminal.
-    let layout = match layout_of(&project_id) {
+    // A card's terminal is a tab of its own, named after the card: opening it
+    // twice lands in the same place, and it is not mixed into whatever the
+    // person had arranged by hand.
+    let tab_id = format!("tab_card_{card_id}");
+    let layout = match layout_of(&project_id, &tab_id) {
         Ok(layout) => layout,
         Err(_) => {
             let cwd = locate_cwd(&project_id, None)?;
-            load_or_create(&project_id, &cwd)?
+            load_or_create(&project_id, &tab_id, &cwd)?
         }
     };
 
@@ -446,4 +305,30 @@ pub fn terminal_attach_agent(
     tmux_server()?.send_keys(&target, &line).map_err(tmux_err)?;
 
     Ok(line)
+}
+
+/// The layout of whichever tab holds this leaf.
+///
+/// Attaching to a pane needs to know the pane is this project's, not which tab
+/// it is drawn in — and a caller that had to name the tab would be carrying an
+/// answer it does not have when a pane is reached from a card or a shortcut.
+pub(crate) fn holding(project_id: &str, leaf_id: &str) -> Result<SessionLayout, RpcError> {
+    // One connection for the whole walk. `layout_of` opens its own, so asking
+    // it per tab opened the database once per tab a project has — on the path
+    // that attaches a terminal, which is the one nobody is willing to wait on.
+    let store = store()?;
+    for tab_id in store.pane_layout_tabs(project_id)? {
+        let Ok(Some((tree, focused))) = store.pane_layout(project_id, &tab_id) else {
+            continue;
+        };
+        if let Ok(layout) = decode(project_id, &tree, &focused) {
+            if layout.tree.contains_leaf(leaf_id) {
+                return Ok(layout);
+            }
+        }
+    }
+    Err(RpcError::new(
+        ErrorCode::NotFound,
+        "that pane is not in this project",
+    ))
 }

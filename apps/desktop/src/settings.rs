@@ -23,6 +23,7 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
             .map(|seconds| seconds as f64),
         automatic_updates: store.preference_flag(preference::AUTO_UPDATE)?,
         keep_transcripts: store.preference_flag(preference::KEEP_TRANSCRIPTS)?,
+        confirm_stop: store.preference_flag(preference::CONFIRM_STOP)?,
     })
 }
 
@@ -44,6 +45,7 @@ pub fn settings_write(
     theme: Option<Theme>,
     automatic_updates: Option<bool>,
     keep_transcripts: Option<bool>,
+    confirm_stop: Option<bool>,
 ) -> Result<Settings, RpcError> {
     let store = store()?;
     if let Some(allowed) = telemetry {
@@ -57,6 +59,9 @@ pub fn settings_write(
     }
     if let Some(keep) = keep_transcripts {
         store.set_preference_flag(preference::KEEP_TRANSCRIPTS, keep)?;
+    }
+    if let Some(ask) = confirm_stop {
+        store.set_preference_flag(preference::CONFIRM_STOP, ask)?;
     }
     read(&store)
 }

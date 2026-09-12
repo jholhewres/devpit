@@ -6,13 +6,17 @@
 
 use tauri_specta::{collect_commands, Builder};
 
+use crate::account;
+use crate::arranging;
 use crate::asking;
 use crate::branches;
 use crate::chat;
+use crate::happening;
 use crate::index;
 use crate::mcp;
 use crate::reveal;
 use crate::saves;
+use crate::shell_launch;
 use crate::staging;
 use crate::threads;
 use crate::workspace;
@@ -95,14 +99,23 @@ pub fn contract() -> Builder<tauri::Wry> {
         sessions::session_ensure,
         sessions::session_layout,
         sessions::session_focus,
-        sessions::session_split,
-        sessions::session_close_leaf,
-        sessions::session_rename_leaf,
-        sessions::session_set_ratio,
+        arranging::session_split,
+        arranging::session_close_leaf,
+        arranging::session_close_tab,
+        arranging::session_rename_leaf,
+        arranging::session_set_ratio,
         panes::session_write,
         panes::session_resize,
         panes::pane_scrollback,
         panes::session_detach,
+        shell_launch::session_running,
+        shell_launch::agents_known,
+        shell_launch::session_launch_agent,
+        happening::terminal_happenings,
+        account::account_read,
+        account::account_sign_in,
+        account::account_poll,
+        account::account_sign_out,
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,
@@ -110,35 +123,5 @@ pub fn contract() -> Builder<tauri::Wry> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Writes the TypeScript contract, and fails when it was out of date.
-    ///
-    /// Generating from `main` meant the frontend types were only refreshed by
-    /// someone opening the window — a command could reach `main` and never
-    /// reach the screen, which is the drift this rule exists to stop. As a
-    /// test it runs in `make test` and in CI, so a contract change that was
-    /// not regenerated fails the build rather than the next screen.
-    #[test]
-    fn the_typescript_contract_is_up_to_date() {
-        let before = std::fs::read_to_string(BINDINGS).unwrap_or_default();
-
-        contract()
-            .export(specta_typescript::Typescript::default(), BINDINGS)
-            .expect("export the contract");
-
-        let after = std::fs::read_to_string(BINDINGS).expect("read back");
-
-        // Compared as a boolean, not with assert_eq: the two sides are the
-        // whole file, and printing them turns one stale line into a thousand
-        // lines of noise nobody reads.
-        assert!(
-            before == after,
-            "web/src/gen/bindings.ts was stale — it has just been regenerated, commit it \
-             ({} lines before, {} after)",
-            before.lines().count(),
-            after.lines().count()
-        );
-    }
-}
+#[path = "contract_tests.rs"]
+mod tests;

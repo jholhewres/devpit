@@ -211,6 +211,37 @@ CREATE TABLE session_link (
 );
 "#,
     },
+    Migration {
+        version: 5,
+        sql: r#"
+-- A layout belongs to a tab, not to a project.
+--
+-- It was keyed by project alone, which meant one tree for the whole project —
+-- and opening a second terminal tab had to split that tree to get a leaf. So
+-- three tabs were three leaves under two split nodes, drawn as three tabs: a
+-- list wearing a tree's clothes, whose shape meant nothing.
+--
+-- Keyed by tab, a split is what its name says: dividing what one tab shows.
+--
+-- Rebuilt rather than altered because the primary key changes, which SQLite
+-- cannot do in place. Existing rows keep their tree under a tab named after
+-- the project, so a session open across the upgrade is not lost.
+CREATE TABLE pane_layout_v5 (
+    project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    tab_id      TEXT NOT NULL,
+    tree        TEXT NOT NULL,
+    focused_id  TEXT NOT NULL,
+    updated_at  INTEGER NOT NULL,
+    PRIMARY KEY (project_id, tab_id)
+);
+
+INSERT INTO pane_layout_v5 (project_id, tab_id, tree, focused_id, updated_at)
+SELECT project_id, 'tab_' || project_id, tree, focused_id, updated_at FROM pane_layout;
+
+DROP TABLE pane_layout;
+ALTER TABLE pane_layout_v5 RENAME TO pane_layout;
+"#,
+    },
 ];
 
 /// Applies whatever has not been applied yet. Called on every start.

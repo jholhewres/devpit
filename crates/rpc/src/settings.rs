@@ -57,6 +57,14 @@ pub struct Settings {
     pub automatic_updates: Option<bool>,
     /// Whether a turn is written to disk. Null is "never asked".
     pub keep_transcripts: Option<bool>,
+    /// Whether closing a terminal with an agent or a command still running
+    /// stops to ask first.
+    ///
+    /// Null is "never asked", and never-asked means yes: the first time
+    /// someone closes a tab with work in it, the prompt is the only thing
+    /// standing between them and losing it. It goes to `false` when they tick
+    /// "don't ask again", which is a choice and not a default.
+    pub confirm_stop: Option<bool>,
 }
 
 #[cfg(test)]

@@ -68,3 +68,55 @@ fn a_session_survives_and_echoes_through_send_keys() {
 
     server.kill_server().expect("kill");
 }
+
+#[test]
+fn a_window_with_no_shell_configured_is_started_as_tmux_always_did() {
+    let server = Server::new(PathBuf::from("/tmp/s.sock"));
+    /* Only the pane's name. A person who types `claude` into an unwrapped
+    shell has to be as visible as one who picks it from the menu, and the
+    environment is the only thing that reaches the agent's own hooks. */
+    assert_eq!(
+        server.shell_args("leaf_one"),
+        ["-e", "DEVPIT_PANE=leaf_one"]
+    );
+}
+
+#[test]
+fn a_wrapped_shell_rides_in_after_the_double_dash() {
+    /* `--` is what stops tmux reading the shell's own flags as its own. */
+    let server = Server::new(PathBuf::from("/tmp/s.sock")).with_shell(Shell {
+        program: "/bin/bash".to_owned(),
+        args: vec!["--rcfile".to_owned(), "/w/bash/rcfile".to_owned()],
+        env: vec![("DEVPIT_SHELL_FEATURES".to_owned(), "marks".to_owned())],
+    });
+    assert_eq!(
+        server.shell_args("leaf_one"),
+        [
+            "-e",
+            "DEVPIT_PANE=leaf_one",
+            "-e",
+            "DEVPIT_SHELL_FEATURES=marks",
+            "--",
+            "/bin/bash",
+            "--rcfile",
+            "/w/bash/rcfile",
+        ]
+    );
+}
+
+#[test]
+fn a_pane_reports_its_window_its_terminal_and_its_program() {
+    let seen = parse_running("leaf_a /dev/pts/8 zsh\nleaf_b /dev/pts/9 node\n");
+    assert_eq!(seen[0].leaf_id, "leaf_a");
+    assert_eq!(seen[0].tty, "/dev/pts/8");
+    assert_eq!(seen[0].command, "zsh");
+    assert_eq!(seen[1].leaf_id, "leaf_b");
+    assert_eq!(seen[1].command, "node");
+}
+
+#[test]
+fn a_line_it_cannot_read_is_dropped_rather_than_guessed_at() {
+    /* tmux prints one line per pane and a session with none prints nothing;
+    neither is an error worth failing the whole list over. */
+    assert!(parse_running("\n  \nleaf_a\nleaf_b /dev/pts/1\n").is_empty());
+}

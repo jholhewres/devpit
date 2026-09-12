@@ -10,4 +10,8 @@ thiserror = "2.0.20"
 
 [dev-dependencies]
 devpit-agentcli = { path = "../agentcli" }
+# Naming what is in a pane finishes there; this crate only says where to look.
+devpit-pty = { path = "../pty" }
+# The stop-on-close test asks the kernel directly whether a group is there.
+libc = "0.2"
 tempfile = "3.27.0"

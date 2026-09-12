@@ -17,6 +17,7 @@ use devpit_agentcli::{read_hook, Event, Happening};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::asking::{decision, Asking};
+use crate::happening::agent_said;
 use crate::post::read_request;
 use crate::question::question_in;
 
@@ -57,10 +58,11 @@ pub fn start(app: AppHandle, root: &Path) {
 }
 
 fn serve(app: AppHandle, mut stream: TcpStream) {
-    let Some(body) = read_request(&mut stream) else {
+    let Some(posted) = read_request(&mut stream) else {
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return;
     };
+    let body = posted.body;
 
     // A tool this session wants to be asked about holds the connection until
     // a person answers. Everything else is answered at once and empty, which
@@ -75,6 +77,7 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
     if let Some(question) = held {
         if let Some(happening) = read_hook(&body) {
             let _ = app.emit("agent:happening", describe(&happening));
+            tell_the_pane(&app, posted.pane.as_deref(), &happening);
         }
         let asking = app.state::<Asking>();
         let hear = asking.opened(&question.id);
@@ -90,7 +93,32 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
     reply(&mut stream, "");
     if let Some(happening) = read_hook(&body) {
         let _ = app.emit("agent:happening", describe(&happening));
+        tell_the_pane(&app, posted.pane.as_deref(), &happening);
     }
+}
+
+/// Relays an agent's own report to the pane it is running in.
+///
+/// Only when the hook said which pane, which it does whenever the agent was
+/// started inside one of our terminals. A headless turn belongs to a card and
+/// has no pane to tell; it takes the `agent:happening` path above and this
+/// leaves it alone.
+///
+/// This is the difference between knowing an agent is *open* and knowing what
+/// it is *doing*. The first is asked of the process table on a timer; the
+/// second only the agent can say, and it says it here.
+fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
+    let Some(pane) = pane else {
+        return;
+    };
+    let state = match &happening.event {
+        Event::Using { .. } | Event::Used { .. } => "working",
+        Event::Stopped { .. } => "done",
+        // The one worth interrupting somebody for: nothing moves until a
+        // person comes back to it.
+        Event::Waiting => "waiting",
+    };
+    let _ = app.emit("terminal:happening", agent_said(pane, state));
 }
 
 fn reply(stream: &mut TcpStream, body: &str) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { PaneName } from './paneList'
 import { SessionRows } from './SessionRows'
+import { Threads } from './Threads'
 import { useShell, type PrefsPane } from './useShell'
 
 /*
@@ -137,6 +138,8 @@ export function Sidebar({
           <div className="navsep"></div>
 
           <SessionRows />
+
+          <Threads />
         </div>
 
         <div className="side__foot">

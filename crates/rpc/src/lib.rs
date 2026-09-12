@@ -7,6 +7,7 @@
 //! declares the shape; `apps/desktop` adapts that shape to a transport, and
 //! tomorrow an HTTP server and a CLI do the same over the same types.
 
+pub mod account;
 pub mod agents;
 pub mod board;
 pub mod chat;
@@ -22,6 +23,7 @@ pub mod session_tree;
 pub mod settings;
 mod threads;
 
+pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use chat::{Ask, Attachment, CallState, Conversation, Message, Part, Role, TurnEnd};
@@ -34,7 +36,10 @@ pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
     ProjectList, ProjectNotes, ProjectTree, Worktree,
 };
-pub use session::{AgentPresence, LayoutNode, PaneKind, PaneSize, SessionLayout, SplitDirection};
+pub use session::{
+    AgentPresence, KnownAgent, LayoutNode, PaneKind, PaneRunning, PaneSize, SessionLayout,
+    SplitDirection,
+};
 pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
 pub use threads::{Conversations, Thread};

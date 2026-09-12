@@ -2,52 +2,41 @@
 //!
 //! A pane has one live client at a time, and the interesting case is the
 //! handover: a React remount attaches again before the old attach has noticed
-//! it is over, so the two overlap. The rule is that the **newer** one wins,
-//! decided by a client id that only ever goes up.
+//! it is over, so the two overlap. The rule is that the **newer** one wins.
+//!
+//! Newer is decided *here*, by the order the attaches arrive, and not by an
+//! id the caller mints. That was the first cut and it was wrong twice over: a
+//! webview reload restarts whatever counter the client keeps, so half of all
+//! reloads produced an id below the high-water mark and were refused; and the
+//! screen reused one id for the whole window, so a remount compared equal to
+//! itself and every second mount was told a newer client owned the pane. In
+//! development that is every mount, because React mounts twice on purpose.
 //!
 //! Its own type because that rule is the only subtle thing in the session
 //! layer, and because a rule with an `AppHandle` next to it is a rule that
 //! cannot be tested without opening a window.
 
 use std::collections::HashMap;
-use std::io::Write;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use devpit_rpc::{ErrorCode, RpcError};
-use portable_pty::{ChildKiller, MasterPty};
 
-/// One attached client: the ends of its pty, and what it has printed.
-pub(crate) struct Live {
-    pub(crate) client_id: String,
-    pub(crate) writer: Mutex<Box<dyn Write + Send>>,
-    pub(crate) master: Mutex<Box<dyn MasterPty + Send>>,
-    pub(crate) killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
-    /// The scrollback this pane has produced, shared with the reader thread.
-    ///
-    /// Held here and not only inside the pty session so `session.scrollback`
-    /// can answer while the frames are still draining — the drain owns the
-    /// receiver, and a history nobody can ask for is a history nobody has.
-    pub(crate) ring: Arc<Mutex<devpit_pty::RingBuffer>>,
-    /// What to insist to, when asking politely does not work.
-    pub(crate) pid: Option<u32>,
+pub(crate) use crate::live::Live;
+
+/// Who holds a pane, and which attach that was.
+struct Holder {
+    client_id: String,
+    generation: u64,
 }
 
-impl Live {
-    /// Ends this client, without waiting forever to be obeyed.
-    ///
-    /// `kill` on a pty child is `SIGHUP`, which is a request. A closed tab
-    /// must not be able to hang the window because whatever was inside it
-    /// decided to take its time.
-    pub(crate) fn stop(&self) -> Result<(), RpcError> {
-        let mut killer = self
-            .killer
-            .lock()
-            .map_err(|_| RpcError::internal("killer lock"))?;
-        devpit_pty::stop(self.pid, devpit_pty::GRACE, || {
-            let _ = killer.kill();
-        });
-        Ok(())
-    }
+/// What claiming a pane got you.
+pub(crate) struct Claimed {
+    /// Hand this back to [`Claims::install`]. It is how a slow attach finds
+    /// out that a faster one replaced it while its pty was starting.
+    pub(crate) generation: u64,
+    /// The client this one displaced, for the caller to stop.
+    pub(crate) replaced: Option<Arc<Live>>,
 }
 
 #[derive(Default)]
@@ -55,13 +44,9 @@ pub struct Claims {
     /// The attached client of each pane.
     lives: Mutex<HashMap<String, Arc<Live>>>,
     /// Who has claimed each pane and has not released it.
-    held: Mutex<HashMap<String, String>>,
-    /// The highest client id ever seen for a pane.
-    ///
-    /// Separate from `held` because a claim is released and this is not: an
-    /// `invoke` that was in flight during a detach arrives afterwards, and
-    /// without a high-water mark it would find the pane free and take it back.
-    highest: Mutex<HashMap<String, String>>,
+    held: Mutex<HashMap<String, Holder>>,
+    /// Ever-increasing, across every pane, for as long as the app runs.
+    minted: AtomicU64,
 }
 
 impl Claims {
@@ -69,40 +54,35 @@ impl Claims {
         Self::default()
     }
 
-    /// Claims the pane for a newer client, and hands back the one it replaced.
+    /// Claims the pane for a new client, and hands back the one it replaced.
+    ///
+    /// Never refuses. Arriving later *is* being newer, and the process that
+    /// owns the panes is the only place that can say which arrived later —
+    /// which is the whole reason the generation is minted here.
     ///
     /// The caller kills what comes back. Returning it rather than killing it
     /// here keeps this type about ownership and nothing else.
-    pub(crate) fn take_for(
-        &self,
-        pane_id: &str,
-        client_id: &str,
-    ) -> Result<Option<Arc<Live>>, RpcError> {
-        let mut highest = self
-            .highest
-            .lock()
-            .map_err(|_| RpcError::internal("client generation lock"))?;
-        if highest
-            .get(pane_id)
-            .is_some_and(|current| current.as_str() >= client_id)
-        {
-            return Err(RpcError::new(
-                ErrorCode::Conflict,
-                "a newer client already owns that pane",
-            ));
-        }
-        highest.insert(pane_id.to_owned(), client_id.to_owned());
+    pub(crate) fn take_for(&self, pane_id: &str, client_id: &str) -> Result<Claimed, RpcError> {
+        let generation = self.minted.fetch_add(1, Ordering::SeqCst) + 1;
         self.held
             .lock()
             .map_err(|_| RpcError::internal("session claim lock"))?
-            .insert(pane_id.to_owned(), client_id.to_owned());
-        drop(highest);
+            .insert(
+                pane_id.to_owned(),
+                Holder {
+                    client_id: client_id.to_owned(),
+                    generation,
+                },
+            );
 
-        Ok(self
-            .lives
-            .lock()
-            .map_err(|_| RpcError::internal("session lock"))?
-            .remove(pane_id))
+        Ok(Claimed {
+            generation,
+            replaced: self
+                .lives
+                .lock()
+                .map_err(|_| RpcError::internal("session lock"))?
+                .remove(pane_id),
+        })
     }
 
     /// Installs the pty ends, unless a newer client claimed the pane while
@@ -110,14 +90,17 @@ impl Claims {
     pub(crate) fn install(
         &self,
         pane_id: &str,
-        client_id: &str,
+        generation: u64,
         live: Arc<Live>,
     ) -> Result<bool, RpcError> {
         let held = self
             .held
             .lock()
             .map_err(|_| RpcError::internal("session claim lock"))?;
-        if held.get(pane_id).is_none_or(|current| current != client_id) {
+        if held
+            .get(pane_id)
+            .is_none_or(|holder| holder.generation != generation)
+        {
             return Ok(false);
         }
         self.lives
@@ -128,6 +111,10 @@ impl Claims {
     }
 
     /// Gives up the claim, if it is still this client's to give up.
+    ///
+    /// A detach arriving late from a client that has already been replaced
+    /// must not free the pane for the one that replaced it — which is why the
+    /// client id has to be unique per attach and not per window.
     pub fn release(&self, pane_id: &str, client_id: &str) -> Result<bool, RpcError> {
         let mut held = self
             .held
@@ -135,7 +122,7 @@ impl Claims {
             .map_err(|_| RpcError::internal("session claim lock"))?;
         if held
             .get(pane_id)
-            .is_some_and(|current| current == client_id)
+            .is_some_and(|holder| holder.client_id == client_id)
         {
             held.remove(pane_id);
             return Ok(true);

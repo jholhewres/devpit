@@ -1,22 +1,84 @@
+import { useEffect } from 'react'
+
 import mark from '../assets/brand/mark.png'
+import { useShell } from './useShell'
 
-/* The sheet stands in for the identity providers. Nothing is collected
-   here, and nothing will be: the flow is OAuth in the browser. */
+/* Signing in.
+ *
+ * One button, because there is one way in: the browser. devpit never sees a
+ * password — it asks the accounts site for a short code, opens the browser on
+ * the page that approves it, and waits. Whatever the site grows later (GitHub,
+ * Google, a passkey) arrives without this sheet changing at all.
+ */
+export function SignIn({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const { membership } = useShell()
+  const { signingIn, failed, origin, account } = membership
 
-export function SignIn({ onClose, onSignIn }: { onClose: () => void; onSignIn: () => void }): React.JSX.Element {
+  /* The sheet's job ends when there is an account. Closing on the click that
+     opened the browser would have closed it before anything happened. */
+  useEffect(() => {
+    if (account) onClose()
+  }, [account, onClose])
+
+  const close = (): void => {
+    membership.cancelSignIn()
+    onClose()
+  }
+
   return (
-    <div className="auth" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      className="auth"
+      data-open="true"
+      onClick={(event) => event.target === event.currentTarget && close()}
+    >
       <div className="auth__box" role="dialog" aria-label="Sign in to devpit">
-        <button className="auth__x" aria-label="Close" onClick={onClose}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+        <button className="auth__x" aria-label="Close" onClick={close}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
         <span className="auth__mark"><img className="mark" alt="" src={mark} /></span>
-        <h2 className="auth__t">Sign in to devpit</h2>
-        <p className="auth__d">Free. Your projects, conversations and files stay on this
-          computer &mdash; an account saves the workspace around them.</p>
-        <button className="auth__b" onClick={onSignIn}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.94.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.03a9.5 9.5 0 0 1 5 0c1.91-1.3 2.75-1.03 2.75-1.03.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.95.36.31.68.92.68 1.85v2.74c0 .26.18.58.69.48A10 10 0 0 0 12 2Z" /></svg>Continue with GitHub</button>
-        <button className="auth__b" onClick={onSignIn}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8h5a5 5 0 1 1-1.5-3" /></svg>Continue with Google</button>
-        <button className="auth__b" onClick={onSignIn}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>Continue with email</button>
-        <p className="auth__fine">Signing in creates an account the first time.</p>
+
+        {signingIn ? (
+          <>
+            <h2 className="auth__t">Approve this code</h2>
+            <p className="auth__d">
+              Your browser is open at <b>{host(origin)}</b>. Check that it shows this code, then
+              approve it there.
+            </p>
+            <div className="auth__code">{signingIn.userCode}</div>
+            <p className="auth__fine">Waiting for you to approve&hellip;</p>
+          </>
+        ) : (
+          <>
+            <h2 className="auth__t">Sign in to devpit</h2>
+            <p className="auth__d">
+              Free. Your projects, conversations and files stay on this computer &mdash; an account
+              saves the workspace around them.
+            </p>
+            {failed && (
+              <p className="auth__failed" role="alert">
+                {failed}
+              </p>
+            )}
+            <button className="auth__b" onClick={() => void membership.signIn()}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" /></svg>
+              Continue in your browser
+            </button>
+            <p className="auth__fine">
+              Signing in creates an account the first time. devpit never sees your password.
+            </p>
+          </>
+        )}
       </div>
     </div>
   )
+}
+
+/* The host on its own: a person checking that the page in front of them is the
+   one the app opened does not need the scheme to do it. */
+function host(origin: string): string {
+  try {
+    return new URL(origin).host
+  } catch {
+    return origin
+  }
 }

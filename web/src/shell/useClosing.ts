@@ -1,0 +1,81 @@
+import { useCallback, useState } from 'react'
+
+import type { PaneRunning } from '../gen/bindings'
+import { ask, commands } from './live'
+import { stopsOnClose, type Stops } from './running'
+import type { Tab } from './strip'
+
+/*
+ * Closing a terminal that is still doing something.
+ *
+ * Between the cross and the strip, because the question "is anything running
+ * in this tab" is one the strip cannot answer: it draws tabs, and what is
+ * running belongs to panes. Closing a terminal tab kills every tmux window
+ * under it, so a stray click on a cross is the difference between an agent
+ * finishing its task and an agent that never comes back.
+ *
+ * The prompt can be turned off, and only by ticking a box — never by a
+ * default, and never by pressing Enter twice in a row. See `StopRunning`.
+ */
+
+/** A close that is waiting to be confirmed, and what it would stop. */
+export interface Closing {
+  readonly id: string
+  /** What the tab is called, so the prompt can name what is being closed. */
+  readonly tab: string
+  readonly stops: Stops
+}
+
+export interface Guard {
+  /** Closes, or stops to ask when there is something to lose. */
+  close: (id: string) => void
+  readonly closing: Closing | null
+  confirmClose: (dontAskAgain: boolean) => void
+  cancelClose: () => void
+  /** Answers the settings read, where `null` means never asked — which asks. */
+  setConfirmStop: (asked: boolean | null) => void
+}
+
+export function useClosing({
+  open,
+  closeNow,
+  running,
+}: {
+  open: readonly Tab[]
+  /** What closing actually does, once it has been decided. */
+  closeNow: (id: string) => void
+  running: readonly PaneRunning[]
+}): Guard {
+  const [closing, setClosing] = useState<Closing | null>(null)
+  /* Until the settings are read, asking is the safe answer: an unnecessary
+     prompt costs a click, and a missing one costs the work in the terminal. */
+  const [confirmStop, setStop] = useState(true)
+
+  const close = useCallback(
+    (id: string) => {
+      const tab = open.find((one) => one.id === id)
+      const stops = confirmStop ? stopsOnClose(running, tab) : null
+      if (!stops) return closeNow(id)
+      setClosing({ id, tab: tab?.title ?? 'this terminal', stops })
+    },
+    [open, closeNow, running, confirmStop],
+  )
+
+  const confirmClose = useCallback(
+    (dontAskAgain: boolean) => {
+      setClosing((waiting) => {
+        if (waiting) closeNow(waiting.id)
+        return null
+      })
+      if (!dontAskAgain) return
+      setStop(false)
+      void ask(() => commands.settingsWrite(null, null, null, null, false))
+    },
+    [closeNow],
+  )
+
+  const cancelClose = useCallback(() => setClosing(null), [])
+  const setConfirmStop = useCallback((asked: boolean | null) => setStop(asked ?? true), [])
+
+  return { close, closing, confirmClose, cancelClose, setConfirmStop }
+}

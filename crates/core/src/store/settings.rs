@@ -16,6 +16,8 @@ pub mod key {
     pub const THEME: &str = "appearance.theme";
     pub const AUTO_UPDATE: &str = "general.automatic_updates";
     pub const KEEP_TRANSCRIPTS: &str = "storage.keep_transcripts";
+    /// Whether closing a terminal with something running stops to ask.
+    pub const CONFIRM_STOP: &str = "terminal.confirm_stop";
 }
 
 fn now() -> i64 {

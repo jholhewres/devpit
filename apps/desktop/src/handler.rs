@@ -6,14 +6,18 @@
 //! mean the screen cannot call it at all. This list is what exists; that one
 //! is what is typed.
 
+use crate::account;
+use crate::arranging;
 use crate::asking;
 use crate::branches;
 use crate::chat;
+use crate::happening;
 use crate::index;
 use crate::mcp;
 use crate::pty_bridge;
 use crate::reveal;
 use crate::saves;
+use crate::shell_launch;
 use crate::staging;
 use crate::threads;
 use crate::workspace;
@@ -27,6 +31,10 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
     tauri::generate_handler![
         commands::app_info,
         commands::app_health,
+        account::account_read,
+        account::account_sign_in,
+        account::account_poll,
+        account::account_sign_out,
         commands::app_capabilities,
         projects::project_list,
         projects::project_add,
@@ -86,15 +94,20 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         sessions::session_ensure,
         sessions::session_layout,
         sessions::session_focus,
-        sessions::session_split,
-        sessions::session_close_leaf,
-        sessions::session_rename_leaf,
-        sessions::session_set_ratio,
+        arranging::session_split,
+        arranging::session_close_leaf,
+        arranging::session_close_tab,
+        arranging::session_rename_leaf,
+        arranging::session_set_ratio,
         panes::session_write,
         panes::session_resize,
         panes::pane_scrollback,
         panes::session_detach,
         panes::session_attach,
+        shell_launch::session_running,
+        shell_launch::agents_known,
+        shell_launch::session_launch_agent,
+        happening::terminal_happenings,
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,

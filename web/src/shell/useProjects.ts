@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
+import { previewing, STANDIN } from './preview'
 import { found, type Open } from './projects'
 
 /* The project list, apart from the rest of the shell state: it is the only
@@ -16,12 +17,18 @@ export interface Projects {
 }
 
 export function useProjects(): Projects {
-  const [open, setOpen] = useState<Open>({ projects: [], current: null })
+  const [open, setOpen] = useState<Open>(() =>
+    previewing()
+      ? { projects: [STANDIN], current: STANDIN.id }
+      : { projects: [], current: null },
+  )
   const [projectsError, setProjectsError] = useState<string | null>(null)
 
   /* A repository that cannot be read still comes back, marked. Missing from
      the list would read as never having been added. */
   const reloadProjects = useCallback(() => {
+    /* Nothing to reload from: the stand-in is the whole list. */
+    if (previewing()) return
     void ask(() => commands.projectList()).then((asked) => {
       setProjectsError(asked.error)
       const list = asked.data?.projects

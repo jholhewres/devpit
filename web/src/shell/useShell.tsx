@@ -1,71 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
-import { who, type Who } from './account'
-import type { Project, Theme as StoredTheme } from '../gen/bindings'
+import { who } from './account'
 import { ask, commands } from './live'
-import type { PaneName } from './paneList'
-import type { Tab } from './strip'
+import type { PrefsPane, Shell, Theme } from './shape'
+import { useAccount } from './useAccount'
+import { useAgents } from './useAgents'
+import { useClosing } from './useClosing'
 import { useTabs } from './useTabs'
 import { useProjects } from './useProjects'
+import { useRunning } from './useRunning'
 
-export type Theme = StoredTheme
-export type PrefsPane =
-  | 'account'
-  | 'projects'
-  | 'general'
-  | 'appearance'
-  | 'providers'
-  | 'skills'
-  | 'storage'
-  | 'worktrees'
-  | 'usage'
-
-/*
- * Three facts about the panes, because they came apart the moment tabs
- * arrived:
- *
- *   open      the strip's order — first opened is leftmost, and a new one
- *             lands on the right. Clicking an existing tab must not move it,
- *             or the strip reshuffles under the pointer.
- *   active    the pane you are looking at.
- *   previous  what a split would pair with — recency, which is a different
- *             order from the strip and the reason these are two lists.
- */
-interface Shell {
-  readonly open: readonly Tab[]
-  readonly active: Tab | null
-  /** Opens a new one of a kind you can have several of; focuses the rest. */
-  show: (kind: PaneName, tab?: Partial<Tab>) => void
-  close: (id: string) => void
-  focus: (id: string) => void
-  move: (id: string, to: number) => void
-  rename: (id: string, title: string) => void
-  attach: (id: string, paneId: string) => void
-
-  readonly side: boolean
-  readonly files: boolean
-  toggleSide: () => void
-  toggleFiles: () => void
-
-  readonly theme: Theme
-  setTheme: (theme: Theme) => void
-
-  readonly project: Project | null
-  readonly projects: readonly Project[]
-  readonly projectsError: string | null
-  setProject: (id: string) => void
-  forgetProject: (id: string) => void
-  reloadProjects: () => void
-
-  readonly signedIn: boolean
-  readonly account: Who
-  signIn: () => void
-  signOut: () => void
-
-  readonly prefs: PrefsPane | null
-  openPrefs: (pane?: PrefsPane) => void
-  closePrefs: () => void
-}
+export type { Closing } from './useClosing'
+export type { PrefsPane, Theme } from './shape'
 
 const ShellContext = createContext<Shell | null>(null)
 
@@ -79,11 +25,16 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
   const [theme, setThemeState] = useState<Theme>('system')
-  const [signedIn, setSignedIn] = useState(false)
-  const [account, setAccount] = useState<Who>(who(null))
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
+  const [palette, setPalette] = useState(false)
+
+  const membership = useAccount()
   const projects = useProjects()
   const tabs = useTabs(projects.project?.id ?? null)
+  const running = useRunning(projects.project?.id ?? null)
+  const doing = useAgents()
+  const guard = useClosing({ open: tabs.open, closeNow: tabs.close, running })
+  const { setConfirmStop } = guard
 
 
   /* The choice is written where the next launch will find it; the window
@@ -91,7 +42,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     document.documentElement.dataset.theme = next
-    void ask(() => commands.settingsWrite(null, next, null, null))
+    void ask(() => commands.settingsWrite(null, next, null, null, null))
   }, [])
 
   useEffect(() => {
@@ -99,14 +50,17 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
     void ask(() => commands.settingsRead()).then((asked) => {
       if (!asked.data) return
       setThemeState(asked.data.theme)
-      setAccount(who(asked.data.account))
-      setSignedIn(asked.data.account !== null)
+      /* Null is "never asked", and never-asked asks. */
+      setConfirmStop(asked.data.confirmStop)
     })
-  }, [])
+  }, [setConfirmStop])
 
   const value = useMemo<Shell>(
     () => ({
       ...tabs,
+      ...guard,
+      running,
+      doing,
       side,
       files,
       toggleSide: () => setSide((was) => !was),
@@ -118,18 +72,35 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
         projects.setProject(id)
         setPrefs(null)
       },
-      signedIn,
-      account,
-      signIn: () => setSignedIn(true),
+      membership,
+      signedIn: membership.account !== null,
+      account: who(membership.account),
+      signIn: () => void membership.signIn(),
       signOut: () => {
-        setSignedIn(false)
+        void membership.signOut()
         setPrefs(null)
       },
       prefs,
       openPrefs: (pane: PrefsPane = 'account') => setPrefs(pane),
       closePrefs: () => setPrefs(null),
+      palette,
+      openPalette: () => setPalette(true),
+      closePalette: () => setPalette(false),
     }),
-    [tabs, side, files, theme, setTheme, projects, signedIn, account, prefs],
+    [
+      tabs,
+      guard,
+      running,
+      doing,
+      side,
+      files,
+      theme,
+      setTheme,
+      projects,
+      membership,
+      prefs,
+      palette,
+    ],
   )
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>

@@ -13,3 +13,9 @@ tokio = { version = "1.53.1", features = ["sync", "time", "rt"] }
 
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "time"] }
+
+# Only for signalling a process group, and only where groups exist.
+# `/usr/bin/kill` takes a negative pid as an option and silently signals
+# nothing — see `stopping::signal_group`.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

@@ -18,6 +18,7 @@ export interface Row {
    always exist; files last because there are thousands of them. */
 export function useGroups({
   panes,
+  agents,
   sessions,
   cards,
   files,
@@ -25,6 +26,7 @@ export function useGroups({
   show,
 }: {
   panes: Row[]
+  agents: Row[]
   sessions: Row[]
   cards: readonly Card[]
   files: readonly string[]
@@ -34,6 +36,10 @@ export function useGroups({
   return useMemo(() => {
     const asRows = {
       Panes: ranked(panes, query, (row) => row.name),
+      /* Above the sessions you have and below the panes you can open: an
+         agent is a new thing to start, which is what the top of this list is
+         for, and it is the thing people came to the plus button to do. */
+      Agents: ranked(agents, query, (row) => row.name),
       Sessions: ranked(sessions, query, (row) => row.name),
       Cards: ranked(cards, query, (card) => card.title).map((card) => ({
         key: `card:${card.id}`,
@@ -53,5 +59,5 @@ export function useGroups({
     /* A group with nothing in it leaves rather than showing a heading over
        nothing. */
     return Object.entries(asRows).filter(([, rows]) => rows.length > 0)
-  }, [panes, sessions, cards, files, query, show])
+  }, [panes, agents, sessions, cards, files, query, show])
 }

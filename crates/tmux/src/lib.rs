@@ -11,6 +11,13 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod chrome;
+mod naming;
+mod pane;
+mod running;
+mod shell;
+pub use shell::{parse_running, Running, Shell};
+
 #[derive(Debug, thiserror::Error)]
 pub enum TmuxError {
     #[error("tmux is not installed, or not on PATH")]
@@ -22,16 +29,37 @@ pub enum TmuxError {
 
 /// One tmux server, addressed by a socket we own.
 pub struct Server {
-    socket: PathBuf,
+    pub(crate) socket: PathBuf,
+    shell: Option<Shell>,
 }
 
 impl Server {
-    pub fn new(socket: PathBuf) -> Self {
-        Self { socket }
+    /// Session names tmux will accept. Anything else is turned into `_`.
+    pub fn session_name(project_id: &str) -> String {
+        naming::session_name(project_id)
     }
 
+    /// `session:window` — how every tmux command is pointed at a leaf.
+    pub fn target(session: &str, window: &str) -> String {
+        naming::target(session, window)
+    }
+
+    pub fn new(socket: PathBuf) -> Self {
+        Self {
+            socket,
+            shell: None,
+        }
+    }
+
+    /// Whether tmux is on this machine.
+    ///
+    /// Asked once and remembered. It is asked on every command that touches a
+    /// session — opening a terminal asks it four times, and the sidebar's
+    /// two-second poll asks it again — and tmux does not get uninstalled
+    /// while the window is open.
     pub fn available() -> bool {
-        Self::available_at(Path::new("tmux"))
+        static FOUND: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *FOUND.get_or_init(|| Self::available_at(Path::new("tmux")))
     }
 
     fn available_at(program: &Path) -> bool {
@@ -42,23 +70,31 @@ impl Server {
             .unwrap_or(false)
     }
 
-    /// Session names tmux will accept. Anything else is turned into `_`.
-    pub fn session_name(project_id: &str) -> String {
-        let mut name = String::from("devpit_");
-        for ch in project_id.chars() {
-            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
-                name.push(ch);
-            } else {
-                name.push('_');
-            }
-        }
-        name.truncate(80);
-        name
-    }
-
     pub fn has_session(&self, session: &str) -> Result<bool, TmuxError> {
         let output = self.run(&["has-session", "-t", session])?;
         Ok(output.status.success())
+    }
+
+    /// How the shell in a new window is started.
+    ///
+    /// tmux runs the login shell with no arguments by default, and a shell
+    /// started that way says nothing about itself — no prompt boundary, no
+    /// exit code, nothing for the OSC scanner to read. The caller hands the
+    /// program, its arguments and the environment that turns the markers on.
+    pub fn with_shell(mut self, shell: Shell) -> Self {
+        self.shell = Some(shell);
+        self
+    }
+
+    /// The trailing `-e KEY=VAL … -- program args…` a new window needs.
+    ///
+    /// `window` is the leaf the window is for, handed to whatever runs inside
+    /// it as `DEVPIT_PANE`. That is the only thing joining an agent's own
+    /// reports back to the pane a person is looking at: a hook fires in a
+    /// process three levels below the shell, and the environment is what
+    /// reaches down there.
+    fn shell_args(&self, window: &str) -> Vec<String> {
+        shell::window_args(self.shell.as_ref(), window)
     }
 
     /// Creates the session if needed, with status off, named window `window`.
@@ -83,7 +119,12 @@ impl Server {
         }
 
         let cwd = cwd.to_string_lossy().into_owned();
-        self.require(&["new-session", "-d", "-s", session, "-n", window, "-c", &cwd])?;
+        let mut argv: Vec<String> = ["new-session", "-d", "-s", session, "-n", window, "-c", &cwd]
+            .iter()
+            .map(|part| (*part).to_owned())
+            .collect();
+        argv.extend(self.shell_args(window));
+        self.require(&argv.iter().map(String::as_str).collect::<Vec<_>>())?;
         self.quiet_chrome()?;
         self.ensure_client_session(session, window)?;
         Ok(())
@@ -91,7 +132,12 @@ impl Server {
 
     pub fn new_window(&self, session: &str, window: &str, cwd: &Path) -> Result<(), TmuxError> {
         let cwd = cwd.to_string_lossy().into_owned();
-        self.require(&["new-window", "-t", session, "-n", window, "-c", &cwd])?;
+        let mut argv: Vec<String> = ["new-window", "-t", session, "-n", window, "-c", &cwd]
+            .iter()
+            .map(|part| (*part).to_owned())
+            .collect();
+        argv.extend(self.shell_args(window));
+        self.require(&argv.iter().map(String::as_str).collect::<Vec<_>>())?;
         self.ensure_client_session(session, window)?;
         Ok(())
     }
@@ -100,7 +146,7 @@ impl Server {
     /// window. Grouped sessions share the processes but not the current-window
     /// pointer, so two xterms can display two project windows at once.
     fn ensure_client_session(&self, session: &str, window: &str) -> Result<(), TmuxError> {
-        let client = Self::client_session(session, window);
+        let client = naming::client_session(session, window);
         if !self.has_session(&client)? {
             self.require(&["new-session", "-d", "-t", session, "-s", &client])?;
         }
@@ -109,31 +155,22 @@ impl Server {
     }
 
     /// Everything tmux draws that this app draws better itself.
-    ///
-    /// Set on the server rather than per session, and that is the fix rather
-    /// than a shortcut: a grouped session does not inherit another session's
-    /// options, so setting them on the group left the client session — the one
-    /// a pane actually attaches to — with a green tmux bar along the bottom.
-    /// The server is ours, on our own socket, so a global here reaches every
-    /// session including the ones made later.
     fn quiet_chrome(&self) -> Result<(), TmuxError> {
-        for option in [
-            // A status bar inside a pane we already chrome is noise, and it
-            // steals a row from the agent's TUI.
-            ["status", "off"],
-            // Otherwise a shell's title escape renames the window under us, and
-            // the layout is keyed by window name.
-            ["allow-rename", "off"],
-            ["automatic-rename", "off"],
-            // A message that hangs around covers the last line of output.
-            ["display-time", "1500"],
-            // The default half-second swallows an Escape meant for the program
-            // inside, which is most of them.
-            ["escape-time", "10"],
-        ] {
-            let _ = self.require(&["set-option", "-g", option[0], option[1]]);
-        }
+        let _ = self.require(&chrome::one_line());
         Ok(())
+    }
+
+    /// What is running in each window of a session.
+    pub fn running(&self, session: &str) -> Result<Vec<Running>, TmuxError> {
+        let out = self.require(&[
+            "list-panes",
+            "-s",
+            "-t",
+            session,
+            "-F",
+            shell::RUNNING_FORMAT,
+        ])?;
+        Ok(shell::parse_running(&String::from_utf8_lossy(&out.stdout)))
     }
 
     pub fn list_windows(&self, session: &str) -> Result<Vec<String>, TmuxError> {
@@ -146,26 +183,9 @@ impl Server {
             .collect())
     }
 
-    pub fn target(session: &str, window: &str) -> String {
-        format!("{}:{window}", Self::client_session(session, window))
-    }
-
-    fn client_session(session: &str, window: &str) -> String {
-        let mut name = format!("{session}__{window}");
-        name.truncate(160);
-        name
-    }
-
     /// The argv a pty should spawn to attach as a client of this window.
     pub fn attach_argv(&self, session: &str, window: &str) -> Vec<String> {
-        vec![
-            "tmux".to_owned(),
-            "-S".to_owned(),
-            self.socket.display().to_string(),
-            "attach-session".to_owned(),
-            "-t".to_owned(),
-            Self::target(session, window),
-        ]
+        naming::attach_argv(&self.socket, session, window)
     }
 
     /// Kills a window and the client session that was pointed at it.
@@ -178,7 +198,7 @@ impl Server {
     /// shell exited a moment earlier is an ordinary thing to do, and a refusal
     /// would leave the leaf in the tree with no way to remove it.
     pub fn kill_window(&self, session: &str, window: &str) -> Result<(), TmuxError> {
-        let client = Self::client_session(session, window);
+        let client = naming::client_session(session, window);
         if self.has_session(&client)? {
             let _ = self.run(&["kill-session", "-t", &client])?;
         }
@@ -186,14 +206,23 @@ impl Server {
         Ok(())
     }
 
+    /// A copy of everything a pane prints, to `command`'s stdin, with no
+    /// client attached. See [`crate::pane`].
+    pub fn pipe_pane(&self, target: &str, command: &str) -> Result<(), TmuxError> {
+        pane::pipe_pane(self, target, command)
+    }
+
+    /// Stops the pipe. A pane that has none is not an error.
+    pub fn unpipe(&self, target: &str) -> Result<(), TmuxError> {
+        pane::unpipe(self, target)
+    }
+
     pub fn send_keys(&self, target: &str, keys: &str) -> Result<(), TmuxError> {
-        self.require(&["send-keys", "-t", target, keys, "Enter"])?;
-        Ok(())
+        pane::send_keys(self, target, keys)
     }
 
     pub fn capture_pane(&self, target: &str) -> Result<String, TmuxError> {
-        let output = self.require(&["capture-pane", "-t", target, "-p"])?;
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        pane::capture_pane(self, target)
     }
 
     pub fn kill_server(&self) -> Result<(), TmuxError> {
@@ -202,29 +231,11 @@ impl Server {
     }
 
     fn require(&self, args: &[&str]) -> Result<std::process::Output, TmuxError> {
-        let output = self.run(args)?;
-        if output.status.success() {
-            return Ok(output);
-        }
-        Err(TmuxError::Failed {
-            command: args.join(" "),
-            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
-        })
+        running::require(self, args)
     }
 
     fn run(&self, args: &[&str]) -> Result<std::process::Output, TmuxError> {
-        Command::new("tmux")
-            .arg("-S")
-            .arg(&self.socket)
-            .args(args)
-            .output()
-            .map_err(|err| match err.kind() {
-                std::io::ErrorKind::NotFound => TmuxError::Missing,
-                _ => TmuxError::Failed {
-                    command: args.join(" "),
-                    stderr: err.to_string(),
-                },
-            })
+        running::run(self, args)
     }
 }
 

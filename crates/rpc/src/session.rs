@@ -90,3 +90,47 @@ pub struct PaneSize {
     pub rows: u16,
     pub cols: u16,
 }
+
+/// What is running in one pane, for `session.running`.
+///
+/// The foreground process, asked of the operating system rather than reported
+/// by the program itself: an agent CLI opened in a terminal has no reason to
+/// tell this app it exists, and the sidebar still has to know.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PaneRunning {
+    pub pane_id: String,
+    /// The command's own name: `zsh`, `claude`, `codex`, `cargo`.
+    ///
+    /// Read from the arguments, not from the executable: every agent CLI
+    /// written in JavaScript runs as `node`, and a row saying `node` names
+    /// nothing anyone recognises.
+    pub command: String,
+    /// False while the shell itself is in front, which is nothing running.
+    pub busy: bool,
+    /// Which agent this is, when it is one. `null` for a shell, a build, an
+    /// editor — anything the app has no particular name for.
+    pub agent: Option<String>,
+    /// What to call it on screen: `Claude Code` for an agent, and the
+    /// command's own name for everything else.
+    pub label: String,
+}
+
+/// One agent CLI this build can start, for `agents.known`.
+///
+/// The same list that recognises a running one. They cannot be two lists: a
+/// menu that starts Gemini and a sidebar that then calls the pane `node` is
+/// the shape of the bug this replaces.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct KnownAgent {
+    /// Stable, and what the screen keys an icon by.
+    pub id: String,
+    pub label: String,
+    /// What gets typed into the terminal to start it.
+    pub launch: String,
+    /// Whether it is on this machine's PATH. A menu still lists the others —
+    /// saying what could be installed is more use than a short list with no
+    /// explanation.
+    pub installed: bool,
+}

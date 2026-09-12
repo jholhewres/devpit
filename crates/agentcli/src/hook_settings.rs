@@ -54,13 +54,31 @@ pub fn settings_json(endpoint_file: &Path) -> String {
 /// outlived a restart posts to the new port instead of into a dead one. It
 /// always exits 0: a hook that fails must not fail the turn it is reporting
 /// on.
+///
+/// The pane rides in the query string when the terminal set one. It is the
+/// only thing joining an agent's own reports to the pane somebody is looking
+/// at — the hook runs three processes below the shell, and the environment is
+/// what reaches that far. `${VAR:+?pane=$VAR}` is POSIX and expands to
+/// nothing at all when the agent was not started in one of our terminals, so
+/// a headless turn posts exactly the URL it always did.
 fn post(endpoint_file: &str, seconds: &str, echo: bool) -> String {
     let sink = if echo { "" } else { " >/dev/null" };
     format!(
         "E=$(cat {endpoint_file} 2>/dev/null) && [ -n \"$E\" ] && \
          curl -sS -X POST --noproxy '*' --connect-timeout 0.5 --max-time {seconds} \
-         -H 'content-type: application/json' --data-binary @- \"$E\"{sink} 2>/dev/null || true"
+         -H 'content-type: application/json' --data-binary @- \
+         \"$E${{{pane}:+?pane=${pane}}}\"{sink} 2>/dev/null || true",
+        pane = devpit_tmux_pane_env()
     )
+}
+
+/// The variable a devpit terminal puts the pane's name in.
+///
+/// Named here rather than imported: this crate is the boundary around the
+/// agent CLI and does not depend on the terminal one. The name is checked
+/// against it by `the_pane_name_matches_what_the_terminal_sets`.
+fn devpit_tmux_pane_env() -> &'static str {
+    "DEVPIT_PANE"
 }
 
 #[cfg(test)]

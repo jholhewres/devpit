@@ -12,6 +12,9 @@ import { Worktrees } from './Worktrees'
 /* Settings takes the window. Back and Escape leave; the gear and every
    account-menu row land here on the pane they name. */
 
+/* The yes/no settings, named once. */
+type Flag = 'automaticUpdates' | 'keepTranscripts' | 'telemetry' | 'confirmStop'
+
 export function Settings({
   pane,
   onAddProject,
@@ -30,21 +33,21 @@ export function Settings({
 
   /* Each toggle writes only its own field: the command takes null for
      "leave this one alone", so one switch cannot overwrite another. */
-  const set = (field: 'automaticUpdates' | 'keepTranscripts' | 'telemetry', next: boolean): void => {
+  const set = (field: Flag, next: boolean): void => {
     void ask(() =>
       commands.settingsWrite(
         field === 'telemetry' ? next : null,
         null,
         field === 'automaticUpdates' ? next : null,
         field === 'keepTranscripts' ? next : null,
+        field === 'confirmStop' ? next : null,
       ),
     ).then((answer) => setFlags(answer.data ?? flags))
   }
 
-  /* Null is "never asked". Updates and transcripts default to on; sharing
-     data defaults to off, because nobody opted into it. */
-  const on = (field: 'automaticUpdates' | 'keepTranscripts' | 'telemetry'): boolean =>
-    flags?.[field] ?? field !== 'telemetry'
+  /* Null is "never asked". Updates, transcripts and the close prompt default
+     to on; sharing data defaults to off, because nobody opted into it. */
+  const on = (field: Flag): boolean => flags?.[field] ?? field !== 'telemetry'
 
   return (
     <div className="prefs" data-open="true">
@@ -75,14 +78,12 @@ export function Settings({
               </div>
             </div>
 
-            {/* Everything an account does needs a server, and there is not one
-                yet. The fields, the connected providers and the device list
-                were drawn from nothing; a profile showing a handle nobody
-                signed in with is worse than a panel that says "not yet". */}
+            {/* The name and the address are read from the accounts server on
+                launch. Sync is not live yet, and this says so rather than
+                showing a switch that does nothing. */}
             <p className="acc__note">
-              Accounts are not live yet. When they are, signing in will save the workspace around
-              your work &mdash; board columns and cards, what you turned on, appearance and
-              shortcuts.
+              Sync is not live yet. When it is, the account will save the workspace around your
+              work &mdash; board columns and cards, what you turned on, appearance and shortcuts.
             </p>
             <p className="acc__note">
               Projects, conversations, terminal history and files stay on this computer. The

@@ -104,7 +104,16 @@ pub fn pane_scrollback(
     state: State<SessionState>,
     pane_id: String,
 ) -> Result<PaneScrollback, RpcError> {
-    let live = state.claims.live(&pane_id)?;
+    // A pane nobody has attached yet has no history — which is an answer, not
+    // a failure. Refusing here made opening a terminal for the first time
+    // reject before it was ever attached, and the caller had no output and no
+    // error to explain it.
+    let Ok(live) = state.claims.live(&pane_id) else {
+        return Ok(PaneScrollback {
+            text: String::new(),
+            truncated: false,
+        });
+    };
     let ring = live
         .ring
         .lock()
@@ -161,13 +170,8 @@ pub async fn session_attach(
     cols: u16,
     on_frame: Channel<InvokeResponseBody>,
 ) -> Result<(), RpcError> {
-    let layout = crate::sessions::layout_of(&project_id)?;
-    if !layout.tree.contains_leaf(&pane_id) {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            "that pane is not in this layout",
-        ));
-    }
+    // Which tab draws it does not matter here; that it is this project's does.
+    crate::sessions::holding(&project_id, &pane_id)?;
 
     let argv = crate::sessions::attach_argv(&project_id, &pane_id)?;
     let mut builder = CommandBuilder::new(&argv[0]);
@@ -176,7 +180,8 @@ pub async fn session_attach(
     }
     builder.env("TERM", "xterm-256color");
 
-    if let Some(previous) = state.claims.take_for(&pane_id, &client_id)? {
+    let claimed = state.claims.take_for(&pane_id, &client_id)?;
+    if let Some(previous) = claimed.replaced {
         let _ = previous.stop();
     }
 
@@ -227,7 +232,7 @@ pub async fn session_attach(
     });
     if !state
         .claims
-        .install(&pane_id, &client_id, Arc::clone(&live))?
+        .install(&pane_id, claimed.generation, Arc::clone(&live))?
     {
         let _ = live
             .killer

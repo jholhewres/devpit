@@ -1,18 +1,14 @@
 import { useEffect, useState } from 'react'
 
 import './shell.css'
-import { AddProject } from './AddProject'
 import { ContextMenu } from './ContextMenu'
 import { ask, commands } from './live'
 import { Onboarding } from './Onboarding'
-import { Palette } from './Palette'
+import { Overlays } from './Overlays'
 import { Panes } from './Panes'
-import { RemoveProject } from './RemoveProject'
 import { ResizeEdges } from './ResizeEdges'
 import { RightPanel } from './RightPanel'
-import { Settings } from './Settings'
 import { Sidebar } from './Sidebar'
-import { SignIn } from './SignIn'
 import { TopBar } from './TopBar'
 import { ShellProvider, useShell } from './useShell'
 import { isMaximized, onResized } from './window'
@@ -35,8 +31,7 @@ export function AppShell(): React.JSX.Element {
  */
 function Window(): React.JSX.Element {
   const shell = useShell()
-  const { side, files, signedIn, prefs, projects, forgetProject } = shell
-  const [palette, setPalette] = useState(false)
+  const { side, files, signedIn, projects, palette, openPalette, closePalette } = shell
   const [signIn, setSignIn] = useState(false)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
@@ -70,7 +65,8 @@ function Window(): React.JSX.Element {
       const meta = event.metaKey || event.ctrlKey
       if (meta && event.key.toLowerCase() === 'k') {
         event.preventDefault()
-        setPalette((was) => !was)
+        if (palette) closePalette()
+        else openPalette()
       }
       if (meta && event.key.toLowerCase() === 't') {
         event.preventDefault()
@@ -81,7 +77,7 @@ function Window(): React.JSX.Element {
         shell.show('chat')
       }
       if (event.key === 'Escape') {
-        setPalette(false)
+        closePalette()
         setSignIn(false)
         setAdding(false)
         setRemoving(null)
@@ -90,7 +86,7 @@ function Window(): React.JSX.Element {
     }
     document.addEventListener('keydown', key)
     return () => document.removeEventListener('keydown', key)
-  }, [shell])
+  }, [shell, palette, openPalette, closePalette])
 
   return (
     <div className="app" data-max={String(maximized)}>
@@ -99,7 +95,7 @@ function Window(): React.JSX.Element {
       <TopBar onAddProject={() => setAdding(true)} />
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
-        <Sidebar onSearch={() => setPalette(true)} onSignIn={() => setSignIn(true)} />
+        <Sidebar onSearch={openPalette} onSignIn={() => setSignIn(true)} />
         <Panes onOpenFile={openInTab} />
         <RightPanel onOpenFile={openInTab} />
       </div>
@@ -112,34 +108,16 @@ function Window(): React.JSX.Element {
         />
       )}
 
-      {palette && <Palette onClose={() => setPalette(false)} />}
-      {signIn && (
-        <SignIn
-          onClose={() => setSignIn(false)}
-          onSignIn={() => {
-            shell.signIn()
-            setSignIn(false)
-          }}
-        />
-      )}
-      {adding && <AddProject onClose={() => setAdding(false)} />}
-      {removing && (
-        <RemoveProject
-          project={removing}
-          onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            forgetProject(removing)
-            setRemoving(null)
-          }}
-        />
-      )}
-      {prefs && (
-        <Settings
-          pane={prefs}
-          onAddProject={() => setAdding(true)}
-          onRemove={(project) => setRemoving(project)}
-        />
-      )}
+      <Overlays
+        signIn={signIn}
+        onSignInClose={() => setSignIn(false)}
+        adding={adding}
+        onAddingClose={() => setAdding(false)}
+        onAdd={() => setAdding(true)}
+        removing={removing}
+        onRemove={setRemoving}
+        onRemovingClose={() => setRemoving(null)}
+      />
     </div>
   )
 }

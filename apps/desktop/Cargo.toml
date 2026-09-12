@@ -23,6 +23,9 @@ tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
 ulid = "3.0.0"
 base64 = "0.22"
+# rustls rather than the system OpenSSL: the bundle has to build the same way
+# on every machine that builds it.
+reqwest = { version = "0.12", default-features = false, features = ["cookies", "json", "rustls-tls"] }
 tauri-plugin-dialog = "2.7.3"
 
 [build-dependencies]
@@ -30,3 +33,11 @@ tauri-build = { version = "2", features = [] }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# The pty traits answer in `anyhow::Result`, and the ownership tests stand a
+# fake in for a pty whose ends the rule never touches.
+anyhow = "1.0.104"
+
+# Only for `mkfifo`, and only where a fifo exists. The tap's Windows half is
+# the daemon, not this.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

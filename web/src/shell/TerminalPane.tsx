@@ -1,113 +1,144 @@
-import { FitAddon } from '@xterm/addon-fit'
-import { Terminal } from '@xterm/xterm'
-import '@xterm/xterm/css/xterm.css'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { attach, scrollback, type Attached } from './attach'
+import type { LayoutNode } from '../gen/bindings'
 import { ask, commands } from './live'
+import { Leaf } from './Leaf'
+import { Split } from './Split'
+import { leaves } from './splits'
 import type { Tab } from './strip'
 import { useShell } from './useShell'
 
-/* One client id per window: the backend hands a pane to one attacher at a
-   time, and a reload has to be able to take it back from the last one. */
-const CLIENT = crypto.randomUUID()
+/*
+ * One tab's terminals, arranged as its tree says.
+ *
+ * The tab owns the tree. It used to be one tree per project, which meant a
+ * second terminal tab had to split the first one's to get a leaf of its own —
+ * so three tabs were three leaves under two split nodes, drawn as three tabs.
+ * A list wearing a tree's clothes. Now a tab is a tree, and splitting divides
+ * what one tab shows, which is what the word means.
+ */
 
 export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { project, open, rename, attach: remember } = useShell()
-  const host = useRef<HTMLDivElement>(null)
+  const { project, attach, launched } = useShell()
+  const [tree, setTree] = useState<LayoutNode | null>(null)
+  const [focused, setFocused] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const first = open.find((other) => other.kind === 'term')?.id === tab.id
+  /* Something went wrong beside the terminal rather than instead of it. */
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    const box = host.current
-    if (!project || !box) return
-
-    const term = new Terminal({
-      fontFamily: 'Geist Mono, ui-monospace, monospace',
-      fontSize: 12,
-      lineHeight: 1.35,
-      cursorBlink: true,
-      allowProposedApi: true,
-      theme: { background: '#151515', foreground: '#e2e2e2' },
-    })
-    const fit = new FitAddon()
-    term.loadAddon(fit)
-    term.open(box)
-
-    /* The pane is `display: none` until its tab is active and animates in on
-       a transform, so a fit in this tick measures nothing and xterm ends up
-       with zero columns. Fit only once the box has a size. */
-    const refit = (): void => {
-      if (box.clientWidth < 2 || box.clientHeight < 2) return
-      fit.fit()
-    }
-    requestAnimationFrame(refit)
-
-    /* The shell reports where it is; the tab says what the shell said. */
-    term.onTitleChange((title) => rename(tab.id, title))
-
-    let live: Attached | null = null
+    if (!project) return
     let dropped = false
-
-    void (async () => {
-      let leaf = tab.paneId
-      if (!leaf) {
-        const ensured = await ask(() => commands.sessionEnsure(project.id, null))
-        if (ensured.error) return setError(ensured.error)
-        const layout = await ask(() => commands.sessionLayout(project.id))
-        if (!layout.data) return setError(layout.error ?? 'no session')
-        /* The first terminal takes the pane the session already has; every
-           one after it splits a new leaf of its own. */
-        leaf = first
-          ? layout.data.focusedId
-          : (await ask(() =>
-              commands.sessionSplit(project.id, layout.data!.focusedId, 'vertical', null),
-            ).then((split) => split.data?.focusedId))
-        if (!leaf) return setError('could not open a pane')
-        remember(tab.id, leaf)
-      }
-
-      /* Scrollback first, then the stream, or new output lands above what
-         came before it. */
-      const past = await scrollback(project.id, leaf)
-      if (past) term.write(past)
-
-      const attached = await attach(
-        project.id,
-        leaf,
-        CLIENT,
-        { rows: term.rows, cols: term.cols },
-        (bytes) => term.write(bytes),
-      )
-      if (dropped) return attached?.detach()
-      live = attached
-      term.onData((data) => live?.write(data))
-    })()
-
-    const watch = new ResizeObserver(() => {
-      refit()
-      void live?.resize(term.rows, term.cols).then((applied) => {
-        /* The pty clamps; the grid follows what it actually got. */
-        if (applied && (applied.rows !== term.rows || applied.cols !== term.cols)) {
-          term.resize(applied.cols, applied.rows)
-        }
-      })
+    void ask(() => commands.sessionEnsure(project.id, tab.id, null)).then((answer) => {
+      if (dropped) return
+      if (!answer.data) return setError(answer.error ?? 'could not open a terminal')
+      setTree(answer.data.tree)
+      setFocused(answer.data.focusedId)
     })
-    watch.observe(box)
-
     return () => {
       dropped = true
-      watch.disconnect()
-      live?.detach()
-      term.dispose()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, tab.id])
+
+  const split = useCallback(
+    (direction: 'horizontal' | 'vertical') => {
+      if (!project || !focused) return
+      void ask(() => commands.sessionSplit(project.id, tab.id, focused, direction, null)).then(
+        (answer) => {
+          if (!answer.data) return setError(answer.error ?? 'could not split')
+          setTree(answer.data.tree)
+          setFocused(answer.data.focusedId)
+        },
+      )
+    },
+    [project, tab.id, focused],
+  )
+
+  /* The shortcuts every terminal with splits uses. Only while this tab is the
+     one in front, or a hidden tab would split on a key meant for the visible
+     one. */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return
+      const key = event.key.toLowerCase()
+      if (key !== 'd' && key !== 'e') return
+      event.preventDefault()
+      split(key === 'd' ? 'horizontal' : 'vertical')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [split])
+
+  const settle = useCallback(
+    (splitId: string, ratio: number) => {
+      if (!project) return
+      void ask(() => commands.sessionSetRatio(project.id, tab.id, splitId, ratio)).then(
+        (answer) => {
+          if (answer.data) setTree(answer.data.tree)
+        },
+      )
+    },
+    [project, tab.id],
+  )
+
+  const focus = useCallback(
+    (leafId: string) => {
+      setFocused((was) => {
+        if (was === leafId || !project) return was
+        void ask(() => commands.sessionFocus(project.id, tab.id, leafId))
+        return leafId
+      })
+    },
+    [project, tab.id],
+  )
+
+  /* The tab is told which leaves it is showing, because the strip and the
+     sidebar draw this tab and neither can see the tree. Nothing ever told
+     them, so a terminal with an agent open looked exactly like an empty one
+     in both places. */
+  useEffect(() => {
+    if (tree) attach(tab.id, leaves(tree))
+  }, [tree, tab.id, attach])
+
+  /* A terminal opened to run an agent runs it once its pane exists.
+
+     Both a ref and the tab's own state, and neither alone is enough: the
+     state is what stops a later render from sending it again, and the ref is
+     what stops the second of React's two development mounts from sending it
+     before that state has landed. Two sends is two `claude` lines typed, the
+     second one into the first one. */
+  const sent = useRef(false)
+  useEffect(() => {
+    if (!project || !focused || !tab.launch || sent.current) return
+    sent.current = true
+    const agent = tab.launch
+    launched(tab.id)
+    void ask(() => commands.sessionLaunchAgent(project.id, focused, agent)).then((answer) => {
+      /* A notice, not the fatal error. The terminal is open and working
+         whether or not the agent was started for you, and replacing a working
+         terminal with a sentence takes away the one thing that still lets you
+         type the command yourself. */
+      if (answer.error) setNotice(answer.error)
+    })
+  }, [project, focused, tab.launch, tab.id, launched])
+
+  if (error) return <div className="exempty__t">{error}</div>
+  if (!tree) return <div className="termhost" />
 
   return (
     <>
-      {error && <div className="exempty__t">{error}</div>}
-      <div className="termhost" ref={host} />
+      {notice && (
+        <button className="tnote" onClick={() => setNotice(null)} title="Dismiss">
+          {notice}
+        </button>
+      )}
+      <Split
+        node={tree}
+        focused={focused}
+        onFocus={focus}
+        onRatio={settle}
+        leaf={(leafId) => <Leaf key={leafId} paneId={leafId} projectId={project?.id ?? ''} />}
+      />
     </>
   )
 }

@@ -2,7 +2,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
-import type { Question } from '../gen/bindings'
+import type { Happening, Question } from '../gen/bindings'
 
 /*
  * The window, for a window that draws its own frame.
@@ -119,6 +119,32 @@ export function onPermissionAsked(then: (question: Question) => void): () => voi
   let dropped = false
   let drop: (() => void) | undefined
   void listen<Question>('permission:asked', (event) => then(event.payload)).then((unlisten) => {
+    if (dropped) unlisten()
+    else drop = unlisten
+  })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}
+
+/**
+ * Calls back whenever a pane says something about itself.
+ *
+ * One event for all of it — a prompt, a command starting, an exit code, a
+ * title, a working directory — because they are all "something happened in
+ * this pane", and five subscriptions to one question would leave the screen
+ * ordering them itself. The payload names the pane, so a listener that cares
+ * about one filters.
+ *
+ * A pane reports whether or not anyone is attached to it: see
+ * `apps/desktop/src/tap.rs`.
+ */
+export function onHappening(then: (happening: Happening) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void listen<Happening>('terminal:happening', (event) => then(event.payload)).then((unlisten) => {
     if (dropped) unlisten()
     else drop = unlisten
   })

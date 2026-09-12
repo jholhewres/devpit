@@ -20,7 +20,10 @@ fn post(body: &str) -> Vec<u8> {
 fn a_well_formed_post_gives_up_its_body() {
     let body = r#"{"hook_event_name":"Stop","session_id":"s1"}"#;
     let raw = post(body);
-    assert_eq!(read_post(&raw[..]), Some(body.to_owned()));
+    assert_eq!(
+        read_post(&raw[..]).map(|posted| posted.body),
+        Some(body.to_owned())
+    );
 }
 
 /// A header can arrive in any case, and `Content-Length` is how most senders
@@ -28,7 +31,10 @@ fn a_well_formed_post_gives_up_its_body() {
 #[test]
 fn the_length_header_is_read_whatever_its_case() {
     let raw = b"POST /hook HTTP/1.1\r\nContent-Length: 2\r\n\r\nhi";
-    assert_eq!(read_post(&raw[..]), Some("hi".to_owned()));
+    assert_eq!(
+        read_post(&raw[..]).map(|posted| posted.body),
+        Some("hi".to_owned())
+    );
 }
 
 /// The rule this file exists for.
@@ -56,7 +62,10 @@ fn a_length_past_the_ceiling_is_refused_before_anything_is_allocated() {
 fn a_length_at_the_ceiling_is_still_read() {
     let body = "x".repeat(MOST_BYTES);
     let raw = format!("POST /hook HTTP/1.1\r\ncontent-length: {MOST_BYTES}\r\n\r\n{body}");
-    assert_eq!(read_post(raw.as_bytes()), Some(body));
+    assert_eq!(
+        read_post(raw.as_bytes()).map(|posted| posted.body),
+        Some(body)
+    );
 }
 
 #[test]
@@ -87,4 +96,55 @@ fn a_truncated_request_ends_rather_than_spins() {
 fn a_body_shorter_than_promised_is_refused() {
     let raw = b"POST /hook HTTP/1.1\r\ncontent-length: 40\r\n\r\nshort";
     assert_eq!(read_post(&raw[..]), None);
+}
+
+/// The pane the hook fired in, which is the whole reason the query exists:
+/// an agent's own reports arrive from a process the app never spawned, and
+/// this is what ties them back to the terminal somebody is looking at.
+#[test]
+fn the_pane_rides_in_the_query() {
+    let raw = b"POST /hook?pane=leaf_01ABC HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi";
+    assert_eq!(
+        read_post(&raw[..]).and_then(|posted| posted.pane),
+        Some("leaf_01ABC".to_owned())
+    );
+}
+
+/// A headless turn belongs to a card, not to a pane, and posts no query at
+/// all. It must go on working exactly as it did.
+#[test]
+fn a_post_with_no_query_names_no_pane() {
+    let raw = b"POST /hook HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi";
+    assert_eq!(read_post(&raw[..]).and_then(|posted| posted.pane), None);
+}
+
+/// This value arrives from a shell we wrote, through a process we did not,
+/// and goes on to key a map and reach the screen. Anything that is not shaped
+/// like one of our leaf ids is refused rather than sanitised into one.
+#[test]
+fn a_pane_that_is_not_shaped_like_ours_is_refused() {
+    for target in [
+        "/hook?pane=../../etc/passwd",
+        "/hook?pane=leaf%20one",
+        "/hook?pane=",
+        "/hook?pane=<script>",
+    ] {
+        let raw = format!("POST {target} HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi");
+        assert_eq!(
+            read_post(raw.as_bytes()).and_then(|posted| posted.pane),
+            None,
+            "{target} was accepted"
+        );
+    }
+}
+
+/// The query is not always the last thing on the line, and other parameters
+/// may sit beside it.
+#[test]
+fn the_pane_is_found_beside_other_parameters() {
+    let raw = b"POST /hook?x=1&pane=leaf_two HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi";
+    assert_eq!(
+        read_post(&raw[..]).and_then(|posted| posted.pane),
+        Some("leaf_two".to_owned())
+    );
 }

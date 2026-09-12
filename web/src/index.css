@@ -127,6 +127,13 @@ input[type='search']::-webkit-search-cancel-button {
    ring on the input draws a second edge just inside the first. */
 .cmd__in:focus-visible,
 .pickpop__in:focus-visible,
+.mpick__in:focus-visible,
+.sk__find:focus-visible,
+.composer__ph:focus-visible,
+.git__msg:focus-visible,
+.code__edit:focus-visible,
+.ex__q:focus-visible,
+.rename:focus-visible,
 .fld__b:focus-visible {
   outline: none;
 }

@@ -286,14 +286,23 @@ export const commands = {
 	 *  with the text in front of the person, never a side effect of a drag.
 	 */
 	terminalAttachAgent: (projectId: string, cardId: string) => typedError<string, RpcError>(__TAURI_INVOKE("terminal_attach_agent", { projectId, cardId })),
-	/**  `session.ensure` — a layout and a tmux window, created if they were missing. */
-	sessionEnsure: (projectId: string, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_ensure", { projectId, worktreeId })),
+	/**
+	 *  `session.ensure` — a layout and a tmux window, created if they were missing.
+	 * 
+	 *  Async so it does not run on the thread that draws the window.
+	 * 
+	 *  It opens the store and spawns tmux several times — a handful of
+	 *  milliseconds each, and all of them on the main thread while somebody
+	 *  watches an empty pane. There is no `await` in the body, so the work still
+	 *  happens in one go; it just happens somewhere the window can paint through.
+	 */
+	sessionEnsure: (projectId: string, tabId: string, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_ensure", { projectId, tabId, worktreeId })),
 	/**  `session.layout` — the tree as last persisted. */
-	sessionLayout: (projectId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_layout", { projectId })),
+	sessionLayout: (projectId: string, tabId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_layout", { projectId, tabId })),
 	/**  `session.focus` — persists which leaf receives the next split or action. */
-	sessionFocus: (projectId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_focus", { projectId, leafId })),
+	sessionFocus: (projectId: string, tabId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_focus", { projectId, tabId, leafId })),
 	/**  `session.split` — a new tmux window and a split node in the tree. */
-	sessionSplit: (projectId: string, leafId: string, direction: SplitDirection, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_split", { projectId, leafId, direction, worktreeId })),
+	sessionSplit: (projectId: string, tabId: string, leafId: string, direction: SplitDirection, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_split", { projectId, tabId, leafId, direction, worktreeId })),
 	/**
 	 *  `session.close_leaf` — the pane goes, and its tmux window with it.
 	 * 
@@ -303,7 +312,15 @@ export const commands = {
 	 *  Refuses the last pane. A session with no pane is not a layout, and the
 	 *  refusal says so rather than persisting an empty tree the screen cannot draw.
 	 */
-	sessionCloseLeaf: (projectId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_close_leaf", { projectId, leafId })),
+	sessionCloseLeaf: (projectId: string, tabId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_close_leaf", { projectId, tabId, leafId })),
+	/**
+	 *  `session.close_tab` — the tab goes, and every window in its tree with it.
+	 * 
+	 *  A tab owns a tree, so closing one is not closing a leaf: leaving the rest
+	 *  running would leave shells nothing can reach again, which is the shape the
+	 *  scrollback and the layout both keyed on.
+	 */
+	sessionCloseTab: (projectId: string, tabId: string) => typedError<null, RpcError>(__TAURI_INVOKE("session_close_tab", { projectId, tabId })),
 	/**
 	 *  `session.rename_leaf` — the name the person gave this pane.
 	 * 
@@ -311,7 +328,7 @@ export const commands = {
 	 *  program running in it calls itself. The person's name always wins over the
 	 *  program's: a title escape arriving later must not undo a rename.
 	 */
-	sessionRenameLeaf: (projectId: string, leafId: string, name: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_rename_leaf", { projectId, leafId, name })),
+	sessionRenameLeaf: (projectId: string, tabId: string, leafId: string, name: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_rename_leaf", { projectId, tabId, leafId, name })),
 	/**
 	 *  `session.set_ratio` — where a boundary was dragged to.
 	 * 
@@ -319,7 +336,7 @@ export const commands = {
 	 *  put them, and resizing the window does not shuffle a layout someone
 	 *  arranged. The tree clamps, so neither side can be dragged out of reach.
 	 */
-	sessionSetRatio: (projectId: string, splitId: string, ratio: number | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_set_ratio", { projectId, splitId, ratio })),
+	sessionSetRatio: (projectId: string, tabId: string, splitId: string, ratio: number | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_set_ratio", { projectId, tabId, splitId, ratio })),
 	/**
 	 *  `session.write` — bytes into the attached client of a leaf.
 	 * 
@@ -346,6 +363,90 @@ export const commands = {
 	paneScrollback: (paneId: string) => typedError<PaneScrollback, RpcError>(__TAURI_INVOKE("pane_scrollback", { paneId })),
 	/**  `session.detach` — closes only this app's client; tmux keeps the shell. */
 	sessionDetach: (paneId: string, clientId: string) => typedError<null, RpcError>(__TAURI_INVOKE("session_detach", { paneId, clientId })),
+	/**
+	 *  `session.running` — what each of a project's panes has in the foreground.
+	 * 
+	 *  Asked of tmux and of the process table, which is asking the kernel.
+	 *  Nothing is installed in the person's own configuration to make this work,
+	 *  and nothing leaves the machine: the alternative is writing hooks into every
+	 *  agent CLI's settings file, which reaches further and needs consent this
+	 *  does not.
+	 * 
+	 *  Two questions, because one of them is not enough. tmux says which window
+	 *  owns which terminal and what executable is in front of it; the process
+	 *  table says what that executable was *given*, which is where an agent's name
+	 *  actually is. Every JavaScript agent — Claude Code, Codex, Gemini, OpenCode
+	 *  — runs as `node`, so tmux alone reported `node` and the sidebar showed
+	 *  nothing while a conversation was happening in front of it.
+	 * 
+	 *  A project with no session yet is not an error — it is an empty list. The
+	 *  sidebar polls this, and a refusal on every tick for a project nobody has
+	 *  opened a terminal in would be noise.
+	 * 
+	 *  Off the main thread, because it is asked on a timer. A synchronous Tauri
+	 *  command runs on the thread that draws the window, and this one spawns tmux
+	 *  and reads the process table — measured at about forty milliseconds, every
+	 *  two seconds, on the thread that draws. `spawn_blocking` and not a plain
+	 *  `async fn`: the body blocks, and blocking a runtime worker only moves the
+	 *  stall somewhere less visible.
+	 */
+	sessionRunning: (projectId: string) => typedError<PaneRunning[], RpcError>(__TAURI_INVOKE("session_running", { projectId })),
+	/**
+	 *  `agents.known` — the agent CLIs this build can start, and which are here.
+	 * 
+	 *  The list the menu draws. It is the same list that recognises a running
+	 *  agent, on purpose: two lists drift, and the drift shows up as starting
+	 *  Gemini from our own menu and then being told the pane is running `node`.
+	 */
+	agentsKnown: () => typedError<KnownAgent[], RpcError>(__TAURI_INVOKE("agents_known")),
+	/**
+	 *  `session.launch_agent` — types an agent's launch line into a pane.
+	 * 
+	 *  Typed into the pane rather than spawned beside it, and that is the whole
+	 *  design: the person sees the command they would have typed, in the shell
+	 *  they are in, with their own `PATH` and their own configuration. A process
+	 *  started behind the terminal would be an agent the terminal does not own,
+	 *  and closing the tab would leave it running with nothing to reach it.
+	 * 
+	 *  The line is not sent blind, and it is not sent early.
+	 * 
+	 *  A pane with something already in front of it would take the text as input
+	 *  to *that* — a prompt typed into an agent that is already open — so a busy
+	 *  pane is refused with the reason.
+	 * 
+	 *  And a shell that has not reached its prompt yet drops what it is sent.
+	 *  Measured on the machine this was written on: a fresh tmux window took 1.3
+	 *  seconds to print its first prompt, and a line sent at half a second simply
+	 *  vanished. So this waits, which is why it is async.
+	 */
+	sessionLaunchAgent: (projectId: string, paneId: string, agentId: string) => typedError<string, RpcError>(__TAURI_INVOKE("session_launch_agent", { projectId, paneId, agentId })),
+	/**
+	 *  `terminal.happenings` — the shape `terminal:happening` carries.
+	 * 
+	 *  It exists so the generated contract knows [`Happening`]: an event payload
+	 *  is reachable from no command, and specta only writes down what a command
+	 *  can reach. The same reason `chat.frames` exists.
+	 */
+	terminalHappenings: () => typedError<Happening[], RpcError>(__TAURI_INVOKE("terminal_happenings")),
+	/**
+	 *  `account.read` — who this install is signed in as.
+	 * 
+	 *  A token the server refuses is deleted here rather than kept to fail again
+	 *  on every launch, and `expired` says so, because "your session ended" and
+	 *  "you were never signed in" are different sentences.
+	 */
+	accountRead: () => typedError<Membership, RpcError>(__TAURI_INVOKE("account_read")),
+	/**  `account.sign_in` — start a sign-in and open the browser on it. */
+	accountSignIn: () => typedError<SignIn, RpcError>(__TAURI_INVOKE("account_sign_in")),
+	/**  `account.poll` — has the person approved it yet. */
+	accountPoll: () => typedError<SignInState, RpcError>(__TAURI_INVOKE("account_poll")),
+	/**
+	 *  `account.sign_out` — forget the token, and tell the server to as well.
+	 * 
+	 *  The local file goes first. A network failure on the way out must not leave
+	 *  someone looking at an account they asked to leave.
+	 */
+	accountSignOut: () => typedError<Membership, RpcError>(__TAURI_INVOKE("account_sign_out")),
 	/**  `settings.read` — everything the first run and the settings screen need. */
 	settingsRead: () => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_read")),
 	/**
@@ -354,7 +455,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, keepTranscripts: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme, automaticUpdates, keepTranscripts })),
+	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, keepTranscripts: boolean | null, confirmStop: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme, automaticUpdates, keepTranscripts, confirmStop })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -366,6 +467,25 @@ export const commands = {
 };
 
 /* Types */
+/**
+ *  Who the person is, as the accounts server describes them.
+ * 
+ *  Two fields today, because two are what the server has. The shape is an
+ *  object rather than a bare string so a handle, an avatar and a plan can
+ *  arrive later without every caller changing.
+ */
+export type Account = {
+	id: string,
+	email: string,
+	/**
+	 *  What the person calls themselves, when they have set one. Absent rather
+	 *  than derived from the address: a name nobody chose is worse than none.
+	 */
+	name: string | null,
+	/**  RFC 3339, in UTC. */
+	createdAt: string,
+};
+
 /**  An agent on this machine, as the step picker needs it. */
 export type Agent = {
 	/**  The name in the file's frontmatter — what a step stores. */
@@ -743,6 +863,17 @@ export type Front = {
  */
 export type GitStatus = "clean" | "modified" | "added" | "deleted" | "untracked";
 
+/**  The payload of `terminal:happening`. */
+export type Happening = {
+	paneId: string,
+	/**
+	 *  `cwd` | `title` | `prompt` | `running` | `finished` | `clipboard` |
+	 *  `agent`.
+	 */
+	what: string,
+	detail: string | null,
+};
+
 /**  One thing the workspace holds, measured. */
 export type Held = {
 	name: string,
@@ -757,6 +888,27 @@ export type Held = {
 	 *  yet" is honest; a row that says 0 B is not.
 	 */
 	exists: boolean,
+};
+
+/**
+ *  One agent CLI this build can start, for `agents.known`.
+ * 
+ *  The same list that recognises a running one. They cannot be two lists: a
+ *  menu that starts Gemini and a sidebar that then calls the pane `node` is
+ *  the shape of the bug this replaces.
+ */
+export type KnownAgent = {
+	/**  Stable, and what the screen keys an icon by. */
+	id: string,
+	label: string,
+	/**  What gets typed into the terminal to start it. */
+	launch: string,
+	/**
+	 *  Whether it is on this machine's PATH. A menu still lists the others —
+	 *  saying what could be installed is more use than a short list with no
+	 *  explanation.
+	 */
+	installed: boolean,
 };
 
 export type LayoutNode = { type: "leaf"; id: string; 
@@ -780,6 +932,27 @@ title?: string } | { type: "split";
  *  stored tree to add a field nothing had asked for yet.
  */
 id?: string; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
+
+/**
+ *  What the account pane draws.
+ * 
+ *  `account` is null for "nobody is signed in", which is a state and not an
+ *  error — a screen that has to catch a failure to draw its signed-out half
+ *  draws it late.
+ */
+export type Membership = {
+	account: Account | null,
+	/**
+	 *  Where the browser is sent, so the screen can name it without hard-coding
+	 *  a domain the build might not be pointing at.
+	 */
+	origin: string,
+	/**
+	 *  False when the token on disk was refused. The person is signed out, and
+	 *  telling them it expired is kinder than pretending they never signed in.
+	 */
+	expired: boolean,
+};
 
 export type Message = {
 	id: string,
@@ -809,6 +982,37 @@ export type Opened = {
 
 /**  What a leaf shows. Only `terminal` in this slice. */
 export type PaneKind = "terminal";
+
+/**
+ *  What is running in one pane, for `session.running`.
+ * 
+ *  The foreground process, asked of the operating system rather than reported
+ *  by the program itself: an agent CLI opened in a terminal has no reason to
+ *  tell this app it exists, and the sidebar still has to know.
+ */
+export type PaneRunning = {
+	paneId: string,
+	/**
+	 *  The command's own name: `zsh`, `claude`, `codex`, `cargo`.
+	 * 
+	 *  Read from the arguments, not from the executable: every agent CLI
+	 *  written in JavaScript runs as `node`, and a row saying `node` names
+	 *  nothing anyone recognises.
+	 */
+	command: string,
+	/**  False while the shell itself is in front, which is nothing running. */
+	busy: boolean,
+	/**
+	 *  Which agent this is, when it is one. `null` for a shell, a build, an
+	 *  editor — anything the app has no particular name for.
+	 */
+	agent: string | null,
+	/**
+	 *  What to call it on screen: `Claude Code` for an agent, and the
+	 *  command's own name for everything else.
+	 */
+	label: string,
+};
 
 /**  Response of `pane.scrollback`. */
 export type PaneScrollback = {
@@ -1071,7 +1275,42 @@ export type Settings = {
 	automaticUpdates: boolean | null,
 	/**  Whether a turn is written to disk. Null is "never asked". */
 	keepTranscripts: boolean | null,
+	/**
+	 *  Whether closing a terminal with an agent or a command still running
+	 *  stops to ask first.
+	 * 
+	 *  Null is "never asked", and never-asked means yes: the first time
+	 *  someone closes a tab with work in it, the prompt is the only thing
+	 *  standing between them and losing it. It goes to `false` when they tick
+	 *  "don't ask again", which is a choice and not a default.
+	 */
+	confirmStop: boolean | null,
 };
+
+/**  A sign-in that has started but not finished. */
+export type SignIn = {
+	/**
+	 *  Shown in the app, and already in the url the browser opened. Typing it
+	 *  is the fallback, not the path.
+	 */
+	userCode: string,
+	verifyUrl: string,
+	expiresInSeconds: number,
+	/**
+	 *  How often the app may ask. The server decides, so a polling loop cannot
+	 *  become a load test by being written badly here.
+	 */
+	intervalSeconds: number,
+};
+
+/**  Where a sign-in stands, each time the screen asks. */
+export type SignInState = 
+/**  Nobody has approved it yet. Ask again after `interval_seconds`. */
+{ state: "waiting" } | 
+/**  Done. The token is already on disk; the screen gets the person. */
+{ state: "signed"; account: Account } | 
+/**  The code ran out, or was already used. Start again. */
+{ state: "expired" };
 
 export type Skill = {
 	name: string,

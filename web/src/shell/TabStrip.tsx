@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef } from 'react'
 
+import { AgentMark } from './AgentMark'
 import { paneMeta } from './paneList'
-import type { Tab } from './strip'
+import { Rename } from './Rename'
+import { busyIn, doingIn } from './running'
+import { short, twice, type Clicked, type Tab } from './strip'
 import { useShell } from './useShell'
 
 /*
@@ -12,10 +15,12 @@ import { useShell } from './useShell'
  * fires a ghost image nobody asked for.
  */
 export function TabStrip(): React.JSX.Element {
-  const { open, active, show, focus, close, move } = useShell()
-  const strip = useRef<HTMLDivElement>(null)
+  const { open, active, focus, close, move, rename, renaming, setRenaming } = useShell()
+  const { running, doing, openPalette } = useShell()
+    const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
   const moving = useRef<{ id: string; at: number; moved: boolean } | null>(null)
+  const clicked = useRef<Clicked | null>(null)
 
   /* FLIP: the tabs that did not move animate from where they were. */
   useLayoutEffect(() => {
@@ -53,11 +58,60 @@ export function TabStrip(): React.JSX.Element {
     move(drag.id, to === -1 ? tabs.length - 1 : to)
   }
 
-  const label = (tab: Tab): string => tab.title ?? paneMeta(tab.kind).label
+  /* Long enough to tell two chats apart, short enough that six tabs still
+     fit across the strip. */
+  const label = (tab: Tab): string => short(named(tab), 22)
+
+  /* What the tab is called, which is not always what it was named.
+
+     A terminal is born `Terminal 3`, which says where it is in the strip and
+     nothing about what is in it. Once an agent is open, the agent is the
+     truer answer — so the generated name gives way and a name the person
+     typed never does. */
+  function named(tab: Tab): string {
+    if (tab.title && !generated(tab)) return tab.title
+    const here = busyIn(running, tab)
+    return here?.agent ? here.label : (tab.title ?? paneMeta(tab.kind).label)
+  }
+
+  /* A name this app wrote, rather than one a person chose. */
+  const generated = (tab: Tab): boolean =>
+    tab.kind === 'term' && /^Terminal \d+$/.test(tab.title ?? '')
+
+  /* The glyph: the agent's while one is open, and the pane's otherwise.
+
+     `data-doing` carries what the agent says about itself, which is the one
+     thing the process table cannot answer — an agent blocked on the network
+     and an agent blocked on you look identical from outside. */
+  function icon(tab: Tab): React.ReactNode {
+    const here = busyIn(running, tab)
+    if (!here?.agent) return paneMeta(tab.kind).icon
+    return (
+      <span className="tab__mk" data-doing={doingIn(running, doing, tab) ?? undefined}>
+        <AgentMark agent={here.agent} />
+      </span>
+    )
+  }
 
   return (
     <div className="tabs" role="group" aria-label="Panes" ref={strip} onPointerMove={onMove}>
-      {open.map((tab) => (
+      {open.map((tab) =>
+        /* Renaming swaps the whole tab for a field: an input inside a button
+           is neither valid nor operable — the button swallows the click that
+           would place the cursor. */
+        renaming?.id === tab.id && renaming.where === 'strip' ? (
+          <div className="tab" data-tab={tab.id} data-toggle={tab.kind} data-active={String(active?.id === tab.id)} key={tab.id}>
+            {icon(tab)}
+            <Rename
+              value={tab.title ?? paneMeta(tab.kind).label}
+              editing
+              onDone={(title) => {
+                if (title) rename(tab.id, title)
+                setRenaming(null)
+              }}
+            />
+          </div>
+        ) : (
         <button
           key={tab.id}
           className="tab"
@@ -77,13 +131,22 @@ export function TabStrip(): React.JSX.Element {
           onPointerUp={() => {
             moving.current = null
           }}
-          onClick={() => {
+          onClick={(event) => {
             if (moving.current?.moved) return
+            if (twice(clicked.current, tab.id, event.timeStamp)) {
+              clicked.current = null
+              setRenaming({ id: tab.id, where: 'strip' })
+              return
+            }
+            clicked.current = { id: tab.id, at: event.timeStamp }
             focus(tab.id)
           }}
         >
-          {paneMeta(tab.kind).icon}
+          {icon(tab)}
           {label(tab)}
+          {/* Something is running here and it is not an agent. The name stays
+              the tab's own; the dot is the whole message. */}
+          {busyIn(running, tab)?.agent === null && <i className="tab__dot" aria-hidden="true" />}
           <span
             className="tab__x"
             role="button"
@@ -98,10 +161,16 @@ export function TabStrip(): React.JSX.Element {
             </svg>
           </span>
         </button>
-      ))}
+        ),
+      )}
 
-      {/* Another terminal, where every terminal app puts it. */}
-      <button className="tab tab--new" title="New terminal (⌘T)" aria-label="New terminal" onClick={() => show('term')}>
+      {/* Anything new, where every terminal app puts the plus.
+
+          The field rather than a bare terminal: the plus is where a person
+          goes to start something, and most of the time the something is an
+          agent. A plain terminal is the first row in it, and ⌘T still opens
+          one without stopping to ask. */}
+      <button className="tab tab--new" title="Open something new (⌘K)" aria-label="Open something new" onClick={openPalette}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>

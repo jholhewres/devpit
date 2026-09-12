@@ -2,6 +2,8 @@
 // implementation detail.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod account;
+mod arranging;
 mod asking;
 mod board;
 mod branches;
@@ -24,6 +26,7 @@ mod in_flight;
 mod index;
 mod kinds;
 mod listener;
+mod live;
 mod mcp;
 mod panes;
 mod post;
@@ -37,8 +40,10 @@ mod runs;
 mod saves;
 mod sessions;
 mod settings;
+mod shell_launch;
 mod staging;
 mod steps;
+mod tap;
 mod threads;
 mod workspace;
 mod worktrees;
@@ -74,6 +79,10 @@ fn main() {
             if let Ok(root) = devpit_core::Store::root() {
                 listener::start(app.handle().clone(), &root);
             }
+            // Which agent CLIs this machine has, asked of the login shell —
+            // which costs an interactive shell startup. Started now so the
+            // first time somebody opens the menu the answer is already there.
+            shell_launch::warm_installed();
             Ok(())
         })
         .manage(std::sync::Arc::new(in_flight::InFlight::new()))

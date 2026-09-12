@@ -192,7 +192,7 @@ mod tests {
     /// The migration has to be additive over real rows, not over an empty
     /// file: that is the case where a mistake costs someone their data.
     #[test]
-    fn version_four_leaves_older_rows_untouched() {
+    fn migrating_leaves_older_rows_untouched() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("state.db");
 
@@ -213,7 +213,7 @@ mod tests {
             .conn()
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .expect("version");
-        assert_eq!(version, 4);
+        assert_eq!(version, 5);
 
         let name: String = store
             .conn()
@@ -223,15 +223,21 @@ mod tests {
             .expect("the project survived");
         assert_eq!(name, "demo");
 
-        let focused: String = store
+        // The layout table is rebuilt by migration 5, not altered — SQLite
+        // cannot change a primary key in place. So its rows are exactly where
+        // a mistake would cost someone an open session.
+        let (tab_id, focused): (String, String) = store
             .conn()
             .query_row(
-                "SELECT focused_id FROM pane_layout WHERE project_id = 'prj_1'",
+                "SELECT tab_id, focused_id FROM pane_layout WHERE project_id = 'prj_1'",
                 [],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
-            .expect("the layout survived");
+            .expect("the layout survived being rebuilt");
         assert_eq!(focused, "leaf_1");
+        // A tree that predates tabs is adopted by one named after its project,
+        // so a session open across the upgrade is still reachable.
+        assert_eq!(tab_id, "tab_prj_1");
 
         // And the board tables arrived alongside them.
         store.ensure_board("prj_1").expect("seed the board");

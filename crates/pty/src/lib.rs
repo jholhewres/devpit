@@ -22,15 +22,19 @@
 //!
 //! Points 3 and 4 are not built yet; the shape here is what they attach to.
 
+pub mod agents;
+mod foreground;
 mod osc;
 mod reader;
 mod ring;
+pub mod shell;
 mod stopping;
 
+pub use foreground::{at_a_prompt, looking, on as front_on, Front, Settling};
 pub use osc::{Scanner, Told, MOST_CARRIED};
 pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;
-pub use stopping::{stop, Stopped, GRACE};
+pub use stopping::{stop, stop_group, Stopped, GRACE};
 
 use std::io::Write;
 use std::sync::atomic::AtomicU64;

@@ -6,6 +6,7 @@ import {
   attached,
   closed,
   focused,
+  launched as sent,
   moved,
   opened,
   renamed,
@@ -13,6 +14,13 @@ import {
   type Tab,
 } from './strip'
 import { empty, remember, remembered } from './tabs'
+
+export type Where = 'strip' | 'sidebar'
+
+export interface Renaming {
+  readonly id: string
+  readonly where: Where
+}
 
 export interface Tabs {
   readonly open: readonly Tab[]
@@ -22,13 +30,23 @@ export interface Tabs {
   focus: (id: string) => void
   move: (id: string, to: number) => void
   rename: (id: string, title: string) => void
-  attach: (id: string, paneId: string) => void
+  attach: (id: string, panes: readonly string[]) => void
+  /** Forgets the agent a terminal was opened to run, once it has been sent. */
+  launched: (id: string) => void
+  /** Which tab is being renamed, and on which surface.
+
+      The surface is not decoration: the strip and the sidebar draw the same
+      tab, so an id alone puts a field in both. They then race for the focus,
+      and the one that loses it commits and closes the other. */
+  readonly renaming: Renaming | null
+  setRenaming: (renaming: Renaming | null) => void
 }
 
 /* The strip belongs to the project: switching restores what that one had
    open, and the window itself opens on the empty state. */
 export function useTabs(projectId: string | null): Tabs {
   const [strip, setStrip] = useState<Strip>(empty)
+  const [renaming, setRenaming] = useState<Renaming | null>(null)
 
   useEffect(() => setStrip(remembered(projectId)), [projectId])
   useEffect(() => remember(projectId, strip), [projectId, strip])
@@ -39,14 +57,17 @@ export function useTabs(projectId: string | null): Tabs {
     [],
   )
 
-  /* Closing a terminal tab closes its pane too, or the session keeps a leaf
-     nothing is looking at. */
+  /* Closing a terminal tab closes its whole tree, or the session keeps
+     windows nothing is looking at. */
   const close = useCallback(
     (id: string) =>
       setStrip((was) => {
+        /* A terminal tab owns a tree, so closing it takes every window in
+           that tree — not one leaf. Leaving the rest running would leave
+           shells nothing can reach again. */
         const going = was.open.find((tab) => tab.id === id)
-        if (going?.paneId && projectId) {
-          void ask(() => commands.sessionCloseLeaf(projectId, going.paneId!))
+        if (going?.kind === 'term' && projectId) {
+          void ask(() => commands.sessionCloseTab(projectId, id))
         }
         return closed(was, id)
       }),
@@ -60,9 +81,22 @@ export function useTabs(projectId: string | null): Tabs {
     [],
   )
   const attach = useCallback(
-    (id: string, paneId: string) => setStrip((was) => attached(was, id, paneId)),
+    (id: string, panes: readonly string[]) => setStrip((was) => attached(was, id, panes)),
     [],
   )
+  const launched = useCallback((id: string) => setStrip((was) => sent(was, id)), [])
 
-  return { open: strip.open, active: focused(strip), show, close, focus, move, rename, attach }
+  return {
+    open: strip.open,
+    active: focused(strip),
+    show,
+    close,
+    focus,
+    move,
+    rename,
+    attach,
+    launched,
+    renaming,
+    setRenaming,
+  }
 }
