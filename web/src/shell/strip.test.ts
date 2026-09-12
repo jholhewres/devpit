@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
-import { closed, focused, many, moved, opened, renamed, type Strip, type Tab } from './strip'
+import {
+  DOUBLE_MS,
+  closed,
+  focused,
+  many,
+  moved,
+  nextName,
+  opened,
+  renamed,
+  short,
+  titleOf,
+  twice,
+  type Strip,
+  type Tab,
+} from './strip'
 import { empty } from './tabs'
 
 const tab = (id: string, kind = 'term'): Tab => ({ id, kind: kind as Tab['kind'] })
@@ -20,7 +34,11 @@ describe('which kinds you can have several of', () => {
 
 describe('opening a tab', () => {
   it('appends it and looks at it', () => {
-    expect(opened(strip([]), tab('t1'))).toEqual({ open: [tab('t1')], active: 't1' })
+    /* A terminal is named as it opens, so it arrives carrying its number. */
+    expect(opened(strip([]), tab('t1'))).toEqual({
+      open: [{ ...tab('t1'), title: 'Terminal 1' }],
+      active: 't1',
+    })
   })
 
   it('opens a second terminal rather than focusing the first', () => {
@@ -95,5 +113,87 @@ describe('a file is one tab', () => {
     const again = opened(one, file('a.rs'))
     expect(again.open).toHaveLength(2)
     expect(again.active).toBe('file:a.rs')
+  })
+})
+
+describe('what a tab is called', () => {
+  it('names a conversation after the first thing you said in it', () => {
+    expect(titleOf('Fix the login bug')).toBe('Fix the login bug')
+  })
+
+  it('takes the first line that has something on it', () => {
+    expect(titleOf('\n\n  Boa noite\nand then some more')).toBe('Boa noite')
+  })
+
+  it('cuts a long opening line rather than letting it run', () => {
+    const said = 'x'.repeat(60)
+    expect(titleOf(said)).toBe(`${'x'.repeat(48)}…`)
+  })
+
+  it('has nothing to call an empty message', () => {
+    /* The caller keeps the fallback; inventing one here would hide it. */
+    expect(titleOf('   \n  ')).toBe('')
+  })
+})
+
+describe('numbering the terminals', () => {
+  const term = (title?: string): Tab => ({ id: crypto.randomUUID(), kind: 'term', title })
+
+  it('gives the first one a 1', () => {
+    expect(nextName([], 'term', 'Terminal')).toBe('Terminal 1')
+  })
+
+  it('counts up past the ones that are open', () => {
+    expect(nextName([term('Terminal 1'), term('Terminal 2')], 'term', 'Terminal')).toBe('Terminal 3')
+  })
+
+  it('takes back a number the one that closed gave up', () => {
+    /* Terminal 4 beside a Terminal 2 reads as two missing terminals. */
+    expect(nextName([term('Terminal 2')], 'term', 'Terminal')).toBe('Terminal 1')
+  })
+
+  it('ignores a terminal someone renamed', () => {
+    expect(nextName([term('deploy')], 'term', 'Terminal')).toBe('Terminal 1')
+  })
+
+  it('names a terminal as it opens, and leaves a chat to be named later', () => {
+    const one = opened({ open: [], active: null }, { id: 'a', kind: 'term' })
+    expect(one.open[0]!.title).toBe('Terminal 1')
+    const two = opened(one, { id: 'b', kind: 'term' })
+    expect(two.open[1]!.title).toBe('Terminal 2')
+    const chat = opened(two, { id: 'c', kind: 'chat' })
+    expect(chat.open[2]!.title).toBeUndefined()
+  })
+})
+
+describe('two clicks close together', () => {
+  it('is a rename on the same thing inside the window', () => {
+    expect(twice({ id: 't1', at: 0 }, 't1', DOUBLE_MS - 1)).toBe(true)
+  })
+
+  it('is two separate clicks once the window has passed', () => {
+    expect(twice({ id: 't1', at: 0 }, 't1', DOUBLE_MS + 1)).toBe(false)
+  })
+
+  it('is not a double click across two different tabs', () => {
+    expect(twice({ id: 't1', at: 0 }, 't2', 1)).toBe(false)
+  })
+
+  it('has nothing to compare on the first click', () => {
+    expect(twice(null, 't1', 0)).toBe(false)
+  })
+})
+
+describe('cutting a name to fit', () => {
+  it('leaves a name that fits alone', () => {
+    expect(short('Terminal 1', 22)).toBe('Terminal 1')
+  })
+
+  it('cuts a long one and says it cut it', () => {
+    expect(short('x'.repeat(40), 22)).toBe(`${'x'.repeat(22)}…`)
+  })
+
+  it('does not leave a space hanging before the ellipsis', () => {
+    expect(short('abc def ghi', 4)).toBe('abc…')
   })
 })
