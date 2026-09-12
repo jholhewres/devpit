@@ -107,18 +107,24 @@ pub(crate) fn dead_in(text: &str) -> usize {
 
 /// The opening tag, up to the `>` that closes it.
 ///
-/// Not the first `>`: a handler is written `onClick={() => go()}`, and the
-/// arrow's `>` would end the tag two attributes early. That read a wired
-/// button as a dead one, which is the failure mode that makes a guard
-/// distrusted.
+/// Not the first `>`. An attribute value is a JSX expression, and a `>` inside
+/// one closes nothing: `onClick={() => go()}` has one, and so does
+/// `aria-label={n > 0 ? "some" : "none"}`. Ending the tag at either reads a
+/// wired button as a dead one — the failure mode that makes a guard
+/// distrusted, and one this has now had twice.
+///
+/// Braces are counted rather than special-casing the arrow, because the arrow
+/// was only the first way it happened.
 fn tag_at(from: &str) -> &str {
     let bytes = from.as_bytes();
-    let mut at = 0;
-    while at < bytes.len() {
-        if bytes[at] == b'>' && (at == 0 || bytes[at - 1] != b'=') {
-            return &from[..at];
+    let mut depth = 0usize;
+    for (at, byte) in bytes.iter().enumerate() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => depth = depth.saturating_sub(1),
+            b'>' if depth == 0 => return &from[..at],
+            _ => {}
         }
-        at += 1;
     }
     from
 }
@@ -188,6 +194,22 @@ mod tests {
     #[test]
     fn a_button_with_a_handler_is_not_counted() {
         assert_eq!(dead_in(r#"<button onClick={go}>Go</button>"#), 0);
+    }
+
+    /// Both ways a `>` has turned up inside an attribute and cut the tag
+    /// short. Each one read a working button as dead.
+    #[test]
+    fn a_greater_than_inside_an_attribute_does_not_end_the_tag() {
+        assert_eq!(dead_in(r#"<button onClick={() => go()}>Go</button>"#), 0);
+        assert_eq!(
+            dead_in(r#"<button aria-label={n > 0 ? "some" : "none"} onClick={go}>Go</button>"#),
+            0
+        );
+        // And the tag still ends where it ends: this one really is dead.
+        assert_eq!(
+            dead_in(r#"<button aria-label={n > 0 ? "some" : "none"}>Go</button>"#),
+            1
+        );
     }
 
     #[test]
