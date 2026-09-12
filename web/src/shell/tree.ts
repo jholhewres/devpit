@@ -25,6 +25,16 @@ export function mark(status: GitStatus): string | null {
   }
 }
 
+/* What a version bump means for a folder's cached children: never fetched is
+   nothing to do, open is worth a fresh fetch, closed just drops the cache so
+   the next open does not show what a reload already knows is stale. */
+export type ChildRefresh = 'skip' | 'now' | 'drop'
+
+export function refreshChildren(hasChildren: boolean, open: boolean): ChildRefresh {
+  if (!hasChildren) return 'skip'
+  return open ? 'now' : 'drop'
+}
+
 /* Which paths a filter keeps: a file that matches, and every folder on the
    way to it — a match nobody can reach is a match nobody sees. */
 export function matching(nodes: readonly FileNode[], query: string): Set<string> {

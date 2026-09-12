@@ -56,6 +56,7 @@ export function FilesPane({
           <Tree
             projectId={project.id}
             nodes={tree.nodes}
+            version={tree.version}
             query={query}
             current={current}
             collapsed={0}

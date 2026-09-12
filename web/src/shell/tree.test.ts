@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FileNode } from '../gen/bindings'
-import { mark, matching, ordered } from './tree'
+import { mark, matching, ordered, refreshChildren } from './tree'
 
 const file = (name: string, path = name): FileNode =>
   ({ name, path, status: 'clean', children: null })
@@ -54,5 +54,22 @@ describe('filtering the tree', () => {
 
   it('keeps nothing for an empty query, so the caller shows everything', () => {
     expect(matching(tree, '   ').size).toBe(0)
+  })
+})
+
+describe('what a reload means for a folder already fetched once', () => {
+  it('does nothing for a folder that was never opened', () => {
+    expect(refreshChildren(false, false)).toBe('skip')
+    expect(refreshChildren(false, true)).toBe('skip')
+  })
+
+  it('refreshes a folder that is open, since it is on screen', () => {
+    expect(refreshChildren(true, true)).toBe('now')
+  })
+
+  /* Dropping rather than leaving it alone: without this, reopening a closed
+     folder would show what it fetched before the reload, not what changed. */
+  it('drops the cache for a closed folder, so reopening it fetches fresh', () => {
+    expect(refreshChildren(true, false)).toBe('drop')
   })
 })
