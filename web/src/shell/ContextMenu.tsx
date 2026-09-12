@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { FileDialogs } from './FileDialogs'
-import { FILE_MENU, type Entry } from './fileMenu'
+import { FILE_MENU } from './fileMenu'
+import { CARD_MENU, sessionMenu, type SessionEntry } from './sessionMenu'
 import { useFileActions } from './useFileActions'
 import { useShell } from './useShell'
+import { abandoned } from './typing'
 
 /*
  * An item names an action or is not offered.
@@ -13,9 +15,7 @@ import { useShell } from './useShell'
  * session row publishes `data-id`. `act` goes through `useFileActions`, which
  * owns the dialogs a file action needs; `run` is called with the row's id.
  */
-interface Item extends Entry {
-  readonly run?: (id: string) => void
-}
+type Item = SessionEntry
 
 /*
  * Right-click is off everywhere, then switched back on where there is
@@ -28,19 +28,7 @@ interface Item extends Entry {
  * `card` is the one that still only closes. It needs board commands, and it is
  * named here so the next reader knows it is known rather than missed.
  */
-const STATIC: Record<string, readonly Item[]> = {
-  card: [
-    { label: 'Open', key: '↵' },
-    { label: 'Open in a chat' },
-    { label: 'Open a terminal here' },
-    { rule: true },
-    { label: 'Move to…', key: '⌘M' },
-    { label: 'Rename', key: 'F2' },
-    { rule: true },
-    { label: 'Delete card', bad: true },
-  ],
-  file: FILE_MENU,
-}
+const STATIC: Record<string, readonly Item[]> = { card: CARD_MENU, file: FILE_MENU }
 
 interface At {
   readonly kind: string
@@ -58,16 +46,15 @@ export function ContextMenu(): React.JSX.Element {
   const menu = useRef<HTMLDivElement>(null)
   const actions = useFileActions(() => setAt(null))
 
-  /* The session menu is built here because its items act on the shell. */
+  /* Built here because its items act on the shell, which only a component
+     can reach. The list itself is data — see `sessionMenu`. */
   const menus: Record<string, readonly Item[]> = {
     ...STATIC,
-    session: [
-      { label: 'Open', key: '↵', run: focus },
-      { rule: true },
-      { label: 'Rename', key: 'F2', run: (id) => setRenaming({ id, where: 'sidebar' }) },
-      { rule: true },
-      { label: 'Close session', bad: true, run: close },
-    ],
+    session: sessionMenu({
+      focus,
+      close,
+      rename: (id) => setRenaming({ id, where: 'sidebar' }),
+    }),
   }
 
   useEffect(() => {
@@ -97,7 +84,7 @@ export function ContextMenu(): React.JSX.Element {
     }
     const shut = (): void => setAt(null)
     const key = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setAt(null)
+      if (abandoned(event)) setAt(null)
     }
     document.addEventListener('contextmenu', open)
     document.addEventListener('click', shut)
