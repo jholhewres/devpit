@@ -31,3 +31,22 @@ export const stageable = (changes: readonly Change[]): string[] =>
    and a commit with an empty message is refused by the backend anyway. */
 export const committable = (changes: readonly Change[], message: string): boolean =>
   changes.some((change) => change.staged) && message.trim().length > 0
+
+/* What discarding this status actually throws away — the three cases are not
+   the same loss. A deleted file comes back exactly as HEAD has it, so
+   restoring it loses nothing. A modified file also comes back as HEAD has
+   it, but that means every uncommitted edit in between is gone. Added and
+   untracked content has no earlier version anywhere, so discarding it is the
+   file itself going away. */
+export type DiscardLoss = 'nothing' | 'edits' | 'file'
+
+export const discardLoses = (status: Change['status']): DiscardLoss => {
+  switch (status) {
+    case 'deleted':
+      return 'nothing'
+    case 'modified':
+      return 'edits'
+    default:
+      return 'file'
+  }
+}
