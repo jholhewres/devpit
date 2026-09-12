@@ -95,6 +95,63 @@ pub fn column_set_step(
     board_get(project_id)
 }
 
+/// `column.set_flow` — where a pass goes, and how much the lane decides.
+///
+/// Refused rather than corrected when the two disagree: a lane cannot send a
+/// card to itself, and it cannot advance to a lane that is not on this board.
+#[tauri::command]
+#[specta::specta]
+pub fn column_set_flow(
+    project_id: String,
+    column_id: String,
+    on_pass: Option<String>,
+    autonomy: String,
+) -> Result<Board, RpcError> {
+    let store = store()?;
+
+    // Read back rather than trusted: the word keys a rule that moves somebody's
+    // card, and one this build does not know must not reach the column.
+    let autonomy = crate::advancing::Autonomy::parse(&autonomy);
+
+    if let Some(to) = on_pass.as_deref() {
+        if to == column_id {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "a lane cannot send a card to itself",
+            ));
+        }
+        let here = store.columns(&project_id)?;
+        if !here.iter().any(|column| column.id == to) {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "that lane is not on this board",
+            ));
+        }
+
+        // Asked of the board this change *would* make, not the one it is:
+        // two lanes approving into each other is a card that moves for ever,
+        // spending money on every hop with nobody watching. Refused here,
+        // while somebody is looking at what they chose.
+        let mut flow: std::collections::HashMap<String, String> = here
+            .iter()
+            .filter(|column| column.id != column_id)
+            .filter_map(|column| column.on_pass.clone().map(|goes| (column.id.clone(), goes)))
+            .collect();
+        flow.insert(column_id.clone(), to.to_owned());
+        if crate::cycles::loops(&flow, &column_id) {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "that would send a card round in a circle",
+            ));
+        }
+    }
+
+    if !store.set_column_flow(&column_id, on_pass.as_deref(), autonomy.stored())? {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such column"));
+    }
+    board_get(project_id)
+}
+
 /// Why a step cannot be saved, or nothing.
 ///
 /// The catalogues are read here and the rule itself takes them as arguments,

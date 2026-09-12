@@ -12,7 +12,7 @@ use crate::{identify, run, status::status, GitError};
 /// from the one the caller happened to name: two worktrees of the same
 /// repository disagree about both, and that disagreement is the reason the
 /// list exists.
-pub fn worktrees(root: &Path) -> Result<Vec<Worktree>, GitError> {
+pub fn worktrees(root: &Path, mine: &[PathBuf]) -> Result<Vec<Worktree>, GitError> {
     let raw = run(root, &["worktree", "list", "--porcelain"])?;
     let current = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
 
@@ -44,6 +44,7 @@ pub fn worktrees(root: &Path) -> Result<Vec<Worktree>, GitError> {
             // Null, not zero: a checkout whose git could not be read has an
             // unknown amount of work in it, and zero would claim otherwise.
             dirty_files: read.as_ref().ok().map(|s| s.dirty_files()),
+            origin: crate::origin_of(&here, mine),
             current: here == current,
         });
     }
@@ -111,7 +112,7 @@ mod tests {
         std::fs::write(dir.path().join("a.txt"), "one\n").expect("write");
         fixture::commit(dir.path(), "first");
 
-        let found = worktrees(dir.path()).expect("worktrees");
+        let found = worktrees(dir.path(), &[]).expect("worktrees");
         let path = worktree_path(dir.path(), &found[0].id)
             .expect("lookup")
             .expect("a path for the id it just handed out");
@@ -130,7 +131,7 @@ mod tests {
         std::fs::write(dir.path().join("a.txt"), "one\n").expect("write");
         fixture::commit(dir.path(), "first");
 
-        let found = worktrees(dir.path()).expect("worktrees");
+        let found = worktrees(dir.path(), &[]).expect("worktrees");
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].branch, "main");
         assert!(found[0].current, "the checkout asked about is not marked");
@@ -163,7 +164,7 @@ mod tests {
         // dirt from it would report zero for a tree that has work in it.
         std::fs::write(side.join("b.txt"), "two\n").expect("write");
 
-        let found = worktrees(&main).expect("worktrees");
+        let found = worktrees(&main, &[]).expect("worktrees");
         assert_eq!(found.len(), 2);
         assert!(found[0].current, "the caller's checkout is not first");
 

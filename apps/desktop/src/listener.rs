@@ -119,6 +119,21 @@ fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
         Event::Waiting => "waiting",
     };
     let _ = app.emit("terminal:happening", agent_said(pane, state));
+
+    // Only `waiting` reaches the bell. An agent that is working is an agent
+    // you can watch; one that has stopped and is waiting for a person is the
+    // reason somebody left the window and the reason to call them back. The
+    // other two would be a bell that rings through every turn.
+    if state == "waiting" {
+        crate::notices::ring(
+            app,
+            None,
+            crate::notices::kind::AGENT,
+            "An agent is waiting on you",
+            Some(pane),
+            None,
+        );
+    }
 }
 
 fn reply(stream: &mut TcpStream, body: &str) {

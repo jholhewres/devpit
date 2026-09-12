@@ -6,25 +6,11 @@
 
 use tauri_specta::{collect_commands, Builder};
 
-use crate::account;
-use crate::arranging;
-use crate::asking;
-use crate::branches;
-use crate::chat;
-use crate::happening;
-use crate::history;
-use crate::index;
-use crate::mcp;
-use crate::reveal;
-use crate::saves;
-use crate::shell_launch;
-use crate::staging;
-use crate::threads;
-use crate::workspace;
-use crate::worktrees;
 use crate::{
-    board, columns, commands, diffs, files, front, in_flight, panes, paths, projects, search,
-    sessions, settings, steps,
+    account, arranging, asking, board, branches, card_work, cards, chat, columns, commands, diffs,
+    files, filetree, front, happening, history, in_flight, index, mcp, moving, notices, openers,
+    panes, paths, priming, projects, reveal, saves, search, sessions, settings, shell_launch,
+    sources, staging, steps, threads, workspace, worktree_base, worktrees,
 };
 
 /// Where the generated TypeScript lands.
@@ -48,6 +34,7 @@ pub fn contract() -> Builder<tauri::Wry> {
         projects::project_clone,
         projects::project_open,
         projects::project_forget,
+        projects::project_rename,
         chat::chat_history,
         threads::chat_list,
         chat::chat_cancel,
@@ -63,11 +50,20 @@ pub fn contract() -> Builder<tauri::Wry> {
         workspace::usage_read,
         reveal::path_open,
         reveal::path_reveal,
+        openers::apps_list,
+        openers::apps_known,
+        openers::apps_add,
+        openers::apps_remove,
+        openers::apps_open,
         worktrees::worktree_list,
         worktrees::worktree_remove,
-        worktrees::worktree_prime_read,
-        worktrees::worktree_prime_write,
-        projects::project_tree,
+        priming::worktree_prime_read,
+        priming::worktree_prime_write,
+        worktree_base::worktree_base_read,
+        worktree_base::worktree_base_write,
+        sources::worktree_sources,
+        sources::worktree_source_show,
+        filetree::project_tree,
         index::project_files,
         projects::project_changes,
         history::project_history,
@@ -82,9 +78,25 @@ pub fn contract() -> Builder<tauri::Wry> {
         columns::column_reorder,
         columns::column_delete,
         columns::column_set_step,
+        columns::column_set_flow,
         board::card_create,
         board::card_update,
-        board::card_move,
+        moving::card_move,
+        cards::card_detail,
+        cards::card_set_due,
+        cards::card_comment,
+        cards::card_comment_edit,
+        cards::card_comment_delete,
+        cards::card_pin,
+        cards::card_unpin,
+        cards::card_board,
+        card_work::card_checkout,
+        card_work::card_terminal,
+        card_work::card_play,
+        notices::notices_read,
+        notices::notices_mark,
+        notices::notices_mark_all,
+        notices::notices_sweep_due,
         files::file_read,
         paths::path_create,
         paths::path_move,

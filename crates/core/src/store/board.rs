@@ -13,6 +13,11 @@ pub struct ColumnRow {
     pub name: String,
     pub position: i64,
     pub step_id: Option<String>,
+    /// Where a card goes when this lane's step approves it. `None` is the
+    /// default and means the step runs and the card stays.
+    pub on_pass: Option<String>,
+    /// `manual` | `ask` | `auto`. See `advancing::Autonomy`.
+    pub autonomy: String,
 }
 
 pub struct CardRow {
@@ -23,6 +28,9 @@ pub struct CardRow {
     pub position: i64,
     pub worktree_path: Option<String>,
     pub base_ref: Option<String>,
+    /// Seconds since the epoch. Absent for most cards, which is why it is an
+    /// option and not a date somebody never chose.
+    pub due_at: Option<i64>,
 }
 
 pub struct StepRow {
@@ -31,18 +39,6 @@ pub struct StepRow {
     pub name: String,
     pub config: String,
     pub irreversible: bool,
-}
-
-pub struct RunRow {
-    pub id: String,
-    pub card_id: String,
-    pub step_id: String,
-    pub state: String,
-    pub output: Option<String>,
-    pub exit_code: Option<i64>,
-    pub cost_usd: Option<f64>,
-    pub duration_ms: Option<i64>,
-    pub started_at: i64,
 }
 
 /// The board a new project starts with.
@@ -62,7 +58,7 @@ impl Store {
     /// The project's columns, left to right.
     pub fn columns(&self, project_id: &str) -> Result<Vec<ColumnRow>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, position, step_id FROM board_column \
+            "SELECT id, name, position, step_id, on_pass, autonomy FROM board_column \
              WHERE project_id = ?1 ORDER BY position",
         )?;
         let rows = stmt
@@ -72,6 +68,8 @@ impl Store {
                     name: row.get(1)?,
                     position: row.get(2)?,
                     step_id: row.get(3)?,
+                    on_pass: row.get(4)?,
+                    autonomy: row.get(5)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -156,7 +154,7 @@ impl Store {
     /// Every card of a project, by column and then by position.
     pub fn cards(&self, project_id: &str) -> Result<Vec<CardRow>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, column_id, title, body, position, worktree_path, base_ref \
+            "SELECT id, column_id, title, body, position, worktree_path, base_ref, due_at \
              FROM card WHERE project_id = ?1 AND archived_at IS NULL \
              ORDER BY column_id, position",
         )?;
@@ -170,6 +168,7 @@ impl Store {
                     position: row.get(4)?,
                     worktree_path: row.get(5)?,
                     base_ref: row.get(6)?,
+                    due_at: row.get(7)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -180,7 +179,7 @@ impl Store {
         Ok(self
             .conn
             .query_row(
-                "SELECT id, column_id, title, body, position, worktree_path, base_ref \
+                "SELECT id, column_id, title, body, position, worktree_path, base_ref, due_at \
                  FROM card WHERE id = ?1",
                 [card_id],
                 |row| {
@@ -192,6 +191,7 @@ impl Store {
                         position: row.get(4)?,
                         worktree_path: row.get(5)?,
                         base_ref: row.get(6)?,
+                        due_at: row.get(7)?,
                     })
                 },
             )
@@ -314,65 +314,6 @@ impl Store {
     }
 
     /// Opens a run in `running`. It is closed by `finish_run`.
-    pub fn start_run(&self, card_id: &str, step_id: &str) -> Result<String, StoreError> {
-        let id = format!("run_{}", ulid::Ulid::generate());
-        self.conn.execute(
-            "INSERT INTO run (id, card_id, step_id, state, started_at) \
-             VALUES (?1, ?2, ?3, 'running', ?4)",
-            rusqlite::params![id, card_id, step_id, now()],
-        )?;
-        Ok(id)
-    }
-
-    pub fn finish_run(
-        &self,
-        run_id: &str,
-        state: &str,
-        output: Option<&str>,
-        cost_usd: Option<f64>,
-        duration_ms: Option<i64>,
-        exit_code: Option<i64>,
-    ) -> Result<(), StoreError> {
-        self.conn.execute(
-            "UPDATE run SET state = ?2, output = ?3, cost_usd = ?4, duration_ms = ?5, \
-             exit_code = ?6, ended_at = ?7 WHERE id = ?1",
-            rusqlite::params![
-                run_id,
-                state,
-                output,
-                cost_usd,
-                duration_ms,
-                exit_code,
-                now()
-            ],
-        )?;
-        Ok(())
-    }
-
-    /// A card's runs, most recent first.
-    pub fn runs(&self, card_id: &str) -> Result<Vec<RunRow>, StoreError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, card_id, step_id, state, output, exit_code, cost_usd, duration_ms, \
-             started_at FROM run WHERE card_id = ?1 ORDER BY started_at DESC",
-        )?;
-        let rows = stmt
-            .query_map([card_id], |row| {
-                Ok(RunRow {
-                    id: row.get(0)?,
-                    card_id: row.get(1)?,
-                    step_id: row.get(2)?,
-                    state: row.get(3)?,
-                    output: row.get(4)?,
-                    exit_code: row.get(5)?,
-                    cost_usd: row.get(6)?,
-                    duration_ms: row.get(7)?,
-                    started_at: row.get(8)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(rows)
-    }
-
     /// The checkout this card's work happens in, and where it began.
     ///
     /// Both or neither: a worktree with no base ref cannot answer "what
@@ -391,6 +332,24 @@ impl Store {
     }
 
     /// How many cards a column holds. Where a returning card lands.
+    /// Where a pass sends a card, and how much the lane decides on its own.
+    ///
+    /// One write for both, because they are one choice: a lane with somewhere
+    /// to send a pass and no autonomy to use it is a setting that does
+    /// nothing, and autonomy with nowhere to go is the same.
+    pub fn set_column_flow(
+        &self,
+        column_id: &str,
+        on_pass: Option<&str>,
+        autonomy: &str,
+    ) -> Result<bool, StoreError> {
+        let changed = self.conn.execute(
+            "UPDATE board_column SET on_pass = ?2, autonomy = ?3 WHERE id = ?1",
+            rusqlite::params![column_id, on_pass, autonomy],
+        )?;
+        Ok(changed > 0)
+    }
+
     pub fn cards_in_column(&self, column_id: &str) -> Result<i64, StoreError> {
         Ok(self.conn.query_row(
             "SELECT COUNT(*) FROM card WHERE column_id = ?1 AND archived_at IS NULL",

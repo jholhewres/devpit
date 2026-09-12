@@ -10,7 +10,7 @@
 use devpit_core::tree::TreeError;
 use devpit_rpc::{ErrorCode, RpcError};
 
-use crate::projects::project_tree;
+use crate::filetree::project_tree;
 use crate::roots::root_of;
 use devpit_rpc::ProjectTree;
 

@@ -143,7 +143,7 @@ fn a_card_reports_what_every_run_of_it_cost() {
         .expect("step");
 
     for cost in [0.10_f64, 0.25, 0.05] {
-        let run = store.start_run(&card, &step).expect("start");
+        let run = store.start_run(&card, &step, None).expect("start");
         store
             .finish_run(&run, "ok", Some("done"), Some(cost), Some(1000), None)
             .expect("finish");

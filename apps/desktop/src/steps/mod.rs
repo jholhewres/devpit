@@ -10,12 +10,12 @@ pub mod command;
 pub mod context;
 pub mod recipe;
 pub mod session;
+pub mod verdict;
 
 use std::path::PathBuf;
 
 use devpit_core::Store;
 use devpit_rpc::{ErrorCode, RpcError};
-use serde::Deserialize;
 
 /// What a step produced, whichever kind it was.
 pub struct Finished {
@@ -25,28 +25,6 @@ pub struct Finished {
     pub duration_ms: i64,
     /// Only a command has one. An agent turn reports cost, not an exit code.
     pub exit_code: Option<i32>,
-}
-
-/// The verdict fields an agent step may declare.
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase", default)]
-struct Verdict {
-    verdict_field: Option<String>,
-    sends_back_when: Option<String>,
-}
-
-/// Whether an answer asked for the card to go back, and why.
-///
-/// The only automatic transition in the product. It exists because a review
-/// that says "revise" and then leaves the card sitting in the reviewed column
-/// is a review nobody acts on.
-pub fn sends_back(config: &str, answer: &str) -> Option<String> {
-    let config: Verdict = serde_json::from_str(config).ok()?;
-    let field = config.verdict_field?;
-    let back = config.sends_back_when?;
-    let answer: serde_json::Value = serde_json::from_str(answer).ok()?;
-    let verdict = answer.get(&field)?.as_str()?;
-    (verdict == back).then(|| format!("{field}: {verdict}"))
 }
 
 /// A session id shaped like the UUID the CLI expects, derived from the card so

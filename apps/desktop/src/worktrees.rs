@@ -11,7 +11,7 @@ use devpit_rpc::{ErrorCode, RpcError};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::prime::{self, Prime};
+use crate::prime::Prime;
 
 /// One checkout belonging to a card, or left over from one.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -84,7 +84,7 @@ fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
 }
 
-fn home() -> Result<PathBuf, RpcError> {
+pub(crate) fn home() -> Result<PathBuf, RpcError> {
     Store::root().map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))
 }
 
@@ -143,7 +143,16 @@ pub fn worktree_remove(
 ) -> Result<Removed, RpcError> {
     let store = store()?;
     let home = home()?;
-    let path = devpit_git::worktree_home(&home, &project_id, &card_id);
+    // What the card recorded when the worktree was made, not where the rule
+    // would put it now. The two were the same while the base was a constant;
+    // the moment it became a setting, changing it would have sent this looking
+    // in the new place for a folder sitting in the old one — gone from the
+    // screen and still on the disk.
+    let path = store
+        .card(&card_id)?
+        .and_then(|card| card.worktree_path)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| devpit_git::worktree_home(&home, &project_id, &card_id));
     let main = store
         .project(&project_id)?
         .map(|row| PathBuf::from(row.root_path))
@@ -162,34 +171,4 @@ pub fn worktree_remove(
         uncommitted_lines: loss.lines as u32,
         branch_kept: branch,
     })
-}
-
-/// `worktree.prime.read` — what this project does to a fresh checkout.
-#[tauri::command]
-#[specta::specta]
-pub fn worktree_prime_read(project_id: String) -> Result<Preparation, RpcError> {
-    Ok(prime::read(&prime::prime_path(&home()?, &project_id)).into())
-}
-
-/// `worktree.prime.write` — save it, refusing a command that is not installed.
-///
-/// Refused here rather than when a card lands on a column: a typo should be
-/// answered while the person is still looking at what they typed.
-#[tauri::command]
-#[specta::specta]
-pub fn worktree_prime_write(
-    project_id: String,
-    preparation: Preparation,
-) -> Result<Preparation, RpcError> {
-    let declared: Prime = preparation.into();
-    let missing = prime::missing(&declared);
-    if !missing.is_empty() {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            format!("not installed: {}", missing.join(", ")),
-        ));
-    }
-    prime::write(&prime::prime_path(&home()?, &project_id), &declared)
-        .map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
-    Ok(declared.into())
 }

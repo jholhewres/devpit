@@ -1,0 +1,349 @@
+//! The migrations themselves, which are mostly SQL.
+//!
+//! Apart from the runner because they are data and it is code: the list only
+//! ever grows, and a file that grows without bound should not be the one
+//! holding the logic that applies it.
+
+use super::Migration;
+
+/// Migration 001 — the core tables.
+pub(super) const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        sql: r#"
+CREATE TABLE trust_workspace (
+    id          TEXT PRIMARY KEY,
+    slug        TEXT NOT NULL UNIQUE,
+    label       TEXT NOT NULL,
+    -- Required, not decorative: the persistent visual mark in the bar. Without
+    -- it, client context eventually lands in the personal remote.
+    color       TEXT NOT NULL,
+    memory_remote    TEXT,
+    vault_namespace  TEXT NOT NULL,
+    is_default  INTEGER NOT NULL DEFAULT 0,
+    created_at  INTEGER NOT NULL,
+    revision    INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE project (
+    id          TEXT PRIMARY KEY,
+    trust_workspace_id TEXT NOT NULL REFERENCES trust_workspace(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    -- Local. Never syncs: an absolute path means nothing on another machine.
+    root_path   TEXT NOT NULL,
+    origin_url  TEXT,
+    -- Normalized, hashed git origin. Routing key across machines: two clones
+    -- of the same repo converge on the same remote project.
+    origin_hash TEXT,
+    group_name  TEXT,
+    last_opened_at INTEGER,
+    archived_at INTEGER,
+    created_at  INTEGER NOT NULL,
+    revision    INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE UNIQUE INDEX project_root_path ON project(root_path);
+CREATE INDEX project_origin_hash ON project(origin_hash) WHERE origin_hash IS NOT NULL;
+
+CREATE TABLE scratch (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT REFERENCES project(id) ON DELETE CASCADE,
+    body        TEXT NOT NULL,
+    -- Lets the system age a note: "open 40 days, the file it cites changed 6
+    -- times, still valid?". The antidote to orphan notes is the system asking,
+    -- not discipline.
+    anchor_path   TEXT,
+    anchor_commit TEXT,
+    archived_at INTEGER,
+    created_at  INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL,
+    revision    INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX scratch_project ON scratch(project_id, archived_at);
+
+CREATE TABLE drawing (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    -- Opaque on purpose: the core never reads it. Storing the editor's format
+    -- as structured data would sign us up to maintain it every release.
+    scene       TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL,
+    revision    INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE UNIQUE INDEX drawing_name ON drawing(project_id, name);
+
+-- Append-only. Nothing here is updated, which is what makes it auditable.
+CREATE TABLE event (
+    id          TEXT PRIMARY KEY,
+    topic       TEXT NOT NULL,
+    scope_id    TEXT,
+    -- neutral | attention | failure | verified. A field of the event, not a UI
+    -- decision: colouring normal activity turns the screen into an alarm panel.
+    severity    TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    acknowledged_at INTEGER,
+    created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX event_feed ON event(created_at DESC);
+"#,
+    },
+    // Migration 002 — the answers the first run asks for.
+    Migration {
+        version: 2,
+        sql: r#"
+-- Key/value and not a column per setting: every new preference would otherwise
+-- be a migration, and a migration over real data is the part that goes wrong.
+-- Values are text; the reader parses what it asked for.
+CREATE TABLE preference (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    updated_at  INTEGER NOT NULL,
+    revision    INTEGER NOT NULL DEFAULT 1
+);
+"#,
+    },
+    Migration {
+        version: 3,
+        sql: r#"
+CREATE TABLE pane_layout (
+    project_id  TEXT PRIMARY KEY REFERENCES project(id) ON DELETE CASCADE,
+    tree        TEXT NOT NULL,
+    focused_id  TEXT NOT NULL,
+    updated_at  INTEGER NOT NULL
+);
+"#,
+    },
+    Migration {
+        version: 4,
+        sql: r#"
+-- A column is data, not code. It is created, renamed, reordered and deleted
+-- by the person using it, and nothing in the code may assume the names the
+-- default board happens to seed.
+CREATE TABLE board_column (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    position    INTEGER NOT NULL,
+    -- NULL means the column runs nothing, and that is a column doing its job:
+    -- a holding lane is not half-configured.
+    step_id     TEXT REFERENCES step(id) ON DELETE SET NULL,
+    created_at  INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX board_column_position ON board_column(project_id, position);
+
+-- A step belongs to the project, not to one column: "run the tests" serves
+-- more than one lane, and editing the command in one place holds everywhere.
+--
+-- `config` is JSON, shaped by `kind`:
+--   agent   -> { agent, schema, budgetUsd, model }
+--   session -> { agent?, worktree, model }
+--   command -> { command, timeoutSeconds }
+CREATE TABLE step (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL CHECK (kind IN ('agent','session','command')),
+    name        TEXT NOT NULL,
+    config      TEXT NOT NULL,
+    -- A deploy has no undo. An irreversible step is confirmed before it runs,
+    -- never fired by a drag alone.
+    irreversible INTEGER NOT NULL DEFAULT 0,
+    created_at  INTEGER NOT NULL
+);
+
+-- RESTRICT, not CASCADE: deleting a column that still holds cards has to fail
+-- so the interface can ask where they go. CASCADE would delete described work
+-- on one click.
+CREATE TABLE card (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    column_id   TEXT NOT NULL REFERENCES board_column(id) ON DELETE RESTRICT,
+    title       TEXT NOT NULL,
+    body        TEXT NOT NULL DEFAULT '',
+    position    INTEGER NOT NULL,
+    -- The worktree of this line of work, and the ref it started from. The
+    -- diff is against `base_ref`, never against HEAD.
+    worktree_path TEXT,
+    base_ref    TEXT,
+    archived_at INTEGER,
+    created_at  INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL
+);
+CREATE INDEX card_column ON card(column_id, position);
+
+CREATE TABLE run (
+    id          TEXT PRIMARY KEY,
+    card_id     TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    step_id     TEXT NOT NULL REFERENCES step(id) ON DELETE RESTRICT,
+    state       TEXT NOT NULL
+                CHECK (state IN ('running','ok','failed','cancelled')),
+    -- Validated JSON for an agent step, streamed output for a command, or the
+    -- reason it failed.
+    output      TEXT,
+    exit_code   INTEGER,
+    cost_usd    REAL,
+    duration_ms INTEGER,
+    started_at  INTEGER NOT NULL,
+    ended_at    INTEGER
+);
+CREATE INDEX run_card ON run(card_id, started_at DESC);
+
+-- Only the link. Whether a session is idle or busy, and what it cost, are
+-- answered by the agent CLI and its transcript; a copy here would be a second
+-- truth that drifts from the first.
+CREATE TABLE session_link (
+    card_id     TEXT PRIMARY KEY REFERENCES card(id) ON DELETE CASCADE,
+    short_id    TEXT NOT NULL,
+    session_id  TEXT NOT NULL,
+    transcript_path TEXT,
+    created_at  INTEGER NOT NULL
+);
+"#,
+    },
+    Migration {
+        version: 5,
+        sql: r#"
+-- A layout belongs to a tab, not to a project.
+--
+-- It was keyed by project alone, which meant one tree for the whole project —
+-- and opening a second terminal tab had to split that tree to get a leaf. So
+-- three tabs were three leaves under two split nodes, drawn as three tabs: a
+-- list wearing a tree's clothes, whose shape meant nothing.
+--
+-- Keyed by tab, a split is what its name says: dividing what one tab shows.
+--
+-- Rebuilt rather than altered because the primary key changes, which SQLite
+-- cannot do in place. Existing rows keep their tree under a tab named after
+-- the project, so a session open across the upgrade is not lost.
+CREATE TABLE pane_layout_v5 (
+    project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    tab_id      TEXT NOT NULL,
+    tree        TEXT NOT NULL,
+    focused_id  TEXT NOT NULL,
+    updated_at  INTEGER NOT NULL,
+    PRIMARY KEY (project_id, tab_id)
+);
+
+INSERT INTO pane_layout_v5 (project_id, tab_id, tree, focused_id, updated_at)
+SELECT project_id, 'tab_' || project_id, tree, focused_id, updated_at FROM pane_layout;
+
+DROP TABLE pane_layout;
+ALTER TABLE pane_layout_v5 RENAME TO pane_layout;
+"#,
+    },
+    // Migration 006 — what a card is besides a title.
+    //
+    // One migration for three things because a migration over real data is
+    // the part that goes wrong, and doing it once is better than three times.
+    Migration {
+        version: 6,
+        sql: r#"
+-- Seconds since the epoch, like every other time here. Nullable, because
+-- most cards never have one and a default would be a date nobody chose.
+ALTER TABLE card ADD COLUMN due_at INTEGER;
+
+CREATE TABLE card_comment (
+    id          TEXT PRIMARY KEY,
+    card_id     TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    -- Who said it. `you` or an agent id; never a display name, which
+    -- changes, and never free text, which a screen would have to trust.
+    author      TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    edited_at   INTEGER
+);
+CREATE INDEX card_comment_card ON card_comment(card_id, created_at);
+
+-- The path, not the bytes. The file is already on this person's disk and
+-- copying it into the database duplicates what git already versions — and
+-- makes the store grow without bound for nothing.
+CREATE TABLE card_attachment (
+    id          TEXT PRIMARY KEY,
+    card_id     TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    -- Absolute. Local only, like project.root_path, and for the same reason.
+    path        TEXT NOT NULL,
+    label       TEXT NOT NULL,
+    created_at  INTEGER NOT NULL
+);
+CREATE INDEX card_attachment_card ON card_attachment(card_id, created_at);
+
+-- What the bell has to show. Written by whatever noticed; read by one pane.
+CREATE TABLE notice (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT REFERENCES project(id) ON DELETE CASCADE,
+    -- `run`, `agent`, `due`, `irreversible` — what kind of thing happened.
+    kind        TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    detail      TEXT,
+    -- What it is about, so a click can go there. Null for a notice with
+    -- nowhere to go.
+    card_id     TEXT REFERENCES card(id) ON DELETE CASCADE,
+    created_at  INTEGER NOT NULL,
+    read_at     INTEGER
+);
+CREATE INDEX notice_unread ON notice(read_at, created_at DESC);
+"#,
+    },
+    // Migration 007 — a run remembers where its card stood.
+    Migration {
+        version: 7,
+        sql: r#"
+-- Where the card was when this run started.
+--
+-- It was read before the move and passed by value into the thread that runs
+-- the step, which is enough while the process lives and nothing at all when
+-- it does not: a run in flight when the app quits took the only record of
+-- where its card came from with it. A verdict that sends the card back then
+-- has nowhere to send it.
+--
+-- Nullable, because every run already on disk was started before this column
+-- existed and inventing a column for them would be inventing a fact.
+ALTER TABLE run ADD COLUMN from_column TEXT REFERENCES board_column(id) ON DELETE SET NULL;
+
+-- Runs that are still `running` after a restart are runs whose process is
+-- gone. Indexed because the sweep at launch asks exactly this.
+CREATE INDEX run_unfinished ON run(state) WHERE ended_at IS NULL;
+"#,
+    },
+    // Migration 008 — a lane says where a pass goes, and how much it decides
+    // on its own.
+    Migration {
+        version: 8,
+        sql: r#"
+-- Where a card goes when this lane's step approves it.
+--
+-- Declared rather than derived. "The next column by position" was the obvious
+-- rule and it is a trap: a column is data — renamed, reordered by dragging —
+-- so a card would start advancing somewhere else with nobody having changed
+-- anything about it.
+--
+-- The asymmetry with sending a card *back* is deliberate and it is honest:
+-- backward needs no declaration because the card carries where it came from,
+-- and forward has no such record.
+--
+-- NULL is the default and means the step runs and the card stays — which is
+-- what every board does today.
+ALTER TABLE board_column ADD COLUMN on_pass TEXT REFERENCES board_column(id) ON DELETE SET NULL;
+
+-- How much this lane decides without being asked.
+--
+--   manual  nothing happens on its own. The default, and the only value any
+--           existing board has.
+--   ask     the step runs, the verdict is read, and the card waits for a
+--           person to accept the advance.
+--   auto    the card advances on the verdict.
+--
+-- On the column and not the board, because the lane that runs tests and the
+-- lane that deploys never want the same answer. And not on the card, because
+-- a card is a task, not a configuration: the moment one declares how it runs,
+-- two identical tasks in identical lanes behave differently for a reason that
+-- is written nowhere visible.
+ALTER TABLE board_column ADD COLUMN autonomy TEXT NOT NULL DEFAULT 'manual'
+    CHECK (autonomy IN ('manual','ask','auto'));
+"#,
+    },
+];

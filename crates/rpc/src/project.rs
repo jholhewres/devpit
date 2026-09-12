@@ -25,6 +25,24 @@ pub enum GitStatus {
     Untracked,
 }
 
+/// Who made a checkout.
+///
+/// `git worktree list` returns every worktree of the repository, and a person
+/// working with agents has three kinds at once: the ones devpit made for its
+/// cards, the ones Claude Code made for itself, and whatever they made by
+/// hand. Counting all three as one number is what made the project row say
+/// "7 worktrees" about a repository the person had made none of.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum WorktreeOrigin {
+    /// Under the folder devpit creates card worktrees in.
+    Devpit,
+    /// Under a `.claude/worktrees` of its own.
+    Claude,
+    /// Everything else, which is mostly `git worktree add` by hand.
+    Other,
+}
+
 /// A checkout of the project.
 ///
 /// Real git worktrees, so the fields are git's own facts and nothing this
@@ -46,6 +64,8 @@ pub struct Worktree {
     /// a lie. Every count in this contract that can fail to be read is
     /// optional for the same reason.
     pub dirty_files: Option<u32>,
+    /// Who made it, so the lists can be about one kind at a time.
+    pub origin: WorktreeOrigin,
     /// The checkout the project opens into.
     pub current: bool,
 }
@@ -125,6 +145,12 @@ pub struct Project {
     /// Why the repository could not be read, when it could not be. Present and
     /// non-null is the only honest way to draw a project whose git is missing.
     pub unreadable: Option<String>,
+    /// `remote.origin.url`, read when the project was registered. What tells
+    /// two checkouts of one repository apart from two unrelated folders.
+    pub origin: Option<String>,
+    /// Seconds since the epoch; see `Commit::committed_at` for why `f64`.
+    /// Absent for a project registered and never opened.
+    pub last_opened_at: Option<f64>,
 }
 
 // ── Responses ────────────────────────────────────────────────────────────

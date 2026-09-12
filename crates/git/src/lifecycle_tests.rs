@@ -112,7 +112,7 @@ fn removing_keeps_the_branch() {
         "removing the worktree took the branch with it"
     );
     assert_eq!(
-        worktrees(&main).expect("worktrees").len(),
+        worktrees(&main, &[]).expect("worktrees").len(),
         1,
         "git still lists the removed worktree"
     );

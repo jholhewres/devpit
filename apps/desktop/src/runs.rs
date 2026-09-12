@@ -17,16 +17,17 @@
 use std::sync::Arc;
 
 use devpit_core::Store;
-use devpit_rpc::{RpcError, Run, RunState, Step, StepKind};
-use tauri::{AppHandle, Emitter};
+use devpit_rpc::{RpcError, Run, RunState, Step};
+use tauri::AppHandle;
 
 use crate::in_flight::InFlight;
-use crate::steps;
+use crate::working;
 
 /// Runs a step against a card, and returns the run it opened.
 ///
 ///
-/// `came_from` is where a verdict sends the card back to. Without it a review
+/// `came_from` is where a verdict sends the card back to — recorded on the
+/// run's own row, so it survives the process that started it. Without it a review
 /// that says "revise" leaves the card sitting in the reviewed column, which is
 /// a review nobody acts on.
 pub fn start(
@@ -37,78 +38,51 @@ pub fn start(
     step: &Step,
     came_from: Option<&str>,
 ) -> Result<Run, RpcError> {
-    let run_id = store.start_run(card_id, &step.id)?;
+    start_chained(app, in_flight, store, card_id, step, came_from, 0)
+}
+
+/// The same, counting how many lanes this card has already passed through.
+///
+/// A person dropping a card starts at zero. The chain passes its own count
+/// on, so a flow edited into a circle while a chain is in flight still stops.
+pub fn start_chained(
+    app: AppHandle,
+    in_flight: Arc<InFlight>,
+    store: &Store,
+    card_id: &str,
+    step: &Step,
+    came_from: Option<&str>,
+    hops: u8,
+) -> Result<Run, RpcError> {
+    let run_id = store.start_run(card_id, &step.id, came_from)?;
 
     let card = card_id.to_owned();
     let id = run_id.clone();
-    let back_to = came_from.map(ToOwned::to_owned);
     // Read before the move: the row the command returns describes the step
     // that is about to run, and the thread takes ownership of the step itself.
     let step_id = step.id.clone();
     let step_name = step.name.clone();
     let step = step.clone();
+    // The chain needs the same registry the run itself is watched in.
+    let chained = Arc::clone(&in_flight);
     std::thread::spawn(move || {
-        // The thread opens its own connection: SQLite handles are not shared
-        // across threads, and the row it has to close is already committed.
+        // Its own connection: SQLite handles are not shared across threads,
+        // and the row it has to close is already committed.
         let Ok(store) = Store::open_default() else {
             return;
         };
-
-        let outcome = match step.kind {
-            StepKind::Agent => {
-                let progress = app.clone();
-                let run = id.clone();
-                let watching = Arc::clone(&in_flight);
-                let watched = id.clone();
-                steps::agent::run(
-                    &store,
-                    &card,
-                    &step,
-                    |text| {
-                        // The card shows work as it happens rather than a
-                        // spinner that ends in a wall of text.
-                        let _ = progress.emit("run:progress", (run.clone(), text.to_owned()));
-                    },
-                    |pid| watching.watch(&watched, pid),
-                )
-            }
-            StepKind::Session => steps::session::start(&store, &card, &step),
-            StepKind::Command => steps::command::run(&store, &card, &step),
-        };
-
-        let answered = match &outcome {
-            Ok(finished) if finished.ok => Some(finished.output.clone()),
-            _ => None,
-        };
-        let closed = match outcome {
-            Ok(finished) => store.finish_run(
-                &id,
-                if finished.ok { "ok" } else { "failed" },
-                Some(&finished.output),
-                Some(finished.cost_usd),
-                Some(finished.duration_ms),
-                finished.exit_code.map(i64::from),
-            ),
-            Err(reason) => store.finish_run(&id, "failed", Some(&reason), None, None, None),
-        };
-
-        // A failure to record is worth saying out loud: the run finished and
-        // the screen would otherwise show it running forever.
-        if let Err(err) = closed {
-            eprintln!("could not record the end of run {id}: {err}");
-        }
-        in_flight.forget(&id);
-
-        // The verdict is the only thing in the product that moves a card on
-        // its own, and it only ever moves it backwards.
-        if let (Some(column), Some(answer)) = (&back_to, &answered) {
-            if let Some(why) = steps::sends_back(&step.config, answer) {
-                let position = store.cards_in_column(column).unwrap_or(0);
-                let _ = store.move_card(&card, column, position);
-                let _ = store.note_on_card(&card, &format!("sent back — {why}"));
-            }
-        }
-        let _ = app.emit("run:changed", &card);
+        working::carry_out(
+            working::Carrying {
+                app,
+                in_flight,
+                chained,
+                run_id: id,
+                card_id: card,
+                step,
+                hops,
+            },
+            &store,
+        );
     });
 
     Ok(Run {

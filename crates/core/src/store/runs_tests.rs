@@ -1,0 +1,115 @@
+//! What a run remembers, and what happens to one whose process is gone.
+
+use crate::store::Store;
+
+fn seeded() -> (tempfile::TempDir, Store, String, String, String) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let root = dir.path().join("project");
+    std::fs::create_dir_all(&root).expect("create");
+    let project = store.add_project(&root, None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let columns = store.columns(&project).expect("columns");
+    let first = columns[0].id.clone();
+    let card = store
+        .create_card(&project, &first, "a card", "")
+        .expect("card");
+    let step = store
+        .create_step(&project, "command", "tests", "{}", false)
+        .expect("step");
+    (dir, store, card, step, first)
+}
+
+#[test]
+fn a_run_records_where_the_card_stood() {
+    // The whole reason the column exists: this was passed by value into the
+    // thread and nowhere else, so a run in flight when the app quit took the
+    // only answer to "send it back where?" with it.
+    let (_dir, store, card, step, column) = seeded();
+    let run = store.start_run(&card, &step, Some(&column)).expect("start");
+    assert_eq!(store.run_came_from(&run).expect("read"), Some(column));
+}
+
+#[test]
+fn a_run_started_without_one_says_none_rather_than_guessing() {
+    let (_dir, store, card, step, _column) = seeded();
+    let run = store.start_run(&card, &step, None).expect("start");
+    assert_eq!(store.run_came_from(&run).expect("read"), None);
+}
+
+#[test]
+fn asking_about_a_run_that_is_not_there_is_none_and_not_an_error() {
+    let (_dir, store, _card, _step, _column) = seeded();
+    assert_eq!(store.run_came_from("run_nothing").expect("read"), None);
+}
+
+#[test]
+fn a_run_left_open_by_a_dead_process_is_closed_at_launch() {
+    // Nothing survives the process that spawned its thread, so a `running`
+    // row after a restart is not a run still going — and leaving it says the
+    // card is working when it is not, forever.
+    let (_dir, store, card, step, column) = seeded();
+    let run = store.start_run(&card, &step, Some(&column)).expect("start");
+
+    let closed = store.close_abandoned_runs().expect("sweep");
+    assert_eq!(closed, vec![(run.clone(), card.clone())]);
+
+    let after = store.runs(&card).expect("runs");
+    assert_eq!(after[0].state, "failed");
+    assert!(after[0]
+        .output
+        .as_deref()
+        .expect("a reason")
+        .contains("the app closed"));
+}
+
+#[test]
+fn the_sweep_leaves_a_run_that_already_ended_alone() {
+    let (_dir, store, card, step, column) = seeded();
+    let run = store.start_run(&card, &step, Some(&column)).expect("start");
+    store
+        .finish_run(&run, "ok", Some("all good"), None, None, Some(0))
+        .expect("finish");
+
+    assert!(store.close_abandoned_runs().expect("sweep").is_empty());
+    let after = store.runs(&card).expect("runs");
+    assert_eq!(after[0].state, "ok");
+    assert_eq!(after[0].output.as_deref(), Some("all good"));
+}
+
+#[test]
+fn sweeping_twice_closes_nothing_the_second_time() {
+    // It runs at every launch, so it has to be safe to run at every launch.
+    let (_dir, store, card, step, column) = seeded();
+    store.start_run(&card, &step, Some(&column)).expect("start");
+    assert_eq!(store.close_abandoned_runs().expect("first").len(), 1);
+    assert!(store.close_abandoned_runs().expect("second").is_empty());
+}
+
+#[test]
+fn a_run_whose_column_is_deleted_keeps_the_run() {
+    // `ON DELETE SET NULL`, not CASCADE: deleting a column must not delete
+    // the history of what ran while a card was in it.
+    //
+    // The card has to move out first — a column holding cards refuses to be
+    // deleted, which is the point of that RESTRICT. An earlier version of
+    // this test deleted the card instead, which cascaded the run away and
+    // tested nothing.
+    let (_dir, store, card, step, column) = seeded();
+    let project = store
+        .project_id_of_card(&card)
+        .expect("project")
+        .expect("id");
+    let elsewhere = store.columns(&project).expect("columns")[1].id.clone();
+
+    let run = store.start_run(&card, &step, Some(&column)).expect("start");
+    store.move_card(&card, &elsewhere, 0).expect("move");
+    store.delete_column(&column).expect("delete");
+
+    assert_eq!(
+        store.runs(&card).expect("runs").len(),
+        1,
+        "the run went with the column"
+    );
+    assert_eq!(store.run_came_from(&run).expect("read"), None);
+}

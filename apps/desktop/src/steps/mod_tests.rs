@@ -2,37 +2,6 @@
 
 use super::*;
 
-const REVIEW: &str = r#"{"prompt":"review it","verdictField":"verdict","sendsBackWhen":"revise"}"#;
-
-/// The only automatic transition in the product, and it only goes back.
-#[test]
-fn a_verdict_of_revise_sends_the_card_back() {
-    let why = sends_back(REVIEW, r#"{"verdict":"revise","findings":["no tests"]}"#)
-        .expect("should send back");
-    assert!(why.contains("revise"), "{why}");
-}
-
-#[test]
-fn an_approving_verdict_leaves_the_card_where_it_is() {
-    assert_eq!(sends_back(REVIEW, r#"{"verdict":"approved"}"#), None);
-}
-
-/// A step that declares no verdict never moves a card on its own.
-#[test]
-fn a_step_without_a_verdict_never_sends_anything_back() {
-    assert_eq!(
-        sends_back(r#"{"prompt":"refine it"}"#, r#"{"verdict":"revise"}"#),
-        None
-    );
-}
-
-/// Prose where a verdict was expected is not a verdict. Reading one out of
-/// it would move cards on a guess.
-#[test]
-fn an_answer_that_is_not_json_moves_nothing() {
-    assert_eq!(sends_back(REVIEW, "I think you should revise this"), None);
-}
-
 /// The same card keeps the same session id across restarts, which is what
 /// makes its transcript findable later.
 #[test]
@@ -124,7 +93,7 @@ fn a_card_and_a_step_produce_a_real_answer() {
     assert!(streamed > 0, "nothing reached the card while it worked");
 
     // And the run lands on the card, which is where a person reads it.
-    let run = store.start_run(&card, &step_id).expect("start");
+    let run = store.start_run(&card, &step_id, None).expect("start");
     store
         .finish_run(
             &run,

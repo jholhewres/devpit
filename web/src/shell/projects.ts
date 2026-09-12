@@ -19,3 +19,59 @@ export function forgotten(open: Open, id: string): Open {
 
 export const found = (open: Open): Project | null =>
   open.projects.find((project) => project.id === open.current) ?? null
+
+/*
+ * When a project was last opened, against the reader's own clock.
+ *
+ * The column was always there and always empty: `last_opened_at` orders the
+ * list, so the one row at the top is the one you used last and nothing said
+ * whether that was an hour or a year ago.
+ *
+ * Relative rather than a date, because that is the question being asked — and
+ * through `Intl` rather than a table of English words, so a reader whose
+ * machine is not in English does not get one column that is.
+ */
+const SCALES: readonly (readonly [Intl.RelativeTimeFormatUnit, number])[] = [
+  ['year', 365 * 24 * 3600],
+  ['month', 30 * 24 * 3600],
+  ['week', 7 * 24 * 3600],
+  ['day', 24 * 3600],
+  ['hour', 3600],
+  ['minute', 60],
+]
+
+export function since(seconds: number | null, now = Date.now()): string {
+  if (!seconds) return 'never opened'
+
+  const elapsed = Math.round(now / 1000 - seconds)
+  /* A clock that disagrees with the file is not news worth a row saying
+     "in 3 hours", so anything inside the minute is simply now. */
+  if (elapsed < 60) return 'just now'
+
+  const format = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+  for (const [unit, size] of SCALES) {
+    if (elapsed >= size) return format.format(-Math.floor(elapsed / size), unit)
+  }
+  return 'just now'
+}
+
+/*
+ * The remote, short enough to be a line in a list.
+ *
+ * `origin_url` was read when the project was registered and then never shown,
+ * so two clones of one repository looked like two unrelated folders that
+ * happened to share a name. The scheme, the credentials and the `.git` are
+ * noise here — `github.com/owner/name` is the part that identifies it.
+ */
+export function remote(origin: string | null): string | null {
+  const raw = origin?.trim()
+  if (!raw) return null
+  const bare = raw
+    .replace(/^[a-z+]+:\/\//i, '')
+    .replace(/^git@/i, '')
+    .replace(/^[^/@]+@/, '')
+    .replace(/\.git$/i, '')
+    .replace(/\/+$/, '')
+  /* `git@host:org/repo` uses a colon where a URL uses a slash. */
+  return bare.replace(':', '/') || null
+}

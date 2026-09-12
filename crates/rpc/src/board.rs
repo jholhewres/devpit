@@ -45,6 +45,18 @@ pub struct Column {
     pub position: i32,
     /// `null` means the column runs nothing, which is a column doing its job.
     pub step: Option<Step>,
+    /// Where a card goes when this lane's step approves it.
+    ///
+    /// Declared rather than derived: "the next column by position" is the
+    /// obvious rule and a trap, because a column is data — renamed, reordered
+    /// by dragging — so a card would start advancing somewhere else with
+    /// nobody having changed anything about it.
+    pub on_pass: Option<String>,
+    /// `manual` | `ask` | `auto`. How much this lane decides on its own.
+    ///
+    /// `manual` is the default and what every existing board has: nothing
+    /// happens without somebody moving a card.
+    pub autonomy: String,
 }
 
 /// How a run ended, or that it has not.
@@ -88,8 +100,15 @@ pub struct Card {
     pub body: String,
     pub position: i32,
     pub worktree_path: Option<String>,
+    /// Seconds since the epoch; `f64` for the usual reason. Absent for most
+    /// cards, which is why it is an option and not a date nobody chose.
+    pub due_at: Option<f64>,
     /// What every run of this card has cost, added up.
     pub cost_usd: f64,
+    /// Counted, not carried: the tile shows that there is a conversation, and
+    /// the conversation itself is read when the card is opened.
+    pub comments: u32,
+    pub pinned: u32,
     /// Most recent first.
     pub runs: Vec<Run>,
     /// The session working on this card, if one is.

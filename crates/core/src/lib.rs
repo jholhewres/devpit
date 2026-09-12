@@ -19,7 +19,7 @@ mod tree_tests;
 
 pub use bus::{Bus, Event, Severity};
 pub use store::{
-    preference, CardRow, ColumnRow, NoteRow, ProjectRow, RunRow, SessionLink, StepRow, Store,
-    StoreError, DEFAULT_COLUMNS,
+    limits, preference, AttachmentRow, CardRow, ColumnRow, CommentRow, NoteRow, NoticeRow,
+    ProjectRow, RunRow, SessionLink, StepRow, Store, StoreError, DEFAULT_COLUMNS,
 };
 pub use tree::TreeError;

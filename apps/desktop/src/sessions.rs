@@ -215,13 +215,36 @@ pub async fn session_ensure(
     tab_id: String,
     worktree_id: Option<String>,
 ) -> Result<SessionLayout, RpcError> {
-    let lock = state.project_lock(&project_id)?;
+    let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
+    ensure_at(&state, &project_id, &tab_id, &cwd)
+}
+
+/// The tab a card's terminal lives in.
+///
+/// Derived from the card rather than minted, so opening it twice lands in the
+/// same place — and stated once, because two `format!`s that have to agree
+/// are two `format!`s that one day will not.
+pub(crate) fn tab_for_card(card_id: &str) -> String {
+    format!("tab_card_{card_id}")
+}
+
+/// Opens (or reopens) a tab whose panes start in `cwd`.
+///
+/// The body `session_ensure` had, lifted so a card can ask for a terminal in
+/// its own checkout — which is a directory, not a worktree id, and so could
+/// not go through `locate_cwd`.
+pub(crate) fn ensure_at(
+    state: &State<'_, SessionState>,
+    project_id: &str,
+    tab_id: &str,
+    cwd: &Path,
+) -> Result<SessionLayout, RpcError> {
+    let lock = state.project_lock(project_id)?;
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
-    let layout = load_or_create(&project_id, &tab_id, &cwd)?;
-    listen(&state, &project_id, &layout);
+    let layout = load_or_create(project_id, tab_id, cwd)?;
+    listen(state, project_id, &layout);
     Ok(layout)
 }
 
@@ -289,7 +312,7 @@ pub fn terminal_attach_agent(
     // A card's terminal is a tab of its own, named after the card: opening it
     // twice lands in the same place, and it is not mixed into whatever the
     // person had arranged by hand.
-    let tab_id = format!("tab_card_{card_id}");
+    let tab_id = tab_for_card(&card_id);
     let layout = match layout_of(&project_id, &tab_id) {
         Ok(layout) => layout,
         Err(_) => {

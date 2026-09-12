@@ -45,7 +45,7 @@ fn a_card_crosses_the_board_and_the_runs_stay_on_it() {
     assert_eq!(moved.column_id, columns[4].id);
 
     // The run that followed is on the card, with what it cost.
-    let run = store.start_run(&card, &step).expect("start");
+    let run = store.start_run(&card, &step, None).expect("start");
     store
         .finish_run(
             &run,

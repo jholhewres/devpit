@@ -16,12 +16,8 @@ pub struct ProjectRow {
     pub root_path: String,
     pub group: Option<String>,
     pub accent: String,
-}
-
-pub struct NoteRow {
-    pub id: String,
-    pub body: String,
-    pub created_at: i64,
+    pub origin: Option<String>,
+    pub last_opened_at: Option<i64>,
 }
 
 /// The default trust workspace, created on first use.
@@ -58,7 +54,8 @@ impl Store {
     /// creation order so the list never reshuffles on its own.
     pub fn projects(&self) -> Result<Vec<ProjectRow>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT p.id, p.name, p.root_path, p.group_name, w.color \
+            "SELECT p.id, p.name, p.root_path, p.group_name, w.color, \
+                    p.origin_url, p.last_opened_at \
              FROM project p JOIN trust_workspace w ON w.id = p.trust_workspace_id \
              WHERE p.archived_at IS NULL \
              ORDER BY p.last_opened_at DESC NULLS LAST, p.created_at ASC",
@@ -72,6 +69,8 @@ impl Store {
                     root_path: row.get(2)?,
                     group: row.get(3)?,
                     accent: row.get(4)?,
+                    origin: row.get(5)?,
+                    last_opened_at: row.get(6)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -83,7 +82,8 @@ impl Store {
         let row = self
             .conn
             .query_row(
-                "SELECT p.id, p.name, p.root_path, p.group_name, w.color \
+                "SELECT p.id, p.name, p.root_path, p.group_name, w.color, \
+                        p.origin_url, p.last_opened_at \
                  FROM project p JOIN trust_workspace w ON w.id = p.trust_workspace_id \
                  WHERE p.id = ?1",
                 [id],
@@ -94,6 +94,8 @@ impl Store {
                         root_path: row.get(2)?,
                         group: row.get(3)?,
                         accent: row.get(4)?,
+                        origin: row.get(5)?,
+                        last_opened_at: row.get(6)?,
                     })
                 },
             )
@@ -146,7 +148,6 @@ impl Store {
         Ok(id)
     }
 
-    /// Marks a project as the one being worked in, which is what orders the list.
     /// Takes a project out of the list without touching the folder.
     ///
     /// Archived rather than deleted: the board, the cards and their history
@@ -165,43 +166,40 @@ impl Store {
         Ok(changed > 0)
     }
 
+    /// Erases a project and everything hanging off it.
+    ///
+    /// The other half of `forget_project`, and only ever reached by ticking a
+    /// box that says so: the board, its cards, their runs and the notes all
+    /// reference this row and go with it. The folder on disk is still never
+    /// touched — this is the row, not the repository.
+    pub fn erase_project(&self, id: &str) -> Result<bool, StoreError> {
+        let changed = self
+            .conn
+            .execute("DELETE FROM project WHERE id = ?1", [id])?;
+        Ok(changed > 0)
+    }
+
+    /// Renames a project without touching the folder it points at.
+    ///
+    /// The name is the app's, not git's: a folder called `api-v2-final` can be
+    /// called API here, and renaming the folder to match is not something an
+    /// editor should do to somebody's checkout.
+    pub fn rename_project(&self, id: &str, name: &str) -> Result<bool, StoreError> {
+        let changed = self.conn.execute(
+            "UPDATE project SET name = ?2, revision = revision + 1 \
+             WHERE id = ?1 AND archived_at IS NULL",
+            rusqlite::params![id, name],
+        )?;
+        Ok(changed > 0)
+    }
+
+    /// Marks a project as the one being worked in, which is what orders the list.
     pub fn touch_project(&self, id: &str) -> Result<(), StoreError> {
         self.conn.execute(
             "UPDATE project SET last_opened_at = ?2 WHERE id = ?1",
             rusqlite::params![id, now()],
         )?;
         Ok(())
-    }
-
-    pub fn notes(&self, project_id: &str) -> Result<Vec<NoteRow>, StoreError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, body, created_at FROM scratch \
-             WHERE project_id = ?1 AND archived_at IS NULL \
-             ORDER BY created_at DESC",
-        )?;
-
-        let rows = stmt
-            .query_map([project_id], |row| {
-                Ok(NoteRow {
-                    id: row.get(0)?,
-                    body: row.get(1)?,
-                    created_at: row.get(2)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(rows)
-    }
-
-    pub fn add_note(&self, project_id: &str, body: &str) -> Result<String, StoreError> {
-        let id = format!("scr_{}", ulid::Ulid::generate());
-        let at = now();
-        self.conn.execute(
-            "INSERT INTO scratch (id, project_id, body, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?4)",
-            rusqlite::params![id, project_id, body, at],
-        )?;
-        Ok(id)
     }
 }
 
@@ -234,64 +232,5 @@ fn origin_hash(url: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn store() -> (tempfile::TempDir, Store) {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let store = Store::open(&dir.path().join("state.db")).expect("open");
-        (dir, store)
-    }
-
-    #[test]
-    fn adding_the_same_folder_twice_opens_it_rather_than_failing() {
-        let (dir, store) = store();
-        let root = dir.path().join("project");
-        std::fs::create_dir_all(&root).expect("create");
-
-        let first = store.add_project(&root, None).expect("add");
-        let second = store.add_project(&root, None).expect("add again");
-        assert_eq!(first, second, "the second add created a duplicate");
-        assert_eq!(store.projects().expect("list").len(), 1);
-    }
-
-    #[test]
-    fn the_two_shapes_of_one_origin_hash_the_same() {
-        // The reason this exists: the same repository cloned over ssh on one
-        // machine and https on another has to converge on one project.
-        assert_eq!(
-            origin_hash("git@github.com:jholhewres/devpit.git"),
-            origin_hash("https://github.com/jholhewres/devpit")
-        );
-    }
-
-    #[test]
-    fn a_project_carries_its_workspace_colour() {
-        let (dir, store) = store();
-        let root = dir.path().join("project");
-        std::fs::create_dir_all(&root).expect("create");
-        store.add_project(&root, None).expect("add");
-
-        let listed = store.projects().expect("list");
-        assert_eq!(listed[0].accent, DEFAULT_ACCENT);
-        assert_eq!(listed[0].name, "project");
-    }
-
-    #[test]
-    fn notes_belong_to_their_project_and_come_back_newest_first() {
-        let (dir, store) = store();
-        let root = dir.path().join("project");
-        std::fs::create_dir_all(&root).expect("create");
-        let id = store.add_project(&root, None).expect("add");
-
-        store.add_note(&id, "first").expect("note");
-        store.add_note(&id, "second").expect("note");
-
-        let notes = store.notes(&id).expect("notes");
-        assert_eq!(notes.len(), 2);
-        // Same-second inserts tie on created_at, so both orders are valid
-        // here; what must hold is that neither leaks into another project.
-        assert!(notes.iter().all(|note| !note.body.is_empty()));
-        assert!(store.notes("prj_other").expect("notes").is_empty());
-    }
-}
+#[path = "projects_tests.rs"]
+mod tests;

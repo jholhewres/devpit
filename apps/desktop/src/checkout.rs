@@ -40,6 +40,27 @@ pub fn cwd_for(
     store: &Store,
     card_id: &str,
     step: &Step,
+    on_line: impl FnMut(&str),
+) -> Result<PathBuf, String> {
+    let project = store
+        .project_of_card(card_id)
+        .map_err(|err| err.to_string())?
+        .ok_or("this card has no project on disk")?;
+
+    if !needs_worktree(step.kind, &step.config) {
+        return Ok(PathBuf::from(&project));
+    }
+    checkout_of(store, card_id, on_line)
+}
+
+/// The card's own checkout, made the first time it is asked for.
+///
+/// Split out of `cwd_for` because a step is no longer the only thing that
+/// wants one: opening a terminal on a card asks the same question, and a
+/// person clicking that button is asking for the same folder a step would get.
+pub fn checkout_of(
+    store: &Store,
+    card_id: &str,
     mut on_line: impl FnMut(&str),
 ) -> Result<PathBuf, String> {
     let project = store
@@ -47,10 +68,6 @@ pub fn cwd_for(
         .map_err(|err| err.to_string())?
         .ok_or("this card has no project on disk")?;
     let main = PathBuf::from(&project);
-
-    if !needs_worktree(step.kind, &step.config) {
-        return Ok(main);
-    }
 
     let card = store
         .card(card_id)
@@ -71,7 +88,11 @@ pub fn cwd_for(
         .map_err(|err| err.to_string())?
         .ok_or("this card has no project")?;
     let home = Store::root().map_err(|err| err.to_string())?;
-    let at = devpit_git::worktree_home(&home, &project_id, card_id);
+    let base = store
+        .preference(devpit_core::preference::WORKTREE_BASE)
+        .map_err(|err| err.to_string())?
+        .unwrap_or_default();
+    let at = devpit_git::worktree_at(&base, &home, &main, &project_id, card_id);
     let branch = devpit_git::branch_for(&card.title, card_id);
 
     let made = devpit_git::create(&main, &at, &branch, "HEAD").map_err(|err| err.to_string())?;

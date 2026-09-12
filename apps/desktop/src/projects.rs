@@ -6,11 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
-use devpit_core::{tree, Store};
-use devpit_rpc::{
-    ErrorCode, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectList, ProjectNotes,
-    ProjectTree, RpcError,
-};
+use devpit_core::Store;
+use devpit_rpc::{ErrorCode, Note, Project, ProjectChanges, ProjectList, ProjectNotes, RpcError};
 
 pub(crate) fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -40,13 +37,40 @@ pub(crate) fn locate(
     Ok((row, root))
 }
 
-fn tree_error(err: devpit_core::TreeError) -> RpcError {
-    match err {
-        // Its own code, not a generic one: the screen says something different
-        // for a path that escaped than for a folder it could not read, and
-        // this process runs terminals — reaching it is reaching the machine.
-        devpit_core::TreeError::Outside { .. } => RpcError::forbidden(err.to_string()),
-        other => RpcError::internal(other.to_string()),
+/// A row, with what git knows about the folder it points at.
+///
+/// One function rather than the same block in four commands: `Project` gained
+/// two fields and three of the four copies would have compiled without them
+/// had they been optional, which is how a list ends up disagreeing with the
+/// row that was just added to it.
+fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
+    let root = PathBuf::from(&row.root_path);
+    let hidden = crate::sources::hidden(store);
+    let (worktrees, unreadable) =
+        match devpit_git::worktrees(&root, &crate::sources::ours(store, &root)) {
+            // Filtered here rather than on the screen: the count on the row
+            // and the list behind it are the same question, and two places
+            // applying the same rule is two places to get it wrong.
+            Ok(found) => (
+                found
+                    .into_iter()
+                    .filter(|worktree| devpit_git::shown(&hidden, worktree.origin))
+                    .collect(),
+                None,
+            ),
+            Err(err) => (Vec::new(), Some(err.to_string())),
+        };
+
+    Project {
+        id: row.id,
+        name: row.name,
+        root_path: row.root_path,
+        group: row.group,
+        accent: row.accent,
+        origin: row.origin,
+        last_opened_at: row.last_opened_at.map(|at| at as f64),
+        worktrees,
+        unreadable,
     }
 }
 
@@ -63,23 +87,7 @@ pub fn project_list() -> Result<ProjectList, RpcError> {
     let projects = store
         .projects()?
         .into_iter()
-        .map(|row| {
-            let root = PathBuf::from(&row.root_path);
-            let (worktrees, unreadable) = match devpit_git::worktrees(&root) {
-                Ok(found) => (found, None),
-                Err(err) => (Vec::new(), Some(err.to_string())),
-            };
-
-            Project {
-                id: row.id,
-                name: row.name,
-                root_path: row.root_path,
-                group: row.group,
-                accent: row.accent,
-                worktrees,
-                unreadable,
-            }
-        })
+        .map(|row| drawn(&store, row))
         .collect();
 
     Ok(ProjectList { projects })
@@ -108,24 +116,11 @@ pub fn project_add(root_path: String) -> Result<Project, RpcError> {
     let origin = origin_url(&root);
     let id = store.add_project(&root, origin.as_deref())?;
 
-    let (worktrees, unreadable) = match devpit_git::worktrees(&root) {
-        Ok(found) => (found, None),
-        Err(err) => (Vec::new(), Some(err.to_string())),
-    };
-
     let row = store
         .project(&id)?
         .ok_or_else(|| RpcError::internal("the project vanished between write and read"))?;
 
-    Ok(Project {
-        id: row.id,
-        name: row.name,
-        root_path: row.root_path,
-        group: row.group,
-        accent: row.accent,
-        worktrees,
-        unreadable,
-    })
+    Ok(drawn(&store, row))
 }
 
 /// `project.clone` — clones a remote and registers where it landed.
@@ -159,20 +154,7 @@ pub fn project_clone(url: String, into: Option<String>) -> Result<Project, RpcEr
         .project(&id)?
         .ok_or_else(|| RpcError::internal("the project vanished between write and read"))?;
 
-    let (worktrees, unreadable) = match devpit_git::worktrees(&into) {
-        Ok(found) => (found, None),
-        Err(err) => (Vec::new(), Some(err.to_string())),
-    };
-
-    Ok(Project {
-        id: row.id,
-        name: row.name,
-        root_path: row.root_path,
-        group: row.group,
-        accent: row.accent,
-        worktrees,
-        unreadable,
-    })
+    Ok(drawn(&store, row))
 }
 
 /// `project.open` — records that this is the project being worked in.
@@ -193,116 +175,83 @@ pub fn project_open(project_id: String) -> Result<ProjectList, RpcError> {
 /// The folder, its git and its worktrees are untouched: this only stops
 /// devpit listing it. Answers with the list that is left, so the screen does
 /// not have to guess which project it is standing in now.
+///
+/// `wipe_workspace` is the box in the dialog, and it was decorative: the
+/// checkbox said the board and the per-project settings would go, and nothing
+/// went. Ticked, the row and everything hanging off it are deleted and the
+/// project's folder under `~/.devpit/projects/` is removed. The repository is
+/// still never touched — that is the one promise this command makes.
 #[tauri::command]
 #[specta::specta]
-pub fn project_forget(project_id: String) -> Result<ProjectList, RpcError> {
+pub fn project_forget(project_id: String, wipe_workspace: bool) -> Result<ProjectList, RpcError> {
     let store = store()?;
-    if !store.forget_project(&project_id)? {
+
+    if !wipe_workspace {
+        if !store.forget_project(&project_id)? {
+            return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
+        }
+        return project_list();
+    }
+
+    // Before the row, because the row is what says which folder is this
+    // project's: erasing first would leave the directory with nothing left to
+    // name it.
+    let workspace = workspace_of(&project_id)?;
+    if !store.erase_project(&project_id)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
     }
+    if workspace.is_dir() {
+        std::fs::remove_dir_all(&workspace)
+            .map_err(|err| RpcError::internal(format!("{}: {err}", workspace.display())))?;
+    }
+
     project_list()
 }
 
-/// `project.tree` — one level of the file tree, from a given worktree.
+/// Where a project's own workspace lives, checked before anything deletes it.
 ///
-/// One level rather than the whole tree: a monorepo has hundreds of thousands
-/// of files and the screen draws only what is expanded. `path` is empty for
-/// the root.
+/// The id reaches a `remove_dir_all`, so it is built into the path rather than
+/// interpolated from whatever arrived: one path segment, from the alphabet ids
+/// are made of, and the result has to still be under the workspace root.
+fn workspace_of(project_id: &str) -> Result<PathBuf, RpcError> {
+    let sane = !project_id.is_empty()
+        && project_id.len() <= 64
+        && project_id
+            .chars()
+            .all(|letter| letter.is_ascii_alphanumeric() || letter == '_' || letter == '-');
+    if !sane {
+        return Err(RpcError::new(ErrorCode::Invalid, "not a project id"));
+    }
+
+    let home = Store::root()?;
+    let mine = home.join("projects").join(project_id);
+    if !mine.starts_with(home.join("projects")) {
+        return Err(RpcError::new(ErrorCode::Forbidden, "not a project id"));
+    }
+    Ok(mine)
+}
+
+/// `project.rename` — what this project is called in devpit.
+///
+/// The name is the app's, not git's: the folder on disk keeps whatever it was
+/// called, because renaming somebody's checkout is not a thing a list should
+/// do to make its own rows read better.
 #[tauri::command]
 #[specta::specta]
-pub fn project_tree(
-    project_id: String,
-    worktree_id: Option<String>,
-    path: String,
-) -> Result<ProjectTree, RpcError> {
+pub fn project_rename(project_id: String, name: String) -> Result<ProjectList, RpcError> {
+    let wanted = name.trim();
+    if wanted.is_empty() {
+        return Err(RpcError::new(ErrorCode::Invalid, "a project needs a name"));
+    }
+    if wanted.chars().count() > 120 {
+        return Err(RpcError::new(ErrorCode::Invalid, "that name is too long"));
+    }
+
     let store = store()?;
-    let (_, root) = locate(&store, &project_id)?;
-    let root = checkout(&root, worktree_id.as_deref());
-
-    let status = devpit_git::status(&root)
-        .map(|status| status.paths)
-        .unwrap_or_default();
-
-    let nodes = tree::children(&root, &path)
-        .map_err(tree_error)?
-        .into_iter()
-        .map(|entry| FileNode {
-            status: mark(&entry, &status),
-            children: entry.is_dir.then(Vec::new),
-            name: entry.name,
-            path: entry.path,
-        })
-        .collect();
-
-    Ok(ProjectTree { nodes })
-}
-
-/// How much a status wants to be seen, when several are collapsed into one row.
-///
-/// A deletion outranks a modification outranks an addition: the further left,
-/// the harder it is to undo by accident. Untracked is last because it is the
-/// normal state of a working tree, not news.
-fn loudness(status: GitStatus) -> u8 {
-    match status {
-        GitStatus::Deleted => 4,
-        GitStatus::Modified => 3,
-        GitStatus::Added => 2,
-        GitStatus::Untracked => 1,
-        GitStatus::Clean => 0,
+    if !store.rename_project(&project_id, wanted)? {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
     }
-}
-
-/// A directory shows the loudest thing under it.
-///
-/// Otherwise a change three levels down is invisible until you have opened
-/// three folders looking for it, which is the opposite of what the colour is
-/// for. Ranked rather than first-found: the map is ordered by path, and taking
-/// its first entry would show whichever file happens to sort earliest.
-fn mark(entry: &tree::Entry, status: &std::collections::BTreeMap<String, GitStatus>) -> GitStatus {
-    if !entry.is_dir {
-        return status.get(&entry.path).copied().unwrap_or(GitStatus::Clean);
-    }
-
-    let prefix = format!("{}/", entry.path);
-    status
-        .iter()
-        .filter(|(path, _)| path.starts_with(&prefix))
-        .map(|(_, status)| *status)
-        .max_by_key(|status| loudness(*status))
-        .unwrap_or(GitStatus::Clean)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn dir(path: &str) -> tree::Entry {
-        tree::Entry {
-            name: path.rsplit('/').next().unwrap_or(path).to_owned(),
-            path: path.to_owned(),
-            is_dir: true,
-        }
-    }
-
-    #[test]
-    fn a_directory_shows_its_loudest_change_not_its_first() {
-        // `a.rs` sorts before `z.rs`, so first-found would report Modified and
-        // the deletion under the same folder would go unseen.
-        let status = std::collections::BTreeMap::from([
-            ("web/a.rs".to_owned(), GitStatus::Modified),
-            ("web/z.rs".to_owned(), GitStatus::Deleted),
-        ]);
-        assert_eq!(mark(&dir("web"), &status), GitStatus::Deleted);
-    }
-
-    #[test]
-    fn a_directory_with_nothing_under_it_is_clean() {
-        let status = std::collections::BTreeMap::from([
-            // Same prefix, different folder: `webbing` must not count as `web`.
-            ("webbing/a.rs".to_owned(), GitStatus::Modified),
-        ]);
-        assert_eq!(mark(&dir("web"), &status), GitStatus::Clean);
-    }
+    project_list()
 }
 
 /// `project.changes` — what has changed in a checkout, with the size of each edit.
@@ -407,4 +356,32 @@ fn shellexpand_home(raw: &str) -> String {
 
 fn dirs_home() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The id reaches `remove_dir_all`, so it has to be one path segment.
+    ///
+    /// Not a theory: `workspace_of` builds the path this command deletes, and
+    /// a `..` allowed through it is a delete of `~/.devpit` itself.
+    #[test]
+    fn a_project_id_that_could_climb_out_is_refused() {
+        for climbing in ["..", "../..", "a/b", "/etc", "a\0b", ""] {
+            assert!(
+                workspace_of(climbing).is_err(),
+                "{climbing:?} was accepted as a project id"
+            );
+        }
+    }
+
+    #[test]
+    fn a_real_project_id_lands_under_the_workspace() {
+        let Ok(mine) = workspace_of("prj_01JABCDEF") else {
+            // No home directory in this environment; nothing to assert about.
+            return;
+        };
+        assert!(mine.ends_with("projects/prj_01JABCDEF"));
+    }
 }

@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest'
 import type { Board, Card, Column } from '../gen/bindings'
 import { landed, lanes } from './board'
 
-const column = (id: string, position: number): Column => ({ id, name: id, position, step: null })
+const column = (id: string, position: number): Column => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual' })
 const card = (id: string, columnId: string, position: number): Card =>
-  ({ id, columnId, title: id, body: '', position, worktreePath: null, costUsd: null, runs: [], session: null })
+  ({ id, columnId, title: id, body: '', position, worktreePath: null,
+  dueAt: null,
+  comments: 0,
+  pinned: 0, costUsd: null, runs: [], session: null })
 
 const board: Board = {
   projectId: 'p',

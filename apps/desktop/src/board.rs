@@ -7,18 +7,14 @@
 
 use devpit_core::Store;
 use devpit_rpc::{
-    Board, Card, CardChanged, Column, ErrorCode, RpcError, Run, RunState, Session, SessionStatus,
-    Step, StepKind,
+    Board, Card, Column, ErrorCode, RpcError, Run, RunState, Session, SessionStatus, Step, StepKind,
 };
-use std::sync::Arc;
 
-use tauri::{AppHandle, State};
-
-fn store() -> Result<Store, RpcError> {
+pub(crate) fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
 }
 
-fn kind_of(raw: &str) -> StepKind {
+pub(crate) fn kind_of(raw: &str) -> StepKind {
     match raw {
         "session" => StepKind::Session,
         "command" => StepKind::Command,
@@ -35,7 +31,7 @@ fn state_of(raw: &str) -> RunState {
     }
 }
 
-fn steps_of(store: &Store, project_id: &str) -> Result<Vec<Step>, RpcError> {
+pub(crate) fn steps_of(store: &Store, project_id: &str) -> Result<Vec<Step>, RpcError> {
     Ok(store
         .steps(project_id)?
         .into_iter()
@@ -49,7 +45,7 @@ fn steps_of(store: &Store, project_id: &str) -> Result<Vec<Step>, RpcError> {
         .collect())
 }
 
-fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, RpcError> {
+pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, RpcError> {
     let row = store
         .card(id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such card"))?;
@@ -61,7 +57,12 @@ fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, RpcError> {
         body: row.body,
         position: row.position as i32,
         worktree_path: row.worktree_path,
+        due_at: row.due_at.map(|at| at as f64),
         cost_usd: store.card_cost(&row.id)?,
+        // Counted rather than carried. A board of thirty cards would otherwise
+        // read thirty conversations to draw thirty badges.
+        comments: store.comments(&row.id)?.len() as u32,
+        pinned: store.attachments(&row.id)?.len() as u32,
         runs: runs_of(store, &row.id, steps)?,
     })
 }
@@ -151,6 +152,8 @@ pub fn board_get(project_id: String) -> Result<Board, RpcError> {
             step: row
                 .step_id
                 .and_then(|id| steps.iter().find(|s| s.id == id).cloned()),
+            on_pass: row.on_pass,
+            autonomy: row.autonomy,
         })
         .collect();
 
@@ -197,85 +200,6 @@ pub fn card_update(
     store.update_card(&card_id, &title, &body)?;
     let steps = steps_of(&store, &project_id)?;
     card_of(&store, &card_id, &steps)
-}
-
-/// What a card landing on a column sets off, if anything.
-///
-/// The rule the whole product turns on, kept as a function of its own so it
-/// can be read and tested without a window: a column with no step runs
-/// nothing, and an irreversible one runs nothing until someone says so.
-fn what_runs(step: Option<&Step>, confirmed: bool) -> Option<&Step> {
-    match step {
-        // No step on this column: moving the card is all that happened.
-        None => None,
-        // Irreversible and unconfirmed: the move stands, the work does not.
-        Some(step) if step.irreversible && !confirmed => None,
-        Some(step) => Some(step),
-    }
-}
-
-/// `card.move` — and the only place a step is ever started.
-///
-/// `confirmed` is how an irreversible step stays out of a drag: a deploy is
-/// not fired by dropping a card on a lane, it is fired by someone saying so.
-#[tauri::command]
-#[specta::specta]
-pub fn card_move(
-    in_flight: State<Arc<crate::in_flight::InFlight>>,
-    app: AppHandle,
-    project_id: String,
-    card_id: String,
-    column_id: String,
-    position: i32,
-    confirmed: bool,
-) -> Result<CardChanged, RpcError> {
-    let store = store()?;
-
-    // Read before the move: a step that sends the card back needs somewhere to
-    // send it, and after the write the previous column is gone.
-    let came_from = store.card(&card_id)?.map(|card| card.column_id);
-
-    // A run still going is work in flight. Moving the card out from under it
-    // is allowed, but only on purpose.
-    let still_running = store
-        .runs(&card_id)?
-        .iter()
-        .any(|run| run.state == "running");
-    if still_running && !confirmed {
-        return Err(RpcError::new(
-            ErrorCode::Conflict,
-            "a run is still going on this card — move it anyway?",
-        ));
-    }
-
-    store.move_card(&card_id, &column_id, position as i64)?;
-
-    let steps = steps_of(&store, &project_id)?;
-    let landed = store
-        .columns(&project_id)?
-        .into_iter()
-        .find(|column| column.id == column_id);
-
-    let step = landed
-        .and_then(|column| column.step_id)
-        .and_then(|id| steps.iter().find(|s| s.id == id).cloned());
-
-    let started = match what_runs(step.as_ref(), confirmed) {
-        None => None,
-        Some(step) => Some(crate::runs::start(
-            app,
-            Arc::clone(&in_flight),
-            &store,
-            &card_id,
-            step,
-            came_from.as_deref(),
-        )?),
-    };
-
-    Ok(CardChanged {
-        card: card_of(&store, &card_id, &steps)?,
-        started,
-    })
 }
 
 #[cfg(test)]

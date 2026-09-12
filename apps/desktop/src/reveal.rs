@@ -25,7 +25,7 @@ pub struct Opened {
 /// workspace. Resolved through symlinks first, for the same reason as
 /// everywhere else: comparing the strings is the check that looks right and
 /// is not.
-pub fn openable(roots: &[PathBuf], home: &Path, path: &Path) -> Option<PathBuf> {
+pub(crate) fn openable(roots: &[PathBuf], home: &Path, path: &Path) -> Option<PathBuf> {
     let resolved = path.canonicalize().ok()?;
     let home = home.canonicalize().unwrap_or_else(|_| home.to_path_buf());
     let allowed = roots

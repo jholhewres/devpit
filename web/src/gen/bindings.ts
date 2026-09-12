@@ -41,8 +41,22 @@ export const commands = {
 	 *  The folder, its git and its worktrees are untouched: this only stops
 	 *  devpit listing it. Answers with the list that is left, so the screen does
 	 *  not have to guess which project it is standing in now.
+	 * 
+	 *  `wipe_workspace` is the box in the dialog, and it was decorative: the
+	 *  checkbox said the board and the per-project settings would go, and nothing
+	 *  went. Ticked, the row and everything hanging off it are deleted and the
+	 *  project's folder under `~/.devpit/projects/` is removed. The repository is
+	 *  still never touched — that is the one promise this command makes.
 	 */
-	projectForget: (projectId: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_forget", { projectId })),
+	projectForget: (projectId: string, wipeWorkspace: boolean) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_forget", { projectId, wipeWorkspace })),
+	/**
+	 *  `project.rename` — what this project is called in devpit.
+	 * 
+	 *  The name is the app's, not git's: the folder on disk keeps whatever it was
+	 *  called, because renaming somebody's checkout is not a thing a list should
+	 *  do to make its own rows read better.
+	 */
+	projectRename: (projectId: string, name: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_rename", { projectId, name })),
 	/**  `chat.history` — everything said in this conversation, in order. */
 	chatHistory: (projectId: string, conversationId: string) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId })),
 	/**
@@ -139,6 +153,27 @@ export const commands = {
 	 *  was asked for was the folder with the file highlighted in it.
 	 */
 	pathReveal: (path: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("path_reveal", { path })),
+	/**  `apps.list` — the apps in the Open in menu. */
+	appsList: () => typedError<OpenApp[], RpcError>(__TAURI_INVOKE("apps_list")),
+	/**  `apps.known` — what the Add menu offers. */
+	appsKnown: () => typedError<KnownApp[], RpcError>(__TAURI_INVOKE("apps_known")),
+	/**
+	 *  `apps.add` — puts one in the list.
+	 * 
+	 *  Adding the same app twice is not an error and not a duplicate: it updates
+	 *  the one that is there, which is what someone repeating themselves means.
+	 */
+	appsAdd: (label: string, command: string) => typedError<OpenApp[], RpcError>(__TAURI_INVOKE("apps_add", { label, command })),
+	/**  `apps.remove` — takes one out. Nothing on disk is touched. */
+	appsRemove: (appId: string) => typedError<OpenApp[], RpcError>(__TAURI_INVOKE("apps_remove", { appId })),
+	/**
+	 *  `apps.open` — hands a folder to one of them.
+	 * 
+	 *  The path is checked the same way `path.open` checks it: inside a registered
+	 *  project or inside the devpit workspace, resolved through symlinks. This
+	 *  process runs terminals, and reaching it is reaching the machine.
+	 */
+	appsOpen: (appId: string, path: string) => typedError<null, RpcError>(__TAURI_INVOKE("apps_open", { appId, path })),
 	/**
 	 *  `worktree.list` — every checkout this project's cards have, with the disk
 	 *  each one takes and the work each one is holding.
@@ -160,6 +195,19 @@ export const commands = {
 	 *  answered while the person is still looking at what they typed.
 	 */
 	worktreePrimeWrite: (projectId: string, preparation: Preparation) => typedError<Preparation, RpcError>(__TAURI_INVOKE("worktree_prime_write", { projectId, preparation })),
+	/**  `worktree.base_read` — where new worktrees go, and an example of it. */
+	worktreeBaseRead: (projectId: string | null) => typedError<WorktreeBase, RpcError>(__TAURI_INVOKE("worktree_base_read", { projectId })),
+	/**
+	 *  `worktree.base_write` — chooses it, or clears it back to the default.
+	 * 
+	 *  Refused rather than corrected when the path cannot hold a worktree: a
+	 *  field that silently rewrites what was typed is a field nobody trusts twice.
+	 */
+	worktreeBaseWrite: (projectId: string | null, typed: string) => typedError<WorktreeBase, RpcError>(__TAURI_INVOKE("worktree_base_write", { projectId, typed })),
+	/**  `worktree.sources` — the kinds this project has, and which are shown. */
+	worktreeSources: (projectId: string | null) => typedError<Source[], RpcError>(__TAURI_INVOKE("worktree_sources", { projectId })),
+	/**  `worktree.source_show` — shows or hides one kind. */
+	worktreeSourceShow: (projectId: string | null, sourceId: string, shown: boolean) => typedError<Source[], RpcError>(__TAURI_INVOKE("worktree_source_show", { projectId, sourceId, shown })),
 	/**
 	 *  `project.tree` — one level of the file tree, from a given worktree.
 	 * 
@@ -218,6 +266,13 @@ export const commands = {
 	columnDelete: (projectId: string, columnId: string) => typedError<ColumnDeleted, RpcError>(__TAURI_INVOKE("column_delete", { projectId, columnId })),
 	/**  `column.set_step` — what this lane runs, or nothing. */
 	columnSetStep: (projectId: string, columnId: string, stepId: string | null) => typedError<Board, RpcError>(__TAURI_INVOKE("column_set_step", { projectId, columnId, stepId })),
+	/**
+	 *  `column.set_flow` — where a pass goes, and how much the lane decides.
+	 * 
+	 *  Refused rather than corrected when the two disagree: a lane cannot send a
+	 *  card to itself, and it cannot advance to a lane that is not on this board.
+	 */
+	columnSetFlow: (projectId: string, columnId: string, onPass: string | null, autonomy: string) => typedError<Board, RpcError>(__TAURI_INVOKE("column_set_flow", { projectId, columnId, onPass, autonomy })),
 	cardCreate: (projectId: string, columnId: string, title: string, body: string) => typedError<Card, RpcError>(__TAURI_INVOKE("card_create", { projectId, columnId, title, body })),
 	cardUpdate: (projectId: string, cardId: string, title: string, body: string) => typedError<Card, RpcError>(__TAURI_INVOKE("card_update", { projectId, cardId, title, body })),
 	/**
@@ -227,6 +282,92 @@ export const commands = {
 	 *  not fired by dropping a card on a lane, it is fired by someone saying so.
 	 */
 	cardMove: (projectId: string, cardId: string, columnId: string, position: number, confirmed: boolean) => typedError<CardChanged, RpcError>(__TAURI_INVOKE("card_move", { projectId, cardId, columnId, position, confirmed })),
+	/**  `card.detail` — everything one card is. */
+	cardDetail: (projectId: string, cardId: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_detail", { projectId, cardId })),
+	/**
+	 *  `card.set_due` — when this card is due, or nothing.
+	 * 
+	 *  Seconds since the epoch, from the screen's own clock: a date is chosen in
+	 *  the reader's timezone and this process has no business reinterpreting it.
+	 */
+	cardSetDue: (projectId: string, cardId: string, dueAt: number | null) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_set_due", { projectId, cardId, dueAt })),
+	/**  `card.comment` — says something on the card. */
+	cardComment: (projectId: string, cardId: string, body: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_comment", { projectId, cardId, body })),
+	/**  `card.comment_edit` — changes one, and says that it changed. */
+	cardCommentEdit: (projectId: string, cardId: string, commentId: string, body: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_comment_edit", { projectId, cardId, commentId, body })),
+	/**  `card.comment_delete` — takes one out of the conversation. */
+	cardCommentDelete: (projectId: string, cardId: string, commentId: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_comment_delete", { projectId, cardId, commentId })),
+	/**
+	 *  `card.pin` — pins a file to the card.
+	 * 
+	 *  The path is checked the same way `path.open` checks one, and for the same
+	 *  reason: a pin is a path this app will later hand to the desktop, so a pin
+	 *  outside the project is a pin that must not be made.
+	 */
+	cardPin: (projectId: string, cardId: string, path: string, label: string | null) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_pin", { projectId, cardId, path, label })),
+	/**  `card.unpin` — unpins one. The file on disk is never touched. */
+	cardUnpin: (projectId: string, cardId: string, pinId: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_unpin", { projectId, cardId, pinId })),
+	/**
+	 *  `card.reload_board` — the board, after something changed a card.
+	 * 
+	 *  Exists so a screen that just edited a card can refresh the tiles behind it
+	 *  without knowing how the board is assembled.
+	 */
+	cardBoard: (projectId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("card_board", { projectId })),
+	/**
+	 *  `card.checkout` — makes the card's worktree, or reports the one it has.
+	 * 
+	 *  Made rather than asked for: a card with no checkout has nowhere for an
+	 *  agent to work, and the button that says "give this card a checkout" is the
+	 *  whole of what somebody wants when they press it.
+	 * 
+	 *  Blocking work off the UI thread: this can run `git worktree add` and then
+	 *  a whole preparation — `pnpm install` is not something to hold a window for.
+	 */
+	cardCheckout: (cardId: string) => typedError<Checkout, RpcError>(__TAURI_INVOKE("card_checkout", { cardId })),
+	/**
+	 *  `card.terminal` — a terminal open on this card's checkout.
+	 * 
+	 *  Answers with the tab, which the window then shows. The agent is not started
+	 *  here: the pane does not exist until the window has drawn it, and the tab
+	 *  carries which agent to launch so it can be sent once the pane is there.
+	 *  That seam already existed for the launcher palette; this reuses it rather
+	 *  than inventing a second way in.
+	 */
+	cardTerminal: (projectId: string, cardId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("card_terminal", { projectId, cardId })),
+	/**
+	 *  `card.play` — runs this lane's step on this card, now.
+	 * 
+	 *  One meaning, and only one. A lane with no step answers with that fact and
+	 *  the screen offers a terminal instead — a button that does one thing when
+	 *  the lane has a step and something else when it does not is a button with
+	 *  two invisible meanings, and the lane's step name is right there to say
+	 *  which would happen.
+	 * 
+	 *  `confirmed` is the same word `card.move` uses, for the same reason: a step
+	 *  with no undo is not fired by a click somebody might not have meant.
+	 */
+	cardPlay: (projectId: string, cardId: string, confirmed: boolean) => typedError<Played, RpcError>(__TAURI_INVOKE("card_play", { projectId, cardId, confirmed })),
+	/**  `notices.read` — the list, and how many are unread. */
+	noticesRead: () => typedError<Notices, RpcError>(__TAURI_INVOKE("notices_read")),
+	/**  `notices.mark` — marks one read. */
+	noticesMark: (noticeId: string) => typedError<Notices, RpcError>(__TAURI_INVOKE("notices_mark", { noticeId })),
+	/**
+	 *  `notices.mark_all` — marks every one read.
+	 * 
+	 *  Read, never deleted: a list that empties itself is a list where something
+	 *  you meant to come back to is gone.
+	 */
+	noticesMarkAll: () => typedError<Notices, RpcError>(__TAURI_INVOKE("notices_mark_all")),
+	/**
+	 *  `notices.sweep_due` — notices the deadlines that have passed.
+	 * 
+	 *  A sweep and not an event, because a date passing is not something that
+	 *  happens — nothing calls anybody when a clock ticks over. Idempotent: a card
+	 *  already noticed is not noticed again, which is what makes it safe to call
+	 *  on every launch and every board read.
+	 */
+	noticesSweepDue: () => typedError<Notices, RpcError>(__TAURI_INVOKE("notices_sweep_due")),
 	/**  `file.read` — the text of a file, or why it is not text. */
 	fileRead: (projectId: string, worktreeId: string | null, path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("file_read", { projectId, worktreeId, path })),
 	/**
@@ -685,8 +826,19 @@ export type Card = {
 	body: string,
 	position: number,
 	worktreePath: string | null,
+	/**
+	 *  Seconds since the epoch; `f64` for the usual reason. Absent for most
+	 *  cards, which is why it is an option and not a date nobody chose.
+	 */
+	dueAt: number | null,
 	/**  What every run of this card has cost, added up. */
 	costUsd: number | null,
+	/**
+	 *  Counted, not carried: the tile shows that there is a conversation, and
+	 *  the conversation itself is read when the card is opened.
+	 */
+	comments: number,
+	pinned: number,
 	/**  Most recent first. */
 	runs: Run[],
 	/**  The session working on this card, if one is. */
@@ -698,6 +850,24 @@ export type CardChanged = {
 	card: Card,
 	/**  The run this move started, when the column it landed in has a step. */
 	started: Run | null,
+};
+
+/**  Everything one card is, for the screen that opens it. */
+export type CardDetail = {
+	card: Card,
+	columnName: string,
+	/**
+	 *  What the lane this card is in runs, if anything. Here rather than
+	 *  looked up by the screen: the card pane needs it to say what play does,
+	 *  and a second read would be a second answer.
+	 */
+	columnStep: Step | null,
+	comments: Comment[],
+	pinned: Pinned[],
+	/**  Absent until the card has one. */
+	worktree: Checkout | null,
+	/**  Every run, newest first — the tile only carries the latest. */
+	runs: Run[],
 };
 
 /**  One checkout belonging to a card, or left over from one. */
@@ -728,12 +898,47 @@ export type Change = {
 	staged: boolean,
 };
 
+/**
+ *  The checkout this card's work happens in.
+ * 
+ *  `Checkout` and not `CardWorktree`, which the settings pane already uses for
+ *  its own row — that one is about disk and orphans, this one about the branch
+ *  and what is uncommitted in it. Two views of one fact, and the names have to
+ *  say which is which.
+ */
+export type Checkout = {
+	path: string,
+	branch: string | null,
+	/**  What it started from. The diff is against this, never against HEAD. */
+	baseRef: string | null,
+	/**  Null when git could not be read — not 0, which would claim it is clean. */
+	dirtyFiles: number | null,
+	/**  False when the row names a folder that is no longer there. */
+	exists: boolean,
+};
+
 export type Column = {
 	id: string,
 	name: string,
 	position: number,
 	/**  `null` means the column runs nothing, which is a column doing its job. */
 	step: Step | null,
+	/**
+	 *  Where a card goes when this lane's step approves it.
+	 * 
+	 *  Declared rather than derived: "the next column by position" is the
+	 *  obvious rule and a trap, because a column is data — renamed, reordered
+	 *  by dragging — so a card would start advancing somewhere else with
+	 *  nobody having changed anything about it.
+	 */
+	onPass: string | null,
+	/**
+	 *  `manual` | `ask` | `auto`. How much this lane decides on its own.
+	 * 
+	 *  `manual` is the default and what every existing board has: nothing
+	 *  happens without somebody moving a card.
+	 */
+	autonomy: string,
 };
 
 /**
@@ -745,6 +950,24 @@ export type Column = {
 export type ColumnDeleted = {
 	deleted: boolean,
 	cardsInTheWay: number,
+};
+
+/**  One line of the card's conversation. */
+export type Comment = {
+	id: string,
+	/**
+	 *  `you`, or an agent id — never a display name. Names change, and the
+	 *  screen resolves the id to whatever it calls that agent today.
+	 */
+	author: string,
+	body: string,
+	/**
+	 *  Seconds since the epoch; `f64` because this crosses into a JavaScript
+	 *  number. See `Commit::committed_at` for the reason stated once.
+	 */
+	createdAt: number | null,
+	/**  Present when the line was changed after it was said. */
+	editedAt: number | null,
 };
 
 export type Commit = {
@@ -954,6 +1177,13 @@ export type KnownAgent = {
 	installed: boolean,
 };
 
+/**  An app this build knows how to offer before anyone has typed anything. */
+export type KnownApp = {
+	id: string,
+	label: string,
+	command: string,
+};
+
 export type LayoutNode = { type: "leaf"; id: string; 
 /**  `session:window` on our private tmux server. */
 tmuxTarget: string; kind: PaneKind; agent: AgentPresence; 
@@ -1013,6 +1243,51 @@ export type Note = {
 	body: string,
 	/**  Seconds since the epoch; see `Commit::committed_at` for why `f64`. */
 	createdAt: number | null,
+};
+
+/**  Something worth telling somebody about. */
+export type Notice = {
+	id: string,
+	projectId: string | null,
+	/**
+	 *  `run`, `agent`, `due`, `irreversible`. A word rather than an enum
+	 *  because the set grows with whatever learns to notice something, and a
+	 *  kind this build does not know should draw as a plain row, not fail.
+	 */
+	kind: string,
+	title: string,
+	detail: string | null,
+	/**  Where clicking it goes. Null for a notice with nowhere to go. */
+	cardId: string | null,
+	createdAt: number | null,
+	readAt: number | null,
+};
+
+/**
+ *  Response of every notice command.
+ * 
+ *  The count comes with the list so the bell and the list can never disagree —
+ *  two reads a second apart is exactly how a badge ends up saying 3 over an
+ *  empty panel.
+ */
+export type Notices = {
+	notices: Notice[],
+	unread: number,
+};
+
+/**  One app in the list. */
+export type OpenApp = {
+	/**  Stable, and what the menu is keyed on. */
+	id: string,
+	label: string,
+	/**  The program, as it would be typed into a terminal. One word. */
+	command: string,
+	/**
+	 *  Whether this machine can actually run it. Asked of the shell, not of
+	 *  `PATH`: an editor launched by a shell function has no file on `PATH`
+	 *  and would be greyed out for no reason.
+	 */
+	installed: boolean,
 };
 
 export type Opened = {
@@ -1098,6 +1373,44 @@ call_id: string; output: string; is_error: boolean } |
  */
 { kind: "unknown"; text: string };
 
+/**
+ *  A file pinned to a card.
+ * 
+ *  `Pinned` and not `Attachment` because `chat::Attachment` already means
+ *  something else — a file handed to an agent for one turn. This one outlives
+ *  the turn and belongs to the card.
+ */
+export type Pinned = {
+	id: string,
+	/**  Absolute, and local only. */
+	path: string,
+	label: string,
+	/**
+	 *  False when the file has since been moved or deleted. Drawn as missing
+	 *  rather than dropped: a pin that vanishes takes the memory of it too.
+	 */
+	exists: boolean,
+	/**  Bytes, when it could be read. */
+	bytes: number | null,
+	createdAt: number | null,
+};
+
+/**
+ *  What pressing play did, or why it did not.
+ * 
+ *  Three answers rather than an error for two of them: a lane that runs
+ *  nothing and a step that wants confirming are both ordinary, and the screen
+ *  says something different for each.
+ */
+export type Played = {
+	/**  The run that started, when one did. */
+	run: Run | null,
+	/**  The lane's step has no undo and nobody has said to run it. */
+	needsConfirming: boolean,
+	/**  This lane runs nothing, so there was nothing to play. */
+	laneRunsNothing: boolean,
+};
+
 /**  The preparation a project declares for a fresh checkout. */
 export type Preparation = {
 	link: string[],
@@ -1153,6 +1466,16 @@ export type Project = {
 	 *  non-null is the only honest way to draw a project whose git is missing.
 	 */
 	unreadable: string | null,
+	/**
+	 *  `remote.origin.url`, read when the project was registered. What tells
+	 *  two checkouts of one repository apart from two unrelated folders.
+	 */
+	origin: string | null,
+	/**
+	 *  Seconds since the epoch; see `Commit::committed_at` for why `f64`.
+	 *  Absent for a project registered and never opened.
+	 */
+	lastOpenedAt: number | null,
 };
 
 export type ProjectChanges = {
@@ -1403,6 +1726,21 @@ export type Skills = {
 	problem: string | null,
 };
 
+/**  One kind of checkout, with the count that makes the choice meaningful. */
+export type Source = {
+	/**  `devpit`, `claude`, `other` — what the preference stores. */
+	id: string,
+	label: string,
+	/**  Where these sit, in the shape a person would recognise. */
+	hint: string,
+	/**
+	 *  How many this project has right now. Hiding a kind it has none of is a
+	 *  switch that does nothing, and the count is what says so.
+	 */
+	count: number,
+	shown: boolean,
+};
+
 /**  What a project has actually spent. */
 export type Spend = {
 	usd: number | null,
@@ -1517,9 +1855,41 @@ export type Worktree = {
 	 *  optional for the same reason.
 	 */
 	dirtyFiles: number | null,
+	/**  Who made it, so the lists can be about one kind at a time. */
+	origin: WorktreeOrigin,
 	/**  The checkout the project opens into. */
 	current: boolean,
 };
+
+/**  The chosen base, and what it means for the project in front of you. */
+export type WorktreeBase = {
+	/**  Exactly what was typed, so the field shows it back unchanged. */
+	typed: string,
+	/**
+	 *  Where the next worktree of this project would land. A sentence about
+	 *  relative and absolute is not an answer; a path is.
+	 */
+	example: string,
+	/**  True while nothing has been chosen and the workspace default is in use. */
+	isDefault: boolean,
+};
+
+/**
+ *  Who made a checkout.
+ * 
+ *  `git worktree list` returns every worktree of the repository, and a person
+ *  working with agents has three kinds at once: the ones devpit made for its
+ *  cards, the ones Claude Code made for itself, and whatever they made by
+ *  hand. Counting all three as one number is what made the project row say
+ *  "7 worktrees" about a repository the person had made none of.
+ */
+export type WorktreeOrigin = 
+/**  Under the folder devpit creates card worktrees in. */
+"devpit" | 
+/**  Under a `.claude/worktrees` of its own. */
+"claude" | 
+/**  Everything else, which is mostly `git worktree add` by hand. */
+"other";
 
 export type Worktrees = {
 	worktrees: CardWorktree[],

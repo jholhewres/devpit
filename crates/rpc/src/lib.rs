@@ -10,6 +10,7 @@
 pub mod account;
 pub mod agents;
 pub mod board;
+pub mod card;
 pub mod chat;
 pub mod error;
 pub mod file;
@@ -27,6 +28,7 @@ mod threads;
 pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
+pub use card::{CardDetail, Checkout, Comment, Notice, Notices, Pinned, Played};
 pub use chat::{Ask, Attachment, CallState, Conversation, Message, Part, Role, TurnEnd};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
@@ -35,7 +37,7 @@ pub use front::Front;
 pub use profile::Profile;
 pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
-    ProjectList, ProjectNotes, ProjectTree, Worktree,
+    ProjectList, ProjectNotes, ProjectTree, Worktree, WorktreeOrigin,
 };
 pub use search::{SearchFile, SearchHits, SearchLine};
 pub use session::{
