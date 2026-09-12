@@ -1,14 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
+import { FileDialogs } from './FileDialogs'
+import { FILE_MENU, type Entry } from './fileMenu'
+import { useFileActions } from './useFileActions'
 import { useShell } from './useShell'
 
-/* An item either does something or is not offered. `run` takes the id of the
-   thing that was right-clicked, which the row publishes as `data-id`. */
-interface Item {
-  readonly label?: string
-  readonly key?: string
-  readonly rule?: true
-  readonly bad?: true
+/*
+ * An item names an action or is not offered.
+ *
+ * Two ways to name one, because the two wired menus identify their row
+ * differently and neither is wrong: a file row publishes `data-path`, and a
+ * session row publishes `data-id`. `act` goes through `useFileActions`, which
+ * owns the dialogs a file action needs; `run` is called with the row's id.
+ */
+interface Item extends Entry {
   readonly run?: (id: string) => void
 }
 
@@ -18,11 +23,10 @@ interface Item {
  *
  * The browser's own menu offers Reload, Back and View Source — none of which
  * a window like this can do. Leaving it on teaches people that right-click is
- * broken here, which then hides the three places it works.
+ * broken here, which then hides the places it works.
  *
- * These two still only close the menu. They are a control that lies and they
- * should either act or go; the session menu below is what one looks like once
- * it does something.
+ * `card` is the one that still only closes. It needs board commands, and it is
+ * named here so the next reader knows it is known rather than missed.
  */
 const STATIC: Record<string, readonly Item[]> = {
   card: [
@@ -35,31 +39,26 @@ const STATIC: Record<string, readonly Item[]> = {
     { rule: true },
     { label: 'Delete card', bad: true },
   ],
-
-  file: [
-    { label: 'Open', key: '↵' },
-    { label: 'Open beside', key: '⌘↵' },
-    { rule: true },
-    { label: 'Copy path' },
-    { label: 'Reveal in the finder' },
-  ],
+  file: FILE_MENU,
 }
 
 interface At {
   readonly kind: string
-  readonly id: string
   readonly x: number
   readonly y: number
+  /** The row the menu was opened on, from `data-id`. */
+  readonly id: string
+  /** And from `data-path`, for the menu that acts on files. */
+  readonly path: string | null
 }
 
-export function ContextMenu(): React.JSX.Element | null {
+export function ContextMenu(): React.JSX.Element {
   const { focus, close, setRenaming } = useShell()
   const [at, setAt] = useState<At | null>(null)
   const menu = useRef<HTMLDivElement>(null)
+  const actions = useFileActions(() => setAt(null))
 
-  /* The session menu is built here because its items act on the shell. The
-     rest are still lists of labels that do nothing — see the note above the
-     static menus. */
+  /* The session menu is built here because its items act on the shell. */
   const menus: Record<string, readonly Item[]> = {
     ...STATIC,
     session: [
@@ -85,8 +84,14 @@ export function ContextMenu(): React.JSX.Element | null {
       const target = on?.closest('[data-ctx]') as HTMLElement | null
       const kind = target?.dataset.ctx
       setAt(
-        kind && menus[kind]
-          ? { kind, id: target?.dataset.id ?? '', x: event.clientX, y: event.clientY }
+        kind && (kind === 'session' || STATIC[kind])
+          ? {
+              kind,
+              x: event.clientX,
+              y: event.clientY,
+              id: target?.dataset.id ?? '',
+              path: target?.dataset.path ?? null,
+            }
           : null,
       )
     }
@@ -116,9 +121,7 @@ export function ContextMenu(): React.JSX.Element | null {
     el.style.top = `${Math.min(at.y, window.innerHeight - box.height - 8)}px`
   }, [at])
 
-  if (!at) return null
-
-  return (
+  const menuBody = !at ? null : (
     <div className="ctx" ref={menu} role="menu" style={{ left: at.x, top: at.y }}>
       {menus[at.kind]?.map((item, index) =>
         item.rule ? (
@@ -129,8 +132,12 @@ export function ContextMenu(): React.JSX.Element | null {
             className={item.bad ? 'ctx__i ctx__i--bad' : 'ctx__i'}
             role="menuitem"
             onClick={() => {
-              setAt(null)
-              item.run?.(at.id)
+              if (item.run) {
+                setAt(null)
+                item.run(at.id)
+                return
+              }
+              actions.run(item.act, at.path)
             }}
           >
             {item.label}
@@ -139,5 +146,12 @@ export function ContextMenu(): React.JSX.Element | null {
         ),
       )}
     </div>
+  )
+
+  return (
+    <>
+      {menuBody}
+      <FileDialogs actions={actions} />
+    </>
   )
 }
