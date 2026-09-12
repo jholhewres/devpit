@@ -1216,8 +1216,21 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .row__g--added, .row__g--untracked { color: var(--success); }
 .row__g--deleted { color: var(--danger); }
 
-.termhost { flex: 1; min-height: 0; padding: 8px 4px 8px 12px; }
-.termhost .xterm { height: 100%; }
+/* The padding is on `.xterm`, not on the box around it, and that is not a
+   style choice. FitAddon sizes the grid from the *parent's* computed height
+   minus the padding it reads off `.xterm` itself — so padding on the host is
+   height the addon never subtracts. Measured: an 800x600 box asked for 33
+   rows where 32 fit, and the 33rd was drawn 2px past the pane, under an
+   `overflow: hidden`. That is the line cut in half at the bottom of a
+   terminal with Claude Code open. */
+.termhost { flex: 1; min-height: 0; }
+.termhost .xterm { height: 100%; padding: 8px 4px 8px 12px; }
+/* xterm.css paints the viewport `#000`, and the viewport is positioned
+   absolutely against the *padding* box — so the padding above is a black
+   frame around the terminal in xterm's own colour, not ours. Transparent
+   lets `.pane--term` show through, which is the ground the terminal is
+   supposed to have in every theme. */
+.termhost .xterm .xterm-viewport { background-color: transparent; }
 
 .addpj__box .fld__b { width: 100%; text-align: left; }
 .addpj__box .fld__b:disabled { color: var(--ghost); }

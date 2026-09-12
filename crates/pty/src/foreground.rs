@@ -118,16 +118,27 @@ pub fn parse(listed: &str) -> Vec<Front> {
 
 /// What holds one terminal, when several rows share it.
 ///
-/// A pipeline puts every stage in the same foreground group, so `claude | tee`
-/// is two rows and only one of them is the answer. The deepest is taken: the
-/// shell that spawned the group is the shallowest thing in it, and among the
-/// rest the last to be started is the one in front.
+/// The leader of the foreground group, which is the thing that was started —
+/// everything else in the group is something it went on to spawn.
+///
+/// This used to take the highest pid, on the reasoning that the last process
+/// to start is the one in front. It is not, and an agent is exactly where it
+/// breaks: Claude Code runs its MCP servers as children of itself, in its own
+/// group, and children start later and so wear higher pids. Measured on this
+/// machine, a pane with Claude Code open listed five rows and the highest pid
+/// was `bitbucket-mcp` — which is what the sidebar showed the pane was doing.
+///
+/// The leader is not always on the tty. A pipeline started in the background
+/// is led by a subshell that has already gone, and then no row has
+/// `pid == pgid` at all — measured, not assumed. So the fallback is the lowest
+/// pid, which is the closest thing to "started first" that costs no extra
+/// column of `ps`.
 pub fn on<'a>(fronts: &'a [Front], tty: &str) -> Option<&'a Front> {
     let bare = tty.strip_prefix("/dev/").unwrap_or(tty);
-    fronts
-        .iter()
-        .filter(|front| front.tty == bare)
-        .max_by_key(|front| front.pid)
+    let here = || fronts.iter().filter(|front| front.tty == bare);
+    here()
+        .find(|front| front.pid == front.pgid)
+        .or_else(|| here().min_by_key(|front| front.pid))
 }
 
 /// Whether this is a shell waiting for a person.

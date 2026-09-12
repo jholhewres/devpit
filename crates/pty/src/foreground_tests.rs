@@ -46,22 +46,61 @@ fn a_tty_is_found_with_or_without_dev() {
     assert_eq!(on(&fronts, "pts/8"), on(&fronts, "/dev/pts/8"));
 }
 
-/// A pipeline puts every stage in one foreground group, and they share a
-/// group id — which is what ending the terminal's work has to signal. The
-/// last one started is the one the terminal is showing.
+/// The bug this replaces, captured from `ps` on this machine.
+///
+/// Claude Code runs its MCP servers as children of itself, in its own process
+/// group. Children start later and so wear higher pids, so taking the highest
+/// pid named `bitbucket-mcp` — and that is what the sidebar said the pane was
+/// doing while a conversation was happening in front of it.
+const WITH_SERVERS: &str = "\
+1326006 1326006 pts/9    Sl+  claude --permission-mode bypassPermissions
+1326303 1326006 pts/9    Sl+  npm exec @atercates/bitbucket-mcp@latest
+1326507 1326006 pts/9    S+   sh -c bitbucket-mcp
+1326508 1326006 pts/9    Sl+  node /home/j/.npm/_npx/71ef/node_modules/.bin/bitbucket-mcp
+1329304 1326006 pts/9    Sl+  node /home/j/.claude/plugins/omc/bridge/mcp-server.cjs
+";
+
 #[test]
-fn the_deepest_process_in_a_pipeline_is_the_answer() {
+fn an_agents_own_servers_do_not_take_its_place() {
+    let fronts = parse(WITH_SERVERS);
+    let front = on(&fronts, "pts/9").expect("pts/9 has something in front");
+    assert_eq!(front.program(), "claude");
+    assert_eq!(front.pid, 1326006, "a child was named instead of the agent");
+}
+
+/// Whatever is named, the group id is the same — which is what matters for
+/// stopping, because ending a terminal's work means ending all of it.
+#[test]
+fn every_row_of_one_group_agrees_about_what_to_signal() {
+    let fronts = parse(WITH_SERVERS);
+    assert!(fronts.iter().all(|front| front.pgid == 1326006));
+}
+
+/// A pipeline puts every stage in one group led by the first of them, and the
+/// first is what a person would say the terminal is running.
+#[test]
+fn the_first_stage_of_a_pipeline_is_the_answer() {
     let piped = "\
 900 900 pts/3    S+   claude --print
 901 900 pts/3    S+   tee /tmp/out
 ";
     let fronts = parse(piped);
     let front = on(&fronts, "pts/3").expect("pts/3 has something in front");
-    assert_eq!(front.program(), "tee");
-    assert_eq!(
-        front.pgid, 900,
-        "a pipeline is one group, led by its first stage"
-    );
+    assert_eq!(front.program(), "claude");
+}
+
+/// The leader is not always on the tty: a pipeline started in the background
+/// is led by a subshell that has already gone. Measured, not assumed — no row
+/// of this had `pid == pgid`.
+#[test]
+fn a_group_whose_leader_has_gone_still_names_something() {
+    let orphaned = "\
+2146329 2146328 pts/4    S+   sleep 3
+2146330 2146328 pts/4    S+   cat
+";
+    let fronts = parse(orphaned);
+    let front = on(&fronts, "pts/4").expect("pts/4 has something in front");
+    assert_eq!(front.program(), "sleep");
 }
 
 /// A shell blocked reading the tty is at its prompt; one still running its
