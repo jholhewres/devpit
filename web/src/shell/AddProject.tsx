@@ -4,6 +4,7 @@ import { open as pickFolder } from '@tauri-apps/plugin-dialog'
 
 import { ask, commands } from './live'
 import { useShell } from './useShell'
+import { committed } from './typing'
 
 /* Two ways to add a project, one decision — so it is one sheet with a choice
    inside, not two commands side by side. */
@@ -90,7 +91,7 @@ export function AddProject({ onClose }: { onClose: () => void }): React.JSX.Elem
                 placeholder="https://github.com/owner/name.git"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                onKeyDown={(event) => event.key === 'Enter' && void clone()}
+                onKeyDown={(event) => committed(event) && void clone()}
               />
             </label>
 

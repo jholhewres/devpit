@@ -10,6 +10,7 @@ import { useChat } from './useChat'
 import { useShell } from './useShell'
 import { useStop } from './useStop'
 import { onFilesDropped } from './window'
+import { committed } from './typing'
 
 /*
  * One conversation, per tab.
@@ -133,8 +134,9 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               onKeyDown={(event) => {
-                /* Enter sends; Shift+Enter is a new line, as everywhere. */
-                if (event.key === 'Enter' && !event.shiftKey) {
+                /* Enter sends, Shift+Enter is a new line — and `committed`
+                   keeps the Enter that finishes an accented letter out. */
+                if (committed(event) && !event.shiftKey) {
                   event.preventDefault()
                   send()
                 }

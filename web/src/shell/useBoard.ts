@@ -1,19 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import type { Board } from '../gen/bindings'
+import type { Board, Step } from '../gen/bindings'
 import { landed, lanes, type Lane } from './board'
 import { ask, commands } from './live'
+import { onCarried } from './window'
 
 export interface UseBoard {
   readonly lanes: readonly Lane[]
   readonly error: string | null
   readonly cards: number
+  /** The last line each running step printed, by run id. */
+  readonly progress: Readonly<Record<string, string>>
   move: (cardId: string, columnId: string, at: number) => void
   addCard: (columnId: string, title: string) => void
   addColumn: (name: string) => void
   renameColumn: (columnId: string, name: string) => void
   reorderColumns: (ids: string[]) => void
   deleteColumn: (columnId: string) => void
+  /** What a lane runs when a card lands in it, or nothing. */
+  setStep: (columnId: string, stepId: string | null) => void
+  createStep: (kind: string, name: string, config: string, irreversible: boolean) => void
+  /** Where a pass sends a card, and how much the lane decides on its own.
+   *  One call for both, because they are one choice. */
+  setFlow: (columnId: string, onPass: string | null, autonomy: string) => void
+  /** Every step this project has, for the menu that picks one. */
+  readonly steps: readonly Step[]
   reload: () => void
 }
 
@@ -33,6 +44,25 @@ export function useBoard(projectId: string | null): UseBoard {
   }, [projectId])
 
   useEffect(reload, [reload])
+
+  /* A run ends on a thread of its own and says so. Without this the board
+     only ever caught up when somebody touched it — a step finishing in the
+     background left the tile reading `running` until the next drag. The two
+     events were emitted by the backend and nothing listened to either. */
+  useEffect(() => onCarried<string>('run:changed', () => reload()), [reload])
+
+  /* What a step is printing as it prints it, by card. Held apart from the
+     board rather than folded into it: this arrives many times a second and
+     re-reading the whole board on each line would be a board that stutters
+     while it works. */
+  const [progress, setProgress] = useState<Readonly<Record<string, string>>>({})
+  useEffect(
+    () =>
+      onCarried<[string, string]>('run:progress', ([runId, text]) =>
+        setProgress((was) => (was[runId] === text ? was : { ...was, [runId]: text })),
+      ),
+    [],
+  )
 
   /* The drop shows immediately and is put back if the command refuses — a
      card that snaps to where it was is how you learn the move failed. */
@@ -89,17 +119,38 @@ export function useBoard(projectId: string | null): UseBoard {
     (columnId: string) => projectId && then(() => commands.columnDelete(projectId, columnId)),
     [projectId, then],
   )
+  const setStep = useCallback(
+    (columnId: string, stepId: string | null) =>
+      projectId && then(() => commands.columnSetStep(projectId, columnId, stepId)),
+    [projectId, then],
+  )
+  const createStep = useCallback(
+    (kind: string, name: string, config: string, irreversible: boolean) =>
+      projectId && then(() => commands.stepCreate(projectId, kind, name, config, irreversible)),
+    [projectId, then],
+  )
+
+  const setFlow = useCallback(
+    (columnId: string, onPass: string | null, autonomy: string) =>
+      projectId && then(() => commands.columnSetFlow(projectId, columnId, onPass, autonomy)),
+    [projectId, then],
+  )
 
   return {
     lanes: lanes(board),
     error,
     cards: board?.cards.length ?? 0,
+    progress,
     move,
     addCard,
     addColumn,
     renameColumn,
     reorderColumns,
     deleteColumn,
+    setStep,
+    createStep,
+    setFlow,
+    steps: board?.steps ?? [],
     reload,
   }
 }

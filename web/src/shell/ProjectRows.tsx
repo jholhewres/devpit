@@ -1,51 +1,112 @@
+import { useState } from 'react'
+
+import { ask, commands } from './live'
+import { OpenIn } from './OpenIn'
+import { remote, since } from './projects'
+import { Rename } from './Rename'
+import { useOpeners } from './useOpeners'
 import { useShell } from './useShell'
 
+/*
+ * One row per project, showing what the backend already knew.
+ *
+ * The row drew a folder, a name, a path and an empty 92px column. Everything
+ * it needed was in the project table and never left it: when it was last
+ * opened — the very column the list is ordered by — and the remote that says
+ * whether two rows are the same repository twice.
+ *
+ * A project whose git cannot be read keeps its path. The old row replaced the
+ * path with the error, which took away the one thing you need to go and fix
+ * it.
+ */
+
 const Folder = (): React.JSX.Element => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+  <svg className="pj__ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
   </svg>
 )
 
-/* The list, not a fixed set of names: a project added while the window is
-   open has to appear here without a rebuild. */
 export function ProjectRows({ onRemove }: { onRemove: (id: string) => void }): React.JSX.Element {
-  const { projects, project, setProject, projectsError } = useShell()
+  const { projects, project, setProject, projectsError, renameProject } = useShell()
+  const openers = useOpeners()
+  const [naming, setNaming] = useState<string | null>(null)
+  /* Why a rename was refused, against the row that asked: an empty name comes
+     back as an error, and a field that clears itself says nothing. */
+  const [refused, setRefused] = useState<string | null>(null)
 
   if (projectsError) return <p className="acc__note">{projectsError}</p>
   if (projects.length === 0) return <p className="acc__note">No projects yet.</p>
+
+  const rename = (id: string, name: string | null): void => {
+    setNaming(null)
+    if (!name) return
+    void renameProject(id, name).then(setRefused)
+  }
 
   return (
     <>
       {projects.map((row) => {
         const here = row.id === project?.id
+        const origin = remote(row.origin)
         return (
-          <div className="pj" key={row.id} data-live={row.worktrees.length}>
+          <div className="pj" key={row.id} data-here={here}>
             <Folder />
             <span className="pj__b">
               <span className="pj__n">
-                {row.name}
+                <Rename
+                  value={row.name}
+                  editing={naming === row.id}
+                  onDone={(name) => rename(row.id, name)}
+                />
                 {here && <span className="pj__here">Open</span>}
               </span>
-              <span className="pj__p">{row.unreadable ?? row.rootPath}</span>
+              <span className="pj__p">
+                <span className="pj__path" title={row.rootPath}>{row.rootPath}</span>
+                {origin && <span className="pj__remote" title={row.origin ?? ''}>{origin}</span>}
+              </span>
             </span>
-            <span className="pj__live" data-live={row.worktrees.length}>
-              <span className="prow__dot" />
-              {row.worktrees.length} worktrees
+
+            <span className="pj__meta">
+              <span className="pj__when">{since(row.lastOpenedAt)}</span>
+              <span className="pj__live" data-live={row.worktrees.length}>
+                {row.worktrees.length} worktree{row.worktrees.length === 1 ? '' : 's'}
+              </span>
             </span>
-            <span className="pj__when">{row.unreadable ? 'unreadable' : ''}</span>
+
             <span className="pj__acts">
               {!here && (
                 <button className="btn" onClick={() => setProject(row.id)}>
                   Open
                 </button>
               )}
-              <button className="btn" onClick={() => onRemove(row.id)}>
+              <button className="btn" onClick={() => setNaming(row.id)}>
+                Rename
+              </button>
+              {/* The folder, in whatever this desktop uses for folders. The
+                  path is right there and copying it by hand is the step this
+                  removes. */}
+              <button className="btn" onClick={() => void ask(() => commands.pathReveal(row.rootPath))}>
+                Reveal
+              </button>
+              <OpenIn apps={openers} path={row.rootPath} />
+              <button className="btn" data-danger onClick={() => onRemove(row.id)}>
                 Remove
               </button>
             </span>
+
+            {row.unreadable && (
+              <span className="pj__warn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 9v4M12 17v.01" />
+                  <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+                </svg>
+                {row.unreadable}
+              </span>
+            )}
           </div>
         )
       })}
+      {refused && <p className="acc__note">{refused}</p>}
     </>
   )
 }

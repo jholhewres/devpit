@@ -52,8 +52,8 @@ export function Overlays({
         <RemoveProject
           project={removing}
           onClose={onRemovingClose}
-          onConfirm={() => {
-            forgetProject(removing)
+          onConfirm={(wipe) => {
+            forgetProject(removing, wipe)
             onRemovingClose()
           }}
         />

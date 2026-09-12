@@ -5,6 +5,8 @@ import { Confirm } from './Confirm'
 import { bytes } from './disk'
 import { ask, commands } from './live'
 import { useShell } from './useShell'
+import { Sources } from './Sources'
+import { WorktreeBase } from './WorktreeBase'
 
 /*
  * The checkouts the cards of this project have.
@@ -50,6 +52,9 @@ export function Worktrees(): React.JSX.Element {
         <h1 className="prefs__h">Worktrees</h1>
         {room && <span className="pref__d">{room} on disk</span>}
       </div>
+
+      <WorktreeBase />
+      <Sources />
 
       {error && <p className="pref__d">{error}</p>}
       {rows.length === 0 && !error && (

@@ -1,0 +1,209 @@
+import { useEffect, useState } from 'react'
+
+import { Attachments } from './Attachments'
+import { CardDiff } from './CardDiff'
+import { CardPlay } from './CardPlay'
+import { CardWork } from './CardWork'
+import { Comments } from './Comments'
+import { Confirm } from './Confirm'
+import { dueLabel, fromField, nearness, toField } from './due'
+import { useCard } from './useCard'
+import { useShell } from './useShell'
+import { abandoned, committed } from './typing'
+import { money } from './chat'
+
+/*
+ * One card, open over the board.
+ *
+ * The screen the board never had. Clicking a tile did nothing — `role="button"`
+ * with no `onClick` — so `body` was a column the backend could write and
+ * nothing could show, and a deadline, a conversation and a file had nowhere to
+ * live at all.
+ *
+ * Over the board rather than beside it: the board is a layout and this is one
+ * thing, and a panel that squeezes six lanes into four to show you one card
+ * makes you lose your place to read it.
+ */
+
+export function CardPane({
+  cardId,
+  onClose,
+  onChanged,
+}: {
+  cardId: string
+  onClose: () => void
+  onChanged: () => void
+}): React.JSX.Element {
+  const { project } = useShell()
+  const card = useCard(project?.id ?? null, cardId, onChanged)
+  const detail = card.detail
+
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [dirty, setDirty] = useState(false)
+  const [archiving, setArchiving] = useState<string | true | null>(null)
+  /* Play on a lane with no step offers a terminal, and `CardWork` is what
+     knows how to open one — so the ask travels rather than the code. */
+  const [openTerminal, setOpenTerminal] = useState(false)
+
+  /* The fields follow the card until they are touched. After that they are
+     what was typed: a reload landing mid-sentence must not take the sentence. */
+  useEffect(() => {
+    if (!detail || dirty) return
+    setTitle(detail.card.title)
+    setBody(detail.card.body)
+  }, [detail, dirty])
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent): void => {
+      if (abandoned(event)) onClose()
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [onClose])
+
+  const save = (): void => {
+    if (!dirty) return
+    setDirty(false)
+    card.save(title.trim() || 'Untitled', body)
+  }
+
+  const near = nearness(detail?.card.dueAt ?? null)
+
+  return (
+    <div className="cardp" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="cardp__box" role="dialog" aria-modal="true" aria-label="Card">
+        <header className="cardp__top">
+          <span className="cardp__col">{detail?.columnName}</span>
+          <span className="cardp__acts">
+            <button className="conv__act" data-danger onClick={() => setArchiving(true)}>
+              Archive
+            </button>
+          </span>
+          <button className="auth__x" aria-label="Close" onClick={onClose}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </header>
+
+        {!detail && !card.error && <p className="pref__d">Opening…</p>}
+        {card.error && <p className="wtb__no">{card.error}</p>}
+
+        {detail && (
+          <div className="cardp__in">
+            <input
+              className="cardp__title"
+              value={title}
+              aria-label="Title"
+              onChange={(event) => {
+                setTitle(event.target.value)
+                setDirty(true)
+              }}
+              onBlur={save}
+              onKeyDown={(event) => committed(event) && event.currentTarget.blur()}
+            />
+
+            <div className="cardp__row">
+              <label className="cardp__due" data-near={near ?? 'none'}>
+                <span className="fld__l">Due</span>
+                <input
+                  type="date"
+                  className="cardp__date"
+                  value={toField(detail.card.dueAt)}
+                  onChange={(event) => card.setDue(fromField(event.target.value))}
+                />
+                {near && <span className="cardp__near">{dueLabel(detail.card.dueAt)}</span>}
+              </label>
+              {detail.card.dueAt !== null && (
+                <button className="conv__act" onClick={() => card.setDue(null)}>
+                  Clear
+                </button>
+              )}
+              {money(detail.card.costUsd ?? 0) && (
+                <span className="cardp__cost">{money(detail.card.costUsd ?? 0)} spent</span>
+              )}
+            </div>
+
+            <h2 className="cardp__h">Description</h2>
+            <textarea
+              className="cardp__body"
+              value={body}
+              rows={6}
+              aria-label="Description"
+              placeholder="What is this card for?"
+              onChange={(event) => {
+                setBody(event.target.value)
+                setDirty(true)
+              }}
+              onBlur={save}
+            />
+            {dirty && (
+              <div className="ask__row">
+                <button className="btn btn--go" onClick={save}>
+                  Save
+                </button>
+              </div>
+            )}
+
+            <h2 className="cardp__h">Do the work</h2>
+            <CardPlay
+              cardId={cardId}
+              step={detail.columnStep}
+              onPlayed={card.reload}
+              onOpenTerminal={() => setOpenTerminal(true)}
+            />
+
+            <CardWork
+              cardId={cardId}
+              worktree={detail.worktree}
+              runs={detail.runs}
+              onChanged={card.reload}
+              openTerminal={openTerminal}
+              onTerminalOpened={() => setOpenTerminal(false)}
+            />
+
+            {/* Only once the card has a checkout: there is nothing to
+                compare against until it has started somewhere. */}
+            {detail.worktree?.exists && <CardDiff cardId={cardId} />}
+
+            <Attachments
+              pinned={detail.pinned}
+              onPin={card.pin}
+              onUnpin={card.unpin}
+            />
+
+            <Comments
+              comments={detail.comments}
+              onSay={card.comment}
+              onEdit={card.editComment}
+              onDelete={card.deleteComment}
+            />
+          </div>
+        )}
+      </div>
+
+      {archiving && (
+        <Confirm
+          title="Archive this card?"
+          body={
+            typeof archiving === 'string'
+              ? archiving
+              : 'It comes off the board. Its branch and its checkout stay exactly where they are.'
+          }
+          danger={typeof archiving === 'string' ? 'Archive anyway' : 'Archive'}
+          onClose={() => setArchiving(null)}
+          onConfirm={() => {
+            /* The first press asks without forcing. The backend counts the
+               unsaved work and refuses with that count, and the refusal is
+               what the second question says — a warning this screen wrote
+               itself would be a number it never read. */
+            void card.archive(typeof archiving === 'string').then((refused) => {
+              if (refused) return setArchiving(refused)
+              setArchiving(null)
+              onClose()
+            })
+          }}
+        />
+      )}
+    </div>
+  )
+}

@@ -76,7 +76,8 @@ export interface Shell {
   readonly projects: readonly Project[]
   readonly projectsError: string | null
   setProject: (id: string) => void
-  forgetProject: (id: string) => void
+  forgetProject: (id: string, wipe?: boolean) => void
+  renameProject: (id: string, name: string) => Promise<string | null>
   reloadProjects: () => void
 
   readonly signedIn: boolean
@@ -90,6 +91,15 @@ export interface Shell {
   readonly prefs: PrefsPane | null
   openPrefs: (pane?: PrefsPane) => void
   closePrefs: () => void
+
+  /** The card a notification asked for, and the board's job to clear.
+
+      On the shell because two surfaces have to agree about it and neither
+      contains the other: the bell is in the top bar, and the card opens over
+      the board. Cleared by whoever opened it, so a second click on the same
+      notification opens it again. */
+  readonly wantedCard: string | null
+  openCard: (cardId: string | null) => void
 
   /** The one field over the window. Here rather than in the window's own
       state because three things open it — the sidebar's Search, ⌘K, and the

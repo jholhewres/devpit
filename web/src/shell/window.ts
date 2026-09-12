@@ -153,3 +153,47 @@ export function onHappening(then: (happening: Happening) => void): () => void {
     drop?.()
   }
 }
+
+/*
+ * Any event the backend emits, with no payload to read.
+ *
+ * `onHappening` is the shape for one that carries something; this is the
+ * shape for one that only says "look again". The bell is the first of those:
+ * the count and the list come from a command, and the event exists only to
+ * say when to ask for them.
+ */
+export function onEvent(name: string, then: () => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void listen(name, () => then()).then((unlisten) => {
+    if (dropped) unlisten()
+    else drop = unlisten
+  })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}
+
+/*
+ * An event that names the thing it happened to.
+ *
+ * `onEvent` is for one that only says "look again"; this is for one that says
+ * which card, or which run. The payload is a plain value rather than a shape,
+ * because these two carry exactly that — `run:changed` is a card id, and
+ * `run:progress` is a pair.
+ */
+export function onCarried<T>(name: string, then: (payload: T) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void listen<T>(name, (event) => then(event.payload)).then((unlisten) => {
+    if (dropped) unlisten()
+    else drop = unlisten
+  })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}

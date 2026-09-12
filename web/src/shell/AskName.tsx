@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { abandoned, committed } from './typing'
+
 /* One dialog for anything that needs a name before it can happen. Shaped like
    `Confirm`, because the two are the same act with and without a text field,
    and two different-looking modals for that would read as two different
@@ -42,8 +44,8 @@ export function AskName({
           aria-label={title}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && usable) onName(name.trim())
-            if (event.key === 'Escape') onClose()
+            if (committed(event) && usable) onName(name.trim())
+            if (abandoned(event)) onClose()
           }}
         />
         {ready && !usable && (

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 
 import type { Settings as Stored } from '../gen/bindings'
 import { ask, commands } from './live'
+import { PrefsSide } from './PrefsSide'
+import { OpenApps } from './OpenApps'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
@@ -51,21 +53,7 @@ export function Settings({
 
   return (
     <div className="prefs" data-open="true">
-      <aside className="prefs__side">
-        <button className="prefs__back" onClick={closePrefs}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>Back</button>
-        <div className="prefs__find"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>Search settings</div>
-        <nav className="prefs__nav">
-          <button className="prefs__i" aria-selected={pane === 'account'} onClick={() => openPrefs('account')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>Account</button>
-          <button className="prefs__i" aria-selected={pane === 'projects'} onClick={() => openPrefs('projects')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>Projects</button>
-          <button className="prefs__i" aria-selected={pane === 'general'} onClick={() => openPrefs('general')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 7.26 19.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.09 13H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 7.26l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 2.74 1.51l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.91 11H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>General</button>
-          <button className="prefs__i" aria-selected={pane === 'appearance'} onClick={() => openPrefs('appearance')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /></svg>Appearance</button>
-          <button className="prefs__i" aria-selected={pane === 'providers'} onClick={() => openPrefs('providers')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><path d="m8 10 3 3-3 3M14 16h3" /></svg>Providers</button>
-          <button className="prefs__i" aria-selected={pane === 'skills'} onClick={() => openPrefs('skills')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg>Skills</button>
-          <button className="prefs__i" aria-selected={pane === 'storage'} onClick={() => openPrefs('storage')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></svg>Storage</button>
-          <button className="prefs__i" aria-selected={pane === 'worktrees'} onClick={() => openPrefs('worktrees')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>Worktrees</button>
-          <button className="prefs__i" aria-selected={pane === 'usage'} onClick={() => openPrefs('usage')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>Usage</button>
-        </nav>
-      </aside>
+      <PrefsSide pane={pane} onBack={closePrefs} onSelect={openPrefs} />
       <div className="prefs__main">
           <section className="prefs__in" hidden={pane !== 'account'}>
             <h1 className="prefs__h">Account</h1>
@@ -123,6 +111,7 @@ export function Settings({
               <span className="pref__body"><span className="pref__t">Automatic updates</span><span className="pref__d">Check in the background and offer to install.</span></span>
               <span className="sw"></span>
             </button>
+            <OpenApps />
           </section>
 
           <section className="prefs__in" hidden={pane !== 'providers'}>

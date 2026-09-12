@@ -349,16 +349,31 @@ body[data-account='out'] .acct { display: none; }
 
 /* Managing projects. The row carries what you need to decide with:
    where it is, when you were last in it, and what is still running. */
-.pj { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px; background: var(--raised); border-radius: 10px; }
-.pj + .pj { margin-top: 6px; }
-.pj__b { flex: 1; min-width: 0; }
-.pj__n { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.pj { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; width: 100%; padding: 13px 18px; background: var(--raised); border-radius: 10px; }
+.pj + .pj { margin-top: 8px; }
+.pj__ico { flex: none; color: var(--text-3); }
+.pj__b { flex: 1; min-width: 0; margin-left: -8px; }
+.pj__n { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--text); }
 .pj__here { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
-.pj__p { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj__live { flex: none; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-2); }
+/* Where it is and where it came from answer the same question, so they share
+   a line rather than stacking two greys under the name. */
+.pj__p { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; min-width: 0; font-size: 11.5px; color: var(--text-3); }
+.pj__path { font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj__remote { flex: none; padding-left: 10px; border-left: 1px solid var(--border); white-space: nowrap; }
+.pj__meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.pj__live { font-size: 11px; color: var(--text-3); }
 .pj__live[data-live='0'] { display: none; }
-.pj__when { flex: none; width: 92px; text-align: right; font-size: 11.5px; color: var(--text-3); }
+.pj__when { font-size: 11.5px; color: var(--text-2); white-space: nowrap; }
 .pj__acts { flex: none; display: flex; gap: 6px; }
+/* Remove sits in a row of ordinary buttons and is not an ordinary button.
+   Red on hover rather than red always: a list of projects should not look
+   like a list of things about to be deleted. */
+.pj__acts .btn[data-danger]:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+/* Its own line: the reason a repository cannot be read is a sentence, and a
+   sentence in a row of columns pushes everything else off the end. */
+.pj__warn { flex-basis: 100%; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--warning); }
+/* The name field, in place. `.pj__n` is the line it replaces. */
+.pj .rename { flex: 1; min-width: 0; font-size: 13px; }
 
 /* Two ways to add a project, which is one decision — so it is one button
    and a choice inside, not two commands sitting side by side pretending
@@ -559,21 +574,38 @@ body[data-account='out'] .acct { display: none; }
    beside the work, and giving them a column would invite fiddling with
    the machine while an agent is mid-turn behind it. */
 .prefs { position: absolute; inset: 0; z-index: 350; display: none; background: var(--canvas); }
-.prefs[data-open='true'] { display: grid; grid-template-columns: 240px 1fr; animation: pane-in 160ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.prefs[data-open='true'] { display: grid; grid-template-columns: 264px 1fr; animation: pane-in 160ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 
-.prefs__side { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); padding: 10px; }
-.prefs__back { height: 32px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 6px; border-radius: 7px; font-size: 13px; color: var(--text-2); }
+/* The padding lives on the children, not here: the scrolling list has to
+   reach the column's edge or its scrollbar sits in a gutter of its own. */
+.prefs__side { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); padding: 12px 0; }
+.prefs__back { height: 32px; flex: none; display: flex; align-items: center; gap: 9px; margin: 0 12px; padding: 0 10px; border-radius: 8px; font-size: 13px; color: var(--text-2); }
 .prefs__back:hover { background: var(--sidebar-item); color: var(--text); }
-.prefs__find { margin-top: 10px; height: 28px; flex: none; border-radius: 7px; background: var(--inset); border: 1px solid var(--border); display: flex; align-items: center; gap: 7px; padding: 0 9px; font-size: 12px; color: var(--ghost); }
-.prefs__nav { margin-top: 10px; display: flex; flex-direction: column; gap: 1px; }
-.prefs__i { height: 32px; padding: 0 8px; border-radius: 7px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
+.prefs__find { margin: 12px 12px 0; height: 30px; flex: none; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12px; color: var(--ghost); }
+.prefs__find:focus-within { border-color: var(--accent); }
+.prefs__find svg { flex: none; }
+.prefs__q { flex: 1; min-width: 0; background: none; border: 0; font: inherit; color: var(--text); }
+.prefs__q::placeholder { color: var(--ghost); }
+.prefs__q:focus { outline: none; }
+/* The column scrolls on its own: the panes beside it are long, and a list
+   that scrolls the whole window takes the headings off the top with it. */
+.prefs__nav { margin-top: 18px; min-height: 0; overflow-y: auto; padding: 0 12px; display: flex; flex-direction: column; gap: 5px; }
+.prefs__group { display: flex; flex-direction: column; gap: 5px; }
+.prefs__group + .prefs__group { margin-top: 24px; }
+.prefs__gt { padding: 0 10px 3px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-3); }
+.prefs__none { padding: 14px 10px; font-size: 12px; color: var(--text-3); }
+/* The row is the pill: full width of the column inside its gutter, so the
+   thing under the pointer is the thing that lights up. */
+.prefs__i { width: 100%; height: 34px; padding: 0 10px; border-radius: 8px; display: flex; align-items: center; gap: 11px; font-size: 13px; color: var(--text-2); }
 .prefs__i:hover { background: var(--sidebar-item); color: var(--text); }
 .prefs__i[aria-selected='true'] { background: var(--sidebar-item); color: var(--text); }
 .prefs__i[aria-selected='true'] svg { color: var(--accent); }
 .prefs__i svg { flex: none; color: var(--text-3); }
 
 .prefs__main { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
-.prefs__in { max-width: 780px; margin: 0 auto; padding: 34px 24px 60px; }
+/* Wider than prose: these panes are rows of controls, and a 780px column
+   pushed four buttons and two numbers into the same handspan. */
+.prefs__in { max-width: 1080px; margin: 0 auto; padding: 34px 36px 60px; }
 .prefs__h { font-size: 19px; font-weight: 550; letter-spacing: -0.01em; color: var(--text); margin: 0 0 18px; }
 
 .pref { display: flex; align-items: flex-start; gap: 16px; width: 100%; text-align: left; padding: 14px 16px; background: var(--raised); border-radius: 10px; }
@@ -1595,3 +1627,214 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .rowskel__ln { height: 12px; margin: 0 12px 12px; border-radius: 3px;
   background: linear-gradient(90deg, var(--overlay) 25%, var(--overlay-strong) 37%, var(--overlay) 63%);
   background-size: 380% 100%; animation: shimmer 1.25s ease-in-out infinite; }
+
+/* ── Where worktrees go, and what opens a folder ──────────────────────
+   Both are one setting each and both needed a field rather than a
+   switch, which is why they are here and not in `.pref`. */
+.wtb { margin-bottom: 22px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }
+.wtb__head { display: flex; flex-direction: column; }
+.wtb__row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.wtb__f { flex: 1; min-width: 0; height: 32px; padding: 0 12px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); font-family: var(--mono); font-size: 12px; color: var(--text); }
+.wtb__f:focus { outline: none; border-color: var(--accent); }
+.wtb__f::placeholder { font-family: inherit; color: var(--ghost); }
+.wtb__ex { margin-top: 9px; display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--text-3); }
+.wtb__ex code { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.wtb__ok { color: var(--accent); }
+.wtb__no { margin-top: 9px; font-size: 11.5px; color: var(--danger); }
+
+.apps { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
+.apps .prefs__hrow { align-items: flex-start; margin-bottom: 14px; }
+.apps__add { position: relative; flex: none; }
+/* Over the list rather than pushing it down: a menu that reflows the rows
+   behind it moves the row you were about to click. */
+.apps__menu { position: absolute; right: 0; top: calc(100% + 5px); z-index: 20; min-width: 190px; padding: 5px; border-radius: 9px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 18px 44px var(--shade); animation: pop-in 130ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.apps__opt { width: 100%; height: 30px; padding: 0 9px; border-radius: 7px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--text-2); }
+.apps__opt:hover:not(:disabled) { background: var(--sidebar-item); color: var(--text); }
+.apps__opt:disabled { color: var(--text-3); cursor: default; }
+.apps__had { font-size: 10.5px; color: var(--text-3); }
+
+.oapp { display: flex; align-items: center; gap: 16px; width: 100%; padding: 13px 18px; background: var(--raised); border-radius: 10px; }
+.oapp + .oapp { margin-top: 8px; }
+.oapp--new { flex-direction: column; align-items: stretch; gap: 12px; }
+.oapp__b { flex: 1; min-width: 0; }
+.oapp__t { display: block; font-size: 13.5px; color: var(--text); }
+.oapp__c { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.oapp__no { flex: none; font-size: 11.5px; color: var(--warning); }
+.oapp .btn[data-danger]:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+
+.opin { position: relative; }
+
+/* Which kinds of checkout the lists are about. A segmented Show/Hide rather
+   than a switch: "hidden" is not the off state of "shown", it is the other
+   half of a choice, and the pair says so. */
+.src { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
+.src__head { display: flex; flex-direction: column; margin-bottom: 14px; }
+.src__r { display: flex; align-items: center; gap: 16px; padding: 13px 18px; background: var(--raised); border-radius: 10px; }
+.src__r + .src__r { margin-top: 8px; }
+.src__b { flex: 1; min-width: 0; }
+.src__t { display: block; font-size: 13.5px; color: var(--text); }
+.src__h { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.src__n { flex: none; font-size: 11.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.src__sw { flex: none; display: flex; padding: 2px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); }
+.src__o { height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; color: var(--text-3); }
+.src__o[aria-checked='true'] { background: var(--overlay-strong); color: var(--text); }
+
+/* ── One card, open ───────────────────────────────────────────────────
+   Over the board rather than beside it: the board is a layout, and a panel
+   that squeezes six lanes into four to show you one card makes you lose
+   your place in order to read it. */
+.cardp { position: fixed; inset: 0; z-index: 420; display: flex; align-items: flex-start; justify-content: center; padding: 48px 24px; background: var(--shade); overflow-y: auto; }
+.cardp__box { width: 100%; max-width: 760px; border-radius: 14px; background: var(--canvas); border: 1px solid var(--border-strong); box-shadow: 0 24px 60px var(--shade); animation: pop-in 140ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.cardp__top { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.cardp__col { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+.cardp__in { padding: 20px 24px 28px; }
+.cardp__title { width: 100%; background: none; border: 0; font: inherit; font-size: 18px; font-weight: 550; color: var(--text); padding: 4px 0; }
+.cardp__title:focus { outline: none; border-bottom: 1px solid var(--accent); }
+.cardp__row { display: flex; align-items: center; gap: 14px; margin: 14px 0 4px; }
+.cardp__due { display: flex; align-items: center; gap: 9px; }
+.cardp__date { height: 28px; padding: 0 8px; border-radius: 7px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12px; color: var(--text); }
+.cardp__date:focus { outline: none; border-color: var(--accent); }
+.cardp__near { font-size: 11.5px; color: var(--text-3); }
+.cardp__due[data-near='past'] .cardp__near { color: var(--danger); }
+.cardp__due[data-near='today'] .cardp__near { color: var(--warning); }
+.cardp__cost { margin-left: auto; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cardp__h { margin: 26px 0 10px; font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+.cardp__body { width: 100%; padding: 11px 13px; border-radius: 9px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 13px; line-height: 1.6; color: var(--text); resize: vertical; }
+.cardp__body:focus { outline: none; border-color: var(--accent); }
+
+/* Where this card's work happens. */
+.cwork__wt { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--raised); border-radius: 10px; }
+.cwork__wt[data-gone='true'] { opacity: 0.7; }
+.cwork__b { flex: 1; min-width: 0; }
+.cwork__t { display: flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+.cwork__dirty { font-family: inherit; font-size: 11px; color: var(--warning); }
+.cwork__p { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cwork__go { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.crun { display: flex; align-items: center; gap: 14px; padding: 11px 16px; background: var(--raised); border-radius: 10px; }
+.crun + .crun { margin-top: 6px; }
+.crun__b { flex: 1; min-width: 0; }
+.crun__t { display: block; font-size: 13px; color: var(--text); }
+.crun__o { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--text-3); white-space: pre-wrap; max-height: 64px; overflow: hidden; }
+.crun__s { flex: none; font-size: 11px; color: var(--text-3); }
+.crun[data-state='failed'] .crun__s { color: var(--danger); }
+.crun[data-state='ok'] .crun__s { color: var(--success); }
+.crun[data-state='running'] .crun__s { color: var(--warning); }
+.crun__c { flex: none; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* Files pinned to a card. A pin is a path, so it can stop being true — and
+   one whose file has moved is drawn, not dropped. */
+.pin { display: flex; align-items: center; gap: 14px; padding: 11px 16px; background: var(--raised); border-radius: 10px; }
+.pin + .pin { margin-top: 6px; }
+.pin[data-gone='true'] .pin__t { text-decoration: line-through; }
+.pin__ico { flex: none; color: var(--text-3); }
+.pin__b { flex: 1; min-width: 0; }
+.pin__t { display: block; font-size: 13px; color: var(--text); }
+.pin__p { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin__n { flex: none; font-size: 11px; color: var(--text-3); }
+.pin__acts { flex: none; display: flex; gap: 6px; }
+.pin__acts .btn[data-danger]:hover, .conv__act[data-danger]:hover { color: var(--danger); }
+
+/* The card's conversation, oldest first — the order it was said in. */
+.conv__one { padding: 12px 16px; background: var(--raised); border-radius: 10px; }
+.conv__one + .conv__one { margin-top: 6px; }
+.conv__one[data-mine='true'] { background: color-mix(in srgb, var(--accent) 7%, var(--raised)); }
+.conv__who { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+.conv__name { font-size: 12.5px; color: var(--text); }
+.conv__when, .conv__edited { font-size: 11px; color: var(--text-3); }
+.conv__acts { margin-left: auto; display: flex; gap: 8px; opacity: 0; }
+.conv__one:hover .conv__acts, .conv__one:focus-within .conv__acts { opacity: 1; }
+.conv__act { font-size: 11px; color: var(--text-3); }
+.conv__act:hover { color: var(--text); }
+.conv__new { margin-top: 10px; }
+.conv__f { width: 100%; padding: 10px 12px; border-radius: 9px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12.5px; line-height: 1.55; color: var(--text); resize: vertical; }
+.conv__f:focus { outline: none; border-color: var(--accent); }
+
+/* What the tile says besides its title. */
+.tile__due, .tile__n { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); }
+.tile__due[data-near='past'] { color: var(--danger); }
+.tile__due[data-near='today'] { color: var(--warning); }
+
+/* ── The bell ─────────────────────────────────────────────────────────
+   Read, never cleared: a list that empties itself is a list where the thing
+   you meant to come back to is gone. */
+.bell { position: relative; }
+.bell__b { position: relative; width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+.bell__b:hover { background: var(--overlay-strong); color: var(--text); }
+.bell__n { position: absolute; top: 1px; right: 0; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: var(--on-inverse); font-size: 9.5px; font-weight: 600; line-height: 14px; text-align: center; font-variant-numeric: tabular-nums; }
+.bell__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 200; width: 340px; border-radius: 11px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 18px 44px var(--shade); animation: pop-in 130ms cubic-bezier(0.2, 0.7, 0.3, 1) both; overflow: hidden; }
+.bell__top { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.bell__t { font-size: 12px; color: var(--text); }
+.bell__none { padding: 22px 12px; text-align: center; font-size: 12px; color: var(--text-3); }
+.bell__list { max-height: 380px; overflow-y: auto; }
+.bell__one { width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; text-align: left; }
+.bell__one:hover { background: var(--sidebar-item); }
+.bell__one + .bell__one { border-top: 1px solid var(--border); }
+/* Unread is a dot of accent on the glyph, not a different background: a
+   panel where half the rows are tinted reads as two lists. */
+.bell__one[data-unread='true'] .bell__ico { color: var(--accent); }
+.bell__one[data-unread='true'] .bell__line { color: var(--text); }
+.bell__ico { flex: none; margin-top: 2px; color: var(--text-3); }
+.bell__one[data-kind='irreversible'] .bell__ico { color: var(--warning); }
+.bell__body { flex: 1; min-width: 0; }
+.bell__line { display: block; font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+.bell__d { display: block; margin-top: 3px; font-size: 11px; color: var(--text-3); }
+.bell__when { flex: none; font-size: 10.5px; color: var(--ghost); white-space: nowrap; }
+
+/* What a lane runs when a card lands in it — the rule the product turns on,
+   and until now the one thing with no way to set it. */
+.lstep { position: relative; margin-left: auto; }
+.lstep__b { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; color: var(--text-3); }
+.lstep__b:hover { background: var(--overlay-strong); color: var(--text-2); }
+.lstep__pop { position: absolute; right: 0; top: calc(100% + 5px); z-index: 40; min-width: 210px; padding: 6px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 16px 36px var(--shade); animation: pop-in 130ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.lstep__pop--wide { width: 290px; padding: 12px; }
+.lstep__t { padding: 3px 9px 7px; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+.lstep__pop--wide .lstep__t { padding: 0 0 10px; }
+.lstep__warn { font-size: 10px; color: var(--warning); }
+.apps__opt[aria-checked='true'] { background: var(--sidebar-item); color: var(--text); }
+.lstep__pop--wide .fld { margin-top: 12px; }
+.lstep__pop--wide .src__sw { width: 100%; }
+.lstep__pop--wide .src__o { flex: 1; padding: 0 6px; }
+.cardp__acts { margin-left: auto; margin-right: 10px; display: flex; gap: 10px; }
+
+/* What a card changed, against where it started — never against HEAD. */
+.cdiff { margin-top: 22px; }
+.cdiff__f { margin-top: 6px; border-radius: 10px; background: var(--raised); overflow: hidden; }
+.cdiff__s { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: default; list-style: none; }
+.cdiff__s::-webkit-details-marker { display: none; }
+.cdiff__s:hover { background: var(--overlay); }
+.cdiff__p { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cdiff__n { flex: none; font-size: 11px; color: var(--text-3); }
+/* Its own scroller: a diff is the one thing here wider than the pane, and
+   letting it widen the pane would move everything else on the card. */
+.cdiff__body { max-height: 340px; overflow: auto; border-top: 1px solid var(--border); }
+.cdiff__hh { padding: 5px 16px; background: var(--inset); font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+.cdiff__r { padding: 0 16px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; white-space: pre; color: var(--text-2); }
+.cdiff__r[data-kind='add'] { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--text); }
+.cdiff__r[data-kind='del'] { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--text); }
+
+/* A column being carried, and the one it would take the place of. */
+.blane[data-moving='true'] { opacity: 0.55; }
+.blane[data-taking='true'] .blane__top { box-shadow: inset 0 -2px 0 var(--accent); }
+.blane__top { cursor: grab; }
+.blane[data-moving='true'] .blane__top { cursor: grabbing; }
+/* The label and the step picker take their own clicks: the head is the drag
+   handle, and a handle that swallows the rename is a handle nobody wants. */
+.blane__label, .lstep { cursor: auto; }
+/* The last line a running step printed. One line, clipped: a tile is not a
+   log, and the whole output is on the card. */
+.tile__log { margin-top: 5px; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A lane that moves cards without being asked should look different from one
+   that does not. Said on the lane, not hidden in its menu. */
+.lstep__auto { margin-left: 5px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; }
+
+/* Play: do this lane's step on this card, now. */
+.play { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.play__d { font-size: 11.5px; color: var(--text-3); }
+.play__no { font-size: 11.5px; color: var(--danger); }
+/* On the tile it appears under the pointer rather than sitting there: the
+   board is read far more often than it is played, and a row of triangles
+   reads as a list of things waiting to be started. */
+.tile__play { position: absolute; top: 7px; right: 7px; width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-3); background: var(--overlay-strong); opacity: 0; }
+.tile:hover .tile__play, .tile__play:focus-visible { opacity: 1; }
+.tile__play:hover { color: var(--text); }
+.tile { position: relative; }

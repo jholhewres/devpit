@@ -12,6 +12,7 @@ import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { ShellProvider, useShell } from './useShell'
 import { isMaximized, onResized } from './window'
+import { abandoned } from './typing'
 
 export function AppShell(): React.JSX.Element {
   return (
@@ -76,7 +77,7 @@ function Window(): React.JSX.Element {
         event.preventDefault()
         shell.show('chat')
       }
-      if (event.key === 'Escape') {
+      if (abandoned(event)) {
         closePalette()
         setSignIn(false)
         setAdding(false)

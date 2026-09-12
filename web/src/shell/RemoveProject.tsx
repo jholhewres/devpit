@@ -14,7 +14,7 @@ export function RemoveProject({
 }: {
   project: string
   onClose: () => void
-  onConfirm: () => void
+  onConfirm: (wipe: boolean) => void
 }): React.JSX.Element {
   const [wipe, setWipe] = useState(false)
   const { projects } = useShell()
@@ -60,14 +60,18 @@ export function RemoveProject({
           <span>
             <span className="ask__ot">Also delete this project&rsquo;s devpit workspace</span>
             <span className="ask__od">
-              The board, its cards and the per-project settings. This cannot be undone.
+              The board, its cards, its notes and its saved conversations, under{' '}
+              <code>~/.devpit/projects</code>. Your code is still not touched. This cannot be
+              undone.
             </span>
           </span>
         </button>
 
         <div className="ask__row">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn--danger" onClick={onConfirm}>Remove</button>
+          <button className="btn btn--danger" onClick={() => onConfirm(wipe)}>
+            {wipe ? 'Remove and delete' : 'Remove'}
+          </button>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from 'react'
+import { abandoned } from './typing'
 
 /* Closing a menu by clicking off it, and by Escape.
  *
@@ -15,7 +16,7 @@ export function useAway(
       if (!box.current?.contains(event.target as Node)) close()
     }
     const key = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') close()
+      if (abandoned(event)) close()
     }
     window.addEventListener('mousedown', away)
     window.addEventListener('keydown', key)

@@ -27,6 +27,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [theme, setThemeState] = useState<Theme>('system')
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
   const [palette, setPalette] = useState(false)
+  const [wantedCard, setWantedCard] = useState<string | null>(null)
 
   const membership = useAccount()
   const projects = useProjects()
@@ -83,6 +84,8 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       prefs,
       openPrefs: (pane: PrefsPane = 'account') => setPrefs(pane),
       closePrefs: () => setPrefs(null),
+      wantedCard,
+      openCard: setWantedCard,
       palette,
       openPalette: () => setPalette(true),
       closePalette: () => setPalette(false),
@@ -100,6 +103,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       membership,
       prefs,
       palette,
+      wantedCard,
     ],
   )
 

@@ -1,5 +1,6 @@
 import mark from '../assets/brand/mark.png'
 import { BranchPicker } from './BranchPicker'
+import { Notices } from './Notices'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
 import { useShell } from './useShell'
@@ -20,7 +21,7 @@ import { close, minimize, toggleMaximize } from './window'
  * the buttons still take their own clicks.
  */
 export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
-  const { side, files, toggleSide, toggleFiles, project } = useShell()
+  const { side, files, toggleSide, toggleFiles, project, show, openCard } = useShell()
   const { totals } = useTree(project?.id ?? null)
   const here = project?.worktrees.find((tree) => tree.current) ?? project?.worktrees[0]
 
@@ -42,6 +43,16 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
         <span className="add">+{totals.added}</span>
         <span className="del">&minus;{totals.removed}</span>
       </span>
+
+      {/* Beside the panel toggles rather than in the sidebar: what it has to
+          say is about the whole window, and half of it arrives while the
+          sidebar is hidden. */}
+      <Notices
+        onOpenCard={(cardId) => {
+          show('board')
+          openCard(cardId)
+        }}
+      />
 
       <button
         className="sq26 tip"

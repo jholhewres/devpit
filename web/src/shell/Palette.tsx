@@ -4,6 +4,7 @@ import { useGroups } from './paletteGroups'
 import { PaletteKeys, PaletteList } from './PaletteList'
 import { useReachable } from './paletteReach'
 import { useShell } from './useShell'
+import { committed } from './typing'
 
 /*
  * One field over the window, for reaching what the window has.
@@ -41,7 +42,7 @@ export function Palette({ onClose }: { onClose: () => void }): React.JSX.Element
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
       setAt((was) => (was - 1 + flat.length) % flat.length)
-    } else if (event.key === 'Enter') {
+    } else if (committed(event)) {
       event.preventDefault()
       go(at)
     }

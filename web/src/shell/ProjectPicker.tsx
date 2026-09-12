@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { useShell } from './useShell'
+import { abandoned } from './typing'
 
 const Search = (): React.JSX.Element => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -38,7 +39,7 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
     if (!open) return
     const shut = (): void => setOpen(false)
     const key = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false)
+      if (abandoned(event)) setOpen(false)
     }
     document.addEventListener('click', shut)
     document.addEventListener('keydown', key)

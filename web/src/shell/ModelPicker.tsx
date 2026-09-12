@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAway } from './away'
 import { modelName } from './chat'
+import { committed } from './typing'
 import type { Profile } from '../gen/bindings'
 
 /*
@@ -179,7 +180,7 @@ export function ModelPicker({
                   } else if (event.key === 'ArrowUp') {
                     event.preventDefault()
                     setAt((was) => (was - 1 + rows.length) % Math.max(rows.length, 1))
-                  } else if (event.key === 'Enter') {
+                  } else if (committed(event)) {
                     event.preventDefault()
                     choose(rows[at])
                   }

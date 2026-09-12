@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { abandoned, committed } from './typing'
+
 /*
  * A name you can change in place.
  *
@@ -58,10 +60,10 @@ export function Rename({
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         event.stopPropagation()
-        if (event.key === 'Enter') {
+        if (committed(event)) {
           event.preventDefault()
           commit()
-        } else if (event.key === 'Escape') {
+        } else if (abandoned(event)) {
           event.preventDefault()
           onDone(null)
         }

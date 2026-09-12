@@ -1,0 +1,174 @@
+import { useCallback, useEffect, useState } from 'react'
+
+import type { Checkout, Run } from '../gen/bindings'
+import { AgentMark } from './AgentMark'
+import { ask, commands } from './live'
+import { OpenIn } from './OpenIn'
+import { useKnownAgents } from './useKnownAgents'
+import { useOpeners } from './useOpeners'
+import { useShell } from './useShell'
+import { money } from './chat'
+
+/*
+ * Where this card's work happens, and how to start doing it.
+ *
+ * The join the board was missing. A card described a piece of work and had no
+ * way to begin it: the checkout was made only as a side-effect of a step
+ * running, and the terminal knew nothing about cards. Both already existed;
+ * neither was reachable from here.
+ *
+ * "Open a terminal" makes the checkout if there is none, because a person
+ * pressing it is asking for exactly that — a place to work, in this card's own
+ * branch, not an error about a folder they never heard of.
+ */
+
+export function CardWork({
+  cardId,
+  worktree,
+  runs,
+  onChanged,
+  openTerminal,
+  onTerminalOpened,
+}: {
+  cardId: string
+  worktree: Checkout | null
+  runs: readonly Run[]
+  onChanged: () => void
+  /** Asked from elsewhere — play on a lane with no step offers a terminal,
+   *  and this is what knows how to open one. */
+  openTerminal?: boolean
+  onTerminalOpened?: () => void
+}): React.JSX.Element {
+  const { project, show } = useShell()
+  const agents = useKnownAgents()
+  const openers = useOpeners()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const make = async (): Promise<void> => {
+    setBusy('Making a checkout…')
+    const answer = await ask(() => commands.cardCheckout(cardId))
+    setBusy(null)
+    setProblem(answer.error)
+    if (!answer.error) onChanged()
+  }
+
+  /* The agent is carried on the tab rather than sent here: the pane does not
+     exist until the window has drawn it. The launcher palette already works
+     this way, and a second way in would be a second thing to keep right. */
+  const openTerminalFor = useCallback(async (agentId?: string): Promise<void> => {
+    if (!project) return
+    setBusy(agentId ? 'Opening a terminal…' : 'Opening a terminal…')
+    const answer = await ask(() => commands.cardTerminal(project.id, cardId))
+    setBusy(null)
+    setProblem(answer.error)
+    if (answer.error) return
+    show('term', {
+      id: `tab_card_${cardId}`,
+      title: worktree?.branch ?? 'Card',
+      ...(agentId ? { launch: agentId } : {}),
+    })
+    onChanged()
+  }, [project, cardId, worktree?.branch, show, onChanged])
+
+  /* Asked from the play button when the lane runs nothing: this is what knows
+     how to open a terminal, so the ask travels rather than the code. */
+  useEffect(() => {
+    if (!openTerminal) return
+    onTerminalOpened?.()
+    void openTerminalFor()
+  }, [openTerminal, onTerminalOpened, openTerminalFor])
+
+  return (
+    <section className="cwork">
+      <h2 className="cardp__h">Work</h2>
+
+      {worktree ? (
+        <div className="cwork__wt" data-gone={!worktree.exists}>
+          <span className="cwork__b">
+            <span className="cwork__t">
+              {worktree.branch ?? 'a checkout'}
+              {worktree.dirtyFiles !== null && worktree.dirtyFiles > 0 && (
+                <span className="cwork__dirty">
+                  {worktree.dirtyFiles} uncommitted
+                </span>
+              )}
+            </span>
+            <span className="cwork__p" title={worktree.path}>{worktree.path}</span>
+          </span>
+          {!worktree.exists && <span className="oapp__no">not on disk any more</span>}
+          {worktree.exists && (
+            <span className="pin__acts">
+              <button className="btn" onClick={() => void ask(() => commands.pathReveal(worktree.path))}>
+                Reveal
+              </button>
+              <OpenIn apps={openers} path={worktree.path} />
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className="pref__d">
+          No checkout yet. One is made on its own branch the first time this card needs it.
+        </p>
+      )}
+
+      <div className="cwork__go">
+        {!worktree?.exists && (
+          <button className="btn" disabled={Boolean(busy)} onClick={() => void make()}>
+            Make a checkout
+          </button>
+        )}
+        <button className="btn" disabled={Boolean(busy)} onClick={() => void openTerminalFor()}>
+          Open a terminal
+        </button>
+        {/* Only the agents this machine actually has. One it cannot run is a
+            button that fails, and the list already knows which those are. */}
+        {agents
+          .filter((agent) => agent.installed)
+          .map((agent) => (
+            <button
+              className="btn"
+              key={agent.id}
+              disabled={Boolean(busy)}
+              onClick={() => void openTerminalFor(agent.id)}
+            >
+              <AgentMark agent={agent.id} />
+              {agent.label}
+            </button>
+          ))}
+      </div>
+
+      {busy && <p className="pref__d">{busy}</p>}
+      {problem && <p className="wtb__no">{problem}</p>}
+
+      {runs.length > 0 && (
+        <>
+          <h2 className="cardp__h">Runs</h2>
+          {runs.map((run) => (
+            <div className="crun" key={run.id} data-state={run.state}>
+              <span className="crun__b">
+                <span className="crun__t">{run.stepName}</span>
+                {run.output && <span className="crun__o">{run.output.slice(0, 400)}</span>}
+              </span>
+              <span className="crun__s">{run.state}</span>
+              {/* A command step has no cost at all, so most runs would carry
+                  a $0.00 that means "this kind of step does not spend". */}
+              {money(run.costUsd ?? 0) && (
+                <span className="crun__c">{money(run.costUsd ?? 0)}</span>
+              )}
+              {run.state === 'running' && (
+                <button
+                  className="btn"
+                  data-danger
+                  onClick={() => void ask(() => commands.runCancel(cardId, run.id)).then(onChanged)}
+                >
+                  Stop
+                </button>
+              )}
+            </div>
+          ))}
+        </>
+      )}
+    </section>
+  )
+}
