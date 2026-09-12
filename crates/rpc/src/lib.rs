@@ -17,6 +17,7 @@ mod frame;
 pub mod front;
 pub mod profile;
 pub mod project;
+pub mod search;
 pub mod session;
 pub mod session_status;
 pub mod session_tree;
@@ -36,6 +37,7 @@ pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
     ProjectList, ProjectNotes, ProjectTree, Worktree,
 };
+pub use search::{SearchFile, SearchHits, SearchLine};
 pub use session::{
     AgentPresence, KnownAgent, LayoutNode, PaneKind, PaneRunning, PaneSize, SessionLayout,
     SplitDirection,
