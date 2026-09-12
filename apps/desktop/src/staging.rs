@@ -12,6 +12,20 @@ fn git_error(err: devpit_git::GitError) -> RpcError {
     RpcError::new(ErrorCode::Conflict, err.to_string())
 }
 
+/// Refuses any path that resolves outside the project root.
+///
+/// Discard writes to disk — it restores a file or deletes it — so it goes
+/// through the same check every read here already does, rather than trusting
+/// git to catch an escape on its own. `resolve_new`, not `resolve`: the
+/// most common target is a deleted file, which is not there to canonicalise.
+fn resolved(root: &std::path::Path, paths: &[String]) -> Result<(), RpcError> {
+    for path in paths {
+        devpit_core::paths::resolve_new(root, path)
+            .map_err(|err| RpcError::forbidden(err.to_string()))?;
+    }
+    Ok(())
+}
+
 /// `changes.stage` — puts these paths in the index, and answers with the list
 /// as it now stands.
 ///
@@ -53,3 +67,26 @@ pub fn changes_commit(
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_git::commit(&root, &message).map_err(git_error)
 }
+
+/// `changes.discard` — throws away uncommitted work in these paths.
+///
+/// A tracked change goes back to the index or HEAD; a path git has never
+/// recorded — untracked, or added but never committed — has no earlier
+/// version to go back to and is deleted outright. The screen confirms first,
+/// because that second case cannot be undone from here.
+#[tauri::command]
+#[specta::specta]
+pub fn changes_discard(
+    project_id: String,
+    worktree_id: Option<String>,
+    paths: Vec<String>,
+) -> Result<ProjectChanges, RpcError> {
+    let root = root_of(&project_id, worktree_id.as_deref())?;
+    resolved(&root, &paths)?;
+    devpit_git::discard(&root, &paths).map_err(git_error)?;
+    project_changes(project_id, worktree_id)
+}
+
+#[cfg(test)]
+#[path = "staging_tests.rs"]
+mod tests;

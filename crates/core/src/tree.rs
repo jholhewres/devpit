@@ -19,6 +19,9 @@ pub enum TreeError {
         #[source]
         source: std::io::Error,
     },
+
+    #[error("{path} already exists")]
+    AlreadyExists { path: PathBuf },
 }
 
 /// One entry, before the contract dresses it.

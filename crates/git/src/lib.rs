@@ -21,6 +21,7 @@ pub mod branches;
 #[cfg(test)]
 mod branches_tests;
 mod clone;
+mod discard;
 mod front;
 pub mod index;
 #[cfg(test)]
@@ -30,6 +31,7 @@ pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
 mod log;
+mod search;
 mod status;
 mod worktrees;
 
@@ -41,6 +43,7 @@ pub(crate) use invoke::{identify, run, run_diffing};
 
 pub use branches::{branches, switch, Branch};
 pub use clone::{clone, folder_for};
+pub use discard::discard;
 pub use front::{changed_since, diff_file, diff_since, head_of, remove_front, unsaved_in};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
@@ -48,6 +51,7 @@ pub use lifecycle::{
     Made,
 };
 pub use log::{history, show};
+pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};
 pub use status::{changes, status, Status};
 pub use worktrees::{worktree_path, worktrees};
 

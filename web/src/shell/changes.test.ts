@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Change } from '../gen/bindings'
-import { committable, grouped, stageable } from './changes'
+import { committable, discardLoses, grouped, stageable } from './changes'
 
 const change = (path: string, staged: boolean, status: Change['status'] = 'modified'): Change =>
   ({ path, status, added: 1, removed: 0, staged })
@@ -48,5 +48,20 @@ describe('whether committing does anything', () => {
 
   it('commits when something is staged and there is a message', () => {
     expect(committable([change('a.rs', true)], 'fix it')).toBe(true)
+  })
+})
+
+describe('what discarding a change actually loses', () => {
+  it('loses nothing when undoing a deletion — the file comes back as-is', () => {
+    expect(discardLoses('deleted')).toBe('nothing')
+  })
+
+  it('loses the uncommitted edits when a modified file reverts to HEAD', () => {
+    expect(discardLoses('modified')).toBe('edits')
+  })
+
+  it('loses the file itself when there is no earlier version to go back to', () => {
+    expect(discardLoses('added')).toBe('file')
+    expect(discardLoses('untracked')).toBe('file')
   })
 })
