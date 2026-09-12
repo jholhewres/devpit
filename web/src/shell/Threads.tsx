@@ -3,57 +3,90 @@ import { useEffect, useState } from 'react'
 import type { Thread } from '../gen/bindings'
 import { money } from './chat'
 import { ask, commands } from './live'
+import { short } from './strip'
 import { useShell } from './useShell'
 
 /*
  * The conversations this project has had.
  *
- * Drawn in an empty chat, which is where you look when you want the one you
- * had yesterday. The transcripts were always on disk; until this, closing a
- * tab left a file nobody could reach again.
+ * Folded away rather than listed: the sidebar is for what is running, and a
+ * project with two hundred transcripts would bury that under a wall of
+ * yesterday. Ten at a time, because the one you want is nearly always recent
+ * and the rest is what search is for.
+ *
+ * The transcripts were always on disk; until this, closing a tab left a file
+ * nobody could reach again.
  */
 
-export function Threads({ hide }: { hide: string }): React.JSX.Element {
-  const { project, show } = useShell()
+const SHOWN = 10
+
+export function Threads(): React.JSX.Element {
+  const { project, show, open } = useShell()
   const [threads, setThreads] = useState<readonly Thread[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [showing, setShowing] = useState(false)
 
   useEffect(() => {
-    if (!project) return
+    if (!project || !showing) return
     void ask(() => commands.chatList(project.id)).then((answer) => {
       setThreads(answer.data?.conversations ?? [])
       setError(answer.error)
     })
-  }, [project])
+  }, [project, showing])
 
-  /* The conversation you are already in is not somewhere to go. */
-  const shown = threads.filter((thread) => thread.id !== hide)
-  if (shown.length === 0) {
-    return <div className="exempty__t">{error ?? 'Nothing said yet.'}</div>
-  }
+  /* A conversation already open is not somewhere to go — it is a tab. */
+  const here = new Set(open.map((tab) => tab.id))
+  const shown = threads.filter((thread) => !here.has(thread.id)).slice(0, SHOWN)
 
   return (
     <>
-      <div className="exempty__t">Nothing said yet.</div>
-      <div className="threads">
-        <div className="threads__h">Earlier</div>
-        {shown.map((thread) => (
+      <button
+        className="heading heading--act"
+        aria-expanded={showing}
+        onClick={() => setShowing((was) => !was)}
+      >
+        Earlier
+        <svg
+          className="heading__v"
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ transform: showing ? 'none' : 'rotate(-90deg)' }}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {showing && error && <div className="sessions__none">{error}</div>}
+      {showing && !error && shown.length === 0 && (
+        <div className="sessions__none">Nothing earlier.</div>
+      )}
+
+      {showing &&
+        shown.map((thread) => (
           <button
-            className="threads__r"
+            className="card"
             key={thread.id}
-            onClick={() =>
-              show('chat', { id: thread.id, title: thread.title.slice(0, 24) })
-            }
+            title={thread.title}
+            onClick={() => show('chat', { id: thread.id, title: thread.title })}
           >
-            <span className="threads__t">{thread.title}</span>
-            <span className="threads__m">
-              {[thread.profile, thread.model, money(thread.costUsd ?? 0), when(thread.lastAt)]
-                .filter(Boolean)
-                .join(' · ')}
+            <span className="card__l1">
+              <span className="card__t">{short(thread.title, 30)}</span>
+            </span>
+            <span className="card__l2">
+              <span className="card__loose">
+                {[thread.profile, money(thread.costUsd ?? 0), when(thread.lastAt)]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
             </span>
           </button>
         ))}
-      </div>
     </>
   )
 }

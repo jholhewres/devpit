@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext } from 'react'
 
+import { Diagram } from './Diagram'
 import { blocks, external, resolved, spans, type Block, type Span } from './markdown'
 import { ask, commands } from './live'
+import { cut, locate, styleOf, type Chunk } from './veil'
 import { useShell } from './useShell'
 
 /*
@@ -13,13 +15,65 @@ import { useShell } from './useShell'
  * keep ahead of.
  */
 
-export function Markdown({ source, path }: { source: string; path?: string }): React.JSX.Element {
+/* Where the fade is up to. One cursor for the whole pass, walked forward in
+   document order, so a word that appears twice fades on the right one. It is
+   context rather than a prop because every node would otherwise have to carry
+   it down to the one that draws text. */
+interface Fading {
+  readonly source: string
+  readonly chunks: readonly Chunk[]
+  readonly now: number
+  cursor: number
+}
+
+const Veil = createContext<Fading | null>(null)
+
+export function Markdown({
+  source,
+  path,
+  chunks,
+  now,
+}: {
+  source: string
+  path?: string
+  chunks?: readonly Chunk[]
+  now?: number
+}): React.JSX.Element {
+  const fading = chunks?.length ? { source, chunks, now: now ?? Date.now(), cursor: 0 } : null
+
   return (
-    <div className="md">
-      {blocks(source).map((block, at) => (
-        <Piece key={at} block={block} path={path ?? ''} />
-      ))}
-    </div>
+    <Veil.Provider value={fading}>
+      <div className="md">
+        {blocks(source).map((block, at) => (
+          <Piece key={at} block={block} path={path ?? ''} />
+        ))}
+      </div>
+    </Veil.Provider>
+  )
+}
+
+/* A run of text, cut where the fading ranges begin and end. Off the fading
+   path this is one string and one node, exactly as before. */
+function Text({ text }: { text: string }): React.JSX.Element {
+  const fading = useContext(Veil)
+  if (!fading) return <>{text}</>
+
+  const at = locate(fading.source, text, fading.cursor)
+  if (at < 0) return <>{text}</>
+  fading.cursor = at + text.length
+
+  return (
+    <>
+      {cut(text, at, fading.chunks).map((slice, index) =>
+        slice.chunk ? (
+          <span className="veil" key={index} style={styleOf(slice.chunk, fading.now, fading.chunks.length)}>
+            {slice.text}
+          </span>
+        ) : (
+          <span key={index}>{slice.text}</span>
+        ),
+      )}
+    </>
   )
 }
 
@@ -112,39 +166,6 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
         </button>
       )
     default:
-      return <>{span.text}</>
+      return <Text text={span.text} />
   }
-}
-
-/* Mermaid is loaded when a diagram is actually on screen: it is two megabytes
-   and most files have none. */
-function Diagram({ source }: { source: string }): React.JSX.Element {
-  const box = useRef<HTMLDivElement>(null)
-  const [failed, setFailed] = useState<string | null>(null)
-
-  useEffect(() => {
-    let dropped = false
-    void (async () => {
-      try {
-        const mermaid = (await import('mermaid')).default
-        mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict' })
-        const { svg } = await mermaid.render(`d${Math.random().toString(36).slice(2)}`, source)
-        if (!dropped && box.current) box.current.innerHTML = svg
-      } catch (thrown) {
-        if (!dropped) setFailed((thrown as Error).message)
-      }
-    })()
-    return () => {
-      dropped = true
-    }
-  }, [source])
-
-  if (failed) {
-    return (
-      <pre className="md__code">
-        <code>{`${failed}\n\n${source}`}</code>
-      </pre>
-    )
-  }
-  return <div className="md__diagram" ref={box} />
 }

@@ -1,76 +1,90 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import type { Message, Part } from '../gen/bindings'
+import { Acts } from './Acts'
+import type { Message } from '../gen/bindings'
 import { Markdown } from './Markdown'
+import { advanced, opened } from './veil'
 
 /*
  * One message, drawn part by part.
  *
- * A tool call, a thought and an answer are three different things on screen;
- * flattening them into one paragraph is what makes a transcript unreadable.
+ * What you said sits right, in a bubble. What the agent did sits left, under
+ * a rule, as a stack of rows you can open — a tool call, a thought and an
+ * answer are three different things, and a transcript that flattens them into
+ * paragraphs is one nobody reads twice.
  */
 
 export function Turn({ message }: { message: Message }): React.JSX.Element {
   if (message.role === 'user') {
     return (
-      <article className="turn">
-        <div className="said">{text(message)}</div>
+      <article className="said">
+        <div className="said__b">{text(message)}</div>
       </article>
     )
   }
+
+  const answers = message.parts.filter((part) => part.kind === 'text')
+  const doing = message.parts.filter((part) => part.kind !== 'text')
+
   return (
     <article className="turn">
-      {message.parts.map((part, at) => (
-        <Piece key={at} part={part} />
+      <Acts parts={doing} live={message.streaming} />
+      {answers.map((part, at) => (
+        <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} />
       ))}
-      {message.streaming && <div className="act-line__t">working…</div>}
+      {message.streaming && <Working />}
       {!message.streaming && <Foot message={message} />}
     </article>
   )
 }
 
-function Piece({ part }: { part: Part }): React.JSX.Element | null {
-  switch (part.kind) {
-    case 'text':
-      /* The agent answers in markdown — lists, code, emphasis — and drawing
-         it as prose threw all of that away. The same renderer the file pane
-         uses, which never produces markup, so nothing here can inject. */
-      return (
-        <div className="reply">
-          <Markdown source={part.text} />
-        </div>
-      )
-    case 'thinking':
-      return <Folded summary="Thought" body={part.text} />
-    case 'tool_call':
-      return (
-        <div className="act-line" data-state={part.state}>
-          <span className="act-line__ico">{icon(part.state)}</span>
-          <span className="act-line__t">
-            {part.name}
-            {oneLine(part.input)}
-          </span>
-        </div>
-      )
-    case 'tool_result':
-      /* Output only when it went wrong: a successful call's output is noise
-         between the question and the answer. */
-      return part.is_error ? <Folded summary="Failed" body={part.output} /> : null
-    case 'unknown':
-      return <pre className="act-line__t">{part.text}</pre>
-    default:
-      return null
-  }
+/* The answer, under the fade while it is still arriving.
+
+   The veil's state is a ref rather than state: it is bookkeeping about what
+   has already been drawn, and putting it in `useState` would ask React to
+   re-render in order to record that a render happened. */
+function Reply({ source, live }: { source: string; live: boolean }): React.JSX.Element {
+  const veil = useRef(opened(source))
+  const now = Date.now()
+  const chunks = advanced(veil.current, source, live, now)
+
+  return (
+    <div className="reply">
+      <Markdown source={source} chunks={chunks} now={now} />
+    </div>
+  )
 }
 
-function Folded({ summary, body }: { summary: string; body: string }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+/* How long it has been at it. The dots say it is alive; the seconds say
+   whether to keep waiting. */
+function Working(): React.JSX.Element {
+  const [since] = useState(() => Date.now())
+  const [now, setNow] = useState(since)
+
+  useEffect(() => {
+    /* Aimed at the next whole second rather than a second from now: an
+       interval started mid-second drifts, and a counter that skips a number
+       is a counter you stop trusting. */
+    let timer = 0
+    const tick = (): void => {
+      setNow(Date.now())
+      timer = window.setTimeout(tick, 1000 - (Date.now() % 1000) + 8)
+    }
+    timer = window.setTimeout(tick, 1000 - (Date.now() % 1000) + 8)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const seconds = Math.max(0, Math.floor((now - since) / 1000))
+  const said = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+
   return (
-    <div className="act-line">
-      <button className="chip" onClick={() => setOpen((was) => !was)}>
-        {summary}
-      </button>
-      {open && <pre className="act-line__t">{body}</pre>}
+    <div className="working">
+      <span className="working__dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      Working for {said}
     </div>
   )
 }
@@ -78,19 +92,6 @@ function Folded({ summary, body }: { summary: string; body: string }): React.JSX
 const text = (message: Message): string =>
   message.parts.map((part) => ('text' in part ? part.text : '')).join('')
 
-/* The first line of a tool's input, trimmed: the rest is for the fold. */
-function oneLine(input: string): string {
-  const first = input.split('\n')[0]?.trim() ?? ''
-  if (!first) return ''
-  return ` · ${first.length > 80 ? `${first.slice(0, 79)}…` : first}`
-}
-
-function icon(state: 'running' | 'ok' | 'failed'): string {
-  return state === 'running' ? '·' : state === 'ok' ? '✓' : '✕'
-}
-
-/* Copying a reply is the commonest thing anyone does with one, and it was
-   the one control the prototype had here that the rewrite dropped. */
 function Foot({ message }: { message: Message }): React.JSX.Element | null {
   const [copied, setCopied] = useState(false)
   const said = message.parts
@@ -104,7 +105,7 @@ function Foot({ message }: { message: Message }): React.JSX.Element | null {
     <div className="turn__foot">
       <button
         className="tfbtn"
-        aria-label="Copy"
+        aria-label={copied ? 'Copied' : 'Copy'}
         onClick={() =>
           void navigator.clipboard?.writeText(said).then(() => {
             setCopied(true)

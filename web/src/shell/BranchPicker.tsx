@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Branch } from '../gen/bindings'
+import { useAway } from './away'
 import { ask, commands } from './live'
 import { useShell } from './useShell'
 
@@ -26,15 +27,7 @@ export function BranchPicker({ branch, ahead }: { branch: string; ahead: number 
     })
   }, [open, project])
 
-  /* Clicking anywhere else closes it, like every other menu in the window. */
-  useEffect(() => {
-    if (!open) return
-    const away = (event: MouseEvent): void => {
-      if (!box.current?.contains(event.target as Node)) setOpen(false)
-    }
-    window.addEventListener('mousedown', away)
-    return () => window.removeEventListener('mousedown', away)
-  }, [open])
+  useAway(box, useCallback(() => setOpen(false), []), open)
 
   const go = (name: string): void => {
     if (!project) return

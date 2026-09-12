@@ -3,9 +3,9 @@ import type { Question } from '../gen/bindings'
 /*
  * What the agent is waiting to be allowed to do.
  *
- * In the thread rather than over it: a dialog would hide the output that says
- * why the agent wants this, which is the only thing that makes the question
- * answerable.
+ * Above the composer, where your hands already are — not in the thread,
+ * where it scrolls away from the person who has to answer it, and not in a
+ * dialog, which would hide the output that says why the agent wants this.
  */
 
 export function Asked({
@@ -18,7 +18,7 @@ export function Asked({
   return (
     <>
       {questions.map((question) => (
-        <article className="turn asking" key={question.id}>
+        <section className="asking" key={question.id}>
           <div className="asking__t">
             <b>{question.tool}</b> — allow this?
           </div>
@@ -31,7 +31,7 @@ export function Asked({
               Allow
             </button>
           </div>
-        </article>
+        </section>
       ))}
     </>
   )
