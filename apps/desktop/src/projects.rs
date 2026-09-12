@@ -8,15 +8,9 @@ use std::path::{Path, PathBuf};
 
 use devpit_core::{tree, Store};
 use devpit_rpc::{
-    ErrorCode, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory, ProjectList,
-    ProjectNotes, ProjectTree, RpcError,
+    ErrorCode, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectList, ProjectNotes,
+    ProjectTree, RpcError,
 };
-
-/// How many commits the overview asks for.
-///
-/// A number, not "all": `git log` on a large repository walks the whole graph,
-/// and the surface shows four.
-const HISTORY: u32 = 8;
 
 pub(crate) fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -336,23 +330,6 @@ pub fn project_changes(
     })
 }
 
-/// `project.history` — the last few commits of a checkout.
-#[tauri::command]
-#[specta::specta]
-pub fn project_history(
-    project_id: String,
-    worktree_id: Option<String>,
-) -> Result<ProjectHistory, RpcError> {
-    let store = store()?;
-    let (_, root) = locate(&store, &project_id)?;
-    let root = checkout(&root, worktree_id.as_deref());
-
-    let commits =
-        devpit_git::history(&root, HISTORY).map_err(|err| RpcError::internal(err.to_string()))?;
-
-    Ok(ProjectHistory { commits })
-}
-
 /// `project.notes` — the notes pinned to a project.
 #[tauri::command]
 #[specta::specta]
@@ -397,7 +374,7 @@ pub fn project_note_add(project_id: String, body: String) -> Result<ProjectNotes
 /// Falls back to the project root when the caller names no worktree, which is
 /// what a screen that has not loaded the list yet does, and when the named one
 /// has since been removed — a stale id should reopen the project, not fail.
-fn checkout(root: &Path, worktree_id: Option<&str>) -> PathBuf {
+pub(crate) fn checkout(root: &Path, worktree_id: Option<&str>) -> PathBuf {
     worktree_id
         .and_then(|id| devpit_git::worktree_path(root, id).ok().flatten())
         .unwrap_or_else(|| root.to_path_buf())
