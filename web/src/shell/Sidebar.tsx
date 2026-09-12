@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
+import { useAway } from './away'
 import type { PaneName } from './paneList'
 import { SessionRows } from './SessionRows'
 import { Threads } from './Threads'
+import { useKit } from './useKit'
 import { useShell, type PrefsPane } from './useShell'
 
 /*
@@ -21,8 +23,11 @@ export function Sidebar({
 }): React.JSX.Element {
   const shell = useShell()
   const account = shell.account
+  const kit = useKit()
   const [menu, setMenu] = useState<'new' | 'kit' | 'acct' | null>(null)
-  const [synced, setSynced] = useState('Synced 2 minutes ago')
+  const newBox = useRef<HTMLDivElement>(null)
+  const kitBox = useRef<HTMLDivElement>(null)
+  const acctBox = useRef<HTMLDivElement>(null)
 
   const open = (kind: PaneName): void => {
     shell.show(kind)
@@ -40,32 +45,19 @@ export function Sidebar({
     shell.signOut()
     setMenu(null)
   }
-  const sync = (): void => {
-    setSynced('Syncing…')
-    window.setTimeout(() => setSynced('Synced just now'), 900)
-  }
-
   /* A pick is a decision, so the menu goes away with it — and so does a click
-     anywhere else, or Escape. */
-  useEffect(() => {
-    if (!menu) return
-    const shut = (): void => setMenu(null)
-    const key = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setMenu(null)
-    }
-    document.addEventListener('click', shut)
-    document.addEventListener('keydown', key)
-    return () => {
-      document.removeEventListener('click', shut)
-      document.removeEventListener('keydown', key)
-    }
-  }, [menu])
+     anywhere else, or Escape. One hook per menu, because each closes on a
+     click outside its own box and the trigger lives inside it. */
+  const shut = useCallback(() => setMenu(null), [])
+  useAway(newBox, shut, menu === 'new')
+  useAway(kitBox, shut, menu === 'kit')
+  useAway(acctBox, shut, menu === 'acct')
 
   return (
     <aside className="side">
-        <div className="pad10">
-          <div className="newmenu">
-            <button className="act" aria-haspopup="true" aria-expanded={menu === 'new'} onClick={(event) => { event.stopPropagation(); setMenu(menu === 'new' ? null : 'new') }}>
+        <div className="gutter">
+          <div className="newmenu" ref={newBox}>
+            <button className="act" aria-haspopup="true" aria-expanded={menu === 'new'} onClick={() => setMenu(menu === 'new' ? null : 'new')}>
               <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></span>
               <span className="act__label">New Task</span>
             </button>
@@ -89,7 +81,7 @@ export function Sidebar({
           </div>
         </div>
 
-        <div className="side__scroll pad10">
+        <div className="side__scroll gutter">
           <div className="searchslot">
             <button className="act" onClick={onSearch}>
               <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg></span>
@@ -111,8 +103,8 @@ export function Sidebar({
                which plugins. A row each would cost the list half its height for
                a fifth of its use, and the count on each item means the popover
                answers the common question without being opened. */}
-          <div className="newmenu">
-            <button className="act" aria-haspopup="true" aria-expanded={menu === 'kit'} onClick={(event) => { event.stopPropagation(); setMenu(menu === 'kit' ? null : 'kit') }}>
+          <div className="newmenu" ref={kitBox}>
+            <button className="act" aria-haspopup="true" aria-expanded={menu === 'kit'} onClick={() => setMenu(menu === 'kit' ? null : 'kit')}>
               <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 9 5-9 5-9-5Z" /><path d="m3 17 9 5 9-5" /><path d="m3 12 9 5 9-5" /></svg></span>
               <span className="act__label">Resources</span>
               <span className="act__chev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m7 9 5 5 5-5" /></svg></span>
@@ -121,12 +113,12 @@ export function Sidebar({
               <button className="newmenu__item" role="menuitem" onClick={() => open('skills')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
                 <span className="newmenu__label">Skills</span>
-                <span className="newmenu__key">5</span>
+                {kit.skills !== null && <span className="newmenu__n">{kit.skills}</span>}
               </button>
               <button className="newmenu__item" role="menuitem" onClick={() => open('mcps')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2v6M15 2v6" /><path d="M6 8h12v4a6 6 0 0 1-12 0Z" /><path d="M12 18v4" /></svg></span>
                 <span className="newmenu__label">MCPs</span>
-                <span className="newmenu__key">2/4</span>
+                {kit.servers !== null && <span className="newmenu__n">{kit.servers}</span>}
               </button>
               <button className="newmenu__item" role="menuitem" onClick={() => open('workspace')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg></span>
@@ -151,8 +143,8 @@ export function Sidebar({
             </span>
           </button>
 
-          <div className="acct">
-            <button className="acct__row" aria-haspopup="true" aria-expanded={menu === 'acct'} onClick={(event) => { event.stopPropagation(); setMenu(menu === 'acct' ? null : 'acct') }}>
+          <div className="acct" ref={acctBox}>
+            <button className="acct__row" aria-haspopup="true" aria-expanded={menu === 'acct'} onClick={() => setMenu(menu === 'acct' ? null : 'acct')}>
               <span className="acct__av">{account.initials}</span>
               <span className="acct__body">
                 <span className="acct__n">{account.name}</span>
@@ -168,11 +160,9 @@ export function Sidebar({
                   <span className="acct__e">{account.email ?? 'no address yet'}</span>
                 </span>
               </div>
-              <div className="acct__sync"><span className="acct__dot"></span><span>{synced}</span></div>
-            <button className="newmenu__item" role="menuitem" onClick={() => openPrefs('account')}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg></span><span className="newmenu__label">Profile</span></button>
-            <button className="newmenu__item" role="menuitem" onClick={() => openPrefs('account')}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .3-9 6 6 0 0 0-11.6 1.6A3.7 3.7 0 0 0 7 19Z" /><path d="M12 12v5M9.5 14.5 12 12l2.5 2.5" /></svg></span><span className="newmenu__label">What's saved</span></button>
-            <button className="newmenu__item" role="menuitem" onClick={() => openPrefs('account')}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M2 20h20" /></svg></span><span className="newmenu__label">Devices</span></button>
-            <button className="newmenu__item" role="menuitem" onClick={(event) => { event.stopPropagation(); sync() }}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2" /><path d="M3 20v-5h5M21 4v5h-5" /></svg></span><span className="newmenu__label">Sync now</span></button>
+              {/* One item, because Profile, What's saved and Devices were
+                   three names for the same preferences pane. */}
+              <button className="newmenu__item" role="menuitem" onClick={() => openPrefs('account')}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg></span><span className="newmenu__label">Account</span></button>
               <div className="acct__sep"></div>
             <button className="newmenu__item" role="menuitem" data-danger onClick={signOut}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></svg></span><span className="newmenu__label">Sign out</span></button>
             </div>
