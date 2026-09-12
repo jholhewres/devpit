@@ -158,6 +158,9 @@ pub struct ProjectChanges {
 #[serde(rename_all = "camelCase")]
 pub struct ProjectHistory {
     pub commits: Vec<Commit>,
+    /// Whether git has more commits than this page carries — what the screen
+    /// reads to decide whether "load older" still does anything.
+    pub has_more: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

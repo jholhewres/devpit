@@ -13,11 +13,14 @@ use crate::{run, GitError};
 /// purpose. `\x1f` and `\x1e` cannot appear in a commit message.
 const FORMAT: &str = "--format=%h%x1f%s%x1f%an%x1f%at%x1e";
 
-pub fn history(root: &Path, limit: u32) -> Result<Vec<Commit>, GitError> {
+/// `skip` older commits before taking `limit`, for paging back through
+/// history without re-reading what the screen already has.
+pub fn history(root: &Path, limit: u32, skip: u32) -> Result<Vec<Commit>, GitError> {
     let count = format!("-n{limit}");
+    let after = format!("--skip={skip}");
     // A repository with no commits exits non-zero here. That is not a failure
     // worth surfacing — it is a new project, and the honest answer is nothing.
-    let Ok(raw) = run(root, &["log", &count, FORMAT]) else {
+    let Ok(raw) = run(root, &["log", &after, &count, FORMAT]) else {
         return Ok(Vec::new());
     };
     Ok(parse(&raw))
@@ -75,7 +78,7 @@ mod tests {
         std::fs::write(dir.path().join("b.txt"), "two\n").expect("write");
         fixture::commit(dir.path(), "second");
 
-        let commits = history(dir.path(), 10).expect("history");
+        let commits = history(dir.path(), 10, 0).expect("history");
         assert_eq!(commits.len(), 2);
         assert_eq!(commits[0].subject, "second");
         assert_eq!(commits[0].author, "Test");
@@ -86,6 +89,28 @@ mod tests {
     fn a_repository_with_no_commits_answers_nothing_rather_than_failing() {
         let dir = tempfile::tempdir().expect("tempdir");
         fixture::repo(dir.path());
-        assert!(history(dir.path(), 10).expect("history").is_empty());
+        assert!(history(dir.path(), 10, 0).expect("history").is_empty());
+    }
+
+    #[test]
+    fn skip_pages_back_past_what_was_already_read() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fixture::repo(dir.path());
+        for subject in ["first", "second", "third"] {
+            std::fs::write(dir.path().join("a.txt"), subject).expect("write");
+            fixture::commit(dir.path(), subject);
+        }
+
+        let first_page = history(dir.path(), 2, 0).expect("history");
+        assert_eq!(
+            first_page.iter().map(|c| &c.subject).collect::<Vec<_>>(),
+            ["third", "second"]
+        );
+
+        let next_page = history(dir.path(), 2, 2).expect("history");
+        assert_eq!(
+            next_page.iter().map(|c| &c.subject).collect::<Vec<_>>(),
+            ["first"]
+        );
     }
 }

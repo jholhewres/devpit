@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { Commit } from '../gen/bindings'
 import { ask, commands } from './live'
+import { Skeleton } from './Skeleton'
 import { useShell } from './useShell'
 
 /*
@@ -9,20 +10,48 @@ import { useShell } from './useShell'
  *
  * Local history only. Nothing fetches, so what is listed is what this
  * checkout has — and the branch chip beside it says how far behind that is.
+ *
+ * Loaded one page at a time: `hasMore` is what the backend already knows, so
+ * the button disappears the moment there is nothing older to load, without
+ * this screen guessing from a short page.
  */
 
 export function History(): React.JSX.Element {
   const { project, show } = useShell()
   const [commits, setCommits] = useState<readonly Commit[]>([])
+  const [hasMore, setHasMore] = useState(false)
+  // Starts true: an empty list before the first answer arrives is "not
+  // fetched yet", not "no commits", and the two must not draw the same.
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!project) return
-    void ask(() => commands.projectHistory(project.id, null)).then((answer) => {
+    setCommits([])
+    setHasMore(false)
+    setError(null)
+    if (!project) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    void ask(() => commands.projectHistory(project.id, null, null)).then((answer) => {
       setCommits(answer.data?.commits ?? [])
+      setHasMore(answer.data?.hasMore ?? false)
       setError(answer.error)
+      setLoading(false)
     })
   }, [project])
+
+  const older = (): void => {
+    if (!project) return
+    setLoading(true)
+    void ask(() => commands.projectHistory(project.id, null, commits.length)).then((answer) => {
+      setCommits((was) => [...was, ...(answer.data?.commits ?? [])])
+      setHasMore(answer.data?.hasMore ?? false)
+      setError(answer.error)
+      setLoading(false)
+    })
+  }
 
   return (
     <>
@@ -31,7 +60,8 @@ export function History(): React.JSX.Element {
           <span className="exempty__t">{error}</span>
         </div>
       )}
-      {!error && commits.length === 0 && (
+      {loading && commits.length === 0 && <Skeleton />}
+      {!error && !loading && commits.length === 0 && (
         <div className="exempty">
           <span className="exempty__t">No commits yet.</span>
         </div>
@@ -55,6 +85,11 @@ export function History(): React.JSX.Element {
           </span>
         </button>
       ))}
+      {hasMore && (
+        <button className="btn" disabled={loading} onClick={older}>
+          {loading ? 'Loading…' : 'Load older commits'}
+        </button>
+      )}
     </>
   )
 }
