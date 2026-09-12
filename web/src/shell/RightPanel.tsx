@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { Changes } from './Changes'
+import { Explorer } from './Explorer'
 import { History } from './History'
-import { Tree } from './Tree'
+import { useExplorerState } from './useExplorerState'
+import { useFileIndex } from './useFileIndex'
 import { useShell } from './useShell'
 import { useTree } from './useTree'
 
@@ -14,27 +16,32 @@ const Icon = ({ d, size = 15 }: { d: string; size?: number }): React.JSX.Element
 
 const FOLDER = 'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
 const UPLOAD = 'M12 16V4M8 8l4-4 4 4M4 20h16'
-const COLLAPSE = 'M4 7h16M4 12h16M4 17h16'
 const CLOCK = 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'
-const REFRESH = 'M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5'
-const SEARCH = 'm21 21-4.3-4.3'
 
 /* Explorer or Changes: two questions about the same tree, so one is answered
-   at a time rather than both being half-visible. */
+   at a time rather than both being half-visible. The three views' own
+   markup lives in `Explorer.tsx`, `Changes.tsx` and `History.tsx` — this
+   file is just the tab bar and the project the tabs share. */
 export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void }): React.JSX.Element {
-  const { project } = useShell()
+  const { project, files, active } = useShell()
   const tree = useTree(project?.id ?? null)
-  const [view, setView] = useState<'tree' | 'changes' | 'history'>('tree')
-  const [mode, setMode] = useState<'names' | 'contents'>('names')
-  const [query, setQuery] = useState('')
-  const [flags, setFlags] = useState({ case: false, word: false, regex: false })
-  const [collapsed, setCollapsed] = useState(0)
-  const [current, setCurrent] = useState<string | null>(null)
+  const index = useFileIndex(project?.id ?? null)
+  const { view, setView, mode, setMode, query, setQuery } = useExplorerState(project?.id ?? null)
 
-  function open(path: string): void {
-    setCurrent(path)
-    onOpenFile(path)
-  }
+  /* Follows the focused tab, not a click remembered here — opening a file
+     from the palette or from Changes must highlight the same row. */
+  const current = active?.kind === 'file' ? (active.path ?? null) : null
+
+  /* This panel never unmounts — CSS collapses it to zero width instead, per
+     the reference: remounting on every visibility change is what caused an
+     IPC storm elsewhere in this app. So reopening it needs its own reload,
+     not a mount effect. Guarded to the false→true edge so the initial mount
+     (panel already open) does not double the fetch `useTree` already makes. */
+  const wasOpen = useRef(files)
+  useEffect(() => {
+    if (files && !wasOpen.current) tree.reload()
+    wasOpen.current = files
+  }, [files, tree.reload])
 
   return (
     <aside className="rp">
@@ -42,6 +49,7 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
         <button className="rtab" aria-selected={view === 'tree'} onClick={() => setView('tree')}>
           <Icon d={FOLDER} size={14} />
           Explorer
+          <span className="rtab__n">{tree.nodes.length}</span>
         </button>
         <button className="rtab" aria-selected={view === 'changes'} onClick={() => setView('changes')}>
           <Icon d={UPLOAD} size={14} />
@@ -55,49 +63,17 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
       </div>
 
       <div className="rview" data-rview="tree" data-open={String(view === 'tree')}>
-        <div className="ex__head">
-          <span className="ex__proj">{project?.name ?? 'No project'}</span>
-          <button className="sq26 tip" data-tip="Collapse all" aria-label="Collapse all" onClick={() => setCollapsed((was) => was + 1)}>
-            <Icon d={COLLAPSE} />
-          </button>
-          <button className="sq26 tip" data-tip="Refresh" aria-label="Refresh" onClick={tree.reload}>
-            <Icon d={REFRESH} />
-          </button>
-        </div>
-
-        <div className="ex__search">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <path d={SEARCH} />
-          </svg>
-          <input
-            className="ex__q"
-            placeholder={mode === 'contents' ? 'Search in files' : 'Search'}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <span className="ex__flags">
-            <button className="flag" aria-pressed={flags.case} title="Match case" onClick={() => setFlags((f) => ({ ...f, case: !f.case }))}>Aa</button>
-            <button className="flag" aria-pressed={flags.word} title="Whole word" onClick={() => setFlags((f) => ({ ...f, word: !f.word }))}>ab</button>
-            <button className="flag" aria-pressed={flags.regex} title="Regular expression" onClick={() => setFlags((f) => ({ ...f, regex: !f.regex }))}>.*</button>
-          </span>
-        </div>
-
-        <div className="ex__modes">
-          <button className="exmode__tab" data-ex="names" aria-selected={mode === 'names'} onClick={() => setMode('names')}>Names</button>
-          <button className="exmode__tab" data-ex="contents" aria-selected={mode === 'contents'} onClick={() => setMode('contents')}>Contents</button>
-        </div>
-
-        {tree.error && <div className="exempty"><span className="exempty__t">{tree.error}</span></div>}
-        {!tree.error && mode === 'names' && (
-          <Tree projectId={project?.id ?? ''} nodes={tree.nodes} query={query} current={current} collapsed={collapsed} onOpen={open} />
-        )}
-        {!tree.error && mode === 'contents' && (
-          <div className="exempty">
-            <span className="exempty__t">Type to search in files</span>
-            <span className="exempty__d">Searching file contents is not wired yet.</span>
-          </div>
-        )}
+        <Explorer
+          project={project}
+          tree={tree}
+          index={index}
+          mode={mode}
+          setMode={setMode}
+          query={query}
+          setQuery={setQuery}
+          current={current}
+          onOpen={onOpenFile}
+        />
       </div>
 
       <div className="rview" data-rview="changes" data-open={String(view === 'changes')}>

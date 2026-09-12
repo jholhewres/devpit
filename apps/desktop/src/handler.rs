@@ -12,6 +12,7 @@ use crate::asking;
 use crate::branches;
 use crate::chat;
 use crate::happening;
+use crate::history;
 use crate::index;
 use crate::mcp;
 use crate::pty_bridge;
@@ -23,8 +24,8 @@ use crate::threads;
 use crate::workspace;
 use crate::worktrees;
 use crate::{
-    board, columns, commands, diffs, files, front, in_flight, panes, projects, sessions, settings,
-    steps,
+    board, columns, commands, diffs, files, front, in_flight, panes, projects, search, sessions,
+    settings, steps,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -64,7 +65,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         projects::project_tree,
         index::project_files,
         projects::project_changes,
-        projects::project_history,
+        history::project_history,
+        search::project_search,
         branches::branch_list,
         branches::branch_switch,
         projects::project_notes,
@@ -82,6 +84,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         staging::changes_stage,
         staging::changes_unstage,
         staging::changes_commit,
+        staging::changes_discard,
         saves::file_write,
         diffs::file_diff,
         diffs::commit_diff,
