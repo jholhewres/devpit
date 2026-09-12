@@ -172,8 +172,25 @@ export const commands = {
 	projectFiles: (projectId: string, worktreeId: string | null) => typedError<FileIndex, RpcError>(__TAURI_INVOKE("project_files", { projectId, worktreeId })),
 	/**  `project.changes` — what has changed in a checkout, with the size of each edit. */
 	projectChanges: (projectId: string, worktreeId: string | null) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("project_changes", { projectId, worktreeId })),
-	/**  `project.history` — the last few commits of a checkout. */
-	projectHistory: (projectId: string, worktreeId: string | null) => typedError<ProjectHistory, RpcError>(__TAURI_INVOKE("project_history", { projectId, worktreeId })),
+	/**
+	 *  `project.history` — the last few commits of a checkout, or the next page
+	 *  of older ones.
+	 * 
+	 *  `skip` counts from the newest commit, not from a sha: the caller already
+	 *  knows how many it has drawn, and a count survives a rebase that would
+	 *  invalidate a remembered sha.
+	 */
+	projectHistory: (projectId: string, worktreeId: string | null, skip: number | null) => typedError<ProjectHistory, RpcError>(__TAURI_INVOKE("project_history", { projectId, worktreeId, skip })),
+	/**
+	 *  `project.search` — every line matching `pattern`, grouped by file.
+	 * 
+	 *  `match_case`, `word` and `regex` mirror the toggles the search field
+	 *  already has for name search, so flipping one behaves the same way in both
+	 *  modes. Named `match_case` rather than `case`: the latter is a reserved
+	 *  word, and specta emits it as a bare parameter name that no JavaScript
+	 *  engine can parse.
+	 */
+	projectSearch: (projectId: string, worktreeId: string | null, pattern: string, matchCase: boolean, word: boolean, regex: boolean) => typedError<SearchHits, RpcError>(__TAURI_INVOKE("project_search", { projectId, worktreeId, pattern, matchCase, word, regex })),
 	/**  `branch.list` — the local branches, the current one first. */
 	branchList: (projectId: string, worktreeId: string | null) => typedError<Branches, RpcError>(__TAURI_INVOKE("branch_list", { projectId, worktreeId })),
 	/**
@@ -213,6 +230,23 @@ export const commands = {
 	/**  `file.read` — the text of a file, or why it is not text. */
 	fileRead: (projectId: string, worktreeId: string | null, path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("file_read", { projectId, worktreeId, path })),
 	/**
+	 *  `path.create` — a new empty file, or a new folder.
+	 * 
+	 *  Answers with the tree the panel should now draw, the same way
+	 *  `changes.discard` answers with the changes: the screen re-reads rather
+	 *  than predicting what its own click did, so it cannot drift from the disk.
+	 */
+	pathCreate: (projectId: string, worktreeId: string | null, path: string, folder: boolean) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_create", { projectId, worktreeId, path, folder })),
+	/**  `path.move` — renames or moves, which are the same operation. */
+	pathMove: (projectId: string, worktreeId: string | null, from: string, to: string) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_move", { projectId, worktreeId, from, to })),
+	/**
+	 *  `path.delete` — removes a file, or a folder and everything under it.
+	 * 
+	 *  The screen confirms first and names what git cannot bring back; by the
+	 *  time this runs, that decision has been made.
+	 */
+	pathDelete: (projectId: string, worktreeId: string | null, path: string) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_delete", { projectId, worktreeId, path })),
+	/**
 	 *  `changes.stage` — puts these paths in the index, and answers with the list
 	 *  as it now stands.
 	 * 
@@ -224,6 +258,15 @@ export const commands = {
 	changesUnstage: (projectId: string, worktreeId: string | null, paths: string[]) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("changes_unstage", { projectId, worktreeId, paths })),
 	/**  `changes.commit` — commits what is staged. */
 	changesCommit: (projectId: string, worktreeId: string | null, message: string) => typedError<Commit, RpcError>(__TAURI_INVOKE("changes_commit", { projectId, worktreeId, message })),
+	/**
+	 *  `changes.discard` — throws away uncommitted work in these paths.
+	 * 
+	 *  A tracked change goes back to the index or HEAD; a path git has never
+	 *  recorded — untracked, or added but never committed — has no earlier
+	 *  version to go back to and is deleted outright. The screen confirms first,
+	 *  because that second case cannot be undone from here.
+	 */
+	changesDiscard: (projectId: string, worktreeId: string | null, paths: string[]) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("changes_discard", { projectId, worktreeId, paths })),
 	/**
 	 *  `file.write` — saves, and refuses to overwrite a change it never saw.
 	 * 
@@ -1124,6 +1167,11 @@ export type ProjectChanges = {
 
 export type ProjectHistory = {
 	commits: Commit[],
+	/**
+	 *  Whether git has more commits than this page carries — what the screen
+	 *  reads to decide whether "load older" still does anything.
+	 */
+	hasMore: boolean,
 };
 
 export type ProjectList = {
@@ -1205,6 +1253,30 @@ export type Run = {
 
 /**  How a run ended, or that it has not. */
 export type RunState = "running" | "ok" | "failed" | "cancelled";
+
+export type SearchFile = {
+	path: string,
+	lines: SearchLine[],
+};
+
+export type SearchHits = {
+	files: SearchFile[],
+	/**
+	 *  How many lines matched, before the ceiling cut `files` short. The true
+	 *  size, even on a call where `files` cannot carry all of it. Named
+	 *  `matched` rather than `shown`: `shown` is what a screen renders after
+	 *  its own cap, the way `SearchResults.tsx` already uses the word for the
+	 *  slice of `hits` it draws — this is the number before either cap.
+	 */
+	matched: number,
+	/**  True once `matched` is more than what `files` actually holds. */
+	truncated: boolean,
+};
+
+export type SearchLine = {
+	line: number,
+	text: string,
+};
 
 export type Server = {
 	name: string,

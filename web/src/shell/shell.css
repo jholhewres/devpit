@@ -709,7 +709,7 @@ body[data-account='out'] .acct { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .pane[data-show='true'], .blank, .ctx { animation: none; }
   .win { transition: none; }
-  .skel__ln { animation: none; }
+  .skel__ln, .rowskel__ln { animation: none; }
 }
 
 .pane__bar { height: 32px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 6px 0 12px; }
@@ -1163,6 +1163,8 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .row { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; overflow: hidden; height: 24px; padding-right: 9px; text-align: left; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
 .row:hover { background: var(--sidebar-item); }
 .row[aria-current='true'] { background: var(--sidebar-item); color: var(--text); }
+/* The folder under the pointer mid-drag — see `useRowDrag.ts`. */
+.row[data-drag-over='true'] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .row__chev { width: 12px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--ghost); }
 .row__ico { color: var(--text-3); }
 .row__n { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1545,3 +1547,38 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .card__run[data-doing='waiting'] { color: var(--warning); }
 .card__run[data-doing='waiting'] .card__dot { animation: none; }
 .card__run[data-doing='done'] .card__dot { animation: none; opacity: 0.55; }
+
+/* Name search results: one row per path from the flat index, the same
+   density as .row and .gitrow so switching between the tree and the results
+   does not jump the eye. */
+.results { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 0 10px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.result { display: flex; align-items: center; width: 100%; min-width: 0; height: 24px; padding: 0 9px 0 8px; text-align: left; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result:hover { background: var(--sidebar-item); }
+.result__n { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.result__hit { background: color-mix(in srgb, var(--accent) 25%, transparent); color: var(--text); border-radius: 2px; }
+.results__partial { padding: 8px 12px; font-size: 11.5px; color: var(--ghost); }
+
+/* Content search results: one header per file, one row per matched line
+   under it — the grouping the backend already did, not a re-sort of it. */
+.cresult__file { display: flex; align-items: center; width: 100%; min-width: 0; height: 26px; padding: 0 9px 0 8px; text-align: left; font-size: 12px; font-weight: 550; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cresult__file:hover { background: var(--sidebar-item); }
+.cresult__line { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; height: 22px; padding: 0 9px 0 22px; text-align: left; font-size: 12px; font-family: var(--mono); color: var(--text-2); white-space: nowrap; overflow: hidden; }
+.cresult__line:hover { background: var(--sidebar-item); }
+.cresult__n { flex: none; min-width: 24px; text-align: right; color: var(--ghost); font-variant-numeric: tabular-nums; }
+.cresult__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* US-008: keyboard navigation for the tree, and a render ceiling.
+   :focus-visible, not :focus — a mouse click on a row must not leave a ring
+   behind, only keyboard focus does. The negative offset keeps the ring
+   inside .row's own box instead of being cut off by its `overflow: hidden`. */
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.row--more { color: var(--ghost); }
+
+/* US-009: a skeleton for the first fetch — before the tree, Changes, or
+   History has an answer, an empty list and a slow one draw identically.
+   Same shimmer as the file-read skeleton, sized to this panel's 24px rows
+   instead of that one's text lines. */
+.rowskel { padding: 6px 0 0; }
+.rowskel__ln { height: 12px; margin: 0 12px 12px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--overlay) 25%, var(--overlay-strong) 37%, var(--overlay) 63%);
+  background-size: 380% 100%; animation: shimmer 1.25s ease-in-out infinite; }
