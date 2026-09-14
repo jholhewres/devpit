@@ -31,18 +31,47 @@ pub fn latest() -> i64 {
 }
 
 /// Applies whatever has not been applied yet. Called on every start.
+///
+/// One transaction around the whole chain, opened `IMMEDIATE`, with the
+/// applied version read **inside** it.
+///
+/// Both halves of that matter, and for the same reason: more than one
+/// connection can open this file at the same moment. Startup alone does it —
+/// the shell probe reads the store on its own thread while the main thread is
+/// still setting up — and two copies of the app do it trivially. Reading the
+/// version first and writing after meant both connections saw the same old
+/// number and both applied the same migration; the second one arrives at an
+/// `ALTER TABLE` for a column that now exists, and the app fails to start.
+///
+/// `IMMEDIATE` takes the write lock at `BEGIN` rather than at the first write,
+/// so the second connection waits here instead of racing, and then reads the
+/// version the first one just committed. `busy_timeout` is what makes that a
+/// wait rather than a refusal.
+///
+/// All-or-nothing rather than one transaction each, which is stronger than
+/// what was here before and keeps the reason it was written: a partial failure
+/// must not leave half the tables standing with the version already bumped.
 pub fn run(conn: &Connection) -> Result<(), StoreError> {
-    let applied: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    conn.execute_batch("BEGIN IMMEDIATE")?;
+    let applied = match conn.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0)) {
+        Ok(applied) => applied,
+        Err(err) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(err.into());
+        }
+    };
 
     for migration in MIGRATIONS.iter().filter(|m| m.version > applied) {
-        // One transaction per migration: a partial failure must not leave half
-        // the tables standing with the version already bumped.
-        conn.execute_batch(&format!(
-            "BEGIN; {} PRAGMA user_version = {}; COMMIT;",
+        if let Err(err) = conn.execute_batch(&format!(
+            "{} PRAGMA user_version = {};",
             migration.sql, migration.version
-        ))?;
+        )) {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(err.into());
+        }
     }
 
+    conn.execute_batch("COMMIT")?;
     Ok(())
 }
 
