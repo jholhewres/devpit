@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LayoutNode } from '../gen/bindings'
 import { ask, commands } from './live'
 import { Leaf } from './Leaf'
+import { usePaneActions } from './paneActions'
+import { PaneCorner } from './PaneCorner'
 import { Split } from './Split'
 import { leaves } from './splits'
 import type { Tab } from './strip'
@@ -122,11 +124,26 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
     })
   }, [project, focused, tab.launch, tab.id, launched])
 
+  const layoutTo = useCallback((next: LayoutNode, focusedId: string) => {
+    setTree(next)
+    setFocused(focusedId)
+  }, [])
+  const pane = usePaneActions({ tab, tree, focused, onLayout: layoutTo, onNotice: setNotice })
+
   if (error) return <div className="exempty__t">{error}</div>
   if (!tree) return <div className="termhost" />
 
   return (
     <>
+      <PaneCorner
+        tabId={tab.id}
+        what="terminal"
+        onSplit={split}
+        onChat={pane.toChat ?? undefined}
+        onClose={pane.closePane}
+        closeLabel={pane.closeLabel}
+        closeArmed={pane.armed}
+      />
       {notice && (
         <button className="tnote" onClick={() => setNotice(null)} title="Dismiss">
           {notice}
