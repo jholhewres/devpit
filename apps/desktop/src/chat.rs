@@ -8,7 +8,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use devpit_agentcli::driver::driver;
-use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head, Head};
+use devpit_agentcli::head::{
+    after_turn, head_path, read_head, remaining, settled, write_head, Head,
+};
 use devpit_agentcli::store::{append, conversation_path, read};
 use devpit_agentcli::talk::{say, Said, Say};
 use devpit_rpc::{
@@ -20,7 +22,7 @@ use tauri::State;
 /// The turns in flight, by conversation, so one can be stopped.
 #[derive(Default)]
 pub struct Talking {
-    running: Arc<Mutex<HashMap<String, u32>>>,
+    pub(crate) running: Arc<Mutex<HashMap<String, u32>>>,
 }
 
 pub(crate) fn home() -> PathBuf {
@@ -64,6 +66,16 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
         model: head.as_ref().and_then(|head| head.model.clone()),
         session_id: head.as_ref().and_then(|head| head.session_id.clone()),
         cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
+        rewindable: head
+            .as_ref()
+            .map(|head| {
+                head.rewind
+                    .anchors
+                    .iter()
+                    .map(|at| at.turn_id.clone())
+                    .collect()
+            })
+            .unwrap_or_default(),
         created_at: head
             .map(|head| head.created_at)
             .or_else(|| messages.first().map(|first| first.created_at))
@@ -77,6 +89,7 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
 #[specta::specta]
 pub async fn chat_send(
     state: State<'_, Talking>,
+    steering: State<'_, crate::steering::Steering>,
     ask: Ask,
     on_frame: Channel<Frame>,
 ) -> Result<TurnEnd, RpcError> {
@@ -163,9 +176,15 @@ pub async fn chat_send(
             // screen cannot draw would hang with no way to answer it.
             .or_else(|| Some("acceptEdits".to_owned())),
         effort: effort.or_else(|| head.as_ref().and_then(|head| head.effort.clone())),
+        title: head.as_ref().and_then(|head| head.title.clone()),
+        rewind: head
+            .as_ref()
+            .map(|head| head.rewind.clone())
+            .unwrap_or_default(),
     };
     let _ = write_head(&head_file, &opening);
     let resuming = opening.session_id.clone();
+    let forking = opening.rewind.fork_at.clone();
     let mode = opening.permission.clone();
     let thinking = opening.effort.clone();
     let left = remaining(Some(&opening));
@@ -176,6 +195,7 @@ pub async fn chat_send(
         role: Role::User,
         parts: vec![Part::Text {
             text: prompt.clone(),
+            parent: None,
         }],
         created_at: now(),
         streaming: false,
@@ -203,20 +223,25 @@ pub async fn chat_send(
     let sink = on_frame.clone();
     let answer = answer_id.clone();
 
+    let control = steering.hold(&conversation_id);
     let said = tauri::async_runtime::spawn_blocking(move || {
-        say(
+        let checkout = std::path::Path::new(&cwd);
+        let before = crate::turn_changes::before(checkout);
+        let said = say(
             driver.as_ref(),
             &Say {
                 command: &path,
                 prompt: &prompt,
-                cwd: std::path::Path::new(&cwd),
+                cwd: checkout,
                 model: model.as_deref(),
                 // What is left of the cap, not the cap: a resumed conversation
                 // may not spend its whole budget again.
                 budget_usd: left,
                 session_id: resuming.as_deref(),
+                fork_at: forking.as_deref(),
                 permission: mode.as_deref(),
                 effort: thinking.as_deref(),
+                control: Some(&control),
             },
             |part| {
                 collected
@@ -234,7 +259,9 @@ pub async fn chat_send(
                     .map(|mut held| held.insert(key.clone(), pid))
                     .ok();
             },
-        )
+        );
+        crate::turn_changes::report(checkout, before.as_deref(), &collected, &sink, &answer);
+        said
     })
     .await
     .map_err(|err| RpcError::internal(err.to_string()))?
@@ -245,6 +272,7 @@ pub async fn chat_send(
         .lock()
         .map(|mut held| held.remove(&conversation_id))
         .ok();
+    steering.release(&conversation_id);
 
     let answered = Message {
         parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
@@ -253,50 +281,21 @@ pub async fn chat_send(
     };
     let _ = append(&file, &answered);
 
-    let Said { end, session_id } = said;
+    let Said {
+        end,
+        session_id,
+        init,
+        anchor,
+    } = said;
+    crate::slash::remember(&home, &profile_id, init.as_ref());
     let _ = write_head(
         &head_file,
-        &Head {
-            cost_usd: opening.cost_usd + end.cost_usd.unwrap_or_default(),
-            session_id: session_id.or(opening.session_id.clone()),
-            ..opening
-        },
+        &after_turn(opening, &turn_id, end.cost_usd, session_id, anchor),
     );
 
     let end = TurnEnd { turn_id, ..end };
     let _ = on_frame.send(Frame::Ended { end: end.clone() });
     Ok(end)
-}
-
-/// `chat.cancel` — stops the turn in flight, keeping what already arrived.
-///
-/// Answers with the ending it caused, or nothing when no turn was running.
-#[tauri::command]
-#[specta::specta]
-pub fn chat_cancel(
-    state: State<'_, Talking>,
-    conversation_id: String,
-) -> Result<Option<TurnEnd>, RpcError> {
-    let pid = state
-        .running
-        .lock()
-        .ok()
-        .and_then(|held| held.get(&conversation_id).copied());
-    let Some(pid) = pid else {
-        return Ok(None);
-    };
-    // SIGTERM, not SIGKILL: the CLI gets to write its own last line.
-    let _ = std::process::Command::new("kill")
-        .arg("-TERM")
-        .arg(pid.to_string())
-        .status();
-    Ok(Some(TurnEnd {
-        turn_id: String::new(),
-        cost_usd: None,
-        duration_ms: None,
-        stop_reason: Some("cancelled".to_owned()),
-        is_error: false,
-    }))
 }
 
 /// `chat.frames` — the shapes `chat.send` uses, on both sides.

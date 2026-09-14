@@ -6,6 +6,9 @@ import type { PrefsPane, Shell, Theme } from './shape'
 import { useAccount } from './useAccount'
 import { useAgents } from './useAgents'
 import { useClosing } from './useClosing'
+import { usePaneSessions } from './paneSessions'
+import { useSubagents } from './subagents'
+import { useUnread } from './unread'
 import { useWidths } from './useWidths'
 import { useTabs } from './useTabs'
 import { useProjects } from './useProjects'
@@ -35,6 +38,9 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const tabs = useTabs(projects.project?.id ?? null)
   const running = useRunning(projects.project?.id ?? null)
   const doing = useAgents()
+  const unread = useUnread(doing, tabs.active)
+  const subagents = useSubagents()
+  const agentSessions = usePaneSessions()
   const sizing = useWidths()
 
   /* Which tabs hold an edit that is not on disk. Held here because the cross
@@ -59,7 +65,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     document.documentElement.dataset.theme = next
-    void ask(() => commands.settingsWrite(null, next, null, null, null))
+    void ask(() => commands.settingsWrite(null, next, null, null, null, null))
   }, [])
 
   useEffect(() => {
@@ -78,6 +84,10 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       ...guard,
       running,
       doing,
+      unread,
+      subagents,
+      agentSessions,
+      closeNow: tabs.close,
       markUnsaved,
       side,
       files,
@@ -113,6 +123,9 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       guard,
       running,
       doing,
+      unread,
+      subagents,
+      agentSessions,
       markUnsaved,
       side,
       files,

@@ -3,6 +3,9 @@ import type { PaneName } from './paneList'
 import type { Tab } from './strip'
 import type { Who } from './account'
 import type { Membership } from './useAccount'
+import type { PaneSessions } from './paneSessions'
+import type { Subagents } from './subagents'
+import type { Unread } from './unread'
 import type { Doing } from './useAgents'
 import type { Closing } from './useClosing'
 import type { Panel, Widths } from './sizing'
@@ -62,6 +65,14 @@ export interface Shell {
       different answers: the process table says which agent is open, and only
       the agent says whether it is working or waiting for you. */
   readonly doing: Doing
+  /** The panes whose agent finished while their tab was not in front. */
+  readonly unread: Unread
+  /** The subagents each pane's agent started, from its own hooks. */
+  readonly subagents: Subagents
+  /** The CLI session each pane's agent is in, when its hooks said. */
+  readonly agentSessions: PaneSessions
+  /** Closes a tab without asking, for a caller that already knows it should. */
+  closeNow: (id: string) => void
   /** A pane says whether it is holding an edit that is not on disk, so the
    *  cross in the strip can stop and ask before throwing it away. */
   markUnsaved: (tabId: string, dirty: boolean) => void

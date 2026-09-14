@@ -12,12 +12,14 @@ pub mod agents;
 pub mod board;
 pub mod card;
 pub mod chat;
+pub mod conversation;
 pub mod error;
 pub mod file;
 mod frame;
 pub mod front;
 pub mod profile;
 pub mod project;
+pub mod runs;
 pub mod search;
 pub mod session;
 pub mod session_status;
@@ -30,7 +32,8 @@ pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use card::{CardDetail, Checkout, Comment, Notice, Notices, Pinned, Played};
-pub use chat::{Ask, Attachment, CallState, Conversation, Message, Part, Role, TurnEnd};
+pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
+pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use frame::Frame;
@@ -40,6 +43,7 @@ pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
     ProjectList, ProjectNotes, ProjectTree, Worktree, WorktreeOrigin,
 };
+pub use runs::{ProjectRun, RunCursor, RunsPage, RunsQuery};
 pub use search::{SearchFile, SearchHits, SearchLine};
 pub use session::{
     AgentPresence, KnownAgent, LayoutNode, PaneKind, PaneRunning, PaneSize, SessionLayout,

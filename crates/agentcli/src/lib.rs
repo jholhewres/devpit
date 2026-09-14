@@ -278,7 +278,9 @@ fn run(args: &[&str]) -> Result<String, AgentError> {
 #[path = "lib_tests.rs"]
 mod tests;
 
+pub mod claude_lines;
 pub mod cli_config;
+pub mod control;
 pub mod declaring;
 pub mod driver;
 #[cfg(test)]
@@ -289,6 +291,7 @@ mod head_tests;
 pub mod history;
 #[cfg(test)]
 mod history_tests;
+pub mod outside;
 pub mod profile;
 #[cfg(test)]
 mod profile_tests;
@@ -299,3 +302,5 @@ pub mod store;
 #[cfg(test)]
 mod store_tests;
 pub mod talk;
+mod talk_args;
+pub mod transcript_text;

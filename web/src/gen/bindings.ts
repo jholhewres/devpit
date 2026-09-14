@@ -66,6 +66,23 @@ export const commands = {
 	 *  left a file nobody could reach again.
 	 */
 	chatList: (projectId: string) => typedError<Conversations, RpcError>(__TAURI_INVOKE("chat_list", { projectId })),
+	/**  `chat.outside` — sessions of this project started outside devpit. */
+	chatOutside: (projectId: string) => typedError<OutsideSession[], RpcError>(__TAURI_INVOKE("chat_outside", { projectId })),
+	/**
+	 *  `chat.adopt` — a conversation that resumes a terminal session.
+	 * 
+	 *  Answers the new conversation's id, which the window opens as a chat tab.
+	 */
+	chatAdopt: (projectId: string, sessionId: string, profileId: string, title: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("chat_adopt", { projectId, sessionId, profileId, title })),
+	/**
+	 *  `chat.rewind` — a new conversation that goes on from an earlier turn.
+	 * 
+	 *  Answers its id, which the window opens as a chat tab.
+	 */
+	chatRewind: (projectId: string, conversationId: string, turnId: string) => typedError<string, RpcError>(__TAURI_INVOKE("chat_rewind", { projectId, conversationId, turnId })),
+	runsList: (query: RunsQuery) => typedError<RunsPage, RpcError>(__TAURI_INVOKE("runs_list", { query })),
+	/**  `sessions.search` — hits in this project's conversations for a query. */
+	sessionsSearch: (projectId: string, query: string) => typedError<SessionHit[], RpcError>(__TAURI_INVOKE("sessions_search", { projectId, query })),
 	/**
 	 *  `chat.cancel` — stops the turn in flight, keeping what already arrived.
 	 * 
@@ -79,6 +96,14 @@ export const commands = {
 	stopReason: string | null,
 	isError: boolean,
 } | null, RpcError>(__TAURI_INVOKE("chat_cancel", { conversationId })),
+	/**
+	 *  `chat.stop_task` — stops one background task of the turn in flight.
+	 * 
+	 *  Answers whether the request reached the turn. The task's ending arrives on
+	 *  the stream like any other, so the screen learns it stopped from the CLI and
+	 *  not from this answer.
+	 */
+	chatStopTask: (conversationId: string, taskId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("chat_stop_task", { conversationId, taskId })),
 	/**
 	 *  `chat.frames` — the shapes `chat.send` uses, on both sides.
 	 * 
@@ -155,6 +180,17 @@ export const commands = {
 	 *  than read.
 	 */
 	chatAttach: (projectId: string, path: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_attach", { projectId, path })),
+	/**  `chat.paste` — keeps a pasted picture and answers with it as an attachment. */
+	chatPaste: (projectId: string, mediaType: string, data: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_paste", { projectId, mediaType, data })),
+	/**  `chat.receipt` — records an answered question in the conversation. */
+	chatReceipt: (projectId: string, conversationId: string, tool: string, input: string, allowed: boolean) => typedError<Message, RpcError>(__TAURI_INVOKE("chat_receipt", { projectId, conversationId, tool, input, allowed })),
+	/**
+	 *  `chat.slash_commands` — what the composer offers after `/` for a profile.
+	 * 
+	 *  Empty until a turn of that profile has run: nothing is offered that the CLI
+	 *  did not say it has.
+	 */
+	chatSlashCommands: (profileId: string) => typedError<string[], RpcError>(__TAURI_INVOKE("chat_slash_commands", { profileId })),
 	/**  `permission.answer` — what the person said. */
 	permissionAnswer: (id: string, answer: Answer) => typedError<null, RpcError>(__TAURI_INVOKE("permission_answer", { id, answer })),
 	/**
@@ -171,12 +207,20 @@ export const commands = {
 	 *  themselves arrive on an event, which specta does not describe.
 	 */
 	permissionQuestions: () => typedError<Question[], RpcError>(__TAURI_INVOKE("permission_questions")),
-	/**  `mcp.list` — what the CLI resolved for this project. */
-	mcpList: (projectId: string | null) => typedError<Servers, RpcError>(__TAURI_INVOKE("mcp_list", { projectId })),
-	/**  `skills.list` — the skills installed on this machine. */
-	skillsList: () => typedError<Skills, RpcError>(__TAURI_INVOKE("skills_list")),
+	/**
+	 *  `mcp.list` — what one installation of the CLI resolved for this project,
+	 *  the default profile's when none is named.
+	 */
+	mcpList: (projectId: string | null, directory: string | null) => typedError<Servers, RpcError>(__TAURI_INVOKE("mcp_list", { projectId, directory })),
+	/**  `cli.installations` — what the Skills and MCP panels can switch between. */
+	cliInstallations: () => typedError<Installation[], RpcError>(__TAURI_INVOKE("cli_installations")),
+	/**
+	 *  `skills.list` — the skills of one installation of the CLI, the default
+	 *  profile's when none is named.
+	 */
+	skillsList: (directory: string | null) => typedError<Skills, RpcError>(__TAURI_INVOKE("skills_list", { directory })),
 	/**  `skills.read` — the whole of one skill's `SKILL.md`. */
-	skillsRead: (name: string) => typedError<SkillDoc, RpcError>(__TAURI_INVOKE("skills_read", { name })),
+	skillsRead: (name: string, directory: string | null) => typedError<SkillDoc, RpcError>(__TAURI_INVOKE("skills_read", { name, directory })),
 	/**  `workspace.read` — the devpit workspace, row by row, with real sizes. */
 	workspaceRead: (projectId: string | null) => typedError<Workspace, RpcError>(__TAURI_INVOKE("workspace_read", { projectId })),
 	/**
@@ -705,7 +749,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, keepTranscripts: boolean | null, confirmStop: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme, automaticUpdates, keepTranscripts, confirmStop })),
+	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, keepTranscripts: boolean | null, confirmStop: boolean | null, terminalContrast: number | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme, automaticUpdates, keepTranscripts, confirmStop, terminalContrast })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -982,6 +1026,13 @@ export type Change = {
 	staged: boolean,
 };
 
+/**  One file a turn changed, relative to the checkout it ran in. */
+export type ChangedFile = {
+	path: string,
+	added: number,
+	removed: number,
+};
+
 /**
  *  The checkout this card's work happens in.
  * 
@@ -1096,6 +1147,11 @@ export type Conversation = {
 	sessionId: string | null,
 	messages: Message[],
 	costUsd: number | null,
+	/**
+	 *  The turns a rewind can fork at: those whose place in the CLI's
+	 *  transcript was kept. Earlier turns ran before it was.
+	 */
+	rewindable?: string[],
 	createdAt: number | null,
 };
 
@@ -1270,7 +1326,7 @@ export type Happening = {
 	paneId: string,
 	/**
 	 *  `cwd` | `title` | `prompt` | `running` | `finished` | `clipboard` |
-	 *  `agent`.
+	 *  `agent` | `subagent` | `session`.
 	 */
 	what: string,
 	detail: string | null,
@@ -1290,6 +1346,18 @@ export type Held = {
 	 *  yet" is honest; a row that says 0 B is not.
 	 */
 	exists: boolean,
+};
+
+/**  One installation, as the panels offer it. */
+export type Installation = {
+	directory: string,
+	/**
+	 *  The profiles that run against it. Empty for the one this process would
+	 *  use with no profile at all.
+	 */
+	profiles: string[],
+	/**  Whether the default profile runs against it — where the panels start. */
+	default: boolean,
 };
 
 /**
@@ -1444,6 +1512,20 @@ export type Opened = {
 	path: string,
 };
 
+/**
+ *  A session of this project the CLI holds and devpit never saw — one started
+ *  in a terminal.
+ */
+export type OutsideSession = {
+	sessionId: string,
+	/**  The CLI's own title, when it wrote one. */
+	title: string | null,
+	/**  The configuration directory of the installation that holds it. */
+	installation: string,
+	/**  Unix seconds. */
+	lastAt: number | null,
+};
+
 /**  One pane, and the whole process tree under it. */
 export type PaneCost = {
 	paneId: string,
@@ -1534,17 +1616,47 @@ export type PaneWritten = {
 	bytes: number,
 };
 
-/**  One piece of a message. */
-export type Part = { kind: "text"; text: string } | 
+/**
+ *  One piece of a message.
+ * 
+ *  `parent` names the `Agent` call a subagent's part came from. Empty for the
+ *  agent's own work. Defaulted so a transcript written before it existed still
+ *  reads.
+ */
+export type Part = { kind: "text"; text: string; parent?: string | null } | 
 /**  Reasoning the model showed. Separate because it is not the answer. */
-{ kind: "thinking"; text: string } | { kind: "tool_call"; id: string; name: string; 
+{ kind: "thinking"; text: string; parent?: string | null } | { kind: "tool_call"; id: string; name: string; 
 /**
  *  Verbatim. Parsing it here would be this crate guessing at a shape
  *  the provider is free to change.
  */
-input: string; state: CallState } | { kind: "tool_result"; 
+input: string; state: CallState; parent?: string | null } | { kind: "tool_result"; 
 /**  The call this answers. */
-call_id: string; output: string; is_error: boolean } | 
+call_id: string; output: string; is_error: boolean; parent?: string | null } | 
+/**
+ *  Work the CLI runs beside the conversation: a backgrounded subagent or
+ *  command. One part per change, so the latest for a `task_id` is its state.
+ */
+{ kind: "task"; task_id: string; 
+/**  The tool call that started it, when the CLI says. */
+call_id: string | null; 
+/**  The CLI's own word: `local_agent`, `local_bash`. */
+task_kind: string | null; description: string | null; 
+/**  `started`, `running`, then the CLI's own ending (`completed`, …). */
+status: string; summary: string | null } | 
+/**  What a slash command itself answered, as the CLI printed it. */
+{ kind: "command"; content: string } | 
+/**  A permission question somebody answered, kept in the thread. */
+{ kind: "receipt"; tool: string; 
+/**  The tool's input as the question showed it. */
+input: string; allowed: boolean } | 
+/**  What the turn changed in the checkout, measured before and after it. */
+{ kind: "changes"; files: ChangedFile[] } | 
+/**
+ *  This conversation was forked from another at one of its turns, which
+ *  left that one as it was.
+ */
+{ kind: "rewound"; from_conversation: string; turn: number } | 
 /**
  *  A line the driver did not recognise. Kept rather than dropped: losing
  *  output is worse than showing it plain.
@@ -1712,6 +1824,12 @@ export type ProjectNotes = {
 	notes: Note[],
 };
 
+export type ProjectRun = {
+	run: Run,
+	cardId: string,
+	cardTitle: string,
+};
+
 export type ProjectTree = {
 	nodes: FileNode[],
 };
@@ -1804,8 +1922,33 @@ export type Run = {
 	startedAt: number | null,
 };
 
+/**  Where the last page ended: the next one starts after this run. */
+export type RunCursor = {
+	startedAt: number | null,
+	id: string,
+};
+
 /**  How a run ended, or that it has not. */
-export type RunState = "running" | "ok" | "failed" | "cancelled";
+export type RunState = "running" | "ok" | "failed" | "cancelled" | "lost";
+
+export type RunsPage = {
+	runs: ProjectRun[],
+	/**  Absent on the last page. */
+	next: RunCursor | null,
+};
+
+/**  What to list. Every filter is optional, and they narrow together. */
+export type RunsQuery = {
+	projectId: string,
+	/**  A lane is filtered by the step it runs. */
+	stepId: string | null,
+	state: RunState | null,
+	/**  Unix seconds, inclusive. */
+	since: number | null,
+	/**  Unix seconds, exclusive. */
+	until: number | null,
+	after: RunCursor | null,
+};
 
 export type SearchFile = {
 	path: string,
@@ -1864,6 +2007,21 @@ export type Session = {
 	status: SessionStatus,
 };
 
+export type SessionHit = {
+	sessionId: string,
+	/**  `user` or `assistant`. */
+	role: string,
+	/**  The words around the match, the matched ones between `[` and `]`. */
+	snippet: string,
+	/**  The installation whose transcript it is. */
+	installation: string,
+	/**
+	 *  The devpit conversation that already resumes this session, if one does —
+	 *  so a hit opens that tab instead of taking the session in a second time.
+	 */
+	conversationId: string | null,
+};
+
 /**  Response of `session.layout` / `session.ensure` / `session.split`. */
 export type SessionLayout = {
 	projectId: string,
@@ -1912,6 +2070,12 @@ export type Settings = {
 	 *  "don't ask again", which is a choice and not a default.
 	 */
 	confirmStop: boolean | null,
+	/**
+	 *  The contrast xterm lifts every colour to, from 1 (none) to 21. Null is
+	 *  "never asked", which keeps the old rule: none on the dark ground, 4.5
+	 *  on the light one.
+	 */
+	terminalContrast: number | null,
 };
 
 /**  A sign-in that has started but not finished. */

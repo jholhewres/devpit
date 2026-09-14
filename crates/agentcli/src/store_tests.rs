@@ -9,6 +9,7 @@ fn message(id: &str, text: &str) -> Message {
         role: Role::Assistant,
         parts: vec![Part::Text {
             text: text.to_owned(),
+            parent: None,
         }],
         created_at: 0.0,
         streaming: false,

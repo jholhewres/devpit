@@ -2,14 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Asked } from './Asked'
 import { Chips } from './Chips'
-import { money, ready } from './chat'
+import { money, ready, unanswered } from './chat'
 import { targetOf } from './stop'
 import { titleOf, type Tab } from './strip'
+import { ChatWhere } from './ChatWhere'
+import { ComposerStatus } from './ComposerStatus'
+import { CopySession } from './CopySession'
+import { DropTarget } from './DropTarget'
+import { PaneCorner } from './PaneCorner'
+import { picturesTo } from './pasting'
 import { Turn } from './Turn'
+import { SkillPills } from './SkillPills'
+import { SlashMenu } from './SlashMenu'
 import { useChat } from './useChat'
+import { useSlash } from './useSlash'
 import { useShell } from './useShell'
 import { useStop } from './useStop'
-import { onFilesDropped } from './window'
 import { committed } from './typing'
 
 /*
@@ -25,19 +33,16 @@ import { committed } from './typing'
  */
 
 export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { close, active, project, rename } = useShell()
+  const { active, project, rename } = useShell()
   const chat = useChat(tab.id)
   const [prompt, setPrompt] = useState('')
+  const slash = useSlash(chat.profileId, prompt, setPrompt)
   const box = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLTextAreaElement>(null)
 
-  /* A drop lands on the window, not on a pane, so only the chat in front
-     takes it. */
   const mine = active?.id === tab.id
-  useEffect(() => {
-    if (!mine) return
-    return onFilesDropped(chat.attach)
-  }, [mine, chat.attach])
+
+
 
   /* A conversation is called the first thing you said in it. Only once, and
      only while it is unnamed: a tab you renamed keeps the name you gave it. */
@@ -73,17 +78,12 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
 
   return (
     <>
-      <div className="pane__bar">
-        <span className="pane__t">
-          <b>Chat</b>
-          {spent ? ` · ${spent}` : ''}
-        </span>
-        <span className="drag"></span>
-        <button className="sq26" onClick={() => close(tab.id)} aria-label="Close chat">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-        </button>
-      </div>
+      <PaneCorner tabId={tab.id} what="chat">
+        {spent && <span className="pcorner__cost" title="What this conversation has cost">{spent}</span>}
+        {chat.session && <CopySession id={chat.session} />}
+      </PaneCorner>
 
+      <DropTarget mine={mine} onDrop={chat.attach} />
       <div className="scroll" ref={box}>
         {empty ? (
           <div className="chat__blank">
@@ -99,8 +99,9 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <div className="thread">
             {chat.error && <div className="exempty__t">{chat.error}</div>}
             {chat.messages.map((message) => (
-              <Turn key={message.id} message={message} />
+              <Turn key={message.id} message={message} rewind={message.turnId && chat.rewindable.includes(message.turnId) ? () => chat.rewind(message.turnId!) : undefined} />
             ))}
+            {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
           </div>
         )}
       </div>
@@ -110,6 +111,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           {/* The question sits above the composer, where your hands are — not
               in the thread, where it scrolls away from you. */}
           <Asked questions={chat.asked} onAnswer={chat.answer} />
+          <ComposerStatus conversationId={tab.id} messages={chat.messages} />
 
           <div className="composer__in">
             {chat.files.length > 0 && (
@@ -121,21 +123,28 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
                     onClick={() => chat.detach(file.path)}
                     title={`${file.path} — click to remove`}
                   >
+                    {chat.previews[file.path] && (
+                      <img className="chip__thumb" src={chat.previews[file.path]} alt="" />
+                    )}
                     {file.name} ✕
                   </button>
                 ))}
               </div>
             )}
 
+            <SkillPills picked={chat.skills} onChange={chat.setSkills} />
+            <SlashMenu slash={slash} />
             <textarea
               className="composer__ph"
               placeholder="Do anything…"
               ref={field}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
+              onPaste={picturesTo(chat.paste)}
               onKeyDown={(event) => {
                 /* Enter sends, Shift+Enter is a new line — and `committed`
                    keeps the Enter that finishes an accented letter out. */
+                if (slash.keyDown(event)) return
                 if (committed(event) && !event.shiftKey) {
                   event.preventDefault()
                   send()
@@ -174,25 +183,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
             </div>
           </div>
 
-          {/* Where the work happens. Quieter than the composer's own chips,
-              because these describe the conversation rather than steer the
-              turn. */}
-          <div className="composer__where">
-            <span className="wschip">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-              {project?.name ?? 'No project'}
-            </span>
-            <span className="wschip">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
-              Local
-            </span>
-            {project?.worktrees[0] && (
-              <span className="wschip">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
-                {project.worktrees[0].branch}
-              </span>
-            )}
-          </div>
+          <ChatWhere />
         </div>
       </div>
     </>

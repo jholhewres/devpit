@@ -60,7 +60,8 @@ fn opened_with(path: &Path) -> Option<String> {
                 .parts
                 .iter()
                 .filter_map(|part| match part {
-                    devpit_rpc::Part::Text { text } => Some(text.as_str()),
+                    // A subagent's words are not the conversation's.
+                    devpit_rpc::Part::Text { text, parent: None } => Some(text.as_str()),
                     _ => None,
                 })
                 .collect::<Vec<_>>()
@@ -102,9 +103,17 @@ pub fn conversations(home: &Path, project_id: &str) -> Vec<Summary> {
                 session_id: None,
                 permission: None,
                 effort: None,
+                title: None,
+                rewind: Default::default(),
             });
             Some(Summary {
-                title: title_of(&opened_with(&path).unwrap_or_default()),
+                // The person's own words first — the decision above — and the
+                // CLI's title only for a session that has none of them.
+                title: opened_with(&path)
+                    .filter(|said| !said.trim().is_empty())
+                    .map(|said| title_of(&said))
+                    .or_else(|| head.title.clone())
+                    .unwrap_or_else(|| "Untitled".to_owned()),
                 last_at: seconds(&path),
                 profile: head.profile,
                 model: head.model,

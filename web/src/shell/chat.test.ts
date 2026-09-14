@@ -13,6 +13,7 @@ import {
   money,
   ready,
   withFiles,
+  unanswered,
 } from './chat'
 
 const message = (id: string, streaming = true): Message =>
@@ -20,7 +21,7 @@ const message = (id: string, streaming = true): Message =>
 
 const opened = (id: string): Frame => ({ type: 'opened', message: message(id) })
 const text = (id: string, t: string): Frame =>
-  ({ type: 'part', message_id: id, part: { kind: 'text', text: t } } as Frame)
+  ({ type: 'part', message_id: id, part: { kind: 'text', text: t, parent: null } } as Frame)
 
 describe('what arrives on the stream', () => {
   it('adds the message that opened', () => {
@@ -30,7 +31,7 @@ describe('what arrives on the stream', () => {
   it('grows the open message rather than adding another', () => {
     const after = applied(applied([], opened('m1')), text('m1', 'hi'))
     expect(after).toHaveLength(1)
-    expect(after[0]!.parts).toEqual([{ kind: 'text', text: 'hi' }])
+    expect(after[0]!.parts).toEqual([{ kind: 'text', text: 'hi', parent: null }])
   })
 
   it('joins consecutive text into one paragraph', () => {
@@ -38,7 +39,7 @@ describe('what arrives on the stream', () => {
     let msgs = applied([], opened('m1'))
     msgs = applied(msgs, text('m1', 'he'))
     msgs = applied(msgs, text('m1', 'llo'))
-    expect(msgs[0]!.parts).toEqual([{ kind: 'text', text: 'hello' }])
+    expect(msgs[0]!.parts).toEqual([{ kind: 'text', text: 'hello', parent: null }])
   })
 
   it('keeps a tool call separate from the text around it', () => {
@@ -47,7 +48,7 @@ describe('what arrives on the stream', () => {
     msgs = applied(msgs, {
       type: 'part',
       message_id: 'm1',
-      part: { kind: 'tool_call', id: 'c1', name: 'Bash', input: '{}', state: 'running' },
+      part: { kind: 'tool_call', id: 'c1', name: 'Bash', input: '{}', state: 'running', parent: null },
     } as Frame)
     expect(msgs[0]!.parts).toHaveLength(2)
   })
@@ -57,7 +58,7 @@ describe('what arrives on the stream', () => {
     msgs = applied(msgs, {
       type: 'part',
       message_id: 'm1',
-      part: { kind: 'tool_call', id: 'c1', name: 'Bash', input: '{}', state: 'running' },
+      part: { kind: 'tool_call', id: 'c1', name: 'Bash', input: '{}', state: 'running', parent: null },
     } as Frame)
     msgs = applied(msgs, { type: 'call_state', call_id: 'c1', state: 'ok' } as Frame)
     expect(msgs[0]!.parts[0]).toMatchObject({ kind: 'tool_call', state: 'ok' })
@@ -210,5 +211,32 @@ describe('how hard the agent is asked to think', () => {
 
   it('leaves a level it does not know alone', () => {
     expect(effortName('ultracode')).toBe('ultracode')
+  })
+})
+
+describe('who is speaking', () => {
+  it("keeps a subagent's words apart from the agent's", () => {
+    // Merged, the subagent's report would read as the agent's own answer.
+    const opened = applied([], { type: 'opened', message: { id: 'm', turnId: null, role: 'assistant', parts: [], createdAt: 0, streaming: true } } as Frame)
+    const mine = applied(opened, { type: 'part', message_id: 'm', part: { kind: 'text', text: 'I will ask a helper. ', parent: null } } as Frame)
+    const theirs = applied(mine, { type: 'part', message_id: 'm', part: { kind: 'text', text: 'notes.txt has 3 lines', parent: 'toolu_agent' } } as Frame)
+    expect(theirs[0]!.parts).toHaveLength(2)
+    expect(theirs[0]!.parts[1]).toMatchObject({ parent: 'toolu_agent' })
+  })
+})
+
+
+describe('a turn the app closed on', () => {
+  const said = (role: 'user' | 'assistant'): Message =>
+    ({ id: role, turnId: 't', role, parts: [], createdAt: 0, streaming: false }) as Message
+
+  it('is the person speaking last with nothing after it', () => {
+    expect(unanswered([said('user')], false)).toBe(true)
+    expect(unanswered([said('user'), said('assistant')], false)).toBe(false)
+  })
+
+  it('is not a turn still running, nor an empty conversation', () => {
+    expect(unanswered([said('user')], true)).toBe(false)
+    expect(unanswered([], false)).toBe(false)
   })
 })

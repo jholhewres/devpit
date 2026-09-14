@@ -25,15 +25,23 @@ pub enum CallState {
 }
 
 /// One piece of a message.
+///
+/// `parent` names the `Agent` call a subagent's part came from. Empty for the
+/// agent's own work. Defaulted so a transcript written before it existed still
+/// reads.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Part {
     Text {
         text: String,
+        #[serde(default)]
+        parent: Option<String>,
     },
     /// Reasoning the model showed. Separate because it is not the answer.
     Thinking {
         text: String,
+        #[serde(default)]
+        parent: Option<String>,
     },
     ToolCall {
         id: String,
@@ -42,18 +50,74 @@ pub enum Part {
         /// the provider is free to change.
         input: String,
         state: CallState,
+        #[serde(default)]
+        parent: Option<String>,
     },
     ToolResult {
         /// The call this answers.
         call_id: String,
         output: String,
         is_error: bool,
+        #[serde(default)]
+        parent: Option<String>,
+    },
+    /// Work the CLI runs beside the conversation: a backgrounded subagent or
+    /// command. One part per change, so the latest for a `task_id` is its state.
+    Task {
+        task_id: String,
+        /// The tool call that started it, when the CLI says.
+        call_id: Option<String>,
+        /// The CLI's own word: `local_agent`, `local_bash`.
+        task_kind: Option<String>,
+        description: Option<String>,
+        /// `started`, `running`, then the CLI's own ending (`completed`, …).
+        status: String,
+        summary: Option<String>,
+    },
+    /// What a slash command itself answered, as the CLI printed it.
+    Command { content: String },
+    /// A permission question somebody answered, kept in the thread.
+    Receipt {
+        tool: String,
+        /// The tool's input as the question showed it.
+        input: String,
+        allowed: bool,
+    },
+    /// What the turn changed in the checkout, measured before and after it.
+    Changes { files: Vec<ChangedFile> },
+    /// This conversation was forked from another at one of its turns, which
+    /// left that one as it was.
+    Rewound {
+        from_conversation: String,
+        turn: u32,
     },
     /// A line the driver did not recognise. Kept rather than dropped: losing
     /// output is worse than showing it plain.
-    Unknown {
-        text: String,
-    },
+    Unknown { text: String },
+}
+
+/// One file a turn changed, relative to the checkout it ran in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangedFile {
+    pub path: String,
+    pub added: u32,
+    pub removed: u32,
+}
+
+/// What the CLI says about itself when a session starts.
+///
+/// Read from its own report rather than a list kept here: the commands and
+/// skills differ per installation and change with every plugin.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionInit {
+    pub model: Option<String>,
+    pub slash_commands: Vec<String>,
+    /// Commands that only work in the terminal, which a chat must not offer.
+    pub terminal_slash_commands: Vec<String>,
+    pub skills: Vec<String>,
+    pub agents: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -79,61 +143,4 @@ pub struct TurnEnd {
     /// The CLI's own word, kept rather than flattened into "failed".
     pub stop_reason: Option<String>,
     pub is_error: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Conversation {
-    pub id: String,
-    pub project_id: String,
-    pub card_id: Option<String>,
-    /// The profile — account and driver — this conversation belongs to, for
-    /// its whole life.
-    ///
-    /// Fixed on purpose: the transcript, the shape of a message and the way
-    /// cost is counted all belong to one account. Changing it is starting
-    /// another conversation, not continuing this one.
-    pub profile: String,
-    /// The model within that provider, which the composer may change.
-    pub model: Option<String>,
-    /// The CLI's own id for this thread, once it has run a turn. It is what
-    /// ties a permission question back to the conversation that raised it.
-    pub session_id: Option<String>,
-    pub messages: Vec<Message>,
-    pub cost_usd: f64,
-    pub created_at: f64,
-}
-
-/// What one turn needs to run. One object because the composer sends these
-/// together, and because tomorrow's field needs somewhere to live.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Ask {
-    pub project_id: String,
-    pub conversation_id: String,
-    /// Which profile — the account, and the binary it names.
-    pub profile_id: String,
-    pub model: Option<String>,
-    pub prompt: String,
-    pub cwd: String,
-    /// A ceiling for the whole conversation, not for this turn.
-    pub budget_usd: Option<f64>,
-    /// What the agent may do without asking, in the CLI's own words.
-    /// Absent keeps whatever the conversation already had.
-    pub permission: Option<String>,
-    /// How hard to think. Absent keeps what the conversation already had.
-    pub effort: Option<String>,
-}
-
-/// A file the person put in front of the agent.
-///
-/// The path is relative to the project root, because that is the only form
-/// the agent can use and the only form that survives another machine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Attachment {
-    pub name: String,
-    pub path: String,
-    /// The extension, lowercased, or empty. What the chip draws.
-    pub kind: String,
 }

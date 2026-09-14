@@ -54,11 +54,12 @@ export function applied(messages: readonly Message[], frame: Frame): readonly Me
   }
 }
 
-/* Consecutive text is one paragraph, not one part per chunk. */
+/* Consecutive text is one paragraph, not one part per chunk — unless the two
+   came from different speakers: a subagent's words are not the agent's. */
 function merged(parts: readonly Part[], next: Part): Part[] {
   const last = parts[parts.length - 1]
-  if (last?.kind === 'text' && next.kind === 'text') {
-    return [...parts.slice(0, -1), { kind: 'text', text: last.text + next.text }]
+  if (last?.kind === 'text' && next.kind === 'text' && last.parent === next.parent) {
+    return [...parts.slice(0, -1), { kind: 'text', text: last.text + next.text, parent: last.parent }]
   }
   return [...parts, next]
 }
@@ -150,3 +151,16 @@ export function withFiles(prompt: string, files: readonly Attachment[]): string 
    argument and a useless label — it names no model to the person reading it. */
 export const modelName = (model: string): string =>
   model === 'default' ? "The account's default" : model
+
+/* Whether a conversation stopped with the person's message unanswered.
+
+   The answer is written when the turn ends, so an app that closed part way
+   through leaves exactly this: a question and nothing under it. Said on
+   screen, it reads as what happened; left silent, it reads as a message that
+   was never sent. */
+export function unanswered(messages: readonly Message[], sending: boolean): boolean {
+  if (sending) return false
+  const last = messages.at(-1)
+  return last !== undefined && last.role === 'user'
+}
+

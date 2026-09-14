@@ -738,6 +738,9 @@ body[data-account='out'] .acct { display: none; }
 .prefs__in--wide > .sk { height: 100%; }
 .sk__list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
 .sk__seek { display: flex; align-items: center; gap: 4px; margin: 10px 10px 0; }
+/* Chips wrap in a column 268px wide; the picker draws nothing with one. */
+.sk__inst { padding: 8px 10px 0; }
+.sk__inst:empty { display: none; }
 .sk__find { flex: 1; min-width: 0; height: 30px; flex: none; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12.5px; color: var(--ghost); }
 .sk__h { padding: 14px 12px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); display: flex; gap: 7px; }
 .sk__h span { color: var(--ghost); font-weight: 500; letter-spacing: 0; }
@@ -856,6 +859,9 @@ code { font-family: var(--mono); font-size: 0.87em; color: var(--code-text); bac
 .turn__foot { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
 .tfbtn { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--ghost); }
 .tfbtn:hover { background: var(--overlay); color: var(--text-2); }
+/* The note a forked conversation opens with, naming where it came from. */
+.rwnd { margin: 4px 0 10px; padding: 8px 12px; border-left: 2px solid var(--accent); font-size: 12.5px; color: var(--text-2); }
+.rwnd__from { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .turn__time { font-size: 11.5px; color: var(--ghost); }
 
 .composer { flex: none; padding: 0 12px 8px; }
@@ -877,6 +883,7 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .composer__row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .chip { display: flex; align-items: center; gap: 5px; height: 25px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--text-3); }
 .chip:hover { background: var(--overlay); color: var(--text-2); }
+.chip__thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; }
 .chip__sun { color: var(--accent); }
 .send { width: 26px; height: 26px; border-radius: 50%; background: var(--overlay-strong); color: var(--text-2); display: flex; align-items: center; justify-content: center; margin-left: auto; }
 .send:hover { background: var(--inverse); color: var(--on-inverse); }
@@ -983,6 +990,8 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .tile__t { font-size: 12.5px; color: var(--text); line-height: 1.42; }
 .tile__m { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; color: var(--text-3); }
 .tile__agent { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10.5px; }
+/* Lane.tsx set this on failed and lost runs, and no rule ever coloured it. */
+.tile__agent--warn { color: var(--warning); }
 .tile__time { margin-left: auto; font-variant-numeric: tabular-nums; }
 
 /* The strip a landed card runs while its agent spins up. */
@@ -1455,6 +1464,11 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .md__img { max-width: 100%; border-radius: 6px; }
 .md__a { display: inline; padding: 0; color: var(--accent); text-decoration: underline; font: inherit; }
 .md__diagram { margin: 0 0 12px; display: flex; justify-content: center; }
+.md__tablewrap { margin: 0 0 12px; overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+.md__table { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.5; }
+.md__table th { padding: 8px 12px; text-align: left; font-weight: 600; color: var(--text); background: var(--raised); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.md__table td { padding: 8px 12px; vertical-align: top; border-top: 1px solid var(--border); }
+.md__table tbody tr:first-child td { border-top: 0; }
 
 /* Changes: three groups, because a commit takes one of them. */
 /* The section's own action sits beside its name. `Unstage all` used to be a
@@ -1487,6 +1501,9 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .diff__two { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
 .diff__two > div { background: var(--bg); overflow-x: auto; }
 .diff__moved { padding: 6px 12px; font-size: 12px; color: var(--text-3); }
+/* Whitespace marks sit under the text in weight: they are the answer to a
+   question, not part of the code. */
+.diff__ws { color: var(--ghost); }
 
 /* The branch switcher. Anchored to the button, like every other menu. */
 .branchbox { position: relative; }
@@ -1745,6 +1762,15 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .card__run[data-doing='waiting'] { color: var(--warning); }
 .card__run[data-doing='waiting'] .card__dot { animation: none; }
 .card__run[data-doing='done'] .card__dot { animation: none; opacity: 0.55; }
+.card__ask { flex: none; display: grid; place-items: center; width: 11px; height: 11px; border: 1px solid currentColor; border-radius: 50%; font-size: 8px; font-style: normal; font-weight: 700; line-height: 1; }
+/* A finish that happened behind another tab stays loud until someone looks. */
+.card[data-unread='true'] .card__t { font-weight: 600; }
+/* Subagents a terminal's agent started, indented under the agent's own line. */
+.card__subs { display: flex; flex-direction: column; gap: 1px; margin-top: 1px; padding-left: 18px; }
+.card__sub { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 11.5px; color: var(--text-3); }
+.card__subname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card__model { flex: none; font-size: 10.5px; opacity: 0.8; }
+.card__run[data-unread='true'] .card__dot { opacity: 1; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 30%, transparent); }
 
 /* Name search results: one row per path from the flat index, the same
    density as .row and .gitrow so switching between the tree and the results
@@ -1869,6 +1895,17 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .crun__t { display: block; font-size: 13px; color: var(--text); }
 .crun__o { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--text-3); white-space: pre-wrap; max-height: 64px; overflow: hidden; }
 .crun__s { flex: none; font-size: 11px; color: var(--text-3); }
+.crun[data-state='lost'] .crun__s { color: var(--warning); }
+/* The board's runs, across every card. */
+.runsp { width: min(760px, 100%); }
+.runsp__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.runsp__t { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.runsp__filters { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 14px; font-size: 12px; color: var(--text-3); }
+.runsp__filters label { display: flex; align-items: center; gap: 6px; }
+.runsp__card { display: block; font-size: 13px; color: var(--text); text-align: left; }
+.runsp__card:hover { text-decoration: underline; }
+.runsp__none { font-size: 12.5px; color: var(--text-3); }
+.runsp__more { margin-top: 12px; }
 .crun[data-state='failed'] .crun__s { color: var(--danger); }
 .crun[data-state='ok'] .crun__s { color: var(--success); }
 .crun[data-state='running'] .crun__s { color: var(--warning); }
@@ -2044,3 +2081,86 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .fb__sideh { flex: none; height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 12px; border-bottom: 1px solid var(--border); }
 .fb__sidet { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-2); }
 .fb__sideb { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+
+/* ── An edit, in the thread ──────────────────────────────────────────
+   Drawn inside the act row it belongs to, so it shares that row's inset
+   and never reaches the thread's edges. */
+.ecard { margin: 4px 0 6px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.ecard[data-failed] { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.ecard__h { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 10px; background: var(--overlay); font-family: var(--mono); font-size: 11.5px; }
+.ecard__p { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--text-2); }
+button.ecard__p:hover { color: var(--text); text-decoration: underline; }
+.ecard__n { flex: none; font-variant-numeric: tabular-nums; }
+.ecard__add { color: var(--success); }
+.ecard__del { color: var(--danger); }
+.ecard__b { margin: 0; max-height: 320px; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.ecard__err { margin: 0; padding: 8px 10px; font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; color: var(--danger); }
+
+/* ── What a turn changed ─────────────────────────────────────────────
+   Under the turn and quieter than it: this is the receipt, not the work. */
+.tchg { margin: 6px 0 2px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 12px; }
+.tchg__h { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--overlay); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.tchg__h > span:first-child { flex: 1; }
+.tchg__f { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 4px 10px; text-align: left; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.tchg__f:hover { background: var(--overlay); }
+.tchg__p { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.tchg__by { flex: none; padding: 0 6px; border-radius: 4px; font-family: var(--ui); font-size: 10.5px; color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+
+/* The chat a drop will land in. Over the whole pane, because the window
+   catches the drop and the pane is the only thing that can say where it goes. */
+.pane[data-pane='chat'] { position: relative; }
+/* A pane's actions sit in its corner instead of a title bar. */
+.pane[data-pane='term'] { position: relative; }
+.pcorner { position: absolute; top: 6px; right: 8px; z-index: 30; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--canvas) 85%, transparent); }
+.pcorner .sq26[data-armed='true'] { color: var(--danger); background: var(--overlay-strong); }
+.pcorner__cost { padding: 0 6px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* Over a terminal the corner would cover its last columns, so it waits for the pointer. */
+.pane[data-pane='term'] .pcorner { opacity: 0; transition: opacity 120ms; background: var(--terminal); }
+.pane[data-pane='term']:hover .pcorner, .pane[data-pane='term'] .pcorner:focus-within { opacity: 1; }
+/* The thread starts under the corner, not behind it. */
+.pane[data-pane='chat'] > .scroll { padding-top: 36px; }
+.chat__drop { position: absolute; inset: 6px; z-index: 20; display: flex; align-items: center; justify-content: center; border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--canvas)); pointer-events: none; }
+.chat__dropt { font-size: 13px; color: var(--accent); }
+
+/* ── What the turn has going on, above the composer ──────────────────
+   Rows for work left running, then the checklist folded to its count:
+   the count is the glance, the items are for when it is asked for. */
+.bgt { display: flex; flex-direction: column; gap: 4px; margin: 0 0 6px; }
+.bgt__row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; }
+.bgt__k { flex: none; color: var(--text-3); }
+.bgt__d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11.5px; color: var(--text-2); }
+.bgt__t { flex: none; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.ckl { border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+.ckl__h { cursor: pointer; color: var(--text-2); }
+.ckl__i { display: flex; align-items: center; gap: 7px; padding: 2px 0; color: var(--text-2); }
+.ckl__i[data-done] { color: var(--text-3); text-decoration: line-through; }
+.ckl__i[data-changed] { color: var(--accent); }
+.ckl__box { flex: none; width: 13px; height: 13px; border: 1px solid var(--border-strong); border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+
+/* A permission somebody answered, as one quiet line in the thread. */
+.rcpt { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 4px 0; padding: 3px 8px; font-size: 12px; color: var(--text-3); }
+.rcpt b { flex: none; font-weight: 500; color: var(--success); }
+.rcpt[data-allowed='false'] b { color: var(--danger); }
+.rcpt__w { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11.5px; }
+
+/* Slash commands matching what was typed, above the field they complete. */
+.composer__in { position: relative; }
+.slash { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 4px); z-index: 30; display: flex; flex-direction: column; padding: 4px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--raised); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
+.slash__i { padding: 4px 8px; border-radius: 6px; text-align: left; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.slash__i[aria-selected='true'] { background: var(--overlay-strong); color: var(--text); }
+
+/* Skills picked for the turn, as pills beside the attachments. */
+.pills { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 4px; }
+.pills__p { font-family: var(--mono); font-size: 11.5px; color: var(--accent); }
+.pills__menu { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 30; display: flex; flex-direction: column; min-width: 200px; max-height: 240px; overflow-y: auto; padding: 4px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--raised); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); scrollbar-width: thin; }
+.pills__o { padding: 4px 8px; border-radius: 6px; text-align: left; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.pills__o:hover, .pills__o[aria-selected='true'] { background: var(--overlay-strong); color: var(--text); }
+
+/* What a slash command answered: the CLI's words, not the agent's, so set
+   apart and quieter than a reply. */
+.said__cmd { margin: 4px 0; padding: 6px 10px; border-left: 2px solid var(--border-strong); font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; color: var(--text-3); }
+
+/* Searching what was said, above the list it narrows to. */
+.ssearch { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.ssearch mark { padding: 0 1px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--text); }
+

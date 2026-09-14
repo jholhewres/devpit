@@ -26,7 +26,8 @@ fn assistant_text_becomes_a_text_part() {
     assert_eq!(
         Claude.read(line),
         Read::Parts(vec![Part::Text {
-            text: "hi".to_owned()
+            text: "hi".to_owned(),
+            parent: None,
         }])
     );
 }
@@ -38,7 +39,8 @@ fn thinking_is_not_the_answer() {
     assert_eq!(
         Claude.read(line),
         Read::Parts(vec![Part::Thinking {
-            text: "hmm".to_owned()
+            text: "hmm".to_owned(),
+            parent: None,
         }])
     );
 }
@@ -65,6 +67,7 @@ fn a_tool_result_points_at_its_call() {
             call_id: "c1".to_owned(),
             output: "ok".to_owned(),
             is_error: false,
+            parent: None,
         }])
     );
 }
@@ -87,4 +90,156 @@ fn a_driver_that_is_not_installed_is_absent_rather_than_swapped() {
     // Falling back to another provider would change what the conversation is.
     assert!(driver("claude").is_some());
     assert!(driver("codex").is_none());
+}
+
+/// A real turn of Claude Code 2.1.270, sanitized: a subagent, an edit, a
+/// checklist and a backgrounded command. The shapes asserted here were read off
+/// this recording, not the documentation.
+mod recorded {
+    use super::*;
+
+    const TURN: &str =
+        include_str!("../tests/fixtures/claude-2.1.270-subagent-edit-tasks-background.jsonl");
+
+    fn reads() -> Vec<Read> {
+        TURN.lines().map(|line| Claude.read(line)).collect()
+    }
+
+    fn parts() -> Vec<Part> {
+        reads()
+            .into_iter()
+            .flat_map(|read| match read {
+                Read::Parts(parts) => parts,
+                _ => Vec::new(),
+            })
+            .collect()
+    }
+
+    fn agent_call() -> String {
+        parts()
+            .into_iter()
+            .find_map(|part| match part {
+                Part::ToolCall { id, name, .. } if name == "Agent" => Some(id),
+                _ => None,
+            })
+            .expect("the recording starts a subagent")
+    }
+
+    #[test]
+    fn a_subagents_work_points_at_the_call_that_started_it() {
+        let agent = agent_call();
+        let inside: Vec<Part> = parts()
+            .into_iter()
+            .filter(|part| match part {
+                Part::Text { parent, .. }
+                | Part::Thinking { parent, .. }
+                | Part::ToolCall { parent, .. }
+                | Part::ToolResult { parent, .. } => parent.as_deref() == Some(agent.as_str()),
+                _ => false,
+            })
+            .collect();
+        // The subagent read notes.txt: its call and its result are both marked.
+        assert!(inside
+            .iter()
+            .any(|part| matches!(part, Part::ToolCall { name, .. } if name == "Read")));
+        assert!(inside
+            .iter()
+            .any(|part| matches!(part, Part::ToolResult { .. })));
+    }
+
+    #[test]
+    fn the_agents_own_work_has_no_parent() {
+        assert!(parts().iter().any(|part| matches!(
+            part,
+            Part::ToolCall { name, parent: None, .. } if name == "Edit"
+        )));
+    }
+
+    #[test]
+    fn both_background_tasks_start_and_finish() {
+        let tasks: Vec<(String, String, Option<String>)> = parts()
+            .into_iter()
+            .filter_map(|part| match part {
+                Part::Task {
+                    task_id,
+                    status,
+                    task_kind,
+                    ..
+                } => Some((task_id, status, task_kind)),
+                _ => None,
+            })
+            .collect();
+        for kind in ["local_agent", "local_bash"] {
+            let started = tasks
+                .iter()
+                .find(|(_, status, task_kind)| {
+                    status == "started" && task_kind.as_deref() == Some(kind)
+                })
+                .unwrap_or_else(|| panic!("no {kind} task started"));
+            assert!(
+                tasks
+                    .iter()
+                    .any(|(id, status, _)| id == &started.0 && status == "completed"),
+                "{kind} task never completed"
+            );
+        }
+    }
+
+    #[test]
+    fn the_cli_describes_its_own_commands() {
+        let init = reads()
+            .into_iter()
+            .find_map(|read| match read {
+                Read::Init(init) => Some(init),
+                _ => None,
+            })
+            .expect("an init line");
+        assert_eq!(init.slash_commands, ["compact", "clear", "review", "tdd"]);
+        assert_eq!(init.terminal_slash_commands, ["statusline"]);
+        assert!(init.model.is_some());
+    }
+
+    #[test]
+    fn hook_chatter_and_token_estimates_are_not_parts() {
+        // Dropped from the fixture already, so asserted on hand-written lines.
+        for line in [
+            r#"{"type":"system","subtype":"hook_started","hook_id":"h"}"#,
+            r#"{"type":"system","subtype":"thinking_tokens","estimated_tokens":3}"#,
+            r#"{"type":"rate_limit_event","rate_limit_info":{}}"#,
+        ] {
+            assert_eq!(Claude.read(line), Read::Nothing, "{line}");
+        }
+    }
+}
+
+/// A transcript line written before parts carried a parent still reads.
+#[test]
+fn a_part_saved_before_parents_existed_still_loads() {
+    let old = r#"{"kind":"tool_call","id":"c1","name":"Bash","input":"{}","state":"ok"}"#;
+    let part: Part = serde_json::from_str(old).expect("old shape");
+    assert!(matches!(part, Part::ToolCall { parent: None, .. }));
+}
+
+/// What `/compact` or `/clear` answered, printed by the CLI as a system line.
+#[test]
+fn a_slash_commands_own_answer_is_kept() {
+    let line = r#"{"type":"system","subtype":"local_command","content":"Compacted. ctrl+o to see full summary","level":"info"}"#;
+    assert_eq!(
+        Claude.read(line),
+        Read::Parts(vec![Part::Command {
+            content: "Compacted. ctrl+o to see full summary".to_owned()
+        }])
+    );
+}
+
+/// A rewind forks at the agent's own message, never at a subagent's: those
+/// live in the subagent's transcript, where `--resume-session-at` cannot find them.
+#[test]
+fn a_rewind_forks_at_the_agents_own_message() {
+    let own = r#"{"type":"assistant","uuid":"aab2","parent_tool_use_id":null,"session_id":"s","message":{"content":[]}}"#;
+    assert_eq!(Claude.anchor(own).as_deref(), Some("aab2"));
+    let subagent = own.replace("null", "\"toolu_1\"");
+    assert_eq!(Claude.anchor(&subagent), None);
+    let user = r#"{"type":"user","uuid":"u1","session_id":"s"}"#;
+    assert_eq!(Claude.anchor(user), None);
 }

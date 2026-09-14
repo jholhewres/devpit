@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod account;
+mod adopting;
 mod advancing;
 mod arranging;
 mod asking;
@@ -11,6 +12,8 @@ mod branches;
 mod claims;
 mod columns;
 mod commands;
+mod rewinding;
+mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the
 // frontend's types — in a release build nothing calls it, and a module dead in
 // release should say so rather than warn about it on every build.
@@ -33,6 +36,7 @@ mod happening;
 mod history;
 mod in_flight;
 mod index;
+mod installations;
 mod kinds;
 mod listener;
 mod live;
@@ -41,8 +45,10 @@ mod mcp_reading;
 mod moving;
 mod notices;
 mod openers;
+mod outside_sessions;
 mod panels;
 mod panes;
+mod pasting;
 mod paths;
 mod post;
 mod prime;
@@ -50,6 +56,7 @@ mod priming;
 mod projects;
 mod pty_bridge;
 mod question;
+mod receipts;
 mod reconcile;
 mod refusing;
 mod reveal;
@@ -57,15 +64,19 @@ mod roots;
 mod runs;
 mod saves;
 mod search;
+mod session_search;
 mod sessions;
 mod settings;
 mod shell_launch;
 mod skills;
+mod slash;
 mod sources;
 mod staging;
+mod steering;
 mod steps;
 mod tap;
 mod threads;
+mod turn_changes;
 mod watching;
 mod working;
 mod workspace;
@@ -93,6 +104,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(chat::Talking::default())
+        .manage(steering::Steering::default())
         .manage(asking::Asking::default())
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle

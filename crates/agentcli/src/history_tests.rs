@@ -12,6 +12,7 @@ fn said(text: &str, role: Role) -> Message {
         role,
         parts: vec![Part::Text {
             text: text.to_owned(),
+            parent: None,
         }],
         created_at: 0.0,
         streaming: false,
@@ -29,6 +30,8 @@ fn head(profile: &str, cost: f64) -> Head {
         session_id: None,
         permission: None,
         effort: None,
+        title: None,
+        rewind: Default::default(),
     }
 }
 
@@ -120,4 +123,44 @@ fn a_transcript_with_no_head_is_still_listed() {
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].title, "Only this");
     assert!(found[0].profile.is_empty());
+}
+
+/// A session adopted from a terminal has none of the person's words in the
+/// transcript devpit keeps, so it is named by the title the CLI wrote.
+#[test]
+fn an_adopted_session_is_named_by_the_cli_title() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let dir = home.path().join("projects/prj_1/sessions");
+    std::fs::create_dir_all(&dir).expect("mkdir");
+    std::fs::write(dir.join("conv_a.jsonl"), "").expect("empty transcript");
+    let mut adopted = head("claude", 0.0);
+    adopted.title = Some("Fix the parser".to_owned());
+    crate::head::write_head(&dir.join("conv_a.json"), &adopted).expect("head");
+
+    let found = conversations(home.path(), "prj_1");
+    assert_eq!(found[0].title, "Fix the parser");
+}
+
+/// Once the person has spoken in it, their words win over the CLI's title.
+#[test]
+fn the_persons_words_outrank_an_adopted_title() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let dir = home.path().join("projects/prj_1/sessions");
+    std::fs::create_dir_all(&dir).expect("mkdir");
+    std::fs::write(
+        dir.join("conv_a.jsonl"),
+        format!(
+            "{}\n",
+            serde_json::to_string(&said("rename the lexer", Role::User)).expect("json")
+        ),
+    )
+    .expect("transcript");
+    let mut adopted = head("claude", 0.0);
+    adopted.title = Some("Fix the parser".to_owned());
+    crate::head::write_head(&dir.join("conv_a.json"), &adopted).expect("head");
+
+    assert_eq!(
+        conversations(home.path(), "prj_1")[0].title,
+        "rename the lexer"
+    );
 }

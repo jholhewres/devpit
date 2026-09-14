@@ -4,7 +4,9 @@
 //! turns those lines into the typed parts the contract carries, so a new CLI
 //! is a new file here and nothing else.
 
-use devpit_rpc::{CallState, Part};
+use devpit_rpc::{Part, SessionInit};
+
+use crate::claude_lines::{assistant_parts, system, tool_results};
 
 /// What one line of a CLI's output turned into.
 #[derive(Debug, Clone, PartialEq)]
@@ -17,6 +19,8 @@ pub enum Read {
         cost_usd: Option<f64>,
         is_error: bool,
     },
+    /// The CLI described itself: its commands, skills and model.
+    Init(SessionInit),
     /// Nothing to show — a keepalive, a blank line.
     Nothing,
 }
@@ -49,6 +53,12 @@ pub trait Driver: Send + Sync {
     /// Kept so the next turn resumes the same thread: without it the agent
     /// starts over and the transcript on screen is the only memory left.
     fn session(&self, line: &str) -> Option<String>;
+
+    /// The id the CLI's transcript gives this line, when it is the agent's own
+    /// message — what a rewind names to fork at. None for a CLI with no such id.
+    fn anchor(&self, _line: &str) -> Option<String> {
+        None
+    }
 }
 
 /// The Claude Code CLI, which prints one JSON object per line.
@@ -100,6 +110,7 @@ impl Driver for Claude {
             },
             Some("assistant") => Read::Parts(assistant_parts(&value)),
             Some("user") => Read::Parts(tool_results(&value)),
+            Some("system") => system(&value),
             _ => Read::Nothing,
         }
     }
@@ -111,78 +122,19 @@ impl Driver for Claude {
             .as_str()
             .map(str::to_owned)
     }
-}
 
-fn content_of(value: &serde_json::Value) -> &[serde_json::Value] {
-    value
-        .get("message")
-        .and_then(|message| message.get("content"))
-        .and_then(|content| content.as_array())
-        .map(Vec::as_slice)
-        .unwrap_or(&[])
-}
-
-fn assistant_parts(value: &serde_json::Value) -> Vec<Part> {
-    content_of(value)
-        .iter()
-        .filter_map(
-            |block| match block.get("type").and_then(|kind| kind.as_str()) {
-                Some("text") => block
-                    .get("text")
-                    .and_then(|text| text.as_str())
-                    .map(|text| Part::Text {
-                        text: text.to_owned(),
-                    }),
-                Some("thinking") => {
-                    block
-                        .get("thinking")
-                        .and_then(|text| text.as_str())
-                        .map(|text| Part::Thinking {
-                            text: text.to_owned(),
-                        })
-                }
-                Some("tool_use") => Some(Part::ToolCall {
-                    id: string_at(block, "id"),
-                    name: string_at(block, "name"),
-                    input: block
-                        .get("input")
-                        .map(ToString::to_string)
-                        .unwrap_or_default(),
-                    state: CallState::Running,
-                }),
-                _ => None,
-            },
-        )
-        .collect()
-}
-
-fn tool_results(value: &serde_json::Value) -> Vec<Part> {
-    content_of(value)
-        .iter()
-        .filter(|block| block.get("type").and_then(|kind| kind.as_str()) == Some("tool_result"))
-        .map(|block| Part::ToolResult {
-            call_id: string_at(block, "tool_use_id"),
-            output: block
-                .get("content")
-                .map(|content| match content.as_str() {
-                    Some(text) => text.to_owned(),
-                    None => content.to_string(),
-                })
-                .unwrap_or_default(),
-            is_error: block
-                .get("is_error")
-                .and_then(|flag| flag.as_bool())
-                .unwrap_or(false),
-        })
-        .collect()
-}
-
-fn string_at(value: &serde_json::Value, key: &str) -> String {
-    value
-        .get(key)
-        .and_then(|found| found.as_str())
-        .unwrap_or_default()
-        .to_owned()
+    /// Measured: a stream-json assistant line's `uuid` is the transcript's.
+    fn anchor(&self, line: &str) -> Option<String> {
+        let value = serde_json::from_str::<serde_json::Value>(line).ok()?;
+        // A subagent's messages live in its own transcript, not this one.
+        let own = value
+            .get("parent_tool_use_id")
+            .is_none_or(|parent| parent.is_null());
+        if value.get("type")?.as_str()? != "assistant" || !own {
+            return None;
+        }
+        value.get("uuid")?.as_str().map(str::to_owned)
+    }
 }
 
 /// The driver a conversation named, or nothing when it is not installed.

@@ -3,13 +3,14 @@
 //! `headless::run_turn` answers once, at the end — right for a board step,
 //! wrong for a chat, where the point is watching it happen.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use devpit_rpc::{Part, TurnEnd};
+use devpit_rpc::{Part, SessionInit, TurnEnd};
 
 use crate::driver::{Driver, Read};
+use crate::talk_args::argv;
 use crate::AgentError;
 
 /// What a turn needs to start.
@@ -23,10 +24,14 @@ pub struct Say<'a> {
     pub budget_usd: Option<f64>,
     /// Carried forward so the CLI continues the same session.
     pub session_id: Option<&'a str>,
+    /// A message in that session to fork at instead of resuming its end.
+    pub fork_at: Option<&'a str>,
     /// What the agent may do without asking. The CLI's own word for it.
     pub permission: Option<&'a str>,
     /// How hard to think. One of what the driver's `efforts` lists.
     pub effort: Option<&'a str>,
+    /// Where the turn's stdin is kept while it runs, for control requests.
+    pub control: Option<&'a crate::control::Control>,
 }
 
 /// A turn, and the thread it belongs to on the CLI's side.
@@ -34,6 +39,11 @@ pub struct Said {
     pub end: TurnEnd,
     /// The CLI's id for this conversation, to resume it next turn.
     pub session_id: Option<String>,
+    /// The last self-description the CLI printed. A background completion can
+    /// wake it for a second pass, which prints another.
+    pub init: Option<SessionInit>,
+    /// The last message the agent wrote, where a rewind to this turn forks.
+    pub anchor: Option<String>,
 }
 
 /// Runs one turn, handing every part to `on_part` as it is read.
@@ -47,34 +57,7 @@ pub fn say(
     mut on_part: impl FnMut(Part),
     mut on_start: impl FnMut(u32),
 ) -> Result<Said, AgentError> {
-    let mut argv = vec![
-        "--print".to_owned(),
-        "--output-format".to_owned(),
-        "stream-json".to_owned(),
-        "--input-format".to_owned(),
-        "stream-json".to_owned(),
-        "--verbose".to_owned(),
-    ];
-    if let Some(model) = turn.model {
-        argv.push("--model".to_owned());
-        argv.push(model.to_owned());
-    }
-    if let Some(cap) = turn.budget_usd {
-        argv.push("--max-cost".to_owned());
-        argv.push(cap.to_string());
-    }
-    if let Some(session) = turn.session_id {
-        argv.push("--resume".to_owned());
-        argv.push(session.to_owned());
-    }
-    if let Some(mode) = turn.permission {
-        argv.push("--permission-mode".to_owned());
-        argv.push(mode.to_owned());
-    }
-    if let Some(effort) = turn.effort {
-        argv.push("--effort".to_owned());
-        argv.push(effort.to_owned());
-    }
+    let argv = argv(turn);
 
     let mut child = Command::new(turn.command)
         .args(&argv)
@@ -87,37 +70,58 @@ pub fn say(
 
     on_start(child.id());
 
-    {
-        let mut stdin = child.stdin.take().ok_or(AgentError::NotInstalled)?;
-        let message = serde_json::json!({
-            "type": "user",
-            "message": { "role": "user", "content": [{ "type": "text", "text": turn.prompt }] }
-        });
-        writeln!(stdin, "{message}").map_err(|err| AgentError::Unreadable(err.to_string()))?;
+    let stdin = child.stdin.take().ok_or(AgentError::NotInstalled)?;
+    let control = turn.control.cloned().unwrap_or_default();
+    control.attach(stdin);
+    let message = serde_json::json!({
+        "type": "user",
+        "message": { "role": "user", "content": [{ "type": "text", "text": turn.prompt }] }
+    });
+    if !control.write(&message.to_string()) {
+        return Err(AgentError::Unreadable(
+            "could not send the prompt".to_owned(),
+        ));
     }
+    let mut running = crate::control::Running::default();
+    let mut result_seen = false;
 
     let stdout = child.stdout.take().ok_or(AgentError::NotInstalled)?;
     let started = std::time::Instant::now();
     let mut ended = None;
     let mut session_id = None;
+    let mut init = None;
+    let mut anchor = None;
 
     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-        if session_id.is_none() {
-            session_id = driver.session(&line);
+        // The last id seen, not the first: `/clear` starts a new session inside
+        // the turn, and resuming the one it left would undo it.
+        if let Some(seen) = driver.session(&line) {
+            session_id = Some(seen);
         }
+        anchor = driver.anchor(&line).or(anchor);
         match driver.read(&line) {
-            Read::Parts(parts) => parts.into_iter().for_each(&mut on_part),
+            Read::Parts(parts) => parts.into_iter().for_each(|part| {
+                running.saw(&part);
+                on_part(part)
+            }),
             Read::Ended {
                 stop_reason,
                 cost_usd,
                 is_error,
             } => {
                 ended = Some((stop_reason, cost_usd, is_error));
+                result_seen = true;
             }
+            Read::Init(said) => init = Some(said),
             Read::Nothing => {}
+        }
+        if crate::control::may_close(result_seen, &running) {
+            control.close();
         }
     }
 
+    // Whatever ended the stream, stdin is not needed any more.
+    control.close();
     let status = child
         .wait()
         .map_err(|err| AgentError::Unreadable(err.to_string()))?;
@@ -137,5 +141,7 @@ pub fn say(
             is_error,
         },
         session_id,
+        init,
+        anchor,
     })
 }

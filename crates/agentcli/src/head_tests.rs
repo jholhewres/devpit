@@ -11,6 +11,8 @@ fn head(profile: &str) -> Head {
         session_id: None,
         permission: None,
         effort: None,
+        title: None,
+        rewind: Default::default(),
     }
 }
 
@@ -73,4 +75,76 @@ fn a_spent_conversation_has_nothing_left() {
         ..head("claude")
     };
     assert_eq!(remaining(Some(&spent)), Some(0.0));
+}
+
+fn opened(fork_at: Option<&str>) -> crate::head::Head {
+    crate::head::Head {
+        profile: "claude".to_owned(),
+        model: None,
+        card_id: None,
+        created_at: 1.0,
+        cost_usd: 1.0,
+        budget_usd: None,
+        session_id: Some("orig".to_owned()),
+        permission: None,
+        effort: None,
+        title: None,
+        rewind: crate::head::Rewind {
+            fork_at: fork_at.map(str::to_owned),
+            anchors: Vec::new(),
+        },
+    }
+}
+
+#[test]
+fn a_turn_that_wrote_a_message_is_a_place_to_rewind_to() {
+    let head = crate::head::after_turn(
+        opened(None),
+        "turn_1",
+        Some(0.5),
+        Some("s1".to_owned()),
+        Some("u1".to_owned()),
+    );
+    assert_eq!(head.rewind.anchors.len(), 1);
+    let anchor = &head.rewind.anchors[0];
+    assert_eq!(
+        (
+            anchor.turn_id.as_str(),
+            anchor.session_id.as_str(),
+            anchor.uuid.as_str()
+        ),
+        ("turn_1", "s1", "u1")
+    );
+    assert_eq!(
+        (head.session_id.as_deref(), head.cost_usd),
+        (Some("s1"), 1.5)
+    );
+}
+
+#[test]
+fn a_fork_is_settled_by_the_first_message_the_forked_turn_writes() {
+    let head = crate::head::after_turn(
+        opened(Some("u0")),
+        "turn_2",
+        None,
+        Some("s-new".to_owned()),
+        Some("u9".to_owned()),
+    );
+    assert_eq!(head.rewind.fork_at, None);
+    assert_eq!(head.session_id.as_deref(), Some("s-new"));
+}
+
+/// The CLI printed a new session id but the turn died before writing anything:
+/// the next turn has to fork from the original again, not resume that id.
+#[test]
+fn a_forked_turn_that_wrote_nothing_forks_again_next_time() {
+    let head = crate::head::after_turn(
+        opened(Some("u0")),
+        "turn_2",
+        None,
+        Some("s-new".to_owned()),
+        None,
+    );
+    assert_eq!(head.rewind.fork_at.as_deref(), Some("u0"));
+    assert_eq!(head.session_id.as_deref(), Some("orig"));
 }

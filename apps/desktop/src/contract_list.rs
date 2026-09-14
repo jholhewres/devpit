@@ -9,11 +9,12 @@
 use tauri_specta::{collect_commands, Builder};
 
 use crate::{
-    account, agent_choice, agent_profiles, arranging, asking, board, branches, card_work, cards,
-    chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight, index,
-    mcp, moving, notices, openers, panels, panes, paths, priming, projects, reveal, saves, search,
-    sessions, settings, shell_launch, skills, sources, staging, steps, threads, watching,
-    workspace, worktree_base, worktrees, wsfiles,
+    account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_work,
+    cards, chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight,
+    index, installations, mcp, moving, notices, openers, outside_sessions, panels, panes, pasting,
+    paths, priming, projects, receipts, reveal, rewinding, runs_list, saves, search,
+    session_search, sessions, settings, shell_launch, skills, slash, sources, staging, steering,
+    steps, threads, watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -30,7 +31,13 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         projects::project_rename,
         chat::chat_history,
         threads::chat_list,
-        chat::chat_cancel,
+        outside_sessions::chat_outside,
+        adopting::chat_adopt,
+        rewinding::chat_rewind,
+        runs_list::runs_list,
+        session_search::sessions_search,
+        steering::chat_cancel,
+        steering::chat_stop_task,
         chat::chat_frames,
         panels::panel_widths,
         panels::panel_widths_write,
@@ -42,10 +49,14 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         agent_profiles::agent_profile_save,
         agent_profiles::agent_profile_remove,
         chat::chat_attach,
+        pasting::chat_paste,
+        receipts::chat_receipt,
+        slash::chat_slash_commands,
         asking::permission_answer,
         asking::permission_ask_from_now,
         asking::permission_questions,
         mcp::mcp_list,
+        installations::cli_installations,
         skills::skills_list,
         skills::skills_read,
         workspace::workspace_read,

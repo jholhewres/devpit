@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Acts } from './Acts'
 import type { Message } from '../gen/bindings'
 import { Markdown } from './Markdown'
+import { Rewound } from './Rewound'
+import { TurnChanges } from './TurnChanges'
 import { advanced, opened } from './veil'
 
 /*
@@ -14,7 +16,12 @@ import { advanced, opened } from './veil'
  * paragraphs is one nobody reads twice.
  */
 
-export function Turn({ message }: { message: Message }): React.JSX.Element {
+export function Turn({ message, rewind }: { message: Message; rewind?: () => void }): React.JSX.Element {
+  const receipt = message.parts.find((part) => part.kind === 'receipt')
+  if (message.role === 'system' && receipt?.kind === 'receipt') return <Receipt part={receipt} />
+  const rewound = message.parts.find((part) => part.kind === 'rewound')
+  if (message.role === 'system' && rewound?.kind === 'rewound') return <Rewound part={rewound} />
+
   if (message.role === 'user') {
     return (
       <article className="said">
@@ -23,17 +30,26 @@ export function Turn({ message }: { message: Message }): React.JSX.Element {
     )
   }
 
-  const answers = message.parts.filter((part) => part.kind === 'text')
+  /* A subagent's report is not the answer: it is folded under its call. */
+  const answers = message.parts.filter((part) => part.kind === 'text' && !part.parent)
+  const said = message.parts.flatMap((part) => (part.kind === 'command' ? [part.content] : []))
   const doing = message.parts.filter((part) => part.kind !== 'text')
+  const changed = message.parts.flatMap((part) => (part.kind === 'changes' ? part.files : []))
 
   return (
     <article className="turn">
       <Acts parts={doing} live={message.streaming} />
+      {said.map((content, at) => (
+        <pre className="said__cmd" key={`c${at}`}>
+          {content}
+        </pre>
+      ))}
       {answers.map((part, at) => (
         <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} />
       ))}
+      {!message.streaming && <TurnChanges files={changed} parts={message.parts} />}
       {message.streaming && <Working />}
-      {!message.streaming && <Foot message={message} />}
+      {!message.streaming && <Foot message={message} rewind={rewind} />}
     </article>
   )
 }
@@ -92,18 +108,28 @@ function Working(): React.JSX.Element {
 const text = (message: Message): string =>
   message.parts.map((part) => ('text' in part ? part.text : '')).join('')
 
-function Foot({ message }: { message: Message }): React.JSX.Element | null {
+function Foot({ message, rewind }: { message: Message; rewind?: () => void }): React.JSX.Element | null {
   const [copied, setCopied] = useState(false)
   const said = message.parts
     .filter((part) => part.kind === 'text')
     .map((part) => ('text' in part ? part.text : ''))
     .join('\n\n')
 
-  if (!said) return null
+  if (!said && !rewind) return null
 
   return (
     <div className="turn__foot">
-      <button
+      {rewind && (
+        <button
+          className="tfbtn"
+          aria-label="Go back to this turn"
+          title="Go on from here in a new conversation — this one stays as it is"
+          onClick={rewind}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
+        </button>
+      )}
+      {said && <button
         className="tfbtn"
         aria-label={copied ? 'Copied' : 'Copy'}
         onClick={() =>
@@ -118,7 +144,32 @@ function Foot({ message }: { message: Message }): React.JSX.Element | null {
         ) : (
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
         )}
-      </button>
+      </button>}
     </div>
   )
+}
+
+/* One line for a decision a person made: what the agent wanted, and whether
+   it was allowed. */
+function Receipt({ part }: { part: Extract<Message['parts'][number], { kind: 'receipt' }> }): React.JSX.Element {
+  const what = receiptSubject(part.input)
+  return (
+    <div className="rcpt" data-allowed={part.allowed}>
+      <b>{part.allowed ? 'Allowed' : 'Refused'}</b> {part.tool}
+      {what && <code className="rcpt__w">{what}</code>}
+    </div>
+  )
+}
+
+/* The part of a tool's input a person recognises: the command, or the file. */
+export function receiptSubject(input: string): string {
+  try {
+    const args = JSON.parse(input) as Record<string, unknown>
+    for (const key of ['command', 'file_path', 'path', 'url', 'pattern']) {
+      if (typeof args[key] === 'string') return (args[key] as string).split('\n')[0]!.slice(0, 120)
+    }
+  } catch {
+    /* Not JSON: nothing to pick out. */
+  }
+  return ''
 }
