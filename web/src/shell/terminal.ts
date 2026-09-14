@@ -76,7 +76,14 @@ export const palette = (dark: boolean): ITheme => (dark ? DARK : LIGHT)
    thrown away the error you went looking for. */
 const SCROLLBACK = 5000
 
-export function options(dark: boolean): ITerminalOptions {
+/* The contrast colours are lifted to. The person's choice when there is one;
+   otherwise the old rule — none on dark, 4.5 on light, because a program that
+   paints mid-grey is unreadable on white and fine on black. */
+export function contrastFor(dark: boolean, chosen: number | null): number {
+  return chosen ?? (dark ? 1 : 4.5)
+}
+
+export function options(dark: boolean, contrast: number | null = null): ITerminalOptions {
   return {
     allowProposedApi: true,
     theme: palette(dark),
@@ -117,7 +124,7 @@ export function options(dark: boolean): ITerminalOptions {
     /* Only on the light ground: a program that paints mid-grey on white is
        unreadable there and fine on black, so lifting contrast everywhere
        would flatten a palette that already works. */
-    minimumContrastRatio: dark ? 1 : 4.5,
+    minimumContrastRatio: contrastFor(dark, contrast),
 
     allowTransparency: false,
     /* On a non-US layout Option composes `@` and `€`. Treating it as Meta

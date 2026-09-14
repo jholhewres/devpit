@@ -13,6 +13,8 @@ pub const AUTO_UPDATE: &str = "general.automatic_updates";
 pub const KEEP_TRANSCRIPTS: &str = "storage.keep_transcripts";
 /// Whether closing a terminal with something running stops to ask.
 pub const CONFIRM_STOP: &str = "terminal.confirm_stop";
+/// The minimum contrast the terminal lifts colours to, as a number from 1 to 21.
+pub const TERMINAL_CONTRAST: &str = "terminal.minimum_contrast";
 /// Where new worktrees are created. Empty is the devpit workspace.
 pub const WORKTREE_BASE: &str = "worktrees.base";
 /// The apps offered in "Open in", as JSON.

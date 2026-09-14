@@ -8,6 +8,7 @@ import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
 import { SkillsPane } from './SkillsPane'
+import { TerminalContrast } from './TerminalContrast'
 import { Usage } from './Usage'
 import { Worktrees } from './Worktrees'
 
@@ -43,6 +44,7 @@ export function Settings({
         field === 'automaticUpdates' ? next : null,
         field === 'keepTranscripts' ? next : null,
         field === 'confirmStop' ? next : null,
+        null,
       ),
     ).then((answer) => setFlags(answer.data ?? flags))
   }
@@ -159,6 +161,14 @@ export function Settings({
             </div>
             <p className="acc__note">The terminal keeps its dark ground in every theme. A shell paints
               its own ANSI colours for a dark background; on a white one they stop being readable.</p>
+            <TerminalContrast
+              value={flags?.terminalContrast ?? null}
+              onPick={(value) =>
+                void ask(() => commands.settingsWrite(null, null, null, null, null, value)).then((answer) =>
+                  setFlags(answer.data ?? flags),
+                )
+              }
+            />
           </section>
 
           <section className="prefs__in prefs__in--wide" hidden={pane !== 'skills'}>

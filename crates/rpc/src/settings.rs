@@ -65,6 +65,10 @@ pub struct Settings {
     /// standing between them and losing it. It goes to `false` when they tick
     /// "don't ask again", which is a choice and not a default.
     pub confirm_stop: Option<bool>,
+    /// The contrast xterm lifts every colour to, from 1 (none) to 21. Null is
+    /// "never asked", which keeps the old rule: none on the dark ground, 4.5
+    /// on the light one.
+    pub terminal_contrast: Option<f64>,
 }
 
 #[cfg(test)]

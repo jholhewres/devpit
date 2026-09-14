@@ -1,7 +1,10 @@
 //! Contract commands for what the person chose.
 
 use devpit_core::{preference, Store};
-use devpit_rpc::{RpcError, Settings, Theme};
+use devpit_rpc::{ErrorCode, RpcError, Settings, Theme};
+
+/// What xterm accepts: 1 is no lift, 21 is black on white.
+const CONTRAST: std::ops::RangeInclusive<f64> = 1.0..=21.0;
 
 fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -24,6 +27,10 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
         automatic_updates: store.preference_flag(preference::AUTO_UPDATE)?,
         keep_transcripts: store.preference_flag(preference::KEEP_TRANSCRIPTS)?,
         confirm_stop: store.preference_flag(preference::CONFIRM_STOP)?,
+        terminal_contrast: store
+            .preference(preference::TERMINAL_CONTRAST)?
+            .and_then(|value| value.parse::<f64>().ok())
+            .filter(|value| CONTRAST.contains(value)),
     })
 }
 
@@ -46,6 +53,7 @@ pub fn settings_write(
     automatic_updates: Option<bool>,
     keep_transcripts: Option<bool>,
     confirm_stop: Option<bool>,
+    terminal_contrast: Option<f64>,
 ) -> Result<Settings, RpcError> {
     let store = store()?;
     if let Some(allowed) = telemetry {
@@ -62,6 +70,15 @@ pub fn settings_write(
     }
     if let Some(ask) = confirm_stop {
         store.set_preference_flag(preference::CONFIRM_STOP, ask)?;
+    }
+    if let Some(contrast) = terminal_contrast {
+        if !CONTRAST.contains(&contrast) {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "terminal contrast goes from 1 to 21",
+            ));
+        }
+        store.set_preference(preference::TERMINAL_CONTRAST, &contrast.to_string())?;
     }
     read(&store)
 }

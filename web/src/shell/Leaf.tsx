@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { attach, scrollback, type Attached } from './attach'
 import { reason } from './reason'
-import { darkNow, options, palette } from './terminal'
+import { ask, commands } from './live'
+import { contrastFor, darkNow, options, palette } from './terminal'
 import { useMarks } from './useMarks'
 
 /*
@@ -32,6 +33,13 @@ export function Leaf({
     if (!projectId || !box) return
 
     const terminal = new Terminal(options(darkNow()))
+    /* The person's contrast, when they chose one. Read after the terminal is
+       up rather than before: a settings read must not hold the pane empty. */
+    let contrast: number | null = null
+    void ask(() => commands.settingsRead()).then((answer) => {
+      contrast = answer.data?.terminalContrast ?? null
+      terminal.options.minimumContrastRatio = contrastFor(darkNow(), contrast)
+    })
     const fit = new FitAddon()
     terminal.loadAddon(fit)
     terminal.open(box)
@@ -80,6 +88,7 @@ export function Leaf({
        along with it. */
     const themed = new MutationObserver(() => {
       terminal.options.theme = palette(darkNow())
+      terminal.options.minimumContrastRatio = contrastFor(darkNow(), contrast)
     })
     themed.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 

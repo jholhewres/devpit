@@ -80,7 +80,7 @@ export function useClosing({
       })
       if (!dontAskAgain) return
       setStop(false)
-      void ask(() => commands.settingsWrite(null, null, null, null, false))
+      void ask(() => commands.settingsWrite(null, null, null, null, false, null))
     },
     [closeNow],
   )
