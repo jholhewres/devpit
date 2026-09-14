@@ -33,6 +33,9 @@ pub struct Happening {
     pub session_id: String,
     pub event: Event,
     pub cwd: String,
+    /// The session's transcript. Its folder names the installation that wrote
+    /// it, which decides who may resume the session somewhere else.
+    pub transcript_path: Option<String>,
 }
 
 /// The events worth reacting to.
@@ -47,6 +50,20 @@ pub enum Event {
     Used { tool: String },
     /// The turn ended, with the last thing it said.
     Stopped { said: Option<String> },
+    /// A subagent began, known so far only by its id and type.
+    SubagentStarted { agent: String, kind: Option<String> },
+    /// The `Agent` call that launched a subagent returned, naming it. In 2.1.270
+    /// the call returns at launch (`async_launched`), so this is not its end.
+    Delegated {
+        agent: String,
+        description: Option<String>,
+        model: Option<String>,
+        ended: bool,
+    },
+    /// A subagent it started finished. The agent itself is still working —
+    /// reading this as `Stopped` told the sidebar the whole agent was done.
+    /// Recorded arriving many times for one subagent, so ending one is idempotent.
+    SubagentDone { agent: Option<String> },
     /// Waiting on a person — the state that matters most, because nothing
     /// moves until someone comes back.
     Waiting,
@@ -64,6 +81,31 @@ struct Raw {
     tool_name: Option<String>,
     #[serde(default)]
     last_assistant_message: Option<String>,
+    #[serde(default)]
+    agent_id: Option<String>,
+    #[serde(default)]
+    agent_type: Option<String>,
+    #[serde(default)]
+    transcript_path: Option<String>,
+}
+
+/// What an `Agent` call returns, read apart from [`Raw`]: other tools answer
+/// with strings and arrays, and one strict shape would drop their `Used`.
+#[derive(Deserialize)]
+struct Launched {
+    tool_response: LaunchedAgent,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchedAgent {
+    agent_id: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    resolved_model: Option<String>,
+    #[serde(default)]
+    status: Option<String>,
 }
 
 /// Reads one hook payload.
@@ -81,11 +123,29 @@ pub fn read(payload: &str) -> Option<Happening> {
         "PreToolUse" => Event::Using {
             tool: raw.tool_name?,
         },
-        "PostToolUse" => Event::Used {
-            tool: raw.tool_name?,
-        },
-        "Stop" | "SubagentStop" => Event::Stopped {
+        "PostToolUse" => {
+            let tool = raw.tool_name?;
+            // Parsed a second time only for `Agent`, not for every tool's output.
+            match (tool == "Agent").then(|| launched(payload)).flatten() {
+                Some(agent) => Event::Delegated {
+                    // Any status but a launch is a call that ran to its end.
+                    ended: agent.status.as_deref() != Some("async_launched"),
+                    agent: agent.agent_id,
+                    description: agent.description,
+                    model: agent.resolved_model,
+                },
+                None => Event::Used { tool },
+            }
+        }
+        "Stop" => Event::Stopped {
             said: raw.last_assistant_message,
+        },
+        "SubagentStart" => Event::SubagentStarted {
+            agent: raw.agent_id?,
+            kind: raw.agent_type,
+        },
+        "SubagentStop" => Event::SubagentDone {
+            agent: raw.agent_id,
         },
         "Notification" | "PermissionRequest" => Event::Waiting,
         _ => return None,
@@ -95,7 +155,14 @@ pub fn read(payload: &str) -> Option<Happening> {
         session_id: raw.session_id,
         event,
         cwd: raw.cwd,
+        transcript_path: raw.transcript_path,
     })
+}
+
+fn launched(payload: &str) -> Option<LaunchedAgent> {
+    serde_json::from_str::<Launched>(payload)
+        .ok()
+        .map(|launched| launched.tool_response)
 }
 
 /// Where the endpoint is written, and read back from.

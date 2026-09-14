@@ -62,3 +62,107 @@ fn an_event_this_build_has_no_use_for_is_ignored() {
 fn a_payload_with_no_session_is_dropped() {
     assert_eq!(read(r#"{"hook_event_name":"Stop"}"#), None);
 }
+
+/// A subagent finishing is not the agent finishing.
+///
+/// Both used to read as `Stopped`, so the sidebar marked a pane done the moment
+/// any subagent it started returned — while the agent itself was still at work.
+#[test]
+fn a_subagent_stopping_does_not_stop_the_agent() {
+    let payload = r#"{"hook_event_name":"SubagentStop","session_id":"s1","cwd":"/work"}"#;
+    let happening = read(payload).expect("a happening");
+    assert_eq!(happening.event, Event::SubagentDone { agent: None });
+    let stop = r#"{"hook_event_name":"Stop","session_id":"s1","cwd":"/work","last_assistant_message":"done"}"#;
+    assert!(matches!(
+        read(stop).expect("stop").event,
+        Event::Stopped { .. }
+    ));
+}
+
+/// Recorded from 2.1.270 with every hook pointed at `cat`, around one `Agent`
+/// call. Ids kept, the prompt shortened.
+const SUBAGENT_START: &str = r#"{"session_id":"abc","cwd":"/work","hook_event_name":"SubagentStart",
+    "agent_id":"a82d987eefe13ba95","agent_type":"general-purpose","prompt_id":"p1",
+    "transcript_path":"/x.jsonl"}"#;
+
+const AGENT_LAUNCHED: &str = r#"{"session_id":"abc","cwd":"/work","hook_event_name":"PostToolUse",
+    "tool_name":"Agent","tool_input":{"description":"probe child","prompt":"Reply ok."},
+    "tool_response":{"isAsync":true,"status":"async_launched","agentId":"a82d987eefe13ba95",
+    "description":"probe child","resolvedModel":"claude-haiku-4-5-20251001","prompt":"Reply ok."},
+    "tool_use_id":"toolu_1","duration_ms":12,"permission_mode":"default","prompt_id":"p1",
+    "transcript_path":"/x.jsonl"}"#;
+
+/// Sent 16 times for this one subagent in the recording.
+const SUBAGENT_STOP: &str = r#"{"session_id":"abc","cwd":"/work","hook_event_name":"SubagentStop",
+    "agent_id":"a82d987eefe13ba95","agent_type":"general-purpose","agent_transcript_path":"/y.jsonl",
+    "last_assistant_message":"ok","stop_hook_active":false,"background_tasks":[{"id":"a82d987eefe13ba95",
+    "type":"subagent","status":"running","description":"probe child","agent_type":"general-purpose"}],
+    "session_crons":[],"permission_mode":"default","prompt_id":"p1","transcript_path":"/x.jsonl"}"#;
+
+#[test]
+fn a_subagent_is_known_by_one_id_from_start_to_stop() {
+    assert_eq!(
+        read(SUBAGENT_START).expect("start").event,
+        Event::SubagentStarted {
+            agent: "a82d987eefe13ba95".to_owned(),
+            kind: Some("general-purpose".to_owned()),
+        }
+    );
+    assert_eq!(
+        read(SUBAGENT_STOP).expect("stop").event,
+        Event::SubagentDone {
+            agent: Some("a82d987eefe13ba95".to_owned())
+        }
+    );
+}
+
+/// The call returns at launch, so it names the subagent and does not end it.
+#[test]
+fn a_launched_agent_call_names_its_subagent_and_its_model() {
+    assert_eq!(
+        read(AGENT_LAUNCHED).expect("launch").event,
+        Event::Delegated {
+            agent: "a82d987eefe13ba95".to_owned(),
+            description: Some("probe child".to_owned()),
+            model: Some("claude-haiku-4-5-20251001".to_owned()),
+            ended: false,
+        }
+    );
+}
+
+#[test]
+fn an_agent_call_that_ran_to_its_end_ends_its_subagent() {
+    let finished = AGENT_LAUNCHED.replace("async_launched", "completed");
+    assert!(matches!(
+        read(&finished).expect("finished").event,
+        Event::Delegated { ended: true, .. }
+    ));
+}
+
+/// Other tools answer with strings; reading `Agent`'s shape must not drop them.
+#[test]
+fn a_tool_that_answers_with_a_string_is_still_used() {
+    let payload = r#"{"session_id":"abc","hook_event_name":"PostToolUse","tool_name":"Bash",
+        "tool_response":"hi"}"#;
+    assert_eq!(
+        read(payload).expect("used").event,
+        Event::Used {
+            tool: "Bash".to_owned()
+        }
+    );
+}
+
+/// Every payload names its transcript; its folder is the installation.
+#[test]
+fn a_hook_says_where_the_sessions_transcript_is() {
+    assert_eq!(
+        read(PRE_TOOL).expect("read").transcript_path.as_deref(),
+        Some("/x.jsonl")
+    );
+    assert_eq!(
+        read(r#"{"session_id":"abc","hook_event_name":"Stop"}"#)
+            .expect("read")
+            .transcript_path,
+        None
+    );
+}

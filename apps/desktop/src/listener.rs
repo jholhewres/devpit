@@ -17,7 +17,7 @@ use devpit_agentcli::{read_hook, Event, Happening};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::asking::{decision, Asking};
-use crate::happening::agent_said;
+use crate::happening::{agent_said, session_said, subagent_said};
 use crate::post::read_request;
 use crate::question::question_in;
 
@@ -112,13 +112,23 @@ fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
         return;
     };
     let state = match &happening.event {
-        Event::Using { .. } | Event::Used { .. } => "working",
+        Event::Using { .. }
+        | Event::Used { .. }
+        | Event::SubagentStarted { .. }
+        | Event::Delegated { .. }
+        | Event::SubagentDone { .. } => "working",
         Event::Stopped { .. } => "done",
         // The one worth interrupting somebody for: nothing moves until a
         // person comes back to it.
         Event::Waiting => "waiting",
     };
     let _ = app.emit("terminal:happening", agent_said(pane, state));
+    if let Some(session) = session_said(pane, happening) {
+        let _ = app.emit("terminal:happening", session);
+    }
+    if let Some(subagent) = subagent_said(pane, &happening.event) {
+        let _ = app.emit("terminal:happening", subagent);
+    }
 
     // Only `waiting` reaches the bell. An agent that is working is an agent
     // you can watch; one that has stopped and is waiting for a person is the
@@ -155,6 +165,16 @@ fn describe(happening: &Happening) -> (String, String) {
         Event::Stopped { said } => said
             .clone()
             .unwrap_or_else(|| "finished the turn".to_owned()),
+        Event::SubagentStarted {
+            kind: Some(kind), ..
+        } => format!("started a {kind} subagent"),
+        Event::SubagentStarted { kind: None, .. } => "started a subagent".to_owned(),
+        Event::Delegated {
+            description: Some(description),
+            ..
+        } => format!("handed off: {description}"),
+        Event::Delegated { .. } => "handed work to a subagent".to_owned(),
+        Event::SubagentDone { .. } => "a subagent finished".to_owned(),
         Event::Waiting => "waiting on you".to_owned(),
     };
     (happening.session_id.clone(), said)

@@ -172,3 +172,13 @@ export function short(name: string, limit: number): string {
   const letters = [...name]
   return letters.length > limit ? `${letters.slice(0, limit).join('').trimEnd()}…` : name
 }
+
+/* The tab a backend pane is drawn in, or nothing when no open tab shows it.
+
+   A pane is not a tab: a split tab shows several, and the resource monitor
+   names panes because that is what it measures. Handing a pane id to `focus`,
+   which takes a tab id, focused nothing at all. */
+export function tabOfPane(open: readonly Tab[], paneId: string): string | null {
+  return open.find((tab) => tab.panes?.includes(paneId))?.id ?? null
+}
+

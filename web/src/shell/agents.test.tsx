@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type { PaneRunning } from '../gen/bindings'
 import { SessionRows } from './SessionRows'
 import { StopRunning } from './StopRunning'
+import type { Subagents } from './subagents'
 import type { Tab } from './strip'
 import { TabStrip } from './TabStrip'
 
@@ -30,6 +31,8 @@ const shell = {
   active: null as Tab | null,
   running: [] as PaneRunning[],
   doing: {} as Record<string, string>,
+  unread: new Set() as ReadonlySet<string>,
+  subagents: {} as Subagents,
   focus: vi.fn(),
   close: vi.fn(),
   move: vi.fn(),
@@ -78,6 +81,8 @@ beforeEach(() => {
   shell.open = []
   shell.running = []
   shell.doing = {}
+  shell.unread = new Set()
+  shell.subagents = {}
   shell.renaming = null
   shell.active = null
 })
@@ -246,6 +251,60 @@ describe('what the agent says it is doing', () => {
     shell.doing = { leaf_somewhere_else: 'waiting' }
     render(<SessionRows />)
     expect(screen.getByText('Claude Code')).toBeTruthy()
+  })
+
+  it('draws a question for a waiting agent, not only a colour', () => {
+    shell.open = [term()]
+    shell.running = [claude]
+    shell.doing = { leaf_1: 'waiting' }
+    const { container } = render(<SessionRows />)
+    expect(container.querySelector('.card__ask')?.textContent).toBe('?')
+    expect(container.querySelector('.card__dot')).toBeNull()
+  })
+
+  it('keeps a finish nobody has seen loud', () => {
+    shell.open = [term()]
+    shell.running = [claude]
+    shell.doing = { leaf_1: 'done' }
+    shell.unread = new Set(['leaf_1'])
+    const { container } = render(<SessionRows />)
+    expect(screen.getByText('Claude Code · finished')).toBeTruthy()
+    expect(container.querySelector('.card[data-unread="true"]')).toBeTruthy()
+  })
+
+  it('lists the subagents a terminal agent started under it, with their model', () => {
+    shell.open = [term()]
+    shell.running = [claude]
+    shell.subagents = {
+      leaf_1: [
+        { id: 'a1', name: 'probe child', kind: 'general-purpose', model: 'claude-haiku-4-5-20251001', ended: false },
+        { id: 'a2', name: null, kind: 'Explore', model: null, ended: false },
+        { id: 'a3', name: 'already back', kind: null, model: null, ended: true },
+      ],
+    }
+    render(<SessionRows />)
+    expect(screen.getByText('probe child')).toBeTruthy()
+    expect(screen.getByText('haiku-4-5')).toBeTruthy()
+    // Named by its type until the call that launched it says more.
+    expect(screen.getByText('Explore')).toBeTruthy()
+    expect(screen.queryByText('already back')).toBeNull()
+  })
+
+  it('draws no subagents under a pane that is not an agent', () => {
+    shell.open = [term()]
+    shell.running = [build]
+    shell.subagents = { leaf_1: [{ id: 'a1', name: 'stale', kind: null, model: null, ended: false }] }
+    render(<SessionRows />)
+    expect(screen.queryByText('stale')).toBeNull()
+  })
+
+  it('lets a finish that was seen go quiet', () => {
+    shell.open = [term()]
+    shell.running = [claude]
+    shell.doing = { leaf_1: 'done' }
+    const { container } = render(<SessionRows />)
+    expect(screen.getByText('Claude Code')).toBeTruthy()
+    expect(container.querySelector('[data-unread]')).toBeNull()
   })
 })
 

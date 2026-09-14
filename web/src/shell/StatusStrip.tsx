@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { Monitor } from './Monitor'
+import { tabOfPane } from './strip'
 import { useShell } from './useShell'
 import { useUsage } from './useUsage'
 import { counted, cpu, measured, size } from './watching'
@@ -20,7 +21,7 @@ import { counted, cpu, measured, size } from './watching'
  * to skip and then misses when it matters.
  */
 export function StatusStrip(): React.JSX.Element | null {
-  const { project, focus } = useShell()
+  const { project, focus, open: tabs } = useShell()
   const [open, setOpen] = useState(false)
   const usage = useUsage(project?.id ?? null, true)
 
@@ -35,7 +36,8 @@ export function StatusStrip(): React.JSX.Element | null {
           usage={usage}
           onClose={() => setOpen(false)}
           onShow={(paneId) => {
-            focus(paneId)
+            const tab = tabOfPane(tabs, paneId)
+            if (tab) focus(tab)
             setOpen(false)
           }}
         />

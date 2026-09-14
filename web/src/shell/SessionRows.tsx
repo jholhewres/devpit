@@ -5,6 +5,8 @@ import { PANES } from './paneList'
 import { Rename } from './Rename'
 import { busyIn, doingIn } from './running'
 import { short, twice, type Clicked } from './strip'
+import { modelName, runningIn } from './subagents'
+import { unreadIn } from './unread'
 import { useShell } from './useShell'
 
 /*
@@ -17,8 +19,19 @@ import { useShell } from './useShell'
  */
 
 export function SessionRows(): React.JSX.Element {
-  const { open, active, focus, close, rename, renaming, setRenaming, running, doing } =
-    useShell()
+  const {
+    open,
+    active,
+    focus,
+    close,
+    rename,
+    renaming,
+    setRenaming,
+    running,
+    doing,
+    unread,
+    subagents,
+  } = useShell()
     const clicked = useRef<Clicked | null>(null)
   const sessions = open.filter((tab) => tab.kind === 'term' || tab.kind === 'chat')
 
@@ -42,6 +55,19 @@ export function SessionRows(): React.JSX.Element {
            has said anything. `waiting` is the one worth a glance across the
            room: nothing moves until somebody goes back to it. */
         const says = doingIn(running, doing, tab)
+        const unseen = says === 'done' && unreadIn(unread, tab)
+        const children = here?.agent ? runningIn(subagents, tab.panes) : []
+        const subs = children.length > 0 && (
+          <span className="card__subs">
+            {children.map((child) => (
+              <span className="card__sub" key={child.id}>
+                <i className="card__dot" />
+                <span className="card__subname">{child.name ?? child.kind ?? 'subagent'}</span>
+                {child.model && <span className="card__model">{modelName(child.model)}</span>}
+              </span>
+            ))}
+          </span>
+        )
         const below = (
           <span className="card__l2">
             <span className="card__kind">
@@ -52,9 +78,25 @@ export function SessionRows(): React.JSX.Element {
               )}
             </span>
             {here ? (
-              <span className="card__run" data-agent={here.agent !== null} data-doing={says}>
-                <i className="card__dot" />
-                {says === 'waiting' ? `${here.label} · waiting on you` : here.label}
+              <span
+                className="card__run"
+                data-agent={here.agent !== null}
+                data-doing={says}
+                data-unread={unseen || undefined}
+              >
+                {/* Colour alone does not carry a question to everyone. */}
+                {says === 'waiting' ? (
+                  <i className="card__ask" aria-hidden="true">
+                    ?
+                  </i>
+                ) : (
+                  <i className="card__dot" />
+                )}
+                {says === 'waiting'
+                  ? `${here.label} · waiting on you`
+                  : unseen
+                    ? `${here.label} · finished`
+                    : here.label}
               </span>
             ) : (
               <span className="card__loose">{tab.kind === 'term' ? 'terminal' : 'chat'}</span>
@@ -79,6 +121,7 @@ export function SessionRows(): React.JSX.Element {
                 />
               </span>
               {below}
+              {subs}
             </div>
           )
         }
@@ -87,6 +130,7 @@ export function SessionRows(): React.JSX.Element {
             className="card"
             data-ctx="session"
             data-id={tab.id}
+            data-unread={unseen || undefined}
             key={tab.id}
             aria-pressed={active?.id === tab.id}
             onClick={(event) => {
@@ -106,6 +150,7 @@ export function SessionRows(): React.JSX.Element {
               <span className="card__t">{short(name, 30)}</span>
             </span>
             {below}
+            {subs}
           </button>
         )
       })}

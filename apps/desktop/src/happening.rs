@@ -46,13 +46,58 @@ pub fn agent_said(pane_id: &str, state: &str) -> Happening {
     }
 }
 
+/// A subagent the pane's agent started, named, or ended, as one row by id.
+///
+/// JSON in the detail because the row needs its id, name, type and model, and
+/// this event carries one string.
+pub fn subagent_said(pane_id: &str, event: &devpit_agentcli::Event) -> Option<Happening> {
+    use devpit_agentcli::Event;
+    let detail = match event {
+        Event::SubagentStarted { agent, kind } => serde_json::json!({ "id": agent, "kind": kind }),
+        Event::Delegated {
+            agent,
+            description,
+            model,
+            ended,
+        } => {
+            serde_json::json!({ "id": agent, "name": description, "model": model, "ended": ended })
+        }
+        Event::SubagentDone { agent: Some(agent) } => {
+            serde_json::json!({ "id": agent, "ended": true })
+        }
+        _ => return None,
+    };
+    Some(Happening {
+        pane_id: pane_id.to_owned(),
+        what: "subagent".to_owned(),
+        detail: Some(detail.to_string()),
+    })
+}
+
+/// The CLI session the agent in this pane is in, and where its transcript is.
+///
+/// What continuing that conversation in a chat needs: the id to resume, and
+/// the transcript, whose installation decides which profile may resume it.
+pub fn session_said(pane_id: &str, happening: &devpit_agentcli::Happening) -> Option<Happening> {
+    let transcript = happening.transcript_path.as_deref()?;
+    if happening.session_id.is_empty() {
+        return None;
+    }
+    let detail = serde_json::json!({ "sessionId": happening.session_id, "transcript": transcript });
+    Some(Happening {
+        pane_id: pane_id.to_owned(),
+        what: "session".to_owned(),
+        detail: Some(detail.to_string()),
+    })
+}
+
 /// The payload of `terminal:happening`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Happening {
     pub pane_id: String,
     /// `cwd` | `title` | `prompt` | `running` | `finished` | `clipboard` |
-    /// `agent`.
+    /// `agent` | `subagent` | `session`.
     pub what: String,
     pub detail: Option<String>,
 }
@@ -67,3 +112,7 @@ pub struct Happening {
 pub fn terminal_happenings() -> Result<Vec<Happening>, devpit_rpc::RpcError> {
     Ok(Vec::new())
 }
+
+#[cfg(test)]
+#[path = "happening_tests.rs"]
+mod tests;
