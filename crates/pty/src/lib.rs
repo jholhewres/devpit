@@ -29,8 +29,9 @@ mod reader;
 mod ring;
 pub mod shell;
 mod stopping;
+pub mod usage;
 
-pub use foreground::{at_a_prompt, looking, on as front_on, Front, Settling};
+pub use foreground::{all_on as fronts_on, at_a_prompt, looking, on as front_on, Front, Settling};
 pub use osc::{Scanner, Told, MOST_CARRIED};
 pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;

@@ -13,7 +13,14 @@ use super::Finished;
 #[serde(rename_all = "camelCase", default)]
 struct AgentConfig {
     /// The agent to run, by the name in its frontmatter.
+    ///
+    /// A subagent, not a CLI account — `profile` is that, and the two live in
+    /// this JSON side by side without being related.
     agent: Option<String>,
+    /// Which profile runs it: the program, its arguments and the environment
+    /// that picks the account. Absent runs whatever the build's default is,
+    /// which is what every step did before profiles existed.
+    profile: Option<String>,
     /// What to ask. The card's title and body are appended to it.
     prompt: String,
     /// A JSON Schema the answer has to satisfy.
@@ -94,6 +101,14 @@ pub fn run(
     // so a turn tells the board what it is doing while it does it.
     let settings = super::hook_settings();
 
+    // Which account this spends through. A named profile that has gone is an
+    // error rather than a silent fall back to the default: the difference
+    // between them is somebody's bill.
+    let runner = match &config.profile {
+        Some(id) => Some(crate::agent_profiles::runner_for(store, id)?),
+        None => None,
+    };
+
     let outcome = agent::run_turn_cancellable(
         &agent::Turn {
             prompt: &prompt,
@@ -104,6 +119,7 @@ pub fn run(
             model: config.model.as_deref(),
             settings: settings.as_deref(),
             env: &context,
+            runner: runner.as_ref(),
         },
         |line| {
             // Only the assistant's own words. The stream also carries hook

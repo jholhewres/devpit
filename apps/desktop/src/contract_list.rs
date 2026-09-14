@@ -1,27 +1,26 @@
-//! Every command the window may call, at runtime.
+//! Every command, in one list.
 //!
-//! Separate from the contract on purpose, and the difference is the point:
-//! one command cannot be in the *contract*, because specta cannot describe
-//! the channel it streams over — and leaving it out of the *handler* would
-//! mean the screen cannot call it at all. This list is what exists; that one
-//! is what is typed.
+//! Apart from `contract.rs` for the same reason `migrations_list.rs` is apart
+//! from `migrations.rs`: one file holds a decision somebody has to read — why
+//! the contract is separate from the invoke handler, where the generated
+//! TypeScript lands — and the other holds a hundred and thirty names. A
+//! decision buried under a list is a decision nobody finds.
+
+use tauri_specta::{collect_commands, Builder};
 
 use crate::{
     account, agent_choice, agent_profiles, arranging, asking, board, branches, card_work, cards,
     chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight, index,
-    mcp, moving, notices, openers, panels, panes, priming, projects, pty_bridge, reveal, saves,
-    search, sessions, settings, shell_launch, sources, staging, steps, threads, watching,
-    workspace, worktree_base, worktrees,
+    mcp, moving, notices, openers, panels, panes, paths, priming, projects, reveal, saves, search,
+    sessions, settings, shell_launch, sources, staging, steps, threads, watching, workspace,
+    worktree_base, worktrees,
 };
 
-pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
-    tauri::generate_handler![
+/// Loads every command whose types are generated into TypeScript.
+pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
+    builder.commands(collect_commands![
         commands::app_info,
         commands::app_health,
-        account::account_read,
-        account::account_sign_in,
-        account::account_poll,
-        account::account_sign_out,
         commands::app_capabilities,
         projects::project_list,
         projects::project_add,
@@ -31,7 +30,6 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         projects::project_rename,
         chat::chat_history,
         threads::chat_list,
-        chat::chat_send,
         chat::chat_cancel,
         chat::chat_frames,
         panels::panel_widths,
@@ -101,6 +99,9 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         notices::notices_mark_all,
         notices::notices_sweep_due,
         files::file_read,
+        paths::path_create,
+        paths::path_move,
+        paths::path_delete,
         staging::changes_stage,
         staging::changes_unstage,
         staging::changes_commit,
@@ -126,15 +127,17 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         panes::session_resize,
         panes::pane_scrollback,
         panes::session_detach,
-        panes::session_attach,
         shell_launch::session_running,
         watching::session_usage,
         shell_launch::agents_known,
         shell_launch::session_launch_agent,
         happening::terminal_happenings,
+        account::account_read,
+        account::account_sign_in,
+        account::account_poll,
+        account::account_sign_out,
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,
-        pty_bridge::pty_drain,
-    ]
+    ])
 }

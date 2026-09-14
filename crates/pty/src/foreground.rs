@@ -134,11 +134,25 @@ pub fn parse(listed: &str) -> Vec<Front> {
 /// pid, which is the closest thing to "started first" that costs no extra
 /// column of `ps`.
 pub fn on<'a>(fronts: &'a [Front], tty: &str) -> Option<&'a Front> {
-    let bare = tty.strip_prefix("/dev/").unwrap_or(tty);
-    let here = || fronts.iter().filter(|front| front.tty == bare);
+    let here = || all_on(fronts, tty);
     here()
         .find(|front| front.pid == front.pgid)
         .or_else(|| here().min_by_key(|front| front.pid))
+}
+
+/// Everything on this terminal, not only what is in front of it.
+///
+/// The prefix is handled here and nowhere else, which is the point of it
+/// existing: `ps` writes `pts/7` and tmux writes `/dev/pts/7`, so comparing
+/// the two strings directly matches nothing at all. Written out by hand once,
+/// it was a resource monitor reporting every terminal as costing zero — no
+/// error, no empty list, just a number that was always right about nothing.
+pub fn all_on<'a>(
+    fronts: &'a [Front],
+    tty: &str,
+) -> impl Iterator<Item = &'a Front> + Clone + use<'a> {
+    let bare = tty.strip_prefix("/dev/").unwrap_or(tty).to_owned();
+    fronts.iter().filter(move |front| front.tty == bare)
 }
 
 /// Whether this is a shell waiting for a person.

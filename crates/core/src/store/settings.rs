@@ -6,25 +6,9 @@
 
 use crate::store::{Store, StoreError};
 
-/// Keys, in one place.
-///
-/// A key spelled differently in two files is a setting that silently forgets
-/// itself, and nothing about the symptom points at the typo.
-pub mod key {
-    pub const TELEMETRY: &str = "telemetry.enabled";
-    pub const ONBOARDED_AT: &str = "onboarding.completed_at";
-    pub const THEME: &str = "appearance.theme";
-    pub const AUTO_UPDATE: &str = "general.automatic_updates";
-    pub const KEEP_TRANSCRIPTS: &str = "storage.keep_transcripts";
-    /// Whether closing a terminal with something running stops to ask.
-    pub const CONFIRM_STOP: &str = "terminal.confirm_stop";
-    /// Where new worktrees are created. Empty is the devpit workspace.
-    pub const WORKTREE_BASE: &str = "worktrees.base";
-    /// The apps offered in "Open in", as JSON.
-    pub const OPEN_IN_APPS: &str = "apps.open_in";
-    /// Which worktree origins are hidden from the lists, comma-separated.
-    pub const WORKTREES_HIDDEN: &str = "worktrees.hidden";
-}
+/// Keys, in one place. Named rather than written out here: see the file.
+#[path = "settings_keys.rs"]
+pub mod key;
 
 fn now() -> i64 {
     std::time::SystemTime::now()

@@ -36,15 +36,13 @@ pub fn project_tree(
     let (_, root) = locate(&store, &project_id)?;
     let root = checkout(&root, worktree_id.as_deref());
 
-    let status = devpit_git::status(&root)
-        .map(|status| status.paths)
-        .unwrap_or_default();
+    let read = devpit_git::status(&root).unwrap_or_default();
 
     let nodes = tree::children(&root, &path)
         .map_err(tree_error)?
         .into_iter()
         .map(|entry| FileNode {
-            status: mark(&entry, &status),
+            status: mark(&entry, &read.paths, &read.ignored),
             children: entry.is_dir.then(Vec::new),
             name: entry.name,
             path: entry.path,
@@ -66,7 +64,23 @@ fn loudness(status: GitStatus) -> u8 {
         GitStatus::Added => 2,
         GitStatus::Untracked => 1,
         GitStatus::Clean => 0,
+        // Quieter than clean, and that is the point: an ignored row is one
+        // this tree is showing you because it is on disk, not because it has
+        // anything to do with the work.
+        GitStatus::Ignored => 0,
     }
+}
+
+/// Whether an ignore rule reaches this path.
+///
+/// Git reports the **directory** a rule names, so `target` arrives once and
+/// everything under it has to be worked out from the prefix. Asking the other
+/// way round — a rule per file — is what cost 1.06 seconds when it was
+/// measured.
+fn ignored_here(path: &str, ignored: &std::collections::BTreeSet<String>) -> bool {
+    ignored
+        .iter()
+        .any(|rule| path == rule || path.starts_with(&format!("{rule}/")))
 }
 
 /// A directory shows the loudest thing under it.
@@ -75,7 +89,16 @@ fn loudness(status: GitStatus) -> u8 {
 /// three folders looking for it, which is the opposite of what the colour is
 /// for. Ranked rather than first-found: the map is ordered by path, and taking
 /// its first entry would show whichever file happens to sort earliest.
-fn mark(entry: &tree::Entry, status: &std::collections::BTreeMap<String, GitStatus>) -> GitStatus {
+fn mark(
+    entry: &tree::Entry,
+    status: &std::collections::BTreeMap<String, GitStatus>,
+    ignored: &std::collections::BTreeSet<String>,
+) -> GitStatus {
+    // Before anything else: a path an ignore rule reaches has no git status of
+    // its own to report, and nothing under it does either.
+    if ignored_here(&entry.path, ignored) {
+        return GitStatus::Ignored;
+    }
     if !entry.is_dir {
         return status.get(&entry.path).copied().unwrap_or(GitStatus::Clean);
     }
@@ -93,11 +116,24 @@ fn mark(entry: &tree::Entry, status: &std::collections::BTreeMap<String, GitStat
 mod tests {
     use super::*;
 
+    /// A repository with no ignore rules, which is what the older tests here
+    /// were written against.
+    fn nothing() -> std::collections::BTreeSet<String> {
+        std::collections::BTreeSet::new()
+    }
+
     fn dir(path: &str) -> tree::Entry {
         tree::Entry {
             name: path.rsplit('/').next().unwrap_or(path).to_owned(),
             path: path.to_owned(),
             is_dir: true,
+        }
+    }
+
+    fn file(path: &str) -> tree::Entry {
+        tree::Entry {
+            is_dir: false,
+            ..dir(path)
         }
     }
 
@@ -109,7 +145,7 @@ mod tests {
             ("web/a.rs".to_owned(), GitStatus::Modified),
             ("web/z.rs".to_owned(), GitStatus::Deleted),
         ]);
-        assert_eq!(mark(&dir("web"), &status), GitStatus::Deleted);
+        assert_eq!(mark(&dir("web"), &status, &nothing()), GitStatus::Deleted);
     }
 
     #[test]
@@ -118,6 +154,51 @@ mod tests {
             // Same prefix, different folder: `webbing` must not count as `web`.
             ("webbing/a.rs".to_owned(), GitStatus::Modified),
         ]);
-        assert_eq!(mark(&dir("web"), &status), GitStatus::Clean);
+        assert_eq!(mark(&dir("web"), &status, &nothing()), GitStatus::Clean);
+    }
+
+    #[test]
+    fn a_path_an_ignore_rule_names_is_ignored() {
+        let ignored: std::collections::BTreeSet<String> = ["target".to_owned()].into();
+        assert_eq!(
+            mark(&dir("target"), &Default::default(), &ignored),
+            GitStatus::Ignored
+        );
+    }
+
+    #[test]
+    fn everything_under_an_ignored_folder_is_ignored_too() {
+        // Git reports the folder the rule names, once. Everything below it has
+        // to be worked out from the prefix — asking per file is what cost 1.06
+        // seconds when it was measured.
+        let ignored: std::collections::BTreeSet<String> = ["target".to_owned()].into();
+        assert_eq!(
+            mark(&file("target/debug/devpit"), &Default::default(), &ignored),
+            GitStatus::Ignored
+        );
+    }
+
+    #[test]
+    fn a_name_that_merely_starts_the_same_is_not_ignored() {
+        // `target` must not swallow `targets.rs`.
+        let ignored: std::collections::BTreeSet<String> = ["target".to_owned()].into();
+        assert_eq!(
+            mark(&file("targets.rs"), &Default::default(), &ignored),
+            GitStatus::Clean
+        );
+    }
+
+    #[test]
+    fn an_ignored_path_reports_no_change_of_its_own() {
+        // A file inside an ignored folder is untracked as far as git's own
+        // listing goes. Saying so would draw `target` in the colour that means
+        // "new work you have not committed".
+        let mut status = std::collections::BTreeMap::new();
+        status.insert("target/x".to_owned(), GitStatus::Untracked);
+        let ignored: std::collections::BTreeSet<String> = ["target".to_owned()].into();
+        assert_eq!(
+            mark(&file("target/x"), &status, &ignored),
+            GitStatus::Ignored
+        );
     }
 }

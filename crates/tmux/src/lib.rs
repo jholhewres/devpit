@@ -173,6 +173,11 @@ impl Server {
         Ok(shell::parse_running(&String::from_utf8_lossy(&out.stdout)))
     }
 
+    /// Records which profile devpit started in a pane.
+    pub fn name_pane(&self, target: &str, profile: &str) -> Result<(), TmuxError> {
+        pane::name_pane(self, target, profile)
+    }
+
     pub fn list_windows(&self, session: &str) -> Result<Vec<String>, TmuxError> {
         let output = self.require(&["list-windows", "-t", session, "-F", "#{window_name}"])?;
         Ok(String::from_utf8_lossy(&output.stdout)

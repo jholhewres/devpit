@@ -133,4 +133,12 @@ pub struct KnownAgent {
     /// saying what could be installed is more use than a short list with no
     /// explanation.
     pub installed: bool,
+    /// Whether it is offered at all. A person with twelve agents on the list
+    /// uses two, and a menu that offers all twelve is a menu they read past.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Where its own documentation lives. Empty for a profile, which is
+    /// somebody's own and has no page to send them to.
+    #[serde(default)]
+    pub homepage: String,
 }

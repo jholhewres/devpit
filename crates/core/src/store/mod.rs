@@ -32,7 +32,7 @@ pub enum StoreError {
     NoDataDirectory,
 }
 
-pub use board::{CardRow, ColumnRow, SessionLink, StepRow, DEFAULT_COLUMNS};
+pub use board::{CardRow, ColumnRow, SessionLink, StepRow, StepUse, DEFAULT_COLUMNS};
 pub use cards::{AttachmentRow, CommentRow, NoticeRow};
 pub use runs::RunRow;
 /// The ceilings on anything read from outside, in one place.

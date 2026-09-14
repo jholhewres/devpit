@@ -45,6 +45,13 @@ pub struct Turn<'a> {
     /// Variables and never interpolation: a branch named `fix;rm -rf /` has to
     /// become a value, not shell syntax.
     pub env: &'a [(String, String)],
+    /// Which profile runs it — the program, the arguments it always carries,
+    /// and the environment that picks the account.
+    ///
+    /// `None` runs whatever `PROGRAM` names, which is what every turn did
+    /// before profiles existed and what a board with no profile chosen still
+    /// does.
+    pub runner: Option<&'a crate::running::Runner>,
 }
 
 #[derive(Deserialize)]
@@ -97,10 +104,23 @@ pub fn run_turn_cancellable(
         turn.model,
         turn.settings,
     );
-    let mut child = Command::new(PROGRAM)
-        .args(&argv[1..])
+    let mut child = Command::new(turn.runner.map_or(PROGRAM, |one| one.program.as_str()))
+        .args(
+            turn.runner
+                .map_or_else(|| argv[1..].to_vec(), |one| one.argv(&argv[1..])),
+        )
         .current_dir(turn.cwd)
-        .envs(turn.env.iter().map(|(key, value)| (key, value)))
+        // The profile first, then the step's own: the profile says which
+        // account this runs under, and the step's context is about this one
+        // turn. A collision is the turn's to win.
+        .envs(
+            turn.runner
+                .map(|one| one.env.clone())
+                .unwrap_or_default()
+                .iter()
+                .chain(turn.env.iter())
+                .map(|(key, value)| (key, value)),
+        )
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

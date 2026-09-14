@@ -54,6 +54,13 @@ fn now() -> i64 {
         .unwrap_or_default()
 }
 
+/// A step that runs under some profile, and the board it is on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StepUse {
+    pub step: String,
+    pub project: String,
+}
+
 impl Store {
     /// The project's columns, left to right.
     pub fn columns(&self, project_id: &str) -> Result<Vec<ColumnRow>, StoreError> {
@@ -263,6 +270,42 @@ impl Store {
                     name: row.get(2)?,
                     config: row.get(3)?,
                     irreversible: row.get::<_, i64>(4)? != 0,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// The steps, by name, that run under this profile.
+    ///
+    /// `$.profile` and not `$.agent`: a step's `agent` is a subagent named in
+    /// somebody's frontmatter, which is a different thing that happens to live
+    /// in the same JSON. Asking for the wrong one would refuse deletions
+    /// nobody asked about and allow the ones that matter.
+    ///
+    /// Read across every project, because a profile is one person's and their
+    /// boards are not: deleting it from one project's point of view would
+    /// break another's without ever mentioning it.
+    ///
+    /// `json_extract` rather than a `LIKE`, which would also match a step whose
+    /// *name* happened to contain the id.
+    ///
+    /// The project's name comes back with the step's, because "Review uses it"
+    /// is not actionable on a machine with six projects — the person has to
+    /// know which board to go and look at.
+    pub fn steps_using_profile(&self, profile: &str) -> Result<Vec<StepUse>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT step.name, project.name FROM step \
+             JOIN project ON project.id = step.project_id \
+             WHERE json_valid(step.config) \
+               AND json_extract(step.config, '$.profile') = ?1 \
+             ORDER BY project.name, step.name",
+        )?;
+        let rows = stmt
+            .query_map([profile], |row| {
+                Ok(StepUse {
+                    step: row.get(0)?,
+                    project: row.get(1)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

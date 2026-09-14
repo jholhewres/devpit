@@ -37,6 +37,14 @@ pub struct Known {
     /// starts and nothing else, and a menu item does not get to edit files in
     /// somebody's home directory.
     pub settings_flag: Option<&'static str>,
+    /// Which driver reads its output when it is run headless, empty when none
+    /// can. Only Claude Code streams a shape devpit knows how to read, so the
+    /// rest are terminal-only until a driver exists for them — and saying so
+    /// here beats a profile that offers a chat it cannot hold.
+    pub driver: &'static str,
+    /// Where its own documentation lives. The row links to it rather than
+    /// explaining how to install something devpit does not ship.
+    pub homepage: &'static str,
 }
 
 /// Every agent, in the order a menu should offer them.
@@ -54,6 +62,8 @@ pub const KNOWN: &[Known] = &[
         // from", so it adds our hooks rather than replacing what the person
         // has configured.
         settings_flag: Some("--settings {}"),
+        driver: "claude",
+        homepage: "https://code.claude.com/docs",
     },
     Known {
         id: "codex",
@@ -61,6 +71,8 @@ pub const KNOWN: &[Known] = &[
         launch: "codex",
         wears: &["codex"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://github.com/openai/codex",
     },
     Known {
         id: "gemini",
@@ -68,6 +80,8 @@ pub const KNOWN: &[Known] = &[
         launch: "gemini",
         wears: &["gemini"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://github.com/google-gemini/gemini-cli",
     },
     Known {
         id: "opencode",
@@ -75,6 +89,8 @@ pub const KNOWN: &[Known] = &[
         launch: "opencode",
         wears: &["opencode"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://opencode.ai/docs/cli/",
     },
     Known {
         id: "cursor",
@@ -82,6 +98,8 @@ pub const KNOWN: &[Known] = &[
         launch: "cursor-agent",
         wears: &["cursor-agent", "cursor"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://cursor.com/cli",
     },
     Known {
         id: "copilot",
@@ -89,6 +107,8 @@ pub const KNOWN: &[Known] = &[
         launch: "copilot",
         wears: &["copilot"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli",
     },
     Known {
         id: "amp",
@@ -96,6 +116,8 @@ pub const KNOWN: &[Known] = &[
         launch: "amp",
         wears: &["amp"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://ampcode.com/manual#install",
     },
     Known {
         id: "droid",
@@ -103,6 +125,8 @@ pub const KNOWN: &[Known] = &[
         launch: "droid",
         wears: &["droid"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://docs.factory.ai/cli/getting-started/quickstart",
     },
     Known {
         id: "grok",
@@ -110,6 +134,8 @@ pub const KNOWN: &[Known] = &[
         launch: "grok",
         wears: &["grok"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://x.ai/cli",
     },
     Known {
         id: "aider",
@@ -117,6 +143,8 @@ pub const KNOWN: &[Known] = &[
         launch: "aider",
         wears: &["aider"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://aider.chat/docs/install.html",
     },
     Known {
         id: "goose",
@@ -124,6 +152,8 @@ pub const KNOWN: &[Known] = &[
         launch: "goose",
         wears: &["goose"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://block.github.io/goose/docs/quickstart/",
     },
     Known {
         id: "crush",
@@ -131,6 +161,8 @@ pub const KNOWN: &[Known] = &[
         launch: "crush",
         wears: &["crush"],
         settings_flag: None,
+        driver: "",
+        homepage: "https://github.com/charmbracelet/crush",
     },
 ];
 

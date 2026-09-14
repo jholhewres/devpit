@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 
 use devpit_agentcli::driver::driver;
 use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head, Head};
-use devpit_agentcli::profile::profiles;
 use devpit_agentcli::store::{append, conversation_path, read};
 use devpit_agentcli::talk::{say, Said, Say};
 use devpit_rpc::{
@@ -110,7 +109,7 @@ pub async fn chat_send(
         ));
     }
 
-    let Some(profile) = profiles(&[])
+    let Some(profile) = crate::agent_profiles::all(&crate::projects::store()?)?
         .into_iter()
         .find(|found| found.id == profile_id)
     else {
@@ -119,10 +118,20 @@ pub async fn chat_send(
             format!("no profile called {profile_id}"),
         ));
     };
+    // Spawned, not typed, so a name only the shell knows is no use here — and
+    // saying so beats "not on the PATH" about something the person watches
+    // their terminal run every day.
     let Some(path) = profile.path.clone() else {
         return Err(RpcError::new(
             ErrorCode::NotFound,
-            format!("{} is not on the PATH", profile.command),
+            match profile.reach {
+                devpit_rpc::Reach::ShellOnly => format!(
+                    "{} is a shell function, so devpit cannot start it here — \
+                     name the program it runs instead",
+                    profile.command
+                ),
+                _ => format!("{} is not installed", profile.command),
+            },
         ));
     };
     let Some(driver) = driver(&profile.driver) else {
@@ -288,13 +297,6 @@ pub fn chat_cancel(
         stop_reason: Some("cancelled".to_owned()),
         is_error: false,
     }))
-}
-
-/// `agent.profiles` — the accounts this machine can talk to.
-#[tauri::command]
-#[specta::specta]
-pub fn agent_profiles() -> Result<Vec<devpit_rpc::Profile>, RpcError> {
-    Ok(profiles(&[]))
 }
 
 /// `chat.frames` — the shapes `chat.send` uses, on both sides.

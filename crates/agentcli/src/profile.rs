@@ -1,9 +1,23 @@
 //! Finding the profiles this machine can run.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::driver::driver;
-pub use devpit_rpc::Profile;
+pub use devpit_rpc::{Declared, EnvVar, Profile, Reach};
+
+/// What a base agent lends to the profiles built on it.
+///
+/// Resolved by the caller rather than looked up here: the agent catalogue
+/// lives in `devpit_pty`, which this crate does not depend on and should not
+/// start depending on to answer two questions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Base {
+    /// The program a profile runs when it names none of its own.
+    pub program: String,
+    /// Which driver reads its output, empty when nothing can.
+    pub driver: String,
+}
 
 /// Where a command resolves to, if anywhere.
 pub fn found(command: &str) -> Option<String> {
@@ -28,6 +42,25 @@ fn is_runnable(path: &PathBuf) -> bool {
     path.is_file()
 }
 
+/// How far this machine gets with a command.
+///
+/// `shell_knows` is whether the person's own shell can run the name — which is
+/// a different question from whether a file exists, and the only one that is
+/// right about a function defined in their `.zshrc`. Asking the shell costs an
+/// interactive shell, so it is asked once by the caller and passed in here
+/// rather than asked per command.
+///
+/// A file wins over shell knowledge rather than being weighed against it: when
+/// both are true the shell would run the file anyway, and `Runnable` is the
+/// answer that lets devpit spawn it.
+pub fn reach(command: &str, shell_knows: bool) -> (Reach, Option<String>) {
+    match found(command) {
+        Some(path) => (Reach::Runnable, Some(path)),
+        None if shell_knows => (Reach::ShellOnly, None),
+        None => (Reach::Missing, None),
+    }
+}
+
 /// What the driver offers, or nothing when no driver answers to that name.
 fn models_of(name: &str) -> Vec<String> {
     driver(name)
@@ -46,46 +79,91 @@ fn efforts_of(name: &str) -> (Vec<String>, Option<String>) {
         .unwrap_or_default()
 }
 
-/// The commands worth looking for when nothing has been declared.
-const KNOWN: &[(&str, &str, &str)] = &[
+/// The commands worth looking for when nothing has been declared, as
+/// `(command, label, driver)`.
+///
+/// Named for what it is rather than `KNOWN`, which is already the agent
+/// catalogue in `devpit_pty::agents` and answers a different question.
+pub const DISCOVERED: &[(&str, &str, &str)] = &[
     ("claude", "Claude Code", "claude"),
     ("claudin", "Claude Code (second account)", "claude"),
 ];
 
-/// Every profile: the declared ones first, then the known commands that are
-/// installed and not already named.
-pub fn profiles(declared: &[Profile]) -> Vec<Profile> {
+/// Every profile: the declared ones first, then the discovered commands this
+/// machine can reach and that are not already named.
+///
+/// `base` resolves a base agent id into what it lends; `shell_knows` holds the
+/// command names the person's own shell can run, asked once by the caller. A
+/// name missing from both is the only thing that counts as absent.
+pub fn profiles(
+    declared: &[Declared],
+    base: impl Fn(&str) -> Option<Base>,
+    shell_knows: &HashSet<String>,
+) -> Vec<Profile> {
+    let knows = |command: &str| shell_knows.contains(command);
+
     let mut all: Vec<Profile> = declared
         .iter()
-        .map(|profile| {
-            let (efforts, effort_default) = efforts_of(&profile.driver);
+        .map(|one| {
+            // A base that vanished from the build leaves the profile listed
+            // and driverless rather than gone: somebody chose it, and dropping
+            // their row explains nothing.
+            let lent = base(&one.base).unwrap_or_else(|| Base {
+                program: one.command.clone(),
+                driver: String::new(),
+            });
+            let command = if one.command.is_empty() {
+                lent.program
+            } else {
+                one.command.clone()
+            };
+            let (efforts, effort_default) = efforts_of(&lent.driver);
+            let (how, path) = reach(&command, knows(&command));
             Profile {
-                path: found(&profile.command),
-                models: models_of(&profile.driver),
+                id: one.id.clone(),
+                label: one.label.clone(),
+                command,
+                driver: lent.driver.clone(),
+                path,
+                reach: how,
+                base: one.base.clone(),
+                args: one.args.clone(),
+                env: one.env.clone(),
+                mine: true,
+                models: models_of(&lent.driver),
                 efforts,
                 effort_default,
-                ..profile.clone()
             }
         })
         .collect();
 
-    for (command, label, driver) in KNOWN {
+    for (command, label, driver) in DISCOVERED {
         if all.iter().any(|profile| profile.command == *command) {
             continue;
         }
-        if let Some(path) = found(command) {
-            let (efforts, effort_default) = efforts_of(driver);
-            all.push(Profile {
-                id: (*command).to_owned(),
-                label: (*label).to_owned(),
-                command: (*command).to_owned(),
-                driver: (*driver).to_owned(),
-                path: Some(path),
-                models: models_of(driver),
-                efforts,
-                effort_default,
-            });
+        // Discovery, so something absent is left out entirely — a declared
+        // profile is a choice somebody made and stays listed, a discovered one
+        // that is nowhere is just noise.
+        let (how, path) = reach(command, knows(command));
+        if how == Reach::Missing {
+            continue;
         }
+        let (efforts, effort_default) = efforts_of(driver);
+        all.push(Profile {
+            id: (*command).to_owned(),
+            label: (*label).to_owned(),
+            command: (*command).to_owned(),
+            driver: (*driver).to_owned(),
+            path,
+            reach: how,
+            base: String::new(),
+            args: Vec::new(),
+            env: Vec::new(),
+            mine: false,
+            models: models_of(driver),
+            efforts,
+            effort_default,
+        });
     }
     all
 }

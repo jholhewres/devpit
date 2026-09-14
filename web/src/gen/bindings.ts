@@ -104,8 +104,49 @@ export const commands = {
 	/**  How hard to think. Absent keeps what the conversation already had. */
 	effort: string | null,
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
+	/**  `panel.widths` — how wide the panels were left. */
+	panelWidths: () => typedError<Widths, RpcError>(__TAURI_INVOKE("panel_widths")),
+	/**
+	 *  `panel.widths_write` — remembers where the divider was let go.
+	 * 
+	 *  Written on the drop and never during the drag: a preference row rewritten
+	 *  on every pointer move is a disk write per frame for a number nobody reads
+	 *  until the next launch.
+	 */
+	panelWidthsWrite: (sidebar: number, files: number) => typedError<Widths, RpcError>(__TAURI_INVOKE("panel_widths_write", { sidebar, files })),
+	/**  `agent.choice` — the default and the ones switched off. */
+	agentChoice: () => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_choice")),
+	/**  `agent.default_set` — what a new terminal opens. */
+	agentDefaultSet: (id: string) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_default_set", { id })),
+	/**
+	 *  `agent.enabled_set` — whether this one is offered.
+	 * 
+	 *  The default cannot be switched off: a menu whose default is not in it is a
+	 *  menu that opens nothing and explains nothing. Switching off the default
+	 *  clears it instead, which is a state the screen can draw.
+	 */
+	agentEnabledSet: (id: string, on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_enabled_set", { id, on })),
+	/**  `agent.hooks_set` — whether devpit asks for progress at all. */
+	agentHooksSet: (on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_hooks_set", { on })),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
+	/**
+	 *  `agent.profile_save` — writes one profile, new or edited.
+	 * 
+	 *  The id decides which: an id already on the list is an edit in place, so a
+	 *  rename keeps every step that names it. A blank one is minted here rather
+	 *  than in the window, because the window can be reloaded mid-edit.
+	 */
+	agentProfileSave: (declared: Declared) => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profile_save", { declared })),
+	/**
+	 *  `agent.profile_remove` — forgets one.
+	 * 
+	 *  Refused while a board step still names it. A step holds the id as a plain
+	 *  string with nothing enforcing it, so a silent delete is a lane that fails
+	 *  the next time somebody plays a card — and by then the deletion is days ago
+	 *  and nowhere near the symptom.
+	 */
+	agentProfileRemove: (id: string) => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profile_remove", { id })),
 	/**
 	 *  `chat.attach` — a dropped file, as something the agent can be pointed at.
 	 * 
@@ -576,6 +617,13 @@ export const commands = {
 	 */
 	sessionRunning: (projectId: string) => typedError<PaneRunning[], RpcError>(__TAURI_INVOKE("session_running", { projectId })),
 	/**
+	 *  `session.usage` — what each of a project's panes is costing right now.
+	 * 
+	 *  Off the main thread: it reads a file per process, and a busy machine with
+	 *  several agents open is a few hundred of them.
+	 */
+	sessionUsage: (projectId: string) => typedError<Usage, RpcError>(__TAURI_INVOKE("session_usage", { projectId })),
+	/**
 	 *  `agents.known` — the agent CLIs this build can start, and which are here.
 	 * 
 	 *  The list the menu draws. It is the same list that recognises a running
@@ -681,6 +729,24 @@ export type Agent = {
 	 *  two agents that share one can be told apart.
 	 */
 	source: string,
+};
+
+export type AgentChoice = {
+	/**
+	 *  What a new terminal opens, by agent or profile id. Empty for none,
+	 *  which is a plain shell — a deliberate answer, not a missing one.
+	 */
+	defaultId: string,
+	/**  Ids kept out of the menus. Off the catalogue, not uninstalled. */
+	disabled: string[],
+	/**
+	 *  Whether an agent devpit starts is told to report what it is doing.
+	 * 
+	 *  The hooks travel on the command line and reach only the agents this app
+	 *  starts — nothing is written into anybody's own configuration, so
+	 *  turning this off is the whole of turning it off.
+	 */
+	hooks: boolean,
 };
 
 /**  Who is running in the leaf. `none` is a plain shell. */
@@ -1019,6 +1085,55 @@ export type Conversations = {
 	conversations: Thread[],
 };
 
+/**
+ *  A profile as the person wrote it.
+ * 
+ *  The shape was measured rather than invented. Five of these existed as shell
+ *  functions in one `.zshrc` before devpit had anywhere to put them, and every
+ *  one of them was the same three things:
+ * 
+ *  ```text
+ *  glm()     = {seven ANTHROPIC_* vars} + claude + [--permission-mode bypassPermissions]
+ *  claudin() = {CLAUDE_CONFIG_DIR}       + claude + [--permission-mode bypassPermissions]
+ *  ```
+ * 
+ *  `glm` and `claudin` differ in **nothing but the environment**. So a profile
+ *  is environment, program and arguments — not a command line. That matters
+ *  twice: a command line would have to be handed to a shell, and a shell
+ *  function cannot be spawned at all, which is why those five worked in a
+ *  terminal and nowhere else devpit could reach.
+ */
+export type Declared = {
+	/**
+	 *  Minted once and never derived from the label, because the label is the
+	 *  part the person is invited to change.
+	 */
+	id: string,
+	/**  What they called it. */
+	label: string,
+	/**
+	 *  The agent this behaves like, by `devpit_pty::agents` id. It carries the
+	 *  driver, the hook flag and the default program.
+	 */
+	base: string,
+	/**  The program to run. Empty means the base agent's own. */
+	command?: string,
+	args?: string[],
+	env?: EnvVar[],
+};
+
+/**
+ *  One environment variable a profile sets before its program starts.
+ * 
+ *  A pair and not a `HashMap`, because order is what somebody typed and a map
+ *  would reshuffle their list every time the pane redrew.
+ */
+export type EnvVar = {
+	name: string,
+	/**  Often a secret. Never logged, never put in an error message. */
+	value: string,
+};
+
 export type ErrorCode = "unauthenticated" | 
 /**
  *  Used when a path falls outside the registered project root. Distinct
@@ -1124,10 +1239,13 @@ export type Front = {
 /**
  *  How a path stands with git.
  * 
- *  Deliberately smaller than git's own vocabulary: the screen draws four
- *  colours, and a status the screen cannot draw is a status nobody asked for.
+ *  Deliberately smaller than git's own vocabulary: the screen draws a handful
+ *  of colours, and a status the screen cannot draw is a status nobody asked
+ *  for.
  */
-export type GitStatus = "clean" | "modified" | "added" | "deleted" | "untracked";
+export type GitStatus = "clean" | "modified" | "added" | "deleted" | "untracked" | 
+/**  Matched by an ignore rule: not a change, a thing git is not watching. */
+"ignored";
 
 /**  The payload of `terminal:happening`. */
 export type Happening = {
@@ -1175,6 +1293,16 @@ export type KnownAgent = {
 	 *  explanation.
 	 */
 	installed: boolean,
+	/**
+	 *  Whether it is offered at all. A person with twelve agents on the list
+	 *  uses two, and a menu that offers all twelve is a menu they read past.
+	 */
+	enabled?: boolean,
+	/**
+	 *  Where its own documentation lives. Empty for a profile, which is
+	 *  somebody's own and has no page to send them to.
+	 */
+	homepage?: string,
 };
 
 /**  An app this build knows how to offer before anyone has typed anything. */
@@ -1296,6 +1424,38 @@ export type Opened = {
 	 *  so the person can go there themselves.
 	 */
 	path: string,
+};
+
+/**  One pane, and the whole process tree under it. */
+export type PaneCost = {
+	paneId: string,
+	/**  The agent's name when it is one, the executable's otherwise. */
+	label: string,
+	agent: string | null,
+	/**
+	 *  Kibibytes, proportional where the kernel would say — see `proportional`.
+	 * 
+	 *  32 bits because the contract crosses into JavaScript, which holds
+	 *  integers exactly only to 2^53 — so specta refuses a `u64` outright
+	 *  rather than letting a number arrive quietly wrong. Four tebibytes is
+	 *  past anything a terminal will hold.
+	 */
+	memoryKb: number,
+	/**
+	 *  Tenths of a percent, since the last time this was asked. Zero for a
+	 *  pane asked about once: a rate from one sample is not a rate.
+	 * 
+	 *  Tenths and not a float, because specta types an `f64` as `number |
+	 *  null` — a float can be NaN, which JSON has no word for. An integer
+	 *  crosses the wire meaning exactly what it says, and the rounding
+	 *  happens once, here, rather than in Rust and again in TypeScript.
+	 */
+	cpuTenths: number,
+	/**
+	 *  How many processes the tree holds. An agent with fifteen is worth
+	 *  knowing about even when the memory looks ordinary.
+	 */
+	processes: number,
 };
 
 /**  What a leaf shows. Only `terminal` in this slice. */
@@ -1426,8 +1586,25 @@ export type Profile = {
 	command: string,
 	/**  Which driver reads its output. */
 	driver: string,
-	/**  Absent means the command is not on the PATH right now. */
+	/**
+	 *  Where the command resolves to, when it resolves to a file at all.
+	 *  Set exactly when `reach` is `Runnable`.
+	 */
 	path: string | null,
+	/**  How far this machine gets with `command`. */
+	reach: Reach,
+	/**
+	 *  The agent this behaves like. Empty for a discovered command, which is
+	 *  only ever itself.
+	 */
+	base?: string,
+	args?: string[],
+	env?: EnvVar[],
+	/**
+	 *  Whether the person declared this one, and may therefore rename, edit or
+	 *  delete it. A discovered command is devpit noticing, not a choice.
+	 */
+	mine?: boolean,
 	/**
 	 *  The models the composer may pick from. They belong to the driver, and
 	 *  are carried here so one call answers the whole selector.
@@ -1523,6 +1700,29 @@ export type Question = {
 	input: string,
 	cwd: string,
 };
+
+/**
+ *  How far this machine can get with a command.
+ * 
+ *  Three answers and not two, because "installed" is not a yes or a no here.
+ *  On the machine this was written on `claude` is a **shell function** in
+ *  `.zshrc` with no file anywhere on `PATH`: a terminal starts it, because a
+ *  terminal types into that shell, and `Command::new` cannot — you cannot exec
+ *  a function. A single boolean has to pick one of those to be wrong about.
+ */
+export type Reach = 
+/**
+ *  An executable file on the `PATH`. Works everywhere: terminal, chat and
+ *  the board's headless turns.
+ */
+"runnable" | 
+/**
+ *  The person's shell knows the name but no file answers to it — a
+ *  function or an alias. The terminal can start it and nothing else can.
+ */
+"shell_only" | 
+/**  Neither. Nothing here can start it. */
+"missing";
 
 export type RejectedAgent = {
 	file: string,
@@ -1820,6 +2020,28 @@ export type TurnEnd = {
 	/**  The CLI's own word, kept rather than flattened into "failed". */
 	stopReason: string | null,
 	isError: boolean,
+};
+
+/**  Every pane of a project, and the total. */
+export type Usage = {
+	memoryKb: number,
+	/**  Tenths of a percent. See `PaneCost::cpu_tenths`. */
+	cpuTenths: number,
+	/**
+	 *  Whether shared pages were divided among the processes sharing them.
+	 * 
+	 *  False means at least one process could only be read as resident, and
+	 *  the total is therefore an overcount — measured at 44% on one machine.
+	 *  Said rather than hidden: a number that might be half wrong has to
+	 *  arrive labelled.
+	 */
+	proportional: boolean,
+	panes: PaneCost[],
+};
+
+export type Widths = {
+	sidebar: number,
+	files: number,
 };
 
 export type Workspace = {

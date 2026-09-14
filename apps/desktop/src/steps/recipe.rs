@@ -13,6 +13,9 @@ use super::context::CONTEXT_KEYS;
 #[serde(rename_all = "camelCase", default)]
 struct Declared {
     agent: Option<String>,
+    /// Which CLI account runs it, as a profile id. A different thing from
+    /// `agent`, which is a subagent from somebody's frontmatter.
+    profile: Option<String>,
     #[serde(alias = "capUsd")]
     budget_usd: Option<f64>,
     skills: Vec<String>,
@@ -21,13 +24,15 @@ struct Declared {
 
 /// Why this step cannot be saved, or nothing when it can.
 ///
-/// `agents` and `installed` are passed in rather than read here so the rule is
-/// callable from a test without a machine that happens to have them.
+/// `agents`, `installed` and `profiles` are passed in rather than read here so
+/// the rule is callable from a test without a machine that happens to have
+/// them.
 pub fn refuse(
     kind: StepKind,
     config: &str,
     agents: &[String],
     installed: &[String],
+    profiles: &[String],
 ) -> Option<String> {
     if kind != StepKind::Agent {
         return None;
@@ -40,6 +45,11 @@ pub fn refuse(
     if let Some(name) = &declared.agent {
         if !agents.contains(name) {
             return Some(format!("no agent named `{name}` on this machine"));
+        }
+    }
+    if let Some(id) = &declared.profile {
+        if !profiles.contains(id) {
+            return Some("this step names a profile that does not exist".to_owned());
         }
     }
     let missing = devpit_agentcli::skills::missing(&declared.skills, installed);

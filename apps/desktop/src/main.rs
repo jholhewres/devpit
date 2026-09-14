@@ -14,6 +14,8 @@ mod commands;
 // Only ever compiled where it is used. The contract exists to generate the
 // frontend's types — in a release build nothing calls it, and a module dead in
 // release should say so rather than warn about it on every build.
+mod agent_choice;
+mod agent_profiles;
 mod card_work;
 mod cards;
 mod chaining;
@@ -38,6 +40,7 @@ mod mcp;
 mod moving;
 mod notices;
 mod openers;
+mod panels;
 mod panes;
 mod paths;
 mod post;
@@ -60,6 +63,7 @@ mod staging;
 mod steps;
 mod tap;
 mod threads;
+mod watching;
 mod working;
 mod workspace;
 mod worktree_base;

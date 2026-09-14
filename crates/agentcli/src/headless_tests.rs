@@ -66,6 +66,7 @@ fn a_real_turn_answers_the_schema_and_reports_its_cost() {
     let outcome = run_turn(
         &Turn {
             env: &[],
+            runner: None,
             prompt: "Reply with verdict \"approved\" and an empty findings array.",
             cwd: Path::new("/tmp"),
             agents: None,

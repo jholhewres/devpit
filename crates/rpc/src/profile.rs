@@ -1,11 +1,83 @@
 //! A profile is a command and the driver that reads it.
 //!
-//! The same CLI signed into two accounts is two commands on the PATH —
-//! `claude` for one, `claudin` for the other. Which account a conversation
-//! used is a fact about it, so the profile is recorded and never changes.
+//! The same CLI signed into two accounts is two commands — `claude` for one,
+//! `claudin` for the other. Which account a conversation used is a fact about
+//! it, so the profile is recorded and never changes.
+//!
+//! "Two commands on the PATH" was the first telling of this and it was wrong
+//! about the machine it was written on, where both are shell functions with no
+//! file anywhere. That is what `Reach` is for.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
+
+/// How far this machine can get with a command.
+///
+/// Three answers and not two, because "installed" is not a yes or a no here.
+/// On the machine this was written on `claude` is a **shell function** in
+/// `.zshrc` with no file anywhere on `PATH`: a terminal starts it, because a
+/// terminal types into that shell, and `Command::new` cannot — you cannot exec
+/// a function. A single boolean has to pick one of those to be wrong about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Reach {
+    /// An executable file on the `PATH`. Works everywhere: terminal, chat and
+    /// the board's headless turns.
+    Runnable,
+    /// The person's shell knows the name but no file answers to it — a
+    /// function or an alias. The terminal can start it and nothing else can.
+    ShellOnly,
+    /// Neither. Nothing here can start it.
+    Missing,
+}
+
+/// One environment variable a profile sets before its program starts.
+///
+/// A pair and not a `HashMap`, because order is what somebody typed and a map
+/// would reshuffle their list every time the pane redrew.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvVar {
+    pub name: String,
+    /// Often a secret. Never logged, never put in an error message.
+    pub value: String,
+}
+
+/// A profile as the person wrote it.
+///
+/// The shape was measured rather than invented. Five of these existed as shell
+/// functions in one `.zshrc` before devpit had anywhere to put them, and every
+/// one of them was the same three things:
+///
+/// ```text
+/// glm()     = {seven ANTHROPIC_* vars} + claude + [--permission-mode bypassPermissions]
+/// claudin() = {CLAUDE_CONFIG_DIR}       + claude + [--permission-mode bypassPermissions]
+/// ```
+///
+/// `glm` and `claudin` differ in **nothing but the environment**. So a profile
+/// is environment, program and arguments — not a command line. That matters
+/// twice: a command line would have to be handed to a shell, and a shell
+/// function cannot be spawned at all, which is why those five worked in a
+/// terminal and nowhere else devpit could reach.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Declared {
+    /// Minted once and never derived from the label, because the label is the
+    /// part the person is invited to change.
+    pub id: String,
+    /// What they called it.
+    pub label: String,
+    /// The agent this behaves like, by `devpit_pty::agents` id. It carries the
+    /// driver, the hook flag and the default program.
+    pub base: String,
+    /// The program to run. Empty means the base agent's own.
+    #[serde(default)]
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: Vec<EnvVar>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -17,8 +89,23 @@ pub struct Profile {
     pub command: String,
     /// Which driver reads its output.
     pub driver: String,
-    /// Absent means the command is not on the PATH right now.
+    /// Where the command resolves to, when it resolves to a file at all.
+    /// Set exactly when `reach` is `Runnable`.
     pub path: Option<String>,
+    /// How far this machine gets with `command`.
+    pub reach: Reach,
+    /// The agent this behaves like. Empty for a discovered command, which is
+    /// only ever itself.
+    #[serde(default)]
+    pub base: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: Vec<EnvVar>,
+    /// Whether the person declared this one, and may therefore rename, edit or
+    /// delete it. A discovered command is devpit noticing, not a choice.
+    #[serde(default)]
+    pub mine: bool,
     /// The models the composer may pick from. They belong to the driver, and
     /// are carried here so one call answers the whole selector.
     #[serde(default)]
@@ -32,7 +119,18 @@ pub struct Profile {
 }
 
 impl Profile {
+    /// Whether anything on this machine can start it.
     pub fn installed(&self) -> bool {
-        self.path.is_some()
+        self.reach != Reach::Missing
+    }
+
+    /// Whether **devpit** can start it, as opposed to a terminal.
+    ///
+    /// The chat composer and the board's headless turns spawn a process; a
+    /// shell function has no process to spawn. The two questions were one
+    /// boolean until a person's own `claudin` came back as "not installed"
+    /// while the terminal was running it in front of them.
+    pub fn spawnable(&self) -> bool {
+        self.reach == Reach::Runnable
     }
 }

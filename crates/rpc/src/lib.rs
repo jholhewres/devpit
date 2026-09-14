@@ -24,6 +24,7 @@ pub mod session_status;
 pub mod session_tree;
 pub mod settings;
 mod threads;
+pub mod usage;
 
 pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
@@ -34,7 +35,7 @@ pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use frame::Frame;
 pub use front::Front;
-pub use profile::Profile;
+pub use profile::{Declared, EnvVar, Profile, Reach};
 pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
     ProjectList, ProjectNotes, ProjectTree, Worktree, WorktreeOrigin,
@@ -47,6 +48,7 @@ pub use session::{
 pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
 pub use threads::{Conversations, Thread};
+pub use usage::{PaneCost, Usage};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;

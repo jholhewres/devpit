@@ -32,3 +32,17 @@ pub(crate) fn capture_pane(server: &Server, target: &str) -> Result<String, Tmux
     let output = server.require(&["capture-pane", "-t", target, "-p"])?;
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
+
+/// Records which profile devpit started in a pane.
+///
+/// A pane-scoped user option, which is tmux's own place for this and outlives
+/// the app exactly as long as the pane does — a terminal survives a restart,
+/// and so should the answer to what is in it.
+///
+/// Its own storage rather than a map in this process for that reason alone.
+/// The caller treats a failure as cosmetic: the row falls back to reading the
+/// process, which is what it did before there were profiles.
+pub(crate) fn name_pane(server: &Server, target: &str, profile: &str) -> Result<(), TmuxError> {
+    server.require(&["set-option", "-p", "-t", target, "@devpit_profile", profile])?;
+    Ok(())
+}

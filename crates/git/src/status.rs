@@ -20,6 +20,14 @@ pub struct Status {
     pub behind: u32,
     /// Path relative to the worktree root → how it stands.
     pub paths: BTreeMap<String, GitStatus>,
+    /// Paths an ignore rule matched, as git reports them — which is the
+    /// **directory** where a rule names one, so `target/` is one entry rather
+    /// than forty thousand.
+    ///
+    /// Apart from `paths` on purpose: an ignored file is not a change, and
+    /// putting it there would make `dirty_files` count things no commit will
+    /// ever take.
+    pub ignored: BTreeSet<String>,
     /// The paths whose change is in the index — what a commit would take.
     ///
     /// Apart from `paths` because a file can be both: edited, staged, then
@@ -46,6 +54,11 @@ pub fn status(root: &Path) -> Result<Status, GitError> {
             "--porcelain=v2",
             "--branch",
             "--untracked-files=all",
+            // `matching` and not the default `traditional`, measured on this
+            // repository: traditional walks into every ignored directory and
+            // answered in 1.06s with 62,198 records, where matching stops at
+            // the rule and answered in under 10ms with 10.
+            "--ignored=matching",
             "-z",
         ],
     )?;
@@ -90,6 +103,12 @@ fn parse_status(raw: &str) -> Status {
             }
             "?" => {
                 status.paths.insert(rest.to_owned(), GitStatus::Untracked);
+            }
+            // `! <path>`, and a directory arrives with its trailing slash.
+            // Trimmed here so a caller comparing against a tree entry's path
+            // is not the one that has to know.
+            "!" => {
+                status.ignored.insert(rest.trim_end_matches('/').to_owned());
             }
             // `u` (unmerged) is deliberately absent: a conflict is not a
             // status this screen draws, and drawing it as "modified" would say

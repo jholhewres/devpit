@@ -1,5 +1,10 @@
 use super::*;
 
+/// The profiles a machine might have. A test that names one has to say so.
+fn profiles() -> Vec<String> {
+    vec!["01JGLM".to_owned()]
+}
+
 fn agents() -> Vec<String> {
     vec!["architect".to_owned()]
 }
@@ -9,7 +14,7 @@ fn skills() -> Vec<String> {
 }
 
 fn check(config: &str) -> Option<String> {
-    refuse(StepKind::Agent, config, &agents(), &skills())
+    refuse(StepKind::Agent, config, &agents(), &skills(), &profiles())
 }
 
 #[test]
@@ -61,6 +66,35 @@ fn a_recipe_that_names_only_what_exists_is_saved() {
 /// session declares a model; neither has a cap to miss.
 #[test]
 fn the_other_kinds_are_left_alone() {
-    assert_eq!(refuse(StepKind::Command, "{}", &agents(), &skills()), None);
-    assert_eq!(refuse(StepKind::Session, "{}", &agents(), &skills()), None);
+    assert_eq!(
+        refuse(StepKind::Command, "{}", &agents(), &skills(), &profiles()),
+        None
+    );
+    assert_eq!(
+        refuse(StepKind::Session, "{}", &agents(), &skills(), &profiles()),
+        None
+    );
+}
+
+#[test]
+fn a_step_naming_a_profile_that_exists_is_saved() {
+    assert_eq!(
+        check(r#"{"capUsd":1.0,"profile":"01JGLM"}"#),
+        None,
+        "a real profile was refused"
+    );
+}
+
+#[test]
+fn a_step_naming_a_profile_that_does_not_exist_is_refused() {
+    // At save time, while the person is still looking at what they typed —
+    // not when a card lands on the lane two screens away.
+    assert!(check(r#"{"capUsd":1.0,"profile":"01JGONE"}"#).is_some());
+}
+
+#[test]
+fn a_subagent_is_not_checked_against_the_profiles() {
+    // They share the JSON and nothing else. `architect` is a frontmatter name
+    // and not a profile id, and naming it must not be read as naming one.
+    assert_eq!(check(r#"{"capUsd":1.0,"agent":"architect"}"#), None);
 }

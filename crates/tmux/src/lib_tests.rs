@@ -120,3 +120,35 @@ fn a_line_it_cannot_read_is_dropped_rather_than_guessed_at() {
     neither is an error worth failing the whole list over. */
     assert!(parse_running("\n  \nleaf_a\nleaf_b /dev/pts/1\n").is_empty());
 }
+
+/*
+ * Which profile devpit started in a pane.
+ *
+ * `glm` and `claudin` are the same binary run with the same arguments; they
+ * differ in environment alone. Nothing outside the process can tell them
+ * apart without reading its environ, which is where its token lives. So the
+ * answer is recorded at the moment devpit starts one — in tmux, because tmux
+ * is what outlives the app.
+ */
+
+#[test]
+fn a_pane_devpit_did_not_start_has_no_profile() {
+    // tmux prints nothing at all for an unset user option, so the line is one
+    // field shorter rather than malformed.
+    let rows = crate::shell::parse_running("w1 /dev/pts/3 zsh");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].profile, "");
+}
+
+#[test]
+fn a_pane_devpit_started_carries_the_profile_id() {
+    let rows = crate::shell::parse_running("w1 /dev/pts/3 node 01JGLM");
+    assert_eq!(rows[0].profile, "01JGLM");
+    assert_eq!(rows[0].command, "node", "the rest still parses");
+}
+
+#[test]
+fn the_format_asks_tmux_for_the_option() {
+    // The parser and the format have to agree, and they are written apart.
+    assert!(crate::shell::RUNNING_FORMAT.contains("@devpit_profile"));
+}

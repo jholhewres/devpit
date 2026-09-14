@@ -69,6 +69,14 @@ pub struct Running {
     pub command: String,
     /// The terminal this pane owns, as tmux writes it: `/dev/pts/8`.
     pub tty: String,
+    /// The profile devpit started here, by id — empty when devpit did not
+    /// start it, or started a built-in agent.
+    ///
+    /// Kept in tmux and not in this process, because tmux is the thing that
+    /// outlives the app: a pane survives a restart, and so should the answer
+    /// to what is in it. An id rather than a name, so renaming the profile
+    /// renames the row and a name with a space in it cannot break the format.
+    pub profile: String,
 }
 
 pub fn parse_running(listed: &str) -> Vec<Running> {
@@ -79,6 +87,10 @@ pub fn parse_running(listed: &str) -> Vec<Running> {
             let leaf_id = parts.next()?;
             let tty = parts.next()?;
             let command = parts.next()?.trim();
+            // Last, and optional: tmux prints nothing at all for a user option
+            // that was never set, so a pane devpit did not start is a line one
+            // field shorter rather than a line that fails to parse.
+            let profile = parts.next().unwrap_or_default().trim();
             if leaf_id.is_empty() || tty.is_empty() || command.is_empty() {
                 return None;
             }
@@ -86,6 +98,7 @@ pub fn parse_running(listed: &str) -> Vec<Running> {
                 leaf_id: leaf_id.to_owned(),
                 command: command.to_owned(),
                 tty: tty.to_owned(),
+                profile: profile.to_owned(),
             })
         })
         .collect()
@@ -93,4 +106,5 @@ pub fn parse_running(listed: &str) -> Vec<Running> {
 
 /// One line per pane, asked once for a whole session: a sidebar asks this on a
 /// timer, and a process spawn per row would cost more than the answer.
-pub(crate) const RUNNING_FORMAT: &str = "#{window_name} #{pane_tty} #{pane_current_command}";
+pub(crate) const RUNNING_FORMAT: &str =
+    "#{window_name} #{pane_tty} #{pane_current_command} #{@devpit_profile}";

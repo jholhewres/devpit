@@ -58,6 +58,7 @@ fn a_real_turn_posts_its_hooks_to_us() {
     let outcome = devpit_agentcli::run_turn(
         &devpit_agentcli::Turn {
             env: &[],
+            runner: None,
             prompt: "Run the shell command `echo hello`, then reply with the word done.",
             cwd: dir.path(),
             agents: None,

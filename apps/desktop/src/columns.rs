@@ -168,5 +168,18 @@ fn refused(kind: &str, config: &str) -> Option<String> {
         .into_iter()
         .map(|one| one.name)
         .collect();
-    crate::steps::recipe::refuse(kind, config, &agents, &devpit_agentcli::skills::skills())
+    let profiles: Vec<String> = store()
+        .and_then(|store| crate::agent_profiles::all(&store))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|one| one.mine)
+        .map(|one| one.id)
+        .collect();
+    crate::steps::recipe::refuse(
+        kind,
+        config,
+        &agents,
+        &devpit_agentcli::skills::skills(),
+        &profiles,
+    )
 }

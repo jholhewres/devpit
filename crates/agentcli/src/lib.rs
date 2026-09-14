@@ -278,6 +278,7 @@ fn run(args: &[&str]) -> Result<String, AgentError> {
 #[path = "lib_tests.rs"]
 mod tests;
 
+pub mod declaring;
 pub mod driver;
 #[cfg(test)]
 mod driver_tests;
@@ -290,6 +291,7 @@ mod history_tests;
 pub mod profile;
 #[cfg(test)]
 mod profile_tests;
+pub mod running;
 pub mod skills;
 mod sources;
 pub mod store;

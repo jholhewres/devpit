@@ -13,8 +13,9 @@ use specta::Type;
 
 /// How a path stands with git.
 ///
-/// Deliberately smaller than git's own vocabulary: the screen draws four
-/// colours, and a status the screen cannot draw is a status nobody asked for.
+/// Deliberately smaller than git's own vocabulary: the screen draws a handful
+/// of colours, and a status the screen cannot draw is a status nobody asked
+/// for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum GitStatus {
@@ -23,6 +24,8 @@ pub enum GitStatus {
     Added,
     Deleted,
     Untracked,
+    /// Matched by an ignore rule: not a change, a thing git is not watching.
+    Ignored,
 }
 
 /// Who made a checkout.

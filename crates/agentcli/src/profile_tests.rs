@@ -1,23 +1,45 @@
-use crate::profile::{found, profiles, Profile};
+use std::collections::HashSet;
 
-fn declared(id: &str, command: &str) -> Profile {
-    Profile {
+use crate::profile::{found, profiles, reach, Base, Declared, Reach};
+
+fn declared(id: &str, command: &str) -> Declared {
+    Declared {
         id: id.to_owned(),
         label: id.to_owned(),
+        base: "claude".to_owned(),
         command: command.to_owned(),
-        driver: "claude".to_owned(),
-        path: None,
-        models: Vec::new(),
-        efforts: Vec::new(),
-        effort_default: None,
+        args: Vec::new(),
+        env: Vec::new(),
     }
+}
+
+/// The one base these tests use, standing in for the agent catalogue.
+fn base(id: &str) -> Option<Base> {
+    (id == "claude").then(|| Base {
+        program: "claude".to_owned(),
+        driver: "claude".to_owned(),
+    })
+}
+
+/// Nothing the shell knows, which is what `profiles` was always told before
+/// there was anything to tell it.
+fn nothing() -> HashSet<String> {
+    HashSet::new()
+}
+
+fn knows(names: &[&str]) -> HashSet<String> {
+    names.iter().map(|name| (*name).to_owned()).collect()
 }
 
 #[test]
 fn a_command_that_is_not_installed_is_still_listed() {
     // Dropping it would read as a profile that was never declared, and the
     // person would add it again and wonder why nothing changed.
-    let all = profiles(&[declared("work", "definitely-not-a-real-command")]);
+    let all = profiles(
+        &[declared("work", "definitely-not-a-real-command")],
+        base,
+        &nothing(),
+    );
     let mine = all
         .iter()
         .find(|p| p.id == "work")
@@ -27,7 +49,7 @@ fn a_command_that_is_not_installed_is_still_listed() {
 
 #[test]
 fn a_declared_command_keeps_its_label() {
-    let all = profiles(&[declared("personal", "sh")]);
+    let all = profiles(&[declared("personal", "sh")], base, &nothing());
     assert_eq!(all[0].label, "personal");
     assert!(all[0].installed(), "sh is on the PATH");
 }
@@ -35,7 +57,11 @@ fn a_declared_command_keeps_its_label() {
 #[test]
 fn two_profiles_can_name_two_commands() {
     // The whole point: one account per binary, both listed at once.
-    let all = profiles(&[declared("work", "sh"), declared("personal", "ls")]);
+    let all = profiles(
+        &[declared("work", "sh"), declared("personal", "ls")],
+        base,
+        &nothing(),
+    );
     let declared_commands: Vec<_> = all
         .iter()
         .filter(|p| p.id == "work" || p.id == "personal")
@@ -46,11 +72,65 @@ fn two_profiles_can_name_two_commands() {
 
 #[test]
 fn a_declared_command_is_not_listed_twice_by_discovery() {
-    let all = profiles(&[declared("mine", "claude")]);
+    let all = profiles(&[declared("mine", "claude")], base, &knows(&["claude"]));
     assert_eq!(all.iter().filter(|p| p.command == "claude").count(), 1);
 }
 
 #[test]
 fn a_command_that_is_not_executable_is_not_found() {
     assert!(found("definitely-not-a-real-command").is_none());
+}
+
+#[test]
+fn a_file_on_the_path_is_runnable() {
+    let (how, where_) = reach("sh", false);
+    assert_eq!(how, Reach::Runnable);
+    assert!(where_.is_some(), "a runnable command says where it is");
+}
+
+#[test]
+fn a_name_only_the_shell_knows_is_shell_only() {
+    // The case this exists for: `claudin` here is a function in `.zshrc` with
+    // no file anywhere. The terminal runs it; `Command::new` cannot.
+    let (how, where_) = reach("definitely-not-a-real-command", true);
+    assert_eq!(how, Reach::ShellOnly);
+    assert_eq!(where_, None, "there is no file to point at");
+}
+
+#[test]
+fn a_name_nobody_knows_is_missing() {
+    let (how, _) = reach("definitely-not-a-real-command", false);
+    assert_eq!(how, Reach::Missing);
+}
+
+#[test]
+fn a_file_wins_over_the_shell_knowing_the_name() {
+    // Both true is the ordinary case for an installed CLI, and `Runnable` is
+    // the answer that lets devpit spawn it rather than only type it.
+    let (how, _) = reach("sh", true);
+    assert_eq!(how, Reach::Runnable);
+}
+
+#[test]
+fn a_shell_only_profile_is_installed_but_not_spawnable() {
+    // The distinction the single boolean could not make.
+    let all = profiles(
+        &[declared("glm", "definitely-not-a-real-command")],
+        base,
+        &knows(&["definitely-not-a-real-command"]),
+    );
+    let mine = all.iter().find(|p| p.id == "glm").expect("declared");
+    assert!(mine.installed(), "the terminal can start it");
+    assert!(!mine.spawnable(), "devpit cannot");
+}
+
+#[test]
+fn discovery_leaves_out_what_nothing_can_reach() {
+    // A declared profile stays listed because somebody chose it; a discovered
+    // one that is nowhere is noise.
+    let all = profiles(&[], base, &nothing());
+    assert!(
+        all.iter().all(|p| p.installed()),
+        "discovery listed something nothing can start"
+    );
 }

@@ -85,11 +85,33 @@ fn running_in(project_id: &str) -> Result<Vec<PaneRunning>, RpcError> {
     let ttys: Vec<String> = panes.iter().map(|one| one.tty.clone()).collect();
     let fronts = devpit_pty::looking(&ttys);
 
-    Ok(panes.into_iter().map(|one| named(&fronts, one)).collect())
+    // Only asked when a pane says devpit started a profile in it, so the
+    // ordinary session pays nothing for a feature it is not using.
+    let names = if panes.iter().any(|one| !one.profile.is_empty()) {
+        profile_names()
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    Ok(panes
+        .into_iter()
+        .map(|one| named(&fronts, &names, one))
+        .collect())
 }
 
-/// What one pane is running, once both sources have been asked.
-fn named(fronts: &[devpit_pty::Front], pane: devpit_tmux::Running) -> PaneRunning {
+/// Every declared profile's name, by id.
+fn profile_names() -> std::collections::HashMap<String, String> {
+    crate::projects::store()
+        .map(|store| crate::agent_profiles::names(&store))
+        .unwrap_or_default()
+}
+
+/// What one pane is running, once every source has been asked.
+fn named(
+    fronts: &[devpit_pty::Front],
+    names: &std::collections::HashMap<String, String>,
+    pane: devpit_tmux::Running,
+) -> PaneRunning {
     // tmux's answer is the fallback, not the answer: it is right for a native
     // binary and wrong for every interpreted one, and it is all there is when
     // `ps` could not be read.
@@ -100,11 +122,19 @@ fn named(fronts: &[devpit_pty::Front], pane: devpit_tmux::Running) -> PaneRunnin
     let agent = devpit_pty::front_on(fronts, &pane.tty)
         .and_then(|front| devpit_pty::agents::recognise(&front.argv));
 
+    // What devpit started beats what the process looks like, and only here.
+    // `glm` and `claudin` are the same binary with the same argv — they differ
+    // in environment alone, and telling them apart from outside would mean
+    // reading another process's environ, which is where its tokens live.
+    // devpit does not have to: it knows because it started it.
+    let mine = names.get(&pane.profile);
+
     PaneRunning {
         pane_id: pane.leaf_id,
         busy: !devpit_pty::agents::idle_shell(&command),
-        label: agent
-            .map(|one| one.label.to_owned())
+        label: mine
+            .cloned()
+            .or_else(|| agent.map(|one| one.label.to_owned()))
             .unwrap_or_else(|| command.clone()),
         agent: agent.map(|one| one.id.to_owned()),
         command,
@@ -123,21 +153,73 @@ pub async fn agents_known() -> Result<Vec<KnownAgent>, RpcError> {
     // the shell probe. Warmed at startup, so in practice it is already there
     // — but "in practice" is not where a blocked runtime worker comes from.
     tauri::async_runtime::spawn_blocking(|| {
-        devpit_pty::agents::KNOWN
-            .iter()
+        let knows = shell_knows();
+        let off = crate::projects::store()
+            .map(|store| crate::agent_choice::disabled(&store))
+            .unwrap_or_default();
+        let on = |id: &str| !off.iter().any(|one| one == id);
+        // The person's own first. They named them, and a menu that buried
+        // `GLM` under twelve CLIs would be the menu they stopped using.
+        let mine = crate::projects::store()
+            .and_then(|store| crate::agent_profiles::all(&store))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|one| one.mine)
             .map(|one| KnownAgent {
-                id: one.id.to_owned(),
-                label: one.label.to_owned(),
-                launch: one.launch.to_owned(),
-                installed: installed().contains(one.id),
-            })
-            .collect()
+                id: one.id.clone(),
+                label: one.label.clone(),
+                launch: devpit_agentcli::running::line(&devpit_agentcli::running::runner(&one)),
+                // Typed into a terminal, so a name the shell alone knows still
+                // counts. Only nothing at all does not.
+                installed: one.installed(),
+                enabled: on(&one.id),
+                homepage: String::new(),
+            });
+        mine.chain(devpit_pty::agents::KNOWN.iter().map(|one| KnownAgent {
+            id: one.id.to_owned(),
+            label: one.label.to_owned(),
+            launch: one.launch.to_owned(),
+            installed: knows.contains(program_of(one.launch)),
+            enabled: on(one.id),
+            homepage: one.homepage.to_owned(),
+        }))
+        .collect()
     })
     .await
     .map_err(|err| RpcError::internal(err.to_string()))
 }
 
-/// Which agents this machine can actually start.
+/// The program a launch line starts, which is its first word.
+fn program_of(launch: &str) -> &str {
+    launch.split_whitespace().next().unwrap_or(launch)
+}
+
+/// Every command name worth asking the shell about.
+///
+/// The agents a menu can start, plus the commands profile discovery looks for
+/// — `claudin` is in the second list and not the first, and it is exactly the
+/// name this whole mechanism exists for.
+fn names_to_probe() -> Vec<String> {
+    let launches = devpit_pty::agents::KNOWN
+        .iter()
+        .map(|one| program_of(one.launch).to_owned());
+    let discovered = devpit_agentcli::profile::DISCOVERED
+        .iter()
+        .map(|(command, _, _)| (*command).to_owned());
+    // The profiles already declared, so one naming a shell function reads as
+    // what it is. Asked once at startup like the rest: a profile added later
+    // is probed the next time devpit opens, and until then it reads as
+    // missing rather than as a terminal-only name.
+    let declared = crate::projects::store()
+        .map(|store| crate::agent_profiles::commands(&store))
+        .unwrap_or_default();
+    let mut names: Vec<String> = launches.chain(discovered).chain(declared).collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// Which command names this machine can actually start.
 ///
 /// Asked of the person's own login shell, once, and remembered.
 ///
@@ -148,32 +230,30 @@ pub async fn agents_known() -> Result<Vec<KnownAgent>, RpcError> {
 /// so the shell is what gets asked.
 ///
 /// One invocation for the whole list, because an interactive shell is not
-/// cheap: measured at 1.6 seconds here, which is fine once and absurd twelve
-/// times. Warmed at startup by [`warm_installed`], so no menu waits for it.
-fn installed() -> &'static std::collections::HashSet<String> {
+/// cheap: measured at 1.6 seconds here, which is fine once and absurd once per
+/// name. Warmed at startup by [`warm_installed`], so no menu waits for it.
+pub(crate) fn shell_knows() -> &'static std::collections::HashSet<String> {
     static FOUND: std::sync::OnceLock<std::collections::HashSet<String>> =
         std::sync::OnceLock::new();
-    FOUND.get_or_init(ask_the_shell)
+    FOUND.get_or_init(|| ask_the_shell(&names_to_probe()))
 }
 
 /// Starts the probe now, so the first menu finds the answer already there.
 pub(crate) fn warm_installed() {
     std::thread::spawn(|| {
-        let _ = installed();
+        let _ = shell_knows();
     });
 }
 
 #[cfg(unix)]
-fn ask_the_shell() -> std::collections::HashSet<String> {
+fn ask_the_shell(names: &[String]) -> std::collections::HashSet<String> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_owned());
     // Interactive, because that is the only mode that reads the file where a
     // function or an alias would be defined.
-    let script = devpit_pty::agents::KNOWN
+    let script = names
         .iter()
-        .map(|one| {
-            let program = one.launch.split_whitespace().next().unwrap_or(one.launch);
-            format!("command -v {program} >/dev/null 2>&1 && echo {}", one.id)
-        })
+        .filter(|name| is_a_bare_name(name))
+        .map(|name| format!("command -v {name} >/dev/null 2>&1 && echo {name}"))
         .collect::<Vec<_>>()
         .join("; ");
 
@@ -197,13 +277,23 @@ fn ask_the_shell() -> std::collections::HashSet<String> {
 }
 
 #[cfg(not(unix))]
-fn ask_the_shell() -> std::collections::HashSet<String> {
+fn ask_the_shell(names: &[String]) -> std::collections::HashSet<String> {
     // Windows has no `-ic`, and the daemon is what fills this seam there.
-    // Until then every agent is offered and the shell says if it is missing.
-    devpit_pty::agents::KNOWN
-        .iter()
-        .map(|one| one.id.to_owned())
-        .collect()
+    // Until then every name is offered and the shell says if it is missing.
+    names.iter().cloned().collect()
+}
+
+/// Whether a name can be pasted into a shell script as itself.
+///
+/// The probe builds a line of shell out of these, so anything that is not a
+/// plain command name is left out rather than quoted: a name needing quoting
+/// is a name no `command -v` was ever going to find, and building the guard
+/// instead of the escape keeps the script something a person can read.
+fn is_a_bare_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+'))
 }
 
 /// `session.launch_agent` — types an agent's launch line into a pane.
@@ -232,12 +322,10 @@ pub async fn session_launch_agent(
     pane_id: String,
     agent_id: String,
 ) -> Result<String, RpcError> {
-    let agent = devpit_pty::agents::known(&agent_id).ok_or_else(|| {
-        RpcError::new(
-            devpit_rpc::ErrorCode::NotFound,
-            format!("{agent_id} is not an agent this build knows"),
-        )
-    })?;
+    // A profile first, then a built-in agent. The same menu offers both, and
+    // a profile is the more specific answer when an id is both — which it is
+    // for a discovered command, whose id *is* the command.
+    let start = to_start(&agent_id)?;
 
     // The pane has to be this project's. Reached from a menu, the id comes
     // from the screen, and the screen is not the authority on what is open.
@@ -260,15 +348,28 @@ pub async fn session_launch_agent(
         ));
     }
 
-    let line = launch_line(agent);
+    let line = start;
     let lock = state.project_lock(&project_id)?;
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    crate::sessions::tmux_server()?
+    let server = crate::sessions::tmux_server()?;
+    server
         .send_keys(&target, &line)
         .map_err(crate::sessions::tmux_err)?;
+    // After the line, and never instead of it: a pane with the agent running
+    // and no label is a cosmetic loss, and a label on a pane where the launch
+    // failed is a lie.
+    let _ = server.name_pane(&target, &profile_id(&agent_id));
     Ok(line)
+}
+
+/// The profile id to record on a pane, empty for a built-in agent.
+fn profile_id(id: &str) -> String {
+    match profile_names().contains_key(id) {
+        true => id.to_owned(),
+        false => String::new(),
+    }
 }
 
 /// The command this agent is started with, hooks and all.
@@ -286,14 +387,38 @@ pub async fn session_launch_agent(
 ///
 /// Without the settings file the line is just the agent's name, which is what
 /// it always was.
-fn launch_line(agent: &devpit_pty::agents::Known) -> String {
-    let Some(flag) = agent.settings_flag else {
-        return agent.launch.to_owned();
+fn launch_line(launch: &str, settings_flag: Option<&str>) -> String {
+    let Some(flag) = settings_flag else {
+        return launch.to_owned();
     };
     let Some(settings) = hook_settings() else {
-        return agent.launch.to_owned();
+        return launch.to_owned();
     };
-    format!("{} {}", agent.launch, flag.replace("{}", &settings))
+    format!("{launch} {}", flag.replace("{}", &settings))
+}
+
+/// The line that starts this id, whether it names a profile or an agent.
+///
+/// A profile becomes `NAME='value' program --flags`; a built-in agent is the
+/// bare word it always was. Either way the hook flag is appended last, because
+/// it is about this launch and not about the account.
+fn to_start(id: &str) -> Result<String, RpcError> {
+    if let Ok(store) = crate::projects::store() {
+        if let Ok(profiles) = crate::agent_profiles::all(&store) {
+            if let Some(found) = profiles.iter().find(|one| one.id == id && one.mine) {
+                let flag = devpit_pty::agents::known(&found.base).and_then(|one| one.settings_flag);
+                let said = devpit_agentcli::running::line(&devpit_agentcli::running::runner(found));
+                return Ok(launch_line(&said, flag));
+            }
+        }
+    }
+    let agent = devpit_pty::agents::known(id).ok_or_else(|| {
+        RpcError::new(
+            devpit_rpc::ErrorCode::NotFound,
+            format!("{id} is not an agent this build knows"),
+        )
+    })?;
+    Ok(launch_line(agent.launch, agent.settings_flag))
 }
 
 /// Where the hook settings live, written if they are not there yet.
@@ -302,6 +427,14 @@ fn launch_line(agent: &devpit_pty::agents::Known) -> String {
 /// rule: only when it differs, so starting an agent does not touch the disk
 /// for nothing.
 fn hook_settings() -> Option<String> {
+    // Switched off means the flag is never added, so the agent is started
+    // exactly as it would have been by hand.
+    if !crate::projects::store()
+        .map(|store| crate::agent_choice::hooks_on(&store))
+        .unwrap_or(true)
+    {
+        return None;
+    }
     let root = Store::root().ok()?;
     let endpoint = devpit_agentcli::endpoint_file(&root);
     let path = root.join("hooks.json");
@@ -366,3 +499,7 @@ fn settled(session: &str, pane_id: &str) -> Ready {
     }
     Ready::Unknown
 }
+
+#[cfg(test)]
+#[path = "shell_launch_tests.rs"]
+mod tests;
