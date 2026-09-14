@@ -13,6 +13,42 @@ export type Block =
   | { readonly kind: 'list'; readonly ordered: boolean; readonly items: readonly string[] }
   | { readonly kind: 'quote'; readonly text: string }
   | { readonly kind: 'rule' }
+  | {
+      readonly kind: 'table'
+      readonly head: readonly string[]
+      readonly align: readonly Align[]
+      readonly rows: readonly (readonly string[])[]
+    }
+
+export type Align = 'left' | 'center' | 'right' | null
+
+/* A row's cells. `\|` is a pipe inside a cell, as GFM writes it — in code too,
+   so `a\|b` in backticks is one cell. */
+function cells(line: string): string[] {
+  const inner = line.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '')
+  return inner.split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, '|'))
+}
+
+const DELIMITER = /^\s*:?-+:?\s*$/
+
+/* A header row and the delimiter row under it, with as many cells as each
+   other. Anything less is a paragraph that happens to contain a pipe. */
+function tableAt(lines: readonly string[], at: number): string[] | null {
+  const head = lines[at]
+  const under = lines[at + 1]
+  if (!head?.includes('|') || under === undefined || !under.includes('-')) return null
+  const heads = cells(head)
+  const marks = under.trim().replace(/^\|/, '').replace(/\|$/, '').split('|')
+  if (marks.length !== heads.length || !marks.every((mark) => DELIMITER.test(mark))) return null
+  return heads
+}
+
+function alignOf(mark: string): Align {
+  const cell = mark.trim()
+  if (cell.startsWith(':') && cell.endsWith(':')) return 'center'
+  if (cell.endsWith(':')) return 'right'
+  return cell.startsWith(':') ? 'left' : null
+}
 
 export function blocks(source: string): Block[] {
   const lines = source.split('\n')
@@ -66,6 +102,22 @@ export function blocks(source: string): Block[] {
       continue
     }
 
+    const head = tableAt(lines, at)
+    if (head) {
+      const align = lines[at + 1].trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(alignOf)
+      const rows: string[][] = []
+      at += 2
+      while (at < lines.length && lines[at].trim() !== '' && lines[at].includes('|')) {
+        const row = cells(lines[at])
+        /* Every row as wide as the header: GFM pads a short row and drops what
+           a long one has past the last column. */
+        rows.push(head.map((_, column) => row[column] ?? ''))
+        at += 1
+      }
+      out.push({ kind: 'table', head, align, rows })
+      continue
+    }
+
     const bullet = /^\s*([-*+]|\d+[.)])\s+/
     if (bullet.test(line)) {
       const ordered = /^\s*\d/.test(line)
@@ -79,7 +131,13 @@ export function blocks(source: string): Block[] {
     }
 
     const body: string[] = []
-    while (at < lines.length && lines[at].trim() !== '' && !/^(#{1,6}\s|```|>|\s*[-*+]\s)/.test(lines[at])) {
+    while (
+      at < lines.length &&
+      lines[at].trim() !== '' &&
+      !/^(#{1,6}\s|```|>|\s*[-*+]\s)/.test(lines[at]) &&
+      // A table may start right under a line of prose, with no blank between.
+      !(body.length > 0 && tableAt(lines, at))
+    ) {
       body.push(lines[at])
       at += 1
     }

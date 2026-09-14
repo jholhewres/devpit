@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 
 import { Diagram } from './Diagram'
 import { ofName } from './languages'
+import { MdTable } from './MdTable'
 import { Painted } from './Painted'
 import { blocks, external, resolved, spans, type Block, type Span } from './markdown'
 import { ask, commands } from './live'
@@ -134,6 +135,8 @@ function Piece({ block, path }: { block: Block; path: string }): React.JSX.Eleme
       )
     case 'rule':
       return <hr className="md__rule" />
+    case 'table':
+      return <MdTable block={block} cell={(text) => <Inline text={text} path={path} />} />
     default:
       return null
   }
