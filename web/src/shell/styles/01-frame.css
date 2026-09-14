@@ -1,0 +1,127 @@
+/* The window is one project, so the project sits above the columns
+   rather than inside one of them. It gets the whole width, the logo, and
+   the branch — the three things you check before you touch anything. */
+/* The window draws its own frame.
+ *
+ * A rounded corner on a frameless window only works because the page behind
+ * it is transparent — painted over an opaque square the radius comes out as
+ * four black notches. `transparent: true` in tauri.conf.json is the other
+ * half of this, and it wants a compositing window manager.
+ *
+ * Maximised, the corners square off: a rounded rectangle floating in the
+ * middle of a screen it is supposed to fill reads as a bug. */
+.app { position: relative; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--canvas); border: 1px solid var(--border-strong); border-radius: 11px; }
+.app[data-max='true'] { border-radius: 0; border-color: transparent; }
+
+/* Invisible, and only the cursor says they are there — which is what a window
+   edge does. Fixed rather than absolute: these sit on the window boundary and
+   must not be clipped away by the rounded corner.
+   Corners are drawn after the edges so they win the overlap.
+   
+   Below the overlays on purpose: a sheet covering the window has to cover the
+   edges too, or a drag near the border of a dialog resizes the window instead
+   of doing what the dialog says. */
+.grip { position: fixed; z-index: 200; }
+.app[data-max='true'] .grip { display: none; }
+.grip[data-edge='North'] { top: 0; left: 6px; right: 6px; height: 5px; cursor: ns-resize; }
+.grip[data-edge='South'] { bottom: 0; left: 6px; right: 6px; height: 5px; cursor: ns-resize; }
+.grip[data-edge='West'] { left: 0; top: 6px; bottom: 6px; width: 5px; cursor: ew-resize; }
+.grip[data-edge='East'] { right: 0; top: 6px; bottom: 6px; width: 5px; cursor: ew-resize; }
+.grip[data-edge='NorthWest'] { top: 0; left: 0; width: 11px; height: 11px; cursor: nwse-resize; }
+.grip[data-edge='NorthEast'] { top: 0; right: 0; width: 11px; height: 11px; cursor: nesw-resize; }
+.grip[data-edge='SouthWest'] { bottom: 0; left: 0; width: 11px; height: 11px; cursor: nesw-resize; }
+.grip[data-edge='SouthEast'] { bottom: 0; right: 0; width: 11px; height: 11px; cursor: nwse-resize; }
+
+.top { height: 56px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 0; border-bottom: 1px solid var(--border); }
+/* The project block is exactly as wide as the sidebar under it, so the
+   first tab starts on the line the content starts on. With the sidebar
+   closed the block shrinks to itself and the tabs follow. */
+.top__lead { position: relative; width: var(--sidebar-w); flex: none; display: flex; align-items: center; gap: 9px; padding: 0 10px 0 12px; }
+.app:has(.win[data-side='closed']) .top__lead { width: auto; }
+
+/* The mark is a slot, not a drawing. Give both <img> below a src and the
+   app identity is set in one place, at both sizes. Until an image exists
+   the slot is a quiet square: an invented glyph would only be thrown away,
+   and a letter is what the old name left behind. */
+.logo { width: 26px; height: 26px; flex: none; display: flex; align-items: center; justify-content: center; background: var(--raised); border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+.logo:has(img[src]) { background: none; border: none; box-shadow: 0 1px 4px var(--shade); }
+.mark { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mark:not([src]) { display: none; }
+
+/* At rest this used to be bare text, which reads as the window's title —
+   the one thing a control must not look like. It carries its own surface
+   now, and the double chevron is the glyph that means "switches between
+   values" rather than "expands downwards". */
+.pick { height: 30px; padding: 0 6px 0 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; background: var(--overlay); border: 1px solid var(--border); transition: background-color 120ms ease, border-color 120ms ease; }
+.pick:hover { background: var(--overlay-strong); border-color: var(--border-strong); }
+.pick[aria-expanded='true'] { background: var(--overlay-strong); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.pick[aria-expanded='true'] .pick__chev { color: var(--accent); }
+.pick__name { flex: 1; min-width: 0; text-align: left; font-size: 13.5px; font-weight: 560; letter-spacing: -0.01em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick__chev { color: var(--text-3); flex: none; }
+
+/* The branch is its own control: it changes under you, and swapping it is
+   a different act from swapping the project. */
+.branch { height: 26px; padding: 0 9px; border-radius: 7px; display: flex; align-items: center; gap: 6px; flex: none; font-size: 12.5px; color: var(--text-2); background: var(--overlay); transition: background-color 120ms ease; }
+.branch:hover { background: var(--overlay-strong); color: var(--text); }
+.branch__n { font-family: var(--mono); font-size: 11.5px; }
+.branch__ahead { font-family: var(--mono); font-size: 10.5px; color: var(--success); font-variant-numeric: tabular-nums; }
+
+.win { position: relative; display: grid; grid-template-columns: var(--sidebar-w) minmax(360px, 1fr) var(--files-w); flex: 1; min-height: 0; overflow: hidden; }
+/* On the seam, not in the grid: an edge that were a column of its own would be
+   a column the layout has to make room for. Four pixels wide with a wider
+   invisible reach, because a hairline is a target nobody can hit.
+
+   `seam` and not `grip`, which is what the eight edges a frameless window is
+   pulled by have been called since long before this existed. Naming this one
+   `grip` too put a second bare `.grip { }` further down the sheet, and every
+   window edge quietly stopped being fixed at z-index 200. A window that could
+   only be resized sideways is what that looked like. */
+.seam { position: absolute; top: 0; bottom: 0; width: 9px; z-index: 3; cursor: col-resize; touch-action: none; }
+.seam[data-panel='sidebar'] { left: calc(var(--sidebar-w) - 4px); }
+.seam[data-panel='files'] { right: calc(var(--files-w) - 4px); }
+.seam::after { content: ''; position: absolute; inset: 0 4px; background: var(--accent); opacity: 0; transition: opacity 120ms ease; }
+.seam:hover::after, .seam:focus-visible::after { opacity: 0.55; }
+.seam:focus-visible { outline: none; }
+.win[data-files='closed'] { grid-template-columns: var(--sidebar-w) 1fr 0; }
+.win[data-side='closed'] { grid-template-columns: 0 1fr var(--files-w); }
+.win[data-side='closed'][data-files='closed'] { grid-template-columns: 0 1fr 0; }
+
+.drag { flex: 1; height: 100%; }
+
+/* A strip along the bottom, saying what is running.
+ 
+   It answers one question without being asked — is something eating this
+   machine — which people otherwise answer by opening another program. Two
+   numbers and a count; everything else is behind a click. */
+.strip { position: relative; flex: none; height: 24px; display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; border-top: 1px solid var(--border); background: var(--sidebar); }
+.strip__go { height: 20px; padding: 0 7px; border-radius: 5px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); }
+.strip__go:hover { background: var(--overlay); color: var(--text-2); }
+.strip__n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.strip__c { color: var(--ghost); }
+/* The total might be an overcount, so it says so rather than hoping nobody
+   asks. Resident memory overstates a process tree by half. */
+.strip__warn { color: var(--warning); }
+
+/* The monitor, over the strip that opened it. */
+.hud { position: absolute; right: 8px; bottom: 26px; width: 320px; max-height: 60vh; overflow-y: auto; z-index: 60; padding: 10px 12px 10px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border); box-shadow: 0 12px 32px var(--shade-deep); scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.hud__top { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
+.hud__t { font-size: 12.5px; color: var(--text); }
+.hud__sum { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.hud__warn { color: var(--warning); }
+.hudrow { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 7px 0; border-top: 1px solid var(--border); }
+.hudrow:hover { background: var(--overlay); }
+.hudrow__ico { width: 22px; height: 22px; flex: none; border-radius: 6px; background: var(--overlay); display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+.hudrow__body { flex: 1; min-width: 0; }
+.hudrow__n { display: block; font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hudrow__d { display: block; margin-top: 2px; font-size: 11px; color: var(--ghost); }
+.hudrow__cpu, .hudrow__mem { flex: none; font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.hudrow__mem { width: 62px; text-align: right; }
+.hudrow__cpu { width: 46px; text-align: right; }
+
+.sq26 { width: 26px; height: 26px; flex: none; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+.sq26:hover { background: var(--overlay); }
+.sq26:active { background: var(--overlay-strong); }
+.sq26[aria-pressed='true'] { background: var(--overlay-strong); color: var(--accent); }
+.sq26[data-off='true'] { opacity: 0.35; }
+.sq26[data-off='true']:hover { background: none; }
+

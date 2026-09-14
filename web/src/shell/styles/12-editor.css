@@ -1,0 +1,88 @@
+/* The Explorer's two questions, as two tabs over one tree. */
+.ex__modes { display: flex; gap: 2px; margin: 8px 10px 6px; padding: 2px; border-radius: 8px; background: var(--inset); }
+.exmode__tab { flex: 1; height: 26px; border-radius: 6px; font-size: 12px; color: var(--text-3); }
+.exmode__tab[aria-selected='true'] { background: var(--raised); color: var(--text); }
+.code__body { margin: 0; padding: 8px 12px; font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre; color: var(--text-2); }
+.row__g--modified { color: var(--warning); }
+.row__g--added, .row__g--untracked { color: var(--success); }
+.row__g--deleted { color: var(--danger); }
+/* Git is not watching this one. A tree that draws `target` and `node_modules`
+   exactly like `src` is a tree where the three rows that matter are lost among
+   the ones that never will — so they recede rather than disappearing, because
+   they are still on disk and still worth opening. */
+.row[data-ignored] .row__n, .row[data-ignored] .row__ico { opacity: 0.45; }
+.row[data-ignored]:hover .row__n, .row[data-ignored]:hover .row__ico { opacity: 0.75; }
+
+/* The padding is on `.xterm`, not on the box around it, and that is not a
+   style choice. FitAddon sizes the grid from the *parent's* computed height
+   minus the padding it reads off `.xterm` itself — so padding on the host is
+   height the addon never subtracts. Measured: an 800x600 box asked for 33
+   rows where 32 fit, and the 33rd was drawn 2px past the pane, under an
+   `overflow: hidden`. That is the line cut in half at the bottom of a
+   terminal with Claude Code open. */
+.termhost { flex: 1; min-height: 0; }
+.termhost .xterm { height: 100%; padding: 8px 4px 8px 12px; }
+/* xterm.css paints the viewport `#000`, and the viewport is positioned
+   absolutely against the *padding* box — so the padding above is a black
+   frame around the terminal in xterm's own colour, not ours. Transparent
+   lets `.pane--term` show through, which is the ground the terminal is
+   supposed to have in every theme. */
+.termhost .xterm .xterm-viewport { background-color: transparent; }
+
+.addpj__box .fld__b { width: 100%; text-align: left; }
+.addpj__box .fld__b:disabled { color: var(--ghost); }
+.btn--go:disabled { opacity: 0.5; }
+
+.tab--new { flex: none; width: 28px; padding: 0; justify-content: center; color: var(--text-3); }
+.tab--new:hover { color: var(--text); }
+
+/* A word that qualifies the row it sits in — an orphaned worktree, a stale
+   branch. Never the row's only content. */
+.pill { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--overlay); color: var(--text-3); font-size: 11px; }
+
+/* The editor. A textarea rather than a highlighted surface: the file has to
+   come back byte for byte, and every highlighter that owns the text is a
+   chance for it not to. */
+/* The editor is a textarea with a painting behind it, and the two have to
+   agree on every pixel or the caret drifts off the letters. So the metrics are
+   stated once, on both, and neither is allowed its own padding or line height.
+   The field owns the scroll; the painting is moved to match it. */
+.code--edit { overflow: hidden; padding: 0; }
+.code__wrap { position: relative; height: 100%; min-height: 260px; }
+.code__paint,
+.code__edit,
+.code__lines { position: absolute; inset: 0; margin: 0; border: 0; padding: 8px 12px 8px 52px; font-family: var(--mono); font-size: 12px; line-height: 1.6; tab-size: 2; white-space: pre; }
+/* The gutter is one text node, not one element per line: a file of ten
+   thousand lines is ten thousand nodes the browser lays out on every
+   keystroke, for a column nobody interacts with. */
+.code__lines { right: auto; width: 52px; padding: 8px 10px 8px 0; overflow: hidden; pointer-events: none; text-align: right; color: var(--ghost); user-select: none; }
+.code__paint { overflow: hidden; pointer-events: none; color: var(--text-2); }
+/* Transparent rather than hidden: the letters are still there, still
+   selectable and still what a screen reader reads. The colour comes from
+   behind them. */
+.code__edit { overflow: auto; background: none; color: transparent; caret-color: var(--text); resize: none; outline: none; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.code__edit::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+.tok--comment { color: var(--syn-comment); font-style: italic; }
+.tok--string { color: var(--syn-string); }
+.tok--number { color: var(--syn-number); }
+.tok--word { color: var(--syn-word); }
+.tok--type { color: var(--syn-type); }
+.tok--property { color: var(--syn-property); }
+
+/* A save that lost a race says what happened and offers both ways out. */
+.clash { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--overlay); }
+.clash__t { flex: 1; min-width: 0; font-size: 12px; color: var(--text-2); }
+
+/* A picture sits on a chequerboard, so transparency is visible as
+   transparency in both themes rather than as whatever the pane is painted. */
+.media { padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.media__img { max-width: 100%; border-radius: 6px; background-color: var(--inset);
+  background-image: linear-gradient(45deg, var(--overlay) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--overlay) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--overlay) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--overlay) 75%);
+  background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }
+.media__what { font-size: 11.5px; color: var(--text-3); }
+.media__pdf { width: 100%; height: 100%; min-height: 420px; border: 0; }
+

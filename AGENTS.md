@@ -115,9 +115,11 @@ reason a decision went one way, then stop.
 Commit messages the same: a subject line that says what changed, and a body
 only when there is a reason someone would otherwise have to guess at.
 
-**Grep a CSS class name before you write it.** `shell.css` is one global
-stylesheet of well over a thousand lines, so a short name is a name something
-already has. This has now shipped twice: `.act` for a transcript row met `.act`
+**Grep a CSS class name before you write it.** The shell's styles are one global
+cascade of well over two thousand lines, split into `web/src/shell/styles/` and
+imported in order by `shell.css` — grep the whole folder, since a short name is
+a name something already has. A rule goes in the part that styles the same
+thing; order across parts is the cascade. This has now shipped twice: `.act` for a transcript row met `.act`
 for a sidebar button and put a border around every nav item; `.pane` for a
 terminal leaf met `.pane` for the tab wrapper and set `display: none` on the
 thing it was introducing. Neither is caught by anything — TypeScript does not

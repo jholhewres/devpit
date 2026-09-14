@@ -3,6 +3,10 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { stylesheet } from './stylesheet'
+
+const SHELL = resolve(process.cwd(), 'src/shell')
+
 /*
  * No class may be told to be in two places at once.
  *
@@ -20,11 +24,8 @@ import { describe, expect, it } from 'vitest'
  * sharing a name by accident.
  */
 
-const SHELL = resolve(process.cwd(), 'src/shell')
-const SHEET = resolve(SHELL, 'shell.css')
-
 /** The sheet with its comments taken out — prose there names classes too. */
-const css = (): string => readFileSync(SHEET, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const css = (): string => stylesheet().replace(/\/\*[\s\S]*?\*\//g, '')
 
 /** Where each bare class selector says it is positioned, in order. */
 function placements(): Map<string, string[]> {

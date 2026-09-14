@@ -1,0 +1,85 @@
+/* ── Middle: however many panes are open ────────────────────────── */
+
+.mid { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--canvas); }
+.mid__bar { height: 34px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+.mid__title { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.netstat { display: flex; align-items: center; gap: 6px; margin-right: 4px; padding-left: 2px; font-size: 12px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.add { color: var(--success); }
+.del { color: var(--danger); }
+
+.wctl { display: flex; align-items: center; margin-left: 2px; }
+.wbtn { width: 36px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-2); border-radius: 5px; }
+.wbtn:hover { background: var(--overlay-strong); }
+.wbtn--x:hover { background: #c42b1c; color: #fff; }
+
+.mid__body { flex: 1; min-height: 0; display: flex; }
+
+/* The strip lists what is open, in the order it was opened: the newest
+   lands on the right and a tab keeps the place it was given. */
+/* `flex: 0 1 auto` and not `flex: none`: the strip is allowed to give up
+   width, which is what stops eight open files from pushing the branch chip and
+   the bell off the edge of the window. What it gives up, it scrolls. */
+.tabs { display: flex; align-items: center; gap: 3px; flex: 0 1 auto; min-width: 0; }
+.tabs__rail { display: flex; align-items: center; gap: 3px; min-width: 0; overflow-x: auto; overflow-y: hidden; scroll-behavior: smooth; }
+/* No visible bar: it would eat a third of a 30px strip to say something the
+   strip already says by being cut off. Wheel and trackpad still scroll it. */
+.tabs__rail { scrollbar-width: none; }
+.tabs__rail::-webkit-scrollbar { display: none; }
+/* One long filename must not be allowed to take the whole strip. */
+.tab__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab { max-width: 190px; height: 30px; padding: 0 7px 0 11px; border-radius: 7px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; white-space: nowrap; flex: none; }
+/* Closed panes are not listed; what you can open lives in the sidebar. */
+.tab[aria-pressed='false'] { display: none; }
+.tab__x { width: 17px; height: 17px; margin-left: 2px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.tab__x:hover { background: var(--overlay-strong); color: var(--text); }
+.tabs:empty + .tabs__sep { display: none; }
+.tab__dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.tabs__sep { width: 1px; height: 18px; background: var(--border); margin: 0 6px; flex: none; }
+
+/* A tab can be dragged into a new place. The strip's order is the array
+   below it, so a drag edits that array and the DOM follows — nothing is
+   positioned by hand, which is why the tab never lands somewhere the
+   state disagrees with. */
+.tab { cursor: grab; }
+.tab[data-dragging='true'] { cursor: grabbing; opacity: 0.55; }
+.tabs[data-moving='true'] .tab { transition: none; }
+.tabs[data-moving='true'] .tab__x { pointer-events: none; }
+
+/* One pane at a time, chosen by its tab. An earlier build showed every
+   open pane side by side *and* listed them as tabs, which made the tabs
+   mean nothing — if the thing is already on screen, the tab is not a way
+   to reach it. Splitting is now something you ask for. */
+.panes { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.pane { display: none; flex-direction: column; min-width: 0; min-height: 0; }
+.pane[data-show='true'] { display: flex; flex: 1 1 0; }
+.pane[data-show='true'] ~ .pane[data-show='true'] { border-left: 1px solid var(--border-strong); }
+
+/* An open tab is a thing you are meant to read and click, so it sits at
+   --text-2. It was at --text-3, which is the colour for text you are not
+   supposed to focus on — fine for a timestamp, wrong for a control whose
+   whole job is to be legible from across the strip.
+   The surface carries the distinction instead: the pane you are looking
+   at has a background, the others have none. */
+.tab[aria-pressed='true'] { background: transparent; color: var(--text-2); }
+.tab[aria-pressed='true']:hover { background: var(--overlay); color: var(--text); }
+.tab[data-active='true'] { background: var(--overlay-strong); color: var(--text); }
+.tab[data-active='true']:hover { background: var(--overlay-strong); color: var(--text); }
+.tab__x { color: var(--ghost); }
+.tab:hover .tab__x, .tab[data-active='true'] .tab__x { color: var(--text-3); }
+
+/* Nothing open. The window still has to say what it is and what the next
+   move is — a bare canvas reads as something failing to load. */
+.blank { display: none; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding-bottom: 40px; }
+.panes[data-empty='true'] .blank { display: flex; }
+.blank__mark { width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; background: var(--raised); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; }
+.blank__mark:has(img[src]) { background: none; border: none; box-shadow: 0 16px 44px color-mix(in srgb, var(--accent) 26%, transparent); }
+.blank__name { margin-top: 16px; font-size: 17px; font-weight: 560; letter-spacing: -0.01em; color: var(--text); }
+.blank__sub { margin-top: 5px; font-size: 12.5px; color: var(--text-3); }
+.blank__keys { margin-top: 22px; display: flex; flex-direction: column; gap: 2px; }
+.blank__k { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 10px; border-radius: 8px; min-width: 210px; }
+.blank__k:hover { background: var(--overlay); }
+.blank__k svg { color: var(--text-3); flex: none; }
+.blank__k b { flex: 1; font-weight: 400; font-size: 12.5px; color: var(--text-2); text-align: left; }
+.blank__k:hover b { color: var(--text); }
+.blank__k span { font-family: var(--mono); font-size: 10.5px; color: var(--ghost); }
+

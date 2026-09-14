@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-
 import { describe, expect, it } from 'vitest'
+
+import { stylesheet } from './stylesheet'
 
 /*
  * Where the terminal's padding is allowed to live.
@@ -25,9 +24,7 @@ import { describe, expect, it } from 'vitest'
  * agent open — the status line it writes last.
  */
 
-/* From the project root rather than from `import.meta.url`: these run under
-   jsdom, where that is an http URL and `readFileSync` refuses it. */
-const css = readFileSync(resolve(process.cwd(), 'src/shell/shell.css'), 'utf8')
+const css = stylesheet()
 
 const ruleFor = (selector: string): string => {
   const at = css.indexOf(`\n${selector} {`)

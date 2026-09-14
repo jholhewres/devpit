@@ -1,0 +1,34 @@
+/* ── Motion ──────────────────────────────────────────────────────────
+   A pane appearing is a navigation, and a navigation with no motion
+   reads as a repaint — you cannot tell whether the thing swapped or the
+   window blinked. Short and small on purpose: 160ms and six pixels is
+   enough to be read as movement and not enough to be waited on. */
+@keyframes pane-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.pane[data-show='true'] { animation: pane-in 160ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.blank { animation: pane-in 200ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+
+/* The columns closing is the one geometry change a person asks for
+   directly, so it is the one that may animate. */
+.win { transition: grid-template-columns 200ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.tab { transition: background-color 120ms ease, color 120ms ease; }
+.rtab, .segb, .act, .card, .row { transition: background-color 120ms ease, color 120ms ease; }
+
+/* ── Loading ─────────────────────────────────────────────────────────
+   Reading a file crosses a process boundary, so it can be slow enough to
+   notice. The skeleton keeps the shape of what is coming rather than
+   showing a spinner over nothing — the pane does not jump when the text
+   lands. */
+.skel { padding: 12px 0 0; }
+.skel__ln { height: 11px; margin: 0 14px 9px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--overlay) 25%, var(--overlay-strong) 37%, var(--overlay) 63%);
+  background-size: 380% 100%; animation: shimmer 1.25s ease-in-out infinite; }
+@keyframes shimmer { from { background-position: 130% 0; } to { background-position: -30% 0; } }
+.loading .code, .loading .fx__list { display: none; }
+.loading .skel { display: block; }
+.skel { display: none; }
+
+/* ── Context menu ────────────────────────────────────────────────────
+   Right-click is off everywhere by default: a browser menu inside a
+   desktop window offers Reload and View Source, which are not things
+   this app can do. It is switched back on only where there is something
+   to put in it. */

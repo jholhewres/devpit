@@ -1,0 +1,177 @@
+/* A permission question, in the thread rather than over it: a dialog would
+   hide the output that says why the agent wants this. */
+.asking { margin-bottom: 8px; padding: 11px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); background: var(--raised); box-shadow: 0 10px 24px var(--shade); display: flex; flex-direction: column; gap: 8px; }
+.asking__t { font-size: 13px; color: var(--text); }
+.asking__in { margin: 0; padding: 8px; border-radius: 6px; background: var(--inset); font-family: var(--mono); font-size: 11.5px; line-height: 1.5; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.asking__row { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* The conversations this project has had, in an empty chat — which is where
+   you look when you want the one you had yesterday. */
+.threads { margin-top: 14px; display: flex; flex-direction: column; gap: 2px; }
+.threads__h { padding: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
+.threads__r { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 9px; border-radius: 8px; text-align: left; }
+.threads__r:hover { background: var(--overlay); }
+.threads__t { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.threads__m { font-size: 11.5px; color: var(--text-3); }
+
+/* A chip that opens a list of choices. Anchored to itself, so it lands over
+   the composer rather than wherever the platform felt like putting it. */
+.ctl { position: relative; display: flex; }
+.ctl__l { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctl__v { color: var(--ghost); flex: none; }
+
+.ctlmenu { position: absolute; bottom: calc(100% + 5px); left: 0; z-index: 120; min-width: 230px; max-width: 330px; padding: 4px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 16px 36px var(--shade); animation: pop 130ms ease-out both; }
+.ctlmenu__s { padding: 6px 10px 2px; font-size: 10px; font-weight: 500; color: var(--text-3); }
+.ctlmenu__i { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 7px; text-align: left; }
+.ctlmenu__i:hover { background: var(--overlay-strong); }
+.ctlmenu__b { flex: 1; min-width: 0; }
+.ctlmenu__n { display: flex; align-items: baseline; gap: 5px; font-size: 12px; color: var(--text); }
+.ctlmenu__i[aria-checked='true'] .ctlmenu__n { font-weight: 600; }
+.ctlmenu__x { font-size: 10.5px; font-weight: 400; color: var(--ghost); }
+.ctlmenu__w { display: block; margin-top: 2px; font-size: 10.5px; line-height: 1.35; color: var(--text-3); white-space: normal; }
+.ctlmenu__c { flex: none; margin-top: 3px; color: var(--text-3); }
+
+/* The account and model picker. One list, because a model belongs to an
+   account and picking one across accounts would be changing the account. */
+/* Two columns: the account down the left, its models to the right. */
+.mpick { position: absolute; bottom: calc(100% + 5px); left: 0; z-index: 120; display: flex; width: 430px; max-width: calc(100vw - 32px); max-height: min(378px, 62vh); border-radius: 12px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 16px 36px var(--shade); overflow: hidden; animation: pop 130ms ease-out both; }
+.mpick__rail { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; width: 46px; padding: 5px; border-right: 1px solid var(--border); background: var(--canvas); overflow-y: auto; }
+.mpick__tab { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 7px; color: var(--text-3); }
+.mpick__tab:hover { background: var(--overlay); }
+.mpick__tab[data-on='true'] { background: var(--overlay-strong); color: var(--text); }
+/* The account's initial, tucked into the mark's corner. */
+.mpick__tabl { position: absolute; right: 4px; bottom: 3px; font-size: 8.5px; font-weight: 700; line-height: 1; color: currentColor; }
+.mpick__sep { flex: none; width: 22px; height: 1px; margin: 3px 0; background: var(--border); }
+.mpick__main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.mpick__q { flex: none; display: flex; align-items: center; gap: 8px; margin: 9px 10px 4px; padding: 0 9px; height: 32px; border-radius: 9px; background: var(--inset); color: var(--text-3); }
+.mpick__in { flex: 1; min-width: 0; border: 0; background: none; color: var(--text); font-family: inherit; font-size: 12px; outline: none; }
+.mpick__in::placeholder { color: var(--ghost); }
+.mpick__list { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 5px 7px 8px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.mpick__none { display: grid; place-items: center; padding: 28px 0; font-size: 11.5px; color: var(--ghost); }
+.mpick__r { display: flex; align-items: center; gap: 8px; height: 54px; padding: 0 10px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; }
+.mpick__r[data-at='true'] { background: var(--overlay-strong); }
+.mpick__r[aria-selected='true'] { border-color: var(--accent); }
+.mpick__b { flex: 1; min-width: 0; }
+.mpick__n { display: block; font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpick__p { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11px; color: var(--text-3); }
+.mpick__star { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; color: var(--ghost); }
+.mpick__star:hover { background: var(--overlay); }
+.mpick__star[data-on='true'] { color: var(--accent); }
+
+/* An empty chat asks for the work rather than reporting that there is none.
+   "Nothing said yet" is true and says nothing you did not know. */
+.chat__blank { min-height: 100%; display: flex; flex-direction: column; justify-content: center; max-width: 560px; margin: 0 auto; padding: 24px 20px 40px; }
+.chat__ask { text-align: center; }
+.chat__mark { display: block; margin: 0 auto; color: var(--accent); }
+.chat__q { margin: 10px 0 0; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; color: var(--text); }
+.chat__where { border-bottom: 1px dotted var(--text-3); }
+
+/* What the agent did, under a rule: a stack of rows you can open. */
+.acts { min-width: 0; font-size: 12px; color: var(--text-3); }
+.acts__h { display: flex; align-items: center; gap: 6px; height: 28px; width: 100%; min-width: 0; border-radius: 4px; }
+.acts__h:hover { color: var(--text); }
+.acts__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 12.5px; font-weight: 500; color: var(--text-2); }
+.acts__body { margin-left: 6px; padding-left: 12px; padding-bottom: 2px; border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+/* A shade of its own rather than `--inset`: the rows sit on the thread, not
+   in a well, and the three states are one step apart so a hover reads as a
+   hover and not as a selection. */
+.arow {
+  --act: color-mix(in srgb, var(--canvas) 96.5%, var(--text) 3.5%);
+  --act-hover: color-mix(in srgb, var(--canvas) 95%, var(--text) 5%);
+  --act-down: color-mix(in srgb, var(--canvas) 93.5%, var(--text) 6.5%);
+  min-width: 0; overflow: hidden; border-radius: 9px; border: 1px solid var(--border); background: var(--act);
+}
+.arow__h { display: flex; align-items: center; gap: 8px; height: 28px; width: 100%; min-width: 0; padding: 0 8px; text-align: left; font-size: 12px; }
+.arow__h:not(:disabled):hover { background: var(--act-hover); }
+.arow__h:not(:disabled):active { background: var(--act-down); }
+.arow__i { flex: none; color: var(--text-3); }
+.arow__k { flex: none; font-weight: 600; color: var(--text-2); }
+.arow__d { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.arow__v { flex: none; color: var(--ghost); }
+.arow__x { flex: none; color: var(--danger); }
+/* Alive: the same pulse as the composer's dots, so one language means one
+   thing across the pane. */
+.arow__live { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: breathe 1.2s ease-in-out infinite; }
+.arow__body { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 8px 12px; border-top: 1px solid var(--border); }
+.arow__think { font-size: 12px; line-height: 1.55; color: var(--text-2); }
+
+/* One disclosure: what it was given, and what came back. Each copyable on its
+   own, because you want the command far more often than you want both. */
+.asec { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.asec__h { display: flex; align-items: center; justify-content: space-between; height: 20px; font-size: 10.5px; font-weight: 500; color: var(--text-3); }
+.asec__c { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; color: var(--ghost); }
+.asec__c:hover { background: var(--overlay); color: var(--text-2); }
+
+.ascroll { position: relative; min-width: 0; overflow: hidden; }
+.ascroll__v { margin: 0; padding: 2px 8px 2px 0; max-height: 320px; overflow: auto; overscroll-behavior: contain; font-family: var(--mono); font-size: 10.5px; line-height: 1.55; color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
+/* The fade says there is more, without a scrollbar having to appear over the
+   text to say it. */
+.ascroll__f { position: absolute; left: 0; right: 8px; height: 20px; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
+.ascroll__f[data-on='true'] { opacity: 1; }
+.ascroll__f--t { top: 0; background: linear-gradient(to bottom, var(--act), transparent); }
+.ascroll__f--b { bottom: 0; background: linear-gradient(to top, var(--act), transparent); }
+
+/* Text that has just arrived, fading up. The duration and the offset ride in
+   as variables so each delta keeps its own clock — see `veil.ts`. */
+.veil { animation: veil var(--veil-ms) linear both; animation-delay: var(--veil-delay); }
+@keyframes veil {
+  0% { opacity: 0; }
+  25% { opacity: .37; }
+  50% { opacity: .67; }
+  75% { opacity: .89; }
+  100% { opacity: 1; }
+}
+
+/* Alive, and for how long: the dots answer the first, the seconds the second. */
+.working { display: flex; align-items: center; gap: 8px; height: 22px; font-size: 11.5px; font-weight: 500; color: var(--text-3); }
+.working__dots { display: flex; align-items: center; gap: 3px; }
+.working__dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: breathe 1.2s ease-in-out infinite; }
+.working__dots i:nth-child(2) { animation-delay: 120ms; }
+.working__dots i:nth-child(3) { animation-delay: 240ms; }
+@keyframes breathe { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+.sessions__none { padding: 2px 10px 8px; font-size: 11.5px; color: var(--ghost); }
+
+/* A name being changed in place: the field takes the shape of the label it
+   replaces, so the row does not jump as you start typing. */
+/* A field that says it is one by the ground it sits on rather than by a ring
+   around it: the ring is the accent, and the accent on a sidebar row reads as
+   the row being selected. The negative margin keeps the text on the same
+   baseline and the same left edge as the label it replaced, so nothing shifts
+   when the rename opens. */
+.rename {
+  /* `flex: 0 1 auto` and no `width`: the class it borrows for its typography
+     carries `flex: 1`, and an explicit width beats `field-sizing` outright —
+     either one would stretch the field back across the row. */
+  min-width: 3ch; max-width: 100%; flex: 0 1 auto; border: 0; outline: none;
+  padding: 1px 4px; margin: -1px -4px;
+  border-radius: 5px;
+  background: var(--overlay-strong);
+  color: var(--text); font: inherit;
+  /* Grows with what is typed instead of claiming the row: a band the width of
+     the sidebar reads as a bar, not as a name being edited. `width: 100%` is
+     the cap and the fallback where this is unsupported. */
+  field-sizing: content;
+}
+.rename::selection { background: color-mix(in srgb, var(--accent) 34%, transparent); color: var(--text); }
+
+/* A heading you can fold. Same weight as the fixed ones, so the sidebar keeps
+   one voice — the chevron is what says this one opens. */
+.heading--act { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.heading--act:hover { color: var(--text-2); }
+.heading__v { flex: none; color: var(--ghost); }
+
+/* What a pane has in front of it. The dot says it is live; the accent says it
+   is an agent rather than any other program someone started. */
+.card__run { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-2); }
+.card__run[data-agent='true'] { color: var(--accent); }
+.card__dot { flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: breathe 1.6s ease-in-out infinite; }
+
+/* What a command came to, in the terminal's own margin. A bar and not a dot:
+   it has to be findable while scrolling past, and a dot at this size is a
+   speck. */
+.cmdmark { width: 3px; height: 100%; border-radius: 0 2px 2px 0; }
+.cmdmark--ok { background: var(--success); }
+.cmdmark--failed { background: var(--danger); }
+.cmdmark--running { background: var(--accent); animation: breathe 1.6s ease-in-out infinite; }
+

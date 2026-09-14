@@ -1,0 +1,311 @@
+/* ── Settings ────────────────────────────────────────────────────────
+   A full takeover rather than a pane: settings are not work you do
+   beside the work, and giving them a column would invite fiddling with
+   the machine while an agent is mid-turn behind it. */
+.prefs { position: absolute; inset: 0; z-index: 350; display: none; background: var(--canvas); }
+.prefs[data-open='true'] { display: grid; grid-template-columns: 264px 1fr; animation: pane-in 160ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+
+/* The padding lives on the children, not here: the scrolling list has to
+   reach the column's edge or its scrollbar sits in a gutter of its own. */
+.prefs__side { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); padding: 12px 0; }
+.prefs__back { height: 32px; flex: none; display: flex; align-items: center; gap: 9px; margin: 0 12px; padding: 0 10px; border-radius: 8px; font-size: 13px; color: var(--text-2); }
+.prefs__back:hover { background: var(--sidebar-item); color: var(--text); }
+.prefs__find { margin: 12px 12px 0; height: 30px; flex: none; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12px; color: var(--ghost); }
+.prefs__find:focus-within { border-color: var(--accent); }
+.prefs__find svg { flex: none; }
+.prefs__q { flex: 1; min-width: 0; background: none; border: 0; font: inherit; color: var(--text); }
+.prefs__q::placeholder { color: var(--ghost); }
+.prefs__q:focus { outline: none; }
+/* The column scrolls on its own: the panes beside it are long, and a list
+   that scrolls the whole window takes the headings off the top with it. */
+.prefs__nav { margin-top: 18px; min-height: 0; overflow-y: auto; padding: 0 12px; display: flex; flex-direction: column; gap: 5px; }
+.prefs__group { display: flex; flex-direction: column; gap: 5px; }
+.prefs__group + .prefs__group { margin-top: 24px; }
+.prefs__gt { padding: 0 10px 3px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-3); }
+.prefs__none { padding: 14px 10px; font-size: 12px; color: var(--text-3); }
+/* The row is the pill: full width of the column inside its gutter, so the
+   thing under the pointer is the thing that lights up. */
+.prefs__i { width: 100%; height: 34px; padding: 0 10px; border-radius: 8px; display: flex; align-items: center; gap: 11px; font-size: 13px; color: var(--text-2); }
+.prefs__i:hover { background: var(--sidebar-item); color: var(--text); }
+.prefs__i[aria-selected='true'] { background: var(--sidebar-item); color: var(--text); }
+.prefs__i[aria-selected='true'] svg { color: var(--accent); }
+.prefs__i svg { flex: none; color: var(--text-3); }
+
+.prefs__main { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+/* Wider than prose: these panes are rows of controls, and a 780px column
+   pushed four buttons and two numbers into the same handspan. */
+.prefs__in { max-width: 1080px; margin: 0 auto; padding: 34px 36px 60px; }
+/* Every section is apart from the next, whatever kind it is.
+ 
+   This used to be `.pref + .pref`, which only ever separated two switch rows:
+   a card after a switch, a switch after a card, or two cards in a row got
+   nothing and the pane read as one block with seams in it. The rule is about
+   the pane's children, not about which of them happen to be the same type. */
+.prefs__in > * + * { margin-top: 10px; }
+/* A heading opens a group, so it keeps its own distance from what follows and
+   takes a bigger one from what came before. */
+.prefs__in > .prefs__h + * { margin-top: 0; }
+.prefs__in > * + .prefs__h { margin-top: 30px; }
+.prefs__h { font-size: 19px; font-weight: 550; letter-spacing: -0.01em; color: var(--text); margin: 0 0 18px; }
+
+.pref { display: flex; align-items: flex-start; gap: 16px; width: 100%; text-align: left; padding: 14px 16px; background: var(--raised); border-radius: 10px; }
+.pref__body { flex: 1; min-width: 0; }
+.pref__t { display: block; font-size: 13.5px; color: var(--text); }
+.pref__d { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
+.pref__d code { font-size: 11.5px; }
+.pref .sw { margin-top: 2px; }
+.pref[aria-checked='true'] .sw { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.pref[aria-checked='true'] .sw::after { transform: translateX(12px); background: var(--accent); }
+
+/* Providers: agent CLIs on this machine. A row says whether it is there
+   at all before it offers a switch — the same rule as a plugin. */
+.card2 { background: var(--raised); border-radius: 10px; padding: 14px 16px 8px; }
+.card2__top { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 12px; }
+.card2__t { font-size: 13.5px; color: var(--text); }
+.card2__d { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
+.card2__go { flex: none; height: 28px; padding: 0 11px; border-radius: 7px; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); background: var(--overlay-strong); white-space: nowrap; }
+.card2__go:hover { color: var(--text); }
+.card2__when { margin-top: 6px; font-size: 11px; color: var(--ghost); text-align: right; }
+
+/* The default picker: chips that wrap, because twelve agents do not fit on a
+   line and a row that scrolls sideways hides the one you are looking for. */
+/* The mark takes the row's colour; only the dot says whether it is here. */
+.prov__ico .agmark { color: var(--text-2); }
+.prov--off .prov__ico .agmark { color: var(--ghost); }
+
+/* Why this one will not start, under what it would have run. */
+.prov__note { color: var(--warning); }
+
+.agpick { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; }
+/* Each chip is as wide as its own name. They were built on `.segb`, which is
+   `flex: 1` because a segmented control divides a fixed width evenly — so six
+   agents came out as six equal columns filling the row, which reads as one
+   control with six parts rather than as six things you pick between. */
+.agpick__o { flex: none; height: 30px; padding: 0 11px; border-radius: 8px; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); background: var(--overlay); border: 1px solid transparent; }
+.agpick__o:hover { background: var(--overlay-strong); color: var(--text); }
+.agpick__o[aria-checked='true'] { background: var(--raised); color: var(--text); border-color: var(--border-strong); }
+.agpick__o .agmark { color: var(--text-3); }
+.agpick__o[aria-checked='true'] .agmark { color: var(--accent); }
+.agpick__on { color: var(--accent); font-size: 11px; }
+/* Two words, not two paragraphs: this one sits inside a row, not above one. */
+.seg--tight { flex: none; height: 26px; margin: 0; }
+.seg--tight .segb { flex: none; padding: 0 9px; font-size: 11.5px; }
+
+.prov { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px 0; border-top: 1px solid var(--border); }
+.prov__ico { width: 26px; height: 26px; flex: none; border-radius: 7px; background: var(--overlay); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--text-2); position: relative; }
+.prov__dot { position: absolute; bottom: -1px; right: -1px; width: 7px; height: 7px; border-radius: 50%; border: 2px solid var(--raised); }
+.prov__body { flex: 1; min-width: 0; }
+.prov__top { display: flex; align-items: baseline; gap: 8px; }
+.prov__n { font-size: 13px; color: var(--text); }
+.prov--off .prov__n { color: var(--text-3); }
+.prov__v { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.prov__sub { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--ghost); }
+.prov__chev { flex: none; color: var(--ghost); }
+
+/* Skills, in settings: a list you filter and one definition open beside
+   it. Full width rather than the 780px column the toggles use — a skill
+   body is a document, and a document in a narrow gutter is unreadable. */
+.prefs__in--wide { max-width: none; padding: 0; height: 100%; }
+.sk { flex: 1; display: grid; grid-template-columns: 268px 1fr; min-height: 0; }
+/* In the tab it is a flex child under the pane's bar; in Settings the section
+   around it is a plain block with a definite height and nothing to grow in. */
+.prefs__in--wide > .sk { height: 100%; }
+.sk__list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+.sk__seek { display: flex; align-items: center; gap: 4px; margin: 10px 10px 0; }
+/* Chips wrap in a column 268px wide; the picker draws nothing with one. */
+.sk__inst { padding: 8px 10px 0; }
+.sk__inst:empty { display: none; }
+.sk__find { flex: 1; min-width: 0; height: 30px; flex: none; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12.5px; color: var(--ghost); }
+.sk__h { padding: 14px 12px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); display: flex; gap: 7px; }
+.sk__h span { color: var(--ghost); font-weight: 500; letter-spacing: 0; }
+.sk__rows { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.skrow { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 8px 12px; text-align: left; }
+.skrow:hover { background: var(--sidebar-item); }
+.skrow[aria-current='true'] { background: var(--sidebar-item); }
+.skrow__ico { flex: none; margin-top: 1px; color: var(--text-3); }
+.skrow[aria-current='true'] .skrow__ico { color: var(--accent); }
+.skrow__b { flex: 1; min-width: 0; }
+.skrow__n { display: block; font-family: var(--mono); font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skrow__d { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk__foot { flex: none; height: 30px; display: flex; align-items: center; padding: 0 10px; border-top: 1px solid var(--border); font-family: var(--mono); font-size: 10.5px; color: var(--ghost); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; }
+
+.sk__doc { min-width: 0; min-height: 0; overflow-y: auto; padding: 26px 28px 60px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.sk__top { display: flex; align-items: flex-start; gap: 12px; }
+/* Its own switch, not the settings row: .pref is width:100% and it was
+   squeezing the title beside it to one word per line. */
+.sksw { flex: none; margin-top: 4px; }
+.sksw[aria-checked='true'] .sw { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.sksw[aria-checked='true'] .sw::after { transform: translateX(12px); background: var(--accent); }
+.sk__mark { width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--raised); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+.sk__name { font-family: var(--mono); font-size: 16px; color: var(--text); }
+.sk__from { margin-top: 3px; font-size: 12px; color: var(--text-3); }
+.sk__what { margin: 14px 0 18px; font-size: 13px; line-height: 1.62; color: var(--text-2); max-width: 76ch; }
+.facts2 { display: grid; grid-template-columns: 104px 1fr; gap: 0; font-size: 12.5px; max-width: 76ch; }
+.facts2 dt { padding: 8px 0; color: var(--text-3); border-top: 1px solid var(--border); }
+.facts2 dd { padding: 8px 0; margin: 0; color: var(--text-2); font-family: var(--mono); font-size: 12px; border-top: 1px solid var(--border); }
+.sk__acts { display: flex; gap: 7px; margin: 16px 0 24px; max-width: 76ch; }
+/* The rendered SKILL.md sits in a column that already has its own
+   padding, so it drops the centring `Markdown` uses in a full pane. */
+.sk__doc .md { max-width: 76ch; margin: 0; padding: 0; }
+.sk__file { font-family: var(--mono); font-size: 11px; color: var(--ghost); margin: 26px 0 4px; }
+
+/* Usage: figures first, then the shape they make, then the table. */
+.use { max-width: 1040px; margin: 0 auto; padding: 30px 24px 60px; }
+.use__top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+.use__when { margin-top: 5px; font-size: 12.5px; color: var(--text-3); }
+.seg2 { margin-left: auto; display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--inset); flex: none; }
+.seg2 button { height: 26px; padding: 0 11px; border-radius: 6px; font-size: 12px; color: var(--text-3); }
+.seg2 button[aria-selected='true'] { background: var(--raised); color: var(--text); }
+.use__grid { display: grid; grid-template-columns: 320px 1fr; gap: 28px; align-items: start; }
+.use__label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); }
+.use__big { margin-top: 8px; font-size: 30px; font-weight: 550; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.use__note { margin-top: 4px; font-size: 11.5px; color: var(--ghost); }
+.bar { margin-top: 18px; }
+.bar__top { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.bar__n { color: var(--text-2); }
+.bar__v { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+.bar__track { margin-top: 7px; height: 3px; border-radius: 2px; background: var(--overlay-strong); overflow: hidden; }
+.bar__fill { height: 100%; border-radius: 2px; background: var(--accent); }
+.bar__sub { margin-top: 6px; font-size: 11.5px; color: var(--text-3); }
+
+.tiles { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 26px; border-top: 1px solid var(--border); }
+.tile2 { padding: 14px 16px; border-right: 1px solid var(--border); }
+.tile2:last-child { border-right: 0; }
+.tile2__l { font-size: 12px; color: var(--text-3); }
+.tile2__v { margin-top: 6px; font-size: 17px; color: var(--text); font-variant-numeric: tabular-nums; }
+.tile2__s { margin-top: 5px; font-size: 11.5px; color: var(--ghost); }
+
+.use__cols { display: grid; grid-template-columns: 1fr 300px; gap: 32px; margin-top: 30px; align-items: start; }
+.use__hrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.use__h { font-size: 13.5px; color: var(--text); }
+.mrow { display: grid; grid-template-columns: 1fr 92px 62px 76px; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 12.5px; }
+.mrow--h { color: var(--text-3); font-size: 11.5px; border-top: 0; }
+.mrow__n { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-2); }
+.mrow__n b { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.mrow__n span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+.mrow > :not(.mrow__n) { text-align: right; font-family: var(--mono); font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.use__scan { margin-top: 22px; font-size: 11.5px; color: var(--ghost); }
+
+/* Install, then switch on. A toggle on something that is not installed is
+   a switch wired to nothing — the row has to offer the step it is at. */
+.cap__get { flex: none; margin-top: 2px; height: 26px; padding: 0 11px; border-radius: 7px; font-size: 12px; color: var(--text-2); background: var(--overlay-strong); white-space: nowrap; transition: background-color 140ms ease, color 140ms ease; }
+.cap__get:hover { background: color-mix(in srgb, var(--accent) 20%, var(--overlay-strong)); color: var(--text); }
+.cap__get[data-busy='true'] { color: var(--text-3); pointer-events: none; }
+.cap__get[data-busy='true'] svg { animation: spin 1s linear infinite; }
+.cap__size { font-family: var(--mono); font-size: 10.5px; color: var(--ghost); }
+
+.ctx { position: fixed; z-index: 400; min-width: 176px; padding: 4px; border-radius: 10px;
+  background: var(--raised); border: 1px solid var(--border-strong);
+  box-shadow: 0 18px 40px var(--shade); animation: pop 120ms ease-out both; }
+.ctx[hidden] { display: none; }
+.ctx__i { width: 100%; height: 30px; padding: 0 9px; border-radius: 6px; display: flex; align-items: center; gap: 9px; text-align: left; font-size: 12.5px; color: var(--text-2); }
+.ctx__i:hover { background: var(--overlay-strong); color: var(--text); }
+.ctx__i--bad:hover { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--danger); }
+.ctx__k { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--ghost); }
+.ctx__rule { height: 1px; margin: 4px 6px; background: var(--border); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pane[data-show='true'], .blank, .ctx { animation: none; }
+  .win { transition: none; }
+  .skel__ln, .rowskel__ln { animation: none; }
+}
+
+.pane__bar { height: 32px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 6px 0 12px; }
+.pane__ico { color: var(--ghost); }
+.pane__t { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane__t b { color: var(--text-2); font-weight: 500; }
+
+.scroll { flex: 1; min-width: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.thread { max-width: 760px; margin: 0 auto; padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 20px; }
+.turn { display: flex; flex-direction: column; gap: 8px; }
+.said { display: flex; justify-content: flex-end; }
+.said__b { max-width: 540px; min-width: 0; padding: 8px 12px; border-radius: 12px; background: var(--raised); font-size: 14px; line-height: 1.4; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.reply { font-size: 13.5px; line-height: 1.62; color: var(--text-2); }
+.reply p { margin: 0 0 11px; }
+.reply p:last-child { margin-bottom: 0; }
+code { font-family: var(--mono); font-size: 0.87em; color: var(--code-text); background: var(--code-wash); padding: 1.5px 4px; border-radius: 4px; }
+
+.act-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-3); min-width: 0; }
+.act-line__ico { color: var(--ghost); }
+.act-line__t { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.turn__foot { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.tfbtn { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--ghost); }
+.tfbtn:hover { background: var(--overlay); color: var(--text-2); }
+/* The note a forked conversation opens with, naming where it came from. */
+.rwnd { margin: 4px 0 10px; padding: 8px 12px; border-left: 2px solid var(--accent); font-size: 12.5px; color: var(--text-2); }
+.rwnd__from { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.turn__time { font-size: 11.5px; color: var(--ghost); }
+
+.composer { flex: none; padding: 0 12px 8px; }
+.composer__col { max-width: var(--content-max); margin: 0 auto; width: 100%; }
+/* The border lights when the caret is in it, so the thing you are typing in
+   is the thing that looks active. */
+.composer__in { border-radius: 13px; border: 1px solid var(--border); background: var(--composer); padding: 10px; }
+.composer__in:focus-within { border-color: var(--border-strong); }
+.composer__files { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 8px; }
+/* Where the work happens: quieter than the chips inside, because these
+   describe the conversation rather than steer the turn. */
+.composer__where { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 6px; font-size: 11px; color: var(--text-3); }
+.composer__ph { font-size: 13.5px; color: var(--text); min-height: 34px; width: 100%; border: 0; background: none; resize: none; font-family: inherit; line-height: 1.5; outline: none; }
+.composer__ph::placeholder { color: var(--ghost); }
+/* The chips are buttons and selects side by side; the select has to give up
+   its native arrow and box to sit level with them. */
+select.chip { appearance: none; border: 0; background: none; font-family: inherit; cursor: pointer; }
+.send:disabled { opacity: .45; cursor: default; }
+.composer__row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.chip { display: flex; align-items: center; gap: 5px; height: 25px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--text-3); }
+.chip:hover { background: var(--overlay); color: var(--text-2); }
+.chip__thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; }
+.chip__sun { color: var(--accent); }
+.send { width: 26px; height: 26px; border-radius: 50%; background: var(--overlay-strong); color: var(--text-2); display: flex; align-items: center; justify-content: center; margin-left: auto; }
+.send:hover { background: var(--inverse); color: var(--on-inverse); }
+/* Armed: the button stops naming the act and names the key, because the key
+   is what the hand is already on. */
+.send__esc { font-size: 9.5px; font-weight: 600; letter-spacing: .01em; }
+
+.wsbar { max-width: var(--content-max); margin: 6px auto 0; display: flex; align-items: center; gap: 4px; padding: 0 2px; }
+.wschip { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px; border-radius: 5px; font-size: 11.5px; color: var(--text-3); }
+.wschip:hover { background: var(--overlay); color: var(--text-2); }
+
+/* Terminal */
+/* The terminal is a dark island in a light theme, so the text tokens have
+   to stop at its edge. Redefining them on the pane — rather than pinning a
+   colour at each rule inside — means nothing in there can quietly pick up
+   a value meant for the light ground. */
+.pane--term {
+  background: var(--terminal);
+  /* `color` has to be restated here, not only the tokens. It is inherited
+     as an already-computed value from an ancestor outside this pane, so a
+     token redefined on the pane alone never reaches it — which is how the
+     terminal ended up printing near-black on near-black in the light theme. */
+  color: var(--text);
+  --text: #e2e2e2;
+  --text-2: #a3a3a3;
+  --text-3: #7d7d7d;
+  --ghost: #575757;
+  --border: hsla(220, 10%, 90%, 0.07);
+  --border-strong: hsla(220, 10%, 90%, 0.14);
+  --overlay: hsla(220, 10%, 90%, 0.05);
+  --overlay-strong: hsla(220, 10%, 90%, 0.09);
+  --scroll-thumb: #333333;
+  color-scheme: dark;
+}
+.pane--term .pane__bar { border-bottom: 1px solid var(--border); }
+.termbody { flex: 1; overflow-y: auto; padding: 8px 12px 12px; font-family: var(--mono); font-size: 12px; line-height: 1.62; white-space: pre-wrap; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+/* robbyrussell, which is what a fresh oh-my-zsh gives you: an arrow,
+   the folder, the branch, and a mark when the tree is dirty. */
+.t-arrow { color: #62c987; font-weight: 700; }
+.t-dir { color: #45c8d4; font-weight: 700; }
+.t-git { color: #6f9fe8; font-weight: 700; }
+.t-branch { color: #e2726a; font-weight: 700; }
+.t-dirty { color: #e0b36a; font-weight: 700; }
+.t-dim { color: var(--text-3); }
+.t-ok { color: var(--success); }
+.t-warn { color: var(--warning); }
+.t-acc { color: var(--accent); }
+.t-blue { color: var(--gauge); }
+.caret { display: inline-block; width: 7px; height: 14px; vertical-align: -2px; background: var(--accent); animation: blink 1.1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+

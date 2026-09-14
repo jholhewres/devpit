@@ -1,0 +1,86 @@
+/* ── One card, open ───────────────────────────────────────────────────
+   Over the board rather than beside it: the board is a layout, and a panel
+   that squeezes six lanes into four to show you one card makes you lose
+   your place in order to read it. */
+.cardp { position: fixed; inset: 0; z-index: 420; display: flex; align-items: flex-start; justify-content: center; padding: 48px 24px; background: var(--shade); overflow-y: auto; }
+.cardp__box { width: 100%; max-width: 760px; border-radius: 14px; background: var(--canvas); border: 1px solid var(--border-strong); box-shadow: 0 24px 60px var(--shade); animation: pop-in 140ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.cardp__top { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.cardp__col { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+.cardp__in { padding: 20px 24px 28px; }
+.cardp__title { width: 100%; background: none; border: 0; font: inherit; font-size: 18px; font-weight: 550; color: var(--text); padding: 4px 0; }
+.cardp__title:focus { outline: none; border-bottom: 1px solid var(--accent); }
+.cardp__row { display: flex; align-items: center; gap: 14px; margin: 14px 0 4px; }
+.cardp__due { display: flex; align-items: center; gap: 9px; }
+.cardp__date { height: 28px; padding: 0 8px; border-radius: 7px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12px; color: var(--text); }
+.cardp__date:focus { outline: none; border-color: var(--accent); }
+.cardp__near { font-size: 11.5px; color: var(--text-3); }
+.cardp__due[data-near='past'] .cardp__near { color: var(--danger); }
+.cardp__due[data-near='today'] .cardp__near { color: var(--warning); }
+.cardp__cost { margin-left: auto; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cardp__h { margin: 26px 0 10px; font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+.cardp__body { width: 100%; padding: 11px 13px; border-radius: 9px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 13px; line-height: 1.6; color: var(--text); resize: vertical; }
+.cardp__body:focus { outline: none; border-color: var(--accent); }
+
+/* Where this card's work happens. */
+.cwork__wt { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--raised); border-radius: 10px; }
+.cwork__wt[data-gone='true'] { opacity: 0.7; }
+.cwork__b { flex: 1; min-width: 0; }
+.cwork__t { display: flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+.cwork__dirty { font-family: inherit; font-size: 11px; color: var(--warning); }
+.cwork__p { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cwork__go { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.crun { display: flex; align-items: center; gap: 14px; padding: 11px 16px; background: var(--raised); border-radius: 10px; }
+.crun + .crun { margin-top: 6px; }
+.crun__b { flex: 1; min-width: 0; }
+.crun__t { display: block; font-size: 13px; color: var(--text); }
+.crun__o { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--text-3); white-space: pre-wrap; max-height: 64px; overflow: hidden; }
+.crun__s { flex: none; font-size: 11px; color: var(--text-3); }
+.crun[data-state='lost'] .crun__s { color: var(--warning); }
+/* The board's runs, across every card. */
+.runsp { width: min(760px, 100%); }
+.runsp__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.runsp__t { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.runsp__filters { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 14px; font-size: 12px; color: var(--text-3); }
+.runsp__filters label { display: flex; align-items: center; gap: 6px; }
+.runsp__card { display: block; font-size: 13px; color: var(--text); text-align: left; }
+.runsp__card:hover { text-decoration: underline; }
+.runsp__none { font-size: 12.5px; color: var(--text-3); }
+.runsp__more { margin-top: 12px; }
+.crun[data-state='failed'] .crun__s { color: var(--danger); }
+.crun[data-state='ok'] .crun__s { color: var(--success); }
+.crun[data-state='running'] .crun__s { color: var(--warning); }
+.crun__c { flex: none; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* Files pinned to a card. A pin is a path, so it can stop being true — and
+   one whose file has moved is drawn, not dropped. */
+.pin { display: flex; align-items: center; gap: 14px; padding: 11px 16px; background: var(--raised); border-radius: 10px; }
+.pin + .pin { margin-top: 6px; }
+.pin[data-gone='true'] .pin__t { text-decoration: line-through; }
+.pin__ico { flex: none; color: var(--text-3); }
+.pin__b { flex: 1; min-width: 0; }
+.pin__t { display: block; font-size: 13px; color: var(--text); }
+.pin__p { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin__n { flex: none; font-size: 11px; color: var(--text-3); }
+.pin__acts { flex: none; display: flex; gap: 6px; }
+.pin__acts .btn[data-danger]:hover, .conv__act[data-danger]:hover { color: var(--danger); }
+
+/* The card's conversation, oldest first — the order it was said in. */
+.conv__one { padding: 12px 16px; background: var(--raised); border-radius: 10px; }
+.conv__one + .conv__one { margin-top: 6px; }
+.conv__one[data-mine='true'] { background: color-mix(in srgb, var(--accent) 7%, var(--raised)); }
+.conv__who { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+.conv__name { font-size: 12.5px; color: var(--text); }
+.conv__when, .conv__edited { font-size: 11px; color: var(--text-3); }
+.conv__acts { margin-left: auto; display: flex; gap: 8px; opacity: 0; }
+.conv__one:hover .conv__acts, .conv__one:focus-within .conv__acts { opacity: 1; }
+.conv__act { font-size: 11px; color: var(--text-3); }
+.conv__act:hover { color: var(--text); }
+.conv__new { margin-top: 10px; }
+.conv__f { width: 100%; padding: 10px 12px; border-radius: 9px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12.5px; line-height: 1.55; color: var(--text); resize: vertical; }
+.conv__f:focus { outline: none; border-color: var(--accent); }
+
+/* What the tile says besides its title. */
+.tile__due, .tile__n { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); }
+.tile__due[data-near='past'] { color: var(--danger); }
+.tile__due[data-near='today'] { color: var(--warning); }
+

@@ -1,0 +1,35 @@
+/* The first run, and the empty state. One screen, because they are one
+   situation: devpit with no project has nothing to show. */
+.onb { position: absolute; inset: 0; z-index: 380; display: flex; align-items: center; justify-content: center; background: var(--canvas); animation: fade-in 180ms ease both; }
+.onb__box { width: 460px; max-width: calc(100vw - 48px); display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* The mark's corners are in the file. Clipping it again to a different
+   radius cuts a second, mismatched edge just inside the first. */
+.onb__mark { width: 76px; height: 76px; box-shadow: 0 16px 44px color-mix(in srgb, var(--accent) 24%, transparent); border-radius: 11px; }
+.onb__mark .mark { width: 100%; height: 100%; display: block; }
+
+/* Three steps, and which one you are on. A rail rather than a count, because
+   "2 of 3" says how far but not what is left. */
+.onb__rail { display: flex; align-items: center; gap: 8px; margin: 24px 0 26px; padding: 0; list-style: none; }
+.onb__dot { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-3); }
+.onb__dot + .onb__dot::before { content: ''; width: 22px; height: 1px; background: var(--border-strong); }
+.onb__dot[data-state='now'] { color: var(--accent); }
+.onb__dot[data-state='done'] { color: var(--text-2); }
+
+.onb__t { margin: 0; font-size: 20px; font-weight: 560; letter-spacing: -0.015em; color: var(--text); }
+.onb__d { margin: 9px 0 22px; font-size: 12.5px; line-height: 1.6; color: var(--text-3); max-width: 400px; }
+.onb__go { height: 38px; min-width: 190px; padding: 0 20px; border-radius: 9px; font-size: 13px; font-weight: 550; color: var(--on-accent); background: var(--accent); transition: filter 130ms ease; }
+.onb__go:hover { filter: brightness(1.07); }
+.onb__skip { margin-top: 10px; height: 30px; padding: 0 12px; border-radius: 8px; font-size: 12px; color: var(--text-3); }
+.onb__skip:hover { color: var(--text); background: var(--overlay); }
+.onb .thm { width: 100%; margin-bottom: 22px; }
+
+/* A lane's own controls: they appear on hover, because a board at rest is
+   cards and not buttons. */
+.blane__drop { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-3); opacity: 0; transition: opacity 120ms ease; }
+.blane:hover .blane__drop { opacity: 1; }
+.blane__drop:hover { background: var(--overlay-strong); color: var(--danger); }
+.blane { position: relative; }
+.blane__label[contenteditable]:focus { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.blane__new { flex: none; width: 132px; align-self: flex-start; height: 34px; border-radius: 9px; border: 1px dashed var(--border-strong); color: var(--text-3); font-size: 12.5px; }
+.blane__new:hover { color: var(--text); border-color: var(--accent); }
+

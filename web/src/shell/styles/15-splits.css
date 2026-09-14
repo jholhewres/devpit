@@ -1,0 +1,20 @@
+/* A tab's terminals, arranged as its tree says.
+   `tleaf` and not `pane`: `.pane` is already the tab-level wrapper above, and
+   the same name here made every leaf `display: none` and every existing pane
+   `display: flex`. Twice in one week is once too many — see AGENTS.md. */
+.split { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.split[data-down='true'] { flex-direction: column; }
+.split__side { display: flex; flex-direction: column; min-width: 0; min-height: 0; flex-grow: 0; flex-shrink: 1; }
+.tleaf { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+/* The focused leaf is named by its edge and not by a wash: a tint over a
+   terminal changes the colours the program chose. */
+.tleaf[data-focused='true']::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+/* The boundary. Four pixels wide, with a wider invisible grab area — a
+   one-pixel target is a target you miss. */
+.split__bar { position: relative; flex: none; background: var(--border); }
+.split[data-down='false'] > .split__bar { width: 1px; cursor: col-resize; }
+.split[data-down='true'] > .split__bar { height: 1px; cursor: row-resize; }
+.split__bar::before { content: ''; position: absolute; inset: -3px; }
+.split__bar:hover, .split__bar[data-dragging='true'] { background: var(--accent); }
+

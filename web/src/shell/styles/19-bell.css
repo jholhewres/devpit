@@ -1,0 +1,85 @@
+/* ── The bell ─────────────────────────────────────────────────────────
+   Read, never cleared: a list that empties itself is a list where the thing
+   you meant to come back to is gone. */
+.bell { position: relative; }
+.bell__b { position: relative; width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+.bell__b:hover { background: var(--overlay-strong); color: var(--text); }
+.bell__n { position: absolute; top: 1px; right: 0; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: var(--on-inverse); font-size: 9.5px; font-weight: 600; line-height: 14px; text-align: center; font-variant-numeric: tabular-nums; }
+.bell__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 200; width: 340px; border-radius: 11px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 18px 44px var(--shade); animation: pop-in 130ms cubic-bezier(0.2, 0.7, 0.3, 1) both; overflow: hidden; }
+.bell__top { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.bell__t { font-size: 12px; color: var(--text); }
+.bell__none { padding: 22px 12px; text-align: center; font-size: 12px; color: var(--text-3); }
+.bell__list { max-height: 380px; overflow-y: auto; }
+.bell__one { width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; text-align: left; }
+.bell__one:hover { background: var(--sidebar-item); }
+.bell__one + .bell__one { border-top: 1px solid var(--border); }
+/* Unread is a dot of accent on the glyph, not a different background: a
+   panel where half the rows are tinted reads as two lists. */
+.bell__one[data-unread='true'] .bell__ico { color: var(--accent); }
+.bell__one[data-unread='true'] .bell__line { color: var(--text); }
+.bell__ico { flex: none; margin-top: 2px; color: var(--text-3); }
+.bell__one[data-kind='irreversible'] .bell__ico { color: var(--warning); }
+.bell__body { flex: 1; min-width: 0; }
+.bell__line { display: block; font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+.bell__d { display: block; margin-top: 3px; font-size: 11px; color: var(--text-3); }
+.bell__when { flex: none; font-size: 10.5px; color: var(--ghost); white-space: nowrap; }
+
+/* What a lane runs when a card lands in it — the rule the product turns on,
+   and until now the one thing with no way to set it. */
+.lstep { position: relative; margin-left: auto; }
+.lstep__b { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; color: var(--text-3); }
+.lstep__b:hover { background: var(--overlay-strong); color: var(--text-2); }
+.lstep__pop { position: absolute; right: 0; top: calc(100% + 5px); z-index: 40; min-width: 210px; padding: 6px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 16px 36px var(--shade); animation: pop-in 130ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.lstep__pop--wide { width: 290px; padding: 12px; }
+.lstep__t { padding: 3px 9px 7px; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+.lstep__pop--wide .lstep__t { padding: 0 0 10px; }
+.lstep__warn { font-size: 10px; color: var(--warning); }
+.apps__opt[aria-checked='true'] { background: var(--sidebar-item); color: var(--text); }
+.lstep__pop--wide .fld { margin-top: 12px; }
+.lstep__pop--wide .src__sw { width: 100%; }
+.lstep__pop--wide .src__o { flex: 1; padding: 0 6px; }
+.cardp__acts { margin-left: auto; margin-right: 10px; display: flex; gap: 10px; }
+
+/* What a card changed, against where it started — never against HEAD. */
+.cdiff { margin-top: 22px; }
+.cdiff__f { margin-top: 6px; border-radius: 10px; background: var(--raised); overflow: hidden; }
+.cdiff__s { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: default; list-style: none; }
+.cdiff__s::-webkit-details-marker { display: none; }
+.cdiff__s:hover { background: var(--overlay); }
+.cdiff__p { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cdiff__n { flex: none; font-size: 11px; color: var(--text-3); }
+/* Its own scroller: a diff is the one thing here wider than the pane, and
+   letting it widen the pane would move everything else on the card. */
+.cdiff__body { max-height: 340px; overflow: auto; border-top: 1px solid var(--border); }
+.cdiff__hh { padding: 5px 16px; background: var(--inset); font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+.cdiff__r { padding: 0 16px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; white-space: pre; color: var(--text-2); }
+.cdiff__r[data-kind='add'] { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--text); }
+.cdiff__r[data-kind='del'] { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--text); }
+
+/* A column being carried, and the one it would take the place of. */
+.blane[data-moving='true'] { opacity: 0.55; }
+.blane[data-taking='true'] .blane__top { box-shadow: inset 0 -2px 0 var(--accent); }
+.blane__top { cursor: grab; }
+.blane[data-moving='true'] .blane__top { cursor: grabbing; }
+/* The label and the step picker take their own clicks: the head is the drag
+   handle, and a handle that swallows the rename is a handle nobody wants. */
+.blane__label, .lstep { cursor: auto; }
+/* The last line a running step printed. One line, clipped: a tile is not a
+   log, and the whole output is on the card. */
+.tile__log { margin-top: 5px; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A lane that moves cards without being asked should look different from one
+   that does not. Said on the lane, not hidden in its menu. */
+.lstep__auto { margin-left: 5px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; }
+
+/* Play: do this lane's step on this card, now. */
+.play { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.play__d { font-size: 11.5px; color: var(--text-3); }
+.play__no { font-size: 11.5px; color: var(--danger); }
+/* On the tile it appears under the pointer rather than sitting there: the
+   board is read far more often than it is played, and a row of triangles
+   reads as a list of things waiting to be started. */
+.tile__play { position: absolute; top: 7px; right: 7px; width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-3); background: var(--overlay-strong); opacity: 0; }
+.tile:hover .tile__play, .tile__play:focus-visible { opacity: 1; }
+.tile__play:hover { color: var(--text); }
+.tile { position: relative; }
+

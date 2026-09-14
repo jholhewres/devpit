@@ -1,0 +1,95 @@
+/* ── The agent in a pane ─────────────────────────────────────────────
+   A terminal with Claude open and a terminal sitting at its prompt looked
+   identical in the strip and in the sidebar, which is what made "is it still
+   working?" a question you answered by clicking the tab.
+
+   Colour per agent rather than one accent for all of them: three terminals
+   with three different agents is the case worth telling apart at a glance,
+   and they are all the same shape otherwise. Muted enough that a row of them
+   does not read as a warning. */
+.agmk { flex: none; color: var(--accent); }
+.agmk[data-agent='claude'] { color: #d97757; }
+.agmk[data-agent='codex'] { color: #9aa4b2; }
+.agmk[data-agent='gemini'] { color: #6b9bf5; }
+.agmk[data-agent='opencode'] { color: #d3b04a; }
+.agmk[data-agent='cursor'] { color: #8f8f96; }
+.agmk[data-agent='copilot'] { color: #7c9ec9; }
+.agmk[data-agent='amp'] { color: #63b47c; }
+.agmk[data-agent='droid'] { color: #c46fd0; }
+.agmk[data-agent='grok'] { color: #b9bec7; }
+.agmk[data-agent='aider'] { color: #64b0a8; }
+.agmk[data-agent='goose'] { color: #cf8d5a; }
+.agmk[data-agent='crush'] { color: #d071a4; }
+
+/* The tab keeps its own colour; only its glyph is the agent's. A tab tinted
+   end to end would compete with the one marking of the strip that matters,
+   which is which tab is in front. */
+.tab .agmk { opacity: 0.95; }
+.card__kind .agmk { opacity: 1; }
+
+/* What a close would stop, named. `ask__warn` is the yellow box for a
+   consequence; this is the subject line — which tab, and what is in it. */
+.ask__subj { margin-top: 10px; font-size: 12.5px; font-weight: 550; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask__opt input[type='checkbox'] { flex: none; margin: 1px 0 0; accent-color: var(--danger); }
+
+/* Something went wrong beside the terminal rather than instead of it.
+   An agent that could not be started is worth saying, and it is not worth the
+   working terminal underneath it — which is still the fastest way to type the
+   command by hand. Click to dismiss. */
+.tnote { flex: none; width: 100%; text-align: left; padding: 7px 12px; font-size: 12px; color: var(--text); background: color-mix(in srgb, var(--warning) 14%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--warning) 30%, transparent); }
+.tnote:hover { background: color-mix(in srgb, var(--warning) 20%, transparent); }
+
+/* What the agent says it is doing, which is not what the process table can
+   see. `waiting` is the state worth noticing from across the room: the agent
+   has stopped and nothing moves until somebody goes back to it. */
+.tab__mk { display: inline-flex; }
+.tab__mk[data-doing='working'] .agmk { animation: breathe 1.6s ease-in-out infinite; }
+.tab__mk[data-doing='waiting'] .agmk { color: var(--warning); }
+.card__run[data-doing='waiting'] { color: var(--warning); }
+.card__run[data-doing='waiting'] .card__dot { animation: none; }
+.card__run[data-doing='done'] .card__dot { animation: none; opacity: 0.55; }
+.card__ask { flex: none; display: grid; place-items: center; width: 11px; height: 11px; border: 1px solid currentColor; border-radius: 50%; font-size: 8px; font-style: normal; font-weight: 700; line-height: 1; }
+/* A finish that happened behind another tab stays loud until someone looks. */
+.card[data-unread='true'] .card__t { font-weight: 600; }
+/* Subagents a terminal's agent started, indented under the agent's own line. */
+.card__subs { display: flex; flex-direction: column; gap: 1px; margin-top: 1px; padding-left: 18px; }
+.card__sub { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 11.5px; color: var(--text-3); }
+.card__subname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card__model { flex: none; font-size: 10.5px; opacity: 0.8; }
+.card__run[data-unread='true'] .card__dot { opacity: 1; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 30%, transparent); }
+
+/* Name search results: one row per path from the flat index, the same
+   density as .row and .gitrow so switching between the tree and the results
+   does not jump the eye. */
+.results { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 0 10px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.result { display: flex; align-items: center; width: 100%; min-width: 0; height: 24px; padding: 0 9px 0 8px; text-align: left; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result:hover { background: var(--sidebar-item); }
+.result__n { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.result__hit { background: color-mix(in srgb, var(--accent) 25%, transparent); color: var(--text); border-radius: 2px; }
+.results__partial { padding: 8px 12px; font-size: 11.5px; color: var(--ghost); }
+
+/* Content search results: one header per file, one row per matched line
+   under it — the grouping the backend already did, not a re-sort of it. */
+.cresult__file { display: flex; align-items: center; width: 100%; min-width: 0; height: 26px; padding: 0 9px 0 8px; text-align: left; font-size: 12px; font-weight: 550; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cresult__file:hover { background: var(--sidebar-item); }
+.cresult__line { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; height: 22px; padding: 0 9px 0 22px; text-align: left; font-size: 12px; font-family: var(--mono); color: var(--text-2); white-space: nowrap; overflow: hidden; }
+.cresult__line:hover { background: var(--sidebar-item); }
+.cresult__n { flex: none; min-width: 24px; text-align: right; color: var(--ghost); font-variant-numeric: tabular-nums; }
+.cresult__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* US-008: keyboard navigation for the tree, and a render ceiling.
+   :focus-visible, not :focus — a mouse click on a row must not leave a ring
+   behind, only keyboard focus does. The negative offset keeps the ring
+   inside .row's own box instead of being cut off by its `overflow: hidden`. */
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.row--more { color: var(--ghost); }
+
+/* US-009: a skeleton for the first fetch — before the tree, Changes, or
+   History has an answer, an empty list and a slow one draw identically.
+   Same shimmer as the file-read skeleton, sized to this panel's 24px rows
+   instead of that one's text lines. */
+.rowskel { padding: 6px 0 0; }
+.rowskel__ln { height: 12px; margin: 0 12px 12px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--overlay) 25%, var(--overlay-strong) 37%, var(--overlay) 63%);
+  background-size: 380% 100%; animation: shimmer 1.25s ease-in-out infinite; }
+
