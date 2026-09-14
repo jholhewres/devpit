@@ -1,9 +1,12 @@
-//! What is actually on disk: the skills this machine has, and what the devpit
-//! workspace is holding.
+//! What the devpit workspace is holding, measured.
 //!
-//! Both panels drew fixed rows before this. A row that names a file and a size
+//! The panel drew fixed rows before this. A row that names a file and a size
 //! it never read is worse than an empty panel, because an empty panel is
 //! obviously empty.
+//!
+//! The skills this machine has moved to `skills.rs`: "how much room is this
+//! taking" and "what does this machine know how to do" are different
+//! questions, and they were sharing a file only because both were new.
 
 use std::path::{Path, PathBuf};
 
@@ -11,27 +14,6 @@ use devpit_core::Store;
 use devpit_rpc::{ErrorCode, RpcError};
 use serde::{Deserialize, Serialize};
 use specta::Type;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Skill {
-    pub name: String,
-    /// Where it came from — `omc`, `claude`, `yours`.
-    pub source: String,
-    /// The `SKILL.md` itself, so Open and Reveal have something to hand over.
-    pub path: String,
-    /// The first line of prose in the file, when there is one.
-    pub description: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Skills {
-    pub skills: Vec<Skill>,
-    /// Why nothing could be read, when nothing could. Present and non-empty
-    /// means the panel says this instead of looking empty.
-    pub problem: Option<String>,
-}
 
 /// One thing the workspace holds, measured.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -57,72 +39,6 @@ pub struct Workspace {
     /// Everything above, added up. Worktrees and transcripts grow without
     /// announcing themselves.
     pub bytes: f64,
-}
-
-/// The first line of a skill's prose, for the row's second line.
-///
-/// After the frontmatter, if there is any, and skipping the heading: the
-/// heading repeats the name, and a row that says `tdd — # tdd` says nothing.
-pub fn description_of(text: &str) -> String {
-    let body = match text.strip_prefix("---\n") {
-        Some(rest) => rest
-            .split_once("\n---")
-            .map(|(_, body)| body)
-            .unwrap_or(rest),
-        None => text,
-    };
-    body.lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty() && !line.starts_with('#') && !line.starts_with("---"))
-        .unwrap_or_default()
-        .to_owned()
-}
-
-/// `skills.list` — the skills installed on this machine.
-#[tauri::command]
-#[specta::specta]
-pub fn skills_list() -> Result<Skills, RpcError> {
-    let sources = devpit_agentcli::skills::sources();
-    if sources.is_empty() {
-        return Ok(Skills {
-            skills: Vec::new(),
-            problem: Some("no skills directory on this machine".to_owned()),
-        });
-    }
-
-    let mut skills = Vec::new();
-    for dir in &sources {
-        let source = devpit_agentcli::source_of(dir);
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            continue;
-        };
-        for entry in entries.filter_map(Result::ok) {
-            let file = entry.path().join("SKILL.md");
-            if !file.is_file() {
-                continue;
-            }
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if skills.iter().any(|had: &Skill| had.name == name) {
-                continue;
-            }
-            skills.push(Skill {
-                description: std::fs::read_to_string(&file)
-                    .map(|text| description_of(&text))
-                    .unwrap_or_default(),
-                path: file.display().to_string(),
-                name,
-                source: source.clone(),
-            });
-        }
-    }
-    skills.sort_by(|a, b| a.name.cmp(&b.name));
-
-    Ok(Skills {
-        problem: skills
-            .is_empty()
-            .then(|| "the skills directories are there but hold nothing".to_owned()),
-        skills,
-    })
 }
 
 /// What one entry of the workspace is, measured now.

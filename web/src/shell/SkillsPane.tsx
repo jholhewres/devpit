@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import type { Skill } from '../gen/bindings'
 import { ask, commands } from './live'
+import { SkillDoc } from './SkillDoc'
 
 /*
  * The skills this machine has.
@@ -9,6 +10,10 @@ import { ask, commands } from './live'
  * The eight fixed rows that used to live here named skills nobody had
  * installed. A panel that lists what is not there is worse than an empty one,
  * because an empty one is obviously empty.
+ *
+ * The directory is on screen for the same reason: the CLI's configuration is
+ * not always `~/.claude`, and a panel listing another installation's skills is
+ * indistinguishable from one listing this installation's.
  */
 
 const ICON = (
@@ -17,45 +22,53 @@ const ICON = (
 
 export function SkillsPane(): React.JSX.Element {
   const [skills, setSkills] = useState<readonly Skill[]>([])
+  const [directory, setDirectory] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const [chosen, setChosen] = useState<string | null>(null)
   const [find, setFind] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  /* Read on every look, not once at startup: a skill arrives by installing a
+     plugin, which happens in a terminal beside this window. */
+  const load = useCallback(() => {
+    setLoading(true)
     void ask(() => commands.skillsList()).then((answer) => {
       setSkills(answer.data?.skills ?? [])
+      setDirectory(answer.data?.directory ?? '')
       setProblem(answer.error ?? answer.data?.problem ?? null)
+      setLoading(false)
     })
   }, [])
 
-  const shown = skills.filter(
-    (skill) =>
-      skill.name.toLowerCase().includes(find.toLowerCase()) ||
-      skill.description.toLowerCase().includes(find.toLowerCase()),
-  )
-  const open = shown.find((skill) => skill.name === chosen) ?? shown[0]
+  useEffect(load, [load])
 
-  const copy = (): void => {
-    if (!open) return
-    void navigator.clipboard?.writeText(open.path).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    })
-  }
+  const wanted = find.trim().toLowerCase()
+  const shown = wanted
+    ? skills.filter(
+        (skill) =>
+          skill.name.toLowerCase().includes(wanted) ||
+          skill.description.toLowerCase().includes(wanted),
+      )
+    : skills
+  const open = shown.find((skill) => skill.name === chosen) ?? shown[0]
 
   return (
     <div className="sk">
       <div className="sk__list">
-        <input
-          className="sk__find"
-          placeholder="Search skills…"
-          value={find}
-          onChange={(event) => setFind(event.target.value)}
-          aria-label="Search skills"
-        />
+        <div className="sk__seek">
+          <input
+            className="sk__find"
+            placeholder="Search skills…"
+            value={find}
+            onChange={(event) => setFind(event.target.value)}
+            aria-label="Search skills"
+          />
+          <button className="sq26" onClick={load} aria-label="Refresh skills">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5" /></svg>
+          </button>
+        </div>
         <div className="sk__h">
-          Installed <span>{skills.length}</span>
+          Installed <span>{wanted ? `${shown.length} of ${skills.length}` : skills.length}</span>
         </div>
         <div className="sk__rows">
           {shown.map((skill) => (
@@ -72,41 +85,36 @@ export function SkillsPane(): React.JSX.Element {
               </span>
             </button>
           ))}
+          {!loading && shown.length === 0 && (
+            <div className="exempty">
+              <span className="exempty__t">
+                {wanted ? 'No skill matches that.' : (problem ?? 'No skills installed.')}
+              </span>
+              <span className="exempty__d">
+                {wanted
+                  ? 'Names and descriptions are both searched.'
+                  : 'Skills arrive with the plugins you install for the agent CLI.'}
+              </span>
+            </div>
+          )}
         </div>
-        <div className="sk__foot">
-          {problem ?? `${shown.length} of ${skills.length} shown`}
+        {/* Where they were read from. Not decoration: two installations of the
+            same CLI hold different sets, and nothing else on screen says which
+            one this is. */}
+        <div className="sk__foot" title={directory}>
+          {/* Isolated for the same reason as the Files panel's path: the box
+              runs right-to-left to clip the start, not the end. */}
+          <bdi>{problem && shown.length > 0 ? problem : directory}</bdi>
         </div>
       </div>
 
       <div className="sk__doc">
         {open ? (
-          <>
-            <div className="sk__top">
-              <span className="sk__mark">{ICON}</span>
-              <div>
-                <div className="sk__name">{open.name}</div>
-                <div className="sk__from">{open.source}</div>
-              </div>
-            </div>
-            <p className="sk__what">{open.description}</p>
-            <div className="sk__acts">
-              <button className="btn" onClick={() => void ask(() => commands.pathOpen(open.path))}>
-                Open SKILL.md
-              </button>
-              <button
-                className="btn"
-                onClick={() => void ask(() => commands.pathReveal(open.path))}
-              >
-                Show in the finder
-              </button>
-              <button className="btn" onClick={copy}>
-                {copied ? 'Copied' : 'Copy path'}
-              </button>
-            </div>
-            <div className="sk__file">{open.path}</div>
-          </>
+          <SkillDoc skill={open} />
         ) : (
-          <p className="sk__what">{problem ?? 'No skill picked.'}</p>
+          /* Not the problem again: the list beside this is already saying
+             why it is empty, and one sentence twice reads as two faults. */
+          <p className="sk__what">{loading ? 'Reading…' : 'No skill picked.'}</p>
         )}
       </div>
     </div>

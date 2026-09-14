@@ -72,3 +72,37 @@ fn a_path_that_is_not_there_is_refused_rather_than_handed_over() {
     )
     .is_none());
 }
+
+/// A skill lives in the CLI's configuration directory, which is neither a
+/// project nor the devpit workspace.
+///
+/// The Skills panel lists those files and offers Open, Show in the finder and
+/// Copy path. Before the directory was allowed, the first two answered
+/// "that path is not in a project or in the devpit workspace" for every skill
+/// on the machine — a panel of buttons that had never once worked.
+#[test]
+fn a_skill_in_the_cli_configuration_may_be_opened() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join(".claude/plugins/cache/omc/skills/tdd");
+    let home = dir.path().join("devpit");
+    std::fs::create_dir_all(&cli).expect("create");
+    std::fs::create_dir_all(&home).expect("create");
+    std::fs::write(cli.join("SKILL.md"), "---\nname: tdd\n---\n").expect("write");
+
+    let roots = [dir.path().join(".claude")];
+    assert!(openable(&roots, &home, &cli.join("SKILL.md")).is_some());
+}
+
+/// Allowing the configuration directory must not allow the home above it.
+#[test]
+fn the_directory_beside_the_cli_configuration_is_still_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join(".claude");
+    let home = dir.path().join("devpit");
+    for path in [&cli, &home] {
+        std::fs::create_dir_all(path).expect("create");
+    }
+    std::fs::write(dir.path().join(".ssh-key"), "").expect("write");
+
+    assert!(openable(&[cli], &home, &dir.path().join(".ssh-key")).is_none());
+}

@@ -16,12 +16,13 @@ pub fn seed_sources() -> Vec<std::path::PathBuf> {
     let Some(home) = dirs_home() else {
         return Vec::new();
     };
-    let mut dirs = walk_agent_dirs(&home.join(".claude/plugins/cache"));
+    let cli = crate::cli_config::config_dir().unwrap_or_else(|| home.join(".claude"));
+    let mut dirs = walk_agent_dirs(&cli.join("plugins/cache"));
     dirs.sort();
 
     // Yours first, so it shadows a plugin's rather than the other way round.
     let mut all = Vec::new();
-    for own in [home.join(".devpit/agents"), home.join(".claude/agents")] {
+    for own in [home.join(".devpit/agents"), cli.join("agents")] {
         if own.is_dir() {
             all.push(own);
         }

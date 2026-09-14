@@ -10,7 +10,7 @@ use crate::{
     account, agent_choice, agent_profiles, arranging, asking, board, branches, card_work, cards,
     chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight, index,
     mcp, moving, notices, openers, panels, panes, priming, projects, pty_bridge, reveal, saves,
-    search, sessions, settings, shell_launch, sources, staging, steps, threads, watching,
+    search, sessions, settings, shell_launch, skills, sources, staging, steps, threads, watching,
     workspace, worktree_base, worktrees, wsfiles,
 };
 
@@ -48,7 +48,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         asking::permission_ask_from_now,
         asking::permission_questions,
         mcp::mcp_list,
-        workspace::skills_list,
+        skills::skills_list,
+        skills::skills_read,
         workspace::workspace_read,
         workspace::usage_read,
         wsfiles::workspace_list,

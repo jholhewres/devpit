@@ -30,25 +30,38 @@ interface Fading {
 
 const Veil = createContext<Fading | null>(null)
 
+/* Context and not a prop for the same reason as the fade: every node between
+   the document and the one link would otherwise have to carry it down. */
+const Opening = createContext<((path: string) => void) | null>(null)
+
 export function Markdown({
   source,
   path,
   chunks,
   now,
+  opens,
 }: {
   source: string
   path?: string
   chunks?: readonly Chunk[]
   now?: number
+  /* What a link to a file beside this document means. Absent, it is a file in
+     the project, which is what every caller but one wants. The exception is a
+     `SKILL.md`, which lives outside every project — its neighbours cannot be
+     opened as tabs, and following one as if they could ends in a refusal the
+     reader cannot act on. */
+  opens?: (path: string) => void
 }): React.JSX.Element {
   const fading = chunks?.length ? { source, chunks, now: now ?? Date.now(), cursor: 0 } : null
 
   return (
     <Veil.Provider value={fading}>
       <div className="md">
-        {blocks(source).map((block, at) => (
-          <Piece key={at} block={block} path={path ?? ''} />
-        ))}
+        <Opening.Provider value={opens ?? null}>
+          {blocks(source).map((block, at) => (
+            <Piece key={at} block={block} path={path ?? ''} />
+          ))}
+        </Opening.Provider>
       </div>
     </Veil.Provider>
   )
@@ -138,6 +151,7 @@ function Inline({ text, path }: { text: string; path: string }): React.JSX.Eleme
 
 function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
   const { show } = useShell()
+  const opens = useContext(Opening)
 
   switch (span.kind) {
     case 'code':
@@ -162,8 +176,10 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
           onClick={() => {
             /* A link that leaves the machine opens in the system browser; the
                window is not a browser and must not become one. */
-            if (external(span.href)) void ask(() => commands.pathOpen(span.href))
-            else show('file', { id: `file:${resolved(path, span.href)}`, path: resolved(path, span.href) })
+            if (external(span.href)) return void ask(() => commands.pathOpen(span.href))
+            const here = resolved(path, span.href)
+            if (opens) return opens(here)
+            show('file', { id: `file:${here}`, path: here })
           }}
         >
           {span.text}

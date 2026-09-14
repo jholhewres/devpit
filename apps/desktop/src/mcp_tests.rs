@@ -1,50 +1,73 @@
 use super::*;
 
-const CONFIG: &str = r#"{
-  "mcpServers": {
-    "playwright": { "command": "npx", "args": ["@playwright/mcp@latest"] },
-    "anchored": { "url": "https://anchored.example/mcp" }
-  }
-}"#;
-
-#[test]
-fn a_server_reached_by_a_command_shows_the_whole_line() {
-    let found = servers_in(CONFIG, "user");
-    let playwright = found
-        .iter()
-        .find(|one| one.name == "playwright")
-        .expect("found");
-    assert_eq!(playwright.reached_by, "npx @playwright/mcp@latest");
-    assert_eq!(playwright.scope, "user");
+fn server(name: &str, scope: &str) -> Server {
+    Server {
+        name: name.to_owned(),
+        scope: scope.to_owned(),
+        reached_by: format!("{scope}-command"),
+    }
 }
 
+/// The project's file is read first, so the project's spelling of a shared
+/// name is the one that survives — which is the order the CLI resolves in.
 #[test]
-fn a_server_reached_by_a_url_shows_the_url() {
-    let found = servers_in(CONFIG, "project");
-    let anchored = found
-        .iter()
-        .find(|one| one.name == "anchored")
-        .expect("found");
-    assert_eq!(anchored.reached_by, "https://anchored.example/mcp");
+fn the_first_file_to_name_a_server_keeps_it() {
+    let mut servers = Vec::new();
+    let mut sources = Vec::new();
+    take(
+        vec![server("reports", "project")],
+        Path::new("/p/.mcp.json"),
+        &mut servers,
+        &mut sources,
+    );
+    take(
+        vec![server("reports", "user"), server("other", "user")],
+        Path::new("/home/me/.claude.json"),
+        &mut servers,
+        &mut sources,
+    );
+
+    assert_eq!(servers.len(), 2);
+    assert_eq!(servers[0].scope, "project");
+    assert_eq!(servers[0].reached_by, "project-command");
+    assert_eq!(servers[1].name, "other");
 }
 
+/// A file naming nothing is not a source. Listing it would tell the reader
+/// their servers came from a file that has none in it.
 #[test]
-fn a_config_with_no_servers_gives_none_rather_than_failing() {
-    assert!(servers_in(r#"{"other": 1}"#, "user").is_empty());
+fn a_file_that_named_nothing_is_not_listed_as_a_source() {
+    let mut servers = Vec::new();
+    let mut sources = Vec::new();
+    take(
+        Vec::new(),
+        Path::new("/p/.mcp.json"),
+        &mut servers,
+        &mut sources,
+    );
+    assert!(sources.is_empty());
+    assert!(servers.is_empty());
 }
 
-/// The CLI's config is not ours; a shape we cannot read must not take the
-/// panel down with it.
+/// One file is read twice — once for this project's section and once for the
+/// user-wide one — and naming it twice would read as two installations.
 #[test]
-fn a_config_that_is_not_json_gives_none_rather_than_failing() {
-    assert!(servers_in("not json at all", "user").is_empty());
-}
-
-#[test]
-fn the_names_come_back_sorted_so_the_panel_does_not_reshuffle() {
-    let names: Vec<String> = servers_in(CONFIG, "user")
-        .into_iter()
-        .map(|one| one.name)
-        .collect();
-    assert_eq!(names, vec!["anchored".to_owned(), "playwright".to_owned()]);
+fn one_file_read_for_two_scopes_is_named_once() {
+    let mut servers = Vec::new();
+    let mut sources = Vec::new();
+    let settings = Path::new("/home/me/.claude.json");
+    take(
+        vec![server("reports", "project")],
+        settings,
+        &mut servers,
+        &mut sources,
+    );
+    take(
+        vec![server("everywhere", "user")],
+        settings,
+        &mut servers,
+        &mut sources,
+    );
+    sources.dedup();
+    assert_eq!(sources, vec!["/home/me/.claude.json".to_owned()]);
 }

@@ -175,6 +175,8 @@ export const commands = {
 	mcpList: (projectId: string | null) => typedError<Servers, RpcError>(__TAURI_INVOKE("mcp_list", { projectId })),
 	/**  `skills.list` — the skills installed on this machine. */
 	skillsList: () => typedError<Skills, RpcError>(__TAURI_INVOKE("skills_list")),
+	/**  `skills.read` — the whole of one skill's `SKILL.md`. */
+	skillsRead: (name: string) => typedError<SkillDoc, RpcError>(__TAURI_INVOKE("skills_read", { name })),
 	/**  `workspace.read` — the devpit workspace, row by row, with real sizes. */
 	workspaceRead: (projectId: string | null) => typedError<Workspace, RpcError>(__TAURI_INVOKE("workspace_read", { projectId })),
 	/**
@@ -1851,6 +1853,8 @@ export type Servers = {
 	problem: string | null,
 	/**  The command that manages them, to copy. Never run from here. */
 	manageWith: string,
+	/**  The CLI configuration directory these came from. */
+	directory: string,
 };
 
 /**  A background agent session, as the board needs to draw it. */
@@ -1941,8 +1945,16 @@ export type Skill = {
 	source: string,
 	/**  The `SKILL.md` itself, so Open and Reveal have something to hand over. */
 	path: string,
-	/**  The first line of prose in the file, when there is one. */
+	/**  The author's own one line, from the frontmatter. */
 	description: string,
+};
+
+/**  One skill, with the whole of its `SKILL.md`. */
+export type SkillDoc = {
+	name: string,
+	path: string,
+	/**  The file as written, Markdown and all, with the frontmatter removed. */
+	body: string,
 };
 
 export type Skills = {
@@ -1952,6 +1964,14 @@ export type Skills = {
 	 *  means the panel says this instead of looking empty.
 	 */
 	problem: string | null,
+	/**
+	 *  The CLI configuration directory these came from.
+	 * 
+	 *  On screen because it is not always `~/.claude`, and a panel listing
+	 *  another installation's skills is indistinguishable from a panel
+	 *  listing this one's — see `cli_config`.
+	 */
+	directory: string,
 };
 
 /**  One kind of checkout, with the count that makes the choice meaningful. */

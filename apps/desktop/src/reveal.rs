@@ -21,8 +21,9 @@ pub struct Opened {
 
 /// Whether this process may hand that path to the desktop.
 ///
-/// Only inside a project the person registered, or inside the devpit
-/// workspace. Resolved through symlinks first, for the same reason as
+/// Only inside a project the person registered, inside the devpit workspace,
+/// or inside the CLI's own configuration — the three places this window draws
+/// file paths from. Resolved through symlinks first, for the same reason as
 /// everywhere else: comparing the strings is the check that looks right and
 /// is not.
 pub(crate) fn openable(roots: &[PathBuf], home: &Path, path: &Path) -> Option<PathBuf> {
@@ -40,16 +41,21 @@ pub(crate) fn openable(roots: &[PathBuf], home: &Path, path: &Path) -> Option<Pa
 
 fn allowed(path: &str) -> Result<PathBuf, RpcError> {
     let store = Store::open_default()?;
-    let roots: Vec<PathBuf> = store
+    let mut roots: Vec<PathBuf> = store
         .projects()?
         .into_iter()
         .map(|row| PathBuf::from(row.root_path))
         .collect();
+    // The CLI's own configuration, because the Skills panel lists files out of
+    // it and offers to open them. Every `SKILL.md` lives under here and under
+    // nothing else, so without this the three buttons on that panel refused
+    // every path they were ever handed — measured, not reasoned about.
+    roots.extend(devpit_agentcli::cli_config::config_dir());
     let home = Store::root().map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
     openable(&roots, &home, Path::new(path)).ok_or_else(|| {
         RpcError::new(
             ErrorCode::Forbidden,
-            "that path is not in a project or in the devpit workspace",
+            "that path is not in a project, the devpit workspace, or the CLI's configuration",
         )
     })
 }

@@ -17,8 +17,11 @@ pub fn sources() -> Vec<PathBuf> {
     let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
         return Vec::new();
     };
-    let mut dirs = walk(&home.join(".claude/plugins/cache"), 0);
-    for own in [home.join(".claude/skills"), home.join(".devpit/skills")] {
+    // Where the CLI actually keeps its configuration, which is not always
+    // `~/.claude` — see `cli_config`.
+    let cli = crate::cli_config::config_dir().unwrap_or_else(|| home.join(".claude"));
+    let mut dirs = walk(&cli.join("plugins/cache"), 0);
+    for own in [cli.join("skills"), home.join(".devpit/skills")] {
         if own.is_dir() {
             dirs.push(own);
         }

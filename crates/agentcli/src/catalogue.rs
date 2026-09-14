@@ -167,11 +167,12 @@ pub fn source_of(dir: &Path) -> String {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
     match named.as_str() {
-        // `~/.claude/agents` and `~/.devpit/agents` would read as ".claude"
-        // and ".devpit", which is a path showing through into the screen.
-        ".claude" => "claude".to_owned(),
         ".devpit" => "yours".to_owned(),
         "" => "unknown".to_owned(),
+        // `~/.claude/agents` would read as ".claude", which is a path showing
+        // through into the screen — and so would `~/.claude-claudin`, which is
+        // what a second installation of the same CLI is actually called.
+        other if other.starts_with(".claude") => "claude".to_owned(),
         other => other.to_owned(),
     }
 }
@@ -205,3 +206,9 @@ fn quote(value: &str) -> String {
 #[cfg(test)]
 #[path = "catalogue_tests.rs"]
 mod tests;
+
+/// Apart from `catalogue_tests.rs` because it is a different question: that
+/// file is what loads, and this is what the loaded thing is called.
+#[cfg(test)]
+#[path = "source_name_tests.rs"]
+mod source_name;

@@ -59,8 +59,16 @@ export function Panes(): React.JSX.Element {
               <BoardPane />
             </div>
 
-            {/* Skills */}
+            {/* Skills. The bar lives here and not in `SkillsPane`, which is
+                also mounted inside Settings — where this chrome would be a
+                second title bar under the first. */}
             <div className="pane" data-pane="skills" data-show={String(active?.kind === 'skills')}>
+              <div className="pane__bar">
+                <span className="pane__ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg></span>
+                <span className="pane__t"><b>Skills</b></span>
+                <span className="drag"></span>
+                <button className="sq26" onClick={() => close('skills')} aria-label="Close Skills"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+              </div>
               <SkillsPane />
             </div>
 
