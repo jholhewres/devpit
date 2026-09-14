@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parse, sides } from './diff'
+import { parse, sides, visible } from './diff'
 
 const DIFF = `diff --git a/src/a.rs b/src/a.rs
 index 111..222 100644
@@ -86,5 +86,24 @@ describe('the side-by-side view', () => {
     expect(left).toHaveLength(2)
     expect(right).toHaveLength(2)
     expect(right[1]).toBeNull()
+  })
+})
+
+describe('whitespace, when asked for', () => {
+  it('marks spaces and tabs and leaves the words alone', () => {
+    expect(visible('  if\tx')).toEqual([
+      { text: '··', space: true },
+      { text: 'if', space: false },
+      { text: '→   ', space: true },
+      { text: 'x', space: false },
+    ])
+  })
+
+  it('shows trailing whitespace, which is usually why someone looked', () => {
+    expect(visible('done  ').at(-1)).toEqual({ text: '··', space: true })
+  })
+
+  it('is nothing for an empty line', () => {
+    expect(visible('')).toEqual([])
   })
 })

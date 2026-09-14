@@ -11,17 +11,25 @@ import {
   summary,
   targetOf,
   toolName,
+  grouped,
+  groupTarget,
+  isGroup,
+  type Act,
+  type Group,
 } from './acts'
 
 const call = (id: string, name: string, input = '{}', state: 'running' | 'ok' | 'failed' = 'ok'): Part =>
-  ({ kind: 'tool_call', id, name, input, state })
+  ({ kind: 'tool_call', id, name, input, state, parent: null })
 
 const result = (callId: string, output: string, isError = false): Part =>
-  ({ kind: 'tool_result', call_id: callId, output, is_error: isError })
+  ({ kind: 'tool_result', call_id: callId, output, is_error: isError, parent: null })
 
 describe('what a tool call is', () => {
   it('reads the act through the name, whatever the spelling', () => {
     expect(kindOf('Bash')).toBe('run')
+    // Claude Code 2.1.270 keeps its checklist in these, not TodoWrite.
+    expect(kindOf('TaskCreate')).toBe('plan')
+    expect(kindOf('TaskUpdate')).toBe('plan')
     expect(kindOf('run_command')).toBe('run')
     expect(kindOf('runTerminalCommand')).toBe('run')
     expect(kindOf('Edit')).toBe('edit')
@@ -103,7 +111,7 @@ describe('the rows of a message', () => {
   })
 
   it('gives a thought a row of its own', () => {
-    const rows = acts([{ kind: 'thinking', text: 'First I should read the file.\nThen edit it.' }])
+    const rows = acts([{ kind: 'thinking', text: 'First I should read the file.\nThen edit it.', parent: null }])
     expect(rows[0]).toMatchObject({ kind: 'think', target: 'First I should read the file.' })
   })
 
@@ -168,5 +176,40 @@ describe('what is running in a pane', () => {
   it('knows an agent from anything else', () => {
     expect(isAgent('claudin')).toBe(true)
     expect(isAgent('zsh')).toBe(false)
+  })
+})
+
+describe('a run of the same act reads as one row', () => {
+  const read = (id: string, done = true, failed = false): Act => ({
+    id, kind: 'read', name: 'Read', target: `${id}.rs`, input: '{}', output: '', failed, done, children: [],
+  })
+
+  it('folds three or more settled calls of one tool', () => {
+    const items = grouped([read('a'), read('b'), read('c')])
+    expect(items).toHaveLength(1)
+    expect(isGroup(items[0]!)).toBe(true)
+    expect(groupTarget(items[0] as Group)).toBe('3 files')
+  })
+
+  it('leaves two alone: a pair is a list, not a run', () => {
+    expect(grouped([read('a'), read('b')]).every((item) => !isGroup(item))).toBe(true)
+  })
+
+  it('never folds a running call, which is the row being watched', () => {
+    const items = grouped([read('a'), read('b'), read('c'), read('d', false)])
+    expect(items).toHaveLength(2)
+    expect(isGroup(items[1]!)).toBe(false)
+    expect((items[1] as Act).id).toBe('d')
+  })
+
+  it('keeps a failure visible instead of counting it', () => {
+    const items = grouped([read('a'), read('b'), read('x', true, true), read('c'), read('d'), read('e')])
+    expect(items.map((item) => (isGroup(item) ? `g${item.rows.length}` : item.id))).toEqual(['a', 'b', 'x', 'g3'])
+  })
+
+  it('does not fold different tools of the same kind together', () => {
+    const grep = (id: string): Act => ({ ...read(id), kind: 'find', name: 'Grep' })
+    const glob = (id: string): Act => ({ ...read(id), kind: 'find', name: 'Glob' })
+    expect(grouped([grep('a'), glob('b'), grep('c')]).some(isGroup)).toBe(false)
   })
 })

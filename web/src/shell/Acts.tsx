@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { acts, actionLabel, headline, type Act, type Kind } from './acts'
+import { acts, actionLabel, grouped, groupTarget, headline, isGroup, type Act, type Group, type Kind } from './acts'
 import type { Part } from '../gen/bindings'
+import { editDiff } from './editCard'
+import { EditCard } from './EditCard'
 import { Markdown } from './Markdown'
 
 /*
@@ -26,7 +28,50 @@ export function Acts({ parts, live }: { parts: readonly Part[]; live: boolean })
       </button>
       {open && (
         <div className="acts__body">
-          {rows.map((row) => (
+          {grouped(rows).map((item) =>
+            isGroup(item) ? <GroupRow key={item.id} group={item} /> : <Row key={item.id} act={item} />,
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AgentRow({ act }: { act: Act }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="arow">
+      <button className="arow__h" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+        <Icon kind={act.kind} />
+        <span className="arow__k">{actionLabel(act.kind)}</span>
+        {act.target && <span className="arow__d">{act.target}</span>}
+        {act.done ? <Chevron open={open} className="arow__v" /> : <span className="arow__live" aria-label="Running" />}
+      </button>
+      {open && (
+        <div className="arow__body">
+          {grouped(act.children).map((item) =>
+            isGroup(item) ? <GroupRow key={item.id} group={item} /> : <Row key={item.id} act={item} />,
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* A run of one act, closed to its count and open to its rows. */
+function GroupRow({ group }: { group: Group }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="arow">
+      <button className="arow__h" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+        <Icon kind={group.kind} />
+        <span className="arow__k">{actionLabel(group.kind)}</span>
+        <span className="arow__d">{groupTarget(group)}</span>
+        <Chevron open={open} className="arow__v" />
+      </button>
+      {open && (
+        <div className="arow__body">
+          {group.rows.map((row) => (
             <Row key={row.id} act={row} />
           ))}
         </div>
@@ -36,8 +81,14 @@ export function Acts({ parts, live }: { parts: readonly Part[]; live: boolean })
 }
 
 function Row({ act }: { act: Act }): React.JSX.Element {
+  /* A subagent is a stack of its own, folded until asked for: its reads and
+     searches are its business, and the thread is about what it came back with. */
+  if (act.children.length > 0) return <AgentRow act={act} />
   const parts = sections(act)
-  const [open, setOpen] = useState(false)
+  /* An edit shows what it changed as soon as it is on screen: the diff is the
+     point of the row, and a chevron in front of it is a click for nothing. */
+  const edited = act.kind === 'edit' ? editDiff(act.input) : null
+  const [open, setOpen] = useState(edited !== null)
 
   return (
     <div className="arow">
@@ -54,7 +105,9 @@ function Row({ act }: { act: Act }): React.JSX.Element {
       </button>
       {open && parts.length > 0 && (
         <div className="arow__body">
-          {act.kind === 'think' ? (
+          {edited ? (
+            <EditCard diff={edited} failed={act.failed} error={act.output} />
+          ) : act.kind === 'think' ? (
             <div className="arow__think">
               <Markdown source={act.output} />
             </div>
@@ -205,6 +258,7 @@ const PATHS: Readonly<Record<Kind, React.JSX.Element>> = {
   find: <><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></>,
   list: <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />,
   plan: <><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" /></>,
+  agent: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   tool: <path d="M14.7 6.3a4 4 0 0 1 5 5l-9.6 9.6a2.1 2.1 0 0 1-3-3l9.6-9.6a1 1 0 0 0-1.4-1.4L5.7 16.5a4 4 0 0 1-1-5.4" />,
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { parse, sides, type Hunk, type Row } from './diff'
+import { DiffText as Text } from './DiffText'
 import { ask, commands } from './live'
 import type { Tab } from './strip'
 import { useShell } from './useShell'
@@ -24,6 +25,9 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
   const [raw, setRaw] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [split, setSplit] = useState(false)
+  /* Off by default: most diffs are read for what changed, and a page of dots
+     is noise until the change *is* the whitespace. */
+  const [spaces, setSpaces] = useState(false)
   const [shown, setShown] = useState(HUNKS_AT_ONCE)
 
   /* A commit's diff and a file's diff are two questions, and the tab says
@@ -55,6 +59,9 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
           {ofCommit ? ' · this commit' : ' · against HEAD'}
         </span>
         <span className="drag" />
+        <button className="chip" aria-pressed={spaces} onClick={() => setSpaces((was) => !was)}>
+          {spaces ? 'Hide whitespace' : 'Show whitespace'}
+        </button>
         <button className="chip" onClick={() => setSplit((was) => !was)}>
           {split ? 'Unified' : 'Side by side'}
         </button>
@@ -78,7 +85,7 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
         )}
 
         {hunks.slice(0, shown).map((hunk, at) =>
-          split ? <Split key={at} hunk={hunk} /> : <Unified key={at} hunk={hunk} />,
+          split ? <Split key={at} hunk={hunk} spaces={spaces} /> : <Unified key={at} hunk={hunk} spaces={spaces} />,
         )}
 
         {hunks.length > shown && (
@@ -91,20 +98,20 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
   )
 }
 
-function Unified({ hunk }: { hunk: Hunk }): React.JSX.Element {
+function Unified({ hunk, spaces }: { hunk: Hunk; spaces: boolean }): React.JSX.Element {
   return (
     <div className="diff">
       <div className="diff__at">{hunk.header}</div>
       {hunk.rows.map((row, at) => (
         <div className="diff__l" data-d={row.kind} key={at}>
-          {row.text || ' '}
+          <Text text={row.text} spaces={spaces} />
         </div>
       ))}
     </div>
   )
 }
 
-function Split({ hunk }: { hunk: Hunk }): React.JSX.Element {
+function Split({ hunk, spaces }: { hunk: Hunk; spaces: boolean }): React.JSX.Element {
   const { left, right } = sides(hunk)
   return (
     <div className="diff">
@@ -112,12 +119,12 @@ function Split({ hunk }: { hunk: Hunk }): React.JSX.Element {
       <div className="diff__two">
         <div>
           {left.map((row, at) => (
-            <Half key={at} row={row} />
+            <Half key={at} row={row} spaces={spaces} />
           ))}
         </div>
         <div>
           {right.map((row, at) => (
-            <Half key={at} row={row} />
+            <Half key={at} row={row} spaces={spaces} />
           ))}
         </div>
       </div>
@@ -125,8 +132,8 @@ function Split({ hunk }: { hunk: Hunk }): React.JSX.Element {
   )
 }
 
-const Half = ({ row }: { row: Row | null }): React.JSX.Element => (
+const Half = ({ row, spaces }: { row: Row | null; spaces: boolean }): React.JSX.Element => (
   <div className="diff__l" data-d={row?.kind ?? 'gap'}>
-    {row?.text || ' '}
+    <Text text={row?.text ?? ''} spaces={spaces} />
   </div>
 )

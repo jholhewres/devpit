@@ -13,7 +13,7 @@ import type { Part } from '../gen/bindings'
  * grows a case every time a CLI names a tool differently.
  */
 
-export type Kind = 'think' | 'run' | 'edit' | 'read' | 'find' | 'list' | 'plan' | 'tool'
+export type Kind = 'think' | 'run' | 'edit' | 'read' | 'find' | 'list' | 'plan' | 'agent' | 'tool'
 
 export interface Act {
   readonly id: string
@@ -26,6 +26,8 @@ export interface Act {
   readonly output: string
   readonly failed: boolean
   readonly done: boolean
+  /* What a subagent did, for the `Agent` call that started it. */
+  readonly children: readonly Act[]
 }
 
 /* The verb on the row. Six letters at most, so the subject beside it starts
@@ -38,6 +40,7 @@ const LABELS: Readonly<Record<Kind, string>> = {
   find: 'Search',
   list: 'List',
   plan: 'Plan',
+  agent: 'Agent',
   tool: 'Tool',
 }
 
@@ -57,11 +60,16 @@ const EDITS = ['applypatch', 'create', 'createfile', 'delete', 'deletefile', 'ed
 const READS = ['read', 'fileread', 'readfile', 'readtextfile', 'viewfile']
 const FINDS = ['grep', 'glob', 'search', 'filesearch', 'searchfiles', 'findfiles', 'websearch', 'webfetch', 'fetch']
 const LISTS = ['ls', 'filelist', 'listfiles', 'listdirectory', 'listdir']
-const PLANS = ['todo', 'todowrite', 'updateplan', 'plan', 'exitplanmode']
+/* `TaskCreate` and `TaskUpdate` are Claude Code's checklist since it stopped
+   using `TodoWrite` — measured on 2.1.270. */
+const PLANS = ['todo', 'todowrite', 'updateplan', 'plan', 'exitplanmode', 'taskcreate', 'taskupdate']
+/* `Agent` today; `Task` is what the same tool was called before. */
+const AGENTS_TOOLS = ['agent', 'task', 'subagent', 'spawnagent']
 
 export function kindOf(name: string): Kind {
   const it = leaf(name)
   if (PLANS.includes(it)) return 'plan'
+  if (AGENTS_TOOLS.includes(it)) return 'agent'
   if (RUNS.includes(it)) return 'run'
   if (EDITS.includes(it)) return 'edit'
   if (READS.includes(it)) return 'read'
@@ -101,6 +109,8 @@ export function targetOf(kind: Kind, input: string): string {
       return base(at('path') || at('directory'))
     case 'find':
       return oneLine(at('pattern') || at('query') || at('url') || at('regex'), 60)
+    case 'agent':
+      return oneLine(at('description') || at('subagent_type'), 70)
     default:
       return ''
   }
@@ -136,8 +146,26 @@ export function toolName(name: string): string {
    them here is what lets the row show `Run cargo test` with the output folded
    underneath, instead of a call and a result sitting apart. */
 export function acts(parts: readonly Part[]): readonly Act[] {
+  const own = parts.filter((part) => !('parent' in part) || !part.parent)
+  const rows = rowsOf(own, parts)
+  return rows.map((row) => {
+    const inside = parts.filter((part) => 'parent' in part && part.parent === row.id)
+    return inside.length ? { ...row, children: rowsOf(inside, parts), done: row.done && finished(row.id, parts) } : row
+  })
+}
+
+/* A subagent is finished when its background task says so, not when its
+   `Agent` call returns: the call answers at once and the work goes on. */
+function finished(callId: string, parts: readonly Part[]): boolean {
+  const tasks = parts.filter((part) => part.kind === 'task' && part.call_id === callId)
+  if (tasks.length === 0) return true
+  const last = tasks[tasks.length - 1]!
+  return last.kind === 'task' && last.status !== 'started' && last.status !== 'running'
+}
+
+function rowsOf(parts: readonly Part[], every: readonly Part[]): Act[] {
   const results = new Map<string, { output: string; failed: boolean }>()
-  for (const part of parts) {
+  for (const part of every) {
     if (part.kind === 'tool_result') {
       results.set(part.call_id, { output: part.output, failed: part.is_error })
     }
@@ -146,11 +174,11 @@ export function acts(parts: readonly Part[]): readonly Act[] {
   const rows: Act[] = []
   parts.forEach((part, at) => {
     if (part.kind === 'thinking') {
-      rows.push({ id: `t${at}`, kind: 'think', name: 'Thinking', target: oneLine(part.text), input: '', output: part.text, failed: false, done: true })
+      rows.push({ id: `t${at}`, kind: 'think', name: 'Thinking', target: oneLine(part.text), input: '', output: part.text, failed: false, done: true, children: [] })
       return
     }
     if (part.kind === 'unknown') {
-      rows.push({ id: `u${at}`, kind: 'tool', name: 'Output', target: oneLine(part.text), input: '', output: part.text, failed: false, done: true })
+      rows.push({ id: `u${at}`, kind: 'tool', name: 'Output', target: oneLine(part.text), input: '', output: part.text, failed: false, done: true, children: [] })
       return
     }
     if (part.kind !== 'tool_call') return
@@ -165,9 +193,74 @@ export function acts(parts: readonly Part[]): readonly Act[] {
       output: answer?.output ?? '',
       failed: answer?.failed ?? part.state === 'failed',
       done: answer !== undefined || part.state !== 'running',
+      children: [],
     })
   })
   return rows
+}
+
+/* Several of the same act in a row, read as one.
+
+   Eight `Read` rows say nothing eight times over; "Read 8 files" says it once
+   and opens to the eight. Only settled rows fold: a running call is what you
+   are watching, and hiding it inside a count hides the one row that matters. */
+export interface Group {
+  readonly id: string
+  readonly kind: Kind
+  readonly rows: readonly Act[]
+}
+
+export type Item = Act | Group
+
+export const isGroup = (item: Item): item is Group => 'rows' in item
+
+/* Fewer than this is a list, not a run. */
+const FOLD_AT = 3
+
+export function grouped(rows: readonly Act[]): readonly Item[] {
+  const items: Item[] = []
+  let run: Act[] = []
+  const flush = (): void => {
+    if (run.length >= FOLD_AT) items.push({ id: `g${run[0]!.id}`, kind: run[0]!.kind, rows: run })
+    else items.push(...run)
+    run = []
+  }
+  for (const row of rows) {
+    const joins =
+      run.length > 0 &&
+      row.done &&
+      !row.failed &&
+      row.kind !== 'think' &&
+      row.kind === run[0]!.kind &&
+      row.name === run[0]!.name
+    if (joins) {
+      run.push(row)
+      continue
+    }
+    flush()
+    if (row.done && !row.failed && row.kind !== 'think') run.push(row)
+    else items.push(row)
+  }
+  flush()
+  return items
+}
+
+/* What a group amounts to, as the subject beside its verb. */
+const GROUP_NOUNS: Readonly<Record<Kind, readonly [string, string]>> = {
+  think: ['thought', 'thoughts'],
+  run: ['command', 'commands'],
+  edit: ['file', 'files'],
+  read: ['file', 'files'],
+  find: ['search', 'searches'],
+  list: ['folder', 'folders'],
+  plan: ['step', 'steps'],
+  agent: ['subagent', 'subagents'],
+  tool: ['call', 'calls'],
+}
+
+export function groupTarget(group: Group): string {
+  const [one, many] = GROUP_NOUNS[group.kind]
+  return `${group.rows.length} ${group.rows.length === 1 ? one : many}`
 }
 
 /* What a settled group of rows amounts to: "Ran 3 commands · 2 file edits". */
@@ -179,6 +272,7 @@ const NOUNS: Readonly<Record<Kind, readonly [string, string]>> = {
   find: ['search', 'searches'],
   list: ['file list', 'file lists'],
   plan: ['plan step', 'plan steps'],
+  agent: ['subagent', 'subagents'],
   tool: ['tool call', 'tool calls'],
 }
 

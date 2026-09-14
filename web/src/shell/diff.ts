@@ -123,3 +123,18 @@ export function sides(hunk: Hunk): { left: (Row | null)[]; right: (Row | null)[]
 
   return { left, right }
 }
+
+/* A line with its whitespace made visible: a space as `·`, a tab as `→`.
+   Pieces rather than a string, so the marks can be drawn quieter than the
+   text and the line keeps its width. */
+export type Piece = { readonly text: string; readonly space: boolean }
+
+export function visible(line: string): readonly Piece[] {
+  const pieces: Piece[] = []
+  for (const run of line.match(/[ \t]+|[^ \t]+/g) ?? []) {
+    const space = run[0] === ' ' || run[0] === '\t'
+    pieces.push({ text: space ? run.replace(/ /g, '·').replace(/\t/g, '→   ') : run, space })
+  }
+  return pieces
+}
+
