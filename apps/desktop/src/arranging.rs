@@ -107,6 +107,8 @@ pub fn session_close_leaf(
     );
     crate::tap::stop_whatever_runs(&server, &session, &leaf_id);
     server.kill_window(&session, &leaf_id).map_err(tmux_err)?;
+    // A pane closed on purpose is not one to start an agent in again.
+    let _ = store()?.forget_pane_agent(&leaf_id);
 
     // Focus follows the tree when it pointed at what just left.
     let focused_id = if current.focused_id == leaf_id {
@@ -222,6 +224,7 @@ pub fn session_close_tab(
         state.taps.forget(&server, leaf_id, &target);
         crate::tap::stop_whatever_runs(&server, &session, leaf_id);
         let _ = server.kill_window(&session, leaf_id);
+        let _ = store()?.forget_pane_agent(leaf_id);
     }
     store()?.forget_pane_layout(&project_id, &tab_id)?;
     Ok(())

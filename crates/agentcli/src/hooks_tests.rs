@@ -166,3 +166,25 @@ fn a_hook_says_where_the_sessions_transcript_is() {
         None
     );
 }
+
+/// Recorded from an interactive 2.1.270 started in tmux and left with `/exit`.
+const SESSION_START: &str = r#"{"session_id":"94e3457c-dcfa-4580-951a-dc9110a9580e","cwd":"/work",
+    "hook_event_name":"SessionStart","source":"startup","model":"haiku","scratchpad_dir":"/s",
+    "transcript_path":"/home/me/.claude/projects/-work/94e3457c-dcfa-4580-951a-dc9110a9580e.jsonl"}"#;
+
+const SESSION_END: &str = r#"{"session_id":"94e3457c-dcfa-4580-951a-dc9110a9580e","cwd":"/work",
+    "hook_event_name":"SessionEnd","reason":"prompt_input_exit","prompt_id":"p1","scratchpad_dir":"/s",
+    "transcript_path":"/home/me/.claude/projects/-work/94e3457c-dcfa-4580-951a-dc9110a9580e.jsonl"}"#;
+
+#[test]
+fn a_session_is_heard_starting_and_ending_with_its_reason() {
+    let started = read(SESSION_START).expect("start");
+    assert_eq!(started.event, Event::SessionStarted);
+    assert!(started.transcript_path.is_some());
+    assert_eq!(
+        read(SESSION_END).expect("end").event,
+        Event::SessionEnded {
+            reason: Some("prompt_input_exit".to_owned())
+        }
+    );
+}

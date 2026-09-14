@@ -413,4 +413,24 @@ UPDATE run SET state = 'lost'
     WHERE state = 'failed' AND output = 'the app closed while this was running';
 "#,
     },
+    // Migration 011 — which agent a pane was running, to start it again.
+    Migration {
+        version: 11,
+        sql: r#"
+-- The agent devpit started in a pane, and the CLI session it is in.
+--
+-- tmux keeps a pane's processes while the app is closed, but not across a
+-- reboot or a server that died. The layout still names the pane, so the pane
+-- comes back; without this it comes back as an empty shell where a
+-- conversation was.
+CREATE TABLE pane_agent (
+    leaf_id         TEXT PRIMARY KEY,
+    project_id      TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    launch          TEXT NOT NULL,
+    session_id      TEXT,
+    transcript_path TEXT,
+    updated_at      INTEGER NOT NULL
+);
+"#,
+    },
 ];

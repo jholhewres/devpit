@@ -59,6 +59,7 @@ mod question;
 mod receipts;
 mod reconcile;
 mod refusing;
+mod restoring;
 mod reveal;
 mod roots;
 mod runs;

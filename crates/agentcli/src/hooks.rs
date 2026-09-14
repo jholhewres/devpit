@@ -67,6 +67,10 @@ pub enum Event {
     /// Waiting on a person — the state that matters most, because nothing
     /// moves until someone comes back.
     Waiting,
+    /// A session began, at startup, on resume, or after `/clear`.
+    SessionStarted,
+    /// The session ended, with the CLI's reason (`prompt_input_exit` on `/exit`).
+    SessionEnded { reason: Option<String> },
 }
 
 #[derive(Deserialize)]
@@ -87,6 +91,8 @@ struct Raw {
     agent_type: Option<String>,
     #[serde(default)]
     transcript_path: Option<String>,
+    #[serde(default)]
+    reason: Option<String>,
 }
 
 /// What an `Agent` call returns, read apart from [`Raw`]: other tools answer
@@ -148,6 +154,8 @@ pub fn read(payload: &str) -> Option<Happening> {
             agent: raw.agent_id,
         },
         "Notification" | "PermissionRequest" => Event::Waiting,
+        "SessionStart" => Event::SessionStarted,
+        "SessionEnd" => Event::SessionEnded { reason: raw.reason },
         _ => return None,
     };
 

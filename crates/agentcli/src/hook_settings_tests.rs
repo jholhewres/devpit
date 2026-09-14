@@ -22,7 +22,14 @@ fn only_the_hook_that_can_be_answered_prints_what_came_back() {
         !command("PreToolUse").contains(" >/dev/null"),
         "the decision was thrown away"
     );
-    for reporting in ["PostToolUse", "Stop", "SubagentStop", "Notification"] {
+    for reporting in [
+        "PostToolUse",
+        "Stop",
+        "SubagentStop",
+        "Notification",
+        "SessionStart",
+        "SessionEnd",
+    ] {
         assert!(
             command(reporting).contains(" >/dev/null"),
             "{reporting} prints a reply nobody reads back into the turn"

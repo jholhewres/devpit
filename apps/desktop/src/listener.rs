@@ -116,13 +116,18 @@ fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
         | Event::Used { .. }
         | Event::SubagentStarted { .. }
         | Event::Delegated { .. }
-        | Event::SubagentDone { .. } => "working",
-        Event::Stopped { .. } => "done",
+        | Event::SubagentDone { .. } => Some("working"),
+        Event::Stopped { .. } => Some("done"),
         // The one worth interrupting somebody for: nothing moves until a
         // person comes back to it.
-        Event::Waiting => "waiting",
+        Event::Waiting => Some("waiting"),
+        // These say which conversation the pane holds, not whether it works.
+        Event::SessionStarted | Event::SessionEnded { .. } => None,
     };
-    let _ = app.emit("terminal:happening", agent_said(pane, state));
+    crate::restoring::remember(pane, happening);
+    if let Some(state) = state {
+        let _ = app.emit("terminal:happening", agent_said(pane, state));
+    }
     if let Some(session) = session_said(pane, happening) {
         let _ = app.emit("terminal:happening", session);
     }
@@ -134,7 +139,7 @@ fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
     // you can watch; one that has stopped and is waiting for a person is the
     // reason somebody left the window and the reason to call them back. The
     // other two would be a bell that rings through every turn.
-    if state == "waiting" {
+    if state == Some("waiting") {
         crate::notices::ring(
             app,
             None,
@@ -176,6 +181,8 @@ fn describe(happening: &Happening) -> (String, String) {
         Event::Delegated { .. } => "handed work to a subagent".to_owned(),
         Event::SubagentDone { .. } => "a subagent finished".to_owned(),
         Event::Waiting => "waiting on you".to_owned(),
+        Event::SessionStarted => "started a session".to_owned(),
+        Event::SessionEnded { .. } => "ended the session".to_owned(),
     };
     (happening.session_id.clone(), said)
 }

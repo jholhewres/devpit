@@ -165,10 +165,19 @@ fn load_or_create(project_id: &str, tab_id: &str, cwd: &Path) -> Result<SessionL
 
     if let Some((tree, focused)) = store.pane_layout(project_id, tab_id)? {
         let layout = decode(project_id, &tree, &focused)?;
+        // A window missing before this is one tmux lost with its server, not
+        // one closed on purpose — closing forgets the pane's layout too.
+        let had = match server.has_session(&session).map_err(tmux_err)? {
+            true => server.list_windows(&session).map_err(tmux_err)?,
+            false => Vec::new(),
+        };
         for (leaf_id, _) in layout.tree.leaves() {
             server
                 .ensure_session(&session, leaf_id, cwd)
                 .map_err(tmux_err)?;
+            if !had.iter().any(|name| name == leaf_id) {
+                crate::restoring::start_again(&store, &session, leaf_id);
+            }
         }
         return Ok(layout);
     }

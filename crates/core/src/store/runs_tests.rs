@@ -135,7 +135,12 @@ fn rows_the_old_sweep_wrote_become_lost_and_nothing_else_moves() {
     store
         .finish_run(&real, "failed", Some("exit 1"), None, None, Some(1))
         .expect("finish");
-    // Back to the version before it, so opening runs migration 10 over these rows.
+    // Back to the version before it, so opening runs migration 10 over these
+    // rows. What later migrations added goes too, or rerunning them collides.
+    store
+        .conn()
+        .execute_batch("DROP TABLE pane_agent;")
+        .expect("drop later tables");
     store
         .conn()
         .pragma_update(None, "user_version", 9)

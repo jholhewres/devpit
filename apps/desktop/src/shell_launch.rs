@@ -361,11 +361,15 @@ pub async fn session_launch_agent(
     // and no label is a cosmetic loss, and a label on a pane where the launch
     // failed is a lie.
     let _ = server.name_pane(&target, &profile_id(&agent_id));
+    // Remembered so the pane can start it again if tmux loses the window.
+    if let Ok(store) = crate::sessions::store() {
+        let _ = store.remember_pane_launch(&project_id, &pane_id, &agent_id);
+    }
     Ok(line)
 }
 
 /// The profile id to record on a pane, empty for a built-in agent.
-fn profile_id(id: &str) -> String {
+pub(crate) fn profile_id(id: &str) -> String {
     match profile_names().contains_key(id) {
         true => id.to_owned(),
         false => String::new(),
@@ -402,7 +406,7 @@ fn launch_line(launch: &str, settings_flag: Option<&str>) -> String {
 /// A profile becomes `NAME='value' program --flags`; a built-in agent is the
 /// bare word it always was. Either way the hook flag is appended last, because
 /// it is about this launch and not about the account.
-fn to_start(id: &str) -> Result<String, RpcError> {
+pub(crate) fn to_start(id: &str) -> Result<String, RpcError> {
     if let Ok(store) = crate::projects::store() {
         if let Ok(profiles) = crate::agent_profiles::all(&store) {
             if let Some(found) = profiles.iter().find(|one| one.id == id && one.mine) {
@@ -449,7 +453,7 @@ fn hook_settings() -> Option<String> {
 }
 
 /// Whether a pane is ready to be typed into.
-enum Ready {
+pub(crate) enum Ready {
     /// A shell, at its prompt, waiting on the keyboard.
     Prompt,
     /// Something else is in front of it, named.
@@ -469,7 +473,7 @@ const AT_MOST: std::time::Duration = std::time::Duration::from_secs(8);
 /// How often to look, and how long a rest has to hold before it counts.
 const BETWEEN_LOOKS: std::time::Duration = std::time::Duration::from_millis(90);
 
-fn settled(session: &str, pane_id: &str) -> Ready {
+pub(crate) fn settled(session: &str, pane_id: &str) -> Ready {
     let Ok(server) = crate::sessions::tmux_server() else {
         return Ready::Unknown;
     };

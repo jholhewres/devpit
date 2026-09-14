@@ -34,6 +34,10 @@ pub fn settings_json(endpoint_file: &Path) -> String {
         ("Stop", &tell),
         ("SubagentStop", &tell),
         ("Notification", &tell),
+        // Which session a pane's agent is in, and when it has gone, so a pane
+        // tmux lost can start it again on the same conversation.
+        ("SessionStart", &tell),
+        ("SessionEnd", &tell),
     ]
     .iter()
     .map(|(event, command)| {

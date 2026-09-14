@@ -7,6 +7,7 @@ mod cards;
 mod layouts;
 mod migrations;
 mod notes;
+pub mod pane_agents;
 pub mod project_runs;
 mod projects;
 mod runs;
