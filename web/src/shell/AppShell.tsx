@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react'
 import './shell.css'
 import { ContextMenu } from './ContextMenu'
 import { ask, commands } from './live'
+import { Grips } from './Grips'
 import { Onboarding } from './Onboarding'
 import { Overlays } from './Overlays'
 import { Panes } from './Panes'
 import { ResizeEdges } from './ResizeEdges'
 import { RightPanel } from './RightPanel'
 import { Sidebar } from './Sidebar'
+import { StatusStrip } from './StatusStrip'
 import { TopBar } from './TopBar'
 import { ShellProvider, useShell } from './useShell'
 import { isMaximized, onResized } from './window'
@@ -32,7 +34,7 @@ export function AppShell(): React.JSX.Element {
  */
 function Window(): React.JSX.Element {
   const shell = useShell()
-  const { side, files, signedIn, projects, palette, openPalette, closePalette } = shell
+  const { side, files, widths, signedIn, projects, palette, openPalette, closePalette } = shell
   const [signIn, setSignIn] = useState(false)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
@@ -90,7 +92,19 @@ function Window(): React.JSX.Element {
   }, [shell, palette, openPalette, closePalette])
 
   return (
-    <div className="app" data-max={String(maximized)}>
+    <div
+      className="app"
+      data-max={String(maximized)}
+      /* On the shell and not on the grid: the top bar's lead is the same
+         width as the sidebar, and it is not inside the grid. One variable,
+         two readers. */
+      style={
+        {
+          '--sidebar-w': `${widths.sidebar}px`,
+          '--files-w': `${widths.files}px`,
+        } as React.CSSProperties
+      }
+    >
       <ResizeEdges />
       <ContextMenu />
       <TopBar onAddProject={() => setAdding(true)} />
@@ -99,7 +113,10 @@ function Window(): React.JSX.Element {
         <Sidebar onSearch={openPalette} onSignIn={() => setSignIn(true)} />
         <Panes onOpenFile={openInTab} />
         <RightPanel onOpenFile={openInTab} />
+        <Grips />
       </div>
+
+      <StatusStrip />
 
       {/* No project, nothing to show: the setup screen is the empty state. */}
       {projects.length === 0 && (

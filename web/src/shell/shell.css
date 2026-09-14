@@ -66,12 +66,57 @@
 .branch__n { font-family: var(--mono); font-size: 11.5px; }
 .branch__ahead { font-family: var(--mono); font-size: 10.5px; color: var(--success); font-variant-numeric: tabular-nums; }
 
-.win { display: grid; grid-template-columns: var(--sidebar-w) minmax(360px, 1fr) var(--files-w); flex: 1; min-height: 0; overflow: hidden; }
+.win { position: relative; display: grid; grid-template-columns: var(--sidebar-w) minmax(360px, 1fr) var(--files-w); flex: 1; min-height: 0; overflow: hidden; }
+/* On the seam, not in the grid: an edge that were a column of its own would be
+   a column the layout has to make room for. Four pixels wide with a wider
+   invisible reach, because a hairline is a target nobody can hit.
+
+   `seam` and not `grip`, which is what the eight edges a frameless window is
+   pulled by have been called since long before this existed. Naming this one
+   `grip` too put a second bare `.grip { }` further down the sheet, and every
+   window edge quietly stopped being fixed at z-index 200. A window that could
+   only be resized sideways is what that looked like. */
+.seam { position: absolute; top: 0; bottom: 0; width: 9px; z-index: 3; cursor: col-resize; touch-action: none; }
+.seam[data-panel='sidebar'] { left: calc(var(--sidebar-w) - 4px); }
+.seam[data-panel='files'] { right: calc(var(--files-w) - 4px); }
+.seam::after { content: ''; position: absolute; inset: 0 4px; background: var(--accent); opacity: 0; transition: opacity 120ms ease; }
+.seam:hover::after, .seam:focus-visible::after { opacity: 0.55; }
+.seam:focus-visible { outline: none; }
 .win[data-files='closed'] { grid-template-columns: var(--sidebar-w) 1fr 0; }
 .win[data-side='closed'] { grid-template-columns: 0 1fr var(--files-w); }
 .win[data-side='closed'][data-files='closed'] { grid-template-columns: 0 1fr 0; }
 
 .drag { flex: 1; height: 100%; }
+
+/* A strip along the bottom, saying what is running.
+ 
+   It answers one question without being asked — is something eating this
+   machine — which people otherwise answer by opening another program. Two
+   numbers and a count; everything else is behind a click. */
+.strip { position: relative; flex: none; height: 24px; display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; border-top: 1px solid var(--border); background: var(--sidebar); }
+.strip__go { height: 20px; padding: 0 7px; border-radius: 5px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); }
+.strip__go:hover { background: var(--overlay); color: var(--text-2); }
+.strip__n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.strip__c { color: var(--ghost); }
+/* The total might be an overcount, so it says so rather than hoping nobody
+   asks. Resident memory overstates a process tree by half. */
+.strip__warn { color: var(--warning); }
+
+/* The monitor, over the strip that opened it. */
+.hud { position: absolute; right: 8px; bottom: 26px; width: 320px; max-height: 60vh; overflow-y: auto; z-index: 60; padding: 10px 12px 10px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border); box-shadow: 0 12px 32px var(--shade-deep); scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.hud__top { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
+.hud__t { font-size: 12.5px; color: var(--text); }
+.hud__sum { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.hud__warn { color: var(--warning); }
+.hudrow { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 7px 0; border-top: 1px solid var(--border); }
+.hudrow:hover { background: var(--overlay); }
+.hudrow__ico { width: 22px; height: 22px; flex: none; border-radius: 6px; background: var(--overlay); display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+.hudrow__body { flex: 1; min-width: 0; }
+.hudrow__n { display: block; font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hudrow__d { display: block; margin-top: 2px; font-size: 11px; color: var(--ghost); }
+.hudrow__cpu, .hudrow__mem { flex: none; font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.hudrow__mem { width: 62px; text-align: right; }
+.hudrow__cpu { width: 46px; text-align: right; }
 
 .sq26 { width: 26px; height: 26px; flex: none; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .sq26:hover { background: var(--overlay); }
@@ -478,8 +523,18 @@ body[data-account='out'] .acct { display: none; }
 
 /* The strip lists what is open, in the order it was opened: the newest
    lands on the right and a tab keeps the place it was given. */
-.tabs { display: flex; align-items: center; gap: 3px; flex: none; min-width: 0; overflow: hidden; }
-.tab { height: 30px; padding: 0 7px 0 11px; border-radius: 7px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; white-space: nowrap; flex: none; }
+/* `flex: 0 1 auto` and not `flex: none`: the strip is allowed to give up
+   width, which is what stops eight open files from pushing the branch chip and
+   the bell off the edge of the window. What it gives up, it scrolls. */
+.tabs { display: flex; align-items: center; gap: 3px; flex: 0 1 auto; min-width: 0; }
+.tabs__rail { display: flex; align-items: center; gap: 3px; min-width: 0; overflow-x: auto; overflow-y: hidden; scroll-behavior: smooth; }
+/* No visible bar: it would eat a third of a 30px strip to say something the
+   strip already says by being cut off. Wheel and trackpad still scroll it. */
+.tabs__rail { scrollbar-width: none; }
+.tabs__rail::-webkit-scrollbar { display: none; }
+/* One long filename must not be allowed to take the whole strip. */
+.tab__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab { max-width: 190px; height: 30px; padding: 0 7px 0 11px; border-radius: 7px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; white-space: nowrap; flex: none; }
 /* Closed panes are not listed; what you can open lives in the sidebar. */
 .tab[aria-pressed='false'] { display: none; }
 .tab__x { width: 17px; height: 17px; margin-left: 2px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
@@ -606,10 +661,20 @@ body[data-account='out'] .acct { display: none; }
 /* Wider than prose: these panes are rows of controls, and a 780px column
    pushed four buttons and two numbers into the same handspan. */
 .prefs__in { max-width: 1080px; margin: 0 auto; padding: 34px 36px 60px; }
+/* Every section is apart from the next, whatever kind it is.
+ 
+   This used to be `.pref + .pref`, which only ever separated two switch rows:
+   a card after a switch, a switch after a card, or two cards in a row got
+   nothing and the pane read as one block with seams in it. The rule is about
+   the pane's children, not about which of them happen to be the same type. */
+.prefs__in > * + * { margin-top: 10px; }
+/* A heading opens a group, so it keeps its own distance from what follows and
+   takes a bigger one from what came before. */
+.prefs__in > .prefs__h + * { margin-top: 0; }
+.prefs__in > * + .prefs__h { margin-top: 30px; }
 .prefs__h { font-size: 19px; font-weight: 550; letter-spacing: -0.01em; color: var(--text); margin: 0 0 18px; }
 
 .pref { display: flex; align-items: flex-start; gap: 16px; width: 100%; text-align: left; padding: 14px 16px; background: var(--raised); border-radius: 10px; }
-.pref + .pref { margin-top: 8px; }
 .pref__body { flex: 1; min-width: 0; }
 .pref__t { display: block; font-size: 13.5px; color: var(--text); }
 .pref__d { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
@@ -620,7 +685,7 @@ body[data-account='out'] .acct { display: none; }
 
 /* Providers: agent CLIs on this machine. A row says whether it is there
    at all before it offers a switch — the same rule as a plugin. */
-.card2 { background: var(--raised); border-radius: 10px; padding: 14px 16px 6px; }
+.card2 { background: var(--raised); border-radius: 10px; padding: 14px 16px 8px; }
 .card2__top { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 12px; }
 .card2__t { font-size: 13.5px; color: var(--text); }
 .card2__d { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
@@ -628,7 +693,31 @@ body[data-account='out'] .acct { display: none; }
 .card2__go:hover { color: var(--text); }
 .card2__when { margin-top: 6px; font-size: 11px; color: var(--ghost); text-align: right; }
 
-.prov { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 9px 0; border-top: 1px solid var(--border); }
+/* The default picker: chips that wrap, because twelve agents do not fit on a
+   line and a row that scrolls sideways hides the one you are looking for. */
+/* The mark takes the row's colour; only the dot says whether it is here. */
+.prov__ico .agmark { color: var(--text-2); }
+.prov--off .prov__ico .agmark { color: var(--ghost); }
+
+/* Why this one will not start, under what it would have run. */
+.prov__note { color: var(--warning); }
+
+.agpick { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; }
+/* Each chip is as wide as its own name. They were built on `.segb`, which is
+   `flex: 1` because a segmented control divides a fixed width evenly — so six
+   agents came out as six equal columns filling the row, which reads as one
+   control with six parts rather than as six things you pick between. */
+.agpick__o { flex: none; height: 30px; padding: 0 11px; border-radius: 8px; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); background: var(--overlay); border: 1px solid transparent; }
+.agpick__o:hover { background: var(--overlay-strong); color: var(--text); }
+.agpick__o[aria-checked='true'] { background: var(--raised); color: var(--text); border-color: var(--border-strong); }
+.agpick__o .agmark { color: var(--text-3); }
+.agpick__o[aria-checked='true'] .agmark { color: var(--accent); }
+.agpick__on { color: var(--accent); font-size: 11px; }
+/* Two words, not two paragraphs: this one sits inside a row, not above one. */
+.seg--tight { flex: none; height: 26px; margin: 0; }
+.seg--tight .segb { flex: none; padding: 0 9px; font-size: 11.5px; }
+
+.prov { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px 0; border-top: 1px solid var(--border); }
 .prov__ico { width: 26px; height: 26px; flex: none; border-radius: 7px; background: var(--overlay); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--text-2); position: relative; }
 .prov__dot { position: absolute; bottom: -1px; right: -1px; width: 7px; height: 7px; border-radius: 50%; border: 2px solid var(--raised); }
 .prov__body { flex: 1; min-width: 0; }
@@ -636,7 +725,7 @@ body[data-account='out'] .acct { display: none; }
 .prov__n { font-size: 13px; color: var(--text); }
 .prov--off .prov__n { color: var(--text-3); }
 .prov__v { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
-.prov__sub { display: block; margin-top: 2px; font-family: var(--mono); font-size: 11px; color: var(--ghost); }
+.prov__sub { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--ghost); }
 .prov__chev { flex: none; color: var(--ghost); }
 
 /* Skills, in settings: a list you filter and one definition open beside
@@ -1069,7 +1158,10 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 /* Two views of the same tree: everything, or only what moved. Tabs
    rather than a filter toggle, because "what did I change" is a question
    you come back to, not a lens you leave on. */
-.rtab { height: 26px; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); }
+/* An icon and, when there is one, a count. The name is the tooltip: three
+   words plus two counts took the whole width of a panel that can now be
+   dragged narrow. */
+.rtab { height: 26px; min-width: 30px; padding: 0 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12.5px; color: var(--text-3); }
 .rtab:hover { color: var(--text-2); }
 .rtab[aria-selected='true'] { background: var(--sidebar-item); color: var(--text); }
 .rtab__n { font-family: var(--mono); font-size: 10.5px; color: var(--ghost); font-variant-numeric: tabular-nums; }
@@ -1095,12 +1187,15 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
    itself as a tree. The message box sits above the list because you
    write the sentence while you are still reading what you changed. */
 .git { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.git__head { flex: none; padding: 8px 10px 0; }
+/* The whole compose block, at the top. The message used to sit under a list
+   forty rows long, so the field you were composing in moved as you read and
+   was off the screen by the time you had read it. */
+.git__head { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 10px; border-bottom: 1px solid var(--border); }
 .git__row { display: flex; align-items: center; gap: 6px; }
 .pr { height: 26px; padding: 0 10px; border-radius: 7px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); background: var(--overlay-strong); }
 .pr:hover { background: color-mix(in srgb, var(--accent) 18%, var(--overlay-strong)); }
-.git__branch { margin-top: 9px; font-family: var(--mono); font-size: 12px; color: var(--text); }
-.git__up { margin-top: 3px; display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--gauge); }
+.git__branch { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.git__up { margin-left: auto; display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--gauge); }
 .git__up svg { color: var(--text-3); }
 
 .msg { margin: 10px 0 0; border: 1px solid var(--border); border-radius: 9px; background: var(--inset); padding: 9px 10px; display: flex; align-items: flex-start; gap: 8px; min-height: 62px; }
@@ -1133,6 +1228,24 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .gitrow--file .gitrow__n, .gitrow--new .gitrow__n { color: var(--text); }
 .gitrow__end { flex: none; margin-left: auto; padding-left: 8px; display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .gitrow__n2 { flex: none; margin-left: auto; padding-left: 8px; font-size: 11px; color: var(--ghost); font-variant-numeric: tabular-nums; }
+/* A folder is chrome and its files are the content, so the folder recedes —
+   the eye should land on what changed, not on where it lives. */
+.gitrow--dir .gitrow__n { color: var(--text-3); }
+.gitrow--dir:hover .gitrow__n { color: var(--text-2); }
+/* The chevron turns rather than swapping for a second glyph: one shape that
+   moves reads as the same control in two states. */
+.gitrow__chev { transition: transform 120ms ease; }
+.gitrow__chev[data-open='true'] { transform: rotate(90deg); }
+.gitrow__all { margin: 0 10px 4px auto; display: block; font-size: 11px; color: var(--ghost); }
+.gitrow__all:hover { color: var(--text-2); }
+/* The actions sit over the row and appear under the pointer. Two buttons on
+   every one of forty rows is eighty things competing with the names, which
+   are what the panel is for. Focus brings them back for the keyboard, and a
+   machine with no hover keeps them. */
+.gitrow { position: relative; }
+.gitrow__does { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 14px; background: linear-gradient(to right, transparent, var(--sidebar-item) 14px); opacity: 0; pointer-events: none; transition: opacity 100ms ease; }
+.gitrow:hover .gitrow__does, .gitrow__does:focus-within { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .gitrow__does { opacity: 1; pointer-events: auto; } }
 
 .commits { flex: none; height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 10px; border-top: 1px solid var(--border); }
 .commits__t { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-2); }
@@ -1247,6 +1360,12 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .row__g--modified { color: var(--warning); }
 .row__g--added, .row__g--untracked { color: var(--success); }
 .row__g--deleted { color: var(--danger); }
+/* Git is not watching this one. A tree that draws `target` and `node_modules`
+   exactly like `src` is a tree where the three rows that matter are lost among
+   the ones that never will — so they recede rather than disappearing, because
+   they are still on disk and still worth opening. */
+.row[data-ignored] .row__n, .row[data-ignored] .row__ico { opacity: 0.45; }
+.row[data-ignored]:hover .row__n, .row[data-ignored]:hover .row__ico { opacity: 0.75; }
 
 /* The padding is on `.xterm`, not on the box around it, and that is not a
    style choice. FitAddon sizes the grid from the *parent's* computed height
@@ -1337,13 +1456,21 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .md__diagram { margin: 0 0 12px; display: flex; justify-content: center; }
 
 /* Changes: three groups, because a commit takes one of them. */
-.git__group { padding: 8px 12px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); display: flex; gap: 6px; }
-.git__group span { color: var(--ghost); }
-.gitrow__open { flex: 1; min-width: 0; display: flex; text-align: left; padding: 0; background: none; color: inherit; font: inherit; }
+/* The section's own action sits beside its name. `Unstage all` used to be a
+   chip at the top that applied to a group two screens down. */
+.git__group { padding: 10px 10px 4px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+.git__count { color: var(--ghost); }
+.git__group .gitrow__act { margin-left: auto; opacity: 0; transition: opacity 100ms ease; }
+.git__group:hover .gitrow__act, .git__group .gitrow__act:focus-visible { opacity: 1; }
+.gitrow__open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; text-align: left; padding: 0; background: none; color: inherit; font: inherit; }
 .gitrow__act { width: 18px; height: 18px; border-radius: 4px; color: var(--text-3); font-size: 13px; line-height: 1; }
 .gitrow__act:hover { background: var(--overlay); color: var(--text); }
 .gitrow__act:disabled { opacity: .4; }
-.git__commit { flex: none; padding: 8px 12px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+/* Full width, because it is the one thing the panel is asking you to do. */
+.git__go { width: 100%; justify-content: center; }
+/* Why a button will not go. A disabled control that does not explain itself
+   is a dead end. */
+.git__why { font-size: 11.5px; line-height: 1.5; color: var(--text-3); }
 .git__msg { min-height: 56px; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--composer); color: var(--text); font-family: inherit; font-size: 12.5px; resize: vertical; outline: none; }
 .git__msg::placeholder { color: var(--ghost); }
 .btn:disabled, .btn--go:disabled { opacity: .45; cursor: default; }

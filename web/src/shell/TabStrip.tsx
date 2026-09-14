@@ -1,10 +1,10 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
 import { AgentMark } from './AgentMark'
 import { paneMeta } from './paneList'
 import { Rename } from './Rename'
 import { busyIn, doingIn } from './running'
-import { short, twice, type Clicked, type Tab } from './strip'
+import { twice, type Clicked, type Tab } from './strip'
 import { useShell } from './useShell'
 
 /*
@@ -60,7 +60,11 @@ export function TabStrip(): React.JSX.Element {
 
   /* Long enough to tell two chats apart, short enough that six tabs still
      fit across the strip. */
-  const label = (tab: Tab): string => short(named(tab), 22)
+  /* The whole name. It used to be cut at 22 characters here, which cut it
+     whether or not there was room — with one tab open and half the window
+     free, `App.tsx · very-long-branch` still lost its tail. The strip now
+     trims with CSS, which trims only when it has to. */
+  const label = named
 
   /* What the tab is called, which is not always what it was named.
 
@@ -93,8 +97,36 @@ export function TabStrip(): React.JSX.Element {
     )
   }
 
+  /* Picked from the palette or with ⌘K, the tab that becomes active can be
+     one the strip has scrolled past. Selecting something you cannot see is
+     the failure the scrolling introduced, so it is undone here. */
+  useEffect(() => {
+    if (!active) return
+    strip.current
+      ?.querySelector(`[data-tab="${CSS.escape(active.id)}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [active])
+
   return (
-    <div className="tabs" role="group" aria-label="Panes" ref={strip} onPointerMove={onMove}>
+    <div className="tabs">
+      {/* The rail scrolls and the plus does not. `.tabs` was `flex: none`, so
+          with eight files open it never shrank and pushed the branch chip and
+          the bell off the right edge of the window. A strip that scrolls is
+          the limit; the plus stays reachable because it is outside it. */}
+      <div
+        className="tabs__rail"
+        role="group"
+        aria-label="Panes"
+        ref={strip}
+        onPointerMove={onMove}
+        onWheel={(event) => {
+          /* A wheel with no sideways travel is somebody scrolling a strip
+             that only goes sideways. Every editor does this; without it a
+             mouse can only reach the far tabs by dragging. */
+          if (event.deltaX !== 0) return
+          event.currentTarget.scrollLeft += event.deltaY
+        }}
+      >
       {open.map((tab) =>
         /* Renaming swaps the whole tab for a field: an input inside a button
            is neither valid nor operable — the button swallows the click that
@@ -143,7 +175,7 @@ export function TabStrip(): React.JSX.Element {
           }}
         >
           {icon(tab)}
-          {label(tab)}
+          <span className="tab__n">{label(tab)}</span>
           {/* Something is running here and it is not an agent. The name stays
               the tab's own; the dot is the whole message. */}
           {busyIn(running, tab)?.agent === null && <i className="tab__dot" aria-hidden="true" />}
@@ -163,6 +195,8 @@ export function TabStrip(): React.JSX.Element {
         </button>
         ),
       )}
+
+      </div>
 
       {/* Anything new, where every terminal app puts the plus.
 

@@ -55,12 +55,15 @@ export function busyIn(
 /**
  * What a close has to warn about, or nothing when the tab is idle.
  *
- * `agent` and `command` rather than a boolean, because the two closes are
- * different sentences: stopping an agent mid-task and stopping a build are not
- * the same loss, and a prompt that words them alike teaches people to click
- * through it.
+ * `agent`, `command` and `unsaved` rather than a boolean, because the three
+ * closes are different sentences: stopping an agent mid-task, stopping a
+ * build, and throwing away what somebody typed are not the same loss, and a
+ * prompt that words them alike teaches people to click through it.
  */
-export type Stops = { readonly kind: 'agent' | 'command'; readonly label: string }
+export type Stops = {
+  readonly kind: 'agent' | 'command' | 'unsaved'
+  readonly label: string
+}
 
 export function stopsOnClose(
   running: readonly PaneRunning[],

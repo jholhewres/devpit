@@ -45,20 +45,41 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
 
   return (
     <aside className="rp">
+      {/* Icons, with the name in the tooltip and on the label. Three words
+          plus two counts took the whole width of a panel somebody has just
+          been given a handle to make narrower — and the panel is the content,
+          not its own table of contents. */}
       <div className="rp__bar">
-        <button className="rtab" aria-selected={view === 'tree'} onClick={() => setView('tree')}>
-          <Icon d={FOLDER} size={14} />
-          Explorer
-          <span className="rtab__n">{tree.nodes.length}</span>
+        <button
+          className="rtab"
+          aria-selected={view === 'tree'}
+          title="Explorer"
+          aria-label="Explorer"
+          onClick={() => setView('tree')}
+        >
+          <Icon d={FOLDER} size={15} />
+          {tree.nodes.length > 0 && <span className="rtab__n">{tree.nodes.length}</span>}
         </button>
-        <button className="rtab" aria-selected={view === 'changes'} onClick={() => setView('changes')}>
-          <Icon d={UPLOAD} size={14} />
-          Changes
-          <span className="rtab__n">{tree.changes.length}</span>
+        <button
+          className="rtab"
+          aria-selected={view === 'changes'}
+          title="Changes"
+          aria-label="Changes"
+          onClick={() => setView('changes')}
+        >
+          <Icon d={UPLOAD} size={15} />
+          {/* A zero is not news. The count is here to say there is something
+              to look at, and `0` says the opposite while taking the room. */}
+          {tree.changes.length > 0 && <span className="rtab__n">{tree.changes.length}</span>}
         </button>
-        <button className="rtab" aria-selected={view === 'history'} onClick={() => setView('history')}>
-          <Icon d={CLOCK} size={14} />
-          History
+        <button
+          className="rtab"
+          aria-selected={view === 'history'}
+          title="History"
+          aria-label="History"
+          onClick={() => setView('history')}
+        >
+          <Icon d={CLOCK} size={15} />
         </button>
       </div>
 

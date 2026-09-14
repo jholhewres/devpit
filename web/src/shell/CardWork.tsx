@@ -4,7 +4,7 @@ import type { Checkout, Run } from '../gen/bindings'
 import { AgentMark } from './AgentMark'
 import { ask, commands } from './live'
 import { OpenIn } from './OpenIn'
-import { useKnownAgents } from './useKnownAgents'
+import { offered, useKnownAgents } from './useKnownAgents'
 import { useOpeners } from './useOpeners'
 import { useShell } from './useShell'
 import { money } from './chat'
@@ -40,7 +40,8 @@ export function CardWork({
   onTerminalOpened?: () => void
 }): React.JSX.Element {
   const { project, show } = useShell()
-  const agents = useKnownAgents()
+  /* Only what Settings still offers. */
+  const agents = offered(useKnownAgents())
   const openers = useOpeners()
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)

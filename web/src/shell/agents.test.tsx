@@ -248,3 +248,70 @@ describe('what the agent says it is doing', () => {
     expect(screen.getByText('Claude Code')).toBeTruthy()
   })
 })
+
+/*
+ * The strip with more tabs than fit.
+ *
+ * It was `flex: none`, so it never gave up width: with eight files open it
+ * pushed the branch chip and the notice bell off the right edge of the window.
+ */
+describe('a strip with more tabs than room', () => {
+  const many = (): Tab[] =>
+    Array.from({ length: 9 }, (_, at) =>
+      term({ id: `t${at}`, title: `file-with-a-long-name-${at}.tsx`, panes: [`leaf_${at}`] }),
+    )
+
+  it('keeps the tabs in a rail of their own', () => {
+    shell.open = many()
+    const { container } = render(<TabStrip />)
+    expect(container.querySelector('.tabs__rail')).toBeTruthy()
+  })
+
+  it('leaves the plus outside the rail, so it never scrolls away', () => {
+    shell.open = many()
+    const { container } = render(<TabStrip />)
+    const plus = container.querySelector('.tab--new')!
+    expect(plus.closest('.tabs__rail')).toBeNull()
+    expect(plus.closest('.tabs')).toBeTruthy()
+  })
+
+  it('does not count the plus as a tab when reordering', () => {
+    // The drag lands on an index read from the rail's children. With the plus
+    // inside, dropping past the last tab could aim at the button.
+    shell.open = many()
+    const { container } = render(<TabStrip />)
+    const rail = container.querySelector('.tabs__rail')!
+    expect(rail.children).toHaveLength(9)
+  })
+
+  it('gives the label an element of its own, and the whole name to trim', () => {
+    // It used to be cut at 22 characters in JavaScript, which cut it whether
+    // or not there was room. The element is what lets CSS trim it only when
+    // the tab is actually too narrow.
+    shell.open = [term({ title: 'a-very-long-filename-indeed.tsx' })]
+    const { container } = render(<TabStrip />)
+    expect(container.querySelector('.tab__n')?.textContent).toBe('a-very-long-filename-indeed.tsx')
+  })
+
+  it('puts the whole name in the tooltip too', () => {
+    shell.open = [term({ title: 'a-very-long-filename-indeed.tsx' })]
+    const { container } = render(<TabStrip />)
+    expect(container.querySelector('.tab')?.getAttribute('title')).toBe(
+      'a-very-long-filename-indeed.tsx',
+    )
+  })
+
+  it('brings the active tab into view rather than leaving it scrolled past', () => {
+    // Picked from the palette, the tab that becomes active can be one the
+    // strip has scrolled past. Selecting something nobody can see is the
+    // failure the scrolling introduced.
+    const brought: string[] = []
+    Element.prototype.scrollIntoView = function (this: Element) {
+      brought.push(this.getAttribute('data-tab') ?? '')
+    }
+    shell.open = many()
+    shell.active = shell.open[7]!
+    render(<TabStrip />)
+    expect(brought).toContain('t7')
+  })
+})

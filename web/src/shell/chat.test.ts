@@ -84,16 +84,24 @@ describe('which profile the composer may use', () => {
     command: id,
     driver: 'claude',
     path,
+    reach: path === null ? 'missing' : 'runnable',
     models: ['default'],
   })
 
-  it('offers every installed profile before the first turn', () => {
+  const shellOnly = (id: string): Profile => ({ ...profile(id, null), reach: 'shell_only' })
+
+  it('offers every runnable profile before the first turn', () => {
     const all = [profile('claude', '/usr/bin/claude'), profile('claudin', '/usr/bin/claudin')]
     expect(choices(all, null).map((one) => one.id)).toEqual(['claude', 'claudin'])
   })
 
-  it('leaves out a profile that is not on the PATH', () => {
+  it('leaves out a profile nothing can start', () => {
     const all = [profile('claude', '/usr/bin/claude'), profile('codex', null)]
+    expect(choices(all, null).map((one) => one.id)).toEqual(['claude'])
+  })
+
+  it('leaves out a shell function, which the terminal can start and this cannot', () => {
+    const all = [profile('claude', '/usr/bin/claude'), shellOnly('glm')]
     expect(choices(all, null).map((one) => one.id)).toEqual(['claude'])
   })
 

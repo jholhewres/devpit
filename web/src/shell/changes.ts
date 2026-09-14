@@ -27,11 +27,6 @@ export function grouped(changes: readonly Change[]): Groups {
 export const stageable = (changes: readonly Change[]): string[] =>
   changes.filter((change) => !change.staged).map((change) => change.path)
 
-/* Whether committing does anything. Nothing staged means nothing to commit,
-   and a commit with an empty message is refused by the backend anyway. */
-export const committable = (changes: readonly Change[], message: string): boolean =>
-  changes.some((change) => change.staged) && message.trim().length > 0
-
 /* What discarding this status actually throws away — the three cases are not
    the same loss. A deleted file comes back exactly as HEAD has it, so
    restoring it loses nothing. A modified file also comes back as HEAD has

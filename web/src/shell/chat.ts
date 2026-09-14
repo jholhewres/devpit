@@ -76,8 +76,12 @@ export function choices(
   profiles: readonly Profile[],
   fixed: string | null,
 ): readonly Profile[] {
-  const installed = profiles.filter((profile) => profile.path !== null)
-  return fixed ? installed.filter((profile) => profile.id === fixed) : installed
+  // `runnable` and not merely installed: the composer spawns a process, and a
+  // profile the shell alone knows — a function in someone's `.zshrc` — has no
+  // process to spawn. The terminal can still open it, which is why the two are
+  // different answers.
+  const usable = profiles.filter((profile) => profile.reach === 'runnable')
+  return fixed ? usable.filter((profile) => profile.id === fixed) : usable
 }
 
 /* Whether the send button does anything. */

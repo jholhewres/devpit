@@ -1,0 +1,148 @@
+import { useMemo, useState } from 'react'
+
+import type { Change } from '../gen/bindings'
+import { foldered, folders, paths, type Node } from './changeTree'
+import { FileGlyph } from './FileGlyph'
+import { mark } from './tree'
+
+/*
+ * The changed files, drawn as the folders they are in.
+ *
+ * A flat list is fine for three files and unreadable for forty: `mod.rs` four
+ * times over tells you nothing, and the whole path on every row is a column of
+ * repeated prefixes in a panel narrow enough to be a sidebar.
+ *
+ * Open by default, and that is the point of the folding in `changeTree`:
+ * somebody opening this panel wants to see what changed, not to go looking for
+ * it. Closing is for putting aside a folder you have already read.
+ */
+
+export function ChangeRows({
+  changes,
+  staged,
+  busy,
+  onOpen,
+  onStage,
+  onDiscard,
+}: {
+  changes: readonly Change[]
+  /** Whether these are already in the index, which decides what the button on
+   *  a row does. */
+  staged: boolean
+  busy: boolean
+  onOpen: (path: string) => void
+  onStage: (paths: string[]) => void
+  onDiscard: (change: Change) => void
+}): React.JSX.Element {
+  const tree = useMemo(() => foldered(changes), [changes])
+  const [shut, setShut] = useState<ReadonlySet<string>>(() => new Set())
+
+  const rows = (nodes: readonly Node[], depth: number): React.JSX.Element[] =>
+    nodes.flatMap((node) => {
+      const pad = { paddingLeft: `${10 + depth * 12}px` }
+      if (node.kind === 'file') {
+        const { change } = node
+        return [
+          <div className="gitrow gitrow--file" key={change.path}>
+            <button className="gitrow__open" style={pad} onClick={() => onOpen(change.path)}>
+              {/* Coloured by the git status, so the shape says what kind of
+                  file and the colour says what happened to it. */}
+              <span className={`row__g--${change.status}`}>
+                <FileGlyph path={change.path} />
+              </span>
+              <span className="gitrow__n">{node.name}</span>
+            </button>
+            <span className="gitrow__end">
+              {change.added > 0 && <span className="add">+{change.added}</span>}
+              {change.removed > 0 && <span className="del">&minus;{change.removed}</span>}
+              <span className={`row__g row__g--${change.status}`}>{mark(change.status)}</span>
+            </span>
+            {/* Over the row and only while it is under the pointer. Two
+                buttons on every one of forty rows is eighty things competing
+                with the names, which are what the panel is for. */}
+            <span className="gitrow__does">
+              <button
+                className="gitrow__act"
+                disabled={busy}
+                onClick={() => onDiscard(change)}
+                title="Discard"
+                aria-label={`Discard ${change.path}`}
+              >
+                &#8634;
+              </button>
+              <button
+                className="gitrow__act"
+                disabled={busy}
+                onClick={() => onStage([change.path])}
+                title={staged ? 'Take out of the commit' : 'Put in the commit'}
+                aria-label={`${staged ? 'Unstage' : 'Stage'} ${change.path}`}
+              >
+                {staged ? '−' : '+'}
+              </button>
+            </span>
+          </div>,
+        ]
+      }
+
+      const open = !shut.has(node.path)
+      return [
+        <div className="gitrow gitrow--dir" key={node.path}>
+          <button
+            className="gitrow__open"
+            style={pad}
+            aria-expanded={open}
+            onClick={() =>
+              setShut((was) => {
+                const next = new Set(was)
+                if (open) next.add(node.path)
+                else next.delete(node.path)
+                return next
+              })
+            }
+          >
+            <span className="gitrow__chev" data-open={open}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </span>
+            <span className="gitrow__n">{node.name}</span>
+          </button>
+          <span className="gitrow__end">
+            <span className="gitrow__c">{node.files}</span>
+          </span>
+          {/* A folder acts on everything under it, which is the click this
+              panel was missing: staging nine files one at a time is nine
+              clicks for one decision. */}
+          <span className="gitrow__does">
+            <button
+              className="gitrow__act"
+              disabled={busy}
+              onClick={() => onStage(paths([node]))}
+              title={staged ? 'Take all of these out' : 'Put all of these in'}
+              aria-label={`${staged ? 'Unstage' : 'Stage'} everything in ${node.path}`}
+            >
+              {staged ? '−' : '+'}
+            </button>
+          </span>
+        </div>,
+        ...(open ? rows(node.children, depth + 1) : []),
+      ]
+    })
+
+  return (
+    <>
+      {/* Nothing to collapse when the tree is one row deep. */}
+      {folders(tree).length > 1 && (
+        <button
+          className="gitrow__all"
+          onClick={() =>
+            setShut((was) => (was.size > 0 ? new Set() : new Set(folders(tree))))
+          }
+        >
+          {shut.size > 0 ? 'Expand all' : 'Collapse all'}
+        </button>
+      )}
+      {rows(tree, 0)}
+    </>
+  )
+}

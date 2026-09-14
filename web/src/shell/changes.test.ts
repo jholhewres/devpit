@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Change } from '../gen/bindings'
-import { committable, discardLoses, grouped, stageable } from './changes'
+import { discardLoses, grouped, stageable } from './changes'
 
 const change = (path: string, staged: boolean, status: Change['status'] = 'modified'): Change =>
   ({ path, status, added: 1, removed: 0, staged })
@@ -34,20 +34,6 @@ describe('how the Changes panel is grouped', () => {
 describe('what Stage All takes', () => {
   it('takes everything not already in the index', () => {
     expect(stageable([change('a.rs', true), change('b.rs', false)])).toEqual(['b.rs'])
-  })
-})
-
-describe('whether committing does anything', () => {
-  it('does nothing with nothing staged', () => {
-    expect(committable([change('a.rs', false)], 'a message')).toBe(false)
-  })
-
-  it('does nothing with no message', () => {
-    expect(committable([change('a.rs', true)], '   ')).toBe(false)
-  })
-
-  it('commits when something is staged and there is a message', () => {
-    expect(committable([change('a.rs', true)], 'fix it')).toBe(true)
   })
 })
 

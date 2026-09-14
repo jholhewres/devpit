@@ -73,3 +73,11 @@ describe('what a reload means for a folder already fetched once', () => {
     expect(refreshChildren(true, false)).toBe('drop')
   })
 })
+
+describe('a path git is not watching', () => {
+  it('gets no letter, because there is no change to report', () => {
+    // `M`, `A` and `D` are things that happened. Nothing happened to an
+    // ignored file as far as git is concerned.
+    expect(mark('ignored')).toBeNull()
+  })
+})

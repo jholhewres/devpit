@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
 import { bytes } from './disk'
+import { Code } from './Code'
+import { ofPath } from './languages'
 import { ask, commands } from './live'
 import { Markdown } from './Markdown'
 import type { Tab } from './strip'
@@ -16,13 +18,21 @@ import { useShell } from './useShell'
  */
 
 export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { close, active } = useShell()
+  const { close, active, markUnsaved } = useShell()
   const path = tab.path ?? null
   const edit = useFile(path)
   const [preview, setPreview] = useState(true)
 
   const mine = active?.id === tab.id
   const kind = edit.file?.kind
+
+  /* The strip draws the cross and this pane holds the edit, so the answer to
+     "would closing lose anything" has to travel between them. Cleared on the
+     way out: a tab that closed is not a tab with unsaved work. */
+  useEffect(() => {
+    markUnsaved(tab.id, edit.dirty)
+    return () => markUnsaved(tab.id, false)
+  }, [tab.id, edit.dirty, markUnsaved])
 
   /* ⌘S saves the tab in front, and only that one. */
   useEffect(() => {
@@ -38,6 +48,7 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
   }, [mine, edit])
 
   const name = path?.split('/').pop() ?? 'No file open'
+  const editing = kind === 'text' || (kind === 'markdown' && !preview)
 
   return (
     <>
@@ -75,7 +86,7 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
         </div>
       )}
 
-      <div className="code">
+      <div className={editing ? 'code code--edit' : 'code'}>
         {!path && (
           <div className="exempty">
             <span className="exempty__t">No file open</span>
@@ -112,12 +123,11 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
 
         {kind === 'markdown' && preview && <Markdown source={edit.text} />}
 
-        {(kind === 'text' || (kind === 'markdown' && !preview)) && (
-          <textarea
-            className="code__edit"
-            spellCheck={false}
-            value={edit.text}
-            onChange={(event) => edit.change(event.target.value)}
+        {editing && (
+          <Code
+            text={edit.text}
+            language={path ? ofPath(path) : null}
+            onChange={edit.change}
           />
         )}
       </div>

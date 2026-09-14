@@ -1,11 +1,12 @@
 import { useState } from 'react'
 
 import type { Change } from '../gen/bindings'
-import { committable, grouped, stageable } from './changes'
+import { ChangeRows } from './ChangeRows'
+import { grouped, stageable } from './changes'
+import { counted, primary } from './primary'
 import { DiscardConfirm } from './DiscardConfirm'
 import { ask, commands } from './live'
 import { Skeleton } from './Skeleton'
-import { mark } from './tree'
 import { useShell } from './useShell'
 import type { UseTree } from './useTree'
 
@@ -30,6 +31,7 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
   const [discarding, setDiscarding] = useState<Change | null>(null)
 
   const groups = grouped(tree.changes)
+  const act1 = primary(tree.changes, message)
   const here = project?.worktrees.find((worktree) => worktree.current) ?? project?.worktrees[0]
 
   const act = (
@@ -65,36 +67,6 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
       .finally(() => setBusy(false))
   }
 
-  const Row = ({ change, staged }: { change: Change; staged: boolean }): React.JSX.Element => (
-    <div className="gitrow gitrow--file">
-      <button className="gitrow__open" onClick={() => openDiff(change.path)}>
-        <span className="gitrow__n">{change.path}</span>
-      </button>
-      <span className="gitrow__end">
-        {change.added > 0 && <span className="add">+{change.added}</span>}
-        {change.removed > 0 && <span className="del">&minus;{change.removed}</span>}
-        <span className={`row__g row__g--${change.status}`}>{mark(change.status)}</span>
-        <button
-          className="gitrow__act"
-          disabled={busy}
-          onClick={() => setDiscarding(change)}
-          title="Discard"
-          aria-label={`Discard ${change.path}`}
-        >
-          &#8634;
-        </button>
-        <button
-          className="gitrow__act"
-          disabled={busy}
-          onClick={() => (staged ? unstage([change.path]) : stage([change.path]))}
-          title={staged ? 'Take out of the commit' : 'Put in the commit'}
-        >
-          {staged ? '−' : '+'}
-        </button>
-      </span>
-    </div>
-  )
-
   const Group = ({
     title,
     rows,
@@ -107,38 +79,70 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
     rows.length === 0 ? null : (
       <>
         <div className="git__group">
-          {title} <span>{rows.length}</span>
+          <span>{title}</span>
+          <span className="git__count">{rows.length}</span>
+          {/* The section's own action, beside its name. `Unstage all` used to
+              be a chip at the top that applied to a group two screens down. */}
+          <button
+            className="gitrow__act"
+            disabled={busy}
+            onClick={() =>
+              staged
+                ? unstage(rows.map((change) => change.path))
+                : stage(rows.map((change) => change.path))
+            }
+            title={staged ? 'Take all of these out' : 'Put all of these in'}
+            aria-label={`${staged ? 'Unstage' : 'Stage'} everything ${title.toLowerCase()}`}
+          >
+            {staged ? '−' : '+'}
+          </button>
         </div>
-        {rows.map((change) => (
-          <Row key={change.path} change={change} staged={staged} />
-        ))}
+        <ChangeRows
+          changes={rows}
+          staged={staged}
+          busy={busy}
+          onOpen={openDiff}
+          onStage={staged ? unstage : stage}
+          onDiscard={setDiscarding}
+        />
       </>
     )
 
   return (
     <>
       <div className="git__head">
-        <span className="git__branch">{here?.branch ?? 'Changes'}</span>
-        <span className="git__up">
-          {here && here.ahead > 0 && <span>&uarr;{here.ahead}</span>}
-          {here && here.behind > 0 && <span>&darr;{here.behind}</span>}
-          <span className="add">+{tree.totals.added}</span>
-          <span className="del">&minus;{tree.totals.removed}</span>
-        </span>
+        <div className="git__row">
+          <span className="git__branch">{here?.branch ?? 'Changes'}</span>
+          <span className="git__up">
+            {here && here.ahead > 0 && <span>&uarr;{here.ahead}</span>}
+            {here && here.behind > 0 && <span>&darr;{here.behind}</span>}
+            <span className="add">+{counted(tree.totals.added)}</span>
+            <span className="del">&minus;{counted(tree.totals.removed)}</span>
+          </span>
+        </div>
+
+        {/* At the top, and that is the change: the message used to sit under a
+            list forty rows long, so the field you were composing in moved as
+            you read and was off the screen by the time you had read it. */}
+        <textarea
+          className="git__msg"
+          placeholder="What changed, and why"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          aria-label="Commit message"
+        />
+
+        {/* One button, not three. What it says is decided in `primary.ts`. */}
         <button
-          className="chip"
-          disabled={busy || groups.staged.length === 0}
-          onClick={() => unstage(groups.staged.map((change) => change.path))}
+          className="btn btn--go git__go"
+          disabled={busy || act1.disabled}
+          title={act1.why ?? undefined}
+          onClick={() => (act1.doing === 'stage' ? stage(stageable(tree.changes)) : commit())}
         >
-          Unstage all
+          {act1.label}
         </button>
-        <button
-          className="chip"
-          disabled={busy || stageable(tree.changes).length === 0}
-          onClick={() => stage(stageable(tree.changes))}
-        >
-          Stage all
-        </button>
+        {act1.why && <span className="git__why">{act1.why}</span>}
+        {said && <span className="git__why">{said}</span>}
       </div>
 
       <div className="git__body">
@@ -153,26 +157,6 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
         <Group title="Changed" rows={groups.changed} staged={false} />
         <Group title="Untracked" rows={groups.untracked} staged={false} />
       </div>
-
-      {tree.changes.length > 0 && (
-        <div className="git__commit">
-          <textarea
-            className="git__msg"
-            placeholder="What changed, and why"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            aria-label="Commit message"
-          />
-          <button
-            className="btn btn--go"
-            disabled={busy || !committable(tree.changes, message)}
-            onClick={commit}
-          >
-            Commit {groups.staged.length} file(s)
-          </button>
-          {said && <span className="exempty__d">{said}</span>}
-        </div>
-      )}
 
       {discarding && (
         <DiscardConfirm

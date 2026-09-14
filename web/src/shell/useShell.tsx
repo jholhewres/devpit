@@ -6,6 +6,7 @@ import type { PrefsPane, Shell, Theme } from './shape'
 import { useAccount } from './useAccount'
 import { useAgents } from './useAgents'
 import { useClosing } from './useClosing'
+import { useWidths } from './useWidths'
 import { useTabs } from './useTabs'
 import { useProjects } from './useProjects'
 import { useRunning } from './useRunning'
@@ -34,7 +35,22 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const tabs = useTabs(projects.project?.id ?? null)
   const running = useRunning(projects.project?.id ?? null)
   const doing = useAgents()
-  const guard = useClosing({ open: tabs.open, closeNow: tabs.close, running })
+  const sizing = useWidths()
+
+  /* Which tabs hold an edit that is not on disk. Held here because the cross
+     is drawn by the strip and the edit lives in the pane, and neither can see
+     the other — the pane reports, the strip's close reads. */
+  const [unsaved, setUnsaved] = useState<ReadonlySet<string>>(() => new Set())
+  const markUnsaved = useCallback((id: string, dirty: boolean) => {
+    setUnsaved((was) => {
+      if (was.has(id) === dirty) return was
+      const next = new Set(was)
+      if (dirty) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }, [])
+  const guard = useClosing({ open: tabs.open, closeNow: tabs.close, running, unsaved })
   const { setConfirmStop } = guard
 
 
@@ -62,8 +78,10 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       ...guard,
       running,
       doing,
+      markUnsaved,
       side,
       files,
+      ...sizing,
       toggleSide: () => setSide((was) => !was),
       toggleFiles: () => setFiles((was) => !was),
       theme,
@@ -95,8 +113,10 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       guard,
       running,
       doing,
+      markUnsaved,
       side,
       files,
+      sizing,
       theme,
       setTheme,
       projects,

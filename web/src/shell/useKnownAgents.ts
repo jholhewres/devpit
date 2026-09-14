@@ -18,3 +18,13 @@ export function useKnownAgents(): readonly KnownAgent[] {
   }, [])
   return agents
 }
+
+/*
+ * The ones a menu should offer.
+ *
+ * Not applied by the hook: Settings reads the same list and has to show what
+ * is switched off, or an agent turned off is an agent nobody can turn back on.
+ * So the filter lives with the menus, which are the ones making the offer.
+ */
+export const offered = (agents: readonly KnownAgent[]): readonly KnownAgent[] =>
+  agents.filter((agent) => agent.enabled !== false)

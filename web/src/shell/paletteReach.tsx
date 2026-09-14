@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AgentMark } from './AgentMark'
 import type { Card, KnownAgent } from '../gen/bindings'
 import { ask, commands } from './live'
+import { offered } from './useKnownAgents'
 import { PANES, type PaneName } from './paneList'
 import type { Row } from './paletteGroups'
 import { GEAR } from './paletteIcons'
@@ -42,7 +43,9 @@ export function useReachable(): Reachable {
      kept: a CLI installed while the window was up should appear the next time
      the menu is used, not the next time the app is started. */
   useEffect(() => {
-    void ask(() => commands.agentsKnown()).then((asked) => setAgents(asked.data ?? []))
+    /* Switched off is switched off everywhere: a menu that still offers what
+       Settings says is hidden is two answers to one question. */
+    void ask(() => commands.agentsKnown()).then((asked) => setAgents(offered(asked.data ?? [])))
   }, [])
 
   /* Once, when the field opens. */

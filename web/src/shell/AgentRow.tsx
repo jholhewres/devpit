@@ -1,0 +1,132 @@
+import { AgentGlyph } from './AgentGlyph'
+import type { Entry } from './catalogue'
+import { ProfileEditor } from './ProfileEditor'
+import type { Draft } from './profiles'
+import type { KnownAgent } from '../gen/bindings'
+
+/*
+ * One agent in the catalogue.
+ *
+ * Three controls and a command, which is what the row is for: whether it is
+ * offered, whether it is the one a new terminal opens, and what it actually
+ * runs. The command is shown rather than described — `claude --permission-mode
+ * bypassPermissions` is the whole answer to "what will this do", and a row
+ * that hides it behind a menu makes you open the menu to find out.
+ */
+
+export function AgentRow({
+  entry,
+  agents,
+  open,
+  draft,
+  busy,
+  onOpen,
+  onDraft,
+  onSave,
+  onRemove,
+  onDefault,
+  onEnabled,
+}: {
+  entry: Entry
+  agents: readonly KnownAgent[]
+  open: boolean
+  draft: Draft | null
+  busy: boolean
+  onOpen: () => void
+  onDraft: (draft: Draft) => void
+  onSave: () => void
+  onRemove: () => void
+  onDefault: () => void
+  onEnabled: (on: boolean) => void
+}): React.JSX.Element {
+  return (
+    <>
+      <div className={`prov${entry.installed ? '' : ' prov--off'}`}>
+        <span className="prov__ico">
+          <AgentGlyph agent={entry.id} base={entry.base} />
+          <span
+            className="prov__dot"
+            style={{ background: entry.installed ? 'var(--success)' : 'var(--ghost)' }}
+          ></span>
+        </span>
+        <span className="prov__body">
+          <span className="prov__top">
+            <span className="prov__n">{entry.label}</span>
+          </span>
+          {/* The line, not a description of it. */}
+          <span className="prov__sub">{entry.launch}</span>
+          {entry.note && <span className="prov__sub prov__note">{entry.note}</span>}
+        </span>
+
+        {/* Offered or not. A person with twelve agents uses two. */}
+        <span className="seg seg--tight">
+          <button
+            className="segb"
+            aria-selected={entry.enabled}
+            disabled={busy}
+            onClick={() => onEnabled(true)}
+          >
+            Enabled
+          </button>
+          <button
+            className="segb"
+            aria-selected={!entry.enabled}
+            disabled={busy}
+            onClick={() => onEnabled(false)}
+          >
+            Disabled
+          </button>
+        </span>
+
+        <button
+          className="acc__act"
+          disabled={busy || entry.isDefault || !entry.installed || !entry.enabled}
+          aria-pressed={entry.isDefault}
+          title={
+            entry.installed
+              ? 'What a new terminal opens'
+              : 'Not on this machine, so nothing would open'
+          }
+          onClick={onDefault}
+        >
+          {entry.isDefault ? '✓ Default' : 'Set default'}
+        </button>
+
+        {/* Its own documentation, rather than devpit explaining how to
+            install something it does not ship. */}
+        {entry.homepage && (
+          <a
+            className="acc__act"
+            href={entry.homepage}
+            target="_blank"
+            rel="noreferrer"
+            title={`${entry.label} documentation`}
+            aria-label={`${entry.label} documentation`}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6M20 4 10 14M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
+          </a>
+        )}
+
+        <button
+          className="acc__act"
+          aria-expanded={open}
+          aria-label={`${open ? 'Hide' : 'Show'} how ${entry.label} is started`}
+          onClick={onOpen}
+        >
+          {open ? '⌃' : '⌄'}
+        </button>
+      </div>
+
+      {open && draft && (
+        <ProfileEditor
+          draft={draft}
+          agents={agents}
+          onChange={onDraft}
+          onSave={onSave}
+          onCancel={onOpen}
+          onRemove={entry.mine ? onRemove : undefined}
+        />
+      )}
+    </>
+  )
+}

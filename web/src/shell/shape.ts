@@ -5,6 +5,7 @@ import type { Who } from './account'
 import type { Membership } from './useAccount'
 import type { Doing } from './useAgents'
 import type { Closing } from './useClosing'
+import type { Panel, Widths } from './sizing'
 import type { Renaming } from './useTabs'
 
 /*
@@ -61,6 +62,15 @@ export interface Shell {
       different answers: the process table says which agent is open, and only
       the agent says whether it is working or waiting for you. */
   readonly doing: Doing
+  /** A pane says whether it is holding an edit that is not on disk, so the
+   *  cross in the strip can stop and ask before throwing it away. */
+  markUnsaved: (tabId: string, dirty: boolean) => void
+  /** How wide the two side panels are. */
+  readonly widths: Widths
+  /** While a divider is being dragged: paints, does not write. */
+  setWidth: (panel: Panel, wide: number) => void
+  /** When it is let go: paints and writes. */
+  keepWidths: (panel: Panel, wide: number) => void
   readonly renaming: Renaming | null
   setRenaming: (renaming: Renaming | null) => void
 

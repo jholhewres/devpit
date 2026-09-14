@@ -40,11 +40,14 @@ export function useClosing({
   open,
   closeNow,
   running,
+  unsaved,
 }: {
   open: readonly Tab[]
   /** What closing actually does, once it has been decided. */
   closeNow: (id: string) => void
   running: readonly PaneRunning[]
+  /** The tabs holding an edit that is not on disk. */
+  unsaved: ReadonlySet<string>
 }): Guard {
   const [closing, setClosing] = useState<Closing | null>(null)
   /* Until the settings are read, asking is the safe answer: an unnecessary
@@ -54,11 +57,19 @@ export function useClosing({
   const close = useCallback(
     (id: string) => {
       const tab = open.find((one) => one.id === id)
-      const stops = confirmStop ? stopsOnClose(running, tab) : null
+      /* Unsaved work is asked about whether or not the prompt is switched
+         off. The setting says "stop asking about running terminals", and
+         reading it as "stop asking before discarding what I typed" would be
+         a setting that quietly destroys work. */
+      const stops: Stops | null = unsaved.has(id)
+        ? { kind: 'unsaved', label: tab?.title ?? 'this file' }
+        : confirmStop
+          ? stopsOnClose(running, tab)
+          : null
       if (!stops) return closeNow(id)
       setClosing({ id, tab: tab?.title ?? 'this terminal', stops })
     },
-    [open, closeNow, running, confirmStop],
+    [open, closeNow, running, confirmStop, unsaved],
   )
 
   const confirmClose = useCallback(

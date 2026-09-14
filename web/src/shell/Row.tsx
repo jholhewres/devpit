@@ -107,6 +107,7 @@ export function Row({
     <>
       <button
         className="row"
+        data-ignored={node.status === 'ignored' || undefined}
         data-ctx="file"
         data-path={node.path}
         data-kind={folder ? 'folder' : 'file'}
