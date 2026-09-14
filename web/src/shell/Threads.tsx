@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 
 import type { Thread } from '../gen/bindings'
 import { money } from './chat'
+import { OutsideThreads } from './OutsideThreads'
+import { SessionSearch } from './SessionSearch'
 import { ask, commands } from './live'
 import { short } from './strip'
 import { useShell } from './useShell'
@@ -87,6 +89,9 @@ export function Threads(): React.JSX.Element {
             </span>
           </button>
         ))}
+
+      {showing && <SessionSearch />}
+      {showing && <OutsideThreads />}
     </>
   )
 }

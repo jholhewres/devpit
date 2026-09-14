@@ -7,8 +7,10 @@ mod cards;
 mod layouts;
 mod migrations;
 mod notes;
+pub mod project_runs;
 mod projects;
 mod runs;
+pub mod search_index;
 pub mod settings;
 mod spend;
 

@@ -346,4 +346,71 @@ ALTER TABLE board_column ADD COLUMN autonomy TEXT NOT NULL DEFAULT 'manual'
     CHECK (autonomy IN ('manual','ask','auto'));
 "#,
     },
+    Migration {
+        version: 9,
+        sql: r#"
+-- Full-text search over what was said in the CLI's own transcripts.
+--
+-- Only the text column is indexed; the rest ride along to filter and to open
+-- the hit. unicode61 so an accented word matches its plain spelling.
+CREATE VIRTUAL TABLE session_text USING fts5(
+    path UNINDEXED,
+    session_id UNINDEXED,
+    project UNINDEXED,
+    installation UNINDEXED,
+    role UNINDEXED,
+    text,
+    tokenize = 'unicode61'
+);
+
+-- What each transcript looked like when it was last read. Size and mtime
+-- together: a rewrite to the same size still moves the mtime.
+CREATE TABLE session_file (
+    path TEXT PRIMARY KEY,
+    size INTEGER NOT NULL,
+    mtime INTEGER NOT NULL
+);
+"#,
+    },
+    // Migration 010 — a run whose process vanished is lost, not failed.
+    Migration {
+        version: 10,
+        sql: r#"
+-- The launch sweep closed runs whose process was gone as `failed`, which tells
+-- a person the step failed when nobody knows how it ended.
+--
+-- SQLite cannot change a CHECK in place, so the table is rebuilt. Nothing
+-- references `run`, so dropping it cascades nowhere.
+CREATE TABLE run_new (
+    id          TEXT PRIMARY KEY,
+    card_id     TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    step_id     TEXT NOT NULL REFERENCES step(id) ON DELETE RESTRICT,
+    state       TEXT NOT NULL
+                CHECK (state IN ('running','ok','failed','cancelled','lost')),
+    output      TEXT,
+    exit_code   INTEGER,
+    cost_usd    REAL,
+    duration_ms INTEGER,
+    started_at  INTEGER NOT NULL,
+    ended_at    INTEGER,
+    from_column TEXT REFERENCES board_column(id) ON DELETE SET NULL
+);
+INSERT INTO run_new (id, card_id, step_id, state, output, exit_code, cost_usd,
+                     duration_ms, started_at, ended_at, from_column)
+    SELECT id, card_id, step_id, state, output, exit_code, cost_usd,
+           duration_ms, started_at, ended_at, from_column FROM run;
+DROP TABLE run;
+ALTER TABLE run_new RENAME TO run;
+CREATE INDEX run_card ON run(card_id, started_at DESC);
+CREATE INDEX run_unfinished ON run(state) WHERE ended_at IS NULL;
+-- The project's runs view pages newest first.
+CREATE INDEX run_started ON run(started_at DESC, id DESC);
+
+-- The sweep's own words mark the rows it wrote. A run that had printed
+-- something before it vanished kept that output instead, so it cannot be told
+-- apart and stays as it was.
+UPDATE run SET state = 'lost'
+    WHERE state = 'failed' AND output = 'the app closed while this was running';
+"#,
+    },
 ];
