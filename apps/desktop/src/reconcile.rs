@@ -32,8 +32,8 @@ pub fn close_abandoned(app: &AppHandle) {
             app,
             store.project_id_of_card(card_id).ok().flatten().as_deref(),
             notices::kind::RUN,
-            &format!("A run on “{title}” did not finish"),
-            Some("The app closed while it was running."),
+            &format!("A run on “{title}” was lost"),
+            Some("The app closed while it was running, so how it ended is unknown."),
             Some(card_id),
         );
     }

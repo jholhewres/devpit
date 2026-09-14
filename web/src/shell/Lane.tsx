@@ -76,7 +76,7 @@ export function Tile({
       {progress && run?.state === 'running' && <div className="tile__log">{progress}</div>}
       <div className="tile__m">
         {run && (
-          <span className={run.state === 'failed' ? 'tile__agent tile__agent--warn' : 'tile__agent'}>
+          <span className={run.state === 'failed' || run.state === 'lost' ? 'tile__agent tile__agent--warn' : 'tile__agent'}>
             <Spark />
             {run.stepName}
           </span>

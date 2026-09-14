@@ -67,6 +67,7 @@ pub enum RunState {
     Ok,
     Failed,
     Cancelled,
+    Lost, // its process vanished, so how it ended is unknown
 }
 
 /// One execution of a step, and what it cost.

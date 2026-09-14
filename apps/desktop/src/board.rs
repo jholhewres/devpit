@@ -22,10 +22,11 @@ pub(crate) fn kind_of(raw: &str) -> StepKind {
     }
 }
 
-fn state_of(raw: &str) -> RunState {
+pub(crate) fn state_of(raw: &str) -> RunState {
     match raw {
         "ok" => RunState::Ok,
         "failed" => RunState::Failed,
+        "lost" => RunState::Lost,
         "cancelled" => RunState::Cancelled,
         _ => RunState::Running,
     }

@@ -6,6 +6,7 @@ import { LaneFoot, LaneHead, Tile } from './Lane'
 import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
 import { reordered } from './laneOrder'
+import { RunsPane } from './RunsPane'
 import { useShell } from './useShell'
 
 /*
@@ -28,6 +29,7 @@ export function BoardPane(): React.JSX.Element {
   /* The card being read. Held here rather than on the tile, because a tile
      unmounts the moment a drag reorders the lane it is in. */
   const [opened, setOpened] = useState<string | null>(null)
+  const [showRuns, setShowRuns] = useState(false)
   /* Which column is being dragged. Its own gesture, not `useDrag`: a column
      moves between columns and a card moves between lanes, and one state
      holding both would need a tag to tell them apart. */
@@ -145,6 +147,21 @@ export function BoardPane(): React.JSX.Element {
       <button className="blane__new" onClick={() => live.addColumn('New column')}>
         + Column
       </button>
+      <button className="blane__new" onClick={() => setShowRuns(true)}>
+        Runs
+      </button>
+
+      {showRuns && project && (
+        <RunsPane
+          projectId={project.id}
+          lanes={live.lanes}
+          onClose={() => setShowRuns(false)}
+          onOpenCard={(cardId) => {
+            setShowRuns(false)
+            setOpened(cardId)
+          }}
+        />
+      )}
 
       {opened && (
         <CardPane cardId={opened} onClose={() => setOpened(null)} onChanged={live.reload} />

@@ -81,7 +81,7 @@ impl Store {
             return Ok(stranded);
         }
         self.conn.execute(
-            "UPDATE run SET state = 'failed', ended_at = ?1, \
+            "UPDATE run SET state = 'lost', ended_at = ?1, \
              output = COALESCE(output, 'the app closed while this was running') \
              WHERE state = 'running' AND ended_at IS NULL",
             [now()],

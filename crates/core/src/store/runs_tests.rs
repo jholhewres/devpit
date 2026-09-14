@@ -55,7 +55,8 @@ fn a_run_left_open_by_a_dead_process_is_closed_at_launch() {
     assert_eq!(closed, vec![(run.clone(), card.clone())]);
 
     let after = store.runs(&card).expect("runs");
-    assert_eq!(after[0].state, "failed");
+    // Lost, not failed: nobody knows how it ended.
+    assert_eq!(after[0].state, "lost");
     assert!(after[0]
         .output
         .as_deref()
@@ -112,4 +113,43 @@ fn a_run_whose_column_is_deleted_keeps_the_run() {
         "the run went with the column"
     );
     assert_eq!(store.run_came_from(&run).expect("read"), None);
+}
+
+/// Migration 10 over rows the old sweep wrote: its own words mark them lost,
+/// and a real failure stays a failure.
+#[test]
+fn rows_the_old_sweep_wrote_become_lost_and_nothing_else_moves() {
+    let (dir, store, card, step, _column) = seeded();
+    let swept = store.start_run(&card, &step, None).expect("start");
+    store
+        .finish_run(
+            &swept,
+            "failed",
+            Some("the app closed while this was running"),
+            None,
+            None,
+            None,
+        )
+        .expect("finish");
+    let real = store.start_run(&card, &step, None).expect("start");
+    store
+        .finish_run(&real, "failed", Some("exit 1"), None, None, Some(1))
+        .expect("finish");
+    // Back to the version before it, so opening runs migration 10 over these rows.
+    store
+        .conn()
+        .pragma_update(None, "user_version", 9)
+        .expect("version");
+    drop(store);
+
+    let store = Store::open(&dir.path().join("state.db")).expect("migrate");
+    let states: Vec<(String, String)> = store
+        .runs(&card)
+        .expect("runs")
+        .into_iter()
+        .map(|run| (run.id, run.state))
+        .collect();
+    assert_eq!(states.len(), 2);
+    assert!(states.contains(&(swept, "lost".to_owned())));
+    assert!(states.contains(&(real, "failed".to_owned())));
 }
