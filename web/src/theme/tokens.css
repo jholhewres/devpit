@@ -72,6 +72,19 @@
   --success: #62c987;
   --danger: #e2726a;
 
+  /* Syntax. Five roles and no more: a lexer knows comments, strings, numbers,
+     keywords and the names of types, and a sixth colour would be a claim about
+     meaning that nothing here is in a position to make. Keywords take the
+     accent because they are the shape of the language; comments take the
+     quietest value there is, because a comment you cannot help reading is a
+     comment competing with the code. */
+  --syn-comment: #867e74;
+  --syn-string: #d4b483;
+  --syn-number: #cf8f4e;
+  --syn-word: #c4705a;
+  --syn-type: #9a9a72;
+  --syn-property: #8fb3c9;
+
   --on-accent: #2a1109;
   --scroll-thumb: #333333;
   --scrim: rgb(0 0 0 / 0.5);
@@ -129,6 +142,13 @@
   --success: #2c8551;
   --danger: #bb4038;
 
+  --syn-comment: #746d63;
+  --syn-string: #8a6a3a;
+  --syn-number: #a35a15;
+  --syn-word: #b0442a;
+  --syn-type: #5f6636;
+  --syn-property: #3c6a86;
+
   --on-accent: #fff6f2;
   --scroll-thumb: #c8c2b8;
   --scrim: rgb(38 32 26 / 0.34);
@@ -168,6 +188,13 @@
     --warning: #9a6a14;
     --success: #2c8551;
     --danger: #bb4038;
+
+    --syn-comment: #746d63;
+    --syn-string: #8a6a3a;
+    --syn-number: #a35a15;
+    --syn-word: #b0442a;
+    --syn-type: #5f6636;
+    --syn-property: #3c6a86;
     --on-accent: #fff6f2;
     --scroll-thumb: #c8c2b8;
     --scrim: rgb(38 32 26 / 0.34);

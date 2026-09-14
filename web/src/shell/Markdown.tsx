@@ -1,6 +1,8 @@
 import { createContext, useContext } from 'react'
 
 import { Diagram } from './Diagram'
+import { ofName } from './languages'
+import { Painted } from './Painted'
 import { blocks, external, resolved, spans, type Block, type Span } from './markdown'
 import { ask, commands } from './live'
 import { cut, locate, styleOf, type Chunk } from './veil'
@@ -94,7 +96,9 @@ function Piece({ block, path }: { block: Block; path: string }): React.JSX.Eleme
         <Diagram source={block.text} />
       ) : (
         <pre className="md__code">
-          <code>{block.text}</code>
+          <code>
+            <Painted text={block.text} language={ofName(block.language)} />
+          </code>
         </pre>
       )
     case 'list': {
