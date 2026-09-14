@@ -60,36 +60,36 @@ fn a_symlink_pointing_out_is_refused_too() {
 /// A save carries the mtime the read saw. These prove the two cases that
 /// matter: a normal save goes through, and a save built on a stale read is
 /// refused — which is the whole reason the field exists.
-/// The read ceiling, called rather than restated.
+/// A named pipe is not a file, and reading one waits forever.
 ///
-/// Nothing else stops `file_read` from pulling a whole file into memory and
-/// handing it to a window that then has to draw it, so the threshold and the
-/// sentence it produces are both worth a test.
-mod opening {
-    use super::*;
+/// The workspace holds the tap FIFOs, and the Files panel lists everything it
+/// finds — so a row for one is a click that stops the reader rather than
+/// failing it. Run with a deadline on purpose: the bug being guarded against
+/// is a read that never returns, and a test that reproduces it by hanging is
+/// a test nobody can run.
+#[cfg(unix)]
+#[test]
+fn a_named_pipe_is_refused_instead_of_waited_on() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let made = std::process::Command::new("mkfifo")
+        .arg(dir.path().join("tap.fifo"))
+        .status()
+        .expect("mkfifo to run");
+    assert!(made.success(), "mkfifo made no pipe");
 
-    #[test]
-    fn a_small_file_is_opened() {
-        assert_eq!(past_the_ceiling("a.txt", 4_096), None);
-    }
+    let root = dir.path().to_path_buf();
+    let (tell, hear) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tell.send(contents(&root, "tap.fifo".to_owned()));
+    });
 
-    /// Exactly at the ceiling still opens: the rule is "past it", and an
-    /// off-by-one here would refuse a file the message says is allowed.
-    #[test]
-    fn a_file_exactly_at_the_ceiling_is_opened() {
-        assert_eq!(past_the_ceiling("a.txt", MOST_BYTES), None);
-    }
-
-    #[test]
-    fn a_file_past_the_ceiling_is_refused_with_its_size() {
-        let said = past_the_ceiling("big.bin", MOST_BYTES + 1).expect("refused");
-        assert!(
-            said.contains("big.bin"),
-            "the sentence lost the path: {said}"
-        );
-        assert!(
-            said.contains("2 MB"),
-            "the sentence lost the ceiling: {said}"
-        );
-    }
+    let answered = hear
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("the read to answer at all");
+    let read = answered.expect("an answer, not an error");
+    assert_eq!(
+        read.not_shown.as_deref(),
+        Some("tap.fifo is not a file — nothing to read")
+    );
+    assert!(read.text.is_none());
 }

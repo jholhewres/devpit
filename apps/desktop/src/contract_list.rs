@@ -13,7 +13,7 @@ use crate::{
     chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight, index,
     mcp, moving, notices, openers, panels, panes, paths, priming, projects, reveal, saves, search,
     sessions, settings, shell_launch, sources, staging, steps, threads, watching, workspace,
-    worktree_base, worktrees,
+    worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -49,6 +49,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         workspace::skills_list,
         workspace::workspace_read,
         workspace::usage_read,
+        wsfiles::workspace_list,
+        wsfiles::workspace_file,
         reveal::path_open,
         reveal::path_reveal,
         openers::apps_list,

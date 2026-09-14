@@ -50,6 +50,7 @@ mod projects;
 mod pty_bridge;
 mod question;
 mod reconcile;
+mod refusing;
 mod reveal;
 mod roots;
 mod runs;
@@ -68,6 +69,7 @@ mod working;
 mod workspace;
 mod worktree_base;
 mod worktrees;
+mod wsfiles;
 
 fn main() {
     // Regenerated on every dev run so `make dev` keeps the frontend types in

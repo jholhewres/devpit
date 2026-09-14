@@ -19,11 +19,7 @@ import { useShell } from './useShell'
  * to delete. The markup is in git and in the prototype when they become real.
  */
 
-export function Panes({
-  onOpenFile,
-}: {
-  onOpenFile: (path: string) => void
-}): React.JSX.Element {
+export function Panes(): React.JSX.Element {
   const { open, active, show, close, project } = useShell()
 
   return (
@@ -74,7 +70,7 @@ export function Panes({
             </div>
 
             <div className="pane" data-pane="files" data-show={String(active?.kind === 'files')}>
-              <FilesPane onOpenFile={onOpenFile} />
+              <FilesPane />
             </div>
 
             <div className="pane" data-pane="workspace" data-show={String(active?.kind === 'workspace')}>

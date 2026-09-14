@@ -185,6 +185,22 @@ export const commands = {
 	 *  measured is the thing this milestone exists to delete.
 	 */
 	usageRead: (projectId: string) => typedError<Spend, RpcError>(__TAURI_INVOKE("usage_read", { projectId })),
+	/**
+	 *  `workspace.list` — one folder of the devpit workspace.
+	 * 
+	 *  `path` absent means "wherever this project's own files are". The panel
+	 *  cannot ask for that itself without a round trip to find out whether the
+	 *  folder exists, and opening on a list of ULIDs is not an answer.
+	 */
+	workspaceList: (projectId: string | null, path: string | null) => typedError<WorkspaceListing, RpcError>(__TAURI_INVOKE("workspace_list", { projectId, path })),
+	/**
+	 *  `workspace.file` — one file of the workspace, read for preview.
+	 * 
+	 *  Through `files::contents`, which resolves the path through symlinks and
+	 *  checks containment before it reads a byte, and refuses anything past its
+	 *  ceiling. A second reader here would be a second place for those to drift.
+	 */
+	workspaceFile: (path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("workspace_file", { path })),
 	/**  `path.open` — opens a file or folder in whatever the desktop uses for it. */
 	pathOpen: (path: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("path_open", { path })),
 	/**
@@ -1556,6 +1572,18 @@ export type Pinned = {
 };
 
 /**
+ *  A folder worth a shortcut.
+ * 
+ *  Every folder devpit makes for a project is named by ULID, so the way to
+ *  this project's own files is thirty characters nobody can recognise, let
+ *  alone type.
+ */
+export type Place = {
+	label: string,
+	path: string,
+};
+
+/**
  *  What pressing play did, or why it did not.
  * 
  *  Three answers rather than an error for two of them: a lane that runs
@@ -2052,6 +2080,37 @@ export type Workspace = {
 	 *  announcing themselves.
 	 */
 	bytes: number | null,
+};
+
+/**  One entry in a workspace folder. */
+export type WorkspaceEntry = {
+	name: string,
+	/**  Relative to the workspace root, `/` separated. */
+	path: string,
+	isDir: boolean,
+	/**
+	 *  Bytes, for a file. Zero for a directory: measuring one means walking
+	 *  it, and a listing that walks every folder it lists reads the whole
+	 *  workspace to draw one screen.
+	 */
+	bytes: number | null,
+	/**  Milliseconds since the epoch; zero when it could not be read. */
+	modified: number | null,
+	/**  How many entries a directory holds. Absent for a file. */
+	count: number | null,
+};
+
+export type WorkspaceListing = {
+	/**  The workspace root, absolute, so the panel can say where this is. */
+	root: string,
+	/**  The folder listed, relative to the root. Empty at the top. */
+	path: string,
+	entries: WorkspaceEntry[],
+	/**
+	 *  Only the ones that exist: a shortcut to a folder devpit has not made
+	 *  yet is a dead end dressed as a feature.
+	 */
+	places: Place[],
 };
 
 /**

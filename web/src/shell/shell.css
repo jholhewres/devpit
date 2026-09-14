@@ -1990,3 +1990,56 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .tile:hover .tile__play, .tile__play:focus-visible { opacity: 1; }
 .tile__play:hover { color: var(--text); }
 .tile { position: relative; }
+
+/* ── Files: the devpit workspace, browsed ────────────────────────────
+   A navigator and not a tree. The folders here are deep and named by
+   ULID, so the crumbs are the part that makes them readable, and they
+   have to stay put while the list under them scrolls. */
+.fb { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 1fr); }
+.fb[data-preview='true'] { grid-template-columns: minmax(280px, 420px) 1fr; }
+.fb__main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.fb__head { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 8px; border-bottom: 1px solid var(--border); }
+.fb__crumbs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; min-width: 0; }
+.fb__crumb { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.fb__sep { color: var(--ghost); font-size: 11.5px; }
+.fb__up { height: 24px; padding: 0 6px; border-radius: 6px; font-size: 12px; color: var(--text-3); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb__up:hover { background: var(--overlay); color: var(--text-2); }
+/* The folder you are in is not somewhere to go. It stays a button so the
+   crumbs keep one shape, and reads as the place rather than the trip. */
+.fb__up[aria-current='true'] { color: var(--text); font-weight: 500; }
+
+.fb__places { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.fb__place { height: 22px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--border); font-size: 11px; color: var(--text-3); }
+.fb__place:hover { color: var(--text-2); border-color: var(--border-strong); }
+.fb__place[aria-current='true'] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+.fb__tools { display: flex; align-items: center; gap: 8px; }
+.fb__find { flex: 1; min-width: 0; height: 28px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); padding: 0 10px; font-size: 12.5px; color: var(--text-2); }
+.fb__find::placeholder { color: var(--ghost); }
+.fb__find:focus-visible { outline: none; border-color: var(--border-strong); }
+
+.fb__list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 0; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; display: flex; flex-direction: column; }
+.fb__list:focus-visible { outline: none; }
+.fb__row { display: flex; align-items: center; gap: 9px; flex: none; width: 100%; min-width: 0; height: 30px; padding: 0 12px; text-align: left; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+.fb__row:hover { background: var(--overlay); }
+.fb__row[aria-current='true'] { background: var(--overlay-strong); color: var(--text); }
+.fb__ico { flex: none; display: flex; color: var(--text-3); }
+.fb__n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* What it weighs and when it changed, in the corner rather than in the
+   name: it is the answer to a second question, and a reader scanning for
+   a filename should not have to read past it. */
+.fb__m { flex: none; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.fb__go { flex: none; display: flex; color: var(--ghost); }
+
+.fb__foot { flex: none; display: flex; align-items: center; gap: 10px; height: 26px; padding: 0 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-3); }
+.fb__count { flex: none; }
+.fb__where { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: right; font-family: var(--mono); color: var(--ghost); }
+
+/* The preview is read-only and says so by having no Save: these files are
+   records of what the product did, and typing into one rewrites history
+   something else is still reading. */
+.fb__side { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border); }
+.fb__sideh { flex: none; height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 12px; border-bottom: 1px solid var(--border); }
+.fb__sidet { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-2); }
+.fb__sideb { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }

@@ -111,7 +111,7 @@ function Window(): React.JSX.Element {
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
         <Sidebar onSearch={openPalette} onSignIn={() => setSignIn(true)} />
-        <Panes onOpenFile={openInTab} />
+        <Panes />
         <RightPanel onOpenFile={openInTab} />
         <Grips />
       </div>

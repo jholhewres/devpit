@@ -1,41 +1,95 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Tree } from './Tree'
+import { FileGlyph } from './FileGlyph'
+import { ask, commands } from './live'
 import { useShell } from './useShell'
-import { useTree } from './useTree'
+import { useWorkspaceFolder } from './useWorkspace'
+import { WorkspaceFile } from './WorkspaceFile'
+import { committed } from './typing'
+import { crumbs, fullPath, matching, meta, moved, parentOf, sorted, type Order } from './wsbrowse'
 
 /*
- * The project's files, full width.
+ * The devpit workspace, browsed.
  *
- * The same tree the right panel draws, from the same command — the rows here
- * used to be a fixed list of this repository's own files, which looked right
- * on this machine and was a fabrication on any other.
+ * This panel used to draw the project's checkout, which is what the Explorer
+ * beside it already draws — two readers of one tree, and the wider one no
+ * better at it. The workspace is the half nothing showed: every session's
+ * transcript, the worktree a card actually runs in, the agents this machine
+ * has. All on disk, all named by ULID, and until now all unreachable without
+ * a terminal.
+ *
+ * A navigator rather than a tree, because a tree answers "what is under this"
+ * and the question here is "what is in here": the folders are deep, their
+ * names are opaque, and the crumbs are what make them readable.
  */
 
-export function FilesPane({
-  onOpenFile,
-}: {
-  onOpenFile: (path: string) => void
-}): React.JSX.Element {
-  const { project, close } = useShell()
-  const tree = useTree(project?.id ?? null)
-  const [query, setQuery] = useState('')
-  const [current, setCurrent] = useState<string | null>(null)
+const SORTS: readonly (readonly [Order, string])[] = [
+  ['name', 'Name'],
+  ['size', 'Size'],
+  ['modified', 'Changed'],
+]
 
-  const open = (path: string): void => {
-    setCurrent(path)
-    onOpenFile(path)
+export function FilesPane(): React.JSX.Element {
+  const { project, close } = useShell()
+  const folder = useWorkspaceFolder(project?.id ?? null)
+  const [query, setQuery] = useState('')
+  const [order, setOrder] = useState<Order>('name')
+  const [picked, setPicked] = useState<string | null>(null)
+
+  const listing = folder.listing
+  const here = listing?.path ?? ''
+  const root = listing?.root ?? ''
+  const up = parentOf(here)
+
+  const rows = useMemo(
+    () => sorted(matching(listing?.entries ?? [], query), order),
+    [listing, query, order],
+  )
+  const at = rows.findIndex((row) => row.path === picked)
+
+  /* The row that was clicked to come in here has just unmounted, and focus
+     with it — the keyboard would land on the document and the arrows would do
+     nothing until something was clicked again. */
+  const list = useRef<HTMLDivElement>(null)
+  const came = useRef(here)
+  useEffect(() => {
+    if (came.current === here) return
+    came.current = here
+    list.current?.focus()
+  }, [here])
+
+  const enter = (path: string, isDir: boolean): void => {
+    if (isDir) {
+      setPicked(null)
+      setQuery('')
+      folder.go(path)
+      return
+    }
+    setPicked(path)
   }
+
+  const folders = rows.filter((row) => row.isDir).length
 
   return (
     <>
       <div className="pane__bar">
+        <span className="pane__ico">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+        </span>
         <span className="pane__t">
           <b>Files</b>
           {project ? ` · ${project.name}` : ''}
         </span>
         <span className="drag"></span>
-        <button className="sq26" onClick={tree.reload} aria-label="Refresh">
+        <button
+          className="sq26"
+          onClick={() => void ask(() => commands.pathReveal(fullPath(root, here)))}
+          disabled={!root}
+          aria-label="Show this folder in the finder"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+        </button>
+        <button className="sq26" onClick={folder.reload} aria-label="Refresh">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5" /></svg>
         </button>
         <button className="sq26" onClick={() => close('files')} aria-label="Close Files">
@@ -43,24 +97,157 @@ export function FilesPane({
         </button>
       </div>
 
-      <div className="scroll">
-        {tree.error && <div className="exempty__t">{tree.error}</div>}
-        <input
-          className="sk__find"
-          placeholder="Filter by name…"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          aria-label="Filter files"
-        />
-        {project && (
-          <Tree
-            projectId={project.id}
-            nodes={tree.nodes}
-            version={tree.version}
-            query={query}
-            current={current}
-            collapsed={0}
-            onOpen={open}
+      <div className="fb" data-preview={String(picked !== null)}>
+        <div className="fb__main">
+          <div className="fb__head">
+            <nav className="fb__crumbs" aria-label="Folder">
+              <button
+                className="sq26"
+                onClick={() => up !== null && folder.go(up)}
+                disabled={up === null}
+                aria-label="Up one folder"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+              </button>
+              {crumbs(here, project ?? null).map((crumb, index, all) => (
+                <span className="fb__crumb" key={crumb.path}>
+                  {index > 0 && <span className="fb__sep">/</span>}
+                  <button
+                    className="fb__up"
+                    aria-current={index === all.length - 1}
+                    onClick={() => folder.go(crumb.path)}
+                  >
+                    {crumb.label}
+                  </button>
+                </span>
+              ))}
+            </nav>
+
+            {listing && listing.places.length > 0 && (
+              <div className="fb__places">
+                {listing.places.map((place) => (
+                  <button
+                    className="fb__place"
+                    key={place.path}
+                    aria-current={here === place.path}
+                    onClick={() => folder.go(place.path)}
+                  >
+                    {place.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="fb__tools">
+              <input
+                className="fb__find"
+                placeholder="Filter by name…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                aria-label="Filter files"
+              />
+              <div className="seg seg--tight" role="tablist" aria-label="Sort by">
+                {SORTS.map(([key, label]) => (
+                  <button
+                    className="segb"
+                    key={key}
+                    role="tab"
+                    aria-selected={order === key}
+                    onClick={() => setOrder(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="fb__list"
+            ref={list}
+            /* One tab stop for the list, the way the tree does it: a folder of
+               four hundred rows is four hundred stops otherwise. */
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault()
+                const next = moved(at, event.key === 'ArrowDown' ? 1 : -1, rows.length)
+                setPicked(rows[next]?.path ?? null)
+                return
+              }
+              if (committed(event) && rows[at]) {
+                event.preventDefault()
+                enter(rows[at].path, rows[at].isDir)
+                return
+              }
+              if (event.key === 'Backspace' && up !== null) {
+                event.preventDefault()
+                folder.go(up)
+              }
+            }}
+          >
+            {folder.error && <div className="exempty__t">{folder.error}</div>}
+
+            {!folder.error && !folder.loading && rows.length === 0 && (
+              <div className="exempty">
+                <span className="exempty__t">
+                  {query ? 'Nothing here matches that.' : 'This folder is empty.'}
+                </span>
+                <span className="exempty__d">
+                  {query
+                    ? 'Clear the filter to see everything in this folder.'
+                    : 'devpit writes here as you work — sessions, worktrees and agents.'}
+                </span>
+              </div>
+            )}
+
+            {rows.map((row) => (
+              <button
+                className="fb__row"
+                key={row.path}
+                aria-current={row.path === picked}
+                onClick={() => enter(row.path, row.isDir)}
+                title={fullPath(root, row.path)}
+                tabIndex={-1}
+              >
+                <span className="fb__ico">
+                  {row.isDir ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+                  ) : (
+                    <FileGlyph path={row.name} />
+                  )}
+                </span>
+                <span className="fb__n">{row.name}</span>
+                <span className="fb__m">{meta(row)}</span>
+                {row.isDir && (
+                  <span className="fb__go">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="fb__foot">
+            <span className="fb__count">
+              {rows.length === 0
+                ? 'Nothing here'
+                : `${folders} folder${folders === 1 ? '' : 's'}, ${rows.length - folders} file${rows.length - folders === 1 ? '' : 's'}`}
+            </span>
+            <span className="fb__where">
+              {/* Isolated: the box runs right-to-left so the ellipsis eats the
+                  start of the path, and without this the leading `/` is drawn
+                  at the end. */}
+              <bdi>{fullPath(root, here)}</bdi>
+            </span>
+          </div>
+        </div>
+
+        {picked && (
+          <WorkspaceFile
+            path={picked}
+            full={fullPath(root, picked)}
+            onClose={() => setPicked(null)}
           />
         )}
       </div>

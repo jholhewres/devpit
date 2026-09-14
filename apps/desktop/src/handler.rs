@@ -11,7 +11,7 @@ use crate::{
     chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight, index,
     mcp, moving, notices, openers, panels, panes, priming, projects, pty_bridge, reveal, saves,
     search, sessions, settings, shell_launch, sources, staging, steps, threads, watching,
-    workspace, worktree_base, worktrees,
+    workspace, worktree_base, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -51,6 +51,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         workspace::skills_list,
         workspace::workspace_read,
         workspace::usage_read,
+        wsfiles::workspace_list,
+        wsfiles::workspace_file,
         reveal::path_open,
         reveal::path_reveal,
         openers::apps_list,

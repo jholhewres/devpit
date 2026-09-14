@@ -14,13 +14,8 @@ use devpit_rpc::{ErrorCode, FileContents, FileKind, RpcError};
 
 use crate::kinds::{kind_of, media_type};
 
+use crate::refusing::{not_a_file, past_the_ceiling, too_big_to_draw};
 use crate::roots::root_of;
-
-/// Read no more than this in one go.
-///
-/// A file past it is refused with its size rather than truncated: half a file
-/// in an editor is a file about to be saved with the other half gone.
-const MOST_BYTES: u64 = 2 * 1024 * 1024;
 
 pub(crate) fn modified(path: &Path) -> f64 {
     std::fs::metadata(path)
@@ -31,29 +26,6 @@ pub(crate) fn modified(path: &Path) -> f64 {
         .unwrap_or_default()
 }
 
-/// Why a file is too big to open, or nothing.
-///
-/// A function of its own for the same reason as `is_stale`: a test that
-/// re-states the comparison passes whether or not `file_read` still applies
-/// it, and this ceiling is what keeps a window from reading a gigabyte into
-/// memory to draw it.
-fn past_the_ceiling(path: &str, bytes: u64) -> Option<String> {
-    if bytes <= MOST_BYTES {
-        return None;
-    }
-    Some(format!(
-        "{path} is {:.1} MB — past the {} MB this opens",
-        bytes as f64 / 1_048_576.0,
-        MOST_BYTES / 1_048_576
-    ))
-}
-
-/// The most a picture or a PDF may be to travel inline.
-///
-/// Smaller than the text ceiling on purpose: a data URL is a third bigger
-/// than the bytes it carries, and it crosses the IPC boundary as a string.
-const MOST_MEDIA_BYTES: u64 = 8 * 1024 * 1024;
-
 /// `file.read` — the text of a file, or why it is not text.
 #[tauri::command]
 #[specta::specta]
@@ -62,13 +34,34 @@ pub fn file_read(
     worktree_id: Option<String>,
     path: String,
 ) -> Result<FileContents, RpcError> {
-    let root = root_of(&project_id, worktree_id.as_deref())?;
-    let resolved = devpit_core::tree::resolve(&root, &path)
+    contents(&root_of(&project_id, worktree_id.as_deref())?, path)
+}
+
+/// The same reading, against whichever root the caller is standing in.
+///
+/// Split out so the workspace browser reads a transcript through exactly this
+/// code — the ceilings, the sniffing and the containment check are the part
+/// worth having, and a second reader would be a second place for them to
+/// drift.
+pub(crate) fn contents(root: &Path, path: String) -> Result<FileContents, RpcError> {
+    let resolved = devpit_core::tree::resolve(root, &path)
         .map_err(|err| RpcError::new(ErrorCode::Forbidden, err.to_string()))?;
 
-    let bytes = std::fs::metadata(&resolved)
-        .map(|meta| meta.len())
-        .unwrap_or_default();
+    let meta = std::fs::metadata(&resolved).ok();
+    let bytes = meta.as_ref().map(|meta| meta.len()).unwrap_or_default();
+
+    if meta.is_some_and(|meta| !meta.is_file()) {
+        return Ok(FileContents {
+            full_path: resolved.display().to_string(),
+            read_at: modified(&resolved),
+            not_shown: Some(not_a_file(&path)),
+            kind: FileKind::Binary,
+            bytes: bytes as f64,
+            text: None,
+            data_url: None,
+            path,
+        });
+    }
 
     let raw = match std::fs::read(&resolved) {
         Ok(raw) => raw,
@@ -83,13 +76,8 @@ pub fn file_read(
 
     match kind {
         FileKind::Image | FileKind::Pdf if not_shown.is_none() => {
-            if bytes > MOST_MEDIA_BYTES {
-                not_shown = Some(format!(
-                    "{path} is {:.1} MB — past the {} MB this draws",
-                    bytes as f64 / 1_048_576.0,
-                    MOST_MEDIA_BYTES / 1_048_576
-                ));
-            } else {
+            not_shown = too_big_to_draw(&path, bytes);
+            if not_shown.is_none() {
                 data_url = Some(format!(
                     "data:{};base64,{}",
                     media_type(&path, kind, head),

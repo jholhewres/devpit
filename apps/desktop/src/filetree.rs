@@ -10,7 +10,7 @@ use devpit_rpc::{FileNode, GitStatus, ProjectTree, RpcError};
 
 use crate::projects::{checkout, locate, store};
 
-fn tree_error(err: devpit_core::TreeError) -> RpcError {
+pub(crate) fn tree_error(err: devpit_core::TreeError) -> RpcError {
     match err {
         // Its own code, not a generic one: the screen says something different
         // for a path that escaped than for a folder it could not read, and
