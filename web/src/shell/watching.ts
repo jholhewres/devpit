@@ -31,8 +31,16 @@ export function cpu(tenths: number): string {
   return tenths < 100 ? `${(tenths / 10).toFixed(1)}%` : `${Math.round(tenths / 10)}%`
 }
 
-/** Whether the total is worth drawing at all. */
-export const busy = (usage: Usage): boolean =>
+/*
+ * Whether there are numbers worth drawing.
+ *
+ * Not whether the strip appears. It hid itself whenever this was false, which
+ * made "nothing is running" and "this is broken" the same picture — somebody
+ * opened the window, looked for the strip, and found nothing to tell them
+ * which. So the strip stays and says how many terminals there are; this
+ * decides only whether it has figures to put beside the count.
+ */
+export const measured = (usage: Usage): boolean =>
   usage.panes.length > 0 && (usage.memoryKb > 0 || usage.cpuTenths > 0)
 
 /*

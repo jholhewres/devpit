@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PaneCost, Usage } from '../gen/bindings'
-import { busy, counted, cpu, notable, size } from './watching'
+import { counted, cpu, measured, notable, size } from './watching'
 
 const pane = (over: Partial<PaneCost> = {}): PaneCost => ({
   paneId: 'leaf_1',
@@ -67,17 +67,17 @@ describe('cpu, in tenths of a percent', () => {
   })
 })
 
-describe('whether the strip has anything to say', () => {
-  it('says nothing with no panes open', () => {
-    expect(busy(usage({ panes: [], memoryKb: 0 }))).toBe(false)
+describe('whether there are figures worth drawing', () => {
+  it('has none with no panes open', () => {
+    expect(measured(usage({ panes: [], memoryKb: 0 }))).toBe(false)
   })
 
-  it('says nothing when every pane is idle and empty', () => {
-    expect(busy(usage({ memoryKb: 0, cpuTenths: 0 }))).toBe(false)
+  it('has none when every pane is idle and empty', () => {
+    expect(measured(usage({ memoryKb: 0, cpuTenths: 0 }))).toBe(false)
   })
 
-  it('speaks up as soon as something is running', () => {
-    expect(busy(usage({ memoryKb: 4096 }))).toBe(true)
+  it('has them as soon as something is running', () => {
+    expect(measured(usage({ memoryKb: 4096 }))).toBe(true)
   })
 })
 
