@@ -89,6 +89,35 @@ export function onResized(then: () => void): () => void {
  * The webview's own drop event carries a `File` with no path, which is no use
  * to an agent that has to open it. Tauri's event carries the real paths.
  */
+/* Whether files are being dragged over the window, from the webview's own
+   drag events. A function over the event type so the rule is testable: a
+   drop and a leave both end the hover. */
+export function draggingAfter(type: string): boolean {
+  return type === 'enter' || type === 'over'
+}
+
+/**
+ * Calls back when files start or stop being dragged over the window.
+ *
+ * The drop itself lands on the window, not on an element, so there is no DOM
+ * event to hang a target on — the pane draws its target from this.
+ */
+export function onFilesDragging(then: (over: boolean) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void getCurrentWebview()
+    .onDragDropEvent((event) => then(draggingAfter(event.payload.type)))
+    .then((unlisten) => {
+      if (dropped) unlisten()
+      else drop = unlisten
+    })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}
+
 export function onFilesDropped(then: (paths: readonly string[]) => void): () => void {
   if (!inTauri()) return () => {}
   let dropped = false
