@@ -60,6 +60,11 @@ pub(crate) fn hooks_on(store: &devpit_core::Store) -> bool {
     read(store).hooks
 }
 
+/// What a new terminal opens, for whoever needs to start where it starts.
+pub(crate) fn default_id(store: &devpit_core::Store) -> String {
+    read(store).default_id
+}
+
 /// The ids kept out of the menus, for whoever is drawing one.
 pub(crate) fn disabled(store: &devpit_core::Store) -> Vec<String> {
     read(store).disabled

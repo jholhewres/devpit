@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { Server } from '../gen/bindings'
 import { ask, commands } from './live'
+import { InstallationPicker } from './InstallationPicker'
+import { useInstallations } from './useInstallations'
 import { useShell } from './useShell'
 
 /*
@@ -20,6 +22,7 @@ import { useShell } from './useShell'
 
 export function McpPane(): React.JSX.Element {
   const { project, close } = useShell()
+  const installations = useInstallations()
   const [servers, setServers] = useState<readonly Server[]>([])
   const [sources, setSources] = useState<readonly string[]>([])
   const [directory, setDirectory] = useState('')
@@ -30,14 +33,14 @@ export function McpPane(): React.JSX.Element {
   /* Re-read on every look: `claude mcp add` happens in a terminal beside this
      window, and a catalogue fetched once at startup is wrong by then. */
   const load = useCallback(() => {
-    void ask(() => commands.mcpList(project?.id ?? null)).then((answer) => {
+    void ask(() => commands.mcpList(project?.id ?? null, installations.chosen)).then((answer) => {
       setServers(answer.data?.servers ?? [])
       setSources(answer.data?.sources ?? [])
       setDirectory(answer.data?.directory ?? '')
       setManage(answer.data?.manageWith ?? 'claude mcp')
       setProblem(answer.error ?? answer.data?.problem ?? null)
     })
-  }, [project])
+  }, [project, installations.chosen])
 
   useEffect(load, [load])
 
@@ -62,7 +65,14 @@ export function McpPane(): React.JSX.Element {
           {servers.length > 0 ? ` · ${servers.length}` : ''}
         </span>
         <span className="drag"></span>
-        <button className="sq26" onClick={load} aria-label="Refresh MCPs">
+        <button
+          className="sq26"
+          onClick={() => {
+            installations.reload()
+            load()
+          }}
+          aria-label="Refresh MCPs"
+        >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5" /></svg>
         </button>
         <button className="sq26" onClick={() => close('mcps')} aria-label="Close MCPs">
@@ -76,6 +86,8 @@ export function McpPane(): React.JSX.Element {
             Read from the agent CLI&rsquo;s own config &mdash; devpit keeps no second copy. Add or
             remove one with <code>{manage} add</code> and it changes here.
           </p>
+
+          <InstallationPicker installations={installations} />
 
           {problem && (
             <div className="exempty">

@@ -57,6 +57,14 @@ pub(crate) fn names(store: &Store) -> std::collections::HashMap<String, String> 
         .collect()
 }
 
+/// The profiles the person declared, as written.
+///
+/// Not `all`: the installations need only the environment, and `all` resolves
+/// every command against the `PATH` and asks the shell about the rest.
+pub(crate) fn declared(store: &Store) -> Vec<Declared> {
+    stored(store).unwrap_or_default()
+}
+
 /// The command each declared profile runs, for the shell probe.
 pub(crate) fn commands(store: &Store) -> Vec<String> {
     stored(store)

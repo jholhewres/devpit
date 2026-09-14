@@ -20,6 +20,11 @@ pub fn sources() -> Vec<PathBuf> {
     // Where the CLI actually keeps its configuration, which is not always
     // `~/.claude` — see `cli_config`.
     let cli = crate::cli_config::config_dir().unwrap_or_else(|| home.join(".claude"));
+    sources_in(&cli, &home)
+}
+
+/// The skill directories of one installation of the CLI, plus the person's own.
+pub fn sources_in(cli: &Path, home: &Path) -> Vec<PathBuf> {
     let mut dirs = walk(&cli.join("plugins/cache"), 0);
     for own in [cli.join("skills"), home.join(".devpit/skills")] {
         if own.is_dir() {

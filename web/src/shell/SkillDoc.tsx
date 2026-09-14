@@ -14,7 +14,14 @@ import { Markdown } from './Markdown'
  * contents with no book behind it.
  */
 
-export function SkillDoc({ skill }: { skill: Skill }): React.JSX.Element {
+export function SkillDoc({
+  skill,
+  directory,
+}: {
+  skill: Skill
+  /** The installation it was listed from; a name can exist in two. */
+  directory: string | null
+}): React.JSX.Element {
   const [body, setBody] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -26,7 +33,7 @@ export function SkillDoc({ skill }: { skill: Skill }): React.JSX.Element {
     let current = true
     setBody(null)
     setError(null)
-    void ask(() => commands.skillsRead(skill.name)).then((answer) => {
+    void ask(() => commands.skillsRead(skill.name, directory)).then((answer) => {
       if (!current) return
       setBody(answer.data?.body ?? null)
       setError(answer.error)
@@ -34,7 +41,7 @@ export function SkillDoc({ skill }: { skill: Skill }): React.JSX.Element {
     return () => {
       current = false
     }
-  }, [skill.name])
+  }, [skill.name, directory])
 
   const copy = (): void => {
     void navigator.clipboard?.writeText(skill.path).then(() => {

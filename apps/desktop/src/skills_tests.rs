@@ -96,13 +96,13 @@ fn a_name_that_is_really_a_path_is_refused() {
     // against one — but a name carrying separators is a path pretending, and
     // saying so beats letting it miss quietly.
     for name in ["../../etc/passwd", "a/b", ".ssh"] {
-        let refused = skills_read(name.to_owned()).expect_err("a refusal");
+        let refused = skills_read(name.to_owned(), None).expect_err("a refusal");
         assert_eq!(refused.code, devpit_rpc::ErrorCode::Forbidden);
     }
 }
 
 #[test]
 fn a_skill_this_machine_does_not_have_is_not_found() {
-    let missing = skills_read("no-such-skill-anywhere".to_owned()).expect_err("not found");
+    let missing = skills_read("no-such-skill-anywhere".to_owned(), None).expect_err("not found");
     assert_eq!(missing.code, devpit_rpc::ErrorCode::NotFound);
 }

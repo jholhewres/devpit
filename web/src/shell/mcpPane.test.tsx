@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Project, Server } from '../gen/bindings'
+import type { Installation, Project, Server } from '../gen/bindings'
 import { McpPane } from './McpPane'
 
 afterEach(cleanup)
@@ -9,12 +9,14 @@ afterEach(cleanup)
 const listed = vi.fn()
 
 let catalogue: Server[] = []
+let installs: Installation[] = []
 
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
-    mcpList: (projectId: string | null) => {
-      listed(projectId)
+    cliInstallations: () => [...installs],
+    mcpList: (projectId: string | null, directory: string | null) => {
+      listed(projectId, directory)
       return {
         servers: [...catalogue],
         sources: ['/home/me/.claude-claudin/.claude.json'],
@@ -31,6 +33,7 @@ vi.mock('./useShell', () => ({ useShell: () => ({ project, close: vi.fn() }) }))
 
 beforeEach(() => {
   listed.mockClear()
+  installs = [{ directory: '/home/me/.claude-claudin', profiles: ['claudin'], default: true }]
   catalogue = [
     { name: 'reports', scope: 'project', reachedBy: 'npx reports-mcp' },
     { name: 'anchored', scope: 'user', reachedBy: 'https://anchored.example/mcp' },
@@ -82,5 +85,16 @@ describe('the MCP panel', () => {
     render(<McpPane />)
     await screen.findByText('anchored')
     expect(screen.queryByText('This project')).toBeNull()
+  })
+
+  it('reads the installation that was picked, for this project', async () => {
+    installs = [
+      { directory: '/home/me/.claude', profiles: ['claude'], default: true },
+      { directory: '/home/me/.claude-glm', profiles: ['glm'], default: false },
+    ]
+    render(<McpPane />)
+    await waitFor(() => expect(listed).toHaveBeenCalledWith('p', null))
+    fireEvent.click(await screen.findByRole('radio', { name: 'glm' }))
+    await waitFor(() => expect(listed).toHaveBeenCalledWith('p', '/home/me/.claude-glm'))
   })
 })

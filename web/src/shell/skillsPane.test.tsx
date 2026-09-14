@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Skill } from '../gen/bindings'
+import type { Installation, Skill } from '../gen/bindings'
 import { SkillsPane } from './SkillsPane'
 
 afterEach(cleanup)
@@ -22,20 +22,22 @@ const skill = (over: Partial<Skill> & { name: string }): Skill => ({
 })
 
 let catalogue: Skill[] = []
+let installs: Installation[] = []
 
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
-    skillsList: () => {
-      listed()
+    cliInstallations: () => [...installs],
+    skillsList: (directory: string | null) => {
+      listed(directory)
       return {
         skills: [...catalogue],
         problem: catalogue.length === 0 ? 'no skills directory on this machine' : null,
-        directory: '/home/me/.claude-claudin',
+        directory: directory ?? '/home/me/.claude-claudin',
       }
     },
-    skillsRead: (name: string) => {
-      read(name)
+    skillsRead: (name: string, directory: string | null) => {
+      read(name, directory)
       return { name, path: 'x', body: '# Heading\n\nThe instructions themselves.\n' }
     },
     pathOpen: () => null,
@@ -49,6 +51,7 @@ beforeEach(() => {
   listed.mockClear()
   read.mockClear()
   catalogue = [skill({ name: 'tdd' }), skill({ name: 'ai-slop-cleaner', source: 'claude' })]
+  installs = [{ directory: '/home/me/.claude-claudin', profiles: ['claudin'], default: true }]
 })
 
 /*
@@ -66,7 +69,7 @@ describe('the skills panel', () => {
     render(<SkillsPane />)
     await screen.findByText('The instructions themselves.')
     fireEvent.click(screen.getByText('ai-slop-cleaner'))
-    await waitFor(() => expect(read).toHaveBeenCalledWith('ai-slop-cleaner'))
+    await waitFor(() => expect(read).toHaveBeenCalledWith('ai-slop-cleaner', null))
   })
 
   it('names the directory it read, because it is not always ~/.claude', async () => {
@@ -106,5 +109,27 @@ describe('the skills panel', () => {
     // than repeating the sentence, which would read as two faults.
     expect(await screen.findByText('no skills directory on this machine')).toBeTruthy()
     expect(screen.getByText('No skill picked.')).toBeTruthy()
+  })
+
+  it('offers no choice when there is one installation', async () => {
+    render(<SkillsPane />)
+    await waitFor(() => expect(row('tdd')).toBeTruthy())
+    expect(screen.queryByRole('radiogroup', { name: 'Installation' })).toBeNull()
+  })
+
+  it('switches to another installation and reads its skills from there', async () => {
+    // claude, claudin and glm are one CLI with three catalogues.
+    installs = [
+      { directory: '/home/me/.claude', profiles: ['claude'], default: true },
+      { directory: '/home/me/.claude-glm', profiles: ['glm'], default: false },
+    ]
+    render(<SkillsPane />)
+    const glm = await screen.findByRole('radio', { name: 'glm' })
+    expect(screen.getByRole('radio', { name: /claude/ }).getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.click(glm)
+    await waitFor(() => expect(listed).toHaveBeenCalledWith('/home/me/.claude-glm'))
+    await waitFor(() => expect(read).toHaveBeenCalledWith('tdd', '/home/me/.claude-glm'))
+    expect(glm.getAttribute('aria-checked')).toBe('true')
   })
 })

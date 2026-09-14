@@ -21,7 +21,7 @@ export function useKit(): Kit {
   const [kit, setKit] = useState<Kit>({ skills: null, servers: null })
 
   useEffect(() => {
-    void ask(() => commands.skillsList()).then((answer) =>
+    void ask(() => commands.skillsList(null)).then((answer) =>
       setKit((was) => ({ ...was, skills: counted(answer.data?.skills) })),
     )
   }, [])
@@ -29,7 +29,7 @@ export function useKit(): Kit {
   /* Servers are read per project: a server reached through the project's own
      config is not one the machine has everywhere. */
   useEffect(() => {
-    void ask(() => commands.mcpList(project?.id ?? null)).then((answer) =>
+    void ask(() => commands.mcpList(project?.id ?? null, null)).then((answer) =>
       setKit((was) => ({ ...was, servers: counted(answer.data?.servers) })),
     )
   }, [project])

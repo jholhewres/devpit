@@ -11,7 +11,7 @@
 use std::path::{Path, PathBuf};
 
 use devpit_core::Store;
-use devpit_rpc::{ErrorCode, RpcError};
+use devpit_rpc::RpcError;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -59,19 +59,18 @@ fn take(found: Vec<Server>, path: &Path, into: &mut Vec<Server>, sources: &mut V
     }
 }
 
-/// `mcp.list` — what the CLI resolved for this project.
+/// `mcp.list` — what one installation of the CLI resolved for this project,
+/// the default profile's when none is named.
 #[tauri::command]
 #[specta::specta]
-pub fn mcp_list(project_id: Option<String>) -> Result<Servers, RpcError> {
-    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
-        return Err(RpcError::new(
-            ErrorCode::Internal,
-            "there is no HOME to read the CLI's config from",
-        ));
-    };
-    let said = std::env::var("CLAUDE_CONFIG_DIR").ok();
-    let cli = devpit_agentcli::cli_config::config_dir_from(&home, said.as_deref());
-    let settings = devpit_agentcli::cli_config::settings_file_from(&home, said.as_deref());
+pub fn mcp_list(
+    project_id: Option<String>,
+    directory: Option<String>,
+) -> Result<Servers, RpcError> {
+    let home = crate::installations::home()?;
+    let chosen = crate::installations::chosen(directory.as_deref())?;
+    let cli = chosen.directory;
+    let settings = devpit_agentcli::cli_config::settings_file_from(&home, chosen.said.as_deref());
     // Read once: it holds every project the CLI was ever started in, and is
     // consulted twice below.
     let settings_text = text_of(&settings);

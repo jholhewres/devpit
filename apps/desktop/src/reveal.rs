@@ -46,11 +46,16 @@ fn allowed(path: &str) -> Result<PathBuf, RpcError> {
         .into_iter()
         .map(|row| PathBuf::from(row.root_path))
         .collect();
-    // The CLI's own configuration, because the Skills panel lists files out of
-    // it and offers to open them. Every `SKILL.md` lives under here and under
-    // nothing else, so without this the three buttons on that panel refused
-    // every path they were ever handed — measured, not reasoned about.
-    roots.extend(devpit_agentcli::cli_config::config_dir());
+    // Every installation of the CLI, because the Skills panel lists files out
+    // of them and offers to open them. Every `SKILL.md` lives under one of
+    // these and nothing else, so without this the buttons on that panel
+    // refused every path they were ever handed — measured, not reasoned about.
+    roots.extend(
+        crate::installations::found()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|one| one.directory),
+    );
     let home = Store::root().map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
     openable(&roots, &home, Path::new(path)).ok_or_else(|| {
         RpcError::new(

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { Skill } from '../gen/bindings'
 import { ask, commands } from './live'
+import { InstallationPicker } from './InstallationPicker'
 import { SkillDoc } from './SkillDoc'
+import { useInstallations } from './useInstallations'
 
 /*
  * The skills this machine has.
@@ -21,6 +23,7 @@ const ICON = (
 )
 
 export function SkillsPane(): React.JSX.Element {
+  const installations = useInstallations()
   const [skills, setSkills] = useState<readonly Skill[]>([])
   const [directory, setDirectory] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
@@ -32,13 +35,13 @@ export function SkillsPane(): React.JSX.Element {
      plugin, which happens in a terminal beside this window. */
   const load = useCallback(() => {
     setLoading(true)
-    void ask(() => commands.skillsList()).then((answer) => {
+    void ask(() => commands.skillsList(installations.chosen)).then((answer) => {
       setSkills(answer.data?.skills ?? [])
       setDirectory(answer.data?.directory ?? '')
       setProblem(answer.error ?? answer.data?.problem ?? null)
       setLoading(false)
     })
-  }, [])
+  }, [installations.chosen])
 
   useEffect(load, [load])
 
@@ -63,9 +66,19 @@ export function SkillsPane(): React.JSX.Element {
             onChange={(event) => setFind(event.target.value)}
             aria-label="Search skills"
           />
-          <button className="sq26" onClick={load} aria-label="Refresh skills">
+          <button
+            className="sq26"
+            onClick={() => {
+              installations.reload()
+              load()
+            }}
+            aria-label="Refresh skills"
+          >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5" /></svg>
           </button>
+        </div>
+        <div className="sk__inst">
+          <InstallationPicker installations={installations} />
         </div>
         <div className="sk__h">
           Installed <span>{wanted ? `${shown.length} of ${skills.length}` : skills.length}</span>
@@ -110,7 +123,7 @@ export function SkillsPane(): React.JSX.Element {
 
       <div className="sk__doc">
         {open ? (
-          <SkillDoc skill={open} />
+          <SkillDoc skill={open} directory={installations.chosen} />
         ) : (
           /* Not the problem again: the list beside this is already saying
              why it is empty, and one sentence twice reads as two faults. */

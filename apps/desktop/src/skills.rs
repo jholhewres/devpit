@@ -141,14 +141,22 @@ fn skills_in(dir: &Path, source: &str, into: &mut Vec<Skill>) {
     }
 }
 
-/// `skills.list` — the skills installed on this machine.
+/// The skill directories of the installation asked for.
+fn sources_of(directory: Option<&str>) -> Result<(String, Vec<PathBuf>), RpcError> {
+    let chosen = crate::installations::chosen(directory)?;
+    let home = crate::installations::home()?;
+    Ok((
+        chosen.directory.display().to_string(),
+        devpit_agentcli::skills::sources_in(&chosen.directory, &home),
+    ))
+}
+
+/// `skills.list` — the skills of one installation of the CLI, the default
+/// profile's when none is named.
 #[tauri::command]
 #[specta::specta]
-pub fn skills_list() -> Result<Skills, RpcError> {
-    let directory = devpit_agentcli::cli_config::config_dir()
-        .map(|dir| dir.display().to_string())
-        .unwrap_or_default();
-    let sources = devpit_agentcli::skills::sources();
+pub fn skills_list(directory: Option<String>) -> Result<Skills, RpcError> {
+    let (directory, sources) = sources_of(directory.as_deref())?;
     if sources.is_empty() {
         return Ok(Skills {
             skills: Vec::new(),
@@ -177,8 +185,8 @@ pub fn skills_list() -> Result<Skills, RpcError> {
 /// By name and never by a path from the screen: this process reads whatever it
 /// is handed, so the name is looked up in the directories that are already
 /// trusted rather than resolved against one of them.
-fn found(name: &str) -> Option<PathBuf> {
-    devpit_agentcli::skills::sources()
+fn found(name: &str, sources: Vec<PathBuf>) -> Option<PathBuf> {
+    sources
         .into_iter()
         .map(|dir| dir.join(name).join("SKILL.md"))
         .find(|file| file.is_file())
@@ -187,12 +195,12 @@ fn found(name: &str) -> Option<PathBuf> {
 /// `skills.read` — the whole of one skill's `SKILL.md`.
 #[tauri::command]
 #[specta::specta]
-pub fn skills_read(name: String) -> Result<SkillDoc, RpcError> {
+pub fn skills_read(name: String, directory: Option<String>) -> Result<SkillDoc, RpcError> {
     // A name with a separator in it is a path pretending to be a name.
     if name.contains(['/', '\\']) || name.starts_with('.') {
         return Err(RpcError::new(ErrorCode::Forbidden, "that is not a skill"));
     }
-    let file = found(&name)
+    let file = found(&name, sources_of(directory.as_deref())?.1)
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, format!("no skill called {name}")))?;
 
     let bytes = std::fs::metadata(&file)
