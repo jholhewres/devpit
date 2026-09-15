@@ -1,7 +1,7 @@
 import { Confirm } from './Confirm'
 import { dueLabel, nearness } from './due'
 import type { Lane as LaneData } from './board'
-import type { Card, ColumnDeleted, Step } from '../gen/bindings'
+import type { Card, ColumnDeleted, Played, Step } from '../gen/bindings'
 import { LaneStep } from './LaneStep'
 import { money } from './chat'
 import { abandoned, committed } from './typing'
@@ -41,13 +41,17 @@ const Spark = (): React.JSX.Element => (
 export function Tile({
   card,
   progress,
+  stepName,
   onPlay,
 }: {
   card: Card
   progress?: string
-  /** Absent on the card in the air — a floating tile takes no clicks. */
-  onPlay?: () => void
+  /** The lane's step, for the button and for the question a step with no undo asks. */
+  stepName?: string
+  /** Present only when the tile can be played (`playable`); absent on the card in the air. */
+  onPlay?: (confirmed: boolean) => Promise<Played | null>
 }): React.JSX.Element {
+  const [asking, setAsking] = useState(false)
   const run = card.runs[0]
   const near = nearness(card.dueAt)
   const spent = money(card.costUsd ?? 0)
@@ -57,14 +61,15 @@ export function Tile({
       {/* Under the pointer rather than always there: the board is read far
           more often than it is played, and a row of triangles reads as a list
           of things waiting to be started. */}
-      {onPlay && run?.state !== 'running' && (
+      {onPlay && (
         <button
           className="tile__play"
-          aria-label={`Run this card's step`}
+          aria-label={`Run ${stepName ?? "this card's step"}`}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation()
-            onPlay()
+            /* It used to open the card. It plays; a step with no undo asks first. */
+            void onPlay(false).then((answer) => setAsking(Boolean(answer?.needsConfirming)))
           }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -109,6 +114,21 @@ export function Tile({
         {spent && <span className="tile__time">{spent}</span>}
         {card.session && <span className="tile__time">{card.session.status}</span>}
       </div>
+      {asking &&
+        createPortal(
+          /* The portal is still inside the tile in React's tree: a press here
+             must not start a drag or open the card. */
+          <div onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+            <Confirm
+              title={`Run ${stepName ?? 'this step'}?`}
+              body="This step is marked as having no undo. It runs against this card's own checkout, on its own branch — but what it does from there is its own."
+              danger={`Run ${stepName ?? 'it'}`}
+              onClose={() => setAsking(false)}
+              onConfirm={() => void onPlay?.(true).then(() => setAsking(false))}
+            />
+          </div>,
+          document.body,
+        )}
     </>
   )
 }

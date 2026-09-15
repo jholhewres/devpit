@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import type { Board, ColumnDeleted, Step } from '../gen/bindings'
+import type { Board, ColumnDeleted, Played, Step } from '../gen/bindings'
 import { landed, lanes, type Lane } from './board'
 import { ask, commands } from './live'
 import { onCarried } from './window'
@@ -14,6 +14,8 @@ export interface UseBoard {
   /** The last line each running step printed, by run id. */
   readonly progress: Readonly<Record<string, string>>
   move: (cardId: string, columnId: string, at: number) => void
+  /** Runs a card's lane step now. Answers what happened, or null when refused — the refusal is in `error`. */
+  play: (cardId: string, confirmed: boolean) => Promise<Played | null>
   addCard: (columnId: string, title: string) => void
   addColumn: (name: string) => void
   renameColumn: (columnId: string, name: string) => void
@@ -80,6 +82,17 @@ export function useBoard(projectId: string | null): UseBoard {
       })
     },
     [board, projectId],
+  )
+
+  const play = useCallback(
+    async (cardId: string, confirmed: boolean): Promise<Played | null> => {
+      if (!projectId) return null
+      const asked = await ask(() => commands.cardPlay(projectId, cardId, confirmed))
+      setError(asked.error)
+      if (asked.data?.run) reload()
+      return asked.data
+    },
+    [projectId, reload],
   )
 
   const addCard = useCallback(
@@ -152,6 +165,7 @@ export function useBoard(projectId: string | null): UseBoard {
     cards: board?.cards.length ?? 0,
     progress,
     move,
+    play,
     addCard,
     addColumn,
     renameColumn,

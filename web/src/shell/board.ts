@@ -32,3 +32,9 @@ export function landed(board: Board, cardId: string, columnId: string, at: numbe
     cards: [...rest.filter((card) => card.columnId !== columnId), ...renumbered],
   }
 }
+
+/* Whether a tile's play button can do anything: the lane has to run a step,
+   and a card with a run already going would be two processes in one checkout. */
+export function playable(card: Card, column: Column): boolean {
+  return column.step !== null && !card.runs.some((run) => run.state === 'running')
+}

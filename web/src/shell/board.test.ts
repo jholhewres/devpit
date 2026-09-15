@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Board, Card, Column } from '../gen/bindings'
-import { landed, lanes } from './board'
+import type { Board, Card, Column, Run } from '../gen/bindings'
+import { landed, lanes, playable } from './board'
 
 const column = (id: string, position: number): Column => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual' })
 const card = (id: string, columnId: string, position: number): Card =>
@@ -50,5 +50,32 @@ describe('landing a card', () => {
 
   it('leaves the board alone when the card is not on it', () => {
     expect(landed(board, 'nope', 'b', 0)).toBe(board)
+  })
+})
+
+describe('whether a tile can be played', () => {
+  const step = { id: 's', kind: 'command', name: 'tests', config: '{}', irreversible: false } as const
+  const run = (state: Run['state']): Run => ({
+    id: 'r',
+    stepId: 's',
+    stepName: 'tests',
+    state,
+    output: null,
+    exitCode: null,
+    costUsd: null,
+    durationMs: null,
+    startedAt: 0,
+  })
+
+  it('is not, in a lane that runs nothing', () => {
+    expect(playable(card('c', 'a', 0), column('a', 0))).toBe(false)
+  })
+
+  it('is not, while a run is going on the card', () => {
+    expect(playable({ ...card('c', 'a', 0), runs: [run('running')] }, { ...column('a', 0), step })).toBe(false)
+  })
+
+  it('is, in a lane with a step and nothing running', () => {
+    expect(playable({ ...card('c', 'a', 0), runs: [run('failed')] }, { ...column('a', 0), step })).toBe(true)
   })
 })

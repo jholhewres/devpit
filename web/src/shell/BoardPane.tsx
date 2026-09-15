@@ -6,6 +6,7 @@ import { LaneFoot, LaneHead, Tile } from './Lane'
 import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
 import { reordered } from './laneOrder'
+import { playable } from './board'
 import { BoardShelf } from './BoardShelf'
 import { useShell } from './useShell'
 
@@ -136,7 +137,8 @@ export function BoardPane(): React.JSX.Element {
                       <Tile
                         card={card}
                         progress={live.progress[card.runs[0]?.id ?? '']}
-                        onPlay={() => setOpened(card.id)}
+                        stepName={lane.column.step?.name}
+                        onPlay={playable(card, lane.column) ? (confirmed) => live.play(card.id, confirmed) : undefined}
                       />
                     </div>
                   </Fragment>
