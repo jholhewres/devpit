@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use devpit_rpc::{LayoutNode, SplitDirection};
+use devpit_rpc::{LayoutNode, SessionKind, SplitDirection};
 
 use super::*;
 use crate::sessions::tab_for_card;
@@ -119,4 +119,56 @@ fn only_waiting_rings_and_a_card_pane_names_its_card() {
     );
     assert_eq!(notice_for(Some(&route), Some("working")), None);
     assert_eq!(notice_for(Some(&route), None), None);
+}
+
+#[test]
+fn a_session_is_found_through_the_run_that_spoke_in_it() {
+    let (dir, store) = seeded();
+    let (project, card) = card_in(&store, dir.path(), "one");
+    let step = store
+        .create_step(&project, "agent", "review", "{}", false)
+        .expect("step");
+    let run = store.start_run(&card, &step, None).expect("run");
+    store.set_run_session(&run, "s-run").expect("session");
+    assert_eq!(
+        card_of_session(&store, "s-run"),
+        Some((card, SessionKind::Run))
+    );
+}
+
+#[test]
+fn a_session_is_found_through_its_background_link() {
+    let (dir, store) = seeded();
+    let (_project, card) = card_in(&store, dir.path(), "one");
+    store
+        .link_session(&card, "a1b2", "s-bg", None, None)
+        .expect("link");
+    assert_eq!(
+        card_of_session(&store, "s-bg"),
+        Some((card, SessionKind::Background))
+    );
+}
+
+#[test]
+fn an_archived_card_holds_no_session() {
+    let (dir, store) = seeded();
+    let (_project, card) = card_in(&store, dir.path(), "one");
+    store
+        .link_session(&card, "a1b2", "s-bg", None, None)
+        .expect("link");
+    store.archive_card(&card).expect("archive");
+    assert_eq!(card_of_session(&store, "s-bg"), None);
+}
+
+#[test]
+fn an_unknown_or_unsafe_session_id_finds_no_card() {
+    let (dir, store) = seeded();
+    let (_project, card) = card_in(&store, dir.path(), "one");
+    // Held under an id a hook must never be trusted with.
+    store
+        .link_session(&card, "a1b2", "../s-bg", None, None)
+        .expect("link");
+    for id in ["../s-bg", "s-nowhere", ""] {
+        assert_eq!(card_of_session(&store, id), None, "{id}");
+    }
 }

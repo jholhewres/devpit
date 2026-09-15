@@ -21,7 +21,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::asking::{decision, Asking};
 use crate::card_activity::{hear, next_seq, pane_word, state_of_event, Activities, Key, Place};
-use crate::card_route::{card_of_leaf, notice_for, Ring};
+use crate::card_route::{card_of_leaf, card_of_session, notice_for, Ring};
 use crate::happening::{agent_said, session_said, subagent_said};
 use crate::post::{read_request, Posted};
 use crate::question::question_in;
@@ -120,6 +120,7 @@ fn hear_post(sink: &impl HookSink, posted: &Posted, seq: u64) {
 /// second only the agent can say, and it says it here.
 fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u64) {
     let Some(pane) = pane else {
+        heard_without_pane(sink, happening, seq);
         return;
     };
     let doing = state_of_event(&happening.event);
@@ -166,6 +167,36 @@ fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u
     // other two would be a bell that rings through every turn.
     if let (Some(ring), Some(store)) = (notice_for(route.as_ref(), state), &store) {
         sink.ring(store, ring, pane);
+    }
+}
+
+/// A hook from a session with no pane — a run's turn, or a session a step
+/// started in the background — reaching the card that holds its id.
+///
+/// Heard like a pane is and combined when read: a background session's word
+/// stands only while the CLI still lists it (see `background_state`).
+fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) {
+    let Some(doing) = state_of_event(&happening.event) else {
+        return;
+    };
+    let Some(store) = sink.store() else {
+        return;
+    };
+    let Some((card_id, kind)) = card_of_session(&store, &happening.session_id) else {
+        return;
+    };
+    let key = Key {
+        card_id,
+        kind,
+        reference: happening.session_id.clone(),
+    };
+    let told = sink
+        .activities()
+        .lock()
+        .ok()
+        .and_then(|mut activities| hear(&mut activities, key, seq, doing, Place::default()));
+    if let Some(happening) = told {
+        sink.to_window("card:happening", happening);
     }
 }
 

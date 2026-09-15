@@ -4,7 +4,9 @@
 //! already says which card it is for, and a second record of the same fact
 //! would have to be kept right on every split, close and restore.
 
+use devpit_core::store::SessionHeld;
 use devpit_core::Store;
+use devpit_rpc::SessionKind;
 
 use crate::sessions::{card_of_tab, decode};
 
@@ -37,6 +39,22 @@ pub(crate) fn card_of_leaf(store: &Store, leaf: &str) -> Option<Route> {
         card_id: card.to_owned(),
         tab_id: layout.tab_id.clone(),
     })
+}
+
+/// The card a session with no pane belongs to — a run's turn, or a session a
+/// step started in the background — and the kind it is heard as.
+///
+/// The id comes from a hook's payload, so it is checked before any query.
+pub(crate) fn card_of_session(store: &Store, session_id: &str) -> Option<(String, SessionKind)> {
+    if !crate::adopting::plain(session_id) {
+        return None;
+    }
+    let (card, held) = store.session_holder(session_id).ok().flatten()?;
+    let kind = match held {
+        SessionHeld::Run => SessionKind::Run,
+        SessionHeld::Background => SessionKind::Background,
+    };
+    Some((card, kind))
 }
 
 /// Who a pane's bell is about, when its state rings one.

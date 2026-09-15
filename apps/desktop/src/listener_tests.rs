@@ -4,9 +4,12 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use devpit_agentcli::{AgentSession, Kind, Status};
 use devpit_rpc::{Doing, LayoutNode};
 
 use super::*;
+use crate::card_sessions::card_sessions;
+use crate::post::Posted;
 use crate::sessions::tab_for_card;
 
 /// What the listener's core said, and to where.
@@ -143,4 +146,63 @@ fn a_hook_reaches_the_card() {
             .activity,
         Some(Doing::Done)
     );
+}
+
+/// What a background session's hook posts when it stops on a person: the
+/// `Notification` shape the CLI sends, with no pane in the query.
+const BACKGROUND_WAITING: &str = r#"{"hook_event_name":"Notification","session_id":"s-bg","cwd":"/w/card","message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}"#;
+
+#[test]
+fn a_background_session_waiting_reaches_its_card() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store_path = dir.path().join("state.db");
+    let store = Store::open(&store_path).expect("store");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let column = store.columns(&project).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&project, &column, "a card", "")
+        .expect("card");
+    store
+        .link_session(&card, "a1b2", "s-bg", None, Some("/w/card"))
+        .expect("link");
+    let sink = Recorded {
+        store_path,
+        activities: Mutex::default(),
+        said: Mutex::default(),
+    };
+
+    let posted = Posted {
+        body: BACKGROUND_WAITING.to_owned(),
+        pane: None,
+    };
+    hear_post(&sink, &posted, next_seq());
+
+    let heard = sink.activities.lock().expect("activities").happening(&card);
+    assert_eq!(heard.activity, Some(Doing::Waiting));
+    assert_eq!(heard.sessions[0].kind, SessionKind::Background);
+    assert_eq!(heard.sessions[0].reference, "s-bg");
+    assert!(sink
+        .said
+        .lock()
+        .expect("said")
+        .iter()
+        .any(|(channel, _)| channel == "card:happening"));
+
+    // Combined when read: while the CLI lists it, its hook's word stands; once
+    // the CLI no longer lists it, it is gone whatever it said last.
+    let listed = AgentSession {
+        session_id: "s-bg".to_owned(),
+        short_id: Some("a1b2".to_owned()),
+        name: None,
+        cwd: "/w/card".to_owned(),
+        pid: None,
+        started_at: None,
+        kind: Kind::Background,
+        status: Status::Busy,
+    };
+    let read = card_sessions(&store, &project, &card, &[listed], &heard);
+    assert_eq!(read[0].state, Some(Doing::Waiting));
+    let unlisted = card_sessions(&store, &project, &card, &[], &heard);
+    assert_eq!(unlisted[0].state, Some(Doing::Gone));
 }

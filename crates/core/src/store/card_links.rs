@@ -31,6 +31,15 @@ pub struct ChatLink {
     pub created_at: i64,
 }
 
+/// Where a card holds a session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionHeld {
+    /// A run's agent spoke in it.
+    Run,
+    /// A step started it in the background.
+    Background,
+}
+
 /// Everything durable that ties a card to a session.
 pub struct CardLinks {
     /// Newest first.
@@ -96,6 +105,35 @@ impl Store {
 }
 
 impl Store {
+    /// The card still on a board that holds this session, and where it holds it.
+    ///
+    /// An archived card holds nothing: no board shows it, so nothing it held
+    /// has a tile to reach.
+    pub fn session_holder(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<(String, SessionHeld)>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT r.card_id, 0 FROM run r JOIN card c ON c.id = r.card_id \
+                 WHERE r.session_id = ?1 AND c.archived_at IS NULL \
+                 UNION ALL \
+                 SELECT l.card_id, 1 FROM session_link l JOIN card c ON c.id = l.card_id \
+                 WHERE l.session_id = ?1 AND c.archived_at IS NULL \
+                 LIMIT 1",
+                [session_id],
+                |row| {
+                    let held = match row.get::<_, i64>(1)? {
+                        0 => SessionHeld::Run,
+                        _ => SessionHeld::Background,
+                    };
+                    Ok((row.get(0)?, held))
+                },
+            )
+            .optional()?)
+    }
+
     /// Names the session a run's agent speaks in.
     pub fn set_run_session(&self, run_id: &str, session_id: &str) -> Result<(), StoreError> {
         self.conn.execute(

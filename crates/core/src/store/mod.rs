@@ -43,7 +43,7 @@ pub enum StoreError {
 }
 
 pub use board::{CardRow, ColumnRow, SessionLink, StepRow, StepUse, DEFAULT_COLUMNS};
-pub use card_links::{BackgroundLink, CardLinks, ChatLink, RunLink};
+pub use card_links::{BackgroundLink, CardLinks, ChatLink, RunLink, SessionHeld};
 pub use cards::{AttachmentRow, CommentRow, NoticeRow};
 pub use layouts::CardTabLayout;
 pub use runs::RunRow;
