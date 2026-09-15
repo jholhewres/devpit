@@ -8,6 +8,8 @@ import { onCarried } from './window'
 export interface UseBoard {
   readonly lanes: readonly Lane[]
   readonly error: string | null
+  /** Puts the last refusal away once it has been read. */
+  dismiss: () => void
   readonly cards: number
   /** The last line each running step printed, by run id. */
   readonly progress: Readonly<Record<string, string>>
@@ -139,6 +141,7 @@ export function useBoard(projectId: string | null): UseBoard {
   return {
     lanes: lanes(board),
     error,
+    dismiss: () => setError(null),
     cards: board?.cards.length ?? 0,
     progress,
     move,

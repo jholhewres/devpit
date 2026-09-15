@@ -74,109 +74,118 @@ export function BoardPane(): React.JSX.Element {
   const { held, landing, landed } = drag
 
   return (
-    <div className="board" onPointerMove={drag.move} onPointerUp={onUp} onPointerCancel={onUp}>
-      {live.lanes.map((lane) => {
-        const dropping = landing?.lane === lane.column.id
-        return (
-          <div
-            key={lane.column.id}
-            className="blane"
-            data-lane={lane.column.id}
-            data-agent={lane.column.step?.name}
-            data-over={String(Boolean(held?.moved && dropping))}
-            data-moving={String(moving?.id === lane.column.id)}
-            data-taking={String(Boolean(moving) && moving?.onto === lane.column.id && moving?.id !== lane.column.id)}
-            onPointerEnter={() => moving && setMoving({ ...moving, onto: lane.column.id })}
-          >
-            <LaneHead
-              lane={lane}
-              steps={live.steps}
-              onRename={(name) => live.renameColumn(lane.column.id, name)}
-              onPickStep={(stepId) => live.setStep(lane.column.id, stepId)}
-              onCreateStep={live.createStep}
-              others={live.lanes
-                .filter((other) => other.column.id !== lane.column.id)
-                .map((other) => ({ id: other.column.id, name: other.column.name }))}
-              onFlow={(onPass, autonomy) => live.setFlow(lane.column.id, onPass, autonomy)}
-              onGrab={(event) => grab(event, lane.column.id)}
-            />
-
-            <div className="blane__list">
-              {lane.cards.map((card, index) => (
-                <Fragment key={card.id}>
-                  {dropping && held?.moved && landing.index === index && (
-                    <div className="slot" style={{ height: held.height }} />
-                  )}
-                  <div
-                    className={landed === card.id ? 'tile tile--landed' : 'tile'}
-                    role="button"
-                    tabIndex={0}
-                    data-ctx="card"
-                    data-card={card.id}
-                    data-ghost={String(held?.card.id === card.id && held.moved)}
-                    onPointerDown={(event) => drag.down(event, card, lane.column.id)}
-                    /* Keyboard reaches it too. A card openable only by pointer
-                       is a card somebody cannot open. */
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        setOpened(card.id)
-                      }
-                    }}
-                  >
-                    <Tile
-                      card={card}
-                      progress={live.progress[card.runs[0]?.id ?? '']}
-                      onPlay={() => setOpened(card.id)}
-                    />
-                  </div>
-                </Fragment>
-              ))}
-              {dropping && held?.moved && landing.index >= lane.cards.length && (
-                <div className="slot" style={{ height: held.height }} />
-              )}
-            </div>
-
-            <LaneFoot
-              lane={lane}
-              onAddCard={() => live.addCard(lane.column.id, 'New card')}
-              onDelete={() => live.deleteColumn(lane.column.id)}
-            />
-          </div>
-        )
-      })}
-
-      <button className="blane__new" onClick={() => live.addColumn('New column')}>
-        + Column
-      </button>
-      <BoardShelf
-        projectId={project?.id ?? null}
-        lanes={live.lanes}
-        archived={archived}
-        onUndone={undone}
-        onOpenCard={setOpened}
-        onChanged={live.reload}
-      />
-
-      {opened && (
-        <CardPane cardId={opened} onClose={() => setOpened(null)} onChanged={live.reload} onArchived={setArchived} />
+    <>
+      {/* Every board command reported its refusal into state nobody drew: a
+          rename that failed simply did not happen, and nothing said why. */}
+      {live.error && (
+        <button className="tnote" onClick={live.dismiss} title="Dismiss">
+          {live.error}
+        </button>
       )}
+      <div className="board" onPointerMove={drag.move} onPointerUp={onUp} onPointerCancel={onUp}>
+        {live.lanes.map((lane) => {
+          const dropping = landing?.lane === lane.column.id
+          return (
+            <div
+              key={lane.column.id}
+              className="blane"
+              data-lane={lane.column.id}
+              data-agent={lane.column.step?.name}
+              data-over={String(Boolean(held?.moved && dropping))}
+              data-moving={String(moving?.id === lane.column.id)}
+              data-taking={String(Boolean(moving) && moving?.onto === lane.column.id && moving?.id !== lane.column.id)}
+              onPointerEnter={() => moving && setMoving({ ...moving, onto: lane.column.id })}
+            >
+              <LaneHead
+                lane={lane}
+                steps={live.steps}
+                onRename={(name) => live.renameColumn(lane.column.id, name)}
+                onPickStep={(stepId) => live.setStep(lane.column.id, stepId)}
+                onCreateStep={live.createStep}
+                others={live.lanes
+                  .filter((other) => other.column.id !== lane.column.id)
+                  .map((other) => ({ id: other.column.id, name: other.column.name }))}
+                onFlow={(onPass, autonomy) => live.setFlow(lane.column.id, onPass, autonomy)}
+                onGrab={(event) => grab(event, lane.column.id)}
+              />
 
-      {/* On the body, not in the board.
-          `position: fixed` inside an ancestor that has a transform anchors to
-          that ancestor instead of the window, and the pane's entrance
-          animation is exactly such an ancestor — which puts the card in the
-          air nowhere near the pointer. */}
-      {held?.moved &&
-        createPortal(
-          <div
-            className="tile tile--float"
-            style={{ width: held.width, left: held.x - held.dx, top: held.y - held.dy }}
-          >
-            <Tile card={held.card} />
-          </div>,
-          document.body,
+              <div className="blane__list">
+                {lane.cards.map((card, index) => (
+                  <Fragment key={card.id}>
+                    {dropping && held?.moved && landing.index === index && (
+                      <div className="slot" style={{ height: held.height }} />
+                    )}
+                    <div
+                      className={landed === card.id ? 'tile tile--landed' : 'tile'}
+                      role="button"
+                      tabIndex={0}
+                      data-ctx="card"
+                      data-card={card.id}
+                      data-ghost={String(held?.card.id === card.id && held.moved)}
+                      onPointerDown={(event) => drag.down(event, card, lane.column.id)}
+                      /* Keyboard reaches it too. A card openable only by pointer
+                         is a card somebody cannot open. */
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setOpened(card.id)
+                        }
+                      }}
+                    >
+                      <Tile
+                        card={card}
+                        progress={live.progress[card.runs[0]?.id ?? '']}
+                        onPlay={() => setOpened(card.id)}
+                      />
+                    </div>
+                  </Fragment>
+                ))}
+                {dropping && held?.moved && landing.index >= lane.cards.length && (
+                  <div className="slot" style={{ height: held.height }} />
+                )}
+              </div>
+
+              <LaneFoot
+                lane={lane}
+                onAddCard={() => live.addCard(lane.column.id, 'New card')}
+                onDelete={() => live.deleteColumn(lane.column.id)}
+              />
+            </div>
+          )
+        })}
+
+        <button className="blane__new" onClick={() => live.addColumn('New column')}>
+          + Column
+        </button>
+        <BoardShelf
+          projectId={project?.id ?? null}
+          lanes={live.lanes}
+          archived={archived}
+          onUndone={undone}
+          onOpenCard={setOpened}
+          onChanged={live.reload}
+        />
+
+        {opened && (
+          <CardPane cardId={opened} onClose={() => setOpened(null)} onChanged={live.reload} onArchived={setArchived} />
         )}
-    </div>
+
+        {/* On the body, not in the board.
+            `position: fixed` inside an ancestor that has a transform anchors to
+            that ancestor instead of the window, and the pane's entrance
+            animation is exactly such an ancestor — which puts the card in the
+            air nowhere near the pointer. */}
+        {held?.moved &&
+          createPortal(
+            <div
+              className="tile tile--float"
+              style={{ width: held.width, left: held.x - held.dx, top: held.y - held.dy }}
+            >
+              <Tile card={held.card} />
+            </div>,
+            document.body,
+          )}
+      </div>
+    </>
   )
 }
