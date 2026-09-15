@@ -15,6 +15,8 @@ use devpit_rpc::{
     Ask, Attachment, Conversation, ErrorCode, Frame, Message, Part, Role, RpcError, TurnEnd,
 };
 use tauri::ipc::Channel;
+
+use crate::card_activity::Doing;
 use tauri::State;
 
 /// The turns in flight, by conversation, so one can be stopped.
@@ -51,10 +53,11 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
         eprintln!("{conversation_id}: {skipped} unreadable line(s)");
     }
     let head = read_head(&head_path(&sessions, &conversation_id));
+    let card_id = crate::projects::store()?.chat_card(&conversation_id)?;
     Ok(Conversation {
         id: conversation_id,
         project_id,
-        card_id: head.as_ref().and_then(|head| head.card_id.clone()),
+        card_id,
         // Empty until the first turn settles it: a conversation nobody has
         // spoken in belongs to no account yet.
         profile: head
@@ -86,6 +89,7 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
 #[tauri::command]
 #[specta::specta]
 pub async fn chat_send(
+    app: tauri::AppHandle,
     state: State<'_, Talking>,
     steering: State<'_, crate::steering::Steering>,
     ask: Ask,
@@ -120,6 +124,7 @@ pub async fn chat_send(
             "this conversation has spent its budget".to_owned(),
         ));
     }
+    let cwd = crate::chat_turn::turn_cwd(head.as_ref().and_then(|head| head.cwd.as_deref()), &cwd)?;
 
     let Some(profile) = crate::agent_profiles::all(&crate::projects::store()?)?
         .into_iter()
@@ -209,6 +214,7 @@ pub async fn chat_send(
     let answer = answer_id.clone();
 
     let control = steering.hold(&conversation_id);
+    crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
     let said = tauri::async_runtime::spawn_blocking(move || {
         let checkout = std::path::Path::new(&cwd);
         let before = crate::turn_changes::before(checkout);
@@ -248,9 +254,12 @@ pub async fn chat_send(
         crate::turn_changes::report(checkout, before.as_deref(), &collected, &sink, &answer);
         said
     })
-    .await
-    .map_err(|err| RpcError::internal(err.to_string()))?
-    .map_err(|err| RpcError::internal(err.to_string()))?;
+    .await;
+    // Before the answer is looked at: a turn that failed is not still working.
+    crate::card_chat::turn_heard(&app, &conversation_id, Doing::Done);
+    let said = said
+        .map_err(|err| RpcError::internal(err.to_string()))?
+        .map_err(|err| RpcError::internal(err.to_string()))?;
 
     state
         .running

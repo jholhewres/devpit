@@ -134,6 +134,32 @@ impl Store {
             .optional()?)
     }
 
+    /// Files a conversation under a card. Once: a conversation is one card's.
+    pub fn link_chat(&self, card_id: &str, conversation_id: &str) -> Result<(), StoreError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_secs() as i64)
+            .unwrap_or_default();
+        self.conn.execute(
+            "INSERT INTO card_chat (conversation_id, card_id, created_at) VALUES (?1, ?2, ?3) \
+             ON CONFLICT(conversation_id) DO NOTHING",
+            rusqlite::params![conversation_id, card_id, now],
+        )?;
+        Ok(())
+    }
+
+    /// The card a conversation is filed under; `None` once that card is gone.
+    pub fn chat_card(&self, conversation_id: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT card_id FROM card_chat WHERE conversation_id = ?1",
+                [conversation_id],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+
     /// Names the session a run's agent speaks in.
     pub fn set_run_session(&self, run_id: &str, session_id: &str) -> Result<(), StoreError> {
         self.conn.execute(

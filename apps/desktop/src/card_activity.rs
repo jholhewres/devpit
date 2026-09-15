@@ -221,6 +221,27 @@ pub(crate) fn run_heard(app: &tauri::AppHandle, card_id: &str, reference: &str, 
     }
 }
 
+/// A card's conversation, as the plan's table keys it.
+pub(crate) fn chat_key(card_id: &str, conversation_id: &str) -> Key {
+    Key {
+        card_id: card_id.to_owned(),
+        kind: SessionKind::Chat,
+        reference: conversation_id.to_owned(),
+    }
+}
+
+/// `hear` for a session with no place on screen, stamped in the one order and
+/// told to the window.
+pub(crate) fn heard_now(app: &tauri::AppHandle, key: Key, state: Doing) {
+    let told = registry()
+        .lock()
+        .ok()
+        .and_then(|mut activities| hear(&mut activities, key, next_seq(), state, Place::default()));
+    if let Some(happening) = told {
+        let _ = tauri::Emitter::emit(app, "card:happening", happening);
+    }
+}
+
 /// What a run is heard under: its agent's session, or the run itself when it
 /// had none.
 pub(crate) fn run_reference(store: &Store, run_id: &str) -> String {

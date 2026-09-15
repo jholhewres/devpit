@@ -7,12 +7,13 @@
 //! is what is typed.
 
 use crate::{
-    account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_work,
-    cards, chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight,
-    index, installations, mcp, moving, notices, openers, outside_sessions, panels, panes, pasting,
-    plugin_data, plugins, priming, projects, pty_bridge, receipts, reveal, rewinding, runs_list,
-    saves, search, session_search, sessions, settings, shell_launch, skills, slash, sources,
-    staging, steering, steps, threads, watching, workspace, worktree_base, worktrees, wsfiles,
+    account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_chat,
+    card_work, cards, chat, columns, commands, diffs, files, filetree, front, happening, history,
+    in_flight, index, installations, mcp, moving, notices, openers, outside_sessions, panels,
+    panes, pasting, plugin_data, plugins, priming, projects, pty_bridge, receipts, reveal,
+    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
+    slash, sources, staging, steering, steps, threads, watching, workspace, worktree_base,
+    worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -34,6 +35,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         threads::chat_list,
         outside_sessions::chat_outside,
         adopting::chat_adopt,
+        card_chat::card_chat,
         rewinding::chat_rewind,
         runs_list::runs_list,
         session_search::sessions_search,

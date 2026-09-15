@@ -95,7 +95,6 @@ pub fn conversations(dir: &Path) -> Vec<Summary> {
             let head: Head = read_head(&dir.join(format!("{id}.json"))).unwrap_or(Head {
                 profile: String::new(),
                 model: None,
-                card_id: None,
                 created_at: 0.0,
                 cost_usd: 0.0,
                 budget_usd: None,
@@ -104,6 +103,7 @@ pub fn conversations(dir: &Path) -> Vec<Summary> {
                 effort: None,
                 title: None,
                 rewind: Default::default(),
+                cwd: None,
             });
             Some(Summary {
                 // The person's own words first — the decision above — and the

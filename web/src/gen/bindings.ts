@@ -75,6 +75,12 @@ export const commands = {
 	 */
 	chatAdopt: (projectId: string, sessionId: string, profileId: string, title: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("chat_adopt", { projectId, sessionId, profileId, title })),
 	/**
+	 *  `card.chat` — a new conversation about this card, in its checkout.
+	 * 
+	 *  Answers the conversation's id, which the window opens as a chat tab.
+	 */
+	cardChat: (projectId: string, cardId: string, profileId: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("card_chat", { projectId, cardId, profileId })),
+	/**
 	 *  `chat.rewind` — a new conversation that goes on from an earlier turn.
 	 * 
 	 *  Answers its id, which the window opens as a chat tab.

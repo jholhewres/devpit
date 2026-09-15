@@ -71,13 +71,19 @@ fn a_background_session_is_linked_with_the_folder_it_runs_in() {
 #[test]
 fn a_cards_chats_are_listed_in_order_and_go_with_the_card() {
     let (_dir, store, _project, card) = seeded();
+    store.link_chat(&card, "conv_first").expect("first");
+    store.link_chat(&card, "conv_later").expect("later");
     store
         .conn
-        .execute_batch(&format!(
-            "INSERT INTO card_chat (conversation_id, card_id, created_at) VALUES \
-             ('conv_later', '{card}', 20), ('conv_first', '{card}', 10);"
-        ))
-        .expect("chats");
+        .execute(
+            "UPDATE card_chat SET created_at = 10 WHERE conversation_id = 'conv_first'",
+            [],
+        )
+        .expect("older");
+    assert_eq!(
+        store.chat_card("conv_later").expect("read").as_deref(),
+        Some(card.as_str())
+    );
 
     let chats: Vec<String> = store
         .card_links(&card)
@@ -89,6 +95,7 @@ fn a_cards_chats_are_listed_in_order_and_go_with_the_card() {
     assert_eq!(chats, ["conv_first", "conv_later"]);
 
     store.delete_card(&card).expect("delete");
+    assert_eq!(store.chat_card("conv_later").expect("read"), None);
     let left: i64 = store
         .conn
         .query_row("SELECT COUNT(*) FROM card_chat", [], |row| row.get(0))

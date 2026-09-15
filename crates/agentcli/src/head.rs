@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 pub struct Head {
     pub profile: String,
     pub model: Option<String>,
-    pub card_id: Option<String>,
     /// Unix seconds.
     pub created_at: f64,
     /// What every turn so far actually cost, from the CLI's own report.
@@ -38,6 +37,10 @@ pub struct Head {
     pub title: Option<String>,
     #[serde(default)]
     pub rewind: Rewind,
+    /// The folder every turn runs in, fixed when the conversation began on a
+    /// card or took in a session: a session resumed anywhere else is not found.
+    #[serde(default)]
+    pub cwd: Option<String>,
 }
 
 /// Where each turn sits in the CLI's own transcript, and a fork still to run.
@@ -121,7 +124,7 @@ pub fn write_head(path: &Path, head: &Head) -> std::io::Result<()> {
 /// `Err` names the profile it is already tied to.
 pub fn settled<'a>(head: Option<&'a Head>, asked: &str) -> Result<(), &'a str> {
     match head {
-        Some(head) if head.profile != asked => Err(&head.profile),
+        Some(head) if !head.profile.is_empty() && head.profile != asked => Err(&head.profile),
         _ => Ok(()),
     }
 }

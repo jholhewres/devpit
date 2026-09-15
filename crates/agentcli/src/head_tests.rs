@@ -4,7 +4,6 @@ fn head(profile: &str) -> Head {
     Head {
         profile: profile.to_owned(),
         model: None,
-        card_id: None,
         created_at: 0.0,
         cost_usd: 0.0,
         budget_usd: None,
@@ -13,6 +12,7 @@ fn head(profile: &str) -> Head {
         effort: None,
         title: None,
         rewind: Default::default(),
+        cwd: None,
     }
 }
 
@@ -81,7 +81,6 @@ fn opened(fork_at: Option<&str>) -> crate::head::Head {
     crate::head::Head {
         profile: "claude".to_owned(),
         model: None,
-        card_id: None,
         created_at: 1.0,
         cost_usd: 1.0,
         budget_usd: None,
@@ -93,6 +92,7 @@ fn opened(fork_at: Option<&str>) -> crate::head::Head {
             fork_at: fork_at.map(str::to_owned),
             anchors: Vec::new(),
         },
+        cwd: None,
     }
 }
 
@@ -147,4 +147,11 @@ fn a_forked_turn_that_wrote_nothing_forks_again_next_time() {
     );
     assert_eq!(head.rewind.fork_at.as_deref(), Some("u0"));
     assert_eq!(head.session_id.as_deref(), Some("orig"));
+}
+
+/// A conversation begun on a card has no account until its first turn picks one.
+#[test]
+fn a_conversation_opened_without_a_profile_takes_the_first_turns() {
+    assert_eq!(settled(Some(&head("")), "prof_glm"), Ok(()));
+    assert_eq!(settled(Some(&head("prof_a")), "prof_glm"), Err("prof_a"));
 }

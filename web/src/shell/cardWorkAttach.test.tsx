@@ -7,11 +7,20 @@ import { CardWork } from './CardWork'
 afterEach(cleanup)
 
 const attached = vi.fn()
+const chatted = vi.fn()
 const shown = vi.fn()
 
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
   commands: {
+    agentProfiles: () => [
+      { id: 'prof_1', path: '/usr/bin/claude' },
+      { id: 'prof_gone', path: null },
+    ],
+    cardChat: (project: string, card: string, profile: string | null) => {
+      chatted(project, card, profile)
+      return 'conv_1'
+    },
     terminalAttachAgent: (project: string, card: string) => {
       attached(project, card)
       return {
@@ -44,5 +53,14 @@ describe("a card's background session", () => {
   it('has no row when the card has no background session', () => {
     work([{ kind: 'pane', ref: 'leaf_1', state: null, tabId: 'tab_1', leafId: 'leaf_1' }])
     expect(screen.queryByRole('button', { name: 'Attach in terminal' })).toBeNull()
+  })
+})
+
+describe('a chat about the card', () => {
+  it('opens in a chat tab, under the one account installed', async () => {
+    work([])
+    fireEvent.click(screen.getByRole('button', { name: 'Chat about this card' }))
+    await waitFor(() => expect(shown).toHaveBeenCalledWith('chat', { id: 'conv_1' }))
+    expect(chatted).toHaveBeenCalledWith('p1', 'card_1', 'prof_1')
   })
 })

@@ -9,12 +9,13 @@
 use tauri_specta::{collect_commands, Builder};
 
 use crate::{
-    account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_work,
-    cards, chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight,
-    index, installations, mcp, moving, notices, openers, outside_sessions, panels, panes, pasting,
-    paths, plugin_data, plugins, priming, projects, receipts, reveal, rewinding, runs_list, saves,
-    search, session_search, sessions, settings, shell_launch, skills, slash, sources, staging,
-    steering, steps, threads, watching, workspace, worktree_base, worktrees, wsfiles,
+    account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_chat,
+    card_work, cards, chat, columns, commands, diffs, files, filetree, front, happening, history,
+    in_flight, index, installations, mcp, moving, notices, openers, outside_sessions, panels,
+    panes, pasting, paths, plugin_data, plugins, priming, projects, receipts, reveal, rewinding,
+    runs_list, saves, search, session_search, sessions, settings, shell_launch, skills, slash,
+    sources, staging, steering, steps, threads, watching, workspace, worktree_base, worktrees,
+    wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -33,6 +34,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         threads::chat_list,
         outside_sessions::chat_outside,
         adopting::chat_adopt,
+        card_chat::card_chat,
         rewinding::chat_rewind,
         runs_list::runs_list,
         session_search::sessions_search,

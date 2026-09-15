@@ -38,7 +38,6 @@ fn two_turns(home: &Path) {
         &Head {
             profile: "claude".to_owned(),
             model: None,
-            card_id: None,
             created_at: 1.0,
             cost_usd: 0.5,
             budget_usd: Some(2.0),
@@ -46,6 +45,7 @@ fn two_turns(home: &Path) {
             permission: None,
             effort: None,
             title: None,
+            cwd: None,
             rewind: Rewind {
                 fork_at: None,
                 anchors: vec![anchor("turn_1", "u-1"), anchor("turn_2", "u-2")],

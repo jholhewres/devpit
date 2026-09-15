@@ -23,7 +23,6 @@ fn head(profile: &str, cost: f64) -> Head {
     Head {
         profile: profile.to_owned(),
         model: Some("opus".to_owned()),
-        card_id: None,
         created_at: 0.0,
         cost_usd: cost,
         budget_usd: None,
@@ -32,6 +31,7 @@ fn head(profile: &str, cost: f64) -> Head {
         effort: None,
         title: None,
         rewind: Default::default(),
+        cwd: None,
     }
 }
 

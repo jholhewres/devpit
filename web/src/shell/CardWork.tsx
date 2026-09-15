@@ -67,6 +67,20 @@ export function CardWork({
     onChanged()
   }, [project, cardId, worktree?.branch, show, onChanged])
 
+  /* A conversation about this card, in its checkout. One account installed
+     is the answer; several are the chat's to ask about. */
+  const chat = async (): Promise<void> => {
+    if (!project) return
+    setBusy('Opening a chat…')
+    const profiles = await ask(() => commands.agentProfiles())
+    const installed = (profiles.data ?? []).filter((profile) => profile.path !== null)
+    const only = installed.length === 1 ? installed[0]!.id : null
+    const answer = await ask(() => commands.cardChat(project.id, cardId, only))
+    setBusy(null)
+    setProblem(answer.error)
+    if (answer.data) show('chat', { id: answer.data })
+  }
+
   /* The step's detached session, brought into the card's own terminal. */
   const background = sessions.find((session) => session.kind === 'background')
   const attach = async (): Promise<void> => {
@@ -120,6 +134,9 @@ export function CardWork({
         )}
         <button className="btn" disabled={Boolean(busy)} onClick={() => void openTerminalFor()}>
           Open a terminal
+        </button>
+        <button className="btn" disabled={Boolean(busy)} onClick={() => void chat()}>
+          Chat about this card
         </button>
         {/* Only the agents this machine actually has. One it cannot run is a
             button that fails, and the list already knows which those are. */}

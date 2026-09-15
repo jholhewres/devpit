@@ -20,6 +20,7 @@ fn a_later_turn_keeps_what_the_conversation_settled() {
         42.0,
     );
     first.session_id = Some("s1".to_owned());
+    first.cwd = Some("/w/card".to_owned());
     first.cost_usd = 0.5;
 
     let later = opening(
@@ -33,9 +34,26 @@ fn a_later_turn_keeps_what_the_conversation_settled() {
     );
     assert_eq!(later.created_at, 42.0);
     assert_eq!(later.session_id.as_deref(), Some("s1"));
+    assert_eq!(later.cwd.as_deref(), Some("/w/card"));
     assert_eq!(later.cost_usd, 0.5);
     assert_eq!(later.budget_usd, Some(2.0));
     assert_eq!(later.permission.as_deref(), Some("plan"));
     assert_eq!(later.model.as_deref(), Some("haiku"));
     assert_eq!(later.effort.as_deref(), Some("high"));
+}
+
+#[test]
+fn a_turn_runs_where_the_conversation_was_fixed_and_refuses_a_folder_that_is_gone() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let here = dir.path().display().to_string();
+    assert_eq!(turn_cwd(None, "/asked").expect("not fixed"), "/asked");
+    assert_eq!(turn_cwd(Some(&here), "/asked").expect("fixed"), here);
+
+    let gone = dir.path().join("gone").display().to_string();
+    let refused = turn_cwd(Some(&gone), "/asked").expect_err("gone");
+    assert_eq!(refused.code, ErrorCode::Conflict);
+    assert_eq!(
+        refused.message,
+        "the folder this conversation ran in is gone"
+    );
 }

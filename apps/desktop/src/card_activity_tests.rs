@@ -471,3 +471,30 @@ fn a_cancelled_run_does_not_stay_working() {
         .expect("late"));
     assert_eq!(activities.happening(&card).activity, Some(Doing::Done));
 }
+
+/// A card's conversation is heard working while a turn runs and done after it.
+#[test]
+fn a_chat_turn_is_heard_working_then_done() {
+    let mut activities = Activities::default();
+    let working = hear(
+        &mut activities,
+        chat_key("card_1", "conv_1"),
+        1,
+        Doing::Working,
+        Place::default(),
+    )
+    .expect("working");
+    assert_eq!(working.activity, Some(Doing::Working));
+    let done = hear(
+        &mut activities,
+        chat_key("card_1", "conv_1"),
+        2,
+        Doing::Done,
+        Place::default(),
+    )
+    .expect("done");
+    assert_eq!(
+        said(&done),
+        [(SessionKind::Chat, "conv_1", Some(Doing::Done))]
+    );
+}

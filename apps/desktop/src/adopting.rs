@@ -15,7 +15,21 @@ pub(crate) fn plain(id: &str) -> bool {
     !id.is_empty() && !id.contains(['/', '\\']) && !id.starts_with('.')
 }
 
-/// Writes the head and the empty transcript that make a conversation listed.
+/// Writes a head and the empty transcript that make a conversation listed.
+pub(crate) fn write_listed(
+    sessions: &Path,
+    conversation_id: &str,
+    head: &Head,
+) -> std::io::Result<()> {
+    write_head(&head_path(sessions, conversation_id), head)?;
+    let transcript = conversation_path(sessions, conversation_id);
+    if !transcript.exists() {
+        std::fs::write(transcript, b"")?;
+    }
+    Ok(())
+}
+
+/// Writes the head and the empty transcript that make an adopted session listed.
 pub(crate) fn adopt(
     sessions: &Path,
     conversation_id: &str,
@@ -24,12 +38,12 @@ pub(crate) fn adopt(
     title: Option<String>,
     now: f64,
 ) -> std::io::Result<()> {
-    write_head(
-        &head_path(sessions, conversation_id),
+    write_listed(
+        sessions,
+        conversation_id,
         &Head {
             profile: profile_id.to_owned(),
             model: None,
-            card_id: None,
             created_at: now,
             cost_usd: 0.0,
             budget_usd: None,
@@ -38,13 +52,9 @@ pub(crate) fn adopt(
             effort: None,
             title,
             rewind: Default::default(),
+            cwd: None,
         },
-    )?;
-    let transcript = conversation_path(sessions, conversation_id);
-    if !transcript.exists() {
-        std::fs::write(transcript, b"")?;
-    }
-    Ok(())
+    )
 }
 
 /// `chat.adopt` — a conversation that resumes a terminal session.
