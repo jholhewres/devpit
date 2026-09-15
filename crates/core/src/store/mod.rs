@@ -3,6 +3,7 @@
 //! WAL because the access pattern is a window drawing while a watcher writes.
 
 mod board;
+mod card_links;
 mod cards;
 mod folders;
 mod layouts;
@@ -42,6 +43,7 @@ pub enum StoreError {
 }
 
 pub use board::{CardRow, ColumnRow, SessionLink, StepRow, StepUse, DEFAULT_COLUMNS};
+pub use card_links::{BackgroundLink, CardLinks, ChatLink, RunLink};
 pub use cards::{AttachmentRow, CommentRow, NoticeRow};
 pub use runs::RunRow;
 /// The ceilings on anything read from outside, in one place.

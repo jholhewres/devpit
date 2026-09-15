@@ -477,4 +477,25 @@ ALTER TABLE card_attachment ADD COLUMN plugin_id TEXT;
 DROP TABLE drawing;
 "#,
     },
+    // Migration 014 — what links a card to the sessions working on it.
+    Migration {
+        version: 14,
+        sql: r#"
+-- The session a run's agent spoke in, and the folder it ran in: a run resumed
+-- in a chat has to resume where it ran, because the CLI files sessions by folder.
+ALTER TABLE run ADD COLUMN session_id TEXT;
+ALTER TABLE run ADD COLUMN cwd TEXT;
+-- The same folder for the background session a step started.
+ALTER TABLE session_link ADD COLUMN cwd TEXT;
+
+-- The conversations that are a card's. One card to a conversation, and they go
+-- with the card. Whether one is working is never stored: the app keeps that.
+CREATE TABLE card_chat (
+    conversation_id TEXT PRIMARY KEY,
+    card_id         TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    created_at      INTEGER NOT NULL
+);
+CREATE INDEX card_chat_card ON card_chat(card_id, created_at);
+"#,
+    },
 ];
