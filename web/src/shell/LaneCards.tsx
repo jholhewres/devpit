@@ -4,6 +4,7 @@ import type { Card, Played } from '../gen/bindings'
 import { playable, type Lane } from './board'
 import { CardMenu } from './CardMenu'
 import { Tile } from './Lane'
+import { tileAction } from './tileKeys'
 import type { CardBoardActs } from './useCardActs'
 import type { Drag } from './useDrag'
 
@@ -42,7 +43,7 @@ export function LaneCards({
   acts: (card: Card) => CardBoardActs
 }): React.JSX.Element {
   const { held, landing, landed } = drag
-  const [menu, setMenu] = useState<{ card: Card; x: number; y: number } | null>(null)
+  const [menu, setMenu] = useState<{ card: Card; x: number; y: number; picking?: boolean } | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const playFor = (card: Card) =>
     playable(card, lane.column) ? (confirmed: boolean) => onPlay(card.id, confirmed) : undefined
@@ -70,9 +71,18 @@ export function LaneCards({
                card somebody cannot open. */
             onKeyDown={(event) => {
               if (renaming === card.id) return
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                onOpen(card.id)
+              const action = tileAction(event)
+              if (!action) return
+              event.preventDefault()
+              if (action === 'open') onOpen(card.id)
+              if (action === 'rename') setRenaming(card.id)
+              if (action === 'archive') {
+                const hands = acts(card)
+                void hands.archive(false).then((refused) => (refused ? hands.problem(refused) : hands.archived()))
+              }
+              if (action === 'moveTo' && others.length > 0) {
+                const box = event.currentTarget.getBoundingClientRect()
+                setMenu({ card, x: box.left, y: box.bottom, picking: true })
               }
             }}
           >
@@ -94,7 +104,9 @@ export function LaneCards({
 
       {menu && (
         <CardMenu
+          key={`${menu.card.id}${menu.picking ? ':picking' : ''}`}
           card={menu.card}
+          startPicking={menu.picking}
           stepName={lane.column.step?.name}
           at={menu}
           acts={{

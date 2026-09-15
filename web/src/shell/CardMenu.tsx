@@ -33,10 +33,13 @@ export function CardMenu({
   at,
   acts,
   lanes,
+  startPicking,
   onClose,
 }: {
   card: Card
   stepName?: string
+  /** Opened by Ctrl/⌘+M: straight to the lanes. */
+  startPicking?: boolean
   /** The other lanes, for Move to…. */
   lanes: readonly { id: string; name: string }[]
   at: { readonly x: number; readonly y: number }
@@ -46,7 +49,7 @@ export function CardMenu({
   const box = useRef<HTMLDivElement>(null)
   const [ending, setEnding] = useState<Ending | null>(null)
   const [running, setRunning] = useState(false)
-  const [picking, setPicking] = useState(false)
+  const [picking, setPicking] = useState(startPicking ?? false)
   const listing = !ending && !running
 
   useEffect(() => {
@@ -124,9 +127,16 @@ export function CardMenu({
                 key={index}
                 className={entry.bad ? 'ctx__i ctx__i--bad' : 'ctx__i'}
                 role="menuitem"
+                aria-label={entry.label}
+                aria-keyshortcuts={entry.key}
                 onClick={() => entry.run?.(card.id)}
               >
                 {entry.label}
+                {entry.key && (
+                  <span className="ctx__k" aria-hidden="true">
+                    {entry.key}
+                  </span>
+                )}
               </button>
             ),
           )}

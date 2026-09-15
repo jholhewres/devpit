@@ -1,4 +1,5 @@
 import type { SessionEntry } from './sessionMenu'
+import { keyLabel } from './tileKeys'
 
 /*
  * A card's menu, as data, so `wired` can count it.
@@ -23,13 +24,13 @@ export interface CardHands {
 }
 
 export const cardMenu = (hands: CardHands): readonly SessionEntry[] => [
-  { label: 'Open', run: hands.open },
-  { label: 'Rename', run: hands.rename },
-  ...(hands.moveTo ? [{ label: 'Move to…', run: hands.moveTo }] : []),
+  { label: 'Open', key: keyLabel('open'), run: hands.open },
+  { label: 'Rename', key: keyLabel('rename'), run: hands.rename },
+  ...(hands.moveTo ? [{ label: 'Move to…', key: keyLabel('moveTo'), run: hands.moveTo }] : []),
   { rule: true },
   hands.play ? { label: 'Run step', run: hands.play } : { label: 'Open a terminal', run: hands.terminal },
   ...(hands.copyBranch ? [{ label: 'Copy branch', run: hands.copyBranch }] : []),
   { rule: true },
-  { label: 'Archive', run: hands.archive },
+  { label: 'Archive', key: keyLabel('archive'), run: hands.archive },
   { label: 'Delete…', bad: true, run: hands.remove },
 ]

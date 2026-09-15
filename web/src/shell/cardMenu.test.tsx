@@ -117,7 +117,7 @@ describe('a card on the board', () => {
   it('publishes its id where a menu reads it, and opens its menu on a right-click', () => {
     const { container } = board()
     rightClick(container)
-    const items = within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.textContent)
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'))
     expect(items).toEqual(['Open', 'Rename', 'Open a terminal', 'Archive', 'Delete…'])
   })
 
