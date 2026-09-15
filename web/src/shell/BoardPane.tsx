@@ -1,12 +1,13 @@
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { CardPane } from './CardPane'
 import { LaneFoot, LaneHead, NewColumn, Tile } from './Lane'
+import { LaneCards } from './LaneCards'
+import { useCardActs } from './useCardActs'
 import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
 import { reordered } from './laneOrder'
-import { playable } from './board'
 import { BoardShelf } from './BoardShelf'
 import { useShell } from './useShell'
 
@@ -33,6 +34,7 @@ export function BoardPane(): React.JSX.Element {
   /* The card just archived, while Undo is still offered. */
   const [archived, setArchived] = useState<string | null>(null)
   const undone = useCallback(() => setArchived(null), [])
+  const acts = useCardActs(project?.id ?? null, live, setArchived)
   const [adding, setAdding] = useState<string | null>(null)
   /* Which column is being dragged. Its own gesture, not `useDrag`: a column
      moves between columns and a card moves between lanes, and one state
@@ -73,7 +75,7 @@ export function BoardPane(): React.JSX.Element {
     if (ended.what === 'moved') live.move(ended.card.id, ended.lane, ended.index)
   }
 
-  const { held, landing, landed } = drag
+  const { held, landing } = drag
 
   return (
     <>
@@ -115,42 +117,16 @@ export function BoardPane(): React.JSX.Element {
                 onDelete={(moveTo) => live.deleteColumn(lane.column.id, moveTo)}
               />
 
-              <div className="blane__list">
-                {lane.cards.map((card, index) => (
-                  <Fragment key={card.id}>
-                    {dropping && held?.moved && landing.index === index && (
-                      <div className="slot" style={{ height: held.height }} />
-                    )}
-                    <div
-                      className={landed === card.id ? 'tile tile--landed' : 'tile'}
-                      role="button"
-                      tabIndex={0}
-                      data-ctx="card"
-                      data-card={card.id}
-                      data-ghost={String(held?.card.id === card.id && held.moved)}
-                      onPointerDown={(event) => drag.down(event, card, lane.column.id)}
-                      /* Keyboard reaches it too. A card openable only by pointer
-                         is a card somebody cannot open. */
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          setOpened(card.id)
-                        }
-                      }}
-                    >
-                      <Tile
-                        card={card}
-                        progress={live.progress[card.runs[0]?.id ?? '']}
-                        stepName={lane.column.step?.name}
-                        onPlay={playable(card, lane.column) ? (confirmed) => live.play(card.id, confirmed) : undefined}
-                      />
-                    </div>
-                  </Fragment>
-                ))}
-                {dropping && held?.moved && landing.index >= lane.cards.length && (
-                  <div className="slot" style={{ height: held.height }} />
-                )}
-              </div>
+              <LaneCards
+                lane={lane}
+                drag={drag}
+                dropping={dropping}
+                progress={live.progress}
+                onOpen={setOpened}
+                onPlay={live.play}
+                onRename={live.renameCard}
+                acts={acts}
+              />
 
               <LaneFoot
                 adding={adding === lane.column.id}

@@ -4,6 +4,7 @@ import type { Checkout, Run } from '../gen/bindings'
 import { AgentMark } from './AgentMark'
 import { ask, commands } from './live'
 import { OpenIn } from './OpenIn'
+import { openCardTerminal } from './useCardActs'
 import { offered, useKnownAgents } from './useKnownAgents'
 import { useOpeners } from './useOpeners'
 import { useShell } from './useShell'
@@ -56,16 +57,11 @@ export function CardWork({
      this way, and a second way in would be a second thing to keep right. */
   const openTerminalFor = useCallback(async (agentId?: string): Promise<void> => {
     if (!project) return
-    setBusy(agentId ? 'Opening a terminal…' : 'Opening a terminal…')
-    const answer = await ask(() => commands.cardTerminal(project.id, cardId))
+    setBusy('Opening a terminal…')
+    const refused = await openCardTerminal(project.id, cardId, worktree?.branch ?? 'Card', show, agentId)
     setBusy(null)
-    setProblem(answer.error)
-    if (answer.error) return
-    show('term', {
-      id: `tab_card_${cardId}`,
-      title: worktree?.branch ?? 'Card',
-      ...(agentId ? { launch: agentId } : {}),
-    })
+    setProblem(refused)
+    if (refused) return
     onChanged()
   }, [project, cardId, worktree?.branch, show, onChanged])
 

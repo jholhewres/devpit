@@ -50,6 +50,8 @@
 @keyframes slot-in { from { opacity: 0; transform: scaleY(0.82); } to { opacity: 1; transform: none; } }
 
 .tile__t { font-size: 12.5px; color: var(--text); line-height: 1.42; }
+.tile__rename { width: 100%; padding: 1px 4px; margin: -2px -5px; border-radius: 5px; border: 1px solid var(--accent); background: var(--canvas); font: inherit; font-size: 12.5px; line-height: 1.42; color: var(--text); }
+.tile__rename:focus { outline: none; }
 .tile__m { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; color: var(--text-3); }
 .tile__agent { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10.5px; }
 /* Lane.tsx set this on failed and lost runs, and no rule ever coloured it. */

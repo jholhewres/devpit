@@ -11,6 +11,8 @@ export interface UseBoard {
   readonly error: string | null
   /** Puts the last refusal away once it has been read. */
   dismiss: () => void
+  /** Says something went wrong where the board's own refusals are said. */
+  report: (message: string) => void
   readonly cards: number
   /** The last line each running step printed, by run id. */
   readonly progress: Readonly<Record<string, string>>
@@ -18,6 +20,7 @@ export interface UseBoard {
   /** Runs a card's lane step now. Answers what happened, or null when refused — the refusal is in `error`. */
   play: (cardId: string, confirmed: boolean) => Promise<Played | null>
   addCard: (columnId: string, title: string) => void
+  renameCard: (cardId: string, title: string) => void
   addColumn: (name: string) => void
   renameColumn: (columnId: string, name: string) => void
   reorderColumns: (ids: string[]) => void
@@ -121,6 +124,13 @@ export function useBoard(projectId: string | null): UseBoard {
     [reload],
   )
 
+  const renameCard = useCallback(
+    (cardId: string, title: string) => {
+      const body = board?.cards.find((card) => card.id === cardId)?.body ?? ''
+      if (projectId) then(() => commands.cardUpdate(projectId, cardId, title, body))
+    },
+    [board, projectId, then],
+  )
   const addColumn = useCallback(
     (name: string) => projectId && then(() => commands.columnCreate(projectId, name)),
     [projectId, then],
@@ -173,11 +183,13 @@ export function useBoard(projectId: string | null): UseBoard {
     lanes: lanes(board),
     error,
     dismiss: () => setError(null),
+    report: setError,
     cards: board?.cards.length ?? 0,
     progress,
     move,
     play,
     addCard,
+    renameCard,
     addColumn,
     renameColumn,
     reorderColumns,

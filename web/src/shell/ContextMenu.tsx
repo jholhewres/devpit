@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { FileDialogs } from './FileDialogs'
 import { FILE_MENU } from './fileMenu'
-import { CARD_MENU, sessionMenu, type SessionEntry } from './sessionMenu'
+import { sessionMenu, type SessionEntry } from './sessionMenu'
 import { useFileActions } from './useFileActions'
 import { useShell } from './useShell'
 import { abandoned } from './typing'
@@ -25,10 +25,9 @@ type Item = SessionEntry
  * a window like this can do. Leaving it on teaches people that right-click is
  * broken here, which then hides the places it works.
  *
- * `card` is the one that still only closes. It needs board commands, and it is
- * named here so the next reader knows it is known rather than missed.
+ * A card's menu is not here: it acts on the board, and the board opens it.
  */
-const STATIC: Record<string, readonly Item[]> = { card: CARD_MENU, file: FILE_MENU }
+const STATIC: Record<string, readonly Item[]> = { file: FILE_MENU }
 
 interface At {
   readonly kind: string

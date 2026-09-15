@@ -28,22 +28,3 @@ export const sessionMenu = (hands: SessionHands): readonly SessionEntry[] => [
   { rule: true },
   { label: 'Close session', bad: true, run: hands.close },
 ]
-
-/*
- * The card menu, which still only closes.
- *
- * Here rather than hidden in the component so it is countable: wiring it means
- * board commands, and it is named as known rather than missed. `fileMenu` has
- * a `wired` test for exactly this shape; this list is what fails it until the
- * entries act.
- */
-export const CARD_MENU: readonly SessionEntry[] = [
-  { label: 'Open', key: '↵' },
-  { label: 'Open in a chat' },
-  { label: 'Open a terminal here' },
-  { rule: true },
-  { label: 'Move to…', key: '⌘M' },
-  { label: 'Rename', key: 'F2' },
-  { rule: true },
-  { label: 'Delete card', bad: true },
-]

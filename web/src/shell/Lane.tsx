@@ -45,6 +45,8 @@ export function Tile({
   progress,
   stepName,
   onPlay,
+  renaming,
+  onRenamed,
 }: {
   card: Card
   progress?: string
@@ -52,6 +54,10 @@ export function Tile({
   stepName?: string
   /** Present only when the tile can be played (`playable`); absent on the card in the air. */
   onPlay?: (confirmed: boolean) => Promise<Played | null>
+  /** The title is being renamed in place, from the card's menu. */
+  renaming?: boolean
+  /** The new title, or null when the rename was abandoned. */
+  onRenamed?: (title: string | null) => void
 }): React.JSX.Element {
   const [asking, setAsking] = useState(false)
   const run = card.runs[0]
@@ -59,7 +65,11 @@ export function Tile({
   const spent = money(card.costUsd ?? 0)
   return (
     <>
-      <div className="tile__t">{card.title}</div>
+      {renaming ? (
+        <TileRename title={card.title} onDone={(title) => onRenamed?.(title)} />
+      ) : (
+        <div className="tile__t">{card.title}</div>
+      )}
       {/* Under the pointer rather than always there: the board is read far
           more often than it is played, and a row of triangles reads as a list
           of things waiting to be started. */}
@@ -116,22 +126,71 @@ export function Tile({
         {spent && <span className="tile__time">{spent}</span>}
         {card.session && <span className="tile__time">{card.session.status}</span>}
       </div>
-      {asking &&
-        createPortal(
-          /* The portal is still inside the tile in React's tree: a press here
-             must not start a drag or open the card. */
-          <div onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-            <Confirm
-              title={`Run ${stepName ?? 'this step'}?`}
-              body="This step is marked as having no undo. It runs against this card's own checkout, on its own branch — but what it does from there is its own."
-              danger={`Run ${stepName ?? 'it'}`}
-              onClose={() => setAsking(false)}
-              onConfirm={() => void onPlay?.(true).then(() => setAsking(false))}
-            />
-          </div>,
-          document.body,
-        )}
+      {asking && (
+        <RunConfirm
+          stepName={stepName}
+          onClose={() => setAsking(false)}
+          onConfirm={() => void onPlay?.(true).then(() => setAsking(false))}
+        />
+      )}
     </>
+  )
+}
+
+/** The question a step with no undo asks before it runs, from the tile or its menu. */
+export function RunConfirm({
+  stepName,
+  onClose,
+  onConfirm,
+}: {
+  stepName?: string
+  onClose: () => void
+  onConfirm: () => void
+}): React.JSX.Element {
+  /* The portal is still inside the tile in React's tree: a press here must
+     not start a drag or open the card. */
+  return createPortal(
+    <div onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      <Confirm
+        title={`Run ${stepName ?? 'this step'}?`}
+        body="This step is marked as having no undo. It runs against this card's own checkout, on its own branch — but what it does from there is its own."
+        danger={`Run ${stepName ?? 'it'}`}
+        onClose={onClose}
+        onConfirm={onConfirm}
+      />
+    </div>,
+    document.body,
+  )
+}
+
+/** A title renamed in place. Settles once: Enter, Escape or leaving the field. */
+function TileRename({ title, onDone }: { title: string; onDone: (title: string | null) => void }): React.JSX.Element {
+  const done = useRef(false)
+  const finish = (next: string | null): void => {
+    if (done.current) return
+    done.current = true
+    onDone(next)
+  }
+  return (
+    <input
+      className="tile__rename"
+      autoFocus
+      defaultValue={title}
+      aria-label="Card title"
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (committed(event)) {
+          event.preventDefault()
+          finish(event.currentTarget.value.trim() || null)
+        }
+        if (abandoned(event)) {
+          event.preventDefault()
+          finish(null)
+        }
+      }}
+      onBlur={(event) => finish(event.currentTarget.value.trim() || null)}
+    />
   )
 }
 
