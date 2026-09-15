@@ -273,7 +273,8 @@ body[data-account='out'] .acct { display: none; }
 .ask__t { margin: 0 0 8px; font-size: 15px; font-weight: 560; color: var(--text); }
 /* Says a second step is coming, so the first confirm is not read as the last. */
 .ask__step { margin: 0 0 6px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ghost); }
-.ask__d { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+/* A path has no spaces to break at, and a dialog is a fixed width: it wraps anywhere rather than run past the box. */
+.ask__d { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
 .ask__warn { display: flex; gap: 9px; margin-top: 12px; padding: 9px 11px; border-radius: 9px; background: color-mix(in srgb, var(--warning) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent); font-size: 12px; line-height: 1.5; color: var(--text); }
 .ask__warn[hidden] { display: none; }
 .ask__warn svg { flex: none; margin-top: 1px; color: var(--warning); }

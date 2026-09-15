@@ -42,6 +42,14 @@ describe('the open card header', () => {
 })
 
 describe('what a delete says', () => {
+  it('wraps a checkout path inside the dialog instead of running past it', () => {
+    const body = stylesheet()
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('}')
+      .find((rule) => /(^|\s)\.ask__d\s*\{/.test(rule))
+    expect(body).toMatch(/overflow-wrap:\s*anywhere/)
+  })
+
   it('names what goes and where the checkout stays', () => {
     expect(deleteBody({ comments: 2, pinned: 1, runs: 3, checkout: '/w/card' })).toBe(
       'Its 2 comments, 1 pinned file and 3 runs go with it. The checkout and its branch stay at /w/card.',
