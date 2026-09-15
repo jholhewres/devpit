@@ -18,8 +18,10 @@ fn a_missing_files_existing_parent_still_resolves() {
 #[test]
 fn a_parent_that_climbs_out_is_refused_as_outside() {
     let dir = tempfile::tempdir().expect("tempdir");
-    // Reaches a real file so the failure is containment, not "not there".
-    let refused = resolve_new(dir.path(), "../../../etc/passwd");
+    // Reaches a real file so the failure is containment, not "not there". One
+    // `..` per component climbs to `/` wherever the tempdir happens to live.
+    let climb = "../".repeat(dir.path().components().count());
+    let refused = resolve_new(dir.path(), &format!("{climb}etc/passwd"));
     assert!(
         matches!(refused, Err(TreeError::Outside { .. })),
         "wrong reason: {refused:?}"
