@@ -29,7 +29,6 @@ export function CardWork({
   worktree,
   runs,
   onChanged,
-  play,
 }: {
   cardId: string
   /** What the card's terminal tab is called: the card, not its branch. */
@@ -37,8 +36,6 @@ export function CardWork({
   worktree: Checkout | null
   runs: readonly Run[]
   onChanged: () => void
-  /** The lane's step, first under the same heading: running it is doing the work too. */
-  play?: React.ReactNode
 }): React.JSX.Element {
   const { project, show } = useShell()
   /* Only what Settings still offers. */
@@ -80,7 +77,6 @@ export function CardWork({
   return (
     <section className="cwork">
       <h2 className="cardp__h">Work</h2>
-      {play}
 
       {worktree ? (
         <div className="cwork__wt" data-gone={!worktree.exists}>

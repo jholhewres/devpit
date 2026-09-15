@@ -155,7 +155,13 @@ export function BoardPane(): React.JSX.Element {
         />
 
         {opened && (
-          <CardPane cardId={opened} onClose={() => setOpened(null)} onChanged={live.reload} onArchived={setArchived} />
+          <CardPane
+            cardId={opened}
+            onClose={() => setOpened(null)}
+            onChanged={live.reload}
+            onArchived={setArchived}
+            lanes={live.lanes.map((lane) => ({ id: lane.column.id, name: lane.column.name, cards: lane.cards.length }))}
+          />
         )}
 
         {/* On the body, not in the board.

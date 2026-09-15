@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Attachments } from './Attachments'
+import { CardDescription } from './CardDescription'
 import { CardDiff } from './CardDiff'
+import { CardLane, type LaneChoice } from './CardLane'
 import { CardPlay } from './CardPlay'
 import { CardSessions } from './CardSessions'
 import { liveWork, stopLiveWork } from './liveWork'
@@ -43,10 +45,13 @@ export function CardPane({
   onClose,
   onChanged,
   onArchived,
+  lanes,
 }: {
   cardId: string
   onClose: () => void
   onChanged: () => void
+  /** The board's lanes, for moving the card without closing it. */
+  lanes?: readonly LaneChoice[]
   /** Told after an archive, so the board can offer to take it back. */
   onArchived?: (cardId: string) => void
 }): React.JSX.Element {
@@ -57,6 +62,8 @@ export function CardPane({
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [dirty, setDirty] = useState(false)
+  /* Said where the Save button was: the fields save as they lose focus. */
+  const [saved, setSaved] = useState(false)
   const [ending, setEnding] = useState<Ending | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
 
@@ -72,6 +79,7 @@ export function CardPane({
     if (!dirty) return
     setDirty(false)
     card.save(title.trim() || 'Untitled', body)
+    setSaved(true)
   }
 
   /* The fields save on blur, and a close by Esc or by a click outside is not
@@ -121,88 +129,97 @@ export function CardPane({
         {card.error && <p className="wtb__no">{card.error}</p>}
 
         {detail && (
-          <div className="cardp__in">
-            <input
-              className="cardp__title"
-              value={title}
-              aria-label="Title"
-              onChange={(event) => {
-                setTitle(event.target.value)
-                setDirty(true)
-              }}
-              onBlur={save}
-              onKeyDown={(event) => committed(event) && event.currentTarget.blur()}
-            />
+          <div className="cardp__in cardp__grid">
+            <div className="cardp__main">
+              <input
+                className="cardp__title"
+                value={title}
+                aria-label="Title"
+                onChange={(event) => {
+                  setTitle(event.target.value)
+                  setDirty(true)
+                  setSaved(false)
+                }}
+                onBlur={save}
+                onKeyDown={(event) => committed(event) && event.currentTarget.blur()}
+              />
 
-            <div className="cardp__row">
-              <label className="cardp__due" data-near={near ?? 'none'}>
-                <span className="fld__l">Due</span>
-                <input
-                  type="date"
-                  className="cardp__date"
-                  value={toField(detail.card.dueAt)}
-                  onChange={(event) => card.setDue(fromField(event.target.value))}
-                />
-                {near && <span className="cardp__near">{dueLabel(detail.card.dueAt)}</span>}
-              </label>
-              {detail.card.dueAt !== null && (
-                <button className="conv__act" onClick={() => card.setDue(null)}>
-                  Clear
-                </button>
+              <h2 className="cardp__h">Description</h2>
+              <CardDescription
+                body={body}
+                onChange={(next) => {
+                  setBody(next)
+                  setDirty(true)
+                  setSaved(false)
+                }}
+                onDone={save}
+              />
+              {saved && !dirty && (
+                <p className="cardp__saved" role="status">
+                  Saved
+                </p>
               )}
-              {money(detail.card.costUsd ?? 0) && (
-                <span className="cardp__cost">{money(detail.card.costUsd ?? 0)} spent</span>
-              )}
+
+              {/* Only once the card has a checkout: there is nothing to
+                  compare against until it has started somewhere. */}
+              {detail.worktree?.exists && <CardDiff cardId={cardId} />}
+
+              <Comments
+                comments={detail.comments}
+                onSay={card.comment}
+                onEdit={card.editComment}
+                onDelete={card.deleteComment}
+              />
             </div>
 
-            <h2 className="cardp__h">Description</h2>
-            <textarea
-              className="cardp__body"
-              value={body}
-              rows={6}
-              aria-label="Description"
-              placeholder="What is this card for?"
-              onChange={(event) => {
-                setBody(event.target.value)
-                setDirty(true)
-              }}
-              onBlur={save}
-            />
-            {dirty && (
-              <div className="ask__row">
-                <button className="btn btn--go" onClick={save}>
-                  Save
-                </button>
+            <div className="cardp__side">
+              {project && lanes && lanes.length > 0 && (
+                <CardLane
+                  projectId={project.id}
+                  cardId={cardId}
+                  columnId={detail.card.columnId}
+                  lanes={lanes}
+                  onMoved={() => {
+                    card.reload()
+                    onChanged()
+                  }}
+                />
+              )}
+              <CardPlay cardId={cardId} step={detail.columnStep} onPlayed={card.reload} />
+
+              <div className="cardp__row">
+                <label className="cardp__due" data-near={near ?? 'none'}>
+                  <span className="fld__l">Due</span>
+                  <input
+                    type="date"
+                    className="cardp__date"
+                    value={toField(detail.card.dueAt)}
+                    onChange={(event) => card.setDue(fromField(event.target.value))}
+                  />
+                  {near && <span className="cardp__near">{dueLabel(detail.card.dueAt)}</span>}
+                </label>
+                {detail.card.dueAt !== null && (
+                  <button className="conv__act" onClick={() => card.setDue(null)}>
+                    Clear
+                  </button>
+                )}
+                {money(detail.card.costUsd ?? 0) && (
+                  <span className="cardp__cost">{money(detail.card.costUsd ?? 0)} spent</span>
+                )}
               </div>
-            )}
 
-            <CardWork
-              cardId={cardId}
-              title={detail.card.title}
-              worktree={detail.worktree}
-              runs={detail.runs}
-              onChanged={card.reload}
-              play={<CardPlay cardId={cardId} step={detail.columnStep} onPlayed={card.reload} />}
-            />
+              <CardWork
+                cardId={cardId}
+                title={detail.card.title}
+                worktree={detail.worktree}
+                runs={detail.runs}
+                onChanged={card.reload}
+              />
 
-            <CardSessions cardId={cardId} title={detail.card.title} sessions={detail.sessions} onChanged={card.reload} />
+              <CardSessions cardId={cardId} title={detail.card.title} sessions={detail.sessions} onChanged={card.reload} />
 
-            {/* Only once the card has a checkout: there is nothing to
-                compare against until it has started somewhere. */}
-            {detail.worktree?.exists && <CardDiff cardId={cardId} />}
-
-            <Attachments
-              pinned={detail.pinned}
-              onPin={card.pin}
-              onUnpin={card.unpin}
-            />
-
-            <Comments
-              comments={detail.comments}
-              onSay={card.comment}
-              onEdit={card.editComment}
-              onDelete={card.deleteComment}
-            />
+              <Attachments pinned={detail.pinned} onPin={card.pin} onUnpin={card.unpin} />
+            </div>
           </div>
         )}
       </div>

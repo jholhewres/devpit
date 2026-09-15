@@ -118,30 +118,9 @@ describe('playing a card', () => {
 })
 
 describe('the work section of a card', () => {
-  const work = (step: Step | null) =>
-    render(
-      <CardWork
-        cardId="card_1"
-        title="Ship it"
-        worktree={null}
-        runs={[]}
-        onChanged={vi.fn()}
-        play={<CardPlay cardId="card_1" step={step} onPlayed={vi.fn()} />}
-      />,
-    )
-
-  it('offers one terminal when the lane runs nothing', () => {
-    work(null)
+  it('offers one terminal', () => {
+    render(<CardWork cardId="card_1" title="Ship it" worktree={null} runs={[]} onChanged={vi.fn()} />)
     expect(screen.getAllByRole('button', { name: 'Open a terminal' })).toHaveLength(1)
-  })
-
-  it('puts play, the checkout and the terminal under one heading', () => {
-    work(step())
     expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Work'])
-    const section = screen.getByRole('heading', { name: 'Work' }).closest('section')
-    expect(section?.contains(screen.getByRole('button', { name: /Run the tests/ }))).toBe(true)
-    expect(section?.contains(screen.getByRole('button', { name: 'Make a checkout' }))).toBe(true)
-    expect(section?.contains(screen.getByRole('button', { name: 'Open a terminal' }))).toBe(true)
   })
 })
-

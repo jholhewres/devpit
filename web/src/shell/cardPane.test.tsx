@@ -56,7 +56,8 @@ vi.mock('./CardWork', () => ({ CardWork: () => null }))
 vi.mock('./CardSessions', () => ({ CardSessions: () => null }))
 vi.mock('./CardDiff', () => ({ CardDiff: () => null }))
 vi.mock('./Attachments', () => ({ Attachments: () => null }))
-vi.mock('./Comments', () => ({ Comments: () => null }))
+vi.mock('./Comments', () => ({ Comments: () => <div>comments</div> }))
+vi.mock('./Markdown', () => ({ Markdown: ({ source }: { source: string }) => <div>{source}</div> }))
 
 const escape = (): void => {
   fireEvent.keyDown(window, { key: 'Escape' })
@@ -136,5 +137,26 @@ describe('the backdrop', () => {
     fireEvent.pointerDown(title())
     fireEvent.click(backdrop())
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('the open card, laid out', () => {
+  it('keeps what the card is in the main column and what is done with it beside', () => {
+    const main = document.querySelector('.cardp__main')!
+    const side = document.querySelector('.cardp__side')!
+    expect(main.contains(title())).toBe(true)
+    expect(main.textContent).toContain('comments')
+    expect(side.textContent).toContain('Due')
+  })
+
+  it('says Saved where the Save button was, once what was written is kept', () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Edit the description' }))
+    const field = screen.getByRole('textbox', { name: 'Description' })
+    fireEvent.change(field, { target: { value: 'All of it' } })
+    expect(screen.queryByRole('status')).toBeNull()
+    fireEvent.blur(field)
+    expect(save).toHaveBeenCalledWith('Wire the board', 'All of it')
+    expect(screen.getByRole('status').textContent).toBe('Saved')
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
   })
 })
