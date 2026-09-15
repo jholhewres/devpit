@@ -1,0 +1,12 @@
+# Joins onto an agent CLI's own `projects/` folder, per file. One "path count"
+# per line, and the count is exact.
+#
+# `~/.claude/projects` is the CLI's, not devpit's. Every other `projects/` path
+# is built by `devpit_core::home::ProjectHome`, and the guard fails anywhere
+# else that spells one.
+
+apps/desktop/src/session_search.rs 1
+apps/desktop/src/session_search_tests.rs 1
+crates/agentcli/src/outside.rs 1
+crates/agentcli/src/outside_tests.rs 1
+crates/agentcli/src/transcript.rs 1

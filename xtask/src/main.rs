@@ -11,6 +11,7 @@ use std::process::ExitCode;
 
 mod agent_boundary;
 mod dead_controls;
+mod home_paths;
 mod naming;
 mod platform_window;
 mod ratchet;
@@ -74,6 +75,7 @@ fn check() -> ExitCode {
     findings.extend(ratchet::files_only_get_shorter(&root));
     findings.extend(agent_boundary::only_one_crate_drives_the_agent(&root));
     findings.extend(dead_controls::a_control_either_works_or_goes(&root));
+    findings.extend(home_paths::paths_come_from_home(&root));
 
     if findings.is_empty() {
         println!("guards: ok");
