@@ -74,6 +74,11 @@
 .tile__add { flex: none; height: 30px; border-radius: 9px; border: 1px dashed var(--border-strong); color: var(--text-3); font-size: 11.5px; transition: color 140ms ease, border-color 140ms ease; }
 .tile__add:hover { color: var(--text-2); border-color: var(--ghost); }
 
+/* Right after an archive, the one thing worth offering is taking it back. */
+.undo { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 14px; padding: 7px 8px 7px 14px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 12px 30px var(--shade); font-size: 12.5px; color: var(--text); animation: rise 180ms ease-out both; }
+.undo__b { padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 550; color: var(--accent); }
+.undo__b:hover { background: var(--overlay-strong); }
+
 body[data-dragging='true'] { cursor: grabbing; }
 body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 

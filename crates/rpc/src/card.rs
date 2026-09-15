@@ -151,3 +151,20 @@ pub struct DeleteRefusal {
     /// True only for unsaved work, which is the person's to throw away.
     pub forcible: bool,
 }
+
+/// A card off the board, as the Archived list shows it.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedCard {
+    pub id: String,
+    pub title: String,
+    pub column_name: Option<String>,
+    pub archived_at: f64,
+}
+
+/// Response of `board.archived`: most recently archived first, at most 200.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedCards {
+    pub cards: Vec<ArchivedCard>,
+}

@@ -126,6 +126,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         in_flight::run_cancel,
         front::card_archive,
         front::card_delete,
+        front::card_restore,
+        front::board_archived,
         front::card_diff,
         columns::step_create,
         steps::agents_list,

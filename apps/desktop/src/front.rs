@@ -1,7 +1,9 @@
 //! What a line of work changed, and putting it away safely.
 
 use devpit_core::Store;
-use devpit_rpc::{Board, CardDeleted, DeleteRefusal, ErrorCode, Front, RpcError};
+use devpit_rpc::{
+    ArchivedCard, ArchivedCards, Board, CardDeleted, DeleteRefusal, ErrorCode, Front, RpcError,
+};
 use tauri::State;
 
 use crate::board::board_get;
@@ -122,9 +124,7 @@ pub fn card_delete(
     force: bool,
 ) -> Result<CardDeleted, RpcError> {
     let store = store()?;
-    if store.project_id_of_card(&card_id)?.as_deref() != Some(project_id.as_str()) {
-        return Err(RpcError::new(ErrorCode::NotFound, "no such card"));
-    }
+    of_project(&store, &project_id, &card_id)?;
     let card = store
         .card(&card_id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such card"))?;
@@ -175,6 +175,50 @@ pub fn card_delete(
         deleted: store.delete_card(&card_id)?,
         refused: None,
     })
+}
+
+/// A card id from the window is only acted on inside the project it names.
+fn of_project(store: &Store, project_id: &str, card_id: &str) -> Result<(), RpcError> {
+    if store.project_id_of_card(card_id)?.as_deref() == Some(project_id) {
+        Ok(())
+    } else {
+        Err(RpcError::new(ErrorCode::NotFound, "no such card"))
+    }
+}
+
+/// How many archived cards `board.archived` answers with.
+const ARCHIVED_AT_MOST: i64 = 200;
+
+/// `board.archived` — the cards off the board, newest first.
+#[tauri::command]
+#[specta::specta]
+pub fn board_archived(project_id: String) -> Result<ArchivedCards, RpcError> {
+    let cards = store()?
+        .archived_cards(&project_id, ARCHIVED_AT_MOST)?
+        .into_iter()
+        .map(|row| ArchivedCard {
+            id: row.id,
+            title: row.title,
+            column_name: row.column_name,
+            archived_at: row.archived_at as f64,
+        })
+        .collect();
+    Ok(ArchivedCards { cards })
+}
+
+/// `card.restore` — an archived card back on the board.
+#[tauri::command]
+#[specta::specta]
+pub fn card_restore(project_id: String, card_id: String) -> Result<Board, RpcError> {
+    let store = store()?;
+    of_project(&store, &project_id, &card_id)?;
+    if !store.restore_card(&card_id)? {
+        return Err(RpcError::new(
+            ErrorCode::Conflict,
+            "that card is not archived",
+        ));
+    }
+    board_get(project_id)
 }
 
 #[cfg(test)]

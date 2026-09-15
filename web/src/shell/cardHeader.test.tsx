@@ -82,7 +82,7 @@ describe('ending a card', () => {
     const hands = ending({ ending: { what: 'delete', refused: unsaved }, remove })
     expect(screen.getByText(unsaved.reason)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Delete anyway' }))
-    await waitFor(() => expect(hands.onDone).toHaveBeenCalled())
+    await waitFor(() => expect(hands.onDone).toHaveBeenCalledWith('delete'))
     expect(remove).toHaveBeenCalledWith(true)
   })
 

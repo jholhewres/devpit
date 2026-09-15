@@ -302,3 +302,81 @@ impl Store {
 #[cfg(test)]
 #[path = "cards_tests.rs"]
 mod tests;
+
+/// A card off the board, as the Archived list shows it.
+pub struct ArchivedRow {
+    pub id: String,
+    pub title: String,
+    /// `None` only for a lane that went while the card was archived.
+    pub column_name: Option<String>,
+    pub archived_at: i64,
+}
+
+impl Store {
+    /// A project's archived cards, most recently archived first.
+    pub fn archived_cards(
+        &self,
+        project_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ArchivedRow>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.id, c.title, col.name, c.archived_at FROM card c \
+             LEFT JOIN board_column col ON col.id = c.column_id \
+             WHERE c.project_id = ?1 AND c.archived_at IS NOT NULL \
+             ORDER BY c.archived_at DESC, c.id DESC LIMIT ?2",
+        )?;
+        let rows = stmt
+            .query_map(rusqlite::params![project_id, limit], |row| {
+                Ok(ArchivedRow {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    column_name: row.get(2)?,
+                    archived_at: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Back on the board at the end of its lane, or of the first lane when its
+    /// own is gone. Answers false for a card that is not archived.
+    pub fn restore_card(&self, card_id: &str) -> Result<bool, StoreError> {
+        let Some((project, column)) = self
+            .conn
+            .query_row(
+                "SELECT project_id, column_id FROM card WHERE id = ?1 AND archived_at IS NOT NULL",
+                [card_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+        else {
+            return Ok(false);
+        };
+        let lane: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT id FROM board_column WHERE id = ?1 \
+                 UNION ALL SELECT * FROM \
+                 (SELECT id FROM board_column WHERE project_id = ?2 ORDER BY position LIMIT 1) \
+                 LIMIT 1",
+                rusqlite::params![column, project],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(lane) = lane else {
+            return Ok(false);
+        };
+        let position: i64 = self.conn.query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM card \
+             WHERE column_id = ?1 AND archived_at IS NULL",
+            [&lane],
+            |row| row.get(0),
+        )?;
+        self.conn.execute(
+            "UPDATE card SET archived_at = NULL, column_id = ?2, position = ?3, updated_at = ?4 \
+             WHERE id = ?1",
+            rusqlite::params![card_id, lane, position, now()],
+        )?;
+        Ok(true)
+    }
+}

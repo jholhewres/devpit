@@ -29,10 +29,13 @@ export function CardPane({
   cardId,
   onClose,
   onChanged,
+  onArchived,
 }: {
   cardId: string
   onClose: () => void
   onChanged: () => void
+  /** Told after an archive, so the board can offer to take it back. */
+  onArchived?: (cardId: string) => void
 }): React.JSX.Element {
   const { project } = useShell()
   const card = useCard(project?.id ?? null, cardId, onChanged)
@@ -188,7 +191,10 @@ export function CardPane({
           remove={card.remove}
           onAsk={setEnding}
           onProblem={setProblem}
-          onDone={onClose}
+          onDone={(what) => {
+            if (what === 'archive') onArchived?.(cardId)
+            onClose()
+          }}
         />
       )}
     </div>

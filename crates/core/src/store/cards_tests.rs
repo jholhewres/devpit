@@ -289,3 +289,79 @@ fn deleting_a_card_takes_its_comments_pins_and_runs() {
     assert_eq!(store.steps(&project).expect("steps").len(), 1);
     assert!(!store.delete_card(&card).expect("again"));
 }
+
+fn column_and_project(store: &Store, card: &str) -> (String, String) {
+    let row = store.card(card).expect("read").expect("there");
+    let project = store
+        .project_id_of_card(card)
+        .expect("read")
+        .expect("there");
+    (row.column_id, project)
+}
+
+#[test]
+fn a_restored_card_comes_back_at_the_end_of_its_lane() {
+    let (_dir, store, card) = seeded();
+    let (column, project) = column_and_project(&store, &card);
+    store.archive_card(&card).expect("archive");
+    let other = store
+        .create_card(&project, &column, "other", "")
+        .expect("card");
+
+    assert!(store.restore_card(&card).expect("restore"));
+    let back = store.card(&card).expect("read").expect("there");
+    assert_eq!(back.column_id, column);
+    let after = store.card(&other).expect("read").expect("there").position;
+    assert!(back.position > after);
+    assert!(store
+        .cards(&project)
+        .expect("cards")
+        .iter()
+        .any(|row| row.id == card));
+    // Restoring twice is not restoring anything.
+    assert!(!store.restore_card(&card).expect("again"));
+}
+
+#[test]
+fn a_card_whose_lane_is_gone_comes_back_to_the_first_lane() {
+    let (_dir, store, card) = seeded();
+    let (_, project) = column_and_project(&store, &card);
+    let columns = store.columns(&project).expect("columns");
+    store.move_card(&card, &columns[1].id, 0).expect("move");
+    store.archive_card(&card).expect("archive");
+    // Behind the constraint's back: the lane goes while the card is archived.
+    store
+        .conn
+        .execute_batch(&format!(
+            "PRAGMA foreign_keys = OFF; DELETE FROM board_column WHERE id = '{}'; PRAGMA foreign_keys = ON;",
+            columns[1].id
+        ))
+        .expect("drop lane");
+
+    assert!(store.restore_card(&card).expect("restore"));
+    let back = store.card(&card).expect("read").expect("there");
+    assert_eq!(back.column_id, columns[0].id);
+}
+
+#[test]
+fn archived_cards_are_listed_newest_first_and_capped() {
+    let (_dir, store, card) = seeded();
+    let (column, project) = column_and_project(&store, &card);
+    let later = store
+        .create_card(&project, &column, "later", "")
+        .expect("card");
+    store.archive_card(&card).expect("archive");
+    store
+        .conn
+        .execute(
+            "UPDATE card SET archived_at = archived_at - 10 WHERE id = ?1",
+            [&card],
+        )
+        .expect("older");
+    store.archive_card(&later).expect("archive");
+
+    let listed = store.archived_cards(&project, 200).expect("list");
+    let ids: Vec<&str> = listed.iter().map(|row| row.id.as_str()).collect();
+    assert_eq!(ids, [later.as_str(), card.as_str()]);
+    assert_eq!(store.archived_cards(&project, 1).expect("capped").len(), 1);
+}

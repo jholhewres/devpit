@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { CardPane } from './CardPane'
@@ -6,7 +6,7 @@ import { LaneFoot, LaneHead, Tile } from './Lane'
 import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
 import { reordered } from './laneOrder'
-import { RunsPane } from './RunsPane'
+import { BoardShelf } from './BoardShelf'
 import { useShell } from './useShell'
 
 /*
@@ -29,7 +29,9 @@ export function BoardPane(): React.JSX.Element {
   /* The card being read. Held here rather than on the tile, because a tile
      unmounts the moment a drag reorders the lane it is in. */
   const [opened, setOpened] = useState<string | null>(null)
-  const [showRuns, setShowRuns] = useState(false)
+  /* The card just archived, while Undo is still offered. */
+  const [archived, setArchived] = useState<string | null>(null)
+  const undone = useCallback(() => setArchived(null), [])
   /* Which column is being dragged. Its own gesture, not `useDrag`: a column
      moves between columns and a card moves between lanes, and one state
      holding both would need a tag to tell them apart. */
@@ -147,24 +149,17 @@ export function BoardPane(): React.JSX.Element {
       <button className="blane__new" onClick={() => live.addColumn('New column')}>
         + Column
       </button>
-      <button className="blane__new" onClick={() => setShowRuns(true)}>
-        Runs
-      </button>
-
-      {showRuns && project && (
-        <RunsPane
-          projectId={project.id}
-          lanes={live.lanes}
-          onClose={() => setShowRuns(false)}
-          onOpenCard={(cardId) => {
-            setShowRuns(false)
-            setOpened(cardId)
-          }}
-        />
-      )}
+      <BoardShelf
+        projectId={project?.id ?? null}
+        lanes={live.lanes}
+        archived={archived}
+        onUndone={undone}
+        onOpenCard={setOpened}
+        onChanged={live.reload}
+      />
 
       {opened && (
-        <CardPane cardId={opened} onClose={() => setOpened(null)} onChanged={live.reload} />
+        <CardPane cardId={opened} onClose={() => setOpened(null)} onChanged={live.reload} onArchived={setArchived} />
       )}
 
       {/* On the body, not in the board.

@@ -99,6 +99,7 @@ export function deleteBody(held: {
 export function CardEnding({
   ending,
   detail,
+  summary,
   archive,
   remove,
   onAsk,
@@ -107,16 +108,19 @@ export function CardEnding({
 }: {
   ending: Ending
   detail: CardDetail | null
-  archive: (force: boolean) => Promise<string | null>
+  /** Said instead of the counts, where the card is not open to count. */
+  summary?: string
+  /** Absent where a card can only be deleted, as in the Archived list. */
+  archive?: (force: boolean) => Promise<string | null>
   remove: (force: boolean) => Promise<DeleteRefusal | string | null>
   onAsk: (ending: Ending | null) => void
   onProblem: (problem: string | null) => void
-  onDone: () => void
+  onDone: (what: Ending['what']) => void
 }): React.JSX.Element {
   const finished = (): void => {
     onAsk(null)
     onProblem(null)
-    onDone()
+    onDone(ending.what)
   }
 
   if (ending.what === 'archive') {
@@ -129,7 +133,7 @@ export function CardEnding({
         onConfirm={() => {
           /* The first press asks without forcing; the backend counts the
              unsaved work, and its refusal is what the second question says. */
-          void archive(Boolean(ending.refused)).then((refused) =>
+          void archive?.(Boolean(ending.refused)).then((refused) =>
             refused ? onAsk({ what: 'archive', refused }) : finished(),
           )
         }}
@@ -142,6 +146,7 @@ export function CardEnding({
       title="Delete this card?"
       body={
         ending.refused?.reason ??
+        summary ??
         deleteBody({
           comments: detail?.comments.length ?? 0,
           pinned: detail?.pinned.length ?? 0,

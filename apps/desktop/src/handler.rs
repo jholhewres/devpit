@@ -125,6 +125,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         in_flight::run_cancel,
         front::card_archive,
         front::card_delete,
+        front::card_restore,
+        front::board_archived,
         front::card_diff,
         columns::step_create,
         steps::agents_list,

@@ -546,6 +546,10 @@ export const commands = {
 	cardArchive: (projectId: string, cardId: string, force: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("card_archive", { projectId, cardId, force })),
 	/**  `card.delete` — the card and what hangs off it, never its checkout or branch. */
 	cardDelete: (projectId: string, cardId: string, force: boolean) => typedError<CardDeleted, RpcError>(__TAURI_INVOKE("card_delete", { projectId, cardId, force })),
+	/**  `card.restore` — an archived card back on the board. */
+	cardRestore: (projectId: string, cardId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("card_restore", { projectId, cardId })),
+	/**  `board.archived` — the cards off the board, newest first. */
+	boardArchived: (projectId: string) => typedError<ArchivedCards, RpcError>(__TAURI_INVOKE("board_archived", { projectId })),
 	/**
 	 *  `card.diff` — what this front changed, against the ref it began from.
 	 * 
@@ -891,6 +895,19 @@ export type AppInfo = {
 	 *  question of anyone taking a backup or filing a bug.
 	 */
 	statePath: string,
+};
+
+/**  A card off the board, as the Archived list shows it. */
+export type ArchivedCard = {
+	id: string,
+	title: string,
+	columnName: string | null,
+	archivedAt: number | null,
+};
+
+/**  Response of `board.archived`: most recently archived first, at most 200. */
+export type ArchivedCards = {
+	cards: ArchivedCard[],
 };
 
 /**
