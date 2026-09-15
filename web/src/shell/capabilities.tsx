@@ -68,6 +68,34 @@ export function enabledCount(plugins: readonly PluginState[] | null): number | n
 }
 
 /** "1 installed · 1 on"; null until the catalogue is read, so nothing claims zero. */
+/** Which capabilities the pane shows. */
+export type CapabilityFilter = 'all' | 'on' | 'installed' | 'available'
+
+export const CAPABILITY_FILTERS: readonly { readonly id: CapabilityFilter; readonly label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'on', label: 'On' },
+  { id: 'installed', label: 'Installed' },
+  { id: 'available', label: 'Not installed' },
+]
+
+/** The capabilities a search and a filter keep: the query is looked for in the name and the description, in any case. */
+export function shownCapabilities(
+  plugins: readonly PluginState[],
+  query: string,
+  filter: CapabilityFilter,
+): readonly PluginState[] {
+  const wanted = query.trim().toLowerCase()
+  return plugins.filter((plugin) => {
+    const kept =
+      filter === 'all' ||
+      (filter === 'on' && plugin.installed && plugin.enabled) ||
+      (filter === 'installed' && plugin.installed) ||
+      (filter === 'available' && !plugin.installed)
+    const text = `${plugin.manifest.name} ${plugin.manifest.description}`.toLowerCase()
+    return kept && (wanted === '' || text.includes(wanted))
+  })
+}
+
 export function summary(plugins: readonly PluginState[] | null): string | null {
   if (plugins === null) return null
   return `${plugins.filter((one) => one.installed).length} installed · ${enabledCount(plugins)} on`

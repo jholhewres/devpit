@@ -3,7 +3,15 @@ import { useState } from 'react'
 import type { PluginManifest } from '../gen/bindings'
 import { CapabilityCard } from './CapabilityCard'
 import { InstallCapability, uninstalledInWords, UninstallCapability } from './CapabilityDialogs'
-import { addsInWords, CAPABILITIES_ICON, opensFor, summary } from './capabilities'
+import {
+  addsInWords,
+  CAPABILITIES_ICON,
+  CAPABILITY_FILTERS,
+  opensFor,
+  shownCapabilities,
+  summary,
+  type CapabilityFilter,
+} from './capabilities'
 import { ask, commands } from './live'
 import { usePlugins } from './usePlugins'
 import { useShell } from './useShell'
@@ -39,6 +47,9 @@ export function PluginsPane(): React.JSX.Element {
   /* Kept with its project, so a switch does not report another project's uninstall. */
   const [done, setDone] = useState<{ projectId: string; words: string } | null>(null)
   const said = summary(plugins)
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<CapabilityFilter>('all')
+  const shown = plugins ? shownCapabilities(plugins, query, filter) : []
 
   const askUninstall = (manifest: PluginManifest): void => {
     if (!project) return
@@ -97,8 +108,32 @@ export function PluginsPane(): React.JSX.Element {
                   {done.words}
                 </p>
               )}
+              <div className="list__tools">
+                <input
+                  className="list__search"
+                  type="search"
+                  aria-label="Search capabilities"
+                  placeholder="Search capabilities"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+                <div className="list__seg" role="tablist" aria-label="Show capabilities">
+                  {CAPABILITY_FILTERS.map((one) => (
+                    <button
+                      key={one.id}
+                      className="segb"
+                      role="tab"
+                      aria-selected={filter === one.id}
+                      onClick={() => setFilter(one.id)}
+                    >
+                      {one.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {shown.length === 0 && <Quiet title="No capability matches." detail="Try another word, or show all." />}
               <div className="capgrid">
-                {plugins.map((plugin) => {
+                {shown.map((plugin) => {
                   const opens = opensFor(plugin.manifest.id)
                   return (
                     <CapabilityCard

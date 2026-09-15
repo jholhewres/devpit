@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PluginManifest } from '../gen/bindings'
-import { addsInWords, capabilityName, enabledCount, isOn, liveCapabilities, openerOf, summary } from './capabilities'
+import {
+  addsInWords,
+  capabilityName,
+  enabledCount,
+  isOn,
+  liveCapabilities,
+  openerOf,
+  shownCapabilities,
+  summary,
+} from './capabilities'
 import { uninstalledInWords, uninstallLabel } from './CapabilityDialogs'
 
 const excalidraw: PluginManifest = {
@@ -107,5 +116,32 @@ describe('the words around uninstalling', () => {
   it('reports the backend’s count once the files are deleted, and that they stay otherwise', () => {
     expect(uninstalledInWords('Excalidraw', true, 2)).toBe('Excalidraw uninstalled and 2 files deleted.')
     expect(uninstalledInWords('Excalidraw', false, 0)).toMatch(/files stay/)
+  })
+})
+
+describe('shownCapabilities', () => {
+  const plugin = (id: string, name: string, description: string, installed: boolean, enabled: boolean) => ({
+    manifest: { ...excalidraw, id, name, description },
+    installed,
+    enabled,
+  })
+  const catalogue = [
+    plugin('excalidraw', 'Excalidraw', 'Hand-drawn diagrams', true, true),
+    plugin('mermaid', 'Mermaid', 'Diagrams from text', true, false),
+    plugin('notes', 'Notes', 'Plain notes', false, false),
+  ]
+  const ids = (kept: readonly { manifest: PluginManifest }[]) => kept.map((one) => one.manifest.id)
+
+  it('keeps what the filter asks for', () => {
+    expect(ids(shownCapabilities(catalogue, '', 'all'))).toEqual(['excalidraw', 'mermaid', 'notes'])
+    expect(ids(shownCapabilities(catalogue, '', 'on'))).toEqual(['excalidraw'])
+    expect(ids(shownCapabilities(catalogue, '', 'installed'))).toEqual(['excalidraw', 'mermaid'])
+    expect(ids(shownCapabilities(catalogue, '', 'available'))).toEqual(['notes'])
+  })
+
+  it('searches the name and the description, in any case, within the filter', () => {
+    expect(ids(shownCapabilities(catalogue, '  DIAGRAMS ', 'all'))).toEqual(['excalidraw', 'mermaid'])
+    expect(ids(shownCapabilities(catalogue, 'diagrams', 'on'))).toEqual(['excalidraw'])
+    expect(ids(shownCapabilities(catalogue, 'nothing', 'all'))).toEqual([])
   })
 })

@@ -58,6 +58,15 @@ describe('the MCP panel', () => {
     expect(screen.getByText('https://anchored.example/mcp')).toBeTruthy()
   })
 
+  it('puts the scope beside the name, apart from how the server is reached', async () => {
+    const { container } = render(<McpPane />)
+    await screen.findByText('reports')
+    const top = screen.getByText('reports').closest('.cap__top')!
+    expect(top.textContent).toBe('reportsproject')
+    expect(top.contains(screen.getByText('npx reports-mcp'))).toBe(false)
+    expect(container.querySelector('.list__in')).toBeTruthy()
+  })
+
   it('names the directory it read, because it is not always ~/.claude', async () => {
     render(<McpPane />)
     expect(await screen.findByText('/home/me/.claude-claudin')).toBeTruthy()

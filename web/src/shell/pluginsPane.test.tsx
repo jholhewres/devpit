@@ -5,6 +5,7 @@ import type { PluginFile, PluginList, PluginManifest } from '../gen/bindings'
 import { DRAWINGS } from '../plugins/excalidraw/drawings'
 import { PluginsPane } from './PluginsPane'
 import type { Tab } from './strip'
+import { stylesheet } from './stylesheet'
 import { PluginsProvider } from './usePlugins'
 
 afterEach(cleanup)
@@ -129,6 +130,30 @@ describe('the Capabilities pane', () => {
     expect(await screen.findByText(/· 1 installed · 1 on/)).toBeTruthy()
     fireEvent.click(screen.getByRole('switch'))
     expect(await screen.findByText(/· 1 installed · 0 on/)).toBeTruthy()
+  })
+
+  it('searches the catalogue and filters it by what this project has', async () => {
+    pane()
+    await screen.findByRole('article', { name: 'Excalidraw' })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search capabilities' }), { target: { value: 'SKETCHES' } })
+    expect(screen.getByRole('article', { name: 'Excalidraw' })).toBeTruthy()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search capabilities' }), { target: { value: 'nothing like it' } })
+    expect(screen.getByText('No capability matches.')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search capabilities' }), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('tab', { name: 'Not installed' }))
+    expect(screen.queryByRole('article', { name: 'Excalidraw' })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Installed' }))
+    expect(screen.getByRole('article', { name: 'Excalidraw' })).toBeTruthy()
+  })
+
+  it('lays its list out from the left, as wide as the pane', () => {
+    const rule = stylesheet()
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('}')
+      .find((one) => /(^|\s)\.list__in\s*\{/.test(one))
+    expect(rule).toBeTruthy()
+    expect(rule).not.toMatch(/margin:\s*0 auto|max-width/)
   })
 
   it('draws each capability as a card saying what it adds in plain words', async () => {
