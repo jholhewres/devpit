@@ -61,6 +61,19 @@ impl Store {
         Ok(())
     }
 
+    /// The pane a session was last seen in, if one was.
+    pub fn pane_of_session(&self, session_id: &str) -> Result<Option<String>, StoreError> {
+        use rusqlite::OptionalExtension;
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT leaf_id FROM pane_agent WHERE session_id = ?1",
+                [session_id],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+
     pub fn pane_agent(&self, leaf_id: &str) -> Result<Option<PaneAgent>, StoreError> {
         Ok(self
             .conn

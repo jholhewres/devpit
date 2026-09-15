@@ -10,3 +10,5 @@ apps/desktop/src/session_search_tests.rs 1
 crates/agentcli/src/outside.rs 1
 crates/agentcli/src/outside_tests.rs 1
 crates/agentcli/src/transcript.rs 1
+crates/agentcli/src/spend_scan.rs 1
+crates/agentcli/src/spend_scan_tests.rs 6

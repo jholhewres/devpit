@@ -26,6 +26,7 @@ pub mod search;
 pub mod session;
 pub mod session_tree;
 pub mod settings;
+pub mod spend;
 mod threads;
 pub mod tile;
 pub mod usage;
@@ -62,6 +63,10 @@ pub use session::{
     SplitDirection,
 };
 pub use settings::{Settings, Theme};
+pub use spend::{
+    PlanLimits, PlanWindow, SpendCard, SpendDay, SpendHistory, SpendInstallation, SpendRow,
+    SpendSession, SpendShare, TokenCounts,
+};
 pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
 pub use usage::{PaneCost, Usage};

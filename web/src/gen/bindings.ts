@@ -76,6 +76,13 @@ export const commands = {
 	 *  the session ran in.
 	 */
 	chatAdopt: (projectId: string, sessionId: string, profileId: string, title: string | null, cardId: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("chat_adopt", { projectId, sessionId, profileId, title, cardId })),
+	/**  `plan.limits` — the quota windows of an installation's plan. */
+	planLimits: (installation: string | null) => typedError<PlanLimits, RpcError>(__TAURI_INVOKE("plan_limits", { installation })),
+	/**
+	 *  `spend.history` — what the agents spent over the last `days`, from their
+	 *  transcripts, for one installation or all and one project or all.
+	 */
+	spendHistory: (projectId: string | null, installation: string | null, days: number) => typedError<SpendHistory, RpcError>(__TAURI_INVOKE("spend_history", { projectId, installation, days })),
 	/**
 	 *  `card.chat` — a new conversation about this card, in its checkout.
 	 * 
@@ -1862,6 +1869,26 @@ export type Place = {
 	path: string,
 };
 
+/**  Response of `plan.limits`. */
+export type PlanLimits = {
+	installation: string,
+	plan: string | null,
+	windows: PlanWindow[],
+	/**  Unix seconds. */
+	readAt: number | null,
+	/**  Why there are no windows, said rather than drawn as zero. */
+	problem: string | null,
+};
+
+/**  One quota window of a plan. */
+export type PlanWindow = {
+	label: string,
+	/**  0 to 100. */
+	percent: number | null,
+	/**  Unix seconds. */
+	resetsAt: number | null,
+};
+
 /**
  *  What pressing play did, or why it did not.
  * 
@@ -2387,6 +2414,88 @@ export type Spend = {
 	cards: ([string, number | null])[],
 };
 
+/**  A card a session is known to belong to. */
+export type SpendCard = {
+	id: string,
+	title: string,
+};
+
+/**  One UTC day. */
+export type SpendDay = {
+	/**  `YYYY-MM-DD`, UTC. */
+	day: string,
+	costUsd: number | null,
+	tokens: TokenCounts,
+	/**  Cost by model, most first. */
+	byModel: SpendShare[],
+};
+
+/**  Response of `spend.history`. */
+export type SpendHistory = {
+	days: number,
+	installations: SpendInstallation[],
+	costUsd: number | null,
+	tokens: TokenCounts,
+	sessions: number,
+	turns: number,
+	activeDays: number,
+	/**  The share of input served from the cache, 0 to 1. */
+	cacheReuse: number | null,
+	daily: SpendDay[],
+	models: SpendRow[],
+	projects: SpendRow[],
+	/**  Most recently active first, at most twenty. */
+	recent: SpendSession[],
+	/**  Some of the dollars are list price for an installation not billed by Anthropic. */
+	estimated: boolean,
+	/**  Tokens from models the price table does not know. */
+	unpricedTokens: number | null,
+	files: number,
+	records: number,
+	scanMs: number | null,
+};
+
+/**  An agent CLI installation the history reads from. */
+export type SpendInstallation = {
+	directory: string,
+	label: string,
+	/**
+	 *  False for an installation pointed at another provider: its dollars are
+	 *  Anthropic's list price for tokens nobody billed that way.
+	 */
+	billed: boolean,
+};
+
+/**  A model or a project, over the whole range. */
+export type SpendRow = {
+	name: string,
+	costUsd: number | null,
+	tokens: TokenCounts,
+	sessions: number,
+	/**  Unix seconds. */
+	lastActive: number | null,
+};
+
+export type SpendSession = {
+	sessionId: string,
+	project: string,
+	/**  The model that wrote most of its tokens. */
+	model: string,
+	turns: number,
+	tokens: TokenCounts,
+	costUsd: number | null,
+	/**  Unix seconds. */
+	lastActive: number | null,
+	installation: string,
+	card: SpendCard | null,
+};
+
+export type SpendShare = {
+	name: string,
+	costUsd: number | null,
+	tokens: number | null,
+};
+
 /**  Orca's names: horizontal is left/right, vertical is top/bottom. */
 export type SplitDirection = "horizontal" | "vertical";
 
@@ -2459,6 +2568,14 @@ export type Thread = {
 	costUsd: number | null,
 	/**  Unix seconds, when it was last spoken in. */
 	lastAt: number | null,
+};
+
+/**  Tokens by kind. */
+export type TokenCounts = {
+	input: number | null,
+	output: number | null,
+	cacheRead: number | null,
+	cacheWrite: number | null,
 };
 
 /**  What a turn cost and why it stopped. */

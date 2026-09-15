@@ -304,6 +304,8 @@ mod profile_tests;
 pub mod running;
 pub mod skills;
 mod sources;
+pub mod spend_prices;
+pub mod spend_scan;
 pub mod store;
 #[cfg(test)]
 mod store_tests;
