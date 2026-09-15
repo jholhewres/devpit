@@ -124,7 +124,15 @@ fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
         // These say which conversation the pane holds, not whether it works.
         Event::SessionStarted | Event::SessionEnded { .. } => None,
     };
-    crate::restoring::remember(pane, happening);
+    // One Store for the event. Resolved before `remember`, which forgets the
+    // pane's agent on SessionEnded — the end has to reach the card too.
+    let store = devpit_core::Store::open_default().ok();
+    let route = store
+        .as_ref()
+        .and_then(|store| crate::card_route::card_of_leaf(store, pane));
+    if let Some(store) = &store {
+        crate::restoring::remember(store, pane, happening);
+    }
     if let Some(state) = state {
         let _ = app.emit("terminal:happening", agent_said(pane, state));
     }
@@ -139,14 +147,17 @@ fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
     // you can watch; one that has stopped and is waiting for a person is the
     // reason somebody left the window and the reason to call them back. The
     // other two would be a bell that rings through every turn.
-    if state == Some("waiting") {
-        crate::notices::ring(
+    if let (Some(ring), Some(store)) =
+        (crate::card_route::notice_for(route.as_ref(), state), &store)
+    {
+        crate::notices::ring_in(
+            store,
             app,
-            None,
+            ring.project_id,
             crate::notices::kind::AGENT,
             "An agent is waiting on you",
             Some(pane),
-            None,
+            ring.card_id,
         );
     }
 }

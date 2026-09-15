@@ -19,6 +19,7 @@ mod runs_list;
 // release should say so rather than warn about it on every build.
 mod agent_choice;
 mod agent_profiles;
+mod card_route;
 mod card_work;
 mod cards;
 mod chaining;

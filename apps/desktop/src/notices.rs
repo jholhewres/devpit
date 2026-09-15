@@ -68,6 +68,19 @@ pub fn ring(
     let Ok(store) = Store::open_default() else {
         return;
     };
+    ring_in(&store, app, project_id, kind, title, detail, card_id);
+}
+
+/// `ring`, with a Store the caller already opened for the same event.
+pub(crate) fn ring_in(
+    store: &Store,
+    app: &tauri::AppHandle,
+    project_id: Option<&str>,
+    kind: &str,
+    title: &str,
+    detail: Option<&str>,
+    card_id: Option<&str>,
+) {
     if store
         .add_notice(project_id, kind, title, detail, card_id)
         .is_err()

@@ -95,6 +95,20 @@ impl Store {
     }
 }
 
+impl Store {
+    /// The project of a card that is still on a board; `None` once archived or gone.
+    pub fn live_card_project(&self, card_id: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT project_id FROM card WHERE id = ?1 AND archived_at IS NULL",
+                [card_id],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+}
+
 #[cfg(test)]
 #[path = "card_links_tests.rs"]
 mod tests;

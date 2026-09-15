@@ -234,7 +234,17 @@ pub async fn session_ensure(
 /// same place — and stated once, because two `format!`s that have to agree
 /// are two `format!`s that one day will not.
 pub(crate) fn tab_for_card(card_id: &str) -> String {
-    format!("tab_card_{card_id}")
+    format!("{CARD_TAB}{card_id}")
+}
+
+const CARD_TAB: &str = "tab_card_";
+
+/// The card a tab was named for, when it was — and only a plain id: a tab id
+/// comes from the window, which can send anything.
+pub(crate) fn card_of_tab(tab_id: &str) -> Option<&str> {
+    tab_id
+        .strip_prefix(CARD_TAB)
+        .filter(|card| crate::adopting::plain(card))
 }
 
 /// Opens (or reopens) a tab whose panes start in `cwd`.

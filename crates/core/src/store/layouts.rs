@@ -75,6 +75,36 @@ impl Store {
     }
 }
 
+/// A tab a card named, and the tree in it.
+pub struct CardTabLayout {
+    pub project_id: String,
+    pub tab_id: String,
+    pub tree: String,
+    pub focused_id: String,
+}
+
+impl Store {
+    /// Every layout whose tab a card named, across projects.
+    ///
+    /// `_` is a wildcard to LIKE, so the prefix is escaped: `tabXcardY` is not
+    /// a card's tab.
+    pub fn card_tab_layouts(&self) -> Result<Vec<CardTabLayout>, StoreError> {
+        let mut statement = self.conn.prepare(
+            "SELECT project_id, tab_id, tree, focused_id FROM pane_layout \
+             WHERE tab_id LIKE 'tab\\_card\\_%' ESCAPE '\\'",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(CardTabLayout {
+                project_id: row.get(0)?,
+                tab_id: row.get(1)?,
+                tree: row.get(2)?,
+                focused_id: row.get(3)?,
+            })
+        })?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::store::Store;

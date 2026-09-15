@@ -13,10 +13,7 @@ use devpit_core::Store;
 use crate::shell_launch::{profile_id, settled, to_start, Ready};
 
 /// What restoring the pane later needs, from the agent's own hooks.
-pub(crate) fn remember(pane: &str, happening: &Happening) {
-    let Ok(store) = Store::open_default() else {
-        return;
-    };
+pub(crate) fn remember(store: &Store, pane: &str, happening: &Happening) {
     let _ = match &happening.event {
         Event::SessionStarted => store.remember_pane_session(
             pane,

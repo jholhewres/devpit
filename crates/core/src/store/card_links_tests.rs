@@ -129,3 +129,34 @@ fn migration_14_adds_the_links_beside_what_was_there() {
         ["conversation_id", "card_id", "created_at"]
     );
 }
+
+#[test]
+fn only_a_card_still_on_a_board_answers_with_its_project() {
+    let (_dir, store, project, card) = seeded();
+    assert_eq!(store.live_card_project(&card).expect("read"), Some(project));
+    store.archive_card(&card).expect("archive");
+    assert_eq!(store.live_card_project(&card).expect("read"), None);
+    assert_eq!(store.live_card_project("card_gone").expect("read"), None);
+}
+
+#[test]
+fn only_tabs_a_card_named_are_card_tabs() {
+    let (_dir, store, project, card) = seeded();
+    let named = format!("tab_card_{card}");
+    store
+        .set_pane_layout(&project, &named, "{}", "leaf")
+        .expect("card tab");
+    store
+        .set_pane_layout(&project, "tabXcardYz", "{}", "leaf")
+        .expect("look-alike");
+    store
+        .set_pane_layout(&project, "tab_plain", "{}", "leaf")
+        .expect("plain");
+    let tabs: Vec<String> = store
+        .card_tab_layouts()
+        .expect("layouts")
+        .into_iter()
+        .map(|layout| layout.tab_id)
+        .collect();
+    assert_eq!(tabs, [named]);
+}
