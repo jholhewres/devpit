@@ -174,7 +174,7 @@ export function Settings({
           <section className="prefs__in prefs__in--wide" hidden={pane !== 'skills'}>
             <SkillsPane />
           </section>
-          <section className="prefs__in prefs__in--wide" hidden={pane !== 'usage'}>
+          <section className="prefs__in" hidden={pane !== 'usage'}>
             <Usage />
           </section>
       </div>

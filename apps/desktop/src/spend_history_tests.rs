@@ -141,6 +141,13 @@ fn an_installation_not_billed_by_anthropic_marks_its_dollars_estimated_and_unkno
 }
 
 #[test]
+fn a_folder_no_project_claims_is_named_by_its_last_two_parts() {
+    assert_eq!(short_path("/home/me/Workspace/asc/api"), "asc/api");
+    assert_eq!(short_path("/tmp"), "tmp");
+    assert_eq!(short_path(""), "");
+}
+
+#[test]
 fn a_folder_contains_its_children_and_not_its_namesakes() {
     assert!(within("/w/devpit", "/w/devpit"));
     assert!(within("/w/devpit/web", "/w/devpit"));

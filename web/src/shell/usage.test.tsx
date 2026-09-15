@@ -9,6 +9,7 @@ afterEach(cleanup)
 const asked = vi.fn()
 const shown = vi.fn()
 const opened = vi.fn()
+let held: ((days: number) => Promise<SpendHistory>) | null = null
 
 const history = (): SpendHistory => ({
   days: 30,
@@ -64,7 +65,7 @@ vi.mock('./live', () => ({
   commands: {
     spendHistory: (project: string | null, installation: string | null, days: number) => {
       asked('history', project, installation, days)
-      return history()
+      return held ? held(days) : history()
     },
     planLimits: (installation: string | null) => {
       asked('limits', installation)
@@ -76,6 +77,7 @@ vi.mock('./live', () => ({
 vi.mock('./useShell', () => ({ useShell: () => ({ project: { id: 'p1', name: 'devpit' }, show: shown, openCard: opened }) }))
 
 beforeEach(() => {
+  held = null
   asked.mockClear()
   shown.mockClear()
   opened.mockClear()
@@ -112,5 +114,20 @@ describe('the usage screen', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Wire the board' }))
     expect(shown).toHaveBeenCalledWith('board')
     expect(opened).toHaveBeenCalledWith('card_1')
+  })
+
+  it('draws the range asked for last, even when an earlier range answers after it', async () => {
+    const answers = new Map<number, (value: SpendHistory) => void>()
+    held = (days) => new Promise((resolve) => answers.set(days, resolve))
+    render(<Usage />)
+    await waitFor(() => expect(answers.has(30)).toBe(true))
+    fireEvent.click(screen.getByRole('tab', { name: '7d' }))
+    await waitFor(() => expect(answers.has(7)).toBe(true))
+    answers.get(7)!({ ...history(), days: 7 })
+    expect(await screen.findByText('Last 7 days')).toBeTruthy()
+    answers.get(30)!({ ...history(), days: 30 })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(screen.queryByText('Last 30 days')).toBeNull()
+    expect(screen.getByText('Last 7 days')).toBeTruthy()
   })
 })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { PlanLimits, Spend, SpendHistory, SpendRow } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -21,6 +21,7 @@ function Table({ rows, what }: { rows: readonly SpendRow[]; what: string }): Rea
   if (rows.length === 0) return null
   return (
     <section className="use__block">
+      <span className="use__label">By {what}</span>
       <div className="mrow mrow--h">
         <span className="mrow__n">{what}</span>
         <span>tokens</span>
@@ -53,16 +54,22 @@ export function Usage(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [reading, setReading] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  /* A long range reads slower than a short one; only the latest ask is drawn. */
+  const asking = useRef(0)
 
   const read = useCallback(() => {
+    const mine = ++asking.current
     setReading(true)
     const scope = onlyProject && project ? project.id : null
     void ask(() => commands.spendHistory(scope, installation, days)).then((answer) => {
+      if (mine !== asking.current) return
       setReading(false)
       setError(answer.error)
       if (answer.data) setHistory(answer.data)
     })
-    void ask(() => commands.planLimits(installation)).then((answer) => setLimits(answer.data))
+    void ask(() => commands.planLimits(installation)).then((answer) => {
+      if (mine === asking.current) setLimits(answer.data)
+    })
     if (project) void ask(() => commands.usageRead(project.id)).then((answer) => setCards(answer.data))
   }, [days, installation, onlyProject, project])
 
@@ -121,8 +128,9 @@ export function Usage(): React.JSX.Element {
 
       {limits && (
         <section className="use__block" aria-label="Plan limits">
-          <div className="use__label">Plan{limits.plan ? ` · ${limits.plan}` : ''}</div>
+          <span className="use__label">Plan{limits.plan ? ` · ${limits.plan}` : ''}</span>
           {limits.problem && <p className="use__note">{limits.problem}</p>}
+          <div className="use__limits">
           {limits.windows.map((window) => (
             <div className="bar" key={window.label}>
               <div className="bar__top">
@@ -135,16 +143,19 @@ export function Usage(): React.JSX.Element {
               {window.resetsAt !== null && <div className="bar__sub">{resetIn(window.resetsAt, now)}</div>}
             </div>
           ))}
+          </div>
         </section>
       )}
 
       {history && (
         <>
+          <section className="use__block">
+          <span className="use__label">Last {history.days} days</span>
           <div className="tiles">
             <div className="tile2">
               <div className="tile2__l">Est. cost</div>
               <div className="tile2__v">{dollars(history.costUsd)}</div>
-              <div className="tile2__s">{history.estimated ? 'partly list price, not billed' : `last ${history.days} days`}</div>
+              <div className="tile2__s">{history.estimated ? 'partly list price, not billed' : 'at list price'}</div>
             </div>
             <div className="tile2">
               <div className="tile2__l">Tokens</div>
@@ -169,10 +180,11 @@ export function Usage(): React.JSX.Element {
               <div className="tile2__s">of input from cache</div>
             </div>
           </div>
+          </section>
 
           <section className="use__block">
             <div className="use__hrow">
-              <span className="use__h">By day</span>
+              <span className="use__label">By day</span>
               <div className="seg2" role="tablist" aria-label="Chart shows">
                 <button role="tab" aria-selected={metric === 'cost'} onClick={() => setMetric('cost')}>
                   Cost
@@ -209,7 +221,7 @@ export function Usage(): React.JSX.Element {
 
           {history.recent.length > 0 && (
             <section className="use__block">
-              <div className="use__h">Recent sessions</div>
+              <span className="use__label">Recent sessions</span>
               {history.recent.map((session) => (
                 <div className="srow" key={session.sessionId}>
                   <span className="srow__when">{ago(session.lastActive, now)}</span>
@@ -239,7 +251,7 @@ export function Usage(): React.JSX.Element {
 
           {cards && cards.cards.length > 0 && (
             <section className="use__block">
-              <div className="use__h">This project&rsquo;s cards, by what their runs cost</div>
+              <span className="use__label">This project&rsquo;s cards, by what their runs cost</span>
               {cards.cards.map(([title, usd]) => (
                 <div className="mrow" key={title}>
                   <span className="mrow__n">

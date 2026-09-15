@@ -354,10 +354,17 @@ fn history(
             ])
         }
     };
+    // A card's checkout is its project's work too.
+    let checkouts = Store::root()
+        .map_err(|err| RpcError::internal(err.to_string()))?
+        .join("worktrees");
     let roots: Vec<(String, String)> = store
         .projects()?
         .into_iter()
-        .map(|row| (row.root_path, row.name))
+        .flat_map(|row| {
+            let checkout = checkouts.join(&row.id).display().to_string();
+            [(row.root_path, row.name.clone()), (checkout, row.name)]
+        })
         .collect();
 
     let now = SystemTime::now()
@@ -389,7 +396,7 @@ fn history(
             .filter(|(root, _)| within(cwd, root))
             .max_by_key(|(root, _)| root.len())
             .map(|(_, name)| name.clone())
-            .unwrap_or_else(|| cwd.to_owned())
+            .unwrap_or_else(|| short_path(cwd))
     };
     let mut history = summarize(read, installations, now, days, project_of, |session| {
         card_of_session(&store, session)
@@ -398,6 +405,17 @@ fn history(
     history.records = records;
     history.scan_ms = started.elapsed().as_secs_f64() * 1_000.0;
     Ok(history)
+}
+
+/// A folder no project claims, by its last two parts: enough to recognise,
+/// short enough to fit a row.
+fn short_path(path: &str) -> String {
+    let parts: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+    match parts.as_slice() {
+        [] => path.to_owned(),
+        [.., parent, last] => format!("{parent}/{last}"),
+        [only] => (*only).to_owned(),
+    }
 }
 
 /// Whether `path` is `folder` or inside it — not a sibling that shares a prefix.
