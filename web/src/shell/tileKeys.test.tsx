@@ -66,6 +66,8 @@ describe('a focused tile', () => {
     chat: vi.fn(),
     archive: vi.fn(() => Promise.resolve(null)),
     remove: vi.fn(() => Promise.resolve<DeleteRefusal | string | null>(null)),
+    liveWork: vi.fn(() => Promise.resolve({ tabs: [], runs: [] })),
+    stopLive: vi.fn(() => Promise.resolve(null)),
     archived: vi.fn(),
     problem: vi.fn(),
     ...over,

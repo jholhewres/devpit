@@ -77,6 +77,7 @@ pub fn card_archive(project_id: String, card_id: String, force: bool) -> Result<
     }
 
     store.archive_card(&card_id)?;
+    crate::card_activity::card_ended(&card_id);
     board_get(project_id)
 }
 
@@ -171,8 +172,12 @@ pub fn card_delete(
     if !leaves.is_empty() {
         crate::arranging::close_tab(&state, &project_id, &tab)?;
     }
+    let deleted = store.delete_card(&card_id)?;
+    if deleted {
+        crate::card_activity::card_ended(&card_id);
+    }
     Ok(CardDeleted {
-        deleted: store.delete_card(&card_id)?,
+        deleted,
         refused: None,
     })
 }

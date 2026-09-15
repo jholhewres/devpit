@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { CardDetail, DeleteRefusal } from '../gen/bindings'
 import { useAway } from './away'
 import { Confirm } from './Confirm'
+import { anyLive, liveBody, type LiveWork } from './liveWork'
 
 /*
  * The open card's header, and the two ways a card ends.
@@ -102,6 +103,8 @@ export function CardEnding({
   summary,
   archive,
   remove,
+  live,
+  stopLive,
   onAsk,
   onProblem,
   onDone,
@@ -113,14 +116,59 @@ export function CardEnding({
   /** Absent where a card can only be deleted, as in the Archived list. */
   archive?: (force: boolean) => Promise<string | null>
   remove: (force: boolean) => Promise<DeleteRefusal | string | null>
+  /** What is still going on the card, and how to stop it before it ends. */
+  live?: LiveWork | null
+  stopLive?: () => Promise<string | null>
   onAsk: (ending: Ending | null) => void
   onProblem: (problem: string | null) => void
   onDone: (what: Ending['what']) => void
 }): React.JSX.Element {
+  const [stopped, setStopped] = useState(false)
   const finished = (): void => {
     onAsk(null)
     onProblem(null)
     onDone(ending.what)
+  }
+
+  /* The first press asks without forcing; the backend counts the unsaved
+     work, and its refusal is what the second question says. */
+  const archiving = (force: boolean): void => {
+    void archive?.(force).then((refused) => (refused ? onAsk({ what: 'archive', refused }) : finished()))
+  }
+  const removing = (force: boolean): void => {
+    void remove(force).then((answer) => {
+      if (answer === null) return finished()
+      /* Only unsaved work can be pressed through. A run or an agent in
+         the card's terminal is said, and the dialog goes. */
+      if (typeof answer !== 'string' && answer.forcible) {
+        return onAsk({ what: 'delete', refused: answer })
+      }
+      onAsk(null)
+      onProblem(typeof answer === 'string' ? answer : answer.reason)
+    })
+  }
+
+  if (stopLive && anyLive(live) && !stopped && !ending.refused) {
+    return (
+      <Confirm
+        title={ending.what === 'archive' ? 'Archive this card?' : 'Delete this card?'}
+        body={liveBody(live)}
+        danger={ending.what === 'archive' ? 'Stop it and archive' : 'Stop it and delete'}
+        onClose={() => onAsk(null)}
+        onConfirm={() => {
+          void stopLive().then((refused) => {
+            if (refused) {
+              onAsk(null)
+              onProblem(refused)
+              return
+            }
+            setStopped(true)
+            if (ending.what === 'archive') archiving(false)
+            else removing(false)
+          })
+        }}
+      />
+    )
   }
 
   if (ending.what === 'archive') {
@@ -130,13 +178,7 @@ export function CardEnding({
         body={ending.refused ?? 'It comes off the board. Its branch and its checkout stay exactly where they are.'}
         danger={ending.refused ? 'Archive anyway' : 'Archive'}
         onClose={() => onAsk(null)}
-        onConfirm={() => {
-          /* The first press asks without forcing; the backend counts the
-             unsaved work, and its refusal is what the second question says. */
-          void archive?.(Boolean(ending.refused)).then((refused) =>
-            refused ? onAsk({ what: 'archive', refused }) : finished(),
-          )
-        }}
+        onConfirm={() => archiving(Boolean(ending.refused))}
       />
     )
   }
@@ -156,18 +198,7 @@ export function CardEnding({
       }
       danger={ending.refused ? 'Delete anyway' : 'Delete'}
       onClose={() => onAsk(null)}
-      onConfirm={() => {
-        void remove(Boolean(ending.refused)).then((answer) => {
-          if (answer === null) return finished()
-          /* Only unsaved work can be pressed through. A run or an agent in
-             the card's terminal is said, and the dialog goes. */
-          if (typeof answer !== 'string' && answer.forcible) {
-            return onAsk({ what: 'delete', refused: answer })
-          }
-          onAsk(null)
-          onProblem(typeof answer === 'string' ? answer : answer.reason)
-        })
-      }}
+      onConfirm={() => removing(Boolean(ending.refused))}
     />
   )
 }

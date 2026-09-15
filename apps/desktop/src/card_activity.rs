@@ -276,6 +276,24 @@ pub(crate) fn forget_before(
     Some(activities.happening(&key.card_id))
 }
 
+/// Takes a card off the record: every session it had.
+///
+/// An archived or deleted card has no tile to paint. A hook arriving later
+/// does not bring it back, because resolving a pane or a session to a card
+/// ignores cards that are off the board.
+pub(crate) fn forget_card(activities: &mut Activities, card_id: &str) -> bool {
+    let before = activities.heard.len();
+    activities.heard.retain(|key, _| key.card_id != card_id);
+    activities.heard.len() < before
+}
+
+/// `forget_card` on the app's record, for a card that has just ended.
+pub(crate) fn card_ended(card_id: &str) {
+    if let Ok(mut activities) = registry().lock() {
+        forget_card(&mut activities, card_id);
+    }
+}
+
 /// Forgets one session, answering whether it was known.
 pub(crate) fn forget(activities: &mut Activities, key: &Key) -> bool {
     activities.heard.remove(key).is_some()

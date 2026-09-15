@@ -500,3 +500,33 @@ fn a_chat_turn_is_heard_working_then_done() {
         [(SessionKind::Chat, "conv_1", Some(Doing::Done))]
     );
 }
+
+#[test]
+fn ending_a_card_forgets_every_session_it_had() {
+    let mut activities = Activities::default();
+    hear(
+        &mut activities,
+        pane("card_1", "leaf_a"),
+        1,
+        Doing::Working,
+        place("leaf_a"),
+    )
+    .expect("pane");
+    hear_run(&mut activities, "card_1", "s-run", 2, Doing::Working).expect("run");
+    hear(
+        &mut activities,
+        pane("card_2", "leaf_b"),
+        3,
+        Doing::Waiting,
+        place("leaf_b"),
+    )
+    .expect("other");
+
+    assert!(forget_card(&mut activities, "card_1"));
+    assert!(activities.happening("card_1").sessions.is_empty());
+    assert_eq!(
+        activities.happening("card_2").activity,
+        Some(Doing::Waiting)
+    );
+    assert!(!forget_card(&mut activities, "card_1"));
+}

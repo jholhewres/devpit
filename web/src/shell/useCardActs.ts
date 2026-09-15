@@ -4,6 +4,7 @@ import type { Card, CardDetail, DeleteRefusal } from '../gen/bindings'
 import type { Tab } from './strip'
 import { ask, commands } from './live'
 import type { UseBoard } from './useBoard'
+import { liveWork, stopLiveWork, type LiveWork } from './liveWork'
 import { useShell } from './useShell'
 
 /*
@@ -20,6 +21,10 @@ export interface CardBoardActs {
   copyBranch?: () => void
   archive: (force: boolean) => Promise<string | null>
   remove: (force: boolean) => Promise<DeleteRefusal | string | null>
+  /** What is still going on the card, read when it is about to end. */
+  liveWork: () => Promise<LiveWork>
+  /** Closes the card's terminals and stops its runs. */
+  stopLive: (live: LiveWork) => Promise<string | null>
   /** After an archive, so the board offers Undo. */
   archived: () => void
   problem: (message: string) => void
@@ -86,7 +91,7 @@ export function useCardActs(
   live: UseBoard,
   onArchived: (cardId: string) => void,
 ): (card: Card) => CardBoardActs {
-  const { show } = useShell()
+  const { show, closeNow } = useShell()
   const { reload, report } = live
 
   return useCallback(
@@ -116,9 +121,15 @@ export function useCardActs(
         reload()
         return null
       },
+      liveWork: async () => {
+        if (!projectId) return { tabs: [], runs: [] }
+        const answer = await ask(() => commands.cardDetail(projectId, card.id))
+        return liveWork(answer.data?.sessions ?? [])
+      },
+      stopLive: (going) => (projectId ? stopLiveWork(projectId, card.id, going, closeNow) : Promise.resolve('no project open')),
       archived: () => onArchived(card.id),
       problem: report,
     }),
-    [projectId, show, reload, report, onArchived],
+    [projectId, show, closeNow, reload, report, onArchived],
   )
 }

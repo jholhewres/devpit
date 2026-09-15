@@ -4,6 +4,7 @@ import { Attachments } from './Attachments'
 import { CardDiff } from './CardDiff'
 import { CardPlay } from './CardPlay'
 import { CardSessions } from './CardSessions'
+import { liveWork, stopLiveWork } from './liveWork'
 import { CardWork } from './CardWork'
 import { Comments } from './Comments'
 import { CardEnding, CardHeader, type Ending } from './CardHeader'
@@ -49,7 +50,7 @@ export function CardPane({
   /** Told after an archive, so the board can offer to take it back. */
   onArchived?: (cardId: string) => void
 }): React.JSX.Element {
-  const { project } = useShell()
+  const { project, closeNow } = useShell()
   const card = useCard(project?.id ?? null, cardId, onChanged)
   const detail = card.detail
 
@@ -214,6 +215,12 @@ export function CardPane({
           detail={detail}
           archive={card.archive}
           remove={card.remove}
+          live={liveWork(detail?.sessions ?? [])}
+          stopLive={() =>
+            project
+              ? stopLiveWork(project.id, cardId, liveWork(detail?.sessions ?? []), closeNow)
+              : Promise.resolve('no project open')
+          }
           onAsk={setEnding}
           onProblem={setProblem}
           onDone={(what) => {

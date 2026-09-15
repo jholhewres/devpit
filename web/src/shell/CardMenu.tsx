@@ -7,6 +7,7 @@ import { cardMenu } from './cardMenu'
 import { RunConfirm } from './Lane'
 import { LanePicker } from './LanePicker'
 import { abandoned } from './typing'
+import type { LiveWork } from './liveWork'
 import type { CardBoardActs } from './useCardActs'
 
 /** Everything a card's menu can do. */
@@ -50,7 +51,22 @@ export function CardMenu({
   const [ending, setEnding] = useState<Ending | null>(null)
   const [running, setRunning] = useState(false)
   const [picking, setPicking] = useState(startPicking ?? false)
+  const [live, setLive] = useState<LiveWork | null>(null)
   const listing = !ending && !running
+
+  /* Read once the card is about to end: the board holds no sessions of its own. */
+  const asking = ending !== null
+  const readLive = acts.liveWork
+  useEffect(() => {
+    if (!asking) return
+    let still = true
+    void readLive().then((found) => still && setLive(found))
+    return () => {
+      still = false
+    }
+    // Read when the question opens, not on every render of the menu's acts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asking])
 
   useEffect(() => {
     if (!listing) return
@@ -161,6 +177,8 @@ export function CardMenu({
           })}
           archive={acts.archive}
           remove={acts.remove}
+          live={live}
+          stopLive={() => (live ? acts.stopLive(live) : Promise.resolve(null))}
           onAsk={(next) => (next ? setEnding(next) : onClose())}
           onProblem={(message) => message && acts.problem(message)}
           onDone={(what) => {

@@ -206,3 +206,57 @@ fn a_background_session_waiting_reaches_its_card() {
     let unlisted = card_sessions(&store, &project, &card, &[], &heard);
     assert_eq!(unlisted[0].state, Some(Doing::Gone));
 }
+
+#[test]
+fn a_hook_from_an_archived_cards_pane_does_not_bring_it_back() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store_path = dir.path().join("state.db");
+    let store = Store::open(&store_path).expect("store");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let column = store.columns(&project).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&project, &column, "a card", "")
+        .expect("card");
+    let tree = serde_json::to_string(&LayoutNode::leaf(LEAF, "s:leaf")).expect("tree");
+    store
+        .set_pane_layout(&project, &tab_for_card(&card), &tree, LEAF)
+        .expect("layout");
+    let sink = Recorded {
+        store_path,
+        activities: Mutex::default(),
+        said: Mutex::default(),
+    };
+    let posted = Posted {
+        body: PAYLOAD.to_owned(),
+        pane: Some(LEAF.to_owned()),
+    };
+    hear_post(&sink, &posted, next_seq());
+    assert!(!sink
+        .activities
+        .lock()
+        .expect("lock")
+        .happening(&card)
+        .sessions
+        .is_empty());
+
+    // Archived: the card forgets its sessions, and the agent keeps talking.
+    store.archive_card(&card).expect("archive");
+    crate::card_activity::forget_card(&mut sink.activities.lock().expect("lock"), &card);
+    sink.said.lock().expect("said").clear();
+    hear_post(&sink, &posted, next_seq());
+
+    assert!(sink
+        .activities
+        .lock()
+        .expect("lock")
+        .happening(&card)
+        .sessions
+        .is_empty());
+    assert!(!sink
+        .said
+        .lock()
+        .expect("said")
+        .iter()
+        .any(|(channel, _)| channel == "card:happening"));
+}

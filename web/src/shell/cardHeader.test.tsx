@@ -103,4 +103,24 @@ describe('ending a card', () => {
       expect(hands.onAsk).toHaveBeenCalledWith({ what: 'archive', refused: '1 change … archive anyway?' }),
     )
   })
+
+  it('offers to close the terminal and stop the runs first, then archives', async () => {
+    const stopLive = vi.fn(() => Promise.resolve<string | null>(null))
+    const archive = vi.fn(() => Promise.resolve<string | null>(null))
+    const hands = ending({ ending: { what: 'archive' }, live: { tabs: ['tab_1'], runs: ['run_1'] }, stopLive, archive })
+    expect(screen.getByText(/an agent is in its terminal and 1 run is still going/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop it and archive' }))
+    await waitFor(() => expect(hands.onDone).toHaveBeenCalledWith('archive'))
+    expect(stopLive).toHaveBeenCalled()
+    expect(archive).toHaveBeenCalledWith(false)
+    expect(stopLive.mock.invocationCallOrder[0]!).toBeLessThan(archive.mock.invocationCallOrder[0]!)
+  })
+
+  it('says why the work could not be stopped, and ends nothing', async () => {
+    const stopLive = vi.fn(() => Promise.resolve<string | null>('that run is not in flight here'))
+    const hands = ending({ live: { tabs: [], runs: ['run_1'] }, stopLive })
+    fireEvent.click(screen.getByRole('button', { name: 'Stop it and delete' }))
+    await waitFor(() => expect(hands.onProblem).toHaveBeenCalledWith('that run is not in flight here'))
+    expect(hands.remove).not.toHaveBeenCalled()
+  })
 })
