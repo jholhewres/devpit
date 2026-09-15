@@ -6,6 +6,9 @@ import { adoptable } from './sessionRows'
 import { useShell } from './useShell'
 import { onCarried } from './window'
 
+/** How long a card's sessions have to be quiet before the card is read again. */
+export const READ_AFTER_MS = 250
+
 const KIND: Readonly<Record<CardSession['kind'], string>> = {
   pane: 'Terminal',
   run: 'Run',
@@ -35,13 +38,20 @@ export function CardSessions({
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
 
-  useEffect(
-    () =>
-      onCarried<CardHappening>('card:happening', (happening) => {
-        if (happening.cardId === cardId) onChanged()
-      }),
-    [cardId, onChanged],
-  )
+  /* A turn says something many times a second; the card is read once it has
+     paused, not once per word. */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const stop = onCarried<CardHappening>('card:happening', (happening) => {
+      if (happening.cardId !== cardId) return
+      clearTimeout(timer)
+      timer = setTimeout(onChanged, READ_AFTER_MS)
+    })
+    return () => {
+      clearTimeout(timer)
+      stop()
+    }
+  }, [cardId, onChanged])
 
   if (sessions.length === 0) return null
   const projectId = project?.id ?? null

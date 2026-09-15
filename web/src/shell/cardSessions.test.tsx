@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CardSession } from '../gen/bindings'
-import { CardSessions } from './CardSessions'
+import { CardSessions, READ_AFTER_MS } from './CardSessions'
 
 afterEach(cleanup)
 
@@ -99,11 +99,16 @@ describe("a card's Sessions", () => {
     expect(called).toHaveBeenCalledWith('terminalAttachAgent', 'p1', 'card_1')
   })
 
-  it('reads the card again when the card hears one of its sessions', () => {
+  it('reads the card again once its sessions pause, not once per word', () => {
+    vi.useFakeTimers()
     const onChanged = rows([session({ kind: 'run', ref: 's-run', state: 'working', runId: 'run_1' })])
     handlers['card:happening']!({ cardId: 'card_2', activity: 'done', sessions: [] })
-    expect(onChanged).not.toHaveBeenCalled()
+    handlers['card:happening']!({ cardId: 'card_1', activity: 'working', sessions: [] })
     handlers['card:happening']!({ cardId: 'card_1', activity: 'done', sessions: [] })
+    vi.advanceTimersByTime(READ_AFTER_MS - 1)
+    expect(onChanged).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
     expect(onChanged).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
   })
 })

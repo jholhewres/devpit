@@ -530,3 +530,46 @@ fn ending_a_card_forgets_every_session_it_had() {
     );
     assert!(!forget_card(&mut activities, "card_1"));
 }
+
+#[test]
+fn a_background_session_the_cli_listed_still_counts_when_another_session_of_the_card_speaks() {
+    let mut activities = Activities::default();
+    let listed = CardSession {
+        kind: SessionKind::Background,
+        reference: "s-bg".to_owned(),
+        state: Some(Doing::Working),
+        tab_id: None,
+        leaf_id: None,
+        run_id: None,
+    };
+    note_background(&mut activities, "card_1", std::slice::from_ref(&listed));
+
+    // A chat turn ends on the same card: the tile must still show the busy session.
+    let told = hear(
+        &mut activities,
+        chat_key("card_1", "conv_1"),
+        1,
+        Doing::Done,
+        Place::default(),
+    )
+    .expect("chat");
+    assert_eq!(told.activity, Some(Doing::Working));
+
+    // Its own hook says more than the listing.
+    let key = Key {
+        card_id: "card_1".to_owned(),
+        kind: SessionKind::Background,
+        reference: "s-bg".to_owned(),
+    };
+    let heard = hear(&mut activities, key, 2, Doing::Waiting, Place::default()).expect("hook");
+    assert_eq!(heard.activity, Some(Doing::Waiting));
+    assert_eq!(heard.sessions.len(), 2);
+
+    // Once the CLI no longer lists it, it leaves the card.
+    let gone = CardSession {
+        state: Some(Doing::Gone),
+        ..listed
+    };
+    note_background(&mut activities, "card_1", &[gone]);
+    assert_eq!(activities.happening("card_1").activity, Some(Doing::Done));
+}

@@ -8,7 +8,7 @@
 use devpit_core::Store;
 use devpit_rpc::{Board, Card, Column, ErrorCode, RpcError, Run, RunState, Step, StepKind};
 
-use crate::card_activity::{activity, prune_unlisted, snapshot};
+use crate::card_activity::{activity, background_read, snapshot};
 use crate::card_sessions::card_sessions;
 
 pub(crate) fn store() -> Result<Store, RpcError> {
@@ -135,7 +135,7 @@ pub fn board_get(project_id: String) -> Result<Board, RpcError> {
     for row in store.cards(&project_id)? {
         let mut card = card_of(&store, &row.id, &steps)?;
         let sessions = card_sessions(&store, &project_id, &row.id, &live, &snapshot(&row.id));
-        prune_unlisted(&row.id, &sessions);
+        background_read(&row.id, &sessions);
         card.activity = activity(&sessions);
         cards.push(card);
     }

@@ -394,7 +394,12 @@ export const commands = {
 	 *  not fired by dropping a card on a lane, it is fired by someone saying so.
 	 */
 	cardMove: (projectId: string, cardId: string, columnId: string, position: number, confirmed: boolean) => typedError<CardChanged, RpcError>(__TAURI_INVOKE("card_move", { projectId, cardId, columnId, position, confirmed })),
-	/**  `card.detail` — everything one card is. */
+	/**
+	 *  `card.detail` — everything one card is.
+	 * 
+	 *  Off the main thread: it asks git, tmux, `ps` and sometimes the CLI, and an
+	 *  open card reads it again whenever one of its sessions says something.
+	 */
 	cardDetail: (projectId: string, cardId: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_detail", { projectId, cardId })),
 	/**
 	 *  `card.set_due` — when this card is due, or nothing.

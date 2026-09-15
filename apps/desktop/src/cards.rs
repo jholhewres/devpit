@@ -80,9 +80,19 @@ fn checkout_of(row: &devpit_core::CardRow) -> Option<Checkout> {
 }
 
 /// `card.detail` — everything one card is.
+///
+/// Off the main thread: it asks git, tmux, `ps` and sometimes the CLI, and an
+/// open card reads it again whenever one of its sessions says something.
 #[tauri::command]
 #[specta::specta]
-pub fn card_detail(project_id: String, card_id: String) -> Result<CardDetail, RpcError> {
+pub async fn card_detail(project_id: String, card_id: String) -> Result<CardDetail, RpcError> {
+    tauri::async_runtime::spawn_blocking(move || detail_of(project_id, card_id))
+        .await
+        .map_err(|err| RpcError::internal(err.to_string()))?
+}
+
+/// Everything one card is, read on the caller's thread.
+pub(crate) fn detail_of(project_id: String, card_id: String) -> Result<CardDetail, RpcError> {
     let store = store()?;
     let steps = steps_of(&store, &project_id)?;
     let mut card = card_of(&store, &card_id, &steps)?;
@@ -106,7 +116,7 @@ pub fn card_detail(project_id: String, card_id: String) -> Result<CardDetail, Rp
     let heard = crate::card_activity::snapshot(&card_id);
     let sessions =
         crate::card_sessions::card_sessions(&store, &project_id, &card_id, &live, &heard);
-    crate::card_activity::prune_unlisted(&card_id, &sessions);
+    crate::card_activity::background_read(&card_id, &sessions);
     card.activity = crate::card_activity::activity(&sessions);
 
     let row = store
@@ -161,7 +171,7 @@ pub fn card_set_due(
     if !store.set_card_due(&card_id, at)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such card"));
     }
-    card_detail(project_id, card_id)
+    detail_of(project_id, card_id)
 }
 
 /// What a comment body has to be before it is written.
@@ -197,7 +207,7 @@ pub fn card_comment(
 ) -> Result<CardDetail, RpcError> {
     let store = store()?;
     store.add_comment(&card_id, YOU, sayable(&body)?)?;
-    card_detail(project_id, card_id)
+    detail_of(project_id, card_id)
 }
 
 /// `card.comment_edit` — changes one, and says that it changed.
@@ -213,7 +223,7 @@ pub fn card_comment_edit(
     if !store.edit_comment(&comment_id, sayable(&body)?)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such comment"));
     }
-    card_detail(project_id, card_id)
+    detail_of(project_id, card_id)
 }
 
 /// `card.comment_delete` — takes one out of the conversation.
@@ -228,7 +238,7 @@ pub fn card_comment_delete(
     if !store.delete_comment(&comment_id)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such comment"));
     }
-    card_detail(project_id, card_id)
+    detail_of(project_id, card_id)
 }
 
 /// `card.pin` — pins a file to the card.
@@ -268,7 +278,7 @@ pub fn card_pin(
     }
 
     store.attach(&card_id, &resolved.display().to_string(), &named, None)?;
-    card_detail(project_id, card_id)
+    detail_of(project_id, card_id)
 }
 
 /// `card.unpin` — unpins one. The file on disk is never touched.
@@ -283,7 +293,7 @@ pub fn card_unpin(
     if !store.detach(&pin_id)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such attachment"));
     }
-    card_detail(project_id, card_id)
+    detail_of(project_id, card_id)
 }
 
 /// `card.reload_board` — the board, after something changed a card.

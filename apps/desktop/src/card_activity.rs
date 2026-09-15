@@ -79,6 +79,10 @@ struct Heard {
 #[derive(Default)]
 pub(crate) struct Activities {
     heard: HashMap<Key, Heard>,
+    /// What the CLI last listed for background sessions nobody has heard
+    /// from: it is only read with the board, and an event about another
+    /// session of the card must not drop it from the tile.
+    listed: HashMap<Key, Doing>,
 }
 
 impl Activities {
@@ -106,6 +110,19 @@ impl Activities {
                 run_id: None,
             })
             .collect();
+        sessions.extend(
+            self.listed
+                .iter()
+                .filter(|(key, _)| key.card_id == card_id && !self.heard.contains_key(key))
+                .map(|(key, state)| CardSession {
+                    kind: key.kind,
+                    reference: key.reference.clone(),
+                    state: Some(*state),
+                    tab_id: None,
+                    leaf_id: None,
+                    run_id: None,
+                }),
+        );
         sessions.sort_by(|a, b| (a.kind, &a.reference).cmp(&(b.kind, &b.reference)));
         CardHappening {
             card_id: card_id.to_owned(),
@@ -282,9 +299,10 @@ pub(crate) fn forget_before(
 /// does not bring it back, because resolving a pane or a session to a card
 /// ignores cards that are off the board.
 pub(crate) fn forget_card(activities: &mut Activities, card_id: &str) -> bool {
-    let before = activities.heard.len();
+    let before = activities.heard.len() + activities.listed.len();
     activities.heard.retain(|key, _| key.card_id != card_id);
-    activities.heard.len() < before
+    activities.listed.retain(|key, _| key.card_id != card_id);
+    activities.heard.len() + activities.listed.len() < before
 }
 
 /// `forget_card` on the app's record, for a card that has just ended.
@@ -331,22 +349,39 @@ pub(crate) fn snapshot(card_id: &str) -> CardHappening {
         })
 }
 
-/// Forgets the background sessions a read found gone, so the card stops
-/// carrying what their hooks last said.
-pub(crate) fn prune_unlisted(card_id: &str, sessions: &[CardSession]) {
-    let Ok(mut activities) = registry().lock() else {
-        return;
-    };
+/// What a read of the board found about a card's background sessions: one the
+/// CLI no longer lists is forgotten, whatever its hooks last said, and the
+/// state of one it does list is kept for the events that follow.
+pub(crate) fn note_background(
+    activities: &mut Activities,
+    card_id: &str,
+    sessions: &[CardSession],
+) {
     for session in sessions
         .iter()
-        .filter(|one| one.kind == SessionKind::Background && one.state == Some(Doing::Gone))
+        .filter(|one| one.kind == SessionKind::Background)
     {
         let key = Key {
             card_id: card_id.to_owned(),
             kind: SessionKind::Background,
             reference: session.reference.clone(),
         };
-        forget(&mut activities, &key);
+        match session.state {
+            Some(Doing::Gone) | None => {
+                forget(activities, &key);
+                activities.listed.remove(&key);
+            }
+            Some(state) => {
+                activities.listed.insert(key, state);
+            }
+        }
+    }
+}
+
+/// `note_background` on the app's record.
+pub(crate) fn background_read(card_id: &str, sessions: &[CardSession]) {
+    if let Ok(mut activities) = registry().lock() {
+        note_background(&mut activities, card_id, sessions);
     }
 }
 

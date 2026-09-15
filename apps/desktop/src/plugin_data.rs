@@ -21,7 +21,7 @@ use devpit_rpc::{
     PluginFileText, PluginFiles, PluginManifest, RpcError,
 };
 
-use crate::cards::card_detail;
+use crate::cards::detail_of;
 use crate::files::modified;
 use crate::plugins::manifest;
 use crate::projects::{home_of, store};
@@ -403,7 +403,7 @@ pub fn plugin_data_pin(
 ) -> Result<CardDetail, RpcError> {
     let (store, root) = (store()?, Store::root()?);
     pin(&store, &root, &project_id, &plugin_id, &name, &card_id)?;
-    card_detail(project_id, card_id)
+    detail_of(project_id, card_id)
 }
 
 #[cfg(test)]
