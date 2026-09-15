@@ -11,6 +11,8 @@ import type { SessionEntry } from './sessionMenu'
 export interface CardHands {
   open: () => void
   rename: () => void
+  /** Present when there is another lane to move to. */
+  moveTo?: () => void
   /** Present when the card's lane runs a step. */
   play?: () => void
   terminal: () => void
@@ -23,6 +25,7 @@ export interface CardHands {
 export const cardMenu = (hands: CardHands): readonly SessionEntry[] => [
   { label: 'Open', run: hands.open },
   { label: 'Rename', run: hands.rename },
+  ...(hands.moveTo ? [{ label: 'Move to…', run: hands.moveTo }] : []),
   { rule: true },
   hands.play ? { label: 'Run step', run: hands.play } : { label: 'Open a terminal', run: hands.terminal },
   ...(hands.copyBranch ? [{ label: 'Copy branch', run: hands.copyBranch }] : []),

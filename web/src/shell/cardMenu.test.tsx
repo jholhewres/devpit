@@ -83,7 +83,16 @@ describe('a card on the board', () => {
     ...over,
   })
 
-  const board = (props: { cards?: Card[]; acts?: CardBoardActs; onRename?: () => void; onOpen?: () => void } = {}) => {
+  const board = (
+    props: {
+      cards?: Card[]
+      acts?: CardBoardActs
+      onRename?: () => void
+      onOpen?: () => void
+      others?: { id: string; name: string }[]
+      onMove?: (cardId: string, columnId: string) => void
+    } = {},
+  ) => {
     const lane = { column: column(), cards: props.cards ?? [card()] } as Lane
     return render(
       <LaneCards
@@ -94,6 +103,8 @@ describe('a card on the board', () => {
         onOpen={props.onOpen ?? vi.fn()}
         onPlay={vi.fn(() => Promise.resolve(null))}
         onRename={props.onRename ?? vi.fn()}
+        others={props.others ?? []}
+        onMove={props.onMove ?? vi.fn()}
         acts={() => props.acts ?? acts()}
       />,
     )
@@ -140,6 +151,25 @@ describe('a card on the board', () => {
     expect(screen.getByText(/Its 2 comments, 1 pinned file and 0 runs go with it/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(remove).toHaveBeenCalledWith(false))
+  })
+
+  describe('moving a card from its menu', () => {
+  it('offers the other lanes and moves the card to the one picked', () => {
+    const onMove = vi.fn()
+    const { container } = board({ others: [{ id: 'col_2', name: 'Doing' }, { id: 'col_3', name: 'Done' }], onMove })
+    rightClick(container)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to…' }))
+    const lanes = within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.textContent)
+    expect(lanes).toEqual(['Doing', 'Done'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Done' }))
+    expect(onMove).toHaveBeenCalledWith('card_1', 'col_3')
+  })
+
+  it('does not offer Move to… on a board with one lane', () => {
+    const { container } = board()
+    rightClick(container)
+    expect(screen.queryByRole('menuitem', { name: 'Move to…' })).toBeNull()
+  })
   })
 })
 

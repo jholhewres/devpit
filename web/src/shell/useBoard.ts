@@ -17,6 +17,8 @@ export interface UseBoard {
   /** The last line each running step printed, by run id. */
   readonly progress: Readonly<Record<string, string>>
   move: (cardId: string, columnId: string, at: number) => void
+  /** Moves a card to the end of a lane — what a pick from its menu means. */
+  moveToEnd: (cardId: string, columnId: string) => void
   /** Runs a card's lane step now. Answers what happened, or null when refused — the refusal is in `error`. */
   play: (cardId: string, confirmed: boolean) => Promise<Played | null>
   addCard: (columnId: string, title: string) => void
@@ -88,6 +90,14 @@ export function useBoard(projectId: string | null): UseBoard {
       })
     },
     [board, projectId],
+  )
+
+  const moveToEnd = useCallback(
+    (cardId: string, columnId: string) => {
+      const lane = lanes(board).find((one) => one.column.id === columnId)
+      move(cardId, columnId, lane?.cards.length ?? 0)
+    },
+    [board, move],
   )
 
   const play = useCallback(
@@ -187,6 +197,7 @@ export function useBoard(projectId: string | null): UseBoard {
     cards: board?.cards.length ?? 0,
     progress,
     move,
+    moveToEnd,
     play,
     addCard,
     renameCard,

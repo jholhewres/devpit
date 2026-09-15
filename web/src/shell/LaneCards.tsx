@@ -23,9 +23,14 @@ export function LaneCards({
   onOpen,
   onPlay,
   onRename,
+  others,
+  onMove,
   acts,
 }: {
   lane: Lane
+  /** The other lanes, which Move to… offers. */
+  others: readonly { id: string; name: string }[]
+  onMove: (cardId: string, columnId: string) => void
   drag: Drag
   /** A card is being dragged over this lane. */
   dropping: boolean
@@ -97,7 +102,9 @@ export function LaneCards({
             open: () => onOpen(menu.card.id),
             rename: () => setRenaming(menu.card.id),
             play: playFor(menu.card),
+            move: (columnId) => onMove(menu.card.id, columnId),
           }}
+          lanes={others}
           onClose={() => setMenu(null)}
         />
       )}

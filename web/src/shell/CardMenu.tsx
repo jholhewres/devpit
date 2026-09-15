@@ -5,6 +5,7 @@ import type { Card, Played } from '../gen/bindings'
 import { CardEnding, deleteBody, type Ending } from './CardHeader'
 import { cardMenu } from './cardMenu'
 import { RunConfirm } from './Lane'
+import { LanePicker } from './LanePicker'
 import { abandoned } from './typing'
 import type { CardBoardActs } from './useCardActs'
 
@@ -14,6 +15,8 @@ export interface CardActs extends CardBoardActs {
   rename: () => void
   /** Present when the card's lane runs a step. */
   play?: (confirmed: boolean) => Promise<Played | null>
+  /** Present when there is another lane: moves the card to the end of it. */
+  move?: (columnId: string) => void
 }
 
 const stay = (event: React.SyntheticEvent): void => event.stopPropagation()
@@ -29,10 +32,13 @@ export function CardMenu({
   stepName,
   at,
   acts,
+  lanes,
   onClose,
 }: {
   card: Card
   stepName?: string
+  /** The other lanes, for Move to…. */
+  lanes: readonly { id: string; name: string }[]
   at: { readonly x: number; readonly y: number }
   acts: CardActs
   onClose: () => void
@@ -40,6 +46,7 @@ export function CardMenu({
   const box = useRef<HTMLDivElement>(null)
   const [ending, setEnding] = useState<Ending | null>(null)
   const [running, setRunning] = useState(false)
+  const [picking, setPicking] = useState(false)
   const listing = !ending && !running
 
   useEffect(() => {
@@ -67,7 +74,7 @@ export function CardMenu({
     const size = el.getBoundingClientRect()
     el.style.left = `${Math.max(8, Math.min(at.x, window.innerWidth - size.width - 8))}px`
     el.style.top = `${Math.max(8, Math.min(at.y, window.innerHeight - size.height - 8))}px`
-  }, [at, listing])
+  }, [at, listing, picking])
 
   const play = acts.play
   const entries = cardMenu({
@@ -79,6 +86,7 @@ export function CardMenu({
       onClose()
       acts.rename()
     },
+    moveTo: acts.move && lanes.length > 0 ? () => setPicking(true) : undefined,
     play: play
       ? () => void play(false).then((answer) => (answer?.needsConfirming ? setRunning(true) : onClose()))
       : undefined,
@@ -100,7 +108,15 @@ export function CardMenu({
     <div onPointerDown={stay} onKeyDown={stay}>
       {listing && (
         <div className="ctx" ref={box} role="menu" aria-label={`${card.title} actions`} style={{ left: at.x, top: at.y }}>
-          {entries.map((entry, index) =>
+          {picking ? (
+            <LanePicker
+              lanes={lanes}
+              onPick={(columnId) => {
+                onClose()
+                acts.move?.(columnId)
+              }}
+            />
+          ) : entries.map((entry, index) =>
             entry.rule ? (
               <div key={index} className="ctx__rule" />
             ) : (

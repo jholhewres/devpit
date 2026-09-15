@@ -125,6 +125,8 @@ export function BoardPane(): React.JSX.Element {
                 onOpen={setOpened}
                 onPlay={live.play}
                 onRename={live.renameCard}
+                others={others}
+                onMove={live.moveToEnd}
                 acts={acts}
               />
 
