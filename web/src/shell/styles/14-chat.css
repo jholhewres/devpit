@@ -24,6 +24,8 @@
 .ctlmenu--down { top: calc(100% + 5px); bottom: auto; left: auto; right: 0; }
 .ctlmenu__s { padding: 6px 10px 2px; font-size: 10px; font-weight: 500; color: var(--text-3); }
 .ctlmenu__i { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 7px; text-align: left; }
+/* An entry with no way back says so. */
+.ctlmenu__i[data-danger] .ctlmenu__n { color: var(--danger); }
 .ctlmenu__i:hover { background: var(--overlay-strong); }
 .ctlmenu__b { flex: 1; min-width: 0; }
 .ctlmenu__n { display: flex; align-items: baseline; gap: 5px; font-size: 12px; color: var(--text); }

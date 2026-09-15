@@ -25,3 +25,14 @@ export function reordered(
   const rest = ids.filter((id) => id !== moving)
   return [...rest.slice(0, to), moving, ...rest.slice(to)]
 }
+
+/** The ids with one moved a place left (-1) or right (1), or the same list at an edge. */
+export function shifted(ids: readonly string[], moving: string, by: -1 | 1): readonly string[] {
+  const from = ids.indexOf(moving)
+  const to = from + by
+  if (from < 0 || to < 0 || to >= ids.length) return ids
+  const next = [...ids]
+  next[from] = ids[to]!
+  next[to] = moving
+  return next
+}

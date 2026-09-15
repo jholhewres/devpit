@@ -44,5 +44,5 @@ export const FILE_MENU: readonly Entry[] = [
 ]
 
 /** Whether every entry either draws a rule or does something. */
-export const wired = (menu: readonly Entry[]): boolean =>
-  menu.every((entry) => entry.rule === true || entry.act !== undefined)
+export const wired = (menu: readonly (Entry & { readonly run?: unknown })[]): boolean =>
+  menu.every((entry) => entry.rule === true || entry.act !== undefined || entry.run !== undefined)

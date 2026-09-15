@@ -2,10 +2,11 @@ import { Confirm } from './Confirm'
 import { dueLabel, nearness } from './due'
 import type { Lane as LaneData } from './board'
 import type { Card, ColumnDeleted, Played, Step } from '../gen/bindings'
+import { LaneMenu } from './LaneMenu'
 import { LaneStep } from './LaneStep'
 import { money } from './chat'
 import { abandoned, committed } from './typing'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 const line = {
@@ -144,10 +145,16 @@ export function LaneHead({
   others,
   onFlow,
   onGrab,
+  onAddCard,
+  onShift,
+  onDelete,
 }: {
   lane: LaneData
   steps: readonly Step[]
   onRename: (name: string) => void
+  onAddCard: () => void
+  onShift: (by: -1 | 1) => void
+  onDelete: (moveTo: string | null) => Promise<ColumnDeleted | null>
   onPickStep: (stepId: string | null) => void
   onCreateStep: (kind: string, name: string, config: string, irreversible: boolean) => void
   /** The other lanes, for the one a pass sends a card to. */
@@ -157,13 +164,41 @@ export function LaneHead({
       already a drop target for cards, and one surface cannot be both. */
   onGrab?: (event: React.PointerEvent) => void
 }): React.JSX.Element {
+  /* Not editable on a single click: the head is the drag handle, and a press
+     that meant to carry the lane kept landing in the name. */
+  const [renaming, setRenaming] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const label = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    const el = label.current
+    if (!renaming || !el) return
+    el.focus()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+  }, [renaming])
+
   return (
-    <div className="blane__top" onPointerDown={onGrab}>
+    <div
+      className="blane__top"
+      onPointerDown={onGrab}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setMenu(true)
+      }}
+    >
       <span
+        ref={label}
         className="blane__label"
-        contentEditable
+        contentEditable={renaming}
         suppressContentEditableWarning
         role="textbox"
+        aria-label={`${lane.column.name} name`}
+        aria-readonly={!renaming}
+        onDoubleClick={() => setRenaming(true)}
         onKeyDown={(event) => {
           if (committed(event)) {
             event.preventDefault()
@@ -175,6 +210,7 @@ export function LaneHead({
           }
         }}
         onBlur={(event) => {
+          setRenaming(false)
           const name = event.currentTarget.textContent?.trim()
           if (name && name !== lane.column.name) onRename(name)
           else event.currentTarget.textContent = lane.column.name
@@ -193,94 +229,27 @@ export function LaneHead({
         onCreate={onCreateStep}
         onFlow={onFlow}
       />
+      <LaneMenu
+        name={lane.column.name}
+        others={others}
+        open={menu}
+        onOpen={setMenu}
+        onRename={() => setRenaming(true)}
+        onAddCard={onAddCard}
+        onShift={onShift}
+        onDelete={onDelete}
+      />
     </div>
   )
 }
 
-/** What the dialog says when a lane still holds cards: the backend's count, and a choice. */
-export const moveTitle = (inTheWay: number, lane: string): string =>
-  `Move ${inTheWay} card${inTheWay === 1 ? '' : 's'} out of “${lane}” first`
-
-export function LaneFoot({
-  lane,
-  others,
-  onAddCard,
-  onDelete,
-}: {
-  lane: LaneData
-  /** The lanes its cards can go to. */
-  others: readonly { id: string; name: string }[]
-  onAddCard: () => void
-  onDelete: (moveTo: string | null) => Promise<ColumnDeleted | null>
-}): React.JSX.Element {
-  const [asking, setAsking] = useState<'confirm' | { readonly inTheWay: number } | null>(null)
-  const [to, setTo] = useState('')
-  const name = lane.column.name
-  const target = to || others[0]?.id || ''
-
-  /* On the body: `.ask` fills its positioned ancestor, and a lane is one. */
+export function LaneFoot({ onAddCard }: { onAddCard: () => void }): React.JSX.Element {
   return (
     <>
       <button className="tile__add" onClick={onAddCard}>
         + Add card
       </button>
-      <button className="blane__drop" aria-label={`Delete ${name}`} onClick={() => setAsking('confirm')}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
-          <path d="M18 6 6 18M6 6l12 12" />
-        </svg>
-      </button>
       <div className="blane__fill" />
-      {asking === 'confirm' &&
-        createPortal(
-          <Confirm
-            title={`Delete “${name}”?`}
-            body="The lane goes. Cards in it are never deleted with it — if there are any, you choose where they move."
-            onClose={() => setAsking(null)}
-            onConfirm={() => {
-              /* Asked without a destination first: the backend counts what is in
-                 the way, and that count is what the next question says. */
-              void onDelete(null).then((answer) =>
-                setAsking(answer && !answer.deleted && answer.cardsInTheWay > 0 ? { inTheWay: answer.cardsInTheWay } : null),
-              )
-            }}
-          />,
-          document.body,
-        )}
-      {asking && asking !== 'confirm' &&
-        createPortal(
-          <div className="ask" data-open="true" onClick={(event) => event.target === event.currentTarget && setAsking(null)}>
-            <div className="ask__box" role="dialog" aria-modal="true" aria-label={`Delete ${name}`}>
-              <h2 className="ask__t">{moveTitle(asking.inTheWay, name)}</h2>
-              {others.length > 0 ? (
-                <label className="fld">
-                  <span className="fld__l">Move them to</span>
-                  <select className="fld__b" value={target} onChange={(event) => setTo(event.target.value)}>
-                    {others.map((other) => (
-                      <option key={other.id} value={other.id}>
-                        {other.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <p className="ask__d">It is the only lane, so its cards have nowhere to go.</p>
-              )}
-              <div className="ask__row">
-                <button className="btn" onClick={() => setAsking(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="btn btn--danger"
-                  disabled={!target}
-                  onClick={() => void onDelete(target).then(() => setAsking(null))}
-                >
-                  Move and delete
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
     </>
   )
 }

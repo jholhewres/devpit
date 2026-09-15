@@ -109,6 +109,9 @@ export function BoardPane(): React.JSX.Element {
                 others={others}
                 onFlow={(onPass, autonomy) => live.setFlow(lane.column.id, onPass, autonomy)}
                 onGrab={(event) => grab(event, lane.column.id)}
+                onAddCard={() => live.addCard(lane.column.id, 'New card')}
+                onShift={(by) => live.shiftColumn(lane.column.id, by)}
+                onDelete={(moveTo) => live.deleteColumn(lane.column.id, moveTo)}
               />
 
               <div className="blane__list">
@@ -148,12 +151,7 @@ export function BoardPane(): React.JSX.Element {
                 )}
               </div>
 
-              <LaneFoot
-                lane={lane}
-                onAddCard={() => live.addCard(lane.column.id, 'New card')}
-                others={others}
-                onDelete={(moveTo) => live.deleteColumn(lane.column.id, moveTo)}
-              />
+              <LaneFoot onAddCard={() => live.addCard(lane.column.id, 'New card')} />
             </div>
           )
         })}

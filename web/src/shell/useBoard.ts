@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { Board, ColumnDeleted, Played, Step } from '../gen/bindings'
 import { landed, lanes, type Lane } from './board'
+import { shifted } from './laneOrder'
 import { ask, commands } from './live'
 import { onCarried } from './window'
 
@@ -20,6 +21,8 @@ export interface UseBoard {
   addColumn: (name: string) => void
   renameColumn: (columnId: string, name: string) => void
   reorderColumns: (ids: string[]) => void
+  /** Moves a lane one place left or right; nothing at an edge. */
+  shiftColumn: (columnId: string, by: -1 | 1) => void
   /** Answers what the backend did: deleted, or refused with the cards in the way. */
   deleteColumn: (columnId: string, moveTo: string | null) => Promise<ColumnDeleted | null>
   /** What a lane runs when a card lands in it, or nothing. */
@@ -131,6 +134,14 @@ export function useBoard(projectId: string | null): UseBoard {
     (ids: string[]) => projectId && then(() => commands.columnReorder(projectId, ids)),
     [projectId, then],
   )
+  const shiftColumn = useCallback(
+    (columnId: string, by: -1 | 1) => {
+      const ids = lanes(board).map((lane) => lane.column.id)
+      const order = shifted(ids, columnId, by)
+      if (order !== ids) reorderColumns([...order])
+    },
+    [board, reorderColumns],
+  )
   const deleteColumn = useCallback(
     async (columnId: string, moveTo: string | null): Promise<ColumnDeleted | null> => {
       if (!projectId) return null
@@ -170,6 +181,7 @@ export function useBoard(projectId: string | null): UseBoard {
     addColumn,
     renameColumn,
     reorderColumns,
+    shiftColumn,
     deleteColumn,
     setStep,
     createStep,

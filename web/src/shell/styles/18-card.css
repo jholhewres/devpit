@@ -6,8 +6,6 @@
 .cardp__box { width: 100%; max-width: 760px; border-radius: 14px; background: var(--canvas); border: 1px solid var(--border-strong); box-shadow: 0 24px 60px var(--shade); animation: pop-in 140ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .cardp__top { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .cardp__acts { margin-left: auto; display: flex; align-items: center; gap: 2px; }
-/* Delete is the one ending with no way back. */
-.cardp__acts .ctlmenu__i[data-danger] .ctlmenu__n { color: var(--danger); }
 .cardp__col { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
 .cardp__in { padding: 20px 24px 28px; }
 .cardp__title { width: 100%; background: none; border: 0; font: inherit; font-size: 18px; font-weight: 550; color: var(--text); padding: 4px 0; }
