@@ -122,6 +122,7 @@ describe('the work section of a card', () => {
     render(
       <CardWork
         cardId="card_1"
+        title="Ship it"
         worktree={null}
         runs={[]}
         onChanged={vi.fn()}

@@ -177,6 +177,7 @@ export function CardPane({
 
             <CardWork
               cardId={cardId}
+              title={detail.card.title}
               worktree={detail.worktree}
               runs={detail.runs}
               onChanged={card.reload}

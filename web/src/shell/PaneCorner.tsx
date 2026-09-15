@@ -36,11 +36,26 @@ export function PaneCorner({
   closeArmed?: boolean
   children?: React.ReactNode
 }): React.JSX.Element {
-  const { show, close } = useShell()
+  const { show, close, open, openCard } = useShell()
   const chatLabel = onChat ? 'Continue in chat' : 'New chat'
+  /* The way back to the card a terminal was opened for. Only a tab the backend
+     filed under a card has one. */
+  const cardId = open.find((tab) => tab.id === tabId)?.cardId
 
   return (
     <div className="pcorner">
+      {cardId && (
+        <button
+          className="pcorner__card"
+          title="Open the card this terminal is for"
+          onClick={() => {
+            show('board')
+            openCard(cardId)
+          }}
+        >
+          Card
+        </button>
+      )}
       {children}
       <button
         className="sq26"

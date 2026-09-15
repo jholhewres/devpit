@@ -2,13 +2,15 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PaneCorner } from './PaneCorner'
+import type { Tab } from './strip'
 
-const shell = { show: vi.fn(), close: vi.fn() }
+const shell = { show: vi.fn(), close: vi.fn(), openCard: vi.fn(), open: [] as Tab[] }
 vi.mock('./useShell', () => ({ useShell: () => shell }))
 
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  shell.open = []
 })
 
 describe('the icons in a pane corner', () => {
@@ -42,5 +44,20 @@ describe('the icons in a pane corner', () => {
       </PaneCorner>,
     )
     expect(screen.getByText('$0.42')).toBeTruthy()
+  })
+
+  it('goes back to the card a terminal was opened for, and only from such a terminal', () => {
+    shell.open = [
+      { id: 'tab_card', kind: 'term', title: 'Wire the board', cardId: 'card_1' },
+      { id: 'tab_plain', kind: 'term', title: 'zsh' },
+    ]
+    render(<PaneCorner tabId="tab_plain" what="terminal" />)
+    expect(screen.queryByRole('button', { name: 'Card' })).toBeNull()
+    cleanup()
+
+    render(<PaneCorner tabId="tab_card" what="terminal" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }))
+    expect(shell.show).toHaveBeenCalledWith('board')
+    expect(shell.openCard).toHaveBeenCalledWith('card_1')
   })
 })

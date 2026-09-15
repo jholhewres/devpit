@@ -25,12 +25,15 @@ import { money } from './chat'
 
 export function CardWork({
   cardId,
+  title,
   worktree,
   runs,
   onChanged,
   play,
 }: {
   cardId: string
+  /** What the card's terminal tab is called: the card, not its branch. */
+  title: string
   worktree: Checkout | null
   runs: readonly Run[]
   onChanged: () => void
@@ -58,12 +61,12 @@ export function CardWork({
   const openTerminalFor = useCallback(async (agentId?: string): Promise<void> => {
     if (!project) return
     setBusy('Opening a terminal…')
-    const refused = await openCardTerminal(project.id, cardId, worktree?.branch ?? 'Card', show, agentId)
+    const refused = await openCardTerminal(project.id, cardId, title, show, agentId)
     setBusy(null)
     setProblem(refused)
     if (refused) return
     onChanged()
-  }, [project, cardId, worktree?.branch, show, onChanged])
+  }, [project, cardId, title, show, onChanged])
 
   /* A conversation about this card, in its checkout, with the card in it. */
   const chat = async (): Promise<void> => {

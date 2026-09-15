@@ -11,6 +11,7 @@ const shown = vi.fn()
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
   commands: {
+    cardTerminal: () => ({ layout: {}, tabId: 'tab_named_by_the_backend', cardId: 'card_1' }),
     agentProfiles: () => [
       { id: 'prof_1', path: '/usr/bin/claude' },
       { id: 'prof_gone', path: null },
@@ -29,7 +30,7 @@ vi.mock('./useShell', () => ({ useShell: () => ({ project: { id: 'p1' }, show: s
 vi.mock('./useKnownAgents', () => ({ offered: () => [], useKnownAgents: () => [] }))
 vi.mock('./useOpeners', () => ({ useOpeners: () => [] }))
 
-const work = () => render(<CardWork cardId="card_1" worktree={null} runs={[]} onChanged={vi.fn()} />)
+const work = () => render(<CardWork cardId="card_1" title="Wire the board" worktree={null} runs={[]} onChanged={vi.fn()} />)
 
 describe('a chat about the card', () => {
   it('opens in a chat tab with the card in its composer, under the one account installed', async () => {
@@ -42,5 +43,15 @@ describe('a chat about the card', () => {
       }),
     )
     expect(chatted).toHaveBeenCalledWith('p1', 'card_1', 'prof_1')
+  })
+})
+
+describe("a card's terminal", () => {
+  it('opens in a tab named after the card, not its branch', async () => {
+    work()
+    fireEvent.click(screen.getByRole('button', { name: 'Open a terminal' }))
+    await waitFor(() =>
+      expect(shown).toHaveBeenCalledWith('term', { id: 'tab_named_by_the_backend', title: 'Wire the board', cardId: 'card_1' }),
+    )
   })
 })
