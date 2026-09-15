@@ -33,8 +33,8 @@ export async function openCardTerminal(
   launch?: string,
 ): Promise<string | null> {
   const answer = await ask(() => commands.cardTerminal(projectId, cardId))
-  if (answer.error) return answer.error
-  show('term', { id: `tab_card_${cardId}`, title, ...(launch ? { launch } : {}) })
+  if (!answer.data) return answer.error ?? 'the terminal did not open'
+  show('term', { id: answer.data.tabId, title, cardId: answer.data.cardId, ...(launch ? { launch } : {}) })
   return null
 }
 

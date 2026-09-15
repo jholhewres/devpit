@@ -28,6 +28,9 @@ export interface Tab {
       asks the backend for a tree before there is anything to type into.
       Cleared the moment it is sent, so it cannot be sent twice. */
   readonly launch?: string
+  /** The card a terminal tab was opened for. Absent on tabs saved before the
+      backend named them, until they are opened again from the card. */
+  readonly cardId?: string
 }
 
 export interface Strip {

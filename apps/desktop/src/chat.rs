@@ -8,9 +8,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use devpit_agentcli::driver::driver;
-use devpit_agentcli::head::{
-    after_turn, head_path, read_head, remaining, settled, write_head, Head,
-};
+use devpit_agentcli::head::{after_turn, head_path, read_head, remaining, settled, write_head};
 use devpit_agentcli::store::{append, conversation_path, read};
 use devpit_agentcli::talk::{say, Said, Say};
 use devpit_rpc::{
@@ -160,29 +158,15 @@ pub async fn chat_send(
 
     // Written before the turn runs: an interrupted first turn still leaves the
     // conversation tied to the account that opened it.
-    let opening = Head {
-        profile: profile_id.clone(),
-        model: model.clone(),
-        created_at: head
-            .as_ref()
-            .map(|head| head.created_at)
-            .unwrap_or_else(now),
-        card_id: head.as_ref().and_then(|head| head.card_id.clone()),
-        cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
-        budget_usd: budget_usd.or(head.as_ref().and_then(|head| head.budget_usd)),
-        session_id: head.as_ref().and_then(|head| head.session_id.clone()),
-        permission: permission
-            .or_else(|| head.as_ref().and_then(|head| head.permission.clone()))
-            // Nothing to ask with yet: a turn left waiting on a prompt this
-            // screen cannot draw would hang with no way to answer it.
-            .or_else(|| Some("acceptEdits".to_owned())),
-        effort: effort.or_else(|| head.as_ref().and_then(|head| head.effort.clone())),
-        title: head.as_ref().and_then(|head| head.title.clone()),
-        rewind: head
-            .as_ref()
-            .map(|head| head.rewind.clone())
-            .unwrap_or_default(),
-    };
+    let opening = crate::chat_turn::opening(
+        head.as_ref(),
+        &profile_id,
+        model.clone(),
+        budget_usd,
+        permission,
+        effort,
+        now(),
+    );
     let _ = write_head(&head_file, &opening);
     let resuming = opening.session_id.clone();
     let forking = opening.rewind.fork_at.clone();

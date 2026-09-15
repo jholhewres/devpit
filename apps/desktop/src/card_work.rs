@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use std::sync::Arc;
 
-use devpit_rpc::{Checkout, ErrorCode, Played, RpcError, SessionLayout};
+use devpit_rpc::{CardTerminal, Checkout, ErrorCode, Played, RpcError};
 use tauri::State;
 
 use crate::projects::store;
@@ -73,7 +73,7 @@ pub async fn card_terminal(
     state: State<'_, SessionState>,
     project_id: String,
     card_id: String,
-) -> Result<SessionLayout, RpcError> {
+) -> Result<CardTerminal, RpcError> {
     let wanted = card_id.clone();
     let cwd = tauri::async_runtime::spawn_blocking(move || {
         let store = store()?;
@@ -83,7 +83,13 @@ pub async fn card_terminal(
     .await
     .map_err(|err| RpcError::internal(err.to_string()))??;
 
-    crate::sessions::ensure_at(&state, &project_id, &tab_for_card(&card_id), &cwd)
+    let tab_id = tab_for_card(&card_id);
+    let layout = crate::sessions::ensure_at(&state, &project_id, &tab_id, &cwd)?;
+    Ok(CardTerminal {
+        layout,
+        tab_id,
+        card_id,
+    })
 }
 
 /// `card.play` — runs this lane's step on this card, now.

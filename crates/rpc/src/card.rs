@@ -8,7 +8,8 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::board::{Card, Run};
+use crate::board::Run;
+use crate::tile::Card;
 
 /// One line of the card's conversation.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -167,4 +168,16 @@ pub struct ArchivedCard {
 #[serde(rename_all = "camelCase")]
 pub struct ArchivedCards {
     pub cards: Vec<ArchivedCard>,
+}
+
+/// Response of `card.terminal`: the layout, and the tab and card it belongs to.
+///
+/// The window files the tab under these and never spells the tab's id itself:
+/// a second place writing the prefix is a second place to get it wrong.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardTerminal {
+    pub layout: crate::SessionLayout,
+    pub tab_id: String,
+    pub card_id: String,
 }

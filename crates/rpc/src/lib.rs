@@ -28,14 +28,15 @@ pub mod session_status;
 pub mod session_tree;
 pub mod settings;
 mod threads;
+pub mod tile;
 pub mod usage;
 
 pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
-pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
+pub use board::{Board, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use card::{
-    ArchivedCard, ArchivedCards, CardDeleted, CardDetail, Checkout, Comment, DeleteRefusal, Notice,
-    Notices, Pinned, Played,
+    ArchivedCard, ArchivedCards, CardDeleted, CardDetail, CardTerminal, Checkout, Comment,
+    DeleteRefusal, Notice, Notices, Pinned, Played,
 };
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
@@ -64,6 +65,7 @@ pub use session::{
 pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
 pub use threads::{Conversations, Thread};
+pub use tile::Card;
 pub use usage::{PaneCost, Usage};
 
 use serde::{Deserialize, Serialize};

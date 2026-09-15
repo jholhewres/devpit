@@ -438,7 +438,7 @@ export const commands = {
 	 *  That seam already existed for the launcher palette; this reuses it rather
 	 *  than inventing a second way in.
 	 */
-	cardTerminal: (projectId: string, cardId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("card_terminal", { projectId, cardId })),
+	cardTerminal: (projectId: string, cardId: string) => typedError<CardTerminal, RpcError>(__TAURI_INVOKE("card_terminal", { projectId, cardId })),
 	/**
 	 *  `card.play` — runs this lane's step on this card, now.
 	 * 
@@ -1051,6 +1051,18 @@ export type CardDetail = {
 	worktree: Checkout | null,
 	/**  Every run, newest first — the tile only carries the latest. */
 	runs: Run[],
+};
+
+/**
+ *  Response of `card.terminal`: the layout, and the tab and card it belongs to.
+ * 
+ *  The window files the tab under these and never spells the tab's id itself:
+ *  a second place writing the prefix is a second place to get it wrong.
+ */
+export type CardTerminal = {
+	layout: SessionLayout,
+	tabId: string,
+	cardId: string,
 };
 
 /**  One checkout belonging to a card, or left over from one. */
