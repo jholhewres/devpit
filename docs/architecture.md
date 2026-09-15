@@ -34,6 +34,27 @@ style preferences.
   root.** This process runs terminals and writes files; reaching it is reaching
   the machine.
 
+## A card follows its sessions
+
+A card knows what is working on it from links that already live elsewhere and
+from what its agents say — never from a copy of their state in a table, which
+would still say `working` after the app had closed.
+
+- **Links are rows.** A card's terminal tab (`tab_card_<id>`), a run's own
+  session (`run.session_id`, with the folder it ran in, `run.cwd`), a background
+  session (`session_link`, with its `cwd`) and a conversation about the card
+  (`card_chat`). A card's sessions are these, joined when read.
+- **State is heard.** Hooks from panes, headless turns and background sessions,
+  runs starting and ending, chat turns and the process table all land in one
+  in-memory registry, stamped by one counter, so a late word never undoes a
+  newer one. After a restart it is empty; the process table marks a card pane
+  with an agent in front as open until the agent says more.
+- **The window hears it on `card:happening`.** One event per change, with the
+  card's sessions and what they add up to. The tile's dot and the open card's
+  Sessions section read it.
+- **A conversation runs where its session ran.** Its folder is fixed when it
+  begins or takes a session in, and no turn makes a checkout.
+
 ## Context never becomes shell syntax
 
 Context reaches a `command` step **only through environment variables, never

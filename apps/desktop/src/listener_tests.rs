@@ -1,7 +1,6 @@
 use std::io::{ErrorKind, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use devpit_agentcli::{AgentSession, Kind, Status};
@@ -51,6 +50,59 @@ fn command_for(settings: &str, event: &str) -> String {
         .to_owned()
 }
 
+/// Runs the real hook command for one event, the way the CLI does, and
+/// answers the post it made. `pane` is set only for an agent inside a pane.
+fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) -> Posted {
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("bind");
+    listener.set_nonblocking(true).expect("nonblocking");
+    let endpoint = dir.join("hook-endpoint");
+    let port = listener.local_addr().expect("address").port();
+    std::fs::write(&endpoint, format!("http://127.0.0.1:{port}/hook")).expect("endpoint");
+
+    let served = std::thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    stream.set_nonblocking(false).expect("blocking");
+                    let posted = read_request(&mut stream);
+                    reply(&mut stream, "");
+                    return posted;
+                }
+                Err(err) if err.kind() == ErrorKind::WouldBlock && Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Err(_) => return None,
+            }
+        }
+    });
+
+    let command = command_for(&devpit_agentcli::settings_json(&endpoint), event);
+    let mut hook = Command::new("sh");
+    hook.arg("-c")
+        .arg(&command)
+        .env_remove("DEVPIT_PANE")
+        .stdin(Stdio::piped());
+    if let Some(pane) = pane {
+        hook.env("DEVPIT_PANE", pane);
+    }
+    let mut child = hook.spawn().expect("hook");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(payload.as_bytes())
+        .expect("payload");
+    child.wait().expect("hook ran");
+    served
+        .join()
+        .expect("served")
+        .unwrap_or_else(|| panic!("the {event} hook never posted"))
+}
+
+/// Every way a hook reaches a card, each one fired through the real hook
+/// command: the pane route, a run's session, a background session, a post that
+/// arrives out of order, and a session ending.
 #[test]
 fn a_hook_reaches_the_card() {
     for (tool, check) in [("sh", "true"), ("curl", "command -v curl")] {
@@ -77,74 +129,106 @@ fn a_hook_reaches_the_card() {
     store
         .set_pane_layout(&project, &tab_for_card(&card), &tree, LEAF)
         .expect("layout");
+    let step = store
+        .create_step(&project, "agent", "review", "{}", false)
+        .expect("step");
+    let run = store.start_run(&card, &step, None).expect("run");
+    store.set_run_session(&run, "s-run").expect("run session");
+    store
+        .link_session(&card, "a1b2", "s-bg", None, None)
+        .expect("background");
     drop(store);
 
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("bind");
-    listener.set_nonblocking(true).expect("nonblocking");
-    let endpoint = dir.path().join("hook-endpoint");
-    let port = listener.local_addr().expect("address").port();
-    std::fs::write(&endpoint, format!("http://127.0.0.1:{port}/hook")).expect("endpoint");
-
-    let sink = Arc::new(Recorded {
+    let sink = Recorded {
         store_path,
         activities: Mutex::default(),
         said: Mutex::default(),
-    });
-    let core = Arc::clone(&sink);
-    let served = std::thread::spawn(move || {
-        let deadline = Instant::now() + Duration::from_secs(10);
-        loop {
-            match listener.accept() {
-                Ok((mut stream, _)) => {
-                    stream.set_nonblocking(false).expect("blocking");
-                    let posted = read_request(&mut stream).expect("a post");
-                    reply(&mut stream, "");
-                    hear_post(core.as_ref(), &posted, next_seq());
-                    return true;
-                }
-                Err(err) if err.kind() == ErrorKind::WouldBlock && Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(20));
-                }
-                Err(_) => return false,
-            }
-        }
-    });
+    };
+    let state_of = |kind: SessionKind, reference: &str| {
+        sink.activities
+            .lock()
+            .expect("activities")
+            .happening(&card)
+            .sessions
+            .iter()
+            .find(|one| one.kind == kind && one.reference == reference)
+            .and_then(|one| one.state)
+    };
 
-    let command = command_for(&devpit_agentcli::settings_json(&endpoint), "Stop");
-    let mut hook = Command::new("sh")
-        .arg("-c")
-        .arg(&command)
-        .env("DEVPIT_PANE", LEAF)
-        .stdin(Stdio::piped())
-        .spawn()
-        .expect("hook");
-    hook.stdin
-        .take()
-        .expect("stdin")
-        .write_all(PAYLOAD.as_bytes())
-        .expect("payload");
-    hook.wait().expect("hook ran");
-    assert!(served.join().expect("served"), "the hook never posted");
-
-    let said = sink.said.lock().expect("said");
-    let (_, happening) = said
-        .iter()
-        .find(|(channel, _)| channel == "card:happening")
-        .expect("the card heard it");
-    assert_eq!(happening["cardId"], card.as_str());
-    assert_eq!(happening["activity"], "done");
-    assert_eq!(happening["sessions"][0]["ref"], LEAF);
-    assert_eq!(
-        happening["sessions"][0]["tabId"],
-        tab_for_card(&card).as_str()
+    // The pane route: the agent in the card's pane stops.
+    let stopped = posted_by_hook(
+        dir.path(),
+        "Stop",
+        r#"{"hook_event_name":"Stop","session_id":"s-pane","cwd":"/w"}"#,
+        Some(LEAF),
     );
+    hear_post(&sink, &stopped, 10);
+    assert_eq!(state_of(SessionKind::Pane, LEAF), Some(Doing::Done));
+    {
+        let said = sink.said.lock().expect("said");
+        let (_, happening) = said
+            .iter()
+            .rev()
+            .find(|(channel, _)| channel == "card:happening")
+            .expect("the card heard it");
+        assert_eq!(happening["cardId"], card.as_str());
+        assert_eq!(happening["sessions"][0]["ref"], LEAF);
+        assert_eq!(
+            happening["sessions"][0]["tabId"],
+            tab_for_card(&card).as_str()
+        );
+    }
+
+    // A run's session id, from a headless turn with no pane.
+    let used = posted_by_hook(
+        dir.path(),
+        "PostToolUse",
+        r#"{"hook_event_name":"PostToolUse","tool_name":"Edit","session_id":"s-run","cwd":"/w"}"#,
+        None,
+    );
+    assert_eq!(used.pane, None);
+    hear_post(&sink, &used, 11);
+    assert_eq!(state_of(SessionKind::Run, "s-run"), Some(Doing::Working));
+
+    // A background session's id.
+    let asked = posted_by_hook(
+        dir.path(),
+        "Notification",
+        r#"{"hook_event_name":"Notification","session_id":"s-bg","cwd":"/w","message":"needs you"}"#,
+        None,
+    );
+    hear_post(&sink, &asked, 12);
+    assert_eq!(
+        state_of(SessionKind::Background, "s-bg"),
+        Some(Doing::Waiting)
+    );
+
+    // Out of order: a post stamped before the stop, served after it.
+    let late = posted_by_hook(
+        dir.path(),
+        "Notification",
+        r#"{"hook_event_name":"Notification","session_id":"s-pane","cwd":"/w","message":"needs you"}"#,
+        Some(LEAF),
+    );
+    hear_post(&sink, &late, 9);
+    assert_eq!(state_of(SessionKind::Pane, LEAF), Some(Doing::Done));
+
+    // SessionEnded: the pane's session ends.
+    let ended = posted_by_hook(
+        dir.path(),
+        "SessionEnd",
+        r#"{"hook_event_name":"SessionEnd","session_id":"s-pane","cwd":"/w","reason":"prompt_input_exit"}"#,
+        Some(LEAF),
+    );
+    hear_post(&sink, &ended, 13);
+    assert_eq!(state_of(SessionKind::Pane, LEAF), Some(Doing::Gone));
     assert_eq!(
         sink.activities
             .lock()
             .expect("activities")
             .happening(&card)
             .activity,
-        Some(Doing::Done)
+        Some(Doing::Waiting)
     );
 }
 
