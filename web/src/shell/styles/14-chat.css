@@ -21,6 +21,7 @@
 .ctl__v { color: var(--ghost); flex: none; }
 
 .ctlmenu { position: absolute; bottom: calc(100% + 5px); left: 0; z-index: 120; min-width: 230px; max-width: 330px; padding: 4px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 16px 36px var(--shade); animation: pop 130ms ease-out both; }
+.ctlmenu--down { top: calc(100% + 5px); bottom: auto; left: auto; right: 0; }
 .ctlmenu__s { padding: 6px 10px 2px; font-size: 10px; font-weight: 500; color: var(--text-3); }
 .ctlmenu__i { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 7px; text-align: left; }
 .ctlmenu__i:hover { background: var(--overlay-strong); }

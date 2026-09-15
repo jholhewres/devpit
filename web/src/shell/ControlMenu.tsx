@@ -26,11 +26,14 @@ export function ControlMenu({
   title,
   choices,
   onPick,
+  opens = 'up',
 }: {
   label: string
   title: string
   choices: readonly Choice[]
   onPick: (id: string) => void
+  /** Up over a composer; down from a bar at the top, where up is off the pane. */
+  opens?: 'up' | 'down'
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -49,7 +52,7 @@ export function ControlMenu({
       </button>
 
       {open && (
-        <div className="ctlmenu" role="menu" aria-label={title}>
+        <div className={opens === 'down' ? 'ctlmenu ctlmenu--down' : 'ctlmenu'} role="menu" aria-label={title}>
           {choices.map((choice, at) => (
             <div key={choice.id}>
               {choice.section && choices[at - 1]?.section !== choice.section && (
