@@ -36,10 +36,10 @@ fn head(profile: &str, cost: f64) -> Head {
 }
 
 fn conversation(home: &Path, id: &str, opening: &str, profile: &str, cost: f64) {
-    let file = conversation_path(home, "proj", id);
+    let file = conversation_path(home, id);
     append(&file, &said(opening, Role::User)).expect("append");
     append(&file, &said("Sure.", Role::Assistant)).expect("append");
-    write_head(&head_path(home, "proj", id), &head(profile, cost)).expect("head");
+    write_head(&head_path(home, id), &head(profile, cost)).expect("head");
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn every_conversation_on_disk_is_listed_with_what_it_cost() {
     let home = tempfile::tempdir().expect("tempdir");
     conversation(home.path(), "c1", "Fix the login", "claude", 0.25);
 
-    let found = conversations(home.path(), "proj");
+    let found = conversations(home.path());
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].id, "c1");
     assert_eq!(found[0].title, "Fix the login");
@@ -89,7 +89,7 @@ fn the_most_recent_comes_first() {
     std::thread::sleep(std::time::Duration::from_millis(1100));
     conversation(home.path(), "newer", "The newer one", "claude", 0.0);
 
-    let found = conversations(home.path(), "proj");
+    let found = conversations(home.path());
     assert_eq!(found[0].id, "newer", "the older one sorted first");
 }
 
@@ -98,17 +98,17 @@ fn the_most_recent_comes_first() {
 #[test]
 fn the_agents_reply_is_never_the_title() {
     let home = tempfile::tempdir().expect("tempdir");
-    let file = conversation_path(home.path(), "proj", "c1");
+    let file = conversation_path(home.path(), "c1");
     append(&file, &said("Working on it…", Role::Assistant)).expect("append");
     append(&file, &said("Fix the login", Role::User)).expect("append");
 
-    assert_eq!(conversations(home.path(), "proj")[0].title, "Fix the login");
+    assert_eq!(conversations(home.path())[0].title, "Fix the login");
 }
 
 #[test]
 fn a_project_that_has_said_nothing_lists_nothing() {
     let home = tempfile::tempdir().expect("tempdir");
-    assert!(conversations(home.path(), "quiet").is_empty());
+    assert!(conversations(home.path()).is_empty());
 }
 
 /// A transcript with no head is still a conversation: the head is written on
@@ -116,10 +116,10 @@ fn a_project_that_has_said_nothing_lists_nothing() {
 #[test]
 fn a_transcript_with_no_head_is_still_listed() {
     let home = tempfile::tempdir().expect("tempdir");
-    let file = conversation_path(home.path(), "proj", "c1");
+    let file = conversation_path(home.path(), "c1");
     append(&file, &said("Only this", Role::User)).expect("append");
 
-    let found = conversations(home.path(), "proj");
+    let found = conversations(home.path());
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].title, "Only this");
     assert!(found[0].profile.is_empty());
@@ -130,14 +130,13 @@ fn a_transcript_with_no_head_is_still_listed() {
 #[test]
 fn an_adopted_session_is_named_by_the_cli_title() {
     let home = tempfile::tempdir().expect("tempdir");
-    let dir = home.path().join("projects/prj_1/sessions");
-    std::fs::create_dir_all(&dir).expect("mkdir");
+    let dir = home.path();
     std::fs::write(dir.join("conv_a.jsonl"), "").expect("empty transcript");
     let mut adopted = head("claude", 0.0);
     adopted.title = Some("Fix the parser".to_owned());
     crate::head::write_head(&dir.join("conv_a.json"), &adopted).expect("head");
 
-    let found = conversations(home.path(), "prj_1");
+    let found = conversations(dir);
     assert_eq!(found[0].title, "Fix the parser");
 }
 
@@ -145,8 +144,7 @@ fn an_adopted_session_is_named_by_the_cli_title() {
 #[test]
 fn the_persons_words_outrank_an_adopted_title() {
     let home = tempfile::tempdir().expect("tempdir");
-    let dir = home.path().join("projects/prj_1/sessions");
-    std::fs::create_dir_all(&dir).expect("mkdir");
+    let dir = home.path();
     std::fs::write(
         dir.join("conv_a.jsonl"),
         format!(
@@ -159,8 +157,5 @@ fn the_persons_words_outrank_an_adopted_title() {
     adopted.title = Some("Fix the parser".to_owned());
     crate::head::write_head(&dir.join("conv_a.json"), &adopted).expect("head");
 
-    assert_eq!(
-        conversations(home.path(), "prj_1")[0].title,
-        "rename the lexer"
-    );
+    assert_eq!(conversations(dir)[0].title, "rename the lexer");
 }

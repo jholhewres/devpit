@@ -50,6 +50,8 @@ mod panels;
 mod panes;
 mod pasting;
 mod paths;
+mod plugin_data;
+mod plugins;
 mod post;
 mod prime;
 mod priming;
@@ -111,6 +113,26 @@ fn main() {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.
             tauri::Manager::manage(app, sessions::SessionState::new(app.handle().clone()));
+            // The catalogue is compiled in and pinned by a test, so a manifest
+            // breaking the contract is a build defect: loud where it is being
+            // written; logged in release, where `plugin_data` refuses it on use
+            // and panicking would only take the whole app away.
+            if let Err(err) = devpit_rpc::validate_catalogue(&devpit_rpc::catalogue()) {
+                if cfg!(debug_assertions) {
+                    panic!("the plugin catalogue breaks the contract: {err}");
+                }
+                eprintln!("the plugin catalogue breaks the contract: {err}");
+            }
+            // Project folders named and moved before anything reads one. Here
+            // and not in `Store::open`, so a test opening a store moves
+            // nothing; a failure leaves each project where it was.
+            if let Ok(root) = devpit_core::Store::root() {
+                if let Err(err) = devpit_core::Store::open_default()
+                    .and_then(|store| devpit_core::home::settle(&store, &root))
+                {
+                    eprintln!("project folders were not settled: {err}");
+                }
+            }
             // Hooks are how the board hears about work as it happens rather
             // than a poll later. Started here so the endpoint is on disk before
             // the first turn goes out.

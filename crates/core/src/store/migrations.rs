@@ -4,17 +4,34 @@
 //! migration that reruns against real data loses data. The applied version is
 //! read from the database itself (`user_version`), not tracked beside it.
 
+use std::path::Path;
+
 use rusqlite::Connection;
 
 use crate::store::StoreError;
 
 #[path = "migrations_list.rs"]
 mod list;
-use list::MIGRATIONS;
+use list::{BEFORE, MIGRATIONS};
 
 pub(super) struct Migration {
     pub(super) version: i64,
     pub(super) sql: &'static str,
+}
+
+/// Work a migration needs done in Rust before its SQL, given the workspace
+/// root. Inside the same transaction, so its failure leaves the version as it was.
+pub(super) type Before = fn(&Connection, &Path) -> Result<(), StoreError>;
+
+fn apply(conn: &Connection, root: &Path, migration: &Migration) -> Result<(), StoreError> {
+    for (_, before) in BEFORE.iter().filter(|(at, _)| *at == migration.version) {
+        before(conn, root)?;
+    }
+    conn.execute_batch(&format!(
+        "{} PRAGMA user_version = {};",
+        migration.sql, migration.version
+    ))?;
+    Ok(())
 }
 
 /// The newest schema this build knows.
@@ -51,7 +68,7 @@ pub fn latest() -> i64 {
 /// All-or-nothing rather than one transaction each, which is stronger than
 /// what was here before and keeps the reason it was written: a partial failure
 /// must not leave half the tables standing with the version already bumped.
-pub fn run(conn: &Connection) -> Result<(), StoreError> {
+pub fn run(conn: &Connection, root: &Path) -> Result<(), StoreError> {
     conn.execute_batch("BEGIN IMMEDIATE")?;
     let applied = match conn.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0)) {
         Ok(applied) => applied,
@@ -62,12 +79,9 @@ pub fn run(conn: &Connection) -> Result<(), StoreError> {
     };
 
     for migration in MIGRATIONS.iter().filter(|m| m.version > applied) {
-        if let Err(err) = conn.execute_batch(&format!(
-            "{} PRAGMA user_version = {};",
-            migration.sql, migration.version
-        )) {
+        if let Err(err) = apply(conn, root, migration) {
             let _ = conn.execute_batch("ROLLBACK");
-            return Err(err.into());
+            return Err(err);
         }
     }
 

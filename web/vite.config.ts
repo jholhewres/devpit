@@ -1,4 +1,8 @@
-import { defineConfig } from 'vite'
+import { cpSync, existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve, sep } from 'node:path'
+
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
 /**
@@ -11,8 +15,77 @@ import react from '@vitejs/plugin-react'
  */
 const DEV_PORT = 17800
 
+/*
+ * Excalidraw loads its hand-drawn fonts at runtime from esm.sh unless told
+ * otherwise. The app works offline, so they are served from its own bundle
+ * at `<base>excalidraw/fonts/`: read from node_modules in dev, copied into
+ * outDir on build — never checked in.
+ *
+ * Two plugins, split by `apply`: Vitest closes the plugin container with
+ * `build.outDir` stubbed, and an unscoped `closeBundle` copied fonts there.
+ */
+function excalidrawFontsDir(): string {
+  const require = createRequire(import.meta.url)
+  // `require.resolve('@excalidraw/excalidraw')` lands on `dist/prod/index.js`
+  // under plain Node's default export condition; `fonts` sits next to it.
+  return join(dirname(require.resolve('@excalidraw/excalidraw')), 'fonts')
+}
+
+function excalidrawFontsDev(): Plugin {
+  const fontsDir = excalidrawFontsDir()
+
+  return {
+    name: 'excalidraw-fonts-dev',
+    apply: 'serve',
+    configureServer(server) {
+      const prefix = `${server.config.base}excalidraw/fonts/`
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? ''
+        if (!url.startsWith(prefix)) {
+          next()
+          return
+        }
+        const rel = decodeURIComponent(url.slice(prefix.length).split('?')[0]!)
+        // Resolved, then checked against its root before it is read — same
+        // rule as the backend (AGENTS.md). `resolve` alone is not enough: a
+        // `rel` with enough `../` (or an absolute path) can still land
+        // outside `fontsDir`, so the result must be checked afterwards.
+        const file = resolve(fontsDir, rel)
+        if (file !== fontsDir && !file.startsWith(fontsDir + sep)) {
+          next()
+          return
+        }
+        if (!existsSync(file)) {
+          next()
+          return
+        }
+        res.setHeader('Content-Type', 'font/woff2')
+        res.end(readFileSync(file))
+      })
+    },
+  }
+}
+
+function excalidrawFontsBuild(): Plugin {
+  const fontsDir = excalidrawFontsDir()
+  let outDir = 'dist'
+  let root = process.cwd()
+
+  return {
+    name: 'excalidraw-fonts-build',
+    apply: 'build',
+    configResolved(config) {
+      outDir = config.build.outDir
+      root = config.root
+    },
+    closeBundle() {
+      cpSync(fontsDir, resolve(root, outDir, 'excalidraw/fonts'), { recursive: true })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), excalidrawFontsDev(), excalidrawFontsBuild()],
   server: {
     port: DEV_PORT,
     // Fail loudly instead of drifting to another port: `devUrl` in

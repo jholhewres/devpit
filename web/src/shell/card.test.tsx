@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Card, Checkout, Comment, Notice, Notices as Rung, Pinned } from '../gen/bindings'
+import { drawingTab } from '../plugins/excalidraw/drawings'
 import { Attachments } from './Attachments'
 import { Comments } from './Comments'
 import { Notices } from './Notices'
@@ -12,12 +13,16 @@ afterEach(cleanup)
 let bell: Rung = { notices: [], unread: 0 }
 const marked = vi.fn()
 const markedAll = vi.fn()
+const revealed = vi.fn()
 
 vi.mock('./live', () => ({
   ask: (call: () => unknown) =>
     Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
-    pathReveal: () => null,
+    pathReveal: (path: string) => {
+      revealed(path)
+      return null
+    },
     appsList: () => [],
     noticesRead: () => bell,
     noticesSweepDue: () => bell,
@@ -36,7 +41,13 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({ open: () => Promise.resolve(null) 
 
 /* `Markdown` reaches for the shell to resolve a link against the project.
    These render one comment, not a window. */
-vi.mock('./useShell', () => ({ useShell: () => ({ project: { id: 'p1' }, show: vi.fn() }) }))
+const shell = { project: { id: 'p1' }, show: vi.fn() }
+vi.mock('./useShell', () => ({ useShell: () => shell }))
+
+let drawingsOn = true
+vi.mock('./usePlugins', () => ({
+  usePlugins: () => ({ offers: (kind: string) => kind !== 'drawing' || drawingsOn }),
+}))
 
 const card = (over: Partial<Card> = {}): Card => ({
   id: 'card_1',
@@ -139,7 +150,14 @@ describe('the files pinned to a card', () => {
     exists: true,
     bytes: 2048,
     createdAt: Date.now() / 1000,
+    plugin: null,
     ...over,
+  })
+
+  beforeEach(() => {
+    drawingsOn = true
+    shell.show.mockClear()
+    revealed.mockClear()
   })
 
   it('explains that nothing is copied', () => {
@@ -162,6 +180,35 @@ describe('the files pinned to a card', () => {
     render(<Attachments pinned={[pin()]} onPin={vi.fn()} onUnpin={onUnpin} />)
     fireEvent.click(screen.getByText('Unpin'))
     expect(onUnpin).toHaveBeenCalledWith('att_1')
+  })
+
+  const drawn = pin({
+    id: 'att_2',
+    path: '/ws/projects/demo-1/data/excalidraw/flow.excalidraw',
+    label: 'flow',
+    plugin: 'excalidraw',
+  })
+
+  it('opens a drawing its plugin pinned in the drawing tab while the plugin is on', () => {
+    render(<Attachments pinned={[drawn]} onPin={vi.fn()} onUnpin={vi.fn()} />)
+    fireEvent.click(screen.getByText('Open'))
+    expect(shell.show).toHaveBeenCalledWith('drawing', drawingTab('flow.excalidraw'))
+    expect(screen.queryByText('Reveal')).toBeNull()
+  })
+
+  it('reveals that drawing in its folder once the plugin is off', () => {
+    drawingsOn = false
+    render(<Attachments pinned={[drawn]} onPin={vi.fn()} onUnpin={vi.fn()} />)
+    expect(screen.queryByText('Open')).toBeNull()
+    fireEvent.click(screen.getByText('Reveal'))
+    expect(revealed).toHaveBeenCalledWith(drawn.path)
+    expect(shell.show).not.toHaveBeenCalled()
+  })
+
+  it('keeps a file no plugin pinned in its folder', () => {
+    render(<Attachments pinned={[pin({ path: '/p/flow.excalidraw' })]} onPin={vi.fn()} onUnpin={vi.fn()} />)
+    expect(screen.queryByText('Open')).toBeNull()
+    expect(screen.getByText('Reveal')).toBeTruthy()
   })
 })
 

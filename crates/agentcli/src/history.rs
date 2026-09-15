@@ -80,10 +80,9 @@ fn seconds(path: &Path) -> f64 {
         .unwrap_or_default()
 }
 
-/// Every conversation this project has had, most recently spoken in first.
-pub fn conversations(home: &Path, project_id: &str) -> Vec<Summary> {
-    let dir = home.join("projects").join(project_id).join("sessions");
-    let Ok(entries) = std::fs::read_dir(&dir) else {
+/// Every conversation in a project's `sessions`, most recently spoken in first.
+pub fn conversations(dir: &Path) -> Vec<Summary> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
 

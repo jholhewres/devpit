@@ -5,8 +5,6 @@
 
 use devpit_rpc::{Conversations, RpcError, Thread};
 
-use crate::chat::home;
-
 /// `chat.list` — every conversation this project has had.
 ///
 /// The transcripts were always on disk; nothing listed them, so closing a tab
@@ -15,16 +13,18 @@ use crate::chat::home;
 #[specta::specta]
 pub fn chat_list(project_id: String) -> Result<Conversations, RpcError> {
     Ok(Conversations {
-        conversations: devpit_agentcli::history::conversations(&home(), &project_id)
-            .into_iter()
-            .map(|one| Thread {
-                id: one.id,
-                title: one.title,
-                profile: one.profile,
-                model: one.model,
-                cost_usd: one.cost_usd,
-                last_at: one.last_at,
-            })
-            .collect(),
+        conversations: devpit_agentcli::history::conversations(
+            &crate::projects::project_home(&project_id)?.sessions(),
+        )
+        .into_iter()
+        .map(|one| Thread {
+            id: one.id,
+            title: one.title,
+            profile: one.profile,
+            model: one.model,
+            cost_usd: one.cost_usd,
+            last_at: one.last_at,
+        })
+        .collect(),
     })
 }

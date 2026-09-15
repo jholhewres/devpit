@@ -17,6 +17,8 @@ pub mod error;
 pub mod file;
 mod frame;
 pub mod front;
+pub mod plugin_data;
+pub mod plugins;
 pub mod profile;
 pub mod project;
 pub mod runs;
@@ -38,6 +40,13 @@ pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use frame::Frame;
 pub use front::Front;
+pub use plugin_data::{
+    PluginFile, PluginFileRemoved, PluginFileSaved, PluginFileText, PluginFiles,
+};
+pub use plugins::{
+    catalogue, validate, validate_catalogue, DataSpec, Permission, PluginError, PluginList,
+    PluginManifest, PluginState, PluginUninstalled, Surface,
+};
 pub use profile::{Declared, EnvVar, Profile, Reach};
 pub use project::{
     Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,

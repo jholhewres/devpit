@@ -1,0 +1,95 @@
+import type { PluginManifest, PluginState, Surface } from '../gen/bindings'
+import { DRAWINGS, PLUGIN_ID as EXCALIDRAW } from '../plugins/excalidraw/drawings'
+import type { PaneName } from './paneList'
+import type { Tab } from './strip'
+
+/*
+ * A plugin, as the person reads it: a capability.
+ *
+ * The contract keeps the word plugin and everything drawn says capability.
+ * This is where the two meet: how one looks, what it adds, where it opens.
+ */
+
+/** Where a capability's main surface opens: a pane kind, and the tab it lands on. */
+export interface Opens {
+  readonly kind: PaneName
+  readonly tab?: Partial<Tab>
+}
+
+/* Only a capability listed here gets a sidebar item and an Open action. */
+const OPENS: Readonly<Record<string, Opens>> = { [EXCALIDRAW]: { kind: 'drawing', tab: DRAWINGS } }
+
+export const opensFor = (pluginId: string): Opens | undefined => OPENS[pluginId]
+
+/** The capability a pane kind belongs to; undefined for the app's own panes. */
+export function ownerOf(kind: PaneName): string | undefined {
+  return Object.entries(OPENS).find(([, opens]) => opens.kind === kind)?.[0]
+}
+
+/** How a pane kind is reached, when it belongs to a capability. */
+export const openerOf = (kind: PaneName): Opens | undefined => Object.values(OPENS).find((opens) => opens.kind === kind)
+
+/** A capability's pane is called what the person turned on, not what the pane holds. */
+export function capabilityName(kind: PaneName, plugins: readonly PluginState[] | null): string | undefined {
+  const owner = ownerOf(kind)
+  return owner === undefined ? undefined : plugins?.find((one) => one.manifest.id === owner)?.manifest.name
+}
+
+/* Keyed by the contract's surface types, so a new surface cannot ship without words. */
+const ADDS: Readonly<Record<Surface['type'], string>> = {
+  pane: 'Opens beside your work',
+  cardPin: 'Pins to cards',
+}
+
+/** What switching a capability on adds, once per kind of surface its manifest declares. */
+export function addsInWords(manifest: PluginManifest): string[] {
+  return [...new Set(manifest.surfaces.map((surface) => ADDS[surface.type]))]
+}
+
+/** On means installed and switched on: a switch left on by an uninstall is not on. */
+export const isOn = (plugin: PluginState): boolean => plugin.installed && plugin.enabled
+
+export interface Live {
+  readonly manifest: PluginManifest
+  readonly opens: Opens
+}
+
+/** The capabilities that are on and have somewhere to open, in catalogue order. */
+export function liveCapabilities(plugins: readonly PluginState[] | null): Live[] {
+  return (plugins ?? []).flatMap((one) => {
+    const opens = opensFor(one.manifest.id)
+    return isOn(one) && opens ? [{ manifest: one.manifest, opens }] : []
+  })
+}
+
+/** Null rather than zero when nothing was read, for the same reason as `counted`. */
+export function enabledCount(plugins: readonly PluginState[] | null): number | null {
+  return plugins === null ? null : plugins.filter(isOn).length
+}
+
+/** "1 installed · 1 on"; null until the catalogue is read, so nothing claims zero. */
+export function summary(plugins: readonly PluginState[] | null): string | null {
+  if (plugins === null) return null
+  return `${plugins.filter((one) => one.installed).length} installed · ${enabledCount(plugins)} on`
+}
+
+const GLYPHS: Readonly<Record<string, React.JSX.Element>> = {
+  [EXCALIDRAW]: <path d="M12 19l7-7 3 3-7 7-3-3ZM18 13l-1.5-7.5L2 2l3.5 14.5L13 18ZM2 2l7.6 7.6" />,
+}
+
+/** A capability's mark. One this build has no glyph for is drawn as a block. */
+export function CapabilityGlyph({ id, size }: { id: string; size: number }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {GLYPHS[id] ?? <rect x="4" y="4" width="16" height="16" rx="3" />}
+    </svg>
+  )
+}
+
+/** The mark of Capabilities itself, as in the prototype. */
+export const CAPABILITIES_ICON = (size: number): React.JSX.Element => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 2 4 6v6c0 5 3.4 9.1 8 10 4.6-.9 8-5 8-10V6Z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+)

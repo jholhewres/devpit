@@ -34,12 +34,8 @@ pub struct SessionHit {
 }
 
 /// Which devpit conversation of this project resumes each CLI session.
-fn held(project_id: &str) -> std::collections::HashMap<String, String> {
-    let dir = crate::chat::home()
-        .join("projects")
-        .join(project_id)
-        .join("sessions");
-    std::fs::read_dir(dir)
+fn held(sessions: &Path) -> std::collections::HashMap<String, String> {
+    std::fs::read_dir(sessions)
         .into_iter()
         .flatten()
         .filter_map(Result::ok)
@@ -132,7 +128,9 @@ pub async fn sessions_search(
             .map(|one| one.directory)
             .collect();
         refresh(&store, &project_id, &root, &installations)?;
-        let held = held(&project_id);
+        let sessions =
+            crate::projects::home_of(&store, &devpit_core::Store::root()?, &project_id)?.sessions();
+        let held = held(&sessions);
         let hits = search_index::search(store.conn(), &query, Some(&project_id), MOST_HITS)?;
         Ok(hits
             .into_iter()

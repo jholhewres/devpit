@@ -1,10 +1,14 @@
 import { open as pickFile } from '@tauri-apps/plugin-dialog'
 
 import type { Pinned } from '../gen/bindings'
+import { drawingTab, PLUGIN_ID as EXCALIDRAW } from '../plugins/excalidraw/drawings'
 import { bytes } from './disk'
 import { ask, commands } from './live'
 import { OpenIn } from './OpenIn'
+import type { PaneName } from './paneList'
 import { useOpeners } from './useOpeners'
+import { usePlugins } from './usePlugins'
+import { useShell } from './useShell'
 
 /*
  * The files pinned to a card.
@@ -18,6 +22,12 @@ import { useOpeners } from './useOpeners'
  * memory of it too, and the memory is sometimes the whole point.
  */
 
+/** The drawing file a pin opens, when Excalidraw pinned it and is on; null for a plain file. */
+export function drawingOf(pin: Pinned, offers: (kind: PaneName) => boolean): string | null {
+  if (pin.plugin !== EXCALIDRAW || !offers('drawing')) return null
+  return pin.path.split(/[\\/]/).pop() || null
+}
+
 export function Attachments({
   pinned,
   onPin,
@@ -28,6 +38,8 @@ export function Attachments({
   onUnpin: (id: string) => void
 }): React.JSX.Element {
   const openers = useOpeners()
+  const { show } = useShell()
+  const { offers } = usePlugins()
 
   const add = async (): Promise<void> => {
     const picked = await pickFile({ multiple: false })
@@ -50,33 +62,41 @@ export function Attachments({
         </p>
       )}
 
-      {pinned.map((one) => (
-        <div className="pin" key={one.id} data-gone={!one.exists}>
-          <svg className="pin__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 3v6h5l-7 12-7-12h5V3Z" transform="rotate(180 12 12)" />
-          </svg>
-          <span className="pin__b">
-            <span className="pin__t">{one.label}</span>
-            <span className="pin__p" title={one.path}>{one.path}</span>
-          </span>
-          <span className="pin__n">
-            {one.exists ? (bytes(one.bytes) ?? '') : 'not where it was'}
-          </span>
-          <span className="pin__acts">
-            {one.exists && (
-              <>
-                <button className="btn" onClick={() => void ask(() => commands.pathReveal(one.path))}>
-                  Reveal
+      {pinned.map((one) => {
+        const drawing = one.exists ? drawingOf(one, offers) : null
+        return (
+          <div className="pin" key={one.id} data-gone={!one.exists}>
+            <svg className="pin__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 3v6h5l-7 12-7-12h5V3Z" transform="rotate(180 12 12)" />
+            </svg>
+            <span className="pin__b">
+              <span className="pin__t">{one.label}</span>
+              <span className="pin__p" title={one.path}>{one.path}</span>
+            </span>
+            <span className="pin__n">
+              {one.exists ? (bytes(one.bytes) ?? '') : 'not where it was'}
+            </span>
+            <span className="pin__acts">
+              {drawing !== null && (
+                <button className="btn" onClick={() => show('drawing', drawingTab(drawing))}>
+                  Open
                 </button>
-                <OpenIn apps={openers} path={one.path} />
-              </>
-            )}
-            <button className="btn" data-danger onClick={() => onUnpin(one.id)}>
-              Unpin
-            </button>
-          </span>
-        </div>
-      ))}
+              )}
+              {one.exists && drawing === null && (
+                <>
+                  <button className="btn" onClick={() => void ask(() => commands.pathReveal(one.path))}>
+                    Reveal
+                  </button>
+                  <OpenIn apps={openers} path={one.path} />
+                </>
+              )}
+              <button className="btn" data-danger onClick={() => onUnpin(one.id)}>
+                Unpin
+              </button>
+            </span>
+          </div>
+        )
+      })}
     </section>
   )
 }

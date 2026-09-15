@@ -42,10 +42,6 @@ pub enum Primed {
     },
 }
 
-pub fn prime_path(home: &Path, project_id: &str) -> PathBuf {
-    home.join("projects").join(project_id).join("prime.json")
-}
-
 pub fn read(path: &Path) -> Prime {
     std::fs::read_to_string(path)
         .ok()

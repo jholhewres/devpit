@@ -100,7 +100,11 @@ pub fn checkout_of(
         .set_card_front(card_id, made.path.to_str(), Some(made.base_ref.as_str()))
         .map_err(|err| err.to_string())?;
 
-    let declared = prime::read(&prime::prime_path(&home, &project_id));
+    let declared = prime::read(
+        &devpit_core::home::ProjectHome::of(store, &home, &project_id)
+            .map_err(|err| err.to_string())?
+            .prime(),
+    );
     on_line("preparing the worktree");
     match prime::run(&declared, &main, &made.path, &mut on_line).map_err(|err| err.to_string())? {
         prime::Primed::Failed { command, code } => {

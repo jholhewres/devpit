@@ -8,7 +8,7 @@
 //! taking" and "what does this machine know how to do" are different
 //! questions, and they were sharing a file only because both were new.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use devpit_core::Store;
 use devpit_rpc::{ErrorCode, RpcError};
@@ -42,8 +42,7 @@ pub struct Workspace {
 }
 
 /// What one entry of the workspace is, measured now.
-fn measure(home: &Path, name: &str, relative: &str) -> Held {
-    let path = home.join(relative);
+fn measure(name: &str, path: PathBuf) -> Held {
     let is_dir = path.is_dir();
     Held {
         name: name.to_owned(),
@@ -70,20 +69,21 @@ pub fn workspace_read(project_id: Option<String>) -> Result<Workspace, RpcError>
     let home: PathBuf =
         Store::root().map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
     let mine = project_id
-        .map(|id| format!("projects/{id}"))
-        .unwrap_or_default();
+        .as_deref()
+        .map(crate::projects::project_home)
+        .transpose()?;
 
     let mut held = vec![
-        measure(&home, "agents/", "agents"),
-        measure(&home, "skills/", "skills"),
-        measure(&home, "board.db", "board.db"),
-        measure(&home, "hooks.json", "hooks.json"),
+        measure("agents/", home.join("agents")),
+        measure("skills/", home.join("skills")),
+        measure("board.db", home.join("board.db")),
+        measure("hooks.json", home.join("hooks.json")),
     ];
-    if !mine.is_empty() {
-        held.push(measure(&home, "sessions/", &format!("{mine}/sessions")));
-        held.push(measure(&home, "prime.json", &format!("{mine}/prime.json")));
+    if let Some(mine) = &mine {
+        held.push(measure("sessions/", mine.sessions()));
+        held.push(measure("prime.json", mine.prime()));
     }
-    held.push(measure(&home, "worktrees/", "worktrees"));
+    held.push(measure("worktrees/", home.join("worktrees")));
 
     Ok(Workspace {
         directory: home.display().to_string(),

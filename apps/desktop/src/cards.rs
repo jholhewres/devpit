@@ -30,7 +30,7 @@ fn seconds(at: i64) -> f64 {
 /// and a path is a promise about somebody else's filesystem. Recording "it
 /// exists" would be recording something that stops being true without telling
 /// anyone.
-fn pinned_now(row: AttachmentRow) -> Pinned {
+pub(crate) fn pinned_now(row: AttachmentRow) -> Pinned {
     let path = Path::new(&row.path);
     let seen = std::fs::metadata(path).ok();
     Pinned {
@@ -40,6 +40,7 @@ fn pinned_now(row: AttachmentRow) -> Pinned {
         path: row.path,
         label: row.label,
         created_at: seconds(row.created_at),
+        plugin: row.plugin_id,
     }
 }
 
@@ -243,7 +244,7 @@ pub fn card_pin(
         return Err(RpcError::new(ErrorCode::Invalid, "that label is too long"));
     }
 
-    store.attach(&card_id, &resolved.display().to_string(), &named)?;
+    store.attach(&card_id, &resolved.display().to_string(), &named, None)?;
     card_detail(project_id, card_id)
 }
 

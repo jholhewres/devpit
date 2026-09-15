@@ -758,6 +758,30 @@ export const commands = {
 	 *  one is not a first run.
 	 */
 	settingsFinishOnboarding: () => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_finish_onboarding")),
+	/**  `plugin.list` — the catalogue, and what this project has on. */
+	pluginList: (projectId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_list", { projectId })),
+	/**
+	 *  `plugin.set_enabled` — turns an installed one on or off. Its files stay
+	 *  either way.
+	 */
+	pluginSetEnabled: (projectId: string, pluginId: string, enabled: boolean) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_set_enabled", { projectId, pluginId, enabled })),
+	/**  `plugin.install` — installs one in this project, on. */
+	pluginInstall: (projectId: string, pluginId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_install", { projectId, pluginId })),
+	/**
+	 *  `plugin.uninstall` — uninstalls one, deleting its files only when
+	 *  `delete_data`.
+	 */
+	pluginUninstall: (projectId: string, pluginId: string, deleteData: boolean) => typedError<PluginUninstalled, RpcError>(__TAURI_INVOKE("plugin_uninstall", { projectId, pluginId, deleteData })),
+	/**  `plugin.data.list` — the plugin's files in this project. */
+	pluginDataList: (projectId: string, pluginId: string) => typedError<PluginFiles, RpcError>(__TAURI_INVOKE("plugin_data_list", { projectId, pluginId })),
+	/**  `plugin.data.read` — one file's text. */
+	pluginDataRead: (projectId: string, pluginId: string, name: string) => typedError<PluginFileText, RpcError>(__TAURI_INVOKE("plugin_data_read", { projectId, pluginId, name })),
+	/**  `plugin.data.write` — saves, refusing a change it never saw. */
+	pluginDataWrite: (projectId: string, pluginId: string, name: string, text: string, expectedModified: number | null) => typedError<PluginFileSaved, RpcError>(__TAURI_INVOKE("plugin_data_write", { projectId, pluginId, name, text, expectedModified })),
+	/**  `plugin.data.delete` — removes one file. */
+	pluginDataDelete: (projectId: string, pluginId: string, name: string) => typedError<PluginFileRemoved, RpcError>(__TAURI_INVOKE("plugin_data_delete", { projectId, pluginId, name })),
+	/**  `plugin.data.pin` — pins one file to a card, answering with the card. */
+	pluginDataPin: (projectId: string, pluginId: string, name: string, cardId: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("plugin_data_pin", { projectId, pluginId, name, cardId })),
 };
 
 /* Types */
@@ -1157,6 +1181,18 @@ export type Conversation = {
 
 export type Conversations = {
 	conversations: Thread[],
+};
+
+/**  What a plugin's data folder is allowed to hold. */
+export type DataSpec = {
+	/**  Each with its leading dot, e.g. `.excalidraw`. Enforced by [`validate`]. */
+	extensions: string[],
+	/**
+	 *  Bytes; `f64` and not `u64` because this crosses into a JavaScript
+	 *  number and specta refuses `u64` by default — see `Commit::committed_at`
+	 *  for why `f64`.
+	 */
+	maxBytes: number | null,
 };
 
 /**
@@ -1664,6 +1700,16 @@ input: string; allowed: boolean } |
 { kind: "unknown"; text: string };
 
 /**
+ *  What a plugin is allowed to do beyond drawing its own surfaces.
+ * 
+ *  A closed set on purpose: a plugin compiled into the app is trusted with
+ *  exactly what this enum names, never with whatever it asks for.
+ */
+export type Permission = 
+/**  Owns the files under its own data folder — nothing outside it. */
+"dataOwn";
+
+/**
  *  A file pinned to a card.
  * 
  *  `Pinned` and not `Attachment` because `chat::Attachment` already means
@@ -1683,6 +1729,11 @@ export type Pinned = {
 	/**  Bytes, when it could be read. */
 	bytes: number | null,
 	createdAt: number | null,
+	/**
+	 *  The plugin that pinned it. The screen opens the pin there while that
+	 *  plugin is on, and as a plain file otherwise.
+	 */
+	plugin: string | null,
 };
 
 /**
@@ -1711,6 +1762,80 @@ export type Played = {
 	needsConfirming: boolean,
 	/**  This lane runs nothing, so there was nothing to play. */
 	laneRunsNothing: boolean,
+};
+
+/**  One file in a plugin's data folder. */
+export type PluginFile = {
+	/**  With its extension, e.g. `flow.excalidraw`. */
+	name: string,
+	bytes: number | null,
+	/**  Milliseconds since the epoch. */
+	modified: number | null,
+};
+
+/**  Response of `plugin.data.delete`. `false` when there was nothing to remove. */
+export type PluginFileRemoved = {
+	removed: boolean,
+};
+
+/**  Response of `plugin.data.write`. */
+export type PluginFileSaved = {
+	name: string,
+	modified: number | null,
+};
+
+/**  Response of `plugin.data.read`. */
+export type PluginFileText = {
+	name: string,
+	text: string,
+	/**  Given back on write, so a save can refuse a change it never saw. */
+	modified: number | null,
+};
+
+/**  Response of `plugin.data.list`. */
+export type PluginFiles = {
+	files: PluginFile[],
+};
+
+/**
+ *  Response of `plugin.list`, `plugin.install` and `plugin.set_enabled`: the
+ *  whole catalogue.
+ */
+export type PluginList = {
+	plugins: PluginState[],
+};
+
+/**  What one plugin declares about itself. */
+export type PluginManifest = {
+	/**  Stable, and the name of its data folder. Checked by [`validate`]. */
+	id: string,
+	name: string,
+	version: string,
+	description: string,
+	surfaces: Surface[],
+	data: DataSpec,
+	permissions: Permission[],
+};
+
+/**
+ *  One plugin of the catalogue, whether this project installed it, and
+ *  whether it is on.
+ */
+export type PluginState = {
+	manifest: PluginManifest,
+	/**  Only an installed plugin can be on. */
+	installed: boolean,
+	enabled: boolean,
+};
+
+/**
+ *  Response of `plugin.uninstall`: the catalogue as it is now, under the same
+ *  field as [`PluginList`], and how many of the plugin's files were deleted.
+ */
+export type PluginUninstalled = {
+	plugins: PluginState[],
+	/**  0 when the files were kept. */
+	removedFiles: number,
 };
 
 /**  The preparation a project declares for a fresh checkout. */
@@ -2194,6 +2319,21 @@ export type StepKind =
 "session" | 
 /**  A command of yours: tests, a build, a deploy. */
 "command";
+
+/**
+ *  One capability of the desktop UI a plugin can occupy.
+ * 
+ *  Tagged the way [`crate::session::LayoutNode`] is: `Pane` carries data,
+ *  `CardPin` does not, and one enum says both.
+ */
+export type Surface = 
+/**
+ *  A pane in the workspace strip. `many` says whether a project may have
+ *  more than one open at once.
+ */
+{ type: "pane"; many: boolean } | 
+/**  A pin shown on the card face. */
+{ type: "cardPin" };
 
 /**
  *  The appearance the window uses.

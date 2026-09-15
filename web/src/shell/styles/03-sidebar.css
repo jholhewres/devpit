@@ -30,11 +30,6 @@
    column: a bare `5` sitting where `⌘N` sits reads as a key to press. */
 .newmenu__n { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .newmenu__rule { height: 1px; margin: 4px 6px; background: var(--border); }
-/* A capability you switched on is a surface, not a setting. Accent on
-   the glyph and full-strength label, so the eye separates the two
-   halves of this menu without a heading telling it to. */
-.newmenu__item--live .newmenu__ico { color: var(--accent); }
-.newmenu__item--live .newmenu__label { color: var(--text); }
 
 .searchslot { height: 42px; flex: none; }
 
@@ -65,6 +60,11 @@
 .act[aria-pressed='true'] { background: var(--sidebar-item); }
 .act[aria-pressed='true'] .act__label { color: var(--text); }
 .act[aria-pressed='true'] .act__ico { color: var(--accent); }
+/* A capability switched on is a place to go, not a setting: accent glyph
+   and full-strength label, as the prototype's live items. */
+.act--live .act__ico { color: var(--accent); }
+.act--live .act__label { color: var(--text); }
+.act__n { margin-left: auto; flex: none; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 /* Nav rows were flush, so two hover backgrounds met with no seam and the
    list read as one block. Four pixels separates them without opening a gap
    you notice — three did it while the rows were narrower. */
@@ -271,6 +271,8 @@ body[data-account='out'] .acct { display: none; }
 .ask[data-open='true'] { display: flex; animation: fade-in 130ms ease both; }
 .ask__box { width: 400px; padding: 22px 22px 18px; border-radius: 16px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 30px 80px var(--shade-deep); animation: pop-in 160ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .ask__t { margin: 0 0 8px; font-size: 15px; font-weight: 560; color: var(--text); }
+/* Says a second step is coming, so the first confirm is not read as the last. */
+.ask__step { margin: 0 0 6px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ghost); }
 .ask__d { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
 .ask__warn { display: flex; gap: 9px; margin-top: 12px; padding: 9px 11px; border-radius: 9px; background: color-mix(in srgb, var(--warning) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent); font-size: 12px; line-height: 1.5; color: var(--text); }
 .ask__warn[hidden] { display: none; }

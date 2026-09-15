@@ -7,7 +7,9 @@ import { offered } from './useKnownAgents'
 import { PANES, type PaneName } from './paneList'
 import type { Row } from './paletteGroups'
 import { GEAR } from './paletteIcons'
+import { usePlugins } from './usePlugins'
 import { useShell } from './useShell'
+import { capabilityName, openerOf } from './capabilities'
 
 /*
  * What the field can reach, gathered.
@@ -33,6 +35,7 @@ export interface Reachable {
 
 export function useReachable(): Reachable {
   const { show, openPrefs, focus, open: tabs, project } = useShell()
+  const { offers, plugins } = usePlugins()
   const [files, setFiles] = useState<readonly string[]>([])
   const [indexing, setIndexing] = useState(true)
   const [partial, setPartial] = useState(false)
@@ -64,13 +67,15 @@ export function useReachable(): Reachable {
 
   const panes: Row[] = useMemo(
     () => [
-      ...PANES.filter((pane) => pane.name !== 'file' && pane.name !== 'diff').map((pane) => ({
-        key: `pane:${pane.name}`,
-        name: pane.title,
-        meta: SHORTCUT[pane.name] ?? '',
-        icon: pane.icon,
-        go: () => show(pane.name),
-      })),
+      ...PANES.filter((pane) => pane.name !== 'file' && pane.name !== 'diff' && offers(pane.name)).map(
+        (pane) => ({
+          key: `pane:${pane.name}`,
+          name: capabilityName(pane.name, plugins) ?? pane.title,
+          meta: SHORTCUT[pane.name] ?? '',
+          icon: pane.icon,
+          go: () => show(pane.name, openerOf(pane.name)?.tab),
+        }),
+      ),
       {
         key: 'prefs',
         name: 'Settings',
@@ -79,7 +84,7 @@ export function useReachable(): Reachable {
         go: () => openPrefs('general'),
       },
     ],
-    [show, openPrefs],
+    [show, openPrefs, offers, plugins],
   )
 
   /* Starting an agent is opening a terminal and typing its name into it —

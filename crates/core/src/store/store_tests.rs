@@ -8,7 +8,7 @@ const EXPECTED: [&str; 12] = [
     "trust_workspace",
     "project",
     "scratch",
-    "drawing",
+    "project_plugin",
     "event",
     "pane_layout",
     "preference",
@@ -59,7 +59,7 @@ fn syncable_resources_are_born_with_a_revision() {
     let dir = tempfile::tempdir().expect("tempdir");
     let store = Store::open(&dir.path().join("state.db")).expect("open");
 
-    for table in ["project", "scratch", "drawing", "trust_workspace"] {
+    for table in ["project", "scratch", "project_plugin", "trust_workspace"] {
         let has_revision = store
             .conn()
             .prepare(&format!("SELECT * FROM pragma_table_info('{table}')"))

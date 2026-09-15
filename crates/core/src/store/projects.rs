@@ -130,10 +130,14 @@ impl Store {
             .unwrap_or_else(|| root_path.clone());
 
         let id = format!("prj_{}", ulid::Ulid::generate());
+        // Named once, here, from the name it is born with: a rename later
+        // must not move a folder a conversation may be open in.
+        let taken = self.taken_folders()?;
+        let folder = crate::home::folder_for(&name, &id, |one| taken.contains(one));
         self.conn.execute(
             "INSERT INTO project \
-             (id, trust_workspace_id, name, root_path, origin_url, origin_hash, created_at, last_opened_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+             (id, trust_workspace_id, name, root_path, origin_url, origin_hash, created_at, last_opened_at, folder) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)",
             rusqlite::params![
                 id,
                 DEFAULT_WORKSPACE,
@@ -142,6 +146,7 @@ impl Store {
                 origin_url,
                 origin_url.map(origin_hash),
                 now(),
+                folder,
             ],
         )?;
 

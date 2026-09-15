@@ -7,13 +7,13 @@
 use devpit_rpc::{ErrorCode, RpcError};
 
 use crate::prime::{self, Prime};
-use crate::worktrees::{home, Preparation};
+use crate::worktrees::Preparation;
 
 /// `worktree.prime.read` — what this project does to a fresh checkout.
 #[tauri::command]
 #[specta::specta]
 pub fn worktree_prime_read(project_id: String) -> Result<Preparation, RpcError> {
-    Ok(prime::read(&prime::prime_path(&home()?, &project_id)).into())
+    Ok(prime::read(&crate::projects::project_home(&project_id)?.prime()).into())
 }
 
 /// `worktree.prime.write` — save it, refusing a command that is not installed.
@@ -34,7 +34,10 @@ pub fn worktree_prime_write(
             format!("not installed: {}", missing.join(", ")),
         ));
     }
-    prime::write(&prime::prime_path(&home()?, &project_id), &declared)
-        .map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
+    prime::write(
+        &crate::projects::project_home(&project_id)?.prime(),
+        &declared,
+    )
+    .map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
     Ok(declared.into())
 }

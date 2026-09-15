@@ -19,7 +19,7 @@ fn message(id: &str, text: &str) -> Message {
 #[test]
 fn a_conversation_comes_back_in_order() {
     let home = tempfile::tempdir().expect("tempdir");
-    let path = conversation_path(home.path(), "p1", "c1");
+    let path = conversation_path(home.path(), "c1");
     append(&path, &message("m1", "one")).expect("append");
     append(&path, &message("m2", "two")).expect("append");
 
@@ -34,7 +34,7 @@ fn a_conversation_comes_back_in_order() {
 #[test]
 fn one_bad_line_does_not_take_the_conversation_with_it() {
     let home = tempfile::tempdir().expect("tempdir");
-    let path = conversation_path(home.path(), "p1", "c1");
+    let path = conversation_path(home.path(), "c1");
     append(&path, &message("m1", "one")).expect("append");
     std::fs::OpenOptions::new()
         .append(true)
@@ -51,7 +51,7 @@ fn one_bad_line_does_not_take_the_conversation_with_it() {
 #[test]
 fn a_conversation_that_was_never_written_is_empty_rather_than_an_error() {
     let home = tempfile::tempdir().expect("tempdir");
-    let (messages, skipped) = read(&conversation_path(home.path(), "p1", "never"));
+    let (messages, skipped) = read(&conversation_path(home.path(), "never"));
     assert!(messages.is_empty());
     assert_eq!(skipped, 0);
 }

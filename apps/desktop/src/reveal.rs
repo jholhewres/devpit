@@ -57,7 +57,22 @@ fn allowed(path: &str) -> Result<PathBuf, RpcError> {
             .map(|one| one.directory),
     );
     let home = Store::root().map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
-    openable(&roots, &home, Path::new(path)).ok_or_else(|| {
+    allowed_in(&store, &roots, &home, path)
+}
+
+/// `allowed`, once this machine's roots are known.
+///
+/// A transcript keeps the path a picture was pasted at, which may predate its
+/// project's folder getting a name, so the named folder is looked in first.
+pub(crate) fn allowed_in(
+    store: &Store,
+    roots: &[PathBuf],
+    home: &Path,
+    path: &str,
+) -> Result<PathBuf, RpcError> {
+    let path = devpit_core::home::moved(store, home, Path::new(path))
+        .unwrap_or_else(|| PathBuf::from(path));
+    openable(roots, home, &path).ok_or_else(|| {
         RpcError::new(
             ErrorCode::Forbidden,
             "that path is not in a project, the devpit workspace, or the CLI's configuration",

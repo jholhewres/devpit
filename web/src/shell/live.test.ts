@@ -27,6 +27,12 @@ describe('unwrapping the contract', () => {
     )
   })
 
+  it('keeps the error code, so a conflict can be told from a failure', async () => {
+    const { unwrap } = await import('./live')
+    expect(unwrap({ status: 'error', error: { message: 'changed on disk', code: 'conflict' } }).code).toBe('conflict')
+    expect(unwrap({ status: 'error', error: {} }).code).toBeNull()
+  })
+
   it('names the failure even when the error carries no message', async () => {
     const { unwrap } = await import('./live')
     expect(unwrap({ status: 'error', error: {} }).error).toBeTruthy()

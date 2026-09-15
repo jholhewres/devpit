@@ -2,19 +2,26 @@ use super::*;
 
 use std::path::PathBuf;
 
+use devpit_core::home::ProjectHome;
+
 fn root() -> PathBuf {
     PathBuf::from("/home/someone/.devpit")
 }
 
+fn project() -> ProjectHome {
+    ProjectHome::at(&root(), "prj_01M24GHNGDMZCXRFWEDVK387KM", "demo-k387km").expect("a folder")
+}
+
 #[test]
 fn a_project_gets_shortcuts_to_its_own_folders() {
-    let places = places_for(&root(), Some("prj_1"), |_| true);
+    let sessions = project().relative();
+    let places = places_for(&root(), Some(("prj_1", &project())), |_| true);
     assert_eq!(
         places
             .iter()
             .map(|place| place.path.as_str())
             .collect::<Vec<_>>(),
-        ["projects/prj_1", "worktrees/prj_1", "agents"]
+        [sessions.as_str(), "worktrees/prj_1", "agents"]
     );
 }
 
@@ -23,11 +30,13 @@ fn a_folder_devpit_has_not_made_yet_is_not_offered() {
     // A project that has never run a card has no worktree folder. A shortcut
     // to it would fail on the click, which teaches the reader that none of
     // the shortcuts can be trusted.
-    let places = places_for(&root(), Some("prj_1"), |at| {
+    let places = places_for(&root(), Some(("prj_1", &project())), |at| {
         !at.ends_with("worktrees/prj_1")
     });
     assert!(places.iter().all(|place| place.path != "worktrees/prj_1"));
-    assert!(places.iter().any(|place| place.path == "projects/prj_1"));
+    assert!(places
+        .iter()
+        .any(|place| place.path == project().relative()));
 }
 
 #[test]

@@ -64,7 +64,10 @@ pub fn chat_receipt(
         allowed,
     );
     append(
-        &conversation_path(&crate::chat::home(), &project_id, &conversation_id),
+        &conversation_path(
+            &crate::projects::project_home(&project_id)?.sessions(),
+            &conversation_id,
+        ),
         &message,
     )
     .map_err(|err| RpcError::internal(err.to_string()))?;
@@ -96,7 +99,7 @@ mod tests {
     #[test]
     fn a_receipt_survives_reading_the_conversation_back() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let file = conversation_path(dir.path(), "prj_1", "conv_1");
+        let file = conversation_path(dir.path(), "conv_1");
         append(
             &file,
             &receipt("m".into(), 1.0, "Edit".into(), "{}".into(), false),

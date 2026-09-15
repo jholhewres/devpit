@@ -12,6 +12,7 @@
 
 use std::path::Path;
 
+use devpit_core::home::ProjectHome;
 use devpit_core::{tree, Store};
 use devpit_rpc::{FileContents, RpcError};
 use serde::{Deserialize, Serialize};
@@ -90,14 +91,14 @@ fn described(root: &Path, entry: tree::Entry) -> WorkspaceEntry {
 /// one teaches the reader the shortcuts lie.
 pub(crate) fn places_for(
     root: &Path,
-    project_id: Option<&str>,
+    project: Option<(&str, &ProjectHome)>,
     has: impl Fn(&Path) -> bool,
 ) -> Vec<Place> {
     let mut places = Vec::new();
-    if let Some(id) = project_id {
+    if let Some((id, home)) = project {
         places.push(Place {
             label: "Sessions".to_owned(),
-            path: format!("projects/{id}"),
+            path: home.relative(),
         });
         places.push(Place {
             label: "Worktrees".to_owned(),
@@ -124,7 +125,13 @@ pub fn workspace_list(
     path: Option<String>,
 ) -> Result<WorkspaceListing, RpcError> {
     let root = Store::root().map_err(|err| RpcError::internal(err.to_string()))?;
-    let places = places_for(&root, project_id.as_deref(), |at| at.exists());
+    let home = project_id
+        .as_deref()
+        .map(crate::projects::project_home)
+        .transpose()?;
+    let places = places_for(&root, project_id.as_deref().zip(home.as_ref()), |at| {
+        at.exists()
+    });
     let path = path.unwrap_or_else(|| {
         places
             .first()

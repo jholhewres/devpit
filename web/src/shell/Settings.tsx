@@ -124,7 +124,7 @@ export function Settings({
           <section className="prefs__in" hidden={pane !== 'storage'}>
             <h1 className="prefs__h">Storage</h1>
             <div className="pref">
-              <span className="pref__body"><span className="pref__t">Workspace directory</span><span className="pref__d">Each project gets one, holding its board, skills, capabilities, transcripts and worktrees. None of it is in the repository.<br /><code>~/.devpit/workspaces/devpit</code></span></span>
+              <span className="pref__body"><span className="pref__t">Workspace directory</span><span className="pref__d">Each project gets one, holding its board, skills, capabilities, transcripts and worktrees. None of it is in the repository.<br /><code>~/.devpit/projects/&lt;name&gt;-&lt;suffix&gt;</code></span></span>
             </div>
             <button className="pref" role="switch" aria-checked={on('keepTranscripts')} onClick={() => set('keepTranscripts', !on('keepTranscripts'))}>
               <span className="pref__body"><span className="pref__t">Keep transcripts</span><span className="pref__d">Every turn is written to disk so a session survives a restart. Turning this off leaves the ones already written where they are &mdash; nothing is deleted.</span></span>

@@ -5,16 +5,13 @@
 //! person devpit ever saw, so the CLI's own title is the only name they have.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use devpit_rpc::{OutsideSession, RpcError};
 
-use crate::chat::home;
-
 /// The CLI session ids devpit's own conversations of this project resume.
-fn known(project_id: &str) -> HashSet<String> {
-    let dir = home().join("projects").join(project_id).join("sessions");
-    std::fs::read_dir(dir)
+fn known(sessions: &Path) -> HashSet<String> {
+    std::fs::read_dir(sessions)
         .into_iter()
         .flatten()
         .filter_map(Result::ok)
@@ -30,12 +27,14 @@ fn known(project_id: &str) -> HashSet<String> {
 pub fn chat_outside(project_id: String) -> Result<Vec<OutsideSession>, RpcError> {
     let store = crate::projects::store()?;
     let (_, root) = crate::projects::locate(&store, &project_id)?;
+    let sessions =
+        crate::projects::home_of(&store, &devpit_core::Store::root()?, &project_id)?.sessions();
     let installations: Vec<PathBuf> = crate::installations::found()?
         .into_iter()
         .map(|one| one.directory)
         .collect();
     Ok(
-        devpit_agentcli::outside::sessions(&installations, &root, &known(&project_id))
+        devpit_agentcli::outside::sessions(&installations, &root, &known(&sessions))
             .into_iter()
             .map(|one| OutsideSession {
                 session_id: one.session_id,

@@ -17,8 +17,7 @@ pub(crate) fn plain(id: &str) -> bool {
 
 /// Writes the head and the empty transcript that make a conversation listed.
 pub(crate) fn adopt(
-    home: &Path,
-    project_id: &str,
+    sessions: &Path,
     conversation_id: &str,
     session_id: &str,
     profile_id: &str,
@@ -26,7 +25,7 @@ pub(crate) fn adopt(
     now: f64,
 ) -> std::io::Result<()> {
     write_head(
-        &head_path(home, project_id, conversation_id),
+        &head_path(sessions, conversation_id),
         &Head {
             profile: profile_id.to_owned(),
             model: None,
@@ -41,7 +40,7 @@ pub(crate) fn adopt(
             rewind: Default::default(),
         },
     )?;
-    let transcript = conversation_path(home, project_id, conversation_id);
+    let transcript = conversation_path(sessions, conversation_id);
     if !transcript.exists() {
         std::fs::write(transcript, b"")?;
     }
@@ -68,8 +67,7 @@ pub fn chat_adopt(
         .map(|since| since.as_secs() as f64)
         .unwrap_or_default();
     adopt(
-        &crate::chat::home(),
-        &project_id,
+        &crate::projects::project_home(&project_id)?.sessions(),
         &conversation_id,
         &session_id,
         &profile_id,
@@ -89,7 +87,6 @@ mod tests {
         let home = tempfile::tempdir().expect("tempdir");
         adopt(
             home.path(),
-            "prj_1",
             "conv_1",
             "aaa",
             "prof_glm",
@@ -97,13 +94,13 @@ mod tests {
             1.0,
         )
         .expect("adopt");
-        let head = devpit_agentcli::head::read_head(&head_path(home.path(), "prj_1", "conv_1"))
-            .expect("head");
+        let head =
+            devpit_agentcli::head::read_head(&head_path(home.path(), "conv_1")).expect("head");
         assert_eq!(head.session_id.as_deref(), Some("aaa"));
         assert_eq!(head.profile, "prof_glm");
         assert_eq!(head.title.as_deref(), Some("Fix the parser"));
         // Listed like any other conversation, under the CLI's title.
-        let listed = devpit_agentcli::history::conversations(home.path(), "prj_1");
+        let listed = devpit_agentcli::history::conversations(home.path());
         assert_eq!(listed[0].title, "Fix the parser");
     }
 

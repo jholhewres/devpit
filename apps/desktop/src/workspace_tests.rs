@@ -7,7 +7,7 @@ fn a_directory_is_measured_with_what_is_in_it() {
     std::fs::write(dir.path().join("agents/a.md"), "12345").expect("write");
     std::fs::write(dir.path().join("agents/b.md"), "123").expect("write");
 
-    let held = measure(dir.path(), "agents/", "agents");
+    let held = measure("agents/", dir.path().join("agents"));
     assert!(held.is_dir);
     assert!(held.exists);
     assert_eq!(held.bytes, 8.0);
@@ -19,7 +19,7 @@ fn a_file_is_measured_by_its_own_size_and_has_no_count() {
     let dir = tempfile::tempdir().expect("tempdir");
     std::fs::write(dir.path().join("board.db"), "1234").expect("write");
 
-    let held = measure(dir.path(), "board.db", "board.db");
+    let held = measure("board.db", dir.path().join("board.db"));
     assert!(!held.is_dir);
     assert_eq!(held.bytes, 4.0);
     assert_eq!(held.count, None);
@@ -29,6 +29,6 @@ fn a_file_is_measured_by_its_own_size_and_has_no_count() {
 #[test]
 fn something_the_workspace_has_not_made_yet_says_so() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let held = measure(dir.path(), "worktrees/", "worktrees");
+    let held = measure("worktrees/", dir.path().join("worktrees"));
     assert!(!held.exists);
 }

@@ -6,6 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
+use devpit_core::home::{HomeError, ProjectHome, FOLDER_NOTICE};
 use devpit_core::Store;
 use devpit_rpc::{ErrorCode, Note, Project, ProjectChanges, ProjectList, ProjectNotes, RpcError};
 
@@ -193,42 +194,69 @@ pub fn project_forget(project_id: String, wipe_workspace: bool) -> Result<Projec
         return project_list();
     }
 
-    // Before the row, because the row is what says which folder is this
-    // project's: erasing first would leave the directory with nothing left to
-    // name it.
-    let workspace = workspace_of(&project_id)?;
-    if !store.erase_project(&project_id)? {
-        return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
-    }
-    if workspace.is_dir() {
-        std::fs::remove_dir_all(&workspace)
-            .map_err(|err| RpcError::internal(format!("{}: {err}", workspace.display())))?;
-    }
-
+    erase(&store, &Store::root()?, &project_id)?;
     project_list()
 }
 
-/// Where a project's own workspace lives, checked before anything deletes it.
+/// Erases the row and deletes the project's folder under the workspace.
 ///
-/// The id reaches a `remove_dir_all`, so it is built into the path rather than
-/// interpolated from whatever arrived: one path segment, from the alphabet ids
-/// are made of, and the result has to still be under the workspace root.
-fn workspace_of(project_id: &str) -> Result<PathBuf, RpcError> {
-    let sane = !project_id.is_empty()
-        && project_id.len() <= 64
-        && project_id
-            .chars()
-            .all(|letter| letter.is_ascii_alphanumeric() || letter == '_' || letter == '-');
-    if !sane {
-        return Err(RpcError::new(ErrorCode::Invalid, "not a project id"));
+/// A stored folder `ProjectHome` refuses deletes nothing, but it does not keep
+/// the row either: the bell says the folder was left.
+pub(crate) fn erase(store: &Store, root: &Path, project_id: &str) -> Result<(), RpcError> {
+    // Before the row, because the row is what says which folder is this
+    // project's: erasing first would leave the directory with nothing left to
+    // name it.
+    // Checked by `ProjectHome` before anything deletes it: the id, the stored
+    // folder and a link sitting where the folder goes all reach `remove_dir_all`.
+    let home = match ProjectHome::of(store, root, project_id) {
+        Ok(home) => Some(home),
+        Err(HomeError::Forbidden) => None,
+        Err(err) => return Err(home_refusal(err)),
+    };
+    let workspace = match &home {
+        Some(home) => home.wipeable().map_err(home_refusal)?,
+        None => None,
+    };
+    if !store.erase_project(project_id)? {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
     }
+    match (home, workspace) {
+        (Some(home), Some(workspace)) => std::fs::remove_dir_all(&workspace)
+            .map_err(|err| RpcError::internal(format!("{}: {err}", home.relative()))),
+        (None, _) => {
+            // No project on the notice: the row is gone, and would take it along.
+            let title = "A forgotten project's folder was left on disk";
+            let detail = "Its folder name is not one devpit gives, so nothing was deleted.";
+            store.add_notice(None, FOLDER_NOTICE, title, Some(detail), None)?;
+            Ok(())
+        }
+        (Some(_), None) => Ok(()),
+    }
+}
 
-    let home = Store::root()?;
-    let mine = home.join("projects").join(project_id);
-    if !mine.starts_with(home.join("projects")) {
-        return Err(RpcError::new(ErrorCode::Forbidden, "not a project id"));
-    }
-    Ok(mine)
+/// This project's folder in the devpit workspace, as the store names it.
+pub(crate) fn project_home(project_id: &str) -> Result<ProjectHome, RpcError> {
+    home_of(&store()?, &Store::root()?, project_id)
+}
+
+pub(crate) fn home_of(
+    store: &Store,
+    root: &Path,
+    project_id: &str,
+) -> Result<ProjectHome, RpcError> {
+    ProjectHome::of(store, root, project_id).map_err(home_refusal)
+}
+
+pub(crate) fn home_refusal(err: HomeError) -> RpcError {
+    let code = match err {
+        HomeError::Invalid | HomeError::PluginId => ErrorCode::Invalid,
+        HomeError::NotFound => ErrorCode::NotFound,
+        HomeError::Forbidden | HomeError::Elsewhere | HomeError::PluginElsewhere => {
+            ErrorCode::Forbidden
+        }
+        HomeError::Removal(_) | HomeError::Store(_) => ErrorCode::Internal,
+    };
+    RpcError::new(code, err.to_string())
 }
 
 /// `project.rename` — what this project is called in devpit.
@@ -359,29 +387,5 @@ fn dirs_home() -> Option<PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The id reaches `remove_dir_all`, so it has to be one path segment.
-    ///
-    /// Not a theory: `workspace_of` builds the path this command deletes, and
-    /// a `..` allowed through it is a delete of `~/.devpit` itself.
-    #[test]
-    fn a_project_id_that_could_climb_out_is_refused() {
-        for climbing in ["..", "../..", "a/b", "/etc", "a\0b", ""] {
-            assert!(
-                workspace_of(climbing).is_err(),
-                "{climbing:?} was accepted as a project id"
-            );
-        }
-    }
-
-    #[test]
-    fn a_real_project_id_lands_under_the_workspace() {
-        let Ok(mine) = workspace_of("prj_01JABCDEF") else {
-            // No home directory in this environment; nothing to assert about.
-            return;
-        };
-        assert!(mine.ends_with("projects/prj_01JABCDEF"));
-    }
-}
+#[path = "projects_tests.rs"]
+mod tests;

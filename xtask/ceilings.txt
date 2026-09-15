@@ -74,7 +74,7 @@ web/src/shell/FilePane.tsx 150
 web/src/shell/Markdown.tsx 200
 web/src/shell/Onboarding.tsx 150
 web/src/shell/Palette.tsx 150
-web/src/shell/Panes.tsx 150
+web/src/shell/Panes.tsx 100
 web/src/shell/ProjectPicker.tsx 150
 web/src/shell/Row.tsx 200
 web/src/shell/SearchResults.tsx 200

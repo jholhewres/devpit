@@ -44,15 +44,15 @@ fn id(prefix: &str) -> String {
 #[tauri::command]
 #[specta::specta]
 pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conversation, RpcError> {
-    let home = home();
-    let file = conversation_path(&home, &project_id, &conversation_id);
+    let sessions = crate::projects::project_home(&project_id)?.sessions();
+    let file = conversation_path(&sessions, &conversation_id);
     let (messages, skipped) = read(&file);
     if skipped > 0 {
         // Reported rather than hidden: a conversation missing a line should
         // say so, not quietly show less than happened.
         eprintln!("{conversation_id}: {skipped} unreadable line(s)");
     }
-    let head = read_head(&head_path(&home, &project_id, &conversation_id));
+    let head = read_head(&head_path(&sessions, &conversation_id));
     Ok(Conversation {
         id: conversation_id,
         project_id,
@@ -105,7 +105,8 @@ pub async fn chat_send(
         effort,
     } = ask;
     let home = home();
-    let head_file = head_path(&home, &project_id, &conversation_id);
+    let sessions = crate::projects::project_home(&project_id)?.sessions();
+    let head_file = head_path(&sessions, &conversation_id);
     let head = read_head(&head_file);
     if let Err(fixed) = settled(head.as_ref(), &profile_id) {
         return Err(RpcError::new(
@@ -154,7 +155,7 @@ pub async fn chat_send(
         ));
     };
 
-    let file = conversation_path(&home, &project_id, &conversation_id);
+    let file = conversation_path(&sessions, &conversation_id);
     let turn_id = id("turn");
 
     // Written before the turn runs: an interrupted first turn still leaves the

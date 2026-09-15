@@ -9,11 +9,10 @@ use std::path::{Path, PathBuf};
 
 use devpit_rpc::Message;
 
-pub fn conversation_path(home: &Path, project_id: &str, conversation_id: &str) -> PathBuf {
-    home.join("projects")
-        .join(project_id)
-        .join("sessions")
-        .join(format!("{conversation_id}.jsonl"))
+/// `sessions` is the project's own, resolved by the caller: this crate never
+/// knows where devpit keeps a project.
+pub fn conversation_path(sessions: &Path, conversation_id: &str) -> PathBuf {
+    sessions.join(format!("{conversation_id}.jsonl"))
 }
 
 pub fn append(path: &Path, message: &Message) -> std::io::Result<()> {

@@ -14,14 +14,13 @@ use devpit_rpc::{ErrorCode, Message, Part, Role, RpcError};
 
 /// Writes conversation `to` as `from` up to the end of `turn_id`.
 pub(crate) fn rewind(
-    home: &Path,
-    project_id: &str,
+    sessions: &Path,
     from: &str,
     turn_id: &str,
     to: &str,
     now: f64,
 ) -> Result<(), RpcError> {
-    let head = read_head(&head_path(home, project_id, from))
+    let head = read_head(&head_path(sessions, from))
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such conversation"))?;
     let Some(at) = head
         .rewind
@@ -34,7 +33,7 @@ pub(crate) fn rewind(
             "that turn ran before devpit kept its place in the CLI's transcript",
         ));
     };
-    let (messages, _) = read(&conversation_path(home, project_id, from));
+    let (messages, _) = read(&conversation_path(sessions, from));
     let Some(last) = messages
         .iter()
         .rposition(|message| message.turn_id.as_deref() == Some(turn_id))
@@ -45,7 +44,7 @@ pub(crate) fn rewind(
         ));
     };
 
-    let file = conversation_path(home, project_id, to);
+    let file = conversation_path(sessions, to);
     if file.exists() {
         return Err(RpcError::new(
             ErrorCode::Conflict,
@@ -79,7 +78,7 @@ pub(crate) fn rewind(
 
     let anchor = head.rewind.anchors[at].clone();
     write_head(
-        &head_path(home, project_id, to),
+        &head_path(sessions, to),
         &Head {
             created_at: now,
             session_id: Some(anchor.session_id),
@@ -114,8 +113,7 @@ pub fn chat_rewind(
         .map(|since| since.as_secs() as f64)
         .unwrap_or_default();
     rewind(
-        &crate::chat::home(),
-        &project_id,
+        &crate::projects::project_home(&project_id)?.sessions(),
         &conversation_id,
         &turn_id,
         &to,

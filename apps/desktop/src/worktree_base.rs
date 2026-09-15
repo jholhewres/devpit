@@ -42,7 +42,7 @@ fn answer(store: &Store, project_id: Option<&str>) -> Result<WorktreeBase, RpcEr
         Some(id) => locate(store, id).map(|(_, root)| root).ok(),
         None => None,
     };
-    let root = root.unwrap_or_else(|| home.join("projects"));
+    let root = root.unwrap_or_else(|| devpit_core::home::projects_dir(&home));
 
     Ok(WorktreeBase {
         example: devpit_git::worktree_at(&typed, &home, &root, "<project>", "<card>")

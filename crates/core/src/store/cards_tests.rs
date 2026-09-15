@@ -82,17 +82,68 @@ fn pinning_the_same_file_twice_is_one_attachment() {
     // People drop the same file twice. The second time means "it is already
     // there", not "put it there again".
     let (_dir, store, card) = seeded();
-    let one = store.attach(&card, "/tmp/a.png", "a.png").expect("attach");
-    let two = store.attach(&card, "/tmp/a.png", "a.png").expect("again");
+    let one = store
+        .attach(&card, "/tmp/a.png", "a.png", None)
+        .expect("attach");
+    let two = store
+        .attach(&card, "/tmp/a.png", "a.png", None)
+        .expect("again");
     assert_eq!(one, two);
     assert_eq!(store.attachments(&card).expect("read").len(), 1);
 }
 
 #[test]
+fn a_pin_keeps_the_plugin_that_made_it() {
+    let (_dir, store, card) = seeded();
+    // Looked up by path: two pins in one second have no order.
+    let plugin_of = |path: &str| {
+        store
+            .attachments(&card)
+            .expect("read")
+            .into_iter()
+            .find(|pin| pin.path == path)
+            .expect("pinned")
+            .plugin_id
+    };
+    store
+        .attach(&card, "/tmp/a.png", "a", None)
+        .expect("by hand");
+    store
+        .attach(&card, "/tmp/flow.excalidraw", "flow", Some("excalidraw"))
+        .expect("by its plugin");
+    assert_eq!(plugin_of("/tmp/a.png"), None);
+    assert_eq!(
+        plugin_of("/tmp/flow.excalidraw").as_deref(),
+        Some("excalidraw")
+    );
+
+    // Pinned by hand first and by its plugin after: still one pin, and it
+    // opens in the plugin; pinning it by hand again does not take that away.
+    store
+        .attach(&card, "/tmp/b.excalidraw", "b", None)
+        .expect("by hand");
+    store
+        .attach(&card, "/tmp/b.excalidraw", "b", Some("excalidraw"))
+        .expect("by its plugin");
+    store
+        .attach(&card, "/tmp/b.excalidraw", "b", None)
+        .expect("by hand again");
+    assert_eq!(
+        plugin_of("/tmp/b.excalidraw").as_deref(),
+        Some("excalidraw")
+    );
+    assert_eq!(store.attachments(&card).expect("read").len(), 3);
+}
+
+#[test]
 fn unpinning_leaves_the_others() {
     let (_dir, store, card) = seeded();
-    store.attach(&card, "/tmp/a.png", "a").expect("attach");
-    let second = store.attach(&card, "/tmp/b.png", "b").expect("attach");
+    store
+        .attach(&card, "/tmp/a.png", "a", None)
+        .expect("attach");
+    let second = store
+        .attach(&card, "/tmp/b.png", "b", None)
+        .expect("attach");
     assert!(store.detach(&second).expect("detach"));
     let left = store.attachments(&card).expect("read");
     assert_eq!(left.len(), 1);
@@ -105,7 +156,9 @@ fn what_hangs_off_a_card_goes_when_the_card_does() {
     // one migration.
     let (_dir, store, card) = seeded();
     store.add_comment(&card, "you", "said").expect("comment");
-    store.attach(&card, "/tmp/a.png", "a").expect("attach");
+    store
+        .attach(&card, "/tmp/a.png", "a", None)
+        .expect("attach");
     store
         .add_notice(None, "run", "done", None, Some(&card))
         .expect("notice");

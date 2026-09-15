@@ -4,10 +4,12 @@
 
 mod board;
 mod cards;
+mod folders;
 mod layouts;
 mod migrations;
 mod notes;
 pub mod pane_agents;
+mod plugins;
 pub mod project_runs;
 mod projects;
 mod runs;
@@ -33,6 +35,10 @@ pub enum StoreError {
 
     #[error("this platform exposes no user data directory")]
     NoDataDirectory,
+
+    /// Names the drawing, never a path: this message reaches the screen.
+    #[error("could not export drawing {drawing}: {reason}")]
+    Export { drawing: String, reason: String },
 }
 
 pub use board::{CardRow, ColumnRow, SessionLink, StepRow, StepUse, DEFAULT_COLUMNS};
@@ -43,6 +49,7 @@ pub mod limits {
     pub use crate::store::cards::{LONGEST_COMMENT, LONGEST_LABEL, NOTICES_KEPT};
 }
 pub use notes::NoteRow;
+pub use plugins::{DRAWINGS_PLUGIN, DRAWING_EXTENSION};
 pub use projects::ProjectRow;
 pub use settings::key as preference;
 
@@ -127,7 +134,9 @@ impl Store {
         // later, once the data is already wrong.
         conn.pragma_update(None, "foreign_keys", "ON")?;
 
-        migrations::run(&conn)?;
+        // The workspace root is the store's folder — `default_path` puts it
+        // there — and a migration moving rows into project folders needs it.
+        migrations::run(&conn, path.parent().unwrap_or(Path::new("")))?;
 
         Ok(Self { conn })
     }

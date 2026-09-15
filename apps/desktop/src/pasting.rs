@@ -4,8 +4,6 @@
 //! not a file anybody asked to commit, and a repository that grows a folder of
 //! screenshots every time someone shares one is a repository being littered.
 
-use std::path::{Path, PathBuf};
-
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use devpit_rpc::{Attachment, ErrorCode, RpcError};
@@ -43,11 +41,6 @@ pub(crate) fn decoded(data: &str) -> Result<Vec<u8>, RpcError> {
         .map_err(|_| RpcError::new(ErrorCode::Invalid, "that paste is not a picture"))
 }
 
-/// Where a project's pastes go.
-pub(crate) fn folder(home: &Path, project_id: &str) -> PathBuf {
-    home.join("projects").join(project_id).join("pasted")
-}
-
 /// `chat.paste` — keeps a pasted picture and answers with it as an attachment.
 #[tauri::command]
 #[specta::specta]
@@ -63,7 +56,7 @@ pub fn chat_paste(
     let ext = extension_for(&media_type)
         .ok_or_else(|| RpcError::new(ErrorCode::Invalid, "only pictures can be pasted"))?;
     let bytes = decoded(&data)?;
-    let dir = folder(&crate::chat::home(), &project_id);
+    let dir = crate::projects::project_home(&project_id)?.pasted();
     std::fs::create_dir_all(&dir).map_err(|err| RpcError::internal(err.to_string()))?;
     let name = format!(
         "pasted-{}.{ext}",

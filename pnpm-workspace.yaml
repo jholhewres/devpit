@@ -1,2 +1,10 @@
 packages:
   - web
+
+# Transitive advisories pinned by @excalidraw/excalidraw's own dependency
+# tree (see pnpm audit --prod). Each stays on the major line its dependent
+# pins, so the override is a patch bump, not a swap the dependent never asked
+# for. pnpm 10 reads overrides here, not from package.json#pnpm.
+overrides:
+  '@excalidraw/excalidraw>nanoid': ^3.3.18
+  lodash-es: ^4.18.0

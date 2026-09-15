@@ -18,7 +18,8 @@ export interface Tab {
       tab that recorded one would stop knowing what half of itself is doing
       the moment it was split. */
   readonly panes?: readonly string[]
-  /** The file a `file` tab is showing, relative to the project root. */
+  /** The file a `file` tab is showing, relative to the project root; for a
+      `drawing` tab, the file name in the plugin's data folder. */
   readonly path?: string
   /** An agent this terminal was opened in order to run.
 
@@ -35,7 +36,7 @@ export interface Strip {
 }
 
 /** Kinds you can have several of. Everything else focuses what is open. */
-const MANY: ReadonlySet<PaneName> = new Set<PaneName>(['term', 'chat', 'file', 'diff'])
+const MANY: ReadonlySet<PaneName> = new Set<PaneName>(['term', 'chat', 'file', 'diff', 'drawing'])
 
 export const many = (kind: PaneName): boolean => MANY.has(kind)
 

@@ -10,9 +10,9 @@ use crate::{
     account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_work,
     cards, chat, columns, commands, diffs, files, filetree, front, happening, history, in_flight,
     index, installations, mcp, moving, notices, openers, outside_sessions, panels, panes, pasting,
-    priming, projects, pty_bridge, receipts, reveal, rewinding, runs_list, saves, search,
-    session_search, sessions, settings, shell_launch, skills, slash, sources, staging, steering,
-    steps, threads, watching, workspace, worktree_base, worktrees, wsfiles,
+    plugin_data, plugins, priming, projects, pty_bridge, receipts, reveal, rewinding, runs_list,
+    saves, search, session_search, sessions, settings, shell_launch, skills, slash, sources,
+    staging, steering, steps, threads, watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -149,6 +149,15 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,
+        plugins::plugin_list,
+        plugins::plugin_set_enabled,
+        plugins::plugin_install,
+        plugins::plugin_uninstall,
+        plugin_data::plugin_data_list,
+        plugin_data::plugin_data_read,
+        plugin_data::plugin_data_write,
+        plugin_data::plugin_data_delete,
+        plugin_data::plugin_data_pin,
         pty_bridge::pty_drain,
     ]
 }

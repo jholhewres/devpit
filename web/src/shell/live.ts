@@ -1,4 +1,4 @@
-import { commands } from '../gen/bindings'
+import { commands, type ErrorCode } from '../gen/bindings'
 import { inTauri } from './window'
 
 /* One place that knows a command can fail, so no caller draws an empty
@@ -6,6 +6,8 @@ import { inTauri } from './window'
 export interface Asked<T> {
   readonly data: T | null
   readonly error: string | null
+  /** Why the backend refused, for a caller that acts differently on a conflict. */
+  readonly code?: ErrorCode | null
   readonly loading: boolean
 }
 
@@ -13,13 +15,21 @@ export const waiting = <T,>(): Asked<T> => ({ data: null, error: null, loading: 
 
 /* The contract answers `{ status: 'ok' | 'error' }` rather than throwing, so
    unwrapping it belongs here and not in every caller. */
-type Answer<T> = T | { status: 'ok'; data: T } | { status: 'error'; error: { message?: string } }
+type Answer<T> =
+  | T
+  | { status: 'ok'; data: T }
+  | { status: 'error'; error: { message?: string; code?: ErrorCode } }
 
 export function unwrap<T>(answer: Answer<T>): Asked<T> {
   if (answer && typeof answer === 'object' && 'status' in answer) {
     return answer.status === 'ok'
       ? { data: answer.data, error: null, loading: false }
-      : { data: null, error: answer.error?.message ?? 'the command failed', loading: false }
+      : {
+          data: null,
+          error: answer.error?.message ?? 'the command failed',
+          code: answer.error?.code ?? null,
+          loading: false,
+        }
   }
   return { data: answer as T, error: null, loading: false }
 }

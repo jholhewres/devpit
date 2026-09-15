@@ -96,11 +96,9 @@ pub fn after_turn(
     }
 }
 
-pub fn head_path(home: &Path, project_id: &str, conversation_id: &str) -> PathBuf {
-    home.join("projects")
-        .join(project_id)
-        .join("sessions")
-        .join(format!("{conversation_id}.json"))
+/// Beside the transcript, in the project's `sessions` the caller resolved.
+pub fn head_path(sessions: &Path, conversation_id: &str) -> PathBuf {
+    sessions.join(format!("{conversation_id}.json"))
 }
 
 pub fn read_head(path: &Path) -> Option<Head> {

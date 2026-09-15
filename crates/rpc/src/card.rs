@@ -44,6 +44,9 @@ pub struct Pinned {
     /// Bytes, when it could be read.
     pub bytes: Option<f64>,
     pub created_at: f64,
+    /// The plugin that pinned it. The screen opens the pin there while that
+    /// plugin is on, and as a plain file otherwise.
+    pub plugin: Option<String>,
 }
 
 /// The checkout this card's work happens in.

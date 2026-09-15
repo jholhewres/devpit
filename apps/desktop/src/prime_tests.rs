@@ -115,7 +115,7 @@ fn a_command_that_exists_is_not_named() {
 #[test]
 fn a_preparation_survives_the_round_trip() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let path = prime_path(dir.path(), "proj");
+    let path = dir.path().join("prime.json");
     let declared = Prime {
         link: vec![".env".to_owned()],
         share: [("A".to_owned(), "b".to_owned())].into_iter().collect(),

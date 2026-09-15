@@ -19,7 +19,7 @@ fn said(turn: &str, role: Role, text: &str) -> Message {
 
 /// Two turns, both with their place in the CLI's transcript kept.
 fn two_turns(home: &Path) {
-    let file = conversation_path(home, "prj", "conv_a");
+    let file = conversation_path(home, "conv_a");
     for message in [
         said("turn_1", Role::User, "alpha?"),
         said("turn_1", Role::Assistant, "alpha"),
@@ -34,7 +34,7 @@ fn two_turns(home: &Path) {
         uuid: uuid.to_owned(),
     };
     write_head(
-        &head_path(home, "prj", "conv_a"),
+        &head_path(home, "conv_a"),
         &Head {
             profile: "claude".to_owned(),
             model: None,
@@ -59,12 +59,12 @@ fn two_turns(home: &Path) {
 fn a_rewind_forks_at_the_turn_and_leaves_the_original_alone() {
     let home = tempfile::tempdir().expect("tempdir");
     two_turns(home.path());
-    let from = conversation_path(home.path(), "prj", "conv_a");
+    let from = conversation_path(home.path(), "conv_a");
     let before = std::fs::read(&from).expect("read");
 
-    rewind(home.path(), "prj", "conv_a", "turn_1", "conv_b", 9.0).expect("rewind");
+    rewind(home.path(), "conv_a", "turn_1", "conv_b", 9.0).expect("rewind");
 
-    let (messages, _) = read(&conversation_path(home.path(), "prj", "conv_b"));
+    let (messages, _) = read(&conversation_path(home.path(), "conv_b"));
     assert_eq!(messages.len(), 3, "turn 1, then the note");
     assert!(matches!(&messages[1].parts[0], Part::Text { text, .. } if text == "alpha"));
     assert_eq!(
@@ -75,7 +75,7 @@ fn a_rewind_forks_at_the_turn_and_leaves_the_original_alone() {
         }
     );
 
-    let head = read_head(&head_path(home.path(), "prj", "conv_b")).expect("head");
+    let head = read_head(&head_path(home.path(), "conv_b")).expect("head");
     assert_eq!(head.session_id.as_deref(), Some("s-orig"));
     assert_eq!(head.rewind.fork_at.as_deref(), Some("u-1"));
     assert_eq!(head.rewind.anchors.len(), 1, "only the turns it kept");
@@ -88,10 +88,9 @@ fn a_rewind_forks_at_the_turn_and_leaves_the_original_alone() {
 fn a_turn_with_no_kept_place_is_refused_rather_than_guessed() {
     let home = tempfile::tempdir().expect("tempdir");
     two_turns(home.path());
-    let refused =
-        rewind(home.path(), "prj", "conv_a", "turn_9", "conv_b", 9.0).expect_err("refused");
+    let refused = rewind(home.path(), "conv_a", "turn_9", "conv_b", 9.0).expect_err("refused");
     assert_eq!(refused.code, ErrorCode::Conflict);
-    assert!(!conversation_path(home.path(), "prj", "conv_b").exists());
+    assert!(!conversation_path(home.path(), "conv_b").exists());
 }
 
 #[test]

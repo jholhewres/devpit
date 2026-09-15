@@ -4,7 +4,10 @@
 //! ever grows, and a file that grows without bound should not be the one
 //! holding the logic that applies it.
 
-use super::Migration;
+use super::{Before, Migration};
+
+/// The Rust run before a version's SQL, by version.
+pub(super) const BEFORE: &[(i64, Before)] = &[(13, crate::store::plugins::export_drawings)];
 
 /// Migration 001 — the core tables.
 pub(super) const MIGRATIONS: &[Migration] = &[
@@ -431,6 +434,47 @@ CREATE TABLE pane_agent (
     transcript_path TEXT,
     updated_at      INTEGER NOT NULL
 );
+"#,
+    },
+    // Migration 012 — a project's folder gets a name a person can find.
+    Migration {
+        version: 12,
+        sql: r#"
+-- `projects/<slug>-<suffix>`, named once from the project's name and kept
+-- through renames. Syncs: another machine uses the same folder.
+--
+-- Nullable, and unique through an index rather than the column: SQLite cannot
+-- add a UNIQUE column. The rows that exist are named in Rust at launch
+-- (`home::settle`), because the slug is not something SQL can spell.
+ALTER TABLE project ADD COLUMN folder TEXT;
+CREATE UNIQUE INDEX project_folder ON project(folder);
+"#,
+    },
+    // Migration 013 — plugins, turned on per project.
+    Migration {
+        version: 13,
+        sql: r#"
+-- Syncs, so the same project shows the same plugins on another machine. The id
+-- is checked against the catalogue by the app; a row for a plugin this build
+-- does not ship is ignored, not deleted.
+--
+-- An uninstall keeps the row with both flags off, so the removal syncs too.
+CREATE TABLE project_plugin (
+    project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    plugin_id   TEXT NOT NULL,
+    installed   INTEGER NOT NULL DEFAULT 0,
+    enabled     INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL,
+    revision    INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (project_id, plugin_id)
+);
+
+-- Which plugin opens a pinned file. NULL for a file pinned from the checkout.
+ALTER TABLE card_attachment ADD COLUMN plugin_id TEXT;
+
+-- Drawings are the Excalidraw plugin's files now; the rows were written out
+-- just before this ran (`BEFORE`).
+DROP TABLE drawing;
 "#,
     },
 ];

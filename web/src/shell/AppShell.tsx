@@ -12,6 +12,7 @@ import { RightPanel } from './RightPanel'
 import { Sidebar } from './Sidebar'
 import { StatusStrip } from './StatusStrip'
 import { TopBar } from './TopBar'
+import { PluginsProvider } from './usePlugins'
 import { ShellProvider, useShell } from './useShell'
 import { isMaximized, onResized } from './window'
 import { abandoned } from './typing'
@@ -19,7 +20,9 @@ import { abandoned } from './typing'
 export function AppShell(): React.JSX.Element {
   return (
     <ShellProvider>
-      <Window />
+      <PluginsProvider>
+        <Window />
+      </PluginsProvider>
     </ShellProvider>
   )
 }

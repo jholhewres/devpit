@@ -1,5 +1,36 @@
 use super::*;
 
+use devpit_core::home::{settle, ProjectHome};
+
+/// A picture pasted before its project's folder had a name still opens.
+///
+/// The transcript keeps the path it was pasted at; `allowed` looks it up in
+/// the named folder before checking where it may be opened from.
+#[test]
+fn a_picture_pasted_under_the_old_folder_opens_from_the_new_one() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let home = dir.path();
+    let store = Store::open(&home.join("state.db")).expect("store");
+    let checkout = home.join("checkouts/demo");
+    std::fs::create_dir_all(&checkout).expect("checkout");
+    let id = store.add_project(&checkout, None).expect("project");
+    let old = devpit_core::home::projects_dir(home)
+        .join(&id)
+        .join("pasted");
+    std::fs::create_dir_all(&old).expect("old folder");
+    std::fs::write(old.join("pasted-1.png"), "png").expect("picture");
+
+    settle(&store, home).expect("settle");
+
+    let written = old.join("pasted-1.png").display().to_string();
+    let opened = allowed_in(&store, &[], home, &written).expect("opens");
+    let pasted = ProjectHome::of(&store, home, &id).expect("home").pasted();
+    assert_eq!(
+        opened,
+        pasted.join("pasted-1.png").canonicalize().expect("real")
+    );
+}
+
 #[test]
 fn a_file_in_a_registered_project_may_be_opened() {
     let dir = tempfile::tempdir().expect("tempdir");

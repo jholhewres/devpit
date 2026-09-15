@@ -28,12 +28,6 @@ fn text_that_is_not_base64_is_refused() {
 }
 
 #[test]
-fn pastes_live_in_the_workspace_not_the_project() {
-    let dir = folder(Path::new("/home/me/.devpit"), "prj_1");
-    assert_eq!(dir, Path::new("/home/me/.devpit/projects/prj_1/pasted"));
-}
-
-#[test]
 fn a_project_id_that_is_a_path_is_refused() {
     let refused = chat_paste("../x".to_owned(), "image/png".to_owned(), "aGk=".to_owned())
         .expect_err("refused");

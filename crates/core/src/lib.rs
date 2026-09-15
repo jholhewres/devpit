@@ -9,6 +9,8 @@
 //! shells costs days instead of months.
 
 pub mod bus;
+pub mod data_files;
+pub mod home;
 pub mod paths;
 #[cfg(test)]
 mod paths_tests;

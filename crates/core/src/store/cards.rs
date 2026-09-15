@@ -27,6 +27,8 @@ pub struct AttachmentRow {
     pub path: String,
     pub label: String,
     pub created_at: i64,
+    /// The plugin whose file this is, when that plugin pinned it.
+    pub plugin_id: Option<String>,
 }
 
 pub struct NoticeRow {
@@ -127,7 +129,7 @@ impl Store {
 
     pub fn attachments(&self, card_id: &str) -> Result<Vec<AttachmentRow>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, path, label, created_at FROM card_attachment \
+            "SELECT id, path, label, created_at, plugin_id FROM card_attachment \
              WHERE card_id = ?1 ORDER BY created_at ASC",
         )?;
         let rows = stmt
@@ -137,14 +139,22 @@ impl Store {
                     path: row.get(1)?,
                     label: row.get(2)?,
                     created_at: row.get(3)?,
+                    plugin_id: row.get(4)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
 
-    /// Pins a file. The same path twice is one attachment, not two.
-    pub fn attach(&self, card_id: &str, path: &str, label: &str) -> Result<String, StoreError> {
+    /// Pins a file, naming the plugin that pinned it if one did. The same path
+    /// twice is one attachment, not two.
+    pub fn attach(
+        &self,
+        card_id: &str,
+        path: &str,
+        label: &str,
+        plugin_id: Option<&str>,
+    ) -> Result<String, StoreError> {
         if let Some(had) = self
             .conn
             .query_row(
@@ -154,14 +164,21 @@ impl Store {
             )
             .optional()?
         {
+            // A file pinned by hand and then by its plugin opens in the plugin.
+            if plugin_id.is_some() {
+                self.conn.execute(
+                    "UPDATE card_attachment SET plugin_id = ?2 WHERE id = ?1",
+                    rusqlite::params![had, plugin_id],
+                )?;
+            }
             return Ok(had);
         }
 
         let id = format!("att_{}", ulid::Ulid::generate());
         self.conn.execute(
-            "INSERT INTO card_attachment (id, card_id, path, label, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![id, card_id, path, label, now()],
+            "INSERT INTO card_attachment (id, card_id, path, label, created_at, plugin_id) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![id, card_id, path, label, now(), plugin_id],
         )?;
         Ok(id)
     }
@@ -213,8 +230,21 @@ impl Store {
         detail: Option<&str>,
         card_id: Option<&str>,
     ) -> Result<String, StoreError> {
+        Self::add_notice_on(&self.conn, project_id, kind, title, detail, card_id)
+    }
+
+    /// `add_notice` for work holding a connection but no store: a migration,
+    /// inside its own transaction.
+    pub(crate) fn add_notice_on(
+        conn: &rusqlite::Connection,
+        project_id: Option<&str>,
+        kind: &str,
+        title: &str,
+        detail: Option<&str>,
+        card_id: Option<&str>,
+    ) -> Result<String, StoreError> {
         let id = format!("ntc_{}", ulid::Ulid::generate());
-        self.conn.execute(
+        conn.execute(
             "INSERT INTO notice (id, project_id, kind, title, detail, card_id, created_at) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![id, project_id, kind, title, detail, card_id, now()],
@@ -222,7 +252,7 @@ impl Store {
 
         // Trimmed on write, not on read: the read is what a person waits for.
         // Same tiebreak as the read, or the trim would keep a different 200.
-        self.conn.execute(
+        conn.execute(
             "DELETE FROM notice WHERE id NOT IN \
              (SELECT id FROM notice ORDER BY created_at DESC, id DESC LIMIT ?1)",
             [NOTICES_KEPT],

@@ -34,7 +34,7 @@ fn another_account_is_refused_by_name() {
 #[test]
 fn a_head_survives_the_round_trip() {
     let dir = tempfile::tempdir().unwrap();
-    let path = head_path(dir.path(), "proj", "conv");
+    let path = head_path(dir.path(), "conv");
     let written = Head {
         model: Some("opus".to_owned()),
         created_at: 12.0,
@@ -49,7 +49,7 @@ fn a_head_survives_the_round_trip() {
 #[test]
 fn a_conversation_with_no_head_reads_as_none() {
     let dir = tempfile::tempdir().unwrap();
-    assert_eq!(read_head(&head_path(dir.path(), "proj", "missing")), None);
+    assert_eq!(read_head(&head_path(dir.path(), "missing")), None);
 }
 
 #[test]

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 
 import { useAway } from './away'
+import { CapabilityRows } from './CapabilityRows'
 import type { PaneName } from './paneList'
 import { SessionRows } from './SessionRows'
 import { Threads } from './Threads'
@@ -99,10 +100,13 @@ export function Sidebar({
             <span className="act__label">Files</span>
           </button>
 
-          {/* What the project has to work with: which agents, which servers,
-               which plugins. A row each would cost the list half its height for
-               a fifth of its use, and the count on each item means the popover
-               answers the common question without being opened. */}
+          {/* Resources stays last: it is a popover, and everything above it is a place. */}
+          <CapabilityRows />
+
+          {/* What the project has to work with: which skills, which servers.
+               A row each would cost the list half its height for a fifth of
+               its use, and the count on each item means the popover answers
+               the common question without being opened. */}
           <div className="newmenu" ref={kitBox}>
             <button className="act" aria-haspopup="true" aria-expanded={menu === 'kit'} onClick={() => setMenu(menu === 'kit' ? null : 'kit')}>
               <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 9 5-9 5-9-5Z" /><path d="m3 17 9 5 9-5" /><path d="m3 12 9 5 9-5" /></svg></span>
