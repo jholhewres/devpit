@@ -65,10 +65,20 @@ pub(crate) fn wrapped_shell() -> Result<devpit_tmux::Shell, RpcError> {
 /// stall somewhere less visible.
 #[tauri::command]
 #[specta::specta]
-pub async fn session_running(project_id: String) -> Result<Vec<PaneRunning>, RpcError> {
-    tauri::async_runtime::spawn_blocking(move || running_in(&project_id))
-        .await
-        .map_err(|err| RpcError::internal(err.to_string()))?
+pub async fn session_running(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<Vec<PaneRunning>, RpcError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        // Read before tmux and `ps` are asked: a hook heard after this is
+        // newer than anything they say.
+        let seq = crate::card_activity::next_seq();
+        let panes = running_in(&project_id)?;
+        crate::card_reconcile::reconcile(&app, &project_id, &panes, seq);
+        Ok(panes)
+    })
+    .await
+    .map_err(|err| RpcError::internal(err.to_string()))?
 }
 
 pub(crate) fn running_in(project_id: &str) -> Result<Vec<PaneRunning>, RpcError> {

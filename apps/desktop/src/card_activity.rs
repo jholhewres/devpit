@@ -82,6 +82,15 @@ pub(crate) struct Activities {
 }
 
 impl Activities {
+    /// Every pane heard from, on any card.
+    pub(crate) fn pane_keys(&self) -> Vec<Key> {
+        self.heard
+            .keys()
+            .filter(|key| key.kind == SessionKind::Pane)
+            .cloned()
+            .collect()
+    }
+
     /// A card's sessions as the window reads them, and what they add up to.
     pub(crate) fn happening(&self, card_id: &str) -> CardHappening {
         let mut sessions: Vec<CardSession> = self
@@ -251,6 +260,20 @@ pub(crate) fn run_reference(store: &Store, run_id: &str) -> String {
         .ok()
         .flatten()
         .unwrap_or_else(|| run_id.to_owned())
+}
+
+/// Forgets a session unless it was heard at or after `seq`, answering what its
+/// card shows then.
+pub(crate) fn forget_before(
+    activities: &mut Activities,
+    key: &Key,
+    seq: u64,
+) -> Option<CardHappening> {
+    if activities.heard.get(key)?.seq >= seq {
+        return None;
+    }
+    activities.heard.remove(key);
+    Some(activities.happening(&key.card_id))
 }
 
 /// Forgets one session, answering whether it was known.

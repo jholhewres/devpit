@@ -93,6 +93,16 @@ pub fn card_detail(project_id: String, card_id: String) -> Result<CardDetail, Rp
     } else {
         Vec::new()
     };
+    // The same rule the sidebar's poll applies, for this card's panes only.
+    let mut leaves = crate::card_reconcile::card_leaves(&store, &project_id);
+    leaves.retain(|_, pane| pane.card_id == card_id);
+    if !leaves.is_empty() {
+        let seq = crate::card_activity::next_seq();
+        if let Ok(fronts) = crate::shell_launch::running_in(&project_id) {
+            let registry = crate::card_activity::registry();
+            crate::card_reconcile::reconcile_in(registry, &leaves, &fronts, seq);
+        }
+    }
     let heard = crate::card_activity::snapshot(&card_id);
     let sessions =
         crate::card_sessions::card_sessions(&store, &project_id, &card_id, &live, &heard);
