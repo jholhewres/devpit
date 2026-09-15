@@ -26,7 +26,7 @@ const card: Card = {
   comments: 0,
   pinned: 0,
   runs: [],
-  session: null,
+  activity: null,
 }
 
 const drag: Drag = { held: null, landing: null, landed: null, down: vi.fn(), move: vi.fn(), up: vi.fn(() => ({ what: 'nothing' as const })) }

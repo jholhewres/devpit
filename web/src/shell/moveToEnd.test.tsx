@@ -20,7 +20,7 @@ const card = (id: string, columnId: string, position: number): Card => ({
   comments: 0,
   pinned: 0,
   runs: [],
-  session: null,
+  activity: null,
 })
 
 const board = (): Board => ({

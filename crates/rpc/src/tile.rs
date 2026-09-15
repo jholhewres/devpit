@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::board::Run;
-use crate::session_status::Session;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -29,8 +28,9 @@ pub struct Card {
     pub pinned: u32,
     /// Most recent first.
     pub runs: Vec<Run>,
-    /// The session working on this card, if one is.
-    pub session: Option<Session>,
+    /// What the sessions working on this card add up to, the one most worth a
+    /// look. `None` when nothing is working on it.
+    pub activity: Option<Doing>,
 }
 
 /// What a session is doing, as its agent last said.
@@ -68,7 +68,9 @@ pub struct CardSession {
     /// conversation for a chat.
     #[serde(rename = "ref")]
     pub reference: String,
-    pub state: Doing,
+    /// `None` for a pane or a run whose agent has said nothing since the app
+    /// opened — it is listed, but nobody knows what it is doing.
+    pub state: Option<Doing>,
     /// Where a pane is, so the card can go to it.
     pub tab_id: Option<String>,
     pub leaf_id: Option<String>,

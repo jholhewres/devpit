@@ -85,6 +85,9 @@ pub struct CardDetail {
     pub worktree: Option<Checkout>,
     /// Every run, newest first — the tile only carries the latest.
     pub runs: Vec<Run>,
+    /// Every session working on the card: its tab's panes, runs with a session,
+    /// its background session and its conversations.
+    pub sessions: Vec<crate::tile::CardSession>,
 }
 
 /// Something worth telling somebody about.

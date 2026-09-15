@@ -19,7 +19,7 @@ const detail: CardDetail = {
     comments: 0,
     pinned: 0,
     runs: [],
-    session: null,
+    activity: null,
   },
   columnName: 'Todo',
   columnStep: null,
@@ -27,6 +27,7 @@ const detail: CardDetail = {
   pinned: [],
   worktree: null,
   runs: [],
+  sessions: [],
 }
 
 const save = vi.fn()

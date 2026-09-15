@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import type { Board, ColumnDeleted, Played, Step } from '../gen/bindings'
+import type { Board, CardHappening, CardSession, ColumnDeleted, Played, Step } from '../gen/bindings'
 import { landed, lanes, type Lane } from './board'
 import { shifted } from './laneOrder'
 import { ask, commands } from './live'
@@ -16,6 +16,8 @@ export interface UseBoard {
   readonly cards: number
   /** The last line each running step printed, by run id. */
   readonly progress: Readonly<Record<string, string>>
+  /** Each card's sessions as last heard, by card id. */
+  readonly sessions: Readonly<Record<string, readonly CardSession[]>>
   move: (cardId: string, columnId: string, at: number) => void
   /** Moves a card to the end of a lane — what a pick from its menu means. */
   moveToEnd: (cardId: string, columnId: string) => void
@@ -74,6 +76,26 @@ export function useBoard(projectId: string | null): UseBoard {
       onCarried<[string, string]>('run:progress', ([runId, text]) =>
         setProgress((was) => (was[runId] === text ? was : { ...was, [runId]: text })),
       ),
+    [],
+  )
+
+  /* What a card's sessions are doing arrives many times a turn, for one card.
+     Only that card's tile changes with it; the board is not read again. */
+  const [sessions, setSessions] = useState<Readonly<Record<string, readonly CardSession[]>>>({})
+  useEffect(
+    () =>
+      onCarried<CardHappening>('card:happening', (happening) => {
+        setBoard(
+          (was) =>
+            was && {
+              ...was,
+              cards: was.cards.map((card) =>
+                card.id === happening.cardId ? { ...card, activity: happening.activity } : card,
+              ),
+            },
+        )
+        setSessions((was) => ({ ...was, [happening.cardId]: happening.sessions }))
+      }),
     [],
   )
 
@@ -196,6 +218,7 @@ export function useBoard(projectId: string | null): UseBoard {
     report: setError,
     cards: board?.cards.length ?? 0,
     progress,
+    sessions,
     move,
     moveToEnd,
     play,

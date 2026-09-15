@@ -85,7 +85,19 @@ fn checkout_of(row: &devpit_core::CardRow) -> Option<Checkout> {
 pub fn card_detail(project_id: String, card_id: String) -> Result<CardDetail, RpcError> {
     let store = store()?;
     let steps = steps_of(&store, &project_id)?;
-    let card = card_of(&store, &card_id, &steps)?;
+    let mut card = card_of(&store, &card_id, &steps)?;
+    // The CLI is asked only when the card has a background session to ask about.
+    let has_background = store.card_links(&card_id)?.background.is_some();
+    let live = if has_background {
+        crate::board::live_sessions()
+    } else {
+        Vec::new()
+    };
+    let heard = crate::card_activity::snapshot(&card_id);
+    let sessions =
+        crate::card_sessions::card_sessions(&store, &project_id, &card_id, &live, &heard);
+    crate::card_activity::prune_unlisted(&card_id, &sessions);
+    card.activity = crate::card_activity::activity(&sessions);
 
     let row = store
         .card(&card_id)?
@@ -114,6 +126,7 @@ pub fn card_detail(project_id: String, card_id: String) -> Result<CardDetail, Rp
         worktree: checkout_of(&row),
         column_name,
         column_step,
+        sessions,
         card,
     })
 }

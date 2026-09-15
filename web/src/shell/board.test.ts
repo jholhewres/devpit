@@ -8,7 +8,7 @@ const card = (id: string, columnId: string, position: number): Card =>
   ({ id, columnId, title: id, body: '', position, worktreePath: null,
   dueAt: null,
   comments: 0,
-  pinned: 0, costUsd: null, runs: [], session: null })
+  pinned: 0, costUsd: null, runs: [], activity: null })
 
 const board: Board = {
   projectId: 'p',

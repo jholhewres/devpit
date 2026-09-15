@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { CardPane } from './CardPane'
 import { LaneFoot, LaneHead, NewColumn, Tile } from './Lane'
 import { LaneCards } from './LaneCards'
+import { useCardUnread, useVisit } from './cardDoing'
 import { useCardActs } from './useCardActs'
 import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
@@ -35,6 +36,8 @@ export function BoardPane(): React.JSX.Element {
   const [archived, setArchived] = useState<string | null>(null)
   const undone = useCallback(() => setArchived(null), [])
   const acts = useCardActs(project?.id ?? null, live, setArchived)
+  const unread = useCardUnread(live.lanes.flatMap((lane) => lane.cards), opened)
+  const visit = useVisit(project?.id ?? null, live.sessions, setOpened)
   const [adding, setAdding] = useState<string | null>(null)
   /* Which column is being dragged. Its own gesture, not `useDrag`: a column
      moves between columns and a card moves between lanes, and one state
@@ -128,6 +131,8 @@ export function BoardPane(): React.JSX.Element {
                 others={others}
                 onMove={live.moveToEnd}
                 acts={acts}
+                unread={unread}
+                onDoing={visit}
               />
 
               <LaneFoot

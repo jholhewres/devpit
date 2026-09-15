@@ -107,7 +107,7 @@ fn a_session_end_still_reaches_the_card() {
     )
     .expect("said");
     assert_eq!(told.card_id, "card_1");
-    assert_eq!(told.sessions[0].state, Doing::Gone);
+    assert_eq!(told.sessions[0].state, Some(Doing::Gone));
     assert_eq!(told.activity, Some(Doing::Gone));
 }
 
@@ -240,7 +240,7 @@ fn a_card_adds_up_to_the_state_most_worth_looking_at() {
     let session = |state| CardSession {
         kind: SessionKind::Pane,
         reference: "leaf".to_owned(),
-        state,
+        state: Some(state),
         tab_id: None,
         leaf_id: None,
     };
@@ -311,4 +311,62 @@ fn a_pane_continued_in_a_chat_leaves_the_card_once_its_leaf_closes() {
     let told = forget_leaf(&mut activities, "leaf_a").expect("told");
     assert!(told.sessions.is_empty());
     assert_eq!(told.activity, None);
+}
+
+#[test]
+fn a_background_waiting_and_the_cli_status_agree() {
+    use devpit_agentcli::Status;
+    // No longer listed by the CLI: gone, whatever was heard last.
+    assert_eq!(background_state(None, Some(Doing::Waiting)), Doing::Gone);
+    // Still listed: what its hooks said wins over the CLI's coarser word.
+    assert_eq!(
+        background_state(Some(&Status::Busy), Some(Doing::Waiting)),
+        Doing::Waiting
+    );
+    // Nothing heard yet: the CLI's status, by the plan's table.
+    assert_eq!(background_state(Some(&Status::Busy), None), Doing::Working);
+    assert_eq!(
+        background_state(Some(&Status::Blocked), None),
+        Doing::Waiting
+    );
+    assert_eq!(background_state(Some(&Status::Idle), None), Doing::Open);
+    assert_eq!(background_state(Some(&Status::Done), None), Doing::Done);
+    assert_eq!(background_state(Some(&Status::Unknown), None), Doing::Open);
+}
+
+#[test]
+fn a_session_forgotten_leaves_its_card() {
+    let mut activities = Activities::default();
+    let key = Key {
+        card_id: "card_1".to_owned(),
+        kind: SessionKind::Background,
+        reference: "s-bg".to_owned(),
+    };
+    hear(
+        &mut activities,
+        key.clone(),
+        1,
+        Doing::Waiting,
+        Place::default(),
+    )
+    .expect("heard");
+    assert!(forget(&mut activities, &key));
+    assert!(activities.happening("card_1").sessions.is_empty());
+    assert!(!forget(&mut activities, &key));
+}
+
+#[test]
+fn a_session_nobody_has_heard_from_does_not_count_on_the_tile() {
+    let session = |state| CardSession {
+        kind: SessionKind::Pane,
+        reference: "leaf".to_owned(),
+        state,
+        tab_id: None,
+        leaf_id: None,
+    };
+    assert_eq!(
+        activity(&[session(None), session(Some(Doing::Done))]),
+        Some(Doing::Done)
+    );
+    assert_eq!(activity(&[session(None)]), None);
 }

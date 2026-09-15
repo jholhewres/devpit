@@ -7,6 +7,7 @@ import { Tile } from './Lane'
 import { tileAction } from './tileKeys'
 import type { CardBoardActs } from './useCardActs'
 import type { Drag } from './useDrag'
+import type { Unread } from './unread'
 
 /*
  * A lane's cards: where each sits, the slot a dragged one would land in, and
@@ -27,6 +28,8 @@ export function LaneCards({
   others,
   onMove,
   acts,
+  unread,
+  onDoing,
 }: {
   lane: Lane
   /** The other lanes, which Move to… offers. */
@@ -41,6 +44,10 @@ export function LaneCards({
   onPlay: (cardId: string, confirmed: boolean) => Promise<Played | null>
   onRename: (cardId: string, title: string) => void
   acts: (card: Card) => CardBoardActs
+  /** Cards with a finish nobody has looked at. */
+  unread?: Unread
+  /** Where a tile's dot goes. */
+  onDoing?: (card: Card) => void
 }): React.JSX.Element {
   const { held, landing, landed } = drag
   const [menu, setMenu] = useState<{ card: Card; x: number; y: number; picking?: boolean } | null>(null)
@@ -91,6 +98,8 @@ export function LaneCards({
               progress={progress[card.runs[0]?.id ?? '']}
               stepName={lane.column.step?.name}
               onPlay={playFor(card)}
+              unread={unread?.has(card.id)}
+              onDoing={() => onDoing?.(card)}
               renaming={renaming === card.id}
               onRenamed={(title) => {
                 setRenaming(null)

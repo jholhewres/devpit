@@ -24,7 +24,6 @@ pub mod project;
 pub mod runs;
 pub mod search;
 pub mod session;
-pub mod session_status;
 pub mod session_tree;
 pub mod settings;
 mod threads;
@@ -62,7 +61,6 @@ pub use session::{
     AgentPresence, KnownAgent, LayoutNode, PaneKind, PaneRunning, PaneSize, SessionLayout,
     SplitDirection,
 };
-pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
 pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};

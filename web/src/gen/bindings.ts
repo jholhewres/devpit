@@ -1015,8 +1015,11 @@ export type Card = {
 	pinned: number,
 	/**  Most recent first. */
 	runs: Run[],
-	/**  The session working on this card, if one is. */
-	session: Session | null,
+	/**
+	 *  What the sessions working on this card add up to, the one most worth a
+	 *  look. `None` when nothing is working on it.
+	 */
+	activity: Doing | null,
 };
 
 /**  Response of `card.create` and `card.move`. */
@@ -1053,6 +1056,11 @@ export type CardDetail = {
 	worktree: Checkout | null,
 	/**  Every run, newest first — the tile only carries the latest. */
 	runs: Run[],
+	/**
+	 *  Every session working on the card: its tab's panes, runs with a session,
+	 *  its background session and its conversations.
+	 */
+	sessions: CardSession[],
 };
 
 /**  What `card:happening` carries: a card's sessions, and what they add up to. */
@@ -1071,7 +1079,11 @@ export type CardSession = {
 	 *  conversation for a chat.
 	 */
 	ref: string,
-	state: Doing,
+	/**
+	 *  `None` for a pane or a run whose agent has said nothing since the app
+	 *  opened — it is listed, but nobody knows what it is doing.
+	 */
+	state: Doing | null,
 	/**  Where a pane is, so the card can go to it. */
 	tabId: string | null,
 	leafId: string | null,
@@ -2208,13 +2220,6 @@ export type Servers = {
 	directory: string,
 };
 
-/**  A background agent session, as the board needs to draw it. */
-export type Session = {
-	/**  What `attach`, `logs` and `stop` all take. */
-	shortId: string,
-	status: SessionStatus,
-};
-
 export type SessionHit = {
 	sessionId: string,
 	/**  `user` or `assistant`. */
@@ -2239,19 +2244,6 @@ export type SessionLayout = {
 	focusedId: string,
 	tree: LayoutNode,
 };
-
-/**
- *  What a card's session is doing.
- * 
- *  `Blocked` is separate from `Busy` because it is the one state where nothing
- *  happens until a person comes back — a board that cannot tell them apart
- *  shows five cards working when one has been waiting on you for an hour.
- */
-export type SessionStatus = "busy" | 
-/**  Waiting on you. */
-"blocked" | "done" | "idle" | 
-/**  The link is on the card but the CLI no longer lists it. */
-"gone";
 
 export type Settings = {
 	/**

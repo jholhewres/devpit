@@ -61,7 +61,7 @@ const card = (over: Partial<Card> = {}): Card => ({
   comments: 0,
   pinned: 0,
   runs: [],
-  session: null,
+  activity: null,
   ...over,
 })
 

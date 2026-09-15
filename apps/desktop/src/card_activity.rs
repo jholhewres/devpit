@@ -90,7 +90,7 @@ impl Activities {
             .map(|(key, heard)| CardSession {
                 kind: key.kind,
                 reference: key.reference.clone(),
-                state: heard.state,
+                state: Some(heard.state),
                 tab_id: heard.place.tab_id.clone(),
                 leaf_id: heard.place.leaf_id.clone(),
             })
@@ -160,7 +160,7 @@ pub(crate) fn panes_closed(app: &tauri::AppHandle, leaves: &[String]) {
 pub(crate) fn activity(sessions: &[CardSession]) -> Option<Doing> {
     sessions
         .iter()
-        .map(|session| session.state)
+        .filter_map(|session| session.state)
         .max_by_key(|state| rank(*state))
 }
 
@@ -171,6 +171,62 @@ fn rank(state: Doing) -> u8 {
         Doing::Open => 2,
         Doing::Working => 3,
         Doing::Waiting => 4,
+    }
+}
+
+/// Forgets one session, answering whether it was known.
+pub(crate) fn forget(activities: &mut Activities, key: &Key) -> bool {
+    activities.heard.remove(key).is_some()
+}
+
+/// A background session's state on the card, from its hooks and the CLI.
+///
+/// The CLI decides whether it still exists: one it no longer lists is gone,
+/// whatever its hooks last said. While it exists, its own hooks say more than
+/// the CLI's coarser word, which is only the answer when nothing was heard.
+pub(crate) fn background_state(
+    listed: Option<&devpit_agentcli::Status>,
+    heard: Option<Doing>,
+) -> Doing {
+    let Some(status) = listed else {
+        return Doing::Gone;
+    };
+    heard.unwrap_or(match status {
+        devpit_agentcli::Status::Busy => Doing::Working,
+        devpit_agentcli::Status::Blocked => Doing::Waiting,
+        devpit_agentcli::Status::Done => Doing::Done,
+        devpit_agentcli::Status::Idle | devpit_agentcli::Status::Unknown => Doing::Open,
+    })
+}
+
+/// What has been heard about one card, read off the app's record.
+pub(crate) fn snapshot(card_id: &str) -> CardHappening {
+    registry()
+        .lock()
+        .map(|activities| activities.happening(card_id))
+        .unwrap_or_else(|_| CardHappening {
+            card_id: card_id.to_owned(),
+            activity: None,
+            sessions: Vec::new(),
+        })
+}
+
+/// Forgets the background sessions a read found gone, so the card stops
+/// carrying what their hooks last said.
+pub(crate) fn prune_unlisted(card_id: &str, sessions: &[CardSession]) {
+    let Ok(mut activities) = registry().lock() else {
+        return;
+    };
+    for session in sessions
+        .iter()
+        .filter(|one| one.kind == SessionKind::Background && one.state == Some(Doing::Gone))
+    {
+        let key = Key {
+            card_id: card_id.to_owned(),
+            kind: SessionKind::Background,
+            reference: session.reference.clone(),
+        };
+        forget(&mut activities, &key);
     }
 }
 

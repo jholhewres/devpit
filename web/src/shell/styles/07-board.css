@@ -56,6 +56,14 @@
 .tile__agent { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10.5px; }
 /* Lane.tsx set this on failed and lost runs, and no rule ever coloured it. */
 .tile__agent--warn { color: var(--warning); }
+/* What the sessions on a card are doing, as their agents last said it. */
+.tile__doing { flex: none; display: inline-grid; place-items: center; width: 15px; height: 15px; margin: 0 -2px; border-radius: 50%; color: var(--text-3); }
+.tile__doing:hover { background: var(--overlay-strong); }
+.tile__doing[data-doing='working'] { color: var(--accent); }
+.tile__doing[data-doing='waiting'] { color: var(--warning); }
+.tile__doing[data-doing='open'] .card__dot, .tile__doing[data-doing='done'] .card__dot, .tile__doing[data-doing='gone'] .card__dot { animation: none; }
+.tile__doing[data-doing='done'][data-unread] { color: var(--accent); }
+.tile__doing[data-doing='gone'] { opacity: 0.45; }
 .tile__time { margin-left: auto; font-variant-numeric: tabular-nums; }
 
 /* A card that just landed, and what rises into view. */

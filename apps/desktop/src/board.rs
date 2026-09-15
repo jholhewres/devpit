@@ -6,9 +6,10 @@
 //! itself going.
 
 use devpit_core::Store;
-use devpit_rpc::{
-    Board, Card, Column, ErrorCode, RpcError, Run, RunState, Session, SessionStatus, Step, StepKind,
-};
+use devpit_rpc::{Board, Card, Column, ErrorCode, RpcError, Run, RunState, Step, StepKind};
+
+use crate::card_activity::{activity, prune_unlisted, snapshot};
+use crate::card_sessions::card_sessions;
 
 pub(crate) fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -51,7 +52,9 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
         .card(id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such card"))?;
     Ok(Card {
-        session: session_of(store, &row.id, &live_sessions())?,
+        // What was heard, without asking the CLI: a card answered alone does
+        // not pay for a process. `board_get` and `card_detail` add the rest.
+        activity: snapshot(&row.id).activity,
         id: row.id.clone(),
         column_id: row.column_id,
         title: row.title,
@@ -74,41 +77,9 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
 /// board with twenty cards would pay for it twenty times.
 ///
 /// A CLI that is missing answers with nothing, and every card then reports its
-/// session as gone — which is true from the board's point of view.
-fn live_sessions() -> Vec<devpit_agentcli::AgentSession> {
+/// background session as gone — which is true from the board's point of view.
+pub(crate) fn live_sessions() -> Vec<devpit_agentcli::AgentSession> {
     devpit_agentcli::list(None).unwrap_or_default()
-}
-
-/// What the card should say about its session, if it has one.
-///
-/// `Gone` rather than dropping the session: a card that had one and lost it is
-/// a different thing from a card that never had one, and only the first is
-/// worth telling someone about.
-fn session_of(
-    store: &Store,
-    card_id: &str,
-    live: &[devpit_agentcli::AgentSession],
-) -> Result<Option<Session>, RpcError> {
-    let Some(link) = store.session_link(card_id)? else {
-        return Ok(None);
-    };
-    let status = live
-        .iter()
-        .find(|session| session.session_id == link.session_id)
-        .map_or(SessionStatus::Gone, |session| match session.status {
-            devpit_agentcli::Status::Busy => SessionStatus::Busy,
-            devpit_agentcli::Status::Blocked => SessionStatus::Blocked,
-            devpit_agentcli::Status::Done => SessionStatus::Done,
-            devpit_agentcli::Status::Idle => SessionStatus::Idle,
-            // A state this build does not know is not a state to invent one
-            // for. Idle is the quiet answer, and quiet is right for a word
-            // nobody here has an opinion about.
-            devpit_agentcli::Status::Unknown => SessionStatus::Idle,
-        });
-    Ok(Some(Session {
-        short_id: link.short_id,
-        status,
-    }))
 }
 
 fn runs_of(store: &Store, card_id: &str, steps: &[Step]) -> Result<Vec<Run>, RpcError> {
@@ -163,7 +134,9 @@ pub fn board_get(project_id: String) -> Result<Board, RpcError> {
     let mut cards = Vec::new();
     for row in store.cards(&project_id)? {
         let mut card = card_of(&store, &row.id, &steps)?;
-        card.session = session_of(&store, &row.id, &live)?;
+        let sessions = card_sessions(&store, &project_id, &row.id, &live, &snapshot(&row.id));
+        prune_unlisted(&row.id, &sessions);
+        card.activity = activity(&sessions);
         cards.push(card);
     }
 

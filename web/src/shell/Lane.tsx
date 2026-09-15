@@ -2,6 +2,7 @@ import { Confirm } from './Confirm'
 import { dueLabel, nearness } from './due'
 import type { Lane as LaneData } from './board'
 import type { Card, ColumnDeleted, Played, Step } from '../gen/bindings'
+import { doingLabel } from './cardDoing'
 import { InlineAdd } from './InlineAdd'
 import { LaneMenu } from './LaneMenu'
 import { LaneStep } from './LaneStep'
@@ -47,6 +48,8 @@ export function Tile({
   onPlay,
   renaming,
   onRenamed,
+  unread,
+  onDoing,
 }: {
   card: Card
   progress?: string
@@ -58,6 +61,10 @@ export function Tile({
   renaming?: boolean
   /** The new title, or null when the rename was abandoned. */
   onRenamed?: (title: string | null) => void
+  /** A finish on this card nobody has looked at yet. */
+  unread?: boolean
+  /** Goes where the dot points: the session waiting, or else the card. */
+  onDoing?: () => void
 }): React.JSX.Element {
   const [asking, setAsking] = useState(false)
   const run = card.runs[0]
@@ -93,6 +100,29 @@ export function Tile({
           a tile is not a log, and the whole output is on the card. */}
       {progress && run?.state === 'running' && <div className="tile__log">{progress}</div>}
       <div className="tile__m">
+        {card.activity && (
+          <button
+            className="tile__doing"
+            data-doing={card.activity}
+            data-unread={unread || undefined}
+            aria-label={doingLabel(card.activity, Boolean(unread))}
+            title={doingLabel(card.activity, Boolean(unread))}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation()
+              onDoing?.()
+            }}
+          >
+            {/* Colour alone does not carry a question to everyone. */}
+            {card.activity === 'waiting' ? (
+              <i className="card__ask" aria-hidden="true">
+                ?
+              </i>
+            ) : (
+              <i className="card__dot" aria-hidden="true" />
+            )}
+          </button>
+        )}
         {run && (
           <span className={run.state === 'failed' || run.state === 'lost' ? 'tile__agent tile__agent--warn' : 'tile__agent'}>
             <Spark />
@@ -124,7 +154,6 @@ export function Tile({
             nothing — and a chip reading $0.00 on every card is a number that
             says nothing taking the room of one that would. */}
         {spent && <span className="tile__time">{spent}</span>}
-        {card.session && <span className="tile__time">{card.session.status}</span>}
       </div>
       {asking && (
         <RunConfirm
