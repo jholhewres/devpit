@@ -66,6 +66,7 @@ fn a_real_turn_posts_its_hooks_to_us() {
             budget_usd: Some(0.50),
             model: Some("claude-haiku-4-5-20251001"),
             settings: settings.to_str(),
+            session_id: None,
         },
         |_| {},
     )

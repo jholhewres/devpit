@@ -17,11 +17,12 @@
 use std::sync::Arc;
 
 use devpit_core::Store;
-use devpit_rpc::{RpcError, Run, RunState, Step};
+use devpit_rpc::{RpcError, Run, RunState, Step, StepKind};
 use tauri::AppHandle;
 
+use crate::card_activity::{run_heard, run_reference, Doing};
 use crate::in_flight::InFlight;
-use crate::working;
+use crate::{steps, working};
 
 /// Runs a step against a card, and returns the run it opened.
 ///
@@ -55,6 +56,19 @@ pub fn start_chained(
     hops: u8,
 ) -> Result<Run, RpcError> {
     let run_id = store.start_run(card_id, &step.id, came_from)?;
+    // A session of its own for every run: two runs of one card are two
+    // conversations, and one id for both would write the second over the first.
+    let session_id = steps::fresh_session_id();
+    if step.kind == StepKind::Agent {
+        store.set_run_session(&run_id, &session_id)?;
+    }
+    // Heard in the one order everything else about the card is heard in.
+    run_heard(
+        &app,
+        card_id,
+        &run_reference(store, &run_id),
+        Doing::Working,
+    );
 
     let card = card_id.to_owned();
     let id = run_id.clone();
@@ -78,6 +92,7 @@ pub fn start_chained(
                 chained,
                 run_id: id,
                 card_id: card,
+                session_id,
                 step,
                 hops,
             },

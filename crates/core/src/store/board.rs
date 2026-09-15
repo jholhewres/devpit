@@ -476,14 +476,15 @@ impl Store {
         short_id: &str,
         session_id: &str,
         transcript_path: Option<&str>,
+        cwd: Option<&str>,
     ) -> Result<(), StoreError> {
         self.conn.execute(
             "INSERT INTO session_link \
-             (card_id, short_id, session_id, transcript_path, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5) \
+             (card_id, short_id, session_id, transcript_path, created_at, cwd) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
              ON CONFLICT(card_id) DO UPDATE SET \
-               short_id = ?2, session_id = ?3, transcript_path = ?4",
-            rusqlite::params![card_id, short_id, session_id, transcript_path, now()],
+               short_id = ?2, session_id = ?3, transcript_path = ?4, cwd = ?6",
+            rusqlite::params![card_id, short_id, session_id, transcript_path, now(), cwd],
         )?;
         Ok(())
     }

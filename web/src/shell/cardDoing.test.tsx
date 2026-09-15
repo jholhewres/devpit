@@ -83,6 +83,7 @@ describe("a tile's dot", () => {
     expect(doingLabel('open', false)).toContain('shows once it reports')
     expect(doingLabel('open', false)).toContain('Only the project open in this window is followed')
     expect(doingLabel('done', true)).toContain('nobody has looked')
+    expect(doingLabel('failed', false)).toBe('A run on this card failed')
   })
 
   it('is drawn only when something is working on the card, and goes where it points', () => {

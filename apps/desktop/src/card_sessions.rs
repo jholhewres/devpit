@@ -49,27 +49,37 @@ pub(crate) fn card_sessions(
         }
     }
 
-    let Ok(links) = store.card_links(card_id) else {
-        return sessions;
-    };
-    for run in &links.runs {
-        sessions.push(unplaced(SessionKind::Run, &run.session_id));
+    if let Ok(links) = store.card_links(card_id) {
+        for run in &links.runs {
+            sessions.push(unplaced(SessionKind::Run, &run.session_id));
+        }
+        if let Some(background) = &links.background {
+            let listed = live
+                .iter()
+                .find(|one| one.session_id == background.session_id)
+                .map(|one| &one.status);
+            sessions.push(CardSession {
+                state: Some(background_state(
+                    listed,
+                    said(SessionKind::Background, &background.session_id),
+                )),
+                ..unplaced(SessionKind::Background, &background.session_id)
+            });
+        }
+        for chat in &links.chats {
+            sessions.push(unplaced(SessionKind::Chat, &chat.conversation_id));
+        }
     }
-    if let Some(background) = &links.background {
-        let listed = live
+
+    // What was heard with no link to show for it: a run with no agent is
+    // heard under its own id, and has no session on its row.
+    for one in &heard.sessions {
+        if !sessions
             .iter()
-            .find(|one| one.session_id == background.session_id)
-            .map(|one| &one.status);
-        sessions.push(CardSession {
-            state: Some(background_state(
-                listed,
-                said(SessionKind::Background, &background.session_id),
-            )),
-            ..unplaced(SessionKind::Background, &background.session_id)
-        });
-    }
-    for chat in &links.chats {
-        sessions.push(unplaced(SessionKind::Chat, &chat.conversation_id));
+            .any(|listed| listed.kind == one.kind && listed.reference == one.reference)
+        {
+            sessions.push(one.clone());
+        }
     }
     sessions
 }

@@ -34,13 +34,12 @@ fn a_run_is_linked_once_it_has_a_session_of_its_own() {
     store
         .start_run(&card, &step, None)
         .expect("a run with no session");
-    store
-        .conn
-        .execute(
-            "UPDATE run SET session_id = 's-1', cwd = '/w/card' WHERE id = ?1",
-            [&spoke],
-        )
-        .expect("session");
+    store.set_run_session(&spoke, "s-1").expect("session");
+    store.set_run_cwd(&spoke, "/w/card").expect("cwd");
+    assert_eq!(
+        store.run_session(&spoke).expect("read").as_deref(),
+        Some("s-1")
+    );
 
     let links = store.card_links(&card).expect("links");
     assert_eq!(links.runs.len(), 1);
@@ -53,15 +52,12 @@ fn a_run_is_linked_once_it_has_a_session_of_its_own() {
 fn a_background_session_is_linked_with_the_folder_it_runs_in() {
     let (_dir, store, _project, card) = seeded();
     store
-        .link_session(&card, "a1b2", "s-bg", None)
-        .expect("link");
+        .link_session(&card, "a0a0", "s-old", None, Some("/w/old"))
+        .expect("an earlier run's session");
+    // The next run's session takes its place, folder included.
     store
-        .conn
-        .execute(
-            "UPDATE session_link SET cwd = '/w/card' WHERE card_id = ?1",
-            [&card],
-        )
-        .expect("cwd");
+        .link_session(&card, "a1b2", "s-bg", None, Some("/w/card"))
+        .expect("link");
 
     let background = store
         .card_links(&card)

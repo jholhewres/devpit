@@ -9,8 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use serde::Deserialize;
-
+use crate::headless_stream::read_stream;
 use crate::{headless_argv, AgentError, PROGRAM};
 
 /// What one turn produced.
@@ -26,6 +25,8 @@ pub struct Outcome {
     /// Why it ended: the CLI's own word, kept rather than mapped so a new one
     /// arrives intact instead of being flattened into "failed".
     pub stop_reason: Option<String>,
+    /// The session the CLI says it ran, from its `init` line.
+    pub session_id: Option<String>,
 }
 
 /// How a turn is configured.
@@ -40,6 +41,9 @@ pub struct Turn<'a> {
     pub model: Option<&'a str>,
     /// A settings file for this turn — the hooks that report what it is doing.
     pub settings: Option<&'a str>,
+    /// The session this turn speaks in: new for every run, so two runs of one
+    /// card are two conversations.
+    pub session_id: Option<&'a str>,
     /// Context the step declared, as environment variables.
     ///
     /// Variables and never interpolation: a branch named `fix;rm -rf /` has to
@@ -52,28 +56,6 @@ pub struct Turn<'a> {
     /// before profiles existed and what a board with no profile chosen still
     /// does.
     pub runner: Option<&'a crate::running::Runner>,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type")]
-enum Line {
-    #[serde(rename = "result")]
-    Result {
-        #[serde(default)]
-        result: String,
-        #[serde(default)]
-        is_error: bool,
-        #[serde(default)]
-        total_cost_usd: f64,
-        #[serde(default)]
-        duration_ms: i64,
-        #[serde(default)]
-        num_turns: i64,
-        #[serde(default)]
-        stop_reason: Option<String>,
-    },
-    #[serde(other)]
-    Other,
 }
 
 /// Runs the turn and reports the outcome.
@@ -94,7 +76,7 @@ pub fn run_turn(turn: &Turn<'_>, on_partial: impl FnMut(&str)) -> Result<Outcome
 /// start.
 pub fn run_turn_cancellable(
     turn: &Turn<'_>,
-    mut on_partial: impl FnMut(&str),
+    on_partial: impl FnMut(&str),
     mut on_start: impl FnMut(u32),
 ) -> Result<Outcome, AgentError> {
     let argv = headless_argv(
@@ -103,6 +85,7 @@ pub fn run_turn_cancellable(
         turn.budget_usd,
         turn.model,
         turn.settings,
+        turn.session_id,
     );
     let mut child = Command::new(turn.runner.map_or(PROGRAM, |one| one.program.as_str()))
         .args(
@@ -139,32 +122,10 @@ pub fn run_turn_cancellable(
     }
 
     let stdout = child.stdout.take().ok_or(AgentError::NotInstalled)?;
-    let mut outcome = None;
-    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-        match serde_json::from_str::<Line>(&line) {
-            Ok(Line::Result {
-                result,
-                is_error,
-                total_cost_usd,
-                duration_ms,
-                num_turns,
-                stop_reason,
-            }) => {
-                outcome = Some(Outcome {
-                    result,
-                    cost_usd: total_cost_usd,
-                    duration_ms,
-                    turns: num_turns,
-                    is_error,
-                    stop_reason,
-                });
-            }
-            Ok(Line::Other) => on_partial(&line),
-            // A line we cannot read is not a reason to abandon the run: the
-            // one that matters is `result`, and it comes last.
-            Err(_) => {}
-        }
-    }
+    let outcome = read_stream(
+        BufReader::new(stdout).lines().map_while(Result::ok),
+        on_partial,
+    );
 
     let status = child
         .wait()

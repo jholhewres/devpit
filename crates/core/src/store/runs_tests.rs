@@ -78,6 +78,21 @@ fn the_sweep_leaves_a_run_that_already_ended_alone() {
     assert_eq!(after[0].output.as_deref(), Some("all good"));
 }
 
+/// A person's stop is the run's end: the process it killed ends a moment
+/// later and finds nothing left to close.
+#[test]
+fn a_run_closes_once_so_a_stop_is_not_written_over() {
+    let (_dir, store, card, step, _column) = seeded();
+    let run = store.start_run(&card, &step, None).expect("start");
+    assert!(store
+        .finish_run(&run, "cancelled", Some("stopped by you"), None, None, None)
+        .expect("cancel"));
+    assert!(!store
+        .finish_run(&run, "failed", Some("killed"), None, None, None)
+        .expect("late"));
+    assert_eq!(store.runs(&card).expect("runs")[0].state, "cancelled");
+}
+
 #[test]
 fn sweeping_twice_closes_nothing_the_second_time() {
     // It runs at every launch, so it has to be safe to run at every launch.

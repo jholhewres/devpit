@@ -64,6 +64,7 @@ fn a_pane_still_says_only_its_three_words() {
     assert_eq!(pane_word(Some(Doing::Waiting)), Some("waiting"));
     assert_eq!(pane_word(Some(Doing::Done)), Some("done"));
     assert_eq!(pane_word(Some(Doing::Open)), None);
+    assert_eq!(pane_word(Some(Doing::Failed)), None);
     assert_eq!(pane_word(Some(Doing::Gone)), None);
     assert_eq!(pane_word(None), None);
 }
@@ -248,6 +249,7 @@ fn a_card_adds_up_to_the_state_most_worth_looking_at() {
         Doing::Gone,
         Doing::Done,
         Doing::Open,
+        Doing::Failed,
         Doing::Working,
         Doing::Waiting,
     ];
@@ -369,4 +371,103 @@ fn a_session_nobody_has_heard_from_does_not_count_on_the_tile() {
         Some(Doing::Done)
     );
     assert_eq!(activity(&[session(None)]), None);
+}
+
+/// The plan's run table, row by row.
+#[test]
+fn each_run_state_means_what_the_table_says() {
+    for (state, doing) in [
+        ("running", Doing::Working),
+        ("failed", Doing::Failed),
+        ("lost", Doing::Failed),
+        ("ok", Doing::Done),
+        ("cancelled", Doing::Done),
+    ] {
+        assert_eq!(state_of_run(state), doing, "{state}");
+    }
+}
+
+fn said(told: &CardHappening) -> Vec<(SessionKind, &str, Option<Doing>)> {
+    told.sessions
+        .iter()
+        .map(|one| (one.kind, one.reference.as_str(), one.state))
+        .collect()
+}
+
+/// A run is heard like a hook: its start, its end under the same key, and a
+/// new run taking the card's earlier one off it while its panes stay.
+#[test]
+fn a_run_start_reaches_the_card() {
+    let mut activities = Activities::default();
+    hear(
+        &mut activities,
+        pane("card_1", "leaf_a"),
+        1,
+        Doing::Open,
+        place("leaf_a"),
+    )
+    .expect("pane");
+
+    let started =
+        hear_run(&mut activities, "card_1", "s-1", 2, state_of_run("running")).expect("started");
+    assert_eq!(started.activity, Some(Doing::Working));
+    let failed =
+        hear_run(&mut activities, "card_1", "s-1", 3, state_of_run("failed")).expect("ended");
+    assert_eq!(failed.activity, Some(Doing::Failed));
+
+    let next = hear_run(
+        &mut activities,
+        "card_1",
+        "run_2",
+        4,
+        state_of_run("running"),
+    )
+    .expect("next");
+    assert_eq!(
+        said(&next),
+        [
+            (SessionKind::Pane, "leaf_a", Some(Doing::Open)),
+            (SessionKind::Run, "run_2", Some(Doing::Working)),
+        ]
+    );
+}
+
+/// A stop is heard as the run's end, and the process it killed finds the run
+/// closed, so nothing after it says `failed` or leaves it `working`.
+#[test]
+fn a_cancelled_run_does_not_stay_working() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let column = store.columns(&project).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&project, &column, "a card", "")
+        .expect("card");
+    let step = store
+        .create_step(&project, "command", "tests", "{}", false)
+        .expect("step");
+    let run = store.start_run(&card, &step, None).expect("start");
+    let reference = run_reference(&store, &run);
+    assert_eq!(reference, run, "a run with no agent is heard under its id");
+
+    let mut activities = Activities::default();
+    hear_run(&mut activities, &card, &reference, 1, Doing::Working).expect("started");
+    assert!(store
+        .finish_run(&run, "cancelled", None, None, None, None)
+        .expect("stop"));
+    hear_run(
+        &mut activities,
+        &card,
+        &reference,
+        2,
+        state_of_run("cancelled"),
+    )
+    .expect("stopped");
+
+    // What the run's own thread does once its process is gone.
+    assert!(!store
+        .finish_run(&run, "failed", None, None, None, None)
+        .expect("late"));
+    assert_eq!(activities.happening(&card).activity, Some(Doing::Done));
 }

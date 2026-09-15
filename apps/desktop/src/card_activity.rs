@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use devpit_agentcli::Event;
+use devpit_core::Store;
 pub(crate) use devpit_rpc::Doing;
 use devpit_rpc::{CardHappening, CardSession, SessionKind};
 
@@ -40,7 +41,7 @@ pub(crate) fn pane_word(doing: Option<Doing>) -> Option<&'static str> {
         Doing::Working => Some("working"),
         Doing::Waiting => Some("waiting"),
         Doing::Done => Some("done"),
-        Doing::Open | Doing::Gone => None,
+        Doing::Open | Doing::Failed | Doing::Gone => None,
     }
 }
 
@@ -169,9 +170,65 @@ fn rank(state: Doing) -> u8 {
         Doing::Gone => 0,
         Doing::Done => 1,
         Doing::Open => 2,
-        Doing::Working => 3,
-        Doing::Waiting => 4,
+        Doing::Failed => 3,
+        Doing::Working => 4,
+        Doing::Waiting => 5,
     }
+}
+
+/// What a run's row says, on the card: the plan's run table.
+pub(crate) fn state_of_run(state: &str) -> Doing {
+    match state {
+        "running" => Doing::Working,
+        "failed" | "lost" => Doing::Failed,
+        _ => Doing::Done,
+    }
+}
+
+/// Records what a run said, and answers what the card now shows.
+///
+/// A card shows its latest run only: whichever run speaks, the card's other
+/// runs leave it, so yesterday's failure does not outrank today's pass. Runs on
+/// one card never overlap, and the next one starts after the last was heard.
+pub(crate) fn hear_run(
+    activities: &mut Activities,
+    card_id: &str,
+    reference: &str,
+    seq: u64,
+    state: Doing,
+) -> Option<CardHappening> {
+    let before = activities.heard.len();
+    activities.heard.retain(|key, _| {
+        key.card_id != card_id || key.kind != SessionKind::Run || key.reference == reference
+    });
+    let dropped = activities.heard.len() < before;
+    let key = Key {
+        card_id: card_id.to_owned(),
+        kind: SessionKind::Run,
+        reference: reference.to_owned(),
+    };
+    hear(activities, key, seq, state, Place::default())
+        .or_else(|| dropped.then(|| activities.happening(card_id)))
+}
+
+/// `hear_run` stamped in the one order, and told to the window.
+pub(crate) fn run_heard(app: &tauri::AppHandle, card_id: &str, reference: &str, state: Doing) {
+    let told = registry().lock().ok().and_then(|mut activities| {
+        hear_run(&mut activities, card_id, reference, next_seq(), state)
+    });
+    if let Some(happening) = told {
+        let _ = tauri::Emitter::emit(app, "card:happening", happening);
+    }
+}
+
+/// What a run is heard under: its agent's session, or the run itself when it
+/// had none.
+pub(crate) fn run_reference(store: &Store, run_id: &str) -> String {
+    store
+        .run_session(run_id)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| run_id.to_owned())
 }
 
 /// Forgets one session, answering whether it was known.

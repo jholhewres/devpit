@@ -61,7 +61,8 @@
 .tile__doing:hover { background: var(--overlay-strong); }
 .tile__doing[data-doing='working'] { color: var(--accent); }
 .tile__doing[data-doing='waiting'] { color: var(--warning); }
-.tile__doing[data-doing='open'] .card__dot, .tile__doing[data-doing='done'] .card__dot, .tile__doing[data-doing='gone'] .card__dot { animation: none; }
+.tile__doing[data-doing='failed'] { color: var(--danger); }
+.tile__doing[data-doing='open'] .card__dot, .tile__doing[data-doing='done'] .card__dot, .tile__doing[data-doing='failed'] .card__dot, .tile__doing[data-doing='gone'] .card__dot { animation: none; }
 .tile__doing[data-doing='done'][data-unread] { color: var(--accent); }
 .tile__doing[data-doing='gone'] { opacity: 0.45; }
 .tile__time { margin-left: auto; font-variant-numeric: tabular-nums; }

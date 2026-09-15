@@ -2,15 +2,39 @@
 
 use super::*;
 
-/// The same card keeps the same session id across restarts, which is what
-/// makes its transcript findable later.
+/// Every run speaks in a session of its own, shaped like the UUID the CLI
+/// takes, and two runs of one card keep theirs apart on the card's links.
 #[test]
-fn a_card_always_gets_the_same_session_id() {
-    let first = uuid_like("card_01HX");
-    assert_eq!(first, uuid_like("card_01HX"));
-    assert_ne!(first, uuid_like("card_01HY"));
+fn two_runs_of_one_card_speak_in_different_sessions() {
+    let first = fresh_session_id();
     assert_eq!(first.len(), 36, "{first} is not shaped like a uuid");
     assert_eq!(first.matches('-').count(), 4);
+    assert_eq!(&first[14..15], "4", "{first} is not a version 4 uuid");
+    assert!(
+        matches!(&first[19..20], "8" | "9" | "a" | "b"),
+        "{first} has no uuid variant"
+    );
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let column = store.columns(&project).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&project, &column, "a card", "")
+        .expect("card");
+    let step = store
+        .create_step(&project, "agent", "review", "{}", false)
+        .expect("step");
+    for _ in 0..2 {
+        let run = store.start_run(&card, &step, None).expect("start");
+        store
+            .set_run_session(&run, &fresh_session_id())
+            .expect("session");
+    }
+    let links = store.card_links(&card).expect("links");
+    assert_eq!(links.runs.len(), 2);
+    assert_ne!(links.runs[0].session_id, links.runs[1].session_id);
 }
 
 /// The chain, end to end, with a real agent at the far side of it.
@@ -80,9 +104,20 @@ fn a_card_and_a_step_produce_a_real_answer() {
         irreversible: false,
     };
 
+    // Opened first, as the board does, so the step has a row to record its
+    // folder and session on.
+    let run = store.start_run(&card, &step_id, None).expect("start");
     let mut streamed = 0;
-    let finished =
-        agent::run(&store, &card, &step, |_| streamed += 1, |_| {}).expect("the step ran");
+    let finished = agent::run(
+        &store,
+        &card,
+        &step,
+        &run,
+        &fresh_session_id(),
+        |_| streamed += 1,
+        |_| {},
+    )
+    .expect("the step ran");
 
     assert!(finished.ok, "the step failed: {}", finished.output);
     assert!(
@@ -93,7 +128,6 @@ fn a_card_and_a_step_produce_a_real_answer() {
     assert!(streamed > 0, "nothing reached the card while it worked");
 
     // And the run lands on the card, which is where a person reads it.
-    let run = store.start_run(&card, &step_id, None).expect("start");
     store
         .finish_run(
             &run,

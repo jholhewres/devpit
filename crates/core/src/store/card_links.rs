@@ -96,6 +96,35 @@ impl Store {
 }
 
 impl Store {
+    /// Names the session a run's agent speaks in.
+    pub fn set_run_session(&self, run_id: &str, session_id: &str) -> Result<(), StoreError> {
+        self.conn.execute(
+            "UPDATE run SET session_id = ?2 WHERE id = ?1",
+            [run_id, session_id],
+        )?;
+        Ok(())
+    }
+
+    /// Records the folder a run works in, once it is known.
+    pub fn set_run_cwd(&self, run_id: &str, cwd: &str) -> Result<(), StoreError> {
+        self.conn
+            .execute("UPDATE run SET cwd = ?2 WHERE id = ?1", [run_id, cwd])?;
+        Ok(())
+    }
+
+    /// The session a run's agent spoke in; `None` for a run with no agent.
+    pub fn run_session(&self, run_id: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT session_id FROM run WHERE id = ?1",
+                [run_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
     /// The project of a card that is still on a board; `None` once archived or gone.
     pub fn live_card_project(&self, card_id: &str) -> Result<Option<String>, StoreError> {
         Ok(self

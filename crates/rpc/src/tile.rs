@@ -43,6 +43,8 @@ pub enum Doing {
     /// Stopped on a person — the one worth coming back for.
     Waiting,
     Done,
+    /// Its run ended badly.
+    Failed,
     /// It ended.
     Gone,
 }

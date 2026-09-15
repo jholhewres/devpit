@@ -7,6 +7,7 @@
 use devpit_core::Store;
 use tauri::AppHandle;
 
+use crate::card_activity::{run_heard, run_reference, state_of_run};
 use crate::notices;
 
 /// Closes the runs whose process is gone, and says so in the bell.
@@ -21,7 +22,13 @@ pub fn close_abandoned(app: &AppHandle) {
     let Ok(stranded) = store.close_abandoned_runs() else {
         return;
     };
-    for (_, card_id) in &stranded {
+    for (run_id, card_id) in &stranded {
+        run_heard(
+            app,
+            card_id,
+            &run_reference(&store, run_id),
+            state_of_run("lost"),
+        );
         let title = store
             .card(card_id)
             .ok()

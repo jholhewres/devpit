@@ -47,6 +47,8 @@ pub fn run(
     store: &Store,
     card_id: &str,
     step: &Step,
+    run_id: &str,
+    session_id: &str,
     mut on_progress: impl FnMut(&str),
     on_start: impl FnMut(u32),
 ) -> Result<Finished, String> {
@@ -85,6 +87,10 @@ pub fn run(
 
     // The card's checkout when this step wants one, the project otherwise.
     let cwd = crate::checkout::cwd_for(store, card_id, step, &mut on_progress)?;
+    // On the run's row, so continuing this session later finds its folder.
+    store
+        .set_run_cwd(run_id, &cwd.display().to_string())
+        .map_err(|err| err.to_string())?;
     let context = injected(
         &Context {
             card: card.id.clone(),
@@ -118,6 +124,7 @@ pub fn run(
             budget_usd: Some(cap),
             model: config.model.as_deref(),
             settings: settings.as_deref(),
+            session_id: Some(session_id),
             env: &context,
             runner: runner.as_ref(),
         },
@@ -132,6 +139,15 @@ pub fn run(
         on_start,
     )
     .map_err(|err| err.to_string())?;
+
+    // The CLI's own word for the session wins: its transcript is named by it.
+    let said = outcome.session_id.as_deref().unwrap_or(session_id);
+    if said != session_id {
+        eprintln!("run {run_id} asked for session {session_id} and ran in {said}");
+        store
+            .set_run_session(run_id, said)
+            .map_err(|err| err.to_string())?;
+    }
 
     // A schema the answer does not satisfy is a failure, and the card does not
     // advance. Prose where fields were asked for is the case this catches.

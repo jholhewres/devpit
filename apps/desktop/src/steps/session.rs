@@ -6,7 +6,7 @@ use devpit_core::Store;
 use devpit_rpc::Step;
 use serde::Deserialize;
 
-use super::{uuid_like, Finished};
+use super::Finished;
 
 /// What a `session` step needs to know, out of `step.config`.
 #[derive(Deserialize, Default)]
@@ -21,7 +21,16 @@ struct SessionConfig {
 /// person attaches it to the target terminal when they want to sit in front of
 /// it — which is the whole point of the target being one terminal rather than
 /// a pane per card.
-pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String> {
+///
+/// `session_id` is new for this run and chosen before it starts: it names the
+/// transcript, and the transcript is where a session the person drove by hand
+/// reports what it spent.
+pub fn start(
+    store: &Store,
+    card_id: &str,
+    step: &Step,
+    session_id: &str,
+) -> Result<Finished, String> {
     let config: SessionConfig = serde_json::from_str(&step.config)
         .map_err(|err| format!("this step's config is not readable: {err}"))?;
 
@@ -31,14 +40,9 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
     // ripgrep, and one day in a commit.
     let cwd = crate::checkout::cwd_for(store, card_id, step, |_| {})?;
 
-    // A stable id chosen here rather than discovered later: it is what names
-    // the transcript, and the transcript is where a session the person drove
-    // by hand reports what it spent.
-    let session_id = uuid_like(card_id);
-
     let short_id = agent::start_background(
         &cwd,
-        Some(&session_id),
+        Some(session_id),
         None,
         config.model.as_deref(),
         super::hook_settings().as_deref(),
@@ -47,14 +51,15 @@ pub fn start(store: &Store, card_id: &str, step: &Step) -> Result<Finished, Stri
 
     let transcript = std::env::var_os("HOME")
         .map(PathBuf::from)
-        .map(|home| agent::transcript_path(&home, &cwd, &session_id));
+        .map(|home| agent::transcript_path(&home, &cwd, session_id));
 
     store
         .link_session(
             card_id,
             &short_id,
-            &session_id,
+            session_id,
             transcript.as_ref().and_then(|p| p.to_str()),
+            cwd.to_str(),
         )
         .map_err(|err| err.to_string())?;
 

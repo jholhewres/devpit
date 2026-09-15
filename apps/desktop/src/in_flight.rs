@@ -6,7 +6,9 @@ use std::sync::Mutex;
 use devpit_core::Store;
 use devpit_rpc::{ErrorCode, RpcError};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, State};
+
+use crate::card_activity::{run_heard, run_reference, state_of_run};
 
 /// The runs in flight, by id, and the process behind each.
 ///
@@ -48,10 +50,19 @@ impl InFlight {
 #[tauri::command]
 #[specta::specta]
 pub fn run_cancel(
+    app: AppHandle,
     state: State<'_, Arc<InFlight>>,
     card_id: String,
     run_id: String,
 ) -> Result<(), RpcError> {
+    let store = Store::open_default()?;
+    // The stop is told on the card, so the run has to be that card's.
+    if !store.runs(&card_id)?.iter().any(|run| run.id == run_id) {
+        return Err(RpcError::new(
+            ErrorCode::NotFound,
+            "that run is not on this card",
+        ));
+    }
     let Some(pid) = state.pid_of(&run_id) else {
         return Err(RpcError::new(
             ErrorCode::NotFound,
@@ -82,8 +93,7 @@ pub fn run_cancel(
         return Err(RpcError::internal(format!("could not stop process {pid}")));
     }
 
-    let store = Store::open_default()?;
-    store.finish_run(
+    let stopped_here = store.finish_run(
         &run_id,
         "cancelled",
         Some("stopped by you"),
@@ -92,6 +102,14 @@ pub fn run_cancel(
         None,
     )?;
     state.forget(&run_id);
-    let _ = card_id;
+    // Unless the run reached its own end first, and told the card itself.
+    if stopped_here {
+        run_heard(
+            &app,
+            &card_id,
+            &run_reference(&store, &run_id),
+            state_of_run("cancelled"),
+        );
+    }
     Ok(())
 }

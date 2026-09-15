@@ -27,16 +27,15 @@ pub struct Finished {
     pub exit_code: Option<i32>,
 }
 
-/// A session id shaped like the UUID the CLI expects, derived from the card so
-/// the same card keeps the same id across restarts.
-fn uuid_like(card_id: &str) -> String {
-    let digest: Vec<String> = card_id
-        .bytes()
-        .cycle()
-        .take(16)
-        .map(|b| format!("{b:02x}"))
-        .collect();
-    let hex = digest.concat();
+/// A new session id for one run, shaped like the version-4 UUID the CLI takes.
+///
+/// New for every run rather than derived from the card: two runs of one card
+/// are two sessions, and one id for both would put the second transcript on
+/// top of the first.
+pub(crate) fn fresh_session_id() -> String {
+    let random = ulid::Ulid::generate().0;
+    let bits = (random & !(0xf_u128 << 76) & !(0x3_u128 << 62)) | (0x4 << 76) | (0x2 << 62);
+    let hex = format!("{bits:032x}");
     format!(
         "{}-{}-{}-{}-{}",
         &hex[0..8],

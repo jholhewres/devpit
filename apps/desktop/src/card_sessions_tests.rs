@@ -70,7 +70,7 @@ fn a_cards_panes_are_listed_before_their_agents_say_anything() {
 fn a_background_session_the_cli_no_longer_lists_is_gone() {
     let (_dir, store, project, card) = seeded();
     store
-        .link_session(&card, "a1b2", "s-bg", None)
+        .link_session(&card, "a1b2", "s-bg", None, None)
         .expect("link");
     let sessions = card_sessions(&store, &project, &card, &[], &nothing_heard(&card));
     assert_eq!(sessions.len(), 1);
@@ -82,4 +82,24 @@ fn a_background_session_the_cli_no_longer_lists_is_gone() {
 fn a_card_with_nothing_has_no_sessions() {
     let (_dir, store, project, card) = seeded();
     assert!(card_sessions(&store, &project, &card, &[], &nothing_heard(&card)).is_empty());
+}
+
+#[test]
+fn a_run_heard_under_its_own_id_is_listed_without_a_link() {
+    let (_dir, store, project, card) = seeded();
+    let heard = CardHappening {
+        card_id: card.clone(),
+        activity: Some(Doing::Working),
+        sessions: vec![CardSession {
+            kind: SessionKind::Run,
+            reference: "run_1".to_owned(),
+            state: Some(Doing::Working),
+            tab_id: None,
+            leaf_id: None,
+        }],
+    };
+    assert_eq!(
+        card_sessions(&store, &project, &card, &[], &heard),
+        heard.sessions
+    );
 }

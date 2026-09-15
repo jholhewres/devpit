@@ -103,7 +103,7 @@ fn a_session_stays_attached_to_its_card_across_a_restart() {
             .create_card(&project, &column, "Fix the parser", "")
             .expect("card");
         store
-            .link_session(&card, "a1b2", "uuid-1", Some("/transcript.jsonl"))
+            .link_session(&card, "a1b2", "uuid-1", Some("/transcript.jsonl"), None)
             .expect("link");
         card
     };

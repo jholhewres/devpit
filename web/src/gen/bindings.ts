@@ -1324,6 +1324,8 @@ export type Doing =
 "open" | "working" | 
 /**  Stopped on a person — the one worth coming back for. */
 "waiting" | "done" | 
+/**  Its run ended badly. */
+"failed" | 
 /**  It ended. */
 "gone";
 

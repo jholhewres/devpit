@@ -15,6 +15,7 @@ use devpit_core::Store;
 use devpit_rpc::{Step, StepKind};
 use tauri::{AppHandle, Emitter};
 
+use crate::card_activity::{run_heard, run_reference, state_of_run};
 use crate::in_flight::InFlight;
 use crate::{chaining, notices, steps};
 
@@ -25,6 +26,8 @@ pub struct Carrying {
     pub chained: Arc<InFlight>,
     pub run_id: String,
     pub card_id: String,
+    /// The session an agent or session step speaks in, new for this run.
+    pub session_id: String,
     pub step: Step,
     pub hops: u8,
 }
@@ -37,6 +40,7 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
         chained,
         run_id: id,
         card_id: card,
+        session_id,
         step,
         hops,
     } = carrying;
@@ -51,6 +55,8 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
                 store,
                 &card,
                 &step,
+                &id,
+                &session_id,
                 |text| {
                     // The card shows work as it happens rather than a
                     // spinner that ends in a wall of text.
@@ -59,7 +65,7 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
                 |pid| watching.watch(&watched, pid),
             )
         }
-        StepKind::Session => steps::session::start(store, &card, &step),
+        StepKind::Session => steps::session::start(store, &card, &step, &session_id),
         StepKind::Command => steps::command::run(store, &card, &step),
     };
 
@@ -81,8 +87,14 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
 
     // A failure to record is worth saying out loud: the run finished and
     // the screen would otherwise show it running forever.
-    if let Err(err) = closed {
-        eprintln!("could not record the end of run {id}: {err}");
+    match closed {
+        Err(err) => eprintln!("could not record the end of run {id}: {err}"),
+        // Closed already: a person stopped it, and the card heard that then.
+        Ok(false) => {}
+        Ok(true) => {
+            let ended = if answered.is_some() { "ok" } else { "failed" };
+            run_heard(&app, &card, &run_reference(store, &id), state_of_run(ended));
+        }
     }
     in_flight.forget(&id);
 

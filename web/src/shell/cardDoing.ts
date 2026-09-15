@@ -15,6 +15,7 @@ const SAYS: Readonly<Record<Doing, string>> = {
   working: 'An agent is working on this card',
   waiting: 'An agent is waiting on you',
   done: 'An agent finished',
+  failed: 'A run on this card failed',
   gone: 'The session on this card ended',
 }
 

@@ -56,7 +56,7 @@ fn attaching_takes_the_short_id() {
 /// cannot overspend is a step you can leave running.
 #[test]
 fn a_headless_turn_declares_its_cap() {
-    let argv = headless_argv(None, None, Some(0.5), None, None);
+    let argv = headless_argv(None, None, Some(0.5), None, None, None);
     let cap = argv
         .iter()
         .position(|a| a == "--max-budget-usd")
@@ -66,10 +66,23 @@ fn a_headless_turn_declares_its_cap() {
 
 #[test]
 fn a_headless_turn_streams_in_and_out() {
-    let argv = headless_argv(None, None, None, None, None);
+    let argv = headless_argv(None, None, None, None, None, None);
     assert!(argv.contains(&"--input-format".to_owned()));
     assert!(argv.contains(&"--output-format".to_owned()));
     assert_eq!(argv.iter().filter(|a| *a == "stream-json").count(), 2);
+    assert!(!argv.contains(&"--session-id".to_owned()));
+}
+
+/// A run names the session its turn speaks in, so the card can find it again.
+#[test]
+fn a_headless_turn_names_its_session() {
+    let id = "0190f5a2-7b3c-4d1e-8f00-1234567890ab";
+    let argv = headless_argv(None, None, None, None, None, Some(id));
+    let at = argv
+        .iter()
+        .position(|a| a == "--session-id")
+        .expect("no session id in the line");
+    assert_eq!(argv[at + 1], id);
 }
 
 /// The whole handle round-trip, against the installed CLI.

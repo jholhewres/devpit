@@ -16,6 +16,7 @@
 
 mod catalogue;
 mod headless;
+mod headless_stream;
 mod hook_settings;
 mod hooks;
 mod schema;
@@ -209,6 +210,7 @@ pub fn headless_argv(
     budget_usd: Option<f64>,
     model: Option<&str>,
     settings: Option<&str>,
+    session_id: Option<&str>,
 ) -> Vec<String> {
     let mut argv = vec![
         PROGRAM.to_owned(),
@@ -237,6 +239,10 @@ pub fn headless_argv(
     if let Some(path) = settings {
         argv.push("--settings".to_owned());
         argv.push(path.to_owned());
+    }
+    if let Some(id) = session_id {
+        argv.push("--session-id".to_owned());
+        argv.push(id.to_owned());
     }
     argv
 }

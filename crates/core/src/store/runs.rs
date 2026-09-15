@@ -89,6 +89,11 @@ impl Store {
         Ok(stranded)
     }
 
+    /// Closes a run that is still open, answering whether it did.
+    ///
+    /// Once only: a run a person stopped says `cancelled`, and the thread whose
+    /// process that stop killed finds it closed instead of writing `failed`
+    /// over it.
     pub fn finish_run(
         &self,
         run_id: &str,
@@ -97,10 +102,10 @@ impl Store {
         cost_usd: Option<f64>,
         duration_ms: Option<i64>,
         exit_code: Option<i64>,
-    ) -> Result<(), StoreError> {
-        self.conn.execute(
+    ) -> Result<bool, StoreError> {
+        let closed = self.conn.execute(
             "UPDATE run SET state = ?2, output = ?3, cost_usd = ?4, duration_ms = ?5, \
-             exit_code = ?6, ended_at = ?7 WHERE id = ?1",
+             exit_code = ?6, ended_at = ?7 WHERE id = ?1 AND ended_at IS NULL",
             rusqlite::params![
                 run_id,
                 state,
@@ -111,7 +116,7 @@ impl Store {
                 now()
             ],
         )?;
-        Ok(())
+        Ok(closed == 1)
     }
 
     /// A card's runs, most recent first.
