@@ -379,4 +379,24 @@ impl Store {
         )?;
         Ok(true)
     }
+
+    /// Moves every card of a lane, archived ones too — the lane's RESTRICT counts
+    /// them — to the end of another in their order, then deletes the lane. One
+    /// transaction: a lane half emptied is worse than either answer.
+    pub fn delete_column_moving_cards(&self, column_id: &str, to: &str) -> Result<(), StoreError> {
+        let tx = self.conn.unchecked_transaction()?;
+        let start: i64 = tx.query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM card WHERE column_id = ?1",
+            [to],
+            |row| row.get(0),
+        )?;
+        tx.execute(
+            "UPDATE card SET column_id = ?2, position = ?3 + position, updated_at = ?4 \
+             WHERE column_id = ?1",
+            rusqlite::params![column_id, to, start, now()],
+        )?;
+        tx.execute("DELETE FROM board_column WHERE id = ?1", [column_id])?;
+        tx.commit()?;
+        Ok(())
+    }
 }

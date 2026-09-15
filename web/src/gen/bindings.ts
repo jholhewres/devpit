@@ -361,12 +361,13 @@ export const commands = {
 	columnRename: (projectId: string, columnId: string, name: string) => typedError<Board, RpcError>(__TAURI_INVOKE("column_rename", { projectId, columnId, name })),
 	columnReorder: (projectId: string, ids: string[]) => typedError<Board, RpcError>(__TAURI_INVOKE("column_reorder", { projectId, ids })),
 	/**
-	 *  `column.delete` — refuses while cards are in it, and says how many.
+	 *  `column.delete` — refuses while cards are in it and says how many, or moves
+	 *  them to `move_to` first.
 	 * 
 	 *  Refusing is the answer, but a refusal without the number leaves the screen
 	 *  asking a question it cannot phrase.
 	 */
-	columnDelete: (projectId: string, columnId: string) => typedError<ColumnDeleted, RpcError>(__TAURI_INVOKE("column_delete", { projectId, columnId })),
+	columnDelete: (projectId: string, columnId: string, moveTo: string | null) => typedError<ColumnDeleted, RpcError>(__TAURI_INVOKE("column_delete", { projectId, columnId, moveTo })),
 	/**  `column.set_step` — what this lane runs, or nothing. */
 	columnSetStep: (projectId: string, columnId: string, stepId: string | null) => typedError<Board, RpcError>(__TAURI_INVOKE("column_set_step", { projectId, columnId, stepId })),
 	/**

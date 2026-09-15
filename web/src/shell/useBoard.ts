@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import type { Board, Step } from '../gen/bindings'
+import type { Board, ColumnDeleted, Step } from '../gen/bindings'
 import { landed, lanes, type Lane } from './board'
 import { ask, commands } from './live'
 import { onCarried } from './window'
@@ -18,7 +18,8 @@ export interface UseBoard {
   addColumn: (name: string) => void
   renameColumn: (columnId: string, name: string) => void
   reorderColumns: (ids: string[]) => void
-  deleteColumn: (columnId: string) => void
+  /** Answers what the backend did: deleted, or refused with the cards in the way. */
+  deleteColumn: (columnId: string, moveTo: string | null) => Promise<ColumnDeleted | null>
   /** What a lane runs when a card lands in it, or nothing. */
   setStep: (columnId: string, stepId: string | null) => void
   createStep: (kind: string, name: string, config: string, irreversible: boolean) => void
@@ -118,8 +119,14 @@ export function useBoard(projectId: string | null): UseBoard {
     [projectId, then],
   )
   const deleteColumn = useCallback(
-    (columnId: string) => projectId && then(() => commands.columnDelete(projectId, columnId)),
-    [projectId, then],
+    async (columnId: string, moveTo: string | null): Promise<ColumnDeleted | null> => {
+      if (!projectId) return null
+      const asked = await ask(() => commands.columnDelete(projectId, columnId, moveTo))
+      setError(asked.error)
+      if (asked.data?.deleted) reload()
+      return asked.data
+    },
+    [projectId, reload],
   )
   const setStep = useCallback(
     (columnId: string, stepId: string | null) =>

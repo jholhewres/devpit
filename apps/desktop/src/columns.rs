@@ -37,28 +37,81 @@ pub fn column_reorder(project_id: String, ids: Vec<String>) -> Result<Board, Rpc
     board_get(project_id)
 }
 
-/// `column.delete` — refuses while cards are in it, and says how many.
+/// What deleting a lane does with the cards that point at it.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Deleting {
+    /// Cards on the board are in it and nobody said where they go.
+    Refused(u32),
+    /// Every card, archived ones too, moves here before the lane goes.
+    MovingTo(String),
+    /// Nothing points at it.
+    Plain,
+}
+
+/// Where a deleted lane's cards go, or the refusal that asks.
+pub(crate) fn where_cards_go(
+    lanes: &[String],
+    column_id: &str,
+    move_to: Option<&str>,
+    in_the_way: u32,
+) -> Result<Deleting, RpcError> {
+    if !lanes.iter().any(|lane| lane == column_id) {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such column"));
+    }
+    match move_to {
+        Some(to) if to == column_id => Err(RpcError::new(
+            ErrorCode::Invalid,
+            "cards cannot move into the lane being deleted",
+        )),
+        Some(to) if !lanes.iter().any(|lane| lane == to) => Err(RpcError::new(
+            ErrorCode::Invalid,
+            "that lane is not on this board",
+        )),
+        Some(to) => Ok(Deleting::MovingTo(to.to_owned())),
+        None if in_the_way > 0 => Ok(Deleting::Refused(in_the_way)),
+        // Archived cards still point at the lane and RESTRICT counts them: they
+        // go where a restore looks first.
+        None => Ok(lanes
+            .iter()
+            .find(|lane| *lane != column_id)
+            .map_or(Deleting::Plain, |lane| Deleting::MovingTo(lane.clone()))),
+    }
+}
+
+/// `column.delete` — refuses while cards are in it and says how many, or moves
+/// them to `move_to` first.
 ///
 /// Refusing is the answer, but a refusal without the number leaves the screen
 /// asking a question it cannot phrase.
 #[tauri::command]
 #[specta::specta]
-pub fn column_delete(project_id: String, column_id: String) -> Result<ColumnDeleted, RpcError> {
+pub fn column_delete(
+    project_id: String,
+    column_id: String,
+    move_to: Option<String>,
+) -> Result<ColumnDeleted, RpcError> {
     let store = store()?;
+    let lanes: Vec<String> = store
+        .columns(&project_id)?
+        .into_iter()
+        .map(|lane| lane.id)
+        .collect();
     let in_the_way = store
         .cards(&project_id)?
         .into_iter()
         .filter(|card| card.column_id == column_id)
         .count() as u32;
 
-    if in_the_way > 0 {
-        return Ok(ColumnDeleted {
-            deleted: false,
-            cards_in_the_way: in_the_way,
-        });
+    match where_cards_go(&lanes, &column_id, move_to.as_deref(), in_the_way)? {
+        Deleting::Refused(count) => {
+            return Ok(ColumnDeleted {
+                deleted: false,
+                cards_in_the_way: count,
+            })
+        }
+        Deleting::MovingTo(to) => store.delete_column_moving_cards(&column_id, &to)?,
+        Deleting::Plain => store.delete_column(&column_id)?,
     }
-
-    store.delete_column(&column_id)?;
     Ok(ColumnDeleted {
         deleted: true,
         cards_in_the_way: 0,
@@ -183,3 +236,7 @@ fn refused(kind: &str, config: &str) -> Option<String> {
         &profiles,
     )
 }
+
+#[cfg(test)]
+#[path = "columns_tests.rs"]
+mod tests;

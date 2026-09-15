@@ -85,6 +85,9 @@ export function BoardPane(): React.JSX.Element {
       <div className="board" onPointerMove={drag.move} onPointerUp={onUp} onPointerCancel={onUp}>
         {live.lanes.map((lane) => {
           const dropping = landing?.lane === lane.column.id
+          const others = live.lanes
+            .filter((other) => other.column.id !== lane.column.id)
+            .map((other) => ({ id: other.column.id, name: other.column.name }))
           return (
             <div
               key={lane.column.id}
@@ -102,9 +105,7 @@ export function BoardPane(): React.JSX.Element {
                 onRename={(name) => live.renameColumn(lane.column.id, name)}
                 onPickStep={(stepId) => live.setStep(lane.column.id, stepId)}
                 onCreateStep={live.createStep}
-                others={live.lanes
-                  .filter((other) => other.column.id !== lane.column.id)
-                  .map((other) => ({ id: other.column.id, name: other.column.name }))}
+                others={others}
                 onFlow={(onPass, autonomy) => live.setFlow(lane.column.id, onPass, autonomy)}
                 onGrab={(event) => grab(event, lane.column.id)}
               />
@@ -148,7 +149,8 @@ export function BoardPane(): React.JSX.Element {
               <LaneFoot
                 lane={lane}
                 onAddCard={() => live.addCard(lane.column.id, 'New card')}
-                onDelete={() => live.deleteColumn(lane.column.id)}
+                others={others}
+                onDelete={(moveTo) => live.deleteColumn(lane.column.id, moveTo)}
               />
             </div>
           )

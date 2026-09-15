@@ -365,3 +365,40 @@ fn archived_cards_are_listed_newest_first_and_capped() {
     assert_eq!(ids, [later.as_str(), card.as_str()]);
     assert_eq!(store.archived_cards(&project, 1).expect("capped").len(), 1);
 }
+
+#[test]
+fn a_lane_deleted_with_cards_moves_them_in_order_to_the_end_of_another() {
+    let (_dir, store, card) = seeded();
+    let (column, project) = column_and_project(&store, &card);
+    let columns = store.columns(&project).expect("columns");
+    let second = store
+        .create_card(&project, &column, "second", "")
+        .expect("card");
+    let archived = store
+        .create_card(&project, &column, "archived", "")
+        .expect("card");
+    store.archive_card(&archived).expect("archive");
+    let already = store
+        .create_card(&project, &columns[1].id, "already there", "")
+        .expect("card");
+
+    store
+        .delete_column_moving_cards(&column, &columns[1].id)
+        .expect("delete");
+
+    assert!(store
+        .columns(&project)
+        .expect("columns")
+        .iter()
+        .all(|lane| lane.id != column));
+    let order: Vec<String> = store
+        .cards(&project)
+        .expect("cards")
+        .into_iter()
+        .filter(|row| row.column_id == columns[1].id)
+        .map(|row| row.id)
+        .collect();
+    assert_eq!(order, [already, card, second]);
+    let moved = store.card(&archived).expect("read").expect("there");
+    assert_eq!(moved.column_id, columns[1].id);
+}
