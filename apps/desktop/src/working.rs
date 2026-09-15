@@ -73,16 +73,17 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
         Ok(finished) if finished.ok => Some(finished.output.clone()),
         _ => None,
     };
+    let ended = end_state(in_flight.was_cancelled(&id), answered.is_some());
     let closed = match outcome {
         Ok(finished) => store.finish_run(
             &id,
-            if finished.ok { "ok" } else { "failed" },
+            ended,
             Some(&finished.output),
             Some(finished.cost_usd),
             Some(finished.duration_ms),
             finished.exit_code.map(i64::from),
         ),
-        Err(reason) => store.finish_run(&id, "failed", Some(&reason), None, None, None),
+        Err(reason) => store.finish_run(&id, ended, Some(&reason), None, None, None),
     };
 
     // A failure to record is worth saying out loud: the run finished and
@@ -91,10 +92,7 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
         Err(err) => eprintln!("could not record the end of run {id}: {err}"),
         // Closed already: a person stopped it, and the card heard that then.
         Ok(false) => {}
-        Ok(true) => {
-            let ended = if answered.is_some() { "ok" } else { "failed" };
-            run_heard(&app, &card, &run_reference(store, &id), state_of_run(ended));
-        }
+        Ok(true) => run_heard(&app, &card, &run_reference(store, &id), state_of_run(ended)),
     }
     in_flight.forget(&id);
 
@@ -116,3 +114,17 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
     );
     let _ = app.emit("run:changed", &card);
 }
+
+/// How a run ended, as its row says it. A person's stop wins over whatever the
+/// killed process looked like on its way out.
+fn end_state(cancelled: bool, ok: bool) -> &'static str {
+    match (cancelled, ok) {
+        (true, _) => "cancelled",
+        (false, true) => "ok",
+        (false, false) => "failed",
+    }
+}
+
+#[cfg(test)]
+#[path = "working_tests.rs"]
+mod tests;

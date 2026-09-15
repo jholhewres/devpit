@@ -1,6 +1,6 @@
 //! The runs happening right now, and stopping one.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use devpit_core::Store;
@@ -18,6 +18,10 @@ use crate::card_activity::{run_heard, run_reference, state_of_run};
 #[derive(Default)]
 pub struct InFlight {
     processes: Mutex<HashMap<String, u32>>,
+    /// Runs a person has asked to stop. Marked before the signal is sent, so
+    /// the run's own thread, waking to a killed process, records the stop and
+    /// not a failure.
+    cancelled: Mutex<HashSet<String>>,
 }
 
 impl InFlight {
@@ -35,6 +39,28 @@ impl InFlight {
         if let Ok(mut processes) = self.processes.lock() {
             processes.remove(run_id);
         }
+        self.uncancel(run_id);
+    }
+
+    /// Marks a run as stopped by a person.
+    pub fn cancel(&self, run_id: &str) {
+        if let Ok(mut cancelled) = self.cancelled.lock() {
+            cancelled.insert(run_id.to_owned());
+        }
+    }
+
+    /// Takes the mark back, for a stop that never reached the process.
+    pub fn uncancel(&self, run_id: &str) {
+        if let Ok(mut cancelled) = self.cancelled.lock() {
+            cancelled.remove(run_id);
+        }
+    }
+
+    pub fn was_cancelled(&self, run_id: &str) -> bool {
+        self.cancelled
+            .lock()
+            .map(|cancelled| cancelled.contains(run_id))
+            .unwrap_or(false)
     }
 
     fn pid_of(&self, run_id: &str) -> Option<u32> {
@@ -70,6 +96,10 @@ pub fn run_cancel(
         ));
     };
 
+    // Before the signal: the run's thread wakes the moment its process dies,
+    // and has to find the stop already said.
+    state.cancel(&run_id);
+
     // SIGTERM, not SIGKILL: the CLI writes its transcript on the way out, and
     // what a cancelled turn already spent is worth keeping.
     //
@@ -90,6 +120,7 @@ pub fn run_cancel(
         .unwrap_or(false);
 
     if !stopped {
+        state.uncancel(&run_id);
         return Err(RpcError::internal(format!("could not stop process {pid}")));
     }
 
@@ -113,3 +144,7 @@ pub fn run_cancel(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "in_flight_tests.rs"]
+mod tests;
