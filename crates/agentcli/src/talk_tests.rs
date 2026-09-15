@@ -73,7 +73,22 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
         effort: None,
         control: None,
     };
-    let said = crate::talk::say(&crate::driver::Claude, &turn, |_| {}, |_| {}).expect("a turn");
+    // A script written a moment ago can be "text file busy" to exec while
+    // another test forks with it still open, and `say` reports any failed
+    // spawn as NotInstalled. The script is there and executable, so that is
+    // the only reason left: try again, a few times.
+    let said = (0..5)
+        .find_map(
+            |_| match crate::talk::say(&crate::driver::Claude, &turn, |_| {}, |_| {}) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                }
+                other => Some(other),
+            },
+        )
+        .expect("the stand-in never started")
+        .expect("a turn");
     assert_eq!(said.session_id.as_deref(), Some("new"));
     // Where a rewind to this turn forks: the last message the agent wrote.
     assert_eq!(said.anchor.as_deref(), Some("u-2"));
