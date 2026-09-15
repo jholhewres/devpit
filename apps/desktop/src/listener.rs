@@ -14,9 +14,12 @@ use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::Path;
 
 use devpit_agentcli::{read_hook, Event, Happening};
+use devpit_core::Store;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::asking::{decision, Asking};
+use crate::card_activity::{pane_word, state_of_event};
+use crate::card_route::{card_of_leaf, notice_for, Ring};
 use crate::happening::{agent_said, session_said, subagent_said};
 use crate::post::read_request;
 use crate::question::question_in;
@@ -77,7 +80,7 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
     if let Some(question) = held {
         if let Some(happening) = read_hook(&body) {
             let _ = app.emit("agent:happening", describe(&happening));
-            tell_the_pane(&app, posted.pane.as_deref(), &happening);
+            heard(&app, posted.pane.as_deref(), &happening);
         }
         let asking = app.state::<Asking>();
         let hear = asking.opened(&question.id);
@@ -93,7 +96,7 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
     reply(&mut stream, "");
     if let Some(happening) = read_hook(&body) {
         let _ = app.emit("agent:happening", describe(&happening));
-        tell_the_pane(&app, posted.pane.as_deref(), &happening);
+        heard(&app, posted.pane.as_deref(), &happening);
     }
 }
 
@@ -107,52 +110,56 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
 /// This is the difference between knowing an agent is *open* and knowing what
 /// it is *doing*. The first is asked of the process table on a timer; the
 /// second only the agent can say, and it says it here.
-fn tell_the_pane(app: &AppHandle, pane: Option<&str>, happening: &Happening) {
+fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening) {
     let Some(pane) = pane else {
         return;
     };
-    let state = match &happening.event {
-        Event::Using { .. }
-        | Event::Used { .. }
-        | Event::SubagentStarted { .. }
-        | Event::Delegated { .. }
-        | Event::SubagentDone { .. } => Some("working"),
-        Event::Stopped { .. } => Some("done"),
-        // The one worth interrupting somebody for: nothing moves until a
-        // person comes back to it.
-        Event::Waiting => Some("waiting"),
-        // These say which conversation the pane holds, not whether it works.
-        Event::SessionStarted | Event::SessionEnded { .. } => None,
-    };
+    let state = pane_word(state_of_event(&happening.event));
     // One Store for the event. Resolved before `remember`, which forgets the
     // pane's agent on SessionEnded — the end has to reach the card too.
-    let store = devpit_core::Store::open_default().ok();
-    let route = store
-        .as_ref()
-        .and_then(|store| crate::card_route::card_of_leaf(store, pane));
+    let store = Store::open_default().ok();
+    let route = store.as_ref().and_then(|store| card_of_leaf(store, pane));
     if let Some(store) = &store {
         crate::restoring::remember(store, pane, happening);
     }
     if let Some(state) = state {
-        let _ = app.emit("terminal:happening", agent_said(pane, state));
+        sink.to_window("terminal:happening", agent_said(pane, state));
     }
     if let Some(session) = session_said(pane, happening) {
-        let _ = app.emit("terminal:happening", session);
+        sink.to_window("terminal:happening", session);
     }
     if let Some(subagent) = subagent_said(pane, &happening.event) {
-        let _ = app.emit("terminal:happening", subagent);
+        sink.to_window("terminal:happening", subagent);
     }
 
     // Only `waiting` reaches the bell. An agent that is working is an agent
     // you can watch; one that has stopped and is waiting for a person is the
     // reason somebody left the window and the reason to call them back. The
     // other two would be a bell that rings through every turn.
-    if let (Some(ring), Some(store)) =
-        (crate::card_route::notice_for(route.as_ref(), state), &store)
-    {
+    if let (Some(ring), Some(store)) = (notice_for(route.as_ref(), state), &store) {
+        sink.ring(store, ring, pane);
+    }
+}
+
+/// Where what a hook says goes: the window, and the bell.
+///
+/// A trait rather than the `AppHandle`, so the listener's core runs without a
+/// window.
+pub(crate) trait HookSink {
+    fn to_window<P: serde::Serialize + Clone>(&self, channel: &str, payload: P);
+    /// A pane worth coming back to, with the Store the event already opened.
+    fn ring(&self, store: &Store, ring: Ring<'_>, pane: &str);
+}
+
+impl HookSink for AppHandle {
+    fn to_window<P: serde::Serialize + Clone>(&self, channel: &str, payload: P) {
+        let _ = self.emit(channel, payload);
+    }
+
+    fn ring(&self, store: &Store, ring: Ring<'_>, pane: &str) {
         crate::notices::ring_in(
             store,
-            app,
+            self,
             ring.project_id,
             crate::notices::kind::AGENT,
             "An agent is waiting on you",
