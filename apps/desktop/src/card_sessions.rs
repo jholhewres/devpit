@@ -8,7 +8,7 @@ use devpit_agentcli::AgentSession;
 use devpit_core::Store;
 use devpit_rpc::{CardHappening, CardSession, SessionKind};
 
-use crate::card_activity::background_state;
+use crate::card_activity::{background_state, state_of_run};
 use crate::sessions::{decode, tab_for_card};
 
 pub(crate) fn card_sessions(
@@ -51,9 +51,14 @@ pub(crate) fn card_sessions(
     }
 
     if let Ok(links) = store.card_links(card_id) {
-        for run in &links.runs {
+        // The latest run only, as the card hears runs: an older one's session
+        // is history. What its row says stands in until its agent says more,
+        // so a run still going after the app reopened does not look adoptable.
+        if let Some(run) = links.runs.first() {
+            let heard = said(SessionKind::Run, &run.session_id);
             sessions.push(CardSession {
                 run_id: Some(run.run_id.clone()),
+                state: heard.or(Some(state_of_run(&run.state))),
                 ..unplaced(SessionKind::Run, &run.session_id)
             });
         }

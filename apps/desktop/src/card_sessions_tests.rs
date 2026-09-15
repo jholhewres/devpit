@@ -119,3 +119,26 @@ fn a_run_that_spoke_in_a_session_names_its_run() {
     assert_eq!(sessions[0].reference, "s-run");
     assert_eq!(sessions[0].run_id.as_deref(), Some(run.as_str()));
 }
+
+#[test]
+fn only_the_latest_run_is_listed_and_its_row_speaks_until_its_agent_does() {
+    let (_dir, store, project, card) = seeded();
+    let step = store
+        .create_step(&project, "agent", "review", "{}", false)
+        .expect("step");
+    let older = store.start_run(&card, &step, None).expect("older");
+    store.set_run_session(&older, "s-old").expect("session");
+    store
+        .finish_run(&older, "ok", None, None, None, None)
+        .expect("finish");
+    let latest = store.start_run(&card, &step, None).expect("latest");
+    store.set_run_session(&latest, "s-new").expect("session");
+
+    let sessions = card_sessions(&store, &project, &card, &[], &nothing_heard(&card));
+    let runs: Vec<(&str, Option<Doing>)> = sessions
+        .iter()
+        .filter(|one| one.kind == SessionKind::Run)
+        .map(|one| (one.reference.as_str(), one.state))
+        .collect();
+    assert_eq!(runs, [("s-new", Some(Doing::Working))]);
+}
