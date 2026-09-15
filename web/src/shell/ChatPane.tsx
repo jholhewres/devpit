@@ -5,6 +5,7 @@ import { Chips } from './Chips'
 import { money, ready, unanswered } from './chat'
 import { targetOf } from './stop'
 import { titleOf, type Tab } from './strip'
+import { ChatCardChip } from './ChatCardChip'
 import { ChatWhere } from './ChatWhere'
 import { ComposerStatus } from './ComposerStatus'
 import { CopySession } from './CopySession'
@@ -84,6 +85,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   return (
     <>
       <PaneCorner tabId={tab.id} what="chat">
+        <ChatCardChip card={chat.card} />
         {spent && <span className="pcorner__cost" title="What this conversation has cost">{spent}</span>}
         {chat.session && <CopySession id={chat.session} />}
       </PaneCorner>

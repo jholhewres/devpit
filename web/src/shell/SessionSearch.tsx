@@ -57,7 +57,7 @@ export function SessionSearch(): React.JSX.Element | null {
       (known.data ?? []) as readonly Profile[],
     )
     if (!profile) return setError('No profile runs against the installation that holds this session.')
-    const adopted = await ask(() => commands.chatAdopt(project.id, hit.sessionId, profile.id, null))
+    const adopted = await ask(() => commands.chatAdopt(project.id, hit.sessionId, profile.id, null, null))
     if (adopted.data) show('chat', { id: adopted.data })
     else setError(adopted.error)
   }

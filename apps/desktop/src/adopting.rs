@@ -36,6 +36,7 @@ pub(crate) fn adopt(
     session_id: &str,
     profile_id: &str,
     title: Option<String>,
+    cwd: Option<String>,
     now: f64,
 ) -> std::io::Result<()> {
     write_listed(
@@ -52,7 +53,7 @@ pub(crate) fn adopt(
             effort: None,
             title,
             rewind: Default::default(),
-            cwd: None,
+            cwd,
         },
     )
 }
@@ -60,6 +61,8 @@ pub(crate) fn adopt(
 /// `chat.adopt` — a conversation that resumes a terminal session.
 ///
 /// Answers the new conversation's id, which the window opens as a chat tab.
+/// With a card, the conversation is filed under it and goes on in the folder
+/// the session ran in.
 #[tauri::command]
 #[specta::specta]
 pub fn chat_adopt(
@@ -67,10 +70,23 @@ pub fn chat_adopt(
     session_id: String,
     profile_id: String,
     title: Option<String>,
+    card_id: Option<String>,
 ) -> Result<String, RpcError> {
-    if !plain(&project_id) || !plain(&session_id) || !plain(&profile_id) {
+    if !plain(&project_id)
+        || !plain(&session_id)
+        || !plain(&profile_id)
+        || card_id.as_deref().is_some_and(|card| !plain(card))
+    {
         return Err(RpcError::new(ErrorCode::Forbidden, "that is not a session"));
     }
+    let card = match card_id {
+        Some(card) => {
+            let store = crate::projects::store()?;
+            let cwd = crate::card_chat::card_session_cwd(&store, &project_id, &card, &session_id)?;
+            Some((store, card, cwd))
+        }
+        None => None,
+    };
     let conversation_id = format!("conv_{}", ulid::Ulid::generate());
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -82,9 +98,13 @@ pub fn chat_adopt(
         &session_id,
         &profile_id,
         title,
+        card.as_ref().map(|(_, _, cwd)| cwd.clone()),
         now,
     )
     .map_err(|err| RpcError::internal(err.to_string()))?;
+    if let Some((store, card, _)) = &card {
+        store.link_chat(card, &conversation_id)?;
+    }
     Ok(conversation_id)
 }
 
@@ -101,6 +121,7 @@ mod tests {
             "aaa",
             "prof_glm",
             Some("Fix the parser".into()),
+            None,
             1.0,
         )
         .expect("adopt");
@@ -121,9 +142,18 @@ mod tests {
             ("p", "../a", "p"),
             ("p", "a", ".hidden"),
         ] {
-            let refused = chat_adopt(project.into(), session.into(), profile.into(), None)
+            let refused = chat_adopt(project.into(), session.into(), profile.into(), None, None)
                 .expect_err("refused");
             assert_eq!(refused.code, ErrorCode::Forbidden);
         }
+        let refused = chat_adopt(
+            "p".into(),
+            "a".into(),
+            "p".into(),
+            None,
+            Some("../card".into()),
+        )
+        .expect_err("refused");
+        assert_eq!(refused.code, ErrorCode::Forbidden);
     }
 }

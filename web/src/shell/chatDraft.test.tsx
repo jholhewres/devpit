@@ -21,6 +21,7 @@ const chat = {
   profileId: 'prof_1',
   cost: 0,
   session: null,
+  card: { id: 'card_1', title: 'Wire the board', onBoard: false },
   say: said,
   stop: vi.fn(),
   answer: vi.fn(),
@@ -43,7 +44,7 @@ vi.mock('./ChatWhere', () => ({ ChatWhere: () => null }))
 vi.mock('./ComposerStatus', () => ({ ComposerStatus: () => null }))
 vi.mock('./CopySession', () => ({ CopySession: () => null }))
 vi.mock('./DropTarget', () => ({ DropTarget: () => null }))
-vi.mock('./PaneCorner', () => ({ PaneCorner: () => null }))
+vi.mock('./PaneCorner', () => ({ PaneCorner: ({ children }: { children?: React.ReactNode }) => <>{children}</> }))
 vi.mock('./Turn', () => ({ Turn: () => null }))
 vi.mock('./SkillPills', () => ({ SkillPills: () => null }))
 vi.mock('./SlashMenu', () => ({ SlashMenu: () => null }))
@@ -56,6 +57,8 @@ describe('a chat opened from a card', () => {
     expect((screen.getByPlaceholderText('Do anything…') as HTMLTextAreaElement).value).toBe(draft)
     expect(taken).toHaveBeenCalledWith('conv_1')
     expect(said).not.toHaveBeenCalled()
+    // Its corner names the card it is about.
+    expect(screen.getByText('Wire the board')).toBeTruthy()
   })
 
   it('stops carrying the draft once it is in the composer', () => {

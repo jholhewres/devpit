@@ -53,11 +53,13 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
         eprintln!("{conversation_id}: {skipped} unreadable line(s)");
     }
     let head = read_head(&head_path(&sessions, &conversation_id));
-    let card_id = crate::projects::store()?.chat_card(&conversation_id)?;
+    let card = crate::card_chat::conversation_card(&crate::projects::store()?, &conversation_id)?;
     Ok(Conversation {
         id: conversation_id,
         project_id,
-        card_id,
+        card_id: card.id,
+        card_title: card.title,
+        card_on_board: card.on_board,
         // Empty until the first turn settles it: a conversation nobody has
         // spoken in belongs to no account yet.
         profile: head

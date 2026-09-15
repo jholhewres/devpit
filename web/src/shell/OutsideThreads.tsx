@@ -44,7 +44,7 @@ export function OutsideThreads(): React.JSX.Element | null {
       setError('No profile runs against the installation that holds this session.')
       return
     }
-    void ask(() => commands.chatAdopt(project.id, session.sessionId, profile.id, session.title)).then((answer) => {
+    void ask(() => commands.chatAdopt(project.id, session.sessionId, profile.id, session.title, null)).then((answer) => {
       if (answer.error || !answer.data) return setError(answer.error ?? 'could not open it')
       show('chat', { id: answer.data, title: titled(session) })
     })

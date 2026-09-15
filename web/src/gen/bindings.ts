@@ -72,8 +72,10 @@ export const commands = {
 	 *  `chat.adopt` — a conversation that resumes a terminal session.
 	 * 
 	 *  Answers the new conversation's id, which the window opens as a chat tab.
+	 *  With a card, the conversation is filed under it and goes on in the folder
+	 *  the session ran in.
 	 */
-	chatAdopt: (projectId: string, sessionId: string, profileId: string, title: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("chat_adopt", { projectId, sessionId, profileId, title })),
+	chatAdopt: (projectId: string, sessionId: string, profileId: string, title: string | null, cardId: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("chat_adopt", { projectId, sessionId, profileId, title, cardId })),
 	/**
 	 *  `card.chat` — a new conversation about this card, in its checkout.
 	 * 
@@ -1236,6 +1238,10 @@ export type Conversation = {
 	id: string,
 	projectId: string,
 	cardId: string | null,
+	/**  That card's title, so the chat can name it. */
+	cardTitle: string | null,
+	/**  Whether that card is still on a board, which is when the chat can open it. */
+	cardOnBoard: boolean,
 	/**
 	 *  The profile — account and driver — this conversation belongs to, for
 	 *  its whole life.

@@ -79,7 +79,7 @@ export function usePaneActions({
       ])
       const profile = profileForInstallation(known.installation, installs.data ?? [], found.data ?? [])
       if (!profile) return onNotice(`No profile runs the installation this agent uses: ${known.installation}`)
-      const adopted = await ask(() => commands.chatAdopt(project.id, known.sessionId, profile.id, null))
+      const adopted = await ask(() => commands.chatAdopt(project.id, known.sessionId, profile.id, null, tab.cardId ?? null))
       if (!adopted.data) return onNotice(adopted.error ?? 'could not open the chat')
       /* The agent here stops before the chat speaks: two CLIs resuming one
          session would each write their own continuation of it. */
@@ -90,7 +90,7 @@ export function usePaneActions({
       }
       show('chat', { id: adopted.data })
     })()
-  }, [project, known, onNotice, several, closeLeaf, closeNow, tab.id, show])
+  }, [project, known, onNotice, several, closeLeaf, closeNow, tab.id, tab.cardId, show])
 
   const closeLabel = armed && busy ? `Press again to stop ${busy.label}` : several ? 'Close pane' : 'Close terminal'
 

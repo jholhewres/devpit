@@ -15,6 +15,10 @@ pub struct Conversation {
     pub id: String,
     pub project_id: String,
     pub card_id: Option<String>,
+    /// That card's title, so the chat can name it.
+    pub card_title: Option<String>,
+    /// Whether that card is still on a board, which is when the chat can open it.
+    pub card_on_board: bool,
     /// The profile — account and driver — this conversation belongs to, for
     /// its whole life.
     ///

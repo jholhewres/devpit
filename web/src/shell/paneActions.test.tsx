@@ -16,8 +16,8 @@ vi.mock('./live', () => ({
     },
     cliInstallations: () => [{ directory: '/home/me/.claude-glm', profiles: ['glm'], default: false }],
     agentProfiles: () => [{ id: 'prof_glm', label: 'glm', reach: 'runnable', driver: 'claude', mine: true }],
-    chatAdopt: (_project: string, session: string, profile: string) => {
-      calls.push(`adopt ${session} as ${profile}`)
+    chatAdopt: (_project: string, session: string, profile: string, _title: string | null, card: string | null) => {
+      calls.push(`adopt ${session} as ${profile}${card ? ` for ${card}` : ''}`)
       return 'conv_9'
     },
   },
@@ -91,6 +91,15 @@ describe('continuing a terminal conversation in a chat', () => {
     const { result } = actions(split)
     act(() => result.current.toChat?.())
     await waitFor(() => expect(calls).toEqual(['adopt abc as prof_glm', 'closeLeaf leaf_1', 'show chat conv_9']))
+  })
+
+  it('files the conversation under the card when the pane is a card’s', async () => {
+    shell.agentSessions = { leaf_1: { sessionId: 'abc', installation: '/home/me/.claude-glm' } }
+    const { result } = renderHook(() =>
+      usePaneActions({ tab: { ...tab, cardId: 'card_1' }, tree: split, focused: 'leaf_1', onLayout: vi.fn(), onNotice: vi.fn() }),
+    )
+    act(() => result.current.toChat?.())
+    await waitFor(() => expect(calls[0]).toBe('adopt abc as prof_glm for card_1'))
   })
 
   it('closes a single-pane tab without asking, since moving the agent was the ask', async () => {

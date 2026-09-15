@@ -7,8 +7,17 @@ import { withSkills } from './pills'
 import { onPermissionAsked } from './window'
 import { useShell } from './useShell'
 
+/** The card a conversation is filed under. */
+export interface ChatCard {
+  readonly id: string
+  readonly title: string | null
+  /** Off the board, the chat names it and cannot open it. */
+  readonly onBoard: boolean
+}
+
 export interface Chat {
   readonly messages: readonly Message[]
+  readonly card: ChatCard | null
   readonly profiles: readonly Profile[]
   /** The profile this conversation belongs to, once it has spoken. */
   readonly fixed: string | null
@@ -61,6 +70,7 @@ export function useChat(conversationId: string): Chat {
   const [files, setFiles] = useState<readonly Attachment[]>([])
   const [asked, setAsked] = useState<readonly Question[]>([])
   const [session, setSession] = useState<string | null>(null)
+  const [card, setCard] = useState<ChatCard | null>(null)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const live = useRef(true)
@@ -82,6 +92,8 @@ export function useChat(conversationId: string): Chat {
         setModel(past.data.model)
         setCost(past.data.costUsd ?? 0)
         setSession(past.data.sessionId)
+        const { cardId, cardTitle, cardOnBoard } = past.data
+        setCard(cardId ? { id: cardId, title: cardTitle, onBoard: cardOnBoard } : null)
         setRewindable(past.data.rewindable ?? [])
       }
       const installed = (found.data ?? []).filter((profile) => profile.path !== null)
@@ -240,6 +252,7 @@ export function useChat(conversationId: string): Chat {
 
   return {
     messages,
+    card,
     profiles,
     fixed,
     profileId,

@@ -7,6 +7,7 @@
 use std::path::Path;
 
 use devpit_agentcli::head::Head;
+use devpit_core::store::CardLinks;
 use devpit_core::Store;
 use devpit_rpc::{ErrorCode, RpcError};
 
@@ -64,6 +65,94 @@ pub(crate) fn open_card_chat(
         .map_err(|err| RpcError::internal(err.to_string()))?;
     store.link_chat(card_id, conversation_id)?;
     Ok(())
+}
+
+/// Where a session taken into a chat goes on, by the plan's cwd decision: the
+/// folder its run recorded, the folder its background session recorded, or the
+/// card's checkout for a session found in the card's terminal.
+///
+/// Never a folder made for it: a checkout created now is not where the session
+/// is, and a folder nobody recorded is refused rather than guessed.
+pub(crate) fn adopted_cwd(
+    links: &CardLinks,
+    session_id: &str,
+    checkout: Option<&str>,
+) -> Result<String, RpcError> {
+    let recorded = |cwd: Option<&String>| {
+        cwd.filter(|cwd| !cwd.is_empty()).cloned().ok_or_else(|| {
+            RpcError::new(
+                ErrorCode::Invalid,
+                "the folder this session ran in was not recorded, so it cannot go on in a chat",
+            )
+        })
+    };
+    if let Some(run) = links.runs.iter().find(|run| run.session_id == session_id) {
+        return recorded(run.cwd.as_ref());
+    }
+    if let Some(background) = links
+        .background
+        .as_ref()
+        .filter(|background| background.session_id == session_id)
+    {
+        return recorded(background.cwd.as_ref());
+    }
+    checkout
+        .filter(|checkout| !checkout.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            RpcError::new(
+                ErrorCode::Invalid,
+                "this card has no checkout for the session to go on in",
+            )
+        })
+}
+
+/// The folder a card's session goes on in, with the card checked against the
+/// project and the folder against what a conversation may be fixed to.
+pub(crate) fn card_session_cwd(
+    store: &Store,
+    project_id: &str,
+    card_id: &str,
+    session_id: &str,
+) -> Result<String, RpcError> {
+    if store.live_card_project(card_id)?.as_deref() != Some(project_id) {
+        return Err(RpcError::new(
+            ErrorCode::NotFound,
+            "no such card in this project",
+        ));
+    }
+    let (_, root) = crate::projects::locate(store, project_id)?;
+    let checkout = store.card(card_id)?.and_then(|card| card.worktree_path);
+    let cwd = adopted_cwd(&store.card_links(card_id)?, session_id, checkout.as_deref())?;
+    if !fixable_cwd(&root, checkout.as_deref().map(Path::new), Path::new(&cwd)) {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "this session ran outside its card's checkout and the project",
+        ));
+    }
+    Ok(cwd)
+}
+
+/// The card a conversation is filed under, as the chat's header draws it.
+#[derive(Default)]
+pub(crate) struct ConversationCard {
+    pub id: Option<String>,
+    pub title: Option<String>,
+    pub on_board: bool,
+}
+
+pub(crate) fn conversation_card(
+    store: &Store,
+    conversation_id: &str,
+) -> Result<ConversationCard, RpcError> {
+    let Some(id) = store.chat_card(conversation_id)? else {
+        return Ok(ConversationCard::default());
+    };
+    Ok(ConversationCard {
+        title: store.card(&id)?.map(|card| card.title),
+        on_board: store.live_card_project(&id)?.is_some(),
+        id: Some(id),
+    })
 }
 
 /// A turn of a card's conversation, heard on its card.
