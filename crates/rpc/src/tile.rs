@@ -32,3 +32,54 @@ pub struct Card {
     /// The session working on this card, if one is.
     pub session: Option<Session>,
 }
+
+/// What a session is doing, as its agent last said.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Doing {
+    /// It began and has said nothing since.
+    Open,
+    Working,
+    /// Stopped on a person — the one worth coming back for.
+    Waiting,
+    Done,
+    /// It ended.
+    Gone,
+}
+
+/// Where a session working on a card lives.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Type,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionKind {
+    Pane,
+    Run,
+    Background,
+    Chat,
+}
+
+/// One session working on a card.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardSession {
+    pub kind: SessionKind,
+    /// A leaf for a pane, a session id for a run or a background session, a
+    /// conversation for a chat.
+    #[serde(rename = "ref")]
+    pub reference: String,
+    pub state: Doing,
+    /// Where a pane is, so the card can go to it.
+    pub tab_id: Option<String>,
+    pub leaf_id: Option<String>,
+}
+
+/// What `card:happening` carries: a card's sessions, and what they add up to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardHappening {
+    pub card_id: String,
+    /// The one the tile shows. `None` once nothing is left.
+    pub activity: Option<Doing>,
+    pub sessions: Vec<CardSession>,
+}

@@ -65,7 +65,7 @@ pub use session::{
 pub use session_status::{Session, SessionStatus};
 pub use settings::{Settings, Theme};
 pub use threads::{Conversations, Thread};
-pub use tile::Card;
+pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
 pub use usage::{PaneCost, Usage};
 
 use serde::{Deserialize, Serialize};

@@ -149,6 +149,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         shell_launch::agents_known,
         shell_launch::session_launch_agent,
         happening::terminal_happenings,
+        happening::card_happenings,
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,

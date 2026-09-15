@@ -729,6 +729,8 @@ export const commands = {
 	 *  can reach. The same reason `chat.frames` exists.
 	 */
 	terminalHappenings: () => typedError<Happening[], RpcError>(__TAURI_INVOKE("terminal_happenings")),
+	/**  `card.happenings` — the shape `card:happening` carries, for the same reason. */
+	cardHappenings: () => typedError<CardHappening[], RpcError>(__TAURI_INVOKE("card_happenings")),
 	/**
 	 *  `account.read` — who this install is signed in as.
 	 * 
@@ -1053,6 +1055,28 @@ export type CardDetail = {
 	runs: Run[],
 };
 
+/**  What `card:happening` carries: a card's sessions, and what they add up to. */
+export type CardHappening = {
+	cardId: string,
+	/**  The one the tile shows. `None` once nothing is left. */
+	activity: Doing | null,
+	sessions: CardSession[],
+};
+
+/**  One session working on a card. */
+export type CardSession = {
+	kind: SessionKind,
+	/**
+	 *  A leaf for a pane, a session id for a run or a background session, a
+	 *  conversation for a chat.
+	 */
+	ref: string,
+	state: Doing,
+	/**  Where a pane is, so the card can go to it. */
+	tabId: string | null,
+	leafId: string | null,
+};
+
 /**
  *  Response of `card.terminal`: the layout, and the tab and card it belongs to.
  * 
@@ -1281,6 +1305,15 @@ export type DeleteRefusal = {
 	/**  True only for unsaved work, which is the person's to throw away. */
 	forcible: boolean,
 };
+
+/**  What a session is doing, as its agent last said. */
+export type Doing = 
+/**  It began and has said nothing since. */
+"open" | "working" | 
+/**  Stopped on a person — the one worth coming back for. */
+"waiting" | "done" | 
+/**  It ended. */
+"gone";
 
 /**
  *  One environment variable a profile sets before its program starts.
@@ -2196,6 +2229,9 @@ export type SessionHit = {
 	 */
 	conversationId: string | null,
 };
+
+/**  Where a session working on a card lives. */
+export type SessionKind = "pane" | "run" | "background" | "chat";
 
 /**  Response of `session.layout` / `session.ensure` / `session.split`. */
 export type SessionLayout = {

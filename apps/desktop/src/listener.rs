@@ -15,13 +15,15 @@ use std::path::Path;
 
 use devpit_agentcli::{read_hook, Event, Happening};
 use devpit_core::Store;
+use devpit_rpc::SessionKind;
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::asking::{decision, Asking};
-use crate::card_activity::{pane_word, state_of_event};
+use crate::card_activity::{hear, next_seq, pane_word, state_of_event, Activities, Key, Place};
 use crate::card_route::{card_of_leaf, notice_for, Ring};
 use crate::happening::{agent_said, session_said, subagent_said};
-use crate::post::read_request;
+use crate::post::{read_request, Posted};
 use crate::question::question_in;
 
 /// Starts listening, and writes the address where the hook will look for it.
@@ -53,35 +55,35 @@ pub fn start(app: AppHandle, root: &Path) {
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
             let app = app.clone();
+            // Stamped here, in the order posts arrived: each is served on its
+            // own thread, and threads finish in any order.
+            let seq = next_seq();
             // One thread per post, and they are short: a hook that has to wait
             // for the one before it is a hook holding up the agent that sent it.
-            std::thread::spawn(move || serve(app, stream));
+            std::thread::spawn(move || serve(app, stream, seq));
         }
     });
 }
 
-fn serve(app: AppHandle, mut stream: TcpStream) {
+fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     let Some(posted) = read_request(&mut stream) else {
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return;
     };
-    let body = posted.body;
+    let body = &posted.body;
 
     // A tool this session wants to be asked about holds the connection until
     // a person answers. Everything else is answered at once and empty, which
     // leaves the CLI's own permission mode in charge — a board step running
     // where nobody is watching must never wait on a window.
-    let held = question_in(&body).filter(|question| {
+    let held = question_in(body).filter(|question| {
         app.try_state::<Asking>()
             .map(|asking| asking.asks(&question.session_id))
             .unwrap_or(false)
     });
 
     if let Some(question) = held {
-        if let Some(happening) = read_hook(&body) {
-            let _ = app.emit("agent:happening", describe(&happening));
-            heard(&app, posted.pane.as_deref(), &happening);
-        }
+        hear_post(&app, &posted, seq);
         let asking = app.state::<Asking>();
         let hear = asking.opened(&question.id);
         let _ = app.emit("permission:asked", &question);
@@ -94,9 +96,15 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
     // reply with a short budget, and nothing it says changes what we reply
     // with.
     reply(&mut stream, "");
-    if let Some(happening) = read_hook(&body) {
-        let _ = app.emit("agent:happening", describe(&happening));
-        heard(&app, posted.pane.as_deref(), &happening);
+    hear_post(&app, &posted, seq);
+}
+
+/// What a post becomes once it has been answered: the listener's core, apart
+/// from the window.
+fn hear_post(sink: &impl HookSink, posted: &Posted, seq: u64) {
+    if let Some(happening) = read_hook(&posted.body) {
+        sink.to_window("agent:happening", describe(&happening));
+        heard(sink, posted.pane.as_deref(), &happening, seq);
     }
 }
 
@@ -110,14 +118,15 @@ fn serve(app: AppHandle, mut stream: TcpStream) {
 /// This is the difference between knowing an agent is *open* and knowing what
 /// it is *doing*. The first is asked of the process table on a timer; the
 /// second only the agent can say, and it says it here.
-fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening) {
+fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u64) {
     let Some(pane) = pane else {
         return;
     };
-    let state = pane_word(state_of_event(&happening.event));
+    let doing = state_of_event(&happening.event);
+    let state = pane_word(doing);
     // One Store for the event. Resolved before `remember`, which forgets the
     // pane's agent on SessionEnded — the end has to reach the card too.
-    let store = Store::open_default().ok();
+    let store = sink.store();
     let route = store.as_ref().and_then(|store| card_of_leaf(store, pane));
     if let Some(store) = &store {
         crate::restoring::remember(store, pane, happening);
@@ -130,6 +139,25 @@ fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening) {
     }
     if let Some(subagent) = subagent_said(pane, &happening.event) {
         sink.to_window("terminal:happening", subagent);
+    }
+    if let (Some(route), Some(doing)) = (&route, doing) {
+        let key = Key {
+            card_id: route.card_id.clone(),
+            kind: SessionKind::Pane,
+            reference: pane.to_owned(),
+        };
+        let place = Place {
+            tab_id: Some(route.tab_id.clone()),
+            leaf_id: Some(pane.to_owned()),
+        };
+        let told = sink
+            .activities()
+            .lock()
+            .ok()
+            .and_then(|mut activities| hear(&mut activities, key, seq, doing, place));
+        if let Some(happening) = told {
+            sink.to_window("card:happening", happening);
+        }
     }
 
     // Only `waiting` reaches the bell. An agent that is working is an agent
@@ -149,6 +177,10 @@ pub(crate) trait HookSink {
     fn to_window<P: serde::Serialize + Clone>(&self, channel: &str, payload: P);
     /// A pane worth coming back to, with the Store the event already opened.
     fn ring(&self, store: &Store, ring: Ring<'_>, pane: &str);
+    /// The Store for one event, or nothing when it cannot be opened.
+    fn store(&self) -> Option<Store>;
+    /// What has been heard about cards so far.
+    fn activities(&self) -> &Mutex<Activities>;
 }
 
 impl HookSink for AppHandle {
@@ -166,6 +198,14 @@ impl HookSink for AppHandle {
             Some(pane),
             ring.card_id,
         );
+    }
+
+    fn store(&self) -> Option<Store> {
+        Store::open_default().ok()
+    }
+
+    fn activities(&self) -> &Mutex<Activities> {
+        crate::card_activity::registry()
     }
 }
 
@@ -204,3 +244,7 @@ fn describe(happening: &Happening) -> (String, String) {
     };
     (happening.session_id.clone(), said)
 }
+
+#[cfg(test)]
+#[path = "listener_tests.rs"]
+mod tests;

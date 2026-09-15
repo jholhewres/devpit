@@ -149,6 +149,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         shell_launch::agents_known,
         shell_launch::session_launch_agent,
         happening::terminal_happenings,
+        happening::card_happenings,
         account::account_read,
         account::account_sign_in,
         account::account_poll,

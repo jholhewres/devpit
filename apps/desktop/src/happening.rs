@@ -113,6 +113,13 @@ pub fn terminal_happenings() -> Result<Vec<Happening>, devpit_rpc::RpcError> {
     Ok(Vec::new())
 }
 
+/// `card.happenings` — the shape `card:happening` carries, for the same reason.
+#[tauri::command]
+#[specta::specta]
+pub fn card_happenings() -> Result<Vec<devpit_rpc::CardHappening>, devpit_rpc::RpcError> {
+    Ok(Vec::new())
+}
+
 #[cfg(test)]
 #[path = "happening_tests.rs"]
 mod tests;
