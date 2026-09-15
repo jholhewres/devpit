@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import type { Card, DeleteRefusal } from '../gen/bindings'
+import type { Card, CardDetail, DeleteRefusal } from '../gen/bindings'
 import type { Tab } from './strip'
 import { ask, commands } from './live'
 import type { UseBoard } from './useBoard'
@@ -16,6 +16,7 @@ import { useShell } from './useShell'
 /** What a card can have done to it from the board, besides opening and playing. */
 export interface CardBoardActs {
   terminal: () => void
+  chat: () => void
   copyBranch?: () => void
   archive: (force: boolean) => Promise<string | null>
   remove: (force: boolean) => Promise<DeleteRefusal | string | null>
@@ -47,6 +48,39 @@ export async function copyBranch(projectId: string, cardId: string): Promise<str
   return null
 }
 
+/** The words a card's chat opens with: what the card says, and the files pinned to it. */
+export function cardDraft(detail: Pick<CardDetail, 'card' | 'pinned'>): string {
+  const pinned = detail.pinned.map((pin) => `- ${pin.path}`)
+  return [
+    `# ${detail.card.title}`,
+    detail.card.body.trim(),
+    pinned.length > 0 ? ['Pinned files:', ...pinned].join('\n') : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+/** Opens a conversation about a card, in its checkout, with the card in its
+    composer and nothing sent. One account installed is the answer; with
+    several, the chat asks on its first turn. Answers the refusal, or null. */
+export async function openCardChat(
+  projectId: string,
+  cardId: string,
+  show: (kind: 'chat', tab: Partial<Tab>) => void,
+): Promise<string | null> {
+  const [detail, profiles] = await Promise.all([
+    ask(() => commands.cardDetail(projectId, cardId)),
+    ask(() => commands.agentProfiles()),
+  ])
+  if (!detail.data) return detail.error ?? 'the card could not be read'
+  const installed = (profiles.data ?? []).filter((profile) => profile.path !== null)
+  const only = installed.length === 1 ? installed[0]!.id : null
+  const answer = await ask(() => commands.cardChat(projectId, cardId, only))
+  if (!answer.data) return answer.error ?? 'the chat did not open'
+  show('chat', { id: answer.data, draft: cardDraft(detail.data) })
+  return null
+}
+
 export function useCardActs(
   projectId: string | null,
   live: UseBoard,
@@ -59,6 +93,9 @@ export function useCardActs(
     (card: Card): CardBoardActs => ({
       terminal: () => {
         if (projectId) void openCardTerminal(projectId, card.id, card.title, show).then((refused) => refused && report(refused))
+      },
+      chat: () => {
+        if (projectId) void openCardChat(projectId, card.id, show).then((refused) => refused && report(refused))
       },
       copyBranch: card.worktreePath
         ? () => {

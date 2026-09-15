@@ -31,6 +31,9 @@ export interface Tab {
   /** The card a terminal tab was opened for. Absent on tabs saved before the
       backend named them, until they are opened again from the card. */
   readonly cardId?: string
+  /** Words a chat tab was opened with, for its composer. Put there once and
+      never sent: the person reads them first. Cleared once they are in. */
+  readonly draft?: string
 }
 
 export interface Strip {
@@ -143,6 +146,18 @@ export function launched(strip: Strip, id: string): Strip {
     open: strip.open.map((tab) => {
       if (tab.id !== id || tab.launch === undefined) return tab
       const { launch: _sent, ...rest } = tab
+      return rest
+    }),
+  }
+}
+
+/* The draft is in the composer, so the tab stops carrying it. */
+export function drafted(strip: Strip, id: string): Strip {
+  return {
+    ...strip,
+    open: strip.open.map((tab) => {
+      if (tab.id !== id || tab.draft === undefined) return tab
+      const { draft: _taken, ...rest } = tab
       return rest
     }),
   }

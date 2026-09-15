@@ -17,6 +17,10 @@ vi.mock('./live', () => ({
       { id: 'prof_1', path: '/usr/bin/claude' },
       { id: 'prof_gone', path: null },
     ],
+    cardDetail: () => ({
+      card: { title: 'Wire the board', body: 'All of it.\n' },
+      pinned: [{ path: '/w/notes.md', label: 'notes.md' }],
+    }),
     cardChat: (project: string, card: string, profile: string | null) => {
       chatted(project, card, profile)
       return 'conv_1'
@@ -57,10 +61,15 @@ describe("a card's background session", () => {
 })
 
 describe('a chat about the card', () => {
-  it('opens in a chat tab, under the one account installed', async () => {
+  it('opens in a chat tab with the card in its composer, under the one account installed', async () => {
     work([])
     fireEvent.click(screen.getByRole('button', { name: 'Chat about this card' }))
-    await waitFor(() => expect(shown).toHaveBeenCalledWith('chat', { id: 'conv_1' }))
+    await waitFor(() =>
+      expect(shown).toHaveBeenCalledWith('chat', {
+        id: 'conv_1',
+        draft: '# Wire the board\n\nAll of it.\n\nPinned files:\n- /w/notes.md',
+      }),
+    )
     expect(chatted).toHaveBeenCalledWith('p1', 'card_1', 'prof_1')
   })
 })

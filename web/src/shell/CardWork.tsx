@@ -4,7 +4,7 @@ import type { CardSession, Checkout, Run } from '../gen/bindings'
 import { AgentMark } from './AgentMark'
 import { ask, commands } from './live'
 import { OpenIn } from './OpenIn'
-import { openCardTerminal } from './useCardActs'
+import { openCardChat, openCardTerminal } from './useCardActs'
 import { offered, useKnownAgents } from './useKnownAgents'
 import { useOpeners } from './useOpeners'
 import { useShell } from './useShell'
@@ -67,18 +67,13 @@ export function CardWork({
     onChanged()
   }, [project, cardId, worktree?.branch, show, onChanged])
 
-  /* A conversation about this card, in its checkout. One account installed
-     is the answer; several are the chat's to ask about. */
+  /* A conversation about this card, in its checkout, with the card in it. */
   const chat = async (): Promise<void> => {
     if (!project) return
     setBusy('Opening a chat…')
-    const profiles = await ask(() => commands.agentProfiles())
-    const installed = (profiles.data ?? []).filter((profile) => profile.path !== null)
-    const only = installed.length === 1 ? installed[0]!.id : null
-    const answer = await ask(() => commands.cardChat(project.id, cardId, only))
+    const refused = await openCardChat(project.id, cardId, show)
     setBusy(null)
-    setProblem(answer.error)
-    if (answer.data) show('chat', { id: answer.data })
+    setProblem(refused)
   }
 
   /* The step's detached session, brought into the card's own terminal. */

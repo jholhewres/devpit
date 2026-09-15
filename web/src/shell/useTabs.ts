@@ -5,6 +5,7 @@ import type { PaneName } from './paneList'
 import {
   attached,
   closed,
+  drafted as taken,
   focused,
   launched as sent,
   moved,
@@ -33,6 +34,8 @@ export interface Tabs {
   attach: (id: string, panes: readonly string[]) => void
   /** Forgets the agent a terminal was opened to run, once it has been sent. */
   launched: (id: string) => void
+  /** Forgets the words a chat was opened with, once they are in its composer. */
+  drafted: (id: string) => void
   /** Which tab is being renamed, and on which surface.
 
       The surface is not decoration: the strip and the sidebar draw the same
@@ -85,6 +88,7 @@ export function useTabs(projectId: string | null): Tabs {
     [],
   )
   const launched = useCallback((id: string) => setStrip((was) => sent(was, id)), [])
+  const drafted = useCallback((id: string) => setStrip((was) => taken(was, id)), [])
 
   return {
     open: strip.open,
@@ -96,6 +100,7 @@ export function useTabs(projectId: string | null): Tabs {
     rename,
     attach,
     launched,
+    drafted,
     renaming,
     setRenaming,
   }

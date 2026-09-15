@@ -97,6 +97,10 @@ export function CardMenu({
       onClose()
       acts.terminal()
     },
+    chat: () => {
+      onClose()
+      acts.chat()
+    },
     copyBranch: acts.copyBranch
       ? () => {
           onClose()

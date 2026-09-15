@@ -17,6 +17,7 @@ export interface CardHands {
   /** Present when the card's lane runs a step. */
   play?: () => void
   terminal: () => void
+  chat: () => void
   /** Present when the card has a checkout. */
   copyBranch?: () => void
   archive: () => void
@@ -29,6 +30,7 @@ export const cardMenu = (hands: CardHands): readonly SessionEntry[] => [
   ...(hands.moveTo ? [{ label: 'Move to…', key: keyLabel('moveTo'), run: hands.moveTo }] : []),
   { rule: true },
   hands.play ? { label: 'Run step', run: hands.play } : { label: 'Open a terminal', run: hands.terminal },
+  { label: 'Chat about this card', run: hands.chat },
   ...(hands.copyBranch ? [{ label: 'Copy branch', run: hands.copyBranch }] : []),
   { rule: true },
   { label: 'Archive', key: keyLabel('archive'), run: hands.archive },

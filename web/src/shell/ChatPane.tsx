@@ -33,14 +33,19 @@ import { committed } from './typing'
  */
 
 export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { active, project, rename } = useShell()
+  const { active, project, rename, drafted } = useShell()
   const chat = useChat(tab.id)
-  const [prompt, setPrompt] = useState('')
+  /* A chat opened from a card starts with the card in the composer, unsent. */
+  const [prompt, setPrompt] = useState(tab.draft ?? '')
   const slash = useSlash(chat.profileId, prompt, setPrompt)
   const box = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLTextAreaElement>(null)
 
   const mine = active?.id === tab.id
+
+  useEffect(() => {
+    if (tab.draft !== undefined) drafted(tab.id)
+  }, [tab.draft, tab.id, drafted])
 
 
 

@@ -47,7 +47,7 @@ const column = (over: Partial<Column> = {}): Column => ({
 
 const drag: Drag = { held: null, landing: null, landed: null, down: vi.fn(), move: vi.fn(), up: vi.fn(() => ({ what: 'nothing' as const })) }
 
-const hands = { open: vi.fn(), rename: vi.fn(), terminal: vi.fn(), archive: vi.fn(), remove: vi.fn() }
+const hands = { open: vi.fn(), rename: vi.fn(), terminal: vi.fn(), chat: vi.fn(), archive: vi.fn(), remove: vi.fn() }
 
 describe('the card menu', () => {
   it('has something behind every entry', () => {
@@ -61,11 +61,12 @@ describe('the card menu', () => {
 
   it('runs the step where the lane has one, and opens a terminal where it does not', () => {
     const labels = (menu: ReturnType<typeof cardMenu>) => menu.filter((one) => !one.rule).map((one) => one.label)
-    expect(labels(cardMenu(hands))).toEqual(['Open', 'Rename', 'Open a terminal', 'Archive', 'Delete…'])
+    expect(labels(cardMenu(hands))).toEqual(['Open', 'Rename', 'Open a terminal', 'Chat about this card', 'Archive', 'Delete…'])
     expect(labels(cardMenu({ ...hands, play: vi.fn(), copyBranch: vi.fn() }))).toEqual([
       'Open',
       'Rename',
       'Run step',
+      'Chat about this card',
       'Copy branch',
       'Archive',
       'Delete…',
@@ -76,6 +77,7 @@ describe('the card menu', () => {
 describe('a card on the board', () => {
   const acts = (over: Partial<CardBoardActs> = {}): CardBoardActs => ({
     terminal: vi.fn(),
+    chat: vi.fn(),
     archive: vi.fn(() => Promise.resolve(null)),
     remove: vi.fn(() => Promise.resolve<DeleteRefusal | string | null>(null)),
     archived: vi.fn(),
@@ -118,7 +120,16 @@ describe('a card on the board', () => {
     const { container } = board()
     rightClick(container)
     const items = within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'))
-    expect(items).toEqual(['Open', 'Rename', 'Open a terminal', 'Archive', 'Delete…'])
+    expect(items).toEqual(['Open', 'Rename', 'Open a terminal', 'Chat about this card', 'Archive', 'Delete…'])
+  })
+
+  it('starts a chat about the card from its menu', () => {
+    const hands = acts()
+    const { container } = board({ acts: hands })
+    rightClick(container)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Chat about this card' }))
+    expect(hands.chat).toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 
   it('offers its branch only once it has a checkout', () => {

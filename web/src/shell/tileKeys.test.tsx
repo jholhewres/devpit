@@ -48,6 +48,7 @@ describe('the keys a tile answers to', () => {
       rename: vi.fn(),
       moveTo: vi.fn(),
       terminal: vi.fn(),
+      chat: vi.fn(),
       archive: vi.fn(),
       remove: vi.fn(),
     })
@@ -62,6 +63,7 @@ describe('the keys a tile answers to', () => {
 describe('a focused tile', () => {
   const acts = (over: Partial<CardBoardActs> = {}): CardBoardActs => ({
     terminal: vi.fn(),
+    chat: vi.fn(),
     archive: vi.fn(() => Promise.resolve(null)),
     remove: vi.fn(() => Promise.resolve<DeleteRefusal | string | null>(null)),
     archived: vi.fn(),

@@ -53,6 +53,7 @@ export interface Shell {
   rename: (id: string, title: string) => void
   attach: (id: string, panes: readonly string[]) => void
   launched: (id: string) => void
+  drafted: (id: string) => void
   /** What each of the project's panes has in front of it.
 
       Polled once for the window rather than once per surface: the strip, the
