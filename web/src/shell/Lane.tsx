@@ -361,20 +361,3 @@ export function LaneFoot({
     </>
   )
 }
-
-export function NewColumn({ onAdd }: { onAdd: (name: string) => void }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  return open ? (
-    <InlineAdd
-      className="blane__newin"
-      label="New column name"
-      placeholder="Column name"
-      onAdd={onAdd}
-      onDone={() => setOpen(false)}
-    />
-  ) : (
-    <button className="blane__new" onClick={() => setOpen(true)}>
-      + Column
-    </button>
-  )
-}

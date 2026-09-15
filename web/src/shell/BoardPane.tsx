@@ -2,14 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { CardPane } from './CardPane'
-import { LaneFoot, LaneHead, NewColumn, Tile } from './Lane'
+import { LaneFoot, LaneHead, Tile } from './Lane'
 import { LaneCards } from './LaneCards'
 import { useCardUnread, useVisit } from './cardDoing'
 import { useCardActs } from './useCardActs'
 import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
 import { reordered } from './laneOrder'
-import { BoardShelf } from './BoardShelf'
+import { BoardToolbar } from './BoardToolbar'
+import { matches } from './board'
 import { useShell } from './useShell'
 
 /*
@@ -39,6 +40,7 @@ export function BoardPane(): React.JSX.Element {
   const unread = useCardUnread(live.lanes.flatMap((lane) => lane.cards), opened)
   const visit = useVisit(project?.id ?? null, live.sessions, setOpened)
   const [adding, setAdding] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   /* Which column is being dragged. Its own gesture, not `useDrag`: a column
      moves between columns and a card moves between lanes, and one state
      holding both would need a tag to tell them apart. */
@@ -75,7 +77,9 @@ export function BoardPane(): React.JSX.Element {
     }
     const ended = drag.up()
     if (ended.what === 'clicked') setOpened(ended.card.id)
-    if (ended.what === 'moved') live.move(ended.card.id, ended.lane, ended.index)
+    /* Filtered, the slot under the pointer is not a place in the whole lane. */
+    if (ended.what === 'moved' && query) live.moveToEnd(ended.card.id, ended.lane)
+    else if (ended.what === 'moved') live.move(ended.card.id, ended.lane, ended.index)
   }
 
   const { held, landing } = drag
@@ -89,6 +93,17 @@ export function BoardPane(): React.JSX.Element {
           {live.error}
         </button>
       )}
+      <BoardToolbar
+        projectId={project?.id ?? null}
+        lanes={live.lanes}
+        query={query}
+        onQuery={setQuery}
+        archived={archived}
+        onUndone={undone}
+        onOpenCard={setOpened}
+        onChanged={live.reload}
+        onAddColumn={live.addColumn}
+      />
       <div className="board" onPointerMove={drag.move} onPointerUp={onUp} onPointerCancel={onUp}>
         {live.lanes.map((lane) => {
           const dropping = landing?.lane === lane.column.id
@@ -121,7 +136,7 @@ export function BoardPane(): React.JSX.Element {
               />
 
               <LaneCards
-                lane={lane}
+                lane={query ? { ...lane, cards: lane.cards.filter((card) => matches(card, query)) } : lane}
                 drag={drag}
                 dropping={dropping}
                 progress={live.progress}
@@ -144,15 +159,6 @@ export function BoardPane(): React.JSX.Element {
           )
         })}
 
-        <NewColumn onAdd={live.addColumn} />
-        <BoardShelf
-          projectId={project?.id ?? null}
-          lanes={live.lanes}
-          archived={archived}
-          onUndone={undone}
-          onOpenCard={setOpened}
-          onChanged={live.reload}
-        />
 
         {opened && (
           <CardPane

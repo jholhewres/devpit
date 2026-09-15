@@ -4,6 +4,11 @@
    opens before you let go, and the card that lands runs a strip that
    names the agent it just woke. Anything prettier than that would be
    animation about nothing. */
+/* The toolbar above the lanes: the filter, and what sits beside the work. */
+.btools { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px 4px; }
+.btools__filter { width: 220px; height: 28px; padding: 0 9px; border-radius: 7px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12.5px; color: var(--text); }
+.btools__filter:focus { outline: none; border-color: var(--accent); }
+.btools__gap { flex: 1; }
 .board { flex: 1; min-height: 0; overflow-x: auto; display: flex; gap: 10px; padding: 4px 12px 14px; align-items: stretch; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 
 .blane { position: relative; width: 236px; flex: none; display: flex; flex-direction: column; min-height: 0; border-radius: 10px; padding: 0 4px 4px; transition: background-color 160ms ease; }
@@ -81,8 +86,6 @@
 
 /* A lane's own controls: its menu holds rename, order and delete. */
 .blane__label[contenteditable='true']:focus { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-.blane__new { flex: none; width: 132px; align-self: flex-start; height: 34px; border-radius: 9px; border: 1px dashed var(--border-strong); color: var(--text-3); font-size: 12.5px; }
-.blane__new:hover { color: var(--text); border-color: var(--accent); }
 
 /* A column being carried, and the one it would take the place of. */
 .blane[data-moving='true'] { opacity: 0.55; }

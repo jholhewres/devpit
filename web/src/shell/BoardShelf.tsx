@@ -2,15 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { ArchivedCard, DeleteRefusal } from '../gen/bindings'
-import type { Lane } from './board'
 import { CardEnding, type Ending } from './CardHeader'
 import { ask, commands } from './live'
-import { RunsPane } from './RunsPane'
 import { abandoned } from './typing'
 
 /*
- * What sits beside the lanes: the board's runs, its archived cards, and Undo
- * for the card just archived.
+ * The board's archived cards, and Undo for the card just archived.
  *
  * Archiving had no way back. The row stayed in the table with `archived_at`
  * set and nothing listed it, so a card archived by mistake was a card lost.
@@ -18,55 +15,6 @@ import { abandoned } from './typing'
 
 /** How long Undo is offered after an archive. */
 export const UNDO_MS = 6000
-
-export function BoardShelf({
-  projectId,
-  lanes,
-  archived,
-  onUndone,
-  onOpenCard,
-  onChanged,
-}: {
-  projectId: string | null
-  lanes: readonly Lane[]
-  /** The card just archived, while Undo is still worth offering. */
-  archived: string | null
-  onUndone: () => void
-  onOpenCard: (cardId: string) => void
-  onChanged: () => void
-}): React.JSX.Element | null {
-  const [showing, setShowing] = useState<'runs' | 'archived' | null>(null)
-  if (!projectId) return null
-
-  return (
-    <>
-      <button className="blane__new" onClick={() => setShowing('runs')}>
-        Runs
-      </button>
-      <button className="blane__new" onClick={() => setShowing('archived')}>
-        Archived
-      </button>
-
-      {showing === 'runs' && (
-        <RunsPane
-          projectId={projectId}
-          lanes={lanes}
-          onClose={() => setShowing(null)}
-          onOpenCard={(cardId) => {
-            setShowing(null)
-            onOpenCard(cardId)
-          }}
-        />
-      )}
-      {showing === 'archived' && (
-        <ArchivedPane projectId={projectId} onClose={() => setShowing(null)} onChanged={onChanged} />
-      )}
-      {archived && (
-        <UndoArchive projectId={projectId} cardId={archived} onRestored={onChanged} onGone={onUndone} />
-      )}
-    </>
-  )
-}
 
 /** Undo, for a few seconds after an archive. On the body: the board animates in. */
 export function UndoArchive({

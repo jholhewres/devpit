@@ -5,7 +5,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { LaneFoot, NewColumn } from './Lane'
+import { NewColumn } from './BoardToolbar'
+import { LaneFoot } from './Lane'
 
 afterEach(cleanup)
 

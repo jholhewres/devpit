@@ -38,3 +38,9 @@ export function landed(board: Board, cardId: string, columnId: string, at: numbe
 export function playable(card: Card, column: Column): boolean {
   return column.step !== null && !card.runs.some((run) => run.state === 'running')
 }
+
+/** Whether a card is one the board's filter keeps: its title holds the query, in any case. */
+export function matches(card: Card, query: string): boolean {
+  const wanted = query.trim().toLowerCase()
+  return wanted === '' || card.title.toLowerCase().includes(wanted)
+}

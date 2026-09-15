@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ArchivedCards, CardDeleted } from '../gen/bindings'
-import { ArchivedPane, BoardShelf, UNDO_MS, UndoArchive } from './BoardShelf'
+import { ArchivedPane, UNDO_MS, UndoArchive } from './BoardShelf'
 
 afterEach(() => {
   cleanup()
@@ -31,16 +31,6 @@ vi.mock('./live', () => ({
 }))
 
 describe('the archived cards', () => {
-  it('opens from beside Runs', async () => {
-    render(
-      <BoardShelf projectId="p1" lanes={[]} archived={null} onUndone={vi.fn()} onOpenCard={vi.fn()} onChanged={vi.fn()} />,
-    )
-    const buttons = screen.getAllByRole('button').map((button) => button.textContent)
-    expect(buttons).toEqual(['Runs', 'Archived'])
-    fireEvent.click(screen.getByRole('button', { name: 'Archived' }))
-    expect(await screen.findByRole('dialog', { name: 'Archived cards' })).toBeTruthy()
-  })
-
   it('brings one back', async () => {
     const onChanged = vi.fn()
     render(<ArchivedPane projectId="p1" onClose={vi.fn()} onChanged={onChanged} />)
