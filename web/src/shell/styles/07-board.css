@@ -6,14 +6,13 @@
    animation about nothing. */
 .board { flex: 1; min-height: 0; overflow-x: auto; display: flex; gap: 10px; padding: 4px 12px 14px; align-items: stretch; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 
-.blane { width: 236px; flex: none; display: flex; flex-direction: column; min-height: 0; border-radius: 10px; padding: 0 4px 4px; transition: background-color 160ms ease; }
+.blane { position: relative; width: 236px; flex: none; display: flex; flex-direction: column; min-height: 0; border-radius: 10px; padding: 0 4px 4px; transition: background-color 160ms ease; }
 /* The lane under the pointer, and only while a card is in the air. */
 .blane[data-over='true'] { background: var(--overlay); }
-.blane__top { height: 30px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 4px; }
+.blane__top { height: 30px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 4px; cursor: grab; }
 .blane__label { font-size: 12.5px; font-weight: 550; color: var(--text-2); }
 .blane__n { font-size: 11.5px; color: var(--ghost); font-variant-numeric: tabular-nums; transition: color 160ms ease; }
 .blane[data-over='true'] .blane__n { color: var(--accent); }
-.blane__agent { margin-left: auto; display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--ghost); }
 /* The list takes only the height its cards need; the filler below it is
    what keeps the lane a drop target all the way down. Letting the list
    grow instead pushed Add card to the bottom of the window, a screen
@@ -23,13 +22,13 @@
 
 .tile {
   display: block; width: 100%; text-align: left;
+  position: relative;
   background: var(--raised); border: 1px solid var(--border);
   border-radius: 9px; padding: 9px 10px; flex: none;
   cursor: grab; touch-action: none;
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease, opacity 140ms ease;
 }
 .tile:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: 0 5px 16px var(--shade); }
-.tile[aria-current='true'] { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 /* The original stays in place, dimmed, so the column keeps its shape. */
 .tile[data-ghost='true'] { opacity: 0.28; }
 .tile[data-ghost='true']:hover { transform: none; box-shadow: none; }
@@ -57,22 +56,61 @@
 .tile__agent--warn { color: var(--warning); }
 .tile__time { margin-left: auto; font-variant-numeric: tabular-nums; }
 
-/* The strip a landed card runs while its agent spins up. */
-.tile__run { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 7px; animation: rise 200ms ease-out both; }
-.tile__run-label { font-family: var(--mono); font-size: 10.5px; color: var(--accent); white-space: nowrap; }
-.tile__track { flex: 1; height: 2px; border-radius: 1px; background: var(--overlay-strong); overflow: hidden; }
-.tile__track i { display: block; height: 100%; width: 38%; border-radius: 1px; background: var(--accent); animation: sweep 1.25s ease-in-out infinite; }
-@keyframes sweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(320%); } }
-.tile__elapsed { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-
-/* A card arriving, and a card that just landed. */
+/* A card that just landed, and what rises into view. */
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.tile--enter { animation: rise 220ms ease-out both; }
 @keyframes landed { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
 .tile--landed { animation: landed 620ms ease-out; }
 
 .tile__add { flex: none; height: 30px; border-radius: 9px; border: 1px dashed var(--border-strong); color: var(--text-3); font-size: 11.5px; transition: color 140ms ease, border-color 140ms ease; }
 .tile__add:hover { color: var(--text-2); border-color: var(--ghost); }
+
+/* A lane's own controls: they appear on hover, because a board at rest is
+   cards and not buttons. */
+.blane__drop { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-3); opacity: 0; transition: opacity 120ms ease; }
+.blane:hover .blane__drop { opacity: 1; }
+.blane__drop:hover { background: var(--overlay-strong); color: var(--danger); }
+.blane__label[contenteditable]:focus { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.blane__new { flex: none; width: 132px; align-self: flex-start; height: 34px; border-radius: 9px; border: 1px dashed var(--border-strong); color: var(--text-3); font-size: 12.5px; }
+.blane__new:hover { color: var(--text); border-color: var(--accent); }
+
+/* A column being carried, and the one it would take the place of. */
+.blane[data-moving='true'] { opacity: 0.55; }
+.blane[data-taking='true'] .blane__top { box-shadow: inset 0 -2px 0 var(--accent); }
+.blane[data-moving='true'] .blane__top { cursor: grabbing; }
+/* The label and the step picker take their own clicks: the head is the drag
+   handle, and a handle that swallows the rename is a handle nobody wants. */
+.blane__label, .lstep { cursor: auto; }
+/* The last line a running step printed. One line, clipped: a tile is not a
+   log, and the whole output is on the card. */
+.tile__log { margin-top: 5px; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A lane that moves cards without being asked should look different from one
+   that does not. Said on the lane, not hidden in its menu. */
+.lstep__auto { margin-left: 5px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; }
+/* On the tile it appears under the pointer rather than sitting there: the
+   board is read far more often than it is played, and a row of triangles
+   reads as a list of things waiting to be started. */
+.tile__play { position: absolute; top: 7px; right: 7px; width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-3); background: var(--overlay-strong); opacity: 0; }
+.tile:hover .tile__play, .tile__play:focus-visible { opacity: 1; }
+.tile__play:hover { color: var(--text); }
+
+/* What a lane runs when a card lands in it — the rule the product turns on,
+   and until now the one thing with no way to set it. */
+.lstep { position: relative; margin-left: auto; }
+.lstep__b { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; color: var(--text-3); }
+.lstep__b:hover { background: var(--overlay-strong); color: var(--text-2); }
+.lstep__pop { position: absolute; right: 0; top: calc(100% + 5px); z-index: 40; min-width: 210px; padding: 6px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 16px 36px var(--shade); animation: pop-in 130ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.lstep__pop--wide { width: 290px; padding: 12px; }
+.lstep__t { padding: 3px 9px 7px; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+.lstep__pop--wide .lstep__t { padding: 0 0 10px; }
+.lstep__warn { font-size: 10px; color: var(--warning); }
+.lstep__pop--wide .fld { margin-top: 12px; }
+.lstep__pop--wide .src__sw { width: 100%; }
+.lstep__pop--wide .src__o { flex: 1; padding: 0 6px; }
+
+/* What the tile says besides its title. */
+.tile__due, .tile__n { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); }
+.tile__due[data-near='past'] { color: var(--danger); }
+.tile__due[data-near='today'] { color: var(--warning); }
 
 /* Right after an archive, the one thing worth offering is taking it back. */
 .undo { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 14px; padding: 7px 8px 7px 14px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 12px 30px var(--shade); font-size: 12.5px; color: var(--text); animation: rise 180ms ease-out both; }
@@ -83,18 +121,5 @@ body[data-dragging='true'] { cursor: grabbing; }
 body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile, .blane, .slot, .tile--enter, .tile--landed { transition: none; animation: none; }
-  .tile__track i { animation: none; width: 100%; }
+  .tile, .blane, .slot, .tile--landed { transition: none; animation: none; }
 }
-
-/* Skills: the agents a lane can wake, and what each one is allowed to
-   do. Kept as a plain table rather than cards — this is a reference you
-   scan for one row, not a gallery. */
-/* A surface whose shape is not settled yet. Written as an empty state
-   rather than filled with plausible rows: invented data here would get
-   reviewed as if it were the design. */
-.todo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 24px 40px; text-align: center; }
-.todo__ico { width: 40px; height: 40px; border-radius: 11px; background: var(--raised); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-3); margin-bottom: 14px; }
-.todo__t { font-size: 13.5px; color: var(--text); }
-.todo__d { margin-top: 6px; max-width: 300px; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
-

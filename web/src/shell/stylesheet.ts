@@ -24,3 +24,12 @@ export function stylesheet(sheet = SHEET): string {
     .map((part) => readFileSync(part, 'utf8'))
     .join('')
 }
+
+/** Classes a sheet styles that no source ever names — rules for markup that is gone. */
+export function unusedIn(sheet: string, sources: readonly string[]): string[] {
+  const css = sheet.replace(/\/\*[\s\S]*?\*\//g, '')
+  const named = new Set([...css.matchAll(/\.([a-z][a-z0-9_-]*)/gi)].map((found) => found[1]!))
+  const said = (name: string, source: string): boolean =>
+    new RegExp(`(^|[^a-zA-Z0-9_-])${name}($|[^a-zA-Z0-9_-])`).test(source)
+  return [...named].filter((name) => !sources.some((source) => said(name, source))).sort()
+}
