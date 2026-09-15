@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { CardPane } from './CardPane'
-import { LaneFoot, LaneHead, Tile } from './Lane'
+import { LaneFoot, LaneHead, NewColumn, Tile } from './Lane'
 import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
 import { reordered } from './laneOrder'
@@ -33,6 +33,7 @@ export function BoardPane(): React.JSX.Element {
   /* The card just archived, while Undo is still offered. */
   const [archived, setArchived] = useState<string | null>(null)
   const undone = useCallback(() => setArchived(null), [])
+  const [adding, setAdding] = useState<string | null>(null)
   /* Which column is being dragged. Its own gesture, not `useDrag`: a column
      moves between columns and a card moves between lanes, and one state
      holding both would need a tag to tell them apart. */
@@ -109,7 +110,7 @@ export function BoardPane(): React.JSX.Element {
                 others={others}
                 onFlow={(onPass, autonomy) => live.setFlow(lane.column.id, onPass, autonomy)}
                 onGrab={(event) => grab(event, lane.column.id)}
-                onAddCard={() => live.addCard(lane.column.id, 'New card')}
+                onAddCard={() => setAdding(lane.column.id)}
                 onShift={(by) => live.shiftColumn(lane.column.id, by)}
                 onDelete={(moveTo) => live.deleteColumn(lane.column.id, moveTo)}
               />
@@ -151,14 +152,16 @@ export function BoardPane(): React.JSX.Element {
                 )}
               </div>
 
-              <LaneFoot onAddCard={() => live.addCard(lane.column.id, 'New card')} />
+              <LaneFoot
+                adding={adding === lane.column.id}
+                onAdding={(open) => setAdding(open ? lane.column.id : null)}
+                onAddCard={(title) => live.addCard(lane.column.id, title)}
+              />
             </div>
           )
         })}
 
-        <button className="blane__new" onClick={() => live.addColumn('New column')}>
-          + Column
-        </button>
+        <NewColumn onAdd={live.addColumn} />
         <BoardShelf
           projectId={project?.id ?? null}
           lanes={live.lanes}

@@ -2,6 +2,7 @@ import { Confirm } from './Confirm'
 import { dueLabel, nearness } from './due'
 import type { Lane as LaneData } from './board'
 import type { Card, ColumnDeleted, Played, Step } from '../gen/bindings'
+import { InlineAdd } from './InlineAdd'
 import { LaneMenu } from './LaneMenu'
 import { LaneStep } from './LaneStep'
 import { money } from './chat'
@@ -243,13 +244,49 @@ export function LaneHead({
   )
 }
 
-export function LaneFoot({ onAddCard }: { onAddCard: () => void }): React.JSX.Element {
+export function LaneFoot({
+  adding,
+  onAdding,
+  onAddCard,
+}: {
+  /** Held by the board: the lane menu's Add card opens the same field. */
+  adding: boolean
+  onAdding: (open: boolean) => void
+  onAddCard: (title: string) => void
+}): React.JSX.Element {
   return (
     <>
-      <button className="tile__add" onClick={onAddCard}>
-        + Add card
-      </button>
+      {adding ? (
+        <InlineAdd
+          className="tile__new"
+          label="New card title"
+          placeholder="Card title"
+          onAdd={onAddCard}
+          onDone={() => onAdding(false)}
+        />
+      ) : (
+        <button className="tile__add" onClick={() => onAdding(true)}>
+          + Add card
+        </button>
+      )}
       <div className="blane__fill" />
     </>
+  )
+}
+
+export function NewColumn({ onAdd }: { onAdd: (name: string) => void }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  return open ? (
+    <InlineAdd
+      className="blane__newin"
+      label="New column name"
+      placeholder="Column name"
+      onAdd={onAdd}
+      onDone={() => setOpen(false)}
+    />
+  ) : (
+    <button className="blane__new" onClick={() => setOpen(true)}>
+      + Column
+    </button>
   )
 }

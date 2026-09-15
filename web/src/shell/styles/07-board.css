@@ -63,6 +63,10 @@
 
 .tile__add { flex: none; height: 30px; border-radius: 9px; border: 1px dashed var(--border-strong); color: var(--text-3); font-size: 11.5px; transition: color 140ms ease, border-color 140ms ease; }
 .tile__add:hover { color: var(--text-2); border-color: var(--ghost); }
+/* Where a card or a lane is named as it is made. */
+.tile__new, .blane__newin { flex: none; height: 30px; padding: 0 10px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); background: var(--raised); font: inherit; font-size: 12.5px; color: var(--text); }
+.tile__new:focus, .blane__newin:focus { outline: none; border-color: var(--accent); }
+.blane__newin { width: 180px; height: 34px; align-self: flex-start; }
 
 /* A lane's own controls: its menu holds rename, order and delete. */
 .blane__label[contenteditable='true']:focus { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
