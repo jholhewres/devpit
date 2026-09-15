@@ -105,8 +105,9 @@ pub(crate) fn reconciled(
 /// Reconciles against the registry, stamping every change `seq`.
 ///
 /// `seq` was read before tmux and `ps` were asked, so a hook heard since then
-/// is newer and wins: an `open` never lands over it, and a pane it spoke for is
-/// not taken off its card. Answers the cards that changed.
+/// is newer and wins: a pane it spoke for is not taken off its card. An `open`
+/// is stamped below every hook instead, so even a hook accepted before `seq`
+/// and applied after it still says more. Answers the cards that changed.
 pub(crate) fn reconcile_in(
     activities: &Mutex<Activities>,
     leaves: &HashMap<String, CardPane>,
@@ -123,7 +124,9 @@ pub(crate) fn reconcile_in(
     reconciled(leaves, fronts, &known)
         .into_iter()
         .filter_map(|change| match change {
-            Change::Open { key, place } => hear(&mut activities, key, seq, Doing::Open, place),
+            // The weakest word, at the bottom of the order: a hook already on
+            // its way when tmux was asked still lands over it.
+            Change::Open { key, place } => hear(&mut activities, key, 0, Doing::Open, place),
             Change::Gone(key) => forget_before(&mut activities, &key, seq),
         })
         .collect()

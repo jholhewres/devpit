@@ -183,3 +183,25 @@ fn a_projects_card_leaves_are_read_in_one_scan() {
     store.archive_card(&card).expect("archive");
     assert!(card_leaves(&store, &mine).is_empty());
 }
+
+#[test]
+fn an_open_from_the_process_table_does_not_swallow_a_hook_already_on_its_way() {
+    let activities = Mutex::new(Activities::default());
+    // The hook was accepted (stamped 6) before the poll, and is applied after.
+    let told = reconcile_in(
+        &activities,
+        &leaves(),
+        &[front("leaf_a", Some("claude"))],
+        7,
+    );
+    assert_eq!(told[0].activity, Some(Doing::Open));
+    let waited = hear(
+        &mut activities.lock().expect("lock"),
+        pane("leaf_a"),
+        6,
+        Doing::Waiting,
+        Place::default(),
+    )
+    .expect("the waiting still lands");
+    assert_eq!(waited.activity, Some(Doing::Waiting));
+}
