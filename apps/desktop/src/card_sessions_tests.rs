@@ -52,6 +52,7 @@ fn a_cards_panes_are_listed_before_their_agents_say_anything() {
             state: Some(Doing::Working),
             tab_id: Some(tab.clone()),
             leaf_id: Some("leaf_a".to_owned()),
+            run_id: None,
         }],
     };
 
@@ -96,10 +97,25 @@ fn a_run_heard_under_its_own_id_is_listed_without_a_link() {
             state: Some(Doing::Working),
             tab_id: None,
             leaf_id: None,
+            run_id: None,
         }],
     };
-    assert_eq!(
-        card_sessions(&store, &project, &card, &[], &heard),
-        heard.sessions
-    );
+    let listed = card_sessions(&store, &project, &card, &[], &heard);
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].reference, "run_1");
+    assert_eq!(listed[0].state, Some(Doing::Working));
+    assert_eq!(listed[0].run_id.as_deref(), Some("run_1"));
+}
+
+#[test]
+fn a_run_that_spoke_in_a_session_names_its_run() {
+    let (_dir, store, project, card) = seeded();
+    let step = store
+        .create_step(&project, "agent", "review", "{}", false)
+        .expect("step");
+    let run = store.start_run(&card, &step, None).expect("run");
+    store.set_run_session(&run, "s-run").expect("session");
+    let sessions = card_sessions(&store, &project, &card, &[], &nothing_heard(&card));
+    assert_eq!(sessions[0].reference, "s-run");
+    assert_eq!(sessions[0].run_id.as_deref(), Some(run.as_str()));
 }

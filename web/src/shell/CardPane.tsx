@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Attachments } from './Attachments'
 import { CardDiff } from './CardDiff'
 import { CardPlay } from './CardPlay'
+import { CardSessions } from './CardSessions'
 import { CardWork } from './CardWork'
 import { Comments } from './Comments'
 import { CardEnding, CardHeader, type Ending } from './CardHeader'
@@ -178,10 +179,11 @@ export function CardPane({
               cardId={cardId}
               worktree={detail.worktree}
               runs={detail.runs}
-              sessions={detail.sessions}
               onChanged={card.reload}
               play={<CardPlay cardId={cardId} step={detail.columnStep} onPlayed={card.reload} />}
             />
+
+            <CardSessions cardId={cardId} title={detail.card.title} sessions={detail.sessions} onChanged={card.reload} />
 
             {/* Only once the card has a checkout: there is nothing to
                 compare against until it has started somewhere. */}

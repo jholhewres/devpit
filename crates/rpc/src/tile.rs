@@ -76,6 +76,8 @@ pub struct CardSession {
     /// Where a pane is, so the card can go to it.
     pub tab_id: Option<String>,
     pub leaf_id: Option<String>,
+    /// The run a `run` session belongs to, so the card can stop it.
+    pub run_id: Option<String>,
 }
 
 /// What `card:happening` carries: a card's sessions, and what they add up to.

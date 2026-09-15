@@ -244,6 +244,7 @@ fn a_card_adds_up_to_the_state_most_worth_looking_at() {
         state: Some(state),
         tab_id: None,
         leaf_id: None,
+        run_id: None,
     };
     let order = [
         Doing::Gone,
@@ -365,6 +366,7 @@ fn a_session_nobody_has_heard_from_does_not_count_on_the_tile() {
         state,
         tab_id: None,
         leaf_id: None,
+        run_id: None,
     };
     assert_eq!(
         activity(&[session(None), session(Some(Doing::Done))]),

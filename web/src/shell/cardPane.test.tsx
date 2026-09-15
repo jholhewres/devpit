@@ -53,6 +53,7 @@ vi.mock('./useShell', () => ({ useShell: () => ({ project: { id: 'p1' } }) }))
 /* The sections below the description have their own tests and their own commands. */
 vi.mock('./CardPlay', () => ({ CardPlay: () => null }))
 vi.mock('./CardWork', () => ({ CardWork: () => null }))
+vi.mock('./CardSessions', () => ({ CardSessions: () => null }))
 vi.mock('./CardDiff', () => ({ CardDiff: () => null }))
 vi.mock('./Attachments', () => ({ Attachments: () => null }))
 vi.mock('./Comments', () => ({ Comments: () => null }))

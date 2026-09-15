@@ -124,7 +124,6 @@ describe('the work section of a card', () => {
         cardId="card_1"
         worktree={null}
         runs={[]}
-        sessions={[]}
         onChanged={vi.fn()}
         play={<CardPlay cardId="card_1" step={step} onPlayed={vi.fn()} />}
       />,

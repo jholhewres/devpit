@@ -31,6 +31,7 @@ pub(crate) fn card_sessions(
         state: said(kind, reference),
         tab_id: None,
         leaf_id: None,
+        run_id: None,
     };
     let mut sessions = Vec::new();
 
@@ -51,7 +52,10 @@ pub(crate) fn card_sessions(
 
     if let Ok(links) = store.card_links(card_id) {
         for run in &links.runs {
-            sessions.push(unplaced(SessionKind::Run, &run.session_id));
+            sessions.push(CardSession {
+                run_id: Some(run.run_id.clone()),
+                ..unplaced(SessionKind::Run, &run.session_id)
+            });
         }
         if let Some(background) = &links.background {
             let listed = live
@@ -78,7 +82,12 @@ pub(crate) fn card_sessions(
             .iter()
             .any(|listed| listed.kind == one.kind && listed.reference == one.reference)
         {
-            sessions.push(one.clone());
+            // A run with no link was heard under its own id.
+            let run_id = (one.kind == SessionKind::Run).then(|| one.reference.clone());
+            sessions.push(CardSession {
+                run_id,
+                ..one.clone()
+            });
         }
     }
     sessions

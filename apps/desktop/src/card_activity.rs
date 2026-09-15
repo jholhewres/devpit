@@ -94,6 +94,7 @@ impl Activities {
                 state: Some(heard.state),
                 tab_id: heard.place.tab_id.clone(),
                 leaf_id: heard.place.leaf_id.clone(),
+                run_id: None,
             })
             .collect();
         sessions.sort_by(|a, b| (a.kind, &a.reference).cmp(&(b.kind, &b.reference)));

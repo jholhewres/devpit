@@ -60,7 +60,7 @@ vi.mock('./useShell', () => ({ useShell: () => ({ show: shown }) }))
 const waiting: CardHappening = {
   cardId: 'a',
   activity: 'waiting',
-  sessions: [{ kind: 'pane', ref: 'leaf_1', state: 'waiting', tabId: 'tab_of_a', leafId: 'leaf_1' }],
+  sessions: [{ kind: 'pane', ref: 'leaf_1', state: 'waiting', tabId: 'tab_of_a', leafId: 'leaf_1', runId: null }],
 }
 
 describe("a card's happening on the board", () => {

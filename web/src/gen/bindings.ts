@@ -1093,6 +1093,8 @@ export type CardSession = {
 	/**  Where a pane is, so the card can go to it. */
 	tabId: string | null,
 	leafId: string | null,
+	/**  The run a `run` session belongs to, so the card can stop it. */
+	runId: string | null,
 };
 
 /**
