@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use devpit_core::Store;
 use devpit_git::worktree_path;
-use devpit_rpc::{ErrorCode, LayoutNode, RpcError, SessionLayout};
+use devpit_rpc::{CardTerminal, ErrorCode, LayoutNode, RpcError, SessionLayout};
 use tauri::State;
 use ulid::Ulid;
 
@@ -299,54 +299,63 @@ pub fn session_focus(
     Ok(layout)
 }
 
-/// `terminal.attach_agent` — brings a card's session into the target terminal.
+/// `terminal.attach_agent` — brings a card's background session into the
+/// card's own terminal, in its checkout.
 ///
-/// This is the rule the product turns on: one target terminal per project, and
-/// switching cards switches what is attached to it. The session that was there
-/// keeps running detached; it stops taking up the screen, not working.
-///
-/// The command is typed into the focused pane, which means typing over
-/// whoever is sitting there — so this is only ever an action of the interface,
-/// with the text in front of the person, never a side effect of a drag.
+/// The session that was there keeps running detached; attaching takes up the
+/// screen, not the work. The line is typed into the tab's focused pane, so a
+/// pane running something else is refused rather than typed over — and this is
+/// only ever an action of the interface, never a side effect of a drag.
 #[tauri::command]
 #[specta::specta]
-pub fn terminal_attach_agent(
-    state: State<SessionState>,
+pub async fn terminal_attach_agent(
+    state: State<'_, SessionState>,
     project_id: String,
     card_id: String,
-) -> Result<String, RpcError> {
+) -> Result<CardTerminal, RpcError> {
+    let (project, wanted) = (project_id.clone(), card_id.clone());
+    let (short_id, checkout) = tauri::async_runtime::spawn_blocking(move || {
+        let store = store()?;
+        if store.live_card_project(&wanted)?.as_deref() != Some(project.as_str()) {
+            return Err(RpcError::new(
+                ErrorCode::NotFound,
+                "no such card in this project",
+            ));
+        }
+        let link = store
+            .session_link(&wanted)?
+            .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this card has no session yet"))?;
+        let checkout = crate::checkout::checkout_of(&store, &wanted, |_| {})
+            .map_err(|why| RpcError::new(ErrorCode::Internal, why))?;
+        Ok::<_, RpcError>((link.short_id, checkout))
+    })
+    .await
+    .map_err(|err| RpcError::internal(err.to_string()))??;
+
+    // The card's own tab, made at its checkout if it is not there yet.
+    let tab_id = tab_for_card(&card_id);
+    let layout = ensure_at(&state, &project_id, &tab_id, &checkout)?;
+    let session = devpit_tmux::Server::session_name(&project_id);
+    let target = devpit_tmux::Server::target(&session, &layout.focused_id);
+
+    // Not under the project lock: a shell reaching its prompt takes seconds.
+    let (waiting, leaf) = (session.clone(), layout.focused_id.clone());
+    let ready =
+        tauri::async_runtime::spawn_blocking(move || crate::shell_launch::settled(&waiting, &leaf))
+            .await
+            .map_err(|err| RpcError::internal(err.to_string()))?;
+    let line = crate::attaching::attach_target(&checkout, &short_id, &ready)?;
+
     let lock = state.project_lock(&project_id)?;
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-
-    let store = store()?;
-    let link = store
-        .session_link(&card_id)?
-        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this card has no session yet"))?;
-
-    // The terminal is made if it is not there yet. Refusing because nobody has
-    // opened one is refusing over a step the product can take itself — and the
-    // person clicking this on a card is asking for exactly that terminal.
-    // A card's terminal is a tab of its own, named after the card: opening it
-    // twice lands in the same place, and it is not mixed into whatever the
-    // person had arranged by hand.
-    let tab_id = tab_for_card(&card_id);
-    let layout = match layout_of(&project_id, &tab_id) {
-        Ok(layout) => layout,
-        Err(_) => {
-            let cwd = locate_cwd(&project_id, None)?;
-            load_or_create(&project_id, &tab_id, &cwd)?
-        }
-    };
-
-    let session = devpit_tmux::Server::session_name(&project_id);
-    let target = devpit_tmux::Server::target(&session, &layout.focused_id);
-
-    let line = devpit_agentcli::attach_argv(&link.short_id).join(" ");
     tmux_server()?.send_keys(&target, &line).map_err(tmux_err)?;
-
-    Ok(line)
+    Ok(CardTerminal {
+        layout,
+        tab_id,
+        card_id,
+    })
 }
 
 /// The layout of whichever tab holds this leaf.

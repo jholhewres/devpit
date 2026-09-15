@@ -7,6 +7,7 @@ mod adopting;
 mod advancing;
 mod arranging;
 mod asking;
+mod attaching;
 mod board;
 mod branches;
 mod claims;

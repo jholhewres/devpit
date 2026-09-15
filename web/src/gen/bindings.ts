@@ -569,17 +569,15 @@ export const commands = {
 	 */
 	agentsList: () => typedError<Agents, RpcError>(__TAURI_INVOKE("agents_list")),
 	/**
-	 *  `terminal.attach_agent` — brings a card's session into the target terminal.
+	 *  `terminal.attach_agent` — brings a card's background session into the
+	 *  card's own terminal, in its checkout.
 	 * 
-	 *  This is the rule the product turns on: one target terminal per project, and
-	 *  switching cards switches what is attached to it. The session that was there
-	 *  keeps running detached; it stops taking up the screen, not working.
-	 * 
-	 *  The command is typed into the focused pane, which means typing over
-	 *  whoever is sitting there — so this is only ever an action of the interface,
-	 *  with the text in front of the person, never a side effect of a drag.
+	 *  The session that was there keeps running detached; attaching takes up the
+	 *  screen, not the work. The line is typed into the tab's focused pane, so a
+	 *  pane running something else is refused rather than typed over — and this is
+	 *  only ever an action of the interface, never a side effect of a drag.
 	 */
-	terminalAttachAgent: (projectId: string, cardId: string) => typedError<string, RpcError>(__TAURI_INVOKE("terminal_attach_agent", { projectId, cardId })),
+	terminalAttachAgent: (projectId: string, cardId: string) => typedError<CardTerminal, RpcError>(__TAURI_INVOKE("terminal_attach_agent", { projectId, cardId })),
 	/**
 	 *  `session.ensure` — a layout and a tmux window, created if they were missing.
 	 * 

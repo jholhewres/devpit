@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 
-import type { Checkout, Run } from '../gen/bindings'
+import type { CardSession, Checkout, Run } from '../gen/bindings'
 import { AgentMark } from './AgentMark'
 import { ask, commands } from './live'
 import { OpenIn } from './OpenIn'
@@ -27,12 +27,14 @@ export function CardWork({
   cardId,
   worktree,
   runs,
+  sessions,
   onChanged,
   play,
 }: {
   cardId: string
   worktree: Checkout | null
   runs: readonly Run[]
+  sessions: readonly CardSession[]
   onChanged: () => void
   /** The lane's step, first under the same heading: running it is doing the work too. */
   play?: React.ReactNode
@@ -64,6 +66,17 @@ export function CardWork({
     if (refused) return
     onChanged()
   }, [project, cardId, worktree?.branch, show, onChanged])
+
+  /* The step's detached session, brought into the card's own terminal. */
+  const background = sessions.find((session) => session.kind === 'background')
+  const attach = async (): Promise<void> => {
+    if (!project) return
+    setBusy('Attaching…')
+    const answer = await ask(() => commands.terminalAttachAgent(project.id, cardId))
+    setBusy(null)
+    setProblem(answer.error)
+    if (answer.data) show('term', { id: answer.data.tabId, title: worktree?.branch ?? 'Card', cardId: answer.data.cardId })
+  }
 
   return (
     <section className="cwork">
@@ -124,6 +137,18 @@ export function CardWork({
             </button>
           ))}
       </div>
+
+      {background && (
+        <div className="crun">
+          <span className="crun__b">
+            <span className="crun__t">Background session</span>
+          </span>
+          <span className="crun__s">{background.state ?? 'not heard from yet'}</span>
+          <button className="btn" disabled={Boolean(busy)} onClick={() => void attach()}>
+            Attach in terminal
+          </button>
+        </div>
+      )}
 
       {busy && <p className="pref__d">{busy}</p>}
       {problem && <p className="wtb__no">{problem}</p>}

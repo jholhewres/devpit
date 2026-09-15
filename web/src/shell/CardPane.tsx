@@ -178,6 +178,7 @@ export function CardPane({
               cardId={cardId}
               worktree={detail.worktree}
               runs={detail.runs}
+              sessions={detail.sessions}
               onChanged={card.reload}
               play={<CardPlay cardId={cardId} step={detail.columnStep} onPlayed={card.reload} />}
             />
