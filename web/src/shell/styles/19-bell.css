@@ -38,7 +38,7 @@
 .lstep__pop--wide .fld { margin-top: 12px; }
 .lstep__pop--wide .src__sw { width: 100%; }
 .lstep__pop--wide .src__o { flex: 1; padding: 0 6px; }
-.cardp__acts { margin-left: auto; margin-right: 10px; display: flex; gap: 10px; }
+.cardp__acts { margin-left: auto; display: flex; align-items: center; gap: 2px; }
 
 /* What a card changed, against where it started — never against HEAD. */
 .cdiff { margin-top: 22px; }

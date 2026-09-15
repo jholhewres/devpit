@@ -131,3 +131,23 @@ pub struct Played {
     /// This lane runs nothing, so there was nothing to play.
     pub lane_runs_nothing: bool,
 }
+
+/// Response of `card.delete`.
+///
+/// A refusal is an answer rather than an error: the screen has to know whether
+/// asking again with `force` can change it.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardDeleted {
+    pub deleted: bool,
+    pub refused: Option<DeleteRefusal>,
+}
+
+/// Why a card was not deleted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteRefusal {
+    pub reason: String,
+    /// True only for unsaved work, which is the person's to throw away.
+    pub forcible: bool,
+}

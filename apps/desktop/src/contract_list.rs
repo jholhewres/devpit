@@ -125,6 +125,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         diffs::commit_diff,
         in_flight::run_cancel,
         front::card_archive,
+        front::card_delete,
         front::card_diff,
         columns::step_create,
         steps::agents_list,

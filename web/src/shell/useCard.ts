@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import type { CardDetail } from '../gen/bindings'
+import type { CardDetail, DeleteRefusal } from '../gen/bindings'
 import { ask, commands } from './live'
 
 /*
@@ -30,6 +30,8 @@ export interface Card {
   /** Takes it off the board. Answers with why it was refused, or null — the
    *  backend counts the unsaved work and the dialog quotes that count. */
   archive: (force: boolean) => Promise<string | null>
+  /** Deletes it. Answers with the refusal or the error, or null once it is gone. */
+  remove: (force: boolean) => Promise<DeleteRefusal | string | null>
   reload: () => void
 }
 
@@ -97,6 +99,15 @@ export function useCard(
       setError(answer.error)
       if (!answer.error) onChanged?.()
       return answer.error
+    },
+    remove: async (force) => {
+      if (!projectId || !cardId) return 'no card open'
+      const answer = await ask(() => commands.cardDelete(projectId, cardId, force))
+      setError(answer.error)
+      if (answer.error) return answer.error
+      if (answer.data?.refused) return answer.data.refused
+      onChanged?.()
+      return null
     },
     reload,
   }

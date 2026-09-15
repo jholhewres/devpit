@@ -5,7 +5,7 @@ import { CardDiff } from './CardDiff'
 import { CardPlay } from './CardPlay'
 import { CardWork } from './CardWork'
 import { Comments } from './Comments'
-import { Confirm } from './Confirm'
+import { CardEnding, CardHeader, type Ending } from './CardHeader'
 import { dueLabel, fromField, nearness, toField } from './due'
 import { useCard } from './useCard'
 import { useShell } from './useShell'
@@ -41,7 +41,8 @@ export function CardPane({
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [dirty, setDirty] = useState(false)
-  const [archiving, setArchiving] = useState<string | true | null>(null)
+  const [ending, setEnding] = useState<Ending | null>(null)
+  const [problem, setProblem] = useState<string | null>(null)
   /* Play on a lane with no step offers a terminal, and `CardWork` is what
      knows how to open one — so the ask travels rather than the code. */
   const [openTerminal, setOpenTerminal] = useState(false)
@@ -73,17 +74,13 @@ export function CardPane({
   return (
     <div className="cardp" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="cardp__box" role="dialog" aria-modal="true" aria-label="Card">
-        <header className="cardp__top">
-          <span className="cardp__col">{detail?.columnName}</span>
-          <span className="cardp__acts">
-            <button className="conv__act" data-danger onClick={() => setArchiving(true)}>
-              Archive
-            </button>
-          </span>
-          <button className="auth__x" aria-label="Close" onClick={onClose}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          </button>
-        </header>
+        <CardHeader
+          column={detail?.columnName}
+          problem={problem}
+          onArchive={() => setEnding({ what: 'archive' })}
+          onDelete={() => setEnding({ what: 'delete' })}
+          onClose={onClose}
+        />
 
         {!detail && !card.error && <p className="pref__d">Opening…</p>}
         {card.error && <p className="wtb__no">{card.error}</p>}
@@ -181,27 +178,17 @@ export function CardPane({
         )}
       </div>
 
-      {archiving && (
-        <Confirm
-          title="Archive this card?"
-          body={
-            typeof archiving === 'string'
-              ? archiving
-              : 'It comes off the board. Its branch and its checkout stay exactly where they are.'
-          }
-          danger={typeof archiving === 'string' ? 'Archive anyway' : 'Archive'}
-          onClose={() => setArchiving(null)}
-          onConfirm={() => {
-            /* The first press asks without forcing. The backend counts the
-               unsaved work and refuses with that count, and the refusal is
-               what the second question says — a warning this screen wrote
-               itself would be a number it never read. */
-            void card.archive(typeof archiving === 'string').then((refused) => {
-              if (refused) return setArchiving(refused)
-              setArchiving(null)
-              onClose()
-            })
-          }}
+      {/* Beside the box, not inside it: the box animates in, and a transform
+          on an ancestor would anchor the dialog to the box. */}
+      {ending && (
+        <CardEnding
+          ending={ending}
+          detail={detail}
+          archive={card.archive}
+          remove={card.remove}
+          onAsk={setEnding}
+          onProblem={setProblem}
+          onDone={onClose}
         />
       )}
     </div>

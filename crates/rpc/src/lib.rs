@@ -33,7 +33,9 @@ pub mod usage;
 pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use board::{Board, Card, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
-pub use card::{CardDetail, Checkout, Comment, Notice, Notices, Pinned, Played};
+pub use card::{
+    CardDeleted, CardDetail, Checkout, Comment, DeleteRefusal, Notice, Notices, Pinned, Played,
+};
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
 pub use error::{ErrorCode, RpcError};

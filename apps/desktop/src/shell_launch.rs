@@ -71,7 +71,7 @@ pub async fn session_running(project_id: String) -> Result<Vec<PaneRunning>, Rpc
         .map_err(|err| RpcError::internal(err.to_string()))?
 }
 
-fn running_in(project_id: &str) -> Result<Vec<PaneRunning>, RpcError> {
+pub(crate) fn running_in(project_id: &str) -> Result<Vec<PaneRunning>, RpcError> {
     let Ok(server) = crate::sessions::tmux_server() else {
         return Ok(Vec::new());
     };

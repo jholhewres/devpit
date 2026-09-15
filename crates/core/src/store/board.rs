@@ -257,6 +257,15 @@ impl Store {
         Ok(())
     }
 
+    /// Comments, pins, runs and notices go with it by cascade; the checkout
+    /// and its branch are files, and nothing here touches them.
+    pub fn delete_card(&self, card_id: &str) -> Result<bool, StoreError> {
+        Ok(self
+            .conn
+            .execute("DELETE FROM card WHERE id = ?1", [card_id])?
+            > 0)
+    }
+
     pub fn steps(&self, project_id: &str) -> Result<Vec<StepRow>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, kind, name, config, irreversible FROM step \

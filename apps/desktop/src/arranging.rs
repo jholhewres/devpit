@@ -207,18 +207,27 @@ pub fn session_close_tab(
     project_id: String,
     tab_id: String,
 ) -> Result<(), RpcError> {
-    let lock = state.project_lock(&project_id)?;
+    close_tab(&state, &project_id, &tab_id)
+}
+
+/// The body of `session.close_tab`, for a card that takes its own tab with it.
+pub(crate) fn close_tab(
+    state: &SessionState,
+    project_id: &str,
+    tab_id: &str,
+) -> Result<(), RpcError> {
+    let lock = state.project_lock(project_id)?;
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
 
     // A tab with no tree is already closed. Saying so is not an error: the
     // window asks on every close, including ones that never opened a session.
-    let Ok(layout) = layout_of(&project_id, &tab_id) else {
+    let Ok(layout) = layout_of(project_id, tab_id) else {
         return Ok(());
     };
     let server = tmux_server()?;
-    let session = devpit_tmux::Server::session_name(&project_id);
+    let session = devpit_tmux::Server::session_name(project_id);
     for (leaf_id, _) in layout.tree.leaves() {
         let target = devpit_tmux::Server::target(&session, leaf_id);
         state.taps.forget(&server, leaf_id, &target);
@@ -226,6 +235,6 @@ pub fn session_close_tab(
         let _ = server.kill_window(&session, leaf_id);
         let _ = store()?.forget_pane_agent(leaf_id);
     }
-    store()?.forget_pane_layout(&project_id, &tab_id)?;
+    store()?.forget_pane_layout(project_id, tab_id)?;
     Ok(())
 }

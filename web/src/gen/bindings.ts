@@ -544,6 +544,8 @@ export const commands = {
 	 *  that work nobody committed was not worth keeping.
 	 */
 	cardArchive: (projectId: string, cardId: string, force: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("card_archive", { projectId, cardId, force })),
+	/**  `card.delete` — the card and what hangs off it, never its checkout or branch. */
+	cardDelete: (projectId: string, cardId: string, force: boolean) => typedError<CardDeleted, RpcError>(__TAURI_INVOKE("card_delete", { projectId, cardId, force })),
 	/**
 	 *  `card.diff` — what this front changed, against the ref it began from.
 	 * 
@@ -1004,6 +1006,17 @@ export type CardChanged = {
 	started: Run | null,
 };
 
+/**
+ *  Response of `card.delete`.
+ * 
+ *  A refusal is an answer rather than an error: the screen has to know whether
+ *  asking again with `force` can change it.
+ */
+export type CardDeleted = {
+	deleted: boolean,
+	refused: DeleteRefusal | null,
+};
+
 /**  Everything one card is, for the screen that opens it. */
 export type CardDetail = {
 	card: Card,
@@ -1230,6 +1243,13 @@ export type Declared = {
 	command?: string,
 	args?: string[],
 	env?: EnvVar[],
+};
+
+/**  Why a card was not deleted. */
+export type DeleteRefusal = {
+	reason: string,
+	/**  True only for unsaved work, which is the person's to throw away. */
+	forcible: boolean,
 };
 
 /**

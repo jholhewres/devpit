@@ -261,3 +261,31 @@ fn the_default_board_is_a_seed_and_not_a_contract() {
     // which would quietly depend on the seed's order otherwise.
     assert_eq!(DEFAULT_COLUMNS.len(), 6);
 }
+
+#[test]
+fn deleting_a_card_takes_its_comments_pins_and_runs() {
+    let (dir, store, card) = seeded();
+    let project = store
+        .project_id_of_card(&card)
+        .expect("read")
+        .expect("there");
+    store.add_comment(&card, "you", "a line").expect("comment");
+    let file = dir.path().join("project").join("notes.md");
+    std::fs::write(&file, "x").expect("write");
+    store
+        .attach(&card, file.to_str().expect("utf8"), "notes", None)
+        .expect("pin");
+    let step = store
+        .create_step(&project, "command", "tests", "make test", false)
+        .expect("step");
+    store.start_run(&card, &step, None).expect("run");
+
+    assert!(store.delete_card(&card).expect("delete"));
+    assert!(store.card(&card).expect("read").is_none());
+    assert!(store.comments(&card).expect("comments").is_empty());
+    assert!(store.attachments(&card).expect("pins").is_empty());
+    assert!(store.runs(&card).expect("runs").is_empty());
+    // The step belongs to the lane, and stays.
+    assert_eq!(store.steps(&project).expect("steps").len(), 1);
+    assert!(!store.delete_card(&card).expect("again"));
+}
