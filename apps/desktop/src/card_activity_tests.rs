@@ -263,3 +263,52 @@ fn a_card_adds_up_to_the_state_most_worth_looking_at() {
     }
     assert_eq!(activity(&[]), None);
 }
+
+#[test]
+fn closing_a_card_pane_takes_it_off_the_card() {
+    let mut activities = Activities::default();
+    hear(
+        &mut activities,
+        pane("card_1", "leaf_a"),
+        1,
+        Doing::Working,
+        place("leaf_a"),
+    )
+    .expect("a");
+    hear(
+        &mut activities,
+        pane("card_1", "leaf_b"),
+        2,
+        Doing::Waiting,
+        place("leaf_b"),
+    )
+    .expect("b");
+
+    let told = forget_leaf(&mut activities, "leaf_b").expect("told");
+    let left: Vec<&str> = told
+        .sessions
+        .iter()
+        .map(|session| session.reference.as_str())
+        .collect();
+    assert_eq!(left, ["leaf_a"]);
+    assert_eq!(told.activity, Some(Doing::Working));
+    // Closing it twice tells nobody anything.
+    assert_eq!(forget_leaf(&mut activities, "leaf_b"), None);
+}
+
+#[test]
+fn a_pane_continued_in_a_chat_leaves_the_card_once_its_leaf_closes() {
+    // Continue in chat adopts the session, then closes the leaf that ran it.
+    let mut activities = Activities::default();
+    hear(
+        &mut activities,
+        pane("card_1", "leaf_a"),
+        1,
+        Doing::Waiting,
+        place("leaf_a"),
+    )
+    .expect("a");
+    let told = forget_leaf(&mut activities, "leaf_a").expect("told");
+    assert!(told.sessions.is_empty());
+    assert_eq!(told.activity, None);
+}

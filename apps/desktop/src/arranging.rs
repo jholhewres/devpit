@@ -70,6 +70,7 @@ pub fn session_split(
 #[tauri::command]
 #[specta::specta]
 pub fn session_close_leaf(
+    app: tauri::AppHandle,
     state: State<SessionState>,
     project_id: String,
     tab_id: String,
@@ -109,6 +110,7 @@ pub fn session_close_leaf(
     server.kill_window(&session, &leaf_id).map_err(tmux_err)?;
     // A pane closed on purpose is not one to start an agent in again.
     let _ = store()?.forget_pane_agent(&leaf_id);
+    crate::card_activity::panes_closed(&app, std::slice::from_ref(&leaf_id));
 
     // Focus follows the tree when it pointed at what just left.
     let focused_id = if current.focused_id == leaf_id {
@@ -203,19 +205,23 @@ pub fn session_set_ratio(
 #[tauri::command]
 #[specta::specta]
 pub fn session_close_tab(
+    app: tauri::AppHandle,
     state: State<SessionState>,
     project_id: String,
     tab_id: String,
 ) -> Result<(), RpcError> {
-    close_tab(&state, &project_id, &tab_id)
+    let closed = close_tab(&state, &project_id, &tab_id)?;
+    crate::card_activity::panes_closed(&app, &closed);
+    Ok(())
 }
 
 /// The body of `session.close_tab`, for a card that takes its own tab with it.
+/// Answers the leaves it closed.
 pub(crate) fn close_tab(
     state: &SessionState,
     project_id: &str,
     tab_id: &str,
-) -> Result<(), RpcError> {
+) -> Result<Vec<String>, RpcError> {
     let lock = state.project_lock(project_id)?;
     let _guard = lock
         .lock()
@@ -224,8 +230,14 @@ pub(crate) fn close_tab(
     // A tab with no tree is already closed. Saying so is not an error: the
     // window asks on every close, including ones that never opened a session.
     let Ok(layout) = layout_of(project_id, tab_id) else {
-        return Ok(());
+        return Ok(Vec::new());
     };
+    let closed: Vec<String> = layout
+        .tree
+        .leaves()
+        .into_iter()
+        .map(|(leaf, _)| leaf.to_owned())
+        .collect();
     let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(project_id);
     for (leaf_id, _) in layout.tree.leaves() {
@@ -236,5 +248,5 @@ pub(crate) fn close_tab(
         let _ = store()?.forget_pane_agent(leaf_id);
     }
     store()?.forget_pane_layout(project_id, tab_id)?;
-    Ok(())
+    Ok(closed)
 }

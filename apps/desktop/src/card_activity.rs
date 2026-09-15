@@ -130,6 +130,32 @@ pub(crate) fn hear(
     Some(activities.happening(&card_id))
 }
 
+/// Takes a closed pane off its card, and answers what the card shows now.
+///
+/// A closed window posts nothing more, so without this the pane would stay on
+/// the card as whatever it last said — `working`, forever.
+pub(crate) fn forget_leaf(activities: &mut Activities, leaf: &str) -> Option<CardHappening> {
+    let key = activities
+        .heard
+        .keys()
+        .find(|key| key.kind == SessionKind::Pane && key.reference == leaf)
+        .cloned()?;
+    activities.heard.remove(&key);
+    Some(activities.happening(&key.card_id))
+}
+
+/// `forget_leaf` for the panes the window just closed, told to the window.
+pub(crate) fn panes_closed(app: &tauri::AppHandle, leaves: &[String]) {
+    let Ok(mut activities) = registry().lock() else {
+        return;
+    };
+    for leaf in leaves {
+        if let Some(happening) = forget_leaf(&mut activities, leaf) {
+            let _ = tauri::Emitter::emit(app, "card:happening", happening);
+        }
+    }
+}
+
 /// What a card's sessions add up to on its tile: the one most worth looking at.
 pub(crate) fn activity(sessions: &[CardSession]) -> Option<Doing> {
     sessions
