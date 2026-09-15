@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Attachments } from './Attachments'
 import { CardDiff } from './CardDiff'
@@ -24,6 +24,17 @@ import { money } from './chat'
  * thing, and a panel that squeezes six lanes into four to show you one card
  * makes you lose your place to read it.
  */
+
+/** What Escape does in an open card.
+ *
+ *  A dialog over the card hears it first; then the field being typed in, which
+ *  only lets go of the keyboard; only then the card. Closing on the first Esc
+ *  took a half-written description with it. */
+export function escapeMeans(focused: Element | null, confirming: boolean): 'nothing' | 'blur' | 'close' {
+  if (confirming) return 'nothing'
+  if (focused?.closest('input, textarea, select, [contenteditable="true"]')) return 'blur'
+  return 'close'
+}
 
 export function CardPane({
   cardId,
@@ -58,31 +69,53 @@ export function CardPane({
     setBody(detail.card.body)
   }, [detail, dirty])
 
-  useEffect(() => {
-    const key = (event: KeyboardEvent): void => {
-      if (abandoned(event)) onClose()
-    }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
-  }, [onClose])
-
   const save = (): void => {
     if (!dirty) return
     setDirty(false)
     card.save(title.trim() || 'Untitled', body)
   }
 
+  /* The fields save on blur, and a close by Esc or by a click outside is not
+     a blur — so closing is the last chance to keep what was typed. */
+  const close = (): void => {
+    save()
+    onClose()
+  }
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent): void => {
+      if (!abandoned(event)) return
+      const focused = document.activeElement
+      const means = escapeMeans(focused, document.querySelector('.ask') !== null)
+      if (means === 'blur') (focused as HTMLElement).blur()
+      if (means === 'close') close()
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  })
+
+  /* A press that starts in the box and ends outside it — selecting text past
+     the edge — is not a click on the backdrop, though the browser says it is. */
+  const pressedOutside = useRef(false)
+
   const near = nearness(detail?.card.dueAt ?? null)
 
   return (
-    <div className="cardp" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      className="cardp"
+      data-open="true"
+      onPointerDown={(event) => {
+        pressedOutside.current = event.target === event.currentTarget
+      }}
+      onClick={(event) => pressedOutside.current && event.target === event.currentTarget && close()}
+    >
       <div className="cardp__box" role="dialog" aria-modal="true" aria-label="Card">
         <CardHeader
           column={detail?.columnName}
           problem={problem}
           onArchive={() => setEnding({ what: 'archive' })}
           onDelete={() => setEnding({ what: 'delete' })}
-          onClose={onClose}
+          onClose={close}
         />
 
         {!detail && !card.error && <p className="pref__d">Opening…</p>}
