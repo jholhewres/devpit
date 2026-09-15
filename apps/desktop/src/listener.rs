@@ -66,6 +66,7 @@ pub fn start(app: AppHandle, root: &Path) {
 }
 
 fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
+    trace(&format!("post seq={seq}"));
     let Some(posted) = read_request(&mut stream) else {
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return;
@@ -200,6 +201,21 @@ fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) {
     }
 }
 
+/// A timestamped line on stderr, only with `DEVPIT_TRACE_HOOKS` set: how long a
+/// hook's post takes to reach the window is measured from these, by a person
+/// running the app, and nobody else pays for the lines.
+fn trace(what: &str) {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*ON.get_or_init(|| std::env::var_os("DEVPIT_TRACE_HOOKS").is_some()) {
+        return;
+    }
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_millis())
+        .unwrap_or_default();
+    eprintln!("devpit-trace {millis} {what}");
+}
+
 /// Where what a hook says goes: the window, and the bell.
 ///
 /// A trait rather than the `AppHandle`, so the listener's core runs without a
@@ -216,6 +232,9 @@ pub(crate) trait HookSink {
 
 impl HookSink for AppHandle {
     fn to_window<P: serde::Serialize + Clone>(&self, channel: &str, payload: P) {
+        if channel == "card:happening" {
+            trace("emit card:happening");
+        }
         let _ = self.emit(channel, payload);
     }
 
