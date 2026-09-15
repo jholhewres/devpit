@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import type { Checkout, Run } from '../gen/bindings'
 import { AgentMark } from './AgentMark'
@@ -27,17 +27,14 @@ export function CardWork({
   worktree,
   runs,
   onChanged,
-  openTerminal,
-  onTerminalOpened,
+  play,
 }: {
   cardId: string
   worktree: Checkout | null
   runs: readonly Run[]
   onChanged: () => void
-  /** Asked from elsewhere — play on a lane with no step offers a terminal,
-   *  and this is what knows how to open one. */
-  openTerminal?: boolean
-  onTerminalOpened?: () => void
+  /** The lane's step, first under the same heading: running it is doing the work too. */
+  play?: React.ReactNode
 }): React.JSX.Element {
   const { project, show } = useShell()
   /* Only what Settings still offers. */
@@ -72,17 +69,10 @@ export function CardWork({
     onChanged()
   }, [project, cardId, worktree?.branch, show, onChanged])
 
-  /* Asked from the play button when the lane runs nothing: this is what knows
-     how to open a terminal, so the ask travels rather than the code. */
-  useEffect(() => {
-    if (!openTerminal) return
-    onTerminalOpened?.()
-    void openTerminalFor()
-  }, [openTerminal, onTerminalOpened, openTerminalFor])
-
   return (
     <section className="cwork">
       <h2 className="cardp__h">Work</h2>
+      {play}
 
       {worktree ? (
         <div className="cwork__wt" data-gone={!worktree.exists}>

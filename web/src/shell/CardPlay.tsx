@@ -8,10 +8,9 @@ import { useShell } from './useShell'
 /*
  * Play: do this lane's step on this card, now.
  *
- * One meaning, and only one. A lane with no step says so and offers a terminal
- * instead — a button that does one thing when the lane has a step and
- * something else when it does not is a button with two invisible meanings, and
- * the lane's step name is on the lane, so saying which will happen is free.
+ * One meaning, and only one. A lane with no step says so and leaves the
+ * terminal to the button below it in the same section — it used to draw a
+ * second "Open a terminal" right above the first.
  *
  * What it does NOT ask is most of what Orca's dialog asks. The card already
  * carries the work: its title, its description, its files, its conversation.
@@ -24,13 +23,11 @@ export function CardPlay({
   cardId,
   step,
   onPlayed,
-  onOpenTerminal,
 }: {
   cardId: string
   /** What the lane the card is in runs, if anything. */
   step: Step | null
   onPlayed: () => void
-  onOpenTerminal: () => void
 }): React.JSX.Element {
   const { project } = useShell()
   const [busy, setBusy] = useState(false)
@@ -56,10 +53,6 @@ export function CardPlay({
   if (!step) {
     return (
       <div className="play">
-        <button className="btn" onClick={onOpenTerminal}>
-          <Triangle />
-          Open a terminal
-        </button>
         <span className="play__d">This lane runs nothing on its own.</span>
       </div>
     )

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Played, Step } from '../gen/bindings'
 import { CardPlay } from './CardPlay'
+import { CardWork } from './CardWork'
 
 afterEach(cleanup)
 
@@ -18,6 +19,8 @@ vi.mock('./live', () => ({
         : { data: call(), error: null, loading: false },
     ),
   commands: {
+    agentsKnown: () => [],
+    appsList: () => [],
     cardPlay: (_project: string, card: string, confirmed: boolean) => {
       played(card, confirmed)
       return answer
@@ -25,7 +28,7 @@ vi.mock('./live', () => ({
   },
 }))
 
-vi.mock('./useShell', () => ({ useShell: () => ({ project: { id: 'p1' } }) }))
+vi.mock('./useShell', () => ({ useShell: () => ({ project: { id: 'p1' }, show: vi.fn() }) }))
 
 const step = (over: Partial<Step> = {}): Step => ({
   id: 'step_1',
@@ -47,21 +50,19 @@ describe('playing a card', () => {
      a step and something else when it does not is a button with two invisible
      meanings. */
   it('names the step it will run', () => {
-    render(<CardPlay cardId="card_1" step={step()} onPlayed={vi.fn()} onOpenTerminal={vi.fn()} />)
+    render(<CardPlay cardId="card_1" step={step()} onPlayed={vi.fn()} />)
     expect(screen.getByText('Run the tests')).toBeTruthy()
   })
 
   it('says the lane runs nothing rather than pretending to play', () => {
-    const onOpenTerminal = vi.fn()
-    render(<CardPlay cardId="card_1" step={null} onPlayed={vi.fn()} onOpenTerminal={onOpenTerminal} />)
-    expect(screen.getByText(/runs nothing on its own/)).toBeTruthy()
-    fireEvent.click(screen.getByText('Open a terminal'))
-    expect(onOpenTerminal).toHaveBeenCalled()
+    render(<CardPlay cardId="card_1" step={null} onPlayed={vi.fn()} />)
+    expect(screen.getByText('This lane runs nothing on its own.')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
   it('starts the run unconfirmed, for an ordinary step', async () => {
     const onPlayed = vi.fn()
-    render(<CardPlay cardId="card_1" step={step()} onPlayed={onPlayed} onOpenTerminal={vi.fn()} />)
+    render(<CardPlay cardId="card_1" step={step()} onPlayed={onPlayed} />)
     fireEvent.click(screen.getByText('Run the tests'))
     await waitFor(() => expect(played).toHaveBeenCalledWith('card_1', false))
     await waitFor(() => expect(onPlayed).toHaveBeenCalled())
@@ -77,7 +78,7 @@ describe('playing a card', () => {
         cardId="card_1"
         step={step({ name: 'deploy', irreversible: true })}
         onPlayed={onPlayed}
-        onOpenTerminal={vi.fn()}
+       
       />,
     )
     expect(screen.getByText('no undo')).toBeTruthy()
@@ -95,7 +96,7 @@ describe('playing a card', () => {
         cardId="card_1"
         step={step({ name: 'deploy', irreversible: true })}
         onPlayed={vi.fn()}
-        onOpenTerminal={vi.fn()}
+       
       />,
     )
     fireEvent.click(screen.getByText('Run deploy'))
@@ -110,8 +111,36 @@ describe('playing a card', () => {
      backend refuses it. The refusal is what the screen says. */
   it('shows the refusal rather than swallowing it', async () => {
     refusal = 'something is already running on this card'
-    render(<CardPlay cardId="card_1" step={step()} onPlayed={vi.fn()} onOpenTerminal={vi.fn()} />)
+    render(<CardPlay cardId="card_1" step={step()} onPlayed={vi.fn()} />)
     fireEvent.click(screen.getByText('Run the tests'))
     expect(await screen.findByText(/already running/)).toBeTruthy()
   })
 })
+
+describe('the work section of a card', () => {
+  const work = (step: Step | null) =>
+    render(
+      <CardWork
+        cardId="card_1"
+        worktree={null}
+        runs={[]}
+        onChanged={vi.fn()}
+        play={<CardPlay cardId="card_1" step={step} onPlayed={vi.fn()} />}
+      />,
+    )
+
+  it('offers one terminal when the lane runs nothing', () => {
+    work(null)
+    expect(screen.getAllByRole('button', { name: 'Open a terminal' })).toHaveLength(1)
+  })
+
+  it('puts play, the checkout and the terminal under one heading', () => {
+    work(step())
+    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Work'])
+    const section = screen.getByRole('heading', { name: 'Work' }).closest('section')
+    expect(section?.contains(screen.getByRole('button', { name: /Run the tests/ }))).toBe(true)
+    expect(section?.contains(screen.getByRole('button', { name: 'Make a checkout' }))).toBe(true)
+    expect(section?.contains(screen.getByRole('button', { name: 'Open a terminal' }))).toBe(true)
+  })
+})
+

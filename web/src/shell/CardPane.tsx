@@ -57,9 +57,6 @@ export function CardPane({
   const [dirty, setDirty] = useState(false)
   const [ending, setEnding] = useState<Ending | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
-  /* Play on a lane with no step offers a terminal, and `CardWork` is what
-     knows how to open one — so the ask travels rather than the code. */
-  const [openTerminal, setOpenTerminal] = useState(false)
 
   /* The fields follow the card until they are touched. After that they are
      what was typed: a reload landing mid-sentence must not take the sentence. */
@@ -177,21 +174,12 @@ export function CardPane({
               </div>
             )}
 
-            <h2 className="cardp__h">Do the work</h2>
-            <CardPlay
-              cardId={cardId}
-              step={detail.columnStep}
-              onPlayed={card.reload}
-              onOpenTerminal={() => setOpenTerminal(true)}
-            />
-
             <CardWork
               cardId={cardId}
               worktree={detail.worktree}
               runs={detail.runs}
               onChanged={card.reload}
-              openTerminal={openTerminal}
-              onTerminalOpened={() => setOpenTerminal(false)}
+              play={<CardPlay cardId={cardId} step={detail.columnStep} onPlayed={card.reload} />}
             />
 
             {/* Only once the card has a checkout: there is nothing to
