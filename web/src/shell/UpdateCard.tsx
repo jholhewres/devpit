@@ -23,7 +23,7 @@ function offer(status: UpdateStatus): { title: string; said: string } | null {
     case 'ready':
       return { title: `devpit ${status.version} is ready`, said: 'It is installed when you restart.' }
     case 'manualInstall':
-      return { title: 'A package to install', said: status.command }
+      return { title: 'Install this package yourself', said: status.path }
     case 'failed':
       return { title: 'The update did not go through', said: status.message }
     default:
@@ -34,6 +34,7 @@ function offer(status: UpdateStatus): { title: string; said: string } | null {
 export function UpdateCard(): React.JSX.Element | null {
   const [status, setStatus] = useState<UpdateStatus | null>(null)
   const [later, setLater] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
 
   useEffect(
     () =>
@@ -51,6 +52,7 @@ export function UpdateCard(): React.JSX.Element | null {
 
   const downloading = status.type === 'downloading'
   const fromATestFeed = status.type === 'available' && status.testFeed
+  const manual = status.type === 'manualInstall' ? status : null
 
   return (
     <div className="upd" role="status" aria-label="Update">
@@ -64,7 +66,36 @@ export function UpdateCard(): React.JSX.Element | null {
           <div className="upd__fill" style={{ width: `${status.percent}%` }} />
         </div>
       )}
+      {manual && (
+        <>
+          <code className="upd__cmd">{copied ?? manual.command}</code>
+          <span className="upd__d">
+            devpit checked this file against the release&rsquo;s signature when it downloaded it,
+            and again just now. What the command does after that is your package manager&rsquo;s,
+            not devpit&rsquo;s — devpit never runs it.
+          </span>
+        </>
+      )}
       <div className="upd__row">
+        {manual && (
+          <button
+            className="btn"
+            onClick={() => {
+              // Asked again rather than copied from the card: the file has been
+              // sitting in a cache since it arrived.
+              void ask(() => commands.updatePackage()).then((answer) => {
+                if (answer.data) {
+                  void navigator.clipboard?.writeText(answer.data)
+                  setCopied(answer.data)
+                } else if (answer.error) {
+                  setStatus({ type: 'failed', message: answer.error, recoverable: true })
+                }
+              })
+            }}
+          >
+            Copy command
+          </button>
+        )}
         <button className="btn" onClick={() => setLater(true)}>
           Later
         </button>

@@ -39,6 +39,11 @@ pub(crate) enum Event {
     Downloaded {
         version: String,
     },
+    /// A package this app will not install: the person runs the command.
+    Manual {
+        command: String,
+        path: String,
+    },
     /// Not now.
     Cancel,
     /// Put it in.
@@ -90,6 +95,9 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
             percent: percent.min(100),
         }),
         (S::Downloading { .. }, E::Downloaded { version }) => Some(S::Ready { version }),
+        (S::Downloading { .. }, E::Manual { command, path }) => {
+            Some(S::ManualInstall { command, path })
+        }
         (S::Ready { .. }, E::Blocked { runs, turns, since }) => {
             Some(S::Waiting { runs, turns, since })
         }
@@ -243,6 +251,9 @@ pub struct Updating {
     pub(crate) window_ready: tokio::sync::Notify,
     pub(crate) found: std::sync::Mutex<Option<tauri_plugin_updater::Update>>,
     pub(crate) downloaded: std::sync::Mutex<Option<(String, Vec<u8>)>>,
+    /// A package written to the cache, and what it hashed to when it was
+    /// verified. Checked again before its command is shown.
+    pub(crate) package: std::sync::Mutex<Option<(std::path::PathBuf, String)>>,
 }
 
 impl Updating {
@@ -580,6 +591,30 @@ pub fn update_restart_ready(updating: tauri::State<'_, Updating>) {
     updating.window_ready.notify_one();
 }
 
+/// `update.package` — the command for the package that was downloaded.
+///
+/// Checked again here rather than trusted from the download: a person may come
+/// back to this card hours later, and the file has been sitting in a
+/// world-readable cache the whole time. A file that is no longer what was
+/// verified gets its own sentence and no command at all.
+#[tauri::command]
+#[specta::specta]
+pub fn update_package(updating: tauri::State<'_, Updating>) -> Result<String, RpcError> {
+    let (path, digest) = updating
+        .package
+        .lock()
+        .ok()
+        .and_then(|held| held.clone())
+        .ok_or_else(|| RpcError::internal("no package has been downloaded"))?;
+
+    let folder = crate::update_deb::cache_dir();
+    crate::update_deb::still_ours(&path, &folder, &digest)
+        .map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why.said().to_owned()))?;
+
+    crate::update_deb::install_command(&path, &crate::update_deb::TRUSTED)
+        .map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why))
+}
+
 /// `update.install` — put it in and come back.
 ///
 /// Only an AppImage is installed from here: a `.deb` is shown as a command for
@@ -799,6 +834,29 @@ pub async fn update_download(
             }
             RpcError::internal(message)
         })?;
+
+    // A package is not installed from here: it is written where the package
+    // manager can read it, and the person is given the command.
+    if kind_here() == InstallKind::Deb {
+        let (path, digest) = crate::update_deb::keep(&bytes, &version)
+            .map_err(|why| RpcError::internal(format!("the package could not be kept: {why}")))?;
+        if let Ok(mut held) = updating.package.lock() {
+            *held = Some((path.clone(), digest));
+        }
+        let command = crate::update_deb::install_command(&path, &crate::update_deb::TRUSTED)
+            .unwrap_or_else(|why| why);
+        let now = updating.state();
+        let manual = next(
+            &now,
+            Event::Manual {
+                command,
+                path: path.display().to_string(),
+            },
+        )
+        .ok_or_else(|| RpcError::internal("the package ended nowhere"))?;
+        updating.moved_to(&app, manual.clone());
+        return Ok(manual);
+    }
 
     if let Ok(mut held) = updating.downloaded.lock() {
         *held = Some((version.clone(), bytes));

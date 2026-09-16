@@ -41,6 +41,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         update::update_choose,
         update::update_install,
         update::update_restart_ready,
+        update::update_package,
         spend_history::spend_history,
         card_chat::card_chat,
         rewinding::chat_rewind,

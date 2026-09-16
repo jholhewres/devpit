@@ -90,6 +90,7 @@ mod tap;
 mod threads;
 mod turn_changes;
 mod update;
+mod update_deb;
 mod watching;
 mod working;
 mod workspace;

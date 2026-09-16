@@ -121,6 +121,15 @@ export const commands = {
 	/**  `update.restart_ready` — the window has saved what it had. */
 	updateRestartReady: () => __TAURI_INVOKE<void>("update_restart_ready"),
 	/**
+	 *  `update.package` — the command for the package that was downloaded.
+	 * 
+	 *  Checked again here rather than trusted from the download: a person may come
+	 *  back to this card hours later, and the file has been sitting in a
+	 *  world-readable cache the whole time. A file that is no longer what was
+	 *  verified gets its own sentence and no command at all.
+	 */
+	updatePackage: () => typedError<string, RpcError>(__TAURI_INVOKE("update_package")),
+	/**
 	 *  `spend.history` — what the agents spent over the last `days`, from their
 	 *  transcripts, for one installation or all and one project or all.
 	 */

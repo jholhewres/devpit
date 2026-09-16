@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { UpdateStatus } from '../gen/bindings'
@@ -13,12 +13,13 @@ vi.mock('./window', () => ({
 }))
 
 const download = vi.fn(async () => ({ status: 'ok', data: null }))
+const packaged = vi.fn(async () => ({ status: 'ok', data: "sudo /usr/bin/apt install '/c/devpit.deb'" }))
 vi.mock('./live', () => ({
-  ask: async (call: () => Promise<unknown>) => {
-    await call()
-    return { data: null, error: null, loading: false }
+  ask: async (call: () => Promise<{ data?: unknown }>) => {
+    const answer = (await call()) as { data?: unknown }
+    return { data: answer?.data ?? null, error: null, loading: false }
   },
-  commands: { updateDownload: () => download() },
+  commands: { updateDownload: () => download(), updatePackage: () => packaged() },
 }))
 
 /* The app pushes these in from outside React, so the render has to be let
@@ -95,5 +96,27 @@ describe('the update card', () => {
     render(<UpdateCard />)
     say({ type: 'failed', message: 'the download failed', recoverable: true })
     expect(screen.getByText('the download failed')).toBeTruthy()
+  })
+
+  /* A package devpit will not install: the path, the note, and a command asked
+     for again at the moment it is copied. */
+  it('shows a package to install by hand, and asks again before copying', async () => {
+    const written = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText: written } })
+    render(<UpdateCard />)
+
+    say({
+      type: 'manualInstall',
+      command: "sudo /usr/bin/apt install '/c/devpit.deb'",
+      path: '/c/devpit.deb',
+    })
+
+    expect(screen.getByText('Install this package yourself')).toBeTruthy()
+    expect(screen.getByText('/c/devpit.deb')).toBeTruthy()
+    expect(screen.getByText(/devpit never runs it/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    await waitFor(() => expect(packaged).toHaveBeenCalled())
+    expect(written).toHaveBeenCalledWith("sudo /usr/bin/apt install '/c/devpit.deb'")
   })
 })
