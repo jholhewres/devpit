@@ -60,7 +60,7 @@ pub fn start_chained(
     // process would die with this one at the commit.
     if let Some(updating) = tauri::Manager::try_state::<crate::update::Updating>(&app) {
         if let Some(why) = crate::update::starting_refused(&updating.state()) {
-            return Err(RpcError::new(ErrorCode::Conflict, why.to_owned()));
+            return Err(RpcError::new(ErrorCode::Busy, why.to_owned()));
         }
     }
 

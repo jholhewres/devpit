@@ -227,7 +227,7 @@ pub async fn chat_send(
     // die with the process at the commit, halfway through an answer.
     if let Some(updating) = app.try_state::<crate::update::Updating>() {
         if let Some(why) = crate::update::starting_refused(&updating.state()) {
-            return Err(RpcError::new(ErrorCode::Conflict, why.to_owned()));
+            return Err(RpcError::new(ErrorCode::Busy, why.to_owned()));
         }
     }
     let guard = state.begin(&conversation_id, &steering)?;

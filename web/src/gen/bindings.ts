@@ -437,8 +437,8 @@ export const commands = {
 	/**
 	 *  `card.move` — and the only place a step is ever started.
 	 * 
-	 *  `confirmed` is how an irreversible step stays out of a drag: a deploy is
-	 *  not fired by dropping a card on a lane, it is fired by someone saying so.
+	 *  `confirmed` answers one question: move the card although a run is still
+	 *  going on it. It is never consent to an irreversible step.
 	 */
 	cardMove: (projectId: string, cardId: string, columnId: string, position: number, confirmed: boolean) => typedError<CardChanged, RpcError>(__TAURI_INVOKE("card_move", { projectId, cardId, columnId, position, confirmed })),
 	/**
