@@ -8,6 +8,7 @@
  */
 
 import { spawn } from 'node:child_process'
+import { onPath } from './preflight.mjs'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { setTimeout as wait } from 'node:timers/promises'
 import { Builder } from 'selenium-webdriver'
@@ -32,7 +33,10 @@ export async function startDriver({ port = PORT, env = {}, log = null } = {}) {
   // Laid over it, every variable the seed deliberately left out — the CLI's
   // CLAUDE_CONFIG_DIR above all — came back from the parent, and the Usage
   // screen read the real installation's plan and every real transcript.
-  const driver = spawn('tauri-driver', ['--port', String(port), '--native-port', native], {
+  // Found on this process's PATH and started by its full path: the seeded
+  // environment's PATH is the system's, and cargo's bin is not in it.
+  const binary = onPath('tauri-driver') ?? 'tauri-driver'
+  const driver = spawn(binary, ['--port', String(port), '--native-port', native], {
     stdio: ['ignore', 'inherit', log ? 'pipe' : 'inherit'],
     env: Object.keys(env).length > 0 ? env : process.env,
   })
@@ -93,11 +97,16 @@ export async function insideTheSeededHome(window, home) {
   // And the CLI it reads: state in the right place is not enough when the
   // installations it finds are somebody's real ones.
   const found = await window.executeAsyncScript(function (done) {
-    window.__TAURI_INTERNALS__.invoke('cli_installations').then(done, function () {
-      done([])
+    window.__TAURI_INTERNALS__.invoke('cli_installations').then(done, function (error) {
+      done({ refused: String(error?.message ?? error) })
     })
   })
-  const outside = (found ?? [])
+  // A refusal is not an empty list: it is a question the check never got
+  // answered, and the suite does not run on a guess.
+  if (!Array.isArray(found)) {
+    throw new Error(`the app would not say which CLI installations it reads: ${found?.refused}`)
+  }
+  const outside = found
     .map((one) => one.directory)
     .filter((directory) => !String(directory).startsWith(home))
   if (outside.length > 0) {

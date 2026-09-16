@@ -12,7 +12,14 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { seedEnv, seedHome } from './lib/home.mjs'
-import { missingBuild, missingTools, needsXvfb, refusal } from './lib/preflight.mjs'
+import {
+  missingBuild,
+  missingTools,
+  needsXvfb,
+  notTheRealHome,
+  refusal,
+  theShellFindsTheStub,
+} from './lib/preflight.mjs'
 import { startDriver } from './lib/session.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -48,6 +55,16 @@ const [command, args] = needsXvfb()
 // The home is seeded here because the driver inherits it: the app is the
 // driver's child, and that is the only way its environment gets set.
 const seeded = seedHome(root)
+// Asked of the home this run will really use, with the shell the app will
+// really ask — before the driver starts anything in it.
+const unsafe = [
+  notTheRealHome(seeded.home),
+  theShellFindsTheStub(seedEnv(seeded), seeded.stub, process.env.SHELL || '/bin/sh'),
+].filter(Boolean)
+if (unsafe.length > 0) {
+  console.error(refusal(unsafe))
+  process.exit(1)
+}
 const log = join(seeded.home, 'app.log')
 const driver = await startDriver({ env: seedEnv(seeded), log })
 try {

@@ -226,6 +226,7 @@ fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u
             .ok()
             .and_then(|mut activities| hear(&mut activities, key, seq, doing, place));
         if let Some(happening) = told {
+            trace(&format!("emit card:happening seq={seq}"));
             sink.to_window("card:happening", happening);
         }
     }
@@ -265,6 +266,7 @@ fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) {
         .ok()
         .and_then(|mut activities| hear(&mut activities, key, seq, doing, Place::default()));
     if let Some(happening) = told {
+        trace(&format!("emit card:happening seq={seq}"));
         sink.to_window("card:happening", happening);
     }
 }
@@ -300,9 +302,6 @@ pub(crate) trait HookSink {
 
 impl HookSink for AppHandle {
     fn to_window<P: serde::Serialize + Clone>(&self, channel: &str, payload: P) {
-        if channel == "card:happening" {
-            trace("emit card:happening");
-        }
         let _ = self.emit(channel, payload);
     }
 

@@ -43,7 +43,7 @@ export function seedHome(root, name = 'e2e-home') {
   // is. Empty is not enough: the file has to exist, or zsh falls back to the
   // system one, which is the machine's and not this home's.
   const bin = join(home, '.local/bin')
-  const line = `export PATH="${bin}:$PATH"\n`
+  const line = `export PATH="${bin}:/usr/local/bin:/usr/bin:/bin"\n`
   for (const rc of ['.zshenv', '.zshrc', '.bashrc', '.profile']) {
     writeFileSync(join(home, rc), line)
   }
@@ -100,17 +100,34 @@ function gitEnv(home) {
 }
 
 /**
- * The environment the app is started with.
+ * The variables a window needs from the machine, and nothing else.
  *
- * Every `ANTHROPIC_*` and `CLAUDE_*` variable is dropped rather than
- * overridden: the point is a window that has no account anywhere, and a
- * variable left behind is a credential the suite did not know it was using.
+ * An allowlist, not the parent's environment minus a few names: the review
+ * found ZDOTDIR passing through, which the terminal honours, so the panes read
+ * the developer's own zsh config — their PATH, their aliases, their tokens.
+ * Whatever is not named here does not reach the app.
  */
+const FROM_THE_MACHINE = [
+  'DISPLAY',
+  'WAYLAND_DISPLAY',
+  'XDG_RUNTIME_DIR',
+  'DBUS_SESSION_BUS_ADDRESS',
+  'XAUTHORITY',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TERM',
+  'SHELL',
+  'USER',
+  'LOGNAME',
+  'TZ',
+]
+
+/** The environment the app is started with. */
 export function seedEnv({ home, feed }) {
   const env = {}
-  for (const [key, value] of Object.entries(process.env)) {
-    if (key.startsWith('ANTHROPIC_') || key.startsWith('CLAUDE_')) continue
-    env[key] = value
+  for (const key of FROM_THE_MACHINE) {
+    if (process.env[key] !== undefined) env[key] = process.env[key]
   }
   return {
     ...env,
@@ -118,7 +135,9 @@ export function seedEnv({ home, feed }) {
     XDG_CACHE_HOME: join(home, '.cache'),
     XDG_CONFIG_HOME: join(home, '.config'),
     XDG_DATA_HOME: join(home, '.local/share'),
-    PATH: `${join(home, '.local/bin')}:${process.env.PATH ?? ''}`,
+    // The system's own directories after the stub's, never the developer's
+    // PATH: a real `claude` in ~/.local/bin is exactly what must not answer.
+    PATH: `${join(home, '.local/bin')}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     DEVPIT_ACCOUNT_ORIGIN: CLOSED_PORT,
     DEVPIT_ACCOUNT_NO_BROWSER: '1',

@@ -17,8 +17,11 @@ export async function press(window, words) {
   const pressed = await window.executeScript(function (words) {
     const buttons = Array.prototype.slice.call(document.querySelectorAll('button'))
     const hit = buttons.find(function (node) {
-      const said = (node.getAttribute('aria-label') || node.innerText || '').trim()
-      return said === words && node.offsetParent !== null
+      // The label, or the first line of what it says: a button that shows
+      // its shortcut beside its name reads "New terminal\n⌘T".
+      const label = (node.getAttribute('aria-label') || '').trim()
+      const first = (node.innerText || '').trim().split('\n')[0].trim()
+      return (label === words || first === words) && node.offsetParent !== null
     })
     if (!hit) return false
     hit.click()

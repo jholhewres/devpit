@@ -208,7 +208,9 @@ describe('the screens', () => {
     await buttons[0].click()
     await settle(1200)
     const after = await text()
-    assert.match(after, /nothing to install|test feed/)
+    // The refusal itself, not the tag that was on screen before the click.
+    assert.match(after, /this offer came from a test feed, so there is nothing to install/)
+    assert.doesNotMatch(after, /Downloading the update/)
     await shoot(window, 'update-refused')
   })
 })

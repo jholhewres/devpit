@@ -64,7 +64,8 @@ describe('manual item 1 — the card menu does what it says', () => {
     await openCardMenu(window, 'Keep me')
     await press(window, 'Open')
     await settle(700)
-    assert.match(await text(window), /Keep me/)
+    // Something only an open card draws — the title is on the tile anyway.
+    assert.match(await text(window), /Chat about this card/)
     await window.findElement(By.css('body')).sendKeys('')
     await settle()
   })
