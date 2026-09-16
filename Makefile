@@ -27,7 +27,7 @@ TEST_ENV := HOME=$(TEST_HOME) \
 	RUSTUP_HOME=$(RUSTUP_HOME)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev build test fmt clean
+.PHONY: help setup dev build test fmt clean e2e
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \

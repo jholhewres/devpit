@@ -8,22 +8,27 @@
 import { strict as assert } from 'node:assert'
 import { after, before, test } from 'node:test'
 
-import { openWindow, startDriver } from '../lib/session.mjs'
+import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
 
-let driver
 let window
 
 before(async () => {
-  driver = await startDriver()
   window = await openWindow(process.env.E2E_BINARY)
 })
 
 after(async () => {
   await window?.quit()
-  driver?.kill()
 })
 
 test('the window opens and says what it is', async () => {
   const title = await window.getTitle()
   assert.equal(title, 'devpit')
+})
+
+/* Before anything else writes: the app keeps its state in the home the harness
+   made. When this was assumed rather than asked, the suite read the real plan
+   usage out of the real CLI's credentials. */
+test('the window keeps its state in the seeded home, not yours', async () => {
+  const path = await insideTheSeededHome(window, process.env.E2E_HOME)
+  assert.ok(path.includes('/target/'), path)
 })

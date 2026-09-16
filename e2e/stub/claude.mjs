@@ -1,0 +1,136 @@
+/*
+ * A `claude` that answers without a network and without an account.
+ *
+ * The suite drives the real binary, and the real binary starts the real CLI.
+ * Letting it start the actual one would make every test depend on somebody's
+ * plan, their rate limit and their bill — so a login shell in the seeded home
+ * finds this instead, and the harness refuses to run when it does not.
+ *
+ * What it answers is taken from the same fixtures the Rust tests read, so the
+ * stream the window parses here is a stream the CLI really produced.
+ */
+
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { dirname, join } from 'node:path'
+
+const VERSION = '2.1.273 (Claude Code)'
+const argv = process.argv.slice(2)
+const home = process.env.HOME ?? ''
+const state = join(home, '.claude', 'stub-sessions.json')
+
+const has = (flag) => argv.includes(flag)
+const valueOf = (flag) => {
+  const at = argv.indexOf(flag)
+  return at >= 0 ? argv[at + 1] : undefined
+}
+
+if (has('--version')) {
+  console.log(VERSION)
+  process.exit(0)
+}
+
+if (argv[0] === 'agents' && has('--json')) {
+  console.log(JSON.stringify(sessions()))
+  process.exit(0)
+}
+
+if (has('--bg')) {
+  background()
+} else if (argv[0] === 'attach') {
+  attach(argv[1])
+} else if (has('-p')) {
+  await headless()
+} else {
+  console.log(`claude ${VERSION}\n\nUSAGE: claude [FLAGS] [-p PROMPT]\n\nThis is the devpit end-to-end stub. It answers; it never calls anything.`)
+}
+
+/** The sessions this stub has started, as `agents --json` reports them. */
+function sessions() {
+  if (!existsSync(state)) return []
+  try {
+    return JSON.parse(readFileSync(state, 'utf8'))
+  } catch {
+    return []
+  }
+}
+
+function remember(session) {
+  mkdirSync(dirname(state), { recursive: true })
+  writeFileSync(state, JSON.stringify([...sessions(), session], null, 2))
+}
+
+/** `--bg`: a session that exists, named the way the CLI names one. */
+function background() {
+  const short = `stub${Date.now().toString(36).slice(-6)}`
+  remember({
+    id: short,
+    session_id: valueOf('--session-id') ?? `00000000-0000-4000-8000-${short.padEnd(12, '0')}`,
+    name: 'stub session',
+    cwd: process.cwd(),
+    pid: process.pid,
+    started_at: new Date().toISOString(),
+    kind: 'background',
+    state: 'idle',
+    status: 'idle',
+  })
+  fireHooks('SessionStart')
+  console.log(`backgrounded ${short}`)
+  console.log(`claude attach ${short}`)
+}
+
+/** `attach <id>`: sits in the pane the way a session does, until it is killed. */
+function attach(short) {
+  console.log(`attached to ${short ?? 'a session'} — devpit end-to-end stub`)
+  fireHooks('SessionStart')
+  // A session holds its pane. The suite kills the pane; nothing here exits on
+  // its own, because a session that exits looks like a session that ended.
+  setInterval(() => {}, 1 << 30)
+}
+
+/** `-p`: one headless turn, replayed from the fixture the Rust tests read. */
+async function headless() {
+  const lines = readFileSync(fixture(), 'utf8').split('\n').filter(Boolean)
+  fireHooks('UserPromptSubmit')
+  for (const line of lines) {
+    console.log(line)
+  }
+  fireHooks('Stop')
+}
+
+function fixture() {
+  const root = process.env.E2E_ROOT ?? join(import.meta.dirname, '..', '..')
+  return join(root, 'crates/agentcli/tests/fixtures/claude-2.1.270-subagent-edit-tasks-background.jsonl')
+}
+
+/**
+ * The hooks of the settings file devpit wrote, run with a fixture payload.
+ *
+ * This is how the board hears anything: the app does not watch the CLI, it is
+ * told. A stub that answers but never fires a hook would leave every tile
+ * blank and every test asserting nothing.
+ */
+function fireHooks(event) {
+  const settings = valueOf('--settings')
+  if (!settings || !existsSync(settings)) return
+  let declared
+  try {
+    declared = JSON.parse(readFileSync(settings, 'utf8'))
+  } catch {
+    return
+  }
+  const payload = JSON.stringify({
+    hook_event_name: event,
+    session_id: valueOf('--session-id') ?? 'stub-session',
+    cwd: process.cwd(),
+    transcript_path: join(home, '.claude', 'stub.jsonl'),
+  })
+  for (const group of declared.hooks?.[event] ?? []) {
+    for (const hook of group.hooks ?? []) {
+      if (!hook.command) continue
+      const ran = spawn('sh', ['-c', hook.command], { stdio: ['pipe', 'ignore', 'ignore'] })
+      ran.stdin.end(payload)
+    }
+  }
+  appendFileSync(join(home, '.claude', 'stub-hooks.log'), `${event}\n`, { flag: 'a' })
+}

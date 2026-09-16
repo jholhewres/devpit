@@ -8,7 +8,7 @@
  */
 
 import { strict as assert } from 'node:assert'
-import { mkdirSync, writeFileSync, chmodSync } from 'node:fs'
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -32,24 +32,24 @@ test('a home outside target/ is refused', () => {
 })
 
 test('a login shell that finds the stub is accepted', () => {
-  const seeded = seedHome(root)
-  writeStub(seeded.bin)
-  assert.equal(theShellFindsTheStub(seedEnv(seeded), join(seeded.bin, 'claude'), '/bin/sh'), null)
+  const seeded = seedHome(root, 'e2e-home-preflight')
+  assert.equal(theShellFindsTheStub(seedEnv(seeded), seeded.stub, '/bin/sh'), null)
 })
 
 /* The sabotage: the stub is not where it should be, and another claude answers
    instead. That is what a developer's own machine looks like — which is
    exactly the machine this must refuse. */
 test('another claude answering instead of the stub is refused, and named', () => {
-  const seeded = seedHome(root)
+  const seeded = seedHome(root, 'e2e-home-preflight')
   const elsewhere = join(root, 'target/e2e-elsewhere')
   mkdirSync(elsewhere, { recursive: true })
   writeStub(elsewhere)
 
-  // No stub in the seeded bin, so whatever this machine has answers instead —
-  // the real CLI, if it is installed, which is the case that matters.
+  // The stub taken away, so whatever this machine has answers instead — the
+  // real CLI, if it is installed, which is the case that matters.
+  rmSync(seeded.stub)
   const env = seedEnv(seeded)
-  const stub = join(seeded.bin, 'claude')
+  const stub = seeded.stub
   const said = theShellFindsTheStub({ ...env, PATH: `${env.PATH}:${elsewhere}` }, stub, '/bin/sh')
 
   assert.ok(said, 'a home with no stub was accepted')
@@ -58,9 +58,10 @@ test('another claude answering instead of the stub is refused, and named', () =>
 })
 
 test('no claude at all is refused too', () => {
-  const seeded = seedHome(root)
+  const seeded = seedHome(root, 'e2e-home-preflight')
+  rmSync(seeded.stub)
   const env = seedEnv(seeded)
-  const said = theShellFindsTheStub({ ...env, PATH: '/nonexistent' }, join(seeded.bin, 'claude'), '/bin/sh')
+  const said = theShellFindsTheStub({ ...env, PATH: '/nonexistent' }, seeded.stub, '/bin/sh')
   assert.ok(said?.includes('no claude at all'), said)
 })
 

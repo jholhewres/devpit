@@ -9,15 +9,22 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /** A port nothing listens on, so a sign-in attempt fails instead of leaving. */
 const CLOSED_PORT = 'http://127.0.0.1:9'
 
-/** The home, wiped and rebuilt. Returns where things are. */
-export function seedHome(root) {
-  const home = join(root, 'target/e2e-home')
+/**
+ * The home, wiped and rebuilt. Returns where things are.
+ *
+ * `name` because test files run in their own processes: two of them seeding
+ * the same directory means one wipes the other's git repository halfway
+ * through, and the error that comes out is about an ignored file.
+ */
+export function seedHome(root, name = 'e2e-home') {
+  const home = join(root, 'target', name)
   rmSync(home, { recursive: true, force: true })
 
   for (const dir of [
@@ -54,13 +61,21 @@ export function seedHome(root) {
   git('add', 'README.md')
   git('commit', '-qm', 'first')
 
+  // The `claude` a login shell in this home finds. A one-line shim rather
+  // than a copy: the stub is source in the tree, and a copy would go stale the
+  // first time it changed.
+  const stub = join(bin, 'claude')
+  const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'stub', 'claude.mjs')
+  writeFileSync(stub, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
+  chmodSync(stub, 0o755)
+
   const feed = join(home, 'feed.json')
   writeFileSync(
     feed,
     `${JSON.stringify({ version: '99.0.0', notes: 'A version from a file, for the suite.' }, null, 2)}\n`,
   )
 
-  return { home, repo, feed, bin }
+  return { home, repo, feed, bin, stub }
 }
 
 function gitEnv(home) {

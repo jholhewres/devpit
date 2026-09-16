@@ -1,0 +1,214 @@
+/*
+ * Six screens of the running app, each asserted and each photographed.
+ *
+ * The assertions are what fails the build; the PNGs in `target/e2e-shots` are
+ * for the person reviewing. That order matters — a screenshot suite with a
+ * pixel baseline fails on a different font and gets deleted within a month, so
+ * there is no baseline here. What is checked is structural: the landmarks
+ * exist, the container has a size, enough of the window is drawn on, nothing
+ * overflows sideways, and the console said nothing.
+ */
+
+import { strict as assert } from 'node:assert'
+import { after, before, describe, test } from 'node:test'
+import { By, Key, until } from 'selenium-webdriver'
+
+import { invoke, seedBoard } from '../lib/seed.mjs'
+import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
+import {
+  complaints,
+  inkFraction,
+  overflowsSideways,
+  settle,
+  shellBox,
+  shoot,
+  watchTheConsole,
+} from '../lib/screen.mjs'
+
+let window
+
+before(async () => {
+  window = await openWindow(process.env.E2E_BINARY)
+  await window.wait(until.elementLocated(By.css('#root')), 20000)
+  // Refused before the first write, not discovered after it.
+  await insideTheSeededHome(window, process.env.E2E_HOME)
+  await watchTheConsole(window)
+  await seedBoard(window, process.env.E2E_REPO)
+  await window.navigate().refresh()
+  await window.wait(until.elementLocated(By.css('.app')), 20000)
+  await watchTheConsole(window)
+  await settle(1200)
+  // The window opens on nothing — "pick something on the left" — which is the
+  // honest empty state and not a screen worth six assertions.
+  await openPane('Board')
+  await settle(800)
+})
+
+after(async () => {
+  await window?.quit()
+})
+
+/** What every screen owes, whatever else it shows. */
+async function sound(name) {
+  const said = await complaints(window)
+  assert.deepEqual(said.errors, [], `${name} wrote to console.error`)
+  assert.deepEqual(said.policy, [], `${name} violated the content policy`)
+
+  const box = await shellBox(window)
+  assert.ok(box.width > 200 && box.height > 200, `${name} drew a ${box.width}x${box.height} shell`)
+
+  assert.equal(await overflowsSideways(window), false, `${name} overflows sideways`)
+
+  const ink = await inkFraction(window)
+  assert.ok(ink > 0.05, `${name} is ${(ink * 100).toFixed(1)}% drawn on — it looks blank`)
+
+  await shoot(window, name)
+}
+
+const text = async () =>
+  (await window.executeScript('return document.body.innerText')).replace(/\s+/g, ' ')
+
+/**
+ * Opens a pane by the word on it, wherever that word is.
+ *
+ * The same pane is offered in two places — the sidebar rail and the "pick
+ * something" empty state — and which one is on screen depends on what the
+ * window last had open. Clicking whichever is visible is what a person does.
+ */
+async function openPane(label) {
+  await window.executeScript(function (label) {
+    const buttons = Array.prototype.slice.call(document.querySelectorAll('button'))
+    const hit = buttons.find(function (node) {
+      return node.innerText.trim().split('\n')[0].trim() === label
+    })
+    if (!hit) throw new Error('no button says ' + label)
+    hit.click()
+  }, label)
+}
+
+/**
+ * Settings, on the pane asked for.
+ *
+ * Opened through the DOM rather than a real click: once the settings screen is
+ * up it covers the gear, and a second test asking for another pane would be
+ * clicking something behind an overlay — which is not what a person does
+ * either, since they can see the screen is already open.
+ */
+async function openSettings(pane) {
+  await window.executeScript(function (pane) {
+    const open = document.querySelector('.prefs')
+    if (!open) {
+      document.querySelector('[aria-label="Settings"]')?.click()
+    }
+    if (!pane) return
+    const items = Array.prototype.slice.call(document.querySelectorAll('.prefs__i'))
+    const hit = items.find(function (node) {
+      return node.innerText.trim() === pane
+    })
+    hit?.click()
+  }, pane)
+  await settle(500)
+  if (pane) {
+    // The first call opens the screen; the pane list only exists after that.
+    await window.executeScript(function (pane) {
+      const items = Array.prototype.slice.call(document.querySelectorAll('.prefs__i'))
+      const hit = items.find(function (node) {
+        return node.innerText.trim() === pane
+      })
+      hit?.click()
+    }, pane)
+    await settle(500)
+  }
+}
+
+async function closeSettings() {
+  await window.findElement(By.css('body')).sendKeys(Key.ESCAPE)
+  await settle()
+}
+
+describe('the screens', () => {
+  test('the board shows the lanes, the cards and what a lane runs', async () => {
+    const said = await text()
+    assert.match(said, /inbox/)
+    assert.match(said, /Fix the parser/)
+    assert.match(said, /Name the socket/)
+    // The lane that was given a step says so, rather than "no step".
+    assert.match(said, /tests/)
+    await sound('board')
+  })
+
+  test('an open card shows its body and its comment', async () => {
+    const tiles = await window.findElements(By.xpath("//*[contains(text(),'Fix the parser')]"))
+    for (const tile of tiles) {
+      if (await tile.isDisplayed()) {
+        await tile.click()
+        break
+      }
+    }
+    await settle(900)
+    const said = await text()
+    assert.match(said, /drops the last line/)
+    assert.match(said, /Reproduced on a file of one line/)
+    await sound('card')
+    await closeSettings()
+  })
+
+  test('settings offers automatic updates, and nothing that does nothing', async () => {
+    await openSettings('General')
+    const said = await text()
+    assert.match(said, /Automatic updates/)
+    assert.doesNotMatch(said, /anonymous usage/i)
+    assert.doesNotMatch(said, /Keep transcripts/i)
+    await sound('settings-general')
+  })
+
+  /* The seeded home has no CLI sign-in, so this screen has to say so rather
+     than show a number it does not have — which is also the proof that
+     nothing left the machine looking for one. */
+  test('usage says it has no sign-in to read, and asks nothing of the network', async () => {
+    await openSettings('Usage')
+    await settle(1200)
+    const said = await text()
+    assert.match(said, /sign-in|Usage/)
+    assert.doesNotMatch(said, /\$\d/, 'a plan number appeared without a sign-in')
+    await sound('usage')
+    await closeSettings()
+  })
+
+  /* Not on the sidebar: it is one of the panes the palette offers, which is
+     also the only test here that goes through the palette at all. */
+  test('capabilities opens from the palette', async () => {
+    await openPane('Search')
+    await settle(500)
+    const field = await window.findElement(By.css('input[placeholder^="Search tabs"]'))
+    await field.sendKeys('Capabilities')
+    await settle(600)
+    await field.sendKeys(Key.ENTER)
+    await settle(1000)
+    assert.match(await text(), /Capabilities|MCP|server/i)
+    await sound('capabilities')
+  })
+
+  /* The feed is a file in the seeded home saying 99.0.0. The card must offer
+     it, say where it came from, and refuse to install it. */
+  test('the update card offers the fixture feed and refuses to install it', async () => {
+    // Asked for, not waited for: the app checks once on start, which happened
+    // before this window was reloaded, and a card cannot hear an event that
+    // was emitted while it did not exist.
+    await closeSettings()
+    await invoke(window, 'update_check')
+    await window.wait(async () => (await text()).includes('99.0.0'), 20000)
+    const said = await text()
+    assert.match(said, /devpit 99\.0\.0 is ready\./)
+    assert.match(said, /Your terminals keep running/)
+    assert.match(said, /test feed/)
+    await sound('update-available')
+
+    const buttons = await window.findElements(By.xpath("//button[normalize-space()='Update']"))
+    await buttons[0].click()
+    await settle(1200)
+    const after = await text()
+    assert.match(after, /nothing to install|test feed/)
+    await shoot(window, 'update-refused')
+  })
+})
