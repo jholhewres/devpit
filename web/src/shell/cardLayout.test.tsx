@@ -69,8 +69,8 @@ describe('the open card', () => {
         cardId="card_1"
         columnId="col_1"
         lanes={[
-          { id: 'col_1', name: 'Todo', cards: 3 },
-          { id: 'col_2', name: 'Doing', cards: 2 },
+          { id: 'col_1', name: 'Todo', end: 3 },
+          { id: 'col_2', name: 'Doing', end: 2 },
         ]}
         onMoved={onMoved}
       />,

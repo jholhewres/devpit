@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { CardDetail, DeleteRefusal } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -20,7 +20,8 @@ export interface Card {
   readonly detail: CardDetail | null
   readonly error: string | null
   readonly busy: boolean
-  save: (title: string, body: string) => void
+  /** Answers why the title and body were not kept, or null once they are. */
+  save: (title: string, body: string) => Promise<string | null>
   setDue: (seconds: number | null) => void
   comment: (body: string) => Promise<string | null>
   editComment: (commentId: string, body: string) => Promise<string | null>
@@ -43,13 +44,19 @@ export function useCard(
   const [detail, setDetail] = useState<CardDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /* A reply is for the card that asked: a read of the last card landing after
+     the next one opened would put one card's words under the other's id. */
+  const current = useRef(cardId)
+  current.current = cardId
 
   const reload = useCallback(() => {
     if (!projectId || !cardId) {
       setDetail(null)
       return
     }
+    setDetail((was) => (was?.card.id === cardId ? was : null))
     void ask(() => commands.cardDetail(projectId, cardId)).then((answer) => {
+      if (current.current !== cardId) return
       setError(answer.error)
       if (answer.data) setDetail(answer.data)
     })
@@ -63,16 +70,18 @@ export function useCard(
      has to keep what was typed. */
   const wrote = useCallback(
     async (call: () => Promise<unknown>): Promise<string | null> => {
+      const asking = cardId
       setBusy(true)
       const answer = await ask(call as () => Promise<CardDetail>)
       setBusy(false)
+      if (current.current !== asking) return answer.error
       setError(answer.error)
       if (!answer.data) return answer.error
       setDetail(answer.data)
       onChanged?.()
       return null
     },
-    [onChanged],
+    [cardId, onChanged],
   )
 
   const here = (
@@ -84,7 +93,19 @@ export function useCard(
     detail,
     error,
     busy,
-    save: (title, body) => void here((p, c) => commands.cardUpdate(p, c, title, body)),
+    /* Not through `wrote`: this answers with the card alone, and taking that
+       for the whole detail left the open card with nothing to draw. */
+    save: async (title, body) => {
+      if (!projectId || !cardId) return 'no card open'
+      const answer = await ask(() => commands.cardUpdate(projectId, cardId, title, body))
+      if (current.current !== cardId) return answer.error
+      setError(answer.error)
+      if (!answer.data) return answer.error
+      const kept = answer.data
+      setDetail((was) => (was && was.card.id === kept.id ? { ...was, card: kept } : was))
+      onChanged?.()
+      return null
+    },
     setDue: (seconds) => void here((p, c) => commands.cardSetDue(p, c, seconds)),
     comment: (body) => here((p, c) => commands.cardComment(p, c, body)),
     editComment: (id, body) => here((p, c) => commands.cardCommentEdit(p, c, id, body)),

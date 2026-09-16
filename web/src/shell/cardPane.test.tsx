@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CardDetail } from '../gen/bindings'
@@ -30,7 +30,7 @@ const detail: CardDetail = {
   sessions: [],
 }
 
-const save = vi.fn()
+const save = vi.fn((_title: string, _body: string) => Promise.resolve<string | null>(null))
 
 vi.mock('./useCard', () => ({
   useCard: () => ({
@@ -64,10 +64,11 @@ const escape = (): void => {
 }
 
 let onClose = vi.fn()
+let unmount = (): void => undefined
 beforeEach(() => {
   save.mockClear()
   onClose = vi.fn()
-  render(<CardPane cardId="card_1" onClose={onClose} onChanged={vi.fn()} />)
+  unmount = render(<CardPane cardId="card_1" onClose={onClose} onChanged={vi.fn()} />).unmount
 })
 
 const title = (): HTMLInputElement => screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement
@@ -79,6 +80,23 @@ describe('what Escape means in an open card', () => {
     expect(escapeMeans(field, true)).toBe('nothing')
     expect(escapeMeans(field, false)).toBe('blur')
     expect(escapeMeans(document.body, false)).toBe('close')
+    expect(escapeMeans(document.body, false, true)).toBe('nothing')
+  })
+
+  it("closes the card's menu, not the card", () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Card actions' }))
+    escape()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('still closes the card past a menu that is in the page but hidden', () => {
+    const hidden = document.body.appendChild(document.createElement('div'))
+    hidden.setAttribute('role', 'menu')
+    hidden.hidden = true
+    escape()
+    hidden.remove()
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('lets go of a field and keeps the card open', () => {
@@ -107,28 +125,59 @@ describe('closing an open card keeps what was typed', () => {
   const typed = (): void => {
     fireEvent.change(title(), { target: { value: 'Wire the whole board' } })
   }
-  const savedBeforeClosing = (): void => {
+  const savedBeforeClosing = async (): Promise<void> => {
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(save).toHaveBeenCalledWith('Wire the whole board', '')
     expect(save.mock.invocationCallOrder[0]!).toBeLessThan(onClose.mock.invocationCallOrder[0]!)
   }
 
-  it('by the close button', () => {
+  it('by the close button', async () => {
     typed()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    savedBeforeClosing()
+    await savedBeforeClosing()
   })
 
-  it('by Escape', () => {
+  it('by Escape', async () => {
     typed()
     escape()
-    savedBeforeClosing()
+    await savedBeforeClosing()
   })
 
-  it('by a click on the backdrop', () => {
+  it('by a click on the backdrop', async () => {
     typed()
     fireEvent.pointerDown(backdrop())
     fireEvent.click(backdrop())
-    savedBeforeClosing()
+    await savedBeforeClosing()
+  })
+
+  it('and stays open when the write is refused, with the words still in the field', async () => {
+    save.mockResolvedValueOnce('the card is gone').mockResolvedValueOnce('the card is gone')
+    typed()
+    fireEvent.blur(title())
+    await act(async () => undefined)
+    expect(title().value).toBe('Wire the whole board')
+    expect(screen.queryByRole('status')).toBeNull()
+    escape()
+    await act(async () => undefined)
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('without calling newer words saved when an older write lands', async () => {
+    let land = (_refused: string | null): void => undefined
+    save.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+    typed()
+    fireEvent.blur(title())
+    fireEvent.change(title(), { target: { value: 'Wire the whole board, twice' } })
+    await act(async () => land(null))
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(title().value).toBe('Wire the whole board, twice')
+  })
+
+  it('when it goes without a blur, hidden with the board', () => {
+    typed()
+    unmount()
+    expect(save).toHaveBeenCalledWith('Wire the whole board', '')
   })
 })
 
@@ -149,14 +198,14 @@ describe('the open card, laid out', () => {
     expect(side.textContent).toContain('Due')
   })
 
-  it('says Saved where the Save button was, once what was written is kept', () => {
+  it('says Saved where the Save button was, once what was written is kept', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit the description' }))
     const field = screen.getByRole('textbox', { name: 'Description' })
     fireEvent.change(field, { target: { value: 'All of it' } })
     expect(screen.queryByRole('status')).toBeNull()
     fireEvent.blur(field)
     expect(save).toHaveBeenCalledWith('Wire the board', 'All of it')
-    expect(screen.getByRole('status').textContent).toBe('Saved')
+    expect((await screen.findByRole('status')).textContent).toBe('Saved')
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
   })
 })

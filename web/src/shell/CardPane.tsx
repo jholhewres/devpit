@@ -31,11 +31,15 @@ import { money } from './chat'
 
 /** What Escape does in an open card.
  *
- *  A dialog over the card hears it first; then the field being typed in, which
- *  only lets go of the keyboard; only then the card. Closing on the first Esc
- *  took a half-written description with it. */
-export function escapeMeans(focused: Element | null, confirming: boolean): 'nothing' | 'blur' | 'close' {
-  if (confirming) return 'nothing'
+ *  A dialog or a menu over the card hears it first; then the field being typed
+ *  in, which only lets go of the keyboard; only then the card. Closing on the
+ *  first Esc took a half-written description with it. */
+export function escapeMeans(
+  focused: Element | null,
+  confirming: boolean,
+  menu = false,
+): 'nothing' | 'blur' | 'close' {
+  if (confirming || menu) return 'nothing'
   if (focused?.closest('input, textarea, select, [contenteditable="true"]')) return 'blur'
   return 'close'
 }
@@ -66,6 +70,14 @@ export function CardPane({
   const [saved, setSaved] = useState(false)
   const [ending, setEnding] = useState<Ending | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
+  /* Counted, not flagged: a write that lands after more was typed must not
+     call the newer words saved. */
+  const edits = useRef(0)
+  const edited = (): void => {
+    edits.current += 1
+    setDirty(true)
+    setSaved(false)
+  }
 
   /* The fields follow the card until they are touched. After that they are
      what was typed: a reload landing mid-sentence must not take the sentence. */
@@ -75,25 +87,43 @@ export function CardPane({
     setBody(detail.card.body)
   }, [detail, dirty])
 
-  const save = (): void => {
-    if (!dirty) return
+  /* Hidden with the board or swapped for another card, the pane goes without
+     a blur, so what was typed is written on the way out. */
+  const leaving = useRef<(() => void) | null>(null)
+  leaving.current = dirty ? () => void card.save(title.trim() || 'Untitled', body) : null
+  useEffect(() => () => leaving.current?.(), [])
+
+  /* What was typed stays typed until the write is kept: a refusal said next
+     to an emptied field has already lost the words. */
+  const save = async (): Promise<string | null> => {
+    if (!dirty) return null
+    const at = edits.current
+    const refused = await card.save(title.trim() || 'Untitled', body)
+    if (refused || edits.current !== at) return refused
+    leaving.current = null
     setDirty(false)
-    card.save(title.trim() || 'Untitled', body)
     setSaved(true)
+    return null
   }
 
   /* The fields save on blur, and a close by Esc or by a click outside is not
-     a blur — so closing is the last chance to keep what was typed. */
+     a blur — so closing is the last chance to keep what was typed. A refused
+     write keeps the card open, where the refusal is said. */
   const close = (): void => {
-    save()
-    onClose()
+    if (!dirty) return onClose()
+    void save().then((refused) => refused === null && onClose())
   }
 
   useEffect(() => {
     const key = (event: KeyboardEvent): void => {
       if (!abandoned(event)) return
       const focused = document.activeElement
-      const means = escapeMeans(focused, document.querySelector('.ask') !== null)
+      const means = escapeMeans(
+        focused,
+        document.querySelector('.ask') !== null,
+        /* Not the sidebar's menus, which stay in the page while hidden. */
+        document.querySelector('[role="menu"]:not([hidden])') !== null,
+      )
       if (means === 'blur') (focused as HTMLElement).blur()
       if (means === 'close') close()
     }
@@ -137,10 +167,9 @@ export function CardPane({
                 aria-label="Title"
                 onChange={(event) => {
                   setTitle(event.target.value)
-                  setDirty(true)
-                  setSaved(false)
+                  edited()
                 }}
-                onBlur={save}
+                onBlur={() => void save()}
                 onKeyDown={(event) => committed(event) && event.currentTarget.blur()}
               />
 
@@ -149,10 +178,9 @@ export function CardPane({
                 body={body}
                 onChange={(next) => {
                   setBody(next)
-                  setDirty(true)
-                  setSaved(false)
+                  edited()
                 }}
-                onDone={save}
+                onDone={() => void save()}
               />
               {saved && !dirty && (
                 <p className="cardp__saved" role="status">
