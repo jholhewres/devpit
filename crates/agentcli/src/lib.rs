@@ -72,8 +72,15 @@ pub fn available() -> bool {
 ///
 /// `--json` is what makes this usable from a GUI: the interactive listing
 /// refuses to run without a TTY.
-pub fn list(cwd: Option<&Path>) -> Result<Vec<AgentSession>, AgentError> {
-    let mut command = Command::new(PROGRAM);
+pub fn list(
+    runner: Option<&running::Runner>,
+    cwd: Option<&Path>,
+) -> Result<Vec<AgentSession>, AgentError> {
+    let mut command = Command::new(runner.map_or(PROGRAM, |one| one.program.as_str()));
+    // Asked of the binary that started these sessions, under its account: a
+    // different build knows nothing about them and would answer "none".
+    command.envs(runner.map(|one| one.env.clone()).unwrap_or_default());
+    command.args(runner.map(|one| one.args.clone()).unwrap_or_default());
     command.arg("agents").arg("--json");
     if let Some(path) = cwd {
         command.arg("--cwd").arg(path);
@@ -93,12 +100,17 @@ pub fn list(cwd: Option<&Path>) -> Result<Vec<AgentSession>, AgentError> {
 /// Returned rather than run so the caller can log it, and so a test can assert
 /// the exact line without launching anything.
 pub fn background_argv(
+    runner: Option<&running::Runner>,
     session_id: Option<&str>,
     worktree: Option<&str>,
     model: Option<&str>,
     settings: Option<&str>,
 ) -> Vec<String> {
-    let mut argv = vec![PROGRAM.to_owned(), "--bg".to_owned()];
+    let mut argv = vec![runner
+        .map_or(PROGRAM, |one| one.program.as_str())
+        .to_owned()];
+    argv.extend(runner.map(|one| one.args.clone()).unwrap_or_default());
+    argv.push("--bg".to_owned());
     if let Some(id) = session_id {
         argv.push("--session-id".to_owned());
         argv.push(id.to_owned());
@@ -128,15 +140,19 @@ pub fn background_argv(
 /// the block it arrives in and why it is read off the `attach` line.
 pub fn start_background(
     cwd: &Path,
+    runner: Option<&running::Runner>,
     session_id: Option<&str>,
     worktree: Option<&str>,
     model: Option<&str>,
     settings: Option<&str>,
 ) -> Result<String, AgentError> {
-    let argv = background_argv(session_id, worktree, model, settings);
-    let output = Command::new(PROGRAM)
+    let argv = background_argv(runner, session_id, worktree, model, settings);
+    let output = Command::new(&argv[0])
         .args(&argv[1..])
         .current_dir(cwd)
+        // The profile says which account starts this session, and a session
+        // started under the wrong one bills the wrong account for days.
+        .envs(runner.map(|one| one.env.clone()).unwrap_or_default())
         .output()
         .map_err(|_| AgentError::NotInstalled)?;
 
@@ -170,10 +186,11 @@ pub fn start_background(
 /// where the cause is no longer on screen.
 fn short_id_in(stdout: &str) -> Option<String> {
     let from_attach = stdout.lines().find_map(|line| {
+        // `<binary> attach <id>`, whatever the binary is called: a profile may
+        // name another build of the same CLI, and it prints its own name here.
         let mut words = line.split_whitespace();
-        (words.next()? == PROGRAM && words.next()? == "attach")
-            .then(|| words.next())
-            .flatten()
+        let _binary = words.next()?;
+        (words.next()? == "attach").then(|| words.next()).flatten()
     });
     from_attach
         .or_else(|| {
@@ -196,8 +213,14 @@ fn is_handle(token: &str) -> bool {
 }
 
 /// The argv that brings a background session into a terminal.
-pub fn attach_argv(short_id: &str) -> Vec<String> {
-    vec![PROGRAM.to_owned(), "attach".to_owned(), short_id.to_owned()]
+pub fn attach_argv(runner: Option<&running::Runner>, short_id: &str) -> Vec<String> {
+    let mut argv = vec![runner
+        .map_or(PROGRAM, |one| one.program.as_str())
+        .to_owned()];
+    argv.extend(runner.map(|one| one.args.clone()).unwrap_or_default());
+    argv.push("attach".to_owned());
+    argv.push(short_id.to_owned());
+    argv
 }
 
 /// One headless turn, as a line of arguments.
@@ -283,6 +306,10 @@ fn run(args: &[&str]) -> Result<String, AgentError> {
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "lib_live_tests.rs"]
+mod live_tests;
 
 pub mod claude_lines;
 pub mod cli_config;

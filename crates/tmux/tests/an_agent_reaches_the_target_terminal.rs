@@ -61,11 +61,11 @@ fn a_session_typed_into_the_target_pane_attaches_to_it() {
         .expect("the target terminal");
     let target = devpit_tmux::Server::target(&session, leaf);
 
-    let short = devpit_agentcli::start_background(dir.path(), None, None, None, None)
+    let short = devpit_agentcli::start_background(dir.path(), None, None, None, None, None)
         .expect("start a session");
 
     // Exactly what the product types, built by the same function.
-    let line = devpit_agentcli::attach_argv(&short).join(" ");
+    let line = devpit_agentcli::attach_argv(None, &short).join(" ");
     server.send_keys(&target, &line).expect("send the attach");
 
     // What counts as arrival.

@@ -23,6 +23,9 @@ pub struct BackgroundLink {
     pub short_id: String,
     pub session_id: String,
     pub cwd: Option<String>,
+    /// Which profile started it, so asking the CLI about it asks the same
+    /// binary that made it. `None` for links made before profiles got here.
+    pub profile_id: Option<String>,
 }
 
 /// A conversation that is the card's.
@@ -71,13 +74,15 @@ impl Store {
         let background = self
             .conn
             .query_row(
-                "SELECT short_id, session_id, cwd FROM session_link WHERE card_id = ?1",
+                "SELECT short_id, session_id, cwd, profile_id FROM session_link \
+                 WHERE card_id = ?1",
                 [card_id],
                 |row| {
                     Ok(BackgroundLink {
                         short_id: row.get(0)?,
                         session_id: row.get(1)?,
                         cwd: row.get(2)?,
+                        profile_id: row.get(3)?,
                     })
                 },
             )

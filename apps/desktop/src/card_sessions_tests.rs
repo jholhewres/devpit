@@ -71,7 +71,7 @@ fn a_cards_panes_are_listed_before_their_agents_say_anything() {
 fn a_background_session_the_cli_no_longer_lists_is_gone() {
     let (_dir, store, project, card) = seeded();
     store
-        .link_session(&card, "a1b2", "s-bg", None, None)
+        .link_session(&card, "a1b2", "s-bg", None, None, None)
         .expect("link");
     let sessions = card_sessions(&store, &project, &card, &[], &nothing_heard(&card));
     assert_eq!(sessions.len(), 1);

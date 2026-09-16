@@ -498,4 +498,14 @@ CREATE TABLE card_chat (
 CREATE INDEX card_chat_card ON card_chat(card_id, created_at);
 "#,
     },
+    // Migration 015 — which profile a background session runs under.
+    Migration {
+        version: 15,
+        sql: r#"
+-- The profile a step used to start this session, so attaching it later names
+-- the same binary and the same account. NULL for links made before this, which
+-- fall back to the default runner.
+ALTER TABLE session_link ADD COLUMN profile_id TEXT;
+"#,
+    },
 ];

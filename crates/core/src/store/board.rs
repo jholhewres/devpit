@@ -47,7 +47,7 @@ pub struct StepRow {
 /// types later, and a test asserts no query matches on them.
 pub const DEFAULT_COLUMNS: [&str; 6] = ["inbox", "refine", "review", "doing", "check", "ship"];
 
-fn now() -> i64 {
+pub(super) fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs() as i64)
@@ -454,78 +454,6 @@ impl Store {
                 |row| row.get(0),
             )
             .optional()?)
-    }
-}
-
-/// The link between a card and the agent session working on it.
-///
-/// Only the link. Whether that session is idle or busy, and what it has spent,
-/// are answered by the agent CLI and its transcript — a copy here would be a
-/// second truth that drifts from the first.
-pub struct SessionLink {
-    pub card_id: String,
-    pub short_id: String,
-    pub session_id: String,
-    pub transcript_path: Option<String>,
-}
-
-impl Store {
-    pub fn link_session(
-        &self,
-        card_id: &str,
-        short_id: &str,
-        session_id: &str,
-        transcript_path: Option<&str>,
-        cwd: Option<&str>,
-    ) -> Result<(), StoreError> {
-        self.conn.execute(
-            "INSERT INTO session_link \
-             (card_id, short_id, session_id, transcript_path, created_at, cwd) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-             ON CONFLICT(card_id) DO UPDATE SET \
-               short_id = ?2, session_id = ?3, transcript_path = ?4, cwd = ?6",
-            rusqlite::params![card_id, short_id, session_id, transcript_path, now(), cwd],
-        )?;
-        Ok(())
-    }
-
-    pub fn session_link(&self, card_id: &str) -> Result<Option<SessionLink>, StoreError> {
-        Ok(self
-            .conn
-            .query_row(
-                "SELECT card_id, short_id, session_id, transcript_path \
-                 FROM session_link WHERE card_id = ?1",
-                [card_id],
-                |row| {
-                    Ok(SessionLink {
-                        card_id: row.get(0)?,
-                        short_id: row.get(1)?,
-                        session_id: row.get(2)?,
-                        transcript_path: row.get(3)?,
-                    })
-                },
-            )
-            .optional()?)
-    }
-
-    /// Every card of a project that has a session behind it.
-    pub fn session_links(&self, project_id: &str) -> Result<Vec<SessionLink>, StoreError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT l.card_id, l.short_id, l.session_id, l.transcript_path \
-             FROM session_link l JOIN card c ON c.id = l.card_id \
-             WHERE c.project_id = ?1",
-        )?;
-        let rows = stmt
-            .query_map([project_id], |row| {
-                Ok(SessionLink {
-                    card_id: row.get(0)?,
-                    short_id: row.get(1)?,
-                    session_id: row.get(2)?,
-                    transcript_path: row.get(3)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(rows)
     }
 }
 

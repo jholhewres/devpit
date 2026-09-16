@@ -141,7 +141,7 @@ fn a_session_is_found_through_its_background_link() {
     let (dir, store) = seeded();
     let (_project, card) = card_in(&store, dir.path(), "one");
     store
-        .link_session(&card, "a1b2", "s-bg", None, None)
+        .link_session(&card, "a1b2", "s-bg", None, None, None)
         .expect("link");
     assert_eq!(
         card_of_session(&store, "s-bg"),
@@ -154,7 +154,7 @@ fn an_archived_card_holds_no_session() {
     let (dir, store) = seeded();
     let (_project, card) = card_in(&store, dir.path(), "one");
     store
-        .link_session(&card, "a1b2", "s-bg", None, None)
+        .link_session(&card, "a1b2", "s-bg", None, None, None)
         .expect("link");
     store.archive_card(&card).expect("archive");
     assert_eq!(card_of_session(&store, "s-bg"), None);
@@ -166,7 +166,7 @@ fn an_unknown_or_unsafe_session_id_finds_no_card() {
     let (_project, card) = card_in(&store, dir.path(), "one");
     // Held under an id a hook must never be trusted with.
     store
-        .link_session(&card, "a1b2", "../s-bg", None, None)
+        .link_session(&card, "a1b2", "../s-bg", None, None, None)
         .expect("link");
     for id in ["../s-bg", "s-nowhere", ""] {
         assert_eq!(card_of_session(&store, id), None, "{id}");

@@ -13,6 +13,10 @@ use super::Finished;
 #[serde(rename_all = "camelCase", default)]
 struct SessionConfig {
     model: Option<String>,
+    /// Which profile starts it. The session outlives this step and is attached
+    /// later, so the profile is written down with the link rather than looked
+    /// up again from a step that may have changed by then.
+    profile: Option<String>,
 }
 
 /// Starts a background session for this card and records the handle.
@@ -40,8 +44,14 @@ pub fn start(
     // ripgrep, and one day in a commit.
     let cwd = crate::checkout::cwd_for(store, card_id, step, |_| {})?;
 
+    let runner = config
+        .profile
+        .as_deref()
+        .map(|id| crate::agent_profiles::runner_for(store, id))
+        .transpose()?;
     let short_id = agent::start_background(
         &cwd,
+        runner.as_ref(),
         Some(session_id),
         None,
         config.model.as_deref(),
@@ -60,6 +70,7 @@ pub fn start(
             session_id,
             transcript.as_ref().and_then(|p| p.to_str()),
             cwd.to_str(),
+            config.profile.as_deref(),
         )
         .map_err(|err| err.to_string())?;
 

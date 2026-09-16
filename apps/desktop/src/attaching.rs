@@ -16,6 +16,7 @@ use crate::shell_launch::Ready;
 pub(crate) fn attach_target(
     checkout: &Path,
     short_id: &str,
+    runner: Option<&devpit_agentcli::running::Runner>,
     ready: &Ready,
 ) -> Result<String, RpcError> {
     if let Ready::Busy(command) = ready {
@@ -33,8 +34,15 @@ pub(crate) fn attach_target(
             "this card's checkout cannot be typed into a terminal",
         ));
     }
-    let attach = devpit_agentcli::attach_argv(short_id).join(" ");
-    Ok(format!("cd '{folder}' && {attach}"))
+    // The profile's binary, and its variables in front of it — the same line
+    // the launch builds. Typed into a shell, so a token in one of those
+    // variables is in that terminal's scrollback, exactly as it already is on
+    // launch (`running::line`). Declared, not solved: the keyring is plan 17.
+    let attach = devpit_agentcli::attach_argv(runner, short_id).join(" ");
+    let env = runner
+        .map(devpit_agentcli::running::assignments)
+        .unwrap_or_default();
+    Ok(format!("cd '{folder}' && {env}{attach}"))
 }
 
 #[cfg(test)]

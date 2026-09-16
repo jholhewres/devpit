@@ -50,6 +50,23 @@ pub fn runner(profile: &Profile) -> Runner {
     }
 }
 
+/// The `NAME='value' ` assignments a typed line starts with, ready to be put
+/// in front of any command the profile runs — the launch line, or an attach.
+///
+/// Every **value** is quoted, because a value is data and may be a token, a
+/// URL or a path with a space in it. Nothing else is quoted, because nothing
+/// else is allowed to need it.
+pub fn assignments(runner: &Runner) -> String {
+    let mut said = String::new();
+    for (name, value) in &runner.env {
+        said.push_str(name);
+        said.push('=');
+        said.push_str(&quoted(value));
+        said.push(' ');
+    }
+    said
+}
+
 /// The line a terminal is asked to type.
 ///
 /// Variables go in front as shell assignments, which is what the person's own
@@ -66,13 +83,7 @@ pub fn runner(profile: &Profile) -> Runner {
 /// value to a file to source would only move it somewhere it stays. The
 /// spawned paths have no such problem; they never build a line at all.
 pub fn line(runner: &Runner) -> String {
-    let mut said = String::new();
-    for (name, value) in &runner.env {
-        said.push_str(name);
-        said.push('=');
-        said.push_str(&quoted(value));
-        said.push(' ');
-    }
+    let mut said = assignments(runner);
     said.push_str(&runner.program);
     for arg in &runner.args {
         said.push(' ');

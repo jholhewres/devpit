@@ -15,6 +15,7 @@ pub mod project_runs;
 mod projects;
 mod runs;
 pub mod search_index;
+mod session_links;
 pub mod settings;
 mod spend;
 
@@ -42,11 +43,12 @@ pub enum StoreError {
     Export { drawing: String, reason: String },
 }
 
-pub use board::{CardRow, ColumnRow, SessionLink, StepRow, StepUse, DEFAULT_COLUMNS};
+pub use board::{CardRow, ColumnRow, StepRow, StepUse, DEFAULT_COLUMNS};
 pub use card_links::{BackgroundLink, CardLinks, ChatLink, RunLink, SessionHeld};
 pub use cards::{AttachmentRow, CommentRow, NoticeRow};
 pub use layouts::CardTabLayout;
 pub use runs::RunRow;
+pub use session_links::SessionLink;
 /// The ceilings on anything read from outside, in one place.
 pub mod limits {
     pub use crate::store::cards::{LONGEST_COMMENT, LONGEST_LABEL, NOTICES_KEPT};

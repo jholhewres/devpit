@@ -78,8 +78,21 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
 ///
 /// A CLI that is missing answers with nothing, and every card then reports its
 /// background session as gone — which is true from the board's point of view.
-pub(crate) fn live_sessions() -> Vec<devpit_agentcli::AgentSession> {
-    devpit_agentcli::list(None).unwrap_or_default()
+pub(crate) fn live_sessions(store: &Store, project_id: &str) -> Vec<devpit_agentcli::AgentSession> {
+    let mut listed = Vec::new();
+    for profile in store.session_profiles(project_id).unwrap_or_default() {
+        let runner = match profile.as_deref() {
+            None => None,
+            // A profile that has been deleted since is not asked under the
+            // default binary: that would be another account's answer.
+            Some(id) => match crate::agent_profiles::runner_for(store, id) {
+                Ok(runner) => Some(runner),
+                Err(_) => continue,
+            },
+        };
+        listed.extend(devpit_agentcli::list(runner.as_ref(), None).unwrap_or_default());
+    }
+    listed
 }
 
 fn runs_of(store: &Store, card_id: &str, steps: &[Step]) -> Result<Vec<Run>, RpcError> {
@@ -130,7 +143,7 @@ pub fn board_get(project_id: String) -> Result<Board, RpcError> {
         .collect();
 
     // One listing for the whole board, not one per card.
-    let live = live_sessions();
+    let live = live_sessions(&store, &project_id);
     let mut cards = Vec::new();
     for row in store.cards(&project_id)? {
         let mut card = card_of(&store, &row.id, &steps)?;

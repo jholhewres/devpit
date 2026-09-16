@@ -52,11 +52,11 @@ fn a_run_is_linked_once_it_has_a_session_of_its_own() {
 fn a_background_session_is_linked_with_the_folder_it_runs_in() {
     let (_dir, store, _project, card) = seeded();
     store
-        .link_session(&card, "a0a0", "s-old", None, Some("/w/old"))
+        .link_session(&card, "a0a0", "s-old", None, Some("/w/old"), None)
         .expect("an earlier run's session");
     // The next run's session takes its place, folder included.
     store
-        .link_session(&card, "a1b2", "s-bg", None, Some("/w/card"))
+        .link_session(&card, "a1b2", "s-bg", None, Some("/w/card"), None)
         .expect("link");
 
     let background = store

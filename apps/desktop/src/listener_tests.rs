@@ -141,7 +141,7 @@ fn a_hook_reaches_the_card() {
     let run = store.start_run(&card, &step, None).expect("run");
     store.set_run_session(&run, "s-run").expect("run session");
     store
-        .link_session(&card, "a1b2", "s-bg", None, None)
+        .link_session(&card, "a1b2", "s-bg", None, None, None)
         .expect("background");
     drop(store);
 
@@ -254,7 +254,7 @@ fn a_background_session_waiting_reaches_its_card() {
         .create_card(&project, &column, "a card", "")
         .expect("card");
     store
-        .link_session(&card, "a1b2", "s-bg", None, Some("/w/card"))
+        .link_session(&card, "a1b2", "s-bg", None, Some("/w/card"), None)
         .expect("link");
     let sink = Recorded {
         store_path,

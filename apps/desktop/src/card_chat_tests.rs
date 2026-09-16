@@ -189,7 +189,7 @@ fn a_session_whose_folder_was_not_recorded_is_refused() {
 
     seeded
         .store
-        .link_session(&card, "a1b2", "s-bg", None, None)
+        .link_session(&card, "a1b2", "s-bg", None, None, None)
         .expect("link");
     assert!(card_session_cwd(&seeded.store, &seeded.project, &card, "s-bg").is_err());
 

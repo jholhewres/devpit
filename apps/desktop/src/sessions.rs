@@ -314,7 +314,7 @@ pub async fn terminal_attach_agent(
     card_id: String,
 ) -> Result<CardTerminal, RpcError> {
     let (project, wanted) = (project_id.clone(), card_id.clone());
-    let (short_id, checkout) = tauri::async_runtime::spawn_blocking(move || {
+    let (short_id, checkout, runner) = tauri::async_runtime::spawn_blocking(move || {
         let store = store()?;
         if store.live_card_project(&wanted)?.as_deref() != Some(project.as_str()) {
             return Err(RpcError::new(
@@ -327,7 +327,15 @@ pub async fn terminal_attach_agent(
             .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this card has no session yet"))?;
         let checkout = crate::checkout::checkout_of(&store, &wanted, |_| {})
             .map_err(|why| RpcError::new(ErrorCode::Internal, why))?;
-        Ok::<_, RpcError>((link.short_id, checkout))
+        // Started under a profile, attached under the same one: the binary and
+        // the account are the session's, not this moment's default.
+        let runner = link
+            .profile_id
+            .as_deref()
+            .map(|id| crate::agent_profiles::runner_for(&store, id))
+            .transpose()
+            .map_err(|why| RpcError::new(ErrorCode::NotFound, why))?;
+        Ok::<_, RpcError>((link.short_id, checkout, runner))
     })
     .await
     .map_err(|err| RpcError::internal(err.to_string()))??;
@@ -344,7 +352,7 @@ pub async fn terminal_attach_agent(
         tauri::async_runtime::spawn_blocking(move || crate::shell_launch::settled(&waiting, &leaf))
             .await
             .map_err(|err| RpcError::internal(err.to_string()))?;
-    let line = crate::attaching::attach_target(&checkout, &short_id, &ready)?;
+    let line = crate::attaching::attach_target(&checkout, &short_id, runner.as_ref(), &ready)?;
 
     let lock = state.project_lock(&project_id)?;
     let _guard = lock

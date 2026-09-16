@@ -99,7 +99,7 @@ pub(crate) fn detail_of(project_id: String, card_id: String) -> Result<CardDetai
     // The CLI is asked only when the card has a background session to ask about.
     let has_background = store.card_links(&card_id)?.background.is_some();
     let live = if has_background {
-        crate::board::live_sessions()
+        crate::board::live_sessions(&store, &project_id)
     } else {
         Vec::new()
     };
