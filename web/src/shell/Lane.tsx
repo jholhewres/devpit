@@ -231,6 +231,8 @@ export function LaneHead({
   onRename,
   onPickStep,
   onCreateStep,
+  onUpdateStep,
+  onRemoveStep,
   others,
   onFlow,
   onGrab,
@@ -246,6 +248,8 @@ export function LaneHead({
   onDelete: (moveTo: string | null) => Promise<ColumnDeleted | null>
   onPickStep: (stepId: string | null) => void
   onCreateStep: (kind: string, name: string, config: string, irreversible: boolean) => void
+  onUpdateStep: (stepId: string, name: string, config: string, irreversible: boolean) => void
+  onRemoveStep: (stepId: string) => void
   /** The other lanes, for the one a pass sends a card to. */
   others: readonly { id: string; name: string }[]
   onFlow: (onPass: string | null, autonomy: string) => void
@@ -316,6 +320,8 @@ export function LaneHead({
         autonomy={lane.column.autonomy}
         onPick={onPickStep}
         onCreate={onCreateStep}
+        onUpdate={onUpdateStep}
+        onRemove={onRemoveStep}
         onFlow={onFlow}
       />
       <LaneMenu

@@ -12,6 +12,8 @@ import { useBoard } from './useBoard'
 afterEach(cleanup)
 
 const reordered = vi.fn()
+const updated = vi.fn()
+const deleted = vi.fn()
 
 const board = (): Board => ({
   projectId: 'p1',
@@ -33,6 +35,14 @@ vi.mock('./live', () => ({
     boardGet: () => board(),
     columnReorder: (_project: string, ids: string[]) => {
       reordered(ids)
+      return board()
+    },
+    stepUpdate: (...args: unknown[]) => {
+      updated(...args)
+      return board()
+    },
+    stepDelete: (...args: unknown[]) => {
+      deleted(...args)
       return board()
     },
   },
@@ -73,6 +83,27 @@ describe('moving a lane a place', () => {
   })
 })
 
+/* The two commands a lane's step menu ends in. Called here rather than
+   through the popover: what the menu does with them is its own test. */
+describe('editing and deleting a step', () => {
+  it('sends the edit and the deletion to the backend', async () => {
+    const { result } = renderHook(() => useBoard('p1'))
+    await waitFor(() => expect(result.current.lanes).toHaveLength(3))
+
+    act(() => {
+      result.current.updateStep('step_1', 'suite', '{"command":"make test"}', true)
+    })
+    await waitFor(() =>
+      expect(updated).toHaveBeenCalledWith('p1', 'step_1', 'suite', '{"command":"make test"}', true),
+    )
+
+    act(() => {
+      result.current.removeStep('step_1')
+    })
+    await waitFor(() => expect(deleted).toHaveBeenCalledWith('p1', 'step_1'))
+  })
+})
+
 describe('the lane head', () => {
   const lane = { column: board().columns[1], cards: [] } as unknown as Lane
   const head = (onShift = vi.fn()) =>
@@ -83,6 +114,8 @@ describe('the lane head', () => {
         onRename={vi.fn()}
         onPickStep={vi.fn()}
         onCreateStep={vi.fn()}
+        onUpdateStep={vi.fn()}
+        onRemoveStep={vi.fn()}
         others={[]}
         onFlow={vi.fn()}
         onAddCard={vi.fn()}

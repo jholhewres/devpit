@@ -39,6 +39,8 @@ const draw = (over: Partial<Parameters<typeof LaneStep>[0]> = {}) => {
       autonomy="manual"
       onPick={vi.fn()}
       onCreate={vi.fn()}
+      onUpdate={vi.fn()}
+      onRemove={vi.fn()}
       onFlow={onFlow}
       {...over}
     />,
@@ -120,6 +122,8 @@ describe('what a lane does when its step passes', () => {
         autonomy="auto"
         onPick={vi.fn()}
         onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
         onFlow={vi.fn()}
       />,
     )
@@ -136,6 +140,8 @@ describe('what a lane does when its step passes', () => {
         autonomy="ask"
         onPick={vi.fn()}
         onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
         onFlow={vi.fn()}
       />,
     )
@@ -218,5 +224,48 @@ describe('the form that makes an agent step', () => {
       '{"agent":"architect","capUsd":2,"prompt":"Review it","inject":["branch"]}',
       false,
     )
+  })
+})
+
+describe('editing and deleting the step a lane runs', () => {
+  it('opens it filled in with what is stored, and saves through step.update', () => {
+    const onUpdate = vi.fn()
+    draw({ onUpdate, step: step({ config: '{"command":"make test"}' }) })
+    fireEvent.click(screen.getByTitle('Runs tests'))
+    fireEvent.click(screen.getByText(/Edit tests/))
+    expect((screen.getByPlaceholderText('make test') as HTMLInputElement).value).toBe('make test')
+    fireEvent.change(screen.getByPlaceholderText('make test'), { target: { value: 'make check' } })
+    fireEvent.click(screen.getByText('Save'))
+    expect(onUpdate).toHaveBeenCalledWith('step_1', 'tests', '{"command":"make check"}', false)
+  })
+
+  /* The kind is not offered while editing: a command that became an agent
+     would be a different step, and its runs say what it was. */
+  it('does not offer to change what kind of step it is', () => {
+    draw({ step: step({ config: '{"command":"make test"}' }) })
+    fireEvent.click(screen.getByTitle('Runs tests'))
+    fireEvent.click(screen.getByText(/Edit tests/))
+    expect(screen.queryByText('Session')).toBeNull()
+  })
+
+  it('asks before deleting, and does nothing until the question is answered', () => {
+    const onRemove = vi.fn()
+    draw({ onRemove })
+    fireEvent.click(screen.getByTitle('Runs tests'))
+    fireEvent.click(screen.getByText('Delete tests'))
+    expect(onRemove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Delete'))
+    expect(onRemove).toHaveBeenCalledWith('step_1')
+  })
+
+  /* A step written by hand in the database, or saved before the form asked
+     for anything. The lane says so instead of failing when a card lands. */
+  it('says when a stored step cannot be read, and still offers to edit it', () => {
+    draw({ step: step({ config: 'make test' }) })
+    expect(screen.getByText('cannot be read')).toBeTruthy()
+    fireEvent.click(screen.getByTitle('Runs tests'))
+    expect(screen.getByText('Its settings cannot be read')).toBeTruthy()
+    fireEvent.click(screen.getByText(/Edit tests/))
+    expect((screen.getByPlaceholderText('make test') as HTMLInputElement).value).toBe('')
   })
 })

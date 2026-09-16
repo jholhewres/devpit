@@ -1,8 +1,15 @@
 import { useRef, useState } from 'react'
 
+import { createPortal } from 'react-dom'
+
 import type { Step } from '../gen/bindings'
+import { Confirm } from './Confirm'
 import { StepNew } from './StepNew'
 import { useAway } from './away'
+import { stepFields } from './stepConfig'
+
+/* Presses inside stay here: the lane head around this is its drag handle. */
+const stay = (event: React.SyntheticEvent): void => event.stopPropagation()
 
 /*
  * What a lane runs when a card lands in it.
@@ -25,6 +32,8 @@ export function LaneStep({
   autonomy,
   onPick,
   onCreate,
+  onUpdate,
+  onRemove,
   onFlow,
 }: {
   step: Step | null
@@ -35,12 +44,19 @@ export function LaneStep({
   autonomy: string
   onPick: (stepId: string | null) => void
   onCreate: (kind: string, name: string, config: string, irreversible: boolean) => void
+  onUpdate: (stepId: string, name: string, config: string, irreversible: boolean) => void
+  onRemove: (stepId: string) => void
   onFlow: (onPass: string | null, autonomy: string) => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [making, setMaking] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   useAway(box, () => setOpen(false), open)
+  // Said on the lane and not only when the form opens: a step nothing can read
+  // is a lane that will fail when a card lands on it.
+  const unreadable = step !== null && stepFields(step.kind, step.config) === null
 
   return (
     <div className="lstep" ref={box}>
@@ -58,9 +74,10 @@ export function LaneStep({
         {/* Said on the lane, not hidden in its menu: a lane that moves cards
             without being asked should look different from one that does not. */}
         {step && autonomy === 'auto' && <span className="lstep__auto">auto</span>}
+        {unreadable && <span className="lstep__warn">cannot be read</span>}
       </button>
 
-      {open && !making && (
+      {open && !making && !editing && (
         <div className="lstep__pop" role="menu">
           <p className="lstep__t">Runs when a card lands here</p>
           <button
@@ -99,6 +116,16 @@ export function LaneStep({
               step has nothing to decide about. */}
           {step && (
             <>
+              <div className="newmenu__rule" />
+              {unreadable && <p className="lstep__t">Its settings cannot be read</p>}
+              <button className="apps__opt" role="menuitem" onClick={() => setEditing(true)}>
+                Edit {step.name}&hellip;
+              </button>
+              <button className="apps__opt" role="menuitem" onClick={() => setRemoving(true)}>
+                <span>Delete {step.name}</span>
+                <span className="lstep__warn">no undo</span>
+              </button>
+
               <div className="newmenu__rule" />
               <p className="lstep__t">When it passes</p>
               <button
@@ -159,6 +186,38 @@ export function LaneStep({
           }}
         />
       )}
+
+      {open && editing && step && (
+        <StepNew
+          step={step}
+          onCancel={() => setEditing(false)}
+          onDone={(_kind, name, config, irreversible) => {
+            onUpdate(step.id, name, config, irreversible)
+            setEditing(false)
+            setOpen(false)
+          }}
+        />
+      )}
+
+      {/* On the body, like the lane's own delete: `.ask` fills its positioned
+          ancestor, and this popover is one. */}
+      {removing &&
+        step &&
+        createPortal(
+          <div onPointerDown={stay} onKeyDown={stay}>
+            <Confirm
+              title={`Delete “${step.name}”?`}
+              body="Every lane that runs it goes back to running nothing. A step that has already run on a card cannot be deleted — its runs are that card's history."
+              onClose={() => setRemoving(false)}
+              onConfirm={() => {
+                onRemove(step.id)
+                setRemoving(false)
+                setOpen(false)
+              }}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

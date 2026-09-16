@@ -64,3 +64,48 @@ export function stepConfig(kind: string, fields: Fields): string {
     ...(text('expects') ? { expects: text('expects') } : {}),
   })
 }
+
+/**
+ * The fields behind a stored config, for the form that edits one.
+ *
+ * `null` when the config cannot be read as an object — a step written by hand
+ * in the database, or saved before the form asked for anything. The lane says
+ * so rather than opening a form that would quietly replace it.
+ */
+export function stepFields(kind: string, config: string): Fields | null {
+  let read: unknown
+  try {
+    read = JSON.parse(config)
+  } catch {
+    return null
+  }
+  if (typeof read !== 'object' || read === null || Array.isArray(read)) return null
+  const held = read as Record<string, unknown>
+
+  const fields: Record<string, string> = {}
+  const put = (key: string): void => {
+    const value = held[key]
+    // A number comes back as what was typed: the form is text, and the config
+    // is what `stepConfig` makes of it again.
+    if (typeof value === 'string' && value) fields[key] = value
+    if (typeof value === 'number') fields[key] = String(value)
+  }
+
+  if (kind === 'command') {
+    put('command')
+    put('timeoutSeconds')
+    return fields
+  }
+  if (kind === 'session') {
+    put('model')
+    put('profile')
+    return fields
+  }
+  for (const key of ['agent', 'profile', 'model', 'capUsd', 'prompt', 'expects']) put(key)
+  const inject = held.inject
+  if (Array.isArray(inject)) {
+    const keys = inject.filter((one): one is string => typeof one === 'string')
+    if (keys.length > 0) fields.inject = keys.join(', ')
+  }
+  return fields
+}

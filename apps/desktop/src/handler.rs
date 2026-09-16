@@ -140,6 +140,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         front::board_archived,
         front::card_diff,
         columns::step_create,
+        columns::step_update,
+        columns::step_delete,
         steps::agents_list,
         sessions::terminal_attach_agent,
         sessions::session_ensure,

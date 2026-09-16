@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { CONTEXT_KEYS, stepConfig } from './stepConfig'
+import { CONTEXT_KEYS, stepConfig, stepFields } from './stepConfig'
 
 /*
  * The cases are shared with `apps/desktop/src/steps/recipe_tests.rs`, which
@@ -33,6 +33,22 @@ describe('what the step form saves', () => {
       expect(JSON.parse(stepConfig(one.kind, one.fields))).toEqual(one.config)
     })
   }
+
+  /* The form that edits a step starts from what is stored, so the two have to
+     be each other's inverse — otherwise opening a step and saving it again
+     changes it. */
+  for (const one of cases) {
+    it(`reads a ${one.kind} config back into its fields`, () => {
+      const filled = Object.fromEntries(Object.entries(one.fields).filter(([, value]) => value !== ''))
+      expect(stepFields(one.kind, JSON.stringify(one.config))).toEqual(filled)
+    })
+  }
+
+  it('says a config it cannot read is not readable, rather than guessing', () => {
+    expect(stepFields('command', 'make test')).toBeNull()
+    expect(stepFields('command', '[1, 2]')).toBeNull()
+    expect(stepFields('command', 'null')).toBeNull()
+  })
 
   /* A timeout is optional, so anything that is not a number of seconds is no
      timeout — never a zero, which would read as "give up at once". */

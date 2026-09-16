@@ -141,6 +141,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         front::board_archived,
         front::card_diff,
         columns::step_create,
+        columns::step_update,
+        columns::step_delete,
         steps::agents_list,
         sessions::terminal_attach_agent,
         sessions::session_ensure,

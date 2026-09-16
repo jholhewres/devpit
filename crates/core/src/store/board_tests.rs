@@ -6,7 +6,9 @@
 use super::*;
 
 /// A store with one project, ready for a board.
-fn store_with_project(dir: &std::path::Path) -> (Store, String) {
+///
+/// Shared with `board_steps_tests.rs`, which is the other half of this suite.
+pub(super) fn store_with_project(dir: &std::path::Path) -> (Store, String) {
     let store = Store::open(&dir.join("state.db")).expect("open");
     let id = store.add_project(dir, None).expect("add project");
     (store, id)

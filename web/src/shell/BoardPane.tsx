@@ -127,6 +127,8 @@ export function BoardPane(): React.JSX.Element {
                 onRename={(name) => live.renameColumn(lane.column.id, name)}
                 onPickStep={(stepId) => live.setStep(lane.column.id, stepId)}
                 onCreateStep={live.createStep}
+                onUpdateStep={live.updateStep}
+                onRemoveStep={live.removeStep}
                 others={others}
                 onFlow={(onPass, autonomy) => live.setFlow(lane.column.id, onPass, autonomy)}
                 onGrab={(event) => grab(event, lane.column.id)}

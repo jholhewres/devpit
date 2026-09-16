@@ -35,6 +35,9 @@ export interface UseBoard {
   /** What a lane runs when a card lands in it, or nothing. */
   setStep: (columnId: string, stepId: string | null) => void
   createStep: (kind: string, name: string, config: string, irreversible: boolean) => void
+  updateStep: (stepId: string, name: string, config: string, irreversible: boolean) => void
+  /** A step nothing has run, and the lanes that pointed at it. */
+  removeStep: (stepId: string) => void
   /** Where a pass sends a card, and how much the lane decides on its own.
    *  One call for both, because they are one choice. */
   setFlow: (columnId: string, onPass: string | null, autonomy: string) => void
@@ -205,6 +208,18 @@ export function useBoard(projectId: string | null): UseBoard {
     [projectId, then],
   )
 
+  const updateStep = useCallback(
+    (stepId: string, name: string, config: string, irreversible: boolean) =>
+      projectId && then(() => commands.stepUpdate(projectId, stepId, name, config, irreversible)),
+    [projectId, then],
+  )
+  /* A step that has run is refused by the backend, and the reason lands in
+     `error` like every other refusal — the board is not reloaded on one. */
+  const removeStep = useCallback(
+    (stepId: string) => projectId && then(() => commands.stepDelete(projectId, stepId)),
+    [projectId, then],
+  )
+
   const setFlow = useCallback(
     (columnId: string, onPass: string | null, autonomy: string) =>
       projectId && then(() => commands.columnSetFlow(projectId, columnId, onPass, autonomy)),
@@ -231,6 +246,8 @@ export function useBoard(projectId: string | null): UseBoard {
     deleteColumn,
     setStep,
     createStep,
+    updateStep,
+    removeStep,
     setFlow,
     steps: board?.steps ?? [],
     reload,

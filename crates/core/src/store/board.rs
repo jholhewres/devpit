@@ -365,6 +365,57 @@ impl Store {
         Ok(id)
     }
 
+    /// Changes what a step does, where it already is.
+    ///
+    /// Not the kind: a command that becomes an agent is a different step, and
+    /// the runs filed under this one say what it was when they ran.
+    pub fn update_step(
+        &self,
+        step_id: &str,
+        name: &str,
+        config: &str,
+        irreversible: bool,
+    ) -> Result<bool, StoreError> {
+        Ok(self.conn.execute(
+            "UPDATE step SET name = ?2, config = ?3, irreversible = ?4 WHERE id = ?1",
+            rusqlite::params![step_id, name, config, irreversible as i64],
+        )? > 0)
+    }
+
+    /// How many runs this step has, and how many of those are going now.
+    ///
+    /// Both, because they refuse a deletion for different reasons: one is work
+    /// in flight, the other is history that points here.
+    pub fn step_runs(&self, step_id: &str) -> Result<(usize, usize), StoreError> {
+        Ok(self.conn.query_row(
+            "SELECT COUNT(*), COUNT(*) FILTER (WHERE state = 'running' AND ended_at IS NULL) \
+             FROM run WHERE step_id = ?1",
+            [step_id],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)? as usize,
+                    row.get::<_, i64>(1)? as usize,
+                ))
+            },
+        )?)
+    }
+
+    /// Deletes a step and lets go of every lane that ran it, in one go.
+    ///
+    /// The lanes are cleared here rather than left to the foreign key, so the
+    /// two halves cannot come apart: a board that lost a step but kept
+    /// pointing at it would draw a lane with no name for what it runs.
+    pub fn delete_step(&self, step_id: &str) -> Result<bool, StoreError> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE board_column SET step_id = NULL WHERE step_id = ?1",
+            [step_id],
+        )?;
+        let gone = tx.execute("DELETE FROM step WHERE id = ?1", [step_id])? > 0;
+        tx.commit()?;
+        Ok(gone)
+    }
+
     /// Opens a run in `running`. It is closed by `finish_run`.
     /// The checkout this card's work happens in, and where it began.
     ///
@@ -460,3 +511,7 @@ impl Store {
 #[cfg(test)]
 #[path = "board_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "board_steps_tests.rs"]
+mod step_tests;

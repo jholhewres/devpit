@@ -631,6 +631,16 @@ export const commands = {
 	cardDiff: (cardId: string) => typedError<Front, RpcError>(__TAURI_INVOKE("card_diff", { cardId })),
 	stepCreate: (projectId: string, kind: string, name: string, config: string, irreversible: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("step_create", { projectId, kind, name, config, irreversible })),
 	/**
+	 *  `step.update` — what a step does, changed where it already runs.
+	 * 
+	 *  The kind is not among the things that change: a command that becomes an
+	 *  agent is a different step, and the runs filed under this one say what it
+	 *  was when they ran.
+	 */
+	stepUpdate: (projectId: string, stepId: string, name: string, config: string, irreversible: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("step_update", { projectId, stepId, name, config, irreversible })),
+	/**  `step.delete` — a step nothing has run, and the lanes that pointed at it. */
+	stepDelete: (projectId: string, stepId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("step_delete", { projectId, stepId })),
+	/**
 	 *  `agents.list` — the agents on this machine, and the files that would not
 	 *  load.
 	 * 

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import type { Agent, Profile } from '../gen/bindings'
+import type { Agent, Profile, Step } from '../gen/bindings'
 import { ask, commands } from './live'
-import { CONTEXT_KEYS, stepConfig, type Fields } from './stepConfig'
+import { CONTEXT_KEYS, stepConfig, stepFields, type Fields } from './stepConfig'
 
 /*
  * The form that makes a step.
@@ -11,6 +11,10 @@ import { CONTEXT_KEYS, stepConfig, type Fields } from './stepConfig'
  * and a patience, a session has a model and an account to run it under. Until
  * this form asked for them, every step made here was saved as the one line the
  * person typed, which is not JSON, which is not what any runner reads.
+ *
+ * The same form edits one. The kind is not offered then: a command that became
+ * an agent would be a different step, and the runs already filed under this
+ * one say what it was when they ran.
  */
 
 const KINDS = [
@@ -46,18 +50,25 @@ const FIELDS: Readonly<Record<string, readonly Field[]>> = {
 }
 
 export function StepNew({
+  step,
   onDone,
   onCancel,
 }: {
+  /** The step being edited, or nothing when one is being made. */
+  step?: Step | null
   onDone: (kind: string, name: string, config: string, irreversible: boolean) => void
   onCancel: () => void
 }): React.JSX.Element {
-  const [kind, setKind] = useState<string>('command')
-  const [name, setName] = useState('')
-  const [fields, setFields] = useState<Fields>({})
+  const [kind, setKind] = useState<string>(step?.kind ?? 'command')
+  const [name, setName] = useState(step?.name ?? '')
+  // A config nobody can read starts the form empty rather than half filled:
+  // what is on screen is then what will be saved, all of it.
+  const [fields, setFields] = useState<Fields>(
+    step ? (stepFields(step.kind, step.config) ?? {}) : {},
+  )
   const [profiles, setProfiles] = useState<readonly Profile[]>([])
   const [agents, setAgents] = useState<readonly Agent[]>([])
-  const [irreversible, setIrreversible] = useState(false)
+  const [irreversible, setIrreversible] = useState(step?.irreversible ?? false)
   const chosen = KINDS.find((one) => one.id === kind)
   const asked = FIELDS[kind] ?? []
 
@@ -90,20 +101,22 @@ export function StepNew({
 
   return (
     <div className="lstep__pop lstep__pop--wide">
-      <p className="lstep__t">A new step</p>
+      <p className="lstep__t">{step ? 'This step' : 'A new step'}</p>
 
-      <div className="src__sw">
-        {KINDS.map((one) => (
-          <button
-            className="src__o"
-            key={one.id}
-            aria-checked={kind === one.id}
-            onClick={() => setKind(one.id)}
-          >
-            {one.label}
-          </button>
-        ))}
-      </div>
+      {!step && (
+        <div className="src__sw">
+          {KINDS.map((one) => (
+            <button
+              className="src__o"
+              key={one.id}
+              aria-checked={kind === one.id}
+              onClick={() => setKind(one.id)}
+            >
+              {one.label}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="pref__d">{chosen?.hint}</p>
 
       <label className="fld">
@@ -232,7 +245,7 @@ export function StepNew({
           disabled={!name.trim() || missing}
           onClick={() => onDone(kind, name.trim(), stepConfig(kind, fields), irreversible)}
         >
-          Create
+          {step ? 'Save' : 'Create'}
         </button>
       </div>
     </div>

@@ -46,3 +46,50 @@ fn a_lane_of_another_board_is_not_found() {
     let refused = where_cards_go(&lanes(), "elsewhere", None, 0).expect_err("refused");
     assert_eq!(refused.code, ErrorCode::NotFound);
 }
+
+/// Each branch says a different thing, because each is a different problem:
+/// work in flight, history pointing here, or nothing in the way.
+#[test]
+fn a_step_that_is_running_is_not_deleted() {
+    assert_eq!(
+        step_delete_refusal(3, 1).as_deref(),
+        Some("a card is running this step right now")
+    );
+    assert!(step_delete_refusal(5, 2)
+        .expect("refused")
+        .contains("2 cards"));
+}
+
+#[test]
+fn a_step_with_runs_behind_it_is_not_deleted_either() {
+    let why = step_delete_refusal(1, 0).expect("refused");
+    assert!(why.contains("still shows it"), "{why}");
+    assert!(step_delete_refusal(4, 0)
+        .expect("refused")
+        .contains("4 runs"));
+}
+
+#[test]
+fn a_step_nothing_has_run_is_deleted() {
+    assert_eq!(step_delete_refusal(0, 0), None);
+}
+
+/// An edit goes through the rule that refused the step when it was made.
+///
+/// Read off the source: the alternative is a store, a project and a board to
+/// prove a single call, and what this guards against is that call quietly
+/// going away — which is how `step_create` came to be the only door with a
+/// lock on it.
+#[test]
+fn an_edit_is_refused_by_the_same_rule_as_a_new_step() {
+    let source = include_str!("columns.rs");
+    let update = source
+        .split("pub fn step_update(")
+        .nth(1)
+        .expect("step_update is in this file");
+    let body = update.split("\npub fn ").next().unwrap_or(update);
+    assert!(
+        body.contains("refused(&step.kind, &config)"),
+        "step_update saves a config nothing checked"
+    );
+}

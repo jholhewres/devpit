@@ -136,6 +136,75 @@ pub fn step_create(
     board_get(project_id)
 }
 
+/// `step.update` — what a step does, changed where it already runs.
+///
+/// The kind is not among the things that change: a command that becomes an
+/// agent is a different step, and the runs filed under this one say what it
+/// was when they ran.
+#[tauri::command]
+#[specta::specta]
+pub fn step_update(
+    project_id: String,
+    step_id: String,
+    name: String,
+    config: String,
+    irreversible: bool,
+) -> Result<Board, RpcError> {
+    let store = store()?;
+    let Some(step) = store.step(&step_id)? else {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such step"));
+    };
+    // The same rule as when it was made. An edit that would be refused as a
+    // new step is not saved as an old one.
+    if let Some(why) = refused(&step.kind, &config) {
+        return Err(RpcError::new(ErrorCode::Invalid, why));
+    }
+    store.update_step(&step_id, &name, &config, irreversible)?;
+    board_get(project_id)
+}
+
+/// Why this step cannot be deleted, or nothing.
+///
+/// `ran` is every run it has ever had and `running` the ones going right now.
+/// They refuse for different reasons: one is work in flight, the other is a
+/// card's history pointing here — which is also why the schema will not let
+/// the row go while a run references it.
+pub(crate) fn step_delete_refusal(ran: usize, running: usize) -> Option<String> {
+    if running == 1 {
+        return Some("a card is running this step right now".to_owned());
+    }
+    if running > 1 {
+        return Some(format!("{running} cards are running this step right now"));
+    }
+    if ran == 1 {
+        return Some(
+            "a card was run by this step and still shows it —              set the lanes to run nothing instead"
+                .to_owned(),
+        );
+    }
+    if ran > 1 {
+        return Some(format!(
+            "{ran} runs were done by this step and the cards still show them —              set the lanes to run nothing instead"
+        ));
+    }
+    None
+}
+
+/// `step.delete` — a step nothing has run, and the lanes that pointed at it.
+#[tauri::command]
+#[specta::specta]
+pub fn step_delete(project_id: String, step_id: String) -> Result<Board, RpcError> {
+    let store = store()?;
+    let (ran, running) = store.step_runs(&step_id)?;
+    if let Some(why) = step_delete_refusal(ran, running) {
+        return Err(RpcError::new(ErrorCode::Conflict, why));
+    }
+    if !store.delete_step(&step_id)? {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such step"));
+    }
+    board_get(project_id)
+}
+
 /// `column.set_step` — what this lane runs, or nothing.
 #[tauri::command]
 #[specta::specta]
