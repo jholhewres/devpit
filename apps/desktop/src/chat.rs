@@ -22,7 +22,9 @@ use tauri::State;
 /// The turns in flight, by conversation, so one can be stopped.
 #[derive(Default)]
 pub struct Talking {
-    pub(crate) running: Arc<Mutex<HashMap<String, u32>>>,
+    /// The pid serving each conversation, `None` while its turn is still
+    /// starting. A key here means a turn is claimed — see `Talking::begin`.
+    pub(crate) running: Arc<Mutex<HashMap<String, Option<u32>>>>,
 }
 
 pub(crate) fn home() -> PathBuf {
@@ -219,6 +221,9 @@ pub async fn chat_send(
     let sink = on_frame.clone();
     let answer = answer_id.clone();
 
+    // Claimed before anything is spawned, and released by the guard however
+    // this returns.
+    let guard = state.begin(&conversation_id, &steering)?;
     let control = steering.hold(&conversation_id);
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
     let said = tauri::async_runtime::spawn_blocking(move || {
@@ -254,7 +259,7 @@ pub async fn chat_send(
             |pid| {
                 running
                     .lock()
-                    .map(|mut held| held.insert(key.clone(), pid))
+                    .map(|mut held| held.insert(key.clone(), Some(pid)))
                     .ok();
             },
         );
@@ -268,12 +273,8 @@ pub async fn chat_send(
         .map_err(|err| RpcError::internal(err.to_string()))?
         .map_err(|err| RpcError::internal(err.to_string()))?;
 
-    state
-        .running
-        .lock()
-        .map(|mut held| held.remove(&conversation_id))
-        .ok();
-    steering.release(&conversation_id);
+    // The guard does both when it goes, including on the `?` above.
+    drop(guard);
 
     let answered = Message {
         parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),

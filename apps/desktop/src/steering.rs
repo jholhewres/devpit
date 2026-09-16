@@ -37,6 +37,12 @@ impl Steering {
     fn get(&self, conversation_id: &str) -> Option<Control> {
         self.held.lock().ok()?.get(conversation_id).cloned()
     }
+
+    /// Whether a turn's handle is still held. Only the guard's test asks.
+    #[cfg(test)]
+    pub(crate) fn holds(&self, conversation_id: &str) -> bool {
+        self.get(conversation_id).is_some()
+    }
 }
 
 /// `chat.stop_task` — stops one background task of the turn in flight.
@@ -69,7 +75,9 @@ pub fn chat_cancel(
         .running
         .lock()
         .ok()
-        .and_then(|held| held.get(&conversation_id).copied());
+        // `None` is a turn that has been claimed but has no process yet: there
+        // is nothing to signal, and pid 0 would mean the whole process group.
+        .and_then(|held| held.get(&conversation_id).copied().flatten());
     let Some(pid) = pid else {
         return Ok(None);
     };

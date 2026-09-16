@@ -29,6 +29,7 @@ mod card_work;
 mod cards;
 mod chaining;
 mod chat;
+mod chat_running;
 mod chat_turn;
 mod checkout;
 #[cfg(any(debug_assertions, test))]
