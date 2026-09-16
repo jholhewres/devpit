@@ -210,6 +210,24 @@ describe('restarting into the update', () => {
   })
 })
 
+/* The only overlay that appears on its own, so the only one a focus has to
+   hold back. It waits rather than being dismissed: an update nobody was told
+   about is not an update that went away. */
+describe('an update while a focus is on', () => {
+  afterEach(() => delete document.documentElement.dataset.headsDown)
+
+  it('says nothing during a focus, and says it when the focus ends', async () => {
+    document.documentElement.dataset.headsDown = 'true'
+    render(<UpdateCard />)
+    say({ type: 'available', version: '0.2.0', notes: '', kind: 'appImage', testFeed: false } as UpdateStatus)
+    expect(screen.queryByText('Update ready')).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Update' })).toBeNull()
+
+    delete document.documentElement.dataset.headsDown
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Update' })).toBeTruthy())
+  })
+})
+
 describe('an update waiting for the work to end', () => {
   it('says what it is waiting for, and since when, and Cancel is told to the app', async () => {
     render(<UpdateCard />)

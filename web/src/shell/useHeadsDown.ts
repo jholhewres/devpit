@@ -38,3 +38,28 @@ export function useHeadsDown(): {
     leave: useCallback(() => write(null), [write]),
   }
 }
+
+/**
+ * Whether a focus is on, for something that only needs to know that much.
+ *
+ * Read off the root element rather than through `focusRead`: the card that
+ * asks this is not the one that owns the focus, and a second reader with its
+ * own copy of the state is two answers that can disagree. Watched the way
+ * `Leaf.tsx` watches the theme, which is stamped in the same place.
+ */
+export function useFocusIsOn(): boolean {
+  const [on, setOn] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.dataset.headsDown === 'true',
+  )
+
+  useEffect(() => {
+    const root = document.documentElement
+    const look = (): void => setOn(root.dataset.headsDown === 'true')
+    look()
+    const watching = new MutationObserver(look)
+    watching.observe(root, { attributes: true, attributeFilter: ['data-heads-down'] })
+    return () => watching.disconnect()
+  }, [])
+
+  return on
+}

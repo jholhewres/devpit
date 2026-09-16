@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { UpdateStatus, UpdateWork } from '../gen/bindings'
 import { ask, commands } from './live'
+import { useFocusIsOn } from './useHeadsDown'
 import { onCarried } from './window'
 
 /*
@@ -117,6 +118,11 @@ export function UpdateCard(): React.JSX.Element | null {
   /* The moment the card is drawing against. State rather than a read in the
      render, so the tick below is what moves it. */
   const [now, setNow] = useState(() => Date.now() / 1000)
+  /* The only overlay that appears on its own, so the only one a focus has to
+     hold back. It is not dismissed — it waits, and arrives when the focus
+     ends. There is no distinction for a security update today, so every
+     update waits. */
+  const focused = useFocusIsOn()
 
   useEffect(
     () =>
@@ -194,7 +200,7 @@ export function UpdateCard(): React.JSX.Element | null {
     })
   }
 
-  if (!status || later) return null
+  if (!status || later || focused) return null
   const said = offer(status, now)
   if (!said) return null
 
