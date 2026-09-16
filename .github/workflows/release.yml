@@ -1,0 +1,92 @@
+name: Release
+
+# A tag is the only thing that publishes. Nothing here runs on a branch, so a
+# green main never becomes a release by accident.
+on:
+  push:
+    tags: ['v*']
+
+# The one permission this needs, and no other.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      # Every action is pinned to a commit: a tag can be moved, and a moved tag
+      # is somebody else's code inside a job that holds the signing key.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # The same system packages CI installs, plus what the AppImage needs:
+      # linuxdeploy's gtk plugin reads librsvg-2.0.pc.
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: make setup
+
+      # The tag says what the app says about itself, or nothing is published:
+      # an update names a version, and a version nobody built is a download
+      # that verifies and then refuses to install.
+      - name: The tag is the version
+        run: |
+          version=$(sed -n '/\[workspace.package\]/,/^\[/p' Cargo.toml \
+            | sed -n 's/^version = "\(.*\)"/\1/p')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "the tag is $GITHUB_REF_NAME and the workspace says $version"
+            exit 1
+          fi
+
+      - run: make test
+
+      # The only step that sees the key. The overlay is what turns on the
+      # AppImage and the signing; the base config builds a .deb and signs
+      # nothing, which is what every pull request runs.
+      - name: Build the release bundles
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./node_modules/.bin/tauri build --config apps/desktop/tauri.release.conf.json
+
+      # Each artifact is verified against the public key the app carries before
+      # a single manifest is written. `createUpdaterArtifacts` already signs
+      # both bundles, so nothing is signed again here.
+      - name: Manifests, from artifacts that verify
+        run: |
+          cargo xtask release-manifest "${GITHUB_REF_NAME#v}" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${GITHUB_REF_NAME}"
+
+      - name: Publish the artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "$GITHUB_REF_NAME" --generate-notes \
+            target/release/bundle/appimage/*.AppImage \
+            target/release/bundle/appimage/*.AppImage.sig \
+            target/release/bundle/deb/*.deb \
+            target/release/bundle/deb/*.deb.sig \
+            target/release/manifests/SHA256SUMS
+
+      # Last, and alone: an installed app polls these. Published before the
+      # artifacts they name, they would point at files that are not there yet.
+      - name: The manifests last
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            target/release/manifests/latest-appimage.json \
+            target/release/manifests/latest-deb.json

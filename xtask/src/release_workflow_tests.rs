@@ -1,0 +1,69 @@
+//! What the release job promises, and each way of breaking it.
+
+use super::*;
+
+fn ours() -> String {
+    std::fs::read_to_string(crate::workspace_root().join(WORKFLOW)).expect("the workflow")
+}
+
+#[test]
+fn the_workflow_as_it_stands_keeps_them() {
+    let broken = refusals(&ours());
+    assert!(
+        broken.is_empty(),
+        "{}",
+        broken
+            .iter()
+            .map(|(line, what)| format!("{line}: {what}"))
+            .collect::<Vec<_>>()
+            .join("; ")
+    );
+}
+
+/// An action pinned to a tag is an action somebody else can change under a job
+/// that holds the signing key.
+#[test]
+fn an_action_pinned_to_a_tag_is_refused() {
+    let loosened = ours().replace(
+        "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+        "actions/checkout@v5",
+    );
+    assert!(refusals(&loosened)
+        .iter()
+        .any(|(_, what)| what.contains("not pinned")));
+}
+
+#[test]
+fn the_key_in_a_second_step_is_refused() {
+    let spread = ours().replace(
+        "      - name: Publish the artifacts\n",
+        "      - name: Publish the artifacts\n        # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}\n",
+    );
+    assert!(refusals(&spread)
+        .iter()
+        .any(|(_, what)| what.contains("hands the signing key")));
+}
+
+#[test]
+fn publishing_without_verify_tag_is_refused() {
+    let loose = ours().replace(" --verify-tag", "");
+    assert!(refusals(&loose)
+        .iter()
+        .any(|(_, what)| what.contains("--verify-tag")));
+}
+
+/// The manifests are what an installed app polls; published first, they name
+/// files that are not there yet.
+#[test]
+fn manifests_published_before_the_artifacts_are_refused() {
+    let text = ours();
+    let created = text.find("gh release create").expect("a create step");
+    let swapped = format!(
+        "{}gh release upload before\n{}",
+        &text[..created],
+        &text[created..]
+    );
+    assert!(refusals(&swapped)
+        .iter()
+        .any(|(_, what)| what.contains("before the files they name")));
+}

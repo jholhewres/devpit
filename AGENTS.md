@@ -129,10 +129,16 @@ first, and a two-word name (`.arow`, `.tleaf`) when the obvious one is taken.
 
 ## Tests
 
-Fast unit tests, and visual checks where the thing is visual. Nothing that
-takes minutes, nothing that reaches the network, nothing that exercises
-GitHub.
+Fast unit tests, and visual checks where the thing is visual. `make test`
+takes seconds per change, reaches no network and exercises no service: that is
+the bar every commit clears, and nothing slow belongs in it.
 
-**CI is not the job until release.** `make test` passing locally is the bar.
-Do not add workflows, do not tune the ones that exist, do not chase a red
-badge — that work happens once, when there is something to release.
+Two things sit outside it, deliberately. `make e2e` drives the built app
+through a WebDriver and takes minutes, so it is its own target and its own CI
+job — a suite nobody can run locally is a suite nobody fixes. And
+`release.yml` builds, signs and publishes on a tag; it is the one job that
+holds a key, and the one place GitHub is exercised.
+
+The rule is the same as it ever was, stated as its reason rather than as a
+count: the Makefile is the interface everyone reads, and CI does not invent
+commands that cannot be run by hand.

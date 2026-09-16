@@ -10,7 +10,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# No release, publish or deploy job. Those arrive with v1.
+# Tests and a build, nothing published: releasing is `release.yml`, which
+# runs on a tag and is the only job that holds the signing key.
 jobs:
   test:
     runs-on: ubuntu-24.04
