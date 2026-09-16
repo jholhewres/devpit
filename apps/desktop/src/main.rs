@@ -166,6 +166,9 @@ fn main() {
             // which costs an interactive shell startup. Started now so the
             // first time somebody opens the menu the answer is already there.
             shell_launch::warm_installed();
+            // What the cards were doing before this process started: asked
+            // once, on its own thread, for the project the window opens on.
+            card_reconcile::rebuild_on_start(app.handle().clone());
             // Looks for a newer devpit while the switch says to. Started
             // last: it is the one thing here that can wait.
             update::watch(app.handle().clone());

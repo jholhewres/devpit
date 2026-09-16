@@ -148,6 +148,44 @@ pub(crate) fn reconcile(
     }
 }
 
+/// The project to rebuild first: the one the person was last in.
+///
+/// Pure so the choice can be read without a store. `projects()` already
+/// answers most-recently-opened first, and this says out loud that the order
+/// is the rule rather than an accident of the query.
+pub(crate) fn last_opened(projects: &[devpit_core::ProjectRow]) -> Option<String> {
+    projects.first().map(|row| row.id.clone())
+}
+
+/// Rebuilds what the registry knew, for the project the window will open on.
+///
+/// The registry is in memory, so a restart starts it empty and every card says
+/// nothing until its agent speaks again. This asks tmux and the process table
+/// once, on its own thread — `setup` returns without waiting, because the same
+/// two questions were measured at about forty milliseconds each and this runs
+/// before the window has painted.
+///
+/// One project, not all of them: the others are rebuilt by the poll that
+/// already runs when they are opened.
+pub(crate) fn rebuild_on_start(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        let Ok(store) = crate::projects::store() else {
+            return;
+        };
+        let Ok(projects) = store.projects() else {
+            return;
+        };
+        let Some(project_id) = last_opened(&projects) else {
+            return;
+        };
+        // Stamped before tmux and `ps` are asked, so a hook heard in between
+        // is newer and wins.
+        let seq = crate::card_activity::next_seq();
+        let fronts = crate::shell_launch::running_in(&project_id).unwrap_or_default();
+        reconcile(&app, &project_id, &fronts, seq);
+    });
+}
+
 #[cfg(test)]
 #[path = "card_reconcile_tests.rs"]
 mod tests;

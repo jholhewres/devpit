@@ -205,3 +205,36 @@ fn an_open_from_the_process_table_does_not_swallow_a_hook_already_on_its_way() {
     .expect("the waiting still lands");
     assert_eq!(waited.activity, Some(Doing::Waiting));
 }
+
+/// The rebuild starts with the project the person was last in.
+///
+/// `projects()` answers most-recently-opened first, and this is the rule that
+/// depends on it: rebuilding every project at startup would ask tmux and the
+/// process table once per project, before the window has painted.
+#[test]
+fn a_restart_rebuilds_the_last_active_project() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("store");
+    let older = store
+        .add_project(&dir.path().join("older"), None)
+        .expect("older");
+    let newer = store
+        .add_project(&dir.path().join("newer"), None)
+        .expect("newer");
+    // Written rather than touched: both were added in the same second, and the
+    // tie-break is creation order — which is not what this rule is about.
+    store
+        .conn()
+        .execute(
+            "UPDATE project SET last_opened_at = CASE id WHEN ?1 THEN 200 ELSE 100 END",
+            [&newer],
+        )
+        .expect("opened at");
+
+    let projects = store.projects().expect("projects");
+    assert_eq!(last_opened(&projects).as_deref(), Some(newer.as_str()));
+    assert_ne!(last_opened(&projects).as_deref(), Some(older.as_str()));
+
+    // And with nothing registered there is nothing to rebuild.
+    assert_eq!(last_opened(&[]), None);
+}

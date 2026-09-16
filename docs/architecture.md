@@ -47,8 +47,11 @@ would still say `working` after the app had closed.
 - **State is heard.** Hooks from panes, headless turns and background sessions,
   runs starting and ending, chat turns and the process table all land in one
   in-memory registry, stamped by one counter, so a late word never undoes a
-  newer one. After a restart it is empty; the process table marks a card pane
-  with an agent in front as open until the agent says more.
+  newer one. After a restart it is empty, so the app rebuilds what it can on
+  its own thread: for the project you were last in, tmux and the process table
+  say which card panes have an agent in front, and those read as open until
+  the agent says more. Other projects are rebuilt when they are opened. What
+  an agent was *doing* — working, waiting, done — waits for its next hook.
 - **The window hears it on `card:happening`.** One event per change, with the
   card's sessions and what they add up to. The tile's dot and the open card's
   Sessions section read it.
