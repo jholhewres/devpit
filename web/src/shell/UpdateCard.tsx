@@ -35,8 +35,23 @@ export function waitingFor(since: number | null, now: number): string {
   return `for ${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
+/** Whether the card has a clock to keep.
+ *
+ * Only a wait says how long it has been waiting, and only a wait is told
+ * nothing while it waits: no event arrives between the choice and the work
+ * ending, so without a tick of its own the card said "for less than a minute"
+ * for as long as it was open. */
+export const counting = (status: UpdateStatus | null): boolean => status?.type === 'waiting'
+
+/** How often that clock moves. Minutes are what the card says, so a finer tick
+ *  would re-render for a sentence that did not change. */
+const A_TICK = 30_000
+
 /** What the card says about each state, and what its one button does. */
-function offer(status: UpdateStatus): {
+function offer(
+  status: UpdateStatus,
+  now: number,
+): {
   title: string
   said: string
   calm: string | null
@@ -62,7 +77,7 @@ function offer(status: UpdateStatus): {
     case 'waiting':
       return {
         title: 'Update waiting',
-        said: `It goes in once ${inFlight(status.runs, status.turns)} are done. Waiting ${waitingFor(status.since, Date.now() / 1000)}.`,
+        said: `It goes in once ${inFlight(status.runs, status.turns)} are done. Waiting ${waitingFor(status.since, now)}.`,
         calm: 'Nothing new starts meanwhile. Your terminals keep running.',
         action: 'Cancel',
       }
@@ -92,6 +107,9 @@ export function UpdateCard(): React.JSX.Element | null {
   /* What is running, once the person has asked to restart and it turns out
      something is. Null is "nothing in the way, or nobody has asked yet". */
   const [work, setWork] = useState<UpdateWork | null>(null)
+  /* The moment the card is drawing against. State rather than a read in the
+     render, so the tick below is what moves it. */
+  const [now, setNow] = useState(() => Date.now() / 1000)
 
   useEffect(
     () =>
@@ -105,6 +123,13 @@ export function UpdateCard(): React.JSX.Element | null {
       }),
     [],
   )
+
+  useEffect(() => {
+    if (!counting(status)) return
+    setNow(Date.now() / 1000)
+    const tick = window.setInterval(() => setNow(Date.now() / 1000), A_TICK)
+    return () => window.clearInterval(tick)
+  }, [status])
 
   const failed = (error: string): void =>
     setStatus({ type: 'failed', message: error, recoverable: true })
@@ -155,7 +180,7 @@ export function UpdateCard(): React.JSX.Element | null {
   }
 
   if (!status || later) return null
-  const said = offer(status)
+  const said = offer(status, now)
   if (!said) return null
 
   const fromATestFeed = testFeed && (status.type === 'available' || status.type === 'failed')

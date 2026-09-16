@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { UpdateStatus } from '../gen/bindings'
-import { RELEASE_PAGE, UpdateCard, waitingFor } from './UpdateCard'
+import { counting, RELEASE_PAGE, UpdateCard, waitingFor } from './UpdateCard'
 
 const heard: Record<string, (payload: UpdateStatus) => void> = {}
 vi.mock('./window', () => ({
@@ -230,6 +230,33 @@ describe('an update waiting for the work to end', () => {
     expect(waitingFor(100, 110)).toBe('for less than a minute')
     expect(waitingFor(0, 125)).toBe('for 2 min')
     expect(waitingFor(0, 3900)).toBe('for 1 h 5 min')
+  })
+
+  /* Nothing arrives between the choice and the work ending, so the card has to
+     move its own clock — it said "for less than a minute" for as long as it was
+     left open. */
+  it('keeps counting while it waits, and only while it waits', () => {
+    vi.useFakeTimers()
+    try {
+      const started = Date.now() / 1000
+      render(<UpdateCard />)
+      say({ type: 'waiting', runs: 1, turns: 0, since: started } as UpdateStatus)
+      expect(screen.getByText(/Waiting for less than a minute\./)).toBeTruthy()
+
+      act(() => void vi.advanceTimersByTime(90_000))
+      expect(screen.getByText(/Waiting for 1 min\./)).toBeTruthy()
+
+      act(() => void vi.advanceTimersByTime(4 * 60_000))
+      expect(screen.getByText(/Waiting for 5 min\./)).toBeTruthy()
+
+      // A state with nothing to count does not keep a timer running.
+      expect(counting({ type: 'waiting', runs: 0, turns: 0, since: 0 } as UpdateStatus)).toBe(true)
+      expect(counting({ type: 'ready', version: '0.2.0' } as UpdateStatus)).toBe(false)
+      expect(counting({ type: 'installing' } as UpdateStatus)).toBe(false)
+      expect(counting(null)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   /* The review's case: closing a ready update only hid the card, and the app
