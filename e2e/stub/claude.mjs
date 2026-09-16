@@ -13,6 +13,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
+import { createInterface } from 'node:readline'
 
 const VERSION = '2.1.273 (Claude Code)'
 const argv = process.argv.slice(2)
@@ -35,14 +36,55 @@ if (argv[0] === 'agents' && has('--json')) {
   process.exit(0)
 }
 
-if (has('--bg')) {
+if (has('--help')) {
+  console.log(`claude ${VERSION}\n\nUSAGE: claude [FLAGS] [-p PROMPT]\n\nThis is the devpit end-to-end stub. It answers; it never calls anything.`)
+} else if (has('--bg')) {
   background()
 } else if (argv[0] === 'attach') {
   attach(argv[1])
 } else if (has('-p')) {
   await headless()
 } else {
-  console.log(`claude ${VERSION}\n\nUSAGE: claude [FLAGS] [-p PROMPT]\n\nThis is the devpit end-to-end stub. It answers; it never calls anything.`)
+  interactive()
+}
+
+/**
+ * `claude` with no mode: a session somebody sits in front of.
+ *
+ * It reads lines the way the real one reads a prompt. `/exit` ends it, a line
+ * that asks for something needing permission makes it wait on the person, and
+ * anything else is a turn that starts and finishes — each announced through
+ * the hooks, which is the only way the board hears any of it.
+ */
+function interactive() {
+  const session = valueOf('--session-id') ?? `stub-${process.pid}`
+  fireHooks('SessionStart', { source: 'startup' }, session)
+  process.stdout.write('\n  devpit end-to-end stub — type /exit to leave\n\n> ')
+
+  const lines = createInterface({ input: process.stdin })
+  lines.on('line', (line) => {
+    const said = line.trim()
+    if (said === '/exit') {
+      fireHooks('SessionEnd', { reason: 'prompt_input_exit' }, session)
+      // A moment for the hook's curl to leave before the process does.
+      setTimeout(() => process.exit(0), 300)
+      return
+    }
+    if (/permission/i.test(said)) {
+      fireHooks(
+        'Notification',
+        {
+          message: 'Claude needs your permission to use Write',
+          notification_type: 'permission_prompt',
+        },
+        session,
+      )
+    } else if (said) {
+      fireHooks('UserPromptSubmit', { prompt: said }, session)
+      fireHooks('Stop', {}, session)
+    }
+    process.stdout.write('> ')
+  })
 }
 
 /** The sessions this stub has started, as `agents --json` reports them. */
@@ -110,7 +152,7 @@ function fixture() {
  * told. A stub that answers but never fires a hook would leave every tile
  * blank and every test asserting nothing.
  */
-function fireHooks(event) {
+function fireHooks(event, extra = {}, sessionId = undefined) {
   const settings = valueOf('--settings')
   if (!settings || !existsSync(settings)) return
   let declared
@@ -121,9 +163,10 @@ function fireHooks(event) {
   }
   const payload = JSON.stringify({
     hook_event_name: event,
-    session_id: valueOf('--session-id') ?? 'stub-session',
+    session_id: sessionId ?? valueOf('--session-id') ?? 'stub-session',
     cwd: process.cwd(),
     transcript_path: join(home, '.claude', 'stub.jsonl'),
+    ...extra,
   })
   for (const group of declared.hooks?.[event] ?? []) {
     for (const hook of group.hooks ?? []) {

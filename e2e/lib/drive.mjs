@@ -31,20 +31,46 @@ export async function press(window, words) {
 /** Right-clicks the tile with this title, and waits for its menu. */
 export async function openCardMenu(window, title) {
   // Whatever was open is closed first: an open card or a menu over the board
-  // takes the right-click, and the tile never hears it.
-  await window.findElement(By.css('body')).sendKeys('\uE00C')
-  await settle(300)
+  // takes the right-click, and the tile never hears it. Dispatched rather
+  // than typed — with a terminal focused, the body is not "interactable".
+  await escape(window)
   const menu = By.css(`[role="menu"][aria-label="${title} actions"]`)
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const tile = await window.findElement(
-      By.xpath(`//*[@data-card][.//*[normalize-space()='${title}'] or normalize-space()='${title}']`),
-    )
-    await window.executeScript('arguments[0].scrollIntoView({ block: "center" })', tile)
-    await window.actions().contextClick(tile).perform()
+    // Dispatched rather than right-clicked through the driver: the driver
+    // refuses an element it judges covered, and what covers a tile after a
+    // terminal was in front is a layer that is already on its way out.
+    await window.executeScript(function (title) {
+      const tiles = Array.prototype.slice.call(document.querySelectorAll('[data-card]'))
+      const tile = tiles.find(function (one) {
+        return one.innerText.split('\n').some(function (line) {
+          return line.trim() === title
+        })
+      })
+      if (!tile) return
+      tile.scrollIntoView({ block: 'center' })
+      const box = tile.getBoundingClientRect()
+      tile.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: box.left + box.width / 2,
+          clientY: box.top + box.height / 2,
+        }),
+      )
+    }, title)
     await settle(400)
     if ((await window.findElements(menu)).length > 0) return
   }
   throw new Error(`the menu for "${title}" did not open`)
+}
+
+/** Escape, the way the window hears it, whatever has focus. */
+export async function escape(window) {
+  await window.executeScript(function () {
+    const target = document.activeElement ?? document.body
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  })
+  await settle(300)
 }
 
 /** Opens a lane's own menu by its name. */
