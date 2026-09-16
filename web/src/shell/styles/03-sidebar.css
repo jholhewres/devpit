@@ -364,3 +364,4 @@ body[data-account='out'] .acct { display: none; }
 .fsum__one:hover { background: var(--overlay); }
 .fsum__line { display: block; font-size: 12px; }
 .fsum__d { display: block; font-size: 11px; color: var(--dim); }
+.fsum__did { margin: 0 0 10px; font-size: 12px; color: var(--dim); }

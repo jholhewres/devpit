@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import type { HeadsDown, Notice } from '../gen/bindings'
+import type { HeadsDown, Notice, ProjectRun } from '../gen/bindings'
+import { minutesIn, whatYouDid } from './headsDown'
 import { ask, commands } from './live'
 
 /*
@@ -36,6 +37,9 @@ export function FocusSummary({
   const [waiting, setWaiting] = useState<Notice[]>([])
   const [more, setMore] = useState(false)
   const [read, setRead] = useState(false)
+  /* The other half: what this project did while the door was shut. Read with
+     the same instant the door was shut at, which RunsQuery already takes. */
+  const [mine, setMine] = useState<ProjectRun[]>([])
 
   useEffect(() => {
     if (ended.since === null) return
@@ -58,9 +62,21 @@ export function FocusSummary({
         over = heard.more
         if (!heard.more) break
       }
+      const ran = await ask(() =>
+        commands.runsList({
+          projectId: ended.projectId,
+          stepId: null,
+          state: null,
+          since: ended.since as number,
+          until: null,
+          after: null,
+        }),
+      )
+
       if (dropped) return
       setWaiting(all)
       setMore(over)
+      setMine(ran.data?.runs ?? [])
       setRead(true)
     })()
     return () => {
@@ -79,9 +95,24 @@ export function FocusSummary({
     byProject.set(one.projectId ?? '', group)
   }
 
+  const did = whatYouDid(mine)
+  const spent =
+    did.costUsd === null
+      ? null
+      : `$${did.costUsd.toFixed(2)}${did.uncosted > 0 ? ' of what was priced' : ''}`
+
   return (
     <div className="fsum" role="dialog" aria-label="Focus ended">
       <div className="fsum__box">
+        {/* What you did comes first: it is the thing the focus was for. */}
+        <p className="fsum__did">
+          {`${minutesIn(ended, Date.now() / 1000)} min`}
+          {mine.length > 0
+            ? ` · ${did.ok} finished${did.failed > 0 ? `, ${did.failed} failed` : ''}`
+            : ' · nothing ran'}
+          {spent ? ` · ${spent}` : ''}
+        </p>
+
         <div className="fsum__top">
           <span className="fsum__t">
             {waiting.length === 0

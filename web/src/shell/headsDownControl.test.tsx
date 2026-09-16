@@ -15,6 +15,7 @@ vi.mock('./live', () => ({
   commands: {
     focusRead: async () => ({ status: 'ok', data: stored }),
     focusWaiting: async () => ({ notices: [], more: false }),
+    runsList: async () => ({ runs: [], next: null }),
     focusWrite: async (projectId: string | null) => {
       written.push(projectId)
       stored = projectId ? { projectId, since: Date.now() / 1000 } : null

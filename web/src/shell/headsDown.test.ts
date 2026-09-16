@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Notice } from '../gen/bindings'
-import { held, minutesIn, nextThatNeedsYou, type HeadsDown } from './headsDown'
+import { held, minutesIn, nextThatNeedsYou, whatYouDid, type HeadsDown } from './headsDown'
 
 const focus: HeadsDown = { projectId: 'prj_here', since: 1000 }
 
@@ -135,5 +135,34 @@ describe('the next thing that needs you', () => {
   it('puts a kind it has never heard of last', () => {
     const picked = nextThatNeedsYou([one({ id: 'strange', kind: 'whatever' }), one({ id: 'run' })])
     expect(picked?.id).toBe('run')
+  })
+})
+
+/* The inside half: what you did while the door was shut. */
+describe('what you did', () => {
+  const run = (state: string, costUsd: number | null = null) => ({ run: { state, costUsd } })
+
+  it('counts nothing out of nothing', () => {
+    expect(whatYouDid([])).toEqual({ ok: 0, failed: 0, costUsd: null, uncosted: 0 })
+  })
+
+  it('counts what ended, each way', () => {
+    const said = whatYouDid([run('ok'), run('ok'), run('failed'), run('cancelled')])
+    expect(said.ok).toBe(2)
+    expect(said.failed).toBe(1)
+  })
+
+  /* A command step never records a cost. Folding it in as zero would make the
+     total read as complete when it is a sum over agent turns only. */
+  it('sums only what cost something, and says how much it could not see', () => {
+    const said = whatYouDid([run('ok', 0.12), run('ok', 0.3), run('ok'), run('failed')])
+    expect(said.costUsd).toBeCloseTo(0.42)
+    expect(said.uncosted).toBe(2)
+  })
+
+  it('has no cost at all when nothing recorded one', () => {
+    const said = whatYouDid([run('ok'), run('failed')])
+    expect(said.costUsd).toBeNull()
+    expect(said.uncosted).toBe(2)
   })
 })

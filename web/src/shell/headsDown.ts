@@ -92,3 +92,39 @@ export function nextThatNeedsYou<T extends Pick<Notice, 'kind' | 'readAt' | 'cre
   })
   return ordered[0] ?? null
 }
+
+/** What the focus's own project did while the door was shut. */
+export interface WhatYouDid {
+  readonly ok: number
+  readonly failed: number
+  /** Only what actually cost something: a run with no figure is not a zero. */
+  readonly costUsd: number | null
+  /** How many runs carried no cost at all, so the sum can say it is partial. */
+  readonly uncosted: number
+}
+
+/**
+ * The inside half of the summary: what you did, not what was held.
+ *
+ * A run with no cost recorded is not counted as zero — a command step never
+ * has one, and folding it in as zero would make the total read as complete
+ * when it is a sum over agent turns only. `uncosted` is what lets the screen
+ * say so instead of quietly rounding it away.
+ */
+export function whatYouDid(
+  runs: readonly { run: { state: string; costUsd: number | null } }[],
+): WhatYouDid {
+  let ok = 0
+  let failed = 0
+  let costUsd: number | null = null
+  let uncosted = 0
+
+  for (const { run } of runs) {
+    if (run.state === 'ok') ok += 1
+    if (run.state === 'failed') failed += 1
+    if (run.costUsd === null) uncosted += 1
+    else costUsd = (costUsd ?? 0) + run.costUsd
+  }
+
+  return { ok, failed, costUsd, uncosted }
+}

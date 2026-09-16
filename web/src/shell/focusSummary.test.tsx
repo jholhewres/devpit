@@ -5,6 +5,7 @@ import type { Notice } from '../gen/bindings'
 import { FocusSummary } from './FocusSummary'
 
 let pages: { notices: Notice[]; more: boolean }[] = []
+let ran: { run: { state: string; costUsd: number | null } }[] = []
 const asked: (string | null)[] = []
 
 vi.mock('./live', () => ({
@@ -18,6 +19,7 @@ vi.mock('./live', () => ({
       asked.push(after)
       return pages.shift() ?? { notices: [], more: false }
     },
+    runsList: async () => ({ runs: ran, next: null }),
   },
 }))
 
@@ -36,11 +38,32 @@ const notice = (over: Partial<Notice>): Notice => ({
 afterEach(() => {
   cleanup()
   pages = []
+  ran = []
   asked.length = 0
 })
 
 describe('what a focus says it held, on the way out', () => {
   const ended = { projectId: 'prj_here', since: 1000 }
+
+  /* What you did comes first: it is the thing the focus was for. A run with no
+     cost — every command step — is not folded in as zero, or the total would
+     read as complete when it is a sum over agent turns only. */
+  it('says how long it was and what this project did in it', async () => {
+    ran = [
+      { run: { state: 'ok', costUsd: 0.2 } },
+      { run: { state: 'ok', costUsd: null } },
+      { run: { state: 'failed', costUsd: null } },
+    ]
+    render(<FocusSummary ended={ended} onOpenCard={vi.fn()} onClose={vi.fn()} />)
+    const said = await screen.findByText(/finished/)
+    expect(said.textContent).toContain('2 finished, 1 failed')
+    expect(said.textContent).toContain('$0.20 of what was priced')
+  })
+
+  it('says nothing ran when nothing did', async () => {
+    render(<FocusSummary ended={ended} onOpenCard={vi.fn()} onClose={vi.fn()} />)
+    expect((await screen.findByText(/nothing ran/)).textContent).toMatch(/min · nothing ran/)
+  })
 
   it('says so plainly when nothing arrived', async () => {
     render(<FocusSummary ended={ended} onOpenCard={vi.fn()} onClose={vi.fn()} />)
