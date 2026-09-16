@@ -593,6 +593,25 @@ pub(crate) fn shutting_the_door(state: &UpdateStatus, since: f64) -> UpdateStatu
     .unwrap_or_else(|| state.clone())
 }
 
+/// Whether this install waits for the work it found, given what its caller
+/// already decided.
+///
+/// "Stop them and update now" stopped the work and said to go in; the install
+/// goes in whether or not everything died inside the few seconds it was given,
+/// which is what the line on the way out has always said. Waiting there would
+/// hand the person back the wait they were leaving.
+pub(crate) fn waiting_on(
+    when: WhenWorkIsInTheWay,
+    state: &UpdateStatus,
+    work: &UpdateWork,
+    since: f64,
+) -> Option<UpdateStatus> {
+    match when {
+        WhenWorkIsInTheWay::GoAhead => None,
+        WhenWorkIsInTheWay::Wait => holding_for(state, work, since),
+    }
+}
+
 /// The state an install holds in for the work it found, if it must hold at all.
 ///
 /// `None` is the only answer that lets the install go on.
@@ -887,6 +906,26 @@ pub async fn update_install(
     app: tauri::AppHandle,
     updating: tauri::State<'_, Updating>,
 ) -> Result<UpdateStatus, RpcError> {
+    install(app, updating, WhenWorkIsInTheWay::Wait).await
+}
+
+/// What an install does about work it finds still running.
+///
+/// Every caller waits, except the one where the person already answered that
+/// question: "Stop them and update now" stopped the work and said to go in.
+/// Waiting there would be devpit overruling them with the state they were
+/// trying to leave.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum WhenWorkIsInTheWay {
+    Wait,
+    GoAhead,
+}
+
+async fn install(
+    app: tauri::AppHandle,
+    updating: tauri::State<'_, Updating>,
+    when: WhenWorkIsInTheWay,
+) -> Result<UpdateStatus, RpcError> {
     let state = updating.state();
     // An install already under way is not an error to put on the card: the
     // person asked for what is already happening. Answered before the guard
@@ -926,7 +965,7 @@ pub async fn update_install(
         .try_state::<crate::chat::Talking>()
         .and_then(|talking| blocking_now(&talking).ok())
         .unwrap_or_default();
-    if let Some(held) = holding_for(&state, &work, now()) {
+    if let Some(held) = waiting_on(when, &state, &work, now()) {
         // The watcher puts it in once the work has ended.
         updating.moved_to(&app, held.clone());
         updating
@@ -1077,7 +1116,9 @@ pub async fn update_choose(
             if !stop_and_wait(&stopping, THE_WORK_GETS, every).await {
                 eprintln!("devpit-update the work did not stop in time; installing anyway");
             }
-            update_install(app, updating).await
+            // Anyway means anyway: the person chose to stop the work and go in,
+            // so an install that waited here would hand them back the wait.
+            install(app, updating, WhenWorkIsInTheWay::GoAhead).await
         }
     }
 }

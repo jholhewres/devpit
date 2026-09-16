@@ -629,3 +629,47 @@ fn a_fixture_feed_never_installs() {
     assert!(may_download(&heard).is_err());
     assert_eq!(next(&heard, Event::Install), None);
 }
+
+/// "Stop them and update now" means now, even if something would not die.
+///
+/// The install reads the work again before it commits (B-1). That read must
+/// not overrule the person who already answered the question: `stop_and_wait`
+/// gives the work a few seconds and then says "installing anyway", and an
+/// install that waited there would hand back the wait they were leaving.
+#[test]
+fn an_install_told_to_go_ahead_does_not_wait_for_work_that_would_not_stop() {
+    let waiting = S::Waiting {
+        runs: 0,
+        turns: 0,
+        since: 500.0,
+    };
+    let stubborn = devpit_rpc::UpdateWork {
+        runs: vec![devpit_rpc::UpdateBlocking {
+            id: "run_1".to_owned(),
+            title: "A suite that ignores its signal".to_owned(),
+        }],
+        turns: Vec::new(),
+        keeps: Vec::new(),
+    };
+
+    assert_eq!(
+        waiting_on(WhenWorkIsInTheWay::GoAhead, &waiting, &stubborn, 900.0),
+        None,
+        "the person chose to stop the work and go in"
+    );
+    assert_eq!(
+        waiting_on(WhenWorkIsInTheWay::Wait, &waiting, &stubborn, 900.0),
+        Some(S::Waiting {
+            runs: 1,
+            turns: 0,
+            since: 500.0
+        }),
+        "every other caller waits"
+    );
+    // And with nothing in the way the two answer the same.
+    let idle = devpit_rpc::UpdateWork::default();
+    assert_eq!(
+        waiting_on(WhenWorkIsInTheWay::Wait, &waiting, &idle, 900.0),
+        None
+    );
+}
