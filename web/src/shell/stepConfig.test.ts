@@ -97,9 +97,25 @@ describe('an edited step', () => {
       verdictField: 'verdict',
       sendsBackWhen: 'fail',
       needsWorktree: true,
-      schema: { type: 'object' },
-      budgetUsd: 5,
-      skills: ['review'],
+    })
+  })
+
+  /* `budgetUsd` and `capUsd` are one field to the runner: both in one config
+     is a duplicate it refuses, and so is a `skills` it cannot honour. */
+  it('writes one name per field, and nothing the runner refuses', () => {
+    const saved = JSON.parse(stepConfig('agent', { prompt: 'go', capUsd: '3', expects: '{"type":"object"}' }, stored))
+    expect(saved).not.toHaveProperty('budgetUsd')
+    expect(saved).not.toHaveProperty('schema')
+    expect(saved).not.toHaveProperty('skills')
+    expect(saved.capUsd).toBe(3)
+    expect(saved.expects).toBe('{"type":"object"}')
+  })
+
+  it('reads the other name back into the form', () => {
+    expect(stepFields('agent', JSON.stringify({ prompt: 'go', budgetUsd: 4, schema: '{}' }))).toEqual({
+      prompt: 'go',
+      capUsd: '4',
+      expects: '{}',
     })
   })
 

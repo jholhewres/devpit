@@ -30,12 +30,21 @@ export const CONTEXT_KEYS = [
 ] as const
 
 /** The keys the form asks for, by kind. Anything else a stored config holds is
- *  somebody else's, and an edit keeps it. */
+ *  somebody else's, and an edit keeps it.
+ *
+ *  An agent's also counts the names the runner reads as the same field
+ *  (`budgetUsd` for `capUsd`, `schema` for `expects`): kept beside the form's,
+ *  the pair is a duplicate field and the save is refused. And `skills`, which
+ *  the runner refuses outright — kept, it made the step impossible to save
+ *  from a form that has no way to remove it. */
 const OWNED: Readonly<Record<string, readonly string[]>> = {
   command: ['command', 'timeoutSeconds'],
   session: ['model', 'profile'],
-  agent: ['agent', 'profile', 'model', 'capUsd', 'prompt', 'inject', 'expects'],
+  agent: ['agent', 'profile', 'model', 'capUsd', 'budgetUsd', 'prompt', 'inject', 'expects', 'schema', 'skills'],
 }
+
+/** The other name a stored agent config may give a field the form shows. */
+const ALSO: Readonly<Record<string, string>> = { capUsd: 'budgetUsd', expects: 'schema' }
 
 /**
  * `stored` is the config being edited. The form's fields are laid over it:
@@ -114,7 +123,8 @@ export function stepFields(kind: string, config: string): Fields | null {
 
   const fields: Record<string, string> = {}
   const put = (key: string): void => {
-    const value = held[key]
+    const other = ALSO[key]
+    const value = held[key] ?? (other === undefined ? undefined : held[other])
     // A number comes back as what was typed: the form is text, and the config
     // is what `stepConfig` makes of it again.
     if (typeof value === 'string' && value) fields[key] = value
