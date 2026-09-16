@@ -27,9 +27,13 @@ export async function startDriver({ port = PORT, env = {} } = {}) {
   // drivers on neighbouring ports take each other's native port, and the
   // second session fails with "Failed to match capabilities".
   const native = String(port + 1)
+  // The seeded environment *replaces* this one rather than being laid over it.
+  // Laid over it, every variable the seed deliberately left out — the CLI's
+  // CLAUDE_CONFIG_DIR above all — came back from the parent, and the Usage
+  // screen read the real installation's plan and every real transcript.
   const driver = spawn('tauri-driver', ['--port', String(port), '--native-port', native], {
     stdio: ['ignore', 'inherit', 'inherit'],
-    env: { ...process.env, ...env },
+    env: Object.keys(env).length > 0 ? env : process.env,
   })
   driver.on('error', (err) => {
     throw err
@@ -76,6 +80,19 @@ export async function insideTheSeededHome(window, home) {
   const path = info?.statePath ?? ''
   if (!path.startsWith(home)) {
     throw new Error(`the app is keeping state in ${path}, which is not under ${home}`)
+  }
+  // And the CLI it reads: state in the right place is not enough when the
+  // installations it finds are somebody's real ones.
+  const found = await window.executeAsyncScript(function (done) {
+    window.__TAURI_INTERNALS__.invoke('cli_installations').then(done, function () {
+      done([])
+    })
+  })
+  const outside = (found ?? [])
+    .map((one) => one.directory)
+    .filter((directory) => !String(directory).startsWith(home))
+  if (outside.length > 0) {
+    throw new Error(`the app reads CLI installations outside the seeded home: ${outside.join(', ')}`)
   }
   return path
 }

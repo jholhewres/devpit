@@ -78,6 +78,23 @@ export function seedHome(root, name = 'e2e-home') {
   return { home, repo, feed, bin, stub }
 }
 
+/**
+ * Another fixture repository in a seeded home, for a test that needs a project
+ * of its own — the tests share a home and a driver, and one test archiving the
+ * card another one photographs is a flaky suite.
+ */
+export function seedRepo(home, name) {
+  const repo = join(home, 'work', name)
+  rmSync(repo, { recursive: true, force: true })
+  mkdirSync(repo, { recursive: true })
+  const git = (...args) => execFileSync('git', args, { cwd: repo, env: gitEnv(home) })
+  git('init', '-q')
+  writeFileSync(join(repo, 'README.md'), `# ${name}\n`)
+  git('add', 'README.md')
+  git('commit', '-qm', 'first')
+  return repo
+}
+
 function gitEnv(home) {
   return { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig') }
 }

@@ -31,6 +31,9 @@ export async function invoke(window, command, args = {}) {
 export async function seedBoard(window, repo) {
   await invoke(window, 'settings_finish_onboarding')
   const project = await invoke(window, 'project_add', { rootPath: repo })
+  // Opened as well as added: the tests share a home, and the window shows
+  // whichever project was opened last — another test's, otherwise.
+  await invoke(window, 'project_open', { projectId: project.id })
   const board = await invoke(window, 'board_get', { projectId: project.id })
 
   const step = await invoke(window, 'step_create', {

@@ -1,0 +1,86 @@
+/*
+ * What a person does to the window, said the way they would say it.
+ *
+ * Clicks go through the DOM where a real click would be intercepted by an
+ * overlay a person would not be fighting — the confirm dialogs and the menus
+ * are portals over everything, and the button under them is not what anybody
+ * is aiming at.
+ */
+
+import { By } from 'selenium-webdriver'
+import { setTimeout as wait } from 'node:timers/promises'
+
+export const settle = (ms = 400) => wait(ms)
+
+/** Clicks the visible button whose words are exactly these. */
+export async function press(window, words) {
+  const pressed = await window.executeScript(function (words) {
+    const buttons = Array.prototype.slice.call(document.querySelectorAll('button'))
+    const hit = buttons.find(function (node) {
+      const said = (node.getAttribute('aria-label') || node.innerText || '').trim()
+      return said === words && node.offsetParent !== null
+    })
+    if (!hit) return false
+    hit.click()
+    return true
+  }, words)
+  if (!pressed) throw new Error(`no visible button says "${words}"`)
+  await settle()
+}
+
+/** Right-clicks the tile with this title, and waits for its menu. */
+export async function openCardMenu(window, title) {
+  // Whatever was open is closed first: an open card or a menu over the board
+  // takes the right-click, and the tile never hears it.
+  await window.findElement(By.css('body')).sendKeys('\uE00C')
+  await settle(300)
+  const menu = By.css(`[role="menu"][aria-label="${title} actions"]`)
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tile = await window.findElement(
+      By.xpath(`//*[@data-card][.//*[normalize-space()='${title}'] or normalize-space()='${title}']`),
+    )
+    await window.executeScript('arguments[0].scrollIntoView({ block: "center" })', tile)
+    await window.actions().contextClick(tile).perform()
+    await settle(400)
+    if ((await window.findElements(menu)).length > 0) return
+  }
+  throw new Error(`the menu for "${title}" did not open`)
+}
+
+/** Opens a lane's own menu by its name. */
+export async function openLaneMenu(window, lane) {
+  await press(window, `${lane} actions`)
+}
+
+/**
+ * Puts words in a field and presses Enter, the way typing would have.
+ *
+ * Not `sendKeys` for the words: WebKitWebDriver dispatches the keydown events
+ * and inserts nothing — the field keeps its old value while the page sees
+ * every key go by. So the value is set through the element's own setter, with
+ * the `input` event React listens for, and only Enter is sent as a key, which
+ * is the part the app actually reacts to.
+ */
+export async function fill(window, selector, words) {
+  const field = await window.findElement(By.css(selector))
+  await window.executeScript(
+    function (field, words) {
+      field.focus()
+      if (field.isContentEditable) {
+        field.textContent = words
+      } else {
+        const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value').set
+        setter.call(field, words)
+      }
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    },
+    field,
+    words,
+  )
+  await field.sendKeys('\uE007')
+  await settle(700)
+}
+
+export async function text(window) {
+  return (await window.executeScript('return document.body.innerText')).replace(/\s+/g, ' ')
+}

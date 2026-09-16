@@ -13,6 +13,7 @@ import { strict as assert } from 'node:assert'
 import { after, before, describe, test } from 'node:test'
 import { By, Key, until } from 'selenium-webdriver'
 
+import { openCardMenu, press } from '../lib/drive.mjs'
 import { invoke, seedBoard } from '../lib/seed.mjs'
 import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
 import {
@@ -138,14 +139,11 @@ describe('the screens', () => {
   })
 
   test('an open card shows its body and its comment', async () => {
-    const tiles = await window.findElements(By.xpath("//*[contains(text(),'Fix the parser')]"))
-    for (const tile of tiles) {
-      if (await tile.isDisplayed()) {
-        await tile.click()
-        break
-      }
-    }
-    await settle(900)
+    // Through the card's own menu, which the menus suite already proves:
+    // a click on the title lands on whichever child is under the pointer.
+    await openCardMenu(window, 'Fix the parser')
+    await press(window, 'Open')
+    await window.wait(async () => /drops the last line/.test(await text()), 10000)
     const said = await text()
     assert.match(said, /drops the last line/)
     assert.match(said, /Reproduced on a file of one line/)
@@ -169,8 +167,10 @@ describe('the screens', () => {
     await openSettings('Usage')
     await settle(1200)
     const said = await text()
-    assert.match(said, /sign-in|Usage/)
-    assert.doesNotMatch(said, /\$\d/, 'a plan number appeared without a sign-in')
+    // What the plan reader answers when the CLI in this home has never been
+    // signed in — which is exactly the proof that it found no credential.
+    assert.match(said, /no saved sign-in/)
+    assert.doesNotMatch(said, /Max \(|Pro\b|% used/, 'a plan appeared without a sign-in')
     await sound('usage')
     await closeSettings()
   })
