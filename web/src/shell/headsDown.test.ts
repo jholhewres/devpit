@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Notice } from '../gen/bindings'
-import { held, minutesIn, type HeadsDown } from './headsDown'
+import { held, minutesIn, nextThatNeedsYou, type HeadsDown } from './headsDown'
 
 const focus: HeadsDown = { projectId: 'prj_here', since: 1000 }
 
@@ -89,5 +89,51 @@ describe('splitting what the bell knows', () => {
 
   it('holds nothing at all when no focus is on', () => {
     expect(list.filter((one) => held(one, null))).toEqual([])
+  })
+})
+
+/* The order somebody stuck between five agents actually wants. */
+describe('the next thing that needs you', () => {
+  const one = (over: Partial<Notice>): Pick<Notice, 'id' | 'kind' | 'readAt' | 'createdAt'> => ({
+    id: 'x',
+    kind: 'run',
+    readAt: null,
+    createdAt: 1000,
+    ...over,
+  })
+
+  it('answers nothing when there is nothing', () => {
+    expect(nextThatNeedsYou([])).toBeNull()
+  })
+
+  it('puts an agent that is waiting before anything else', () => {
+    const picked = nextThatNeedsYou([
+      one({ id: 'run', kind: 'run' }),
+      one({ id: 'due', kind: 'due' }),
+      one({ id: 'agent', kind: 'agent' }),
+      one({ id: 'undo', kind: 'irreversible' }),
+    ])
+    expect(picked?.id).toBe('agent')
+  })
+
+  it('puts a step with no undo second, before an ordinary run', () => {
+    const picked = nextThatNeedsYou([one({ id: 'run' }), one({ id: 'undo', kind: 'irreversible' })])
+    expect(picked?.id).toBe('undo')
+  })
+
+  it('prefers what nobody looked at, then the one waiting longest', () => {
+    const picked = nextThatNeedsYou([
+      one({ id: 'seen', readAt: 500 }),
+      one({ id: 'newer', createdAt: 9000 }),
+      one({ id: 'older', createdAt: 2000 }),
+    ])
+    expect(picked?.id).toBe('older')
+  })
+
+  /* A kind this build does not know sorts last rather than throwing: the set
+     grows with whatever learns to notice something. */
+  it('puts a kind it has never heard of last', () => {
+    const picked = nextThatNeedsYou([one({ id: 'strange', kind: 'whatever' }), one({ id: 'run' })])
+    expect(picked?.id).toBe('run')
   })
 })

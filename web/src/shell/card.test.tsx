@@ -246,6 +246,26 @@ describe('the bell', () => {
     )
   }
 
+  /* One key to whatever has been waiting longest, in the order somebody
+     between five agents wants. It opens the card the notice points at, which
+     is what every other route into a notice does. */
+  it('goes to the next thing that needs you on the key', async () => {
+    const onOpenCard = vi.fn()
+    bell = {
+      notices: [
+        notice({ id: 'ntc_run', kind: 'run', cardId: 'card_run' }),
+        notice({ id: 'ntc_agent', kind: 'agent', cardId: 'card_agent' }),
+      ],
+      unread: 2,
+    }
+    render(<Bell onOpenCard={onOpenCard} />)
+    await waitFor(() => expect(screen.getByLabelText('2 unread')).toBeTruthy())
+
+    fireEvent.keyDown(window, { key: 'N', shiftKey: true, metaKey: true })
+    await waitFor(() => expect(onOpenCard).toHaveBeenCalledWith('card_agent'))
+    expect(marked).toHaveBeenCalledWith('ntc_agent')
+  })
+
   it('shows no count when there is nothing unread', async () => {
     bell = { notices: [notice({ readAt: Date.now() / 1000 })], unread: 0 }
     const { container } = render(<Bell />)

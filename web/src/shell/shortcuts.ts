@@ -17,6 +17,7 @@ export type Shortcut =
   | 'splitRight'
   | 'splitDown'
   | 'focus'
+  | 'next'
 
 /** How each one is written where it is announced, exactly as a title prints it. */
 export const SHORTCUTS: Readonly<Record<Shortcut, string>> = {
@@ -28,6 +29,7 @@ export const SHORTCUTS: Readonly<Record<Shortcut, string>> = {
   splitRight: '⇧⌘D',
   splitDown: '⇧⌘E',
   focus: '⇧⌘F',
+  next: '⇧⌘N',
 }
 
 const PLAIN: Readonly<Record<string, Shortcut>> = {
@@ -42,6 +44,7 @@ const SHIFTED: Readonly<Record<string, Shortcut>> = {
   d: 'splitRight',
   e: 'splitDown',
   f: 'focus',
+  n: 'next',
 }
 
 /** A press, as much of one as this needs to know. */

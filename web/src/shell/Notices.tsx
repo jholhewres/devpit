@@ -1,8 +1,10 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 import type { Notice } from '../gen/bindings'
 import { useAway } from './away'
 import { since } from './projects'
+import { nextThatNeedsYou } from './headsDown'
+import { shortcutFor } from './shortcuts'
 import type { Bell } from './useNotices'
 
 /*
@@ -43,6 +45,22 @@ export function Notices({
 }): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   useAway(box, () => setOpen(false), open)
+
+  /* One key to the thing that has been waiting longest for you, in the order
+     somebody between five agents wants: an agent stopped for an answer, then a
+     step with no undo, then a run that ended. It walks what is ringing — what
+     a focus is holding is not something to be sent to. */
+  useEffect(() => {
+    const key = (event: KeyboardEvent): void => {
+      if (shortcutFor(event) !== 'next') return
+      const next = nextThatNeedsYou(bell.notices)
+      if (!next) return
+      event.preventDefault()
+      act(next)
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  })
 
   const act = (one: Notice): void => {
     bell.markRead(one.id)

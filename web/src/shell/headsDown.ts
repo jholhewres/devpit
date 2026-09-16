@@ -60,3 +60,35 @@ export function held(
  * from, so it counts as none rather than as zero minutes of something. */
 export const minutesIn = (focus: HeadsDown, now: number): number =>
   focus.since === null ? 0 : Math.max(0, Math.floor((now - focus.since) / 60))
+
+/**
+ * Which of this project's notices is the one that needs you next.
+ *
+ * The order is what somebody stuck between five agents actually wants: an
+ * agent that is waiting on an answer first, because it is stopped until you
+ * come; then a step with no undo, which is the one thing that fires without
+ * being asked twice; then a run that ended; then everything else.
+ *
+ * Within a rank, what nobody has looked at comes before what they have, and
+ * the older before the newer — the one that has been waiting longest.
+ *
+ * **A failed run is not ranked above one that finished**, and it should be.
+ * The notice carries the sentence ("tests failed on …") and not the outcome,
+ * so telling them apart here would mean reading English out of a title. That
+ * is a change to what a notice records, not a regex — `notices.rs:104` writes
+ * the sentence, and the rank can be right the day it writes the outcome too.
+ */
+const RANK: Readonly<Record<string, number>> = { agent: 0, irreversible: 1, run: 2 }
+
+export function nextThatNeedsYou<T extends Pick<Notice, 'kind' | 'readAt' | 'createdAt'>>(
+  mine: readonly T[],
+): T | null {
+  const ordered = [...mine].sort((a, b) => {
+    const rank = (RANK[a.kind] ?? 9) - (RANK[b.kind] ?? 9)
+    if (rank !== 0) return rank
+    const unread = Number(a.readAt !== null) - Number(b.readAt !== null)
+    if (unread !== 0) return unread
+    return (a.createdAt ?? 0) - (b.createdAt ?? 0)
+  })
+  return ordered[0] ?? null
+}
