@@ -455,7 +455,9 @@ fn hook_settings() -> Option<String> {
     let wanted = devpit_agentcli::settings_json(&endpoint);
     if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
         std::fs::create_dir_all(&root).ok()?;
-        std::fs::write(&path, &wanted).ok()?;
+        // Private: these are the commands an agent runs on every hook, so a
+        // file someone else can write is a command someone else chose.
+        devpit_core::home::write_private(&path, wanted.as_bytes()).ok()?;
     }
     // Quoted, because a home directory with a space in it would otherwise
     // become two arguments to the shell this is typed into.

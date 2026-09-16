@@ -61,7 +61,9 @@ fn hook_settings() -> Option<String> {
     // nothing.
     if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
         std::fs::create_dir_all(&root).ok()?;
-        std::fs::write(&path, &wanted).ok()?;
+        // Private, like the other writer of this file: these are the commands
+        // an agent runs on every hook.
+        devpit_core::home::write_private(&path, wanted.as_bytes()).ok()?;
     }
     Some(path.display().to_string())
 }

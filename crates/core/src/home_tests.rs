@@ -1,6 +1,130 @@
-//! What a project's folder has to keep straight.
+//! What a project's folder has to keep straight, and what the home keeps to
+//! itself.
 
 use super::*;
+
+/// The mode of a path, as the three octal digits a person reads.
+#[cfg(unix)]
+fn mode_of(path: &Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+
+    std::fs::symlink_metadata(path)
+        .expect("a path")
+        .permissions()
+        .mode()
+        & 0o777
+}
+
+/// An install from before `harden` existed: a world-readable store, a hooks
+/// file the group can write, and a directory anyone can list.
+#[cfg(unix)]
+#[test]
+fn an_existing_install_is_tightened_on_start() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join(".devpit");
+    std::fs::create_dir_all(&root).expect("root");
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o775)).expect("loose root");
+    for (name, mode) in [("state.db", 0o644), ("hooks.json", 0o664)] {
+        let path = root.join(name);
+        std::fs::write(&path, "held").expect("a file");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).expect("loose file");
+    }
+
+    let refused = harden(&root);
+
+    assert!(refused.is_empty(), "{refused:?}");
+    assert_eq!(mode_of(&root), 0o700);
+    assert_eq!(mode_of(&root.join("state.db")), 0o600);
+    assert_eq!(mode_of(&root.join("hooks.json")), 0o600);
+    // A file that is not there is not a problem to report.
+    assert!(!root.join("account-token").exists());
+}
+
+/// `set_permissions` follows a link, so a link planted in the home would have
+/// devpit tighten whatever it points at — someone else's file, by its own
+/// hand. Refused and reported instead.
+#[cfg(unix)]
+#[test]
+fn a_symlinked_file_is_not_followed() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join(".devpit");
+    std::fs::create_dir_all(&root).expect("root");
+    let elsewhere = dir.path().join("someone-elses-file");
+    std::fs::write(&elsewhere, "not ours").expect("a file");
+    std::fs::set_permissions(&elsewhere, std::fs::Permissions::from_mode(0o644)).expect("mode");
+    std::os::unix::fs::symlink(&elsewhere, root.join("hook-endpoint")).expect("link");
+
+    let refused = harden(&root);
+
+    assert_eq!(mode_of(&elsewhere), 0o644, "the link was followed");
+    assert!(
+        refused
+            .iter()
+            .any(|(path, _)| path.ends_with("hook-endpoint")),
+        "the link was passed over in silence: {refused:?}"
+    );
+}
+
+/// A home devpit cannot tighten is a line on stderr, not a window that never
+/// opens: `harden` answers with what it could not do and never panics, and the
+/// caller carries on.
+///
+/// The read-only directory of the pattern above cannot be used here: on Unix a
+/// mode is the inode's, so chmod of a file one owns succeeds however the
+/// directory is set. A home that is itself a link is the case that does fail.
+#[cfg(unix)]
+#[test]
+fn harden_failure_does_not_stop_the_app() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let real = dir.path().join("elsewhere");
+    std::fs::create_dir_all(&real).expect("dir");
+    let root = dir.path().join(".devpit");
+    std::os::unix::fs::symlink(&real, &root).expect("link");
+
+    let refused = harden(&root);
+
+    assert_eq!(refused.len(), 1, "{refused:?}");
+    assert!(refused[0].0.ends_with(".devpit"));
+
+    // And a home that is not there at all is the same kind of answer.
+    let missing = harden(&dir.path().join("never-made"));
+    assert_eq!(missing.len(), 1, "{missing:?}");
+}
+
+/// The endpoint, the hooks file and the token are private from the moment they
+/// exist — written at 0600 rather than written and then tightened, and an
+/// existing loose file is tightened as it is rewritten.
+#[cfg(unix)]
+#[test]
+fn a_new_endpoint_is_written_private() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("hook-endpoint");
+
+    write_private(&path, b"http://127.0.0.1:1/hook").expect("written");
+    assert_eq!(mode_of(&path), 0o600);
+    assert_eq!(
+        std::fs::read_to_string(&path).expect("read"),
+        "http://127.0.0.1:1/hook"
+    );
+
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("loosen");
+    write_private(&path, b"http://127.0.0.1:2/hook").expect("rewritten");
+    assert_eq!(
+        mode_of(&path),
+        0o600,
+        "a file that was already there kept its mode"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&path).expect("read"),
+        "http://127.0.0.1:2/hook"
+    );
+}
 
 const ID: &str = "prj_01M24GHNGDMZCXRFWEDVK387KM";
 

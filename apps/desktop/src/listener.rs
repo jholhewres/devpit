@@ -47,7 +47,11 @@ pub fn start(app: AppHandle, root: &Path) {
     if let Some(parent) = endpoint.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Err(err) = std::fs::write(&endpoint, format!("http://{address}/hook")) {
+    // Private: the port is what a post has to know, so a file anyone can read
+    // is an invitation to post as the agent.
+    if let Err(err) =
+        devpit_core::home::write_private(&endpoint, format!("http://{address}/hook").as_bytes())
+    {
         eprintln!("could not publish the hook endpoint: {err}");
         return;
     }

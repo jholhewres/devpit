@@ -535,6 +535,95 @@ pub fn moved(store: &Store, root: &Path, path: &Path) -> Option<PathBuf> {
     found.exists().then_some(found)
 }
 
+/// What the devpit home holds that another user has no business reading: the
+/// store and its journals (profile environments live there, tokens and all),
+/// the port the hooks post to, the secret they carry, the commands the agent
+/// CLI runs, and the account token.
+const PRIVATE: &[&str] = &[
+    "state.db",
+    "state.db-wal",
+    "state.db-shm",
+    "hook-endpoint",
+    "hook-auth",
+    "hooks.json",
+    "account-token",
+];
+
+/// Makes the devpit home private, and says what it could not do.
+///
+/// The directory becomes owner-only and so does every file in [`PRIVATE`] that
+/// is there. An install made before this existed is tightened on the next
+/// start, which is the only moment the app knows about every one of them.
+///
+/// **Best effort, and deliberately so.** A home on a filesystem with no modes,
+/// or one owned by somebody else, is a reason to say so and carry on — an app
+/// that refuses to open because it could not change a permission has turned a
+/// hardening into an outage. The caller logs what comes back.
+///
+/// Nothing here follows a link: `set_permissions` does, so a link planted in
+/// the home would have devpit change the mode of whatever it points at.
+#[cfg(unix)]
+pub fn harden(root: &Path) -> Vec<(PathBuf, std::io::Error)> {
+    let mut refused = Vec::new();
+    if let Err(err) = owner_only(root, 0o700) {
+        refused.push((root.to_path_buf(), err));
+    }
+    for name in PRIVATE {
+        let path = root.join(name);
+        match owner_only(&path, 0o600) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => refused.push((path, err)),
+        }
+    }
+    refused
+}
+
+#[cfg(not(unix))]
+pub fn harden(_root: &Path) -> Vec<(PathBuf, std::io::Error)> {
+    Vec::new()
+}
+
+/// One path, owner-only, refusing a link rather than following it.
+#[cfg(unix)]
+fn owner_only(path: &Path, mode: u32) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let found = std::fs::symlink_metadata(path)?;
+    if found.file_type().is_symlink() {
+        return Err(std::io::Error::other(
+            "a link, and what it points at is not devpit's to tighten",
+        ));
+    }
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+}
+
+/// Writes a file only its owner can read, private from the moment it exists.
+///
+/// The mode is given to `open`, not set afterwards: a token written first and
+/// tightened second is world-readable for as long as that takes. The second
+/// call is for the file that was already there, which keeps the mode it had.
+pub fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        file.write_all(bytes)?;
+        owner_only(path, 0o600)
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, bytes)
+    }
+}
+
 #[cfg(test)]
 #[path = "home_tests.rs"]
 mod tests;

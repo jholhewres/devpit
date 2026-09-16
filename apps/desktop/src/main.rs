@@ -132,6 +132,15 @@ fn main() {
                 }
                 eprintln!("the plugin catalogue breaks the contract: {err}");
             }
+            // The home made private before anything opens or writes in it. An
+            // install from before this existed is world-readable until someone
+            // tightens it, and this start is the only moment that knows about
+            // every file in there. What it could not do is said, not fatal.
+            if let Ok(root) = devpit_core::Store::root() {
+                for (path, err) in devpit_core::home::harden(&root) {
+                    eprintln!("{} was left as it was: {err}", path.display());
+                }
+            }
             // Project folders named and moved before anything reads one. Here
             // and not in `Store::open`, so a test opening a store moves
             // nothing; a failure leaves each project where it was.

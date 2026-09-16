@@ -265,9 +265,8 @@ mod token {
             std::fs::create_dir_all(parent)
                 .map_err(|err| RpcError::internal(format!("could not create {parent:?}: {err}")))?;
         }
-        std::fs::write(&path, token)
+        devpit_core::home::write_private(&path, token.as_bytes())
             .map_err(|err| RpcError::internal(format!("could not write the token: {err}")))?;
-        restrict(&path);
         Ok(())
     }
 
@@ -276,17 +275,6 @@ mod token {
             let _ = std::fs::remove_file(path);
         }
     }
-
-    /// Owner only. A token readable by every process on the machine is a token
-    /// worth as much as no token.
-    #[cfg(unix)]
-    fn restrict(path: &std::path::Path) {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
-    }
-
-    #[cfg(not(unix))]
-    fn restrict(_path: &std::path::Path) {}
 }
 
 mod browser {
