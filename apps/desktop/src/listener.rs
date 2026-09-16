@@ -47,6 +47,20 @@ pub fn start(app: AppHandle, root: &Path) {
     if let Some(parent) = endpoint.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
+    // The secret before the address, and for the same reason the address is
+    // written at all: a hook that found a port to post to but no secret to
+    // carry would post and, from the next story on, be refused.
+    let Some(secret) = fresh_secret() else {
+        eprintln!("no hook listener: the system gave out no randomness");
+        return;
+    };
+    if let Err(err) = devpit_core::home::write_private(
+        &devpit_agentcli::auth_file(root),
+        format!("{}: {secret}\n", devpit_agentcli::HOOK_HEADER).as_bytes(),
+    ) {
+        eprintln!("could not write the hook secret: {err}");
+        return;
+    }
     // Private: the port is what a post has to know, so a file anyone can read
     // is an invitation to post as the agent.
     if let Err(err) =
@@ -67,6 +81,19 @@ pub fn start(app: AppHandle, root: &Path) {
             std::thread::spawn(move || serve(app, stream, seq));
         }
     });
+}
+
+/// The secret this run's hooks carry, thirty-two bytes from the system's own
+/// randomness.
+///
+/// Not `fresh_session_id` and not a ULID: those are a timestamp and a counter,
+/// and a secret anything can recompute from the moment the app started is not
+/// one. `None` when the system refuses, which is a reason not to listen at all
+/// rather than to listen without a door.
+fn fresh_secret() -> Option<String> {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).ok()?;
+    Some(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
 fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {

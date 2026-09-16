@@ -452,7 +452,7 @@ fn hook_settings() -> Option<String> {
     let root = Store::root().ok()?;
     let endpoint = devpit_agentcli::endpoint_file(&root);
     let path = root.join("hooks.json");
-    let wanted = devpit_agentcli::settings_json(&endpoint);
+    let wanted = devpit_agentcli::settings_json(&endpoint, &devpit_agentcli::auth_file(&root));
     if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
         std::fs::create_dir_all(&root).ok()?;
         // Private: these are the commands an agent runs on every hook, so a

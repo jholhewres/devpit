@@ -52,8 +52,17 @@ fn a_real_turn_posts_its_hooks_to_us() {
     let endpoint = devpit_agentcli::endpoint_file(dir.path());
     std::fs::write(&endpoint, format!("http://{address}/hook")).expect("publish");
 
+    // The secret the app makes at startup, stood in for here: without it the
+    // hook command has a header file to read and finds nothing.
+    let auth = endpoint.with_file_name("hook-auth");
+    std::fs::write(
+        &auth,
+        format!("{}: a-test-secret\n", devpit_agentcli::HOOK_HEADER),
+    )
+    .expect("secret");
+
     let settings = dir.path().join("hooks.json");
-    std::fs::write(&settings, devpit_agentcli::settings_json(&endpoint)).expect("settings");
+    std::fs::write(&settings, devpit_agentcli::settings_json(&endpoint, &auth)).expect("settings");
 
     let outcome = devpit_agentcli::run_turn(
         &devpit_agentcli::Turn {

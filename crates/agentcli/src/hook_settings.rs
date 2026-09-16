@@ -15,18 +15,19 @@ use std::path::Path;
 /// makes, so an app that has gone away has to cost it a second and a half,
 /// not a hang. `--noproxy` because a proxy in the environment must not be
 /// consulted for a loopback address.
-pub fn settings_json(endpoint_file: &Path) -> String {
-    let file = endpoint_file.display();
+pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
+    let file = endpoint_file.display().to_string();
+    let auth = auth_file.display().to_string();
 
     // Told and forgotten. The reply is discarded and the budget is short,
     // because these only report what happened and the agent is waiting.
-    let tell = post(&file.to_string(), "1.5", false);
+    let tell = post(&file, &auth, "1.5", false);
 
     // `PreToolUse` is the one that can be answered, so its reply is printed:
     // the app either sends back a decision or sends back nothing, and nothing
     // leaves the CLI's own permission mode in charge. The budget is long
     // because on this one the answer is a person.
-    let consult = post(&file.to_string(), "125", true);
+    let consult = post(&file, &auth, "125", true);
 
     let hooks: Vec<String> = [
         ("PreToolUse", &consult),
@@ -65,12 +66,12 @@ pub fn settings_json(endpoint_file: &Path) -> String {
 /// what reaches that far. `${VAR:+?pane=$VAR}` is POSIX and expands to
 /// nothing at all when the agent was not started in one of our terminals, so
 /// a headless turn posts exactly the URL it always did.
-fn post(endpoint_file: &str, seconds: &str, echo: bool) -> String {
+fn post(endpoint_file: &str, auth_file: &str, seconds: &str, echo: bool) -> String {
     let sink = if echo { "" } else { " >/dev/null" };
     format!(
         "E=$(cat {endpoint_file} 2>/dev/null) && [ -n \"$E\" ] && \
          curl -sS -X POST --noproxy '*' --connect-timeout 0.5 --max-time {seconds} \
-         -H 'content-type: application/json' --data-binary @- \
+         -H 'content-type: application/json' -H @'{auth_file}' --data-binary @- \
          \"$E${{{pane}:+?pane=${pane}}}\"{sink} 2>/dev/null || true",
         pane = devpit_tmux_pane_env()
     )

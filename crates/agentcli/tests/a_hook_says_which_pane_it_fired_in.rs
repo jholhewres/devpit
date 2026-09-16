@@ -17,9 +17,12 @@ use std::process::{Command, Stdio};
 
 const PAYLOAD: &str = r#"{"hook_event_name":"Stop","session_id":"s1","cwd":"/tmp"}"#;
 
+/// Stands in for the secret the app makes at startup.
+const SECRET: &str = "a-secret-only-this-run-knows";
+
 #[test]
 fn the_pane_reaches_the_listener_and_the_payload_survives() {
-    let Some((target, body)) = posted(Some("leaf_01TEST")) else {
+    let Some((target, body, carried)) = posted(Some("leaf_01TEST")) else {
         eprintln!("skipped: no shell or no curl");
         return;
     };
@@ -28,6 +31,13 @@ fn the_pane_reaches_the_listener_and_the_payload_survives() {
         body, PAYLOAD,
         "the agent's own report was altered on the way"
     );
+    // Read from the file by curl, never typed into the command: this is what
+    // the listener checks before it hears anything.
+    assert_eq!(
+        carried.as_deref(),
+        Some(SECRET),
+        "the hook posted without the secret"
+    );
 }
 
 /// A headless turn belongs to a card and runs in no pane at all. The same
@@ -35,7 +45,7 @@ fn the_pane_reaches_the_listener_and_the_payload_survives() {
 /// nothing, and nothing is what a turn with no terminal should add.
 #[test]
 fn a_turn_with_no_pane_posts_what_it_always_did() {
-    let Some((target, _)) = posted(None) else {
+    let Some((target, _, _)) = posted(None) else {
         eprintln!("skipped: no shell or no curl");
         return;
     };
@@ -43,7 +53,7 @@ fn a_turn_with_no_pane_posts_what_it_always_did() {
 }
 
 /// Runs the real hook command against a real socket, and reports what arrived.
-fn posted(pane: Option<&str>) -> Option<(String, String)> {
+fn posted(pane: Option<&str>) -> Option<(String, String, Option<String>)> {
     let listener = TcpListener::bind(("127.0.0.1", 0)).ok()?;
     let port = listener.local_addr().ok()?.port();
 
@@ -51,7 +61,14 @@ fn posted(pane: Option<&str>) -> Option<(String, String)> {
     let endpoint = home.path().join("hook-endpoint");
     std::fs::write(&endpoint, format!("http://127.0.0.1:{port}/hook")).ok()?;
 
-    let settings = devpit_agentcli::settings_json(&endpoint);
+    let auth = home.path().join("hook-auth");
+    std::fs::write(
+        &auth,
+        format!("{}: {SECRET}\n", devpit_agentcli::HOOK_HEADER),
+    )
+    .ok()?;
+
+    let settings = devpit_agentcli::settings_json(&endpoint, &auth);
     let command = one_command(&settings, "Stop")?;
 
     let heard = std::thread::spawn(move || {
@@ -75,24 +92,28 @@ fn posted(pane: Option<&str>) -> Option<(String, String)> {
 }
 
 /// Reads the request line and the body off one connection, then answers.
-fn read_one(stream: std::net::TcpStream) -> Option<(String, String)> {
+fn read_one(stream: std::net::TcpStream) -> Option<(String, String, Option<String>)> {
     let mut reader = BufReader::new(stream.try_clone().ok()?);
     let mut first = String::new();
     reader.read_line(&mut first).ok()?;
     let target = first.split_whitespace().nth(1)?.to_owned();
 
     let mut length = 0usize;
+    let mut carried = None;
     loop {
         let mut line = String::new();
         if reader.read_line(&mut line).ok()? == 0 {
             break;
         }
-        let line = line.trim_end();
+        let line = line.trim_end().to_ascii_lowercase();
         if line.is_empty() {
             break;
         }
-        if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+        if let Some(value) = line.strip_prefix("content-length:") {
             length = value.trim().parse().ok()?;
+        }
+        if let Some(value) = line.strip_prefix(&format!("{}:", devpit_agentcli::HOOK_HEADER)) {
+            carried = Some(value.trim().to_owned());
         }
     }
     let mut body = vec![0u8; length];
@@ -104,7 +125,7 @@ fn read_one(stream: std::net::TcpStream) -> Option<(String, String)> {
     let _ = back.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n");
     let _ = back.flush();
 
-    Some((target, String::from_utf8(body).ok()?))
+    Some((target, String::from_utf8(body).ok()?, carried))
 }
 
 /// Digs one event's shell command out of the generated settings.

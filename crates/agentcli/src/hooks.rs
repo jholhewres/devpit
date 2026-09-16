@@ -178,6 +178,22 @@ pub fn endpoint_file(root: &Path) -> PathBuf {
     root.join("hook-endpoint")
 }
 
+/// The header a hook carries to say it is one of ours.
+///
+/// Named here, next to the file that holds it, so the side that writes the
+/// header and the side that checks it cannot drift apart.
+pub const HOOK_HEADER: &str = "x-devpit-hook";
+
+/// Where the secret that header carries is kept.
+///
+/// A file rather than an argument: the hook command lives in a settings file
+/// the agent CLI reads, and everything in that line is visible to anyone who
+/// can list processes. `curl -H @file` reads the header from disk instead, and
+/// the file is owner-only.
+pub fn auth_file(root: &Path) -> PathBuf {
+    root.join("hook-auth")
+}
+
 #[cfg(test)]
 #[path = "hooks_tests.rs"]
 mod tests;

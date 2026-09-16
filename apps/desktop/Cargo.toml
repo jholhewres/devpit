@@ -23,6 +23,10 @@ tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
 ulid = "3.0.0"
 base64 = "0.22"
+# The hook secret, and nothing else. A ULID is a timestamp and a counter, so a
+# secret derived from one is a secret anything that knows when the app started
+# can guess.
+getrandom = "0.3"
 # rustls rather than the system OpenSSL: the bundle has to build the same way
 # on every machine that builds it.
 reqwest = { version = "0.12", default-features = false, features = ["cookies", "json", "rustls-tls"] }

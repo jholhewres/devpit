@@ -58,6 +58,12 @@ fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) ->
     let endpoint = dir.join("hook-endpoint");
     let port = listener.local_addr().expect("address").port();
     std::fs::write(&endpoint, format!("http://127.0.0.1:{port}/hook")).expect("endpoint");
+    let auth = endpoint.with_file_name("hook-auth");
+    std::fs::write(
+        &auth,
+        format!("{}: a-test-secret\n", devpit_agentcli::HOOK_HEADER),
+    )
+    .expect("secret");
 
     let served = std::thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -77,7 +83,7 @@ fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) ->
         }
     });
 
-    let command = command_for(&devpit_agentcli::settings_json(&endpoint), event);
+    let command = command_for(&devpit_agentcli::settings_json(&endpoint, &auth), event);
     let mut hook = Command::new("sh");
     hook.arg("-c")
         .arg(&command)

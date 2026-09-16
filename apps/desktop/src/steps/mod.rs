@@ -55,7 +55,7 @@ fn hook_settings() -> Option<String> {
     let root = Store::root().ok()?;
     let endpoint = devpit_agentcli::endpoint_file(&root);
     let path = root.join("hooks.json");
-    let wanted = devpit_agentcli::settings_json(&endpoint);
+    let wanted = devpit_agentcli::settings_json(&endpoint, &devpit_agentcli::auth_file(&root));
 
     // Rewritten only when it differs, so a turn does not touch the disk for
     // nothing.

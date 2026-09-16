@@ -29,7 +29,7 @@ pub use catalogue::{
 };
 pub use headless::{run_turn, run_turn_cancellable, Outcome, Turn};
 pub use hook_settings::settings_json;
-pub use hooks::{endpoint_file, read as read_hook, Event, Happening};
+pub use hooks::{auth_file, endpoint_file, read as read_hook, Event, Happening, HOOK_HEADER};
 pub use schema::validates;
 pub use sources::seed_sources;
 // `start_background` and the argv builders live in this module.
