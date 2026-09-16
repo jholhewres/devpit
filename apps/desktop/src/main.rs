@@ -164,6 +164,9 @@ fn main() {
             // which costs an interactive shell startup. Started now so the
             // first time somebody opens the menu the answer is already there.
             shell_launch::warm_installed();
+            // Looks for a newer devpit while the switch says to. Started
+            // last: it is the one thing here that can wait.
+            update::watch(app.handle().clone());
             // A run still marked `running` after a restart is a run whose
             // thread died with the last process. Closed here, before anything
             // draws, or the card says it is working forever.

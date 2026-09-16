@@ -2621,7 +2621,16 @@ export type TurnEnd = {
 /**  Where the update is, and what may be done about it. */
 export type UpdateStatus = 
 /**  Nothing known, or nothing newer. */
-{ type: "idle" } | { type: "checking" } | { type: "available"; version: string; notes: string; kind: InstallKind } | { type: "downloading"; percent: number } | 
+{ type: "idle" } | { type: "checking" } | { type: "available"; version: string; notes: string; kind: InstallKind; 
+/**
+ *  True when the answer came from a test feed rather than the real
+ *  one. The window says so: an offer nobody can install has to look
+ *  different from one they can.
+ * 
+ *  Renamed by hand: `rename_all` on a tagged enum renames the
+ *  variants, not the fields inside them.
+ */
+testFeed: boolean } | { type: "downloading"; percent: number } | 
 /**  Downloaded and verified. From here on the app refuses to start new work. */
 { type: "ready"; version: string } | 
 /**  Waiting for work that is already running, with what it is waiting on. */

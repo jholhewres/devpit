@@ -3,11 +3,40 @@
 use super::*;
 use devpit_rpc::UpdateStatus as S;
 
+#[test]
+fn checking_happens_at_start_then_daily() {
+    let day = 24.0 * 60.0 * 60.0;
+    assert!(due(None, 1000.0, 0, true), "the first start never checked");
+    assert!(!due(Some(1000.0), 1000.0 + day - 1.0, 0, true));
+    assert!(due(Some(1000.0), 1000.0 + day, 0, true));
+}
+
+#[test]
+fn a_failure_waits_an_hour_and_doubles_to_six() {
+    let hour = 60.0 * 60.0;
+    assert!(!due(Some(0.0), hour - 1.0, 1, true));
+    assert!(due(Some(0.0), hour, 1, true));
+    assert!(due(Some(0.0), 2.0 * hour, 2, true));
+    assert!(!due(Some(0.0), 3.0 * hour, 3, true), "four hours to wait");
+    // However many times it has failed, six hours is the longest wait.
+    assert!(due(Some(0.0), 6.0 * hour, 9, true));
+}
+
+/// The switch is not advice: off means the network is never asked, at startup
+/// or ever after.
+#[test]
+fn automatic_updates_off_never_checks() {
+    assert!(!due(None, 1000.0, 0, false));
+    assert!(!due(Some(0.0), 10.0 * 24.0 * 60.0 * 60.0, 0, false));
+    assert!(!due(Some(0.0), 10.0 * 24.0 * 60.0 * 60.0, 5, false));
+}
+
 fn available() -> S {
     S::Available {
         version: "0.2.0".to_owned(),
         notes: "what changed".to_owned(),
         kind: InstallKind::AppImage,
+        test_feed: false,
     }
 }
 
@@ -21,6 +50,7 @@ fn a_check_becomes_an_offer_or_nothing() {
                 version: "0.2.0".to_owned(),
                 notes: "what changed".to_owned(),
                 kind: InstallKind::AppImage,
+                test_feed: false,
             }
         ),
         Some(available())
@@ -39,6 +69,7 @@ fn an_externally_managed_build_is_never_offered_a_download() {
                 version: "0.2.0".to_owned(),
                 notes: String::new(),
                 kind: InstallKind::ExternallyManaged,
+                test_feed: false,
             }
         ),
         Some(S::ExternallyManaged)

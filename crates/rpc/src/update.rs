@@ -37,6 +37,14 @@ pub enum UpdateStatus {
         version: String,
         notes: String,
         kind: InstallKind,
+        /// True when the answer came from a test feed rather than the real
+        /// one. The window says so: an offer nobody can install has to look
+        /// different from one they can.
+        ///
+        /// Renamed by hand: `rename_all` on a tagged enum renames the
+        /// variants, not the fields inside them.
+        #[serde(rename = "testFeed")]
+        test_feed: bool,
     },
     Downloading {
         percent: u8,

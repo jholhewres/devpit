@@ -20,6 +20,8 @@ pub(crate) enum Event {
         version: String,
         notes: String,
         kind: InstallKind,
+        /// True when the answer came from `DEVPIT_UPDATE_FEED_FILE`.
+        test_feed: bool,
     },
     /// Checked, and this is the newest there is.
     NothingNewer,
@@ -52,6 +54,7 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
                 version,
                 notes,
                 kind,
+                test_feed,
             },
         ) => Some(match kind {
             InstallKind::ExternallyManaged => S::ExternallyManaged,
@@ -59,6 +62,7 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
                 version,
                 notes,
                 kind,
+                test_feed,
             },
         }),
         (S::Checking, E::NothingNewer) => Some(S::Idle),
@@ -70,6 +74,77 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
         // A check while something is in flight is refused here, once, rather
         // than politely somewhere else.
         _ => None,
+    }
+}
+
+/// How long to wait before looking again.
+const A_DAY: f64 = 24.0 * 60.0 * 60.0;
+const AFTER_A_FAILURE: f64 = 60.0 * 60.0;
+const AT_MOST: f64 = 6.0 * 60.0 * 60.0;
+
+/// How often the task wakes to ask `due`.
+const A_CYCLE: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// Whether to check now.
+///
+/// At startup, then once a day; after a failure an hour, doubling to six, so a
+/// machine that is offline for a morning does not ask sixty times.
+pub(crate) fn due(last: Option<f64>, now: f64, failures: u32, enabled: bool) -> bool {
+    if !enabled {
+        return false;
+    }
+    let Some(last) = last else {
+        return true;
+    };
+    let wait = if failures == 0 {
+        A_DAY
+    } else {
+        (AFTER_A_FAILURE * 2f64.powi(failures as i32 - 1)).min(AT_MOST)
+    };
+    now - last >= wait
+}
+
+/// The feed a test points the check at, instead of the network.
+///
+/// The same category of surface as a command that only exists for tests, and
+/// accepted for the same reasons it was refused there: it only replaces where
+/// the answer is *read* from, it is visible on screen as a test feed, and
+/// nothing it offers can be installed.
+pub(crate) fn fixture_feed() -> Option<std::path::PathBuf> {
+    std::env::var_os("DEVPIT_UPDATE_FEED_FILE")
+        .map(std::path::PathBuf::from)
+        .filter(|path| !path.as_os_str().is_empty())
+}
+
+/// What a fixture feed says, read as the static manifest it is.
+fn feed_says(path: &std::path::Path, current: &str) -> Event {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Event::Failed {
+            message: format!("the test feed at {} could not be read", path.display()),
+        };
+    };
+    let Ok(feed) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return Event::Failed {
+            message: "the test feed is not the manifest shape".to_owned(),
+        };
+    };
+    let version = feed
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    if version.is_empty() || version == current {
+        return Event::NothingNewer;
+    }
+    Event::Found {
+        version,
+        notes: feed
+            .get("notes")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_owned(),
+        kind: kind_here(),
+        test_feed: true,
     }
 }
 
@@ -127,6 +202,78 @@ pub(crate) fn kind_here() -> InstallKind {
     install_kind(appimage.as_deref(), bundle.as_deref(), &tools_found())
 }
 
+/// Looks for a newer devpit on its own, while the switch says to.
+///
+/// One line per transition on stderr and one event to the window: a person who
+/// leaves the app open for a week should not have to ask, and a person who
+/// turned the switch off should never be asked of the network at all.
+///
+/// The switch is read every cycle rather than once: turning it off is meant to
+/// take effect without a restart.
+pub(crate) fn watch(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut last: Option<f64> = None;
+        let mut failures: u32 = 0;
+        let mut state = UpdateStatus::Idle;
+
+        loop {
+            // Unset means on: this is the switch a new install never touched.
+            let enabled = devpit_core::Store::open_default()
+                .and_then(|store| store.preference_flag(devpit_core::preference::AUTO_UPDATE))
+                .ok()
+                .flatten()
+                .unwrap_or(true);
+
+            if due(last, now(), failures, enabled) {
+                last = Some(now());
+                let heard = match update_check(app.clone()).await {
+                    Ok(heard) => heard,
+                    Err(err) => UpdateStatus::Failed {
+                        message: err.message.clone(),
+                        recoverable: true,
+                    },
+                };
+                failures = match &heard {
+                    UpdateStatus::Failed { .. } => failures.saturating_add(1),
+                    _ => 0,
+                };
+                if heard != state {
+                    state = heard.clone();
+                    // The state, and nothing else: no url, no bytes, no
+                    // version of anyone's machine.
+                    eprintln!("devpit-update {}", named(&state));
+                    let _ = tauri::Emitter::emit(&app, "update:status", &state);
+                }
+            }
+
+            tokio::time::sleep(A_CYCLE).await;
+        }
+    });
+}
+
+/// The word for a state, for the one line it gets on stderr.
+fn named(state: &UpdateStatus) -> &'static str {
+    match state {
+        UpdateStatus::Idle => "idle",
+        UpdateStatus::Checking => "checking",
+        UpdateStatus::Available { .. } => "available",
+        UpdateStatus::Downloading { .. } => "downloading",
+        UpdateStatus::Ready { .. } => "ready",
+        UpdateStatus::Waiting { .. } => "waiting",
+        UpdateStatus::Installing => "installing",
+        UpdateStatus::ManualInstall { .. } => "manual-install",
+        UpdateStatus::ExternallyManaged => "externally-managed",
+        UpdateStatus::Failed { .. } => "failed",
+    }
+}
+
+fn now() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs_f64())
+        .unwrap_or_default()
+}
+
 /// `update.check` — ask the feed whether there is a newer devpit.
 ///
 /// Answers a state rather than a version: the window draws the state, and the
@@ -134,8 +281,6 @@ pub(crate) fn kind_here() -> InstallKind {
 #[tauri::command]
 #[specta::specta]
 pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcError> {
-    use tauri_plugin_updater::UpdaterExt;
-
     let kind = kind_here();
     let checking = next(&UpdateStatus::Idle, Event::Check)
         .ok_or_else(|| RpcError::internal("a check was refused before it started"))?;
@@ -143,7 +288,22 @@ pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcErro
         return Ok(UpdateStatus::ExternallyManaged);
     }
 
-    let heard = match app.updater() {
+    let heard = if let Some(feed) = fixture_feed() {
+        feed_says(&feed, env!("CARGO_PKG_VERSION"))
+    } else {
+        asked(&app, kind).await
+    };
+
+    // The table decides, here as everywhere: a command that builds its own
+    // states is a second opinion about what may follow what.
+    next(&checking, heard).ok_or_else(|| RpcError::internal("the check ended nowhere"))
+}
+
+/// What the feed answers, through the plugin.
+async fn asked(app: &tauri::AppHandle, kind: InstallKind) -> Event {
+    use tauri_plugin_updater::UpdaterExt;
+
+    match app.updater() {
         Err(err) => Event::Failed {
             message: format!("no updater: {err}"),
         },
@@ -152,17 +312,14 @@ pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcErro
                 version: update.version.clone(),
                 notes: update.body.clone().unwrap_or_default(),
                 kind,
+                test_feed: false,
             },
             Ok(None) => Event::NothingNewer,
             Err(err) => Event::Failed {
                 message: format!("could not check for an update: {err}"),
             },
         },
-    };
-
-    // The table decides, here as everywhere: a command that builds its own
-    // states is a second opinion about what may follow what.
-    next(&checking, heard).ok_or_else(|| RpcError::internal("the check ended nowhere"))
+    }
 }
 
 #[cfg(test)]
