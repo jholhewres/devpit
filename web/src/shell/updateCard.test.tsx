@@ -58,7 +58,7 @@ describe('the update card', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('offers the version and its notes, and downloads on the click', () => {
+  it('offers the version, says the terminals keep running, and downloads on the click', () => {
     render(<UpdateCard />)
     say({
       type: 'available',
@@ -68,7 +68,12 @@ describe('the update card', () => {
       testFeed: false,
     })
 
-    expect(screen.getByText('devpit 0.2.0 is out')).toBeTruthy()
+    expect(screen.getByText('Update available')).toBeTruthy()
+    expect(screen.getByText('devpit 0.2.0 is ready.')).toBeTruthy()
+    expect(screen.getByText('Your terminals keep running.')).toBeTruthy()
+    // The notes are one click away, not the first thing in the corner.
+    expect(screen.queryByText('what changed')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Release notes' }))
     expect(screen.getByText('what changed')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Update' }))
     expect(download).toHaveBeenCalled()
@@ -95,14 +100,14 @@ describe('the update card', () => {
     expect(screen.queryByRole('button', { name: 'Update' })).toBeNull()
   })
 
-  it('goes away on Later, and comes back when the state changes', () => {
+  it('goes away on close, and comes back when the state changes', () => {
     render(<UpdateCard />)
     say({ type: 'available', version: '0.2.0', notes: '', kind: 'appImage', testFeed: false })
-    fireEvent.click(screen.getByRole('button', { name: 'Later' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('status')).toBeNull()
 
-    say({ type: 'ready', version: '0.2.0' })
-    expect(screen.getByText('devpit 0.2.0 is ready')).toBeTruthy()
+    say({ type: 'ready', version: '0.2.0' } as UpdateStatus)
+    expect(screen.getByText('devpit 0.2.0 is ready to install.')).toBeTruthy()
   })
 
   it('says what failed', () => {
@@ -126,7 +131,7 @@ describe('the update card', () => {
 
     expect(screen.getByText('Install this package yourself')).toBeTruthy()
     expect(screen.getByText('/c/devpit.deb')).toBeTruthy()
-    expect(screen.getByText(/devpit never runs it/)).toBeTruthy()
+    expect(screen.getByText(/devpit never runs an install command/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
     await waitFor(() => expect(packaged).toHaveBeenCalled())

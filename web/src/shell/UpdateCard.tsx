@@ -8,28 +8,49 @@ import { onCarried } from './window'
  * The offer, over the window and never in front of it.
  *
  * An update is not urgent enough to take the keyboard: this is a card in the
- * corner with Later on it, not a dialog. What it never does is decide — the
- * download happens on a click, the restart happens on a click, and the states
- * it draws are the app's, arriving on `update:status`.
+ * corner with a close on it, not a dialog. One sentence for what is ready, one
+ * for what it costs you — nothing, because the terminals are tmux sessions and
+ * they do not go down with the window — and one button.
  *
- * Restarting asks what is running first. Interrupting two runs and a turn is a
- * question about those three things, not about updates, so the card names them
- * and lets the person answer.
+ * What it never does is decide. The download happens on a click, the restart
+ * happens on a click, and the states it draws are the app's, arriving on
+ * `update:status`. Restarting asks what is running first: interrupting two
+ * runs and a turn is a question about those three things.
  */
 
-/** What the card says about each state, or nothing when there is nothing to say. */
-function offer(status: UpdateStatus): { title: string; said: string } | null {
+/** What the card says about each state, and what its one button does. */
+function offer(status: UpdateStatus): {
+  title: string
+  said: string
+  calm: string | null
+  action: string | null
+} | null {
   switch (status.type) {
     case 'available':
-      return { title: `devpit ${status.version} is out`, said: status.notes }
+      return {
+        title: 'Update available',
+        said: `devpit ${status.version} is ready.`,
+        calm: 'Your terminals keep running.',
+        action: 'Update',
+      }
     case 'downloading':
-      return { title: 'Downloading the update', said: '' }
+      return { title: 'Downloading the update', said: '', calm: null, action: null }
     case 'ready':
-      return { title: `devpit ${status.version} is ready`, said: 'It is installed when you restart.' }
+      return {
+        title: 'Update ready',
+        said: `devpit ${status.version} is ready to install.`,
+        calm: 'Your terminals keep running.',
+        action: 'Restart now',
+      }
     case 'manualInstall':
-      return { title: 'Install this package yourself', said: status.path }
+      return {
+        title: 'Install this package yourself',
+        said: status.path,
+        calm: 'devpit never runs an install command for you.',
+        action: 'Copy command',
+      }
     case 'failed':
-      return { title: 'The update did not go through', said: status.message }
+      return { title: 'The update did not go through', said: status.message, calm: null, action: null }
     default:
       return null
   }
@@ -39,6 +60,7 @@ export function UpdateCard(): React.JSX.Element | null {
   const [status, setStatus] = useState<UpdateStatus | null>(null)
   const [later, setLater] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const [notes, setNotes] = useState(false)
   /* What is running, once the person has asked to restart and it turns out
      something is. Null is "nothing in the way, or nobody has asked yet". */
   const [work, setWork] = useState<UpdateWork | null>(null)
@@ -47,8 +69,9 @@ export function UpdateCard(): React.JSX.Element | null {
     () =>
       onCarried<UpdateStatus>('update:status', (heard) => {
         setStatus(heard)
-        // A new state is news again: Later dismissed the state it was clicked on.
+        // A new state is news again: the close dismissed the state it was on.
         setLater(false)
+        setNotes(false)
       }),
     [],
   )
@@ -82,98 +105,100 @@ export function UpdateCard(): React.JSX.Element | null {
     })
   }
 
+  const copyCommand = (): void => {
+    // Asked again rather than copied from the card: the file has been sitting
+    // in a cache since it arrived.
+    void ask(() => commands.updatePackage()).then((answer) => {
+      if (answer.data) {
+        void navigator.clipboard?.writeText(answer.data)
+        setCopied(answer.data)
+      } else if (answer.error) {
+        failed(answer.error)
+      }
+    })
+  }
+
+  const download = (): void => {
+    void ask(() => commands.updateDownload()).then((answer) => {
+      if (answer.error) failed(answer.error)
+    })
+  }
+
   if (!status || later) return null
   const said = offer(status)
   if (!said) return null
 
-  const downloading = status.type === 'downloading'
   const fromATestFeed = status.type === 'available' && status.testFeed
+  const release = status.type === 'available' ? status.notes : ''
   const manual = status.type === 'manualInstall' ? status : null
+  const act =
+    status.type === 'available' ? download : status.type === 'ready' ? restart : copyCommand
 
   return (
     <div className="upd" role="status" aria-label="Update">
-      <span className="upd__t">
-        {said.title}
-        {fromATestFeed && <span className="upd__tag">test feed</span>}
-      </span>
-      {said.said && <span className="upd__d">{said.said}</span>}
-      {downloading && (
+      <div className="upd__hd">
+        <span className="upd__t">
+          {said.title}
+          {fromATestFeed && <span className="upd__tag">test feed</span>}
+        </span>
+        <button className="upd__x" aria-label="Close" onClick={() => setLater(true)}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+
+      {said.said && <span className="upd__said">{said.said}</span>}
+      {said.calm && <span className="upd__d">{said.calm}</span>}
+
+      {status.type === 'downloading' && (
         <div className="upd__bar">
           <div className="upd__fill" style={{ width: `${status.percent}%` }} />
         </div>
       )}
+
       {manual && (
         <>
           <code className="upd__cmd">{copied ?? manual.command}</code>
           <span className="upd__d">
             devpit checked this file against the release&rsquo;s signature when it downloaded it,
-            and again just now. What the command does after that is your package manager&rsquo;s,
-            not devpit&rsquo;s — devpit never runs it.
+            and again just now. What the command does after that is your package manager&rsquo;s.
           </span>
         </>
       )}
+
+      {release && (
+        <button className="upd__notes" onClick={() => setNotes((was) => !was)}>
+          Release notes
+        </button>
+      )}
+      {notes && release && <span className="upd__d">{release}</span>}
+
       {work && (
         <span className="upd__d">
           {[...work.runs, ...work.turns].map((one) => one.title).join(', ')} still going.
         </span>
       )}
 
-      <div className="upd__row">
-        {work && (
-          <>
-            <button className="btn" onClick={() => choose('later')}>
-              Not now
-            </button>
-            <button className="btn" onClick={() => choose('whenItIsDone')}>
-              When it is done
-            </button>
-            <button className="btn btn--go" onClick={() => choose('stopIt')}>
-              Stop it and restart
-            </button>
-          </>
-        )}
-        {!work && manual && (
-          <button
-            className="btn"
-            onClick={() => {
-              // Asked again rather than copied from the card: the file has been
-              // sitting in a cache since it arrived.
-              void ask(() => commands.updatePackage()).then((answer) => {
-                if (answer.data) {
-                  void navigator.clipboard?.writeText(answer.data)
-                  setCopied(answer.data)
-                } else if (answer.error) {
-                  setStatus({ type: 'failed', message: answer.error, recoverable: true })
-                }
-              })
-            }}
-          >
-            Copy command
+      {work ? (
+        <div className="upd__row">
+          <button className="btn" onClick={() => choose('later')}>
+            Not now
           </button>
-        )}
-        {!work && (
-          <button className="btn" onClick={() => setLater(true)}>
-            Later
+          <button className="btn" onClick={() => choose('whenItIsDone')}>
+            When it is done
           </button>
-        )}
-        {!work && status.type === 'ready' && (
-          <button className="btn btn--go" onClick={restart}>
-            Restart now
+          <button className="btn btn--go" onClick={() => choose('stopIt')}>
+            Stop it and restart
           </button>
-        )}
-        {!work && status.type === 'available' && (
-          <button
-            className="btn"
-            onClick={() => {
-              void ask(() => commands.updateDownload()).then((answer) => {
-                if (answer.error) setStatus({ type: 'failed', message: answer.error, recoverable: true })
-              })
-            }}
-          >
-            Update
+        </div>
+      ) : (
+        said.action && (
+          <button className="upd__go" onClick={act}>
+            {said.action}
           </button>
-        )}
-      </div>
+        )
+      )}
     </div>
   )
 }
