@@ -51,8 +51,8 @@ export function SignIn({ onClose }: { onClose: () => void }): React.JSX.Element 
           <>
             <h2 className="auth__t">Sign in to devpit</h2>
             <p className="auth__d">
-              Free. Your projects, conversations and files stay on this computer &mdash; an account
-              saves the workspace around them.
+              Free. Your projects, conversations and files stay on this computer &mdash; nothing is
+              uploaded, and sync between machines is not built yet.
             </p>
             {failed && (
               <p className="auth__failed" role="alert">

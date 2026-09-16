@@ -46,6 +46,14 @@ describe('what the settings screen promises', () => {
     expect(sidebar).toMatch(/nothing is synced yet/)
   })
 
+  /* The sign-in dialog is the last thing read before the account exists, and
+     it said the account saves the workspace around the projects. */
+  it('does not promise, in the sign-in dialog, a workspace that is saved', () => {
+    const dialog = readFileSync(resolve(process.cwd(), 'src/shell/SignIn.tsx'), 'utf8')
+    expect(dialog).not.toMatch(/saves the workspace/i)
+    expect(dialog).toMatch(/sync between machines is not built yet/)
+  })
+
   /* A switch for something nothing reads is worse than no switch: it is a
      choice the person makes and the app ignores. */
   it('has no switch for anything that does not happen', () => {
