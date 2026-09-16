@@ -1,4 +1,6 @@
 import { Drawing } from '../plugins/excalidraw/Drawing'
+import { MermaidList } from '../plugins/mermaid/MermaidList'
+import { MermaidPane } from '../plugins/mermaid/MermaidPane'
 import { DrawingList } from '../plugins/excalidraw/DrawingList'
 import { BoardPane } from './BoardPane'
 import { ChatPane } from './ChatPane'
@@ -86,6 +88,13 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
   { name: 'diff', many: true, className: 'pane pane--file', render: (tab) => <DiffPane tab={tab} /> },
   { name: 'file', many: true, className: 'pane pane--file', render: (tab) => <FilePane tab={tab} /> },
   { name: 'term', many: true, className: 'pane pane--term', render: (tab) => <TerminalPane tab={tab} /> },
+  /* A diagram tab with no file is the list of diagrams. */
+  {
+    name: 'diagram',
+    many: true,
+    className: 'pane',
+    render: (tab) => (tab.path ? <MermaidPane tab={tab} name={tab.path} /> : <MermaidList tab={tab} />),
+  },
   /* A drawing tab with no file is the list of drawings. */
   {
     name: 'drawing',

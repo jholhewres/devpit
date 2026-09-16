@@ -1,5 +1,6 @@
 import type { PluginManifest, PluginState, Surface } from '../gen/bindings'
 import { DRAWINGS, PLUGIN_ID as EXCALIDRAW } from '../plugins/excalidraw/drawings'
+import { DIAGRAMS, PLUGIN_ID as MERMAID } from '../plugins/mermaid/mermaidFiles'
 import type { PaneName } from './paneList'
 import type { Tab } from './strip'
 
@@ -17,7 +18,10 @@ export interface Opens {
 }
 
 /* Only a capability listed here gets a sidebar item and an Open action. */
-const OPENS: Readonly<Record<string, Opens>> = { [EXCALIDRAW]: { kind: 'drawing', tab: DRAWINGS } }
+const OPENS: Readonly<Record<string, Opens>> = {
+  [EXCALIDRAW]: { kind: 'drawing', tab: DRAWINGS },
+  [MERMAID]: { kind: 'diagram', tab: DIAGRAMS },
+}
 
 export const opensFor = (pluginId: string): Opens | undefined => OPENS[pluginId]
 

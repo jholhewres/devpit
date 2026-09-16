@@ -9,3 +9,12 @@
 .plg-excalidraw__field { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--inset); color: var(--text); font: inherit; font-size: 12.5px; outline: none; }
 .plg-excalidraw__field:focus { border-color: var(--border-strong); }
 .plg-excalidraw__problem { margin: 0 0 12px; font-size: 12px; color: var(--danger); }
+
+/* A diagram: its text beside what it draws. Two words in the class because
+   `.mmd` is the extension and reads as the file, not the pane. */
+.mmd { display: grid; grid-template-columns: minmax(240px, 40%) 1fr; height: 100%; overflow: hidden; }
+.mmd__edit { border-right: 1px solid var(--line); overflow: auto; }
+.mmd__see { display: grid; place-items: center; padding: 16px; overflow: auto; }
+.ted { height: 100%; font-size: 12.5px; }
+.ted .cm-editor { height: 100%; background: transparent; }
+.ted .cm-gutters { border: 0; background: transparent; color: var(--dim); }
