@@ -13,6 +13,11 @@ import { isArmed, pressed, same, stops, type Armed } from './stop'
  * lets an arming lapse.
  */
 
+/** What takes Escape for itself while it is open. `:not([hidden])` because the
+    sidebar keeps its menus mounted and hidden, and counting those meant the
+    double Escape never armed the stop at all. */
+export const OWNS_ESCAPE = '[role="menu"]:not([hidden]), [role="dialog"]:not([hidden])'
+
 export function useStop(
   active: boolean,
   target: string,
@@ -29,7 +34,7 @@ export function useStop(
     const onKey = (event: KeyboardEvent): void => {
       /* A menu or a dialog owns Escape while it is open: closing it is what
          the person meant, and stopping the turn behind it is not. */
-      if (!stops(event, document.querySelector('[role="menu"], [role="dialog"]') !== null)) return
+      if (!stops(event, document.querySelector(OWNS_ESCAPE) !== null)) return
       event.preventDefault()
       const press = pressed(armed, target, Date.now())
       if (press.type === 'stop') {

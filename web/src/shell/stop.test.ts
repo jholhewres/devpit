@@ -68,3 +68,23 @@ describe('which keystroke counts', () => {
     expect(stops(key({ key: 'Enter' }), false)).toBe(false)
   })
 })
+
+describe('what takes Escape away from the stop', () => {
+  /* The case found in review: the sidebar keeps its menus mounted with
+     `hidden`, and a selector that counted them never let the stop arm. */
+  it('is an open menu or dialog, not one that is mounted and hidden', async () => {
+    const { OWNS_ESCAPE } = await import('./useStop')
+    const hidden = document.createElement('div')
+    hidden.setAttribute('role', 'menu')
+    hidden.hidden = true
+    document.body.appendChild(hidden)
+    expect(document.querySelector(OWNS_ESCAPE)).toBeNull()
+
+    const open = document.createElement('div')
+    open.setAttribute('role', 'dialog')
+    document.body.appendChild(open)
+    expect(document.querySelector(OWNS_ESCAPE)).toBe(open)
+    hidden.remove()
+    open.remove()
+  })
+})
