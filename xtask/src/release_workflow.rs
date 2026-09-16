@@ -13,6 +13,8 @@ use crate::Finding;
 
 const WORKFLOW: &str = ".github/workflows/release.yml";
 const SECRET: &str = "secrets.TAURI_SIGNING_PRIVATE_KEY";
+/// The end-to-end workflow the release calls before it builds.
+const CALLED: &str = ".github/workflows/e2e.yml";
 
 pub fn the_release_workflow_keeps_its_promises(root: &Path) -> Vec<Finding> {
     let Ok(text) = std::fs::read_to_string(root.join(WORKFLOW)) else {
@@ -22,14 +24,21 @@ pub fn the_release_workflow_keeps_its_promises(root: &Path) -> Vec<Finding> {
             what: "there is no release workflow".to_owned(),
         }];
     };
-    refusals(&text)
+    let mut findings: Vec<Finding> = refusals(&text)
         .into_iter()
         .map(|(line, what)| Finding {
             file: WORKFLOW.into(),
             line,
             what,
         })
-        .collect()
+        .collect();
+    let called = std::fs::read_to_string(root.join(CALLED)).unwrap_or_default();
+    findings.extend(unpinned(&called).into_iter().map(|(line, what)| Finding {
+        file: CALLED.into(),
+        line,
+        what,
+    }));
+    findings
 }
 
 /// Every promise the workflow breaks, with the line to look at.
@@ -51,21 +60,7 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
         said.push((1, "does not ask for contents: write".to_owned()));
     }
 
-    for (number, line) in text.lines().enumerate() {
-        let Some(used) = line.split("uses:").nth(1) else {
-            continue;
-        };
-        let reference = used.split('#').next().unwrap_or("").trim();
-        let pinned = reference
-            .split_once('@')
-            .is_some_and(|(_, sha)| sha.len() == 40 && sha.chars().all(|c| c.is_ascii_hexdigit()));
-        if !pinned {
-            said.push((
-                number + 1,
-                format!("{reference} is not pinned to a commit; a tag can be moved"),
-            ));
-        }
-    }
+    said.extend(unpinned(text));
 
     // Counted by step, not by mention: the one step that builds names both
     // the key and its password, and that is one holder, not two.
@@ -78,6 +73,15 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
             format!(
                 "hands the signing key to {holders} steps; one builds, the rest do not need it"
             ),
+        ));
+    }
+
+    // Nothing ships that the end-to-end suite has not driven: the release job
+    // waits for the call to it.
+    if !text.contains("uses: ./.github/workflows/e2e.yml") || !text.contains("needs: e2e") {
+        said.push((
+            at("  release:").unwrap_or(1),
+            "publishes without waiting for the end-to-end suite".to_owned(),
         ));
     }
 
@@ -119,6 +123,34 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
         _ => {}
     }
 
+    said
+}
+
+/// Every action not pinned to a commit, with its line.
+///
+/// Also asked of `e2e.yml`, which runs inside the release before anything is
+/// built to ship.
+fn unpinned(text: &str) -> Vec<(usize, String)> {
+    let mut said = Vec::new();
+    for (number, line) in text.lines().enumerate() {
+        let Some(used) = line.split("uses:").nth(1) else {
+            continue;
+        };
+        let reference = used.split('#').next().unwrap_or("").trim();
+        // A workflow in this repository is the tree being released, not
+        // somebody else's tag, so a local path is as pinned as it gets.
+        let local = reference.starts_with("./");
+        let pinned = local
+            || reference.split_once('@').is_some_and(|(_, sha)| {
+                sha.len() == 40 && sha.chars().all(|c| c.is_ascii_hexdigit())
+            });
+        if !pinned {
+            said.push((
+                number + 1,
+                format!("{reference} is not pinned to a commit; a tag can be moved"),
+            ));
+        }
+    }
     said
 }
 

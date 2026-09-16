@@ -11,7 +11,16 @@ permissions:
   contents: write
 
 jobs:
+  # The built app driven through a real window, before anything is built to
+  # ship. Called, not copied, so the release runs the suite the nightly runs;
+  # it reads the tree and nothing else, and no secret is handed to it.
+  e2e:
+    uses: ./.github/workflows/e2e.yml
+    permissions:
+      contents: read
+
   release:
+    needs: e2e
     runs-on: ubuntu-24.04
     steps:
       # Every action is pinned to a commit: a tag can be moved, and a moved tag

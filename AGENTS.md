@@ -155,8 +155,11 @@ takes seconds per change, reaches no network and exercises no service: that is
 the bar every commit clears, and nothing slow belongs in it.
 
 Two things sit outside it, deliberately. `make e2e` drives the built app
-through a WebDriver and takes minutes, so it is its own target and its own CI
-job — a suite nobody can run locally is a suite nobody fixes. And
+through a WebDriver and takes minutes, so it is its own target and its own
+workflow, `e2e.yml`: nightly, on request, and called by `release.yml` before
+anything is built to ship — not on every push. A suite nobody can run locally
+is a suite nobody fixes, so run it before a change that touches what it
+drives. And
 `release.yml` builds, signs and publishes on a tag; it is the one job that
 holds a key, and the one place GitHub is exercised.
 

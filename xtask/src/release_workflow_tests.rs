@@ -89,3 +89,25 @@ fn a_checkout_that_keeps_the_token_is_refused() {
         .iter()
         .any(|(_, what)| what.contains(".git/config")));
 }
+
+/// A release that does not wait for the end-to-end suite ships whatever the
+/// unit tests missed.
+#[test]
+fn a_release_that_does_not_wait_for_the_end_to_end_suite_is_refused() {
+    let hurried = ours().replace("    needs: e2e\n", "");
+    assert!(refusals(&hurried)
+        .iter()
+        .any(|(_, what)| what.contains("end-to-end suite")));
+}
+
+/// The called workflow runs inside the release, so its actions are pinned too.
+#[test]
+fn the_called_end_to_end_workflow_is_pinned() {
+    let called = std::fs::read_to_string(crate::workspace_root().join(CALLED)).expect("e2e.yml");
+    assert!(unpinned(&called).is_empty(), "{:?}", unpinned(&called));
+    let loosened = called.replace(
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "actions/upload-artifact@v4",
+    );
+    assert!(!unpinned(&loosened).is_empty());
+}
