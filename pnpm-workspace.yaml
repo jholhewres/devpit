@@ -1,5 +1,6 @@
 packages:
   - web
+  - e2e
 
 # Transitive advisories pinned by @excalidraw/excalidraw's own dependency
 # tree (see pnpm audit --prod). Each stays on the major line its dependent

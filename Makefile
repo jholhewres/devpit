@@ -65,6 +65,10 @@ test: node_modules ## Everything CI runs: guards, Rust, frontend
 	pnpm --filter ./web build
 	@echo "\nall green"
 
+e2e: node_modules ## The built app, driven through a WebDriver (minutes, not seconds)
+	./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.conf.json
+	node e2e/run.mjs
+
 fmt: ## Format the tree
 	cargo fmt --all
 
