@@ -92,6 +92,19 @@ pub async fn card_terminal(
     })
 }
 
+/// What the bell says when a step with no undo starts, and nothing otherwise.
+///
+/// The one kind of run worth a line at the moment it *starts*: everything else
+/// is told when it ends, and a deploy just set off is a thing to be able to see
+/// was set off, by whom and on what, without waiting for it to come back.
+///
+/// It rings here rather than on the move, because a move no longer starts one:
+/// `moving::what_runs` sends an irreversible step to this button, which asks
+/// first.
+pub(crate) fn bell_for(step_name: &str, irreversible: bool, card_title: &str) -> Option<String> {
+    irreversible.then(|| format!("{step_name} started on \u{201c}{card_title}\u{201d}"))
+}
+
 /// `card.play` — runs this lane's step on this card, now.
 ///
 /// One meaning, and only one. A lane with no step answers with that fact and
@@ -151,6 +164,17 @@ pub fn card_play(
         });
     }
 
+    if let Some(said) = bell_for(&step.name, step.irreversible, &card.title) {
+        crate::notices::ring(
+            &app,
+            Some(&project_id),
+            crate::notices::kind::IRREVERSIBLE,
+            &said,
+            Some("This step was marked as having no undo."),
+            Some(&card_id),
+        );
+    }
+
     let shaped = devpit_rpc::Step {
         id: step.id.clone(),
         kind: crate::board::kind_of(&step.kind),
@@ -174,3 +198,7 @@ pub fn card_play(
         lane_runs_nothing: false,
     })
 }
+
+#[cfg(test)]
+#[path = "card_work_tests.rs"]
+mod tests;

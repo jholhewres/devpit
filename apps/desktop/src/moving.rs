@@ -98,36 +98,16 @@ pub fn card_move(
 
     let started = match what_runs(step.as_ref()) {
         None => None,
-        Some(step) => {
-            // The one kind of run worth a line in the bell at the moment it
-            // *starts*. Everything else is told when it ends; a deploy that
-            // was just set off is a thing to be able to see was set off, by
-            // whom and on what, without waiting for it to come back.
-            if step.irreversible {
-                let title = store
-                    .card(&card_id)
-                    .ok()
-                    .flatten()
-                    .map(|row| row.title)
-                    .unwrap_or_else(|| "a card".to_owned());
-                crate::notices::ring(
-                    &app,
-                    Some(&project_id),
-                    crate::notices::kind::IRREVERSIBLE,
-                    &format!("{} started on “{title}”", step.name),
-                    Some("This step was marked as having no undo."),
-                    Some(&card_id),
-                );
-            }
-            Some(crate::runs::start(
-                app,
-                Arc::clone(&in_flight),
-                &store,
-                &card_id,
-                step,
-                came_from.as_deref(),
-            )?)
-        }
+        // Never an irreversible step: `what_runs` sends those to the play
+        // button, which is where the bell for one rings.
+        Some(step) => Some(crate::runs::start(
+            app,
+            Arc::clone(&in_flight),
+            &store,
+            &card_id,
+            step,
+            came_from.as_deref(),
+        )?),
     };
 
     Ok(CardChanged {
