@@ -1,10 +1,8 @@
 import { Drawing } from '../plugins/excalidraw/Drawing'
-import { MermaidList } from '../plugins/mermaid/MermaidList'
 import { DataList } from '../plugins/data/DataList'
 import { DataPane } from '../plugins/data/DataPane'
 import { NotePane } from '../plugins/notes/NotePane'
 import { NotesList } from '../plugins/notes/NotesList'
-import { MermaidPane } from '../plugins/mermaid/MermaidPane'
 import { DrawingList } from '../plugins/excalidraw/DrawingList'
 import { BoardPane } from './BoardPane'
 import { ChatPane } from './ChatPane'
@@ -105,13 +103,6 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
     many: true,
     className: 'pane',
     render: (tab) => (tab.path ? <NotePane tab={tab} name={tab.path} /> : <NotesList tab={tab} />),
-  },
-  /* A diagram tab with no file is the list of diagrams. */
-  {
-    name: 'diagram',
-    many: true,
-    className: 'pane',
-    render: (tab) => (tab.path ? <MermaidPane tab={tab} name={tab.path} /> : <MermaidList tab={tab} />),
   },
   /* A drawing tab with no file is the list of drawings. */
   {

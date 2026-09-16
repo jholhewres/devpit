@@ -1,6 +1,5 @@
 import type { PluginManifest, PluginState, Surface } from '../gen/bindings'
 import { DRAWINGS, PLUGIN_ID as EXCALIDRAW } from '../plugins/excalidraw/drawings'
-import { DIAGRAMS, PLUGIN_ID as MERMAID } from '../plugins/mermaid/mermaidFiles'
 import { DATA_FILES, PLUGIN_ID as DATA_ID } from '../plugins/data/dataFiles'
 import { NOTES, PLUGIN_ID as NOTES_ID } from '../plugins/notes/noteFiles'
 import type { PaneName } from './paneList'
@@ -22,7 +21,6 @@ export interface Opens {
 /* Only a capability listed here gets a sidebar item and an Open action. */
 const OPENS: Readonly<Record<string, Opens>> = {
   [EXCALIDRAW]: { kind: 'drawing', tab: DRAWINGS },
-  [MERMAID]: { kind: 'diagram', tab: DIAGRAMS },
   [NOTES_ID]: { kind: 'note', tab: NOTES },
   [DATA_ID]: { kind: 'data', tab: DATA_FILES },
 }
