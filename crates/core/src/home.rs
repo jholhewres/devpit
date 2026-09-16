@@ -584,6 +584,30 @@ pub fn harden(_root: &Path) -> Vec<(PathBuf, std::io::Error)> {
     Vec::new()
 }
 
+/// Creates the state root owner-only, when this is the start that creates it.
+///
+/// Before the store opens: SQLite makes `state.db` with the umask's mode, and
+/// in a folder nobody else can enter that mode reaches nobody. Left to
+/// `harden`, a first start ran its whole session with the store readable by
+/// every user of the machine.
+pub fn make_private_root(root: &Path) -> std::io::Result<()> {
+    if root.exists() {
+        return Ok(());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(root)
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(root)
+    }
+}
+
 /// One path, owner-only, refusing a link rather than following it.
 #[cfg(unix)]
 fn owner_only(path: &Path, mode: u32) -> std::io::Result<()> {

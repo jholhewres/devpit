@@ -136,11 +136,15 @@ fn main() {
                 }
                 eprintln!("the plugin catalogue breaks the contract: {err}");
             }
-            // The home made private before anything opens or writes in it. An
-            // install from before this existed is world-readable until someone
-            // tightens it, and this start is the only moment that knows about
-            // every file in there. What it could not do is said, not fatal.
+            // The home made private before anything opens or writes in it. A
+            // first start creates it owner-only; an install from before this
+            // existed is world-readable until someone tightens it, and this
+            // start is the only moment that knows about every file in there.
+            // What it could not do is said, not fatal.
             if let Ok(root) = devpit_core::Store::root() {
+                if let Err(err) = devpit_core::home::make_private_root(&root) {
+                    eprintln!("{} could not be created private: {err}", root.display());
+                }
                 for (path, err) in devpit_core::home::harden(&root) {
                     eprintln!("{} was left as it was: {err}", path.display());
                 }

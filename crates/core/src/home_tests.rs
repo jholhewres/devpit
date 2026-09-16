@@ -854,3 +854,24 @@ fn an_unregistered_project_is_not_found_to_uninstall_from() {
     let err = uninstall_plugin(&store, dir.path(), "prj_missing", PLUGIN, true);
     assert!(matches!(err, Err(HomeError::NotFound)), "{err:?}");
 }
+
+/// The review's case: a first start created the root with the umask's mode,
+/// and the store in it was readable by other users until the next start.
+#[cfg(unix)]
+#[test]
+fn a_new_state_root_is_private_from_the_moment_it_exists() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join(".devpit");
+
+    make_private_root(&root).expect("made");
+
+    let mode = std::fs::metadata(&root)
+        .expect("there")
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(mode, 0o700, "the root was made {mode:o}");
+    // And an existing one is left alone: tightening is harden's job.
+    make_private_root(&root).expect("again");
+}
