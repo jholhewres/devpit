@@ -14,6 +14,7 @@ import { StatusStrip } from './StatusStrip'
 import { TopBar } from './TopBar'
 import { PluginsProvider } from './usePlugins'
 import { ShellProvider, useShell } from './useShell'
+import { shortcutFor } from './shortcuts'
 import { isMaximized, onResized } from './window'
 import { abandoned } from './typing'
 
@@ -68,19 +69,17 @@ function Window(): React.JSX.Element {
 
   useEffect(() => {
     const key = (event: KeyboardEvent): void => {
-      const meta = event.metaKey || event.ctrlKey
-      if (meta && event.key.toLowerCase() === 'k') {
+      // Only the window's own. A pane's keys are the pane's: splitting
+      // belongs to the terminal being split, ⌘P to the picker it opens.
+      const press = shortcutFor(event)
+      if (press === 'palette') {
         event.preventDefault()
         if (palette) closePalette()
         else openPalette()
       }
-      if (meta && event.key.toLowerCase() === 't') {
+      if (press === 'terminal' || press === 'chat') {
         event.preventDefault()
-        shell.show('term')
-      }
-      if (meta && event.key.toLowerCase() === 'n') {
-        event.preventDefault()
-        shell.show('chat')
+        shell.show(press === 'terminal' ? 'term' : 'chat')
       }
       if (abandoned(event)) {
         closePalette()

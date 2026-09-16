@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { shortcutFor } from './shortcuts'
 import { useShell } from './useShell'
 import { abandoned } from './typing'
 
@@ -35,13 +36,19 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
     if (open) field.current?.focus()
   }, [open])
 
+  /* ⌘P is heard open or shut, and here rather than in the shell, which would
+     have to hold this menu's state. Escape only matters while it is open. */
   useEffect(() => {
-    if (!open) return
     const shut = (): void => setOpen(false)
     const key = (event: KeyboardEvent): void => {
-      if (abandoned(event)) setOpen(false)
+      if (shortcutFor(event) === 'project') {
+        event.preventDefault()
+        setQuery('')
+        return setOpen((was) => !was)
+      }
+      if (open && abandoned(event)) setOpen(false)
     }
-    document.addEventListener('click', shut)
+    if (open) document.addEventListener('click', shut)
     document.addEventListener('keydown', key)
     return () => {
       document.removeEventListener('click', shut)

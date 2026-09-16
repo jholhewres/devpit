@@ -6,6 +6,7 @@ import { Leaf } from './Leaf'
 import { usePaneActions } from './paneActions'
 import { PaneCorner } from './PaneCorner'
 import { Split } from './Split'
+import { shortcutFor } from './shortcuts'
 import { leaves } from './splits'
 import type { Tab } from './strip'
 import { useShell } from './useShell'
@@ -61,11 +62,10 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
      one. */
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return
-      const key = event.key.toLowerCase()
-      if (key !== 'd' && key !== 'e') return
+      const press = shortcutFor(event)
+      if (press !== 'splitRight' && press !== 'splitDown') return
       event.preventDefault()
-      split(key === 'd' ? 'horizontal' : 'vertical')
+      split(press === 'splitRight' ? 'horizontal' : 'vertical')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
