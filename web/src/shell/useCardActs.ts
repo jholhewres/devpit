@@ -37,10 +37,18 @@ export async function openCardTerminal(
   title: string,
   show: (kind: 'term', tab: Partial<Tab>) => void,
   launch?: string,
+  open: readonly Tab[] = [],
 ): Promise<string | null> {
   const answer = await ask(() => commands.cardTerminal(projectId, cardId))
   if (!answer.data) return answer.error ?? 'the terminal did not open'
-  show('term', { id: answer.data.tabId, title, cardId: answer.data.cardId, ...(launch ? { launch } : {}) })
+  const { tabId, layout } = answer.data
+  /* A tab already open is only brought to the front, and the agent it was
+     asked for is dropped on the way — so it is sent to the pane the tab has. */
+  if (launch && open.some((tab) => tab.id === tabId)) {
+    show('term', { id: tabId, title, cardId: answer.data.cardId })
+    return (await ask(() => commands.sessionLaunchAgent(projectId, layout.focusedId, launch))).error
+  }
+  show('term', { id: tabId, title, cardId: answer.data.cardId, ...(launch ? { launch } : {}) })
   return null
 }
 
@@ -49,7 +57,13 @@ export async function copyBranch(projectId: string, cardId: string): Promise<str
   const answer = await ask(() => commands.cardDetail(projectId, cardId))
   const branch = answer.data?.worktree?.branch
   if (!branch) return answer.error ?? 'this card has no branch yet'
-  await navigator.clipboard.writeText(branch)
+  /* After an awaited read WebKit may no longer count this as the click that
+     asked, and refuse: said, rather than nothing happening. */
+  try {
+    await navigator.clipboard.writeText(branch)
+  } catch {
+    return `could not put ${branch} on the clipboard`
+  }
   return null
 }
 

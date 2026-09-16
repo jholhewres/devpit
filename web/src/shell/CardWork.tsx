@@ -37,7 +37,7 @@ export function CardWork({
   runs: readonly Run[]
   onChanged: () => void
 }): React.JSX.Element {
-  const { project, show } = useShell()
+  const { project, show, open } = useShell()
   /* Only what Settings still offers. */
   const agents = offered(useKnownAgents())
   const openers = useOpeners()
@@ -58,12 +58,12 @@ export function CardWork({
   const openTerminalFor = useCallback(async (agentId?: string): Promise<void> => {
     if (!project) return
     setBusy('Opening a terminal…')
-    const refused = await openCardTerminal(project.id, cardId, title, show, agentId)
+    const refused = await openCardTerminal(project.id, cardId, title, show, agentId, open)
     setBusy(null)
     setProblem(refused)
     if (refused) return
     onChanged()
-  }, [project, cardId, title, show, onChanged])
+  }, [project, cardId, title, show, open, onChanged])
 
   /* A conversation about this card, in its checkout, with the card in it. */
   const chat = async (): Promise<void> => {

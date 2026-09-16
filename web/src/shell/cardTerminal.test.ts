@@ -5,9 +5,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { openCardTerminal } from './useCardActs'
 
+const launched = vi.fn()
+
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
   commands: {
+    sessionLaunchAgent: (...args: unknown[]) => launched(...args),
     cardTerminal: () => ({
       layout: { projectId: 'p1', focusedId: 'leaf_1', tree: { type: 'leaf', id: 'leaf_1' } },
       tabId: 'tab_named_by_the_backend',
@@ -27,6 +30,14 @@ describe("a card's terminal tab", () => {
       cardId: 'card_1',
       launch: 'claude',
     })
+  })
+
+  it('starts the agent in the pane it has when the tab is already open', async () => {
+    const show = vi.fn()
+    const open = [{ id: 'tab_named_by_the_backend', kind: 'term' as const }]
+    expect(await openCardTerminal('p1', 'card_1', 'Wire the board', show, 'claude', open)).toBeNull()
+    expect(launched).toHaveBeenCalledWith('p1', 'leaf_1', 'claude')
+    expect(show).toHaveBeenCalledWith('term', { id: 'tab_named_by_the_backend', title: 'Wire the board', cardId: 'card_1' })
   })
 
   it('never has its id spelled by the window', () => {

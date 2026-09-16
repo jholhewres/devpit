@@ -82,6 +82,11 @@ describe("a card's Sessions", () => {
     expect(onChanged).toHaveBeenCalled()
   })
 
+  it('does not offer a run with no agent session as a chat: there is no conversation behind it', () => {
+    rows([session({ kind: 'run', ref: 'run_1', state: 'done', runId: 'run_1' })])
+    expect(row('Run').queryByRole('button', { name: 'Open as chat' })).toBeNull()
+  })
+
   it('stops a run that is working, and will not take it into a chat until then', async () => {
     rows([session({ kind: 'run', ref: 's-run', state: 'working', runId: 'run_1' })])
     expect((row('Run').getByRole('button', { name: 'Open as chat' }) as HTMLButtonElement).disabled).toBe(true)

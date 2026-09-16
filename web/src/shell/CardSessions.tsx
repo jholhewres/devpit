@@ -16,6 +16,10 @@ const KIND: Readonly<Record<CardSession['kind'], string>> = {
   chat: 'Chat',
 }
 
+/** Whether a chat can go on with a session. A run with no agent is heard under
+ *  its own id, and no conversation was ever filed under that. */
+export const hasConversation = (session: CardSession): boolean => session.ref !== session.runId
+
 /*
  * Every session working on this card, one row each, with what can be done
  * with it from here.
@@ -132,7 +136,7 @@ export function CardSessions({
                 Stop
               </button>
             )}
-            {(adoption === 'adopt' || adoption === 'stop-first') && (
+            {(adoption === 'adopt' || adoption === 'stop-first') && hasConversation(session) && (
               <button
                 className="btn"
                 disabled={busy || adoption === 'stop-first'}
