@@ -123,5 +123,7 @@ export function seedEnv({ home, feed }) {
     DEVPIT_ACCOUNT_ORIGIN: CLOSED_PORT,
     DEVPIT_ACCOUNT_NO_BROWSER: '1',
     DEVPIT_UPDATE_FEED_FILE: feed,
+    // The hook timings, on the app's stderr, which the driver keeps in a file.
+    DEVPIT_TRACE_HOOKS: '1',
   }
 }

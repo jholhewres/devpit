@@ -103,7 +103,13 @@ export async function fill(window, selector, words) {
     field,
     words,
   )
-  await field.sendKeys('\uE007')
+  // Enter dispatched too: a textarea that has only just mounted is "not
+  // focusable" to the driver for a moment, and the keydown is all the app
+  // listens for anyway.
+  await settle(200)
+  await window.executeScript(function (field) {
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }))
+  }, field)
   await settle(700)
 }
 

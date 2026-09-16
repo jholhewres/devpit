@@ -6,7 +6,7 @@
  * test with the same stack.
  */
 
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,10 +26,15 @@ if (reasons.length > 0) {
   process.exit(1)
 }
 
+// In name order, with the trace test last: it measures the hooks the others
+// made, and run first it would have measured nothing.
+// `E2E_ONLY=chat` runs one file — for the person fixing it, not for CI.
+const only = process.env.E2E_ONLY
 const tests = readdirSync(join(here, 'tests'))
   .filter((name) => name.endsWith('.test.mjs'))
+  .filter((name) => !only || name.startsWith(only))
+  .sort((a, b) => (a === 'trace.test.mjs') - (b === 'trace.test.mjs') || a.localeCompare(b))
   .map((name) => join('tests', name))
-  .sort()
 
 // One at a time: the app writes to a seeded home and drives one window, and
 // two of those at once is two answers to "what is on screen".
@@ -43,9 +48,13 @@ const [command, args] = needsXvfb()
 // The home is seeded here because the driver inherits it: the app is the
 // driver's child, and that is the only way its environment gets set.
 const seeded = seedHome(root)
-const driver = await startDriver({ env: seedEnv(seeded) })
+const log = join(seeded.home, 'app.log')
+const driver = await startDriver({ env: seedEnv(seeded), log })
 try {
-  const ran = spawnSync(command, args, {
+  // Not spawnSync: that blocks this process's event loop, and the driver's
+  // stderr — the app's log — is only written while the loop turns. With it
+  // blocked the log arrived after the tests that read it had finished.
+  const tests = spawn(command, args, {
     cwd: here,
     stdio: 'inherit',
     env: {
@@ -54,9 +63,10 @@ try {
       E2E_ROOT: root,
       E2E_HOME: seeded.home,
       E2E_REPO: seeded.repo,
+      E2E_APP_LOG: log,
     },
   })
-  process.exitCode = ran.status ?? 1
+  process.exitCode = await new Promise((done) => tests.on('exit', (code) => done(code ?? 1)))
 } finally {
   driver.kill()
 }

@@ -8,6 +8,7 @@
  */
 
 import { spawn } from 'node:child_process'
+import { appendFileSync, writeFileSync } from 'node:fs'
 import { setTimeout as wait } from 'node:timers/promises'
 import { Builder } from 'selenium-webdriver'
 
@@ -22,7 +23,7 @@ const PORT = Number(process.env.E2E_DRIVER_PORT ?? 4444)
  * capability quietly ignored, the suite drove the app against the real home
  * and read the real plan usage out of the real CLI's credentials.
  */
-export async function startDriver({ port = PORT, env = {} } = {}) {
+export async function startDriver({ port = PORT, env = {}, log = null } = {}) {
   // The native WebKitWebDriver listens next door, on port + 1 by default. Two
   // drivers on neighbouring ports take each other's native port, and the
   // second session fails with "Failed to match capabilities".
@@ -32,9 +33,17 @@ export async function startDriver({ port = PORT, env = {} } = {}) {
   // CLAUDE_CONFIG_DIR above all — came back from the parent, and the Usage
   // screen read the real installation's plan and every real transcript.
   const driver = spawn('tauri-driver', ['--port', String(port), '--native-port', native], {
-    stdio: ['ignore', 'inherit', 'inherit'],
+    stdio: ['ignore', 'inherit', log ? 'pipe' : 'inherit'],
     env: Object.keys(env).length > 0 ? env : process.env,
   })
+  // The app is the driver's child and writes to the driver's stderr, so this
+  // file is the app's own log — what the trace test reads. Appended as each
+  // chunk arrives, not through a stream: another process reads it while this
+  // one is still running, and a buffered stream had written nothing yet.
+  if (log) {
+    writeFileSync(log, '')
+    driver.stderr.on('data', (chunk) => appendFileSync(log, chunk))
+  }
   driver.on('error', (err) => {
     throw err
   })

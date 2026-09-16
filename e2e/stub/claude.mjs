@@ -42,7 +42,9 @@ if (has('--help')) {
   background()
 } else if (argv[0] === 'attach') {
   attach(argv[1])
-} else if (has('-p')) {
+} else if (has('-p') || has('--print') || has('--output-format')) {
+  // A chat turn does not pass -p: it speaks stream-json on both ends, and that
+  // alone is what makes a turn headless.
   await headless()
 } else {
   interactive()
@@ -130,14 +132,68 @@ function attach(short) {
   setInterval(() => {}, 1 << 30)
 }
 
-/** `-p`: one headless turn, replayed from the fixture the Rust tests read. */
+/**
+ * `-p`: one turn, over the stream-json both callers speak.
+ *
+ * The prompt arrives as the first line on stdin. Only that line is read — a
+ * chat keeps stdin open for the whole conversation, and a stub that waited for
+ * it to close would hang every turn. `pwd` is answered with the folder the
+ * turn runs in, which is how a test learns where a resumed session ran;
+ * anything else replays the recorded turn, whose frames are real.
+ */
 async function headless() {
-  const lines = readFileSync(fixture(), 'utf8').split('\n').filter(Boolean)
-  fireHooks('UserPromptSubmit')
-  for (const line of lines) {
-    console.log(line)
+  const prompt = await firstPrompt()
+  // What was asked of the stub, for the person reading a failed run.
+  appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ argv, cwd: process.cwd(), prompt })}\n`)
+  const recorded = readFileSync(fixture(), 'utf8').split('\n').filter(Boolean)
+  const session = valueOf('--resume') ?? valueOf('--session-id') ?? JSON.parse(recorded[0]).session_id
+
+  fireHooks('UserPromptSubmit', { prompt }, session)
+  // A turn takes a moment, and the board shows "working" for exactly that
+  // moment. Answering instantly would make the state unobservable.
+  await new Promise((done) => setTimeout(done, 1500))
+
+  const init = JSON.parse(recorded[0])
+  console.log(JSON.stringify({ ...init, cwd: process.cwd(), session_id: session }))
+
+  if (/\bpwd\b/.test(prompt)) {
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.content = [{ type: 'text', text: process.cwd() }]
+    console.log(JSON.stringify(said))
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: process.cwd(), session_id: session }))
+  } else {
+    for (const line of recorded.slice(1)) {
+      const frame = JSON.parse(line)
+      if ('session_id' in frame) frame.session_id = session
+      console.log(JSON.stringify(frame))
+    }
   }
-  fireHooks('Stop')
+  fireHooks('Stop', {}, session)
+  process.exit(0)
+}
+
+/** The first user message on stdin, skipping whatever control lines precede it. */
+function firstPrompt() {
+  return new Promise((done) => {
+    const lines = createInterface({ input: process.stdin })
+    lines.on('line', (line) => {
+      let message
+      try {
+        message = JSON.parse(line)
+      } catch {
+        return
+      }
+      if (message.type !== 'user') return
+      const content = message.message?.content
+      // Resolved before closing: closing emits 'close' synchronously, and the
+      // close handler would resolve with nothing first.
+      done(Array.isArray(content) ? content.map((part) => part.text ?? '').join('') : String(content ?? ''))
+      lines.close()
+    })
+    lines.once('close', () => done(''))
+  })
 }
 
 function fixture() {
