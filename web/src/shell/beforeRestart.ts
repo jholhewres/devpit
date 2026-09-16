@@ -12,7 +12,8 @@ import { onCarried } from './window'
  * edit flush it first.
  */
 
-type Flush = () => void
+/** A save, finished when its promise settles. The app keeps the deadline. */
+type Flush = () => void | Promise<unknown>
 
 const holding = new Set<Flush>()
 
@@ -25,14 +26,9 @@ export function savesBeforeRestart(flush: Flush): () => void {
 /** Starts listening. Called once, from the shell. */
 export function answerBeforeRestart(): () => void {
   return onCarried<null>('update:before-restart', () => {
-    for (const flush of holding) {
-      try {
-        flush()
-      } catch {
-        /* One editor failing to save must not keep the others from trying,
-           and must not keep the update waiting for a deadline. */
-      }
-    }
-    void commands.updateRestartReady()
+    /* One editor failing to save must not keep the others from trying, and
+       must not keep the update waiting for a deadline. */
+    const saving = [...holding].map((flush) => Promise.resolve().then(flush))
+    void Promise.allSettled(saving).then(() => commands.updateRestartReady())
   })
 }

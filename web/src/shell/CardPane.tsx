@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Attachments } from './Attachments'
+import { savesBeforeRestart } from './beforeRestart'
 import { CardDescription } from './CardDescription'
 import { CardDiff } from './CardDiff'
 import { CardLane, type LaneChoice } from './CardLane'
@@ -89,9 +90,12 @@ export function CardPane({
 
   /* Hidden with the board or swapped for another card, the pane goes without
      a blur, so what was typed is written on the way out. */
-  const leaving = useRef<(() => void) | null>(null)
-  leaving.current = dirty ? () => void card.save(title.trim() || 'Untitled', body) : null
-  useEffect(() => () => leaving.current?.(), [])
+  const leaving = useRef<(() => Promise<unknown>) | null>(null)
+  leaving.current = dirty ? () => card.save(title.trim() || 'Untitled', body) : null
+  useEffect(() => () => void leaving.current?.(), [])
+  /* Nor is an update's restart a blur: the window is asked to put down what it
+     holds first, and a half-typed description is exactly that. */
+  useEffect(() => savesBeforeRestart(() => leaving.current?.()), [])
 
   /* What was typed stays typed until the write is kept: a refusal said next
      to an emptied field has already lost the words. */

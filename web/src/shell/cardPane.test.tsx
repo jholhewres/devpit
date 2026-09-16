@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CardDetail } from '../gen/bindings'
+import { answerBeforeRestart } from './beforeRestart'
 import { CardPane, escapeMeans } from './CardPane'
 
 afterEach(cleanup)
@@ -50,6 +51,19 @@ vi.mock('./useCard', () => ({
   }),
 }))
 vi.mock('./useShell', () => ({ useShell: () => ({ project: { id: 'p1' } }) }))
+const heard: Record<string, (payload: null) => void> = {}
+vi.mock('./window', () => ({
+  onCarried: (name: string, then: (payload: null) => void) => {
+    heard[name] = then
+    return () => delete heard[name]
+  },
+}))
+const restartReady = vi.fn(async () => ({ status: 'ok', data: null }))
+vi.mock('./live', async (actual) => ({
+  ...(await actual<object>()),
+  commands: { updateRestartReady: () => restartReady() },
+}))
+answerBeforeRestart()
 /* The sections below the description have their own tests and their own commands. */
 vi.mock('./CardPlay', () => ({ CardPlay: () => null }))
 vi.mock('./CardWork', () => ({ CardWork: () => null }))
@@ -178,6 +192,14 @@ describe('closing an open card keeps what was typed', () => {
     typed()
     unmount()
     expect(save).toHaveBeenCalledWith('Wire the whole board', '')
+  })
+
+  /* An update restarting the window is not a blur either. */
+  it('when an update restarts the window', async () => {
+    typed()
+    heard['update:before-restart']!(null)
+    await waitFor(() => expect(save).toHaveBeenCalledWith('Wire the whole board', ''))
+    await waitFor(() => expect(restartReady).toHaveBeenCalled())
   })
 })
 

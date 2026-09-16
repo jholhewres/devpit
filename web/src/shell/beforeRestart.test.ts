@@ -16,21 +16,30 @@ vi.mock('./live', () => ({ commands: { updateRestartReady: () => ready() } }))
 afterEach(() => vi.clearAllMocks())
 
 describe('what the window puts down before a restart', () => {
-  it('flushes what is holding on, then says it is ready', () => {
+  it('flushes what is holding on, waits for the write, then says it is ready', async () => {
     const saved: string[] = []
+    let written = (): void => {}
     const stopWatching = answerBeforeRestart()
-    const stopHolding = savesBeforeRestart(() => saved.push('a card'))
+    const stopHolding = savesBeforeRestart(
+      () =>
+        new Promise<void>((done) => {
+          saved.push('a card')
+          written = done
+        }),
+    )
 
     heard['update:before-restart']!(null)
+    await vi.waitFor(() => expect(saved).toEqual(['a card']))
+    expect(ready).not.toHaveBeenCalled()
 
-    expect(saved).toEqual(['a card'])
-    expect(ready).toHaveBeenCalled()
+    written()
+    await vi.waitFor(() => expect(ready).toHaveBeenCalled())
     stopHolding()
     stopWatching()
   })
 
   /* One editor throwing must not leave the update waiting out its deadline. */
-  it('says it is ready even when a save throws', () => {
+  it('says it is ready even when a save throws', async () => {
     const stopWatching = answerBeforeRestart()
     const stopHolding = savesBeforeRestart(() => {
       throw new Error('no')
@@ -38,7 +47,7 @@ describe('what the window puts down before a restart', () => {
 
     heard['update:before-restart']!(null)
 
-    expect(ready).toHaveBeenCalled()
+    await vi.waitFor(() => expect(ready).toHaveBeenCalled())
     stopHolding()
     stopWatching()
   })
