@@ -18,6 +18,7 @@ mod platform_window;
 mod ratchet;
 mod reseed;
 mod shell_boundary;
+mod versions;
 
 fn main() -> ExitCode {
     let command = std::env::args()
@@ -78,6 +79,7 @@ fn check() -> ExitCode {
     findings.extend(dead_controls::a_control_either_works_or_goes(&root));
     findings.extend(home_paths::paths_come_from_home(&root));
     findings.extend(csp::the_csp_forbids_what_the_app_never_needs(&root));
+    findings.extend(versions::the_version_has_one_source(&root));
 
     if findings.is_empty() {
         println!("guards: ok");
