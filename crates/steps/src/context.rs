@@ -15,6 +15,7 @@ pub const CONTEXT_KEYS: &[&str] = &[
     "projectPath",
     "worktreePath",
     "branch",
+    "baseRef",
     "card",
     "cardTitle",
 ];
@@ -25,7 +26,12 @@ pub struct Context {
     pub project: String,
     pub project_path: String,
     pub worktree_path: String,
+    /// The branch the checkout is on. Empty when the step is running in the
+    /// project itself, which is on whatever branch the person left it on.
     pub branch: String,
+    /// The commit the card's work started from, as a SHA. A different thing
+    /// from `branch`, which is where the work is going.
+    pub base_ref: String,
     pub card: String,
     pub card_title: String,
 }
@@ -37,6 +43,7 @@ impl Context {
             "projectPath" => Some(&self.project_path),
             "worktreePath" => Some(&self.worktree_path),
             "branch" => Some(&self.branch),
+            "baseRef" => Some(&self.base_ref),
             "card" => Some(&self.card),
             "cardTitle" => Some(&self.card_title),
             _ => None,
@@ -80,7 +87,8 @@ mod tests {
             project: "devpit".to_owned(),
             project_path: "/home/x/devpit".to_owned(),
             worktree_path: "/home/x/devpit".to_owned(),
-            branch: "main".to_owned(),
+            branch: "devpit/ship-it-01hzxy9k".to_owned(),
+            base_ref: "9f1c2b7".to_owned(),
             card: "card_1".to_owned(),
             card_title: "Ship it".to_owned(),
         }

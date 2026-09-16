@@ -4,7 +4,7 @@ use devpit_agentcli as agent;
 use devpit_core::Store;
 use devpit_rpc::Step;
 
-use super::context::{injected, Context};
+use super::context::{context_of, injected, Checkout};
 use super::Finished;
 
 pub fn run(
@@ -54,17 +54,18 @@ pub fn run(
     store
         .set_run_cwd(run_id, &cwd.display().to_string())
         .map_err(|err| err.to_string())?;
-    let context = injected(
-        &Context {
-            card: card.id.clone(),
-            card_title: card.title.clone(),
-            card_body: card.body.clone(),
-            branch: card.base_ref.clone(),
-            worktree_path: Some(cwd.display().to_string()),
-            project_path: store.project_of_card(card_id).ok().flatten(),
-        },
-        &config.inject,
+    // Only a checkout of the card's own carries the card's branch. A step that
+    // asked for none runs in the project, where the branch is the person's.
+    let branch = crate::checkout::branch_of(step, &cwd);
+    let project = store.project_of_card(card_id).ok().flatten();
+    let context = context_of(
+        &card,
+        branch
+            .as_deref()
+            .map(|branch| Checkout { path: &cwd, branch }),
+        project.as_deref(),
     );
+    let context = injected(&context, &config.inject);
 
     // The hooks reach us through a settings file written next to the state,
     // so a turn tells the board what it is doing while it does it.

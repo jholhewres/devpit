@@ -15,6 +15,14 @@ pub struct Branch {
     pub subject: String,
 }
 
+/// The branch a checkout is on, empty when HEAD is detached.
+///
+/// `--show-current` and not `status`: the name is one line, and a step asking
+/// which branch it is on should not pay for a scan of the working tree.
+pub fn branch_at(root: &Path) -> Result<String, GitError> {
+    Ok(run(root, &["branch", "--show-current"])?.trim().to_owned())
+}
+
 /// Every local branch, the current one first.
 ///
 /// Local only: listing remotes would offer to switch to something that has to

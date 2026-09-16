@@ -53,6 +53,20 @@ pub fn cwd_for(
     checkout_of(store, card_id, on_line)
 }
 
+/// The branch this step's checkout is on, or nothing when it has none.
+///
+/// Read from git rather than rebuilt from the card's title: a card renamed
+/// after its worktree was made would name a branch that does not exist, and a
+/// step told to push to it would fail on somebody else's machine.
+pub fn branch_of(step: &Step, cwd: &std::path::Path) -> Option<String> {
+    if !needs_worktree(step.kind, &step.config) {
+        return None;
+    }
+    devpit_git::branch_at(cwd)
+        .ok()
+        .filter(|name| !name.is_empty())
+}
+
 /// The card's own checkout, made the first time it is asked for.
 ///
 /// Split out of `cwd_for` because a step is no longer the only thing that

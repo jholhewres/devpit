@@ -23,6 +23,8 @@ export const CONTEXT_KEYS = [
   'cardTitle',
   'cardBody',
   'branch',
+  'baseRef',
+  'project',
   'worktreePath',
   'projectPath',
 ] as const

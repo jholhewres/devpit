@@ -45,7 +45,7 @@ pub(crate) use invoke::fixture;
 pub(crate) use invoke::{identify, run, run_diffing};
 
 pub use basing::{allowed as base_allowed, chosen as base_chosen, worktree_at, Refused};
-pub use branches::{branches, switch, Branch};
+pub use branches::{branch_at, branches, switch, Branch};
 pub use clone::{clone, folder_for};
 pub use discard::discard;
 pub use front::{changed_since, diff_file, diff_since, head_of, remove_front, unsaved_in};

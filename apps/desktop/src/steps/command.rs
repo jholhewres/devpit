@@ -1,7 +1,5 @@
 //! The command step: your own command, as a lane of the board.
 
-use std::path::Path;
-
 use devpit_core::Store;
 use devpit_rpc::Step;
 use devpit_steps as steps;
@@ -28,14 +26,15 @@ pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String
     // The card's own checkout, created on the first step that needs one.
     let cwd = crate::checkout::cwd_for(store, card_id, step, |_| {})?;
 
-    let context = steps::Context {
-        project: name_of(&project),
-        project_path: project,
-        worktree_path: cwd.display().to_string(),
-        branch: card.base_ref.clone().unwrap_or_default(),
-        card: card.id.clone(),
-        card_title: card.title.clone(),
-    };
+    let branch = crate::checkout::branch_of(step, &cwd);
+    let context = super::context::context_of(
+        &card,
+        branch
+            .as_deref()
+            .map(|branch| super::context::Checkout { path: &cwd, branch }),
+        Some(&project),
+    )
+    .for_a_command();
 
     let mut output = String::new();
     let ended = steps::run(
@@ -70,12 +69,4 @@ pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String
         duration_ms: ended.duration_ms,
         exit_code: ended.exit_code,
     })
-}
-
-/// The last segment of a path, which is what a project is called.
-fn name_of(path: &str) -> String {
-    Path::new(path)
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| path.to_owned())
 }

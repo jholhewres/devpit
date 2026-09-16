@@ -59,3 +59,15 @@ fn switching_away_from_work_that_would_be_lost_is_refused() {
         "the switch took uncommitted work with it"
     );
 }
+
+/// What a step is told it is working on. A detached HEAD has no branch name,
+/// and saying so beats naming the commit as though it were one.
+#[test]
+fn the_branch_a_checkout_is_on_is_read_by_name() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    repo(dir.path());
+    assert_eq!(crate::branch_at(dir.path()).expect("branch"), "main");
+
+    crate::run(dir.path(), &["checkout", "--detach"]).expect("detach");
+    assert_eq!(crate::branch_at(dir.path()).expect("branch"), "");
+}
