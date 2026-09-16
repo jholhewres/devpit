@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { Notices } from '../gen/bindings'
+import { held } from './headsDown'
 import { ask, commands } from './live'
+import { useFocus } from './useHeadsDown'
 import { onEvent } from './window'
 
 /*
@@ -19,6 +21,9 @@ import { onEvent } from './window'
 export interface Bell {
   readonly notices: Notices['notices']
   readonly unread: number
+  /** What a focus is holding back: from another project, since it began.
+   *  Never dropped and never marked read — shown on the way out. */
+  readonly waiting: Notices['notices']
   markRead: (id: string) => void
   markAllRead: () => void
   reload: () => void
@@ -26,6 +31,10 @@ export interface Bell {
 
 export function useNotices(): Bell {
   const [seen, setSeen] = useState<Notices>({ notices: [], unread: 0 })
+  /* Read here rather than passed in: the bell is the one place that has the
+     whole list, so the split between what rings and what waits is made once,
+     from one list, and the badge and the queue cannot disagree. */
+  const focus = useFocus()
 
   const take = useCallback((answer: { data: Notices | null }) => {
     if (answer.data) setSeen(answer.data)
@@ -44,9 +53,20 @@ export function useNotices(): Bell {
 
   useEffect(() => onEvent('notice:rang', reload), [reload])
 
+  const waiting = seen.notices.filter((one) => held(one, focus))
+  const ringing = seen.notices.filter((one) => !held(one, focus))
+
   return {
-    notices: seen.notices,
-    unread: seen.unread,
+    notices: ringing,
+    /* The app's count, untouched, unless a focus is holding something back —
+       then it is that count less what is waiting, because the badge and the
+       panel must not disagree and the panel is no longer the whole list.
+       Computing it here in every case would replace the app's answer with a
+       guess about rows this page may not even hold. */
+    unread: focus
+      ? Math.max(0, seen.unread - waiting.filter((one) => one.readAt === null).length)
+      : seen.unread,
+    waiting,
     markRead: (id) => void ask(() => commands.noticesMark(id)).then(take),
     markAllRead: () => void ask(() => commands.noticesMarkAll()).then(take),
     reload,

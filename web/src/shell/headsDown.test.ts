@@ -70,3 +70,24 @@ describe('what a focus holds back', () => {
     expect(minutesIn(focus, 900)).toBe(0)
   })
 })
+
+/* The bell's split, as a list rather than one notice at a time: this is what
+   the panel shows and what the queue holds, from the same read. */
+describe('splitting what the bell knows', () => {
+  const list = [
+    { id: 'a', projectId: 'prj_here', kind: 'run', createdAt: 2000 },
+    { id: 'b', projectId: 'prj_far', kind: 'run', createdAt: 2000 },
+    { id: 'c', projectId: 'prj_far', kind: 'irreversible', createdAt: 2000 },
+    { id: 'd', projectId: 'prj_far', kind: 'run', createdAt: 500 },
+    { id: 'e', projectId: null, kind: 'run', createdAt: 2000 },
+  ]
+
+  it('holds only what came from elsewhere after it began', () => {
+    const waiting = list.filter((one) => held(one, focus)).map((one) => one.id)
+    expect(waiting).toEqual(['b'])
+  })
+
+  it('holds nothing at all when no focus is on', () => {
+    expect(list.filter((one) => held(one, null))).toEqual([])
+  })
+})

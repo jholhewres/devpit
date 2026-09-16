@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { minutesIn } from './headsDown'
 import { shortcutFor, SHORTCUTS } from './shortcuts'
-import { useHeadsDown } from './useHeadsDown'
+import { stamp, useHeadsDown } from './useHeadsDown'
 
 /*
  * Going into a focus, and what it says while it is on.
@@ -38,12 +38,13 @@ export function HeadsDown({ projectId }: { projectId: string | null }): React.JS
      CSS, and `AppShell` does not have to hold this state to pass it down. */
   useEffect(() => {
     const root = document.documentElement
-    if (on) root.dataset.headsDown = 'true'
+    const written = stamp(focus)
+    if (written) root.dataset.headsDown = written
     else delete root.dataset.headsDown
     return () => {
       delete root.dataset.headsDown
     }
-  }, [on])
+  }, [focus])
 
   const toggle = (): void => {
     if (focus) leave()

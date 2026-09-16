@@ -57,7 +57,11 @@ describe('going into a focus', () => {
     expect(document.documentElement.dataset.headsDown).toBeUndefined()
 
     fireEvent.click(screen.getByRole('button', { name: /Focus/ }))
-    await waitFor(() => expect(document.documentElement.dataset.headsDown).toBe('true'))
+    // The whole focus, not a flag: the bell reads the project and the second
+    // it began off this, and a flag would leave it asking the app again.
+    await waitFor(() =>
+      expect(document.documentElement.dataset.headsDown).toMatch(/^prj_1:\d+/),
+    )
 
     fireEvent.click(screen.getByRole('button', { name: /Focus/ }))
     await waitFor(() => expect(document.documentElement.dataset.headsDown).toBeUndefined())

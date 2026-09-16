@@ -217,7 +217,7 @@ describe('an update while a focus is on', () => {
   afterEach(() => delete document.documentElement.dataset.headsDown)
 
   it('says nothing during a focus, and says it when the focus ends', async () => {
-    document.documentElement.dataset.headsDown = 'true'
+    document.documentElement.dataset.headsDown = 'prj_1:1700000000'
     render(<UpdateCard />)
     say({ type: 'available', version: '0.2.0', notes: '', kind: 'appImage', testFeed: false } as UpdateStatus)
     expect(screen.queryByText('Update ready')).toBeNull()
