@@ -324,6 +324,14 @@ export const commands = {
 	 *  was asked for was the folder with the file highlighted in it.
 	 */
 	pathReveal: (path: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("path_reveal", { path })),
+	/**
+	 *  `url.open` — opens a web address in the browser the person uses.
+	 * 
+	 *  The window cannot do this itself: a `target="_blank"` reaches wry's
+	 *  `new_window_req_handler`, which tauri never sets (wry 0.55.1
+	 *  `webkitgtk/mod.rs:487`), so the click did nothing at all.
+	 */
+	urlOpen: (url: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("url_open", { url })),
 	/**  `apps.list` — the apps in the Open in menu. */
 	appsList: () => typedError<OpenApp[], RpcError>(__TAURI_INVOKE("apps_list")),
 	/**  `apps.known` — what the Add menu offers. */

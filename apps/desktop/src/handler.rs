@@ -76,6 +76,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         wsfiles::workspace_file,
         reveal::path_open,
         reveal::path_reveal,
+        reveal::url_open,
         openers::apps_list,
         openers::apps_known,
         openers::apps_add,

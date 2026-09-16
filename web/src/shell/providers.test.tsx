@@ -16,6 +16,8 @@ const defaulted = vi.fn()
 const switched = vi.fn()
 const hooked = vi.fn()
 
+const opened: string[] = []
+
 vi.mock('./live', () => ({
   ask: (call: () => unknown) =>
     Promise.resolve(
@@ -25,6 +27,7 @@ vi.mock('./live', () => ({
     ),
   commands: {
     agentProfiles: () => listed,
+    urlOpen: (url: string) => (opened.push(url), { path: url }),
     agentsKnown: () => known,
     agentChoice: () => choice,
     agentDefaultSet: (id: string) => (defaulted(id), { ...choice, defaultId: id }),
@@ -292,12 +295,19 @@ describe('finding a row again', () => {
     await waitFor(() => expect(container.querySelector('.agmark')).toBeTruthy())
   })
 
-  it('links an agent to its own documentation', async () => {
+  /* The address stays in the href, to hover over and copy, but the click is
+     the app's: nothing in the window answers a new-window request, so
+     target="_blank" opened nothing at all. */
+  it('links an agent to its own documentation, and opens it through the app', async () => {
     known = [agent('claude', { label: 'Claude Code', homepage: 'https://code.claude.com/docs' })]
     await shown()
     const link = screen.getByLabelText('Claude Code documentation')
     expect(link.getAttribute('href')).toBe('https://code.claude.com/docs')
-    expect(link.getAttribute('rel')).toContain('noreferrer')
+    expect(link.getAttribute('target')).toBeNull()
+
+    opened.length = 0
+    fireEvent.click(link)
+    await waitFor(() => expect(opened).toEqual(['https://code.claude.com/docs']))
   })
 
   it('has no link for a profile, which has no page to send anyone to', async () => {

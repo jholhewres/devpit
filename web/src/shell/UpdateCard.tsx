@@ -290,7 +290,17 @@ export function UpdateCard(): React.JSX.Element | null {
           </button>
         </div>
       ) : unmanaged ? (
-        <a className="upd__go" href={RELEASE_PAGE} target="_blank" rel="noreferrer">
+        <a
+          className="upd__go"
+          href={RELEASE_PAGE}
+          /* The window cannot open a new one of its own: nothing in tauri
+             answers wry's new-window request, so target="_blank" did nothing
+             at all. The address stays in the href, for hovering and copying. */
+          onClick={(event) => {
+            event.preventDefault()
+            void ask(() => commands.urlOpen(RELEASE_PAGE))
+          }}
+        >
           Release page
         </a>
       ) : (

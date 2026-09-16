@@ -3,6 +3,7 @@ import type { Entry } from './catalogue'
 import { ProfileEditor } from './ProfileEditor'
 import type { Draft } from './profiles'
 import type { KnownAgent } from '../gen/bindings'
+import { ask, commands } from './live'
 
 /*
  * One agent in the catalogue.
@@ -98,8 +99,12 @@ export function AgentRow({
           <a
             className="acc__act"
             href={entry.homepage}
-            target="_blank"
-            rel="noreferrer"
+            /* Opened by the app, not by the window: nothing answers wry's
+               new-window request, so this link did nothing when clicked. */
+            onClick={(event) => {
+              event.preventDefault()
+              void ask(() => commands.urlOpen(entry.homepage as string))
+            }}
             title={`${entry.label} documentation`}
             aria-label={`${entry.label} documentation`}
           >

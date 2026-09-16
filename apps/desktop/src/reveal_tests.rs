@@ -137,3 +137,36 @@ fn the_directory_beside_the_cli_configuration_is_still_refused() {
 
     assert!(openable(&[cli], &home, &dir.path().join(".ssh-key")).is_none());
 }
+
+/// What the window may hand to the browser.
+///
+/// The link did nothing at all before this: a `target="_blank"` reaches wry's
+/// `new_window_req_handler`, which tauri never sets, so nothing acted on the
+/// click. Now that something does, the scheme is the whole of the check —
+/// sabotage by accepting anything and the four refusals below stop failing.
+#[test]
+fn only_a_web_address_is_handed_to_the_browser() {
+    // `RpcError` has no `PartialEq`, so the answer is read rather than compared.
+    assert_eq!(
+        web_address("https://github.com/jholhewres/devpit/releases/latest").ok(),
+        Some("https://github.com/jholhewres/devpit/releases/latest")
+    );
+    assert_eq!(
+        web_address("https://example.org").ok(),
+        Some("https://example.org")
+    );
+
+    // A scheme that does something other than open a page.
+    assert!(web_address("http://example.org").is_err(), "plain http");
+    assert!(web_address("file:///etc/passwd").is_err(), "a local file");
+    assert!(
+        web_address("javascript:alert(1)").is_err(),
+        "a script, not an address"
+    );
+    // A flag rather than an address.
+    assert!(web_address("-fWhatever").is_err());
+    // And the two ways a host lies about where it goes.
+    assert!(web_address("https://").is_err(), "no host");
+    assert!(web_address("https://user:pw@example.org").is_err());
+    assert!(web_address("https://example.org/a b").is_err(), "a space");
+}
