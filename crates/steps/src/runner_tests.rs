@@ -13,9 +13,14 @@ fn context() -> Context {
 fn collected(command: &str, timeout: Option<Duration>) -> (Ended, Vec<String>) {
     let dir = tempfile::tempdir().expect("tempdir");
     let mut lines = Vec::new();
-    let ended = run(command, dir.path(), &context(), timeout, |line| {
-        lines.push(line.to_owned())
-    })
+    let ended = run(
+        command,
+        dir.path(),
+        &context(),
+        timeout,
+        |_| {},
+        |line| lines.push(line.to_owned()),
+    )
     .expect("the command ran");
     (ended, lines)
 }
@@ -67,6 +72,7 @@ fn a_branch_full_of_shell_syntax_runs_nothing() {
         &context,
         None,
         |_| {},
+        |_| {},
     )
     .expect("ran");
 
@@ -93,6 +99,7 @@ fn the_first_line_arrives_before_the_command_ends() {
         dir.path(),
         &context(),
         None,
+        |_| {},
         |_| {
             if first.is_none() {
                 first = Some(started.elapsed());
@@ -112,7 +119,31 @@ fn the_first_line_arrives_before_the_command_ends() {
 fn an_empty_command_is_refused_rather_than_run() {
     let dir = tempfile::tempdir().expect("tempdir");
     assert!(matches!(
-        run("   ", dir.path(), &context(), None, |_| {}),
+        run("   ", dir.path(), &context(), None, |_| {}, |_| {}),
         Err(RunError::Empty)
     ));
+}
+
+/// A command run can be stopped, which means its pid has to come back.
+///
+/// Without this the card's stop and an update told to stop the work both
+/// answered "not in flight here", and the run came back `lost` rather than
+/// `cancelled`. Sabotage: stop calling `on_pid` and this fails on the `None`.
+#[test]
+fn the_shell_says_which_process_it_is_before_it_runs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut said: Option<u32> = None;
+    let ended = run(
+        "echo hello",
+        dir.path(),
+        &context(),
+        None,
+        |pid| said = Some(pid),
+        |_| {},
+    )
+    .expect("ran");
+
+    let pid = said.expect("the runner never said which process it started");
+    assert!(pid > 1, "pid {pid} is not a process this run could stop");
+    assert_eq!(ended.exit_code, Some(0));
 }

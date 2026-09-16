@@ -6,9 +6,11 @@
 //! interpolated into the command string.
 
 pub mod context;
+pub mod ended;
 pub mod manifest;
 pub mod runner;
 
 pub use context::{Context, CONTEXT_KEYS};
+pub use ended::{Ended, RunError};
 pub use manifest::{validate, Manifest, ManifestError};
-pub use runner::{run, Ended, RunError};
+pub use runner::run;

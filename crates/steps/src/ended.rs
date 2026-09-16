@@ -1,0 +1,23 @@
+//! What a command run answers, and the two ways it never starts.
+//!
+//! Apart from the runner because they are the shape of its answer rather than
+//! part of running: the runner has a ceiling, and a type moved out of it is
+//! room for the run itself.
+
+#[derive(Debug, thiserror::Error)]
+pub enum RunError {
+    #[error("the command could not be started: {0}")]
+    NotStarted(String),
+
+    #[error("no command to run")]
+    Empty,
+}
+
+/// How a command run ended.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ended {
+    /// `None` when the command was killed for running past its timeout.
+    pub exit_code: Option<i32>,
+    pub timed_out: bool,
+    pub duration_ms: i64,
+}

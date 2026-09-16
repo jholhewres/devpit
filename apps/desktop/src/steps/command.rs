@@ -11,7 +11,12 @@ use super::Finished;
 /// The output is streamed onto the card while the command works. A suite that
 /// takes twenty minutes shows its first line at once — buffering would make a
 /// working command look identical to a hung one for twenty minutes.
-pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String> {
+pub fn run(
+    store: &Store,
+    card_id: &str,
+    step: &Step,
+    on_pid: impl FnOnce(u32),
+) -> Result<Finished, String> {
     let manifest = steps::validate(&step.config).map_err(|err| err.to_string())?;
 
     let card = store
@@ -42,6 +47,7 @@ pub fn run(store: &Store, card_id: &str, step: &Step) -> Result<Finished, String
         &cwd,
         &context,
         manifest.timeout_seconds.map(std::time::Duration::from_secs),
+        on_pid,
         |line| {
             output.push_str(line);
             output.push('\n');

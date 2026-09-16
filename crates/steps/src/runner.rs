@@ -11,36 +11,27 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use crate::ended::{Ended, RunError};
 use crate::Context;
-
-#[derive(Debug, thiserror::Error)]
-pub enum RunError {
-    #[error("the command could not be started: {0}")]
-    NotStarted(String),
-
-    #[error("no command to run")]
-    Empty,
-}
-
-/// How a command run ended.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Ended {
-    /// `None` when the command was killed for running past its timeout.
-    pub exit_code: Option<i32>,
-    pub timed_out: bool,
-    pub duration_ms: i64,
-}
 
 /// Runs `command` in `cwd`, calling `on_line` with each line as it arrives.
 ///
 /// The context reaches the command only through the environment. The command
 /// string itself is never built from it, so a value containing shell syntax
 /// stays a value.
+///
+/// `on_pid` is handed the shell's process id the moment it exists, so a caller
+/// can stop the run later. Without it a command run could only be waited out:
+/// the card's stop and an update that was told to stop the work both answered
+/// "not in flight here", and the run came back `lost` instead of `cancelled`.
+/// What it stops is the shell; a command that leaves grandchildren behind is
+/// still a wider problem than this signal.
 pub fn run(
     command: &str,
     cwd: &Path,
     context: &Context,
     timeout: Option<Duration>,
+    on_pid: impl FnOnce(u32),
     mut on_line: impl FnMut(&str),
 ) -> Result<Ended, RunError> {
     if command.trim().is_empty() {
@@ -58,6 +49,7 @@ pub fn run(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|err| RunError::NotStarted(err.to_string()))?;
+    on_pid(child.id());
 
     // stderr matters as much as stdout for a failing build, and interleaving
     // them keeps the order a person would have seen in a terminal.

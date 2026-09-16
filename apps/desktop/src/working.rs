@@ -45,12 +45,15 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
         hops,
     } = carrying;
 
+    // Both kinds that run a process here register it, so the card's stop and an
+    // update told to stop the work reach either one.
+    let watching = Arc::clone(&in_flight);
+    let watched = id.clone();
+
     let outcome = match step.kind {
         StepKind::Agent => {
             let progress = app.clone();
             let run = id.clone();
-            let watching = Arc::clone(&in_flight);
-            let watched = id.clone();
             steps::agent::run(
                 store,
                 &card,
@@ -66,7 +69,9 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
             )
         }
         StepKind::Session => steps::session::start(store, &card, &step, &session_id),
-        StepKind::Command => steps::command::run(store, &card, &step),
+        StepKind::Command => {
+            steps::command::run(store, &card, &step, |pid| watching.watch(&watched, pid))
+        }
     };
 
     let answered = match &outcome {
