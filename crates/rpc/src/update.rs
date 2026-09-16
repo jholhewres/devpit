@@ -92,4 +92,8 @@ pub struct UpdateBlocking {
 pub struct UpdateWork {
     pub runs: Vec<UpdateBlocking>,
     pub turns: Vec<UpdateBlocking>,
+    /// Terminal agents and background sessions. Not in the way: they live in
+    /// tmux or in the CLI's own daemon, and they keep running through the
+    /// restart. Listed so the person does not have to take that on trust.
+    pub keeps: Vec<UpdateBlocking>,
 }

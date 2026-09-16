@@ -24,6 +24,17 @@ function inFlight(runs: number, turns: number): string {
   return [counted(runs, 'run'), counted(turns, 'turn')].filter(Boolean).join(' and ') || 'the work in progress'
 }
 
+/** Where the files are for a build devpit does not install over. */
+export const RELEASE_PAGE = 'https://github.com/jholhewres/devpit/releases/latest'
+
+/** "for 3 min", for how long an update has been waiting. */
+export function waitingFor(since: number | null, now: number): string {
+  const minutes = Math.floor(Math.max(0, now - (since ?? now)) / 60)
+  if (minutes < 1) return 'for less than a minute'
+  if (minutes < 60) return `for ${minutes} min`
+  return `for ${Math.floor(minutes / 60)} h ${minutes % 60} min`
+}
+
 /** What the card says about each state, and what its one button does. */
 function offer(status: UpdateStatus): {
   title: string
@@ -51,7 +62,7 @@ function offer(status: UpdateStatus): {
     case 'waiting':
       return {
         title: 'Update waiting',
-        said: `It goes in once ${inFlight(status.runs, status.turns)} are done.`,
+        said: `It goes in once ${inFlight(status.runs, status.turns)} are done. Waiting ${waitingFor(status.since, Date.now() / 1000)}.`,
         calm: 'Nothing new starts meanwhile. Your terminals keep running.',
         action: 'Cancel',
       }
@@ -73,7 +84,11 @@ export function UpdateCard(): React.JSX.Element | null {
   const [status, setStatus] = useState<UpdateStatus | null>(null)
   const [later, setLater] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const [copyRefused, setCopyRefused] = useState(false)
   const [notes, setNotes] = useState(false)
+  /* Kept apart from the status: a refused download turns the card into a
+     failure, and the failure still came from a test feed. */
+  const [testFeed, setTestFeed] = useState(false)
   /* What is running, once the person has asked to restart and it turns out
      something is. Null is "nothing in the way, or nobody has asked yet". */
   const [work, setWork] = useState<UpdateWork | null>(null)
@@ -82,6 +97,8 @@ export function UpdateCard(): React.JSX.Element | null {
     () =>
       onCarried<UpdateStatus>('update:status', (heard) => {
         setStatus(heard)
+        if (heard.type === 'available') setTestFeed(heard.testFeed)
+        else if (heard.type !== 'failed') setTestFeed(false)
         // A new state is news again: the close dismissed the state it was on.
         setLater(false)
         setNotes(false)
@@ -102,7 +119,7 @@ export function UpdateCard(): React.JSX.Element | null {
     void ask(() => commands.updateRunning()).then((answer) => {
       const busy = answer.data
       if (answer.error) return failed(answer.error)
-      if (busy && (busy.runs.length > 0 || busy.turns.length > 0)) setWork(busy)
+      if (busy && busy.runs.length + busy.turns.length > 0) setWork(busy)
       else install()
     })
   }
@@ -111,10 +128,9 @@ export function UpdateCard(): React.JSX.Element | null {
     void ask(() => commands.updateChoose(choice)).then((answer) => {
       setWork(null)
       if (answer.error) return failed(answer.error)
+      // "Stop it" is carried out by the app: it stops the work, waits for
+      // it to go, and installs — the window only hears the states.
       if (answer.data) setStatus(answer.data)
-      // Stopping is part of going in: the app closes what is running as it
-      // quits, and it only quits once the install starts.
-      if (choice === 'stopIt') install()
     })
   }
 
@@ -122,12 +138,13 @@ export function UpdateCard(): React.JSX.Element | null {
     // Asked again rather than copied from the card: the file has been sitting
     // in a cache since it arrived.
     void ask(() => commands.updatePackage()).then((answer) => {
-      if (answer.data) {
-        void navigator.clipboard?.writeText(answer.data)
-        setCopied(answer.data)
-      } else if (answer.error) {
-        failed(answer.error)
-      }
+      const command = answer.data
+      if (!command) return answer.error && failed(answer.error)
+      setCopied(command)
+      // Through a promise so a missing clipboard is a refusal too, not a throw.
+      Promise.resolve()
+        .then(() => navigator.clipboard.writeText(command))
+        .catch(() => setCopyRefused(true))
     })
   }
 
@@ -141,7 +158,9 @@ export function UpdateCard(): React.JSX.Element | null {
   const said = offer(status)
   if (!said) return null
 
-  const fromATestFeed = status.type === 'available' && status.testFeed
+  const fromATestFeed = testFeed && (status.type === 'available' || status.type === 'failed')
+  /* A build nobody installs over gets the files, not a button that refuses. */
+  const unmanaged = status.type === 'available' && status.kind === 'unmanaged' && !status.testFeed
   const release = status.type === 'available' ? status.notes : ''
   const manual = status.type === 'manualInstall' ? status : null
   /* Closing a downloaded or waiting update is a decision, so it is told to
@@ -155,9 +174,7 @@ export function UpdateCard(): React.JSX.Element | null {
       ? download
       : status.type === 'ready'
         ? restart
-        : status.type === 'waiting'
-          ? () => choose('later')
-          : copyCommand
+        : copyCommand
 
   return (
     <div className="upd" role="status" aria-label="Update">
@@ -185,6 +202,7 @@ export function UpdateCard(): React.JSX.Element | null {
       {manual && (
         <>
           <code className="upd__cmd">{copied ?? manual.command}</code>
+          {copyRefused && <span className="upd__d">The clipboard refused it — select the command above to copy it.</span>}
           <span className="upd__d">
             devpit checked this file against the release&rsquo;s signature when it downloaded it,
             and again just now. What the command does after that is your package manager&rsquo;s.
@@ -204,6 +222,9 @@ export function UpdateCard(): React.JSX.Element | null {
           {[...work.runs, ...work.turns].map((one) => one.title).join(', ')} still going.
         </span>
       )}
+      {work && work.keeps.length > 0 && (
+        <span className="upd__d">Keeps running: {work.keeps.map((one) => one.title).join(', ')}.</span>
+      )}
 
       {work ? (
         <div className="upd__row">
@@ -217,6 +238,19 @@ export function UpdateCard(): React.JSX.Element | null {
             Stop it and restart
           </button>
         </div>
+      ) : status.type === 'waiting' ? (
+        <div className="upd__row">
+          <button className="btn" onClick={() => choose('later')}>
+            Cancel
+          </button>
+          <button className="btn btn--go" onClick={() => choose('stopIt')}>
+            Stop them and update now
+          </button>
+        </div>
+      ) : unmanaged ? (
+        <a className="upd__go" href={RELEASE_PAGE} target="_blank" rel="noreferrer">
+          Release page
+        </a>
       ) : (
         said.action && (
           <button className="upd__go" onClick={act}>

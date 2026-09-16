@@ -89,7 +89,21 @@ pub fn run_cancel(
             "that run is not on this card",
         ));
     }
-    let Some(pid) = state.pid_of(&run_id) else {
+    stop_run(&app, &state, &store, &card_id, &run_id)
+}
+
+/// Stops one run by id, records it cancelled, and tells its card.
+///
+/// Apart from the command so an update that was told to stop the work can do
+/// exactly what the card's stop button does, and nothing less.
+pub(crate) fn stop_run(
+    app: &AppHandle,
+    state: &InFlight,
+    store: &Store,
+    card_id: &str,
+    run_id: &str,
+) -> Result<(), RpcError> {
+    let Some(pid) = state.pid_of(run_id) else {
         return Err(RpcError::new(
             ErrorCode::NotFound,
             "that run is not in flight here — it may have finished already",
@@ -98,7 +112,7 @@ pub fn run_cancel(
 
     // Before the signal: the run's thread wakes the moment its process dies,
     // and has to find the stop already said.
-    state.cancel(&run_id);
+    state.cancel(run_id);
 
     // SIGTERM, not SIGKILL: the CLI writes its transcript on the way out, and
     // what a cancelled turn already spent is worth keeping.
@@ -120,25 +134,25 @@ pub fn run_cancel(
         .unwrap_or(false);
 
     if !stopped {
-        state.uncancel(&run_id);
+        state.uncancel(run_id);
         return Err(RpcError::internal(format!("could not stop process {pid}")));
     }
 
     let stopped_here = store.finish_run(
-        &run_id,
+        run_id,
         "cancelled",
         Some("stopped by you"),
         None,
         None,
         None,
     )?;
-    state.forget(&run_id);
+    state.forget(run_id);
     // Unless the run reached its own end first, and told the card itself.
     if stopped_here {
         run_heard(
-            &app,
-            &card_id,
-            &run_reference(&store, &run_id),
+            app,
+            card_id,
+            &run_reference(store, run_id),
             state_of_run("cancelled"),
         );
     }

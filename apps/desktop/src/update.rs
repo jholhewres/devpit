@@ -103,7 +103,10 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
         }
         (S::Waiting { .. }, E::Cancel) | (S::Ready { .. }, E::Cancel) => Some(S::Idle),
         (S::Ready { .. } | S::Waiting { .. }, E::Install) => Some(S::Installing),
-        (S::Checking | S::Downloading { .. }, E::Failed { message }) => Some(S::Failed {
+        (
+            S::Checking | S::Downloading { .. } | S::Ready { .. } | S::Waiting { .. },
+            E::Failed { message },
+        ) => Some(S::Failed {
             message,
             recoverable: true,
         }),
@@ -264,6 +267,11 @@ pub struct Updating {
     /// A package written to the cache, and what it hashed to when it was
     /// verified. Checked again before its command is shown.
     pub(crate) package: std::sync::Mutex<Option<(std::path::PathBuf, String)>>,
+    /// Taken by the one install under way. The watcher keeping a wait and a
+    /// person choosing to stop the work can reach the installer in the same
+    /// seconds, and the second one must neither take the update from the
+    /// first nor call it failed.
+    pub(crate) claimed: std::sync::atomic::AtomicBool,
 }
 
 impl Updating {
@@ -276,10 +284,16 @@ impl Updating {
     }
 
     fn moved_to(&self, app: &tauri::AppHandle, status: UpdateStatus) {
-        if let Ok(mut held) = self.status.lock() {
-            *held = Some(status.clone());
+        let was = self
+            .status
+            .lock()
+            .ok()
+            .and_then(|mut held| held.replace(status.clone()));
+        // One line per transition: a download moves through a hundred
+        // percentages, and each of them is the same state on stderr.
+        if was.as_ref().map(named) != Some(named(&status)) {
+            eprintln!("devpit-update {}", named(&status));
         }
-        eprintln!("devpit-update {}", named(&status));
         let _ = tauri::Emitter::emit(app, "update:status", &status);
     }
 }
@@ -296,6 +310,7 @@ pub(crate) fn watch(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last: Option<f64> = None;
         let mut failures: u32 = 0;
+        let mut looked: Option<std::time::Instant> = None;
 
         loop {
             let current = app
@@ -309,51 +324,57 @@ pub(crate) fn watch(app: tauri::AppHandle) {
             if matches!(current, UpdateStatus::Waiting { .. }) {
                 let idle = app
                     .try_state::<crate::chat::Talking>()
-                    .and_then(|talking| update_running(talking).ok())
+                    .and_then(|talking| blocking_now(&talking).ok())
                     .is_some_and(|work| blockers(&work) == 0);
                 if idle {
                     if let Some(updating) = app.try_state::<Updating>() {
                         let _ = update_install(app.clone(), updating).await;
                     }
                 }
-                tokio::time::sleep(WHILE_WAITING).await;
-                continue;
+            } else if looked.is_none_or(|at| at.elapsed() >= A_CYCLE) {
+                // The loop turns every few seconds so a choice to wait is
+                // kept within seconds; the feed is still asked once a cycle.
+                looked = Some(std::time::Instant::now());
+                check_when_due(&app, &current, &mut last, &mut failures).await;
             }
 
-            // Unset means on: this is the switch a new install never touched.
-            let enabled = devpit_core::Store::open_default()
-                .and_then(|store| store.preference_flag(devpit_core::preference::AUTO_UPDATE))
-                .ok()
-                .flatten()
-                .unwrap_or(true);
-
-            // Only when a check may start from here: one in the middle of a
-            // download is refused, and counting that as a failure would back
-            // the next check off for nothing.
-            if next(&current, Event::Check).is_some() && due(last, now(), failures, enabled) {
-                last = Some(now());
-                let heard = match update_check(app.clone()).await {
-                    Ok(heard) => heard,
-                    Err(err) => UpdateStatus::Failed {
-                        message: err.message.clone(),
-                        recoverable: true,
-                    },
-                };
-                failures = match &heard {
-                    UpdateStatus::Failed { .. } => failures.saturating_add(1),
-                    _ => 0,
-                };
-                if heard != current {
-                    // The state, and nothing else: no url, no bytes, no
-                    // version of anyone's machine.
-                    eprintln!("devpit-update {}", named(&heard));
-                    let _ = tauri::Emitter::emit(&app, "update:status", &heard);
-                }
-            }
-
-            tokio::time::sleep(A_CYCLE).await;
+            tokio::time::sleep(WHILE_WAITING).await;
         }
     });
+}
+
+/// One automatic check, if the switch is on and one is due.
+async fn check_when_due(
+    app: &tauri::AppHandle,
+    current: &UpdateStatus,
+    last: &mut Option<f64>,
+    failures: &mut u32,
+) {
+    // Unset means on: this is the switch a new install never touched.
+    let enabled = devpit_core::Store::open_default()
+        .and_then(|store| store.preference_flag(devpit_core::preference::AUTO_UPDATE))
+        .ok()
+        .flatten()
+        .unwrap_or(true);
+
+    // Only when a check may start from here: one in the middle of a download
+    // is refused, and counting that as a failure would back the next check
+    // off for nothing.
+    if next(current, Event::Check).is_none() || !due(*last, now(), *failures, enabled) {
+        return;
+    }
+    *last = Some(now());
+    // The check tells the window itself, one line and one event per
+    // transition; saying it again here printed every state twice.
+    let failed = match update_check(app.clone()).await {
+        Ok(heard) => matches!(heard, UpdateStatus::Failed { .. }),
+        Err(_) => true,
+    };
+    *failures = if failed {
+        failures.saturating_add(1)
+    } else {
+        0
+    };
 }
 
 /// The word for a state, for the one line it gets on stderr.
@@ -400,6 +421,9 @@ pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcErro
         )
     })?;
     if kind == InstallKind::ExternallyManaged {
+        if let Some(updating) = app.try_state::<Updating>() {
+            updating.moved_to(&app, UpdateStatus::ExternallyManaged);
+        }
         return Ok(UpdateStatus::ExternallyManaged);
     }
 
@@ -537,6 +561,13 @@ pub(crate) fn starting_refused(state: &UpdateStatus) -> Option<&'static str> {
 pub fn update_running(
     talking: tauri::State<'_, crate::chat::Talking>,
 ) -> Result<UpdateWork, RpcError> {
+    let mut work = blocking_now(&talking)?;
+    work.keeps = keeps_running();
+    Ok(work)
+}
+
+/// The runs and chat turns an install would end, by title.
+pub(crate) fn blocking_now(talking: &crate::chat::Talking) -> Result<UpdateWork, RpcError> {
     let store = devpit_core::Store::open_default()?;
     let runs = store
         .running_runs()?
@@ -567,7 +598,130 @@ pub fn update_running(
         })
         .collect();
 
-    Ok(UpdateWork { runs, turns })
+    Ok(UpdateWork {
+        runs,
+        turns,
+        keeps: Vec::new(),
+    })
+}
+
+/// The terminal agents and background sessions a restart leaves running.
+fn keeps_running() -> Vec<UpdateBlocking> {
+    let keys = crate::card_activity::registry()
+        .lock()
+        .map(|activities| activities.surviving())
+        .unwrap_or_default();
+    let store = devpit_core::Store::open_default().ok();
+    keys.into_iter()
+        .map(|key| {
+            let card = store
+                .as_ref()
+                .and_then(|store| store.card(&key.card_id).ok().flatten())
+                .map(|card| card.title)
+                .unwrap_or_else(|| key.card_id.clone());
+            let place = match key.kind {
+                devpit_rpc::SessionKind::Background => "in the background",
+                _ => "in a terminal",
+            };
+            UpdateBlocking {
+                id: key.reference,
+                title: format!("{card}, {place}"),
+            }
+        })
+        .collect()
+}
+
+/// What stopping the work in an update's way takes.
+///
+/// A trait so the order can be tested without a window: every run and turn is
+/// told to stop, and recorded as stopped, before anything is installed.
+pub(crate) trait InTheWay {
+    fn work(&self) -> UpdateWork;
+    fn stop_run(&self, run_id: &str);
+    fn stop_turn(&self, conversation_id: &str);
+}
+
+/// How long stopped work gets to go before the install goes on anyway.
+pub(crate) const THE_WORK_GETS: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Stops what is in the way and waits for it to go, up to `within`.
+///
+/// Answers whether it went. Either way the install follows: the person said
+/// to stop it, and a turn that ignores its signal ends with the process.
+pub(crate) async fn stop_and_wait(
+    way: &impl InTheWay,
+    within: std::time::Duration,
+    every: std::time::Duration,
+) -> bool {
+    let work = way.work();
+    for run in &work.runs {
+        way.stop_run(&run.id);
+    }
+    for turn in &work.turns {
+        way.stop_turn(&turn.id);
+    }
+    let deadline = tokio::time::Instant::now() + within;
+    loop {
+        if blockers(&way.work()) == 0 {
+            return true;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return false;
+        }
+        tokio::time::sleep(every).await;
+    }
+}
+
+/// The work in the way, as the app really has it.
+struct Stopping<'a> {
+    app: &'a tauri::AppHandle,
+    in_flight: &'a crate::in_flight::InFlight,
+    talking: &'a crate::chat::Talking,
+}
+
+impl InTheWay for Stopping<'_> {
+    fn work(&self) -> UpdateWork {
+        blocking_now(self.talking).unwrap_or_default()
+    }
+
+    fn stop_run(&self, run_id: &str) {
+        let Ok(store) = devpit_core::Store::open_default() else {
+            return;
+        };
+        let Some(card_id) = store.run_card(run_id).ok().flatten() else {
+            return;
+        };
+        if let Err(err) =
+            crate::in_flight::stop_run(self.app, self.in_flight, &store, &card_id, run_id)
+        {
+            eprintln!("devpit-update could not stop a run: {}", err.message);
+        }
+    }
+
+    fn stop_turn(&self, conversation_id: &str) {
+        crate::steering::stop_turn(self.talking, conversation_id);
+    }
+}
+
+/// The state that holds new work back while the work in flight ends.
+///
+/// From `Ready` it is a new wait; from `Waiting` it is the wait already on.
+pub(crate) fn waiting_for(
+    state: &UpdateStatus,
+    work: &UpdateWork,
+    since: f64,
+) -> Option<UpdateStatus> {
+    match state {
+        UpdateStatus::Waiting { .. } => Some(state.clone()),
+        _ => next(
+            state,
+            Event::Blocked {
+                runs: work.runs.len() as u32,
+                turns: work.turns.len() as u32,
+                since,
+            },
+        ),
+    }
 }
 
 /// What putting an update in takes, in order.
@@ -682,13 +836,37 @@ pub async fn update_install(
         ));
     }
 
+    if updating
+        .claimed
+        .swap(true, std::sync::atomic::Ordering::SeqCst)
+    {
+        return Ok(updating.state());
+    }
+
+    // A refusal from here on also ends a wait: left in `Waiting`, every run
+    // and chat would be refused until a restart.
+    let refused = |error: RpcError| {
+        updating
+            .claimed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        if let Some(failed) = next(
+            &state,
+            Event::Failed {
+                message: error.message.clone(),
+            },
+        ) {
+            updating.moved_to(&app, failed);
+        }
+        error
+    };
+
     let kind = kind_here();
     let steps = quit_steps(kind);
     if !steps.contains(&QuitStep::Install) {
-        return Err(RpcError::new(
+        return Err(refused(RpcError::new(
             devpit_rpc::ErrorCode::Conflict,
             "this build is not one devpit installs over".to_owned(),
-        ));
+        )));
     }
 
     // The update first: taking the bytes and then finding nothing to install
@@ -698,7 +876,11 @@ pub async fn update_install(
         .lock()
         .ok()
         .and_then(|mut held| held.take())
-        .ok_or_else(|| RpcError::internal("the update to install is no longer known"))?;
+        .ok_or_else(|| {
+            refused(RpcError::internal(
+                "the update to install is no longer known",
+            ))
+        })?;
     let Some((version, bytes)) = updating
         .downloaded
         .lock()
@@ -710,9 +892,9 @@ pub async fn update_install(
         if let Ok(mut held) = updating.found.lock() {
             *held = Some(found);
         }
-        return Err(RpcError::internal(
+        return Err(refused(RpcError::internal(
             "there are no verified bytes to install — download it again",
-        ));
+        )));
     };
 
     let going = next(&state, Event::Install)
@@ -729,6 +911,9 @@ pub async fn update_install(
     }
 
     if let Err(err) = found.install(bytes) {
+        updating
+            .claimed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         eprintln!("devpit-update the installer refused: {err}");
         let failed = UpdateStatus::Failed {
             message: format!("the installer refused: {err}"),
@@ -747,15 +932,16 @@ pub async fn update_install(
 
 /// `update.choose` — what to do about the work in flight.
 ///
-/// Answers the state the choice leaves behind. Installing itself is not here:
-/// this is the moment a person decides, and from `Ready` onward nothing new
-/// starts whatever they decide.
+/// Answers the state the choice leaves behind. "Stop it" holds new work back,
+/// stops every run and turn in the way — recorded as cancelled, as the card's
+/// own stop does — waits a few seconds for them to go, and installs.
 #[tauri::command]
 #[specta::specta]
-pub fn update_choose(
+pub async fn update_choose(
     app: tauri::AppHandle,
     updating: tauri::State<'_, Updating>,
     talking: tauri::State<'_, crate::chat::Talking>,
+    in_flight: tauri::State<'_, std::sync::Arc<crate::in_flight::InFlight>>,
     choice: String,
 ) -> Result<UpdateStatus, RpcError> {
     let chose = match choice.as_str() {
@@ -770,25 +956,38 @@ pub fn update_choose(
         }
     };
 
-    let work = update_running(talking)?;
+    let work = blocking_now(&talking)?;
     let state = updating.state();
-    let moved = match install_plan(chose, &work) {
-        Plan::Later => next(&state, Event::Cancel),
-        Plan::WaitForIdle => next(
-            &state,
-            Event::Blocked {
-                runs: work.runs.len() as u32,
-                turns: work.turns.len() as u32,
-                since: now(),
-            },
-        ),
-        // Both mean "go", and going is US-016a's; the state stays where it is.
-        Plan::InstallNow | Plan::StopThenInstall => None,
-    };
-
-    let ended = moved.unwrap_or(state);
-    updating.moved_to(&app, ended.clone());
-    Ok(ended)
+    match install_plan(chose, &work) {
+        Plan::Later => {
+            let ended = next(&state, Event::Cancel).unwrap_or(state);
+            updating.moved_to(&app, ended.clone());
+            Ok(ended)
+        }
+        Plan::WaitForIdle => {
+            let ended = waiting_for(&state, &work, now()).unwrap_or(state);
+            updating.moved_to(&app, ended.clone());
+            Ok(ended)
+        }
+        Plan::InstallNow => update_install(app, updating).await,
+        Plan::StopThenInstall => {
+            // Nothing new first: a run started while these stop would be the
+            // next thing in the way.
+            if let Some(held) = waiting_for(&state, &work, now()) {
+                updating.moved_to(&app, held);
+            }
+            let stopping = Stopping {
+                app: &app,
+                in_flight: in_flight.inner().as_ref(),
+                talking: talking.inner(),
+            };
+            let every = std::time::Duration::from_millis(200);
+            if !stop_and_wait(&stopping, THE_WORK_GETS, every).await {
+                eprintln!("devpit-update the work did not stop in time; installing anyway");
+            }
+            update_install(app, updating).await
+        }
+    }
 }
 
 /// Why a download would be refused, if it would.
@@ -893,11 +1092,28 @@ pub async fn update_download(
         let (path, digest) = crate::update_deb::keep(&bytes, &version)
             .map_err(|why| RpcError::internal(format!("the package could not be kept: {why}")))?;
         if let Ok(mut held) = updating.package.lock() {
-            *held = Some((path.clone(), digest));
+            *held = Some((path.clone(), digest.clone()));
         }
-        let command = crate::update_deb::install_command(&path, &crate::update_deb::TRUSTED)
-            .unwrap_or_else(|why| why);
+        let shown = crate::update_deb::still_ours(&path, &crate::update_deb::cache_dir(), &digest)
+            .map_err(|why| why.said().to_owned())
+            .and_then(|()| crate::update_deb::install_command(&path, &crate::update_deb::TRUSTED));
         let now = updating.state();
+        // A refusal is a sentence, never a command: a file that is not the
+        // package that verified is not named in anything to paste into a shell.
+        let command = match shown {
+            Ok(command) => command,
+            Err(why) => {
+                if let Some(moved) = next(
+                    &now,
+                    Event::Failed {
+                        message: why.clone(),
+                    },
+                ) {
+                    updating.moved_to(&app, moved);
+                }
+                return Err(RpcError::new(devpit_rpc::ErrorCode::Conflict, why));
+            }
+        };
         let manual = next(
             &now,
             Event::Manual {

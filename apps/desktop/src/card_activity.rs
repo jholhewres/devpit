@@ -95,6 +95,33 @@ impl Activities {
             .collect()
     }
 
+    /// The terminal and background sessions still alive, on any card.
+    ///
+    /// What an update restart leaves running: a pane is a tmux session and a
+    /// background session is the CLI's, and neither goes down with the window.
+    pub(crate) fn surviving(&self) -> Vec<Key> {
+        let alive = |state: &Doing| !matches!(state, Doing::Done | Doing::Failed | Doing::Gone);
+        let mut keys: Vec<Key> = self
+            .heard
+            .iter()
+            .filter(|(key, heard)| {
+                matches!(key.kind, SessionKind::Pane | SessionKind::Background)
+                    && alive(&heard.state)
+            })
+            .map(|(key, _)| key.clone())
+            .chain(
+                self.listed
+                    .iter()
+                    .filter(|(key, state)| !self.heard.contains_key(key) && alive(state))
+                    .map(|(key, _)| key.clone()),
+            )
+            .collect();
+        keys.sort_by(|a, b| {
+            (&a.card_id, a.kind, &a.reference).cmp(&(&b.card_id, b.kind, &b.reference))
+        });
+        keys
+    }
+
     /// A card's sessions as the window reads them, and what they add up to.
     pub(crate) fn happening(&self, card_id: &str) -> CardHappening {
         let mut sessions: Vec<CardSession> = self

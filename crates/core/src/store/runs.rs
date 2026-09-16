@@ -62,6 +62,17 @@ impl Store {
             .flatten())
     }
 
+    /// The card a run belongs to, if the run is known.
+    pub fn run_card(&self, run_id: &str) -> Result<Option<String>, StoreError> {
+        use rusqlite::OptionalExtension;
+        Ok(self
+            .conn
+            .query_row("SELECT card_id FROM run WHERE id = ?1", [run_id], |row| {
+                row.get(0)
+            })
+            .optional()?)
+    }
+
     /// Closes every run left open by a process that is gone.
     ///
     /// The runs going right now, by what a person would call them.

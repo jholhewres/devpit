@@ -224,6 +224,7 @@ fn the_plan_follows_the_choice_and_what_is_running() {
             title: "Wire the board".to_owned(),
         }],
         turns: Vec::new(),
+        keeps: Vec::new(),
     };
 
     // Nothing in the way: the choice does not come up at all.
@@ -319,4 +320,210 @@ fn a_downloaded_update_is_still_there_to_install() {
         downloaded.lock().expect("downloaded").take(),
         Some(("0.1.1".to_owned(), vec![7, 7]))
     );
+}
+
+/// Work in the way, as a list a test can watch being stopped.
+#[derive(Default)]
+struct Fake {
+    runs: std::sync::Mutex<Vec<String>>,
+    turns: std::sync::Mutex<Vec<String>>,
+    /// Everything that happened, in order.
+    said: std::sync::Mutex<Vec<String>>,
+    /// A turn that ignores its signal.
+    stubborn: bool,
+}
+
+impl Fake {
+    fn with(runs: &[&str], turns: &[&str]) -> Self {
+        let owned = |ids: &[&str]| ids.iter().map(|id| id.to_string()).collect();
+        Fake {
+            runs: std::sync::Mutex::new(owned(runs)),
+            turns: std::sync::Mutex::new(owned(turns)),
+            ..Fake::default()
+        }
+    }
+
+    fn said(&self) -> Vec<String> {
+        self.said.lock().unwrap().clone()
+    }
+}
+
+impl InTheWay for Fake {
+    fn work(&self) -> devpit_rpc::UpdateWork {
+        let listed = |ids: &std::sync::Mutex<Vec<String>>| {
+            ids.lock()
+                .unwrap()
+                .iter()
+                .map(|id| devpit_rpc::UpdateBlocking {
+                    id: id.clone(),
+                    title: id.clone(),
+                })
+                .collect()
+        };
+        devpit_rpc::UpdateWork {
+            runs: listed(&self.runs),
+            turns: listed(&self.turns),
+            keeps: Vec::new(),
+        }
+    }
+
+    fn stop_run(&self, run_id: &str) {
+        self.said
+            .lock()
+            .unwrap()
+            .push(format!("{run_id} cancelled"));
+        self.runs.lock().unwrap().retain(|id| id != run_id);
+    }
+
+    fn stop_turn(&self, conversation_id: &str) {
+        self.said
+            .lock()
+            .unwrap()
+            .push(format!("{conversation_id} stopped"));
+        if !self.stubborn {
+            self.turns
+                .lock()
+                .unwrap()
+                .retain(|id| id != conversation_id);
+        }
+    }
+}
+
+/// Choosing to wait, or to stop the work, holds new work back at once: a run
+/// started while the others end would be the next thing in the way.
+#[test]
+fn wait_refuses_new_work() {
+    let ready = S::Ready {
+        version: "0.2.0".to_owned(),
+    };
+    let busy = Fake::with(&["run_1"], &["chat_1"]).work();
+    for choice in [Choice::WhenItIsDone, Choice::StopIt] {
+        assert_ne!(install_plan(choice, &busy), Plan::InstallNow);
+        let held = waiting_for(&ready, &busy, 10.0).expect("ready becomes a wait");
+        assert_eq!(
+            held,
+            S::Waiting {
+                runs: 1,
+                turns: 1,
+                since: 10.0
+            }
+        );
+        assert!(
+            starting_refused(&held).is_some(),
+            "{choice:?} let new work in"
+        );
+        // Choosing again while waiting keeps the wait it already has.
+        assert_eq!(waiting_for(&held, &busy, 99.0), Some(held.clone()));
+    }
+}
+
+/// "Stop it and restart" stops every run and turn, and they are recorded as
+/// stopped before anything is installed.
+#[tokio::test]
+async fn stop_records_cancelled_before_commit() {
+    let way = Fake::with(&["run_1", "run_2"], &["chat_1"]);
+    let went = stop_and_wait(
+        &way,
+        std::time::Duration::from_secs(5),
+        std::time::Duration::from_millis(1),
+    )
+    .await;
+    way.said.lock().unwrap().push("install".to_owned());
+
+    assert!(went);
+    assert_eq!(
+        way.said(),
+        vec![
+            "run_1 cancelled",
+            "run_2 cancelled",
+            "chat_1 stopped",
+            "install"
+        ]
+    );
+    assert_eq!(blockers(&way.work()), 0);
+}
+
+/// A turn that ignores its signal holds the update for the few seconds it was
+/// given, not for ever.
+#[tokio::test]
+async fn work_that_will_not_stop_holds_the_update_only_so_long() {
+    let way = Fake {
+        stubborn: true,
+        ..Fake::with(&[], &["chat_1"])
+    };
+    let started = std::time::Instant::now();
+    let went = stop_and_wait(
+        &way,
+        std::time::Duration::from_millis(30),
+        std::time::Duration::from_millis(5),
+    )
+    .await;
+    assert!(!went);
+    assert!(started.elapsed() < std::time::Duration::from_secs(2));
+}
+
+/// Nothing running: no question, nothing stopped, no waiting.
+#[tokio::test]
+async fn nothing_running_goes_straight_to_install() {
+    let way = Fake::with(&[], &[]);
+    for choice in [Choice::WhenItIsDone, Choice::StopIt] {
+        assert_eq!(install_plan(choice, &way.work()), Plan::InstallNow);
+    }
+    let started = std::time::Instant::now();
+    assert!(
+        stop_and_wait(
+            &way,
+            std::time::Duration::from_secs(5),
+            std::time::Duration::from_secs(1),
+        )
+        .await
+    );
+    assert!(way.said().is_empty());
+    assert!(started.elapsed() < std::time::Duration::from_millis(500));
+}
+
+/// A refusal after the person decided ends the wait, so new work is not
+/// refused until a restart.
+#[test]
+fn a_refused_install_ends_the_wait() {
+    let waiting = S::Waiting {
+        runs: 0,
+        turns: 0,
+        since: 1.0,
+    };
+    let failed = next(
+        &waiting,
+        Event::Failed {
+            message: "no bytes".to_owned(),
+        },
+    )
+    .expect("a wait can fail");
+    assert!(matches!(
+        failed,
+        S::Failed {
+            recoverable: true,
+            ..
+        }
+    ));
+    assert!(starting_refused(&failed).is_none());
+}
+
+/// An offer from a test feed never reaches the installer: it cannot be
+/// downloaded, and nothing else produces bytes to install.
+#[test]
+fn a_fixture_feed_never_installs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let feed = dir.path().join("latest.json");
+    std::fs::write(&feed, r#"{"version":"9.9.9","notes":"n"}"#).unwrap();
+
+    let heard = next(&S::Checking, feed_says(&feed, "0.1.0")).expect("an offer");
+    assert!(matches!(
+        heard,
+        S::Available {
+            test_feed: true,
+            ..
+        }
+    ));
+    assert!(may_download(&heard).is_err());
+    assert_eq!(next(&heard, Event::Install), None);
 }

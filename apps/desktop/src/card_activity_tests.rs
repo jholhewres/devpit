@@ -573,3 +573,36 @@ fn a_background_session_the_cli_listed_still_counts_when_another_session_of_the_
     note_background(&mut activities, "card_1", &[gone]);
     assert_eq!(activities.happening("card_1").activity, Some(Doing::Done));
 }
+
+/// What a restart leaves running: terminals and background sessions still
+/// alive, never a run or a chat, and never one that has ended.
+#[test]
+fn a_restart_keeps_the_terminals_and_background_sessions() {
+    let mut activities = Activities::default();
+    let key = |kind, reference: &str| Key {
+        card_id: "card_1".to_owned(),
+        kind,
+        reference: reference.to_owned(),
+    };
+    for (kind, reference, state) in [
+        (SessionKind::Pane, "leaf_1", Doing::Working),
+        (SessionKind::Background, "s-bg", Doing::Waiting),
+        (SessionKind::Pane, "leaf_2", Doing::Gone),
+        (SessionKind::Run, "s-run", Doing::Working),
+        (SessionKind::Chat, "chat_1", Doing::Working),
+    ] {
+        hear(
+            &mut activities,
+            key(kind, reference),
+            1,
+            state,
+            Place::default(),
+        );
+    }
+    let kept: Vec<String> = activities
+        .surviving()
+        .into_iter()
+        .map(|one| one.reference)
+        .collect();
+    assert_eq!(kept, vec!["leaf_1", "s-bg"]);
+}

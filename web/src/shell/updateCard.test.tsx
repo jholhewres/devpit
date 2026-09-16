@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { UpdateStatus } from '../gen/bindings'
-import { UpdateCard } from './UpdateCard'
+import { RELEASE_PAGE, UpdateCard, waitingFor } from './UpdateCard'
 
 const heard: Record<string, (payload: UpdateStatus) => void> = {}
 vi.mock('./window', () => ({
@@ -16,10 +16,8 @@ const download = vi.fn(async () => ({ status: 'ok', data: null }))
 const packaged = vi.fn(async () => ({ status: 'ok', data: "sudo /usr/bin/apt install '/c/devpit.deb'" }))
 const installed = vi.fn(async () => ({ status: 'ok', data: null }))
 const chose = vi.fn(async (_choice: string) => ({ status: 'ok', data: null }))
-let busy: { runs: { id: string; title: string }[]; turns: { id: string; title: string }[] } = {
-  runs: [],
-  turns: [],
-}
+type Blocking = { id: string; title: string }
+let busy: { runs: Blocking[]; turns: Blocking[]; keeps: Blocking[] } = { runs: [], turns: [], keeps: [] }
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<{ data?: unknown }>) => {
     const answer = (await call()) as { data?: unknown }
@@ -43,7 +41,7 @@ function say(status: UpdateStatus): void {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
-  busy = { runs: [], turns: [] }
+  busy = { runs: [], turns: [], keeps: [] }
 })
 
 describe('the update card', () => {
@@ -136,6 +134,31 @@ describe('the update card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
     await waitFor(() => expect(packaged).toHaveBeenCalled())
     expect(written).toHaveBeenCalledWith("sudo /usr/bin/apt install '/c/devpit.deb'")
+    expect(screen.queryByText(/The clipboard refused it/)).toBeNull()
+  })
+
+  it('says so when the clipboard refuses the command', async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => Promise.reject(new Error('no'))) } })
+    render(<UpdateCard />)
+    say({ type: 'manualInstall', command: 'sudo x', path: '/c/devpit.deb' })
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(await screen.findByText(/The clipboard refused it/)).toBeTruthy()
+  })
+
+  /* A build from `make dev` or a tarball: the files, not a button that can
+     only refuse. */
+  it('points a build devpit does not install over at the release page', () => {
+    render(<UpdateCard />)
+    say({ type: 'available', version: '0.2.0', notes: '', kind: 'unmanaged', testFeed: false })
+    expect(screen.queryByRole('button', { name: 'Update' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Release page' }).getAttribute('href')).toBe(RELEASE_PAGE)
+  })
+
+  it('still says test feed once a download from it was refused', () => {
+    render(<UpdateCard />)
+    say({ type: 'available', version: '0.2.0', notes: '', kind: 'appImage', testFeed: true })
+    say({ type: 'failed', message: 'this offer came from a test feed', recoverable: true })
+    expect(screen.getByText('test feed')).toBeTruthy()
   })
 })
 
@@ -153,21 +176,28 @@ describe('restarting into the update', () => {
   /* The question is about the two runs, not about the update: the card names
      them and installs nothing until it is answered. */
   it('names what is running, and waits for an answer', async () => {
-    busy = { runs: [{ id: 'run_1', title: 'Fix the parser' }], turns: [] }
+    busy = {
+      runs: [{ id: 'run_1', title: 'Fix the parser' }],
+      turns: [],
+      keeps: [{ id: 'leaf_1', title: 'Wire the board, in a terminal' }],
+    }
     render(<UpdateCard />)
     ready()
     fireEvent.click(screen.getByText('Restart now'))
 
     expect(await screen.findByText(/Fix the parser/)).toBeTruthy()
+    expect(screen.getByText('Keeps running: Wire the board, in a terminal.')).toBeTruthy()
     expect(installed).not.toHaveBeenCalled()
 
+    // The app stops the work and installs; the window does not race it with
+    // an install of its own.
     fireEvent.click(screen.getByText('Stop it and restart'))
     await waitFor(() => expect(chose).toHaveBeenCalledWith('stopIt'))
-    await waitFor(() => expect(installed).toHaveBeenCalled())
+    expect(installed).not.toHaveBeenCalled()
   })
 
   it('lets the update wait for the work instead', async () => {
-    busy = { runs: [], turns: [{ id: 'conv_1', title: 'Ship it' }] }
+    busy = { runs: [], turns: [{ id: 'conv_1', title: 'Ship it' }], keeps: [] }
     render(<UpdateCard />)
     ready()
     fireEvent.click(screen.getByText('Restart now'))
@@ -179,14 +209,27 @@ describe('restarting into the update', () => {
 })
 
 describe('an update waiting for the work to end', () => {
-  it('says what it is waiting for, and Cancel is told to the app', async () => {
+  it('says what it is waiting for, and since when, and Cancel is told to the app', async () => {
     render(<UpdateCard />)
-    say({ type: 'waiting', runs: 2, turns: 1, since: 0 } as UpdateStatus)
+    say({ type: 'waiting', runs: 2, turns: 1, since: Date.now() / 1000 - 180 } as UpdateStatus)
     expect(screen.getByText('Update waiting')).toBeTruthy()
-    expect(screen.getByText(/2 runs and 1 turn/)).toBeTruthy()
+    expect(screen.getByText(/2 runs and 1 turn are done\. Waiting for 3 min\./)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(chose).toHaveBeenCalledWith('later'))
+  })
+
+  it('stops the work and updates now, when asked from the wait', async () => {
+    render(<UpdateCard />)
+    say({ type: 'waiting', runs: 1, turns: 0, since: Date.now() / 1000 } as UpdateStatus)
+    fireEvent.click(screen.getByRole('button', { name: 'Stop them and update now' }))
+    await waitFor(() => expect(chose).toHaveBeenCalledWith('stopIt'))
+  })
+
+  it('counts the wait in minutes, then hours', () => {
+    expect(waitingFor(100, 110)).toBe('for less than a minute')
+    expect(waitingFor(0, 125)).toBe('for 2 min')
+    expect(waitingFor(0, 3900)).toBe('for 1 h 5 min')
   })
 
   /* The review's case: closing a ready update only hid the card, and the app

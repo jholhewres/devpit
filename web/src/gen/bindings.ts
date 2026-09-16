@@ -107,9 +107,9 @@ export const commands = {
 	/**
 	 *  `update.choose` — what to do about the work in flight.
 	 * 
-	 *  Answers the state the choice leaves behind. Installing itself is not here:
-	 *  this is the moment a person decides, and from `Ready` onward nothing new
-	 *  starts whatever they decide.
+	 *  Answers the state the choice leaves behind. "Stop it" holds new work back,
+	 *  stops every run and turn in the way — recorded as cancelled, as the card's
+	 *  own stop does — waits a few seconds for them to go, and installs.
 	 */
 	updateChoose: (choice: string) => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_choose", { choice })),
 	/**
@@ -2631,6 +2631,12 @@ recoverable: boolean };
 export type UpdateWork = {
 	runs: UpdateBlocking[],
 	turns: UpdateBlocking[],
+	/**
+	 *  Terminal agents and background sessions. Not in the way: they live in
+	 *  tmux or in the CLI's own daemon, and they keep running through the
+	 *  restart. Listed so the person does not have to take that on trust.
+	 */
+	keeps: UpdateBlocking[],
 };
 
 /**  Every pane of a project, and the total. */

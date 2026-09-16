@@ -44,7 +44,11 @@
    row of small buttons makes somebody read three before picking it. */
 .upd__go {
   display: block;
+  box-sizing: border-box;
   width: 100%;
+  line-height: 32px;
+  text-align: center;
+  text-decoration: none;
   margin-top: 14px;
   height: 34px;
   border-radius: 8px;

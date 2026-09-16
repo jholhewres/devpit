@@ -71,21 +71,9 @@ pub fn chat_cancel(
     state: State<'_, crate::chat::Talking>,
     conversation_id: String,
 ) -> Result<Option<devpit_rpc::TurnEnd>, RpcError> {
-    let pid = state
-        .running
-        .lock()
-        .ok()
-        // `None` is a turn that has been claimed but has no process yet: there
-        // is nothing to signal, and pid 0 would mean the whole process group.
-        .and_then(|held| held.get(&conversation_id).copied().flatten());
-    let Some(pid) = pid else {
+    if !stop_turn(&state, &conversation_id) {
         return Ok(None);
-    };
-    // SIGTERM, not SIGKILL: the CLI gets to write its own last line.
-    let _ = std::process::Command::new("kill")
-        .arg("-TERM")
-        .arg(pid.to_string())
-        .status();
+    }
     Ok(Some(devpit_rpc::TurnEnd {
         turn_id: String::new(),
         cost_usd: None,
@@ -93,6 +81,26 @@ pub fn chat_cancel(
         stop_reason: Some("cancelled".to_owned()),
         is_error: false,
     }))
+}
+
+/// Signals the turn in flight to end. Answers whether there was one to signal.
+pub(crate) fn stop_turn(talking: &crate::chat::Talking, conversation_id: &str) -> bool {
+    let pid = talking
+        .running
+        .lock()
+        .ok()
+        // `None` is a turn that has been claimed but has no process yet: there
+        // is nothing to signal, and pid 0 would mean the whole process group.
+        .and_then(|held| held.get(conversation_id).copied().flatten());
+    let Some(pid) = pid else {
+        return false;
+    };
+    // SIGTERM, not SIGKILL: the CLI gets to write its own last line.
+    let _ = std::process::Command::new("kill")
+        .arg("-TERM")
+        .arg(pid.to_string())
+        .status();
+    true
 }
 
 #[cfg(test)]
