@@ -46,7 +46,15 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
 
       <span className="drag" data-tauri-drag-region />
 
-      <HeadsDown projectId={project?.id ?? null} waiting={bell.waiting.length} onPeek={() => setBellOpen(true)} />
+      <HeadsDown
+        projectId={project?.id ?? null}
+        waiting={bell.waiting.length}
+        onPeek={() => setBellOpen(true)}
+        onOpenCard={(cardId) => {
+          show('board')
+          openCard(cardId)
+        }}
+      />
       {here && <BranchPicker branch={here.branch} ahead={here.ahead} />}
       <span className="netstat" hidden={totals.added + totals.removed === 0}>
         <span className="add">+{totals.added}</span>

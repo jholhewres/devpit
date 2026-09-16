@@ -334,6 +334,15 @@ export const commands = {
 	since: number | null,
 } | null, RpcError>(__TAURI_INVOKE("focus_read")),
 	/**
+	 *  `focus.waiting` — what the door has been holding, a page at a time.
+	 * 
+	 *  Walked forward from the last id the caller saw, so a summary reads every
+	 *  one exactly once however long the focus lasted. The bell's own list is a
+	 *  page of the newest and cannot answer this: a focus is exactly the case
+	 *  where what matters fell off the end of it.
+	 */
+	focusWaiting: (projectId: string, since: number | null, after: string | null) => typedError<Waiting, RpcError>(__TAURI_INVOKE("focus_waiting", { projectId, since, after })),
+	/**
 	 *  `focus.write` — begins a focus on a project, or ends the one that is on.
 	 * 
 	 *  Beginning one while another is on replaces it: changing project ends the
@@ -2694,6 +2703,19 @@ export type Usage = {
 	 */
 	proportional: boolean,
 	panes: PaneCost[],
+};
+
+/**
+ *  What a focus has been holding, a page at a time.
+ * 
+ *  An object rather than a bare list, and `more` rather than a total: a count
+ *  would mean reading every row to say a number nobody acts on, and what the
+ *  screen needs to know is whether to ask again.
+ */
+export type Waiting = {
+	notices: Notice[],
+	/**  True when the page filled, so there may be another behind it. */
+	more: boolean,
 };
 
 export type Widths = {

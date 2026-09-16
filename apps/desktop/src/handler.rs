@@ -77,6 +77,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         reveal::path_open,
         reveal::path_reveal,
         heads_down::focus_read,
+        heads_down::focus_waiting,
         heads_down::focus_write,
         reveal::url_open,
         openers::apps_list,

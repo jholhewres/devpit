@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { FocusSummary } from './FocusSummary'
 import { minutesIn } from './headsDown'
 import { shortcutFor, SHORTCUTS } from './shortcuts'
 import { stamp, useHeadsDown } from './useHeadsDown'
@@ -25,15 +26,20 @@ export function HeadsDown({
   projectId,
   waiting = 0,
   onPeek,
+  onOpenCard,
 }: {
   projectId: string | null
   /** How many notices the door is holding. Shown, never acted on here. */
   waiting?: number
+  /** Where a held notice sends you, when the summary is acted on. */
+  onOpenCard?: (cardId: string) => void
   /** Looking at what is held is not leaving the focus, so the pill opens the
    *  panel the notices already live in rather than a second list. */
   onPeek?: () => void
 }): React.JSX.Element | null {
   const { focus, enter, leave } = useHeadsDown()
+  /* The focus that just ended, kept only long enough to say what it held. */
+  const [ended, setEnded] = useState<typeof focus>(null)
   const [now, setNow] = useState(() => Date.now() / 1000)
 
   const on = focus !== null
@@ -58,8 +64,10 @@ export function HeadsDown({
   }, [focus])
 
   const toggle = (): void => {
-    if (focus) leave()
-    else if (projectId) enter(projectId)
+    if (focus) {
+      setEnded(focus)
+      leave()
+    } else if (projectId) enter(projectId)
   }
 
   /* While one is on, the pill is the way to look at what is waiting; the way
@@ -84,7 +92,18 @@ export function HeadsDown({
   if (!projectId) return null
 
   return (
-    <button
+    <>
+      {ended && (
+        <FocusSummary
+          ended={ended}
+          onOpenCard={(cardId) => {
+            setEnded(null)
+            onOpenCard?.(cardId)
+          }}
+          onClose={() => setEnded(null)}
+        />
+      )}
+      <button
       className="hdown"
       data-on={String(on)}
       onClick={press}
@@ -94,6 +113,7 @@ export function HeadsDown({
       {focus
         ? `Focus · ${minutesIn(focus, now)} min${waiting > 0 ? ` · ${waiting} outside` : ''}`
         : 'Focus'}
-    </button>
+      </button>
+    </>
   )
 }

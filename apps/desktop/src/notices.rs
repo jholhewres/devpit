@@ -33,7 +33,7 @@ pub mod kind {
 /// The event the window listens on so the bell updates without asking.
 pub const RANG: &str = "notice:rang";
 
-fn drawn(row: devpit_core::NoticeRow) -> Notice {
+pub(crate) fn drawn(row: devpit_core::NoticeRow) -> Notice {
     Notice {
         id: row.id,
         project_id: row.project_id,

@@ -9,7 +9,7 @@
 //! state and one rule, not an eighth object.
 
 use devpit_core::store::preference;
-use devpit_rpc::{HeadsDown, RpcError};
+use devpit_rpc::{HeadsDown, RpcError, Waiting};
 
 fn now() -> f64 {
     std::time::SystemTime::now()
@@ -72,3 +72,31 @@ pub fn focus_write(project_id: Option<String>) -> Result<Option<HeadsDown>, RpcE
 #[cfg(test)]
 #[path = "heads_down_tests.rs"]
 mod tests;
+
+/// How many held notices one read brings back.
+///
+/// A page rather than everything: a focus that lasted a day on a busy machine
+/// is a summary nobody scrolls, and the screen asks again if it wants more.
+const A_PAGE: i64 = 100;
+
+/// `focus.waiting` — what the door has been holding, a page at a time.
+///
+/// Walked forward from the last id the caller saw, so a summary reads every
+/// one exactly once however long the focus lasted. The bell's own list is a
+/// page of the newest and cannot answer this: a focus is exactly the case
+/// where what matters fell off the end of it.
+#[tauri::command]
+#[specta::specta]
+pub fn focus_waiting(
+    project_id: String,
+    since: f64,
+    after: Option<String>,
+) -> Result<Waiting, RpcError> {
+    let store = crate::projects::store()?;
+    let rows = store.notices_since(&project_id, true, since as i64, after.as_deref(), A_PAGE)?;
+    let more = rows.len() as i64 == A_PAGE;
+    Ok(Waiting {
+        notices: rows.into_iter().map(crate::notices::drawn).collect(),
+        more,
+    })
+}
