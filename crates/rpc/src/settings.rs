@@ -44,19 +44,15 @@ impl Theme {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    /// Three states, not two. `null` is "never asked", which is what makes the
-    /// first run ask instead of assuming a silent yes or a silent no.
-    pub telemetry: Option<bool>,
     pub theme: Theme,
     /// The account this install is signed in as, when it is.
     pub account: Option<String>,
     /// Unix seconds, or null while the first run has not been finished.
     pub onboarded_at: Option<f64>,
-    /// Null is "never asked", like telemetry. Updates default to on when the
-    /// person has not said otherwise.
+    /// Three states, not two: `null` is "never asked", which is what lets a
+    /// default be a default rather than a silent choice. Updates are on when
+    /// the person has not said otherwise.
     pub automatic_updates: Option<bool>,
-    /// Whether a turn is written to disk. Null is "never asked".
-    pub keep_transcripts: Option<bool>,
     /// Whether closing a terminal with an agent or a command still running
     /// stops to ask first.
     ///

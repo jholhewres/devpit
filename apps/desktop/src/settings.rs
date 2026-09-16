@@ -12,7 +12,6 @@ fn store() -> Result<Store, RpcError> {
 
 fn read(store: &Store) -> Result<Settings, RpcError> {
     Ok(Settings {
-        telemetry: store.preference_flag(preference::TELEMETRY)?,
         theme: store
             .preference(preference::THEME)?
             .map_or(Theme::Dark, |stored| Theme::parse(&stored)),
@@ -25,7 +24,6 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
             .and_then(|value| value.parse::<i64>().ok())
             .map(|seconds| seconds as f64),
         automatic_updates: store.preference_flag(preference::AUTO_UPDATE)?,
-        keep_transcripts: store.preference_flag(preference::KEEP_TRANSCRIPTS)?,
         confirm_stop: store.preference_flag(preference::CONFIRM_STOP)?,
         terminal_contrast: store
             .preference(preference::TERMINAL_CONTRAST)?
@@ -48,25 +46,17 @@ pub fn settings_read() -> Result<Settings, RpcError> {
 #[tauri::command]
 #[specta::specta]
 pub fn settings_write(
-    telemetry: Option<bool>,
     theme: Option<Theme>,
     automatic_updates: Option<bool>,
-    keep_transcripts: Option<bool>,
     confirm_stop: Option<bool>,
     terminal_contrast: Option<f64>,
 ) -> Result<Settings, RpcError> {
     let store = store()?;
-    if let Some(allowed) = telemetry {
-        store.set_preference_flag(preference::TELEMETRY, allowed)?;
-    }
     if let Some(chosen) = theme {
         store.set_preference(preference::THEME, chosen.stored())?;
     }
     if let Some(automatic) = automatic_updates {
         store.set_preference_flag(preference::AUTO_UPDATE, automatic)?;
-    }
-    if let Some(keep) = keep_transcripts {
-        store.set_preference_flag(preference::KEEP_TRANSCRIPTS, keep)?;
     }
     if let Some(ask) = confirm_stop {
         store.set_preference_flag(preference::CONFIRM_STOP, ask)?;

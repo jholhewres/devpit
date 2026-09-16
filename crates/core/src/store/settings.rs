@@ -72,24 +72,24 @@ mod tests {
 
     #[test]
     fn an_unset_flag_is_neither_true_nor_false() {
-        // The reason it is an Option. Defaulting telemetry to `false` would
-        // read as "they said no" and the screen would never ask.
+        // The reason it is an Option. Defaulting a flag to `false` would read
+        // as "they said no" and the screen would never ask.
         let (_dir, store) = store();
-        assert_eq!(store.preference_flag(key::TELEMETRY).expect("read"), None);
+        assert_eq!(store.preference_flag(key::AUTO_UPDATE).expect("read"), None);
     }
 
     #[test]
     fn writing_twice_keeps_the_last_value_and_counts_the_change() {
         let (_dir, store) = store();
         store
-            .set_preference_flag(key::TELEMETRY, true)
+            .set_preference_flag(key::AUTO_UPDATE, true)
             .expect("write");
         store
-            .set_preference_flag(key::TELEMETRY, false)
+            .set_preference_flag(key::AUTO_UPDATE, false)
             .expect("write");
 
         assert_eq!(
-            store.preference_flag(key::TELEMETRY).expect("read"),
+            store.preference_flag(key::AUTO_UPDATE).expect("read"),
             Some(false)
         );
 
@@ -97,7 +97,7 @@ mod tests {
             .conn()
             .query_row(
                 "SELECT revision FROM preference WHERE key = ?1",
-                [key::TELEMETRY],
+                [key::AUTO_UPDATE],
                 |row| row.get(0),
             )
             .expect("read revision");
@@ -111,13 +111,13 @@ mod tests {
 
         let store = Store::open(&path).expect("open");
         store
-            .set_preference_flag(key::TELEMETRY, true)
+            .set_preference_flag(key::AUTO_UPDATE, true)
             .expect("write");
         drop(store);
 
         let store = Store::open(&path).expect("reopen");
         assert_eq!(
-            store.preference_flag(key::TELEMETRY).expect("read"),
+            store.preference_flag(key::AUTO_UPDATE).expect("read"),
             Some(true)
         );
     }

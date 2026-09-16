@@ -7,9 +7,9 @@ import { useShell } from './useShell'
  * The first run, and the empty state — the same screen, because they are the
  * same situation: devpit with no project is devpit with nothing to show.
  *
- * Three steps, and the first one is optional and says so. An account buys
- * sync; it does not buy the app, and a first screen that reads as a wall is a
- * first screen people close.
+ * Three steps, and the first is optional and says what an account is worth
+ * today: a name, not sync. A first screen that reads as a wall is one people
+ * close, and one that promises what is not built is worse.
  *
  * Signing in already? Then that step is not asked again. The empty state is
  * reachable long after the first run, and asking a signed-in person to sign
@@ -46,9 +46,9 @@ export function Onboarding({
           <>
             <h1 className="onb__t">Sign in, if you want to</h1>
             <p className="onb__d">
-              Free, and optional. An account saves the workspace around your work — your board,
-              the capabilities you turn on, your theme. <b>Your projects, conversations and files
-              stay on this computer</b> either way.
+              Free, and optional. Today it signs you in and nothing more — syncing between
+              machines is not built yet. <b>Your projects, conversations and files stay on this
+              computer</b> either way.
             </p>
             <button
               className="onb__go"

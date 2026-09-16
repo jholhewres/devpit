@@ -837,7 +837,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (telemetry: boolean | null, theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, keepTranscripts: boolean | null, confirmStop: boolean | null, terminalContrast: number | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { telemetry, theme, automaticUpdates, keepTranscripts, confirmStop, terminalContrast })),
+	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -2376,23 +2376,17 @@ export type SessionLayout = {
 };
 
 export type Settings = {
-	/**
-	 *  Three states, not two. `null` is "never asked", which is what makes the
-	 *  first run ask instead of assuming a silent yes or a silent no.
-	 */
-	telemetry: boolean | null,
 	theme: Theme,
 	/**  The account this install is signed in as, when it is. */
 	account: string | null,
 	/**  Unix seconds, or null while the first run has not been finished. */
 	onboardedAt: number | null,
 	/**
-	 *  Null is "never asked", like telemetry. Updates default to on when the
-	 *  person has not said otherwise.
+	 *  Three states, not two: `null` is "never asked", which is what lets a
+	 *  default be a default rather than a silent choice. Updates are on when
+	 *  the person has not said otherwise.
 	 */
 	automaticUpdates: boolean | null,
-	/**  Whether a turn is written to disk. Null is "never asked". */
-	keepTranscripts: boolean | null,
 	/**
 	 *  Whether closing a terminal with an agent or a command still running
 	 *  stops to ask first.

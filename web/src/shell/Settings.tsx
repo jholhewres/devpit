@@ -17,7 +17,7 @@ import { Worktrees } from './Worktrees'
    account-menu row land here on the pane they name. */
 
 /* The yes/no settings, named once. */
-type Flag = 'automaticUpdates' | 'keepTranscripts' | 'telemetry' | 'confirmStop'
+type Flag = 'automaticUpdates' | 'confirmStop'
 
 export function Settings({
   pane,
@@ -40,19 +40,17 @@ export function Settings({
   const set = (field: Flag, next: boolean): void => {
     void ask(() =>
       commands.settingsWrite(
-        field === 'telemetry' ? next : null,
         null,
         field === 'automaticUpdates' ? next : null,
-        field === 'keepTranscripts' ? next : null,
         field === 'confirmStop' ? next : null,
         null,
       ),
     ).then((answer) => setFlags(answer.data ?? flags))
   }
 
-  /* Null is "never asked". Updates, transcripts and the close prompt default
-     to on; sharing data defaults to off, because nobody opted into it. */
-  const on = (field: Flag): boolean => flags?.[field] ?? field !== 'telemetry'
+  /* Null is "never asked", and both of these default to on: updates, and the
+     prompt that stands between somebody and losing what a terminal was doing. */
+  const on = (field: Flag): boolean => flags?.[field] ?? true
 
   return (
     <div className="prefs" data-open="true">
@@ -69,16 +67,16 @@ export function Settings({
               </div>
             </div>
 
-            {/* The name and the address are read from the accounts server on
-                launch. Sync is not live yet, and this says so rather than
-                showing a switch that does nothing. */}
+            {/* What it does today, and nothing about what it might do. A pane
+                describing a feature that is not built is a pane people plan
+                around. */}
             <p className="acc__note">
-              Sync is not live yet. When it is, the account will save the workspace around your
-              work &mdash; board columns and cards, what you turned on, appearance and shortcuts.
+              Today the account signs you in on this computer and tells devpit your name and
+              address. That is all it does: <b>nothing is uploaded and nothing is synced</b>, and
+              sync between machines is not built yet.
             </p>
             <p className="acc__note">
-              Projects, conversations, terminal history and files stay on this computer. The
-              account saves the workspace around them, not the work itself.
+              Projects, boards, conversations, terminal history and files are on this computer.
             </p>
 
             <div className="acc__sub">Leaving</div>
@@ -106,10 +104,6 @@ export function Settings({
             <div className="pref">
               <span className="pref__body"><span className="pref__t">Local by default</span><span className="pref__d">Projects, conversations and settings are kept on this computer.</span></span>
             </div>
-            <button className="pref" role="switch" aria-checked={on('telemetry')} onClick={() => set('telemetry', !on('telemetry'))}>
-              <span className="pref__body"><span className="pref__t">Share anonymous usage data</span><span className="pref__d">Feature use and reliability only. Prompts, replies, project names and file paths are never sent.</span></span>
-              <span className="sw"></span>
-            </button>
             <button className="pref" role="switch" aria-checked={on('automaticUpdates')} onClick={() => set('automaticUpdates', !on('automaticUpdates'))}>
               <span className="pref__body"><span className="pref__t">Automatic updates</span><span className="pref__d">Check in the background and offer to install.</span></span>
               <span className="sw"></span>
@@ -128,10 +122,9 @@ export function Settings({
             <div className="pref">
               <span className="pref__body"><span className="pref__t">Workspace directory</span><span className="pref__d">Each project gets one, holding its board, skills, capabilities, transcripts and worktrees. None of it is in the repository.<br /><code>~/.devpit/projects/&lt;name&gt;-&lt;suffix&gt;</code></span></span>
             </div>
-            <button className="pref" role="switch" aria-checked={on('keepTranscripts')} onClick={() => set('keepTranscripts', !on('keepTranscripts'))}>
-              <span className="pref__body"><span className="pref__t">Keep transcripts</span><span className="pref__d">Every turn is written to disk so a session survives a restart. Turning this off leaves the ones already written where they are &mdash; nothing is deleted.</span></span>
-              <span className="sw"></span>
-            </button>
+            <p className="acc__note">Transcripts are always written: a session that a restart
+              loses is a session that was never yours to come back to. Nothing is uploaded, and
+              removing a project leaves its folder where it is.</p>
           </section>
 
           <section className="prefs__in" hidden={pane !== 'worktrees'}>
@@ -166,7 +159,7 @@ export function Settings({
             <TerminalContrast
               value={flags?.terminalContrast ?? null}
               onPick={(value) =>
-                void ask(() => commands.settingsWrite(null, null, null, null, null, value)).then((answer) =>
+                void ask(() => commands.settingsWrite(null, null, null, value)).then((answer) =>
                   setFlags(answer.data ?? flags),
                 )
               }

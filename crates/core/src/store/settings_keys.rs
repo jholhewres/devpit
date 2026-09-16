@@ -6,11 +6,9 @@
 //! differently in two files is a setting that silently forgets itself, and
 //! nothing about the symptom points at the typo.
 
-pub const TELEMETRY: &str = "telemetry.enabled";
 pub const ONBOARDED_AT: &str = "onboarding.completed_at";
 pub const THEME: &str = "appearance.theme";
 pub const AUTO_UPDATE: &str = "general.automatic_updates";
-pub const KEEP_TRANSCRIPTS: &str = "storage.keep_transcripts";
 /// Whether closing a terminal with something running stops to ask.
 pub const CONFIRM_STOP: &str = "terminal.confirm_stop";
 /// The minimum contrast the terminal lifts colours to, as a number from 1 to 21.
