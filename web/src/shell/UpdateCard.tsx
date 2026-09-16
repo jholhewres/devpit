@@ -89,7 +89,14 @@ function offer(
         action: 'Copy command',
       }
     case 'failed':
-      return { title: 'The update did not go through', said: status.message, calm: null, action: null }
+      return {
+        title: 'The update did not go through',
+        said: status.message,
+        calm: null,
+        /* Recoverable means nothing was committed, so asking again is all it
+           takes. Without a button here the only way back was Settings. */
+        action: status.recoverable ? 'Check again' : null,
+      }
     default:
       return null
   }
@@ -173,6 +180,14 @@ export function UpdateCard(): React.JSX.Element | null {
     })
   }
 
+  /* A refusal before the install commits leaves the offer good; the app just
+     has to be asked again. */
+  const checkAgain = (): void => {
+    void ask(() => commands.updateCheck()).then((answer) => {
+      if (answer.error) failed(answer.error)
+    })
+  }
+
   const download = (): void => {
     void ask(() => commands.updateDownload()).then((answer) => {
       if (answer.error) failed(answer.error)
@@ -199,7 +214,9 @@ export function UpdateCard(): React.JSX.Element | null {
       ? download
       : status.type === 'ready'
         ? restart
-        : copyCommand
+        : status.type === 'failed'
+          ? checkAgain
+          : copyCommand
 
   return (
     <div className="upd" role="status" aria-label="Update">

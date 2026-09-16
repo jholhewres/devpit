@@ -15,6 +15,7 @@ vi.mock('./window', () => ({
 const download = vi.fn(async () => ({ status: 'ok', data: null }))
 const packaged = vi.fn(async () => ({ status: 'ok', data: "sudo /usr/bin/apt install '/c/devpit.deb'" }))
 const installed = vi.fn(async () => ({ status: 'ok', data: null }))
+const checked = vi.fn(async () => ({ status: 'ok', data: { type: 'checking' } }))
 const chose = vi.fn(async (_choice: string) => ({ status: 'ok', data: null }))
 type Blocking = { id: string; title: string }
 let busy: { runs: Blocking[]; turns: Blocking[]; keeps: Blocking[] } = { runs: [], turns: [], keeps: [] }
@@ -27,6 +28,7 @@ vi.mock('./live', () => ({
     updateDownload: () => download(),
     updatePackage: () => packaged(),
     updateInstall: () => installed(),
+    updateCheck: () => checked(),
     updateRunning: async () => ({ status: 'ok', data: busy }),
     updateChoose: (choice: string) => chose(choice),
   },
@@ -257,6 +259,22 @@ describe('an update waiting for the work to end', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  /* A refusal before the install commits leaves the offer good, so the card
+     has to offer a way back: Failed with no action meant going to Settings to
+     retry something the card already knew about. */
+  it('offers a way back when the failure came before the install committed', async () => {
+    render(<UpdateCard />)
+    say({ type: 'failed', message: 'the download was refused', recoverable: true } as UpdateStatus)
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    await waitFor(() => expect(checked).toHaveBeenCalled())
+  })
+
+  it('offers nothing once the install has committed, because there is nothing to retry', () => {
+    render(<UpdateCard />)
+    say({ type: 'failed', message: 'the installer refused', recoverable: false } as UpdateStatus)
+    expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull()
   })
 
   /* The review's case: closing a ready update only hid the card, and the app
