@@ -159,7 +159,7 @@ pub fn session_detach(
 /// Attaches a client pty to the tmux window for this leaf and streams frames.
 ///
 /// Not in the generated contract: the binary channel cannot be described by
-/// specta. The wrapper lives next to the xterm host, like `pty_drain`.
+/// specta, so its wrapper is hand-written, next to the xterm host.
 #[tauri::command]
 pub async fn session_attach(
     state: State<'_, SessionState>,

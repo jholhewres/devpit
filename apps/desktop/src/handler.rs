@@ -10,9 +10,9 @@ use crate::{
     account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_chat,
     card_work, cards, chat, columns, commands, diffs, files, filetree, front, happening, history,
     in_flight, index, installations, mcp, moving, notices, openers, outside_sessions, panels,
-    panes, pasting, plan_limits, plugin_data, plugins, priming, projects, pty_bridge, receipts,
-    reveal, rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch,
-    skills, slash, sources, spend_history, staging, steering, steps, threads, watching, workspace,
+    panes, pasting, plan_limits, plugin_data, plugins, priming, projects, receipts, reveal,
+    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
+    slash, sources, spend_history, staging, steering, steps, threads, watching, workspace,
     worktree_base, worktrees, wsfiles,
 };
 
@@ -166,6 +166,5 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         plugin_data::plugin_data_write,
         plugin_data::plugin_data_delete,
         plugin_data::plugin_data_pin,
-        pty_bridge::pty_drain,
     ]
 }

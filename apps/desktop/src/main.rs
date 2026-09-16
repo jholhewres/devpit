@@ -64,7 +64,6 @@ mod post;
 mod prime;
 mod priming;
 mod projects;
-mod pty_bridge;
 mod question;
 mod receipts;
 mod reconcile;
@@ -108,11 +107,10 @@ fn main() {
 
     // The runtime handler carries everything, contract or not.
     //
-    // `pty_drain` and `session_attach` stream over
-    // `Channel<InvokeResponseBody>` so frames reach the webview as raw bytes
-    // rather than JSON. specta cannot describe that enum; their wrappers are
-    // hand-written. Everything else about a session — ensure, split, write,
-    // resize — is in the generated contract.
+    // `session_attach` streams over `Channel<InvokeResponseBody>` so frames
+    // reach the webview as raw bytes rather than JSON. specta cannot describe
+    // that enum, so its wrapper is hand-written. Everything else about a
+    // session — ensure, split, write, resize — is in the generated contract.
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(chat::Talking::default())
