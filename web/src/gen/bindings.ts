@@ -79,6 +79,13 @@ export const commands = {
 	/**  `plan.limits` — the quota windows of an installation's plan. */
 	planLimits: (installation: string | null) => typedError<PlanLimits, RpcError>(__TAURI_INVOKE("plan_limits", { installation })),
 	/**
+	 *  `update.check` — ask the feed whether there is a newer devpit.
+	 * 
+	 *  Answers a state rather than a version: the window draws the state, and the
+	 *  same states come back from the automatic check.
+	 */
+	updateCheck: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_check")),
+	/**
 	 *  `spend.history` — what the agents spent over the last `days`, from their
 	 *  transcripts, for one installation or all and one project or all.
 	 */
@@ -1505,6 +1512,29 @@ export type Held = {
 	exists: boolean,
 };
 
+/**
+ *  How this copy of devpit was installed, which decides what an update may do
+ *  to it.
+ */
+export type InstallKind = 
+/**  A single file the app can replace by itself. */
+"appImage" | 
+/**
+ *  A system package: downloaded and verified here, installed by the person
+ *  with the command we show. The app never runs a package manager.
+ */
+"deb" | 
+/**
+ *  A package the machine's own tooling looks after — a repackage, a Nix
+ *  profile, a container. Nothing is downloaded.
+ */
+"externallyManaged" | 
+/**
+ *  `make dev`, a `cargo run`, or anything else with no bundle around it.
+ *  Nothing is installed from here.
+ */
+"unmanaged";
+
 /**  One installation, as the panels offer it. */
 export type Installation = {
 	directory: string,
@@ -2587,6 +2617,23 @@ export type TurnEnd = {
 	stopReason: string | null,
 	isError: boolean,
 };
+
+/**  Where the update is, and what may be done about it. */
+export type UpdateStatus = 
+/**  Nothing known, or nothing newer. */
+{ type: "idle" } | { type: "checking" } | { type: "available"; version: string; notes: string; kind: InstallKind } | { type: "downloading"; percent: number } | 
+/**  Downloaded and verified. From here on the app refuses to start new work. */
+{ type: "ready"; version: string } | 
+/**  Waiting for work that is already running, with what it is waiting on. */
+{ type: "waiting"; runs: number; turns: number; 
+/**  Seconds since the epoch, so the window can say how long. */
+since: number | null } | 
+/**  Past the point of return: the installer is running. */
+{ type: "installing" } | 
+/**  A package the person installs, with the command to do it. */
+{ type: "manualInstall"; command: string; path: string } | { type: "externallyManaged" } | { type: "failed"; message: string; 
+/**  False once the install has committed: there is nothing to retry. */
+recoverable: boolean };
 
 /**  Every pane of a project, and the total. */
 export type Usage = {

@@ -89,6 +89,7 @@ mod steps;
 mod tap;
 mod threads;
 mod turn_changes;
+mod update;
 mod watching;
 mod working;
 mod workspace;

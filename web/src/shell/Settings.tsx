@@ -9,6 +9,7 @@ import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
 import { SkillsPane } from './SkillsPane'
 import { TerminalContrast } from './TerminalContrast'
+import { UpdateSettings } from './UpdateSettings'
 import { Usage } from './Usage'
 import { Worktrees } from './Worktrees'
 
@@ -114,6 +115,7 @@ export function Settings({
               <span className="sw"></span>
             </button>
             <OpenApps />
+            <UpdateSettings />
           </section>
 
           <section className="prefs__in" hidden={pane !== 'providers'}>

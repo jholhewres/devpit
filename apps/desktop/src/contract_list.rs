@@ -14,7 +14,7 @@ use crate::{
     in_flight, index, installations, mcp, moving, notices, openers, outside_sessions, panels,
     panes, pasting, paths, plan_limits, plugin_data, plugins, priming, projects, receipts, reveal,
     rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
-    slash, sources, spend_history, staging, steering, steps, threads, watching, workspace,
+    slash, sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
     worktree_base, worktrees, wsfiles,
 };
 
@@ -35,6 +35,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         outside_sessions::chat_outside,
         adopting::chat_adopt,
         plan_limits::plan_limits,
+        update::update_check,
         spend_history::spend_history,
         card_chat::card_chat,
         rewinding::chat_rewind,

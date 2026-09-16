@@ -29,6 +29,7 @@ pub mod settings;
 pub mod spend;
 mod threads;
 pub mod tile;
+pub mod update;
 pub mod usage;
 
 pub use account::{Account, Membership, SignIn, SignInState};
@@ -69,6 +70,7 @@ pub use spend::{
 };
 pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
+pub use update::{InstallKind, UpdateStatus};
 pub use usage::{PaneCost, Usage};
 
 use serde::{Deserialize, Serialize};
