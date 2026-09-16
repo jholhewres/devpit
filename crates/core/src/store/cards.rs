@@ -203,7 +203,7 @@ impl Store {
     pub fn notices(&self, limit: i64) -> Result<Vec<NoticeRow>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, project_id, kind, title, detail, card_id, created_at, read_at \
-             FROM notice ORDER BY created_at DESC, id DESC LIMIT ?1",
+             FROM notice ORDER BY created_at DESC, rowid DESC LIMIT ?1",
         )?;
         let rows = stmt
             .query_map([limit], |row| {
@@ -252,9 +252,11 @@ impl Store {
 
         // Trimmed on write, not on read: the read is what a person waits for.
         // Same tiebreak as the read, or the trim would keep a different 200.
+        // The tiebreak is the insert order: two notices in one clock tick used
+        // to be ordered by their ids, whose tails are random.
         conn.execute(
             "DELETE FROM notice WHERE id NOT IN \
-             (SELECT id FROM notice ORDER BY created_at DESC, id DESC LIMIT ?1)",
+             (SELECT id FROM notice ORDER BY created_at DESC, rowid DESC LIMIT ?1)",
             [NOTICES_KEPT],
         )?;
         Ok(id)
