@@ -210,12 +210,15 @@ fn notices_come_back_newest_first() {
 #[test]
 fn the_notice_list_does_not_grow_without_bound() {
     // Trimmed on write rather than on read: the read is what a person waits
-    // for, and a list nobody trims is one day a megabyte.
+    // for, and a list nobody trims is one day a megabyte. Read ones are what
+    // the ordinary ceiling takes; unread ones have their own, higher one, so
+    // a focus holding something back still finds it in the store.
     let (_dir, store, _card) = seeded();
     for n in 0..(NOTICES_KEPT + 25) {
-        store
+        let id = store
             .add_notice(None, "run", &format!("notice {n}"), None, None)
             .expect("notice");
+        store.read_notice(&id).expect("read");
     }
     let kept: i64 = store
         .conn()
@@ -227,6 +230,25 @@ fn the_notice_list_does_not_grow_without_bound() {
         store.notices(1).expect("read")[0].title,
         format!("notice {}", NOTICES_KEPT + 24)
     );
+}
+
+/// Unread ones are kept, but not for ever.
+///
+/// Somebody who never opens the bell must not grow the table without end, so
+/// the higher ceiling is real and this proves it rather than trusting it.
+#[test]
+fn even_an_unread_notice_has_a_ceiling() {
+    let (_dir, store, _card) = seeded();
+    for n in 0..(NOTICES_KEPT_UNREAD + 25) {
+        store
+            .add_notice(None, "run", &format!("notice {n}"), None, None)
+            .expect("notice");
+    }
+    let kept: i64 = store
+        .conn()
+        .query_row("SELECT COUNT(*) FROM notice", [], |row| row.get(0))
+        .expect("count");
+    assert_eq!(kept, NOTICES_KEPT_UNREAD);
 }
 
 #[test]
@@ -401,4 +423,119 @@ fn a_lane_deleted_with_cards_moves_them_in_order_to_the_end_of_another() {
     assert_eq!(order, [already, card, second]);
     let moved = store.card(&archived).expect("read").expect("there");
     assert_eq!(moved.column_id, columns[1].id);
+}
+
+/// A focus can hold a notice for an afternoon, so the store must still have it.
+///
+/// The trim took the oldest rows whatever their state, so 200 notices from a
+/// busy project threw away what somebody had not looked at on another one —
+/// and a queue holding those back to show them on the way out would have been
+/// holding rows that no longer existed. Sabotage: drop `read_at IS NOT NULL`
+/// from the first delete and the unread one disappears here.
+
+/// Two projects on disk, because a notice's project is a foreign key.
+fn two_projects(dir: &std::path::Path, store: &Store) -> (String, String) {
+    let mut made = Vec::new();
+    for name in ["mine", "far"] {
+        let root = dir.join(name);
+        std::fs::create_dir_all(&root).expect("create");
+        made.push(store.add_project(&root, None).expect("project"));
+    }
+    (made[0].clone(), made[1].clone())
+}
+
+#[test]
+fn the_trim_takes_what_was_read_and_leaves_what_was_not() {
+    let (dir, store, _card) = seeded();
+    let (mine, far) = two_projects(dir.path(), &store);
+    let held = store
+        .add_notice(Some(&far), "run", "nobody looked at this", None, None)
+        .expect("held");
+
+    // Enough traffic to push it well past the ordinary ceiling, all of it read.
+    for n in 0..(NOTICES_KEPT + 50) {
+        let id = store
+            .add_notice(Some(&mine), "run", &format!("notice {n}"), None, None)
+            .expect("notice");
+        store.read_notice(&id).expect("read");
+    }
+
+    let kept: i64 = store
+        .conn()
+        .query_row(
+            "SELECT COUNT(*) FROM notice WHERE id = ?1",
+            [&held],
+            |row| row.get(0),
+        )
+        .expect("count");
+    assert_eq!(kept, 1, "the unread notice was trimmed away under a focus");
+}
+
+/// The query behind a focus: this project's own, or everything that is not.
+#[test]
+fn notices_come_back_by_project_and_since_in_pages() {
+    let (dir, store, _card) = seeded();
+    let (here, there) = two_projects(dir.path(), &store);
+    let mine = store
+        .add_notice(Some(&here), "run", "mine", None, None)
+        .expect("mine");
+    let far = store
+        .add_notice(Some(&there), "run", "far", None, None)
+        .expect("far");
+    let nowhere = store
+        .add_notice(None, "run", "no project at all", None, None)
+        .expect("nowhere");
+
+    let ours = store
+        .notices_since(&here, false, 0, None, 50)
+        .expect("ours");
+    assert_eq!(ours.iter().map(|row| &row.id).collect::<Vec<_>>(), [&mine]);
+
+    // Elsewhere is another project, never an unknown one: a notice with no
+    // project is not "from somewhere else", it is one whose project is gone.
+    let elsewhere = store
+        .notices_since(&here, true, 0, None, 50)
+        .expect("elsewhere");
+    assert_eq!(
+        elsewhere.iter().map(|row| &row.id).collect::<Vec<_>>(),
+        [&far]
+    );
+    assert!(!elsewhere.iter().any(|row| row.id == nowhere));
+
+    // Nothing from before the focus began.
+    let later = store
+        .notices_since(&here, false, now() + 60, None, 50)
+        .expect("later");
+    assert!(later.is_empty());
+}
+
+/// More than the old ceiling of a hundred, walked one page at a time.
+#[test]
+fn a_long_focus_reads_every_held_notice_across_pages() {
+    let (dir, store, _card) = seeded();
+    let (here, there) = two_projects(dir.path(), &store);
+    for n in 0..150 {
+        store
+            .add_notice(Some(&there), "run", &format!("held {n}"), None, None)
+            .expect("notice");
+    }
+
+    let mut seen = Vec::new();
+    let mut after: Option<String> = None;
+    for _ in 0..20 {
+        let page = store
+            .notices_since(&here, true, 0, after.as_deref(), 40)
+            .expect("page");
+        if page.is_empty() {
+            break;
+        }
+        after = Some(page[page.len() - 1].id.clone());
+        seen.extend(page.into_iter().map(|row| row.id));
+    }
+
+    assert_eq!(seen.len(), 150, "a page was skipped or read twice");
+    let mut unique = seen.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), 150);
 }

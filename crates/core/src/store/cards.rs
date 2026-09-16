@@ -52,6 +52,15 @@ pub const LONGEST_LABEL: usize = 200;
 /// How many notices the bell keeps. Older ones are dropped on write rather
 /// than on read: a list nobody trims is a list that is one day a megabyte.
 pub const NOTICES_KEPT: i64 = 200;
+/// Beyond which even an unread notice goes.
+///
+/// The trim used to take the oldest rows whatever their state, so anything a
+/// person had not looked at was thrown away by a busy afternoon on another
+/// project — and a focus that holds a notice back to show it on the way out
+/// would have been holding a row the store had already deleted. Unread ones
+/// now survive the ordinary trim, and this is the ceiling that keeps the table
+/// bounded anyway for somebody who never opens the bell.
+pub const NOTICES_KEPT_UNREAD: i64 = 2000;
 
 fn now() -> i64 {
     std::time::SystemTime::now()
@@ -222,6 +231,56 @@ impl Store {
         Ok(rows)
     }
 
+    /// A page of notices, narrowed to one project or to what it is not.
+    ///
+    /// The global read above takes a limit and nothing else, so a focus that
+    /// lasted an afternoon could not ask "what arrived from elsewhere since I
+    /// started" without reading the whole table and hoping it fitted in a
+    /// hundred rows. This answers that question in pages, oldest boundary
+    /// first: `after` is exclusive, so the caller walks forward from the last
+    /// id it saw and never reads a row twice.
+    ///
+    /// `elsewhere` flips the sense of `project_id`: false for "this project's
+    /// own", true for "everything that is not this project's", which is the
+    /// shape the queue behind a focus needs. A notice with no project is never
+    /// "elsewhere" — its project is unknown, not different — and it is left to
+    /// the project-less read that already exists.
+    pub fn notices_since(
+        &self,
+        project_id: &str,
+        elsewhere: bool,
+        since: i64,
+        after: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<NoticeRow>, StoreError> {
+        let whose = if elsewhere {
+            "project_id IS NOT NULL AND project_id <> ?1"
+        } else {
+            "project_id = ?1"
+        };
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT id, project_id, kind, title, detail, card_id, created_at, read_at \
+             FROM notice \
+             WHERE {whose} AND created_at >= ?2 AND (?3 IS NULL OR id > ?3) \
+             ORDER BY created_at ASC, id ASC LIMIT ?4",
+        ))?;
+        let rows = stmt
+            .query_map(rusqlite::params![project_id, since, after, limit], |row| {
+                Ok(NoticeRow {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    kind: row.get(2)?,
+                    title: row.get(3)?,
+                    detail: row.get(4)?,
+                    card_id: row.get(5)?,
+                    created_at: row.get(6)?,
+                    read_at: row.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     pub fn add_notice(
         &self,
         project_id: Option<&str>,
@@ -254,10 +313,19 @@ impl Store {
         // Same tiebreak as the read, or the trim would keep a different 200.
         // The tiebreak is the insert order: two notices in one clock tick used
         // to be ordered by their ids, whose tails are random.
+        //
+        // Read ones first, and only read ones: something nobody has looked at
+        // is the one thing here worth keeping, and a focus holding it back to
+        // show it later must not find the store threw it away meanwhile.
+        conn.execute(
+            "DELETE FROM notice WHERE read_at IS NOT NULL AND id NOT IN \
+             (SELECT id FROM notice ORDER BY created_at DESC, rowid DESC LIMIT ?1)",
+            [NOTICES_KEPT],
+        )?;
         conn.execute(
             "DELETE FROM notice WHERE id NOT IN \
              (SELECT id FROM notice ORDER BY created_at DESC, rowid DESC LIMIT ?1)",
-            [NOTICES_KEPT],
+            [NOTICES_KEPT_UNREAD],
         )?;
         Ok(id)
     }
