@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Notice } from '../gen/bindings'
 import { held, minutesIn, nextThatNeedsYou, whatYouDid, type HeadsDown } from './headsDown'
 
-const focus: HeadsDown = { projectId: 'prj_here', since: 1000 }
+const focus: HeadsDown = { projectId: 'prj_here', since: 1000, until: null }
 
 const notice = (over: Partial<Notice> = {}): Pick<Notice, 'projectId' | 'kind' | 'createdAt'> => ({
   projectId: 'prj_far',
@@ -57,8 +57,8 @@ describe('what a focus holds back', () => {
   /* `since` crosses the contract as `number | null`: a float has values JSON
      cannot carry. A focus with no beginning holds nothing. */
   it('holds nothing when the focus has no beginning', () => {
-    expect(held(notice(), { projectId: 'prj_here', since: null })).toBe(false)
-    expect(minutesIn({ projectId: 'prj_here', since: null }, 9999)).toBe(0)
+    expect(held(notice(), { projectId: 'prj_here', since: null, until: null })).toBe(false)
+    expect(minutesIn({ projectId: 'prj_here', since: null, until: null }, 9999)).toBe(0)
   })
 
   it('counts the focus in whole minutes from when it began', () => {
@@ -164,5 +164,22 @@ describe('what you did', () => {
     const said = whatYouDid([run('ok'), run('failed')])
     expect(said.costUsd).toBeNull()
     expect(said.uncosted).toBe(2)
+  })
+})
+
+/* The timebox: it opens the door, and it does not end the focus. */
+describe('a focus that was given a length', () => {
+  const boxed = { projectId: 'prj_here', since: 1000, until: 2500 }
+
+  it('holds while the door is shut', () => {
+    expect(held(notice(), { ...boxed, open: false })).toBe(true)
+  })
+
+  /* The pill is the only thing here with a clock, so it is the pill that
+     decides the door has opened and says so; everything else reads a state. */
+  it('holds nothing once the door has opened, and is still a focus', () => {
+    expect(held(notice(), { ...boxed, open: true })).toBe(false)
+    // Still on: the project keeps the screen to itself, and the minutes run.
+    expect(minutesIn({ ...boxed, open: true }, 2500)).toBe(25)
   })
 })

@@ -43,7 +43,7 @@ afterEach(() => {
 })
 
 describe('what a focus says it held, on the way out', () => {
-  const ended = { projectId: 'prj_here', since: 1000 }
+  const ended = { projectId: 'prj_here', since: 1000, until: null }
 
   /* What you did comes first: it is the thing the focus was for. A run with no
      cost — every command step — is not folded in as zero, or the total would

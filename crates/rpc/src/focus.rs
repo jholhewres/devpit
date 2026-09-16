@@ -16,6 +16,12 @@ pub struct HeadsDown {
     /// Seconds since the epoch. `f64` because the contract forbids 64-bit
     /// integers, and every other timestamp that crosses it is one too.
     pub since: f64,
+    /// When the queue is let go, for a focus that was given a length. Absent
+    /// is a focus with no end in mind, which is the default.
+    ///
+    /// Reaching it does not end the focus and does not open a dialog: the door
+    /// opens, the pill says so, and the person leaves when they are ready.
+    pub until: Option<f64>,
 }
 
 /// What a focus has been holding, a page at a time.

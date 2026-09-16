@@ -6,6 +6,7 @@ import { HeadsDown } from './HeadsDown'
 
 let stored: Stored | null = null
 const written: (string | null)[] = []
+const lengths: number[] = []
 
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<{ data?: unknown }>) => {
@@ -16,9 +17,10 @@ vi.mock('./live', () => ({
     focusRead: async () => ({ status: 'ok', data: stored }),
     focusWaiting: async () => ({ notices: [], more: false }),
     runsList: async () => ({ runs: [], next: null }),
-    focusWrite: async (projectId: string | null) => {
+    focusWrite: async (projectId: string | null, minutes: number) => {
+      lengths.push(minutes)
       written.push(projectId)
-      stored = projectId ? { projectId, since: Date.now() / 1000 } : null
+      stored = projectId ? { projectId, since: Date.now() / 1000, until: null } : null
       return { status: 'ok', data: stored }
     },
   },
@@ -28,6 +30,7 @@ afterEach(() => {
   cleanup()
   stored = null
   written.length = 0
+  lengths.length = 0
   delete document.documentElement.dataset.headsDown
   vi.useRealTimers()
 })
@@ -80,7 +83,7 @@ describe('going into a focus', () => {
   })
 
   it('reads back a focus that was already on when the window opened', async () => {
-    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 300 }
+    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 300, until: null }
     render(<HeadsDown projectId="prj_1" />)
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Focus · 5 min/ })).toBeTruthy(),
@@ -97,7 +100,7 @@ describe('opening another project', () => {
   /* A focus is on one project by definition. Asking whether they meant it
      would be asking about the thing they just did. */
   it('ends the focus and says what it held', async () => {
-    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 60 }
+    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 60, until: null }
     const { rerender } = render(<HeadsDown projectId="prj_1" />)
     await waitFor(() => expect(screen.getByRole('button', { name: /Focus · 1 min/ })).toBeTruthy())
 
@@ -107,7 +110,7 @@ describe('opening another project', () => {
   })
 
   it('leaves it alone while the project it is on stays open', async () => {
-    stored = { projectId: 'prj_1', since: Date.now() / 1000 }
+    stored = { projectId: 'prj_1', since: Date.now() / 1000, until: null }
     const { rerender } = render(<HeadsDown projectId="prj_1" />)
     await waitFor(() => expect(screen.getByRole('button', { name: /Focus ·/ })).toBeTruthy())
 
@@ -118,7 +121,7 @@ describe('opening another project', () => {
 
 describe('what the pill says while a focus is on', () => {
   it('counts what is waiting outside, and says nothing when none is', async () => {
-    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 120 }
+    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 120, until: null }
     const { rerender } = render(<HeadsDown projectId="prj_1" waiting={0} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Focus · 2 min' })).toBeTruthy())
 
@@ -133,11 +136,35 @@ describe('what the pill says while a focus is on', () => {
      end-to-end test found by trying to leave. What is held is in the bell
      beside it, under its own heading. */
   it('leaves the focus even while something is held', async () => {
-    stored = { projectId: 'prj_1', since: Date.now() / 1000 }
+    stored = { projectId: 'prj_1', since: Date.now() / 1000, until: null }
     render(<HeadsDown projectId="prj_1" waiting={2} />)
     await waitFor(() => expect(screen.getByRole('button', { name: /outside/ })).toBeTruthy())
 
     fireEvent.click(screen.getByRole('button', { name: /outside/ }))
     await waitFor(() => expect(written).toEqual([null]))
+  })
+})
+
+describe('a length given to a focus', () => {
+  it('sends none unless one was picked', async () => {
+    render(<HeadsDown projectId="prj_1" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Focus' }))
+    await waitFor(() => expect(lengths).toEqual([0]))
+  })
+
+  /* Offered, never imposed: the evidence for a fixed break is contradictory
+     and only about students, so the default is no end at all. */
+  it('sends the one that was picked', async () => {
+    render(<HeadsDown projectId="prj_1" />)
+    fireEvent.change(screen.getByLabelText('Focus length'), { target: { value: '25' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Focus' }))
+    await waitFor(() => expect(lengths).toEqual([25]))
+  })
+
+  it('offers no length while a focus is already on', async () => {
+    stored = { projectId: 'prj_1', since: Date.now() / 1000, until: null }
+    render(<HeadsDown projectId="prj_1" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Focus ·/ })).toBeTruthy())
+    expect(screen.queryByLabelText('Focus length')).toBeNull()
   })
 })

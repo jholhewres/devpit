@@ -13,7 +13,7 @@ import type { HeadsDown } from '../gen/bindings'
 
 export function useHeadsDown(): {
   focus: HeadsDown | null
-  enter: (projectId: string) => void
+  enter: (projectId: string, minutes?: number) => void
   leave: () => void
 } {
   const [focus, setFocus] = useState<HeadsDown | null>(null)
@@ -24,8 +24,8 @@ export function useHeadsDown(): {
     })
   }, [])
 
-  const write = useCallback((projectId: string | null) => {
-    void ask(() => commands.focusWrite(projectId)).then((answer) => {
+  const write = useCallback((projectId: string | null, minutes = 0) => {
+    void ask(() => commands.focusWrite(projectId, minutes)).then((answer) => {
       /* What the app answered, not what was asked for: the second it began is
          the store's, and the pill counts from it. */
       setFocus(answer.data ?? null)
@@ -34,21 +34,32 @@ export function useHeadsDown(): {
 
   return {
     focus,
-    enter: useCallback((projectId: string) => write(projectId), [write]),
+    enter: useCallback((projectId: string, minutes = 0) => write(projectId, minutes), [write]),
     leave: useCallback(() => write(null), [write]),
   }
 }
 
-/** The focus stamped on the root element, as it is written there. */
-export const stamp = (focus: HeadsDown | null): string | null =>
-  focus === null || focus.since === null ? null : `${focus.projectId}:${focus.since}`
+/**
+ * The focus stamped on the root element, as it is written there.
+ *
+ * `<project>:<second>` while the door is shut, and `<project>:<second>:open`
+ * once a timebox has run out. The door is a state here rather than a time,
+ * because the readers of this — the bell, the update card — have no clock of
+ * their own: only the pill ticks, so only the pill decides.
+ */
+export const stamp = (focus: HeadsDown | null, now: number): string | null => {
+  if (focus === null || focus.since === null) return null
+  const open = focus.until !== null && focus.until !== undefined && now >= focus.until
+  return `${focus.projectId}:${focus.since}${open ? ':open' : ''}`
+}
 
-/** And back. Anything that is not a focus reads as none. */
-export function fromStamp(held: string | undefined): HeadsDown | null {
-  const [projectId, since] = (held ?? '').split(':')
+/** What a stamp says. Anything that is not a focus reads as none. */
+export function fromStamp(held: string | undefined): (HeadsDown & { open: boolean }) | null {
+  const [projectId, since, door] = (held ?? '').split(':')
   if (!projectId || since === undefined) return null
   const began = Number(since)
-  return Number.isFinite(began) ? { projectId, since: began } : null
+  if (!Number.isFinite(began)) return null
+  return { projectId, since: began, until: null, open: door === 'open' }
 }
 
 /**
@@ -59,8 +70,8 @@ export function fromStamp(held: string | undefined): HeadsDown | null {
  * bell and the card both need this one. Watched the way `Leaf.tsx` watches
  * the theme, which is stamped in the same place.
  */
-export function useFocus(): HeadsDown | null {
-  const [focus, setFocus] = useState<HeadsDown | null>(() =>
+export function useFocus(): (HeadsDown & { open: boolean }) | null {
+  const [focus, setFocus] = useState<(HeadsDown & { open: boolean }) | null>(() =>
     typeof document === 'undefined' ? null : fromStamp(document.documentElement.dataset.headsDown),
   )
 

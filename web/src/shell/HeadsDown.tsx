@@ -36,6 +36,9 @@ export function HeadsDown({
   const { focus, enter, leave } = useHeadsDown()
   /* The focus that just ended, kept only long enough to say what it held. */
   const [ended, setEnded] = useState<typeof focus>(null)
+  /* The length to give the next focus. Zero is none, which is the default:
+     a timebox is offered, never imposed. */
+  const [minutes, setMinutes] = useState(0)
   const [now, setNow] = useState(() => Date.now() / 1000)
 
   const on = focus !== null
@@ -51,13 +54,13 @@ export function HeadsDown({
      CSS, and `AppShell` does not have to hold this state to pass it down. */
   useEffect(() => {
     const root = document.documentElement
-    const written = stamp(focus)
+    const written = stamp(focus, now)
     if (written) root.dataset.headsDown = written
     else delete root.dataset.headsDown
     return () => {
       delete root.dataset.headsDown
     }
-  }, [focus])
+  }, [focus, now])
 
   /* Opening another project ends the focus, without asking. A focus is on one
      project by definition, and a question here would be asking whether the
@@ -74,7 +77,7 @@ export function HeadsDown({
     if (focus) {
       setEnded(focus)
       leave()
-    } else if (projectId) enter(projectId)
+    } else if (projectId) enter(projectId, minutes)
   }
 
   /* One meaning, and only one. Peeking used to share this click once
@@ -108,6 +111,22 @@ export function HeadsDown({
           }}
           onClose={() => setEnded(null)}
         />
+      )}
+      {!focus && (
+        /* Offered, never imposed: none is the default, and the evidence for a
+           fixed break is contradictory and only about students. Whoever likes
+           a pomodoro picks 25. */
+        <select
+          className="hdown__box"
+          aria-label="Focus length"
+          value={String(minutes)}
+          onChange={(event) => setMinutes(Number(event.target.value))}
+        >
+          <option value="0">No end</option>
+          <option value="25">25 min</option>
+          <option value="50">50 min</option>
+          <option value="90">90 min</option>
+        </select>
       )}
       <button
       className="hdown"

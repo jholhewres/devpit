@@ -332,6 +332,14 @@ export const commands = {
 	 *  integers, and every other timestamp that crosses it is one too.
 	 */
 	since: number | null,
+	/**
+	 *  When the queue is let go, for a focus that was given a length. Absent
+	 *  is a focus with no end in mind, which is the default.
+	 * 
+	 *  Reaching it does not end the focus and does not open a dialog: the door
+	 *  opens, the pill says so, and the person leaves when they are ready.
+	 */
+	until: number | null,
 } | null, RpcError>(__TAURI_INVOKE("focus_read")),
 	/**
 	 *  `focus.waiting` — what the door has been holding, a page at a time.
@@ -348,14 +356,22 @@ export const commands = {
 	 *  Beginning one while another is on replaces it: changing project ends the
 	 *  focus, and the window asks for the new one in the same breath.
 	 */
-	focusWrite: (projectId: string | null) => typedError<{
+	focusWrite: (projectId: string | null, minutes: number | null) => typedError<{
 	projectId: string,
 	/**
 	 *  Seconds since the epoch. `f64` because the contract forbids 64-bit
 	 *  integers, and every other timestamp that crosses it is one too.
 	 */
 	since: number | null,
-} | null, RpcError>(__TAURI_INVOKE("focus_write", { projectId })),
+	/**
+	 *  When the queue is let go, for a focus that was given a length. Absent
+	 *  is a focus with no end in mind, which is the default.
+	 * 
+	 *  Reaching it does not end the focus and does not open a dialog: the door
+	 *  opens, the pill says so, and the person leaves when they are ready.
+	 */
+	until: number | null,
+} | null, RpcError>(__TAURI_INVOKE("focus_write", { projectId, minutes })),
 	/**
 	 *  `url.open` — opens a web address in the browser the person uses.
 	 * 
@@ -1541,6 +1557,14 @@ export type HeadsDown = {
 	 *  integers, and every other timestamp that crosses it is one too.
 	 */
 	since: number | null,
+	/**
+	 *  When the queue is let go, for a focus that was given a length. Absent
+	 *  is a focus with no end in mind, which is the default.
+	 * 
+	 *  Reaching it does not end the focus and does not open a dialog: the door
+	 *  opens, the pill says so, and the person leaves when they are ready.
+	 */
+	until: number | null,
 };
 
 /**  One thing the workspace holds, measured. */

@@ -43,9 +43,12 @@ const IRREVERSIBLE = 'irreversible'
  */
 export function held(
   notice: Pick<Notice, 'projectId' | 'kind' | 'createdAt'>,
-  focus: HeadsDown | null,
+  focus: (HeadsDown & { open?: boolean }) | null,
 ): boolean {
   if (!focus || focus.since === null) return false
+  // A timebox that has run out opens the door without ending the focus: the
+  // project still has the screen to itself, and what was waiting rings.
+  if (focus.open) return false
   if (notice.createdAt === null) return false
   if (notice.createdAt < focus.since) return false
   if (notice.projectId === null) return false
@@ -58,7 +61,7 @@ export function held(
  * `since` crosses the contract as `number | null`, because a float has values
  * JSON cannot carry. A focus with no beginning is one nothing can be counted
  * from, so it counts as none rather than as zero minutes of something. */
-export const minutesIn = (focus: HeadsDown, now: number): number =>
+export const minutesIn = (focus: HeadsDown & { open?: boolean }, now: number): number =>
   focus.since === null ? 0 : Math.max(0, Math.floor((now - focus.since) / 60))
 
 /**
