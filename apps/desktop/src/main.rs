@@ -121,6 +121,7 @@ fn main() {
         .manage(chat::Talking::default())
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
+        .manage(update::Updating::default())
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.

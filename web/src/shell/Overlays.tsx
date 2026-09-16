@@ -4,6 +4,7 @@ import { RemoveProject } from './RemoveProject'
 import { Settings } from './Settings'
 import { SignIn } from './SignIn'
 import { StopRunning } from './StopRunning'
+import { UpdateCard } from './UpdateCard'
 import { useShell } from './useShell'
 
 /*
@@ -38,6 +39,7 @@ export function Overlays({
 
   return (
     <>
+      <UpdateCard />
       {palette && <Palette onClose={closePalette} />}
       {closing && (
         <StopRunning

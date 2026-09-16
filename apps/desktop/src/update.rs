@@ -5,6 +5,8 @@
 //! devpit even is (`install_kind`). Everything else here is plumbing around
 //! the updater plugin.
 
+use tauri::Manager;
+
 use devpit_rpc::{InstallKind, RpcError, UpdateStatus};
 
 /// What can happen to an update, from the app or from the network.
@@ -25,6 +27,12 @@ pub(crate) enum Event {
     },
     /// Checked, and this is the newest there is.
     NothingNewer,
+    Download,
+    Progress(u8),
+    /// Downloaded, and verified by the plugin before the bytes came back.
+    Downloaded {
+        version: String,
+    },
     Failed {
         message: String,
     },
@@ -66,6 +74,12 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
             },
         }),
         (S::Checking, E::NothingNewer) => Some(S::Idle),
+
+        (S::Available { .. }, E::Download) => Some(S::Downloading { percent: 0 }),
+        (S::Downloading { .. }, E::Progress(percent)) => Some(S::Downloading {
+            percent: percent.min(100),
+        }),
+        (S::Downloading { .. }, E::Downloaded { version }) => Some(S::Ready { version }),
         (S::Checking | S::Downloading { .. }, E::Failed { message }) => Some(S::Failed {
             message,
             recoverable: true,
@@ -202,6 +216,36 @@ pub(crate) fn kind_here() -> InstallKind {
     install_kind(appimage.as_deref(), bundle.as_deref(), &tools_found())
 }
 
+/// What the app knows about the update in flight.
+///
+/// The `Update` the plugin handed back is kept because downloading needs it,
+/// and the bytes are kept because installing needs them: a second check
+/// between the two would be a second answer about which version this is.
+#[derive(Default)]
+pub struct Updating {
+    pub(crate) status: std::sync::Mutex<Option<UpdateStatus>>,
+    pub(crate) found: std::sync::Mutex<Option<tauri_plugin_updater::Update>>,
+    pub(crate) downloaded: std::sync::Mutex<Option<(String, Vec<u8>)>>,
+}
+
+impl Updating {
+    pub(crate) fn state(&self) -> UpdateStatus {
+        self.status
+            .lock()
+            .ok()
+            .and_then(|held| held.clone())
+            .unwrap_or(UpdateStatus::Idle)
+    }
+
+    fn moved_to(&self, app: &tauri::AppHandle, status: UpdateStatus) {
+        if let Ok(mut held) = self.status.lock() {
+            *held = Some(status.clone());
+        }
+        eprintln!("devpit-update {}", named(&status));
+        let _ = tauri::Emitter::emit(app, "update:status", &status);
+    }
+}
+
 /// Looks for a newer devpit on its own, while the switch says to.
 ///
 /// One line per transition on stderr and one event to the window: a person who
@@ -288,38 +332,170 @@ pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcErro
         return Ok(UpdateStatus::ExternallyManaged);
     }
 
-    let heard = if let Some(feed) = fixture_feed() {
-        feed_says(&feed, env!("CARGO_PKG_VERSION"))
+    let (heard, found) = if let Some(feed) = fixture_feed() {
+        (feed_says(&feed, env!("CARGO_PKG_VERSION")), None)
     } else {
         asked(&app, kind).await
     };
+    if let Some(updating) = app.try_state::<Updating>() {
+        if let Ok(mut held) = updating.found.lock() {
+            *held = found;
+        }
+    }
 
     // The table decides, here as everywhere: a command that builds its own
     // states is a second opinion about what may follow what.
-    next(&checking, heard).ok_or_else(|| RpcError::internal("the check ended nowhere"))
+    let ended =
+        next(&checking, heard).ok_or_else(|| RpcError::internal("the check ended nowhere"))?;
+    if let Some(updating) = app.try_state::<Updating>() {
+        updating.moved_to(&app, ended.clone());
+    }
+    Ok(ended)
 }
 
-/// What the feed answers, through the plugin.
-async fn asked(app: &tauri::AppHandle, kind: InstallKind) -> Event {
+/// What the feed answers, through the plugin, and the update it answered with.
+///
+/// The update comes back too: downloading needs the very object the check
+/// produced, and asking again would be a second answer about which version
+/// this is.
+async fn asked(
+    app: &tauri::AppHandle,
+    kind: InstallKind,
+) -> (Event, Option<tauri_plugin_updater::Update>) {
     use tauri_plugin_updater::UpdaterExt;
 
     match app.updater() {
-        Err(err) => Event::Failed {
-            message: format!("no updater: {err}"),
-        },
+        Err(err) => (
+            Event::Failed {
+                message: format!("no updater: {err}"),
+            },
+            None,
+        ),
         Ok(updater) => match updater.check().await {
-            Ok(Some(update)) => Event::Found {
-                version: update.version.clone(),
-                notes: update.body.clone().unwrap_or_default(),
-                kind,
-                test_feed: false,
-            },
-            Ok(None) => Event::NothingNewer,
-            Err(err) => Event::Failed {
-                message: format!("could not check for an update: {err}"),
-            },
+            Ok(Some(update)) => (
+                Event::Found {
+                    version: update.version.clone(),
+                    notes: update.body.clone().unwrap_or_default(),
+                    kind,
+                    test_feed: false,
+                },
+                Some(update),
+            ),
+            Ok(None) => (Event::NothingNewer, None),
+            Err(err) => (
+                Event::Failed {
+                    message: format!("could not check for an update: {err}"),
+                },
+                None,
+            ),
         },
     }
+}
+
+/// Why a download would be refused, if it would.
+///
+/// Pure, because the answer is a rule rather than a step: a build nobody
+/// installs from here, an offer from a test feed, and any state where a
+/// download makes no sense are three different sentences, and the card shows
+/// whichever one applies.
+pub(crate) fn may_download(state: &UpdateStatus) -> Result<(), String> {
+    match state {
+        UpdateStatus::Available {
+            kind, test_feed, ..
+        } => {
+            if *test_feed {
+                return Err(
+                    "this offer came from a test feed, so there is nothing to install".to_owned(),
+                );
+            }
+            match kind {
+                InstallKind::AppImage | InstallKind::Deb => Ok(()),
+                InstallKind::Unmanaged => Err(
+                    "this build was not installed from a devpit release; the release page has the files"
+                        .to_owned(),
+                ),
+                InstallKind::ExternallyManaged => {
+                    Err("this copy is looked after by your system, so update it there".to_owned())
+                }
+            }
+        }
+        UpdateStatus::Downloading { .. } => Err("this update is already downloading".to_owned()),
+        UpdateStatus::Installing => Err("this update is already installing".to_owned()),
+        _ => Err("there is nothing to download from here".to_owned()),
+    }
+}
+
+/// `update.download` — fetch the update, with the plugin verifying it.
+///
+/// Refused from any state where a download makes no sense, and refused
+/// outright for a build nobody installs from here: `make dev`, a `cargo run`,
+/// or a package the machine looks after. The signature is checked by the
+/// plugin before the bytes come back — see `updater.rs:740` — so what lands
+/// here has already been proved to come from the key this app carries.
+#[tauri::command]
+#[specta::specta]
+pub async fn update_download(
+    app: tauri::AppHandle,
+    updating: tauri::State<'_, Updating>,
+) -> Result<UpdateStatus, RpcError> {
+    let state = updating.state();
+    may_download(&state).map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why))?;
+    let going = next(&state, Event::Download)
+        .ok_or_else(|| RpcError::internal("a download the rules allow but the table does not"))?;
+
+    let found = updating
+        .found
+        .lock()
+        .ok()
+        .and_then(|mut held| held.take())
+        .ok_or_else(|| RpcError::internal("the check did not leave an update to download"))?;
+
+    updating.moved_to(&app, going);
+    let version = found.version.clone();
+    let told = app.clone();
+
+    let mut seen = 0usize;
+    let bytes = found
+        .download(
+            |chunk, total| {
+                seen += chunk;
+                if let Some(total) = total {
+                    let percent = ((seen as f64 / total as f64) * 100.0).min(100.0) as u8;
+                    if let Some(updating) = told.try_state::<Updating>() {
+                        let now = updating.state();
+                        if let Some(moved) = next(&now, Event::Progress(percent)) {
+                            updating.moved_to(&told, moved);
+                        }
+                    }
+                }
+            },
+            || {},
+        )
+        .await
+        .map_err(|err| {
+            let message = format!("the download failed: {err}");
+            if let Some(updating) = app.try_state::<Updating>() {
+                let now = updating.state();
+                if let Some(moved) = next(
+                    &now,
+                    Event::Failed {
+                        message: message.clone(),
+                    },
+                ) {
+                    updating.moved_to(&app, moved);
+                }
+            }
+            RpcError::internal(message)
+        })?;
+
+    if let Ok(mut held) = updating.downloaded.lock() {
+        *held = Some((version.clone(), bytes));
+    }
+    let now = updating.state();
+    let ready = next(&now, Event::Downloaded { version })
+        .ok_or_else(|| RpcError::internal("the download ended nowhere"))?;
+    updating.moved_to(&app, ready.clone());
+    Ok(ready)
 }
 
 #[cfg(test)]

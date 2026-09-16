@@ -86,6 +86,16 @@ export const commands = {
 	 */
 	updateCheck: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_check")),
 	/**
+	 *  `update.download` — fetch the update, with the plugin verifying it.
+	 * 
+	 *  Refused from any state where a download makes no sense, and refused
+	 *  outright for a build nobody installs from here: `make dev`, a `cargo run`,
+	 *  or a package the machine looks after. The signature is checked by the
+	 *  plugin before the bytes come back — see `updater.rs:740` — so what lands
+	 *  here has already been proved to come from the key this app carries.
+	 */
+	updateDownload: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_download")),
+	/**
 	 *  `spend.history` — what the agents spent over the last `days`, from their
 	 *  transcripts, for one installation or all and one project or all.
 	 */

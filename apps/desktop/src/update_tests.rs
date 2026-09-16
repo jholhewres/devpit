@@ -134,3 +134,44 @@ fn tools_are_looked_up_only_where_root_writes() {
         );
     }
 }
+
+/// Three refusals, three sentences.
+#[test]
+fn what_may_be_downloaded_and_what_may_not() {
+    assert_eq!(may_download(&available()), Ok(()));
+
+    let deb = S::Available {
+        version: "0.2.0".to_owned(),
+        notes: String::new(),
+        kind: InstallKind::Deb,
+        test_feed: false,
+    };
+    assert_eq!(may_download(&deb), Ok(()));
+
+    // A build nobody installs from here: `make dev`, a `cargo run`.
+    let unmanaged = S::Available {
+        version: "0.2.0".to_owned(),
+        notes: String::new(),
+        kind: InstallKind::Unmanaged,
+        test_feed: false,
+    };
+    assert!(may_download(&unmanaged)
+        .expect_err("unmanaged was allowed")
+        .contains("release page"));
+
+    // The fixture feed offers what nobody can install.
+    let fixture = S::Available {
+        version: "0.2.0".to_owned(),
+        notes: String::new(),
+        kind: InstallKind::AppImage,
+        test_feed: true,
+    };
+    assert!(may_download(&fixture)
+        .expect_err("a test feed was allowed")
+        .contains("test feed"));
+
+    // And the two states where a second download is a second update.
+    assert!(may_download(&S::Downloading { percent: 10 }).is_err());
+    assert!(may_download(&S::Installing).is_err());
+    assert!(may_download(&S::Idle).is_err());
+}
