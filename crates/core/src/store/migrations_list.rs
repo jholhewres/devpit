@@ -508,20 +508,21 @@ CREATE INDEX card_chat_card ON card_chat(card_id, created_at);
 ALTER TABLE session_link ADD COLUMN profile_id TEXT;
 "#,
     },
-    // Migration 016 — two tables nothing ever read.
+    // Migration 016 — a table nothing ever wrote to.
     Migration {
         version: 16,
         sql: r#"
--- `event` was a feed nobody wrote to and nobody drew, and `scratch` was the
--- notes behind two commands the window never called. Both were in the first
--- migration and neither ever held a row on anybody's machine.
+-- `event` was a feed nothing wrote to and nothing drew. Dropped.
 --
--- Destructive, and it has no downgrade. That costs nothing today: no release
--- has been published, so there is no older devpit to go back to. The day one
--- exists, a table is dropped in a release of its own, one version after the
--- code that stopped writing to it.
+-- `scratch` stays, although nothing reads it any more: the window wrote notes
+-- to it until the notes commands went, so a store from before then may hold
+-- somebody's notes, and a migration does not get to delete what a person
+-- wrote. It goes in a later release, after its rows have somewhere to go.
+--
+-- Destructive for `event` only, and without a downgrade, which costs nothing
+-- today: no release has been published, so there is no older devpit to go
+-- back to.
 DROP TABLE IF EXISTS event;
-DROP TABLE IF EXISTS scratch;
 "#,
     },
 ];
