@@ -332,3 +332,15 @@ body[data-account='out'] .acct { display: none; }
 .acc__tag { flex: none; font-size: 11px; color: var(--text-3); }
 .acc__note { margin: 10px 2px 0; font-size: 11.5px; line-height: 1.55; color: var(--text-3); }
 
+
+/* Focus, in the top bar beside the branch. Two words in the class because
+   `.foc` and `.focus` would both read as focusing a pane, which is what the
+   word already means everywhere else in this window. */
+.hdown {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 9px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--dim);
+  font: inherit; font-size: 11.5px; white-space: nowrap; cursor: pointer;
+}
+.hdown:hover { background: var(--overlay); color: var(--fg); }
+.hdown[data-on='true'] { background: var(--overlay-strong); color: var(--fg); }

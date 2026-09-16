@@ -1,5 +1,6 @@
 import mark from '../assets/brand/mark.png'
 import { BranchPicker } from './BranchPicker'
+import { HeadsDown } from './HeadsDown'
 import { Notices } from './Notices'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
@@ -38,6 +39,7 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
 
       <span className="drag" data-tauri-drag-region />
 
+      <HeadsDown projectId={project?.id ?? null} />
       {here && <BranchPicker branch={here.branch} ahead={here.ahead} />}
       <span className="netstat" hidden={totals.added + totals.removed === 0}>
         <span className="add">+{totals.added}</span>
