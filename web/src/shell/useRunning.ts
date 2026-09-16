@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import type { PaneRunning } from '../gen/bindings'
 import { ask, commands } from './live'
+import { whileWatched } from './whileWatched'
 
 /*
  * What each of a project's panes has in the foreground.
@@ -15,7 +16,9 @@ import { ask, commands } from './live'
  *
  * Polled, because a foreground process changes with no event to hang on. Two
  * seconds is slow enough to be free and fast enough that starting an agent
- * shows up before you have looked away.
+ * shows up before you have looked away — and only while the window is on
+ * screen, because a minimised devpit asking tmux every two seconds is asking
+ * for nobody.
  */
 
 const EVERY_MS = 2000
@@ -23,26 +26,19 @@ const EVERY_MS = 2000
 export function useRunning(projectId: string | null): readonly PaneRunning[] {
   const [running, setRunning] = useState<readonly PaneRunning[]>([])
 
-  useEffect(() => {
+  const look = useCallback(() => {
     if (!projectId) {
       setRunning([])
       return
     }
-    let dropped = false
-    const look = (): void => {
-      void ask(() => commands.sessionRunning(projectId)).then((answer) => {
-        /* A project with no session yet answers with an empty list rather
-           than an error, so there is nothing here to report. */
-        if (!dropped && answer.data) setRunning(answer.data)
-      })
-    }
-    look()
-    const timer = window.setInterval(look, EVERY_MS)
-    return () => {
-      dropped = true
-      window.clearInterval(timer)
-    }
+    void ask(() => commands.sessionRunning(projectId)).then((answer) => {
+      /* A project with no session yet answers with an empty list rather
+         than an error, so there is nothing here to report. */
+      if (answer.data) setRunning(answer.data)
+    })
   }, [projectId])
+
+  whileWatched(look, EVERY_MS, projectId)
 
   return running
 }

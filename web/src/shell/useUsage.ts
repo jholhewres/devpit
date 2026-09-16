@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import type { Usage } from '../gen/bindings'
 import { ask, commands } from './live'
+import { whileWatched } from './whileWatched'
 
 /*
  * What the terminals are costing, on a timer.
@@ -29,12 +30,7 @@ export function useUsage(projectId: string | null, watching: boolean): Usage {
     })
   }, [projectId])
 
-  useEffect(() => {
-    if (!watching) return
-    look()
-    const timer = setInterval(look, EVERY)
-    return () => clearInterval(timer)
-  }, [watching, look])
+  whileWatched(look, EVERY, projectId, watching)
 
   return usage
 }
