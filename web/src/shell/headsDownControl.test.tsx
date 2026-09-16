@@ -14,6 +14,7 @@ vi.mock('./live', () => ({
   },
   commands: {
     focusRead: async () => ({ status: 'ok', data: stored }),
+    focusWaiting: async () => ({ notices: [], more: false }),
     focusWrite: async (projectId: string | null) => {
       written.push(projectId)
       stored = projectId ? { projectId, since: Date.now() / 1000 } : null
@@ -89,6 +90,29 @@ describe('going into a focus', () => {
      it is drawn from — US-007. Testing it here meant installing fake timers
      after the component had already registered a real interval, which proves
      nothing about either. */
+})
+
+describe('opening another project', () => {
+  /* A focus is on one project by definition. Asking whether they meant it
+     would be asking about the thing they just did. */
+  it('ends the focus and says what it held', async () => {
+    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 60 }
+    const { rerender } = render(<HeadsDown projectId="prj_1" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Focus · 1 min/ })).toBeTruthy())
+
+    rerender(<HeadsDown projectId="prj_2" />)
+    await waitFor(() => expect(written).toEqual([null]))
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Focus ended' })).toBeTruthy())
+  })
+
+  it('leaves it alone while the project it is on stays open', async () => {
+    stored = { projectId: 'prj_1', since: Date.now() / 1000 }
+    const { rerender } = render(<HeadsDown projectId="prj_1" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Focus ·/ })).toBeTruthy())
+
+    rerender(<HeadsDown projectId="prj_1" waiting={2} />)
+    expect(written).toEqual([])
+  })
 })
 
 describe('what the pill says while a focus is on', () => {

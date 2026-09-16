@@ -63,6 +63,17 @@ export function HeadsDown({
     }
   }, [focus])
 
+  /* Opening another project ends the focus, without asking. A focus is on one
+     project by definition, and a question here would be asking whether the
+     person meant the thing they just did. The summary follows, the same as
+     leaving by the button. */
+  useEffect(() => {
+    if (!focus || !projectId) return
+    if (focus.projectId === projectId) return
+    setEnded(focus)
+    leave()
+  }, [focus, projectId, leave])
+
   const toggle = (): void => {
     if (focus) {
       setEnded(focus)
