@@ -53,13 +53,20 @@ export function seedHome(root, name = 'e2e-home') {
     '[user]\n\tname = devpit e2e\n\temail = e2e@devpit.invalid\n[init]\n\tdefaultBranch = main\n',
   )
 
-  const repo = join(home, 'work/fixture')
-  mkdirSync(repo, { recursive: true })
-  const git = (...args) => execFileSync('git', args, { cwd: repo, env: gitEnv(home) })
-  git('init', '-q')
-  writeFileSync(join(repo, 'README.md'), '# fixture\n\nA repository with one commit.\n')
-  git('add', 'README.md')
-  git('commit', '-qm', 'first')
+  // Two of them: a focus is about one project being interrupted by another,
+  // and one repository can only ever be one project.
+  const made = (name) => {
+    const where = join(home, 'work', name)
+    mkdirSync(where, { recursive: true })
+    const git = (...args) => execFileSync('git', args, { cwd: where, env: gitEnv(home) })
+    git('init', '-q')
+    writeFileSync(join(where, 'README.md'), `# ${name}\n\nA repository with one commit.\n`)
+    git('add', 'README.md')
+    git('commit', '-qm', 'first')
+    return where
+  }
+  const repo = made('fixture')
+  const other = made('fixture-two')
 
   // The `claude` a login shell in this home finds. A one-line shim rather
   // than a copy: the stub is source in the tree, and a copy would go stale the
@@ -75,7 +82,7 @@ export function seedHome(root, name = 'e2e-home') {
     `${JSON.stringify({ version: '99.0.0', notes: 'A version from a file, for the suite.' }, null, 2)}\n`,
   )
 
-  return { home, repo, feed, bin, stub }
+  return { home, repo, other, feed, bin, stub }
 }
 
 /**

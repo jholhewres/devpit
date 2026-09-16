@@ -80,6 +80,7 @@ try {
       E2E_ROOT: root,
       E2E_HOME: seeded.home,
       E2E_REPO: seeded.repo,
+      E2E_REPO_TWO: seeded.other,
       E2E_APP_LOG: log,
     },
   })
