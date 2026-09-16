@@ -64,6 +64,22 @@ impl Store {
 
     /// Closes every run left open by a process that is gone.
     ///
+    /// The runs going right now, by what a person would call them.
+    ///
+    /// Read-only, unlike `close_abandoned_runs`: this one is asked while the
+    /// app is up, by anything that has to know whether interrupting would cost
+    /// somebody their work.
+    pub fn running_runs(&self) -> Result<Vec<(String, String)>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.id, c.title FROM run r JOIN card c ON c.id = r.card_id \
+             WHERE r.state = 'running' AND r.ended_at IS NULL ORDER BY r.started_at",
+        )?;
+        let found = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<Vec<(String, String)>, _>>()?;
+        Ok(found)
+    }
+
     /// Called once at launch. A `running` row with no `ended_at` after a
     /// restart is not a run still going — nothing survives the process that
     /// spawned its thread — so leaving it says the card is working when it is

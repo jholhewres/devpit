@@ -70,7 +70,7 @@ pub use spend::{
 };
 pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
-pub use update::{InstallKind, UpdateStatus};
+pub use update::{InstallKind, UpdateBlocking, UpdateStatus, UpdateWork};
 pub use usage::{PaneCost, Usage};
 
 use serde::{Deserialize, Serialize};

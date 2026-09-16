@@ -17,7 +17,7 @@ use devpit_rpc::{
 use tauri::ipc::Channel;
 
 use crate::card_activity::Doing;
-use tauri::State;
+use tauri::{Manager, State};
 
 /// The turns in flight, by conversation, so one can be stopped.
 #[derive(Default)]
@@ -223,6 +223,13 @@ pub async fn chat_send(
 
     // Claimed before anything is spawned, and released by the guard however
     // this returns.
+    // Nothing new once an update is about to go in: a turn started here would
+    // die with the process at the commit, halfway through an answer.
+    if let Some(updating) = app.try_state::<crate::update::Updating>() {
+        if let Some(why) = crate::update::starting_refused(&updating.state()) {
+            return Err(RpcError::new(ErrorCode::Conflict, why.to_owned()));
+        }
+    }
     let guard = state.begin(&conversation_id, &steering)?;
     let control = steering.hold(&conversation_id);
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);

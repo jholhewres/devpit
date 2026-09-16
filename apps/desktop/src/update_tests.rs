@@ -175,3 +175,57 @@ fn what_may_be_downloaded_and_what_may_not() {
     assert!(may_download(&S::Installing).is_err());
     assert!(may_download(&S::Idle).is_err());
 }
+
+/// From `Ready` onward nothing new starts — and `Ready` is the point, not
+/// `Waiting`: a card set to advance on its own (`advancing.rs`) would
+/// otherwise start a run between the moment the person chose and the moment
+/// the installer commits, and that run dies with the process.
+#[test]
+fn a_run_started_between_the_check_and_the_commit_is_refused() {
+    let ready = S::Ready {
+        version: "0.2.0".to_owned(),
+    };
+    assert!(starting_refused(&ready).is_some());
+    assert!(starting_refused(&S::Waiting {
+        runs: 1,
+        turns: 0,
+        since: 0.0
+    })
+    .is_some());
+    assert!(starting_refused(&S::Installing).is_some());
+
+    // And before that, work goes on as usual: an offer nobody accepted yet
+    // must not stop a person from starting something.
+    assert!(starting_refused(&S::Idle).is_none());
+    assert!(starting_refused(&available()).is_none());
+    assert!(starting_refused(&S::Downloading { percent: 40 }).is_none());
+}
+
+#[test]
+fn the_plan_follows_the_choice_and_what_is_running() {
+    let nothing = devpit_rpc::UpdateWork::default();
+    let busy = devpit_rpc::UpdateWork {
+        runs: vec![devpit_rpc::UpdateBlocking {
+            id: "run_1".to_owned(),
+            title: "Wire the board".to_owned(),
+        }],
+        turns: Vec::new(),
+    };
+
+    // Nothing in the way: the choice does not come up at all.
+    assert_eq!(
+        install_plan(Choice::WhenItIsDone, &nothing),
+        Plan::InstallNow
+    );
+    assert_eq!(install_plan(Choice::StopIt, &nothing), Plan::InstallNow);
+
+    assert_eq!(install_plan(Choice::WhenItIsDone, &busy), Plan::WaitForIdle);
+    assert_eq!(install_plan(Choice::StopIt, &busy), Plan::StopThenInstall);
+
+    // Later is later, whatever is running.
+    assert_eq!(install_plan(Choice::Later, &busy), Plan::Later);
+    assert_eq!(install_plan(Choice::Later, &nothing), Plan::Later);
+
+    assert_eq!(blockers(&busy), 1);
+    assert_eq!(blockers(&nothing), 0);
+}

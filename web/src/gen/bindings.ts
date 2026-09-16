@@ -96,6 +96,21 @@ export const commands = {
 	 */
 	updateDownload: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_download")),
 	/**
+	 *  What a person would recognise the work in flight by.
+	 * 
+	 *  Titles rather than ids: "two runs" is a number, and the question on screen
+	 *  is whether *this* is worth interrupting.
+	 */
+	updateRunning: () => typedError<UpdateWork, RpcError>(__TAURI_INVOKE("update_running")),
+	/**
+	 *  `update.choose` — what to do about the work in flight.
+	 * 
+	 *  Answers the state the choice leaves behind. Installing itself is not here:
+	 *  this is the moment a person decides, and from `Ready` onward nothing new
+	 *  starts whatever they decide.
+	 */
+	updateChoose: (choice: string) => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_choose", { choice })),
+	/**
 	 *  `spend.history` — what the agents spent over the last `days`, from their
 	 *  transcripts, for one installation or all and one project or all.
 	 */
@@ -2628,6 +2643,17 @@ export type TurnEnd = {
 	isError: boolean,
 };
 
+/**  One thing an update is waiting for. */
+export type UpdateBlocking = {
+	/**  The run or the conversation. */
+	id: string,
+	/**
+	 *  What a person would recognise it by: the card's title, the
+	 *  conversation's.
+	 */
+	title: string,
+};
+
 /**  Where the update is, and what may be done about it. */
 export type UpdateStatus = 
 /**  Nothing known, or nothing newer. */
@@ -2653,6 +2679,12 @@ since: number | null } |
 { type: "manualInstall"; command: string; path: string } | { type: "externallyManaged" } | { type: "failed"; message: string; 
 /**  False once the install has committed: there is nothing to retry. */
 recoverable: boolean };
+
+/**  What is running while an update waits to install. */
+export type UpdateWork = {
+	runs: UpdateBlocking[],
+	turns: UpdateBlocking[],
+};
 
 /**  Every pane of a project, and the total. */
 export type Usage = {

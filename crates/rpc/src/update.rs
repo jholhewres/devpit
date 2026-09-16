@@ -74,3 +74,22 @@ pub enum UpdateStatus {
         recoverable: bool,
     },
 }
+
+/// One thing an update is waiting for.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateBlocking {
+    /// The run or the conversation.
+    pub id: String,
+    /// What a person would recognise it by: the card's title, the
+    /// conversation's.
+    pub title: String,
+}
+
+/// What is running while an update waits to install.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateWork {
+    pub runs: Vec<UpdateBlocking>,
+    pub turns: Vec<UpdateBlocking>,
+}

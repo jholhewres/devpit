@@ -38,6 +38,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         plan_limits::plan_limits,
         update::update_check,
         update::update_download,
+        update::update_running,
+        update::update_choose,
         spend_history::spend_history,
         card_chat::card_chat,
         rewinding::chat_rewind,

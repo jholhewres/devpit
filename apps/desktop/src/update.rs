@@ -7,7 +7,7 @@
 
 use tauri::Manager;
 
-use devpit_rpc::{InstallKind, RpcError, UpdateStatus};
+use devpit_rpc::{InstallKind, RpcError, UpdateBlocking, UpdateStatus, UpdateWork};
 
 /// What can happen to an update, from the app or from the network.
 ///
@@ -29,10 +29,18 @@ pub(crate) enum Event {
     NothingNewer,
     Download,
     Progress(u8),
+    /// Work is still running, so the install waits for it.
+    Blocked {
+        runs: u32,
+        turns: u32,
+        since: f64,
+    },
     /// Downloaded, and verified by the plugin before the bytes came back.
     Downloaded {
         version: String,
     },
+    /// Not now.
+    Cancel,
     Failed {
         message: String,
     },
@@ -80,6 +88,10 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
             percent: percent.min(100),
         }),
         (S::Downloading { .. }, E::Downloaded { version }) => Some(S::Ready { version }),
+        (S::Ready { .. }, E::Blocked { runs, turns, since }) => {
+            Some(S::Waiting { runs, turns, since })
+        }
+        (S::Waiting { .. }, E::Cancel) | (S::Ready { .. }, E::Cancel) => Some(S::Idle),
         (S::Checking | S::Downloading { .. }, E::Failed { message }) => Some(S::Failed {
             message,
             recoverable: true,
@@ -390,6 +402,157 @@ async fn asked(
             ),
         },
     }
+}
+
+/// What a person chose to do about the work in flight.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Choice {
+    /// Wait for it to finish, then install.
+    WhenItIsDone,
+    /// Stop it and install now.
+    StopIt,
+    /// Not now.
+    Later,
+}
+
+/// What the app does about an update, given the choice and what is running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Plan {
+    /// Nothing is running: install.
+    InstallNow,
+    /// Hold the update until the work ends.
+    WaitForIdle,
+    /// Stop the work, then install.
+    StopThenInstall,
+    Later,
+}
+
+/// What an update would be waiting for.
+///
+/// Pure over the two lists so the rule can be read without a store: a run with
+/// no card title still blocks, and an empty pair is the only thing that lets an
+/// install go straight through.
+pub(crate) fn blockers(work: &UpdateWork) -> usize {
+    work.runs.len() + work.turns.len()
+}
+
+/// The plan, from the choice and what is in the way.
+pub(crate) fn install_plan(choice: Choice, work: &UpdateWork) -> Plan {
+    if choice == Choice::Later {
+        return Plan::Later;
+    }
+    if blockers(work) == 0 {
+        return Plan::InstallNow;
+    }
+    match choice {
+        Choice::WhenItIsDone => Plan::WaitForIdle,
+        Choice::StopIt => Plan::StopThenInstall,
+        Choice::Later => Plan::Later,
+    }
+}
+
+/// Why new work is refused, once an update is ready to go in.
+///
+/// From `Ready` onward, not only while waiting: a card set to advance on its
+/// own (`advancing.rs`) would otherwise start a run between the moment the
+/// person chose and the moment the installer commits, and that run dies with
+/// the process.
+pub(crate) fn starting_refused(state: &UpdateStatus) -> Option<&'static str> {
+    match state {
+        UpdateStatus::Ready { .. } | UpdateStatus::Waiting { .. } => {
+            Some("an update is about to be installed, so nothing new is started")
+        }
+        UpdateStatus::Installing => Some("an update is installing"),
+        _ => None,
+    }
+}
+
+/// What a person would recognise the work in flight by.
+///
+/// Titles rather than ids: "two runs" is a number, and the question on screen
+/// is whether *this* is worth interrupting.
+#[tauri::command]
+#[specta::specta]
+pub fn update_running(
+    talking: tauri::State<'_, crate::chat::Talking>,
+) -> Result<UpdateWork, RpcError> {
+    let store = devpit_core::Store::open_default()?;
+    let runs = store
+        .running_runs()?
+        .into_iter()
+        .map(|(id, title)| UpdateBlocking { id, title })
+        .collect();
+
+    let turns = talking
+        .running
+        .lock()
+        .map(|held| held.keys().cloned().collect::<Vec<_>>())
+        .unwrap_or_default()
+        .into_iter()
+        .map(|conversation_id| {
+            // A conversation is named by the card it is about; one that is
+            // about no card is named by itself rather than by nothing.
+            let title = store
+                .chat_card(&conversation_id)
+                .ok()
+                .flatten()
+                .and_then(|card_id| store.card(&card_id).ok().flatten())
+                .map(|card| card.title)
+                .unwrap_or_else(|| conversation_id.clone());
+            UpdateBlocking {
+                id: conversation_id,
+                title,
+            }
+        })
+        .collect();
+
+    Ok(UpdateWork { runs, turns })
+}
+
+/// `update.choose` — what to do about the work in flight.
+///
+/// Answers the state the choice leaves behind. Installing itself is not here:
+/// this is the moment a person decides, and from `Ready` onward nothing new
+/// starts whatever they decide.
+#[tauri::command]
+#[specta::specta]
+pub fn update_choose(
+    app: tauri::AppHandle,
+    updating: tauri::State<'_, Updating>,
+    talking: tauri::State<'_, crate::chat::Talking>,
+    choice: String,
+) -> Result<UpdateStatus, RpcError> {
+    let chose = match choice.as_str() {
+        "whenItIsDone" => Choice::WhenItIsDone,
+        "stopIt" => Choice::StopIt,
+        "later" => Choice::Later,
+        other => {
+            return Err(RpcError::new(
+                devpit_rpc::ErrorCode::Invalid,
+                format!("no such choice: {other}"),
+            ))
+        }
+    };
+
+    let work = update_running(talking)?;
+    let state = updating.state();
+    let moved = match install_plan(chose, &work) {
+        Plan::Later => next(&state, Event::Cancel),
+        Plan::WaitForIdle => next(
+            &state,
+            Event::Blocked {
+                runs: work.runs.len() as u32,
+                turns: work.turns.len() as u32,
+                since: now(),
+            },
+        ),
+        // Both mean "go", and going is US-016a's; the state stays where it is.
+        Plan::InstallNow | Plan::StopThenInstall => None,
+    };
+
+    let ended = moved.unwrap_or(state);
+    updating.moved_to(&app, ended.clone());
+    Ok(ended)
 }
 
 /// Why a download would be refused, if it would.

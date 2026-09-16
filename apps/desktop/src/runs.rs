@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 use devpit_core::Store;
-use devpit_rpc::{RpcError, Run, RunState, Step, StepKind};
+use devpit_rpc::{ErrorCode, RpcError, Run, RunState, Step, StepKind};
 use tauri::AppHandle;
 
 use crate::card_activity::{run_heard, run_reference, Doing};
@@ -55,6 +55,15 @@ pub fn start_chained(
     came_from: Option<&str>,
     hops: u8,
 ) -> Result<Run, RpcError> {
+    // Nothing new once an update is about to go in. This is the single place a
+    // run is born, so a card advancing on its own is refused here too — its
+    // process would die with this one at the commit.
+    if let Some(updating) = tauri::Manager::try_state::<crate::update::Updating>(&app) {
+        if let Some(why) = crate::update::starting_refused(&updating.state()) {
+            return Err(RpcError::new(ErrorCode::Conflict, why.to_owned()));
+        }
+    }
+
     let run_id = store.start_run(card_id, &step.id, came_from)?;
     // A session of its own for every run: two runs of one card are two
     // conversations, and one id for both would write the second over the first.
