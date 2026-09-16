@@ -114,6 +114,9 @@ fn main() {
     // session — ensure, split, write, resize — is in the generated contract.
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // Checking and downloading are the app's; installing is not — see
+        // `update` for why only an AppImage is ever installed from here.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(chat::Talking::default())
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())

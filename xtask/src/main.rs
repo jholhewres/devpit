@@ -14,6 +14,7 @@ mod csp;
 mod dead_controls;
 mod home_paths;
 mod naming;
+mod packaging;
 mod platform_window;
 mod ratchet;
 mod reseed;
@@ -80,6 +81,7 @@ fn check() -> ExitCode {
     findings.extend(home_paths::paths_come_from_home(&root));
     findings.extend(csp::the_csp_forbids_what_the_app_never_needs(&root));
     findings.extend(versions::the_version_has_one_source(&root));
+    findings.extend(packaging::the_bundle_says_what_it_ships(&root));
 
     if findings.is_empty() {
         println!("guards: ok");

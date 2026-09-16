@@ -31,6 +31,8 @@ getrandom = "0.3"
 # on every machine that builds it.
 reqwest = { version = "0.12", default-features = false, features = ["cookies", "json", "rustls-tls"] }
 tauri-plugin-dialog = "2.7.3"
+# The 2.x line for tauri 2.11.5; 3.0.0-alpha.0 is the tauri-3 one.
+tauri-plugin-updater = "2.11.0"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

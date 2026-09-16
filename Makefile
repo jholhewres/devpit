@@ -42,11 +42,16 @@ dev: node_modules ## Run the app with hot reload
 build: node_modules ## Bundle a release binary, frontend included
 	$(TAURI) build
 
-# A .deb only. The AppImage bundler downloads linuxdeploy and its plugins at
-# bundle time, so a build that includes it needs the network and fails behind
-# anything that blocks those hosts. Ask for it explicitly when you want one:
+# A .deb only, and no updater artifacts. The AppImage bundler downloads
+# linuxdeploy and its plugins at bundle time, so a build that includes it needs
+# the network and fails behind anything that blocks those hosts — and every PR
+# runs this target. The release does both, through an overlay that is the only
+# place the AppImage and the signing live:
 #
-#     ./node_modules/.bin/tauri build --bundles appimage
+#     ./node_modules/.bin/tauri build --config apps/desktop/tauri.release.conf.json
+#
+# That overlay also needs TAURI_SIGNING_PRIVATE_KEY, and on this distribution
+# the AppImage step needs librsvg2-dev for linuxdeploy's gtk plugin.
 
 test: node_modules ## Everything CI runs: guards, Rust, frontend
 	cargo fmt --all --check
