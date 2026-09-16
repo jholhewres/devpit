@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { stepConfig } from './stepConfig'
+import { CONTEXT_KEYS, stepConfig } from './stepConfig'
 
 /*
  * The cases are shared with `apps/desktop/src/steps/recipe_tests.rs`, which
@@ -40,5 +40,19 @@ describe('what the step form saves', () => {
     expect(JSON.parse(stepConfig('command', { command: 'make test', timeoutSeconds: 'soon' }))).toEqual({
       command: 'make test',
     })
+  })
+})
+
+/* The list a step chooses from has to be the list the backend accepts, and
+   there is no command that hands it over — so it is read off the source. */
+describe('the context a step can ask for', () => {
+  it('offers exactly the keys the backend answers', () => {
+    const rust = readFileSync(
+      resolve(process.cwd(), '../apps/desktop/src/steps/context.rs'),
+      'utf8',
+    )
+    const listed = /CONTEXT_KEYS[^=]*=\s*&\[([^\]]*)\]/.exec(rust)?.[1] ?? ''
+    const keys = [...listed.matchAll(/"([A-Za-z]+)"/g)].map((one) => one[1])
+    expect(keys).toEqual([...CONTEXT_KEYS])
   })
 })

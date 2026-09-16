@@ -127,6 +127,10 @@ fn a_step_made_in_the_form_runs() {
                 assert_eq!(check_kind(StepKind::Session, &config), None, "{config}");
                 crate::steps::session::readable(&config).expect("the runner reads it");
             }
+            "agent" => {
+                assert_eq!(check_kind(StepKind::Agent, &config), None, "{config}");
+                crate::steps::agent_config::readable(&config).expect("the runner reads it");
+            }
             other => panic!("the fixture has a kind nothing runs: {other}"),
         }
     }

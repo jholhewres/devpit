@@ -19,6 +19,32 @@
       "kind": "session",
       "fields": { "model": "", "profile": "" },
       "config": {}
+    },
+    {
+      "kind": "agent",
+      "fields": {
+        "agent": "architect",
+        "profile": "01JGLM",
+        "model": "sonnet",
+        "capUsd": "2",
+        "prompt": "Review the change",
+        "inject": "branch, cardTitle",
+        "expects": "{\"type\":\"object\"}"
+      },
+      "config": {
+        "agent": "architect",
+        "profile": "01JGLM",
+        "model": "sonnet",
+        "capUsd": 2,
+        "prompt": "Review the change",
+        "inject": ["branch", "cardTitle"],
+        "expects": "{\"type\":\"object\"}"
+      }
+    },
+    {
+      "kind": "agent",
+      "fields": { "capUsd": "0.5", "prompt": "Summarise it", "inject": "" },
+      "config": { "capUsd": 0.5, "prompt": "Summarise it" }
     }
   ]
 }

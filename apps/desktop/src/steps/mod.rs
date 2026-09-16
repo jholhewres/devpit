@@ -6,6 +6,7 @@
 //! size ratchet asked for this, and it was right.
 
 pub mod agent;
+pub mod agent_config;
 pub mod command;
 pub mod context;
 pub mod recipe;

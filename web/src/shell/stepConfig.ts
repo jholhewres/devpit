@@ -11,6 +11,22 @@
 /** What the person typed, by field name. */
 export type Fields = Readonly<Record<string, string>>
 
+/**
+ * What a step may be told about the card it runs on.
+ *
+ * The same list as `CONTEXT_KEYS` in `apps/desktop/src/steps/context.rs`,
+ * which refuses a key that is not in it. Kept honest by `stepConfig.test.ts`,
+ * which reads the Rust one.
+ */
+export const CONTEXT_KEYS = [
+  'card',
+  'cardTitle',
+  'cardBody',
+  'branch',
+  'worktreePath',
+  'projectPath',
+] as const
+
 export function stepConfig(kind: string, fields: Fields): string {
   const text = (key: string): string => (fields[key] ?? '').trim()
 
@@ -31,5 +47,20 @@ export function stepConfig(kind: string, fields: Fields): string {
     })
   }
 
-  return JSON.stringify({ agent: text('agent') })
+  const chosen = text('inject')
+    .split(',')
+    .map((one) => one.trim())
+    .filter(Boolean)
+  const cap = Number(text('capUsd'))
+  return JSON.stringify({
+    ...(text('agent') ? { agent: text('agent') } : {}),
+    ...(text('profile') ? { profile: text('profile') } : {}),
+    ...(text('model') ? { model: text('model') } : {}),
+    // Left out when it is not a number of dollars, so the step is refused for
+    // having no cap rather than saved with a cap of zero.
+    ...(Number.isFinite(cap) && cap > 0 ? { capUsd: cap } : {}),
+    prompt: text('prompt'),
+    ...(chosen.length ? { inject: chosen } : {}),
+    ...(text('expects') ? { expects: text('expects') } : {}),
+  })
 }

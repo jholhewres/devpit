@@ -3,45 +3,9 @@
 use devpit_agentcli as agent;
 use devpit_core::Store;
 use devpit_rpc::Step;
-use serde::Deserialize;
 
 use super::context::{injected, Context};
 use super::Finished;
-
-/// What an `agent` step needs to know, out of `step.config`.
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase", default)]
-struct AgentConfig {
-    /// The agent to run, by the name in its frontmatter.
-    ///
-    /// A subagent, not a CLI account — `profile` is that, and the two live in
-    /// this JSON side by side without being related.
-    agent: Option<String>,
-    /// Which profile runs it: the program, its arguments and the environment
-    /// that picks the account. Absent runs whatever the build's default is,
-    /// which is what every step did before profiles existed.
-    profile: Option<String>,
-    /// What to ask. The card's title and body are appended to it.
-    prompt: String,
-    /// A JSON Schema the answer has to satisfy.
-    #[serde(alias = "expects")]
-    schema: Option<String>,
-    /// The ceiling. A step without one does not run: an agent with no ceiling
-    /// is a bill nobody agreed to.
-    #[serde(alias = "capUsd")]
-    budget_usd: Option<f64>,
-    model: Option<String>,
-    /// Skills this step allows. Only these; a skill the step never named does
-    /// not reach the command.
-    skills: Vec<String>,
-    /// Context to put in front of the agent, by key. Reaches the process as
-    /// environment variables and never as text pasted into a command.
-    inject: Vec<String>,
-    /// The field of the answer that carries the verdict, and the value that
-    /// means "not yet". Absent means this step never sends a card back.
-    verdict_field: Option<String>,
-    sends_back_when: Option<String>,
-}
 
 pub fn run(
     store: &Store,
@@ -52,8 +16,7 @@ pub fn run(
     mut on_progress: impl FnMut(&str),
     on_start: impl FnMut(u32),
 ) -> Result<Finished, String> {
-    let config: AgentConfig = serde_json::from_str(&step.config)
-        .map_err(|err| format!("this step's config is not readable: {err}"))?;
+    let config = super::agent_config::readable(&step.config)?;
 
     // No ceiling, no run. Said here rather than after the money is spent.
     let Some(cap) = config.budget_usd else {

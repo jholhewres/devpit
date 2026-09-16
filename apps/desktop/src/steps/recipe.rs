@@ -5,22 +5,8 @@
 //! two screens away from the message.
 
 use devpit_rpc::StepKind;
-use serde::Deserialize;
 
 use super::context::CONTEXT_KEYS;
-
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase", default)]
-struct Declared {
-    agent: Option<String>,
-    /// Which CLI account runs it, as a profile id. A different thing from
-    /// `agent`, which is a subagent from somebody's frontmatter.
-    profile: Option<String>,
-    #[serde(alias = "capUsd")]
-    budget_usd: Option<f64>,
-    skills: Vec<String>,
-    inject: Vec<String>,
-}
 
 /// Why this step cannot be saved, or nothing when it can.
 ///
@@ -46,9 +32,9 @@ pub fn refuse(
         StepKind::Session => return super::session::readable(config).err(),
         StepKind::Agent => {}
     }
-    let declared: Declared = match serde_json::from_str(config) {
+    let declared = match super::agent_config::readable(config) {
         Ok(declared) => declared,
-        Err(err) => return Some(format!("this step's config is not readable: {err}")),
+        Err(why) => return Some(why),
     };
 
     if declared.budget_usd.is_none() {

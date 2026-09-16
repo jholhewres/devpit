@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Step } from '../gen/bindings'
@@ -17,7 +17,10 @@ const step = (over: Partial<Step> = {}): Step => ({
 
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null }),
-  commands: { agentProfiles: () => [{ id: 'prof_glm', label: 'glm' }] },
+  commands: {
+    agentProfiles: () => [{ id: 'prof_glm', label: 'glm' }],
+    agentsList: () => ({ agents: [{ name: 'architect' }], rejected: [], directory: '/home/me/.devpit/agents' }),
+  },
 }))
 
 const lanes = [
@@ -170,5 +173,50 @@ describe('the form that makes a step', () => {
     open()
     fireEvent.change(screen.getByPlaceholderText('tests'), { target: { value: 'suite' } })
     expect(screen.getByText('Create').hasAttribute('disabled')).toBe(true)
+  })
+})
+
+describe('the form that makes an agent step', () => {
+  const open = () => {
+    const onCreate = vi.fn()
+    draw({ onCreate })
+    fireEvent.click(screen.getByTitle('Runs tests'))
+    fireEvent.click(screen.getByText(/New step/))
+    fireEvent.click(screen.getByText('Agent'))
+    return onCreate
+  }
+
+  /* The cap is the rule the backend refuses a step for. Asked for here, so
+     nobody learns about it when a card lands on the lane. */
+  it('will not make one without a cap, however much else is filled in', () => {
+    open()
+    fireEvent.change(screen.getByPlaceholderText('tests'), { target: { value: 'review' } })
+    fireEvent.change(screen.getByPlaceholderText('Review the change'), { target: { value: 'Review it' } })
+    expect(screen.getByText('Create').hasAttribute('disabled')).toBe(true)
+    fireEvent.change(screen.getByPlaceholderText('2'), { target: { value: '2' } })
+    expect(screen.getByText('Create').hasAttribute('disabled')).toBe(false)
+  })
+
+  it('offers the agents on this machine and saves what the runner reads', async () => {
+    const onCreate = open()
+    // A datalist option is an empty element with a value: what the person
+    // sees is the list under the field, not text on the page.
+    await waitFor(() =>
+      expect(document.querySelector('#stepnew-agents option')?.getAttribute('value')).toBe('architect'),
+    )
+    fireEvent.change(screen.getByPlaceholderText('tests'), { target: { value: 'review' } })
+    fireEvent.change(screen.getByPlaceholderText('whichever the account defaults to'), {
+      target: { value: 'architect' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('Review the change'), { target: { value: 'Review it' } })
+    fireEvent.change(screen.getByPlaceholderText('2'), { target: { value: '2' } })
+    fireEvent.click(screen.getByText('branch'))
+    fireEvent.click(screen.getByText('Create'))
+    expect(onCreate).toHaveBeenCalledWith(
+      'agent',
+      'review',
+      '{"agent":"architect","capUsd":2,"prompt":"Review it","inject":["branch"]}',
+      false,
+    )
   })
 })

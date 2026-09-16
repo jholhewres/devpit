@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import type { Profile } from '../gen/bindings'
+import type { Agent, Profile } from '../gen/bindings'
 import { ask, commands } from './live'
-import { stepConfig, type Fields } from './stepConfig'
+import { CONTEXT_KEYS, stepConfig, type Fields } from './stepConfig'
 
 /*
  * The form that makes a step.
@@ -25,6 +25,8 @@ type Field = {
   placeholder: string
   /** A step without it would not run, so Create stays out of reach. */
   needed?: boolean
+  /** Prose rather than a line: a prompt, or the schema of an answer. */
+  prose?: boolean
 }
 
 const FIELDS: Readonly<Record<string, readonly Field[]>> = {
@@ -33,7 +35,14 @@ const FIELDS: Readonly<Record<string, readonly Field[]>> = {
     { key: 'timeoutSeconds', label: 'Give up after (seconds)', placeholder: 'as long as it takes' },
   ],
   session: [{ key: 'model', label: 'Model', placeholder: 'whatever the account defaults to' }],
-  agent: [{ key: 'agent', label: 'Agent', placeholder: 'reviewer', needed: true }],
+  agent: [
+    { key: 'prompt', label: 'Ask', placeholder: 'Review the change', needed: true, prose: true },
+    // A step with no ceiling is a bill nobody agreed to, so the backend
+    // refuses one. Asked for here rather than discovered on the lane.
+    { key: 'capUsd', label: 'Spending cap (USD)', placeholder: '2', needed: true },
+    { key: 'model', label: 'Model', placeholder: 'whatever the account defaults to' },
+    { key: 'expects', label: 'The answer must match (JSON Schema)', placeholder: 'any answer will do', prose: true },
+  ],
 }
 
 export function StepNew({
@@ -47,20 +56,37 @@ export function StepNew({
   const [name, setName] = useState('')
   const [fields, setFields] = useState<Fields>({})
   const [profiles, setProfiles] = useState<readonly Profile[]>([])
+  const [agents, setAgents] = useState<readonly Agent[]>([])
   const [irreversible, setIrreversible] = useState(false)
   const chosen = KINDS.find((one) => one.id === kind)
   const asked = FIELDS[kind] ?? []
 
-  // Only the accounts, and only when a session is being made: the list is a
-  // question about which CLI runs it, and the other kinds do not ask it yet.
+  // A command runs as itself; the two kinds that spend somebody's account ask
+  // which one.
   useEffect(() => {
-    if (kind !== 'session') return
+    if (kind === 'command') return
     void ask(() => commands.agentProfiles()).then((answer) => setProfiles(answer.data ?? []))
+  }, [kind])
+
+  // Offered rather than typed: a step stores an agent by the name in its
+  // frontmatter, and a free-text field over the files on disk is a typo that
+  // fails when the card lands on the lane.
+  useEffect(() => {
+    if (kind !== 'agent') return
+    void ask(() => commands.agentsList()).then((answer) => setAgents(answer.data?.agents ?? []))
   }, [kind])
 
   const typed = (key: string, value: string): void =>
     setFields((was) => ({ ...was, [key]: value }))
   const missing = asked.some((one) => one.needed && !(fields[one.key] ?? '').trim())
+  const injected = (fields.inject ?? '').split(',').map((one) => one.trim())
+  const inject = (key: string): void =>
+    typed(
+      'inject',
+      (injected.includes(key) ? injected.filter((one) => one !== key) : [...injected, key])
+        .filter(Boolean)
+        .join(', '),
+    )
 
   return (
     <div className="lstep__pop lstep__pop--wide">
@@ -91,20 +117,71 @@ export function StepNew({
         />
       </label>
 
+      {kind === 'agent' && (
+        <label className="fld">
+          <span className="fld__l">Agent</span>
+          <input
+            className="fld__b"
+            list="stepnew-agents"
+            value={fields.agent ?? ''}
+            spellCheck={false}
+            placeholder="whichever the account defaults to"
+            onChange={(event) => typed('agent', event.target.value)}
+          />
+          <datalist id="stepnew-agents">
+            {agents.map((one) => (
+              <option key={one.name} value={one.name} />
+            ))}
+          </datalist>
+        </label>
+      )}
+
       {asked.map((one) => (
         <label className="fld" key={one.key}>
           <span className="fld__l">{one.label}</span>
-          <input
-            className="fld__b"
-            value={fields[one.key] ?? ''}
-            spellCheck={false}
-            placeholder={one.placeholder}
-            onChange={(event) => typed(one.key, event.target.value)}
-          />
+          {one.prose ? (
+            <textarea
+              className="lstep__ta"
+              value={fields[one.key] ?? ''}
+              spellCheck={false}
+              placeholder={one.placeholder}
+              onChange={(event) => typed(one.key, event.target.value)}
+            />
+          ) : (
+            <input
+              className="fld__b"
+              value={fields[one.key] ?? ''}
+              spellCheck={false}
+              placeholder={one.placeholder}
+              onChange={(event) => typed(one.key, event.target.value)}
+            />
+          )}
         </label>
       ))}
 
-      {kind === 'session' && (
+      {kind === 'agent' && (
+        <label className="fld">
+          <span className="fld__l">Tell it about the card</span>
+          {CONTEXT_KEYS.map((key) => (
+            <button
+              className="ask__opt"
+              key={key}
+              role="checkbox"
+              aria-checked={injected.includes(key)}
+              onClick={() => inject(key)}
+            >
+              <span className="box">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+              <span className="ask__ot">{key}</span>
+            </button>
+          ))}
+        </label>
+      )}
+
+      {kind !== 'command' && (
         <label className="fld">
           <span className="fld__l">Account</span>
           <div className="src__sw">
