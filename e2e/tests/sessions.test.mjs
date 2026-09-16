@@ -24,16 +24,38 @@ let project
 const card = async (title) =>
   (await invoke(window, 'board_get', { projectId: project.id })).cards.find((one) => one.title === title)
 
+/**
+ * What the card's dot on the board says, read off the tile.
+ *
+ * From the screen and not from `board_get`: the backend knowing is the half
+ * that was already tested, and a tile that never repainted passed with it.
+ * The board stays in the page behind other tabs, so the tile is readable
+ * while a terminal is in front.
+ */
+async function dotOf(title) {
+  const id = (await card(title))?.id
+  return window.executeScript(function (id) {
+    const tile = document.querySelector('[data-card="' + id + '"]')
+    return tile?.querySelector('.tile__doing')?.getAttribute('data-doing') ?? null
+  }, id)
+}
+
 /** Waits for the card's dot to say this, and answers what it said last. */
 async function until_doing(title, wanted, seconds = 25) {
   let last = null
   for (let tick = 0; tick < seconds * 2; tick += 1) {
-    last = (await card(title))?.activity ?? null
+    last = await dotOf(title)
     if (last === wanted) return last
     await wait(500)
   }
   return last
 }
+
+/** The open card's own landmark, and the title in it. */
+const openCardTitle = () =>
+  window.executeScript(
+    'return document.querySelector(\'[role="dialog"][aria-label="Card"] input[aria-label="Title"]\')?.value ?? null',
+  )
 
 /** The pane that appeared since `before`, once something runs in it. */
 async function newPane(known, seconds = 20) {
@@ -152,6 +174,10 @@ describe('manual item 8 — a waiting agent rings the bell and opens its card', 
     assert.equal(await until_doing('Needs you', 'waiting'), 'waiting')
 
     await backToTheBoard()
+    // No card open before the click, so the one that opens is the notice's.
+    await escape(window)
+    await settle(300)
+    assert.equal(await openCardTitle(), null, 'a card was already open before the notice was clicked')
     const bell = await window.wait(async () => {
       const label = await window.executeScript(
         "return document.querySelector('.bell__b')?.getAttribute('aria-label') ?? ''",
@@ -169,7 +195,7 @@ describe('manual item 8 — a waiting agent rings the bell and opens its card', 
       }) ?? notices[0]
       hit.click()
     })
-    await window.wait(async () => (await text(window)).includes('Needs you'), 10000)
+    await window.wait(async () => (await openCardTitle()) === 'Needs you', 10000)
     type(home, pane, '/exit')
   })
 })

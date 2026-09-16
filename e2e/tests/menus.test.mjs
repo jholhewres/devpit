@@ -64,8 +64,12 @@ describe('manual item 1 — the card menu does what it says', () => {
     await openCardMenu(window, 'Keep me')
     await press(window, 'Open')
     await settle(700)
-    // Something only an open card draws — the title is on the tile anyway.
-    assert.match(await text(window), /Chat about this card/)
+    // The open card's own landmark, holding this card: the title is on the
+    // tile anyway, and "Chat about this card" is in the menu too.
+    const opened = await window.executeScript(
+      'return document.querySelector(\'[role="dialog"][aria-label="Card"] input[aria-label="Title"]\')?.value ?? null',
+    )
+    assert.equal(opened, 'Keep me')
     await window.findElement(By.css('body')).sendKeys('')
     await settle()
   })

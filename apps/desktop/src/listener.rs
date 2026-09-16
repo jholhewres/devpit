@@ -43,6 +43,9 @@ pub fn start(app: AppHandle, root: &Path) {
     let Ok(address) = listener.local_addr() else {
         return;
     };
+    // Where one run of the app begins in the trace: sequence numbers start
+    // again with every process, and a reader pairing them has to know that.
+    trace("listening");
     let endpoint = devpit_agentcli::endpoint_file(root);
     if let Some(parent) = endpoint.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -126,6 +129,7 @@ fn fresh_secret() -> Option<String> {
 fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     trace(&format!("post seq={seq}"));
     let Some(posted) = read_request(&mut stream) else {
+        trace(&format!("post seq={seq} bad request"));
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return;
     };
@@ -152,7 +156,8 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     });
 
     if let Some(question) = held {
-        hear_post(&app, &posted, seq);
+        let settled = hear_post(&app, &posted, seq);
+        trace(&format!("post seq={seq} {settled}"));
         let asking = app.state::<Asking>();
         let hear = asking.opened(&question.id);
         let _ = app.emit("permission:asked", &question);
@@ -165,15 +170,23 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     // reply with a short budget, and nothing it says changes what we reply
     // with.
     reply(&mut stream, "");
-    hear_post(&app, &posted, seq);
+    let settled = hear_post(&app, &posted, seq);
+    trace(&format!("post seq={seq} {settled}"));
 }
 
 /// What a post becomes once it has been answered: the listener's core, apart
 /// from the window.
-fn hear_post(sink: &impl HookSink, posted: &Posted, seq: u64) {
-    if let Some(happening) = read_hook(&posted.body) {
-        sink.to_window("agent:happening", describe(&happening));
-        heard(sink, posted.pane.as_deref(), &happening, seq);
+///
+/// Answers how it settled, in a word the trace prints: a post let in and never
+/// accounted for is the one a test cannot see missing.
+fn hear_post(sink: &impl HookSink, posted: &Posted, seq: u64) -> &'static str {
+    match read_hook(&posted.body) {
+        // An event this app does not read: settled, by being left alone.
+        None => "ignored",
+        Some(happening) => {
+            sink.to_window("agent:happening", describe(&happening));
+            heard(sink, posted.pane.as_deref(), &happening, seq)
+        }
     }
 }
 
@@ -187,10 +200,14 @@ fn hear_post(sink: &impl HookSink, posted: &Posted, seq: u64) {
 /// This is the difference between knowing an agent is *open* and knowing what
 /// it is *doing*. The first is asked of the process table on a timer; the
 /// second only the agent can say, and it says it here.
-fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u64) {
+fn heard(
+    sink: &impl HookSink,
+    pane: Option<&str>,
+    happening: &Happening,
+    seq: u64,
+) -> &'static str {
     let Some(pane) = pane else {
-        heard_without_pane(sink, happening, seq);
-        return;
+        return heard_without_pane(sink, happening, seq);
     };
     let doing = state_of_event(&happening.event);
     let state = pane_word(doing);
@@ -210,6 +227,12 @@ fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u
     if let Some(subagent) = subagent_said(pane, &happening.event) {
         sink.to_window("terminal:happening", subagent);
     }
+    let mut settled = match (&route, doing) {
+        (_, None) => "no state",
+        (None, _) if store.is_none() => "no store",
+        (None, _) => "no card",
+        (Some(_), Some(_)) => "unchanged",
+    };
     if let (Some(route), Some(doing)) = (&route, doing) {
         let key = Key {
             card_id: route.card_id.clone(),
@@ -228,6 +251,7 @@ fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u
         if let Some(happening) = told {
             trace(&format!("emit card:happening seq={seq}"));
             sink.to_window("card:happening", happening);
+            settled = "emitted";
         }
     }
 
@@ -238,6 +262,7 @@ fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u
     if let (Some(ring), Some(store)) = (notice_for(route.as_ref(), state), &store) {
         sink.ring(store, ring, pane);
     }
+    settled
 }
 
 /// A hook from a session with no pane — a run's turn, or a session a step
@@ -245,15 +270,15 @@ fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, seq: u
 ///
 /// Heard like a pane is and combined when read: a background session's word
 /// stands only while the CLI still lists it (see `background_state`).
-fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) {
+fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) -> &'static str {
     let Some(doing) = state_of_event(&happening.event) else {
-        return;
+        return "no state";
     };
     let Some(store) = sink.store() else {
-        return;
+        return "no store";
     };
     let Some((card_id, kind)) = card_of_session(&store, &happening.session_id) else {
-        return;
+        return "no card";
     };
     let key = Key {
         card_id,
@@ -265,9 +290,13 @@ fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) {
         .lock()
         .ok()
         .and_then(|mut activities| hear(&mut activities, key, seq, doing, Place::default()));
-    if let Some(happening) = told {
-        trace(&format!("emit card:happening seq={seq}"));
-        sink.to_window("card:happening", happening);
+    match told {
+        Some(happening) => {
+            trace(&format!("emit card:happening seq={seq}"));
+            sink.to_window("card:happening", happening);
+            "emitted"
+        }
+        None => "unchanged",
     }
 }
 

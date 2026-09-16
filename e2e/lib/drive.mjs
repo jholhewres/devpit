@@ -7,7 +7,7 @@
  * is aiming at.
  */
 
-import { By } from 'selenium-webdriver'
+import { By, until } from 'selenium-webdriver'
 import { setTimeout as wait } from 'node:timers/promises'
 
 export const settle = (ms = 400) => wait(ms)
@@ -91,7 +91,9 @@ export async function openLaneMenu(window, lane) {
  * is the part the app actually reacts to.
  */
 export async function fill(window, selector, words) {
-  const field = await window.findElement(By.css(selector))
+  // Waited for, not looked up: a field a menu entry opens is rendered on the
+  // next frame, and a lookup in between failed a run that was otherwise fine.
+  const field = await window.wait(until.elementLocated(By.css(selector)), 5000)
   await window.executeScript(
     function (field, words) {
       field.focus()

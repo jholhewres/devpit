@@ -142,8 +142,13 @@ describe('manual item 10 — a card chat moves the dot', () => {
       all[before].setAttribute('data-e2e', 'mine')
     }, composers)
     await fill(window, 'textarea[data-e2e="mine"]', 'hello')
+    const id = (await card('Chat moves the dot'))?.id
     for (let tick = 0; tick < 60; tick += 1) {
-      const doing = (await card('Chat moves the dot'))?.activity
+      // The tile's dot, off the screen: the backend's answer was already
+      // tested, and a tile that never repainted passed with it.
+      const doing = await window.executeScript(function (id) {
+        return document.querySelector('[data-card="' + id + '"] .tile__doing')?.getAttribute('data-doing') ?? null
+      }, id)
       if (doing) seen.add(doing)
       if (doing === 'done') break
       await wait(150)
