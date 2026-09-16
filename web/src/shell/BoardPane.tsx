@@ -10,7 +10,8 @@ import { useBoard } from './useBoard'
 import { useDrag } from './useDrag'
 import { reordered } from './laneOrder'
 import { BoardToolbar } from './BoardToolbar'
-import { matches } from './board'
+import { endOf, matches } from './board'
+import { MoveConfirm } from './CardLane'
 import { useShell } from './useShell'
 
 /*
@@ -27,7 +28,7 @@ import { useShell } from './useShell'
  */
 
 export function BoardPane(): React.JSX.Element {
-  const { project, wantedCard, openCard } = useShell()
+  const { project, wantedCard, openCard, active } = useShell()
   const live = useBoard(project?.id ?? null)
   const drag = useDrag()
   /* The card being read. Held here rather than on the tile, because a tile
@@ -104,6 +105,7 @@ export function BoardPane(): React.JSX.Element {
         onChanged={live.reload}
         onAddColumn={live.addColumn}
       />
+      {live.asked && <MoveConfirm question={live.asked} onClose={() => live.answer(false)} onConfirm={() => live.answer(true)} />}
       <div className="board" onPointerMove={drag.move} onPointerUp={onUp} onPointerCancel={onUp}>
         {live.lanes.map((lane) => {
           const dropping = landing?.lane === lane.column.id
@@ -162,13 +164,16 @@ export function BoardPane(): React.JSX.Element {
         })}
 
 
-        {opened && (
+        {/* Only while the board shows: a pane behind another tab stays mounted,
+            and a hidden card took the chat's Escape and kept its stop from arming. */}
+        {opened && active?.kind === 'board' && (
           <CardPane
+            key={opened}
             cardId={opened}
             onClose={() => setOpened(null)}
             onChanged={live.reload}
             onArchived={setArchived}
-            lanes={live.lanes.map((lane) => ({ id: lane.column.id, name: lane.column.name, cards: lane.cards.length }))}
+            lanes={live.lanes.map((lane) => ({ id: lane.column.id, name: lane.column.name, end: endOf(lane.cards) }))}
           />
         )}
 

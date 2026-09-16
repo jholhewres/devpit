@@ -69,3 +69,67 @@ fn a_steps_runs_are_counted_as_a_whole_and_as_what_is_still_going() {
 
     assert_eq!(store.step_runs(&step).expect("counts"), (2, 1));
 }
+
+/// The review's case: A(0), B(1), C(2); A leaves; "the end" as a count is 2,
+/// which C already holds. As an index it is the end, and the lane is renumbered.
+#[test]
+fn a_card_moved_to_the_end_of_a_lane_lands_after_the_last_one() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, project) = store_with_project(dir.path());
+    store.ensure_board(&project).expect("seed");
+    let lanes = store.columns(&project).expect("columns");
+    let (here, there) = (lanes[0].id.clone(), lanes[1].id.clone());
+    let a = store.create_card(&project, &here, "A", "").expect("A");
+    let b = store.create_card(&project, &here, "B", "").expect("B");
+    let c = store.create_card(&project, &here, "C", "").expect("C");
+    let moving = store
+        .create_card(&project, &there, "moving", "")
+        .expect("moving");
+
+    store.move_card(&a, &there, 0).expect("A leaves");
+    let count = store.cards_in_column(&here).expect("count");
+    store.move_card(&moving, &here, count).expect("to the end");
+
+    let order: Vec<(String, i64)> = store
+        .cards(&project)
+        .expect("cards")
+        .into_iter()
+        .filter(|card| card.column_id == here)
+        .map(|card| (card.title, card.position))
+        .collect();
+    assert_eq!(
+        order,
+        vec![
+            ("B".to_owned(), 0),
+            ("C".to_owned(), 1),
+            ("moving".to_owned(), 2)
+        ]
+    );
+    let _ = (b, c);
+}
+
+#[test]
+fn a_card_moved_between_two_lands_between_them() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, project) = store_with_project(dir.path());
+    store.ensure_board(&project).expect("seed");
+    let lanes = store.columns(&project).expect("columns");
+    let here = lanes[0].id.clone();
+    for title in ["A", "B", "C"] {
+        store.create_card(&project, &here, title, "").expect("card");
+    }
+    let moving = store
+        .create_card(&project, &lanes[1].id, "moving", "")
+        .expect("moving");
+
+    store.move_card(&moving, &here, 1).expect("between A and B");
+
+    let titles: Vec<String> = store
+        .cards(&project)
+        .expect("cards")
+        .into_iter()
+        .filter(|card| card.column_id == here)
+        .map(|card| card.title)
+        .collect();
+    assert_eq!(titles, ["A", "moving", "B", "C"]);
+}

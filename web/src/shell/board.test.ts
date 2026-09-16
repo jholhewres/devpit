@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Board, Card, Column, Run } from '../gen/bindings'
-import { landed, lanes, playable } from './board'
+import { endOf, landed, lanes, moveQuestion, placed, playable } from './board'
 
 const column = (id: string, position: number): Column => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual' })
 const card = (id: string, columnId: string, position: number): Card =>
@@ -77,5 +77,27 @@ describe('whether a tile can be played', () => {
 
   it('is, in a lane with a step and nothing running', () => {
     expect(playable({ ...card('c', 'a', 0), runs: [run('failed')] }, { ...column('a', 0), step })).toBe(true)
+  })
+})
+
+describe('the end of a lane', () => {
+  it('is past the highest position, not the count, once a card has left it', () => {
+    expect(endOf([card('c3', 'b', 2)])).toBe(3)
+    expect(endOf([])).toBe(0)
+  })
+
+  it('is where a card put there sits, with nothing else renumbered', () => {
+    const moved = placed(board, 'c1', 'b', endOf(lanes(board)[1]!.cards))
+    expect(lanes(moved)[1]!.cards.map((c) => [c.id, c.position])).toEqual([['c3', 0], ['c1', 1]])
+    expect(lanes(moved)[0]!.cards.map((c) => [c.id, c.position])).toEqual([['c2', 1]])
+  })
+})
+
+describe('a refused move', () => {
+  it('is a question when a run is still going, and only then', () => {
+    const going = { error: 'a run is still going on this card — move it anyway?', code: 'conflict' as const }
+    expect(moveQuestion(going, false)).toBe(going.error)
+    expect(moveQuestion(going, true)).toBeNull()
+    expect(moveQuestion({ error: 'no such lane', code: 'not_found' }, false)).toBeNull()
   })
 })

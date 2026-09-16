@@ -236,16 +236,46 @@ impl Store {
         Ok(())
     }
 
+    /// Puts a card at an index of a lane, and renumbers the lane 0..n.
+    ///
+    /// An index, not a stored position: the window and the lane chaining both
+    /// said "the end" as the number of cards, and once a card had left a lane
+    /// that number was a position another card already held — the moved card
+    /// landed mid-lane and jumped on the next read. Anything past the last
+    /// card is the end.
     pub fn move_card(
         &self,
         card_id: &str,
         column_id: &str,
         position: i64,
     ) -> Result<(), StoreError> {
-        self.conn.execute(
-            "UPDATE card SET column_id = ?2, position = ?3, updated_at = ?4 WHERE id = ?1",
-            rusqlite::params![card_id, column_id, position, now()],
+        let tx = self.conn.unchecked_transaction()?;
+        let mut order: Vec<String> = {
+            let mut stmt = tx.prepare(
+                "SELECT id FROM card WHERE column_id = ?1 AND id != ?2 AND archived_at IS NULL \
+                 ORDER BY position, created_at, id",
+            )?;
+            let ids = stmt
+                .query_map(rusqlite::params![column_id, card_id], |row| row.get(0))?
+                .collect::<Result<Vec<String>, _>>()?;
+            ids
+        };
+        let at = usize::try_from(position.max(0))
+            .unwrap_or(usize::MAX)
+            .min(order.len());
+        order.insert(at, card_id.to_owned());
+
+        tx.execute(
+            "UPDATE card SET column_id = ?2, updated_at = ?3 WHERE id = ?1",
+            rusqlite::params![card_id, column_id, now()],
         )?;
+        for (index, id) in order.iter().enumerate() {
+            tx.execute(
+                "UPDATE card SET position = ?2 WHERE id = ?1",
+                rusqlite::params![id, index as i64],
+            )?;
+        }
+        tx.commit()?;
         Ok(())
     }
 

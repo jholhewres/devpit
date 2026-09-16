@@ -1,4 +1,4 @@
-import type { Board, Card, Column } from '../gen/bindings'
+import type { Board, Card, Column, ErrorCode } from '../gen/bindings'
 
 /* What a board looks like once the cards are filed under their columns.
    A function so the test calls it: the ordering rules are the board. */
@@ -31,6 +31,28 @@ export function landed(board: Board, cardId: string, columnId: string, at: numbe
     ...board,
     cards: [...rest.filter((card) => card.columnId !== columnId), ...renumbered],
   }
+}
+
+/** Where the end of a lane is: past the highest position, not the count. A
+ *  move keeps the position it is sent and nothing renumbers, so once a card
+ *  has left a lane its count can be a position another card holds. */
+export function endOf(cards: readonly Card[]): number {
+  return cards.reduce((end, card) => Math.max(end, card.position + 1), 0)
+}
+
+/** A card put at a position, applied to the board we already hold. Nothing
+ *  else is renumbered, so the next end is still read off what the backend has. */
+export function placed(board: Board, cardId: string, columnId: string, position: number): Board {
+  return {
+    ...board,
+    cards: board.cards.map((card) => (card.id === cardId ? { ...card, columnId, position } : card)),
+  }
+}
+
+/** The question a refused move asks, or null when the refusal is only a refusal.
+ *  A run still going on the card is a conflict, and it can be moved on purpose. */
+export function moveQuestion(answer: { error: string | null; code?: ErrorCode | null }, confirmed: boolean): string | null {
+  return !confirmed && answer.code === 'conflict' ? answer.error : null
 }
 
 /* Whether a tile's play button can do anything: the lane has to run a step,

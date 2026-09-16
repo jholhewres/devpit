@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { Board, CardHappening, CardSession, ColumnDeleted, Played, Step } from '../gen/bindings'
-import { landed, lanes, type Lane } from './board'
+import { endOf, landed, lanes, moveQuestion, placed, type Lane } from './board'
 import { shifted } from './laneOrder'
 import { ask, commands } from './live'
 import { onCarried } from './window'
@@ -18,6 +18,10 @@ export interface UseBoard {
   readonly progress: Readonly<Record<string, string>>
   /** Each card's sessions as last heard, by card id. */
   readonly sessions: Readonly<Record<string, readonly CardSession[]>>
+  /** What the backend asked before a move — a run still going on the card — until it is answered. */
+  readonly asked: string | null
+  /** Makes the move that was asked about, or lets it go. */
+  answer: (confirmed: boolean) => void
   move: (cardId: string, columnId: string, at: number) => void
   /** Moves a card to the end of a lane — what a pick from its menu means. */
   moveToEnd: (cardId: string, columnId: string) => void
@@ -102,27 +106,45 @@ export function useBoard(projectId: string | null): UseBoard {
     [],
   )
 
+  const [asked, setAsked] = useState<{ question: string; confirm: () => void } | null>(null)
+
   /* The drop shows immediately and is put back if the command refuses — a
      card that snaps to where it was is how you learn the move failed. */
-  const move = useCallback(
-    (cardId: string, columnId: string, at: number) => {
+  const send = useCallback(
+    (cardId: string, columnId: string, position: number, landing: Board) => {
       if (!projectId || !board) return
       const before = board
-      setBoard(landed(board, cardId, columnId, at))
-      void ask(() => commands.cardMove(projectId, cardId, columnId, at, false)).then((asked) => {
-        setError(asked.error)
-        if (asked.error) setBoard(before)
+      setBoard(landing)
+      void ask(() => commands.cardMove(projectId, cardId, columnId, position, false)).then((answer) => {
+        if (answer.error) setBoard(before)
+        const question = moveQuestion(answer, false)
+        if (question === null) return setError(answer.error)
+        /* Answered later, so the board is read again rather than guessed. */
+        const confirm = (): void =>
+          void ask(() => commands.cardMove(projectId, cardId, columnId, position, true)).then((again) => {
+            setError(again.error)
+            if (!again.error) reload()
+          })
+        setAsked({ question, confirm })
       })
     },
-    [board, projectId],
+    [board, projectId, reload],
+  )
+
+  const move = useCallback(
+    (cardId: string, columnId: string, at: number) => {
+      if (board) send(cardId, columnId, at, landed(board, cardId, columnId, at))
+    },
+    [board, send],
   )
 
   const moveToEnd = useCallback(
     (cardId: string, columnId: string) => {
       const lane = lanes(board).find((one) => one.column.id === columnId)
-      move(cardId, columnId, lane?.cards.length ?? 0)
+      const end = endOf(lane?.cards ?? [])
+      if (board) send(cardId, columnId, end, placed(board, cardId, columnId, end))
     },
-    [board, move],
+    [board, send],
   )
 
   const play = useCallback(
@@ -234,6 +256,11 @@ export function useBoard(projectId: string | null): UseBoard {
     cards: board?.cards.length ?? 0,
     progress,
     sessions,
+    asked: asked?.question ?? null,
+    answer: (confirmed) => {
+      setAsked(null)
+      if (confirmed) asked?.confirm()
+    },
     move,
     moveToEnd,
     play,

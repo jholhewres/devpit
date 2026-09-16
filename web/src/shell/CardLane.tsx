@@ -1,12 +1,34 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 
+import { moveQuestion } from './board'
+import { Confirm } from './Confirm'
 import { ask, commands } from './live'
 
-/** A lane a card can be moved to, and how many cards it holds already. */
+/** A lane a card can be moved to, and the position past its last card. */
 export interface LaneChoice {
   readonly id: string
   readonly name: string
-  readonly cards: number
+  readonly end: number
+}
+
+/** The question a move asks when a run is still going on the card. On the
+ *  body: the board and the card both animate in. */
+export function MoveConfirm({
+  question,
+  onClose,
+  onConfirm,
+}: {
+  question: string
+  onClose: () => void
+  onConfirm: () => void
+}): React.JSX.Element {
+  return createPortal(
+    <div onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      <Confirm title="Move this card?" body={question} danger="Move it anyway" onClose={onClose} onConfirm={onConfirm} />
+    </div>,
+    document.body,
+  )
 }
 
 /*
@@ -30,10 +52,13 @@ export function CardLane({
   onMoved: () => void
 }): React.JSX.Element {
   const [problem, setProblem] = useState<string | null>(null)
+  const [asking, setAsking] = useState<{ to: string; question: string } | null>(null)
 
-  const move = async (to: string): Promise<void> => {
+  const move = async (to: string, confirmed: boolean): Promise<void> => {
     const lane = lanes.find((one) => one.id === to)
-    const answer = await ask(() => commands.cardMove(projectId, cardId, to, lane?.cards ?? 0, false))
+    const answer = await ask(() => commands.cardMove(projectId, cardId, to, lane?.end ?? 0, confirmed))
+    const question = moveQuestion(answer, confirmed)
+    if (question !== null) return setAsking({ to, question })
     setProblem(answer.error)
     if (!answer.error) onMoved()
   }
@@ -42,7 +67,7 @@ export function CardLane({
     <>
       <label className="cardp__lane">
         <span className="fld__l">Lane</span>
-        <select className="cardp__select" aria-label="Lane" value={columnId} onChange={(event) => void move(event.target.value)}>
+        <select className="cardp__select" aria-label="Lane" value={columnId} onChange={(event) => void move(event.target.value, false)}>
           {lanes.map((lane) => (
             <option key={lane.id} value={lane.id}>
               {lane.name}
@@ -51,6 +76,16 @@ export function CardLane({
         </select>
       </label>
       {problem && <p className="wtb__no">{problem}</p>}
+      {asking && (
+        <MoveConfirm
+          question={asking.question}
+          onClose={() => setAsking(null)}
+          onConfirm={() => {
+            setAsking(null)
+            void move(asking.to, true)
+          }}
+        />
+      )}
     </>
   )
 }
