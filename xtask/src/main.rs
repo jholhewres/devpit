@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 mod agent_boundary;
+mod csp;
 mod dead_controls;
 mod home_paths;
 mod naming;
@@ -76,6 +77,7 @@ fn check() -> ExitCode {
     findings.extend(agent_boundary::only_one_crate_drives_the_agent(&root));
     findings.extend(dead_controls::a_control_either_works_or_goes(&root));
     findings.extend(home_paths::paths_come_from_home(&root));
+    findings.extend(csp::the_csp_forbids_what_the_app_never_needs(&root));
 
     if findings.is_empty() {
         println!("guards: ok");
