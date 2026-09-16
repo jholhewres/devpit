@@ -17,6 +17,16 @@ import type { Terminal } from '@xterm/xterm'
 /** A thing that can be handed to `terminal.loadAddon`. */
 type Addon = { dispose: () => void }
 
+/** Whether this machine can give a canvas a WebGL2 context at all. */
+function hasAContext(): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    return canvas.getContext('webgl2') !== null
+  } catch {
+    return false
+  }
+}
+
 /**
  * Turns on the GPU renderer, and answers whether it took.
  *
@@ -31,6 +41,11 @@ export function drawOnTheGpu(
   terminal: Terminal,
   make: () => Addon = () => new WebglAddon(),
 ): boolean {
+  // Asked before the addon is built, not caught after: a machine with no GPU
+  // context — a headless box, a test — does not throw here, it hands back
+  // null and the addon fails later and elsewhere. This is also what makes the
+  // fallback a decision rather than an exception.
+  if (!hasAContext()) return false
   try {
     const webgl = make() as WebglAddon
     webgl.onContextLoss(() => webgl.dispose())
