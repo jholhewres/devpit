@@ -23,30 +23,40 @@ make dev      # the app, hot reload
 make build    # release bundle
 ```
 
-The Makefile has exactly seven targets: `help setup dev build test fmt clean`.
-Do not add an eighth. A one-off belongs in the shell, not in the interface
-everyone reads.
+`help setup dev build test fmt clean`, and `e2e` for the WebDriver suite. The
+list is short because the Makefile is the interface everyone reads: a target
+earns its place by being something a person runs by hand, and a one-off belongs
+in the shell. The other half of the same rule is that **CI never invents a
+command nobody can run locally** — every job calls one of these.
 
-CI runs `setup`, `test` and `build`.
+CI runs `setup`, `test` and `build`; the end-to-end job calls `e2e`.
 
 ## Guards that fail the build
 
-`cargo xtask check` enforces seven rules. Each reports file and line, because
-"the guard failed" sends someone looking and a location sends someone fixing.
+`cargo xtask check` enforces thirteen rules. Each reports file and line,
+because "the guard failed" sends someone looking and a location sends someone
+fixing.
 
 | Guard | Rule |
 |---|---|
 | `core_does_not_know_the_shell` | nothing under `crates/` imports `apps/desktop` |
 | `only_one_crate_drives_the_agent` | agent CLI invocation lives in `crates/agentcli`, nowhere else |
+| `a_command_has_a_caller` | every command in `contract_list.rs` and `handler.rs` is called from `web/src`, or listed with its reason in `xtask/uncalled-commands.txt` |
 | `nothing_is_named_after_nothing` | no enum variant, command or type that nothing draws or calls |
 | `platform_window_matches_the_base` | the per-platform Tauri config cannot drift from the base |
 | `files_only_get_shorter` | every file listed in `xtask/ceilings.txt` stays under its line count |
 | `a_control_either_works_or_goes` | no `<button>` in `web/src` without a handler |
 | `paths_come_from_home` | a path under devpit's `projects/` is built only in `crates/core/src/home.rs`; the joins onto an agent CLI's own `projects/` are counted in `xtask/cli-roots.txt` |
+| `the_csp_forbids_what_the_app_never_needs` | the window's policy allows no remote script and no remote frame |
+| `the_version_has_one_source` | the version in the Cargo manifests, the Tauri config and the web package agree |
+| `the_bundle_says_what_it_ships` | the release bundle declares the targets and the updater artifacts it is built with |
+| `the_release_workflow_keeps_its_promises` | the tag-only release workflow keeps its pinned actions, its tag check and the key in one step |
+| `the_app_never_kills_the_tmux_server` | nothing in `apps/desktop` names `kill_server`, because the terminals outlive the window |
 
-The ratchet only tightens. A file over its ceiling fails, and so does a ceiling
-set higher than the file needs. After a file genuinely shrinks, regenerate with
-`cargo xtask ceilings`.
+The ratchet only tightens: a file over its ceiling fails, and `cargo xtask
+ceilings` refuses to raise one. A ceiling *above* what a file needs does not
+fail — it used to, and a file shrinking by one line broke the build until
+somebody regenerated the list. Regenerate after a file genuinely shrinks.
 
 **A control either works or leaves the screen.** `xtask/dead-controls.txt` is
 now empty, so the budget is zero everywhere: a button with no handler fails the
@@ -126,6 +136,17 @@ terminal leaf met `.pane` for the tab wrapper and set `display: none` on the
 thing it was introducing. Neither is caught by anything — TypeScript does not
 see CSS, and the size ratchet only counts lines. The only guard is looking
 first, and a two-word name (`.arow`, `.tleaf`) when the obvious one is taken.
+
+## Environment toggles
+
+Four, all off by default, none of them a feature:
+
+| | |
+|---|---|
+| `DEVPIT_ACCOUNT_ORIGIN` | points the account at another server, so a build can be run against a local one without editing `account.rs` |
+| `DEVPIT_ACCOUNT_NO_BROWSER` | `1` stops sign-in from opening a browser — for tests, and for a machine with none |
+| `DEVPIT_TRACE_HOOKS` | timestamped lines on stderr saying how long each hook took |
+| `DEVPIT_UPDATE_FEED_FILE` | reads the update feed from a file instead of the network. It only replaces where the answer is read from, the card says "test feed" on screen, and nothing it offers can be installed |
 
 ## Tests
 

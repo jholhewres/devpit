@@ -47,11 +47,14 @@ work stands, and a number on every agent call.
   which slice of the card's context.
 - **A spending cap on every agent call**, and the real cost written on the card
   when it finishes.
-- **Agents are files** — markdown with frontmatter in `~/.devpit/agents/`. Write
-  your own next to the ones that ship. Nothing to recompile, nothing to register.
+- **Agents are files** — markdown with frontmatter in `~/.devpit/agents/`, and
+  whatever your tooling already installed. None ship with devpit: the ones you
+  see are the ones on your machine. Nothing to recompile, nothing to register.
 - **File tree and diffs** beside the terminal, so reviewing what an agent did
   does not mean leaving.
-- **Local-first.** One machine, no account, no cloud.
+- **On your machine.** Projects, boards, conversations and terminal history
+  live in `~/.devpit` on this computer. An account is optional and, today,
+  signs you in and nothing else — syncing between machines is not built.
 
 ## How the board works
 
@@ -67,6 +70,10 @@ work stands, and a number on every agent call.
                                            the one target terminal
 ```
 
+**That is a board somebody set up, not the one you get.** A new project gets
+those six columns with nothing behind them: every lane runs nothing until you
+give it a step, which is one menu on the lane.
+
 A column either does nothing, or runs one of three kinds of step:
 
 | | `agent` | `session` | `command` |
@@ -74,7 +81,7 @@ A column either does nothing, or runs one of three kinds of step:
 | Takes the terminal? | no | **yes** — it is the target terminal | no |
 | Good for | refine, review, verify | implementing | tests, builds, deploys, lint |
 | Gives you back | schema-validated JSON, with cost and duration | a session you drive | streamed output and an exit code |
-| How many at once | several | **one** | several |
+| How many at once | several | several &mdash; one of them attached | several |
 
 The flow above is just the default board for a new project.
 
@@ -104,15 +111,20 @@ Skills are not on that list. The CLI offers a turn all of them or none, so a
 step asks for one in its prompt — `/tdd` — the way you would in a session, and
 a step that tries to declare them is refused when it is saved.
 
-### Nothing advances on its own
+### A lane moves a card only as far as you let it
 
-A step that finishes does not push the card. It writes down what happened —
-output, exit code, real cost — and stops. The next move is yours.
+A step that finishes writes down what happened — output, exit code, real cost.
+What happens next is the lane's setting, and you choose it per lane:
 
-There is no orchestrator in devpit because the orchestrator is you. That absence
-is the product, not a gap in it: orchestration that keeps itself going is
-orchestration you cannot see, and losing sight of the work is the problem this
-attacks.
+| | |
+|---|---|
+| `manual` | nothing moves. The card stays where it is until you drag it. |
+| `ask` | devpit asks, naming the lane it would move the card to. |
+| `auto` | it moves, and the next lane's step runs. |
+
+`manual` is the default, and a lane set to `auto` says so on the board. There
+is no orchestrator behind this: nothing schedules work, nothing retries, and a
+chain of `auto` lanes is one you built lane by lane and can see.
 
 **No card, just a terminal.** Open devpit, type into it, and your agent CLI
 behaves exactly as it always has. The board is an optional source of work, not a
@@ -120,10 +132,30 @@ toll gate.
 
 ## Requirements
 
+- **Linux**, X11 or Wayland. macOS and Windows are not built yet.
+- **`tmux`**. Terminals are tmux panes, which is how they outlive the window.
+- **[Claude Code](https://claude.com/claude-code)** (`claude` on your PATH).
+  Chat, agent steps and session steps all run through it; it is the only CLI
+  devpit knows how to drive today.
+
+## Installing
+
+Two packages, and they update differently:
+
+- **AppImage** — devpit checks for a new version, verifies its signature,
+  installs it over itself and restarts. Your terminals keep running: they are
+  tmux sessions, and tmux does not go down with the window.
+- **`.deb`** — devpit downloads and verifies it, then shows you the command to
+  install it and never runs that command itself. Installing a system package
+  means asking for root, and devpit does not ask for root on your behalf.
+
+Automatic checking is a switch in Settings → General, and it is on unless you
+turn it off.
+
+## Building it
+
 - Rust 1.93+, Node 22+, pnpm
-- `tmux`
-- the agent CLI you use
-- on Linux, the WebKitGTK development packages:
+- the WebKitGTK development packages:
 
 ```sh
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \

@@ -48,12 +48,14 @@ está, e um número em cada chamada de agente.
   que fatia do contexto do card.
 - **Teto de gasto em toda chamada de agente**, e o custo real escrito no card
   quando ela termina.
-- **Agentes são arquivos** — markdown com frontmatter em `~/.devpit/agents/`.
-  Escreva os seus ao lado dos que já vêm. Nada para recompilar, nada para
-  registrar.
+- **Agentes são arquivos** — markdown com frontmatter em `~/.devpit/agents/`, e
+  os que a sua ferramenta já instalou. Nenhum vem com o devpit: os que você vê
+  são os da sua máquina. Nada para recompilar, nada para registrar.
 - **Árvore de arquivos e diffs** ao lado do terminal, para revisar o que o
   agente fez sem precisar sair.
-- **Local-first.** Uma máquina, sem conta, sem nuvem.
+- **Na sua máquina.** Projetos, quadros, conversas e histórico de terminal
+  ficam em `~/.devpit`, neste computador. A conta é opcional e, hoje, só
+  identifica você — sincronizar entre máquinas não está feito.
 
 ## Como o quadro funciona
 
@@ -69,6 +71,10 @@ está, e um número em cada chamada de agente.
                                             o único terminal alvo
 ```
 
+**Esse é um quadro que alguém montou, não o que você recebe.** Um projeto novo
+nasce com essas seis colunas e nada atrás delas: cada raia não executa nada até
+você dar uma etapa a ela, o que é um menu na própria raia.
+
 Uma coluna ou não faz nada, ou executa um de três tipos de etapa:
 
 | | `agent` | `session` | `command` |
@@ -76,7 +82,7 @@ Uma coluna ou não faz nada, ou executa um de três tipos de etapa:
 | Toma o terminal? | não | **sim** — ele é o terminal alvo | não |
 | Serve para | refinar, revisar, verificar | implementar | testes, builds, deploys, lint |
 | Devolve | JSON validado por schema, com custo e duração | uma sessão que você conduz | saída em streaming e um código de saída |
-| Quantos por vez | vários | **um** | vários |
+| Quantos por vez | vários | vários &mdash; um deles anexado | vários |
 
 O fluxo acima é só o quadro padrão de um projeto novo.
 
@@ -106,15 +112,21 @@ Skills não entram nessa lista. A CLI oferece todas ou nenhuma a um turno, entã
 a etapa pede uma no prompt — `/tdd` — do mesmo jeito que você pediria numa
 sessão, e uma etapa que tenta declará-las é recusada ao ser salva.
 
-### Nada avança sozinho
+### Uma raia move o card só até onde você deixa
 
-Uma etapa que termina não empurra o card. Ela anota o que aconteceu — saída,
-código de saída, custo real — e para. O próximo movimento é seu.
+Uma etapa que termina anota o que aconteceu — saída, código de saída, custo
+real. O que vem depois é a configuração da raia, e você escolhe por raia:
 
-Não existe orquestrador no devpit porque o orquestrador é você. Essa ausência é
-o produto, não uma lacuna nele: orquestração que se mantém sozinha é
-orquestração que você não vê, e perder de vista o trabalho é o problema que isto
-ataca.
+| | |
+|---|---|
+| `manual` | nada se move. O card fica onde está até você arrastar. |
+| `ask` | o devpit pergunta, dizendo para qual raia levaria o card. |
+| `auto` | ele move, e a etapa da próxima raia roda. |
+
+`manual` é o padrão, e uma raia em `auto` diz isso no quadro. Não há
+orquestrador atrás disso: nada agenda trabalho, nada tenta de novo, e uma
+sequência de raias em `auto` é uma que você montou raia por raia e consegue
+ver.
 
 **Sem card, só o terminal.** Abra o devpit, digite, e sua CLI de agente se
 comporta exatamente como sempre se comportou. O quadro é uma fonte opcional de
@@ -122,10 +134,31 @@ trabalho, não uma cancela.
 
 ## Requisitos
 
+- **Linux**, X11 ou Wayland. macOS e Windows ainda não são construídos.
+- **`tmux`**. Os terminais são painéis do tmux, e é por isso que eles
+  sobrevivem à janela.
+- **[Claude Code](https://claude.com/claude-code)** (`claude` no PATH). Chat,
+  etapas de agente e de sessão passam por ele; é a única CLI que o devpit sabe
+  conduzir hoje.
+
+## Instalando
+
+Dois pacotes, e eles se atualizam de formas diferentes:
+
+- **AppImage** — o devpit procura uma versão nova, confere a assinatura,
+  instala por cima de si mesmo e reabre. Seus terminais continuam rodando: são
+  sessões do tmux, e o tmux não cai junto com a janela.
+- **`.deb`** — o devpit baixa e confere a assinatura, e então mostra o comando
+  de instalação sem nunca executá-lo. Instalar um pacote do sistema é pedir
+  root, e o devpit não pede root no seu lugar.
+
+A checagem automática é um botão em Configurações → General, e vem ligada até
+você desligar.
+
+## Compilando
+
 - Rust 1.93+, Node 22+, pnpm
-- `tmux`
-- a CLI de agente que você usa
-- no Linux, os pacotes de desenvolvimento do WebKitGTK:
+- os pacotes de desenvolvimento do WebKitGTK:
 
 ```sh
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \

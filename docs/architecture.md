@@ -19,20 +19,31 @@ xtask            the architectural guards
 
 ## The rules that have teeth
 
-Each one is enforced by a test that fails when the rule is broken. They are not
-style preferences.
+`cargo xtask check` runs thirteen guards, each one a rule that failed silently
+before it existed. It names the file and the line. They are not style
+preferences:
 
-- **Nothing under `crates/` imports the shell.** If a crate needs it, the design
-  is wrong. `cargo xtask check` names the file and the line.
-- **A command exists only if something calls it.** Command and caller land in
-  the same commit.
-- **Responses are objects, never bare lists.** Tomorrow's extra field needs
-  somewhere to live.
-- **Types come from Rust.** `web/src/gen/` is generated; two hand-written copies
-  of a type are two copies that will drift.
-- **Every path is resolved through symlinks and checked against the project
-  root.** This process runs terminals and writes files; reaching it is reaching
-  the machine.
+| | |
+|---|---|
+| shell boundary | nothing under `crates/` imports the shell |
+| agent boundary | one crate drives the agent CLI |
+| uncalled commands | a command in the contract is called from `web/src`, or listed with a reason in `xtask/uncalled-commands.txt` |
+| dead controls | a button with a handler, or no button — a budget per file that only shrinks |
+| size ratchet | a file past its ceiling in `xtask/ceilings.txt` is split, never given a bigger ceiling |
+| naming | nothing is named after nothing |
+| home paths | paths come from the state root, not from `$HOME` by hand |
+| csp | the window's policy allows no remote script and no remote frame |
+| versions | the version has one source |
+| packaging | the bundle ships what it says it ships |
+| release workflow | the release workflow keeps its promises |
+| platform window | the platform window matches the base |
+| tmux survives | nothing in `apps/desktop` names `kill_server` |
+
+Two more rules are enforced by tests rather than guards: **types come from
+Rust** (`web/src/gen/` is generated, and a stale contract fails `make test`),
+and **every path is resolved through symlinks and checked against the project
+root** — this process runs terminals and writes files, so reaching it is
+reaching the machine.
 
 ## A card follows its sessions
 
@@ -58,6 +69,36 @@ would still say `working` after the app had closed.
 - **A conversation runs where its session ran.** Its folder is fixed when it
   begins or takes a session in, and no turn makes a checkout.
 
+## What a run writes down
+
+A run is a row, opened when a card lands on a lane with a step and closed when
+the step returns. It holds the state (`running`, `ok`, `failed`, `cancelled`,
+`lost`), the output as it came, the exit code for a command, the cost and the
+duration for an agent turn, the lane it came from, the folder it ran in and the
+session it ran as. The card shows the last one; what a run cost is on the card,
+and what your plan has left is on the Usage page, which reads the CLI's own
+credentials and asks Anthropic.
+
+A `session` step is not limited to one at a time. Each one starts a detached
+tmux session for its card and writes a link to it; what is limited to one is
+the target terminal, which is the session you are looking at.
+
+## How an update goes in
+
+The check is `tauri-plugin-updater` against a signed feed, and the bytes are
+verified against the release public key before anything is written. What
+happens then depends on what this build is:
+
+- an **AppImage** is installed over itself and the window restarts. The
+  terminals are tmux sessions on a server devpit never kills, so they are still
+  there when it comes back — no restore step, because nothing was lost.
+- a **`.deb`** is checked again, kept `0644` in a cache directory, and shown to
+  you as a command to run. devpit never runs it: installing a system package
+  means root, and devpit does not ask for root on anybody's behalf.
+
+From the moment an update is ready, nothing new starts — a turn begun then
+would die with the process.
+
 ## Context never becomes shell syntax
 
 Context reaches a `command` step **only through environment variables, never
@@ -65,12 +106,17 @@ interpolated into the command string**. A branch name containing a space or a
 `;` becomes a variable's value, not shell syntax — that removes an entire class
 of injection.
 
-## Nothing runs on its own
+## Nothing runs that you did not set up
 
-There is no "work a hundred iterations and tell me at the end" mode. If a step
-fails, the card stays where it is with the reason written on it, and you decide
-what happens next.
+There is no "work a hundred iterations and tell me at the end" mode, and
+nothing schedules or retries work. A step that fails leaves the card where it
+is with the reason written on it.
 
-That absence is deliberate. Orchestration that keeps itself going is
+A step that passes does what its lane says: `manual` leaves the card alone,
+`ask` asks before moving it, `auto` moves it and runs the next lane's step. A
+chain of `auto` lanes is one somebody built lane by lane, and the board says
+which lanes those are.
+
+That shape is deliberate. Orchestration that keeps itself going is
 orchestration you cannot see, and the problem this project attacks is losing
 sight of what is happening.

@@ -49,10 +49,10 @@ A column's rule: *on arrival here, run this*. A step is one of three kinds.
 
 | | `agent` | `session` | `command` |
 |---|---|---|---|
-| Takes the target terminal | no | yes | no |
+| Takes the target terminal | no | when you attach it | no |
 | Good for | refine, review, verify | implementing | tests, builds, deploys |
 | Returns | schema-validated JSON | a session you drive | streamed output and an exit code |
-| Concurrent | several | one | several |
+| Concurrent | several | several, one attached | several |
 
 A `command` step receives its context **only through environment variables**,
 never interpolated into the command string. A branch name containing a space or
@@ -64,8 +64,9 @@ shows its first line immediately, not twenty minutes from now.
 
 ## `run`
 
-One execution of a step, and what it cost: agent or command, input, output,
-verdict, spend, duration, turn count, denied permissions, exit code.
+One execution of a step, and what it cost: the state it ended in, the output as
+it came, the exit code of a command, the spend and duration of an agent turn,
+the lane it was sent from, the folder it ran in and the session it ran as.
 
 A card shows its runs. That is how "the agent is doing something" becomes a
 sentence with numbers in it.
@@ -79,9 +80,10 @@ whether a session is busy or idle; keeping that in a database would create a
 second truth that drifts from the first. The database stores only the link —
 which card, which worktree.
 
-The same holds for what a session cost: it is read back from the session's own
-transcript, so a session you drove yourself, with nothing watching, still
-reports its spend.
+What a session you drove yourself cost is not read back. The CLI writes a
+transcript and devpit writes down where it is, but nothing reads the totals out
+of it — so a card says what its *runs* cost, and is quiet about the rest. Being
+quiet is the honest half of that; the other half is not written yet.
 
 ## What is not an object
 

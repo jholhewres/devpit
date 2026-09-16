@@ -4,6 +4,14 @@
 //! endpoint the CLI's own `/usage` reads, with the installation's saved sign-in.
 //! Asked at most every five minutes per installation. The token is read,
 //! sent, and never logged or put in an error.
+//!
+//! It reads the CLI's own credentials, calls an endpoint Anthropic does not
+//! document, and identifies itself as the CLI while doing it. That is a
+//! decision taken with those three things in view, not an oversight: the
+//! number is why the page exists, and it is read on the same machine, with the
+//! sign-in the person already gave the same account. If the endpoint changes
+//! or Anthropic says no, this reader goes and the rest of the page — what the
+//! transcripts say was spent — stands on its own.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
