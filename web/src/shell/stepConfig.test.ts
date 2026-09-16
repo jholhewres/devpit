@@ -72,3 +72,47 @@ describe('the context a step can ask for', () => {
     expect(keys).toEqual([...CONTEXT_KEYS])
   })
 })
+
+/* The form shows a few keys of a config that can hold many. Saving an edit
+   rebuilt the config from the form alone and dropped the rest. */
+describe('an edited step', () => {
+  const stored = JSON.stringify({
+    prompt: 'Review the change',
+    capUsd: 2,
+    model: 'opus',
+    verdictField: 'verdict',
+    sendsBackWhen: 'fail',
+    needsWorktree: true,
+    schema: { type: 'object' },
+    budgetUsd: 5,
+    skills: ['review'],
+  })
+
+  it('keeps every key the form does not ask for', () => {
+    const saved = JSON.parse(stepConfig('agent', { prompt: 'Review it again', capUsd: '3', model: 'opus' }, stored))
+    expect(saved).toEqual({
+      prompt: 'Review it again',
+      capUsd: 3,
+      model: 'opus',
+      verdictField: 'verdict',
+      sendsBackWhen: 'fail',
+      needsWorktree: true,
+      schema: { type: 'object' },
+      budgetUsd: 5,
+      skills: ['review'],
+    })
+  })
+
+  it('drops a key the form asks for once it has been cleared', () => {
+    const saved = JSON.parse(stepConfig('agent', { prompt: 'Review the change', capUsd: '2', model: '' }, stored))
+    expect(saved).not.toHaveProperty('model')
+    expect(saved.verdictField).toBe('verdict')
+    expect(
+      JSON.parse(stepConfig('command', { command: 'make test' }, JSON.stringify({ command: 'make', timeoutSeconds: 60, env: { CI: '1' } }))),
+    ).toEqual({ command: 'make test', env: { CI: '1' } })
+  })
+
+  it('is what the form says, all of it, when the stored config cannot be read', () => {
+    expect(JSON.parse(stepConfig('command', { command: 'make test' }, 'make test'))).toEqual({ command: 'make test' })
+  })
+})

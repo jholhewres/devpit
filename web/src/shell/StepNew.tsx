@@ -243,7 +243,7 @@ export function StepNew({
         <button
           className="btn btn--go"
           disabled={!name.trim() || missing}
-          onClick={() => onDone(kind, name.trim(), stepConfig(kind, fields), irreversible)}
+          onClick={() => onDone(kind, name.trim(), stepConfig(kind, fields, step?.config), irreversible)}
         >
           {step ? 'Save' : 'Create'}
         </button>

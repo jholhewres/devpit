@@ -29,24 +29,58 @@ export const CONTEXT_KEYS = [
   'projectPath',
 ] as const
 
-export function stepConfig(kind: string, fields: Fields): string {
+/** The keys the form asks for, by kind. Anything else a stored config holds is
+ *  somebody else's, and an edit keeps it. */
+const OWNED: Readonly<Record<string, readonly string[]>> = {
+  command: ['command', 'timeoutSeconds'],
+  session: ['model', 'profile'],
+  agent: ['agent', 'profile', 'model', 'capUsd', 'prompt', 'inject', 'expects'],
+}
+
+/**
+ * `stored` is the config being edited. The form's fields are laid over it:
+ * a key the form does not ask for survives, and one it asks for and was
+ * cleared goes. Rebuilt from the fields alone, an edit dropped every key the
+ * form never showed.
+ */
+export function stepConfig(kind: string, fields: Fields, stored?: string): string {
+  const built = fromFields(kind, fields)
+  const held = stored === undefined ? null : readObject(stored)
+  if (!held) return JSON.stringify(built)
+  const owned = OWNED[kind] ?? OWNED.agent!
+  const kept = Object.fromEntries(Object.entries(held).filter(([key]) => !owned.includes(key)))
+  return JSON.stringify({ ...kept, ...built })
+}
+
+function readObject(config: string): Record<string, unknown> | null {
+  let read: unknown
+  try {
+    read = JSON.parse(config)
+  } catch {
+    return null
+  }
+  if (typeof read !== 'object' || read === null || Array.isArray(read)) return null
+  return read as Record<string, unknown>
+}
+
+function fromFields(kind: string, fields: Fields): Record<string, unknown> {
   const text = (key: string): string => (fields[key] ?? '').trim()
 
   if (kind === 'command') {
     const seconds = Number(text('timeoutSeconds'))
-    return JSON.stringify({
+    return {
       command: text('command'),
       // Absent rather than zero: a step with no timeout may take as long as
       // it takes, and `0` would read as "give up at once".
       ...(Number.isFinite(seconds) && seconds > 0 ? { timeoutSeconds: seconds } : {}),
-    })
+    }
   }
 
   if (kind === 'session') {
-    return JSON.stringify({
+    return {
       ...(text('model') ? { model: text('model') } : {}),
       ...(text('profile') ? { profile: text('profile') } : {}),
-    })
+    }
   }
 
   const chosen = text('inject')
@@ -54,7 +88,7 @@ export function stepConfig(kind: string, fields: Fields): string {
     .map((one) => one.trim())
     .filter(Boolean)
   const cap = Number(text('capUsd'))
-  return JSON.stringify({
+  return {
     ...(text('agent') ? { agent: text('agent') } : {}),
     ...(text('profile') ? { profile: text('profile') } : {}),
     ...(text('model') ? { model: text('model') } : {}),
@@ -64,7 +98,7 @@ export function stepConfig(kind: string, fields: Fields): string {
     prompt: text('prompt'),
     ...(chosen.length ? { inject: chosen } : {}),
     ...(text('expects') ? { expects: text('expects') } : {}),
-  })
+  }
 }
 
 /**
@@ -75,14 +109,8 @@ export function stepConfig(kind: string, fields: Fields): string {
  * so rather than opening a form that would quietly replace it.
  */
 export function stepFields(kind: string, config: string): Fields | null {
-  let read: unknown
-  try {
-    read = JSON.parse(config)
-  } catch {
-    return null
-  }
-  if (typeof read !== 'object' || read === null || Array.isArray(read)) return null
-  const held = read as Record<string, unknown>
+  const held = readObject(config)
+  if (!held) return null
 
   const fields: Record<string, string> = {}
   const put = (key: string): void => {
