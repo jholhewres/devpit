@@ -10,9 +10,9 @@ use crate::{
     account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_chat,
     card_work, cards, chat, columns, commands, diffs, files, filetree, front, happening, history,
     in_flight, index, installations, mcp, moving, notices, openers, outside_sessions, panels,
-    panes, pasting, plan_limits, plugin_data, plugins, projects, receipts, reveal, rewinding,
-    runs_list, saves, search, session_search, sessions, settings, shell_launch, skills, slash,
-    sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
+    panes, pasting, paths, plan_limits, plugin_data, plugins, projects, receipts, reveal,
+    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
+    slash, sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
     worktree_base, worktrees, wsfiles,
 };
 
@@ -110,6 +110,9 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         cards::card_comment_edit,
         cards::card_comment_delete,
         cards::card_pin,
+        paths::path_create,
+        paths::path_move,
+        paths::path_delete,
         cards::card_unpin,
         card_work::card_checkout,
         card_work::card_terminal,

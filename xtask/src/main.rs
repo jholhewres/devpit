@@ -119,6 +119,7 @@ fn check() -> ExitCode {
     ));
     findings.extend(tmux_survives::the_app_never_kills_the_tmux_server(&root));
     findings.extend(uncalled::a_command_has_a_caller(&root));
+    findings.extend(uncalled::the_app_answers_what_the_contract_offers(&root));
 
     if findings.is_empty() {
         println!("guards: ok");
