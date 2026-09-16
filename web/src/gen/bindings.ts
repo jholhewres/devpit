@@ -2297,8 +2297,6 @@ export type SessionLayout = {
 
 export type Settings = {
 	theme: Theme,
-	/**  The account this install is signed in as, when it is. */
-	account: string | null,
 	/**  Unix seconds, or null while the first run has not been finished. */
 	onboardedAt: number | null,
 	/**

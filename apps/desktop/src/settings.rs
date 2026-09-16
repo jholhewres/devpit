@@ -15,10 +15,6 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
         theme: store
             .preference(preference::THEME)?
             .map_or(Theme::Dark, |stored| Theme::parse(&stored)),
-        // Filled in when there is an account to be signed into. Absent rather
-        // than an empty string: "not signed in" and "signed in as nobody" are
-        // different, and only one of them is real.
-        account: None,
         onboarded_at: store
             .preference(preference::ONBOARDED_AT)?
             .and_then(|value| value.parse::<i64>().ok())

@@ -38,6 +38,14 @@ describe('what the settings screen promises', () => {
     expect(settings).toMatch(/sync between machines is not built yet/i)
   })
 
+  /* The sidebar's sign-in button is read far more often than the account
+     pane, and it said the account saves the workspace setup. */
+  it('does not promise, on the sign-in button, a sync that is not built', () => {
+    const sidebar = readFileSync(resolve(process.cwd(), 'src/shell/Sidebar.tsx'), 'utf8')
+    expect(sidebar).not.toMatch(/Save your workspace/i)
+    expect(sidebar).toMatch(/nothing is synced yet/)
+  })
+
   /* A switch for something nothing reads is worse than no switch: it is a
      choice the person makes and the app ignores. */
   it('has no switch for anything that does not happen', () => {

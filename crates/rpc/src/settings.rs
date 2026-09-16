@@ -45,8 +45,6 @@ impl Theme {
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub theme: Theme,
-    /// The account this install is signed in as, when it is.
-    pub account: Option<String>,
     /// Unix seconds, or null while the first run has not been finished.
     pub onboarded_at: Option<f64>,
     /// Three states, not two: `null` is "never asked", which is what lets a
