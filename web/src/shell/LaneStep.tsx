@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 
 import type { Step } from '../gen/bindings'
+import { StepNew } from './StepNew'
 import { useAway } from './away'
 
 /*
@@ -15,12 +16,6 @@ import { useAway } from './away'
  * step should learn the rule when they choose it and not when it surprises
  * them.
  */
-
-const KINDS = [
-  { id: 'agent', label: 'Agent', hint: 'One headless turn. Returns JSON, takes no terminal.' },
-  { id: 'session', label: 'Session', hint: 'A session you drive. Takes the terminal.' },
-  { id: 'command', label: 'Command', hint: 'A command of yours: tests, a build, a deploy.' },
-] as const
 
 export function LaneStep({
   step,
@@ -155,7 +150,7 @@ export function LaneStep({
       )}
 
       {open && making && (
-        <Making
+        <StepNew
           onCancel={() => setMaking(false)}
           onDone={(kind, name, config, irreversible) => {
             onCreate(kind, name, config, irreversible)
@@ -164,92 +159,6 @@ export function LaneStep({
           }}
         />
       )}
-    </div>
-  )
-}
-
-function Making({
-  onDone,
-  onCancel,
-}: {
-  onDone: (kind: string, name: string, config: string, irreversible: boolean) => void
-  onCancel: () => void
-}): React.JSX.Element {
-  const [kind, setKind] = useState<string>('command')
-  const [name, setName] = useState('')
-  const [config, setConfig] = useState('')
-  const [irreversible, setIrreversible] = useState(false)
-  const chosen = KINDS.find((one) => one.id === kind)
-
-  return (
-    <div className="lstep__pop lstep__pop--wide">
-      <p className="lstep__t">A new step</p>
-
-      <div className="src__sw">
-        {KINDS.map((one) => (
-          <button
-            className="src__o"
-            key={one.id}
-            aria-checked={kind === one.id}
-            onClick={() => setKind(one.id)}
-          >
-            {one.label}
-          </button>
-        ))}
-      </div>
-      <p className="pref__d">{chosen?.hint}</p>
-
-      <label className="fld">
-        <span className="fld__l">Name</span>
-        <input
-          className="fld__b"
-          autoFocus
-          value={name}
-          placeholder="tests"
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-
-      <label className="fld">
-        <span className="fld__l">{kind === 'command' ? 'Command' : 'Agent'}</span>
-        <input
-          className="fld__b"
-          value={config}
-          spellCheck={false}
-          placeholder={kind === 'command' ? 'make test' : 'reviewer'}
-          onChange={(event) => setConfig(event.target.value)}
-        />
-      </label>
-
-      {/* Stated where it is chosen, not where it bites. A deploy has no undo,
-          so it is confirmed rather than fired by dropping a card on a lane. */}
-      <button
-        className="ask__opt"
-        role="checkbox"
-        aria-checked={irreversible}
-        onClick={() => setIrreversible((was) => !was)}
-      >
-        <span className="box">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-        </span>
-        <span>
-          <span className="ask__ot">This step has no undo</span>
-          <span className="ask__od">It is never started by a drag alone &mdash; you confirm it.</span>
-        </span>
-      </button>
-
-      <div className="ask__row">
-        <button className="btn" onClick={onCancel}>Cancel</button>
-        <button
-          className="btn btn--go"
-          disabled={!name.trim() || !config.trim()}
-          onClick={() => onDone(kind, name.trim(), config.trim(), irreversible)}
-        >
-          Create
-        </button>
-      </div>
     </div>
   )
 }

@@ -13,8 +13,12 @@ fn skills() -> Vec<String> {
     vec!["tdd".to_owned()]
 }
 
+fn check_kind(kind: StepKind, config: &str) -> Option<String> {
+    refuse(kind, config, &agents(), &skills(), &profiles())
+}
+
 fn check(config: &str) -> Option<String> {
-    refuse(StepKind::Agent, config, &agents(), &skills(), &profiles())
+    check_kind(StepKind::Agent, config)
 }
 
 #[test]
@@ -65,15 +69,67 @@ fn a_recipe_that_names_only_what_exists_is_saved() {
 /// Only an agent step has a recipe. A command step declares a command, and a
 /// session declares a model; neither has a cap to miss.
 #[test]
-fn the_other_kinds_are_left_alone() {
+fn the_other_kinds_are_not_asked_for_a_cap() {
     assert_eq!(
-        refuse(StepKind::Command, "{}", &agents(), &skills(), &profiles()),
+        check_kind(StepKind::Command, r#"{"command":"make test"}"#),
         None
     );
-    assert_eq!(
-        refuse(StepKind::Session, "{}", &agents(), &skills(), &profiles()),
-        None
-    );
+    assert_eq!(check_kind(StepKind::Session, "{}"), None);
+}
+
+/// What the form used to save: the single line the person typed. It parsed
+/// into nothing, was accepted, and failed when a card landed on the lane.
+#[test]
+fn a_config_that_is_not_json_is_refused_for_every_kind() {
+    for kind in [StepKind::Agent, StepKind::Command, StepKind::Session] {
+        let why = check_kind(kind, "make test").expect("refused");
+        assert!(why.contains("not readable"), "{kind:?}: {why}");
+    }
+}
+
+#[test]
+fn a_command_step_with_no_command_is_refused() {
+    assert!(check_kind(StepKind::Command, "{}").is_some());
+}
+
+/// The configs the form makes, read from the fixture the web test reads too.
+///
+/// Shared rather than copied: this is one rule with a half on each side of the
+/// bridge, and two fixtures would agree for about a week.
+#[test]
+fn a_step_made_in_the_form_runs() {
+    #[derive(serde::Deserialize)]
+    struct Case {
+        kind: String,
+        config: serde_json::Value,
+    }
+    #[derive(serde::Deserialize)]
+    struct Cases {
+        cases: Vec<Case>,
+    }
+
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../crates/steps/tests/fixtures/step-configs.json"
+    ))
+    .expect("the shared fixture");
+    let cases: Cases = serde_json::from_str(&text).expect("the fixture is readable");
+    assert!(!cases.cases.is_empty(), "the fixture has no cases");
+
+    for case in cases.cases {
+        let config = case.config.to_string();
+        match case.kind.as_str() {
+            "command" => {
+                assert_eq!(check_kind(StepKind::Command, &config), None, "{config}");
+                devpit_steps::validate(&config).expect("the runner reads it");
+            }
+            "session" => {
+                assert_eq!(check_kind(StepKind::Session, &config), None, "{config}");
+                crate::steps::session::readable(&config).expect("the runner reads it");
+            }
+            other => panic!("the fixture has a kind nothing runs: {other}"),
+        }
+    }
 }
 
 #[test]

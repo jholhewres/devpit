@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "kind": "command",
+      "fields": { "command": "make test", "timeoutSeconds": "600" },
+      "config": { "command": "make test", "timeoutSeconds": 600 }
+    },
+    {
+      "kind": "command",
+      "fields": { "command": "deploy {{branch}}", "timeoutSeconds": "" },
+      "config": { "command": "deploy {{branch}}" }
+    },
+    {
+      "kind": "session",
+      "fields": { "model": "sonnet", "profile": "01JGLM" },
+      "config": { "model": "sonnet", "profile": "01JGLM" }
+    },
+    {
+      "kind": "session",
+      "fields": { "model": "", "profile": "" },
+      "config": {}
+    }
+  ]
+}

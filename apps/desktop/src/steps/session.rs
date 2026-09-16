@@ -11,12 +11,21 @@ use super::Finished;
 /// What a `session` step needs to know, out of `step.config`.
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-struct SessionConfig {
+pub(crate) struct SessionConfig {
     model: Option<String>,
     /// Which profile starts it. The session outlives this step and is attached
     /// later, so the profile is written down with the link rather than looked
     /// up again from a step that may have changed by then.
     profile: Option<String>,
+}
+
+/// Reads a session step's config, or says why it cannot be read.
+///
+/// Shared with the rule that refuses a step when it is saved: what runs it and
+/// what accepts it read the same way, so a step that saves is a step that
+/// starts.
+pub(crate) fn readable(config: &str) -> Result<SessionConfig, String> {
+    serde_json::from_str(config).map_err(|err| format!("this step's config is not readable: {err}"))
 }
 
 /// Starts a background session for this card and records the handle.
@@ -35,8 +44,7 @@ pub fn start(
     step: &Step,
     session_id: &str,
 ) -> Result<Finished, String> {
-    let config: SessionConfig = serde_json::from_str(&step.config)
-        .map_err(|err| format!("this step's config is not readable: {err}"))?;
+    let config = readable(&step.config)?;
 
     // The card's own checkout, created here if this is the first step that
     // needs one. The CLI's `--worktree` is deliberately not used: it puts the

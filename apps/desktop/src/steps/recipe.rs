@@ -34,10 +34,22 @@ pub fn refuse(
     installed: &[String],
     profiles: &[String],
 ) -> Option<String> {
-    if kind != StepKind::Agent {
-        return None;
+    match kind {
+        // Each kind is read here by whatever will run it, so a step that saves
+        // is a step that runs. What used to happen instead: anything that was
+        // not JSON parsed into nothing, was accepted, and failed on the lane.
+        StepKind::Command => {
+            return devpit_steps::validate(config)
+                .err()
+                .map(|err| err.to_string())
+        }
+        StepKind::Session => return super::session::readable(config).err(),
+        StepKind::Agent => {}
     }
-    let declared: Declared = serde_json::from_str(config).ok()?;
+    let declared: Declared = match serde_json::from_str(config) {
+        Ok(declared) => declared,
+        Err(err) => return Some(format!("this step's config is not readable: {err}")),
+    };
 
     if declared.budget_usd.is_none() {
         return Some("this step declares no spending cap, so it would never run".to_owned());

@@ -15,6 +15,11 @@ const step = (over: Partial<Step> = {}): Step => ({
   ...over,
 })
 
+vi.mock('./live', () => ({
+  ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null }),
+  commands: { agentProfiles: () => [{ id: 'prof_glm', label: 'glm' }] },
+}))
+
 const lanes = [
   { id: 'col_review', name: 'review' },
   { id: 'col_ship', name: 'ship' },
@@ -132,5 +137,38 @@ describe('what a lane does when its step passes', () => {
       />,
     )
     expect(container.querySelector('.lstep__auto')).toBeNull()
+  })
+})
+
+describe('the form that makes a step', () => {
+  const open = (over: Partial<Parameters<typeof LaneStep>[0]> = {}) => {
+    draw(over)
+    fireEvent.click(screen.getByTitle('Runs tests'))
+    fireEvent.click(screen.getByText(/New step/))
+  }
+
+  /* What this covers: the form used to save the one line the person typed,
+     which is not JSON, which is not what any runner reads. */
+  it('saves a command as the JSON its runner reads', () => {
+    const onCreate = vi.fn()
+    open({ onCreate })
+    fireEvent.change(screen.getByPlaceholderText('tests'), { target: { value: 'suite' } })
+    fireEvent.change(screen.getByPlaceholderText('make test'), { target: { value: 'make test' } })
+    fireEvent.change(screen.getByPlaceholderText('as long as it takes'), { target: { value: '600' } })
+    fireEvent.click(screen.getByText('Create'))
+    expect(onCreate).toHaveBeenCalledWith('command', 'suite', '{"command":"make test","timeoutSeconds":600}', false)
+  })
+
+  it('asks a session which account runs it, and not for a command', async () => {
+    open()
+    fireEvent.click(screen.getByText('Session'))
+    expect(screen.queryByPlaceholderText('make test')).toBeNull()
+    expect(await screen.findByText('glm')).toBeTruthy()
+  })
+
+  it('keeps Create out of reach until the kind has what it needs', () => {
+    open()
+    fireEvent.change(screen.getByPlaceholderText('tests'), { target: { value: 'suite' } })
+    expect(screen.getByText('Create').hasAttribute('disabled')).toBe(true)
   })
 })
