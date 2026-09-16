@@ -4,6 +4,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 
 import { attach, scrollback, type Attached } from './attach'
+import { drawOnTheGpu, measureWideCharacters } from './terminalAddons'
 import { reason } from './reason'
 import { ask, commands } from './live'
 import { contrastFor, darkNow, options, palette } from './terminal'
@@ -43,6 +44,9 @@ export function Leaf({
     const fit = new FitAddon()
     terminal.loadAddon(fit)
     terminal.open(box)
+    // After `open`, which is when there is a canvas to take a context from.
+    measureWideCharacters(terminal)
+    drawOnTheGpu(terminal)
 
     /* The pane is `display: none` until its tab is active and animates in on a
        transform, so a fit in this tick measures nothing and xterm ends up with
