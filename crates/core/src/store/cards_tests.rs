@@ -425,14 +425,6 @@ fn a_lane_deleted_with_cards_moves_them_in_order_to_the_end_of_another() {
     assert_eq!(moved.column_id, columns[1].id);
 }
 
-/// A focus can hold a notice for an afternoon, so the store must still have it.
-///
-/// The trim took the oldest rows whatever their state, so 200 notices from a
-/// busy project threw away what somebody had not looked at on another one —
-/// and a queue holding those back to show them on the way out would have been
-/// holding rows that no longer existed. Sabotage: drop `read_at IS NOT NULL`
-/// from the first delete and the unread one disappears here.
-
 /// Two projects on disk, because a notice's project is a foreign key.
 fn two_projects(dir: &std::path::Path, store: &Store) -> (String, String) {
     let mut made = Vec::new();
@@ -443,6 +435,14 @@ fn two_projects(dir: &std::path::Path, store: &Store) -> (String, String) {
     }
     (made[0].clone(), made[1].clone())
 }
+
+/// A focus can hold a notice for an afternoon, so the store must still have it.
+///
+/// The trim took the oldest rows whatever their state, so 200 notices from a
+/// busy project threw away what somebody had not looked at on another one —
+/// and a queue holding those back to show them on the way out would have been
+/// holding rows that no longer existed. Sabotage: drop `read_at IS NOT NULL`
+/// from the first delete and the unread one disappears here.
 
 #[test]
 fn the_trim_takes_what_was_read_and_leaves_what_was_not() {
