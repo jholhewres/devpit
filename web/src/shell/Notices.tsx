@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 
 import type { Notice } from '../gen/bindings'
 import { useAway } from './away'
 import { since } from './projects'
-import { useNotices } from './useNotices'
+import type { Bell } from './useNotices'
 
 /*
  * The bell.
@@ -30,9 +30,17 @@ const GLYPHS: Readonly<Record<string, React.JSX.Element>> = {
 const glyphFor = (kind: string): React.JSX.Element =>
   GLYPHS[kind] ?? <circle cx="12" cy="12" r="4" />
 
-export function Notices({ onOpenCard }: { onOpenCard?: (cardId: string) => void }): React.JSX.Element {
-  const bell = useNotices()
-  const [open, setOpen] = useState(false)
+export function Notices({
+  bell,
+  open,
+  setOpen,
+  onOpenCard,
+}: {
+  bell: Bell
+  open: boolean
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>
+  onOpenCard?: (cardId: string) => void
+}): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   useAway(box, () => setOpen(false), open)
 
@@ -71,7 +79,9 @@ export function Notices({ onOpenCard }: { onOpenCard?: (cardId: string) => void 
             )}
           </div>
 
-          {bell.notices.length === 0 && <p className="bell__none">Nothing yet.</p>}
+          {bell.notices.length === 0 && bell.waiting.length === 0 && (
+            <p className="bell__none">Nothing yet.</p>
+          )}
 
           <div className="bell__list">
             {bell.notices.map((one) => (
@@ -94,6 +104,26 @@ export function Notices({ onOpenCard }: { onOpenCard?: (cardId: string) => void 
               </button>
             ))}
           </div>
+
+          {/* What the focus is holding, where the rest of the notices are:
+              looking at it is not leaving the focus, and nothing here is
+              marked read by being seen. */}
+          {bell.waiting.length > 0 && (
+            <div className="bell__held">
+              <span className="bell__t">Waiting for the end of the focus</span>
+              {bell.waiting.map((one) => (
+                <span className="bell__one" key={one.id} data-kind={one.kind}>
+                  <svg className="bell__ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                    {glyphFor(one.kind)}
+                  </svg>
+                  <span className="bell__body">
+                    <span className="bell__line">{one.title}</span>
+                  </span>
+                  <span className="bell__when">{since(one.createdAt)}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

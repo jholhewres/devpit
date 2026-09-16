@@ -1,9 +1,12 @@
+import { useState } from 'react'
+
 import mark from '../assets/brand/mark.png'
 import { BranchPicker } from './BranchPicker'
 import { HeadsDown } from './HeadsDown'
 import { Notices } from './Notices'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
+import { useNotices } from './useNotices'
 import { useShell } from './useShell'
 import { useTree } from './useTree'
 import { close, minimize, toggleMaximize } from './window'
@@ -23,6 +26,10 @@ import { close, minimize, toggleMaximize } from './window'
  */
 export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
   const { side, files, toggleSide, toggleFiles, project, show, openCard } = useShell()
+  /* One reader for the whole top bar: the panel and the pill draw from the
+     same list, so a count on one cannot disagree with the other. */
+  const bell = useNotices()
+  const [bellOpen, setBellOpen] = useState(false)
   const { totals } = useTree(project?.id ?? null)
   const here = project?.worktrees.find((tree) => tree.current) ?? project?.worktrees[0]
 
@@ -39,7 +46,7 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
 
       <span className="drag" data-tauri-drag-region />
 
-      <HeadsDown projectId={project?.id ?? null} />
+      <HeadsDown projectId={project?.id ?? null} waiting={bell.waiting.length} onPeek={() => setBellOpen(true)} />
       {here && <BranchPicker branch={here.branch} ahead={here.ahead} />}
       <span className="netstat" hidden={totals.added + totals.removed === 0}>
         <span className="add">+{totals.added}</span>
@@ -50,6 +57,9 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
           say is about the whole window, and half of it arrives while the
           sidebar is hidden. */}
       <Notices
+        bell={bell}
+        open={bellOpen}
+        setOpen={setBellOpen}
         onOpenCard={(cardId) => {
           show('board')
           openCard(cardId)

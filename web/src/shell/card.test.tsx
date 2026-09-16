@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Card, Checkout, Comment, Notice, Notices as Rung, Pinned } from '../gen/bindings'
@@ -231,16 +232,30 @@ describe('the bell', () => {
     markedAll.mockClear()
   })
 
+  /* The top bar owns the bell's state now, so one reader serves the panel and
+     the focus pill. The tests supply it the same way the top bar does. */
+  function Bell({ onOpenCard }: { onOpenCard?: (cardId: string) => void }): React.JSX.Element {
+    const [open, setOpen] = useState(false)
+    return (
+      <Notices
+        bell={{ ...bell, waiting: [], markRead: marked, markAllRead: markedAll, reload: () => {} }}
+        open={open}
+        setOpen={setOpen}
+        onOpenCard={onOpenCard}
+      />
+    )
+  }
+
   it('shows no count when there is nothing unread', async () => {
     bell = { notices: [notice({ readAt: Date.now() / 1000 })], unread: 0 }
-    const { container } = render(<Notices />)
+    const { container } = render(<Bell />)
     await waitFor(() => expect(container.querySelector('.bell__b')).toBeTruthy())
     expect(container.querySelector('.bell__n')).toBeNull()
   })
 
   it('counts what is unread', async () => {
     bell = { notices: [notice()], unread: 2 }
-    render(<Notices />)
+    render(<Bell />)
     expect(await screen.findByLabelText('2 unread')).toBeTruthy()
   })
 
@@ -248,7 +263,7 @@ describe('the bell', () => {
      of digits. */
   it('caps the count', async () => {
     bell = { notices: [notice()], unread: 348 }
-    render(<Notices />)
+    render(<Bell />)
     fireEvent.click(await screen.findByLabelText('348 unread'))
     expect(screen.getByText('99+')).toBeTruthy()
   })
@@ -256,7 +271,7 @@ describe('the bell', () => {
   it('opens the card a notice is about, and marks it read', async () => {
     bell = { notices: [notice()], unread: 1 }
     const onOpenCard = vi.fn()
-    render(<Notices onOpenCard={onOpenCard} />)
+    render(<Bell onOpenCard={onOpenCard} />)
     fireEvent.click(await screen.findByLabelText('1 unread'))
     fireEvent.click(screen.getByText(/tests finished/))
     expect(marked).toHaveBeenCalledWith('ntc_1')
@@ -268,7 +283,7 @@ describe('the bell', () => {
      gone. */
   it('marks nothing merely by being opened', async () => {
     bell = { notices: [notice()], unread: 1 }
-    render(<Notices />)
+    render(<Bell />)
     fireEvent.click(await screen.findByLabelText('1 unread'))
     expect(marked).not.toHaveBeenCalled()
     expect(markedAll).not.toHaveBeenCalled()
@@ -276,7 +291,7 @@ describe('the bell', () => {
 
   it('marks them all when asked', async () => {
     bell = { notices: [notice()], unread: 1 }
-    render(<Notices />)
+    render(<Bell />)
     fireEvent.click(await screen.findByLabelText('1 unread'))
     fireEvent.click(screen.getByText('Mark all read'))
     expect(markedAll).toHaveBeenCalled()
@@ -284,7 +299,7 @@ describe('the bell', () => {
 
   it('draws a kind it does not know rather than failing', async () => {
     bell = { notices: [notice({ kind: 'something-newer', title: 'a new thing' })], unread: 1 }
-    render(<Notices />)
+    render(<Bell />)
     fireEvent.click(await screen.findByLabelText('1 unread'))
     expect(screen.getByText('a new thing')).toBeTruthy()
   })

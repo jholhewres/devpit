@@ -21,7 +21,18 @@ import { stamp, useHeadsDown } from './useHeadsDown'
  *  so a finer tick would re-render for a sentence that did not change. */
 const A_TICK = 30_000
 
-export function HeadsDown({ projectId }: { projectId: string | null }): React.JSX.Element | null {
+export function HeadsDown({
+  projectId,
+  waiting = 0,
+  onPeek,
+}: {
+  projectId: string | null
+  /** How many notices the door is holding. Shown, never acted on here. */
+  waiting?: number
+  /** Looking at what is held is not leaving the focus, so the pill opens the
+   *  panel the notices already live in rather than a second list. */
+  onPeek?: () => void
+}): React.JSX.Element | null {
   const { focus, enter, leave } = useHeadsDown()
   const [now, setNow] = useState(() => Date.now() / 1000)
 
@@ -51,6 +62,13 @@ export function HeadsDown({ projectId }: { projectId: string | null }): React.JS
     else if (projectId) enter(projectId)
   }
 
+  /* While one is on, the pill is the way to look at what is waiting; the way
+     out is the same key, and the button beside it. */
+  const press = (): void => {
+    if (focus && waiting > 0 && onPeek) onPeek()
+    else toggle()
+  }
+
   useEffect(() => {
     const key = (event: KeyboardEvent): void => {
       if (shortcutFor(event) !== 'focus') return
@@ -69,11 +87,13 @@ export function HeadsDown({ projectId }: { projectId: string | null }): React.JS
     <button
       className="hdown"
       data-on={String(on)}
-      onClick={toggle}
+      onClick={press}
       title={`Focus (${SHORTCUTS.focus})`}
       aria-pressed={on}
     >
-      {focus ? `Focus · ${minutesIn(focus, now)} min` : 'Focus'}
+      {focus
+        ? `Focus · ${minutesIn(focus, now)} min${waiting > 0 ? ` · ${waiting} outside` : ''}`
+        : 'Focus'}
     </button>
   )
 }

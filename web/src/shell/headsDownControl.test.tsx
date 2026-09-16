@@ -90,3 +90,29 @@ describe('going into a focus', () => {
      after the component had already registered a real interval, which proves
      nothing about either. */
 })
+
+describe('what the pill says while a focus is on', () => {
+  it('counts what is waiting outside, and says nothing when none is', async () => {
+    stored = { projectId: 'prj_1', since: Date.now() / 1000 - 120 }
+    const { rerender } = render(<HeadsDown projectId="prj_1" waiting={0} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Focus · 2 min' })).toBeTruthy())
+
+    rerender(<HeadsDown projectId="prj_1" waiting={3} />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Focus · 2 min · 3 outside' })).toBeTruthy(),
+    )
+  })
+
+  /* Looking at what is held must not end the focus — that was the whole
+     complaint about a mode that hides things. */
+  it('peeks at what is held instead of leaving, while something is held', async () => {
+    stored = { projectId: 'prj_1', since: Date.now() / 1000 }
+    const peeked = vi.fn()
+    render(<HeadsDown projectId="prj_1" waiting={2} onPeek={peeked} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /outside/ })).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: /outside/ }))
+    expect(peeked).toHaveBeenCalledOnce()
+    expect(written).toEqual([])
+  })
+})

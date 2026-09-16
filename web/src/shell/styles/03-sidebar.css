@@ -344,3 +344,5 @@ body[data-account='out'] .acct { display: none; }
 }
 .hdown:hover { background: var(--overlay); color: var(--fg); }
 .hdown[data-on='true'] { background: var(--overlay-strong); color: var(--fg); }
+.bell__held { border-top: 1px solid var(--line); padding: 6px 0 2px; }
+.bell__held .bell__one { cursor: default; opacity: 0.75; }
