@@ -17,6 +17,7 @@ mod naming;
 mod packaging;
 mod platform_window;
 mod ratchet;
+mod release_manifest;
 mod reseed;
 mod shell_boundary;
 mod versions;
@@ -30,6 +31,7 @@ fn main() -> ExitCode {
         "check" => check(),
         "ceilings" => ceilings(),
         "controls" => controls(),
+        "release-manifest" => release_manifest_command(),
         other => {
             eprintln!("unknown command: {other}\n\nusage: cargo xtask check | ceilings | controls");
             ExitCode::FAILURE
@@ -63,6 +65,33 @@ fn controls() -> ExitCode {
         }
         Err(error) => {
             eprintln!("could not write the budgets: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `cargo xtask release-manifest <version> [date] [notes]`
+///
+/// Run by the release workflow after the overlay build, before anything is
+/// published.
+fn release_manifest_command() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(2).collect();
+    let Some(version) = args.first() else {
+        eprintln!("usage: cargo xtask release-manifest <version> [date] [notes]");
+        return ExitCode::FAILURE;
+    };
+    let date = args.get(1).cloned().unwrap_or_default();
+    let notes = args.get(2).cloned().unwrap_or_default();
+
+    match release_manifest::run(&workspace_root(), version, &notes, &date) {
+        Ok(written) => {
+            for path in written {
+                println!("{}", path.display());
+            }
+            ExitCode::SUCCESS
+        }
+        Err(why) => {
+            eprintln!("nothing was written: {why}");
             ExitCode::FAILURE
         }
     }
