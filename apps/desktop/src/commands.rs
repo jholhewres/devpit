@@ -8,11 +8,15 @@ use devpit_core::Store;
 use devpit_rpc::{AppInfo, RpcError};
 
 /// `app.info` — version, platform, and where state lives.
+///
+/// The version is the one the updater compares against, not the crate's: the
+/// two agree in a release, and when a build sets them apart the screen should
+/// say what an update will be measured from.
 #[tauri::command]
 #[specta::specta]
-pub fn app_info() -> Result<AppInfo, RpcError> {
+pub fn app_info(app: tauri::AppHandle) -> Result<AppInfo, RpcError> {
     Ok(AppInfo {
-        version: env!("CARGO_PKG_VERSION").to_owned(),
+        version: app.package_info().version.to_string(),
         platform: std::env::consts::OS.to_owned(),
         state_path: Store::default_path()?.display().to_string(),
     })

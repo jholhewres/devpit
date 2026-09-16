@@ -4,7 +4,13 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	/**  `app.info` — version, platform, and where state lives. */
+	/**
+	 *  `app.info` — version, platform, and where state lives.
+	 * 
+	 *  The version is the one the updater compares against, not the crate's: the
+	 *  two agree in a release, and when a build sets them apart the screen should
+	 *  say what an update will be measured from.
+	 */
 	appInfo: () => typedError<AppInfo, RpcError>(__TAURI_INVOKE("app_info")),
 	/**
 	 *  `project.list` — every registered project with its checkouts.

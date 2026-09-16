@@ -404,7 +404,10 @@ pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcErro
     }
 
     let (heard, found) = if let Some(feed) = fixture_feed() {
-        (feed_says(&feed, env!("CARGO_PKG_VERSION")), None)
+        (
+            feed_says(&feed, &app.package_info().version.to_string()),
+            None,
+        )
     } else {
         asked(&app, kind).await
     };
