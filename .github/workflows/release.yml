@@ -17,6 +17,10 @@ jobs:
       # Every action is pinned to a commit: a tag can be moved, and a moved tag
       # is somebody else's code inside a job that holds the signing key.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        # The job's token stays out of .git/config: every later step could read
+        # it there, and it can write releases.
+        with:
+          persist-credentials: false
 
       # The same system packages CI installs, plus what the AppImage needs:
       # linuxdeploy's gtk plugin reads librsvg-2.0.pc.
@@ -52,14 +56,22 @@ jobs:
 
       - run: make test
 
-      # The only step that sees the key. The overlay is what turns on the
-      # AppImage and the signing; the base config builds a .deb and signs
-      # nothing, which is what every pull request runs.
-      - name: Build the release bundles
+      # Everything that runs somebody else's code happens here, without the
+      # key: the frontend build runs every npm dependency, and cargo runs every
+      # crate's build script. The binary is the one the next step packs.
+      - name: Build the release binary, without the key
+        run: ./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.release.conf.json
+
+      # The only step that sees the key, and it builds nothing: the frontend
+      # command is emptied and cargo finds the binary already built, so what
+      # runs next to the key is the bundler and the signer.
+      - name: Bundle and sign
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: ./node_modules/.bin/tauri build --config apps/desktop/tauri.release.conf.json
+        run: |
+          ./node_modules/.bin/tauri build --config apps/desktop/tauri.release.conf.json \
+            --config '{"build":{"beforeBuildCommand":""}}'
 
       # Each artifact is verified against the public key the app carries before
       # a single manifest is written. `createUpdaterArtifacts` already signs

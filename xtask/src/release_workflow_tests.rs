@@ -67,3 +67,25 @@ fn manifests_published_before_the_artifacts_are_refused() {
         .iter()
         .any(|(_, what)| what.contains("before the files they name")));
 }
+
+/// The review's case: with the key in the environment of a step that runs
+/// `pnpm build`, a compromised devDependency reads it and signs an update
+/// every installed app accepts.
+#[test]
+fn the_key_next_to_the_frontend_build_is_refused() {
+    let together = ours().replace("--config '{\"build\":{\"beforeBuildCommand\":\"\"}}'", "");
+    assert!(
+        refusals(&together)
+            .iter()
+            .any(|(_, what)| what.contains("also builds the frontend")),
+        "the keyed step building the frontend was accepted"
+    );
+}
+
+#[test]
+fn a_checkout_that_keeps_the_token_is_refused() {
+    let kept = ours().replace("persist-credentials: false", "persist-credentials: true");
+    assert!(refusals(&kept)
+        .iter()
+        .any(|(_, what)| what.contains(".git/config")));
+}

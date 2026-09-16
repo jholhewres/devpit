@@ -81,6 +81,28 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
         ));
     }
 
+    if !text.contains("persist-credentials: false") {
+        said.push((
+            at("actions/checkout@").unwrap_or(1),
+            "checks out with the job's token kept in .git/config, where every later step can read it"
+                .to_owned(),
+        ));
+    }
+
+    // The step holding the key must not build the frontend: that runs every
+    // npm dependency with the key in its environment.
+    let keyed = text
+        .split("\n      - ")
+        .find(|step| step.contains(SECRET))
+        .unwrap_or_default();
+    if keyed.contains("tauri build") && !keyed.contains(r#""beforeBuildCommand":"""#) {
+        said.push((
+            at(SECRET).unwrap_or(1),
+            "the step with the signing key also builds the frontend, running every npm dependency next to it"
+                .to_owned(),
+        ));
+    }
+
     if !text.contains("--verify-tag") {
         said.push((
             at("gh release create").unwrap_or(1),
