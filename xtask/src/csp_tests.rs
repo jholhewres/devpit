@@ -65,3 +65,33 @@ fn the_dev_server_is_named_only_in_the_dev_policy() {
         "dev hosts passed in the shipped policy"
     );
 }
+
+/// The review's cases: both passed a guard that says it forbids injectable
+/// script — a policy with no script source at all, and one that lets inline
+/// script and data URLs run.
+#[test]
+fn scripts_have_to_come_from_the_app_itself() {
+    let silent = "img-src 'self'; frame-src 'none'; object-src 'none'";
+    assert!(
+        refusals(silent, &[])
+            .iter()
+            .any(|why| why.contains("neither script-src nor default-src")),
+        "a policy that says nothing about scripts was accepted"
+    );
+
+    let inline = "default-src 'self'; script-src 'self' 'unsafe-inline' data:; frame-src 'none'; object-src 'none'";
+    assert!(
+        refusals(inline, &[])
+            .iter()
+            .any(|why| why.contains("only 'self' is")),
+        "inline script was accepted"
+    );
+
+    let fallback = "default-src 'self'; frame-src 'none'; object-src 'none'";
+    assert!(
+        !refusals(fallback, &[])
+            .iter()
+            .any(|why| why.contains("script")),
+        "default-src 'self' alone is a fine answer for scripts"
+    );
+}

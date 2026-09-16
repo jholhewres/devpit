@@ -70,6 +70,27 @@ pub fn the_csp_forbids_what_the_app_never_needs(root: &Path) -> Vec<Finding> {
 /// config — a rule a test cannot call is a rule the test cannot guard.
 fn refusals(policy: &str, allowed: &[&str]) -> Vec<String> {
     let mut said = Vec::new();
+
+    // Where scripts may come from is the one directive that decides whether
+    // an injected string can run, and a policy that leaves it unsaid allows
+    // everything. It falls back to default-src, as the browser does.
+    let sources_of = |wanted: &str| {
+        policy.split(';').find_map(|directive| {
+            let mut words = directive.split_whitespace();
+            (words.next() == Some(wanted)).then(|| words.collect::<Vec<_>>())
+        })
+    };
+    match sources_of("script-src").or_else(|| sources_of("default-src")) {
+        None => said.push(
+            "neither script-src nor default-src is set, so scripts may come from anywhere"
+                .to_owned(),
+        ),
+        Some(sources) if sources != ["'self'"] => said.push(format!(
+            "scripts may come from {} — only 'self' is",
+            sources.join(" ")
+        )),
+        Some(_) => {}
+    }
     if policy.contains("unsafe-eval") {
         said.push("'unsafe-eval' turns any injected string into code".to_owned());
     }
