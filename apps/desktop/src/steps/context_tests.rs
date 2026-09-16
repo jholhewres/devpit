@@ -123,3 +123,23 @@ fn a_command_step_reads_the_same_branch_and_base() {
     assert_eq!(context.project, "devpit");
     assert_eq!(context.card_title, "Fix it");
 }
+
+/// The review's case: a checkout mid-rebase, or after `git checkout <sha>`,
+/// has no branch name, and the step still runs in that folder.
+#[test]
+fn a_detached_checkout_still_says_where_the_step_runs() {
+    let cwd = std::path::Path::new("/home/me/.devpit/worktrees/p/card_1");
+    let context = context_of(
+        &card(),
+        Some(Checkout {
+            path: cwd,
+            branch: "",
+        }),
+        Some("/home/me/work/devpit"),
+    );
+    assert_eq!(context.branch, None);
+    assert_eq!(
+        context.worktree_path.as_deref(),
+        Some("/home/me/.devpit/worktrees/p/card_1")
+    );
+}
