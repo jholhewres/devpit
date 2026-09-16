@@ -49,28 +49,6 @@ pub fn read(path: &Path) -> Prime {
         .unwrap_or_default()
 }
 
-pub fn write(path: &Path, prime: &Prime) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(path, serde_json::to_string_pretty(prime)?)
-}
-
-/// Whether a declared preparation can be run at all.
-///
-/// Checked when the preparation is saved, not when a card lands on a column: a
-/// command that does not exist is a typo, and a typo should be answered while
-/// the person is still looking at what they typed.
-pub fn missing(prime: &Prime) -> Vec<String> {
-    prime
-        .run
-        .iter()
-        .filter_map(|line| line.split_whitespace().next())
-        .filter(|program| devpit_agentcli::profile::found(program).is_none())
-        .map(ToOwned::to_owned)
-        .collect()
-}
-
 /// The marker that says this worktree has already been prepared.
 fn done_marker(at: &Path) -> PathBuf {
     at.join(".devpit-primed")

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use devpit_core::home::{HomeError, ProjectHome, FOLDER_NOTICE};
 use devpit_core::Store;
-use devpit_rpc::{ErrorCode, Note, Project, ProjectChanges, ProjectList, ProjectNotes, RpcError};
+use devpit_rpc::{ErrorCode, Project, ProjectChanges, ProjectList, RpcError};
 
 pub(crate) fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -305,45 +305,6 @@ pub fn project_changes(
         added,
         removed,
     })
-}
-
-/// `project.notes` — the notes pinned to a project.
-#[tauri::command]
-#[specta::specta]
-pub fn project_notes(project_id: String) -> Result<ProjectNotes, RpcError> {
-    let store = store()?;
-    locate(&store, &project_id)?;
-
-    let notes = store
-        .notes(&project_id)?
-        .into_iter()
-        .map(|row| Note {
-            id: row.id,
-            body: row.body,
-            created_at: row.created_at as f64,
-        })
-        .collect();
-
-    Ok(ProjectNotes { notes })
-}
-
-/// `project.note_add` — capture, in one keystroke and no form.
-#[tauri::command]
-#[specta::specta]
-pub fn project_note_add(project_id: String, body: String) -> Result<ProjectNotes, RpcError> {
-    let store = store()?;
-    locate(&store, &project_id)?;
-
-    let trimmed = body.trim();
-    if trimmed.is_empty() {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            "an empty note is not a note",
-        ));
-    }
-
-    store.add_note(&project_id, trimmed)?;
-    project_notes(project_id)
 }
 
 /// Resolves which checkout a command is about.

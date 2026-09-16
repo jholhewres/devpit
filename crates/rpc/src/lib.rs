@@ -54,8 +54,8 @@ pub use plugins::{
 };
 pub use profile::{Declared, EnvVar, Profile, Reach};
 pub use project::{
-    Change, Commit, FileNode, GitStatus, Note, Project, ProjectChanges, ProjectHistory,
-    ProjectList, ProjectNotes, ProjectTree, Worktree, WorktreeOrigin,
+    Change, Commit, FileNode, GitStatus, Project, ProjectChanges, ProjectHistory, ProjectList,
+    ProjectTree, Worktree, WorktreeOrigin,
 };
 pub use runs::{ProjectRun, RunCursor, RunsPage, RunsQuery};
 pub use search::{SearchFile, SearchHits, SearchLine};
@@ -89,32 +89,4 @@ pub struct AppInfo {
     /// Where this build keeps state. Exposed on purpose: it is the first
     /// question of anyone taking a backup or filing a bug.
     pub state_path: String,
-}
-
-/// Response of `app.health`.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct AppHealth {
-    pub ok: bool,
-    /// The binary on disk is no longer the one running.
-    ///
-    /// A backend still serving a replaced build makes every symptom read as
-    /// "the fix did not work". In the contract from the start so the screen
-    /// can say so instead of leaving it to be guessed.
-    pub stale: bool,
-    pub state_path: String,
-}
-
-/// What this build can do. Governs the UI.
-///
-/// Memory, cloud and vault are optional dependencies: without them the
-/// matching panel disappears and the rest works. The screen asks here instead
-/// of trying and handling failure — try-and-fail flashes a broken panel first.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Capabilities {
-    pub memory: bool,
-    pub cloud: bool,
-    pub vault: bool,
-    pub tmux: bool,
 }

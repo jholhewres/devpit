@@ -14,12 +14,24 @@ vi.mock('./window', () => ({
 
 const download = vi.fn(async () => ({ status: 'ok', data: null }))
 const packaged = vi.fn(async () => ({ status: 'ok', data: "sudo /usr/bin/apt install '/c/devpit.deb'" }))
+const installed = vi.fn(async () => ({ status: 'ok', data: null }))
+const chose = vi.fn(async (_choice: string) => ({ status: 'ok', data: null }))
+let busy: { runs: { id: string; title: string }[]; turns: { id: string; title: string }[] } = {
+  runs: [],
+  turns: [],
+}
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<{ data?: unknown }>) => {
     const answer = (await call()) as { data?: unknown }
     return { data: answer?.data ?? null, error: null, loading: false }
   },
-  commands: { updateDownload: () => download(), updatePackage: () => packaged() },
+  commands: {
+    updateDownload: () => download(),
+    updatePackage: () => packaged(),
+    updateInstall: () => installed(),
+    updateRunning: async () => ({ status: 'ok', data: busy }),
+    updateChoose: (choice: string) => chose(choice),
+  },
 }))
 
 /* The app pushes these in from outside React, so the render has to be let
@@ -31,6 +43,7 @@ function say(status: UpdateStatus): void {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  busy = { runs: [], turns: [] }
 })
 
 describe('the update card', () => {
@@ -118,5 +131,44 @@ describe('the update card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
     await waitFor(() => expect(packaged).toHaveBeenCalled())
     expect(written).toHaveBeenCalledWith("sudo /usr/bin/apt install '/c/devpit.deb'")
+  })
+})
+
+describe('restarting into the update', () => {
+  const ready = (): void =>
+    say({ type: 'ready', version: '0.2.0', kind: 'appImage' } as UpdateStatus)
+
+  it('goes straight in when nothing is running', async () => {
+    render(<UpdateCard />)
+    ready()
+    fireEvent.click(screen.getByText('Restart now'))
+    await waitFor(() => expect(installed).toHaveBeenCalled())
+  })
+
+  /* The question is about the two runs, not about the update: the card names
+     them and installs nothing until it is answered. */
+  it('names what is running, and waits for an answer', async () => {
+    busy = { runs: [{ id: 'run_1', title: 'Fix the parser' }], turns: [] }
+    render(<UpdateCard />)
+    ready()
+    fireEvent.click(screen.getByText('Restart now'))
+
+    expect(await screen.findByText(/Fix the parser/)).toBeTruthy()
+    expect(installed).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('Stop it and restart'))
+    await waitFor(() => expect(chose).toHaveBeenCalledWith('stopIt'))
+    await waitFor(() => expect(installed).toHaveBeenCalled())
+  })
+
+  it('lets the update wait for the work instead', async () => {
+    busy = { runs: [], turns: [{ id: 'conv_1', title: 'Ship it' }] }
+    render(<UpdateCard />)
+    ready()
+    fireEvent.click(screen.getByText('Restart now'))
+
+    fireEvent.click(await screen.findByText('When it is done'))
+    await waitFor(() => expect(chose).toHaveBeenCalledWith('whenItIsDone'))
+    expect(installed).not.toHaveBeenCalled()
   })
 })

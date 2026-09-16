@@ -1,0 +1,11 @@
+# Commands the window never calls, and why they stay. One `name reason` per
+# line; everything else in the contract has to be called from web/src.
+#
+# All four are the same shape: a command that exists so the generated contract
+# carries a type the window does read. specta writes down what a command can
+# reach, and an event payload is reachable from no command.
+
+chat_frames carries Ask and Frame, which chat.send streams over a Channel specta cannot describe
+permission_questions carries Question, which arrives on an event
+terminal_happenings carries Happening, the payload of terminal:happening
+card_happenings carries CardHappening, the payload of card:happening

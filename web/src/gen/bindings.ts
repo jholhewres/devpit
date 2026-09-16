@@ -6,10 +6,6 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	/**  `app.info` — version, platform, and where state lives. */
 	appInfo: () => typedError<AppInfo, RpcError>(__TAURI_INVOKE("app_info")),
-	/**  `app.health` — alive, and is it the build you think it is? */
-	appHealth: () => typedError<AppHealth, RpcError>(__TAURI_INVOKE("app_health")),
-	/**  `app.capabilities` — what this build can do. */
-	appCapabilities: () => __TAURI_INVOKE<Capabilities>("app_capabilities"),
 	/**
 	 *  `project.list` — every registered project with its checkouts.
 	 * 
@@ -355,15 +351,6 @@ export const commands = {
 	 *  refusal names what would be lost rather than saying "it is dirty".
 	 */
 	worktreeRemove: (projectId: string, cardId: string, evenDirty: boolean) => typedError<Removed, RpcError>(__TAURI_INVOKE("worktree_remove", { projectId, cardId, evenDirty })),
-	/**  `worktree.prime.read` — what this project does to a fresh checkout. */
-	worktreePrimeRead: (projectId: string) => typedError<Preparation, RpcError>(__TAURI_INVOKE("worktree_prime_read", { projectId })),
-	/**
-	 *  `worktree.prime.write` — save it, refusing a command that is not installed.
-	 * 
-	 *  Refused here rather than when a card lands on a column: a typo should be
-	 *  answered while the person is still looking at what they typed.
-	 */
-	worktreePrimeWrite: (projectId: string, preparation: Preparation) => typedError<Preparation, RpcError>(__TAURI_INVOKE("worktree_prime_write", { projectId, preparation })),
 	/**  `worktree.base_read` — where new worktrees go, and an example of it. */
 	worktreeBaseRead: (projectId: string | null) => typedError<WorktreeBase, RpcError>(__TAURI_INVOKE("worktree_base_read", { projectId })),
 	/**
@@ -417,10 +404,6 @@ export const commands = {
 	 *  lost, and a summary here would name fewer.
 	 */
 	branchSwitch: (projectId: string, worktreeId: string | null, name: string) => typedError<Branches, RpcError>(__TAURI_INVOKE("branch_switch", { projectId, worktreeId, name })),
-	/**  `project.notes` — the notes pinned to a project. */
-	projectNotes: (projectId: string) => typedError<ProjectNotes, RpcError>(__TAURI_INVOKE("project_notes", { projectId })),
-	/**  `project.note_add` — capture, in one keystroke and no form. */
-	projectNoteAdd: (projectId: string, body: string) => typedError<ProjectNotes, RpcError>(__TAURI_INVOKE("project_note_add", { projectId, body })),
 	/**  `board.get` — the columns, the cards and the steps of a project. */
 	boardGet: (projectId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("board_get", { projectId })),
 	columnCreate: (projectId: string, name: string) => typedError<Board, RpcError>(__TAURI_INVOKE("column_create", { projectId, name })),
@@ -482,13 +465,6 @@ export const commands = {
 	cardPin: (projectId: string, cardId: string, path: string, label: string | null) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_pin", { projectId, cardId, path, label })),
 	/**  `card.unpin` — unpins one. The file on disk is never touched. */
 	cardUnpin: (projectId: string, cardId: string, pinId: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_unpin", { projectId, cardId, pinId })),
-	/**
-	 *  `card.reload_board` — the board, after something changed a card.
-	 * 
-	 *  Exists so a screen that just edited a card can refresh the tiles behind it
-	 *  without knowing how the board is assembled.
-	 */
-	cardBoard: (projectId: string) => typedError<Board, RpcError>(__TAURI_INVOKE("card_board", { projectId })),
 	/**
 	 *  `card.checkout` — makes the card's worktree, or reports the one it has.
 	 * 
@@ -670,8 +646,6 @@ export const commands = {
 	 *  happens in one go; it just happens somewhere the window can paint through.
 	 */
 	sessionEnsure: (projectId: string, tabId: string, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_ensure", { projectId, tabId, worktreeId })),
-	/**  `session.layout` — the tree as last persisted. */
-	sessionLayout: (projectId: string, tabId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_layout", { projectId, tabId })),
 	/**  `session.focus` — persists which leaf receives the next split or action. */
 	sessionFocus: (projectId: string, tabId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_focus", { projectId, tabId, leafId })),
 	/**  `session.split` — a new tmux window and a split node in the tree. */
@@ -694,14 +668,6 @@ export const commands = {
 	 *  scrollback and the layout both keyed on.
 	 */
 	sessionCloseTab: (projectId: string, tabId: string) => typedError<null, RpcError>(__TAURI_INVOKE("session_close_tab", { projectId, tabId })),
-	/**
-	 *  `session.rename_leaf` — the name the person gave this pane.
-	 * 
-	 *  An empty name clears it, which is how a pane goes back to showing what the
-	 *  program running in it calls itself. The person's name always wins over the
-	 *  program's: a title escape arriving later must not undo a rename.
-	 */
-	sessionRenameLeaf: (projectId: string, tabId: string, leafId: string, name: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_rename_leaf", { projectId, tabId, leafId, name })),
 	/**
 	 *  `session.set_ratio` — where a boundary was dragged to.
 	 * 
@@ -948,20 +914,6 @@ export type Answer = "allow" |
  */
 "deny";
 
-/**  Response of `app.health`. */
-export type AppHealth = {
-	ok: boolean,
-	/**
-	 *  The binary on disk is no longer the one running.
-	 * 
-	 *  A backend still serving a replaced build makes every symptom read as
-	 *  "the fix did not work". In the contract from the start so the screen
-	 *  can say so instead of leaving it to be guessed.
-	 */
-	stale: boolean,
-	statePath: string,
-};
-
 /**
  *  Response of `app.info`.
  * 
@@ -1057,20 +1009,6 @@ export type Branches = {
 
 /**  How a tool call ended, or that it has not. */
 export type CallState = "running" | "ok" | "failed";
-
-/**
- *  What this build can do. Governs the UI.
- * 
- *  Memory, cloud and vault are optional dependencies: without them the
- *  matching panel disappears and the rest works. The screen asks here instead
- *  of trying and handling failure — try-and-fail flashes a broken panel first.
- */
-export type Capabilities = {
-	memory: boolean,
-	cloud: boolean,
-	vault: boolean,
-	tmux: boolean,
-};
 
 export type Card = {
 	id: string,
@@ -1693,13 +1631,6 @@ export type Message = {
 	streaming: boolean,
 };
 
-export type Note = {
-	id: string,
-	body: string,
-	/**  Seconds since the epoch; see `Commit::committed_at` for why `f64`. */
-	createdAt: number | null,
-};
-
 /**  Something worth telling somebody about. */
 export type Notice = {
 	id: string,
@@ -2063,13 +1994,6 @@ export type PluginUninstalled = {
 	removedFiles: number,
 };
 
-/**  The preparation a project declares for a fresh checkout. */
-export type Preparation = {
-	link: string[],
-	share: ([string, string])[],
-	run: string[],
-};
-
 export type Profile = {
 	id: string,
 	/**  What the person calls this account. */
@@ -2168,10 +2092,6 @@ export type ProjectHistory = {
 
 export type ProjectList = {
 	projects: Project[],
-};
-
-export type ProjectNotes = {
-	notes: Note[],
 };
 
 export type ProjectRun = {

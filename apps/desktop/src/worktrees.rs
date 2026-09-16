@@ -11,8 +11,6 @@ use devpit_rpc::{ErrorCode, RpcError};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::prime::Prime;
-
 /// One checkout belonging to a card, or left over from one.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -49,35 +47,6 @@ pub struct Removed {
     /// The branch that stayed behind. The folder is disposable; the commits
     /// in it are not.
     pub branch_kept: Option<String>,
-}
-
-/// The preparation a project declares for a fresh checkout.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Preparation {
-    pub link: Vec<String>,
-    pub share: Vec<(String, String)>,
-    pub run: Vec<String>,
-}
-
-impl From<Prime> for Preparation {
-    fn from(prime: Prime) -> Self {
-        Self {
-            link: prime.link,
-            share: prime.share.into_iter().collect(),
-            run: prime.run,
-        }
-    }
-}
-
-impl From<Preparation> for Prime {
-    fn from(declared: Preparation) -> Self {
-        Self {
-            link: declared.link,
-            share: declared.share.into_iter().collect(),
-            run: declared.run,
-        }
-    }
 }
 
 fn store() -> Result<Store, RpcError> {

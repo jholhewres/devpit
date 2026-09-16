@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use devpit_core::{limits, AttachmentRow, CommentRow, Store};
 use devpit_rpc::{CardDetail, Checkout, Comment, ErrorCode, Pinned, RpcError};
 
-use crate::board::{board_get, card_of, steps_of};
+use crate::board::{card_of, steps_of};
 use crate::projects::{locate, store};
 
 /// Who a comment is from when a person writes it.
@@ -294,14 +294,4 @@ pub fn card_unpin(
         return Err(RpcError::new(ErrorCode::NotFound, "no such attachment"));
     }
     detail_of(project_id, card_id)
-}
-
-/// `card.reload_board` — the board, after something changed a card.
-///
-/// Exists so a screen that just edited a card can refresh the tiles behind it
-/// without knowing how the board is assembled.
-#[tauri::command]
-#[specta::specta]
-pub fn card_board(project_id: String) -> Result<devpit_rpc::Board, RpcError> {
-    board_get(project_id)
 }

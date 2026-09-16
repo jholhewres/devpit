@@ -22,6 +22,7 @@ mod release_workflow;
 mod reseed;
 mod shell_boundary;
 mod tmux_survives;
+mod uncalled;
 mod versions;
 
 fn main() -> ExitCode {
@@ -117,6 +118,7 @@ fn check() -> ExitCode {
         &root,
     ));
     findings.extend(tmux_survives::the_app_never_kills_the_tmux_server(&root));
+    findings.extend(uncalled::a_command_has_a_caller(&root));
 
     if findings.is_empty() {
         println!("guards: ok");

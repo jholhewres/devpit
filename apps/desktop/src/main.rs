@@ -63,7 +63,6 @@ mod plugin_data;
 mod plugins;
 mod post;
 mod prime;
-mod priming;
 mod projects;
 mod question;
 mod receipts;

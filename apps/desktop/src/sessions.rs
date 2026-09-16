@@ -267,13 +267,6 @@ pub(crate) fn ensure_at(
     Ok(layout)
 }
 
-/// `session.layout` — the tree as last persisted.
-#[tauri::command]
-#[specta::specta]
-pub fn session_layout(project_id: String, tab_id: String) -> Result<SessionLayout, RpcError> {
-    layout_of(&project_id, &tab_id)
-}
-
 /// `session.focus` — persists which leaf receives the next split or action.
 #[tauri::command]
 #[specta::specta]

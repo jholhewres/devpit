@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { UpdateStatus } from '../gen/bindings'
+import type { UpdateStatus, UpdateWork } from '../gen/bindings'
 import { ask, commands } from './live'
 import { onCarried } from './window'
 
@@ -9,8 +9,12 @@ import { onCarried } from './window'
  *
  * An update is not urgent enough to take the keyboard: this is a card in the
  * corner with Later on it, not a dialog. What it never does is decide — the
- * download happens on a click, and the states it draws are the app's, arriving
- * on `update:status`.
+ * download happens on a click, the restart happens on a click, and the states
+ * it draws are the app's, arriving on `update:status`.
+ *
+ * Restarting asks what is running first. Interrupting two runs and a turn is a
+ * question about those three things, not about updates, so the card names them
+ * and lets the person answer.
  */
 
 /** What the card says about each state, or nothing when there is nothing to say. */
@@ -35,6 +39,9 @@ export function UpdateCard(): React.JSX.Element | null {
   const [status, setStatus] = useState<UpdateStatus | null>(null)
   const [later, setLater] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  /* What is running, once the person has asked to restart and it turns out
+     something is. Null is "nothing in the way, or nobody has asked yet". */
+  const [work, setWork] = useState<UpdateWork | null>(null)
 
   useEffect(
     () =>
@@ -45,6 +52,35 @@ export function UpdateCard(): React.JSX.Element | null {
       }),
     [],
   )
+
+  const failed = (error: string): void =>
+    setStatus({ type: 'failed', message: error, recoverable: true })
+
+  const install = (): void => {
+    void ask(() => commands.updateInstall()).then((answer) => {
+      if (answer.error) failed(answer.error)
+    })
+  }
+
+  const restart = (): void => {
+    void ask(() => commands.updateRunning()).then((answer) => {
+      const busy = answer.data
+      if (answer.error) return failed(answer.error)
+      if (busy && (busy.runs.length > 0 || busy.turns.length > 0)) setWork(busy)
+      else install()
+    })
+  }
+
+  const choose = (choice: 'whenItIsDone' | 'stopIt' | 'later'): void => {
+    void ask(() => commands.updateChoose(choice)).then((answer) => {
+      setWork(null)
+      if (answer.error) return failed(answer.error)
+      if (answer.data) setStatus(answer.data)
+      // Stopping is part of going in: the app closes what is running as it
+      // quits, and it only quits once the install starts.
+      if (choice === 'stopIt') install()
+    })
+  }
 
   if (!status || later) return null
   const said = offer(status)
@@ -76,8 +112,27 @@ export function UpdateCard(): React.JSX.Element | null {
           </span>
         </>
       )}
+      {work && (
+        <span className="upd__d">
+          {[...work.runs, ...work.turns].map((one) => one.title).join(', ')} still going.
+        </span>
+      )}
+
       <div className="upd__row">
-        {manual && (
+        {work && (
+          <>
+            <button className="btn" onClick={() => choose('later')}>
+              Not now
+            </button>
+            <button className="btn" onClick={() => choose('whenItIsDone')}>
+              When it is done
+            </button>
+            <button className="btn btn--go" onClick={() => choose('stopIt')}>
+              Stop it and restart
+            </button>
+          </>
+        )}
+        {!work && manual && (
           <button
             className="btn"
             onClick={() => {
@@ -96,10 +151,17 @@ export function UpdateCard(): React.JSX.Element | null {
             Copy command
           </button>
         )}
-        <button className="btn" onClick={() => setLater(true)}>
-          Later
-        </button>
-        {status.type === 'available' && (
+        {!work && (
+          <button className="btn" onClick={() => setLater(true)}>
+            Later
+          </button>
+        )}
+        {!work && status.type === 'ready' && (
+          <button className="btn btn--go" onClick={restart}>
+            Restart now
+          </button>
+        )}
+        {!work && status.type === 'available' && (
           <button
             className="btn"
             onClick={() => {

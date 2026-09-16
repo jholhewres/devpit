@@ -93,34 +93,3 @@ fn a_preparation_runs_once_and_not_again() {
         "the preparation ran twice"
     );
 }
-
-#[test]
-fn a_command_that_does_not_exist_is_named_when_the_preparation_is_saved() {
-    let prime = Prime {
-        run: vec!["definitely-not-a-program --go".to_owned()],
-        ..Prime::default()
-    };
-    assert_eq!(missing(&prime), vec!["definitely-not-a-program".to_owned()]);
-}
-
-#[test]
-fn a_command_that_exists_is_not_named() {
-    let prime = Prime {
-        run: vec!["sh -c true".to_owned()],
-        ..Prime::default()
-    };
-    assert!(missing(&prime).is_empty());
-}
-
-#[test]
-fn a_preparation_survives_the_round_trip() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path().join("prime.json");
-    let declared = Prime {
-        link: vec![".env".to_owned()],
-        share: [("A".to_owned(), "b".to_owned())].into_iter().collect(),
-        run: vec!["pnpm install".to_owned()],
-    };
-    write(&path, &declared).expect("write");
-    assert_eq!(read(&path), declared);
-}

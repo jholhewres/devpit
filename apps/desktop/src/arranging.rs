@@ -127,41 +127,6 @@ pub fn session_close_leaf(
     Ok(layout)
 }
 
-/// `session.rename_leaf` — the name the person gave this pane.
-///
-/// An empty name clears it, which is how a pane goes back to showing what the
-/// program running in it calls itself. The person's name always wins over the
-/// program's: a title escape arriving later must not undo a rename.
-#[tauri::command]
-#[specta::specta]
-pub fn session_rename_leaf(
-    state: State<SessionState>,
-    project_id: String,
-    tab_id: String,
-    leaf_id: String,
-    name: String,
-) -> Result<SessionLayout, RpcError> {
-    let lock = state.project_lock(&project_id)?;
-    let _guard = lock
-        .lock()
-        .map_err(|_| RpcError::internal("project session lock"))?;
-
-    let current = layout_of(&project_id, &tab_id)?;
-    let tree = current.tree.rename_leaf(&leaf_id, &name).ok_or_else(|| {
-        RpcError::new(
-            ErrorCode::NotFound,
-            "that pane is not in this project's layout",
-        )
-    })?;
-    let layout = SessionLayout {
-        project_id,
-        focused_id: current.focused_id,
-        tree,
-    };
-    persist(&store()?, &tab_id, &layout)?;
-    Ok(layout)
-}
-
 /// `session.set_ratio` — where a boundary was dragged to.
 ///
 /// Persisted because Orca's rule is the right one: boundaries stay where you

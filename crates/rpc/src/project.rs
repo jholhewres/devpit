@@ -118,15 +118,6 @@ pub struct FileNode {
     pub children: Option<Vec<FileNode>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Note {
-    pub id: String,
-    pub body: String,
-    /// Seconds since the epoch; see `Commit::committed_at` for why `f64`.
-    pub created_at: f64,
-}
-
 /// A project as the window needs it.
 ///
 /// The worktrees come with it because the row that names a project is the row
@@ -190,10 +181,4 @@ pub struct ProjectHistory {
     /// Whether git has more commits than this page carries — what the screen
     /// reads to decide whether "load older" still does anything.
     pub has_more: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectNotes {
-    pub notes: Vec<Note>,
 }
