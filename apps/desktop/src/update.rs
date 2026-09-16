@@ -239,6 +239,8 @@ pub(crate) fn kind_here() -> InstallKind {
 #[derive(Default)]
 pub struct Updating {
     pub(crate) status: std::sync::Mutex<Option<UpdateStatus>>,
+    /// Raised by the window when it has saved what it had.
+    pub(crate) window_ready: tokio::sync::Notify,
     pub(crate) found: std::sync::Mutex<Option<tauri_plugin_updater::Update>>,
     pub(crate) downloaded: std::sync::Mutex<Option<(String, Vec<u8>)>>,
 }
@@ -559,6 +561,25 @@ fn force_the_exit_eventually() {
     });
 }
 
+/// How long the window gets to save what it has before the update goes on.
+const THE_WINDOW_GETS: std::time::Duration = std::time::Duration::from_millis(2500);
+
+/// Waits for the window to say it is ready, or gives up.
+///
+/// Fail open, deliberately: a window that never answers — busy, wedged, or
+/// already gone — must not be able to hold an update forever. Answers whether
+/// it was the window that released it, which is what the tests read.
+pub(crate) async fn window_saved(ready: &tokio::sync::Notify, within: std::time::Duration) -> bool {
+    tokio::time::timeout(within, ready.notified()).await.is_ok()
+}
+
+/// `update.restart_ready` — the window has saved what it had.
+#[tauri::command]
+#[specta::specta]
+pub fn update_restart_ready(updating: tauri::State<'_, Updating>) {
+    updating.window_ready.notify_one();
+}
+
 /// `update.install` — put it in and come back.
 ///
 /// Only an AppImage is installed from here: a `.deb` is shown as a command for
@@ -595,7 +616,11 @@ pub async fn update_install(
         .lock()
         .ok()
         .and_then(|mut held| held.take())
-        .ok_or_else(|| RpcError::internal("there are no verified bytes to install"))?;
+        .ok_or_else(|| {
+            // Before the commit: the offer is still good, and asking again is
+            // all it takes.
+            RpcError::internal("there are no verified bytes to install — download it again")
+        })?;
     let found = updating
         .found
         .lock()
@@ -606,6 +631,15 @@ pub async fn update_install(
     let going = next(&state, Event::Install)
         .ok_or_else(|| RpcError::internal("an install the rules allow but the table does not"))?;
     updating.moved_to(&app, going);
+
+    // The window gets a moment to put down what it is holding. Whatever it
+    // says, the update goes on: this is the last point where waiting is
+    // possible at all, and a window that never answers must not own it.
+    let _ = tauri::Emitter::emit(&app, "update:before-restart", ());
+    let saved = window_saved(&updating.window_ready, THE_WINDOW_GETS).await;
+    if !saved {
+        eprintln!("devpit-update the window did not answer in time; going on");
+    }
 
     // Committed: from here a failure is only logged. The installer is already
     // waiting for this process to end.

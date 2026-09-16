@@ -118,6 +118,8 @@ export const commands = {
 	 *  devpit never does that on anyone's behalf.
 	 */
 	updateInstall: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_install")),
+	/**  `update.restart_ready` — the window has saved what it had. */
+	updateRestartReady: () => __TAURI_INVOKE<void>("update_restart_ready"),
 	/**
 	 *  `spend.history` — what the agents spent over the last `days`, from their
 	 *  transcripts, for one installation or all and one project or all.

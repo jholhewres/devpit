@@ -255,3 +255,28 @@ fn the_update_path_never_kills_tmux() {
     assert!(quit_steps(InstallKind::Unmanaged).is_empty());
     assert!(quit_steps(InstallKind::ExternallyManaged).is_empty());
 }
+
+/// The window says it is done, and the update goes on at once.
+#[tokio::test]
+async fn the_window_ack_releases_the_restart() {
+    let ready = std::sync::Arc::new(tokio::sync::Notify::new());
+    let answering = ready.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        answering.notify_one();
+    });
+
+    let waited = std::time::Instant::now();
+    assert!(window_saved(&ready, std::time::Duration::from_secs(5)).await);
+    assert!(
+        waited.elapsed() < std::time::Duration::from_secs(1),
+        "it waited for the deadline rather than for the window"
+    );
+}
+
+/// And a window that never answers does not own the update.
+#[tokio::test]
+async fn a_silent_window_does_not_hold_the_update() {
+    let ready = tokio::sync::Notify::new();
+    assert!(!window_saved(&ready, std::time::Duration::from_millis(20)).await);
+}
