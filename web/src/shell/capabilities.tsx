@@ -1,6 +1,7 @@
 import type { PluginManifest, PluginState, Surface } from '../gen/bindings'
 import { DRAWINGS, PLUGIN_ID as EXCALIDRAW } from '../plugins/excalidraw/drawings'
 import { DIAGRAMS, PLUGIN_ID as MERMAID } from '../plugins/mermaid/mermaidFiles'
+import { NOTES, PLUGIN_ID as NOTES_ID } from '../plugins/notes/noteFiles'
 import type { PaneName } from './paneList'
 import type { Tab } from './strip'
 
@@ -21,6 +22,7 @@ export interface Opens {
 const OPENS: Readonly<Record<string, Opens>> = {
   [EXCALIDRAW]: { kind: 'drawing', tab: DRAWINGS },
   [MERMAID]: { kind: 'diagram', tab: DIAGRAMS },
+  [NOTES_ID]: { kind: 'note', tab: NOTES },
 }
 
 export const opensFor = (pluginId: string): Opens | undefined => OPENS[pluginId]

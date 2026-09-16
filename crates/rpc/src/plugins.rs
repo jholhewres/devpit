@@ -192,7 +192,7 @@ pub fn validate_catalogue(manifests: &[PluginManifest]) -> Result<(), PluginErro
 /// The plugins this build ships, compiled in. Enabling one is a per-project
 /// choice made elsewhere; this only says what exists.
 pub fn catalogue() -> Vec<PluginManifest> {
-    vec![excalidraw(), mermaid()]
+    vec![excalidraw(), mermaid(), notes()]
 }
 
 fn excalidraw() -> PluginManifest {
@@ -220,6 +220,22 @@ fn mermaid() -> PluginManifest {
         surfaces: vec![Surface::Pane { many: true }, Surface::CardPin],
         data: DataSpec {
             extensions: vec![".mmd".to_owned()],
+            max_bytes: MAX_DATA_BYTES,
+        },
+        permissions: vec![Permission::DataOwn],
+    }
+}
+
+/// Notes in Markdown, drawn by the renderer the window already has.
+fn notes() -> PluginManifest {
+    PluginManifest {
+        id: "notes".to_owned(),
+        name: "Notes".to_owned(),
+        version: "0.1.0".to_owned(),
+        description: "Notes in Markdown, saved as files in the project.".to_owned(),
+        surfaces: vec![Surface::Pane { many: true }, Surface::CardPin],
+        data: DataSpec {
+            extensions: vec![".md".to_owned()],
             max_bytes: MAX_DATA_BYTES,
         },
         permissions: vec![Permission::DataOwn],

@@ -18,3 +18,6 @@
 .ted { height: 100%; font-size: 12.5px; }
 .ted .cm-editor { height: 100%; background: transparent; }
 .ted .cm-gutters { border: 0; background: transparent; color: var(--dim); }
+.note { display: grid; grid-template-columns: minmax(240px, 45%) 1fr; height: 100%; overflow: hidden; }
+.note__edit { border-right: 1px solid var(--line); overflow: auto; }
+.note__see { padding: 16px 20px; overflow: auto; }
