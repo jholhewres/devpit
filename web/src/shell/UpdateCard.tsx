@@ -18,6 +18,12 @@ import { onCarried } from './window'
  * runs and a turn is a question about those three things.
  */
 
+/** "2 runs and 1 turn", for the sentence a waiting update says. */
+function inFlight(runs: number, turns: number): string {
+  const counted = (n: number, word: string): string | null => (n > 0 ? `${n} ${word}${n === 1 ? '' : 's'}` : null)
+  return [counted(runs, 'run'), counted(turns, 'turn')].filter(Boolean).join(' and ') || 'the work in progress'
+}
+
 /** What the card says about each state, and what its one button does. */
 function offer(status: UpdateStatus): {
   title: string
@@ -41,6 +47,13 @@ function offer(status: UpdateStatus): {
         said: `devpit ${status.version} is ready to install.`,
         calm: 'Your terminals keep running.',
         action: 'Restart now',
+      }
+    case 'waiting':
+      return {
+        title: 'Update waiting',
+        said: `It goes in once ${inFlight(status.runs, status.turns)} are done.`,
+        calm: 'Nothing new starts meanwhile. Your terminals keep running.',
+        action: 'Cancel',
       }
     case 'manualInstall':
       return {
@@ -131,8 +144,20 @@ export function UpdateCard(): React.JSX.Element | null {
   const fromATestFeed = status.type === 'available' && status.testFeed
   const release = status.type === 'available' ? status.notes : ''
   const manual = status.type === 'manualInstall' ? status : null
+  /* Closing a downloaded or waiting update is a decision, so it is told to
+     the app — hiding it only here left the app holding the update back. */
+  const close = (): void => {
+    setLater(true)
+    if (status.type === 'ready' || status.type === 'waiting') choose('later')
+  }
   const act =
-    status.type === 'available' ? download : status.type === 'ready' ? restart : copyCommand
+    status.type === 'available'
+      ? download
+      : status.type === 'ready'
+        ? restart
+        : status.type === 'waiting'
+          ? () => choose('later')
+          : copyCommand
 
   return (
     <div className="upd" role="status" aria-label="Update">
@@ -141,7 +166,7 @@ export function UpdateCard(): React.JSX.Element | null {
           {said.title}
           {fromATestFeed && <span className="upd__tag">test feed</span>}
         </span>
-        <button className="upd__x" aria-label="Close" onClick={() => setLater(true)}>
+        <button className="upd__x" aria-label="Close" onClick={close}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>

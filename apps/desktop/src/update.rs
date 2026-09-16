@@ -121,6 +121,8 @@ const AT_MOST: f64 = 6.0 * 60.0 * 60.0;
 
 /// How often the task wakes to ask `due`.
 const A_CYCLE: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+/// How often a chosen wait looks at whether the work has ended.
+const WHILE_WAITING: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Whether to check now.
 ///
@@ -196,10 +198,12 @@ pub(crate) fn install_kind(
     bundle_type: Option<&str>,
     tools: &[String],
 ) -> InstallKind {
-    if appimage.is_some_and(|path| !path.is_empty()) {
-        return InstallKind::AppImage;
-    }
+    let running_as_appimage = appimage.is_some_and(|path| !path.is_empty());
     match bundle_type {
+        // Both, not either: `$APPIMAGE` is inherited by every process the app
+        // starts, tmux panes included, so a .deb build launched from one of
+        // them would otherwise be sent down the path that replaces a file.
+        Some("appimage") if running_as_appimage => InstallKind::AppImage,
         Some("deb") | Some("rpm") => {
             if tools.is_empty() {
                 InstallKind::ExternallyManaged
@@ -207,7 +211,6 @@ pub(crate) fn install_kind(
                 InstallKind::Deb
             }
         }
-        Some("appimage") => InstallKind::AppImage,
         _ => InstallKind::Unmanaged,
     }
 }
@@ -232,11 +235,18 @@ pub(crate) fn tools_found() -> Vec<String> {
     found
 }
 
-/// What this build is, asked of the machine it is running on.
+/// What this build is: the bundle type the bundler stamped into the binary,
+/// and where it is running from.
 pub(crate) fn kind_here() -> InstallKind {
+    use tauri::utils::config::BundleType;
     let appimage = std::env::var("APPIMAGE").ok();
-    let bundle = std::env::var("DEVPIT_BUNDLE_TYPE").ok();
-    install_kind(appimage.as_deref(), bundle.as_deref(), &tools_found())
+    let stamped = tauri::utils::platform::bundle_type().map(|stamp| match stamp {
+        BundleType::AppImage => "appimage",
+        BundleType::Deb => "deb",
+        BundleType::Rpm => "rpm",
+        _ => "other",
+    });
+    install_kind(appimage.as_deref(), stamped, &tools_found())
 }
 
 /// What the app knows about the update in flight.
@@ -286,9 +296,30 @@ pub(crate) fn watch(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last: Option<f64> = None;
         let mut failures: u32 = 0;
-        let mut state = UpdateStatus::Idle;
 
         loop {
+            let current = app
+                .try_state::<Updating>()
+                .map(|updating| updating.state())
+                .unwrap_or(UpdateStatus::Idle);
+
+            // "When it is done" is a promise to go in once the work has ended,
+            // and nothing else would keep it: new work is refused meanwhile,
+            // so without this the app would wait for ever.
+            if matches!(current, UpdateStatus::Waiting { .. }) {
+                let idle = app
+                    .try_state::<crate::chat::Talking>()
+                    .and_then(|talking| update_running(talking).ok())
+                    .is_some_and(|work| blockers(&work) == 0);
+                if idle {
+                    if let Some(updating) = app.try_state::<Updating>() {
+                        let _ = update_install(app.clone(), updating).await;
+                    }
+                }
+                tokio::time::sleep(WHILE_WAITING).await;
+                continue;
+            }
+
             // Unset means on: this is the switch a new install never touched.
             let enabled = devpit_core::Store::open_default()
                 .and_then(|store| store.preference_flag(devpit_core::preference::AUTO_UPDATE))
@@ -296,7 +327,10 @@ pub(crate) fn watch(app: tauri::AppHandle) {
                 .flatten()
                 .unwrap_or(true);
 
-            if due(last, now(), failures, enabled) {
+            // Only when a check may start from here: one in the middle of a
+            // download is refused, and counting that as a failure would back
+            // the next check off for nothing.
+            if next(&current, Event::Check).is_some() && due(last, now(), failures, enabled) {
                 last = Some(now());
                 let heard = match update_check(app.clone()).await {
                     Ok(heard) => heard,
@@ -309,12 +343,11 @@ pub(crate) fn watch(app: tauri::AppHandle) {
                     UpdateStatus::Failed { .. } => failures.saturating_add(1),
                     _ => 0,
                 };
-                if heard != state {
-                    state = heard.clone();
+                if heard != current {
                     // The state, and nothing else: no url, no bytes, no
                     // version of anyone's machine.
-                    eprintln!("devpit-update {}", named(&state));
-                    let _ = tauri::Emitter::emit(&app, "update:status", &state);
+                    eprintln!("devpit-update {}", named(&heard));
+                    let _ = tauri::Emitter::emit(&app, "update:status", &heard);
                 }
             }
 
@@ -354,8 +387,18 @@ fn now() -> f64 {
 #[specta::specta]
 pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcError> {
     let kind = kind_here();
-    let checking = next(&UpdateStatus::Idle, Event::Check)
-        .ok_or_else(|| RpcError::internal("a check was refused before it started"))?;
+    // From where things are, not from Idle: a check in the middle of a
+    // download replaced the update being downloaded and dropped its bytes.
+    let now = app
+        .try_state::<Updating>()
+        .map(|updating| updating.state())
+        .unwrap_or(UpdateStatus::Idle);
+    let checking = next(&now, Event::Check).ok_or_else(|| {
+        RpcError::new(
+            devpit_rpc::ErrorCode::Conflict,
+            "an update is already on its way".to_owned(),
+        )
+    })?;
     if kind == InstallKind::ExternallyManaged {
         return Ok(UpdateStatus::ExternallyManaged);
     }
@@ -467,16 +510,15 @@ pub(crate) fn install_plan(choice: Choice, work: &UpdateWork) -> Plan {
     }
 }
 
-/// Why new work is refused, once an update is ready to go in.
+/// Why new work is refused while an update goes in.
 ///
-/// From `Ready` onward, not only while waiting: a card set to advance on its
-/// own (`advancing.rs`) would otherwise start a run between the moment the
-/// person chose and the moment the installer commits, and that run dies with
-/// the process.
+/// Only once the person chose to wait for the work to end, or the install has
+/// begun — not merely because an update is downloaded. Refusing from `Ready`
+/// meant a closed card left every run and chat refused until a restart.
 pub(crate) fn starting_refused(state: &UpdateStatus) -> Option<&'static str> {
     match state {
-        UpdateStatus::Ready { .. } | UpdateStatus::Waiting { .. } => {
-            Some("an update is about to be installed, so nothing new is started")
+        UpdateStatus::Waiting { .. } => {
+            Some("an update is waiting for the work to finish, so nothing new is started")
         }
         UpdateStatus::Installing => Some("an update is installing"),
         _ => None,
@@ -646,22 +688,29 @@ pub async fn update_install(
         ));
     }
 
-    let (version, bytes) = updating
-        .downloaded
-        .lock()
-        .ok()
-        .and_then(|mut held| held.take())
-        .ok_or_else(|| {
-            // Before the commit: the offer is still good, and asking again is
-            // all it takes.
-            RpcError::internal("there are no verified bytes to install — download it again")
-        })?;
+    // The update first: taking the bytes and then finding nothing to install
+    // them with would throw away a download that verified.
     let found = updating
         .found
         .lock()
         .ok()
         .and_then(|mut held| held.take())
         .ok_or_else(|| RpcError::internal("the update to install is no longer known"))?;
+    let Some((version, bytes)) = updating
+        .downloaded
+        .lock()
+        .ok()
+        .and_then(|mut held| held.take())
+    else {
+        // Before the commit: the offer is still good, and asking again is all
+        // it takes.
+        if let Ok(mut held) = updating.found.lock() {
+            *held = Some(found);
+        }
+        return Err(RpcError::internal(
+            "there are no verified bytes to install — download it again",
+        ));
+    };
 
     let going = next(&state, Event::Install)
         .ok_or_else(|| RpcError::internal("an install the rules allow but the table does not"))?;
@@ -676,9 +725,6 @@ pub async fn update_install(
         eprintln!("devpit-update the window did not answer in time; going on");
     }
 
-    // Committed: from here a failure is only logged. The installer is already
-    // waiting for this process to end.
-    force_the_exit_eventually();
     if let Err(err) = found.install(bytes) {
         eprintln!("devpit-update the installer refused: {err}");
         let failed = UpdateStatus::Failed {
@@ -689,6 +735,9 @@ pub async fn update_install(
         return Ok(failed);
     }
 
+    // Committed: the new version is in place, and this process has to end for
+    // it to run. If the restart hangs, the exit does not.
+    force_the_exit_eventually();
     eprintln!("devpit-update installed {version}; restarting");
     app.restart();
 }
@@ -858,14 +907,39 @@ pub async fn update_download(
         return Ok(manual);
     }
 
-    if let Ok(mut held) = updating.downloaded.lock() {
-        *held = Some((version.clone(), bytes));
-    }
+    keep_for_install(
+        &updating.found,
+        &updating.downloaded,
+        found,
+        version.clone(),
+        bytes,
+    );
     let now = updating.state();
     let ready = next(&now, Event::Downloaded { version })
         .ok_or_else(|| RpcError::internal("the download ended nowhere"))?;
     updating.moved_to(&app, ready.clone());
     Ok(ready)
+}
+
+/// Keeps what an install needs, together: the update and its verified bytes.
+///
+/// `install` takes both. The download used to take the update out to fetch
+/// its bytes and keep only the bytes, so every AppImage update reached
+/// `update_install` with nothing to install it with — found by the rehearsal,
+/// which is the one test that goes all the way to the install.
+pub(crate) fn keep_for_install<U>(
+    found: &std::sync::Mutex<Option<U>>,
+    downloaded: &std::sync::Mutex<Option<(String, Vec<u8>)>>,
+    update: U,
+    version: String,
+    bytes: Vec<u8>,
+) {
+    if let Ok(mut held) = found.lock() {
+        *held = Some(update);
+    }
+    if let Ok(mut held) = downloaded.lock() {
+        *held = Some((version, bytes));
+    }
 }
 
 #[cfg(test)]

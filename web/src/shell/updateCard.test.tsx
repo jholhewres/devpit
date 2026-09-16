@@ -177,3 +177,31 @@ describe('restarting into the update', () => {
     expect(installed).not.toHaveBeenCalled()
   })
 })
+
+describe('an update waiting for the work to end', () => {
+  it('says what it is waiting for, and Cancel is told to the app', async () => {
+    render(<UpdateCard />)
+    say({ type: 'waiting', runs: 2, turns: 1, since: 0 } as UpdateStatus)
+    expect(screen.getByText('Update waiting')).toBeTruthy()
+    expect(screen.getByText(/2 runs and 1 turn/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(chose).toHaveBeenCalledWith('later'))
+  })
+
+  /* The review's case: closing a ready update only hid the card, and the app
+     kept the update pending. */
+  it('tells the app when a ready update is closed', async () => {
+    render(<UpdateCard />)
+    say({ type: 'ready', version: '0.2.0', kind: 'appImage' } as UpdateStatus)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(chose).toHaveBeenCalledWith('later'))
+  })
+
+  it('does not tell the app anything when an offer is closed', () => {
+    render(<UpdateCard />)
+    say({ type: 'available', version: '0.2.0', notes: '', kind: 'appImage', testFeed: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(chose).not.toHaveBeenCalled()
+  })
+})

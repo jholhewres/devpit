@@ -103,12 +103,24 @@ fn what_is_refused_is_refused_once() {
 fn what_this_copy_is_by_branch() {
     let apt = vec!["/usr/bin/apt".to_owned()];
     assert_eq!(
-        install_kind(Some("/opt/devpit.AppImage"), None, &[]),
+        install_kind(Some("/opt/devpit.AppImage"), Some("appimage"), &[]),
         InstallKind::AppImage
     );
+    // Stamped but not running as one: there is no file to replace.
     assert_eq!(
         install_kind(None, Some("appimage"), &[]),
-        InstallKind::AppImage
+        InstallKind::Unmanaged
+    );
+    // The review's case: an AppImage devpit puts APPIMAGE into every tmux
+    // pane, and a .deb build started from one of them must stay a .deb.
+    assert_eq!(
+        install_kind(Some("/opt/devpit.AppImage"), Some("deb"), &apt),
+        InstallKind::Deb
+    );
+    assert_eq!(
+        install_kind(Some("/opt/devpit.AppImage"), None, &apt),
+        InstallKind::Unmanaged,
+        "APPIMAGE without the stamp is an inherited variable, not this build"
     );
     assert_eq!(install_kind(None, Some("deb"), &apt), InstallKind::Deb);
     assert_eq!(
@@ -185,7 +197,9 @@ fn a_run_started_between_the_check_and_the_commit_is_refused() {
     let ready = S::Ready {
         version: "0.2.0".to_owned(),
     };
-    assert!(starting_refused(&ready).is_some());
+    // Downloaded is not decided: a closed card left every run refused until
+    // a restart, so Ready alone refuses nothing.
+    assert!(starting_refused(&ready).is_none());
     assert!(starting_refused(&S::Waiting {
         runs: 1,
         turns: 0,
@@ -279,4 +293,30 @@ async fn the_window_ack_releases_the_restart() {
 async fn a_silent_window_does_not_hold_the_update() {
     let ready = tokio::sync::Notify::new();
     assert!(!window_saved(&ready, std::time::Duration::from_millis(20)).await);
+}
+
+/// The regression: a download kept the bytes and dropped the update they
+/// belong to, so install always answered "the update to install is no longer
+/// known" and no AppImage ever updated itself.
+#[test]
+fn a_downloaded_update_is_still_there_to_install() {
+    let found = std::sync::Mutex::new(None::<String>);
+    let downloaded = std::sync::Mutex::new(None);
+
+    keep_for_install(
+        &found,
+        &downloaded,
+        "0.1.1".to_owned(),
+        "0.1.1".to_owned(),
+        vec![7, 7],
+    );
+
+    assert_eq!(
+        found.lock().expect("found").take().as_deref(),
+        Some("0.1.1")
+    );
+    assert_eq!(
+        downloaded.lock().expect("downloaded").take(),
+        Some(("0.1.1".to_owned(), vec![7, 7]))
+    );
 }
