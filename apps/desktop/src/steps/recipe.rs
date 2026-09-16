@@ -5,19 +5,30 @@
 //! two screens away from the message.
 
 use devpit_rpc::StepKind;
+use serde::Deserialize;
 
 use super::context::CONTEXT_KEYS;
 
+/// What a step promises that nothing can keep.
+///
+/// The CLI has no flag for the skills a turn may load: it offers all of them
+/// or, with `--disable-slash-commands`, none. A step naming two of them was
+/// describing a limit that was never applied, so it is refused now and the
+/// message says what does work.
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct Promised {
+    skills: Vec<String>,
+}
+
 /// Why this step cannot be saved, or nothing when it can.
 ///
-/// `agents`, `installed` and `profiles` are passed in rather than read here so
-/// the rule is callable from a test without a machine that happens to have
-/// them.
+/// `agents` and `profiles` are passed in rather than read here so the rule is
+/// callable from a test without a machine that happens to have them.
 pub fn refuse(
     kind: StepKind,
     config: &str,
     agents: &[String],
-    installed: &[String],
     profiles: &[String],
 ) -> Option<String> {
     match kind {
@@ -50,9 +61,13 @@ pub fn refuse(
             return Some("this step names a profile that does not exist".to_owned());
         }
     }
-    let missing = devpit_agentcli::skills::missing(&declared.skills, installed);
-    if let Some(name) = missing.first() {
-        return Some(format!("no skill named `{name}` on this machine"));
+    let promised: Promised = serde_json::from_str(config).unwrap_or_default();
+    if !promised.skills.is_empty() {
+        return Some(
+            "devpit cannot limit which skills a turn loads — ask for one in the prompt \
+             instead, the way you would in a session: `/tdd`"
+                .to_owned(),
+        );
     }
     if let Some(key) = declared
         .inject

@@ -228,13 +228,7 @@ fn refused(kind: &str, config: &str) -> Option<String> {
         .filter(|one| one.mine)
         .map(|one| one.id)
         .collect();
-    crate::steps::recipe::refuse(
-        kind,
-        config,
-        &agents,
-        &devpit_agentcli::skills::skills(),
-        &profiles,
-    )
+    crate::steps::recipe::refuse(kind, config, &agents, &profiles)
 }
 
 #[cfg(test)]

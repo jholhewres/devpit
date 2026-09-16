@@ -45,7 +45,7 @@ está, e um número em cada chamada de agente.
 - **As colunas são suas.** Renomeie, reordene, crie as suas, decida qual executa
   o quê.
 - **Cada coluna compõe a própria etapa** — qual agente, em qual modelo, com
-  quais skills e com que fatia do contexto do card.
+  que fatia do contexto do card.
 - **Teto de gasto em toda chamada de agente**, e o custo real escrito no card
   quando ela termina.
 - **Agentes são arquivos** — markdown com frontmatter em `~/.devpit/agents/`.
@@ -89,7 +89,6 @@ o card a resolve numa invocação:
 |---|---|
 | `agent` | **quem** faz — `architect`, `executor`, `reviewer` |
 | `model` | em **qual modelo** aquela chamada roda |
-| `skills` | que conhecimento é carregado para ela, e nada além |
 | `inject` | que parte do contexto do card chega nela |
 | `capUsd` | o teto que ela pode gastar |
 | `expects` | o formato que a resposta tem que cumprir |
@@ -98,10 +97,14 @@ Os agentes vêm da sua máquina — os que você escreveu em `~/.devpit/agents/`
 que sua ferramenta já instalou. O devpit **referencia, nunca copia**: quem é
 dono de um catálogo continua sendo.
 
-O ponto é escopo. Vinte agentes e quarenta skills disponíveis em todo lugar
-acabam carregados em todo lugar, e você paga por tudo isso em cada chamada. A
-coluna diz que *esta* etapa é aquele agente, naquele modelo, com aquelas duas
-skills — e é só isso que é enviado.
+O ponto é escopo. Vinte agentes disponíveis em todo lugar acabam carregados em
+todo lugar, e você paga por tudo isso em cada chamada. A coluna diz que *esta*
+etapa é aquele agente, naquele modelo, com aquela fatia do card — e é só isso
+que é enviado.
+
+Skills não entram nessa lista. A CLI oferece todas ou nenhuma a um turno, então
+a etapa pede uma no prompt — `/tdd` — do mesmo jeito que você pediria numa
+sessão, e uma etapa que tenta declará-las é recusada ao ser salva.
 
 ### Nada avança sozinho
 

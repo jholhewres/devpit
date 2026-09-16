@@ -30,9 +30,6 @@ pub(crate) struct AgentConfig {
     #[serde(alias = "capUsd")]
     pub(crate) budget_usd: Option<f64>,
     pub(crate) model: Option<String>,
-    /// Skills this step allows. Only these; a skill the step never named does
-    /// not reach the command.
-    pub(crate) skills: Vec<String>,
     /// Context to put in front of the agent, by key. Reaches the process as
     /// environment variables and never as text pasted into a command.
     pub(crate) inject: Vec<String>,

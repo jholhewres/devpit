@@ -44,7 +44,7 @@ work stands, and a number on every agent call.
 - **Your columns.** Rename them, reorder them, add your own, decide which one
   runs what.
 - **Each column composes its own step** — which agent, on which model, with
-  which skills and which slice of the card's context.
+  which slice of the card's context.
 - **A spending cap on every agent call**, and the real cost written on the card
   when it finishes.
 - **Agents are files** — markdown with frontmatter in `~/.devpit/agents/`. Write
@@ -87,7 +87,6 @@ card resolves it into one invocation:
 |---|---|
 | `agent` | who does it — `architect`, `executor`, `reviewer` |
 | `model` | which model that call runs on |
-| `skills` | what knowledge is loaded for it, and nothing else |
 | `inject` | which of the card's context reaches it |
 | `capUsd` | the ceiling it may spend |
 | `expects` | the shape the answer has to satisfy |
@@ -96,10 +95,14 @@ Agents come from your machine — the ones you wrote in `~/.devpit/agents/`, and
 the ones your tooling already installed. devpit **references them, never copies
 them**: whatever owns a catalogue keeps owning it.
 
-The point is scope. Twenty agents and forty skills that are available everywhere
-end up loaded everywhere, and you pay for all of it on every call. A column says
-*this* step is that one agent, on that model, with those two skills — and that
-is all that gets sent.
+The point is scope. Twenty agents available everywhere end up loaded
+everywhere, and you pay for all of it on every call. A column says *this* step
+is that one agent, on that model, with that slice of the card — and that is all
+that gets sent.
+
+Skills are not on that list. The CLI offers a turn all of them or none, so a
+step asks for one in its prompt — `/tdd` — the way you would in a session, and
+a step that tries to declare them is refused when it is saved.
 
 ### Nothing advances on its own
 

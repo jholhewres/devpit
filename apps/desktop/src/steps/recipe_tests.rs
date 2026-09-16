@@ -9,12 +9,8 @@ fn agents() -> Vec<String> {
     vec!["architect".to_owned()]
 }
 
-fn skills() -> Vec<String> {
-    vec!["tdd".to_owned()]
-}
-
 fn check_kind(kind: StepKind, config: &str) -> Option<String> {
-    refuse(kind, config, &agents(), &skills(), &profiles())
+    refuse(kind, config, &agents(), &profiles())
 }
 
 fn check(config: &str) -> Option<String> {
@@ -39,10 +35,16 @@ fn an_agent_that_does_not_exist_is_refused_by_name() {
     );
 }
 
+/// The CLI has no flag for the skills a turn may load, so a step that names
+/// them was describing a limit nothing applied. Refused now, and the message
+/// says what does work.
 #[test]
-fn a_skill_that_does_not_exist_is_refused_by_name() {
-    let why = check(r#"{"prompt": "go", "capUsd": 1, "skills": ["tddd"]}"#).expect("refused");
-    assert!(why.contains("tddd"), "the refusal does not name it: {why}");
+fn a_step_that_names_skills_is_refused_and_says_what_to_do_instead() {
+    let why = check(r#"{"prompt": "go", "capUsd": 1, "skills": ["tdd"]}"#).expect("refused");
+    assert!(
+        why.contains("prompt"),
+        "the refusal does not offer a way: {why}"
+    );
 }
 
 #[test]
@@ -60,7 +62,7 @@ fn a_recipe_that_names_only_what_exists_is_saved() {
     assert_eq!(
         check(
             r#"{"prompt": "go", "capUsd": 2, "agent": "architect",
-                "skills": ["tdd"], "inject": ["branch", "cardTitle"]}"#
+                "inject": ["branch", "cardTitle"]}"#
         ),
         None
     );
