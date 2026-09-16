@@ -49,7 +49,6 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
       <HeadsDown
         projectId={project?.id ?? null}
         waiting={bell.waiting.length}
-        onPeek={() => setBellOpen(true)}
         onOpenCard={(cardId) => {
           show('board')
           openCard(cardId)

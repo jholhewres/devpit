@@ -11,10 +11,17 @@
 use devpit_core::store::preference;
 use devpit_rpc::{HeadsDown, RpcError, Waiting};
 
+/// Whole seconds, because that is what the row holds and what a notice's own
+/// timestamp is.
+///
+/// It answered a fraction once and wrote an integer, so the window believed
+/// the focus began a little after the store did — and a notice rung inside
+/// that gap compared as older than the focus and was never held. The two have
+/// to be the same number or the comparison is between two different clocks.
 fn now() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs_f64())
+        .map(|elapsed| elapsed.as_secs() as f64)
         .unwrap_or_default()
 }
 
@@ -60,8 +67,6 @@ pub fn focus_write(project_id: Option<String>) -> Result<Option<HeadsDown>, RpcE
         project_id,
         since: now(),
     };
-    // Whole seconds on the way out: the row is read back by a person as often
-    // as by the app, and a fractional second in it says nothing.
     store.set_preference(
         preference::HEADS_DOWN,
         &format!("{}:{}", began.project_id, began.since as i64),

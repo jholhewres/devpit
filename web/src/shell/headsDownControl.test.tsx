@@ -127,16 +127,16 @@ describe('what the pill says while a focus is on', () => {
     )
   })
 
-  /* Looking at what is held must not end the focus — that was the whole
-     complaint about a mode that hides things. */
-  it('peeks at what is held instead of leaving, while something is held', async () => {
+  /* One meaning. Sharing this click with a peek left the button with no way
+     out of the focus at exactly the moment somebody would want one, which the
+     end-to-end test found by trying to leave. What is held is in the bell
+     beside it, under its own heading. */
+  it('leaves the focus even while something is held', async () => {
     stored = { projectId: 'prj_1', since: Date.now() / 1000 }
-    const peeked = vi.fn()
-    render(<HeadsDown projectId="prj_1" waiting={2} onPeek={peeked} />)
+    render(<HeadsDown projectId="prj_1" waiting={2} />)
     await waitFor(() => expect(screen.getByRole('button', { name: /outside/ })).toBeTruthy())
 
     fireEvent.click(screen.getByRole('button', { name: /outside/ }))
-    expect(peeked).toHaveBeenCalledOnce()
-    expect(written).toEqual([])
+    await waitFor(() => expect(written).toEqual([null]))
   })
 })

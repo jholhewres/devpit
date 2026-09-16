@@ -25,7 +25,6 @@ const A_TICK = 30_000
 export function HeadsDown({
   projectId,
   waiting = 0,
-  onPeek,
   onOpenCard,
 }: {
   projectId: string | null
@@ -33,9 +32,6 @@ export function HeadsDown({
   waiting?: number
   /** Where a held notice sends you, when the summary is acted on. */
   onOpenCard?: (cardId: string) => void
-  /** Looking at what is held is not leaving the focus, so the pill opens the
-   *  panel the notices already live in rather than a second list. */
-  onPeek?: () => void
 }): React.JSX.Element | null {
   const { focus, enter, leave } = useHeadsDown()
   /* The focus that just ended, kept only long enough to say what it held. */
@@ -81,12 +77,11 @@ export function HeadsDown({
     } else if (projectId) enter(projectId)
   }
 
-  /* While one is on, the pill is the way to look at what is waiting; the way
-     out is the same key, and the button beside it. */
-  const press = (): void => {
-    if (focus && waiting > 0 && onPeek) onPeek()
-    else toggle()
-  }
+  /* One meaning, and only one. Peeking used to share this click once
+     something was held, which left the button with no way out of the focus at
+     exactly the moment somebody would want one — a control with two invisible
+     meanings, which this window already learned not to ship. What is held is
+     in the bell beside it, under its own heading. */
 
   useEffect(() => {
     const key = (event: KeyboardEvent): void => {
@@ -117,7 +112,7 @@ export function HeadsDown({
       <button
       className="hdown"
       data-on={String(on)}
-      onClick={press}
+      onClick={toggle}
       title={`Focus (${SHORTCUTS.focus})`}
       aria-pressed={on}
     >
