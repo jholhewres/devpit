@@ -111,6 +111,14 @@ export const commands = {
 	 */
 	updateChoose: (choice: string) => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_choose", { choice })),
 	/**
+	 *  `update.install` — put it in and come back.
+	 * 
+	 *  Only an AppImage is installed from here: a `.deb` is shown as a command for
+	 *  the person to run (US-017), because installing it means asking for root and
+	 *  devpit never does that on anyone's behalf.
+	 */
+	updateInstall: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_install")),
+	/**
 	 *  `spend.history` — what the agents spent over the last `days`, from their
 	 *  transcripts, for one installation or all and one project or all.
 	 */

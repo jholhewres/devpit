@@ -21,6 +21,7 @@ mod release_manifest;
 mod release_workflow;
 mod reseed;
 mod shell_boundary;
+mod tmux_survives;
 mod versions;
 
 fn main() -> ExitCode {
@@ -115,6 +116,7 @@ fn check() -> ExitCode {
     findings.extend(release_workflow::the_release_workflow_keeps_its_promises(
         &root,
     ));
+    findings.extend(tmux_survives::the_app_never_kills_the_tmux_server(&root));
 
     if findings.is_empty() {
         println!("guards: ok");

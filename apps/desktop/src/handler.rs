@@ -40,6 +40,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         update::update_download,
         update::update_running,
         update::update_choose,
+        update::update_install,
         spend_history::spend_history,
         card_chat::card_chat,
         rewinding::chat_rewind,

@@ -229,3 +229,29 @@ fn the_plan_follows_the_choice_and_what_is_running() {
     assert_eq!(blockers(&busy), 1);
     assert_eq!(blockers(&nothing), 0);
 }
+
+/// The steps an install takes, and the one that is never among them.
+///
+/// tmux is not in this list and must never be: the terminals outlive the
+/// window on purpose, which is what makes it possible to install while an
+/// agent is mid-task in a pane. `cargo xtask check` refuses the words
+/// `kill_server`/`kill-server` anywhere under `apps/desktop`.
+#[test]
+fn the_update_path_never_kills_tmux() {
+    let appimage = quit_steps(InstallKind::AppImage);
+    assert_eq!(
+        appimage,
+        vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart]
+    );
+
+    // A package is shown, never installed from here.
+    assert_eq!(
+        quit_steps(InstallKind::Deb),
+        vec![QuitStep::ShowTheCommand],
+        "a .deb would mean asking for root"
+    );
+
+    // And nothing at all for a build nobody installs over.
+    assert!(quit_steps(InstallKind::Unmanaged).is_empty());
+    assert!(quit_steps(InstallKind::ExternallyManaged).is_empty());
+}

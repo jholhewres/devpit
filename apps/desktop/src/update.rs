@@ -41,6 +41,8 @@ pub(crate) enum Event {
     },
     /// Not now.
     Cancel,
+    /// Put it in.
+    Install,
     Failed {
         message: String,
     },
@@ -92,6 +94,7 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
             Some(S::Waiting { runs, turns, since })
         }
         (S::Waiting { .. }, E::Cancel) | (S::Ready { .. }, E::Cancel) => Some(S::Idle),
+        (S::Ready { .. } | S::Waiting { .. }, E::Install) => Some(S::Installing),
         (S::Checking | S::Downloading { .. }, E::Failed { message }) => Some(S::Failed {
             message,
             recoverable: true,
@@ -507,6 +510,118 @@ pub fn update_running(
         .collect();
 
     Ok(UpdateWork { runs, turns })
+}
+
+/// What putting an update in takes, in order.
+///
+/// A list rather than a function body so it can be read and asserted about:
+/// the one thing that must never be in it is anything that touches tmux. The
+/// terminals outlive this process by design — that is the whole reason an
+/// update can be installed while they are running — and killing the server
+/// here would take every session on the machine with it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum QuitStep {
+    /// Let the window save what it has, with a short deadline.
+    AskTheWindow,
+    /// Hand the verified bytes to the installer. Past this, there is no back.
+    Install,
+    /// Start the new one.
+    Restart,
+    /// Show the command instead: a package devpit never installs itself.
+    ShowTheCommand,
+}
+
+pub(crate) fn quit_steps(kind: InstallKind) -> Vec<QuitStep> {
+    match kind {
+        InstallKind::AppImage => vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart],
+        InstallKind::Deb => vec![QuitStep::ShowTheCommand],
+        // Nothing to do to a build nobody installs from here.
+        InstallKind::Unmanaged | InstallKind::ExternallyManaged => Vec::new(),
+    }
+}
+
+/// How long the process gets to go away after the installer has been called.
+const BEFORE_FORCING_THE_EXIT: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// Leaves, whatever else is holding on.
+///
+/// The installer is waiting for this process to end so it can replace the
+/// file; a teardown stuck on a socket or a watcher would leave the update
+/// half-applied and the person on the old version with no way to be told why.
+fn force_the_exit_eventually() {
+    std::thread::spawn(|| {
+        std::thread::sleep(BEFORE_FORCING_THE_EXIT);
+        eprintln!(
+            "devpit-update forcing the exit: still here {}s after the installer was called",
+            BEFORE_FORCING_THE_EXIT.as_secs()
+        );
+        std::process::exit(0);
+    });
+}
+
+/// `update.install` — put it in and come back.
+///
+/// Only an AppImage is installed from here: a `.deb` is shown as a command for
+/// the person to run (US-017), because installing it means asking for root and
+/// devpit never does that on anyone's behalf.
+#[tauri::command]
+#[specta::specta]
+pub async fn update_install(
+    app: tauri::AppHandle,
+    updating: tauri::State<'_, Updating>,
+) -> Result<UpdateStatus, RpcError> {
+    let state = updating.state();
+    if !matches!(
+        state,
+        UpdateStatus::Ready { .. } | UpdateStatus::Waiting { .. }
+    ) {
+        return Err(RpcError::new(
+            devpit_rpc::ErrorCode::Conflict,
+            "there is nothing ready to install".to_owned(),
+        ));
+    }
+
+    let kind = kind_here();
+    let steps = quit_steps(kind);
+    if !steps.contains(&QuitStep::Install) {
+        return Err(RpcError::new(
+            devpit_rpc::ErrorCode::Conflict,
+            "this build is not one devpit installs over".to_owned(),
+        ));
+    }
+
+    let (version, bytes) = updating
+        .downloaded
+        .lock()
+        .ok()
+        .and_then(|mut held| held.take())
+        .ok_or_else(|| RpcError::internal("there are no verified bytes to install"))?;
+    let found = updating
+        .found
+        .lock()
+        .ok()
+        .and_then(|mut held| held.take())
+        .ok_or_else(|| RpcError::internal("the update to install is no longer known"))?;
+
+    let going = next(&state, Event::Install)
+        .ok_or_else(|| RpcError::internal("an install the rules allow but the table does not"))?;
+    updating.moved_to(&app, going);
+
+    // Committed: from here a failure is only logged. The installer is already
+    // waiting for this process to end.
+    force_the_exit_eventually();
+    if let Err(err) = found.install(bytes) {
+        eprintln!("devpit-update the installer refused: {err}");
+        let failed = UpdateStatus::Failed {
+            message: format!("the installer refused: {err}"),
+            recoverable: false,
+        };
+        updating.moved_to(&app, failed.clone());
+        return Ok(failed);
+    }
+
+    eprintln!("devpit-update installed {version}; restarting");
+    app.restart();
 }
 
 /// `update.choose` — what to do about the work in flight.
