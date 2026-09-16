@@ -77,6 +77,10 @@ function Window(): React.JSX.Element {
         if (palette) closePalette()
         else openPalette()
       }
+      if (press === 'settings') {
+        event.preventDefault()
+        shell.openPrefs('general')
+      }
       if (press === 'terminal' || press === 'chat') {
         event.preventDefault()
         shell.show(press === 'terminal' ? 'term' : 'chat')

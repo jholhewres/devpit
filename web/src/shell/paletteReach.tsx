@@ -10,6 +10,7 @@ import { GEAR } from './paletteIcons'
 import { usePlugins } from './usePlugins'
 import { useShell } from './useShell'
 import { capabilityName, openerOf } from './capabilities'
+import { SHORTCUTS } from './shortcuts'
 
 /*
  * What the field can reach, gathered.
@@ -20,7 +21,9 @@ import { capabilityName, openerOf } from './capabilities'
  * it should not also be the part that is long.
  */
 
-const SHORTCUT: Partial<Record<PaneName, string>> = { chat: '⌘N', term: '⌘T', board: '⌘B' }
+/* No ⌘B for the board: off macOS it is Ctrl+B, the tmux prefix in every
+   terminal pane, and a window that took it would break tmux for its users. */
+const SHORTCUT: Partial<Record<PaneName, string>> = { chat: SHORTCUTS.chat, term: SHORTCUTS.terminal }
 
 export interface Reachable {
   readonly panes: Row[]
@@ -79,7 +82,7 @@ export function useReachable(): Reachable {
       {
         key: 'prefs',
         name: 'Settings',
-        meta: '⌘,',
+        meta: SHORTCUTS.settings,
         icon: GEAR,
         go: () => openPrefs('general'),
       },

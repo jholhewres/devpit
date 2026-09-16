@@ -16,12 +16,23 @@ const shipped = readdirSync(SHELL).filter(
 )
 const text = (name: string): string => readFileSync(resolve(SHELL, name), 'utf8')
 
-/** Every shortcut a title announces, exactly as it is printed. */
+/** Every shortcut a screen announces, exactly as it is printed: in a title,
+ *  or as a quoted combo anywhere else — a palette row's `meta`, a hint. */
 function announced(): { file: string; combo: string }[] {
   const found: { file: string; combo: string }[] = []
-  for (const file of shipped) {
+  /* tileKeys.ts owns the keys of a focused tile, and its own table is held
+     against its own listener in tileKeys.test.tsx. */
+  for (const file of shipped.filter((name) => name !== 'shortcuts.ts' && name !== 'tileKeys.ts')) {
     for (const match of text(file).matchAll(/title="[^"]*\(([⇧⌥⌘][^)]*)\)"/g)) {
       found.push({ file, combo: match[1]! })
+    }
+    for (const match of text(file).matchAll(/['"`]([⇧⌥]*⌘[^'"`\s]{1,2})['"`]/g)) {
+      found.push({ file, combo: match[1]! })
+    }
+    /* Written as an entity inside JSX text, which is how ⌘B hid from the
+       title-only reading on the empty screen's Board button. */
+    for (const match of text(file).matchAll(/>((?:&#8679;|&#8997;)*&#8984;[^<\s]{1,2})</g)) {
+      found.push({ file, combo: match[1]!.replace(/&#8679;/g, '⇧').replace(/&#8997;/g, '⌥').replace(/&#8984;/g, '⌘') })
     }
   }
   return found
@@ -47,6 +58,13 @@ describe('every shortcut the window announces', () => {
       (name) => !listening.includes(`'${name}'`),
     )
     expect(deaf).toEqual([])
+  })
+})
+
+describe('the keys a palette row prints', () => {
+  it('come from the map, so a row cannot print one nobody listens for', () => {
+    expect(shortcutFor({ key: ',', metaKey: false, ctrlKey: true, shiftKey: false })).toBe('settings')
+    expect(text('paletteReach.tsx')).toContain('SHORTCUTS.settings')
   })
 })
 

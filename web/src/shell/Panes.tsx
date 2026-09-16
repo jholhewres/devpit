@@ -1,6 +1,7 @@
 import mark from '../assets/brand/mark.png'
 import { PANE_MOUNTS } from './paneMounts'
 import { useShell } from './useShell'
+import { SHORTCUTS } from './shortcuts'
 
 export function Panes(): React.JSX.Element {
   const { open, active, show, close, project } = useShell()
@@ -17,15 +18,15 @@ export function Panes(): React.JSX.Element {
               <div className="blank__keys">
                 <button className="blank__k" onClick={() => show('chat')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" /></svg>
-                  <b>New chat</b><span>&#8984;N</span>
+                  <b>New chat</b><span>{SHORTCUTS.chat}</span>
                 </button>
                 <button className="blank__k" onClick={() => show('term')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m4 17 6-6-6-6M12 19h8" /></svg>
-                  <b>New terminal</b><span>&#8984;T</span>
+                  <b>New terminal</b><span>{SHORTCUTS.terminal}</span>
                 </button>
                 <button className="blank__k" onClick={() => show('board')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg>
-                  <b>Board</b><span>&#8984;B</span>
+                  <b>Board</b>
                 </button>
               </div>
             </div>
