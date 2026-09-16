@@ -188,12 +188,11 @@ fn what_may_be_downloaded_and_what_may_not() {
     assert!(may_download(&S::Idle).is_err());
 }
 
-/// From `Ready` onward nothing new starts — and `Ready` is the point, not
-/// `Waiting`: a card set to advance on its own (`advancing.rs`) would
-/// otherwise start a run between the moment the person chose and the moment
-/// the installer commits, and that run dies with the process.
+/// New work is refused from the moment somebody asks for the install, not
+/// from the moment the bytes are ready: a downloaded update whose card was
+/// closed must not hold every run and chat back until a restart.
 #[test]
-fn a_run_started_between_the_check_and_the_commit_is_refused() {
+fn nothing_new_starts_once_the_install_has_been_asked_for() {
     let ready = S::Ready {
         version: "0.2.0".to_owned(),
     };
@@ -213,6 +212,86 @@ fn a_run_started_between_the_check_and_the_commit_is_refused() {
     assert!(starting_refused(&S::Idle).is_none());
     assert!(starting_refused(&available()).is_none());
     assert!(starting_refused(&S::Downloading { percent: 40 }).is_none());
+}
+
+/// The door shuts before the install looks at what is in the way.
+///
+/// This is the whole of B-1: reading the work first and shutting the door
+/// after leaves a gap, and `chaining::after` starts the next run inside it.
+/// Whatever `shutting_the_door` answers, `starting_refused` must answer for —
+/// make it hand back `Ready` unchanged and this test fails.
+#[test]
+fn the_state_an_install_puts_up_first_already_refuses_new_work() {
+    let ready = S::Ready {
+        version: "0.2.0".to_owned(),
+    };
+    let shut = shutting_the_door(&ready, 1000.0);
+    assert!(
+        starting_refused(&shut).is_some(),
+        "the install read the work through an open door"
+    );
+    assert_eq!(
+        shut,
+        S::Waiting {
+            runs: 0,
+            turns: 0,
+            since: 1000.0
+        }
+    );
+
+    // Already waiting: the door is shut and the clock has already started.
+    let waiting = S::Waiting {
+        runs: 2,
+        turns: 1,
+        since: 500.0,
+    };
+    assert_eq!(shutting_the_door(&waiting, 1000.0), waiting);
+}
+
+/// What the install does with the work it found, once the door is shut.
+#[test]
+fn an_install_holds_only_for_work_that_is_really_there() {
+    let shut = S::Waiting {
+        runs: 0,
+        turns: 0,
+        since: 500.0,
+    };
+    let busy = devpit_rpc::UpdateWork {
+        runs: vec![devpit_rpc::UpdateBlocking {
+            id: "run_1".to_owned(),
+            title: "Wire the board".to_owned(),
+        }],
+        turns: Vec::new(),
+        keeps: Vec::new(),
+    };
+
+    // Work in the way: the wait says what it is waiting on, and keeps the
+    // moment it began — the card counts from there, so it must not restart.
+    assert_eq!(
+        holding_for(&shut, &busy, 900.0),
+        Some(S::Waiting {
+            runs: 1,
+            turns: 0,
+            since: 500.0
+        })
+    );
+
+    // Nothing in the way: the install goes on.
+    assert_eq!(
+        holding_for(&shut, &devpit_rpc::UpdateWork::default(), 900.0),
+        None
+    );
+
+    // What keeps running through a restart never holds an update back.
+    let keeps = devpit_rpc::UpdateWork {
+        runs: Vec::new(),
+        turns: Vec::new(),
+        keeps: vec![devpit_rpc::UpdateBlocking {
+            id: "leaf_1".to_owned(),
+            title: "Terminal 1".to_owned(),
+        }],
+    };
+    assert_eq!(holding_for(&shut, &keeps, 900.0), None);
 }
 
 #[test]

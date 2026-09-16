@@ -101,6 +101,13 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
         (S::Ready { .. }, E::Blocked { runs, turns, since }) => {
             Some(S::Waiting { runs, turns, since })
         }
+        // A wait that learns what it is really waiting on keeps the moment it
+        // began: the card says how long, and that clock must not restart.
+        (S::Waiting { since, .. }, E::Blocked { runs, turns, .. }) => Some(S::Waiting {
+            runs,
+            turns,
+            since: *since,
+        }),
         (S::Waiting { .. }, E::Cancel) | (S::Ready { .. }, E::Cancel) => Some(S::Idle),
         (S::Ready { .. } | S::Waiting { .. }, E::Install) => Some(S::Installing),
         (
@@ -552,6 +559,50 @@ pub(crate) fn starting_refused(state: &UpdateStatus) -> Option<&'static str> {
     }
 }
 
+/// The state an install puts up *before* it reads what is in the way.
+///
+/// `Ready` refuses nothing on purpose — a downloaded update whose card was
+/// closed must not hold every run and chat back. So the install shuts the door
+/// first and looks second; whatever this answers, `starting_refused` has to
+/// answer for it, or the gap it exists to close is still open.
+pub(crate) fn shutting_the_door(state: &UpdateStatus, since: f64) -> UpdateStatus {
+    if matches!(state, UpdateStatus::Waiting { .. }) {
+        // Already shut, and already counting. Shutting it twice would forget
+        // what the wait is for and restart the clock the card shows.
+        return state.clone();
+    }
+    next(
+        state,
+        Event::Blocked {
+            runs: 0,
+            turns: 0,
+            since,
+        },
+    )
+    .unwrap_or_else(|| state.clone())
+}
+
+/// The state an install holds in for the work it found, if it must hold at all.
+///
+/// `None` is the only answer that lets the install go on.
+pub(crate) fn holding_for(
+    state: &UpdateStatus,
+    work: &UpdateWork,
+    since: f64,
+) -> Option<UpdateStatus> {
+    if blockers(work) == 0 {
+        return None;
+    }
+    next(
+        state,
+        Event::Blocked {
+            runs: work.runs.len() as u32,
+            turns: work.turns.len() as u32,
+            since,
+        },
+    )
+}
+
 /// What a person would recognise the work in flight by.
 ///
 /// Titles rather than ids: "two runs" is a number, and the question on screen
@@ -841,6 +892,25 @@ pub async fn update_install(
         .swap(true, std::sync::atomic::Ordering::SeqCst)
     {
         return Ok(updating.state());
+    }
+
+    // The wait goes up before the work is read, and the work is read again
+    // after it: `Ready` refuses nothing, so a lane set to advance on its own
+    // started a run in the gap between the two, and that run died with the
+    // process.
+    let state = shutting_the_door(&state, now());
+    updating.moved_to(&app, state.clone());
+    let work = app
+        .try_state::<crate::chat::Talking>()
+        .and_then(|talking| blocking_now(&talking).ok())
+        .unwrap_or_default();
+    if let Some(held) = holding_for(&state, &work, now()) {
+        // The watcher puts it in once the work has ended.
+        updating.moved_to(&app, held.clone());
+        updating
+            .claimed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        return Ok(held);
     }
 
     // A refusal from here on also ends a wait: left in `Waiting`, every run
