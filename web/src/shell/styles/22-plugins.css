@@ -21,3 +21,8 @@
 .note { display: grid; grid-template-columns: minmax(240px, 45%) 1fr; height: 100%; overflow: hidden; }
 .note__edit { border-right: 1px solid var(--line); overflow: auto; }
 .note__see { padding: 16px 20px; overflow: auto; }
+.data { display: grid; grid-template-columns: minmax(240px, 40%) 1fr; height: 100%; overflow: hidden; }
+.data__edit { display: grid; grid-template-rows: 1fr auto; border-right: 1px solid var(--line); overflow: hidden; }
+.data__problem { margin: 0; padding: 6px 10px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--warn, var(--dim)); }
+.data__see { overflow: hidden; }

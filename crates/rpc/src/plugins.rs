@@ -192,7 +192,7 @@ pub fn validate_catalogue(manifests: &[PluginManifest]) -> Result<(), PluginErro
 /// The plugins this build ships, compiled in. Enabling one is a per-project
 /// choice made elsewhere; this only says what exists.
 pub fn catalogue() -> Vec<PluginManifest> {
-    vec![excalidraw(), mermaid(), notes()]
+    vec![excalidraw(), mermaid(), notes(), data()]
 }
 
 fn excalidraw() -> PluginManifest {
@@ -236,6 +236,22 @@ fn notes() -> PluginManifest {
         surfaces: vec![Surface::Pane { many: true }, Surface::CardPin],
         data: DataSpec {
             extensions: vec![".md".to_owned()],
+            max_bytes: MAX_DATA_BYTES,
+        },
+        permissions: vec![Permission::DataOwn],
+    }
+}
+
+/// JSON and YAML, drawn as a graph rather than read as a wall of braces.
+fn data() -> PluginManifest {
+    PluginManifest {
+        id: "data".to_owned(),
+        name: "Data".to_owned(),
+        version: "0.1.0".to_owned(),
+        description: "JSON and YAML, drawn as a graph you can walk.".to_owned(),
+        surfaces: vec![Surface::Pane { many: true }, Surface::CardPin],
+        data: DataSpec {
+            extensions: vec![".json".to_owned(), ".yaml".to_owned(), ".yml".to_owned()],
             max_bytes: MAX_DATA_BYTES,
         },
         permissions: vec![Permission::DataOwn],
