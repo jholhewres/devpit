@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 
 use devpit_rpc::{Part, SessionInit, TurnEnd};
 
-use crate::driver::{Driver, Read};
+use crate::driver::Driver;
 use crate::talk_args::argv;
 use crate::AgentError;
 
@@ -18,6 +18,11 @@ pub struct Say<'a> {
     /// The binary this conversation's profile names. Two accounts of the
     /// same CLI differ here and nowhere else.
     pub command: &'a str,
+    /// The profile's environment. It is what says whose account this turn
+    /// spends: a terminal carries it as shell assignments in the line it
+    /// types, and a spawned turn is handed it here or spends the default one
+    /// without saying so.
+    pub env: &'a [(String, String)],
     pub prompt: &'a str,
     pub cwd: &'a Path,
     pub model: Option<&'a str>,
@@ -54,7 +59,7 @@ pub struct Said {
 pub fn say(
     driver: &dyn Driver,
     turn: &Say<'_>,
-    mut on_part: impl FnMut(Part),
+    on_part: impl FnMut(Part),
     mut on_start: impl FnMut(u32),
 ) -> Result<Said, AgentError> {
     let argv = argv(turn);
@@ -62,6 +67,7 @@ pub fn say(
     let mut child = Command::new(turn.command)
         .args(&argv)
         .current_dir(turn.cwd)
+        .envs(turn.env.iter().map(|(key, value)| (key, value)))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -82,43 +88,14 @@ pub fn say(
             "could not send the prompt".to_owned(),
         ));
     }
-    let mut running = crate::control::Running::default();
-    let mut result_seen = false;
-
     let stdout = child.stdout.take().ok_or(AgentError::NotInstalled)?;
     let started = std::time::Instant::now();
-    let mut ended = None;
-    let mut session_id = None;
-    let mut init = None;
-    let mut anchor = None;
-
-    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-        // The last id seen, not the first: `/clear` starts a new session inside
-        // the turn, and resuming the one it left would undo it.
-        if let Some(seen) = driver.session(&line) {
-            session_id = Some(seen);
-        }
-        anchor = driver.anchor(&line).or(anchor);
-        match driver.read(&line) {
-            Read::Parts(parts) => parts.into_iter().for_each(|part| {
-                running.saw(&part);
-                on_part(part)
-            }),
-            Read::Ended {
-                stop_reason,
-                cost_usd,
-                is_error,
-            } => {
-                ended = Some((stop_reason, cost_usd, is_error));
-                result_seen = true;
-            }
-            Read::Init(said) => init = Some(said),
-            Read::Nothing => {}
-        }
-        if crate::control::may_close(result_seen, &running) {
-            control.close();
-        }
-    }
+    let heard = crate::talk_stream::follow(
+        driver,
+        BufReader::new(stdout).lines().map_while(Result::ok),
+        &control,
+        on_part,
+    );
 
     // Whatever ended the stream, stdin is not needed any more.
     control.close();
@@ -126,7 +103,7 @@ pub fn say(
         .wait()
         .map_err(|err| AgentError::Unreadable(err.to_string()))?;
 
-    let (stop_reason, cost_usd, is_error) = ended.unwrap_or_else(|| {
+    let (stop_reason, cost_usd, is_error) = heard.ended.unwrap_or_else(|| {
         // No end frame means the turn was stopped, not that it finished. A
         // conversation that shows those the same way is lying about one.
         (Some("interrupted".to_owned()), None, !status.success())
@@ -140,8 +117,8 @@ pub fn say(
             stop_reason,
             is_error,
         },
-        session_id,
-        init,
-        anchor,
+        session_id: heard.session_id,
+        init: heard.init,
+        anchor: heard.anchor,
     })
 }

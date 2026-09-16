@@ -159,6 +159,10 @@ pub async fn chat_send(
             format!("no driver called {}", profile.driver),
         ));
     };
+    // Which account this turn spends. A terminal gets it as assignments in the
+    // line it types and a step gets it from its runner; a chat was the one
+    // path that spawned the binary with none of it.
+    let env = devpit_agentcli::running::runner(&profile).env;
 
     let file = conversation_path(&sessions, &conversation_id);
     let turn_id = id("turn");
@@ -224,6 +228,7 @@ pub async fn chat_send(
             driver.as_ref(),
             &Say {
                 command: &path,
+                env: &env,
                 prompt: &prompt,
                 cwd: checkout,
                 model: model.as_deref(),

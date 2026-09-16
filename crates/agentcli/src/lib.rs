@@ -311,4 +311,5 @@ pub mod store;
 mod store_tests;
 pub mod talk;
 mod talk_args;
+mod talk_stream;
 pub mod transcript_text;
