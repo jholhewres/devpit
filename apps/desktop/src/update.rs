@@ -559,6 +559,17 @@ pub(crate) fn starting_refused(state: &UpdateStatus) -> Option<&'static str> {
     }
 }
 
+/// Whether asking to install is asking for what is already happening.
+///
+/// `Installing` is past the point of return, and a claim already taken is an
+/// install between the claim and the state change. Either way the honest
+/// answer is the state itself: a card that says "there is nothing ready to
+/// install" while the update installs is telling the person the opposite of
+/// what is true.
+pub(crate) fn claimed_already(state: &UpdateStatus, claimed: bool) -> bool {
+    matches!(state, UpdateStatus::Installing) || claimed
+}
+
 /// The state an install puts up *before* it reads what is in the way.
 ///
 /// `Ready` refuses nothing on purpose — a downloaded update whose card was
@@ -877,6 +888,17 @@ pub async fn update_install(
     updating: tauri::State<'_, Updating>,
 ) -> Result<UpdateStatus, RpcError> {
     let state = updating.state();
+    // An install already under way is not an error to put on the card: the
+    // person asked for what is already happening. Answered before the guard
+    // below, which would otherwise call it "nothing ready to install" while
+    // the update installs — the watcher wins that race whenever "Stop it"
+    // waits for work that ends first.
+    if claimed_already(
+        &state,
+        updating.claimed.load(std::sync::atomic::Ordering::SeqCst),
+    ) {
+        return Ok(state);
+    }
     if !matches!(
         state,
         UpdateStatus::Ready { .. } | UpdateStatus::Waiting { .. }

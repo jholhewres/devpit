@@ -248,6 +248,29 @@ fn the_state_an_install_puts_up_first_already_refuses_new_work() {
     assert_eq!(shutting_the_door(&waiting, 1000.0), waiting);
 }
 
+/// Asking for an install that is already going is not an error.
+///
+/// S-1's case: "Stop it" polls every 200 ms, the watcher sees an idle Waiting
+/// in that gap and claims the install, and the card then showed "The update
+/// did not go through — there is nothing ready to install" while the update
+/// installed and restarted the app.
+#[test]
+fn asking_for_an_install_already_under_way_answers_with_its_state() {
+    let ready = S::Ready {
+        version: "0.2.0".to_owned(),
+    };
+    assert!(
+        claimed_already(&S::Installing, false),
+        "installing is going"
+    );
+    assert!(claimed_already(&ready, true), "the claim is taken");
+    assert!(
+        !claimed_already(&ready, false),
+        "a ready update nobody claimed is the ordinary case"
+    );
+    assert!(!claimed_already(&S::Idle, false));
+}
+
 /// What the install does with the work it found, once the door is shut.
 #[test]
 fn an_install_holds_only_for_work_that_is_really_there() {
