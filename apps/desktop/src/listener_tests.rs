@@ -265,6 +265,7 @@ fn a_background_session_waiting_reaches_its_card() {
     let posted = Posted {
         body: BACKGROUND_WAITING.to_owned(),
         pane: None,
+        secret: None,
     };
     hear_post(&sink, &posted, next_seq());
 
@@ -320,6 +321,7 @@ fn a_hook_from_an_archived_cards_pane_does_not_bring_it_back() {
     let posted = Posted {
         body: PAYLOAD.to_owned(),
         pane: Some(LEAF.to_owned()),
+        secret: None,
     };
     hear_post(&sink, &posted, next_seq());
     assert!(!sink
@@ -349,4 +351,22 @@ fn a_hook_from_an_archived_cards_pane_does_not_bring_it_back() {
         .expect("said")
         .iter()
         .any(|(channel, _)| channel == "card:happening"));
+}
+
+/// Only this run's secret opens the door.
+///
+/// The port is visible to anything on the machine that can list sockets; the
+/// secret is in a file only its owner can read. Length is checked first and
+/// then every byte is compared, so a caller learns nothing from how long the
+/// refusal took.
+#[test]
+fn only_the_secret_this_run_made_is_heard() {
+    assert!(authorized(Some("6f1c"), "6f1c"));
+    assert!(!authorized(None, "6f1c"), "a post with no header was heard");
+    assert!(!authorized(Some(""), "6f1c"));
+    assert!(!authorized(Some("6f1d"), "6f1c"));
+    assert!(
+        !authorized(Some("6f1c00"), "6f1c"),
+        "a longer guess was heard"
+    );
 }

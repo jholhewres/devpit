@@ -22,10 +22,11 @@ const SECRET: &str = "a-secret-only-this-run-knows";
 
 #[test]
 fn the_pane_reaches_the_listener_and_the_payload_survives() {
-    let Some((target, body, carried)) = posted(Some("leaf_01TEST")) else {
-        eprintln!("skipped: no shell or no curl");
-        return;
-    };
+    // Failed, never skipped: a test that quietly passes when `sh` or `curl`
+    // is missing is a test that says the hook works on a machine where it was
+    // never tried.
+    let (target, body, carried) = posted(Some("leaf_01TEST"))
+        .expect("the hook command needs sh and curl on the PATH, and a port to post to");
     assert_eq!(target, "/hook?pane=leaf_01TEST");
     assert_eq!(
         body, PAYLOAD,
@@ -45,10 +46,8 @@ fn the_pane_reaches_the_listener_and_the_payload_survives() {
 /// nothing, and nothing is what a turn with no terminal should add.
 #[test]
 fn a_turn_with_no_pane_posts_what_it_always_did() {
-    let Some((target, _, _)) = posted(None) else {
-        eprintln!("skipped: no shell or no curl");
-        return;
-    };
+    let (target, _, _) = posted(None)
+        .expect("the hook command needs sh and curl on the PATH, and a port to post to");
     assert_eq!(target, "/hook");
 }
 

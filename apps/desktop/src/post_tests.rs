@@ -4,7 +4,7 @@
 //! that decide how much memory a request gets to ask for, and those do not
 //! need a port to exercise.
 
-use crate::post::{read_post, MOST_BYTES};
+use crate::post::{read_post, MOST_BYTES, MOST_HEADERS, MOST_HEADER_BYTES};
 
 /// A request, assembled the way `curl --data-binary` sends one.
 fn post(body: &str) -> Vec<u8> {
@@ -14,6 +14,77 @@ fn post(body: &str) -> Vec<u8> {
         body.len()
     )
     .into_bytes()
+}
+
+/// The same, with headers of the caller's choosing in front of the length.
+fn post_with(headers: &[&str], body: &str) -> Vec<u8> {
+    let mut raw = String::from("POST /hook HTTP/1.1\r\nhost: 127.0.0.1\r\n");
+    for header in headers {
+        raw.push_str(header);
+        raw.push_str("\r\n");
+    }
+    raw.push_str(&format!("content-length: {}\r\n\r\n{body}", body.len()));
+    raw.into_bytes()
+}
+
+/// The secret is read whatever case the header name arrives in and whatever
+/// padding sits around the value — curl writes what the file says, and the
+/// file is written by hand often enough to be worth being kind about.
+#[test]
+fn the_secret_is_read_whatever_its_case_or_padding() {
+    for header in [
+        "x-devpit-hook: 6f1c",
+        "X-DevPit-Hook: 6f1c",
+        "X-DEVPIT-HOOK:   6f1c   ",
+        "x-devpit-hook :6f1c",
+    ] {
+        let raw = post_with(&[header], "{}");
+        assert_eq!(
+            read_post(&raw[..]).and_then(|posted| posted.secret),
+            Some("6f1c".to_owned()),
+            "{header}"
+        );
+    }
+}
+
+/// No header at all, and a header with nothing in it, are different answers:
+/// the second is a post that showed something and got it wrong.
+#[test]
+fn a_post_with_no_secret_carries_none_and_an_empty_one_carries_empty() {
+    let raw = post("{}");
+    assert_eq!(read_post(&raw[..]).and_then(|posted| posted.secret), None);
+
+    let raw = post_with(&["x-devpit-hook:"], "{}");
+    assert_eq!(
+        read_post(&raw[..]).and_then(|posted| posted.secret),
+        Some(String::new())
+    );
+}
+
+/// `read_line` grows until it finds a newline. A sender that never sends one
+/// would otherwise decide how much memory this process spends — the same rule
+/// the body has always had, one line above it.
+#[test]
+fn a_header_line_has_a_ceiling() {
+    let long = format!("x-devpit-hook: {}", "a".repeat(MOST_HEADER_BYTES + 1));
+    let raw = post_with(&[&long], "{}");
+    assert_eq!(read_post(&raw[..]), None);
+
+    // One byte under it still reads.
+    let short = format!("x-devpit-hook: {}", "a".repeat(64));
+    let raw = post_with(&[&short], "{}");
+    assert!(read_post(&raw[..]).is_some());
+}
+
+/// And a request cannot arrive with ten thousand short headers either.
+#[test]
+fn a_wall_of_headers_is_refused() {
+    let many: Vec<String> = (0..MOST_HEADERS + 5)
+        .map(|at| format!("x-{at}: 1"))
+        .collect();
+    let borrowed: Vec<&str> = many.iter().map(String::as_str).collect();
+    let raw = post_with(&borrowed, "{}");
+    assert_eq!(read_post(&raw[..]), None);
 }
 
 #[test]

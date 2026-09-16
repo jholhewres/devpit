@@ -61,6 +61,7 @@ pub fn start(app: AppHandle, root: &Path) {
         eprintln!("could not write the hook secret: {err}");
         return;
     }
+    let _ = SECRET.set(secret);
     // Private: the port is what a post has to know, so a file anyone can read
     // is an invitation to post as the agent.
     if let Err(err) =
@@ -83,6 +84,32 @@ pub fn start(app: AppHandle, root: &Path) {
     });
 }
 
+/// This run's secret, kept for the door to compare against.
+static SECRET: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Whether a post showed this run's secret.
+///
+/// Compared to the end even once it is known to differ: a comparison that
+/// stops at the first wrong byte says, in how long it took, how much of the
+/// secret the caller already has.
+///
+/// What this defends against: another **user** on the machine, who can see the
+/// port but not read a file at 0600. Not against code running as you — that
+/// code can read the secret as easily as devpit can.
+pub(crate) fn authorized(carried: Option<&str>, secret: &str) -> bool {
+    let Some(carried) = carried else {
+        return false;
+    };
+    if carried.len() != secret.len() {
+        return false;
+    }
+    carried
+        .bytes()
+        .zip(secret.bytes())
+        .fold(0u8, |differs, (mine, theirs)| differs | (mine ^ theirs))
+        == 0
+}
+
 /// The secret this run's hooks carry, thirty-two bytes from the system's own
 /// randomness.
 ///
@@ -102,6 +129,16 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return;
     };
+    // Refused before anything is read out of the payload. Counted, never
+    // logged with what it carried: a refusal written to a log is the guess
+    // written to a log.
+    if let Some(secret) = SECRET.get() {
+        if !authorized(posted.secret.as_deref(), secret) {
+            trace(&format!("post seq={seq} refused"));
+            let _ = stream.write_all(b"HTTP/1.1 401 Unauthorized\r\ncontent-length: 0\r\n\r\n");
+            return;
+        }
+    }
     let body = &posted.body;
 
     // A tool this session wants to be asked about holds the connection until

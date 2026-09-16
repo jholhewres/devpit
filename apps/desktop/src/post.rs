@@ -14,7 +14,18 @@ use std::net::TcpStream;
 /// socket and an unbounded read is a way to spend all the memory on the box.
 pub(crate) const MOST_BYTES: usize = 256 * 1024;
 
-/// One POST: what it carried, and which pane it came from.
+/// A header line longer than this is not one of ours either.
+///
+/// `read_line` grows its buffer until it meets a newline, so a sender that
+/// never sends one chooses how much memory this process spends. The body had a
+/// ceiling from the start; the headers above it did not.
+pub(crate) const MOST_HEADER_BYTES: usize = 8 * 1024;
+
+/// And there are not a hundred of them.
+pub(crate) const MOST_HEADERS: usize = 64;
+
+/// One POST: what it carried, which pane it came from, and the secret it
+/// showed at the door.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Posted {
     pub body: String,
@@ -22,6 +33,10 @@ pub struct Posted {
     /// terminals. Absent for a headless turn, which belongs to a card rather
     /// than to a pane.
     pub pane: Option<String>,
+    /// What the `x-devpit-hook` header carried, if anything. Read here and
+    /// judged in `listener::authorized`: parsing a request and deciding
+    /// whether to trust it are two jobs.
+    pub secret: Option<String>,
 }
 
 /// The body of a POST, or nothing.
@@ -42,11 +57,27 @@ pub fn read_request(stream: &mut TcpStream) -> Option<Posted> {
 pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
     let mut length = 0usize;
     let mut pane = None;
+    let mut secret = None;
     let mut first = true;
+    let mut seen = 0usize;
 
     loop {
+        seen += 1;
+        if seen > MOST_HEADERS {
+            return None;
+        }
         let mut line = String::new();
-        if reader.read_line(&mut line).ok()? == 0 {
+        // Bounded like the body: `take` caps what one line may cost, and a
+        // line that came back without its newline hit that cap rather than
+        // ended — which is a request to stop reading, not to grow.
+        if std::io::Read::take(reader.by_ref(), MOST_HEADER_BYTES as u64)
+            .read_line(&mut line)
+            .ok()?
+            == 0
+        {
+            return None;
+        }
+        if !line.ends_with('\n') {
             return None;
         }
         let line = line.trim_end();
@@ -61,8 +92,14 @@ pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
             first = false;
             continue;
         }
-        if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
-            length = value.trim().parse().ok()?;
+        // Names are case-insensitive and may be padded either side of the
+        // colon; `Content-Length` is how most senders spell it.
+        if let Some((name, value)) = line.split_once(':') {
+            match name.trim().to_ascii_lowercase().as_str() {
+                "content-length" => length = value.trim().parse().ok()?,
+                devpit_agentcli::HOOK_HEADER => secret = Some(value.trim().to_owned()),
+                _ => {}
+            }
         }
     }
 
@@ -74,6 +111,7 @@ pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
     Some(Posted {
         body: String::from_utf8(body).ok()?,
         pane,
+        secret,
     })
 }
 
