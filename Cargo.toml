@@ -29,7 +29,9 @@ devpit-agentcli = { path = "crates/agentcli" }
 devpit-steps = { path = "crates/steps" }
 
 # The binary stays open all day with several fronts live. Size and startup are
-# not vanity here.
+# not vanity here — and now measured: against `opt-level = 3`, "s" is 9.81 MB
+# to 13.63 MB, and the time to the webview differs by less than the spread of
+# three runs. See .omc/evidence/17/opt-level.md.
 [profile.release]
 lto = true
 codegen-units = 1
