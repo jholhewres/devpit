@@ -30,3 +30,7 @@ pub const AGENT_HOOKS: &str = "agents.hooks";
 /// How wide the two side panels were left, in pixels.
 pub const SIDEBAR_WIDTH: &str = "layout.sidebar_width";
 pub const FILES_WIDTH: &str = "layout.files_width";
+/// The focus that is on, as `<project id>:<seconds since the epoch>`, or
+/// absent. Two fields in one row because a focus is one thing: half of it
+/// written and half not is a focus with no beginning.
+pub const HEADS_DOWN: &str = "focus.heads_down";

@@ -10,12 +10,12 @@ use tauri_specta::{collect_commands, Builder};
 
 use crate::{
     account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_chat,
-    card_work, cards, chat, columns, commands, diffs, files, filetree, front, happening, history,
-    in_flight, index, installations, mcp, moving, notices, openers, outside_sessions, panels,
-    panes, pasting, paths, plan_limits, plugin_data, plugins, projects, receipts, reveal,
-    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
-    slash, sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
-    worktree_base, worktrees, wsfiles,
+    card_work, cards, chat, columns, commands, diffs, files, filetree, front, happening,
+    heads_down, history, in_flight, index, installations, mcp, moving, notices, openers,
+    outside_sessions, panels, panes, pasting, paths, plan_limits, plugin_data, plugins, projects,
+    receipts, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
+    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, threads, update,
+    watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -74,6 +74,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         wsfiles::workspace_file,
         reveal::path_open,
         reveal::path_reveal,
+        heads_down::focus_read,
+        heads_down::focus_write,
         reveal::url_open,
         openers::apps_list,
         openers::apps_known,

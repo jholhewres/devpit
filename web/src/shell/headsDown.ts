@@ -1,4 +1,4 @@
-import type { Notice } from '../gen/bindings'
+import type { HeadsDown, Notice } from '../gen/bindings'
 
 /*
  * Focus, and the one rule it is made of.
@@ -13,13 +13,10 @@ import type { Notice } from '../gen/bindings'
  * agents on other projects keep going. Only the calling waits.
  */
 
-export type HeadsDown = {
-  /** The project being worked on. Focus is per project, never per card: the
-   *  work is several cards of one project at once. */
-  projectId: string
-  /** Seconds since the epoch, so the clock survives a restart. */
-  since: number
-}
+/* `HeadsDown` itself comes from the contract — which project, and the second
+   it began — because a type written twice is a type that disagrees with
+   itself. */
+export type { HeadsDown }
 
 /** A notice's kind that goes through the door whatever else is true. */
 const IRREVERSIBLE = 'irreversible'
@@ -48,7 +45,7 @@ export function held(
   notice: Pick<Notice, 'projectId' | 'kind' | 'createdAt'>,
   focus: HeadsDown | null,
 ): boolean {
-  if (!focus) return false
+  if (!focus || focus.since === null) return false
   if (notice.createdAt === null) return false
   if (notice.createdAt < focus.since) return false
   if (notice.projectId === null) return false
@@ -56,6 +53,10 @@ export function held(
   return notice.kind !== IRREVERSIBLE
 }
 
-/** How long the focus has been on, in whole minutes. */
+/** How long the focus has been on, in whole minutes.
+ *
+ * `since` crosses the contract as `number | null`, because a float has values
+ * JSON cannot carry. A focus with no beginning is one nothing can be counted
+ * from, so it counts as none rather than as zero minutes of something. */
 export const minutesIn = (focus: HeadsDown, now: number): number =>
-  Math.max(0, Math.floor((now - focus.since) / 60))
+  focus.since === null ? 0 : Math.max(0, Math.floor((now - focus.since) / 60))

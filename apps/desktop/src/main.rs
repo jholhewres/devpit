@@ -41,6 +41,7 @@ mod filetree;
 mod front;
 mod handler;
 mod happening;
+mod heads_down;
 mod history;
 mod in_flight;
 mod index;

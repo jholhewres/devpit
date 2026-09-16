@@ -54,6 +54,13 @@ describe('what a focus holds back', () => {
     expect(held(notice({ createdAt: null }), focus)).toBe(false)
   })
 
+  /* `since` crosses the contract as `number | null`: a float has values JSON
+     cannot carry. A focus with no beginning holds nothing. */
+  it('holds nothing when the focus has no beginning', () => {
+    expect(held(notice(), { projectId: 'prj_here', since: null })).toBe(false)
+    expect(minutesIn({ projectId: 'prj_here', since: null }, 9999)).toBe(0)
+  })
+
   it('counts the focus in whole minutes from when it began', () => {
     expect(minutesIn(focus, 1000)).toBe(0)
     expect(minutesIn(focus, 1059)).toBe(0)

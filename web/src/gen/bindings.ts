@@ -324,6 +324,29 @@ export const commands = {
 	 *  was asked for was the folder with the file highlighted in it.
 	 */
 	pathReveal: (path: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("path_reveal", { path })),
+	/**  `focus.read` — the focus that is on, if one is. */
+	focusRead: () => typedError<{
+	projectId: string,
+	/**
+	 *  Seconds since the epoch. `f64` because the contract forbids 64-bit
+	 *  integers, and every other timestamp that crosses it is one too.
+	 */
+	since: number | null,
+} | null, RpcError>(__TAURI_INVOKE("focus_read")),
+	/**
+	 *  `focus.write` — begins a focus on a project, or ends the one that is on.
+	 * 
+	 *  Beginning one while another is on replaces it: changing project ends the
+	 *  focus, and the window asks for the new one in the same breath.
+	 */
+	focusWrite: (projectId: string | null) => typedError<{
+	projectId: string,
+	/**
+	 *  Seconds since the epoch. `f64` because the contract forbids 64-bit
+	 *  integers, and every other timestamp that crosses it is one too.
+	 */
+	since: number | null,
+} | null, RpcError>(__TAURI_INVOKE("focus_write", { projectId })),
 	/**
 	 *  `url.open` — opens a web address in the browser the person uses.
 	 * 
@@ -1500,6 +1523,15 @@ export type Happening = {
 	 */
 	what: string,
 	detail: string | null,
+};
+
+export type HeadsDown = {
+	projectId: string,
+	/**
+	 *  Seconds since the epoch. `f64` because the contract forbids 64-bit
+	 *  integers, and every other timestamp that crosses it is one too.
+	 */
+	since: number | null,
 };
 
 /**  One thing the workspace holds, measured. */

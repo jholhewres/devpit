@@ -8,7 +8,15 @@
  */
 
 /** What a press means, when it means anything. */
-export type Shortcut = 'palette' | 'terminal' | 'chat' | 'project' | 'settings' | 'splitRight' | 'splitDown'
+export type Shortcut =
+  | 'palette'
+  | 'terminal'
+  | 'chat'
+  | 'project'
+  | 'settings'
+  | 'splitRight'
+  | 'splitDown'
+  | 'focus'
 
 /** How each one is written where it is announced, exactly as a title prints it. */
 export const SHORTCUTS: Readonly<Record<Shortcut, string>> = {
@@ -19,6 +27,7 @@ export const SHORTCUTS: Readonly<Record<Shortcut, string>> = {
   settings: '⌘,',
   splitRight: '⇧⌘D',
   splitDown: '⇧⌘E',
+  focus: '⇧⌘F',
 }
 
 const PLAIN: Readonly<Record<string, Shortcut>> = {
@@ -32,6 +41,7 @@ const PLAIN: Readonly<Record<string, Shortcut>> = {
 const SHIFTED: Readonly<Record<string, Shortcut>> = {
   d: 'splitRight',
   e: 'splitDown',
+  f: 'focus',
 }
 
 /** A press, as much of one as this needs to know. */
