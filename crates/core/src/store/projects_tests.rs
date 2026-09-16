@@ -21,15 +21,17 @@ fn forgetting_keeps_the_row_and_erasing_takes_the_board_with_it() {
     let root = dir.path().join("project");
     std::fs::create_dir_all(&root).expect("create");
     let id = store.add_project(&root, None).expect("add");
-    store.add_note(&id, "a thought").expect("note");
+    store.ensure_board(&id).expect("board");
+    let column = store.columns(&id).expect("columns")[0].id.clone();
+    store.create_card(&id, &column, "a card", "").expect("card");
 
     assert!(store.forget_project(&id).expect("forget"));
-    assert_eq!(store.notes(&id).expect("notes").len(), 1);
+    assert_eq!(store.cards(&id).expect("cards").len(), 1);
     assert!(store.project(&id).expect("read").is_some());
 
     assert!(store.erase_project(&id).expect("erase"));
     assert!(store.project(&id).expect("read").is_none());
-    assert!(store.notes(&id).expect("notes").is_empty());
+    assert!(store.cards(&id).expect("cards").is_empty());
 }
 
 #[test]
@@ -93,22 +95,4 @@ fn a_project_carries_its_workspace_colour() {
     let listed = store.projects().expect("list");
     assert_eq!(listed[0].accent, DEFAULT_ACCENT);
     assert_eq!(listed[0].name, "project");
-}
-
-#[test]
-fn notes_belong_to_their_project_and_come_back_newest_first() {
-    let (dir, store) = store();
-    let root = dir.path().join("project");
-    std::fs::create_dir_all(&root).expect("create");
-    let id = store.add_project(&root, None).expect("add");
-
-    store.add_note(&id, "first").expect("note");
-    store.add_note(&id, "second").expect("note");
-
-    let notes = store.notes(&id).expect("notes");
-    assert_eq!(notes.len(), 2);
-    // Same-second inserts tie on created_at, so both orders are valid
-    // here; what must hold is that neither leaks into another project.
-    assert!(notes.iter().all(|note| !note.body.is_empty()));
-    assert!(store.notes("prj_other").expect("notes").is_empty());
 }

@@ -4,12 +4,10 @@ use super::*;
 
 /// Checked against the database: a table renamed in the SQL without going
 /// through this test is a migration that breaks whoever has data.
-const EXPECTED: [&str; 12] = [
+const EXPECTED: [&str; 10] = [
     "trust_workspace",
     "project",
-    "scratch",
     "project_plugin",
-    "event",
     "pane_layout",
     "preference",
     "board_column",
@@ -59,7 +57,7 @@ fn syncable_resources_are_born_with_a_revision() {
     let dir = tempfile::tempdir().expect("tempdir");
     let store = Store::open(&dir.path().join("state.db")).expect("open");
 
-    for table in ["project", "scratch", "project_plugin", "trust_workspace"] {
+    for table in ["project", "project_plugin", "trust_workspace"] {
         let has_revision = store
             .conn()
             .prepare(&format!("SELECT * FROM pragma_table_info('{table}')"))

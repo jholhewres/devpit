@@ -51,8 +51,7 @@ pub use discard::discard;
 pub use front::{changed_since, diff_file, diff_since, head_of, remove_front, unsaved_in};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
-    assignable, branch_for, create, disk_usage, orphans, remove, uncommitted, worktree_home, Loss,
-    Made,
+    assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,
 };
 pub use log::{history, show};
 pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};

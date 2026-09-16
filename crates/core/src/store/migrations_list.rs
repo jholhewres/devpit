@@ -508,4 +508,20 @@ CREATE INDEX card_chat_card ON card_chat(card_id, created_at);
 ALTER TABLE session_link ADD COLUMN profile_id TEXT;
 "#,
     },
+    // Migration 016 — two tables nothing ever read.
+    Migration {
+        version: 16,
+        sql: r#"
+-- `event` was a feed nobody wrote to and nobody drew, and `scratch` was the
+-- notes behind two commands the window never called. Both were in the first
+-- migration and neither ever held a row on anybody's machine.
+--
+-- Destructive, and it has no downgrade. That costs nothing today: no release
+-- has been published, so there is no older devpit to go back to. The day one
+-- exists, a table is dropped in a release of its own, one version after the
+-- code that stopped writing to it.
+DROP TABLE IF EXISTS event;
+DROP TABLE IF EXISTS scratch;
+"#,
+    },
 ];

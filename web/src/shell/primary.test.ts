@@ -78,9 +78,13 @@ describe('the one button at the top', () => {
 })
 
 describe('line counts', () => {
+  /* Against the runtime's own formatting and not against "6,624": what this
+     holds is that the window groups thousands in the reader's language, and a
+     test that spelled out one language would be asking for the opposite. */
   it('groups thousands, so six thousand does not read as six hundred', () => {
-    expect(counted(6624)).toBe('6,624')
-    expect(counted(241)).toBe('241')
+    expect(counted(6624)).toBe((6624).toLocaleString())
+    expect(counted(6624).length).toBeGreaterThan('6624'.length)
+    expect(counted(241)).toBe((241).toLocaleString())
     expect(counted(0)).toBe('0')
   })
 })

@@ -67,7 +67,11 @@ fn a_real_background_session_can_be_started_and_stopped() {
         "a live session never named a state"
     );
 
-    stop(&short).expect("stop");
+    // Straight to the CLI: devpit itself never stops a background session —
+    // they outlive the window on purpose — so there is no wrapper to call.
+    let _ = std::process::Command::new(PROGRAM)
+        .args(["stop", &short])
+        .output();
 }
 
 /// Runs against the installed binary, and steps aside when there is none

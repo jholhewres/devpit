@@ -8,7 +8,6 @@ mod cards;
 mod folders;
 mod layouts;
 mod migrations;
-mod notes;
 pub mod pane_agents;
 mod plugins;
 pub mod project_runs;
@@ -53,7 +52,6 @@ pub use session_links::SessionLink;
 pub mod limits {
     pub use crate::store::cards::{LONGEST_COMMENT, LONGEST_LABEL, NOTICES_KEPT};
 }
-pub use notes::NoteRow;
 pub use plugins::{DRAWINGS_PLUGIN, DRAWING_EXTENSION};
 pub use projects::ProjectRow;
 pub use settings::key as preference;

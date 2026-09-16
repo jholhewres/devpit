@@ -56,7 +56,13 @@ export function primary(changes: readonly Change[], message: string): Primary {
   return { doing: 'commit', label: `Commit ${staged}`, why: null, disabled: false, files: staged }
 }
 
-/** Thousands, so six thousand lines does not read as six hundred. */
+/**
+ * Thousands, so six thousand lines does not read as six hundred.
+ *
+ * In whatever the window's locale is: a thousand separator is one of the few
+ * things a person reads without looking, and `en-US` was hardcoded here for
+ * no reason but the machine it was written on.
+ */
 export function counted(lines: number): string {
-  return lines.toLocaleString('en-US')
+  return lines.toLocaleString()
 }

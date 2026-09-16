@@ -131,17 +131,6 @@ fn what_is_uncommitted_is_counted_in_files_and_lines() {
 }
 
 #[test]
-fn a_folder_no_card_claims_is_an_orphan() {
-    let home = tempfile::tempdir().expect("tempdir");
-    let project = home.path().join("worktrees").join("proj");
-    std::fs::create_dir_all(project.join("card_kept")).expect("create");
-    std::fs::create_dir_all(project.join("card_gone")).expect("create");
-
-    let found = orphans(home.path(), "proj", &["card_kept".to_owned()]);
-    assert_eq!(found, vec![project.join("card_gone")]);
-}
-
-#[test]
 fn disk_usage_counts_what_is_in_the_folder() {
     let dir = tempfile::tempdir().expect("tempdir");
     std::fs::create_dir_all(dir.path().join("deep")).expect("create");

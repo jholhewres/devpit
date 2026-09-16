@@ -34,7 +34,7 @@ pub use schema::validates;
 pub use sources::seed_sources;
 // `start_background` and the argv builders live in this module.
 pub use session::{AgentSession, Kind, Status};
-pub use transcript::{read_cost, transcript_path, Cost};
+pub use transcript::transcript_path;
 
 use std::path::Path;
 use std::process::Command;
@@ -268,39 +268,6 @@ pub fn headless_argv(
         argv.push(id.to_owned());
     }
     argv
-}
-
-/// The recent terminal output of a background session, without attaching.
-///
-/// This is how a card stays honest about a session nobody is watching.
-pub fn logs(short_id: &str) -> Result<String, AgentError> {
-    run(&["logs", short_id])
-}
-
-pub fn stop(short_id: &str) -> Result<(), AgentError> {
-    run(&["stop", short_id]).map(|_| ())
-}
-
-pub fn remove(short_id: &str) -> Result<(), AgentError> {
-    run(&["rm", short_id]).map(|_| ())
-}
-
-pub fn respawn(short_id: &str) -> Result<(), AgentError> {
-    run(&["respawn", short_id]).map(|_| ())
-}
-
-fn run(args: &[&str]) -> Result<String, AgentError> {
-    let output = Command::new(PROGRAM)
-        .args(args)
-        .output()
-        .map_err(|_| AgentError::NotInstalled)?;
-    if !output.status.success() {
-        return Err(AgentError::Failed {
-            command: args.join(" "),
-            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
-        });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 #[cfg(test)]

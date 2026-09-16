@@ -197,23 +197,3 @@ pub fn disk_usage(path: &Path) -> u64 {
     }
     walk(path, 0)
 }
-
-/// Worktree folders under a project's home that no card claims any more.
-///
-/// The folder's name is the card id, so the comparison is a set difference
-/// and not a guess.
-pub fn orphans(home: &Path, project_id: &str, cards: &[String]) -> Vec<PathBuf> {
-    let dir = home.join("worktrees").join(project_id);
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return Vec::new();
-    };
-    entries
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
-        .filter(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            !cards.contains(&name)
-        })
-        .map(|entry| entry.path())
-        .collect()
-}

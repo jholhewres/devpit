@@ -77,8 +77,9 @@ pub(crate) fn tmux_server() -> Result<devpit_tmux::Server, RpcError> {
 ///
 /// A Unix socket path is capped at ~108 bytes by `sun_path`, and going over it
 /// fails at connect time with "File name too long" — a symptom that points
-/// nowhere near the decision that caused it. `the_tmux_socket_path_stays_short`
-/// fails if this ever grows.
+/// nowhere near the decision that caused it. Which is why it hangs off the
+/// state root and not off a project's directory, whose name is somebody's
+/// folder and as long as they like.
 fn socket_path() -> Result<PathBuf, RpcError> {
     Ok(Store::root()?.join("tmux.sock"))
 }

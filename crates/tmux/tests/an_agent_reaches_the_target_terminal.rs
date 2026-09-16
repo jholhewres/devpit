@@ -91,7 +91,8 @@ fn a_session_typed_into_the_target_pane_attaches_to_it() {
         }
     }
 
-    let _ = devpit_agentcli::stop(&short);
+    // The session goes with the server: this test runs its own, on its own
+    // socket, and killing it takes every pane and every process in them.
     let _ = Command::new("tmux")
         .args(["-S", socket.to_str().expect("utf-8"), "kill-server"])
         .output();
