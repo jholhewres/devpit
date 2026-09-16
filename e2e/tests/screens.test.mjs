@@ -18,6 +18,7 @@ import { openCardMenu, press } from '../lib/drive.mjs'
 import { invoke, seedBoard } from '../lib/seed.mjs'
 import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
 import {
+  boxOf,
   complaints,
   landmark,
   overflowsSideways,
@@ -51,8 +52,13 @@ after(async () => {
 })
 
 /** What every screen owes, whatever else it shows: its own landmarks, by role
- *  or label and on screen, and a picture that is not blank. */
-async function sound(name, landmarks) {
+ *  or label and on screen, and a picture of *itself* that is not blank.
+ *
+ *  `container` is what the ink is measured over. Without it the count covered
+ *  the whole window, where the sidebar and the title bar alone are past the
+ *  threshold — a board panel painted with its own background read 4.9% and
+ *  passed. */
+async function sound(name, landmarks, container) {
   const said = await complaints(window)
   assert.deepEqual(said.errors, [], `${name} wrote to console.error`)
   assert.deepEqual(said.policy, [], `${name} violated the content policy`)
@@ -68,9 +74,12 @@ async function sound(name, landmarks) {
     assert.ok(await landmark(window, selector), `${name} has no ${selector} on screen`)
   }
 
-  // Measured from the screenshot's pixels: a blank window is 0%, the darkest
-  // real screen here about 3.5%.
-  const { ink } = await shoot(window, name)
+  // Measured from the screenshot's pixels, inside this screen's own container:
+  // a blank panel is 0%, the darkest real screen here about 3.5%.
+  assert.ok(container, `${name} names no container, so the ink would cover the chrome too`)
+  const crop = await boxOf(window, container)
+  assert.ok(crop, `${name} has no ${container} with a size to measure`)
+  const { ink } = await shoot(window, name, crop)
   assert.ok(ink > 0.02, `${name} is ${(ink * 100).toFixed(1)}% drawn on — it looks blank`)
 }
 
@@ -152,7 +161,7 @@ describe('the screens', () => {
     assert.match(said, /Name the socket/)
     // The lane that was given a step says so, rather than "no step".
     assert.match(said, /tests/)
-    await sound('board', ['[role="textbox"][aria-label="inbox name"]', '[data-card]'])
+    await sound('board', ['[role="textbox"][aria-label="inbox name"]', '[data-card]'], '.board')
   })
 
   test('an open card shows its body and its comment', async () => {
@@ -165,7 +174,7 @@ describe('the screens', () => {
     assert.match(said, /drops the last line/)
     assert.match(said, /Reproduced on a file of one line/)
     assert.equal(await valueOf('Title'), 'Fix the parser', 'the open card is not the one asked for')
-    await sound('card', ['[role="dialog"][aria-label="Card"]'])
+    await sound('card', ['[role="dialog"][aria-label="Card"]'], '[role="dialog"][aria-label="Card"]')
     await closeSettings()
   })
 
@@ -185,7 +194,7 @@ describe('the screens', () => {
       return it?.getAttribute('aria-checked') ?? null
     })
     assert.equal(checked, 'false', 'the switch does not show what the store holds')
-    await sound('settings-general', ['[role="switch"][aria-checked="false"]'])
+    await sound('settings-general', ['[role="switch"][aria-checked="false"]'], '.prefs__in:not([hidden])')
     await invoke(window, 'settings_write', { theme: null, automaticUpdates: true, confirmStop: null, terminalContrast: null })
   })
 
@@ -205,7 +214,7 @@ describe('the screens', () => {
       return open?.innerText ?? null
     })
     assert.equal(heading, 'Usage', 'the settings pane in front is not Usage')
-    await sound('usage', ['.prefs__in:not([hidden]) h1'])
+    await sound('usage', ['.prefs__in:not([hidden]) h1'], '.prefs__in:not([hidden])')
     await closeSettings()
   })
 
@@ -220,7 +229,11 @@ describe('the screens', () => {
     await field.sendKeys(Key.ENTER)
     await settle(1000)
     // The pane's own controls: the word is in the sidebar whatever is open.
-    await sound('capabilities', ['[aria-label="Close Capabilities"]', '[aria-label="Search capabilities"]'])
+    await sound(
+      'capabilities',
+      ['[aria-label="Close Capabilities"]', '[aria-label="Search capabilities"]'],
+      '.panes',
+    )
   })
 
   /* The feed is a file in the seeded home saying 99.0.0. The card must offer
@@ -236,7 +249,11 @@ describe('the screens', () => {
     assert.match(said, /devpit 99\.0\.0 is ready\./)
     assert.match(said, /Your terminals keep running/)
     assert.match(said, /test feed/)
-    await sound('update-available', ['[role="status"][aria-label="Update"]', '.upd__tag'])
+    await sound(
+      'update-available',
+      ['[role="status"][aria-label="Update"]', '.upd__tag'],
+      '[role="status"][aria-label="Update"]',
+    )
 
     const buttons = await window.findElements(By.xpath("//button[normalize-space()='Update']"))
     await buttons[0].click()
@@ -248,6 +265,10 @@ describe('the screens', () => {
     // Still marked as a test feed: a refusal that loses the tag reads like a
     // real update that failed.
     assert.ok(await landmark(window, '.upd__tag'), 'the test feed tag went away with the refusal')
-    await sound('update-refused', ['[role="status"][aria-label="Update"]', '.upd__tag'])
+    await sound(
+      'update-refused',
+      ['[role="status"][aria-label="Update"]', '.upd__tag'],
+      '[role="status"][aria-label="Update"]',
+    )
   })
 })
