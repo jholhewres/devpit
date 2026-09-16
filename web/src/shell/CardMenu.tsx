@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 
 import type { Card, Played } from '../gen/bindings'
 import { CardEnding, deleteBody, type Ending } from './CardHeader'
-import { cardMenu } from './cardMenu'
+import { cardMenu, menuFocus } from './cardMenu'
 import { RunConfirm } from './Lane'
 import { LanePicker } from './LanePicker'
 import { abandoned } from './typing'
@@ -35,12 +35,15 @@ export function CardMenu({
   acts,
   lanes,
   startPicking,
+  startArchiving,
   onClose,
 }: {
   card: Card
   stepName?: string
   /** Opened by Ctrl/⌘+M: straight to the lanes. */
   startPicking?: boolean
+  /** Opened by Delete: straight to the question Archive asks. */
+  startArchiving?: boolean
   /** The other lanes, for Move to…. */
   lanes: readonly { id: string; name: string }[]
   at: { readonly x: number; readonly y: number }
@@ -48,7 +51,7 @@ export function CardMenu({
   onClose: () => void
 }): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
-  const [ending, setEnding] = useState<Ending | null>(null)
+  const [ending, setEnding] = useState<Ending | null>(startArchiving ? { what: 'archive' } : null)
   const [running, setRunning] = useState(false)
   const [picking, setPicking] = useState(startPicking ?? false)
   const [live, setLive] = useState<LiveWork | null>(null)
@@ -85,6 +88,22 @@ export function CardMenu({
       window.removeEventListener('blur', onClose)
     }
   }, [listing, onClose])
+
+  /* The keyboard goes where the menu is, and back where it was once the menu
+     goes. Ctrl+M left it on the tile: Tab walked the board, Enter opened the card. */
+  const cameFrom = useRef(document.activeElement)
+  useLayoutEffect(() => {
+    if (listing) box.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+  }, [listing, picking])
+  useEffect(() => {
+    const back = cameFrom.current
+    return () => {
+      /* Only when the focus went down with the menu: an entry that opened a
+         field has put the keyboard where it belongs. */
+      const lost = document.activeElement === null || document.activeElement === document.body
+      if (lost && back instanceof HTMLElement && back.isConnected) back.focus()
+    }
+  }, [])
 
   /* Nudged back inside the window, like the shell's own context menu. */
   useLayoutEffect(() => {
@@ -130,7 +149,20 @@ export function CardMenu({
   return createPortal(
     <div onPointerDown={stay} onKeyDown={stay}>
       {listing && (
-        <div className="ctx" ref={box} role="menu" aria-label={`${card.title} actions`} style={{ left: at.x, top: at.y }}>
+        <div
+          className="ctx"
+          ref={box}
+          role="menu"
+          aria-label={`${card.title} actions`}
+          style={{ left: at.x, top: at.y }}
+          onKeyDown={(event) => {
+            const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+            const next = menuFocus(event.key, items.indexOf(document.activeElement as HTMLElement), items.length)
+            if (next === null) return
+            event.preventDefault()
+            items[next]?.focus()
+          }}
+        >
           {picking ? (
             <LanePicker
               lanes={lanes}
@@ -165,7 +197,9 @@ export function CardMenu({
       {running && (
         <RunConfirm stepName={stepName} onClose={onClose} onConfirm={() => void play?.(true).then(onClose)} />
       )}
-      {ending && (
+      {/* Not before the live work is read: the plain question would archive
+          a card with an agent still working in its terminal. */}
+      {ending && live && (
         <CardEnding
           ending={ending}
           detail={null}

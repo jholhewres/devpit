@@ -50,7 +50,7 @@ export function LaneCards({
   onDoing?: (card: Card) => void
 }): React.JSX.Element {
   const { held, landing, landed } = drag
-  const [menu, setMenu] = useState<{ card: Card; x: number; y: number; picking?: boolean } | null>(null)
+  const [menu, setMenu] = useState<{ card: Card; x: number; y: number; picking?: boolean; archiving?: boolean } | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const playFor = (card: Card) =>
     playable(card, lane.column) ? (confirmed: boolean) => onPlay(card.id, confirmed) : undefined
@@ -83,12 +83,11 @@ export function LaneCards({
               event.preventDefault()
               if (action === 'open') onOpen(card.id)
               if (action === 'rename') setRenaming(card.id)
-              if (action === 'archive') {
-                const hands = acts(card)
-                void hands.archive(false).then((refused) => (refused ? hands.problem(refused) : hands.archived()))
-              }
+              const box = event.currentTarget.getBoundingClientRect()
+              /* Delete asks what the menu's Archive asks: whether to stop the
+                 work still going, and again when the archive is refused. */
+              if (action === 'archive') setMenu({ card, x: box.left, y: box.bottom, archiving: true })
               if (action === 'moveTo' && others.length > 0) {
-                const box = event.currentTarget.getBoundingClientRect()
                 setMenu({ card, x: box.left, y: box.bottom, picking: true })
               }
             }}
@@ -113,9 +112,10 @@ export function LaneCards({
 
       {menu && (
         <CardMenu
-          key={`${menu.card.id}${menu.picking ? ':picking' : ''}`}
+          key={`${menu.card.id}${menu.picking ? ':picking' : ''}${menu.archiving ? ':archiving' : ''}`}
           card={menu.card}
           startPicking={menu.picking}
+          startArchiving={menu.archiving}
           stepName={lane.column.step?.name}
           at={menu}
           acts={{

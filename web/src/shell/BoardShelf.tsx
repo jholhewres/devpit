@@ -77,8 +77,9 @@ export function ArchivedPane({
   useEffect(load, [load])
 
   useEffect(() => {
+    /* A question over the list hears Escape first, as it does over a card. */
     const key = (event: KeyboardEvent): void => {
-      if (abandoned(event)) onClose()
+      if (abandoned(event) && document.querySelector('.ask') === null) onClose()
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)

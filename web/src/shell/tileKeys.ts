@@ -24,8 +24,13 @@ export function tileAction(event: {
   readonly isComposing?: boolean
   readonly nativeEvent?: { readonly isComposing?: boolean }
   readonly keyCode?: number
+  readonly target?: unknown
+  readonly currentTarget?: unknown
 }): TileAction | null {
   if (composing(event)) return null
+  /* A key on a button inside the tile is that button's: Enter on the play
+     button plays, and Delete there is not an archive. */
+  if (event.target !== event.currentTarget) return null
   if (event.key === 'Enter' || event.key === ' ') return 'open'
   if (event.key === 'F2') return 'rename'
   if (event.key === 'Delete') return 'archive'

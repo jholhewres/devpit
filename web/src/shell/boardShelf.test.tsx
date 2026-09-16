@@ -48,6 +48,15 @@ describe('the archived cards', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(deleted).toHaveBeenCalledWith('card_a', false))
   })
+
+  it('closes only the question on Escape, not the list under it', async () => {
+    const onClose = vi.fn()
+    render(<ArchivedPane projectId="p1" onClose={onClose} onChanged={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete…' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByText('Delete this card?')).toBeNull())
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })
 
 describe('undo after an archive', () => {

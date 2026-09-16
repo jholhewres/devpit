@@ -161,9 +161,21 @@ describe('a card on the board', () => {
 
     rightClick(container)
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete…' }))
-    expect(screen.getByText(/Its 2 comments, 1 pinned file and 0 runs go with it/)).toBeTruthy()
+    expect(await screen.findByText(/Its 2 comments, 1 pinned file and 0 runs go with it/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(remove).toHaveBeenCalledWith(false))
+  })
+
+  it('does not ask to archive until it knows what is still going on the card', async () => {
+    let read = (_live: { tabs: string[]; runs: string[] }): void => undefined
+    const liveWork = vi.fn(() => new Promise<{ tabs: string[]; runs: string[] }>((resolve) => (read = resolve)))
+    const { container } = board({ acts: acts({ liveWork }) })
+    rightClick(container)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    read({ tabs: ['tab_1'], runs: [] })
+    expect(await screen.findByRole('button', { name: 'Stop it and archive' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull()
   })
 
   describe('moving a card from its menu', () => {
@@ -192,5 +204,11 @@ describe('copying a branch', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     expect(await copyBranch('p1', 'card_1')).toBeNull()
     expect(writeText).toHaveBeenCalledWith('devpit/wire-the-board')
+  })
+
+  it('says so when the clipboard refuses, rather than throwing it away', async () => {
+    const writeText = vi.fn(() => Promise.reject(new Error('NotAllowedError')))
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    expect(await copyBranch('p1', 'card_1')).toMatch(/devpit\/wire-the-board/)
   })
 })

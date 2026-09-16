@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { Card, DeleteRefusal } from '../gen/bindings'
+import type { Card, Column, DeleteRefusal } from '../gen/bindings'
 import type { Lane } from './board'
-import { cardMenu } from './cardMenu'
+import { cardMenu, menuFocus } from './cardMenu'
 import { LaneCards } from './LaneCards'
 import { keyLabel, tileAction, type TileAction } from './tileKeys'
 import type { CardBoardActs } from './useCardActs'
@@ -42,6 +42,13 @@ describe('the keys a tile answers to', () => {
     expect(tileAction({ key: 'Enter', isComposing: true })).toBeNull()
   })
 
+  it('leaves a key pressed on a button inside the tile to that button', () => {
+    const tile = {}
+    expect(tileAction({ key: 'Enter', target: tile, currentTarget: tile })).toBe('open')
+    expect(tileAction({ key: 'Enter', target: {}, currentTarget: tile })).toBeNull()
+    expect(tileAction({ key: 'Delete', target: {}, currentTarget: tile })).toBeNull()
+  })
+
   it('are the labels the menu shows, each on the entry it performs', () => {
     const entries = cardMenu({
       open: vi.fn(),
@@ -73,8 +80,9 @@ describe('a focused tile', () => {
     ...over,
   })
 
-  const board = (hands: CardBoardActs, onOpen = vi.fn()) => {
-    const lane = { column: { id: 'col_1', name: 'Todo', position: 0, step: null, onPass: null, autonomy: 'manual' }, cards: [card] } as Lane
+  const board = (hands: CardBoardActs, onOpen = vi.fn(), over: { step?: Column['step']; onPlay?: () => Promise<null> } = {}) => {
+    const column: Column = { id: 'col_1', name: 'Todo', position: 0, step: over.step ?? null, onPass: null, autonomy: 'manual' }
+    const lane = { column, cards: [card] } as Lane
     const view = render(
       <LaneCards
         lane={lane}
@@ -82,9 +90,9 @@ describe('a focused tile', () => {
         dropping={false}
         progress={{}}
         onOpen={onOpen}
-        onPlay={vi.fn(() => Promise.resolve(null))}
+        onPlay={over.onPlay ?? vi.fn(() => Promise.resolve(null))}
         onRename={vi.fn()}
-        others={[{ id: 'col_2', name: 'Doing' }]}
+        others={[{ id: 'col_2', name: 'Doing' }, { id: 'col_3', name: 'Done' }]}
         onMove={vi.fn()}
         acts={() => hands}
       />,
@@ -103,15 +111,65 @@ describe('a focused tile', () => {
     expect(screen.getByRole('textbox', { name: 'Card title' })).toBeTruthy()
   })
 
-  it('archives on Delete, and the board offers undo', async () => {
+  it('archives on Delete once asked, and the board offers undo', async () => {
     const hands = acts()
     fireEvent.keyDown(board(hands), { key: 'Delete' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Archive' }))
     await waitFor(() => expect(hands.archived).toHaveBeenCalled())
     expect(hands.archive).toHaveBeenCalledWith(false)
   })
 
+  it('asks on Delete what the menu asks: to stop the work still going, and again when the archive is refused', async () => {
+    const archive = vi.fn((force: boolean) => Promise.resolve(force ? null : '3 changes in /w that nothing has saved — archive anyway?'))
+    const hands = acts({ archive, liveWork: vi.fn(() => Promise.resolve({ tabs: ['tab_1'], runs: [] })) })
+    fireEvent.keyDown(board(hands), { key: 'Delete' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop it and archive' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Archive anyway' }))
+    await waitFor(() => expect(hands.archived).toHaveBeenCalled())
+    expect(hands.stopLive).toHaveBeenCalled()
+    expect(archive.mock.calls).toEqual([[false], [true]])
+    expect(hands.problem).not.toHaveBeenCalled()
+  })
+
+  it('leaves Enter and Delete on its play button to the button', async () => {
+    const onOpen = vi.fn()
+    const onPlay = vi.fn(() => Promise.resolve(null))
+    const step = { id: 'step_1', kind: 'command', name: 'tests', config: '{}', irreversible: false } as Column['step']
+    const tile = board(acts(), onOpen, { step, onPlay })
+    const play = within(tile).getByRole('button', { name: 'Run tests' })
+    fireEvent.keyDown(play, { key: 'Enter' })
+    fireEvent.keyDown(play, { key: 'Delete' })
+    expect(onOpen).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull())
+  })
+
   it('opens the lanes to move to on Ctrl+M', () => {
     fireEvent.keyDown(board(acts()), { key: 'm', ctrlKey: true })
-    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Doing'])
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Doing', 'Done'])
+  })
+
+  it('puts the keyboard in the lanes on Ctrl+M, walks them with the arrows, and gives it back on Escape', () => {
+    const tile = board(acts())
+    tile.focus()
+    fireEvent.keyDown(tile, { key: 'm', ctrlKey: true })
+    expect(document.activeElement?.textContent).toBe('Doing')
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(document.activeElement?.textContent).toBe('Done')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(tile)
+  })
+})
+
+describe('the keys a card menu answers to', () => {
+  it('walk its entries without wrapping, and jump to either end', () => {
+    expect(menuFocus('ArrowDown', 0, 3)).toBe(1)
+    expect(menuFocus('ArrowDown', 2, 3)).toBe(2)
+    expect(menuFocus('ArrowUp', 0, 3)).toBe(0)
+    expect(menuFocus('ArrowDown', -1, 3)).toBe(0)
+    expect(menuFocus('Home', 2, 3)).toBe(0)
+    expect(menuFocus('End', 0, 3)).toBe(2)
+    expect(menuFocus('Enter', 0, 3)).toBeNull()
+    expect(menuFocus('ArrowDown', -1, 0)).toBeNull()
   })
 })
