@@ -18,6 +18,11 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-24.04
+    # Bounded, because an e2e that hangs is the one failure mode this suite
+    # has: a window that never comes up leaves `tauri-driver` waiting, and
+    # without this the job sat for the six-hour default. The release build is
+    # the slow part and lands inside twenty-five minutes on a cold cache.
+    timeout-minutes: 60
     steps:
       # Pinned like release.yml's: this also runs inside the release.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
