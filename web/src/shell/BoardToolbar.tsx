@@ -5,6 +5,7 @@ import { ArchivedPane, UndoArchive } from './BoardShelf'
 import { InlineAdd } from './InlineAdd'
 import { ask, commands } from './live'
 import { RunsPane } from './RunsPane'
+import { useShell } from './useShell'
 
 /*
  * The board's toolbar: what to show, and what sits beside the lanes.
@@ -53,6 +54,16 @@ export function BoardToolbar({
   onAddColumn: (name: string) => void
 }): React.JSX.Element | null {
   const [showing, setShowing] = useState<'runs' | 'archived' | null>(null)
+  const { wantedChecks, openChecks } = useShell()
+
+  /* The sidebar asks and the board answers: the row is over there and the
+     list opens here. Cleared as it opens, so a second click opens it again
+     after somebody closes it. */
+  useEffect(() => {
+    if (!wantedChecks) return
+    setShowing('runs')
+    openChecks(false)
+  }, [wantedChecks, openChecks])
   const [count, setCount] = useState<number | null>(null)
   /* Counted again when a card is archived, restored or deleted from the list. */
   const [counted, setCounted] = useState(0)

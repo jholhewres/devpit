@@ -131,3 +131,14 @@
 /* The state is the control that opens the rest: the word a person is already
    looking at to ask "what happened", rather than a second thing beside it. */
 button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+
+/* Narrow: the row stops being a line and becomes a stack, so what a run
+   proves is read at full width rather than squeezed into the column the cost
+   left over. The detail is already under the row rather than beside it, so
+   nothing has to be swapped out and there is nothing to go back from. */
+@media (max-width: 640px) {
+  .crun { flex-wrap: wrap; }
+  .crun__b { flex-basis: 100%; }
+  .chk__ran { grid-template-columns: 1fr; gap: 1px 0; }
+  .chk__ran dt { margin-top: 5px; }
+}

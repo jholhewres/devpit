@@ -5,7 +5,7 @@ import type { Lane } from './board'
 import { money } from './chat'
 import { Checked } from './Checked'
 import { ask, commands } from './live'
-import { asQuery, STATES, type RunFilters } from './runs'
+import { asQuery, emptyBecause, STATES, type RunFilters } from './runs'
 import { abandoned } from './typing'
 
 /*
@@ -68,6 +68,9 @@ export function RunsPane({
   }, [onClose])
 
   const stepped = lanes.filter((lane) => lane.column.step)
+  /* Three empties, three sentences: nothing configured, nothing run yet, and
+     nothing behind the filter somebody set. */
+  const empty = emptyBecause(stepped.length, filters, runs.length === 0 && !loading && !error)
 
   return (
     <div className="cardp" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()}>
@@ -116,7 +119,16 @@ export function RunsPane({
         </div>
 
         {error && <p className="wtb__no">{error}</p>}
-        {runs.length === 0 && !loading && !error && <p className="runsp__none">No runs match.</p>}
+        {empty === 'noChecks' && (
+          <p className="runsp__none">
+            No checks configured. A lane with a command step is what runs your tests, your build
+            or your deploy — add one to the board and its runs land here.
+          </p>
+        )}
+        {empty === 'nothingRan' && (
+          <p className="runsp__none">Nothing has run yet. Move a card into a lane that runs something.</p>
+        )}
+        {empty === 'noneMatch' && <p className="runsp__none">No runs match.</p>}
         {runs.map(({ run, cardId, cardTitle }) => (
           <div className="crun" key={run.id} data-state={run.state}>
             <span className="crun__b">

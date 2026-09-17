@@ -123,6 +123,15 @@ export interface Shell {
   readonly wantedCard: string | null
   openCard: (cardId: string | null) => void
 
+  /** Whether the sidebar has asked for the runs, and the board's job to clear.
+
+      Here for the same reason as `wantedCard`: the row is in the sidebar and
+      the list opens over the board, and neither contains the other. The list
+      itself stays where it was — this asks for it, it does not hold a second
+      copy of it. */
+  readonly wantedChecks: boolean
+  openChecks: (wanted: boolean) => void
+
   /** The one field over the window. Here rather than in the window's own
       state because three things open it — the sidebar's Search, ⌘K, and the
       plus at the end of the strip — and two of them are not the window. */

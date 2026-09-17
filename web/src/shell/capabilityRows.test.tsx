@@ -50,6 +50,7 @@ const shell = {
   close: vi.fn(),
   closeNow: vi.fn(),
   openPrefs: vi.fn(),
+  openChecks: vi.fn(),
   signOut: vi.fn(),
   account: { initials: 'JH', name: 'Jhol', email: null },
 }
@@ -57,6 +58,7 @@ vi.mock('./useShell', () => ({ useShell: () => shell }))
 
 beforeEach(() => {
   shell.show.mockClear()
+  shell.openChecks.mockClear()
   listed.mockClear()
   catalogue = { plugins: [] }
 })
@@ -87,7 +89,25 @@ describe('Capabilities in the sidebar', () => {
     sidebar()
     await waitFor(() => expect(item('Excalidraw')).not.toBeNull())
     const nav = document.querySelectorAll('.side__scroll > .act > .act__label, .side__scroll > .newmenu > .act > .act__label')
-    expect([...nav].map((label) => label.textContent)).toEqual(['Board', 'Files', 'Capabilities', 'Excalidraw', 'Resources'])
+    expect([...nav].map((label) => label.textContent)).toEqual([
+      'Board',
+      /* Checks answers a question about the board, so it sits with it. */
+      'Checks',
+      'Files',
+      'Capabilities',
+      'Excalidraw',
+      'Resources',
+    ])
+  })
+
+  /* The row is in the sidebar and the list opens over the board, so the row
+     has to do both: ask for the runs and go where they open. Sabotage: drop
+     the `openChecks` call and the row becomes a second way to open the board. */
+  it('Checks asks for the runs and goes to the board they open over', async () => {
+    sidebar()
+    fireEvent.click(item('Checks')!)
+    expect(shell.openChecks).toHaveBeenCalledWith(true)
+    expect(shell.show).toHaveBeenCalledWith('board')
   })
 
   it('counts the capabilities that are on beside it', async () => {

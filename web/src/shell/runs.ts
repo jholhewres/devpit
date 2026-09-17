@@ -30,3 +30,32 @@ export function asQuery(projectId: string, filters: RunFilters, after: RunCursor
     after,
   }
 }
+
+/** Which empty the runs view is looking at, when it is looking at one. */
+export type Empty = 'noChecks' | 'nothingRan' | 'noneMatch'
+
+/**
+ * The three empties, which are three different sentences.
+ *
+ * A board with no lane that runs anything has nothing to say and something to
+ * offer — configure a step. A board that has one and has never run it is
+ * waiting, not misconfigured. And a filter that matches nothing is neither:
+ * the runs are there, behind the filter the person set.
+ *
+ * Telling them apart matters more than it sounds: "No runs match" on a project
+ * that cannot run anything sends somebody looking for a filter that is not the
+ * problem.
+ */
+export function emptyBecause(
+  checks: number,
+  filters: RunFilters,
+  filtered: boolean,
+): Empty | null {
+  if (!filtered) return null
+  if (checks === 0) return 'noChecks'
+  return narrowed(filters) ? 'noneMatch' : 'nothingRan'
+}
+
+/** Whether anything is narrowing the list. */
+export const narrowed = (filters: RunFilters): boolean =>
+  filters.stepId !== null || filters.state !== null || filters.from !== '' || filters.to !== ''
