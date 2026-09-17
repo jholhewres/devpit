@@ -67,13 +67,21 @@ export async function startDriver({ port = PORT, env = {}, log = null } = {}) {
 
 /** A window on the built binary, from the driver at `port`. */
 export async function openWindow(binary, { port = PORT } = {}) {
-  return new Builder()
+  const window = await new Builder()
     .usingServer(`http://127.0.0.1:${port}`)
     .withCapabilities({
       browserName: 'wry',
       'tauri:options': { application: binary },
     })
     .build()
+
+  // Asked for explicitly, because the driver behind a Tauri window does not
+  // apply the W3C default: an `executeAsyncScript` whose callback is never
+  // called waits forever, and a suite that hangs tells you nothing an hour
+  // later. Thirty seconds is longer than any command in this app takes and
+  // short enough that a stuck one is a failure with a message on it.
+  await window.manage().setTimeouts({ script: 30000, pageLoad: 60000 })
+  return window
 }
 
 /**
