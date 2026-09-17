@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Checked } from '../gen/bindings'
 import { ask, commands } from './live'
 import { CURRENT_MEANS, saidNothing, validityWords, verdictWords, whoseWords } from './checked'
+import { FoundPane } from './Found'
 import { WouldRunCard } from './WouldRun'
 
 /*
@@ -71,6 +72,8 @@ export function Checked({
           {checked.validity === 'current' && ` Current means ${CURRENT_MEANS}.`}
         </span>
       </p>
+
+      <FoundPane runId={runId} />
 
       {/* Two sentences, because they are two facts: one thing can ask for a
           run that another carries out. */}

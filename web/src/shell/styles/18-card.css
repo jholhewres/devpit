@@ -144,3 +144,14 @@ button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font:
 }
 .chk__again { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text-2); cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
 .chk__who { margin: 0 0 4px; font-size: 12px; color: var(--text-3); }
+
+/* What a review found. Severity carries a word as well as a colour, for the
+   same reason the verdict does. */
+.fnd { margin-top: 8px; }
+.fnd__l { list-style: none; margin: 0 0 6px; padding: 0; }
+.fnd__i { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.fnd__s { font-weight: 550; color: var(--text-2); }
+.fnd__s[data-severity='blocking'] { color: var(--danger); }
+.fnd__s[data-severity='worth'] { color: var(--warning); }
+.fnd__w { font-family: var(--mono); font-size: 11px; color: var(--text); overflow-wrap: anywhere; }
+.fnd__y { grid-column: 2; color: var(--text-3); }

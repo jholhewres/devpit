@@ -10,6 +10,7 @@ pub mod agent_config;
 pub mod command;
 pub mod context;
 pub mod recipe;
+pub mod review;
 pub mod session;
 pub mod verdict;
 pub mod what_ran;

@@ -875,6 +875,7 @@ export const commands = {
 	 */
 	settingsFinishOnboarding: () => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_finish_onboarding")),
 	checkpointRead: (runId: string) => typedError<Checked, RpcError>(__TAURI_INVOKE("checkpoint_read", { runId })),
+	checkpointFindings: (runId: string) => typedError<Found, RpcError>(__TAURI_INVOKE("checkpoint_findings", { runId })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
 	/**  `plugin.list` — the catalogue, and what this project has on. */
 	pluginList: (projectId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_list", { projectId })),
@@ -1528,6 +1529,40 @@ export type FileSaved = {
 	path: string,
 	bytes: number | null,
 	readAt: number | null,
+};
+
+/**  One thing a review found. */
+export type Finding = {
+	/**  Relative to the checkout the review ran in. */
+	file: string,
+	/**
+	 *  1-based, as an editor counts. `None` for a finding about the file
+	 *  rather than a place in it.
+	 */
+	line: number | null,
+	severity: Severity,
+	/**
+	 *  Why this is a finding. Empty is refused: a finding nobody can evaluate
+	 *  is a claim, not a finding.
+	 */
+	why: string,
+};
+
+/**
+ *  A review as the screen reads it: what it found, and whether it still
+ *  points where it says.
+ */
+export type Found = {
+	findings: Finding[],
+	standing: Standing,
+	/**  The revision the review was made against. */
+	atRevision: string | null,
+	/**
+	 *  The revision the code is at now. Both are shown when they differ: a
+	 *  person reading an outdated review needs to know which two.
+	 */
+	now: string | null,
+	rubric: string | null,
 };
 
 /**  What the stream carries, one frame at a time. */
@@ -2441,6 +2476,20 @@ export type Settings = {
 	focusMode: boolean | null,
 };
 
+/**
+ *  How much a finding is claimed to matter.
+ * 
+ *  A closed set, and small. Seven levels is a scale nobody agrees on twice,
+ *  and a review's job is to be acted on rather than scored.
+ */
+export type Severity = 
+/**  Would break something if it shipped. */
+"blocking" | 
+/**  Worth fixing, not worth stopping for. */
+"worth" | 
+/**  Said for the record. */
+"noted";
+
 /**  A sign-in that has started but not finished. */
 export type SignIn = {
 	/**
@@ -2612,6 +2661,18 @@ export type SpendShare = {
 
 /**  Orca's names: horizontal is left/right, vertical is top/bottom. */
 export type SplitDirection = "horizontal" | "vertical";
+
+/**  Whether a finding is still about the code in front of you. */
+export type Standing = 
+/**  Made against the revision that is checked out. */
+"current" | 
+/**
+ *  Made against another. The line number is not re-pointed, and the
+ *  screen says which revision it meant.
+ */
+"outdated" | 
+/**  Nothing recorded which revision it was made against. */
+"unanchored";
 
 export type Step = {
 	id: string,

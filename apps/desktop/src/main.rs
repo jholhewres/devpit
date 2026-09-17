@@ -33,6 +33,7 @@ mod chat_running;
 mod chat_turn;
 mod checkout;
 mod checkpoint;
+mod checkpoint_findings;
 mod checkpoint_preview;
 #[cfg(any(debug_assertions, test))]
 mod contract;

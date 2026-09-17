@@ -9,20 +9,40 @@
 //! [`devpit_rpc::validity`], which are pure and tested on their own. This
 //! reads the row and asks them.
 
+use devpit_core::store::Evidence;
 use devpit_core::store::{Asked, Carried, Ran, WhoseRun};
 use devpit_core::Store;
-use devpit_rpc::{verdict, Checked, ErrorCode, Report, RpcError, WhatRan, Whose};
+use devpit_rpc::{
+    verdict, Checked, ErrorCode, Report, Review, RpcError, WhatRan, Whose, REVIEW_EVIDENCE,
+};
 
 use crate::still_holds::still_holds;
 
 /// What a run reported, read back out of its evidence.
 ///
-/// `None` until a parser exists — which is the honest state today, and the
-/// reason [`devpit_rpc::verdict`] answers `Inconclusive` for a green command
-/// nobody could read a report from. `.omc/evidence/20/relatorios.md` measured
-/// what this project actually produces; the first parser is the vitest JSON.
-fn reported(_evidence: Option<&str>) -> Option<Report> {
-    None
+/// A review is the one shape devpit writes itself, so it is the one shape this
+/// reads: blocking findings are failures, and a review that found none passed
+/// what it was asked to look for. Nothing else is read yet — a command step's
+/// test report has no parser, which is why [`devpit_rpc::verdict`] answers
+/// `Inconclusive` for a green command. `.omc/evidence/20/relatorios.md`
+/// measured what this project actually produces; the first of those is the
+/// vitest JSON.
+fn reported(evidence: Option<&Evidence>) -> Option<Report> {
+    let evidence = evidence?;
+    if evidence.version != REVIEW_EVIDENCE {
+        // A shape this build does not know is not a shape to read as though it
+        // were the one it does.
+        return None;
+    }
+    let review: Review = serde_json::from_str(&evidence.payload).ok()?;
+    let failed = devpit_rpc::blocking(&review) as u32;
+    Some(Report {
+        // A review that found nothing looked at something: it is one check,
+        // and it passed. A review with blocking findings is one check that
+        // failed, whatever else it also noted.
+        passed: u32::from(failed == 0),
+        failed: u32::from(failed > 0),
+    })
 }
 
 pub(crate) fn checked(store: &Store, run_id: &str) -> Result<Checked, RpcError> {
@@ -35,10 +55,7 @@ pub(crate) fn checked(store: &Store, run_id: &str) -> Result<Checked, RpcError> 
     Ok(Checked {
         run_id: run_id.to_owned(),
         state: crate::board::state_of(&state),
-        verdict: verdict(
-            crate::board::state_of(&state),
-            reported(evidence.as_ref().map(|left| left.payload.as_str())),
-        ),
+        verdict: verdict(crate::board::state_of(&state), reported(evidence.as_ref())),
         validity: still_holds(&ran),
         ran: ran.is_known().then(|| as_read(&ran)),
         evidence_version: evidence.map(|left| left.version as f64),

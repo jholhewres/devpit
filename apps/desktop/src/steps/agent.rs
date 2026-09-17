@@ -130,6 +130,13 @@ pub fn run(
         }
     }
 
+    // A review, if the answer is one. Nothing is inferred: an answer that does
+    // not read as findings leaves no evidence, and the run is what it always
+    // was. `reviewed` refuses a half-read review for the same reason the
+    // schema check above refuses prose — a partial answer acted on as a whole
+    // one is worse than no answer.
+    super::review::kept_as_a_review(store, run_id, &outcome.result, &config.prompt, &cwd);
+
     Ok(Finished {
         ok: !outcome.is_error,
         output: outcome.result,

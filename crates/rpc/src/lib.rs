@@ -23,6 +23,7 @@ pub mod plugin_data;
 pub mod plugins;
 pub mod profile;
 pub mod project;
+pub mod review;
 pub mod runs;
 pub mod search;
 pub mod session;
@@ -62,6 +63,9 @@ pub use profile::{Declared, EnvVar, Profile, Reach};
 pub use project::{
     Change, Commit, FileNode, GitStatus, Project, ProjectChanges, ProjectHistory, ProjectList,
     ProjectTree, Worktree, WorktreeOrigin,
+};
+pub use review::{
+    blocking, reviewed, standing, Finding, Found, Review, Severity, Standing, REVIEW_EVIDENCE,
 };
 pub use runs::{ProjectRun, RunCursor, RunsPage, RunsQuery};
 pub use search::{SearchFile, SearchHits, SearchLine};

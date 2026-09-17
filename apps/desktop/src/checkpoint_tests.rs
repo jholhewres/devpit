@@ -156,3 +156,92 @@ fn a_run_a_process_carried_out_names_no_account() {
     assert_eq!(whose.carried.as_deref(), Some("process"));
     assert_eq!(whose.profile, None);
 }
+
+/// A review with a blocking finding is a check that failed, and the panel says
+/// `Failed` rather than the `Inconclusive` a command with no parser gets.
+///
+/// Sabotage: read a review's findings as a pass and an agent that found a bug
+/// reports green.
+#[test]
+fn a_review_that_found_something_blocking_is_a_failure() {
+    let (_dir, store, run) = a_run_that("ok");
+    store
+        .record_evidence(
+            &run,
+            &devpit_core::store::Evidence {
+                version: devpit_rpc::REVIEW_EVIDENCE,
+                payload: r#"{"findings":[{"file":"a.rs","line":1,"severity":"blocking","why":"x"}],"atRevision":null,"rubric":null}"#.to_owned(),
+            },
+        )
+        .expect("recorded");
+
+    assert_eq!(
+        checked(&store, &run).expect("read").verdict,
+        Verdict::Failed
+    );
+}
+
+#[test]
+fn a_review_that_found_nothing_blocking_is_a_pass() {
+    let (_dir, store, run) = a_run_that("ok");
+    store
+        .record_evidence(
+            &run,
+            &devpit_core::store::Evidence {
+                version: devpit_rpc::REVIEW_EVIDENCE,
+                payload: r#"{"findings":[{"file":"a.rs","line":1,"severity":"noted","why":"x"}],"atRevision":null,"rubric":null}"#.to_owned(),
+            },
+        )
+        .expect("recorded");
+
+    assert_eq!(
+        checked(&store, &run).expect("read").verdict,
+        Verdict::Passed
+    );
+}
+
+/// A shape this build does not know is not a shape to read as though it were
+/// the one it does.
+///
+/// Sabotage: drop the version check and a payload from a later devpit is read
+/// as a review, giving a verdict from fields that mean something else.
+#[test]
+fn evidence_in_a_shape_this_build_does_not_know_gives_no_verdict() {
+    let (_dir, store, run) = a_run_that("ok");
+    store
+        .record_evidence(
+            &run,
+            &devpit_core::store::Evidence {
+                version: devpit_rpc::REVIEW_EVIDENCE + 99,
+                payload: r#"{"findings":[]}"#.to_owned(),
+            },
+        )
+        .expect("recorded");
+
+    assert_eq!(
+        checked(&store, &run).expect("read").verdict,
+        Verdict::Inconclusive
+    );
+}
+
+/// A run that ended badly is not rescued by a review that read clean: the
+/// process said something went wrong, and a review is not a contradiction of
+/// that.
+#[test]
+fn a_review_does_not_rescue_a_run_whose_process_vanished() {
+    let (_dir, store, run) = a_run_that("lost");
+    store
+        .record_evidence(
+            &run,
+            &devpit_core::store::Evidence {
+                version: devpit_rpc::REVIEW_EVIDENCE,
+                payload: r#"{"findings":[],"atRevision":null,"rubric":null}"#.to_owned(),
+            },
+        )
+        .expect("recorded");
+
+    assert_eq!(
+        checked(&store, &run).expect("read").verdict,
+        Verdict::Inconclusive
+    );
+}
