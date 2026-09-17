@@ -8,7 +8,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { appendFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
 import { setTimeout as wait } from 'node:timers/promises'
 
 import { needsXvfb, onPath } from './preflight.mjs'
@@ -49,21 +49,26 @@ export async function startDriver({
   const binary = onPath('tauri-driver') ?? 'tauri-driver'
   const argv = ['--port', String(port), '--native-port', native]
 
-  // The virtual display goes **here**, on the driver, and not on the tests.
-  // The app is the driver's child and GTK is what needs a screen; the tests are
-  // node talking HTTP and need none. Wrapped the other way round, every window
-  // on a machine with no display died with "Failed to initialize GTK" while
-  // the tests sat waiting for one, and the suite spent ten minutes a file
-  // finding that out.
+  // The virtual display belongs to the **driver**, not to the tests: the app
+  // is the driver's child and GTK is what needs a screen, while the tests are
+  // node talking HTTP and need none. Wired the other way round, every window
+  // on a machine without a display died with "Failed to initialize GTK" while
+  // the tests sat waiting for one.
   //
-  // `detached` so the wrapper leads a process group: killing `xvfb-run` alone
-  // leaves the driver it started, and the next run finds the port taken.
-  const [command, args] = headless ? ['xvfb-run', ['-a', binary, ...argv]] : [binary, argv]
-  const driver = spawn(command, args, {
+  // Started here rather than through `xvfb-run`, and that is not a style
+  // choice: with the script in between, the driver was its child and not this
+  // process's, and the app's stderr — which is the only place the hook trace
+  // is written — stopped reaching the pipe this keeps it in. The log came back
+  // empty and the trace test had nothing to measure.
+  const screen = headless ? await startScreen() : null
+  const driver = spawn(binary, argv, {
     stdio: ['ignore', 'inherit', log ? 'pipe' : 'inherit'],
-    env: Object.keys(env).length > 0 ? env : process.env,
-    detached: headless,
+    env: {
+      ...(Object.keys(env).length > 0 ? env : process.env),
+      ...(screen ? { DISPLAY: screen.display } : {}),
+    },
   })
+  driver.screen = screen
   // The app is the driver's child and writes to the driver's stderr, so this
   // file is the app's own log — what the trace test reads. Appended as each
   // chunk arrives, not through a stream: another process reads it while this
@@ -89,15 +94,35 @@ export async function startDriver({
   throw new Error('tauri-driver did not answer on port ' + port)
 }
 
-/** Ends the driver, and the display around it when there is one. */
-export function stopDriver(driver) {
-  try {
-    // The whole group when it leads one — `xvfb-run` is a script, and the
-    // driver under it survives a signal sent to the script alone.
-    process.kill(driver.pid > 0 ? -driver.pid : driver.pid, 'SIGTERM')
-  } catch {
-    driver.kill()
+/**
+ * A virtual screen of its own, on the first display number nobody holds.
+ *
+ * Numbered rather than `xvfb-run -a`: two suites on one machine must not take
+ * each other's display, and the lock file is what says a number is free.
+ */
+async function startScreen() {
+  for (let number = 99; number < 140; number += 1) {
+    if (existsSync(`/tmp/.X${number}-lock`)) continue
+    const xvfb = spawn('Xvfb', [`:${number}`, '-screen', '0', '1280x1024x24', '-nolisten', 'tcp'], {
+      stdio: 'ignore',
+    })
+    // Given a moment to claim the number, then asked whether it did: a display
+    // that never came up is a window that dies on GTK, which is the failure
+    // this whole thing exists to stop.
+    for (let look = 0; look < 40; look += 1) {
+      if (xvfb.exitCode !== null) break
+      if (existsSync(`/tmp/.X${number}-lock`)) return { display: `:${number}`, xvfb }
+      await wait(50)
+    }
+    xvfb.kill()
   }
+  throw new Error('no free display for Xvfb between :99 and :139')
+}
+
+/** Ends the driver, and the screen it was given when there was one. */
+export function stopDriver(driver) {
+  driver.kill()
+  driver.screen?.xvfb.kill()
 }
 
 /** A window on the built binary, from the driver at `port`. */
