@@ -48,8 +48,11 @@ pub fn run(
         &context,
         manifest.timeout_seconds.map(std::time::Duration::from_secs),
         on_pid,
-        |line| {
-            output.push_str(line);
+        |said| {
+            output.push_str(&said.text);
+            if said.cut {
+                output.push_str(" … (line cut)");
+            }
             output.push('\n');
         },
     )
@@ -66,6 +69,10 @@ pub fn run(
             duration_ms: ended.duration_ms,
             exit_code: None,
         });
+    }
+
+    if ended.output_cut {
+        output.push_str("\n— the rest was dropped: this run said more than devpit keeps");
     }
 
     Ok(Finished {

@@ -1,6 +1,7 @@
 //! The runner's tests, kept beside it.
 
 use super::*;
+use crate::said::Channel;
 
 fn context() -> Context {
     Context {
@@ -19,7 +20,7 @@ fn collected(command: &str, timeout: Option<Duration>) -> (Ended, Vec<String>) {
         &context(),
         timeout,
         |_| {},
-        |line| lines.push(line.to_owned()),
+        |said| lines.push(said.text.clone()),
     )
     .expect("the command ran");
     (ended, lines)
@@ -179,5 +180,61 @@ fn the_timeout_ends_the_grandchildren_too() {
         !outlived.exists(),
         "a grandchild outlived the timeout and wrote {}",
         outlived.display()
+    );
+}
+
+/// stderr is where a failing build says why, and a card that cannot tell it
+/// from progress makes the reason one line among a thousand.
+///
+/// Sabotage: hand both streams `Channel::Out` and this fails on the second.
+#[test]
+fn each_line_says_which_mouth_it_came_from() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut lines: Vec<(Channel, String)> = Vec::new();
+    run(
+        "echo out; echo err 1>&2",
+        dir.path(),
+        &context(),
+        None,
+        |_| {},
+        |said| lines.push((said.channel, said.text.clone())),
+    )
+    .expect("ran");
+
+    assert!(
+        lines.contains(&(Channel::Out, "out".to_owned())),
+        "stdout did not arrive as stdout: {lines:?}"
+    );
+    assert!(
+        lines.contains(&(Channel::Err, "err".to_owned())),
+        "stderr did not arrive as stderr: {lines:?}"
+    );
+}
+
+/// A command with a progress bar and no terminal to rewrite prints megabytes
+/// nobody reads. The run stops reporting and the card says it stopped, rather
+/// than the window holding all of it.
+///
+/// Sabotage: take the ceiling out of `Ceiling::report` and this waits for the
+/// whole thing and reports `output_cut` false.
+#[test]
+fn a_run_that_says_too_much_is_cut_and_says_so() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut spoken = 0usize;
+    // Ten thousand lines of a kilobyte: past the ceiling several times over.
+    let ended = run(
+        "i=0; while [ $i -lt 10000 ]; do printf '%01024d\\n' $i; i=$((i+1)); done",
+        dir.path(),
+        &context(),
+        Some(Duration::from_secs(30)),
+        |_| {},
+        |said| spoken += said.text.len(),
+    )
+    .expect("ran");
+
+    assert!(ended.output_cut, "the run was allowed to say all of it");
+    assert!(
+        spoken <= crate::said::MOST_OUTPUT,
+        "{spoken} bytes reached the window, past the ceiling"
     );
 }

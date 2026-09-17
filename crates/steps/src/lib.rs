@@ -10,8 +10,10 @@ mod descendants;
 pub mod ended;
 pub mod manifest;
 pub mod runner;
+pub mod said;
 
 pub use context::{Context, CONTEXT_KEYS};
 pub use ended::{Ended, RunError};
 pub use manifest::{validate, Manifest, ManifestError};
 pub use runner::run;
+pub use said::{Channel, Said};

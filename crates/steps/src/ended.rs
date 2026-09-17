@@ -20,4 +20,7 @@ pub struct Ended {
     pub exit_code: Option<i32>,
     pub timed_out: bool,
     pub duration_ms: i64,
+    /// The run said more than `said::MOST_OUTPUT` and the rest was dropped.
+    /// A card showing this output is showing its beginning, and says so.
+    pub output_cut: bool,
 }
