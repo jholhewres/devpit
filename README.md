@@ -140,17 +140,48 @@ toll gate.
 
 ## Installing
 
-Two packages, and they update differently:
+Both packages are on the [latest release][releases]. Take the AppImage unless
+you have a reason not to: it is the one that updates itself.
 
-- **AppImage** — devpit checks for a new version, verifies its signature,
-  installs it over itself and restarts. Your terminals keep running: they are
-  tmux sessions, and tmux does not go down with the window.
-- **`.deb`** — devpit downloads and verifies it, then shows you the command to
-  install it and never runs that command itself. Installing a system package
-  means asking for root, and devpit does not ask for root on your behalf.
+The commands below name `0.1.0` because the version is part of the file name.
+Check the releases page for the current one, or let an installed devpit update
+itself and never type a version again.
+
+**AppImage.** devpit checks for a new version, verifies its signature, installs
+it over itself and restarts. Your terminals keep running through it — they are
+tmux sessions, and tmux does not go down with the window.
+
+```sh
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.0_amd64.AppImage
+chmod +x devpit_0.1.0_amd64.AppImage
+./devpit_0.1.0_amd64.AppImage
+```
+
+**`.deb`.** devpit downloads the new version and verifies it, then shows you
+the command and never runs it. Installing a system package means asking for
+root, and devpit does not ask for root on your behalf.
+
+```sh
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.0_amd64.deb
+sudo apt install ./devpit_0.1.0_amd64.deb
+```
+
+Every release carries a `SHA256SUMS`, and checking it is one line:
+
+```sh
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+The `.sig` beside each package is the updater's, not a substitute for this: it
+is what an installed devpit checks before it replaces itself, against a public
+key compiled into the binary you are already running. A first download has no
+such binary to check it with, which is what `SHA256SUMS` is for.
 
 Automatic checking is a switch in Settings → General, and it is on unless you
 turn it off.
+
+[releases]: https://github.com/jholhewres/devpit/releases/latest
 
 ## Building it
 

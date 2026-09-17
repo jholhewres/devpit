@@ -143,17 +143,48 @@ trabalho, não uma cancela.
 
 ## Instalando
 
-Dois pacotes, e eles se atualizam de formas diferentes:
+Os dois pacotes estão na [última release][releases]. Prefira o AppImage, a não
+ser que você tenha motivo para não: é o que se atualiza sozinho.
 
-- **AppImage** — o devpit procura uma versão nova, confere a assinatura,
-  instala por cima de si mesmo e reabre. Seus terminais continuam rodando: são
-  sessões do tmux, e o tmux não cai junto com a janela.
-- **`.deb`** — o devpit baixa e confere a assinatura, e então mostra o comando
-  de instalação sem nunca executá-lo. Instalar um pacote do sistema é pedir
-  root, e o devpit não pede root no seu lugar.
+Os comandos abaixo dizem `0.1.0` porque a versão faz parte do nome do arquivo.
+Confira na página de releases qual é a atual — ou deixe um devpit instalado se
+atualizar sozinho e nunca mais digite uma versão.
+
+**AppImage.** O devpit procura uma versão nova, confere a assinatura, instala
+por cima de si mesmo e reabre. Seus terminais continuam rodando no meio disso —
+são sessões do tmux, e o tmux não cai junto com a janela.
+
+```sh
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.0_amd64.AppImage
+chmod +x devpit_0.1.0_amd64.AppImage
+./devpit_0.1.0_amd64.AppImage
+```
+
+**`.deb`.** O devpit baixa a versão nova e confere, e então mostra o comando
+sem nunca executá-lo. Instalar um pacote do sistema é pedir root, e o devpit
+não pede root no seu lugar.
+
+```sh
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.0_amd64.deb
+sudo apt install ./devpit_0.1.0_amd64.deb
+```
+
+Toda release traz um `SHA256SUMS`, e conferir é uma linha:
+
+```sh
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+O `.sig` ao lado de cada pacote é do updater, e não substitui isso: ele é o que
+um devpit já instalado confere antes de se trocar, contra uma chave pública
+compilada no binário que você já está rodando. Um primeiro download não tem
+esse binário para conferir com ele — é para isso que serve o `SHA256SUMS`.
 
 A checagem automática é um botão em Configurações → General, e vem ligada até
 você desligar.
+
+[releases]: https://github.com/jholhewres/devpit/releases/latest
 
 ## Compilando
 
