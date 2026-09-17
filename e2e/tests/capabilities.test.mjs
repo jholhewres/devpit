@@ -34,6 +34,8 @@ const CAPABILITIES = [
     // fallback shown *while* it loads, and waiting for it would pass on the
     // chunk that never arrived.
     editor: '.excalidraw',
+    // What a new one starts as, by `FileKind.empty`. A scene, for a drawing.
+    starts: '{',
   },
   {
     plugin: 'notes',
@@ -42,6 +44,8 @@ const CAPABILITIES = [
     stem: 'a-thought',
     file: 'a-thought.md',
     editor: '.note__ed',
+    // Nothing: a blank page reads as one, and prose needs no starting line.
+    starts: '',
   },
   {
     plugin: 'data',
@@ -50,6 +54,7 @@ const CAPABILITIES = [
     stem: 'a-shape',
     file: 'a-shape.json',
     editor: '.data__edit',
+    starts: '{',
   },
 ]
 
@@ -139,8 +144,10 @@ describe('the Capabilities this build ships', () => {
         pluginId: one.plugin,
         name: one.file,
       })
-      assert.equal(typeof read.text, 'string')
-      assert.ok(read.text.length > 0, `${one.file} came back empty`)
+      assert.ok(
+        read.text.startsWith(one.starts),
+        `${one.file} is not what a new ${one.noun} starts as: ${JSON.stringify(read.text.slice(0, 40))}`,
+      )
 
       // The editor itself arrived. Every one of these is behind `import()`,
       // and a policy that refused the chunk would leave the pane open with
