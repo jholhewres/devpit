@@ -12,6 +12,7 @@ pub mod agents;
 pub mod board;
 pub mod card;
 pub mod chat;
+pub mod checkpoint;
 pub mod conversation;
 pub mod error;
 pub mod file;
@@ -41,6 +42,7 @@ pub use card::{
     DeleteRefusal, Notice, Notices, Pinned, Played,
 };
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
+pub use checkpoint::{validity, verdict, Fingerprint, Report, Validity, Verdict};
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
