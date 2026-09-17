@@ -13,6 +13,14 @@
 /* A note is the editor, and nothing beside it: a pane of source next to a
    pane of output is two things to look at for one document. */
 .note { height: 100%; overflow: auto; }
+/* The formatting bar: sticky, because a note is scrolled and a bar that
+   leaves with the first paragraph is a bar you scroll back for. */
+.note__bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 8px 16px; background: var(--canvas); border-bottom: 1px solid var(--border); }
+.note__act { height: 26px; min-width: 28px; padding: 0 7px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-2); background: transparent; }
+.note__act:hover:not(:disabled) { background: var(--overlay-strong); color: var(--text); }
+.note__act:disabled { opacity: 0.4; }
+/* A group ends where the next begins; the gap says so without a rule. */
+.note__act[data-gap='true'] { margin-left: 10px; }
 .note__ed { max-width: 820px; margin: 0 auto; padding: 8px 0 48px; }
 .note__ed .milkdown { background: transparent; color: inherit; }
 .data { display: grid; grid-template-columns: minmax(240px, 40%) 1fr; height: 100%; overflow: hidden; }
