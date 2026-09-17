@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaneName } from '../../shell/paneList'
 import { opened, type Strip, type Tab } from '../../shell/strip'
 import { DrawingList } from './DrawingList'
-import { EMPTY_DRAWING } from './drawings'
+import { DRAWING } from './drawings'
 
 afterEach(cleanup)
 
@@ -48,7 +48,7 @@ vi.mock('../../shell/useShell', () => ({ useShell: () => shell }))
 
 beforeEach(() => {
   files.clear()
-  files.set('fluxo.excalidraw', { text: EMPTY_DRAWING, modified: Date.now() })
+  files.set('fluxo.excalidraw', { text: DRAWING.empty, modified: Date.now() })
   written.mockClear()
   refusal = null
   strip = { open: [], active: null }
@@ -70,7 +70,7 @@ describe('the list of drawings', () => {
     await screen.findByText('fluxo')
     create('mapa')
     await waitFor(() => expect(strip.active).toBe('drawing:mapa.excalidraw'))
-    expect(written).toHaveBeenCalledWith('mapa.excalidraw', EMPTY_DRAWING, null)
+    expect(written).toHaveBeenCalledWith('mapa.excalidraw', DRAWING.empty, null)
     expect(await screen.findByText('mapa')).toBeTruthy()
   })
 
@@ -101,7 +101,7 @@ describe('the list of drawings', () => {
   })
 
   it('opens each drawing in a tab of its own', async () => {
-    files.set('mapa.excalidraw', { text: EMPTY_DRAWING, modified: Date.now() })
+    files.set('mapa.excalidraw', { text: DRAWING.empty, modified: Date.now() })
     render(<DrawingList tab={{ id: 'drawings', kind: 'drawing' }} />)
     fireEvent.click(await screen.findByText('fluxo'))
     fireEvent.click(screen.getByText('mapa'))

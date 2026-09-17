@@ -1,11 +1,5 @@
 import type { Tab } from '../../shell/strip'
-import {
-  fileName,
-  fileTab,
-  stemOf as stem,
-  type FileKind,
-  type Named,
-} from '../pluginFile'
+import { fileTab, stemOf as stem, type FileKind } from '../pluginFile'
 
 /*
  * What the shell knows about drawings without loading the editor.
@@ -33,8 +27,6 @@ export const DRAWING: FileKind = {
   }),
 }
 
-export const EMPTY_DRAWING = DRAWING.empty
-
 /** How long a drawing waits after the last change before it is written. */
 export { SAVE_AFTER_MS } from '../pluginFile'
 
@@ -44,6 +36,4 @@ export const DRAWINGS: Partial<Tab> = { id: 'drawings', title: 'Excalidraw' }
 
 export const drawingTab = (name: string): Partial<Tab> => fileTab(DRAWING, name)
 export const stemOf = (name: string): string => stem(DRAWING, name)
-export const drawingName = (typed: string): Named => fileName(DRAWING, typed)
 export { plainDataName } from '../pluginFile'
-export type { Named }

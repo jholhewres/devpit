@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { drawingFileValid } from './drawingFile'
-import { drawingName, drawingTab, EMPTY_DRAWING, plainDataName, stemOf } from './drawings'
+import { fileName } from '../pluginFile'
+import { DRAWING, drawingTab, plainDataName, stemOf } from './drawings'
+
+const drawingName = (typed: string) => fileName(DRAWING, typed)
 
 describe('drawingName', () => {
   it('adds the extension to a typed name', () => {
@@ -114,8 +117,8 @@ describe('drawingTab', () => {
   })
 })
 
-describe('EMPTY_DRAWING', () => {
+describe('DRAWING.empty', () => {
   it('is a file the plugin itself would open', () => {
-    expect(drawingFileValid(EMPTY_DRAWING)).toBe(true)
+    expect(drawingFileValid(DRAWING.empty)).toBe(true)
   })
 })
