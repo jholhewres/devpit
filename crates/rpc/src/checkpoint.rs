@@ -173,6 +173,31 @@ pub struct WhatRan {
     pub in_a_worktree: Option<bool>,
 }
 
+/// What running a step on a card would do, said before anybody runs it.
+///
+/// A check is somebody else's command against your machine and your checkout.
+/// A button that says only "Run" asks for trust the screen has not earned:
+/// the same word can be `pnpm test` and can be a deploy.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WouldRun {
+    pub step_id: String,
+    pub step_name: String,
+    /// Marked as having no undo. The screen asks twice for one of these.
+    pub irreversible: bool,
+    /// The command, for a step that has one. An agent or a session step has
+    /// none, and saying nothing is better than an empty line that reads like a
+    /// command that does nothing.
+    pub command: Option<String>,
+    /// Where it **would** run. Absent when the checkout does not exist yet:
+    /// answering a question must not make one.
+    pub in_directory: Option<String>,
+    pub in_a_worktree: bool,
+    /// The **names** of what devpit would declare, never the values.
+    pub declared_env: Vec<String>,
+    pub timeout_seconds: Option<f64>,
+}
+
 #[cfg(test)]
 #[path = "checkpoint_tests.rs"]
 mod tests;

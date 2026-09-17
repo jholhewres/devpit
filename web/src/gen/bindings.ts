@@ -875,6 +875,7 @@ export const commands = {
 	 */
 	settingsFinishOnboarding: () => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_finish_onboarding")),
 	checkpointRead: (runId: string) => typedError<Checked, RpcError>(__TAURI_INVOKE("checkpoint_read", { runId })),
+	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
 	/**  `plugin.list` — the catalogue, and what this project has on. */
 	pluginList: (projectId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_list", { projectId })),
 	/**
@@ -2921,6 +2922,35 @@ export type Worktrees = {
 	worktrees: CardWorktree[],
 	/**  The whole set, so the screen can say it in one number. */
 	diskBytes: number | null,
+};
+
+/**
+ *  What running a step on a card would do, said before anybody runs it.
+ * 
+ *  A check is somebody else's command against your machine and your checkout.
+ *  A button that says only "Run" asks for trust the screen has not earned:
+ *  the same word can be `pnpm test` and can be a deploy.
+ */
+export type WouldRun = {
+	stepId: string,
+	stepName: string,
+	/**  Marked as having no undo. The screen asks twice for one of these. */
+	irreversible: boolean,
+	/**
+	 *  The command, for a step that has one. An agent or a session step has
+	 *  none, and saying nothing is better than an empty line that reads like a
+	 *  command that does nothing.
+	 */
+	command: string | null,
+	/**
+	 *  Where it **would** run. Absent when the checkout does not exist yet:
+	 *  answering a question must not make one.
+	 */
+	inDirectory: string | null,
+	inAWorktree: boolean,
+	/**  The **names** of what devpit would declare, never the values. */
+	declaredEnv: string[],
+	timeoutSeconds: number | null,
 };
 
 /* Tauri Specta runtime */

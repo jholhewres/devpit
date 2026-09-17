@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Checked } from '../gen/bindings'
 import { ask, commands } from './live'
 import { CURRENT_MEANS, saidNothing, validityWords, verdictWords } from './checked'
+import { WouldRunCard } from './WouldRun'
 
 /*
  * What one run proves, under the row that ran it.
@@ -18,7 +19,18 @@ import { CURRENT_MEANS, saidNothing, validityWords, verdictWords } from './check
  * away.
  */
 
-export function Checked({ runId }: { runId: string }): React.JSX.Element {
+export function Checked({
+  runId,
+  cardId,
+  stepId,
+}: {
+  runId: string
+  /** The card and the step this ran on, so the same panel can say what
+      running it again would do without a second trip through the board. */
+  cardId: string
+  stepId: string
+}): React.JSX.Element {
+  const [asking, setAsking] = useState(false)
   const [checked, setChecked] = useState<Checked | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
 
@@ -58,6 +70,13 @@ export function Checked({ runId }: { runId: string }): React.JSX.Element {
           {checked.validity === 'current' && ` Current means ${CURRENT_MEANS}.`}
         </span>
       </p>
+
+      <p className="chk__l">
+        <button className="chk__again" aria-expanded={asking} onClick={() => setAsking(!asking)}>
+          What running this again would do
+        </button>
+      </p>
+      {asking && <WouldRunCard cardId={cardId} stepId={stepId} />}
 
       {checked.ran ? (
         <dl className="chk__ran">

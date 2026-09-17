@@ -42,7 +42,9 @@ pub use card::{
     DeleteRefusal, Notice, Notices, Pinned, Played,
 };
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
-pub use checkpoint::{validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan};
+pub use checkpoint::{
+    validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, WouldRun,
+};
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};

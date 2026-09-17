@@ -8,12 +8,12 @@
 
 use crate::{
     account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, card_chat,
-    card_work, cards, chat, checkpoint, columns, commands, diffs, files, filetree, front,
-    happening, heads_down, history, in_flight, index, installations, mcp, moving, notices, openers,
-    outside_sessions, panels, panes, pasting, paths, plan_limits, plugin_data, plugins, projects,
-    receipts, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
-    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, threads, update,
-    watching, workspace, worktree_base, worktrees, wsfiles,
+    card_work, cards, chat, checkpoint, checkpoint_preview, columns, commands, diffs, files,
+    filetree, front, happening, heads_down, history, in_flight, index, installations, mcp, moving,
+    notices, openers, outside_sessions, panels, panes, pasting, paths, plan_limits, plugin_data,
+    plugins, projects, receipts, reveal, rewinding, runs_list, saves, search, session_search,
+    sessions, settings, shell_launch, skills, slash, sources, spend_history, staging, steering,
+    steps, threads, update, watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -165,6 +165,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         settings::settings_write,
         settings::settings_finish_onboarding,
         checkpoint::checkpoint_read,
+        checkpoint_preview::checkpoint_preview,
         plugins::plugin_list,
         plugins::plugin_set_enabled,
         plugins::plugin_install,

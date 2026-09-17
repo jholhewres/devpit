@@ -140,7 +140,9 @@ export function RunsPane({
                 {run.startedAt !== null && ` · ${new Date(run.startedAt * 1000).toLocaleString()}`}
               </span>
               {run.output && <span className="crun__o">{run.output}</span>}
-              {opened === run.id && <Checked runId={run.id} />}
+              {opened === run.id && (
+                <Checked runId={run.id} cardId={cardId} stepId={run.stepId} />
+              )}
             </span>
             <button
               className="crun__s"
