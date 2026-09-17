@@ -6,6 +6,7 @@
 //! interpolated into the command string.
 
 pub mod context;
+mod descendants;
 pub mod ended;
 pub mod manifest;
 pub mod runner;

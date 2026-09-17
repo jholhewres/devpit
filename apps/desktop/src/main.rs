@@ -86,6 +86,7 @@ mod spend_history;
 mod staging;
 mod steering;
 mod steps;
+mod stopping_a_run;
 mod tap;
 mod threads;
 mod turn_changes;

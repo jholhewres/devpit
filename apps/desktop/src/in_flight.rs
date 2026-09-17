@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, State};
 
 use crate::card_activity::{run_heard, run_reference, state_of_run};
+use crate::stopping_a_run;
 
 /// The runs in flight, by id, and the process behind each.
 ///
@@ -115,23 +116,10 @@ pub(crate) fn stop_run(
     state.cancel(run_id);
 
     // SIGTERM, not SIGKILL: the CLI writes its transcript on the way out, and
-    // what a cancelled turn already spent is worth keeping.
-    //
-    // Through the system's own `kill` rather than a crate: it is one command
-    // that is already on the machine, and a dependency for one signal is a
-    // dependency to keep in step forever.
-    #[cfg(unix)]
-    let stopped = std::process::Command::new("kill")
-        .args(["-TERM", &pid.to_string()])
-        .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false);
-    #[cfg(not(unix))]
-    let stopped = std::process::Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/T"])
-        .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false);
+    // what a cancelled turn already spent is worth keeping. A command step
+    // leads a process group, so the stop reaches the suite under it and not
+    // only the shell — see `stopping_a_run`.
+    let stopped = stopping_a_run::stop(pid);
 
     if !stopped {
         state.uncancel(run_id);

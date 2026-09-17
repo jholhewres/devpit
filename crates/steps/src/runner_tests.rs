@@ -147,3 +147,37 @@ fn the_shell_says_which_process_it_is_before_it_runs() {
     assert!(pid > 1, "pid {pid} is not a process this run could stop");
     assert_eq!(ended.exit_code, Some(0));
 }
+
+/// A command that leaves a grandchild behind is the normal shape of a test
+/// suite: `cargo test` is the shell's child and the test binary is its
+/// grandchild. Killing only the shell leaves the work running under a card
+/// that says it stopped — a "Cancel" that does that is worse than no button.
+///
+/// Sabotage: take `setsid` out of the spawn and the grandchild writes its
+/// proof, and this fails.
+#[test]
+fn the_timeout_ends_the_grandchildren_too() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let outlived = dir.path().join("outlived");
+    let command = format!("(sleep 2; echo alive > {}) & sleep 30", outlived.display());
+
+    let ended = run(
+        &command,
+        dir.path(),
+        &context(),
+        Some(Duration::from_millis(300)),
+        |_| {},
+        |_| {},
+    )
+    .expect("ran");
+    assert!(ended.timed_out, "it was allowed to keep running");
+
+    // Past when the grandchild meant to write, so its silence is a fact
+    // rather than a race the test happened to win.
+    std::thread::sleep(Duration::from_secs(3));
+    assert!(
+        !outlived.exists(),
+        "a grandchild outlived the timeout and wrote {}",
+        outlived.display()
+    );
+}

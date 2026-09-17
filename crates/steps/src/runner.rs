@@ -11,6 +11,7 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use crate::descendants::{end_it_all, in_a_session_of_its_own};
 use crate::ended::{Ended, RunError};
 use crate::Context;
 
@@ -24,8 +25,8 @@ use crate::Context;
 /// can stop the run later. Without it a command run could only be waited out:
 /// the card's stop and an update that was told to stop the work both answered
 /// "not in flight here", and the run came back `lost` instead of `cancelled`.
-/// What it stops is the shell; a command that leaves grandchildren behind is
-/// still a wider problem than this signal.
+/// What it stops is the shell, and through it everything the shell started:
+/// the run gets a process group of its own, and the group ends together.
 pub fn run(
     command: &str,
     cwd: &Path,
@@ -39,14 +40,16 @@ pub fn run(
     }
 
     let started = Instant::now();
-    let mut child = Command::new("sh")
+    let mut spawning = Command::new("sh");
+    spawning
         .arg("-c")
         .arg(command)
         .current_dir(cwd)
         .envs(context.environment())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = in_a_session_of_its_own(&mut spawning)
         .spawn()
         .map_err(|err| RunError::NotStarted(err.to_string()))?;
     on_pid(child.id());
@@ -89,7 +92,7 @@ pub fn run(
         }
         if let Some(limit) = timeout {
             if started.elapsed() > limit {
-                let _ = child.kill();
+                end_it_all(&mut child);
                 timed_out = true;
                 break;
             }
