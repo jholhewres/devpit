@@ -6,9 +6,11 @@
  * and a pane, and the pane opens, makes a file, and finds it again.
  *
  * Every editor in these panes arrives through `import()`, and every one of
- * them is a library the CSP could refuse. So the console is read afterwards:
- * a Capability that only works with the policy relaxed is not one this app
- * ships.
+ * them is a library the CSP could refuse. So each test waits for the editor
+ * itself to appear: a policy that refused the chunk leaves the pane open with
+ * nothing in it, and that is a failure you can see. The browser log is read
+ * too, where the driver has one — but it is the weaker check, because a driver
+ * with no log endpoint would let an empty array pass for a clean one.
  */
 
 import { strict as assert } from 'node:assert'
@@ -21,9 +23,34 @@ import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
 
 /** Each Capability, as the person meets it: a switch, a pane, a file. */
 const CAPABILITIES = [
-  { plugin: 'excalidraw', pane: 'Excalidraw', noun: 'drawing', stem: 'a-sketch', file: 'a-sketch.excalidraw' },
-  { plugin: 'notes', pane: 'Notes', noun: 'note', stem: 'a-thought', file: 'a-thought.md' },
-  { plugin: 'data', pane: 'Data', noun: 'data file', stem: 'a-shape', file: 'a-shape.json' },
+  {
+    plugin: 'excalidraw',
+    pane: 'Excalidraw',
+    noun: 'drawing',
+    stem: 'a-sketch',
+    file: 'a-sketch.excalidraw',
+    // What the editor puts on screen once its `import()` has landed. The
+    // widget's own container, never `plg-excalidraw__loading` — that is the
+    // fallback shown *while* it loads, and waiting for it would pass on the
+    // chunk that never arrived.
+    editor: '.excalidraw',
+  },
+  {
+    plugin: 'notes',
+    pane: 'Notes',
+    noun: 'note',
+    stem: 'a-thought',
+    file: 'a-thought.md',
+    editor: '.note__ed',
+  },
+  {
+    plugin: 'data',
+    pane: 'Data',
+    noun: 'data file',
+    stem: 'a-shape',
+    file: 'a-shape.json',
+    editor: '.data__edit',
+  },
 ]
 
 let window
@@ -113,14 +140,31 @@ describe('the Capabilities this build ships', () => {
         name: one.file,
       })
       assert.equal(typeof read.text, 'string')
+      assert.ok(read.text.length > 0, `${one.file} came back empty`)
+
+      // The editor itself arrived. Every one of these is behind `import()`,
+      // and a policy that refused the chunk would leave the pane open with
+      // nothing in it — which is the failure a log nobody can read would miss.
+      await window.wait(until.elementLocated(By.css(one.editor)), 15000)
     })
   }
 
-  /* An editor that needs a CDN, an eval, or an inline script says so here.
-     `console.error` is the same question asked of React: a pane that mounts
-     with a warning it should not have is a pane that half works. */
-  test('nothing was refused by the policy and nothing errored', async () => {
-    const said = await window.manage().logs().get('browser').catch(() => [])
+  /* The browser log, when the driver offers one. It does not always: the
+     WebKit driver behind a Tauri window has no `/log` endpoint on every
+     version, and a test that quietly passed on an empty array would be a CSP
+     check that checks nothing. So the real check is above — every editor
+     mounting is the observable consequence of the policy not refusing its
+     chunk — and this one only says what it managed to read. */
+  test('the browser log, if there is one, names no refusal', async () => {
+    const said = await window
+      .manage()
+      .logs()
+      .get('browser')
+      .catch(() => null)
+    if (said === null) {
+      console.log('no browser log from this driver; the editors mounting is the check')
+      return
+    }
     const bad = said
       .map((entry) => entry.message ?? '')
       .filter((message) => /Content Security Policy|Refused to/.test(message))

@@ -50,6 +50,13 @@ const clickSaying = (label) =>
 
 const said = () => window.executeScript('return document.body.innerText')
 
+/** Shuts the runs list, if it is open. It reads its page once per mount, so a
+    run started after it opened is only there on a fresh one. */
+const shut = () =>
+  window.executeScript(
+    "document.querySelector('[aria-label=\"Close runs\"]')?.click()",
+  )
+
 describe('the Checks panel', () => {
   test('is a place in the sidebar, next to Board', async () => {
     const order = await window.executeScript(
@@ -75,6 +82,7 @@ describe('the Checks panel', () => {
     assert.match(words, /Nothing has run yet/)
     assert.doesNotMatch(words, /No runs match/)
     assert.doesNotMatch(words, /No checks configured/)
+    await shut()
   })
 
   test('a run that exited zero with nothing to read is not drawn as a pass', async () => {
@@ -125,8 +133,12 @@ describe('the Checks panel', () => {
       'the card moved because something ran on it',
     )
 
+    // Opened fresh, because the list reads its page once per mount and this
+    // run did not exist when it was last open.
+    await shut()
+    await settle(300)
     await clickSaying('Checks')
-    await settle(1200)
+    await settle(1500)
     // The state is the control that opens the rest.
     await clickSaying('ok')
     await settle(1500)
