@@ -25,7 +25,7 @@ import { close, minimize, toggleMaximize } from './window'
  * the buttons still take their own clicks.
  */
 export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
-  const { side, files, toggleSide, toggleFiles, project, show, openCard } = useShell()
+  const { side, files, toggleSide, toggleFiles, project, show, openCard, active } = useShell()
   /* One reader for the whole top bar: the panel and the pill draw from the
      same list, so a count on one cannot disagree with the other. */
   const bell = useNotices()
@@ -40,6 +40,18 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
           <img className="mark" alt="devpit" src={mark} />
         </span>
         <ProjectPicker onAdd={onAddProject} />
+        {/* Beside the picker because it answers the question the picker asks:
+            the picker changes which project you are in, and this is the view
+            that does not have one. */}
+        <button
+          className="sq26 tip"
+          data-tip="Manager — every project's board"
+          aria-label="Manager"
+          aria-pressed={active?.kind === 'manager'}
+          onClick={() => show('manager')}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+        </button>
       </div>
 
       <TabStrip />

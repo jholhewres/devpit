@@ -29,7 +29,18 @@ const open: Tab[] = [
   { id: 'note_1', kind: 'note' },
   { id: 'term_1', kind: 'term' },
 ]
-const shell = { open, active: null, show: vi.fn(), close: vi.fn(), project: null }
+/* `projects` is empty rather than absent: the Manager reads the list to fill
+   its filter, and a shell without one is a shell no window ever has. */
+const shell = {
+  open,
+  active: null,
+  show: vi.fn(),
+  close: vi.fn(),
+  project: null,
+  projects: [],
+  setProject: vi.fn(),
+  openCard: vi.fn(),
+}
 vi.mock('./useShell', () => ({ useShell: () => shell }))
 
 afterEach(cleanup)

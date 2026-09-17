@@ -141,3 +141,26 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) {
   .tile, .blane, .slot, .tile--landed { transition: none; animation: none; }
 }
+
+/* ── The Manager ──────────────────────────────────────────────────────
+   Every project's board at once. It borrows the board's lane and tile so
+   the two read as the same thing seen from two distances; what it adds is
+   the line that says whose card a tile is. */
+.mgr { height: 100%; display: flex; flex-direction: column; min-height: 0; padding: 20px 24px 0; overflow: hidden; }
+.mgr__top { flex: none; margin-bottom: 16px; }
+.mgr__t { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.mgr__d { margin: 5px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--text-3); }
+.mgr__filters { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-3); }
+.mgr__filters label { display: flex; align-items: center; gap: 7px; }
+.mgr__filters select { height: 28px; padding: 0 8px; border-radius: 7px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12px; color: var(--text); }
+.mgr__filters select:focus, .mgr__find:focus { outline: none; border-color: var(--accent); }
+.mgr__find { width: 210px; height: 28px; padding: 0 10px; border-radius: 7px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12px; color: var(--text); }
+/* Last and pushed over: it counts what the filters left, so it belongs at
+   the end of the row that decided it. */
+.mgr__n { margin-left: auto; font-variant-numeric: tabular-nums; }
+.mgr__no { margin: 0 0 16px; font-size: 12.5px; line-height: 1.55; color: var(--text-3); }
+.mgr__board { flex: 1; min-height: 0; display: flex; gap: 10px; overflow-x: auto; padding-bottom: 16px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.mgr__lane { min-height: 0; }
+/* A tile here is not dragged: it goes somewhere. */
+.mgr__tile { cursor: pointer; border-left: 2px solid var(--tile-accent, var(--border)); }
+.mgr__who { display: block; margin-bottom: 5px; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
