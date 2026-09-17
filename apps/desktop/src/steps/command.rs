@@ -15,6 +15,7 @@ pub fn run(
     store: &Store,
     card_id: &str,
     step: &Step,
+    run_id: &str,
     mut on_progress: impl FnMut(&str),
     on_pid: impl FnOnce(u32),
 ) -> Result<Finished, String> {
@@ -41,6 +42,20 @@ pub fn run(
         Some(&project),
     )
     .for_a_command();
+
+    // Before the command, never after: a step that commits moves HEAD, and a
+    // revision read at the end would name the code this run produced rather
+    // than the code it ran against.
+    super::what_ran::recorded(
+        store,
+        run_id,
+        &super::what_ran::gathered(
+            &manifest.command,
+            &cwd,
+            &context,
+            crate::checkout::needs_worktree(step.kind, &step.config),
+        ),
+    );
 
     let mut output = String::new();
     let ended = steps::run(

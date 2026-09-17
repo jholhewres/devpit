@@ -67,7 +67,7 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
             })
         }
         StepKind::Session => steps::session::start(store, &card, &step, &session_id),
-        StepKind::Command => steps::command::run(store, &card, &step, on_progress, |pid| {
+        StepKind::Command => steps::command::run(store, &card, &step, &id, on_progress, |pid| {
             watching.watch(&watched, pid)
         }),
     };

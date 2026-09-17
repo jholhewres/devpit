@@ -525,4 +525,30 @@ ALTER TABLE session_link ADD COLUMN profile_id TEXT;
 DROP TABLE IF EXISTS event;
 "#,
     },
+    // Migration 017 — what a run actually ran, and the evidence it left.
+    Migration {
+        version: 17,
+        sql: r#"
+-- A run used to keep its output and nothing about the circumstances, so a
+-- green row could not answer "green on which code, with which command". These
+-- say it. Additive: every row written before this has them NULL, which the
+-- screen reads as `unknown` and never as an answer.
+ALTER TABLE run ADD COLUMN ran_command TEXT;
+ALTER TABLE run ADD COLUMN ran_in TEXT;
+-- The names of the environment devpit declared, never the values: a snapshot
+-- of a step's environment is a snapshot of whatever secret was in it.
+ALTER TABLE run ADD COLUMN declared_env TEXT;
+ALTER TABLE run ADD COLUMN base_revision TEXT;
+ALTER TABLE run ADD COLUMN head_revision TEXT;
+-- 1 when the run had a checkout of the card's own, 0 when it ran in the
+-- project, NULL for a row from before this migration.
+ALTER TABLE run ADD COLUMN in_a_worktree INTEGER;
+
+-- What the run proved, as a versioned payload rather than seven new tables.
+-- The version is on the row so a reader that does not know a shape can say so
+-- instead of guessing at it.
+ALTER TABLE run ADD COLUMN evidence TEXT;
+ALTER TABLE run ADD COLUMN evidence_version INTEGER;
+"#,
+    },
 ];

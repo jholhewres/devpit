@@ -5,6 +5,7 @@
 mod board;
 mod card_links;
 mod cards;
+mod evidence;
 mod folders;
 mod layouts;
 mod migrations;
@@ -45,6 +46,7 @@ pub enum StoreError {
 pub use board::{CardRow, ColumnRow, StepRow, StepUse, DEFAULT_COLUMNS};
 pub use card_links::{BackgroundLink, CardLinks, ChatLink, RunLink, SessionHeld};
 pub use cards::{AttachmentRow, CommentRow, NoticeRow};
+pub use evidence::{Evidence, EvidenceError, Ran, MOST_EVIDENCE};
 pub use layouts::CardTabLayout;
 pub use runs::RunRow;
 pub use session_links::SessionLink;

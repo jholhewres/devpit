@@ -5,7 +5,7 @@ use super::*;
 use devpit_rpc::StepKind;
 
 /// A project with one card, and the step that will run on it.
-fn a_card_to_run_on(dir: &std::path::Path, command: &str) -> (Store, String, Step) {
+fn a_card_to_run_on(dir: &std::path::Path, command: &str) -> (Store, String, Step, String) {
     let store = Store::open(&dir.join("state.db")).expect("open");
     let project = store.add_project(dir, None).expect("project");
     store.ensure_board(&project).expect("board");
@@ -16,15 +16,19 @@ fn a_card_to_run_on(dir: &std::path::Path, command: &str) -> (Store, String, Ste
 
     // No worktree: what is under test is the output, and a checkout would put
     // minutes and a git clone between the test and the thing it asks about.
-    let config = serde_json::json!({ "command": command, "needsWorktree": false });
+    let config = serde_json::json!({ "command": command, "needsWorktree": false }).to_string();
+    let id = store
+        .create_step(&project, "command", "say", &config, false)
+        .expect("step");
     let step = Step {
-        id: "step_1".to_owned(),
+        id,
         kind: StepKind::Command,
         name: "say".to_owned(),
-        config: config.to_string(),
+        config,
         irreversible: false,
     };
-    (store, card, step)
+    let run = store.start_run(&card, &step.id, None).expect("run");
+    (store, card, step, run)
 }
 
 /// `docs/the-model.md` has promised this since the first release and the
@@ -36,7 +40,7 @@ fn a_card_to_run_on(dir: &std::path::Path, command: &str) -> (Store, String, Ste
 #[test]
 fn the_window_hears_a_command_while_it_runs() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let (store, card, step) = a_card_to_run_on(dir.path(), "echo now; sleep 1; echo later");
+    let (store, card, step, run_id) = a_card_to_run_on(dir.path(), "echo now; sleep 1; echo later");
 
     let started = std::time::Instant::now();
     let mut first: Option<std::time::Duration> = None;
@@ -45,6 +49,7 @@ fn the_window_hears_a_command_while_it_runs() {
         &store,
         &card,
         &step,
+        &run_id,
         |line| {
             first.get_or_insert_with(|| started.elapsed());
             heard.push(line.to_owned());
@@ -69,14 +74,15 @@ fn the_window_hears_a_command_while_it_runs() {
 #[test]
 fn what_streamed_is_what_the_run_keeps() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let (store, card, step) = a_card_to_run_on(dir.path(), "echo out; echo err 1>&2");
+    let (store, card, step, run_id) = a_card_to_run_on(dir.path(), "echo out; echo err 1>&2");
 
     let mut heard: Vec<String> = Vec::new();
     let finished = run(
         &store,
         &card,
         &step,
-        |line| heard.push(line.to_owned()),
+        &run_id,
+        |line: &str| heard.push(line.to_owned()),
         |_| {},
     )
     .expect("the command ran");
@@ -89,4 +95,36 @@ fn what_streamed_is_what_the_run_keeps() {
     }
     assert!(heard.contains(&"out".to_owned()));
     assert!(heard.contains(&"err".to_owned()), "stderr never streamed");
+}
+
+/// A green row that cannot say which command it ran, where, and against which
+/// code is a row nobody can act on. The step records that before the command
+/// starts, so a command that commits cannot move the revision out from under
+/// its own snapshot.
+///
+/// Sabotage: move the `what_ran::recorded` call below `steps::run` and a step
+/// whose command commits records the commit it produced.
+#[test]
+fn a_run_records_what_it_ran_before_it_runs_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, card, step, run_id) = a_card_to_run_on(dir.path(), "echo hello");
+
+    run(&store, &card, &step, &run_id, |_: &str| {}, |_| {}).expect("the command ran");
+
+    let ran = store.what_ran(&run_id).expect("read").expect("a run");
+    assert!(ran.is_known(), "the run recorded nothing about itself");
+    assert_eq!(ran.command.as_deref(), Some("echo hello"));
+    assert_eq!(ran.in_directory.as_deref(), dir.path().to_str());
+    assert_eq!(
+        ran.in_a_worktree,
+        Some(false),
+        "a step that declared no worktree was recorded as having one"
+    );
+    assert!(
+        ran.declared_env
+            .iter()
+            .all(|name| name.starts_with("DEVPIT_")),
+        "{:?} is not a list of names devpit declared",
+        ran.declared_env
+    );
 }

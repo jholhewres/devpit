@@ -12,6 +12,7 @@ pub mod context;
 pub mod recipe;
 pub mod session;
 pub mod verdict;
+pub mod what_ran;
 
 use std::path::PathBuf;
 
