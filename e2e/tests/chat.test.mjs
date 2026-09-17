@@ -143,7 +143,16 @@ describe('manual item 10 — a card chat moves the dot', () => {
     }, composers)
     await fill(window, 'textarea[data-e2e="mine"]', 'hello')
     const id = (await card('Chat moves the dot'))?.id
-    for (let tick = 0; tick < 60; tick += 1) {
+
+    // Watched until it settles, not for a fixed nine seconds. A turn takes as
+    // long as the machine takes, and a window that only sampled the first nine
+    // seconds failed on a busy one while the card was doing exactly the right
+    // thing — the dot was at `done` a moment after the loop gave up.
+    //
+    // The assertion is unchanged and just as strong: both states have to have
+    // been seen. Only the patience is longer.
+    const deadline = Date.now() + 60000
+    while (Date.now() < deadline) {
       // The tile's dot, off the screen: the backend's answer was already
       // tested, and a tile that never repainted passed with it.
       const doing = await window.executeScript(function (id) {
