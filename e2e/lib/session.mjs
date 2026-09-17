@@ -24,7 +24,7 @@ const PORT = Number(process.env.E2E_DRIVER_PORT ?? 4444)
  * capability quietly ignored, the suite drove the app against the real home
  * and read the real plan usage out of the real CLI's credentials.
  */
-export async function startDriver({ port = PORT, env = {}, log = null } = {}) {
+export async function startDriver({ port = PORT, env = {}, log = null, headless = false } = {}) {
   // The native WebKitWebDriver listens next door, on port + 1 by default. Two
   // drivers on neighbouring ports take each other's native port, and the
   // second session fails with "Failed to match capabilities".
@@ -36,9 +36,22 @@ export async function startDriver({ port = PORT, env = {}, log = null } = {}) {
   // Found on this process's PATH and started by its full path: the seeded
   // environment's PATH is the system's, and cargo's bin is not in it.
   const binary = onPath('tauri-driver') ?? 'tauri-driver'
-  const driver = spawn(binary, ['--port', String(port), '--native-port', native], {
+  const argv = ['--port', String(port), '--native-port', native]
+
+  // The virtual display goes **here**, on the driver, and not on the tests.
+  // The app is the driver's child and GTK is what needs a screen; the tests are
+  // node talking HTTP and need none. Wrapped the other way round, every window
+  // on a machine with no display died with "Failed to initialize GTK" while
+  // the tests sat waiting for one, and the suite spent ten minutes a file
+  // finding that out.
+  //
+  // `detached` so the wrapper leads a process group: killing `xvfb-run` alone
+  // leaves the driver it started, and the next run finds the port taken.
+  const [command, args] = headless ? ['xvfb-run', ['-a', binary, ...argv]] : [binary, argv]
+  const driver = spawn(command, args, {
     stdio: ['ignore', 'inherit', log ? 'pipe' : 'inherit'],
     env: Object.keys(env).length > 0 ? env : process.env,
+    detached: headless,
   })
   // The app is the driver's child and writes to the driver's stderr, so this
   // file is the app's own log — what the trace test reads. Appended as each
@@ -61,8 +74,19 @@ export async function startDriver({ port = PORT, env = {}, log = null } = {}) {
     }
     await wait(100)
   }
-  driver.kill()
+  stopDriver(driver)
   throw new Error('tauri-driver did not answer on port ' + port)
+}
+
+/** Ends the driver, and the display around it when there is one. */
+export function stopDriver(driver) {
+  try {
+    // The whole group when it leads one — `xvfb-run` is a script, and the
+    // driver under it survives a signal sent to the script alone.
+    process.kill(driver.pid > 0 ? -driver.pid : driver.pid, 'SIGTERM')
+  } catch {
+    driver.kill()
+  }
 }
 
 /** A window on the built binary, from the driver at `port`. */

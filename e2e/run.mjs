@@ -20,7 +20,7 @@ import {
   refusal,
   theShellFindsTheStub,
 } from './lib/preflight.mjs'
-import { startDriver } from './lib/session.mjs'
+import { startDriver, stopDriver } from './lib/session.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
@@ -55,11 +55,6 @@ const tests = readdirSync(join(here, 'tests'))
 // of work it was doing. A ceiling that fails honest work teaches you to raise
 // it until it catches nothing.
 const argv = ['--test', '--test-concurrency=1', '--test-timeout=600000', ...tests]
-// A virtual display when there is no real one: CI has none, and a suite that
-// only runs on somebody's desktop is a suite that runs once.
-const [command, args] = needsXvfb()
-  ? ['xvfb-run', ['-a', process.execPath, ...argv]]
-  : [process.execPath, argv]
 
 // The home is seeded here because the driver inherits it: the app is the
 // driver's child, and that is the only way its environment gets set.
@@ -75,12 +70,15 @@ if (unsafe.length > 0) {
   process.exit(1)
 }
 const log = join(seeded.home, 'app.log')
-const driver = await startDriver({ env: seedEnv(seeded), log })
+// A virtual display when there is no real one: CI has none, and a suite that
+// only runs on somebody's desktop is a suite that runs once. It goes on the
+// driver because the app is the driver's child.
+const driver = await startDriver({ env: seedEnv(seeded), log, headless: needsXvfb() })
 try {
   // Not spawnSync: that blocks this process's event loop, and the driver's
   // stderr — the app's log — is only written while the loop turns. With it
   // blocked the log arrived after the tests that read it had finished.
-  const tests = spawn(command, args, {
+  const tests = spawn(process.execPath, argv, {
     cwd: here,
     stdio: 'inherit',
     env: {
@@ -95,5 +93,5 @@ try {
   })
   process.exitCode = await new Promise((done) => tests.on('exit', (code) => done(code ?? 1)))
 } finally {
-  driver.kill()
+  stopDriver(driver)
 }
