@@ -44,11 +44,15 @@ export async function seedBoard(window, repo) {
     irreversible: false,
   })
   const lane = board.columns[1]
-  const steps = step.steps ?? []
+  // The step this call just made, by name — not `steps[0]`. The answer carries
+  // every step the project has, and a test file that made one of its own
+  // changes which is first: the lane then runs somebody else's step and the
+  // board says a word this seed never chose.
+  const mine = (step.steps ?? []).find((one) => one.name === 'tests')
   await invoke(window, 'column_set_step', {
     projectId: project.id,
     columnId: lane.id,
-    stepId: steps[0]?.id ?? null,
+    stepId: mine?.id ?? null,
   })
 
   const first = await invoke(window, 'card_create', {
