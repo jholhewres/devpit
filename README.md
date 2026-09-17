@@ -140,31 +140,49 @@ toll gate.
 
 ## Installing
 
-Both packages are on the [latest release][releases]. Take the AppImage unless
-you have a reason not to: it is the one that updates itself.
+Linux and macOS are on the [latest release][releases]. On Linux, take the
+AppImage unless you have a reason not to: it is the one that updates itself.
 
-The commands below name `0.1.0` because the version is part of the file name.
+The commands below name `0.1.1` because the version is part of the file name.
 Check the releases page for the current one, or let an installed devpit update
 itself and never type a version again.
 
-**AppImage.** devpit checks for a new version, verifies its signature, installs
-it over itself and restarts. Your terminals keep running through it — they are
-tmux sessions, and tmux does not go down with the window.
+**AppImage (Linux).** devpit checks for a new version, verifies its signature,
+installs it over itself and restarts. Your terminals keep running through it —
+they are tmux sessions, and tmux does not go down with the window.
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.0_amd64.AppImage
-chmod +x devpit_0.1.0_amd64.AppImage
-./devpit_0.1.0_amd64.AppImage
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.1_amd64.AppImage
+chmod +x devpit_0.1.1_amd64.AppImage
+./devpit_0.1.1_amd64.AppImage
 ```
 
-**`.deb`.** devpit downloads the new version and verifies it, then shows you
-the command and never runs it. Installing a system package means asking for
-root, and devpit does not ask for root on your behalf.
+**`.deb` (Debian, Ubuntu).** devpit downloads the new version and verifies it,
+then shows you the command and never runs it. Installing a system package means
+asking for root, and devpit does not ask for root on your behalf.
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.0_amd64.deb
-sudo apt install ./devpit_0.1.0_amd64.deb
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.1_amd64.deb
+sudo apt install ./devpit_0.1.1_amd64.deb
 ```
+
+**`.dmg` (macOS).** Apple silicon and Intel, one file each — take the one that
+matches your Mac. devpit updates itself here too: it downloads the `.app`,
+checks the signature and replaces itself.
+
+The download is **not signed with an Apple Developer ID and not notarised**, so
+the first open is refused by Gatekeeper with "devpit is damaged" or "cannot be
+opened". That is the missing certificate talking, not the file. Open it once
+with right-click → Open, or clear the quarantine flag yourself:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/devpit.app
+```
+
+Check `SHA256SUMS` first if you are going to do that — see below.
+
+**Windows** is not built yet. The terminal is tmux and tmux is not a thing
+there, so it is a port rather than a build; it is not in this release.
 
 Every release carries a `SHA256SUMS`, and checking it is one line:
 
