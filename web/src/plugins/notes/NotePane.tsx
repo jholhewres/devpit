@@ -1,27 +1,29 @@
-import { useState } from 'react'
+import { lazy, Suspense } from 'react'
 
-import { Markdown } from '../../shell/Markdown'
+import { darkNow } from '../../shell/terminal'
 import type { Tab } from '../../shell/strip'
-import { TextEditor } from '../TextEditor'
 import { usePluginFile } from '../usePluginFile'
-import { NOTES_KIND, stemOf } from './noteFiles'
+import { NOTES_KIND } from './noteFiles'
+
+/* The editor is the heaviest thing a note loads, so it arrives when a note is
+   opened and not before. */
+const NoteEditor = lazy(() =>
+  import('./NoteEditor').then((module) => ({ default: module.NoteEditor })),
+)
 
 /*
- * One note: what was typed on the left, what it reads as on the right.
+ * One note, edited the way it reads.
  *
- * The preview is the window's own `Markdown`, which already draws fenced
- * mermaid blocks — so a note with a diagram in it works without a line of
- * work here, and a heading looks the way a card's description does.
+ * No split and no preview: what is on screen is the note. A pane of source
+ * beside a pane of output is two things to look at for one document, and the
+ * whole point of a block editor is that there is only one.
  *
- * Wikilinks, backlinks and a graph are not here. They are the second half of
- * this Capability and a plan of their own; what this is, is a note.
+ * What is written to disk is Markdown, because that is what the editor works
+ * in and what the file is.
  */
 
 export function NotePane({ tab, name }: { tab: Tab; name: string }): React.JSX.Element {
   const file = usePluginFile(NOTES_KIND, name)
-  /* What the preview reads: the text as typed, ahead of the save. */
-  const [typed, setTyped] = useState<string | null>(null)
-  const showing = typed ?? file.text
 
   if (file.problem) {
     return (
@@ -33,27 +35,16 @@ export function NotePane({ tab, name }: { tab: Tab; name: string }): React.JSX.E
 
   return (
     <div className="note" data-tab={tab.id}>
-      <div className="note__edit">
-        {file.text !== null && (
-          <TextEditor
+      {file.text !== null && (
+        <Suspense fallback={<p className="bell__none">Opening…</p>}>
+          <NoteEditor
             key={file.generation}
             value={file.text}
-            language="markdown"
-            label={`${stemOf(name)} source`}
-            onChange={(text) => {
-              setTyped(text)
-              file.change(text)
-            }}
+            dark={darkNow()}
+            onChange={file.change}
           />
-        )}
-      </div>
-      <div className="note__see md">
-        {showing !== null && showing !== '' ? (
-          <Markdown source={showing} />
-        ) : (
-          <p className="bell__none">An empty note.</p>
-        )}
-      </div>
+        </Suspense>
+      )}
       {file.conflict && (
         <div className="plg-excalidraw__problem" role="alert">
           This note changed on disk while it was open.
