@@ -77,11 +77,16 @@ pub fn stop(pid: Option<u32>, grace: Duration, ask: impl FnOnce()) -> Stopped {
 /// `apps/desktop/src/in_flight.rs` made the same call for the same reason, and
 /// a dependency taken for one signal is a dependency to keep in step forever.
 fn alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false)
+    match Command::new("kill").args(["-0", &pid.to_string()]).output() {
+        Ok(out) => out.status.success(),
+        // Could not ask. "I do not know" is not "it is gone", and this is
+        // polled sixty times in a grace period — sixty forks on a machine
+        // already under load. One that fails used to read as a child that
+        // left, which skips the `SIGKILL` and reports an end to a window
+        // whose process is still running. Saying "still there" costs a
+        // signal to a pid that may not need it, which the kernel ignores.
+        Err(_) => true,
+    }
 }
 
 fn insist(pid: u32) {
