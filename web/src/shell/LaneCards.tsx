@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 
 import type { Card, Played } from '../gen/bindings'
 import { playable, type Lane } from './board'
-import { CardMenu } from './CardMenu'
+import { CardMenu } from './CardMenuView'
 import { Tile } from './Lane'
 import { tileAction } from './tileKeys'
 import type { CardBoardActs } from './useCardActs'

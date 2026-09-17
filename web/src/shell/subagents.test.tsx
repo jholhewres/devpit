@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message, Part } from '../gen/bindings'
 import { acts } from './acts'
-import { Acts } from './Acts'
+import { Acts } from './ActsRows'
 import { Turn } from './Turn'
 
 afterEach(cleanup)

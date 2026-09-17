@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
-import { Changes } from './Changes'
-import { Explorer } from './Explorer'
+import { Changes } from './ChangesPanel'
+import { Explorer } from './ExplorerView'
 import { History } from './History'
 import { useExplorerState } from './useExplorerState'
 import { useFileIndex } from './useFileIndex'

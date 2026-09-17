@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ColumnDeleted } from '../gen/bindings'
-import { LaneMenu, moveTitle } from './LaneMenu'
+import { LaneMenu, moveTitle } from './LaneMenuView'
 
 afterEach(cleanup)
 

@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { acts, actionLabel, grouped, groupTarget, headline, isGroup, type Act, type Group, type Kind } from './acts'
 import type { Part } from '../gen/bindings'
 import { editDiff } from './editCard'
-import { EditCard } from './EditCard'
-import { Markdown } from './Markdown'
+import { EditCard } from './EditCardView'
+import { Markdown } from './MarkdownView'
 
 /*
  * What the agent did, as a foldable stack of rows.

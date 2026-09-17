@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { Skill } from '../gen/bindings'
 import { ask, commands } from './live'
-import { Markdown } from './Markdown'
+import { Markdown } from './MarkdownView'
 
 /*
  * One skill, as written.

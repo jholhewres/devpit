@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Part } from '../gen/bindings'
-import { Acts } from './Acts'
+import { Acts } from './ActsRows'
 
 afterEach(cleanup)
 

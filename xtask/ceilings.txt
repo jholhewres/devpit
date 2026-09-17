@@ -65,13 +65,13 @@ crates/steps/src/runner.rs 150
 crates/tmux/src/lib.rs 250
 web/src/shell/AppShell.tsx 150
 web/src/shell/BoardPane.tsx 200
-web/src/shell/Changes.tsx 200
+web/src/shell/ChangesPanel.tsx 200
 web/src/shell/ChatPane.tsx 200
 web/src/shell/ContextMenu.tsx 150
 web/src/shell/DiffPane.tsx 150
-web/src/shell/Explorer.tsx 200
+web/src/shell/ExplorerView.tsx 200
 web/src/shell/FilePane.tsx 150
-web/src/shell/Markdown.tsx 200
+web/src/shell/MarkdownView.tsx 200
 web/src/shell/Onboarding.tsx 150
 web/src/shell/Palette.tsx 150
 web/src/shell/Panes.tsx 100

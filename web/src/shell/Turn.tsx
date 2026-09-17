@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { Acts } from './Acts'
+import { Acts } from './ActsRows'
 import type { Message } from '../gen/bindings'
-import { Markdown } from './Markdown'
+import { Markdown } from './MarkdownView'
 import { Rewound } from './Rewound'
-import { TurnChanges } from './TurnChanges'
+import { TurnChanges } from './TurnChangesView'
 import { advanced, opened } from './veil'
 
 /*

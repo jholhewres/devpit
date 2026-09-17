@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import mark from '../assets/brand/mark.png'
 import { BranchPicker } from './BranchPicker'
-import { HeadsDown } from './HeadsDown'
+import { HeadsDown } from './HeadsDownControl'
 import { Notices } from './Notices'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'

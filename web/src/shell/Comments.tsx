@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import type { Comment } from '../gen/bindings'
-import { Markdown } from './Markdown'
+import { Markdown } from './MarkdownView'
 import { since } from './projects'
 import { committed } from './typing'
 

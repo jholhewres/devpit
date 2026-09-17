@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Change, Project } from '../gen/bindings'
-import { Changes } from './Changes'
+import { Changes } from './ChangesPanel'
 import type { UseTree } from './useTree'
 
 afterEach(cleanup)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Markdown } from './Markdown'
+import { Markdown } from './MarkdownView'
 
 /*
  * A card's description: read as Markdown, written as text.

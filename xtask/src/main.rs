@@ -14,6 +14,7 @@ mod csp;
 mod dead_controls;
 mod home_paths;
 mod naming;
+mod one_spelling;
 mod packaging;
 mod platform_window;
 mod ratchet;
@@ -107,6 +108,7 @@ fn check() -> ExitCode {
     findings.extend(shell_boundary::core_does_not_know_the_shell(&root));
     findings.extend(platform_window::platform_window_matches_the_base(&root));
     findings.extend(naming::nothing_is_named_after_nothing(&root));
+    findings.extend(one_spelling::every_name_has_one_spelling(&root));
     findings.extend(ratchet::files_only_get_shorter(&root));
     findings.extend(agent_boundary::only_one_crate_drives_the_agent(&root));
     findings.extend(dead_controls::a_control_either_works_or_goes(&root));

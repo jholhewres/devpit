@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { PaneRunning } from '../gen/bindings'
-import { SessionRows } from './SessionRows'
+import { SessionRows } from './SessionRowsView'
 import { StopRunning } from './StopRunning'
 import type { Subagents } from './subagents'
 import type { Tab } from './strip'

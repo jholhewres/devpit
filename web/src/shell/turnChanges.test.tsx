@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Part } from '../gen/bindings'
 import { byAgent, totals } from './turnChanges'
-import { TurnChanges } from './TurnChanges'
+import { TurnChanges } from './TurnChangesView'
 import { Turn } from './Turn'
 
 afterEach(cleanup)

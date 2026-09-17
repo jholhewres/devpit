@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import type { Checked } from '../gen/bindings'
 import { ask, commands } from './live'
 import { CURRENT_MEANS, saidNothing, validityWords, verdictWords, whoseWords } from './checked'
-import { FoundPane } from './Found'
-import { WouldRunCard } from './WouldRun'
+import { FoundPane } from './FoundPane'
+import { WouldRunCard } from './WouldRunCard'
 
 /*
  * What one run proves, under the row that ran it.

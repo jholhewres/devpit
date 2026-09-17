@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { HeadsDown as Stored } from '../gen/bindings'
-import { HeadsDown } from './HeadsDown'
+import { HeadsDown } from './HeadsDownControl'
 
 let stored: Stored | null = null
 const written: (string | null)[] = []
