@@ -45,12 +45,16 @@ const tests = readdirSync(join(here, 'tests'))
 
 // One at a time: the app writes to a seeded home and drives one window, and
 // two of those at once is two answers to "what is on screen".
-// A ceiling per test, hooks included. Without it a `before` that never
+// A ceiling per file, hooks included. Without it a `before` that never
 // settles takes the whole suite with it: the runner prints `TAP version 13`
-// and then nothing at all, and an hour later the job is cancelled with no
-// line saying where it stopped. Two minutes is longer than any test here
-// takes and short enough to be a message rather than a mystery.
-const argv = ['--test', '--test-concurrency=1', '--test-timeout=120000', ...tests]
+// and then nothing at all, and an hour later the job is cancelled with no line
+// saying where it stopped.
+//
+// Ten minutes, not two: `screens.test.mjs` opens a window, drives eight
+// screens and photographs each one, and two minutes cut it off in the middle
+// of work it was doing. A ceiling that fails honest work teaches you to raise
+// it until it catches nothing.
+const argv = ['--test', '--test-concurrency=1', '--test-timeout=600000', ...tests]
 // A virtual display when there is no real one: CI has none, and a suite that
 // only runs on somebody's desktop is a suite that runs once.
 const [command, args] = needsXvfb()
