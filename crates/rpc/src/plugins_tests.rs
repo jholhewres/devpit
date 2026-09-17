@@ -15,12 +15,20 @@ fn minimal_manifest(id: &str) -> PluginManifest {
     }
 }
 
+fn shipped(id: &str) -> PluginManifest {
+    catalogue()
+        .into_iter()
+        .find(|one| one.id == id)
+        .unwrap_or_else(|| panic!("{id} is shipped"))
+}
+
+/// Every Capability this build ships, and the shape of the first of them.
 #[test]
-fn catalogue_returns_the_excalidraw_manifest() {
-    let manifests = catalogue();
-    assert_eq!(manifests.len(), 1);
-    let excalidraw = &manifests[0];
-    assert_eq!(excalidraw.id, "excalidraw");
+fn the_catalogue_ships_the_capabilities_the_window_mounts() {
+    let ids: Vec<String> = catalogue().into_iter().map(|one| one.id).collect();
+    assert_eq!(ids, vec!["excalidraw", "notes", "data"]);
+
+    let excalidraw = shipped("excalidraw");
     assert_eq!(excalidraw.data.extensions, vec![".excalidraw".to_owned()]);
     assert_eq!(excalidraw.data.max_bytes, MAX_DATA_BYTES);
     assert_eq!(
@@ -28,6 +36,14 @@ fn catalogue_returns_the_excalidraw_manifest() {
         vec![Surface::Pane { many: true }, Surface::CardPin]
     );
     assert_eq!(excalidraw.permissions, vec![Permission::DataOwn]);
+
+    // The window names these extensions too; a rename here without one there
+    // opens a pane no file ever reaches.
+    assert_eq!(shipped("notes").data.extensions, vec![".md".to_owned()]);
+    assert_eq!(
+        shipped("data").data.extensions,
+        vec![".json".to_owned(), ".yaml".to_owned(), ".yml".to_owned()]
+    );
 }
 
 #[test]
