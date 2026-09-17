@@ -51,7 +51,7 @@
       "endpoints": [
         "https://github.com/jholhewres/devpit/releases/latest/download/latest-{{bundle_type}}.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcxMDE5QTFEQ0UyRTkxQTkKUldTcGtTN09IWm9CY1hJZEh0Tkg3MERPM0hVR1UyaVR6V3g2VE9CaU5mUk9HR1RGb0UyNGRzaFEK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI3RjQ4Njc0RDRBMDU4MjQKUldRa1dLRFVkSWIwdDFVTDBjYmw4ZDdNTE52Rmx5ajZTcStGYjNDelFsUTc3MkxVRHFPalFkaSsK"
     }
   }
 }
