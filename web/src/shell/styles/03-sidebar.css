@@ -303,7 +303,10 @@ body[data-account='out'] .acct { display: none; }
 .auth__b:hover { background: var(--overlay-strong); }
 .auth__b svg { flex: none; color: var(--text-2); }
 .auth__code { margin-top: 14px; padding: 12px 18px; border-radius: 10px; background: var(--inset); border: 1px solid var(--border-strong); color: var(--text); font-family: var(--mono); font-size: 19px; letter-spacing: 0.16em; }
-.auth__failed { margin-top: 12px; padding: 8px 11px; border-radius: 8px; background: hsl(4 66% 65% / 0.1); border: 1px solid hsl(4 66% 65% / 0.35); color: var(--danger); font-size: 12px; text-align: center; }
+/* Between the description and the button, and the space is its own: the
+   description's 18px sits above it, so a top margin here would stack into a
+   gap twice the one below — which is how it read, glued to the button. */
+.auth__failed { margin: 0 0 14px; padding: 8px 11px; border-radius: 8px; background: hsl(4 66% 65% / 0.1); border: 1px solid hsl(4 66% 65% / 0.35); color: var(--danger); font-size: 12px; line-height: 1.5; text-align: center; }
 .auth__x { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .auth__x:hover { background: var(--overlay-strong); color: var(--text); }
 .auth__fine { margin-top: 14px; font-size: 10.5px; color: var(--ghost); text-align: center; }
