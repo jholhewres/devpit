@@ -82,7 +82,11 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
     // runs nightly and on request instead, and is worth reading before a tag.
     // What must never go is this: the tree is tested before anything is built
     // to publish.
-    if !text.contains("- run: make test") {
+    // The whole line, not a substring of it: `make test-rust` is the machine
+    // half a Mac runs, and it contains `make test` — so `contains` would have
+    // let a release publish having run everything except the frontend. This
+    // test caught exactly that when the split was made.
+    if !text.lines().any(|line| line.trim() == "- run: make test") {
         said.push((
             at("  release:").unwrap_or(1),
             "publishes without running the tests first".to_owned(),

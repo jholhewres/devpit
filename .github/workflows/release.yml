@@ -90,7 +90,15 @@ jobs:
             exit 1
           fi
 
+      # The whole gate on Linux, the machine half on a Mac. The frontend suite
+      # is jsdom, which is the same everywhere, and it has cost this release
+      # two runs without saying anything about what a Mac builds. What every
+      # runner still answers to is the Rust half, because that is the half
+      # that asks the operating system questions.
       - run: make test
+        if: runner.os == 'Linux'
+      - run: make test-rust
+        if: runner.os != 'Linux'
 
       # Everything that runs somebody else's code happens here, without the
       # key: the frontend build runs every npm dependency, and cargo runs every

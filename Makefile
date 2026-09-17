@@ -27,7 +27,7 @@ TEST_ENV := HOME=$(TEST_HOME) \
 	RUSTUP_HOME=$(RUSTUP_HOME)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev build test fmt clean e2e
+.PHONY: help setup dev build test test-rust fmt clean e2e
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -53,7 +53,20 @@ build: node_modules ## Bundle a release binary, frontend included
 # That overlay also needs TAURI_SIGNING_PRIVATE_KEY, and on this distribution
 # the AppImage step needs librsvg2-dev for linuxdeploy's gtk plugin.
 
-test: node_modules ## Everything CI runs: guards, Rust, frontend
+test: node_modules test-rust ## Everything CI runs: guards, Rust, frontend
+	pnpm --filter ./web test
+	pnpm --filter ./web build
+	@echo "\nall green"
+
+# The half that is about this machine: the guards, and the tests that spawn
+# processes, signal groups and look for programs on disk. It is what a release
+# runs on every platform it builds for — a `/bin/true` that is somewhere else
+# on a Mac is exactly the kind of thing only the Mac can say.
+#
+# The frontend half is not here on purpose. It runs in jsdom, which is the same
+# jsdom everywhere, and running it three times has so far cost a release rather
+# than found a bug in one.
+test-rust: node_modules ## Guards and the Rust tests, without the frontend
 	cargo fmt --all --check
 	cargo xtask check
 	cargo clippy --workspace --all-targets -- -D warnings
@@ -61,9 +74,6 @@ test: node_modules ## Everything CI runs: guards, Rust, frontend
 	@mkdir -p $(TEST_HOME)/.cache $(TEST_HOME)/.config $(TEST_HOME)/.local/share
 	@touch $(TEST_HOME)/.zshenv $(TEST_HOME)/.zshrc $(TEST_HOME)/.bashrc $(TEST_HOME)/.profile
 	$(TEST_ENV) cargo test --workspace
-	pnpm --filter ./web test
-	pnpm --filter ./web build
-	@echo "\nall green"
 
 e2e: node_modules ## The built app, driven through a WebDriver (minutes, not seconds)
 	./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.conf.json
