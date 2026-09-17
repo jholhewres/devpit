@@ -673,3 +673,30 @@ fn an_install_told_to_go_ahead_does_not_wait_for_work_that_would_not_stop() {
         None
     );
 }
+
+/// The three failures that actually reach a person, said so they can act.
+///
+/// The plugin's own words are for a log: "Could not fetch a valid release JSON
+/// from the remote" reads as a broken app to somebody whose only real problem
+/// is that they are offline. Sabotage: pass the error through with `{err}` and
+/// every one of these says the same unusable sentence.
+#[test]
+fn a_failed_check_says_something_a_person_can_do_something_about() {
+    use tauri_plugin_updater::Error;
+
+    let silence = why_the_check_failed(&Error::ReleaseNotFound);
+    assert!(silence.contains("offline"), "{silence}");
+    assert!(silence.contains("no published release feed"), "{silence}");
+
+    // A feed that answered, with nothing for this machine: a different problem
+    // and a different answer, so it must not read as the one above.
+    let wrong_machine = why_the_check_failed(&Error::TargetNotFound("darwin-aarch64".to_owned()));
+    assert!(wrong_machine.contains("darwin-aarch64"), "{wrong_machine}");
+    assert!(!wrong_machine.contains("offline"), "{wrong_machine}");
+
+    // Nowhere to ask is ours, not theirs: nobody should be sent to check a
+    // connection over a build that was packaged without a feed.
+    let no_feed = why_the_check_failed(&Error::EmptyEndpoints);
+    assert!(no_feed.contains("no update feed"), "{no_feed}");
+    assert!(!no_feed.contains("offline"), "{no_feed}");
+}

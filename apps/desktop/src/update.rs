@@ -489,11 +489,61 @@ async fn asked(
             Ok(None) => (Event::NothingNewer, None),
             Err(err) => (
                 Event::Failed {
-                    message: format!("could not check for an update: {err}"),
+                    message: why_the_check_failed(&err),
                 },
                 None,
             ),
         },
+    }
+}
+
+/// The plugin's failure, said to the person in front of the window.
+///
+/// The plugin writes for whoever is reading a log: "Could not fetch a valid
+/// release JSON from the remote" is true, names nothing anybody can do, and
+/// reads like the app is broken when the app did exactly what it should. The
+/// three that actually happen are worth separating, because the answer is
+/// different for each — wait, upgrade by hand, or nothing at all.
+fn why_the_check_failed(err: &tauri_plugin_updater::Error) -> String {
+    use tauri_plugin_updater::Error;
+    match err {
+        /* Every endpoint answered with something that was not a release: no
+        network, or a feed that is not published where this build looks.
+        From here the two are the same silence. */
+        Error::ReleaseNotFound => {
+            "Nothing answered where devpit looks for updates. Either this machine is offline, \
+             or there is no published release feed for this build yet."
+                .to_owned()
+        }
+        /* The feed is fine and has nothing for this machine. Saying so beats
+        "not found", which sends somebody to check their connection. */
+        Error::TargetNotFound(target) => {
+            format!("There is a release, but it carries nothing for this machine ({target}).")
+        }
+        Error::TargetsNotFound(targets) => format!(
+            "There is a release, but it carries nothing for this machine ({}).",
+            targets.join(", ")
+        ),
+        Error::UnsupportedOs | Error::UnsupportedArch => {
+            "devpit does not publish updates for this system yet. Installing a new version \
+             means downloading it."
+                .to_owned()
+        }
+        /* Not the network and not the release: this build was packaged with
+        nowhere to ask. Nothing the person can do, and they should not be
+        sent looking. */
+        Error::EmptyEndpoints => {
+            "This build carries no update feed, so there is nothing to check.".to_owned()
+        }
+        Error::Network(said) => format!("Could not reach the update feed: {said}"),
+        Error::Reqwest(said) => format!("Could not reach the update feed: {said}"),
+        /* Something is published and it is not readable. That is ours to fix,
+        and the raw error is what says which part. */
+        Error::Semver(said) => format!("The update feed says a version devpit cannot read: {said}"),
+        Error::Serialization(said) => {
+            format!("The update feed answered something devpit cannot read: {said}")
+        }
+        other => format!("could not check for an update: {other}"),
     }
 }
 
