@@ -12,9 +12,22 @@ fn session_names_are_safe_for_tmux() {
     assert!(Server::session_name("x").starts_with("devpit_"));
 }
 
+/// A program that exits zero, wherever this system keeps it.
+///
+/// `/bin/true` is Linux's; macOS ships it as `/usr/bin/true` and has no
+/// `/bin/true` at all, which is how this test failed a release on a Mac while
+/// saying nothing about tmux.
+fn a_program_that_exits_zero() -> &'static Path {
+    ["/bin/true", "/usr/bin/true"]
+        .iter()
+        .map(Path::new)
+        .find(|path| path.exists())
+        .expect("no `true` on this system")
+}
+
 #[test]
 fn availability_follows_the_program_exit() {
-    assert!(Server::available_at(Path::new("/bin/true")));
+    assert!(Server::available_at(a_program_that_exits_zero()));
     assert!(!Server::available_at(Path::new(
         "/path/that/does/not/contain/tmux"
     )));
