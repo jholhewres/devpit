@@ -8,9 +8,10 @@
  */
 
 import { spawn } from 'node:child_process'
-import { onPath } from './preflight.mjs'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { setTimeout as wait } from 'node:timers/promises'
+
+import { needsXvfb, onPath } from './preflight.mjs'
 import { Builder } from 'selenium-webdriver'
 
 const PORT = Number(process.env.E2E_DRIVER_PORT ?? 4444)
@@ -24,7 +25,17 @@ const PORT = Number(process.env.E2E_DRIVER_PORT ?? 4444)
  * capability quietly ignored, the suite drove the app against the real home
  * and read the real plan usage out of the real CLI's credentials.
  */
-export async function startDriver({ port = PORT, env = {}, log = null, headless = false } = {}) {
+export async function startDriver({
+  port = PORT,
+  env = {},
+  log = null,
+  // Decided here rather than asked of every caller. A test that starts a
+  // driver of its own — `seed.test.mjs` needs two homes, so it needs two —
+  // had no way to know it was the one thing standing between the app and a
+  // screen, and every window it opened died with "Failed to initialize GTK"
+  // while the file sat out its ten minutes.
+  headless = needsXvfb(),
+} = {}) {
   // The native WebKitWebDriver listens next door, on port + 1 by default. Two
   // drivers on neighbouring ports take each other's native port, and the
   // second session fails with "Failed to match capabilities".

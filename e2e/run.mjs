@@ -15,7 +15,6 @@ import { seedEnv, seedHome } from './lib/home.mjs'
 import {
   missingBuild,
   missingTools,
-  needsXvfb,
   notTheRealHome,
   refusal,
   theShellFindsTheStub,
@@ -73,7 +72,7 @@ const log = join(seeded.home, 'app.log')
 // A virtual display when there is no real one: CI has none, and a suite that
 // only runs on somebody's desktop is a suite that runs once. It goes on the
 // driver because the app is the driver's child.
-const driver = await startDriver({ env: seedEnv(seeded), log, headless: needsXvfb() })
+const driver = await startDriver({ env: seedEnv(seeded), log })
 try {
   // Not spawnSync: that blocks this process's event loop, and the driver's
   // stderr — the app's log — is only written while the loop turns. With it

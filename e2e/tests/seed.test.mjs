@@ -13,7 +13,7 @@ import { By, until } from 'selenium-webdriver'
 
 import { seedEnv, seedHome } from '../lib/home.mjs'
 import { invoke, seedBoard } from '../lib/seed.mjs'
-import { insideTheSeededHome, openWindow, startDriver } from '../lib/session.mjs'
+import { insideTheSeededHome, openWindow, startDriver, stopDriver } from '../lib/session.mjs'
 
 const root = process.env.E2E_ROOT ?? join(import.meta.dirname, '..', '..')
 
@@ -48,7 +48,9 @@ async function seedOnce(name, port) {
     return shape(await invoke(window, 'board_get', { projectId: project.id }))
   } finally {
     await window.quit()
-    driver.kill()
+    // Not `kill`: headless, the driver runs under an `xvfb-run` that survives
+    // a signal to itself and leaves the port taken for the next run.
+    stopDriver(driver)
   }
 }
 
