@@ -71,7 +71,10 @@ pub fn start_chained(
 
     // Written now, never from a later event: something arriving after the fact
     // must not reattribute this run to whatever is active by then.
-    store.record_whose_run(
+    // Recorded, not required: a row that could not say whose it was reads as
+    // `unknown`, and that is a worse answer than the truth but a far better
+    // one than refusing to do the work. The same rule the snapshot follows.
+    if let Err(err) = store.record_whose_run(
         &run_id,
         &WhoseRun {
             asked,
@@ -86,7 +89,9 @@ pub fn start_chained(
                 StepKind::Command | StepKind::Session => Carried::Process,
             },
         },
-    )?;
+    ) {
+        eprintln!("could not record whose run {run_id} is: {err}");
+    }
     // Heard in the one order everything else about the card is heard in.
     run_heard(
         &app,
