@@ -80,7 +80,13 @@ export async function openWindow(binary, { port = PORT } = {}) {
   // called waits forever, and a suite that hangs tells you nothing an hour
   // later. Thirty seconds is longer than any command in this app takes and
   // short enough that a stuck one is a failure with a message on it.
-  await window.manage().setTimeouts({ script: 30000, pageLoad: 60000 })
+  // Not fatal: a driver without the endpoint is a driver that keeps its own
+  // defaults, and refusing to open a window over it would fail every file for
+  // a setting that only makes failures faster.
+  await window
+    .manage()
+    .setTimeouts({ script: 30000, pageLoad: 60000 })
+    .catch(() => {})
   return window
 }
 
