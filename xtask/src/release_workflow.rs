@@ -76,12 +76,16 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
         ));
     }
 
-    // Nothing ships that the end-to-end suite has not driven: the release job
-    // waits for the call to it.
-    if !text.contains("uses: ./.github/workflows/e2e.yml") || !text.contains("needs: e2e") {
+    // Nothing ships that the test gate has not answered to. The end-to-end
+    // suite used to be a second gate here and is not any more — it drives a
+    // real window, takes half an hour, and a flake in it cost releases. It
+    // runs nightly and on request instead, and is worth reading before a tag.
+    // What must never go is this: the tree is tested before anything is built
+    // to publish.
+    if !text.contains("- run: make test") {
         said.push((
             at("  release:").unwrap_or(1),
-            "publishes without waiting for the end-to-end suite".to_owned(),
+            "publishes without running the tests first".to_owned(),
         ));
     }
 

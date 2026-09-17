@@ -93,11 +93,15 @@ fn a_checkout_that_keeps_the_token_is_refused() {
 /// A release that does not wait for the end-to-end suite ships whatever the
 /// unit tests missed.
 #[test]
-fn a_release_that_does_not_wait_for_the_end_to_end_suite_is_refused() {
-    let hurried = ours().replace("    needs: e2e\n", "");
-    assert!(refusals(&hurried)
-        .iter()
-        .any(|(_, what)| what.contains("end-to-end suite")));
+fn a_release_that_publishes_without_testing_is_refused() {
+    let untested = ours().replace("      - run: make test\n", "");
+    let broken = refusals(&untested);
+    assert!(
+        broken
+            .iter()
+            .any(|(_, what)| what.contains("without running the tests")),
+        "a release that never runs the tests was accepted: {broken:?}"
+    );
 }
 
 /// The called workflow runs inside the release, so its actions are pinned too.
