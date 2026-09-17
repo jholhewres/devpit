@@ -50,28 +50,26 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
     let watching = Arc::clone(&in_flight);
     let watched = id.clone();
 
+    // The card shows work as it happens rather than a spinner that ends in a
+    // wall of text. Both kinds that produce output get this: a command step
+    // went without it for a year while the docs promised otherwise, which is
+    // the whole reason it is built once here rather than twice below.
+    let progress = app.clone();
+    let run = id.clone();
+    let on_progress = move |text: &str| {
+        let _ = progress.emit("run:progress", (run.clone(), text.to_owned()));
+    };
+
     let outcome = match step.kind {
         StepKind::Agent => {
-            let progress = app.clone();
-            let run = id.clone();
-            steps::agent::run(
-                store,
-                &card,
-                &step,
-                &id,
-                &session_id,
-                |text| {
-                    // The card shows work as it happens rather than a
-                    // spinner that ends in a wall of text.
-                    let _ = progress.emit("run:progress", (run.clone(), text.to_owned()));
-                },
-                |pid| watching.watch(&watched, pid),
-            )
+            steps::agent::run(store, &card, &step, &id, &session_id, on_progress, |pid| {
+                watching.watch(&watched, pid)
+            })
         }
         StepKind::Session => steps::session::start(store, &card, &step, &session_id),
-        StepKind::Command => {
-            steps::command::run(store, &card, &step, |pid| watching.watch(&watched, pid))
-        }
+        StepKind::Command => steps::command::run(store, &card, &step, on_progress, |pid| {
+            watching.watch(&watched, pid)
+        }),
     };
 
     let answered = match &outcome {

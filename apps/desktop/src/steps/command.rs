@@ -15,6 +15,7 @@ pub fn run(
     store: &Store,
     card_id: &str,
     step: &Step,
+    mut on_progress: impl FnMut(&str),
     on_pid: impl FnOnce(u32),
 ) -> Result<Finished, String> {
     let manifest = steps::validate(&step.config).map_err(|err| err.to_string())?;
@@ -49,10 +50,13 @@ pub fn run(
         manifest.timeout_seconds.map(std::time::Duration::from_secs),
         on_pid,
         |said| {
-            output.push_str(&said.text);
-            if said.cut {
-                output.push_str(" … (line cut)");
-            }
+            let line = if said.cut {
+                format!("{} … (line cut)", said.text)
+            } else {
+                said.text.clone()
+            };
+            on_progress(&line);
+            output.push_str(&line);
             output.push('\n');
         },
     )
@@ -83,3 +87,7 @@ pub fn run(
         exit_code: ended.exit_code,
     })
 }
+
+#[cfg(test)]
+#[path = "command_tests.rs"]
+mod tests;
