@@ -112,3 +112,22 @@
 .cdiff__r { padding: 0 16px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; white-space: pre; color: var(--text-2); }
 .cdiff__r[data-kind='add'] { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--text); }
 .cdiff__r[data-kind='del'] { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--text); }
+
+/* What a run proves, under the row that ran it. Every state carries a word as
+   well as a colour: the point of this panel is that "green" is not an answer,
+   and a panel that said it in colour alone would be saying it again. */
+.chk { margin-top: 8px; padding: 10px 12px; background: var(--inset); border-radius: 8px; }
+.chk__l { display: flex; gap: 8px; align-items: baseline; margin: 0 0 6px; font-size: 12px; color: var(--text-3); }
+.chk__l b { flex: none; color: var(--text); }
+.chk__l[data-verdict='passed'] b { color: var(--success); }
+.chk__l[data-verdict='failed'] b { color: var(--danger); }
+.chk__l[data-verdict='inconclusive'] b { color: var(--warning); }
+.chk__l[data-validity='stale'] b { color: var(--warning); }
+.chk__no { margin: 0; font-size: 12px; color: var(--text-3); }
+.chk__ran { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 8px 0 0; font-size: 12px; }
+.chk__ran dt { color: var(--text-3); }
+.chk__ran dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+.chk__ran code { font-family: var(--mono); font-size: 11px; }
+/* The state is the control that opens the rest: the word a person is already
+   looking at to ask "what happened", rather than a second thing beside it. */
+button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }

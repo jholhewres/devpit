@@ -874,6 +874,7 @@ export const commands = {
 	 *  one is not a first run.
 	 */
 	settingsFinishOnboarding: () => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_finish_onboarding")),
+	checkpointRead: (runId: string) => typedError<Checked, RpcError>(__TAURI_INVOKE("checkpoint_read", { runId })),
 	/**  `plugin.list` — the catalogue, and what this project has on. */
 	pluginList: (projectId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_list", { projectId })),
 	/**
@@ -1215,6 +1216,30 @@ export type ChangedFile = {
 	path: string,
 	added: number,
 	removed: number,
+};
+
+/**
+ *  Everything the screen needs about one run, in one answer.
+ * 
+ *  The three states are separate fields and never one: a screen that had to
+ *  derive `Verdict` from `RunState` would be the screen that draws exit code
+ *  zero as a green tick.
+ */
+export type Checked = {
+	runId: string,
+	state: RunState,
+	verdict: Verdict,
+	validity: Validity,
+	/**
+	 *  What the run ran, or nothing for a row that never said. The screen
+	 *  showing nothing here says "unknown", not a blank that reads like none.
+	 */
+	ran: WhatRan | null,
+	/**
+	 *  The evidence's shape, when a run left any. The payload itself is asked
+	 *  for separately: a list of runs is not a place to send megabytes.
+	 */
+	evidenceVersion: number | null,
 };
 
 /**
@@ -2737,6 +2762,32 @@ export type Usage = {
 	panes: PaneCost[],
 };
 
+/**  Whether a verdict is still about the code in front of the person. */
+export type Validity = 
+/**  The revision and the local changes are the ones the run saw. */
+"current" | 
+/**  The code moved under it. Not wrong — about other code. */
+"stale" | 
+/**
+ *  Nothing recorded what the run saw, so nothing can say. Every run from
+ *  before migration 017 is this.
+ */
+"unknown";
+
+/**  What a run says about the thing it was checking. */
+export type Verdict = 
+/**  A report was read and everything in it passed. */
+"passed" | 
+/**  A report was read and something in it failed. */
+"failed" | 
+/**  The check never happened: the process never ran, or a person stopped it. */
+"notRun" | 
+/**
+ *  It ran and left nothing that answers the question. The commonest one,
+ *  and the one a screen must never draw as green.
+ */
+"inconclusive";
+
 /**
  *  What a focus has been holding, a page at a time.
  * 
@@ -2748,6 +2799,17 @@ export type Waiting = {
 	notices: Notice[],
 	/**  True when the page filled, so there may be another behind it. */
 	more: boolean,
+};
+
+/**  The circumstances of a run, as the screen reads them. */
+export type WhatRan = {
+	command: string | null,
+	inDirectory: string | null,
+	/**  The **names** of what devpit put in the environment, never the values. */
+	declaredEnv: string[],
+	baseRevision: string | null,
+	headRevision: string | null,
+	inAWorktree: boolean | null,
 };
 
 export type Widths = {

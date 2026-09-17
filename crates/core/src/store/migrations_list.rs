@@ -551,4 +551,17 @@ ALTER TABLE run ADD COLUMN evidence TEXT;
 ALTER TABLE run ADD COLUMN evidence_version INTEGER;
 "#,
     },
+    // Migration 018 — where the working tree stood when the run saw it.
+    Migration {
+        version: 18,
+        sql: r#"
+-- The revision alone cannot say whether a result is still about the code in
+-- front of somebody: uncommitted work is most of what a person is looking at.
+-- This is a digest of every changed path and the size of its edit, so a run
+-- from before an edit reads as `stale` instead of looking current.
+--
+-- Additive, like 017: NULL is `unknown`, which is what the screen says.
+ALTER TABLE run ADD COLUMN saw_changes TEXT;
+"#,
+    },
 ];

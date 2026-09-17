@@ -35,6 +35,7 @@ mod log;
 mod search;
 mod snapshot;
 mod sourcing;
+pub mod standing;
 mod status;
 mod worktrees;
 
@@ -57,6 +58,7 @@ pub use log::{history, show};
 pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};
 pub use snapshot::{changed_between, snapshot, Changed};
 pub use sourcing::{hidden_as, hidden_in, origin_of, shown, word_of};
+pub use standing::standing_at;
 pub use status::{changes, status, Status};
 pub use worktrees::{worktree_path, worktrees};
 

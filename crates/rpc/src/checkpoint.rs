@@ -140,6 +140,39 @@ pub fn validity(saw: &Fingerprint, now: &Fingerprint) -> Validity {
     }
 }
 
+/// Everything the screen needs about one run, in one answer.
+///
+/// The three states are separate fields and never one: a screen that had to
+/// derive `Verdict` from `RunState` would be the screen that draws exit code
+/// zero as a green tick.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Checked {
+    pub run_id: String,
+    pub state: RunState,
+    pub verdict: Verdict,
+    pub validity: Validity,
+    /// What the run ran, or nothing for a row that never said. The screen
+    /// showing nothing here says "unknown", not a blank that reads like none.
+    pub ran: Option<WhatRan>,
+    /// The evidence's shape, when a run left any. The payload itself is asked
+    /// for separately: a list of runs is not a place to send megabytes.
+    pub evidence_version: Option<f64>,
+}
+
+/// The circumstances of a run, as the screen reads them.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WhatRan {
+    pub command: Option<String>,
+    pub in_directory: Option<String>,
+    /// The **names** of what devpit put in the environment, never the values.
+    pub declared_env: Vec<String>,
+    pub base_revision: Option<String>,
+    pub head_revision: Option<String>,
+    pub in_a_worktree: Option<bool>,
+}
+
 #[cfg(test)]
 #[path = "checkpoint_tests.rs"]
 mod tests;

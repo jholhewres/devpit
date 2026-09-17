@@ -73,15 +73,34 @@ fn the_environment_is_recorded_by_name_and_never_by_value() {
     }
 }
 
-/// A directory that is no repository answers no revision, and that is an
-/// answer: the run still ran, and the row says the commit is unknown.
+/// A directory that is no repository answers no revision and no standing, and
+/// that is an answer: the run still ran, and the row says both are unknown.
 #[test]
-fn a_directory_that_is_no_repository_has_no_head() {
+fn a_directory_that_is_no_repository_has_no_head_and_no_standing() {
     let dir = tempfile::tempdir().expect("tempdir");
-    assert_eq!(
-        gathered("make test", dir.path(), &context(), false).head_revision,
-        None
-    );
+    let ran = gathered("make test", dir.path(), &context(), false);
+    assert_eq!(ran.head_revision, None);
+    assert_eq!(ran.saw_changes, None);
+}
+
+/// Where the tree stood is read before the command, beside the revision:
+/// together they are what a later look compares against.
+///
+/// Sabotage: stop recording `saw_changes` and every result reads `unknown`
+/// forever, because half a fingerprint is not one.
+#[test]
+fn a_run_in_a_repository_records_where_the_tree_stood() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["init", "--initial-branch=main", "-q"])
+        .output()
+        .expect("git init");
+    std::fs::write(dir.path().join("one.txt"), "one\n").expect("write");
+
+    let ran = gathered("make test", dir.path(), &context(), false);
+    assert!(ran.saw_changes.is_some(), "nothing recorded where it stood");
 }
 
 /// A snapshot that cannot be saved does not take the run down with it.

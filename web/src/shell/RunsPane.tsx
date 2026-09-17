@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectRun, RunCursor } from '../gen/bindings'
 import type { Lane } from './board'
 import { money } from './chat'
+import { Checked } from './Checked'
 import { ask, commands } from './live'
 import { asQuery, STATES, type RunFilters } from './runs'
 import { abandoned } from './typing'
@@ -28,6 +29,9 @@ export function RunsPane({
   onOpenCard: (cardId: string) => void
 }): React.JSX.Element {
   const [filters, setFilters] = useState<RunFilters>({ stepId: null, state: null, from: '', to: '' })
+  /* One at a time: what a run proves is read from the repository, and a list
+     that answered it for every row would run two processes per row. */
+  const [opened, setOpened] = useState<string | null>(null)
   const [runs, setRuns] = useState<readonly ProjectRun[]>([])
   const [next, setNext] = useState<RunCursor | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -124,8 +128,15 @@ export function RunsPane({
                 {run.startedAt !== null && ` · ${new Date(run.startedAt * 1000).toLocaleString()}`}
               </span>
               {run.output && <span className="crun__o">{run.output}</span>}
+              {opened === run.id && <Checked runId={run.id} />}
             </span>
-            <span className="crun__s">{run.state}</span>
+            <button
+              className="crun__s"
+              aria-expanded={opened === run.id}
+              onClick={() => setOpened(opened === run.id ? null : run.id)}
+            >
+              {run.state}
+            </button>
             {money(run.costUsd ?? 0) && <span className="crun__c">{money(run.costUsd ?? 0)}</span>}
           </div>
         ))}

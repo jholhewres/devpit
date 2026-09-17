@@ -34,6 +34,9 @@ pub fn gathered(command: &str, cwd: &Path, context: &Context, in_a_worktree: boo
             .collect(),
         base_revision: said(&context.base_ref),
         head_revision: devpit_git::head_of(cwd).ok(),
+        // Read before the command too: this is half of what says, later,
+        // whether the result is still about the code in front of somebody.
+        saw_changes: devpit_git::standing_at(cwd).ok(),
         in_a_worktree: Some(in_a_worktree),
     }
 }

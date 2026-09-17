@@ -26,6 +26,7 @@ fn a_snapshot() -> Ran {
         declared_env: vec!["DEVPIT_BRANCH".to_owned(), "DEVPIT_CARD".to_owned()],
         base_revision: Some("2f0bee9".to_owned()),
         head_revision: Some("ed16baf".to_owned()),
+        saw_changes: Some("a1b2c3".to_owned()),
         in_a_worktree: Some(true),
     }
 }
@@ -53,6 +54,7 @@ fn a_run_that_never_said_is_unknown_and_says_so() {
     assert!(!read.is_known(), "nothing recorded read as something known");
     assert_eq!(read.declared_env, Vec::<String>::new());
     assert_eq!(read.in_a_worktree, None, "a worktree was invented");
+    assert_eq!(read.saw_changes, None, "a standing was invented");
 }
 
 #[test]

@@ -39,6 +39,10 @@ pub struct Ran {
     pub declared_env: Vec<String>,
     pub base_revision: Option<String>,
     pub head_revision: Option<String>,
+    /// A digest of everything uncommitted when the run started. Together with
+    /// `head_revision` this is what says, later, whether a result is still
+    /// about the code in front of somebody.
+    pub saw_changes: Option<String>,
     /// `None` for a run from before this was recorded.
     pub in_a_worktree: Option<bool>,
 }
@@ -87,7 +91,8 @@ impl Store {
         };
         self.conn.execute(
             "UPDATE run SET ran_command = ?2, ran_in = ?3, declared_env = ?4, \
-             base_revision = ?5, head_revision = ?6, in_a_worktree = ?7 WHERE id = ?1",
+             base_revision = ?5, head_revision = ?6, in_a_worktree = ?7, saw_changes = ?8 \
+             WHERE id = ?1",
             rusqlite::params![
                 run_id,
                 ran.command,
@@ -96,6 +101,7 @@ impl Store {
                 ran.base_revision,
                 ran.head_revision,
                 ran.in_a_worktree.map(i64::from),
+                ran.saw_changes,
             ],
         )?;
         Ok(())
@@ -107,7 +113,7 @@ impl Store {
             .conn
             .query_row(
                 "SELECT ran_command, ran_in, declared_env, base_revision, head_revision, \
-                 in_a_worktree FROM run WHERE id = ?1",
+                 in_a_worktree, saw_changes FROM run WHERE id = ?1",
                 [run_id],
                 |row| {
                     let declared: Option<String> = row.get(2)?;
@@ -123,6 +129,7 @@ impl Store {
                         base_revision: row.get(3)?,
                         head_revision: row.get(4)?,
                         in_a_worktree: row.get::<_, Option<i64>>(5)?.map(|kept| kept != 0),
+                        saw_changes: row.get(6)?,
                     })
                 },
             )

@@ -62,6 +62,17 @@ impl Store {
             .flatten())
     }
 
+    /// How a run ended, if the run is known. `running` until it does.
+    pub fn run_state(&self, run_id: &str) -> Result<Option<String>, StoreError> {
+        use rusqlite::OptionalExtension;
+        Ok(self
+            .conn
+            .query_row("SELECT state FROM run WHERE id = ?1", [run_id], |row| {
+                row.get(0)
+            })
+            .optional()?)
+    }
+
     /// The card a run belongs to, if the run is known.
     pub fn run_card(&self, run_id: &str) -> Result<Option<String>, StoreError> {
         use rusqlite::OptionalExtension;

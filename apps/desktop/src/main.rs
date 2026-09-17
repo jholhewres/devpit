@@ -32,6 +32,7 @@ mod chat;
 mod chat_running;
 mod chat_turn;
 mod checkout;
+mod checkpoint;
 #[cfg(any(debug_assertions, test))]
 mod contract;
 mod cycles;
@@ -86,6 +87,7 @@ mod spend_history;
 mod staging;
 mod steering;
 mod steps;
+mod still_holds;
 mod stopping_a_run;
 mod tap;
 mod threads;
