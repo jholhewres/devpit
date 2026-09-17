@@ -1,6 +1,4 @@
 import { Drawing } from '../plugins/excalidraw/Drawing'
-import { DataList } from '../plugins/data/DataList'
-import { DataPane } from '../plugins/data/DataPane'
 import { NotePane } from '../plugins/notes/NotePane'
 import { NotesList } from '../plugins/notes/NotesList'
 import { DrawingList } from '../plugins/excalidraw/DrawingList'
@@ -90,13 +88,6 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
   { name: 'diff', many: true, className: 'pane pane--file', render: (tab) => <DiffPane tab={tab} /> },
   { name: 'file', many: true, className: 'pane pane--file', render: (tab) => <FilePane tab={tab} /> },
   { name: 'term', many: true, className: 'pane pane--term', render: (tab) => <TerminalPane tab={tab} /> },
-  /* A data tab with no file is the list of data files. */
-  {
-    name: 'data',
-    many: true,
-    className: 'pane',
-    render: (tab) => (tab.path ? <DataPane tab={tab} name={tab.path} /> : <DataList tab={tab} />),
-  },
   /* A note tab with no file is the list of notes. */
   {
     name: 'note',

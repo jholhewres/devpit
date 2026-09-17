@@ -26,7 +26,7 @@ fn shipped(id: &str) -> PluginManifest {
 #[test]
 fn the_catalogue_ships_the_capabilities_the_window_mounts() {
     let ids: Vec<String> = catalogue().into_iter().map(|one| one.id).collect();
-    assert_eq!(ids, vec!["excalidraw", "notes", "data"]);
+    assert_eq!(ids, vec!["excalidraw", "notes"]);
 
     let excalidraw = shipped("excalidraw");
     assert_eq!(excalidraw.data.extensions, vec![".excalidraw".to_owned()]);
@@ -40,10 +40,6 @@ fn the_catalogue_ships_the_capabilities_the_window_mounts() {
     // The window names these extensions too; a rename here without one there
     // opens a pane no file ever reaches.
     assert_eq!(shipped("notes").data.extensions, vec![".md".to_owned()]);
-    assert_eq!(
-        shipped("data").data.extensions,
-        vec![".json".to_owned(), ".yaml".to_owned(), ".yml".to_owned()]
-    );
 }
 
 #[test]

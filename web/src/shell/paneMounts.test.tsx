@@ -24,7 +24,6 @@ vi.mock('./WorkspacePane', () => ({ WorkspacePane: () => <div>workspace</div> })
 const open: Tab[] = [
   { id: 'chat_1', kind: 'chat' },
   { id: 'diff_1', kind: 'diff' },
-  { id: 'data_1', kind: 'data' },
   { id: 'drawing_1', kind: 'drawing' },
   { id: 'file_1', kind: 'file' },
   { id: 'note_1', kind: 'note' },

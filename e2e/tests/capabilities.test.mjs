@@ -47,15 +47,6 @@ const CAPABILITIES = [
     // Nothing: a blank page reads as one, and prose needs no starting line.
     starts: '',
   },
-  {
-    plugin: 'data',
-    pane: 'Data',
-    noun: 'data file',
-    stem: 'a-shape',
-    file: 'a-shape.json',
-    editor: '.data__edit',
-    starts: '{',
-  },
 ]
 
 let window
