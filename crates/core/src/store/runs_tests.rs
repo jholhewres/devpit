@@ -180,3 +180,33 @@ fn rows_the_old_sweep_wrote_become_lost_and_nothing_else_moves() {
     assert!(states.contains(&(swept, "lost".to_owned())));
     assert!(states.contains(&(real, "failed".to_owned())));
 }
+
+/// Two runs in the same second are ordinary — a step replayed, a lane that
+/// advanced — and `started_at` is seconds, so they tie. SQLite may return tied
+/// rows in whatever order it likes, and it returned a different one on a Mac
+/// than on Linux: "the latest run" came back as the finished one.
+///
+/// Sabotage: drop the `rowid` from the ORDER BY and this passes on the machine
+/// that wrote it and fails on somebody else's.
+#[test]
+fn two_runs_in_one_second_are_ordered_by_the_one_that_started_later() {
+    let (_dir, store, card, step, _column) = seeded();
+
+    let older = store.start_run(&card, &step, None).expect("older");
+    store
+        .finish_run(&older, "ok", None, None, None, None)
+        .expect("finish");
+    let latest = store.start_run(&card, &step, None).expect("latest");
+
+    let listed = store.runs(&card).expect("runs");
+    let seconds: Vec<i64> = listed.iter().map(|run| run.started_at).collect();
+    assert_eq!(
+        seconds[0], seconds[1],
+        "the two runs did not land in the same second; this test proves nothing"
+    );
+    assert_eq!(
+        listed.iter().map(|run| run.id.as_str()).collect::<Vec<_>>(),
+        [latest.as_str(), older.as_str()],
+        "most recent first, and the tie went the wrong way"
+    );
+}

@@ -20,6 +20,11 @@ pub struct RunRow {
     pub started_at: i64,
 }
 
+/// Seconds, which is why every query that orders by it breaks the tie on
+/// `rowid`: two runs of the same card in the same second are an ordinary
+/// thing — a step replayed, a lane that advanced — and SQLite is free to
+/// return tied rows in any order it likes. It returned a different one on a
+/// Mac than on Linux, and "the latest run" came back stale.
 fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -94,7 +99,8 @@ impl Store {
     pub fn running_runs(&self) -> Result<Vec<(String, String)>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT r.id, c.title FROM run r JOIN card c ON c.id = r.card_id \
-             WHERE r.state = 'running' AND r.ended_at IS NULL ORDER BY r.started_at",
+             WHERE r.state = 'running' AND r.ended_at IS NULL \
+             ORDER BY r.started_at, r.rowid",
         )?;
         let found = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -161,7 +167,8 @@ impl Store {
     pub fn runs(&self, card_id: &str) -> Result<Vec<RunRow>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, card_id, step_id, state, output, exit_code, cost_usd, duration_ms, \
-             started_at FROM run WHERE card_id = ?1 ORDER BY started_at DESC",
+             started_at FROM run WHERE card_id = ?1 \
+             ORDER BY started_at DESC, rowid DESC",
         )?;
         let rows = stmt
             .query_map([card_id], |row| {
