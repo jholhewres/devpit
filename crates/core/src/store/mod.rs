@@ -159,8 +159,19 @@ impl Store {
     ///
     /// The path stays short on purpose. The tmux socket lives under it, and a
     /// Unix socket path is capped at ~108 bytes — see `socket_path_is_short`
-    /// in `apps/desktop/src/sessions.rs`.
+    /// in `apps/desktop/src/sessions.rs`. A `DEVPIT_HOME` long enough to break
+    /// that is refused where the socket is made, not here: this function is
+    /// read by tests and tools that never open a terminal.
+    ///
+    /// `DEVPIT_HOME` is how one machine runs two devpits — an installed one on
+    /// `~/.devpit` and a development one somewhere else — without either
+    /// seeing the other's projects, conversations or terminal history. Empty
+    /// counts as unset, so `DEVPIT_HOME= devpit` is the installed home rather
+    /// than the filesystem root.
     pub fn root() -> Result<PathBuf, StoreError> {
+        if let Some(set) = std::env::var_os("DEVPIT_HOME").filter(|set| !set.is_empty()) {
+            return Ok(PathBuf::from(set));
+        }
         Ok(dirs::home_dir()
             .ok_or(StoreError::NoDataDirectory)?
             .join(".devpit"))
