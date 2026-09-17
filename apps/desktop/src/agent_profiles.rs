@@ -37,7 +37,7 @@ fn stored(store: &Store) -> Result<Vec<Declared>, RpcError> {
     Ok(serde_json::from_str(&raw).unwrap_or_default())
 }
 
-fn save(store: &Store, declared: &[Declared]) -> Result<(), RpcError> {
+pub(crate) fn save(store: &Store, declared: &[Declared]) -> Result<(), RpcError> {
     let written =
         serde_json::to_string(declared).map_err(|err| RpcError::internal(err.to_string()))?;
     store.set_preference(preference::AGENT_PROFILES, &written)?;

@@ -48,6 +48,7 @@ mod history;
 mod in_flight;
 mod index;
 mod installations;
+mod kept_out;
 mod kinds;
 mod listener;
 mod live;

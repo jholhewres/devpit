@@ -240,7 +240,7 @@ enum PollAnswer {
     Expired,
 }
 
-mod token {
+pub(crate) mod token {
     //! The device token on disk.
 
     use std::path::PathBuf;

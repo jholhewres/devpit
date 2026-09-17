@@ -72,6 +72,18 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
         }),
     };
 
+    // On the way to disk, not on the way to the window: a line that already
+    // reached the screen cannot be unseen, and this is the copy that gets read
+    // back tomorrow. It hides what devpit handed out, and nothing else.
+    let secrets = crate::kept_out::what_devpit_gave(store);
+    let outcome = match outcome {
+        Ok(finished) => Ok(crate::steps::Finished {
+            output: crate::kept_out::kept_out(&finished.output, &secrets),
+            ..finished
+        }),
+        Err(reason) => Err(crate::kept_out::kept_out(&reason, &secrets)),
+    };
+
     let answered = match &outcome {
         Ok(finished) if finished.ok => Some(finished.output.clone()),
         _ => None,

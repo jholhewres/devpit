@@ -90,6 +90,14 @@ pub fn start(app: AppHandle, root: &Path) {
 /// This run's secret, kept for the door to compare against.
 static SECRET: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
+/// The hook secret this run of the app is using, if it has one.
+///
+/// Read by `kept_out`, which takes it back out of a command's log before the
+/// log is stored: a hook that fails prints the request it sent.
+pub(crate) fn secret_now() -> Option<String> {
+    SECRET.get().cloned()
+}
+
 /// Whether a post showed this run's secret.
 ///
 /// Compared to the end even once it is known to differ: a comparison that
