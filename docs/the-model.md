@@ -71,6 +71,23 @@ the lane it was sent from, the folder it ran in and the session it ran as.
 A card shows its runs. That is how "the agent is doing something" becomes a
 sentence with numbers in it.
 
+A run also records the circumstances it happened in — the command, the folder,
+the revision, whether it had a checkout of its own — so a green row can answer
+*green on which code*. Those are recorded before the command starts: a step
+that commits would otherwise move `HEAD` out from under its own snapshot.
+
+**Exit code zero is not a pass.** It says the command succeeded, which is a
+different thing from the tests passing: a runner that matched no test files
+exits zero and checked nothing. So a run carries three answers rather than one
+— how the process ended, what the check said, and whether that is still about
+the code in front of you — and a run that left nothing devpit can read reports
+no result rather than a green tick.
+
+**Secrets devpit handed out are taken out of a run's output before it is
+stored**: a profile's environment, the account token, the hook secret. This is
+not detection. A secret the command read from a file or fetched itself is one
+devpit never saw, and it passes through.
+
 ## `session`
 
 A background agent session, tied to a card and a worktree.
