@@ -59,7 +59,13 @@ describe('what a run proves, in words', () => {
 })
 
 describe('a run with nothing to show', () => {
-  const run = { runId: 'run_1', state: 'ok', verdict: 'inconclusive', validity: 'unknown' } as const
+  const run = {
+    runId: 'run_1',
+    state: 'ok',
+    verdict: 'inconclusive',
+    validity: 'unknown',
+    whose: { asked: null, askedFrom: null, carried: null, profile: null },
+  } as const
 
   it('is the one that recorded neither a snapshot nor evidence', () => {
     expect(saidNothing({ ...run, ran: null, evidenceVersion: null })).toBe(true)
