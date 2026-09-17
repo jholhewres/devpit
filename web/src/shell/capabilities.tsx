@@ -105,8 +105,17 @@ export function summary(plugins: readonly PluginState[] | null): string | null {
   return `${plugins.filter((one) => one.installed).length} installed · ${enabledCount(plugins)} on`
 }
 
+/* The same marks the tabs carry, so a capability looks like itself in both
+   places. One this build has no glyph for falls back to a block, which is a
+   placeholder and reads as one — the sidebar showed three of them. */
 const GLYPHS: Readonly<Record<string, React.JSX.Element>> = {
   [EXCALIDRAW]: <path d="M12 19l7-7 3 3-7 7-3-3ZM18 13l-1.5-7.5L2 2l3.5 14.5L13 18ZM2 2l7.6 7.6" />,
+  [NOTES_ID]: (
+    <>
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
+      <path d="M14 3v6h6M8 13h8M8 17h5" />
+    </>
+  ),
 }
 
 /** A capability's mark. One this build has no glyph for is drawn as a block. */
