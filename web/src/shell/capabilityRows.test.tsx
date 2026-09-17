@@ -50,7 +50,6 @@ const shell = {
   close: vi.fn(),
   closeNow: vi.fn(),
   openPrefs: vi.fn(),
-  openChecks: vi.fn(),
   signOut: vi.fn(),
   account: { initials: 'JH', name: 'Jhol', email: null },
 }
@@ -58,7 +57,6 @@ vi.mock('./useShell', () => ({ useShell: () => shell }))
 
 beforeEach(() => {
   shell.show.mockClear()
-  shell.openChecks.mockClear()
   listed.mockClear()
   catalogue = { plugins: [] }
 })
@@ -91,8 +89,6 @@ describe('Capabilities in the sidebar', () => {
     const nav = document.querySelectorAll('.side__scroll > .act > .act__label, .side__scroll > .newmenu > .act > .act__label')
     expect([...nav].map((label) => label.textContent)).toEqual([
       'Board',
-      /* Checks answers a question about the board, so it sits with it. */
-      'Checks',
       'Files',
       'Capabilities',
       'Excalidraw',
@@ -100,14 +96,11 @@ describe('Capabilities in the sidebar', () => {
     ])
   })
 
-  /* The row is in the sidebar and the list opens over the board, so the row
-     has to do both: ask for the runs and go where they open. Sabotage: drop
-     the `openChecks` call and the row becomes a second way to open the board. */
-  it('Checks asks for the runs and goes to the board they open over', async () => {
+  /* The runs are the board's, and the board is where they are asked for:
+     a second door in the sidebar is what this test exists to keep shut. */
+  it('does not carry Checks: the runs open from the board itself', async () => {
     sidebar()
-    fireEvent.click(item('Checks')!)
-    expect(shell.openChecks).toHaveBeenCalledWith(true)
-    expect(shell.show).toHaveBeenCalledWith('board')
+    expect(item('Checks')).toBeNull()
   })
 
   it('counts the capabilities that are on beside it', async () => {

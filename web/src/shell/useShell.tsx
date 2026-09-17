@@ -32,7 +32,6 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
   const [palette, setPalette] = useState(false)
   const [wantedCard, setWantedCard] = useState<string | null>(null)
-  const [wantedChecks, setWantedChecks] = useState(false)
 
   const membership = useAccount()
   const projects = useProjects()
@@ -115,8 +114,6 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       closePrefs: () => setPrefs(null),
       wantedCard,
       openCard: setWantedCard,
-      wantedChecks,
-      openChecks: setWantedChecks,
       palette,
       openPalette: () => setPalette(true),
       closePalette: () => setPalette(false),
@@ -140,7 +137,6 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       prefs,
       palette,
       wantedCard,
-      wantedChecks,
     ],
   )
 

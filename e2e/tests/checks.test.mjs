@@ -78,17 +78,25 @@ const shut = () =>
     "document.querySelector('[aria-label=\"Close runs\"]')?.click()",
   )
 
+/* The runs belong to the board, and they are opened from it: the sidebar
+   used to carry a second door to the same panel, and it is gone. */
+const openRuns = async () => {
+  await clickSaying('Board')
+  await settle(300)
+  await clickSaying('Runs')
+}
+
 describe('the Checks panel', () => {
-  test('is a place in the sidebar, next to Board', async () => {
+  test('is opened from the board, and is not a second row in the sidebar', async () => {
     const order = await window.executeScript(
       "return Array.prototype.map.call(document.querySelectorAll('.side .act__label'), (n) => n.innerText)",
     )
-    assert.ok(order.includes('Checks'), `no Checks in the sidebar: ${JSON.stringify(order)}`)
-    assert.equal(
-      order.indexOf('Checks') - order.indexOf('Board'),
-      1,
-      `Checks is not beside Board: ${JSON.stringify(order)}`,
-    )
+    assert.ok(!order.includes('Checks'), `Checks is back in the sidebar: ${JSON.stringify(order)}`)
+
+    await openRuns()
+    await settle(800)
+    assert.match(await said(), /Runs/)
+    await shut()
   })
 
   /* Three empties, three sentences. The seeded board has a lane that runs
@@ -96,7 +104,7 @@ describe('the Checks panel', () => {
      — and "No runs match" here would send somebody hunting a filter that is
      not the problem. */
   test('a board that has never run anything is told that, not that no runs match', async () => {
-    await clickSaying('Checks')
+    await openRuns()
     await settle(1200)
 
     const words = await said()
@@ -163,7 +171,7 @@ describe('the Checks panel', () => {
     // run did not exist when it was last open.
     await shut()
     await settle(300)
-    await clickSaying('Checks')
+    await openRuns()
     await settle(1500)
     // The state is the control that opens the rest.
     await clickSaying('ok')
