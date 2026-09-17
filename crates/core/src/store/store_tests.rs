@@ -148,3 +148,96 @@ fn migrating_leaves_older_rows_untouched() {
     store.ensure_board("prj_1").expect("seed the board");
     assert_eq!(store.columns("prj_1").expect("columns").len(), 6);
 }
+
+/// A row written before a migration must survive it.
+///
+/// The three this release adds are all `ALTER TABLE run ADD COLUMN`, which is
+/// safe — but "is safe" is what everybody says about the migration that ate
+/// somebody's history. So this builds the store, writes the history, puts the
+/// schema **back** to before those migrations, and opens it again: the same
+/// thing a person upgrading does, and the only shape of this test that proves
+/// anything. Reopening a store that is already current runs no migrations at
+/// all, which is why the obvious version of this test passes whatever the
+/// migrations do.
+///
+/// Sabotage: add `DELETE FROM run;` to any of 017-019 and the run is gone.
+#[test]
+fn a_row_written_before_a_migration_survives_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("state.db");
+
+    let store = Store::open(&path).expect("first open");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let column = store.columns(&project).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&project, &column, "a card", "the body")
+        .expect("card");
+    let step = store
+        .create_step(&project, "command", "tests", "{}", false)
+        .expect("step");
+    let run = store.start_run(&card, &step, None).expect("run");
+    store
+        .finish_run(&run, "ok", Some("28 passed"), None, None, Some(0))
+        .expect("finish");
+
+    // Back to before this release: the columns go, and so does the version
+    // that says they are there.
+    let undo = [
+        "ran_command",
+        "ran_in",
+        "declared_env",
+        "base_revision",
+        "head_revision",
+        "in_a_worktree",
+        "evidence",
+        "evidence_version",
+        "saw_changes",
+        "asked_by",
+        "asked_from",
+        "carried_by",
+        "carried_profile",
+    ];
+    for column in undo {
+        store
+            .conn()
+            .execute_batch(&format!("ALTER TABLE run DROP COLUMN {column};"))
+            .unwrap_or_else(|err| panic!("dropping {column}: {err}"));
+    }
+    store
+        .conn()
+        .execute_batch("PRAGMA user_version = 16;")
+        .expect("back to 16");
+    drop(store);
+
+    // The upgrade, for real: 017, 018 and 019 apply to a table with a row in it.
+    let store = Store::open(&path).expect("the upgrade");
+    let kept = store.runs(&card).expect("runs");
+    assert_eq!(kept.len(), 1, "the run did not survive the upgrade");
+    assert_eq!(kept[0].output.as_deref(), Some("28 passed"));
+    assert_eq!(kept[0].exit_code, Some(0));
+    assert_eq!(
+        store.card(&card).expect("read").expect("a card").body,
+        "the body"
+    );
+
+    // And the new columns are NULL on it, which is exactly what a row written
+    // before them should read as — never a default that looks like an answer.
+    assert!(
+        !store
+            .what_ran(&run)
+            .expect("read")
+            .expect("a run")
+            .is_known(),
+        "a row from before 017 claimed to know what it ran"
+    );
+    assert!(
+        !store
+            .whose_run(&run)
+            .expect("read")
+            .expect("a run")
+            .is_known(),
+        "a row from before 019 claimed to know whose it was"
+    );
+    assert_eq!(store.evidence_of(&run).expect("read"), None);
+}
