@@ -53,7 +53,7 @@ impl Store {
              AND (?4 IS NULL OR r.started_at >= ?4) \
              AND (?5 IS NULL OR r.started_at < ?5) \
              AND (?6 IS NULL OR r.started_at < ?6 OR (r.started_at = ?6 AND r.id < ?7)) \
-             ORDER BY r.started_at DESC, r.id DESC LIMIT ?8",
+             ORDER BY r.started_at DESC, r.rowid DESC LIMIT ?8",
         )?;
         let rows = stmt
             .query_map(

@@ -57,7 +57,7 @@ impl Store {
         let mut runs = self.conn.prepare(
             "SELECT id, session_id, cwd, state, started_at FROM run \
              WHERE card_id = ?1 AND session_id IS NOT NULL \
-             ORDER BY started_at DESC, id DESC",
+             ORDER BY started_at DESC, rowid DESC",
         )?;
         let runs = runs
             .query_map([card_id], |row| {

@@ -163,3 +163,46 @@ fn only_tabs_a_card_named_are_card_tabs() {
         .collect();
     assert_eq!(tabs, [named]);
 }
+
+/// Two runs that tie on the second come back in the order they were made,
+/// even when their ids say otherwise.
+///
+/// The tiebreak used to be `id DESC`. A run's id is a ULID from
+/// `Ulid::generate` — a millisecond and eighty random bits, with no monotonic
+/// generator between calls — so two runs made in the same millisecond order by
+/// their random half. Usually the millisecond differs and the id happens to be
+/// right, which is why this passed on Linux for a year and failed on a Mac
+/// fast enough to start both runs inside one.
+///
+/// So the ids here are made to disagree with the truth: the older run gets the
+/// larger id. Insertion order is the only thing that can still answer.
+#[test]
+fn a_run_made_later_is_listed_first_even_when_its_id_sorts_lower() {
+    let (_dir, store, project, card) = seeded();
+    let step = store
+        .create_step(&project, "agent", "review", "{}", false)
+        .expect("step");
+
+    let same_second = 1_700_000_000_i64;
+    for (id, session) in [("run_ZZZZ_older", "s-old"), ("run_AAAA_newer", "s-new")] {
+        store
+            .conn()
+            .execute(
+                "INSERT INTO run (id, card_id, step_id, state, started_at, session_id) \
+                 VALUES (?1, ?2, ?3, 'running', ?4, ?5)",
+                rusqlite::params![id, card, step, same_second, session],
+            )
+            .expect("insert");
+    }
+
+    let links = store.card_links(&card).expect("links");
+    assert_eq!(
+        links
+            .runs
+            .iter()
+            .map(|one| one.run_id.as_str())
+            .collect::<Vec<_>>(),
+        ["run_AAAA_newer", "run_ZZZZ_older"],
+        "the later run is not first: the tie went to the id, which knows nothing"
+    );
+}

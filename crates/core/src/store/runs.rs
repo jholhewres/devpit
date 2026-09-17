@@ -25,6 +25,13 @@ pub struct RunRow {
 /// thing — a step replayed, a lane that advanced — and SQLite is free to
 /// return tied rows in any order it likes. It returned a different one on a
 /// Mac than on Linux, and "the latest run" came back stale.
+///
+/// **Not on `id`.** A run's id is a ULID from `Ulid::generate`, which is a
+/// millisecond and eighty random bits — no monotonic generator between calls.
+/// Two ids made in the same millisecond order by their random half, so
+/// `ORDER BY started_at DESC, id DESC` is a coin toss wearing the clothes of
+/// a tiebreak. It was in three queries and passed on Linux for a year.
+/// `rowid` is insertion order and cannot tie.
 fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
