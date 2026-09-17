@@ -41,6 +41,16 @@ pub struct ListedRun {
 
 impl Store {
     /// Runs newest first, `limit` of them at most (itself at most [`MOST`]).
+    ///
+    /// The tie goes to `id` here, and it has to: the cursor above compares
+    /// `r.id < ?7`, so the order and the cursor must be the same thing or a
+    /// page boundary lands between rows that were never adjacent — which is
+    /// how this was briefly broken by a fix meant for `card_links`.
+    ///
+    /// A ULID is not a clock (see `runs::now`), so within one second this
+    /// order is arbitrary. That is fine for a page and not fine for "the
+    /// latest run": a list needs an order that is total and stable, and this
+    /// one is both.
     pub fn project_runs(&self, query: &RunQuery<'_>) -> Result<Vec<ListedRun>, StoreError> {
         let (before_at, before_id) = query.before.unzip();
         let mut stmt = self.conn.prepare(
@@ -53,7 +63,7 @@ impl Store {
              AND (?4 IS NULL OR r.started_at >= ?4) \
              AND (?5 IS NULL OR r.started_at < ?5) \
              AND (?6 IS NULL OR r.started_at < ?6 OR (r.started_at = ?6 AND r.id < ?7)) \
-             ORDER BY r.started_at DESC, r.rowid DESC LIMIT ?8",
+             ORDER BY r.started_at DESC, r.id DESC LIMIT ?8",
         )?;
         let rows = stmt
             .query_map(

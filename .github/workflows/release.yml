@@ -23,9 +23,13 @@ jobs:
   # half-publishing one.
   build:
     strategy:
-      # A release is all of it or none: a manifest naming a platform that never
-      # built is an update that 404s on the machines it names.
-      fail-fast: true
+      # Every runner finishes, even when one has already failed. A release is
+      # still all of it or none — `needs: build` below is what guarantees that,
+      # and a failed leg skips the publish on its own. What fail-fast bought
+      # was a cancelled Linux and a cancelled Intel Mac every time the ARM Mac
+      # tripped, which is one symptom per attempt and a quarter of an hour to
+      # learn it.
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-24.04
