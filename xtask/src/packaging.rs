@@ -7,7 +7,10 @@
 //!   window on the next start;
 //! - the **base bundle** stays a `.deb` with nothing signed, because every PR
 //!   runs `make build` and the AppImage bundler reaches the network. The
-//!   AppImage and the signing live in the release overlay, and only there;
+//!   signing lives in the release overlay, and only there. Which bundles a
+//!   release builds is the workflow's to say, because the answer differs by
+//!   platform — an `appimage` on a Mac is an error nobody can act on — and a
+//!   list here would be one list for three runners;
 //! - the **window** is granted no `updater:` permission. The app checks and
 //!   downloads from Rust; installing an update is not something a page may
 //!   ask for.
@@ -20,6 +23,7 @@ const IDENTIFIER: &str = "dev.devpit.app";
 const BASE: &str = "apps/desktop/tauri.conf.json";
 const OVERLAY: &str = "apps/desktop/tauri.release.conf.json";
 const CAPABILITIES: &str = "apps/desktop/capabilities/default.json";
+const RELEASE: &str = ".github/workflows/release.yml";
 
 pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
     let mut findings = Vec::new();
@@ -53,15 +57,11 @@ pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
     }
 
     let overlay = json(root, OVERLAY);
-    let overlay_targets: Vec<&str> = overlay
-        .pointer("/bundle/targets")
-        .and_then(|t| t.as_array())
-        .map(|t| t.iter().filter_map(|one| one.as_str()).collect())
-        .unwrap_or_default();
-    if overlay_targets != ["appimage", "deb"] {
+    if overlay.pointer("/bundle/targets").is_some() {
         refuse(
             OVERLAY,
-            "the release overlay is not [appimage, deb]".to_owned(),
+            "the release overlay pins bundle.targets; the workflow names them per platform"
+                .to_owned(),
         );
     }
     if overlay.pointer("/bundle/createUpdaterArtifacts") != Some(&serde_json::Value::Bool(true)) {
@@ -69,6 +69,16 @@ pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
             OVERLAY,
             "the release overlay does not ask for updater artifacts".to_owned(),
         );
+    }
+
+    /* The bundles are named where the platform is known. A release that stops
+    naming them builds whatever the base config says, which is a `.deb` and
+    no updater artifact at all — a release nobody can update from. */
+    let workflow = std::fs::read_to_string(root.join(RELEASE)).unwrap_or_default();
+    for wanted in ["appimage,deb", "app,dmg"] {
+        if !workflow.contains(&format!("bundles: {wanted}")) {
+            refuse(RELEASE, format!("no runner is told to build {wanted}"));
+        }
     }
 
     let granted: Vec<String> = json(root, CAPABILITIES)

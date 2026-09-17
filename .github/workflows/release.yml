@@ -16,8 +16,35 @@ jobs:
   # suite that drives a real window takes half an hour and a flake in it used
   # to cost a release. What gates this is `make test`, below, which is the same
   # gate every push answers to.
-  release:
-    runs-on: ubuntu-24.04
+  #
+  # One job per platform, because a Mac bundle is made on a Mac. Each builds,
+  # tests and signs its own artifacts and hands them over; nothing is published
+  # from here, so a runner that fails takes the release with it rather than
+  # half-publishing one.
+  build:
+    strategy:
+      # A release is all of it or none: a manifest naming a platform that never
+      # built is an update that 404s on the machines it names.
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            # The key the updater looks itself up by, and the name this
+            # runner's artifacts are collected under.
+            target: linux-x86_64
+            # Named here rather than in the config, because the config is one
+            # file for three platforms and `deb` on a Mac is a build that ends
+            # in an error nobody can act on.
+            bundles: appimage,deb
+          - os: macos-14
+            target: darwin-aarch64
+            # `app` is what the updater replaces in place; `dmg` is what a
+            # person downloads the first time.
+            bundles: app,dmg
+          - os: macos-13
+            target: darwin-x86_64
+            bundles: app,dmg
+    runs-on: ${{ matrix.os }}
     steps:
       # Every action is pinned to a commit: a tag can be moved, and a moved tag
       # is somebody else's code inside a job that holds the signing key.
@@ -28,8 +55,10 @@ jobs:
           persist-credentials: false
 
       # The same system packages CI installs, plus what the AppImage needs:
-      # linuxdeploy's gtk plugin reads librsvg-2.0.pc.
+      # linuxdeploy's gtk plugin reads librsvg-2.0.pc. macOS builds against the
+      # system WebKit and needs none of this.
       - name: System dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
@@ -39,6 +68,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          key: ${{ matrix.target }}
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
@@ -70,17 +101,62 @@ jobs:
       # The only step that sees the key, and it builds nothing: the frontend
       # command is emptied and cargo finds the binary already built, so what
       # runs next to the key is the bundler and the signer.
+      #
+      # Nothing here is signed for the platform, only for the updater: there is
+      # no Developer ID and no code-signing certificate, so a Mac asks before
+      # it opens this the first time. The README says so.
       - name: Bundle and sign
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          ./node_modules/.bin/tauri build --config apps/desktop/tauri.release.conf.json \
+          ./node_modules/.bin/tauri build --bundles ${{ matrix.bundles }} \
+            --config apps/desktop/tauri.release.conf.json \
             --config '{"build":{"beforeBuildCommand":""}}'
 
+      # What the collecting job reads to know whose bundles these are: the
+      # runner knows its target and the folder it lands in does not.
+      - name: Say which target this is
+        run: echo "${{ matrix.target }}" > target/release/target.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.target }}
+          # The bundles and the note beside them, and nothing else: the release
+          # binary itself is 40MB of what is already inside them.
+          path: |
+            target/release/target.txt
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/appimage/*.AppImage.sig
+            target/release/bundle/deb/*.deb
+            target/release/bundle/deb/*.deb.sig
+            target/release/bundle/macos/*.app.tar.gz
+            target/release/bundle/macos/*.app.tar.gz.sig
+            target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      # Each runner's artifacts in a folder of its own, beside the `target.txt`
+      # that names its platform. No secret reaches this job: it reads what was
+      # signed elsewhere and checks it against the key the app carries.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: target/release/collected
+
       # Each artifact is verified against the public key the app carries before
-      # a single manifest is written. `createUpdaterArtifacts` already signs
-      # both bundles, so nothing is signed again here.
+      # a single manifest is written. `createUpdaterArtifacts` already signed
+      # both bundles on the runner that built them; nothing is signed here.
       - name: Manifests, from artifacts that verify
         run: |
           cargo xtask release-manifest "${GITHUB_REF_NAME#v}" \
@@ -92,10 +168,11 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag \
             --title "$GITHUB_REF_NAME" --generate-notes \
-            target/release/bundle/appimage/*.AppImage \
-            target/release/bundle/appimage/*.AppImage.sig \
-            target/release/bundle/deb/*.deb \
-            target/release/bundle/deb/*.deb.sig \
+            $(find target/release/collected -type f \
+              \( -name '*.AppImage' -o -name '*.AppImage.sig' \
+              -o -name '*.deb' -o -name '*.deb.sig' \
+              -o -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \
+              -o -name '*.dmg' \) | sort) \
             target/release/manifests/SHA256SUMS
 
       # Last, and alone: an installed app polls these. Published before the
@@ -104,6 +181,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "$GITHUB_REF_NAME" \
-            target/release/manifests/latest-appimage.json \
-            target/release/manifests/latest-deb.json
+          gh release upload "$GITHUB_REF_NAME" target/release/manifests/latest-*.json

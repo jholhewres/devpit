@@ -40,9 +40,11 @@ fn the_manifest_is_the_shape_the_updater_reads() {
         "0.2.0",
         "what changed",
         "2026-09-16T00:00:00Z",
-        "linux-x86_64",
-        "https://example.invalid/devpit_0.2.0_amd64.AppImage",
-        SIGNATURE,
+        &[(
+            "linux-x86_64".to_owned(),
+            "https://example.invalid/devpit_0.2.0_amd64.AppImage".to_owned(),
+            SIGNATURE.to_owned(),
+        )],
     );
 
     assert_eq!(written["version"], "0.2.0");
@@ -54,6 +56,38 @@ fn the_manifest_is_the_shape_the_updater_reads() {
         "https://example.invalid/devpit_0.2.0_amd64.AppImage"
     );
     assert_eq!(platform["signature"], SIGNATURE);
+}
+
+/* One installer, two Macs: the app asks for `latest-app.json` by its bundle
+type and finds itself in `platforms` by its target, so both have to be in
+the one file. Sabotage: write a manifest per platform and the Intel Mac
+downloads the Apple silicon build. */
+#[test]
+fn one_installer_carries_every_platform_that_built_it() {
+    let written = manifest(
+        "0.2.0",
+        "",
+        "2026-09-16T00:00:00Z",
+        &[
+            (
+                "darwin-aarch64".to_owned(),
+                "https://example.invalid/devpit_aarch64.app.tar.gz".to_owned(),
+                SIGNATURE.to_owned(),
+            ),
+            (
+                "darwin-x86_64".to_owned(),
+                "https://example.invalid/devpit_x64.app.tar.gz".to_owned(),
+                SIGNATURE.to_owned(),
+            ),
+        ],
+    );
+
+    let platforms = written["platforms"].as_object().expect("platforms");
+    assert_eq!(platforms.len(), 2);
+    assert_eq!(
+        platforms["darwin-x86_64"]["url"],
+        "https://example.invalid/devpit_x64.app.tar.gz"
+    );
 }
 
 #[test]

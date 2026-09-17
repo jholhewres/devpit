@@ -1,9 +1,5 @@
 {
   "bundle": {
-    "targets": [
-      "appimage",
-      "deb"
-    ],
     "createUpdaterArtifacts": true
   }
 }

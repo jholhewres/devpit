@@ -17,32 +17,43 @@ use sha2::{Digest, Sha256};
 
 /// One built artifact: what the updater downloads, and the signature beside it.
 pub(crate) struct Artifact {
-    /// `appimage` or `deb` — the installer the plugin detects and substitutes
-    /// into the endpoint as `{{bundle_type}}`.
+    /// `appimage`, `deb` or `app` — the installer the plugin detects and
+    /// substitutes into the endpoint as `{{bundle_type}}`.
     pub kind: String,
     pub file: PathBuf,
     /// The `.sig` beside it, as published: base64 of the minisign file.
     pub signature: String,
+    /// The key the updater looks itself up by: `linux-x86_64`,
+    /// `darwin-aarch64`, `darwin-x86_64`.
+    pub target: String,
 }
 
 /// The static manifest the updater reads for one installer.
+///
+/// One installer can be several platforms: a `.app.tar.gz` is built once for
+/// Apple silicon and once for Intel, and both belong in `latest-app.json`
+/// because the app asks for the file by its bundle type and finds itself in
+/// `platforms` by its own target.
 ///
 /// Pure, so a test can read what it wrote without a release to hand.
 pub(crate) fn manifest(
     version: &str,
     notes: &str,
     date: &str,
-    target: &str,
-    url: &str,
-    signature: &str,
+    platforms: &[(String, String, String)],
 ) -> serde_json::Value {
+    let mut said = serde_json::Map::new();
+    for (target, url, signature) in platforms {
+        said.insert(
+            target.clone(),
+            serde_json::json!({ "url": url, "signature": signature }),
+        );
+    }
     serde_json::json!({
         "version": version,
         "notes": notes,
         "pub_date": date,
-        "platforms": {
-            target: { "url": url, "signature": signature }
-        }
+        "platforms": serde_json::Value::Object(said),
     })
 }
 
@@ -86,16 +97,29 @@ pub(crate) fn pubkey_of(root: &Path) -> Option<String> {
 }
 
 /// The bundles a release build left, each with the signature beside it.
-pub(crate) fn artifacts_in(bundle: &Path) -> Vec<Artifact> {
+///
+/// Three kinds, because three is what the updater can install in place: an
+/// AppImage and a `.deb` on Linux, and on macOS the `.app.tar.gz` the plugin
+/// unpacks over the installed app. The `.dmg` is a download for a person, not
+/// an update, so it is published and never named in a manifest.
+pub(crate) fn artifacts_in(bundle: &Path, target: &str) -> Vec<Artifact> {
     let mut found = Vec::new();
-    for (kind, extension) in [("appimage", "AppImage"), ("deb", "deb")] {
+    for (kind, extension) in [
+        ("appimage", ".AppImage"),
+        ("deb", ".deb"),
+        ("macos", ".app.tar.gz"),
+    ] {
         let dir = bundle.join(kind);
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some(extension) {
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("");
+            if !name.ends_with(extension) {
                 continue;
             }
             let beside = PathBuf::from(format!("{}.sig", path.display()));
@@ -103,17 +127,52 @@ pub(crate) fn artifacts_in(bundle: &Path) -> Vec<Artifact> {
                 continue;
             };
             found.push(Artifact {
-                kind: kind.to_owned(),
+                /* The folder is `macos` and the bundle type the app asks for
+                is `app`: the endpoint is templated with what the updater
+                calls it, not with where the bundler put it. */
+                kind: if kind == "macos" {
+                    "app".to_owned()
+                } else {
+                    kind.to_owned()
+                },
                 file: path,
                 signature: signature.trim().to_owned(),
+                target: target.to_owned(),
             });
         }
     }
     found
 }
 
-/// The target key the updater looks itself up by.
+/// The default target, and the only one a build on this machine can be.
 const TARGET: &str = "linux-x86_64";
+
+/// Every folder of bundles to read, each with the target it was built for.
+///
+/// A release that builds on three runners collects them under
+/// `target/release/collected/<name>/`, each holding the `bundle/` tree one
+/// runner made and a `target.txt` saying whose it is. With no such folder this
+/// is the ordinary local build: one tree, this machine's target.
+fn bundles_in(root: &Path) -> Vec<(PathBuf, String)> {
+    let collected = root.join("target/release/collected");
+    let mut found = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&collected) {
+        for entry in entries.flatten() {
+            let dir = entry.path();
+            if !dir.is_dir() {
+                continue;
+            }
+            let target = std::fs::read_to_string(dir.join("target.txt"))
+                .map(|said| said.trim().to_owned())
+                .unwrap_or_else(|_| TARGET.to_owned());
+            found.push((dir.join("bundle"), target));
+        }
+    }
+    if found.is_empty() {
+        found.push((root.join("target/release/bundle"), TARGET.to_owned()));
+    }
+    found
+}
 
 /// Where a published artifact lives, once the tag exists.
 fn url_for(version: &str, name: &str) -> String {
@@ -126,12 +185,18 @@ fn url_for(version: &str, name: &str) -> String {
 /// release is one the workflow would happily publish.
 pub fn run(root: &Path, version: &str, notes: &str, date: &str) -> Result<Vec<PathBuf>, String> {
     let pubkey = pubkey_of(root).ok_or("the app carries no public key to verify against")?;
-    let bundle = root.join("target/release/bundle");
-    let artifacts = artifacts_in(&bundle);
+    let dirs = bundles_in(root);
+    let artifacts: Vec<Artifact> = dirs
+        .iter()
+        .flat_map(|(bundle, target)| artifacts_in(bundle, target))
+        .collect();
     if artifacts.is_empty() {
         return Err(format!(
             "no signed artifacts under {} — build with the release overlay first",
-            bundle.display()
+            dirs.iter()
+                .map(|(dir, _)| dir.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
 
@@ -148,6 +213,7 @@ pub fn run(root: &Path, version: &str, notes: &str, date: &str) -> Result<Vec<Pa
             .map_err(|why| format!("{name} does not verify against the app's key: {why}"))?;
         checked.push((
             artifact.kind.clone(),
+            artifact.target.clone(),
             name,
             bytes,
             artifact.signature.clone(),
@@ -157,17 +223,26 @@ pub fn run(root: &Path, version: &str, notes: &str, date: &str) -> Result<Vec<Pa
     let out = root.join("target/release/manifests");
     std::fs::create_dir_all(&out).map_err(|err| err.to_string())?;
 
+    /* One manifest per installer, every platform that built it inside — so
+    `latest-app.json` names both Macs and an app on either finds itself. */
+    let mut kinds: Vec<String> = Vec::new();
+    for (kind, ..) in &checked {
+        if !kinds.contains(kind) {
+            kinds.push(kind.clone());
+        }
+    }
+
     let mut written = Vec::new();
-    for (kind, name, _, signature) in &checked {
+    for kind in &kinds {
+        let platforms: Vec<(String, String, String)> = checked
+            .iter()
+            .filter(|(one, ..)| one == kind)
+            .map(|(_, target, name, _, signature)| {
+                (target.clone(), url_for(version, name), signature.clone())
+            })
+            .collect();
         let path = out.join(format!("latest-{kind}.json"));
-        let json = manifest(
-            version,
-            notes,
-            date,
-            TARGET,
-            &url_for(version, name),
-            signature,
-        );
+        let json = manifest(version, notes, date, &platforms);
         std::fs::write(&path, format!("{json:#}\n")).map_err(|err| err.to_string())?;
         written.push(path);
     }
@@ -175,7 +250,7 @@ pub fn run(root: &Path, version: &str, notes: &str, date: &str) -> Result<Vec<Pa
     let sums = out.join("SHA256SUMS");
     let listed: Vec<(String, Vec<u8>)> = checked
         .iter()
-        .map(|(_, name, bytes, _)| (name.clone(), bytes.clone()))
+        .map(|(_, _, name, bytes, _)| (name.clone(), bytes.clone()))
         .collect();
     std::fs::write(&sums, checksums(&listed)).map_err(|err| err.to_string())?;
     written.push(sums);
