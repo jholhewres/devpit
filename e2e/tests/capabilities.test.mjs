@@ -127,7 +127,14 @@ describe('the Capabilities this build ships', () => {
         const field = document.querySelector('[aria-label="New ' + noun + ' name"]')
         field.closest('form').querySelector('button[type="submit"]').click()
       }, one.noun)
-      await settle(1500)
+
+      // Waited for, not slept through: a fixed settle is a guess about the
+      // machine, and the slowest one always turns out to be the one running CI.
+      await window.wait(
+        async () => (await openTabs()).some((title) => title.includes(one.stem)),
+        20000,
+        `no tab opened for the new ${one.noun}`,
+      )
 
       // On disk, under the plugin's own folder, with the extension its
       // manifest declares.
@@ -138,13 +145,6 @@ describe('the Capabilities this build ships', () => {
       assert.ok(
         files.files.some((file) => file.name === one.file),
         `${one.file} is not in ${one.plugin}'s folder: ${JSON.stringify(files.files.map((f) => f.name))}`,
-      )
-
-      // The creation opened it: the tab the list hands the pane carries the
-      // stem, not the file name.
-      assert.ok(
-        (await openTabs()).some((title) => title.includes(one.stem)),
-        `no tab opened for the new ${one.noun}`,
       )
 
       // And the text written for it comes back as it went in.

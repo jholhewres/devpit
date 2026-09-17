@@ -44,7 +44,9 @@ before(async () => {
   await invoke(window, 'project_open', { projectId: here.project.id })
   await window.navigate().refresh()
   await window.wait(until.elementLocated(By.css('.app')), 20000)
-  await settle(1500)
+  // The pill itself: it reads the setting after it mounts, so `.app` being up
+  // says nothing about whether the toggle has been heard yet.
+  await window.wait(until.elementLocated(By.css('.hdown')), 20000)
 })
 
 after(async () => {

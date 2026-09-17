@@ -34,7 +34,10 @@ before(async () => {
   await invoke(window, 'project_open', { projectId: seeded.project.id })
   await window.navigate().refresh()
   await window.wait(until.elementLocated(By.css('.app')), 20000)
-  await settle(1500)
+  // The rows, not the shell around them: `.app` is up long before the sidebar
+  // has asked what this project has, and a settle long enough here is a settle
+  // that is too short on a slower machine.
+  await window.wait(until.elementLocated(By.css('.side .act__label')), 20000)
 })
 
 after(async () => {
@@ -44,9 +47,19 @@ after(async () => {
   await window?.quit()
 })
 
-/** Clicks whatever in the window says `label` first. */
-const clickSaying = (label) =>
-  window.executeScript(function (label) {
+/** Clicks whatever in the window says `label` first, once it is there. */
+const clickSaying = async (label) => {
+  await window.wait(
+    () =>
+      window.executeScript(function (label) {
+        return Array.prototype.some.call(document.querySelectorAll('button'), function (node) {
+          return node.innerText.trim().split('\n')[0].trim() === label
+        })
+      }, label),
+    20000,
+    `nothing in the window ever said ${label}`,
+  )
+  return window.executeScript(function (label) {
     const buttons = Array.prototype.slice.call(document.querySelectorAll('button'))
     const hit = buttons.find(function (node) {
       return node.innerText.trim().split('\n')[0].trim() === label
@@ -54,6 +67,7 @@ const clickSaying = (label) =>
     if (!hit) throw new Error('nothing in the window says ' + label)
     hit.click()
   }, label)
+}
 
 const said = () => window.executeScript('return document.body.innerText')
 

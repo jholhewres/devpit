@@ -78,12 +78,24 @@ export async function boxOf(window, selector) {
  */
 const LONGEST_SHOT_MS = 10000
 
+/**
+ * Whether this driver has already failed to give a frame.
+ *
+ * Asked once. A driver that could not photograph the first window will not
+ * photograph the eighth, and waiting the full ceiling on each of them spent
+ * over a minute a run proving the same thing seven more times.
+ */
+let frameless = false
+
 export async function shoot(window, name, crop = null) {
   mkdirSync(SHOTS, { recursive: true })
+  if (frameless) return { path: null, ink: null }
+
   const taken = await Promise.race([
     window.takeScreenshot(),
     new Promise((resolve) => setTimeout(() => resolve(null), LONGEST_SHOT_MS)),
   ]).catch(() => null)
+  if (taken === null) frameless = true
 
   // `ink: null` is "nobody looked", and it is not the same as zero. A caller
   // that read it as zero would fail every screen on a machine whose driver
