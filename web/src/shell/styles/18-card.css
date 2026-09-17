@@ -143,3 +143,4 @@ button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font:
   .chk__ran dt { margin-top: 5px; }
 }
 .chk__again { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text-2); cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.chk__who { margin: 0 0 4px; font-size: 12px; color: var(--text-3); }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Validity, Verdict } from '../gen/bindings'
-import { CURRENT_MEANS, saidNothing, validityWords, verdictWords } from './checked'
+import type { Validity, Verdict, Whose } from '../gen/bindings'
+import { CURRENT_MEANS, saidNothing, validityWords, verdictWords, whoseWords } from './checked'
 
 /*
  * The sentences are the feature, so they are what is tested.
@@ -81,5 +81,49 @@ describe('a run with nothing to show', () => {
       }),
     ).toBe(false)
     expect(saidNothing({ ...run, ran: null, evidenceVersion: 1 })).toBe(false)
+  })
+})
+
+describe('who asked for a run and what carried it out', () => {
+  const whose = (over: Partial<Whose> = {}): Whose => ({
+    asked: 'board',
+    askedFrom: null,
+    carried: 'process',
+    profile: null,
+    ...over,
+  })
+
+  /* Sabotage: fold the two into one sentence and a test Claude asked for, the
+     local runner ran and Codex reviewed reads as one party's work. */
+  it('says who asked and what did the work as two sentences', () => {
+    const said = whoseWords(whose({ asked: 'checkpoint', carried: 'agent', profile: 'glm' }))
+    expect(said.asked).toMatch(/asked for by/i)
+    expect(said.asked).toMatch(/checks/i)
+    expect(said.carried).toMatch(/carried out by/i)
+    expect(said.carried).toMatch(/glm/)
+    expect(said.asked).not.toBe(said.carried)
+  })
+
+  it('does not invent an origin for a run that recorded none', () => {
+    const said = whoseWords(whose({ asked: null, carried: null }))
+    expect(said.asked).toMatch(/nobody recorded/i)
+    expect(said.carried).toMatch(/nobody recorded/i)
+    expect(said.asked).not.toMatch(/board|lane|card/i)
+  })
+
+  /* The reference is shown, never resolved: a terminal that has closed must
+     not be swapped for another that happens to share its name. */
+  it('shows the surface that asked as the reference it is', () => {
+    expect(whoseWords(whose({ askedFrom: 'tab_that_is_gone' })).asked).toMatch(/tab_that_is_gone/)
+  })
+
+  it('names no account for work a local process did', () => {
+    expect(whoseWords(whose({ carried: 'process' })).carried).toMatch(/on this machine/i)
+    expect(whoseWords(whose({ carried: 'process' })).carried).not.toMatch(/under /i)
+  })
+
+  /* A word a later build invents is not a meaning this one gets to guess. */
+  it('does not guess at a surface it does not know', () => {
+    expect(whoseWords(whose({ asked: 'from-the-future' })).asked).toMatch(/nobody recorded/i)
   })
 })

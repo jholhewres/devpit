@@ -43,7 +43,7 @@ pub use card::{
 };
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
 pub use checkpoint::{
-    validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, WouldRun,
+    validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, Whose, WouldRun,
 };
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
 pub use error::{ErrorCode, RpcError};

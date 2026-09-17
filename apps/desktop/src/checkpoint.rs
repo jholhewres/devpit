@@ -9,9 +9,9 @@
 //! [`devpit_rpc::validity`], which are pure and tested on their own. This
 //! reads the row and asks them.
 
-use devpit_core::store::Ran;
+use devpit_core::store::{Asked, Carried, Ran, WhoseRun};
 use devpit_core::Store;
-use devpit_rpc::{verdict, Checked, ErrorCode, Report, RpcError, WhatRan};
+use devpit_rpc::{verdict, Checked, ErrorCode, Report, RpcError, WhatRan, Whose};
 
 use crate::still_holds::still_holds;
 
@@ -42,6 +42,7 @@ pub(crate) fn checked(store: &Store, run_id: &str) -> Result<Checked, RpcError> 
         validity: still_holds(&ran),
         ran: ran.is_known().then(|| as_read(&ran)),
         evidence_version: evidence.map(|left| left.version as f64),
+        whose: as_whose(&store.whose_run(run_id)?.unwrap_or_else(WhoseRun::unknown)),
     })
 }
 
@@ -55,6 +56,32 @@ fn as_read(ran: &Ran) -> WhatRan {
         base_revision: ran.base_revision.clone(),
         head_revision: ran.head_revision.clone(),
         in_a_worktree: ran.in_a_worktree,
+    }
+}
+
+/// Whose a run was, as the screen reads it. Absent rather than a word for
+/// "nobody said": a blank is read as unknown, and a word would be read as an
+/// answer.
+fn as_whose(whose: &WhoseRun) -> Whose {
+    Whose {
+        asked: match whose.asked {
+            Asked::Board => Some("board"),
+            Asked::Card => Some("card"),
+            Asked::Checkpoint => Some("checkpoint"),
+            Asked::Chain => Some("chain"),
+            Asked::Unknown => None,
+        }
+        .map(str::to_owned),
+        asked_from: whose.asked_from.clone(),
+        carried: match &whose.carried {
+            Carried::Process => Some("process".to_owned()),
+            Carried::Agent { .. } => Some("agent".to_owned()),
+            Carried::Unknown => None,
+        },
+        profile: match &whose.carried {
+            Carried::Agent { profile } => profile.clone(),
+            _ => None,
+        },
     }
 }
 

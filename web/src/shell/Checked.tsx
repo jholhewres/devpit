@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { Checked } from '../gen/bindings'
 import { ask, commands } from './live'
-import { CURRENT_MEANS, saidNothing, validityWords, verdictWords } from './checked'
+import { CURRENT_MEANS, saidNothing, validityWords, verdictWords, whoseWords } from './checked'
 import { WouldRunCard } from './WouldRun'
 
 /*
@@ -57,6 +57,7 @@ export function Checked({
 
   const verdict = verdictWords(checked.verdict)
   const validity = validityWords(checked.validity)
+  const whose = whoseWords(checked.whose)
 
   return (
     <div className="chk">
@@ -70,6 +71,11 @@ export function Checked({
           {checked.validity === 'current' && ` Current means ${CURRENT_MEANS}.`}
         </span>
       </p>
+
+      {/* Two sentences, because they are two facts: one thing can ask for a
+          run that another carries out. */}
+      <p className="chk__who">{whose.asked}</p>
+      <p className="chk__who">{whose.carried}</p>
 
       <p className="chk__l">
         <button className="chk__again" aria-expanded={asking} onClick={() => setAsking(!asking)}>

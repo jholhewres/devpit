@@ -16,45 +16,42 @@
 
 use std::sync::Arc;
 
+use devpit_core::store::{Carried, WhoseRun};
 use devpit_core::Store;
 use devpit_rpc::{ErrorCode, RpcError, Run, RunState, Step, StepKind};
 use tauri::AppHandle;
 
 use crate::card_activity::{run_heard, run_reference, Doing};
 use crate::in_flight::InFlight;
+use crate::run_from::Asking;
 use crate::{steps, working};
 
 /// Runs a step against a card, and returns the run it opened.
-///
-///
-/// `came_from` is where a verdict sends the card back to — recorded on the
-/// run's own row, so it survives the process that started it. Without it a review
-/// that says "revise" leaves the card sitting in the reviewed column, which is
-/// a review nobody acts on.
 pub fn start(
     app: AppHandle,
     in_flight: Arc<InFlight>,
     store: &Store,
     card_id: &str,
     step: &Step,
-    came_from: Option<&str>,
+    from: Asking<'_>,
 ) -> Result<Run, RpcError> {
-    start_chained(app, in_flight, store, card_id, step, came_from, 0)
+    start_chained(app, in_flight, store, card_id, step, from)
 }
 
-/// The same, counting how many lanes this card has already passed through.
-///
-/// A person dropping a card starts at zero. The chain passes its own count
-/// on, so a flow edited into a circle while a chain is in flight still stops.
+/// The same, for a run the chain is carrying on rather than a person starting.
 pub fn start_chained(
     app: AppHandle,
     in_flight: Arc<InFlight>,
     store: &Store,
     card_id: &str,
     step: &Step,
-    came_from: Option<&str>,
-    hops: u8,
+    from: Asking<'_>,
 ) -> Result<Run, RpcError> {
+    let Asking {
+        came_from,
+        hops,
+        asked,
+    } = from;
     // Nothing new once an update is about to go in. This is the single place a
     // run is born, so a card advancing on its own is refused here too — its
     // process would die with this one at the commit.
@@ -71,6 +68,25 @@ pub fn start_chained(
     if step.kind == StepKind::Agent {
         store.set_run_session(&run_id, &session_id)?;
     }
+
+    // Written now, never from a later event: something arriving after the fact
+    // must not reattribute this run to whatever is active by then.
+    store.record_whose_run(
+        &run_id,
+        &WhoseRun {
+            asked,
+            // The surface that asked, as a reference. Nothing looks up what it
+            // names — a terminal that has closed is unavailable, and matching
+            // another by name would point at work that is not this run's.
+            asked_from: came_from.map(str::to_owned),
+            carried: match step.kind {
+                StepKind::Agent => Carried::Agent {
+                    profile: crate::steps::agent_config::profile_of(&step.config),
+                },
+                StepKind::Command | StepKind::Session => Carried::Process,
+            },
+        },
+    )?;
     // Heard in the one order everything else about the card is heard in.
     run_heard(
         &app,

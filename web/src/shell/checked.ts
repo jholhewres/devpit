@@ -1,4 +1,4 @@
-import type { Checked, Validity, Verdict } from '../gen/bindings'
+import type { Checked, Validity, Verdict, Whose } from '../gen/bindings'
 
 /*
  * What a run proves, in words.
@@ -58,3 +58,45 @@ export const saidNothing = (checked: Checked): boolean =>
  * environment variable or the clock.
  */
 export const CURRENT_MEANS = 'the same commit and the same uncommitted work — not the same machine'
+
+/**
+ * Who asked for a run and what carried it out, in words.
+ *
+ * Two sentences because they are two facts: Claude can ask for a test the
+ * local runner executes and Codex reviews. A screen that said "run by Claude"
+ * for all three would be wrong twice.
+ */
+export function whoseWords(whose: Whose): { asked: string; carried: string } {
+  return { asked: askedWords(whose), carried: carriedWords(whose) }
+}
+
+const ASKED: Readonly<Record<string, string>> = {
+  board: 'a card moved into a lane',
+  card: 'the card’s own play',
+  checkpoint: 'here, from Checks',
+  chain: 'the lane before it, passing the card on',
+}
+
+function askedWords(whose: Whose): string {
+  const how = whose.asked === null ? null : ASKED[whose.asked]
+  if (!how) return 'Nobody recorded what asked for this run.'
+  /* The reference is shown and never looked up. A pane that has closed is
+     unavailable — finding another that shares its name would point somebody
+     at work that is not this run's. */
+  return whose.askedFrom === null
+    ? `Asked for by ${how}.`
+    : `Asked for by ${how} (${whose.askedFrom}).`
+}
+
+const CARRIED: Readonly<Record<string, string>> = {
+  process: 'a command devpit started on this machine',
+  agent: 'an agent session',
+}
+
+function carriedWords(whose: Whose): string {
+  const what = whose.carried === null ? null : CARRIED[whose.carried]
+  if (!what) return 'Nobody recorded what did the work.'
+  return whose.profile === null
+    ? `Carried out by ${what}.`
+    : `Carried out by ${what} under ${whose.profile}.`
+}

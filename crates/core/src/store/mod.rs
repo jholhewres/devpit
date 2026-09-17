@@ -18,6 +18,7 @@ pub mod search_index;
 mod session_links;
 pub mod settings;
 mod spend;
+mod whose_run;
 
 use std::path::{Path, PathBuf};
 
@@ -50,6 +51,7 @@ pub use evidence::{Evidence, EvidenceError, Ran, MOST_EVIDENCE};
 pub use layouts::CardTabLayout;
 pub use runs::RunRow;
 pub use session_links::SessionLink;
+pub use whose_run::{Asked, Carried, WhoseRun};
 /// The ceilings on anything read from outside, in one place.
 pub mod limits {
     pub use crate::store::cards::{LONGEST_COMMENT, LONGEST_LABEL, NOTICES_KEPT};

@@ -564,4 +564,28 @@ ALTER TABLE run ADD COLUMN evidence_version INTEGER;
 ALTER TABLE run ADD COLUMN saw_changes TEXT;
 "#,
     },
+    // Migration 019 — who asked for a run, and what carried it out.
+    Migration {
+        version: 19,
+        sql: r#"
+-- Two different questions a run could not answer. Who **asked** — a board
+-- drag, the checkpoint, a chain, a card's own play — and what **carried it
+-- out** — a local process or an agent session under some profile. They are
+-- different: Claude can ask for a test the local runner executes and Codex
+-- reviews, and one column for both would have lost that.
+--
+-- Written when the run starts, never from a later event: an event that arrives
+-- after the fact must not reattribute the run to whatever is active now.
+ALTER TABLE run ADD COLUMN asked_by TEXT;
+-- The id of the surface that asked — a tab, a pane, a session. Read back as a
+-- reference and never resolved by name: a terminal that has closed is
+-- `unavailable`, and matching another pane by a coincidence of name would
+-- point somebody at work that is not theirs.
+ALTER TABLE run ADD COLUMN asked_from TEXT;
+ALTER TABLE run ADD COLUMN carried_by TEXT;
+-- The profile the agent session ran under, as it stood then. NULL for a run a
+-- local process carried out.
+ALTER TABLE run ADD COLUMN carried_profile TEXT;
+"#,
+    },
 ];

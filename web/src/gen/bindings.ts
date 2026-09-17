@@ -1241,6 +1241,11 @@ export type Checked = {
 	 *  for separately: a list of runs is not a place to send megabytes.
 	 */
 	evidenceVersion: number | null,
+	/**
+	 *  Who asked and what did the work. Two answers, because Claude can ask
+	 *  for a test the local runner executes and Codex reviews.
+	 */
+	whose: Whose,
 };
 
 /**
@@ -2811,6 +2816,26 @@ export type WhatRan = {
 	baseRevision: string | null,
 	headRevision: string | null,
 	inAWorktree: boolean | null,
+};
+
+/**  Who asked for a run and what carried it out. */
+export type Whose = {
+	/**
+	 *  `board`, `card`, `checkpoint`, `chain`, or absent for a run that never
+	 *  said — including every one from before this was recorded.
+	 */
+	asked: string | null,
+	/**
+	 *  The surface that asked, as a **reference**. The screen shows it and
+	 *  never looks it up: a terminal that has closed is unavailable, and
+	 *  finding another that shares its name would point at work that is not
+	 *  this run's.
+	 */
+	askedFrom: string | null,
+	/**  `process` or `agent`, or absent for a run that never said. */
+	carried: string | null,
+	/**  The profile an agent session ran under, as it stood then. */
+	profile: string | null,
 };
 
 export type Widths = {

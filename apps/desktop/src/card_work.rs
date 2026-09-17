@@ -189,7 +189,7 @@ pub fn card_play(
         &card_id,
         &shaped,
         // Played where it stands, so a refusal has nowhere else to send it.
-        Some(&card.column_id),
+        crate::run_from::Asking::first(Some(&card.column_id), devpit_core::store::Asked::Card),
     )?;
 
     Ok(Played {

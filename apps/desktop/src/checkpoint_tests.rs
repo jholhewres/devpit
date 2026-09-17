@@ -95,3 +95,64 @@ fn a_run_nobody_knows_is_not_found() {
     let refused = checked(&store, "run_nothing").expect_err("a refusal");
     assert_eq!(refused.code, ErrorCode::NotFound);
 }
+
+/// Who asked and what did the work arrive as two answers, and a run that said
+/// neither says neither.
+#[test]
+fn whose_a_run_was_arrives_as_two_answers() {
+    let (_dir, store, run) = a_run_that("ok");
+    store
+        .record_whose_run(
+            &run,
+            &WhoseRun {
+                asked: Asked::Checkpoint,
+                asked_from: Some("tab_that_is_gone".to_owned()),
+                carried: Carried::Agent {
+                    profile: Some("glm".to_owned()),
+                },
+            },
+        )
+        .expect("recorded");
+
+    let whose = checked(&store, &run).expect("read").whose;
+    assert_eq!(whose.asked.as_deref(), Some("checkpoint"));
+    assert_eq!(whose.carried.as_deref(), Some("agent"));
+    assert_eq!(whose.profile.as_deref(), Some("glm"));
+    // Kept as a reference, not looked up: the pane may be gone, and finding
+    // another that shares its name would point at work that is not this run's.
+    assert_eq!(whose.asked_from.as_deref(), Some("tab_that_is_gone"));
+}
+
+/// Sabotage: default `asked` to "board" and every run from before this was
+/// recorded claims to have come from a drag nobody made.
+#[test]
+fn a_run_that_never_said_whose_it_was_says_nothing() {
+    let (_dir, store, run) = a_run_that("ok");
+    let whose = checked(&store, &run).expect("read").whose;
+
+    assert_eq!(whose.asked, None);
+    assert_eq!(whose.carried, None);
+    assert_eq!(whose.profile, None);
+    assert_eq!(whose.asked_from, None);
+}
+
+/// A local process carries no profile, and inventing one would name an account
+/// that never touched this run.
+#[test]
+fn a_run_a_process_carried_out_names_no_account() {
+    let (_dir, store, run) = a_run_that("ok");
+    store
+        .record_whose_run(
+            &run,
+            &WhoseRun {
+                asked: Asked::Board,
+                asked_from: None,
+                carried: Carried::Process,
+            },
+        )
+        .expect("recorded");
+
+    let whose = checked(&store, &run).expect("read").whose;
+    assert_eq!(whose.carried.as_deref(), Some("process"));
+    assert_eq!(whose.profile, None);
+}

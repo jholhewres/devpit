@@ -158,6 +158,27 @@ pub struct Checked {
     /// The evidence's shape, when a run left any. The payload itself is asked
     /// for separately: a list of runs is not a place to send megabytes.
     pub evidence_version: Option<f64>,
+    /// Who asked and what did the work. Two answers, because Claude can ask
+    /// for a test the local runner executes and Codex reviews.
+    pub whose: Whose,
+}
+
+/// Who asked for a run and what carried it out.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Whose {
+    /// `board`, `card`, `checkpoint`, `chain`, or absent for a run that never
+    /// said — including every one from before this was recorded.
+    pub asked: Option<String>,
+    /// The surface that asked, as a **reference**. The screen shows it and
+    /// never looks it up: a terminal that has closed is unavailable, and
+    /// finding another that shares its name would point at work that is not
+    /// this run's.
+    pub asked_from: Option<String>,
+    /// `process` or `agent`, or absent for a run that never said.
+    pub carried: Option<String>,
+    /// The profile an agent session ran under, as it stood then.
+    pub profile: Option<String>,
 }
 
 /// The circumstances of a run, as the screen reads them.

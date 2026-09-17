@@ -106,7 +106,7 @@ pub fn card_move(
             &store,
             &card_id,
             step,
-            came_from.as_deref(),
+            crate::run_from::Asking::first(came_from.as_deref(), devpit_core::store::Asked::Board),
         )?),
     };
 

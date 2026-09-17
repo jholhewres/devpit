@@ -221,7 +221,10 @@ fn onward(
         store,
         card_id,
         &step,
-        Some(column_id),
-        hops + 1,
+        crate::run_from::Asking {
+            came_from: Some(column_id),
+            hops: hops + 1,
+            asked: devpit_core::store::Asked::Chain,
+        },
     );
 }
