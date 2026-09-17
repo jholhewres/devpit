@@ -27,6 +27,16 @@ before(async () => {
   await window.wait(until.elementLocated(By.css('#root')), 20000)
   await insideTheSeededHome(window, process.env.E2E_HOME)
 
+  // Focus is off until Settings turns it on — it is not finished enough to be
+  // in everybody's top bar — so this turns it on before asking for the pill.
+  await invoke(window, 'settings_write', {
+    theme: null,
+    automaticUpdates: null,
+    confirmStop: null,
+    terminalContrast: null,
+    focusMode: true,
+  })
+
   // The project in focus, and another one to be interrupted by.
   here = await seedBoard(window, process.env.E2E_REPO)
   there = await seedBoard(window, process.env.E2E_REPO_TWO ?? process.env.E2E_REPO)
@@ -39,6 +49,15 @@ before(async () => {
 
 after(async () => {
   await invoke(window, 'focus_write', { projectId: null }).catch(() => {})
+  // Left as it was found: the home is shared, and a later file that saw the
+  // pill would be looking at a window this one changed.
+  await invoke(window, 'settings_write', {
+    theme: null,
+    automaticUpdates: null,
+    confirmStop: null,
+    terminalContrast: null,
+    focusMode: false,
+  }).catch(() => {})
   await window?.quit()
 })
 

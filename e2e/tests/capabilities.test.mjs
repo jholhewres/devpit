@@ -83,6 +83,15 @@ before(async () => {
 })
 
 after(async () => {
+  // Left as it was found. The seeded home is shared between files, and the
+  // tabs this opened are remembered per project: a screenshot taken by a later
+  // file would otherwise be a picture of this file's work.
+  await window
+    ?.executeScript(
+      "document.querySelectorAll('.tab__x').forEach((x) => x.click())",
+    )
+    .catch(() => {})
+  await settle(500)
   await window?.quit()
 })
 
