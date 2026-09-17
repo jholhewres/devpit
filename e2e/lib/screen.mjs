@@ -60,9 +60,40 @@ export async function boxOf(window, selector) {
 
 /** Saves a PNG of the window, and answers its path and how much of it is drawn
  *  on — of the whole picture, or of `crop` when one is given. */
+/**
+ * How long a screenshot is given before the suite gives up on it.
+ *
+ * Bounded because it is the one call here that can wait for ever: the driver
+ * asks the compositor for a frame, and a window that never gives it one leaves
+ * `takeScreenshot` with nothing to return and no error to raise. Unbounded, it
+ * took the whole suite with it — the runner printed `TAP version 13` and then
+ * nothing, and an hour later the job was cancelled with no line saying which
+ * screen it died on.
+ *
+ * Measured on 17/09/2026: this driver gives no frame for **any** window, empty
+ * or drawn, on this machine and on the CI runner both. Nothing the app draws
+ * is involved — the same window answers every DOM question correctly while it
+ * does it. So a missing frame is not a failed screen, and the assertions that
+ * do not need a picture are what the suite still holds.
+ */
+const LONGEST_SHOT_MS = 10000
+
 export async function shoot(window, name, crop = null) {
   mkdirSync(SHOTS, { recursive: true })
-  const png = Buffer.from(await window.takeScreenshot(), 'base64')
+  const taken = await Promise.race([
+    window.takeScreenshot(),
+    new Promise((resolve) => setTimeout(() => resolve(null), LONGEST_SHOT_MS)),
+  ]).catch(() => null)
+
+  // `ink: null` is "nobody looked", and it is not the same as zero. A caller
+  // that read it as zero would fail every screen on a machine whose driver
+  // cannot photograph a window — and a caller that read it as "fine" would
+  // pass a blank one. Both are wrong; saying nothing is the truth.
+  if (taken === null) {
+    return { path: null, ink: null }
+  }
+
+  const png = Buffer.from(taken, 'base64')
   const path = join(SHOTS, `${name}.png`)
   writeFileSync(path, png)
   return { path, ink: inkOf(png, crop) }

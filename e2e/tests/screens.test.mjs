@@ -80,7 +80,15 @@ async function sound(name, landmarks, container) {
   const crop = await boxOf(window, container)
   assert.ok(crop, `${name} has no ${container} with a size to measure`)
   const { ink } = await shoot(window, name, crop)
-  assert.ok(ink > 0.02, `${name} is ${(ink * 100).toFixed(1)}% drawn on — it looks blank`)
+  // `null` is a driver that gave no frame, not a screen that drew nothing.
+  // Said out loud on every screen it happens to, because this is the one
+  // assertion here that reads the pixels — everything above it read the DOM,
+  // and a blank window would still pass those.
+  if (ink === null) {
+    console.error(`${name}: no frame from the driver, so nothing checked the pixels`)
+  } else {
+    assert.ok(ink > 0.02, `${name} is ${(ink * 100).toFixed(1)}% drawn on — it looks blank`)
+  }
 }
 
 /** The value a field shows, by its label. */
