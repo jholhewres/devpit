@@ -7,6 +7,7 @@ import { HeadsDown } from './HeadsDown'
 let stored: Stored | null = null
 const written: (string | null)[] = []
 const lengths: number[] = []
+let offered = true
 
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<{ data?: unknown }>) => {
@@ -16,6 +17,9 @@ vi.mock('./live', () => ({
   commands: {
     focusRead: async () => ({ status: 'ok', data: stored }),
     focusWaiting: async () => ({ notices: [], more: false }),
+    /* The control is off unless Settings turned it on, so every test here
+       says it was turned on. The one that proves it stays hidden says so. */
+    settingsRead: async () => ({ status: 'ok', data: { focusMode: offered } }),
     runsList: async () => ({ runs: [], next: null }),
     focusWrite: async (projectId: string | null, minutes: number) => {
       lengths.push(minutes)
@@ -31,19 +35,20 @@ afterEach(() => {
   stored = null
   written.length = 0
   lengths.length = 0
+  offered = true
   delete document.documentElement.dataset.headsDown
   vi.useRealTimers()
 })
 
 describe('going into a focus', () => {
-  it('shows nothing at all without a project open', () => {
+  it('shows nothing at all without a project open', async () => {
     const { container } = render(<HeadsDown projectId={null} />)
-    expect(container.firstChild).toBeNull()
+    await waitFor(() => expect(container.firstChild).toBeNull())
   })
 
   it('begins one on a click and ends it on the next', async () => {
     render(<HeadsDown projectId="prj_1" />)
-    const button = screen.getByRole('button', { name: /Focus/ })
+    const button = await screen.findByRole('button', { name: /Focus/ })
     expect(button.getAttribute('aria-pressed')).toBe('false')
 
     fireEvent.click(button)
@@ -61,7 +66,7 @@ describe('going into a focus', () => {
     render(<HeadsDown projectId="prj_1" />)
     expect(document.documentElement.dataset.headsDown).toBeUndefined()
 
-    fireEvent.click(screen.getByRole('button', { name: /Focus/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Focus/ }))
     // The whole focus, not a flag: the bell reads the project and the second
     // it began off this, and a flag would leave it asking the app again.
     await waitFor(() =>
@@ -76,7 +81,9 @@ describe('going into a focus', () => {
      to be printed on a button nothing listened for. */
   it('hears the key it announces', async () => {
     render(<HeadsDown projectId="prj_1" />)
-    expect(screen.getByRole('button', { name: /Focus/ }).getAttribute('title')).toContain('⇧⌘F')
+    expect((await screen.findByRole('button', { name: /Focus/ })).getAttribute('title')).toContain(
+      '⇧⌘F',
+    )
 
     fireEvent.keyDown(window, { key: 'F', shiftKey: true, metaKey: true })
     await waitFor(() => expect(written).toEqual(['prj_1']))
@@ -148,7 +155,7 @@ describe('what the pill says while a focus is on', () => {
 describe('a length given to a focus', () => {
   it('sends none unless one was picked', async () => {
     render(<HeadsDown projectId="prj_1" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Focus' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Focus' }))
     await waitFor(() => expect(lengths).toEqual([0]))
   })
 
@@ -156,7 +163,7 @@ describe('a length given to a focus', () => {
      and only about students, so the default is no end at all. */
   it('sends the one that was picked', async () => {
     render(<HeadsDown projectId="prj_1" />)
-    fireEvent.change(screen.getByLabelText('Focus length'), { target: { value: '25' } })
+    fireEvent.change(await screen.findByLabelText('Focus length'), { target: { value: '25' } })
     fireEvent.click(screen.getByRole('button', { name: 'Focus' }))
     await waitFor(() => expect(lengths).toEqual([25]))
   })
@@ -166,5 +173,14 @@ describe('a length given to a focus', () => {
     render(<HeadsDown projectId="prj_1" />)
     await waitFor(() => expect(screen.getByRole('button', { name: /Focus ·/ })).toBeTruthy())
     expect(screen.queryByLabelText('Focus length')).toBeNull()
+  })
+})
+
+/* Unfinished, so it is not in everybody's top bar: Settings turns it on. */
+describe('before it is turned on', () => {
+  it('is not in the top bar at all', async () => {
+    offered = false
+    render(<HeadsDown projectId="prj_1" />)
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Focus/ })).toBeNull())
   })
 })

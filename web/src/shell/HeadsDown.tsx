@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { FocusSummary } from './FocusSummary'
 import { minutesIn } from './headsDown'
 import { shortcutFor, SHORTCUTS } from './shortcuts'
+import { ask, commands } from './live'
 import { stamp, useHeadsDown } from './useHeadsDown'
 
 /*
@@ -39,6 +40,15 @@ export function HeadsDown({
   /* The length to give the next focus. Zero is none, which is the default:
      a timebox is offered, never imposed. */
   const [minutes, setMinutes] = useState(0)
+  /* Off unless somebody turned it on in Settings. Unfinished, and an
+     unfinished thing does not get to be in everybody's top bar. */
+  const [offered, setOffered] = useState(false)
+
+  useEffect(() => {
+    void ask(() => commands.settingsRead()).then((answer) => {
+      setOffered(answer.data?.focusMode === true)
+    })
+  }, [])
   const [now, setNow] = useState(() => Date.now() / 1000)
 
   const on = focus !== null
@@ -97,8 +107,8 @@ export function HeadsDown({
   })
 
   // Only with a project open: a focus is on one, and there is nothing to be in
-  // the middle of before that.
-  if (!projectId) return null
+  // the middle of before that. And only when it is turned on.
+  if (!projectId || !offered) return null
 
   return (
     <>

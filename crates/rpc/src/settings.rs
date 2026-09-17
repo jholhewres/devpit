@@ -63,6 +63,12 @@ pub struct Settings {
     /// "never asked", which keeps the old rule: none on the dark ground, 4.5
     /// on the light one.
     pub terminal_contrast: Option<f64>,
+    /// Whether the focus mode is offered at all.
+    ///
+    /// Off unless somebody turns it on, and `null` is off here rather than
+    /// "never asked": an unfinished thing does not get to be the default by
+    /// virtue of nobody having had an opinion about it yet.
+    pub focus_mode: Option<bool>,
 }
 
 #[cfg(test)]

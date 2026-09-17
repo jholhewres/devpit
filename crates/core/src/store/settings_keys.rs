@@ -34,3 +34,5 @@ pub const FILES_WIDTH: &str = "layout.files_width";
 /// absent. Two fields in one row because a focus is one thing: half of it
 /// written and half not is a focus with no beginning.
 pub const HEADS_DOWN: &str = "focus.heads_down";
+/// Whether the focus mode is offered. Off unless it is turned on.
+pub const FOCUS_MODE: &str = "focus.enabled";

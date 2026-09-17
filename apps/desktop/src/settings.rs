@@ -25,6 +25,7 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
             .preference(preference::TERMINAL_CONTRAST)?
             .and_then(|value| value.parse::<f64>().ok())
             .filter(|value| CONTRAST.contains(value)),
+        focus_mode: store.preference_flag(preference::FOCUS_MODE)?,
     })
 }
 
@@ -46,6 +47,7 @@ pub fn settings_write(
     automatic_updates: Option<bool>,
     confirm_stop: Option<bool>,
     terminal_contrast: Option<f64>,
+    focus_mode: Option<bool>,
 ) -> Result<Settings, RpcError> {
     let store = store()?;
     if let Some(chosen) = theme {
@@ -56,6 +58,9 @@ pub fn settings_write(
     }
     if let Some(ask) = confirm_stop {
         store.set_preference_flag(preference::CONFIRM_STOP, ask)?;
+    }
+    if let Some(offered) = focus_mode {
+        store.set_preference_flag(preference::FOCUS_MODE, offered)?;
     }
     if let Some(contrast) = terminal_contrast {
         if !CONTRAST.contains(&contrast) {

@@ -82,10 +82,13 @@ describe('enabledCount', () => {
 
 describe('where a capability opens', () => {
   it('lists only what is installed, on, and has somewhere to open', () => {
-    const notes = { ...excalidraw, id: 'notes', name: 'Notes' }
+    /* An id no OPENS entry names: `notes` used to stand for this and now has
+       a pane of its own, which is the point — this asks about a capability
+       with nowhere to open, not about any particular one. */
+    const nowhere = { ...excalidraw, id: 'nowhere', name: 'Nowhere' }
     const live = liveCapabilities([
       { manifest: excalidraw, installed: true, enabled: true },
-      { manifest: notes, installed: true, enabled: true },
+      { manifest: nowhere, installed: true, enabled: true },
     ])
     expect(live.map((one) => one.manifest.id)).toEqual(['excalidraw'])
     expect(liveCapabilities([{ manifest: excalidraw, installed: true, enabled: false }])).toEqual([])

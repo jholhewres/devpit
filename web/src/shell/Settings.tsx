@@ -17,7 +17,7 @@ import { Worktrees } from './Worktrees'
    account-menu row land here on the pane they name. */
 
 /* The yes/no settings, named once. */
-type Flag = 'automaticUpdates' | 'confirmStop'
+type Flag = 'automaticUpdates' | 'confirmStop' | 'focusMode'
 
 export function Settings({
   pane,
@@ -44,13 +44,16 @@ export function Settings({
         field === 'automaticUpdates' ? next : null,
         field === 'confirmStop' ? next : null,
         null,
+        field === 'focusMode' ? next : null,
       ),
     ).then((answer) => setFlags(answer.data ?? flags))
   }
 
-  /* Null is "never asked", and both of these default to on: updates, and the
-     prompt that stands between somebody and losing what a terminal was doing. */
-  const on = (field: Flag): boolean => flags?.[field] ?? true
+  /* Null is "never asked", and two of these default to on: updates, and the
+     prompt that stands between somebody and losing what a terminal was doing.
+     The focus mode is the exception — it is unfinished, and an unfinished
+     thing does not become the default by nobody having an opinion yet. */
+  const on = (field: Flag): boolean => flags?.[field] ?? field !== 'focusMode'
 
   return (
     <div className="prefs" data-open="true">
@@ -108,6 +111,10 @@ export function Settings({
               <span className="pref__body"><span className="pref__t">Automatic updates</span><span className="pref__d">Check in the background and offer to install.</span></span>
               <span className="sw"></span>
             </button>
+            <button className="pref" role="switch" aria-checked={on('focusMode')} onClick={() => set('focusMode', !on('focusMode'))}>
+              <span className="pref__body"><span className="pref__t">Focus mode</span><span className="pref__d">Unfinished. A door for one project: what arrives from another waits until you come out.</span></span>
+              <span className="sw"></span>
+            </button>
             <OpenApps />
             <UpdateSettings />
           </section>
@@ -159,7 +166,7 @@ export function Settings({
             <TerminalContrast
               value={flags?.terminalContrast ?? null}
               onPick={(value) =>
-                void ask(() => commands.settingsWrite(null, null, null, value)).then((answer) =>
+                void ask(() => commands.settingsWrite(null, null, null, value, null)).then((answer) =>
                   setFlags(answer.data ?? flags),
                 )
               }

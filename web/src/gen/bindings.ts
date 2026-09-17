@@ -865,7 +865,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast })),
+	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null, focusMode: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast, focusMode })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -2400,6 +2400,14 @@ export type Settings = {
 	 *  on the light one.
 	 */
 	terminalContrast: number | null,
+	/**
+	 *  Whether the focus mode is offered at all.
+	 * 
+	 *  Off unless somebody turns it on, and `null` is off here rather than
+	 *  "never asked": an unfinished thing does not get to be the default by
+	 *  virtue of nobody having had an opinion about it yet.
+	 */
+	focusMode: boolean | null,
 };
 
 /**  A sign-in that has started but not finished. */
