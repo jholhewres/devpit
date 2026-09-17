@@ -21,6 +21,10 @@ import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
 
 let window
 let seeded
+/** The lane this file borrows, and the step it had before. Put back in
+    `after`: the seeded home is shared, and a later file reading the board
+    would otherwise be reading this file's work. */
+let borrowed = null
 
 before(async () => {
   window = await openWindow(process.env.E2E_BINARY)
@@ -34,6 +38,9 @@ before(async () => {
 })
 
 after(async () => {
+  if (borrowed) {
+    await invoke(window, 'column_set_step', borrowed).catch(() => {})
+  }
   await window?.quit()
 })
 
@@ -99,6 +106,11 @@ describe('the Checks panel', () => {
       irreversible: false,
     })
     const mine = (made.steps ?? []).find((one) => one.name === 'nothing')
+    borrowed = {
+      projectId: seeded.project.id,
+      columnId: board.columns[0].id,
+      stepId: board.columns[0].step?.id ?? null,
+    }
     await invoke(window, 'column_set_step', {
       projectId: seeded.project.id,
       columnId: board.columns[0].id,
