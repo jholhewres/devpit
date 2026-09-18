@@ -14,6 +14,10 @@ vi.mock('./window', () => ({
 
 const download = vi.fn(async () => ({ status: 'ok', data: null }))
 const packaged = vi.fn(async () => ({ status: 'ok', data: "sudo /usr/bin/apt install '/c/devpit.deb'" }))
+/* The install polkit runs. `true` is installed, `false` is the person
+   cancelling the system's dialog, and an error is a machine without pkexec —
+   which is where the copied command comes back. */
+const installedPackage = vi.fn(async () => ({ status: 'ok', data: true }))
 const installed = vi.fn(async () => ({ status: 'ok', data: null }))
 const checked = vi.fn(async () => ({ status: 'ok', data: { type: 'checking' } }))
 const chose = vi.fn(async (_choice: string) => ({ status: 'ok', data: null }))
@@ -27,6 +31,7 @@ vi.mock('./live', () => ({
   commands: {
     updateDownload: () => download(),
     updatePackage: () => packaged(),
+    updateInstallPackage: () => installedPackage(),
     updateInstall: () => installed(),
     updateCheck: () => checked(),
     updateRunning: async () => ({ status: 'ok', data: busy }),
@@ -118,9 +123,7 @@ describe('the update card', () => {
 
   /* A package devpit will not install: the path, the note, and a command asked
      for again at the moment it is copied. */
-  it('shows a package to install by hand, and asks again before copying', async () => {
-    const written = vi.fn()
-    Object.assign(navigator, { clipboard: { writeText: written } })
+  it('offers the install, and lets the system ask for the password', async () => {
     render(<UpdateCard />)
 
     say({
@@ -129,21 +132,50 @@ describe('the update card', () => {
       path: '/c/devpit.deb',
     })
 
-    expect(screen.getByText('Install this package yourself')).toBeTruthy()
+    expect(screen.getByText('Install the update')).toBeTruthy()
     expect(screen.getByText('/c/devpit.deb')).toBeTruthy()
-    expect(screen.getByText(/devpit never runs an install command/)).toBeTruthy()
+    /* devpit still does not ask for root: polkit does, and the card says so
+       rather than letting the dialog arrive unannounced. */
+    expect(screen.getByText(/system will ask for your password/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
-    await waitFor(() => expect(packaged).toHaveBeenCalled())
-    expect(written).toHaveBeenCalledWith("sudo /usr/bin/apt install '/c/devpit.deb'")
-    expect(screen.queryByText(/The clipboard refused it/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }))
+    await waitFor(() => expect(installedPackage).toHaveBeenCalled())
+    /* It checked again, which is how the card learns the new version is in. */
+    await waitFor(() => expect(checked).toHaveBeenCalled())
   })
 
-  it('says so when the clipboard refuses the command', async () => {
+  /* A machine with no pkexec: the command comes back, copied, which is what
+     this card has always been. Sabotage: drop the fallback and a machine
+     without polkit is offered a button that only ever fails. */
+  it('falls back to the copied command where there is no polkit', async () => {
+    const written = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText: written } })
+    installedPackage.mockResolvedValueOnce({
+      status: 'error',
+      error: { message: 'this machine has no pkexec' },
+    } as never)
+    render(<UpdateCard />)
+
+    say({
+      type: 'manualInstall',
+      command: "sudo /usr/bin/apt install '/c/devpit.deb'",
+      path: '/c/devpit.deb',
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }))
+
+    await waitFor(() => expect(packaged).toHaveBeenCalled())
+    expect(written).toHaveBeenCalledWith("sudo /usr/bin/apt install '/c/devpit.deb'")
+  })
+
+  it('says so when the clipboard refuses the command it fell back to', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => Promise.reject(new Error('no'))) } })
+    installedPackage.mockResolvedValueOnce({
+      status: 'error',
+      error: { message: 'this machine has no pkexec' },
+    } as never)
     render(<UpdateCard />)
     say({ type: 'manualInstall', command: 'sudo x', path: '/c/devpit.deb' })
-    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }))
     expect(await screen.findByText(/The clipboard refused it/)).toBeTruthy()
   })
 

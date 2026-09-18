@@ -945,6 +945,49 @@ pub fn update_package(updating: tauri::State<'_, Updating>) -> Result<String, Rp
         .map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why))
 }
 
+/// `update.install_package` — the `.deb`, installed by polkit.
+///
+/// The promise this keeps is the one the copied command kept: devpit does not
+/// ask for root. `pkexec` hands the job to polkit, which puts up the system's
+/// dialog, takes the password itself and runs the single command it was
+/// given. Nothing here sees the password and nothing here holds root.
+///
+/// The file is verified again first, for the same reason `update_package`
+/// verifies it: it has been sitting in a world-readable cache, and a person
+/// may be coming back to this card hours later.
+///
+/// `Ok(false)` is polkit refused or the person cancelled, which is an answer
+/// and not a failure — the offer stays good and the card says so.
+#[tauri::command]
+#[specta::specta]
+pub fn update_install_package(updating: tauri::State<'_, Updating>) -> Result<bool, RpcError> {
+    let (path, digest) = updating
+        .package
+        .lock()
+        .ok()
+        .and_then(|held| held.clone())
+        .ok_or_else(|| RpcError::internal("no package has been downloaded"))?;
+
+    let folder = crate::update_deb::cache_dir();
+    crate::update_deb::still_ours(&path, &folder, &digest)
+        .map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why.said().to_owned()))?;
+
+    let argv =
+        crate::update_deb::elevated(&path, &crate::update_deb::TRUSTED).ok_or_else(|| {
+            RpcError::new(
+                devpit_rpc::ErrorCode::Conflict,
+                "this machine has no pkexec, so the command is yours to run".to_owned(),
+            )
+        })?;
+
+    let (program, rest) = argv.split_first().expect("elevated never returns empty");
+    let ended = std::process::Command::new(program)
+        .args(rest)
+        .status()
+        .map_err(|err| RpcError::internal(format!("the installer would not start: {err}")))?;
+    Ok(ended.success())
+}
+
 /// `update.install` — put it in and come back.
 ///
 /// Only an AppImage is installed from here: a `.deb` is shown as a command for

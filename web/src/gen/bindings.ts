@@ -132,6 +132,22 @@ export const commands = {
 	 */
 	updatePackage: () => typedError<string, RpcError>(__TAURI_INVOKE("update_package")),
 	/**
+	 *  `update.install_package` — the `.deb`, installed by polkit.
+	 * 
+	 *  The promise this keeps is the one the copied command kept: devpit does not
+	 *  ask for root. `pkexec` hands the job to polkit, which puts up the system's
+	 *  dialog, takes the password itself and runs the single command it was
+	 *  given. Nothing here sees the password and nothing here holds root.
+	 * 
+	 *  The file is verified again first, for the same reason `update_package`
+	 *  verifies it: it has been sitting in a world-readable cache, and a person
+	 *  may be coming back to this card hours later.
+	 * 
+	 *  `Ok(false)` is polkit refused or the person cancelled, which is an answer
+	 *  and not a failure — the offer stays good and the card says so.
+	 */
+	updateInstallPackage: () => typedError<boolean, RpcError>(__TAURI_INVOKE("update_install_package")),
+	/**
 	 *  `spend.history` — what the agents spent over the last `days`, from their
 	 *  transcripts, for one installation or all and one project or all.
 	 */

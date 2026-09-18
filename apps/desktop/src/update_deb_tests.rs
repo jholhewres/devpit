@@ -157,3 +157,44 @@ fn a_path_that_cannot_be_typed_is_refused() {
         .expect_err("a quote was allowed")
         .contains("cannot be typed"));
 }
+
+/// The elevated install is argv, and polkit is the one that asks.
+#[test]
+fn the_elevated_install_names_pkexec_and_the_package_as_one_argument() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = dir.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin");
+    for tool in ["pkexec", "apt"] {
+        std::fs::write(bin.join(tool), "").expect("tool");
+    }
+    let dirs = [bin.display().to_string()];
+    let dirs: Vec<&str> = dirs.iter().map(String::as_str).collect();
+
+    let package = std::path::Path::new("/home/some one/devpit_0.1.2_amd64.deb");
+    let argv = super::elevated(package, &dirs).expect("an elevated install");
+
+    assert!(argv[0].ends_with("pkexec"), "{argv:?}");
+    assert!(argv[1].ends_with("apt"), "{argv:?}");
+    assert_eq!(argv[2], "install");
+    /* `-y` because polkit already asked and there is no terminal to answer a
+    prompt in: a confirmation nobody can see is a hang. */
+    assert_eq!(argv[3], "-y");
+    /* A path with a space is one argument. Sabotage: build a shell line and
+    this becomes two, and the install fails on a home directory that has a
+    space in its name. */
+    assert_eq!(argv[4], "/home/some one/devpit_0.1.2_amd64.deb");
+}
+
+/// No polkit, no elevated install — and then the copied command is the only
+/// honest answer.
+#[test]
+fn a_machine_without_pkexec_gets_no_elevated_install() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = dir.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin");
+    std::fs::write(bin.join("apt"), "").expect("apt");
+    let dirs = [bin.display().to_string()];
+    let dirs: Vec<&str> = dirs.iter().map(String::as_str).collect();
+
+    assert!(super::elevated(std::path::Path::new("/tmp/x.deb"), &dirs).is_none());
+}

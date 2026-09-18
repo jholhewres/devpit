@@ -150,6 +150,42 @@ pub(crate) fn install_command(package: &Path, dirs: &[&str]) -> Result<String, S
     Ok(format!("{sudo} {apt} {how} '{path}'"))
 }
 
+/// The install, run by polkit rather than typed by the person.
+///
+/// The rule this was written under stands: devpit does not ask for root on
+/// anybody's behalf. `pkexec` is not devpit asking — it hands the job to
+/// polkit, which puts up the system's own dialog, takes the password itself,
+/// and runs the one command it was given. Nothing here ever sees the password
+/// and nothing here holds root.
+///
+/// `-y` here where the copied command has none, and for the same reason it
+/// had none: there, the person reads the command before running it; here,
+/// polkit has already asked them and there is no terminal to answer a prompt
+/// in. A confirmation nobody can see is a hang.
+///
+/// `None` when this machine has no `pkexec`, and then the copied command is
+/// the only honest answer.
+pub(crate) fn elevated(package: &Path, dirs: &[&str]) -> Option<Vec<String>> {
+    if !package.is_absolute() {
+        return None;
+    }
+    let pkexec = found_in(dirs, "pkexec")?;
+    let apt = found_in(dirs, "apt").or_else(|| found_in(dirs, "dpkg"))?;
+    let how = if apt.ends_with("dpkg") {
+        "-i"
+    } else {
+        "install"
+    };
+    /* Argv, not a shell line: the path goes in as one argument and nothing
+    between here and the kernel gets to read it as anything else. */
+    let mut argv = vec![pkexec, apt, how.to_owned()];
+    if !argv[1].ends_with("dpkg") {
+        argv.push("-y".to_owned());
+    }
+    argv.push(package.display().to_string());
+    Some(argv)
+}
+
 fn found_in(dirs: &[&str], tool: &str) -> Option<String> {
     dirs.iter()
         .map(|dir| Path::new(dir).join(tool))

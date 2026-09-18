@@ -84,10 +84,13 @@ function offer(
       }
     case 'manualInstall':
       return {
-        title: 'Install this package yourself',
+        title: 'Install the update',
         said: status.path,
-        calm: 'devpit never runs an install command for you.',
-        action: 'Copy command',
+        /* devpit still does not ask for root. `pkexec` hands the job to
+           polkit, which puts up the system's own dialog and takes the
+           password itself. */
+        calm: 'Your system will ask for your password.',
+        action: 'Install',
       }
     case 'failed':
       return {
@@ -215,6 +218,17 @@ export function UpdateCard(): React.JSX.Element | null {
     setLater(true)
     if (status.type === 'ready' || status.type === 'waiting') choose('later')
   }
+  /* Through polkit. A refusal or a cancel is an answer, not a failure: the
+     offer stays good, and a machine without pkexec falls back to the command
+     the person runs themselves — which is what this card used to be. */
+  const installPackage = (): void => {
+    void ask(() => commands.updateInstallPackage()).then((answer) => {
+      if (answer.data === true) return checkAgain()
+      if (answer.data === false) return
+      copyCommand()
+    })
+  }
+
   const act =
     status.type === 'available'
       ? download
@@ -222,7 +236,7 @@ export function UpdateCard(): React.JSX.Element | null {
         ? restart
         : status.type === 'failed'
           ? checkAgain
-          : copyCommand
+          : installPackage
 
   return (
     <div className="upd" role="status" aria-label="Update">
