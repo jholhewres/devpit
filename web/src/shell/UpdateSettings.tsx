@@ -22,7 +22,7 @@ function said(status: UpdateStatus | null): string {
     case 'checking':
       return 'Checking…'
     case 'available':
-      return `devpit ${status.version} is out.`
+      return `devpit ${status.version} is out. Update starts the download; the card takes it from there.`
     case 'externallyManaged':
       return 'This copy is looked after by your system, so update it there.'
     case 'failed':
@@ -47,19 +47,32 @@ export function UpdateSettings(): React.JSX.Element {
     void ask(() => commands.appInfo()).then((answer) => setVersion(answer.data?.version ?? ''))
   }, [])
 
+  const answered = (answer: { data: UpdateStatus | null; error: string | null }): void => {
+    setAsking(false)
+    setStatus(
+      answer.data ?? {
+        type: 'failed',
+        message: answer.error ?? 'the check said nothing',
+        recoverable: true,
+      },
+    )
+  }
+
   const check = (): void => {
     setAsking(true)
-    void ask(() => commands.updateCheck()).then((answer) => {
-      setAsking(false)
-      setStatus(
-        answer.data ?? {
-          type: 'failed',
-          message: answer.error ?? 'the check said nothing',
-          recoverable: true,
-        },
-      )
-    })
+    void ask(() => commands.updateCheck()).then(answered)
   }
+
+  /* The download is where the card comes in: it is the one place that draws
+     progress, asks about work in flight, and installs. Settings starting it
+     is the row saying how, rather than announcing a version and stopping. */
+  const update = (): void => {
+    setAsking(true)
+    void ask(() => commands.updateDownload()).then(answered)
+  }
+
+  /* Nothing to offer on a test feed: what it names cannot be installed. */
+  const offered = status?.type === 'available' && !fromATestFeed(status)
 
   return (
     <div className="prefs__hrow">
@@ -70,8 +83,8 @@ export function UpdateSettings(): React.JSX.Element {
         </span>
         <span className="pref__d">{said(status)}</span>
       </div>
-      <button className="btn" disabled={asking} onClick={check}>
-        {asking ? 'Checking…' : 'Check now'}
+      <button className="btn" disabled={asking} onClick={offered ? update : check}>
+        {asking ? 'Working…' : offered ? 'Update' : 'Check now'}
       </button>
     </div>
   )
