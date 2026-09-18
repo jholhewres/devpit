@@ -107,11 +107,27 @@ export function Leaf({
     })
     watch.observe(box)
 
+    /* A pane is `display: none` while another tab is in front. The rows
+       survive that; the pixels do not, and coming back the grid is the same
+       size it was — so the `ResizeObserver` above says nothing and the
+       terminal stays blank until a click happens to force a render.
+       Coming back into view is the force. */
+    const shown =
+      typeof IntersectionObserver === 'undefined'
+        ? null
+        : new IntersectionObserver((entries) => {
+            if (!entries.some((entry) => entry.isIntersecting)) return
+            refit()
+            terminal.refresh(0, terminal.rows - 1)
+          })
+    shown?.observe(box)
+
     return () => {
       dropped = true
       setTerm(null)
       themed.disconnect()
       watch.disconnect()
+      shown?.disconnect()
       live?.detach()
       terminal.dispose()
     }
