@@ -504,6 +504,48 @@ async fn asked(
 /// reads like the app is broken when the app did exactly what it should. The
 /// three that actually happen are worth separating, because the answer is
 /// different for each — wait, upgrade by hand, or nothing at all.
+/// Why replacing the file did not work, in a sentence with an answer in it.
+///
+/// An AppImage is updated by writing over the file that is running, and the
+/// two ways that fails are ordinary and have different answers: the file sits
+/// on something mounted read-only, or this user cannot write where it lives.
+/// The plugin hands both back as an io error whose `Display` is "Permission
+/// denied (os error 13)", which tells a person nothing about which of the two
+/// it is or what to do next.
+pub(crate) fn why_the_file_would_not_move(io: &std::io::Error) -> String {
+    /* EROFS. Named rather than matched on `ErrorKind`, which did not carry a
+    read-only-filesystem case when this was written. */
+    const READ_ONLY: i32 = 30;
+    if io.raw_os_error() == Some(READ_ONLY) {
+        return "devpit could not replace itself: it is running from something mounted \
+                read-only. Copy it somewhere writable, or download the new one."
+            .to_owned();
+    }
+    match io.kind() {
+        std::io::ErrorKind::PermissionDenied => {
+            "devpit could not replace itself: this user cannot write where it is installed. \
+             Either move it somewhere you own, or install the new one the way this copy \
+             was installed."
+                .to_owned()
+        }
+        std::io::ErrorKind::NotFound => {
+            "devpit could not replace itself: the file it is running from is no longer \
+             where it was. Download the new one."
+                .to_owned()
+        }
+        _ => format!("devpit could not replace itself: {io}"),
+    }
+}
+
+/// Why the installer refused, translated where the reason is one a person can
+/// act on and passed through where it is not.
+fn why_the_install_failed(err: &tauri_plugin_updater::Error) -> String {
+    match err {
+        tauri_plugin_updater::Error::Io(io) => why_the_file_would_not_move(io),
+        other => format!("the installer refused: {other}"),
+    }
+}
+
 fn why_the_check_failed(err: &tauri_plugin_updater::Error) -> String {
     use tauri_plugin_updater::Error;
     match err {
@@ -870,14 +912,41 @@ pub(crate) enum QuitStep {
     Install,
     /// Start the new one.
     Restart,
-    /// Show the command instead: a package devpit never installs itself.
-    ShowTheCommand,
+    /// Not this flow's: a `.deb` is installed by [`update_install_package`],
+    /// which hands one command to polkit and lets the system ask for the
+    /// password. Quitting to replace a file is what an AppImage needs and
+    /// what a package manager must never have done behind its back.
+    ///
+    /// Named rather than absent so the refusal below can say which of the two
+    /// reasons it is — "installed another way" and "not installed from here"
+    /// are different sentences for the person reading them.
+    ItsOwnInstaller,
+}
+
+/// Why the quit-and-replace flow will not run for a kind, for the kinds where
+/// it will not.
+///
+/// A function so the sentence is asserted rather than read: this is the last
+/// thing a person sees when an update does not happen, and "this build is not
+/// one devpit installs over" was being shown for a `.deb` that devpit had been
+/// installing since 0.1.3.
+pub(crate) fn why_not_here(kind: InstallKind) -> Option<&'static str> {
+    match kind {
+        InstallKind::AppImage => None,
+        InstallKind::Deb => {
+            Some("a package is installed from the update card, not by quitting devpit")
+        }
+        InstallKind::ExternallyManaged => {
+            Some("this copy is kept up to date by whoever installed it")
+        }
+        InstallKind::Unmanaged => Some("this build is not one devpit installs over"),
+    }
 }
 
 pub(crate) fn quit_steps(kind: InstallKind) -> Vec<QuitStep> {
     match kind {
         InstallKind::AppImage => vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart],
-        InstallKind::Deb => vec![QuitStep::ShowTheCommand],
+        InstallKind::Deb => vec![QuitStep::ItsOwnInstaller],
         // Nothing to do to a build nobody installs from here.
         InstallKind::Unmanaged | InstallKind::ExternallyManaged => Vec::new(),
     }
@@ -1089,7 +1158,9 @@ async fn install(
     if !steps.contains(&QuitStep::Install) {
         return Err(refused(RpcError::new(
             devpit_rpc::ErrorCode::Conflict,
-            "this build is not one devpit installs over".to_owned(),
+            why_not_here(kind)
+                .unwrap_or("this build is not one devpit installs over")
+                .to_owned(),
         )));
     }
 
@@ -1140,7 +1211,7 @@ async fn install(
             .store(false, std::sync::atomic::Ordering::SeqCst);
         eprintln!("devpit-update the installer refused: {err}");
         let failed = UpdateStatus::Failed {
-            message: format!("the installer refused: {err}"),
+            message: why_the_install_failed(&err),
             recoverable: false,
         };
         updating.moved_to(&app, failed.clone());

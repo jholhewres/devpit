@@ -364,7 +364,7 @@ fn the_update_path_never_kills_tmux() {
     // A package is shown, never installed from here.
     assert_eq!(
         quit_steps(InstallKind::Deb),
-        vec![QuitStep::ShowTheCommand],
+        vec![QuitStep::ItsOwnInstaller],
         "a .deb would mean asking for root"
     );
 
@@ -699,4 +699,63 @@ fn a_failed_check_says_something_a_person_can_do_something_about() {
     let no_feed = why_the_check_failed(&Error::EmptyEndpoints);
     assert!(no_feed.contains("no update feed"), "{no_feed}");
     assert!(!no_feed.contains("offline"), "{no_feed}");
+}
+
+/// The sentence a person reads when the update does not happen, which was
+/// wrong for a `.deb` from 0.1.3 until this was written: devpit had started
+/// installing packages through polkit, and still said it never installs over
+/// this build.
+#[test]
+fn each_kind_that_cannot_quit_to_install_says_its_own_reason() {
+    assert_eq!(why_not_here(InstallKind::AppImage), None);
+    let deb = why_not_here(InstallKind::Deb).expect("a deb does not quit to install");
+    assert!(deb.contains("update card"), "{deb}");
+    assert!(
+        !deb.contains("not one devpit installs over"),
+        "a deb is one devpit installs, by another door: {deb}"
+    );
+
+    let reasons = [
+        why_not_here(InstallKind::Deb),
+        why_not_here(InstallKind::ExternallyManaged),
+        why_not_here(InstallKind::Unmanaged),
+    ];
+    let mut said: Vec<&str> = reasons.iter().flatten().copied().collect();
+    said.sort_unstable();
+    said.dedup();
+    assert_eq!(said.len(), 3, "three kinds, three sentences");
+}
+
+/// The two ordinary ways replacing a running AppImage fails, told apart.
+/// Before this, both arrived as "Permission denied (os error 13)".
+#[test]
+fn a_file_that_would_not_move_says_which_of_the_two_it_is() {
+    let read_only = why_the_file_would_not_move(&std::io::Error::from_raw_os_error(30));
+    assert!(read_only.contains("read-only"), "{read_only}");
+
+    let refused =
+        why_the_file_would_not_move(&std::io::Error::from(std::io::ErrorKind::PermissionDenied));
+    assert!(refused.contains("cannot write"), "{refused}");
+
+    assert_ne!(
+        read_only, refused,
+        "one sentence for two different problems"
+    );
+    for said in [&read_only, &refused] {
+        assert!(
+            !said.contains("os error"),
+            "an errno is not an answer: {said}"
+        );
+    }
+}
+
+/// A reason nobody here can improve on is passed through rather than dressed
+/// up into a sentence that says less than the original.
+#[test]
+fn a_failure_with_no_better_words_keeps_its_own() {
+    let odd = why_the_file_would_not_move(&std::io::Error::from(std::io::ErrorKind::WouldBlock));
+    assert!(
+        odd.starts_with("devpit could not replace itself: "),
+        "{odd}"
+    );
 }

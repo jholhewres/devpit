@@ -343,3 +343,42 @@ describe('an update waiting for the work to end', () => {
     expect(chose).not.toHaveBeenCalled()
   })
 })
+
+/* The card is told how this copy was installed, and each way has to read
+   differently. The failure this guards against is one text serving all three:
+   an AppImage replaces itself in place and has no package, no command and no
+   password in its story, and a card that mentions any of them is describing
+   somebody else's machine. */
+describe('one card, three ways of being installed', () => {
+  const drawn = (status: UpdateStatus): string => {
+    cleanup()
+    render(<UpdateCard />)
+    say(status)
+    return screen.getByRole('status').textContent ?? ''
+  }
+
+  it('says a different thing for an AppImage, a package and a build it does not install', () => {
+    const appImage = drawn({ type: 'ready', version: '0.2.0' } as UpdateStatus)
+    const pkg = drawn({
+      type: 'manualInstall',
+      command: "sudo /usr/bin/apt install '/c/devpit.deb'",
+      path: '/c/devpit.deb',
+    })
+    const unmanaged = drawn({
+      type: 'available',
+      version: '0.2.0',
+      notes: '',
+      kind: 'unmanaged',
+      testFeed: false,
+    })
+
+    const said = [appImage, pkg, unmanaged]
+    expect(new Set(said).size).toBe(3)
+    for (const one of said) expect(one.length).toBeGreaterThan(0)
+
+    /* The one the plan was written around: an AppImage being told about apt. */
+    for (const word of ['apt', 'dpkg', 'sudo', 'password', '.deb']) {
+      expect(appImage.toLowerCase()).not.toContain(word)
+    }
+  })
+})
