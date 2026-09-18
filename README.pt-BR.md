@@ -170,9 +170,11 @@ curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.
 sudo apt install ./devpit_0.1.1_amd64.deb
 ```
 
-**`.dmg` (macOS).** Apple silicon e Intel, um arquivo para cada — pegue o do
-seu Mac. O devpit também se atualiza aqui: baixa o `.app`, confere a assinatura
-e se troca.
+**`.dmg` (macOS).** Só Apple silicon — M1 ou mais novo. Ainda não há build
+para Intel: o runner que o produz é a última imagem Intel do GitHub e está
+saindo de circulação, então a resposta para um Mac Intel é um binário
+universal, que ainda não é construído. O devpit se atualiza aqui: baixa o
+`.app`, confere a assinatura e se troca.
 
 O download **não é assinado com um Developer ID da Apple nem notarizado**, então
 a primeira abertura é recusada pelo Gatekeeper com "devpit está danificado" ou

@@ -40,13 +40,16 @@ jobs:
             # file for three platforms and `deb` on a Mac is a build that ends
             # in an error nobody can act on.
             bundles: appimage,deb
+          # Apple silicon only: M1 and later. The Intel runner is the last
+          # macOS 13 image GitHub has, it is on its way out, and it sat
+          # queued for over an hour while both other legs finished — so a
+          # release would wait on a machine that may never arrive. An Intel
+          # Mac is covered by building `universal-apple-darwin` here, which
+          # is a job for its own plan and not for the tag that is blocked.
           - os: macos-14
             target: darwin-aarch64
             # `app` is what the updater replaces in place; `dmg` is what a
             # person downloads the first time.
-            bundles: app,dmg
-          - os: macos-13
-            target: darwin-x86_64
             bundles: app,dmg
     runs-on: ${{ matrix.os }}
     steps:
