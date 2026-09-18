@@ -104,3 +104,60 @@ fn the_checksums_are_the_format_sha256sum_reads() {
 fn the_app_carries_a_public_key_to_verify_against() {
     assert!(pubkey_of(&crate::workspace_root()).is_some());
 }
+
+/// The target a local build claims. Written down as `linux-x86_64` until the
+/// release grew an arm64 leg, and the failure would have been a manifest
+/// quietly naming an architecture the machine is not.
+#[test]
+fn the_local_target_is_this_machine_and_not_a_constant() {
+    let said = here();
+    assert!(said.contains(std::env::consts::ARCH), "{said}");
+    assert!(
+        !said.contains("macos"),
+        "darwin is the updater's word: {said}"
+    );
+    if std::env::consts::OS == "macos" {
+        assert!(said.starts_with("darwin-"), "{said}");
+    } else {
+        assert!(said.starts_with(std::env::consts::OS), "{said}");
+    }
+}
+
+/// One runner, two target keys. A universal macOS bundle is a single file
+/// that both Macs download, and the updater looks itself up by target with no
+/// idea the two keys point at the same place.
+#[test]
+fn a_leg_may_answer_for_more_than_one_target() {
+    assert_eq!(
+        targets_named("darwin-aarch64\ndarwin-x86_64\n"),
+        ["darwin-aarch64", "darwin-x86_64"]
+    );
+    /* The shape every other leg writes, unchanged. */
+    assert_eq!(targets_named("linux-x86_64\n"), ["linux-x86_64"]);
+    /* Blank lines and stray spaces are the workflow's echo, not targets. */
+    assert_eq!(targets_named("\n  linux-aarch64  \n\n"), ["linux-aarch64"]);
+    assert!(targets_named("   \n\n").is_empty());
+}
+
+/// And the manifest that comes out of it: two platforms, one download.
+#[test]
+fn two_platforms_may_name_the_same_download() {
+    let one = (
+        "devpit.app.tar.gz".to_owned(),
+        "https://example.invalid/devpit.app.tar.gz".to_owned(),
+        "signature".to_owned(),
+    );
+    let platforms = [
+        ("darwin-aarch64".to_owned(), one.1.clone(), one.2.clone()),
+        ("darwin-x86_64".to_owned(), one.1.clone(), one.2.clone()),
+    ];
+    let said = manifest("0.2.0", "", "2026-01-01T00:00:00Z", &platforms);
+    let found = said["platforms"]
+        .as_object()
+        .expect("platforms is an object");
+    assert_eq!(found.len(), 2, "an Intel Mac has to find itself in here");
+    assert_eq!(
+        found["darwin-aarch64"]["url"],
+        found["darwin-x86_64"]["url"]
+    );
+}

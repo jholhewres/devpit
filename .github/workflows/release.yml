@@ -32,7 +32,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          # The oldest image that can build this, and that is the whole reason
+          # it is named. A binary links against the glibc of the machine that
+          # built it and runs on that version or newer, never older: built on
+          # 24.04 it requires GLIBC_2.39 and refuses to start on 22.04, which
+          # is still LTS. Nothing in devpit asks for 2.39 — measured, the only
+          # two symbols that pull it in are `pidfd_getpid` and `pidfd_spawnp`,
+          # which Rust's own std binds to the newest glibc it is linked
+          # against. On 22.04 std takes the older path and the same source
+          # covers 22.04, 24.04 and everything after.
+          #
+          # 22.04 and not older: Tauri v2 needs webkit2gtk **4.1**, and 20.04
+          # only has 4.0. The step below proves that before anything is built,
+          # because the day the archive stops carrying it this must fail
+          # loudly rather than quietly bundle against something else.
+          - os: ubuntu-22.04
             # The key the updater looks itself up by, and the name this
             # runner's artifacts are collected under.
             target: linux-x86_64
@@ -40,17 +54,35 @@ jobs:
             # file for three platforms and `deb` on a Mac is a build that ends
             # in an error nobody can act on.
             bundles: appimage,deb
-          # Apple silicon only: M1 and later. The Intel runner is the last
-          # macOS 13 image GitHub has, it is on its way out, and it sat
-          # queued for over an hour while both other legs finished — so a
-          # release would wait on a machine that may never arrive. An Intel
-          # Mac is covered by building `universal-apple-darwin` here, which
-          # is a job for its own plan and not for the tag that is blocked.
+            out: target/release
+          # The same floor on the other architecture. Native rather than
+          # cross-compiled: a webview links against the system's own GTK and
+          # WebKit, and a cross build would have to carry a whole sysroot of
+          # them to link at all.
+          - os: ubuntu-22.04-arm
+            target: linux-aarch64
+            bundles: appimage,deb
+            out: target/release
+          # One Apple silicon runner producing a binary for both Macs. The
+          # Intel runner is not used at all: it is the last macOS 13 image
+          # GitHub has, it is on its way out, and it once sat queued for over
+          # an hour while both other legs finished. `universal-apple-darwin`
+          # gets the same coverage from a machine that is always there, and
+          # `lipo` — which is what that target runs — is cheap next to the
+          # two compiles it joins.
+          #
+          # Two targets on one leg, because the download is one file and the
+          # updater resolves by target key: an Intel Mac looks itself up under
+          # `darwin-x86_64` and has no way to know it is the same artifact.
           - os: macos-14
-            target: darwin-aarch64
+            target: |
+              darwin-aarch64
+              darwin-x86_64
             # `app` is what the updater replaces in place; `dmg` is what a
             # person downloads the first time.
             bundles: app,dmg
+            rust-target: universal-apple-darwin
+            out: target/universal-apple-darwin/release
     runs-on: ${{ matrix.os }}
     steps:
       # Every action is pinned to a commit: a tag can be moved, and a moved tag
@@ -68,6 +100,15 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
+          # The floor, checked before it is used. `apt-get install` would fail
+          # on its own, but it would fail in the middle of a list and read as
+          # a network problem; this says which package is missing on which
+          # image, which is the sentence somebody can act on.
+          if ! apt-cache policy libwebkit2gtk-4.1-dev | grep -q 'Candidate: [0-9]'; then
+            echo "::error ::${{ matrix.os }} has no libwebkit2gtk-4.1-dev."
+            echo "Tauri v2 needs webkit2gtk 4.1. Raise the image or pin the one that has it."
+            exit 1
+          fi
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
             libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev
 
@@ -76,12 +117,21 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
-          key: ${{ matrix.target }}
+          # The runner, not the target: macOS names two of them and a cache
+          # key with a newline in it is a cache nobody hits.
+          key: ${{ matrix.os }}
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: pnpm
+
+      # `universal-apple-darwin` is not a toolchain of its own: cargo builds
+      # both real targets and `lipo`s them, so both have to be installed or
+      # the build fails on the second one after paying for the first.
+      - name: The architectures a universal build joins
+        if: matrix.rust-target == 'universal-apple-darwin'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - run: make setup
 
@@ -111,7 +161,42 @@ jobs:
       # key: the frontend build runs every npm dependency, and cargo runs every
       # crate's build script. The binary is the one the next step packs.
       - name: Build the release binary, without the key
-        run: ./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.release.conf.json
+        run: |
+          ./node_modules/.bin/tauri build --no-bundle \
+            ${{ matrix.rust-target && format('--target {0}', matrix.rust-target) || '' }} \
+            --config apps/desktop/tauri.release.conf.json
+
+      # The floor, proved on the artifact rather than assumed from the image.
+      # A dependency that starts reaching past 2.35 — a crate, a toolchain
+      # bump, a std that binds something newer — would otherwise ship a
+      # release that installs on 22.04 and refuses to start, which is the
+      # failure this whole leg exists to prevent and the one nobody sees
+      # until somebody else's machine.
+      - name: The binary runs where it says it does
+        if: runner.os == 'Linux'
+        run: |
+          floor=2.35
+          # Named both ways on purpose: cargo writes the crate's name and
+          # tauri renames it to the product's, and which one is on disk has
+          # changed between tauri versions. A check that silently found
+          # neither would pass forever.
+          bin=""
+          for one in ${{ matrix.out }}/devpit-desktop ${{ matrix.out }}/devpit; do
+            [ -f "$one" ] && bin="$one" && break
+          done
+          if [ -z "$bin" ]; then
+            echo "::error ::no release binary to check under target/release."
+            ls -la ${{ matrix.out }} | head -20
+            exit 1
+          fi
+          found=$(objdump -T "$bin" \
+            | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -u -V | tail -1)
+          echo "$bin needs glibc $found (floor $floor)"
+          if [ "$(printf '%s\n%s\n' "$floor" "$found" | sort -V | tail -1)" != "$floor" ]; then
+            echo "::error ::$bin needs glibc $found, above the $floor floor."
+            objdump -T "$bin" | grep "GLIBC_$found"
+            exit 1
+          fi
 
       # The only step that sees the key, and it builds nothing: the frontend
       # command is emptied and cargo finds the binary already built, so what
@@ -126,28 +211,55 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           ./node_modules/.bin/tauri build --bundles ${{ matrix.bundles }} \
+            ${{ matrix.rust-target && format('--target {0}', matrix.rust-target) || '' }} \
             --config apps/desktop/tauri.release.conf.json \
             --config '{"build":{"beforeBuildCommand":""}}'
 
       # What the collecting job reads to know whose bundles these are: the
       # runner knows its target and the folder it lands in does not.
-      - name: Say which target this is
-        run: echo "${{ matrix.target }}" > target/release/target.txt
+      # The manifest is about to promise an Intel Mac that this download runs
+      # there. A `--target universal-apple-darwin` that quietly produced one
+      # architecture would still bundle, still sign, still publish, and only
+      # fail on somebody's machine.
+      - name: The universal bundle is universal
+        if: matrix.rust-target == 'universal-apple-darwin'
+        run: |
+          inside=$(find "${{ matrix.out }}/bundle/macos" -type f -perm +111 \
+            -path '*/Contents/MacOS/*' | head -1)
+          if [ -z "$inside" ]; then
+            echo "::error ::no binary inside the .app to check."
+            find "${{ matrix.out }}/bundle/macos" -maxdepth 4 | head -20
+            exit 1
+          fi
+          found=$(lipo -archs "$inside")
+          echo "$inside carries: $found"
+          for want in arm64 x86_64; do
+            case " $found " in
+              *" $want "*) ;;
+              *) echo "::error ::$inside has no $want; an Intel Mac would download this and fail."
+                 exit 1 ;;
+            esac
+          done
+
+      - name: Say which targets these bundles answer for
+        run: echo "${{ matrix.target }}" > ${{ matrix.out }}/target.txt
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ${{ matrix.target }}
+          # The runner names the folder, because a leg may answer for more
+          # than one target and an artifact name cannot hold a newline.
+          name: ${{ matrix.os }}
           # The bundles and the note beside them, and nothing else: the release
           # binary itself is 40MB of what is already inside them.
           path: |
-            target/release/target.txt
-            target/release/bundle/appimage/*.AppImage
-            target/release/bundle/appimage/*.AppImage.sig
-            target/release/bundle/deb/*.deb
-            target/release/bundle/deb/*.deb.sig
-            target/release/bundle/macos/*.app.tar.gz
-            target/release/bundle/macos/*.app.tar.gz.sig
-            target/release/bundle/dmg/*.dmg
+            ${{ matrix.out }}/target.txt
+            ${{ matrix.out }}/bundle/appimage/*.AppImage
+            ${{ matrix.out }}/bundle/appimage/*.AppImage.sig
+            ${{ matrix.out }}/bundle/deb/*.deb
+            ${{ matrix.out }}/bundle/deb/*.deb.sig
+            ${{ matrix.out }}/bundle/macos/*.app.tar.gz
+            ${{ matrix.out }}/bundle/macos/*.app.tar.gz.sig
+            ${{ matrix.out }}/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 7
 

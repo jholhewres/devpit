@@ -36,3 +36,45 @@ fn the_tree_ships_what_it_says() {
             .join("; ")
     );
 }
+
+/// The matrix, in the shape the workflow writes it.
+const MATRIX: &str = "
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: linux-x86_64
+          - os: macos-14
+            target: darwin-aarch64
+  release:
+    runs-on: ubuntu-24.04
+";
+
+#[test]
+fn the_floor_and_its_arm_sibling_are_both_the_floor() {
+    let matrix = MATRIX.replace(
+        "- os: macos-14",
+        "- os: ubuntu-22.04-arm\n            target: linux-aarch64\n          - os: macos-14",
+    );
+    assert!(above_the_floor(&matrix).is_empty());
+}
+
+#[test]
+fn a_newer_image_on_the_build_leg_is_named() {
+    let matrix = MATRIX.replace("- os: ubuntu-22.04", "- os: ubuntu-24.04");
+    assert_eq!(above_the_floor(&matrix), ["ubuntu-24.04"]);
+}
+
+/// The one a guard cannot catch afterwards: it is not newer today.
+#[test]
+fn an_image_that_moves_on_its_own_is_named() {
+    let matrix = MATRIX.replace("- os: ubuntu-22.04", "- os: ubuntu-latest");
+    assert_eq!(above_the_floor(&matrix), ["ubuntu-latest"]);
+}
+
+/// The job that publishes builds nothing, so its image is not this guard's.
+#[test]
+fn the_publishing_job_is_not_a_builder() {
+    assert!(above_the_floor(MATRIX).is_empty());
+    assert!(MATRIX.contains("runs-on: ubuntu-24.04"));
+}

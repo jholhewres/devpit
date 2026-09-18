@@ -13,7 +13,13 @@
 //!   list here would be one list for three runners;
 //! - the **window** is granted no `updater:` permission. The app checks and
 //!   downloads from Rust; installing an update is not something a page may
-//!   ask for.
+//!   ask for;
+//! - the **image the Linux binary is built on** decides who can run it. A
+//!   binary links against the glibc of the machine that made it and runs on
+//!   that version or newer, never older, so the oldest image that can build
+//!   this is the one that must. Raising it is a silent way to stop working on
+//!   somebody else's machine, and it is invisible from a machine that is
+//!   already newer than the floor.
 
 use std::path::Path;
 
@@ -81,6 +87,16 @@ pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
         }
     }
 
+    for image in above_the_floor(&workflow) {
+        refuse(
+            RELEASE,
+            format!(
+                "the Linux leg builds on {image}; {FLOOR} is the floor, and a \
+                 newer image makes a binary that refuses to start on it"
+            ),
+        );
+    }
+
     let granted: Vec<String> = json(root, CAPABILITIES)
         .get("permissions")
         .and_then(|p| p.as_array())
@@ -108,6 +124,37 @@ fn updater_permissions(granted: &[String]) -> Vec<String> {
         .iter()
         .filter(|one| one.starts_with("updater:"))
         .cloned()
+        .collect()
+}
+
+/// The oldest Ubuntu that can build this, and the one every Linux leg names.
+///
+/// Not older: Tauri v2 needs webkit2gtk **4.1**, and 20.04 carries only 4.0.
+/// Not newer: 24.04 links `pidfd_spawnp` and the binary then requires
+/// GLIBC_2.39, which 22.04 does not have.
+const FLOOR: &str = "22.04";
+
+/// The build images a workflow names that are newer than the floor.
+///
+/// Reads the matrix's `os:` entries and not `runs-on:`, because those are two
+/// different questions: `runs-on` also names the job that only downloads
+/// artifacts and writes manifests, which builds nothing and may sit on
+/// whatever is current.
+///
+/// `ubuntu-latest` is refused by name. It is not newer today — it is newer
+/// eventually, without a commit, which is the one failure a guard cannot
+/// catch after the fact.
+fn above_the_floor(workflow: &str) -> Vec<String> {
+    workflow
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("- os:").map(str::trim))
+        .filter_map(|image| image.strip_prefix("ubuntu-"))
+        .filter(|image| {
+            /* `22.04-arm` is the same release on another architecture. */
+            let release = image.split('-').next().unwrap_or(image);
+            release != FLOOR
+        })
+        .map(|image| format!("ubuntu-{image}"))
         .collect()
 }
 

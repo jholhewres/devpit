@@ -144,8 +144,19 @@ pub(crate) fn artifacts_in(bundle: &Path, target: &str) -> Vec<Artifact> {
     found
 }
 
-/// The default target, and the only one a build on this machine can be.
-const TARGET: &str = "linux-x86_64";
+/// The target of a build made here, for when there is no `collected/` tree to
+/// read one out of.
+///
+/// Derived rather than written down: `linux-x86_64` as a constant was right
+/// until the release grew an arm64 leg, and the way it would have been wrong
+/// is a local manifest quietly claiming somebody else's architecture.
+pub(crate) fn here() -> String {
+    let os = match std::env::consts::OS {
+        "macos" => "darwin",
+        other => other,
+    };
+    format!("{os}-{}", std::env::consts::ARCH)
+}
 
 /// Every folder of bundles to read, each with the target it was built for.
 ///
@@ -153,7 +164,7 @@ const TARGET: &str = "linux-x86_64";
 /// `target/release/collected/<name>/`, each holding the `bundle/` tree one
 /// runner made and a `target.txt` saying whose it is. With no such folder this
 /// is the ordinary local build: one tree, this machine's target.
-fn bundles_in(root: &Path) -> Vec<(PathBuf, String)> {
+fn bundles_in(root: &Path) -> Vec<(PathBuf, Vec<String>)> {
     let collected = root.join("target/release/collected");
     let mut found = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&collected) {
@@ -162,16 +173,32 @@ fn bundles_in(root: &Path) -> Vec<(PathBuf, String)> {
             if !dir.is_dir() {
                 continue;
             }
-            let target = std::fs::read_to_string(dir.join("target.txt"))
-                .map(|said| said.trim().to_owned())
-                .unwrap_or_else(|_| TARGET.to_owned());
-            found.push((dir.join("bundle"), target));
+            let targets = std::fs::read_to_string(dir.join("target.txt"))
+                .map(|said| targets_named(&said))
+                .ok()
+                .filter(|named: &Vec<String>| !named.is_empty())
+                .unwrap_or_else(|| vec![here()]);
+            found.push((dir.join("bundle"), targets));
         }
     }
     if found.is_empty() {
-        found.push((root.join("target/release/bundle"), TARGET.to_owned()));
+        found.push((root.join("target/release/bundle"), vec![here()]));
     }
     found
+}
+
+/// The targets one runner's bundles answer for, one per line.
+///
+/// More than one because a universal macOS bundle is a single file that an
+/// Intel Mac and an Apple silicon Mac must both find. The updater resolves by
+/// target key and has no idea the two keys point at the same download, so the
+/// manifest has to say it twice.
+pub(crate) fn targets_named(said: &str) -> Vec<String> {
+    said.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
 }
 
 /// Where a published artifact lives, once the tag exists.
@@ -188,7 +215,12 @@ pub fn run(root: &Path, version: &str, notes: &str, date: &str) -> Result<Vec<Pa
     let dirs = bundles_in(root);
     let artifacts: Vec<Artifact> = dirs
         .iter()
-        .flat_map(|(bundle, target)| artifacts_in(bundle, target))
+        .flat_map(|(bundle, targets)| {
+            targets
+                .iter()
+                .flat_map(|target| artifacts_in(bundle, target))
+                .collect::<Vec<_>>()
+        })
         .collect();
     if artifacts.is_empty() {
         return Err(format!(
