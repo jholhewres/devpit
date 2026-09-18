@@ -35,10 +35,36 @@ devpit-steps = { path = "crates/steps" }
 [profile.release]
 lto = true
 codegen-units = 1
-strip = true
 opt-level = "s"
+# Symbols kept, debug info dropped. A panic that reaches somebody else's
+# machine comes back as a paste, and `strip = true` turns that paste into
+# hexadecimal — which is the same as no report at all.
+#
+# Measured on this tree rather than argued about, all against a 10,385,592
+# byte binary:
+#
+#   strip = true                 10,385,592   frames not even named
+#   strip = "debuginfo"          12,310,288   +18.5%, frames named
+#   debug = "line-tables-only"   51,547,088   +396%, named with file and line
+#   debug = 1                    63,122,888   +508%, the same plus more
+#
+# File and line would be better and costs five times the download. Named
+# frames are the difference between a backtrace somebody can read and one
+# nobody can, and they cost a fifth. Warp keeps `debug = 1` on release and
+# pays it; they also ship a crash reporter that symbolicates for them, and we
+# do not — a paste in an issue is the whole of what we get.
+strip = "debuginfo"
 
 # The shell rebuilds on every screen change in dev; without this the webview
 # wait dominates the cycle.
 [profile.dev.package."*"]
 opt-level = 2
+
+# The two that are measured rather than compiled: a dev build's terminal must
+# not be slower than a release one for its own reasons, or the next attempt to
+# find out why opening an agent takes thirty seconds will be measuring this
+# instead of the thing it is looking for.
+[profile.dev.package.devpit-pty]
+opt-level = 3
+[profile.dev.package.devpit-tmux]
+opt-level = 3
