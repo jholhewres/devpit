@@ -143,7 +143,7 @@ toll gate.
 Linux and macOS are on the [latest release][releases]. On Linux, take the
 AppImage unless you have a reason not to: it is the one that updates itself.
 
-The commands below name `0.1.3` because the version is part of the file name.
+The commands below name `0.1.4` because the version is part of the file name.
 Check the releases page for the current one, or let an installed devpit update
 itself and never type a version again.
 
@@ -152,9 +152,9 @@ installs it over itself and restarts. Your terminals keep running through it —
 they are tmux sessions, and tmux does not go down with the window.
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.3_amd64.AppImage
-chmod +x devpit_0.1.3_amd64.AppImage
-./devpit_0.1.3_amd64.AppImage
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.4_amd64.AppImage
+chmod +x devpit_0.1.4_amd64.AppImage
+./devpit_0.1.4_amd64.AppImage
 ```
 
 **`.deb` (Debian, Ubuntu).** devpit downloads the new version and verifies it,
@@ -162,8 +162,8 @@ then shows you the command and never runs it. Installing a system package means
 asking for root, and devpit does not ask for root on your behalf.
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.3_amd64.deb
-sudo apt install ./devpit_0.1.3_amd64.deb
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.4_amd64.deb
+sudo apt install ./devpit_0.1.4_amd64.deb
 ```
 
 **`.dmg` (macOS).** Apple silicon only — an M1 or later. There is no Intel
