@@ -147,7 +147,7 @@ Linux e macOS estão na [última release][releases]. No Linux, prefira o
 AppImage, a não ser que você tenha motivo para não: é o que se atualiza
 sozinho.
 
-Os comandos abaixo dizem `0.1.2` porque a versão faz parte do nome do arquivo.
+Os comandos abaixo dizem `0.1.3` porque a versão faz parte do nome do arquivo.
 Confira na página de releases qual é a atual — ou deixe um devpit instalado se
 atualizar sozinho e nunca mais digite uma versão.
 
@@ -156,9 +156,9 @@ instala por cima de si mesmo e reabre. Seus terminais continuam rodando no meio
 disso — são sessões do tmux, e o tmux não cai junto com a janela.
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.2_amd64.AppImage
-chmod +x devpit_0.1.2_amd64.AppImage
-./devpit_0.1.2_amd64.AppImage
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.3_amd64.AppImage
+chmod +x devpit_0.1.3_amd64.AppImage
+./devpit_0.1.3_amd64.AppImage
 ```
 
 **`.deb` (Debian, Ubuntu).** O devpit baixa a versão nova e confere, e então
@@ -166,8 +166,8 @@ mostra o comando sem nunca executá-lo. Instalar um pacote do sistema é pedir
 root, e o devpit não pede root no seu lugar.
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.2_amd64.deb
-sudo apt install ./devpit_0.1.2_amd64.deb
+curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.3_amd64.deb
+sudo apt install ./devpit_0.1.3_amd64.deb
 ```
 
 **`.dmg` (macOS).** Só Apple silicon — M1 ou mais novo. Ainda não há build
