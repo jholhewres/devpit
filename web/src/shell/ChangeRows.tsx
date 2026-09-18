@@ -22,6 +22,7 @@ export function ChangeRows({
   staged,
   busy,
   onOpen,
+  onScreen,
   onStage,
   onDiscard,
 }: {
@@ -31,6 +32,8 @@ export function ChangeRows({
   staged: boolean
   busy: boolean
   onOpen: (path: string) => void
+  /** The file whose diff is on screen, or null when none is. */
+  onScreen?: string | null
   onStage: (paths: string[]) => void
   onDiscard: (change: Change) => void
 }): React.JSX.Element {
@@ -43,7 +46,11 @@ export function ChangeRows({
       if (node.kind === 'file') {
         const { change } = node
         return [
-          <div className="gitrow gitrow--file" key={change.path}>
+          <div
+            className="gitrow gitrow--file"
+            key={change.path}
+            aria-current={change.path === onScreen ? 'true' : undefined}
+          >
             <button className="gitrow__open" style={pad} onClick={() => onOpen(change.path)}>
               {/* Coloured by the git status, so the shape says what kind of
                   file and the colour says what happened to it. */}

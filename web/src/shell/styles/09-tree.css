@@ -102,3 +102,12 @@
 .segb { flex: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-3); }
 .segb[aria-selected='true'] { background: var(--raised); color: var(--text); }
 
+
+/* The row whose diff is on screen. Marked, not merely hovered: the list and
+   the pane have to agree about where you are, or the tab bar becomes the only
+   place that knows. */
+.gitrow[aria-current='true'] { background: var(--sidebar-item); }
+.gitrow[aria-current='true'] .gitrow__n { color: var(--text); }
+/* Rows and their headings were tight enough that a group read as one block.
+   Four more pixels of row and a line above each heading separate them. */
+.gitrow { height: 28px; }

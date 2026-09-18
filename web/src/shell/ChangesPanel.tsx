@@ -19,7 +19,11 @@ import type { UseTree } from './useTree'
  */
 
 export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
-  const { project, show } = useShell()
+  const { project, show, active } = useShell()
+  /* The row of the file on screen is marked, so the list and the pane agree
+     about where you are. A panel that looks the same whatever is open makes
+     you read the tab bar to find out. */
+  const onScreen = active?.kind === 'diff' ? (active.path ?? null) : null
 
   /* A row in Changes opens the diff, not the file: the question the panel is
      answering is what changed, and the file alone does not answer it. */
@@ -102,6 +106,7 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
           staged={staged}
           busy={busy}
           onOpen={openDiff}
+          onScreen={onScreen}
           onStage={staged ? unstage : stage}
           onDiscard={setDiscarding}
         />
