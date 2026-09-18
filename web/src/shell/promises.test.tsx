@@ -8,7 +8,15 @@ import { Onboarding } from './Onboarding'
 afterEach(cleanup)
 
 vi.mock('./useShell', () => ({
-  useShell: () => ({ signedIn: false, signIn: vi.fn(), theme: 'dark', setTheme: vi.fn() }),
+  useShell: () => ({
+    signedIn: false,
+    signIn: vi.fn(),
+    theme: 'dark',
+    setTheme: vi.fn(),
+    /* Nobody is halfway through signing in on a first run, which is the
+       state this screen offers from. */
+    membership: { signingIn: null, failed: null, origin: 'https://devpit.jhol.dev', cancelSignIn: vi.fn() },
+  }),
 }))
 
 /*

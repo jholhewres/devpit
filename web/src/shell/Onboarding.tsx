@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import mark from '../assets/brand/mark.png'
+import { OnboardingAccount } from './OnboardingAccount'
 import { useShell } from './useShell'
 
 /*
@@ -22,8 +23,16 @@ export function Onboarding({
   onAddProject: () => void
   onDone: () => void
 }): React.JSX.Element {
-  const { signedIn, signIn, theme, setTheme } = useShell()
+  const { signedIn, theme, setTheme } = useShell()
   const [step, setStep] = useState(signedIn ? 1 : 0)
+
+  /* The approval happens in the browser and lands here, so the step it lands
+     on is the one that moves. It used to advance on the click that opened the
+     browser: the code was never on screen, and whoever approved it came back
+     to a theme picker with no idea whether it had worked. */
+  useEffect(() => {
+    if (signedIn) setStep((now) => (now === 0 ? 1 : now))
+  }, [signedIn])
 
   const steps = ['Account', 'Theme', 'Project'] as const
 
@@ -42,28 +51,7 @@ export function Onboarding({
           ))}
         </ol>
 
-        {step === 0 && (
-          <>
-            <h1 className="onb__t">Sign in, if you want to</h1>
-            <p className="onb__d">
-              Free, and optional. Today it signs you in and nothing more — syncing between
-              machines is not built yet. <b>Your projects, conversations and files stay on this
-              computer</b> either way.
-            </p>
-            <button
-              className="onb__go"
-              onClick={() => {
-                signIn()
-                setStep(1)
-              }}
-            >
-              Sign in
-            </button>
-            <button className="onb__skip" onClick={() => setStep(1)}>
-              Not now
-            </button>
-          </>
-        )}
+        {step === 0 && <OnboardingAccount onSkip={() => setStep(1)} />}
 
         {step === 1 && (
           <>
