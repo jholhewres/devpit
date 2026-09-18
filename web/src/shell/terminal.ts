@@ -90,16 +90,25 @@ export function options(dark: boolean, contrast: number | null = null): ITermina
 
     /* A chain rather than one family: a Nerd Font is what draws the glyphs in
        an agent's spinner and a powerline prompt, and whichever of these the
-       machine has is the one that will. */
+       machine has is the one that will.
+    
+       Geist Mono is the window's font and it is not this one. It is a variable
+       webfont, and xterm measures a cell from the font it is given: at weight
+       300 the variable axis draws thinner than the metrics the atlas was built
+       from, which is a terminal that looks washed out next to the same shell
+       in any other window. System monospace first, as Orca does. */
     fontFamily:
-      '"Geist Mono", "SF Mono", "Menlo", "Cascadia Mono", "DejaVu Sans Mono", "Symbols Nerd Font Mono", "MesloLGS Nerd Font", "JetBrainsMono Nerd Font", monospace',
-    fontSize: 13,
+      '"SF Mono", "Menlo", "Monaco", "Cascadia Mono", "Consolas", "DejaVu Sans Mono", "Liberation Mono", "Symbols Nerd Font Mono", "MesloLGS Nerd Font", "JetBrainsMono Nerd Font", monospace',
+    fontSize: 14,
     /* Light, with bold a step up rather than a jump. A TUI uses bold for
        emphasis on nearly every line, so the gap has to be small enough that a
        screen of it still reads as text. */
     fontWeight: '300',
     fontWeightBold: '500',
-    lineHeight: 1.2,
+    /* 1.0: a terminal's rows are the program's to space, and a fifth of a line
+       added to each one is a screen that fits four fewer rows than the TUI
+       drawing it expects. */
+    lineHeight: 1.0,
 
     cursorBlink: true,
     cursorStyle: 'block',
