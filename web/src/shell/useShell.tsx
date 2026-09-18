@@ -9,6 +9,7 @@ import { useClosing } from './useClosing'
 import { usePaneSessions } from './paneSessions'
 import { useSubagents } from './subagents'
 import { useUnread } from './unread'
+import { useSweep } from './useSweep'
 import { useWidths } from './useWidths'
 import { useTabs } from './useTabs'
 import { useProjects } from './useProjects'
@@ -59,6 +60,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const guard = useClosing({ open: tabs.open, closeNow: tabs.close, running, unsaved })
   const { setConfirmStop } = guard
 
+  const sweep = useSweep({ open: tabs.open, active: tabs.active?.id ?? null }, guard.close)
 
   /* The choice is written where the next launch will find it; the window
      paints from local state so the click does not wait on disk. */
@@ -88,6 +90,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       subagents,
       agentSessions,
       closeNow: tabs.close,
+      sweep,
       markUnsaved,
       side,
       files,

@@ -79,6 +79,36 @@ export function closed(strip: Strip, id: string): Strip {
   }
 }
 
+/** Which of the open tabs a "close the others" answers about. */
+export type Sweep = 'others' | 'right' | 'left' | 'all'
+
+/**
+ * The ids a sweep would close, in the order they are open.
+ *
+ * Ids rather than a new strip, and this is the whole point: closing a terminal
+ * tab also ends its tmux tree, and that lives in the hook. A sweep that built
+ * its own strip would take the tabs off the screen and leave the shells
+ * running with nothing able to reach them again.
+ */
+export function sweeping(strip: Strip, id: string, what: Sweep): string[] {
+  const at = strip.open.findIndex((tab) => tab.id === id)
+  if (at < 0) return []
+  return strip.open
+    .filter((tab, index) => {
+      switch (what) {
+        case 'others':
+          return tab.id !== id
+        case 'right':
+          return index > at
+        case 'left':
+          return index < at
+        case 'all':
+          return true
+      }
+    })
+    .map((tab) => tab.id)
+}
+
 export function moved(strip: Strip, id: string, to: number): Strip {
   const at = strip.open.findIndex((tab) => tab.id === id)
   if (at < 0 || at === to || to < 0 || to >= strip.open.length) return strip

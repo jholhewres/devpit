@@ -132,7 +132,7 @@ export function TabStrip(): React.JSX.Element {
            is neither valid nor operable — the button swallows the click that
            would place the cursor. */
         renaming?.id === tab.id && renaming.where === 'strip' ? (
-          <div className="tab" data-tab={tab.id} data-toggle={tab.kind} data-active={String(active?.id === tab.id)} key={tab.id}>
+          <div className="tab" data-tab={tab.id} data-ctx="tab" data-id={tab.id} data-toggle={tab.kind} data-active={String(active?.id === tab.id)} key={tab.id}>
             {icon(tab)}
             <Rename
               value={tab.title ?? paneMeta(tab.kind).label}
@@ -148,6 +148,9 @@ export function TabStrip(): React.JSX.Element {
           key={tab.id}
           className="tab"
           data-tab={tab.id}
+          /* Right-click reaches the same menu from either shape of tab. */
+          data-ctx="tab"
+          data-id={tab.id}
           data-toggle={tab.kind}
           data-active={String(active?.id === tab.id)}
           aria-pressed={true}

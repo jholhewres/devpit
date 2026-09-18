@@ -2,18 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
-import {
-  attached,
-  closed,
-  drafted as taken,
-  focused,
-  launched as sent,
-  moved,
-  opened,
-  renamed,
-  type Strip,
-  type Tab,
-} from './strip'
+import { attached, closed, drafted as taken, focused, launched as sent, moved, opened, renamed, type Strip, type Tab } from './strip'
 import { empty, remember, remembered } from './tabs'
 
 export type Where = 'strip' | 'sidebar'

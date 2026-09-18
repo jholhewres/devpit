@@ -10,6 +10,7 @@ import {
   opened,
   renamed,
   short,
+  sweeping,
   titleOf,
   twice,
   type Strip,
@@ -195,5 +196,37 @@ describe('cutting a name to fit', () => {
 
   it('does not leave a space hanging before the ellipsis', () => {
     expect(short('abc def ghi', 4)).toBe('abc…')
+  })
+})
+
+describe('which tabs a sweep closes', () => {
+  const four = (): Strip => ({
+    open: [
+      { id: 'a', kind: 'file' },
+      { id: 'b', kind: 'file' },
+      { id: 'c', kind: 'file' },
+      { id: 'd', kind: 'file' },
+    ] as Tab[],
+    active: 'c',
+  })
+
+  it('names every tab but the one it was opened on', () => {
+    expect(sweeping(four(), 'b', 'others')).toEqual(['a', 'c', 'd'])
+  })
+
+  it('names what is to the right, and what is to the left', () => {
+    expect(sweeping(four(), 'b', 'right')).toEqual(['c', 'd'])
+    expect(sweeping(four(), 'c', 'left')).toEqual(['a', 'b'])
+  })
+
+  it('names all of them, including the one it was opened on', () => {
+    expect(sweeping(four(), 'a', 'all')).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  /* Ids, not a strip: closing a terminal tab also ends its tmux tree, and
+     that happens in `close`. Sabotage: return a rebuilt strip and the tabs
+     leave the screen while the shells keep running. */
+  it('a tab that is not open names nothing', () => {
+    expect(sweeping(four(), 'nope', 'all')).toEqual([])
   })
 })

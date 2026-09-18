@@ -1,6 +1,6 @@
 import type { PaneRunning, Project, Theme as StoredTheme } from '../gen/bindings'
 import type { PaneName } from './paneList'
-import type { Tab } from './strip'
+import type { Sweep, Tab } from './strip'
 import type { Who } from './account'
 import type { Membership } from './useAccount'
 import type { PaneSessions } from './paneSessions'
@@ -48,6 +48,8 @@ export interface Shell {
   /** Opens a new one of a kind you can have several of; focuses the rest. */
   show: (kind: PaneName, tab?: Partial<Tab>) => void
   close: (id: string) => void
+  /** Closing several at once, as the tab's menu names it. */
+  sweep: (id: string, what: Sweep) => void
   focus: (id: string) => void
   move: (id: string, to: number) => void
   rename: (id: string, title: string) => void

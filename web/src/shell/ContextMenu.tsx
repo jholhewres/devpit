@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FileDialogs } from './FileDialogs'
 import { FILE_MENU } from './fileMenu'
 import { sessionMenu, type SessionEntry } from './sessionMenu'
+import { tabMenu, type TabEntry } from './tabMenu'
 import { useFileActions } from './useFileActions'
 import { useShell } from './useShell'
 import { abandoned } from './typing'
@@ -15,7 +16,7 @@ import { abandoned } from './typing'
  * session row publishes `data-id`. `act` goes through `useFileActions`, which
  * owns the dialogs a file action needs; `run` is called with the row's id.
  */
-type Item = SessionEntry
+type Item = SessionEntry | TabEntry
 
 /*
  * Right-click is off everywhere, then switched back on where there is
@@ -40,7 +41,7 @@ interface At {
 }
 
 export function ContextMenu(): React.JSX.Element {
-  const { focus, close, setRenaming } = useShell()
+  const { focus, close, sweep, setRenaming } = useShell()
   const [at, setAt] = useState<At | null>(null)
   const menu = useRef<HTMLDivElement>(null)
   const actions = useFileActions(() => setAt(null))
@@ -49,6 +50,7 @@ export function ContextMenu(): React.JSX.Element {
      can reach. The list itself is data — see `sessionMenu`. */
   const menus: Record<string, readonly Item[]> = {
     ...STATIC,
+    tab: tabMenu({ close, sweep }),
     session: sessionMenu({
       focus,
       close,
@@ -70,7 +72,7 @@ export function ContextMenu(): React.JSX.Element {
       const target = on?.closest('[data-ctx]') as HTMLElement | null
       const kind = target?.dataset.ctx
       setAt(
-        kind && (kind === 'session' || STATIC[kind])
+        kind && (kind === 'session' || kind === 'tab' || STATIC[kind])
           ? {
               kind,
               x: event.clientX,
