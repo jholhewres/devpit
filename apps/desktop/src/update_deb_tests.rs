@@ -198,3 +198,23 @@ fn a_machine_without_pkexec_gets_no_elevated_install() {
 
     assert!(super::elevated(std::path::Path::new("/tmp/x.deb"), &dirs).is_none());
 }
+
+/// Debian's word for this machine, which is not Rust's word for it.
+/// The name was `amd64` unconditionally until the release grew an arm64 leg.
+#[test]
+fn the_cached_package_is_named_for_the_architecture_it_is_for() {
+    let (folder, _) = (cache_dir(), ());
+    let named = folder.join(format!("devpit_0.2.0_{}.deb", debian_arch()));
+    let said = named.display().to_string();
+
+    match std::env::consts::ARCH {
+        "x86_64" => assert!(said.ends_with("_amd64.deb"), "{said}"),
+        "aarch64" => assert!(said.ends_with("_arm64.deb"), "{said}"),
+        other => assert!(said.ends_with(&format!("_{other}.deb")), "{said}"),
+    }
+    /* Whatever this machine is, it is not both. */
+    assert!(
+        !(said.contains("amd64") && said.contains("arm64")),
+        "{said}"
+    );
+}

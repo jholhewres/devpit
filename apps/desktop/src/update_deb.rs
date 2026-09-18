@@ -40,7 +40,7 @@ fn dirs_home() -> Option<PathBuf> {
 pub(crate) fn keep(bytes: &[u8], version: &str) -> std::io::Result<(PathBuf, String)> {
     let folder = cache_dir();
     std::fs::create_dir_all(&folder)?;
-    let path = folder.join(format!("devpit_{version}_amd64.deb"));
+    let path = folder.join(format!("devpit_{version}_{}.deb", debian_arch()));
     std::fs::write(&path, bytes)?;
 
     #[cfg(unix)]
@@ -51,6 +51,22 @@ pub(crate) fn keep(bytes: &[u8], version: &str) -> std::io::Result<(PathBuf, Str
     }
 
     Ok((path, digest_of(bytes)))
+}
+
+/// What Debian calls this machine's architecture.
+///
+/// Not `std::env::consts::ARCH`, which says `x86_64` and `aarch64` where
+/// Debian says `amd64` and `arm64`. The name only has to be true — the file
+/// is ours, in our own cache, and the package manager reads the real
+/// architecture out of the archive rather than off the path. It is written
+/// correctly anyway because a name that says `amd64` on an arm64 machine is
+/// the sort of thing somebody debugs for an hour.
+fn debian_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        other => other,
+    }
 }
 
 /// What a Debian package starts with. Every `.deb` is an `ar` archive whose
