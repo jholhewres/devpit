@@ -19,7 +19,7 @@ import { useShell } from './useShell'
  */
 
 export function ManagerPane(): React.JSX.Element {
-  const { projects, setProject, show, openCard } = useShell()
+  const { projects, setProject, show, openCard, closeManager } = useShell()
   const [boards, setBoards] = useState<readonly ProjectBoard[] | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
@@ -61,10 +61,20 @@ export function ManagerPane(): React.JSX.Element {
     setProject(projectId)
     show('board')
     openCard(cardId)
+    /* And the Manager leaves. It takes the window, so without this it would
+       sit on top of the board it just opened — the card would be there and
+       nobody would see it. */
+    closeManager()
   }
 
   return (
     <div className="mgr">
+      {/* A way out, because this took the window. Escape leaves too, wired
+          beside the other overlays in `AppShell`. */}
+      <button className="mgr__back" onClick={closeManager}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+        Back
+      </button>
       <header className="mgr__top">
         <h1 className="mgr__t">Manager</h1>
         <p className="mgr__d">Every project&rsquo;s board, in one place. Opening a card goes to it.</p>

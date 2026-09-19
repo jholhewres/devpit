@@ -91,6 +91,7 @@ function Window(): React.JSX.Element {
         setAdding(false)
         setRemoving(null)
         shell.closePrefs()
+        shell.closeManager()
       }
     }
     document.addEventListener('keydown', key)

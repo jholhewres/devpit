@@ -114,6 +114,12 @@ export interface Shell {
 
   readonly prefs: PrefsPane | null
   openPrefs: (pane?: PrefsPane) => void
+  /* The Manager shows every project's board, which puts it above any one of
+     them — so it takes the window like Settings rather than sitting in a
+     project's pane area. */
+  readonly managing: boolean
+  openManager: () => void
+  closeManager: () => void
   closePrefs: () => void
 
   /** The card a notification asked for, and the board's job to clear.

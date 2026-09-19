@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { who } from './account'
 import { ask, commands } from './live'
-import type { PrefsPane, Shell, Theme } from './shape'
+import { useOverlays } from './useOverlays'
+import type { Shell, Theme } from './shape'
 import { useAccount } from './useAccount'
 import { useAgents } from './useAgents'
 import { useClosing } from './useClosing'
@@ -30,7 +31,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
   const [theme, setThemeState] = useState<Theme>('system')
-  const [prefs, setPrefs] = useState<PrefsPane | null>(null)
+  const overlays = useOverlays()
   const [palette, setPalette] = useState(false)
   const [wantedCard, setWantedCard] = useState<string | null>(null)
 
@@ -102,7 +103,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       ...projects,
       setProject: (id: string) => {
         projects.setProject(id)
-        setPrefs(null)
+        overlays.closePrefs()
       },
       membership,
       signedIn: membership.account !== null,
@@ -110,11 +111,11 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       signIn: () => void membership.signIn(),
       signOut: () => {
         void membership.signOut()
-        setPrefs(null)
+        /* Signing out from inside Settings leaves a screen about an account
+           that is gone. */
+        overlays.closePrefs()
       },
-      prefs,
-      openPrefs: (pane: PrefsPane = 'account') => setPrefs(pane),
-      closePrefs: () => setPrefs(null),
+      ...overlays,
       wantedCard,
       openCard: setWantedCard,
       palette,
@@ -137,7 +138,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       setTheme,
       projects,
       membership,
-      prefs,
+      overlays,
       palette,
       wantedCard,
     ],

@@ -1,6 +1,7 @@
 import { AddProject } from './AddProject'
 import { Palette } from './Palette'
 import { RemoveProject } from './RemoveProject'
+import { ManagerPane } from './ManagerPane'
 import { Settings } from './Settings'
 import { SignIn } from './SignIn'
 import { StopRunning } from './StopRunning'
@@ -60,6 +61,7 @@ export function Overlays({
           }}
         />
       )}
+      {shell.managing && <ManagerPane />}
       {prefs && <Settings pane={prefs} onAddProject={onAdd} onRemove={onRemove} />}
     </>
   )
