@@ -18,6 +18,7 @@ mod one_spelling;
 mod packaging;
 mod platform_window;
 mod ratchet;
+mod reachable;
 mod release_manifest;
 mod release_workflow;
 mod reseed;
@@ -116,6 +117,7 @@ fn check() -> ExitCode {
     findings.extend(csp::the_csp_forbids_what_the_app_never_needs(&root));
     findings.extend(versions::the_version_has_one_source(&root));
     findings.extend(packaging::the_bundle_says_what_it_ships(&root));
+    findings.extend(reachable::every_pane_can_be_opened(&root));
     findings.extend(release_workflow::the_release_workflow_keeps_its_promises(
         &root,
     ));

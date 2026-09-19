@@ -50,6 +50,12 @@ work stands, and a number on every agent call.
 - **Agents are files** — markdown with frontmatter in `~/.devpit/agents/`, and
   whatever your tooling already installed. None ship with devpit: the ones you
   see are the ones on your machine. Nothing to recompile, nothing to register.
+- **A browser pane**, for the page the project is serving. It opens
+  `localhost` over http because that is what a dev server answers, keeps each
+  pane's session apart, and can bring a signed-in session over from Chrome,
+  Firefox or Safari — per browser and per domain, never on its own. An agent
+  can drive a page you give it, and never reads what you type into a password
+  field.
 - **File tree and diffs** beside the terminal, so reviewing what an agent did
   does not mean leaving.
 - **On your machine.** Projects, boards, conversations and terminal history

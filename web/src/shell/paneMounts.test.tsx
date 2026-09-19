@@ -7,6 +7,7 @@ import type { Tab } from './strip'
 
 /* Each leaf pane is tested on its own; here only whether it mounts matters. */
 vi.mock('./BoardPane', () => ({ BoardPane: () => <div>board</div> }))
+vi.mock('./BrowserPane', () => ({ BrowserPane: () => <div>browser</div> }))
 vi.mock('./ChatPane', () => ({ ChatPane: () => <div>chat</div> }))
 vi.mock('./SkillsPane', () => ({ SkillsPane: () => <div>skills</div> }))
 vi.mock('./DiffPane', () => ({ DiffPane: () => <div>diff</div> }))
@@ -22,6 +23,7 @@ vi.mock('./WorkspacePane', () => ({ WorkspacePane: () => <div>workspace</div> })
 /* One open tab per kind you can have several of, so every many-instance
    mount has a tab to render from. Single-instance kinds mount unconditionally. */
 const open: Tab[] = [
+  { id: 'browser_1', kind: 'browser' },
   { id: 'chat_1', kind: 'chat' },
   { id: 'diff_1', kind: 'diff' },
   { id: 'drawing_1', kind: 'drawing' },

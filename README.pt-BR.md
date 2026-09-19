@@ -51,6 +51,12 @@ está, e um número em cada chamada de agente.
 - **Agentes são arquivos** — markdown com frontmatter em `~/.devpit/agents/`, e
   os que a sua ferramenta já instalou. Nenhum vem com o devpit: os que você vê
   são os da sua máquina. Nada para recompilar, nada para registrar.
+- **Um pane de navegador**, para a página que o projeto está servindo. Abre
+  `localhost` em http, que é o que um servidor de dev responde, mantém a
+  sessão de cada pane separada, e traz uma sessão já logada do Chrome, do
+  Firefox ou do Safari — por navegador e por domínio, nunca sozinho. Um agente
+  dirige a página que você der a ele, e nunca lê o que você digita num campo
+  de senha.
 - **Árvore de arquivos e diffs** ao lado do terminal, para revisar o que o
   agente fez sem precisar sair.
 - **Na sua máquina.** Projetos, quadros, conversas e histórico de terminal

@@ -73,6 +73,16 @@ export function Sidebar({
                 <span className="newmenu__label">Terminal</span>
                 <span className="newmenu__key">&#8984;T</span>
               </button>
+              {/* Beside Chat and Terminal because it is that kind of thing:
+                  something you open to work in, not a panel about the
+                  project. It was reachable only from the palette until the
+                  e2e went looking for a button and found none. No shortcut —
+                  `shortcuts.ts` decides those, and a key printed here that
+                  nothing listens for is the defect that guard exists for. */}
+              <button className="newmenu__item" role="menuitem" onClick={() => open('browser')}>
+                <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18" /></svg></span>
+                <span className="newmenu__label">Browser</span>
+              </button>
               <button className="newmenu__item" role="menuitem" onClick={() => open('board')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
                 <span className="newmenu__label">Card on the board</span>

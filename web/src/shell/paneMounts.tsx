@@ -3,7 +3,7 @@ import { NotePane } from '../plugins/notes/NotePane'
 import { NotesList } from '../plugins/notes/NotesList'
 import { DrawingList } from '../plugins/excalidraw/DrawingList'
 import { BoardPane } from './BoardPane'
-import { ManagerPane } from './ManagerPane'
+import { BrowserPane } from './BrowserPane'
 import { ChatPane } from './ChatPane'
 import { DiffPane } from './DiffPane'
 import { FilePane } from './FilePane'
@@ -83,7 +83,7 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
   },
   { name: 'mcps', many: false, className: 'pane', render: () => <McpPane /> },
   { name: 'plugins', many: false, className: 'pane', render: () => <PluginsPane /> },
-  { name: 'manager', many: false, className: 'pane', render: () => <ManagerPane /> },
+  { name: 'browser', many: true, className: 'pane pane--browser', render: (tab) => <BrowserPane tab={tab} /> },
   { name: 'files', many: false, className: 'pane', render: () => <FilesPane /> },
   { name: 'workspace', many: false, className: 'pane', render: () => <WorkspacePane /> },
   { name: 'chat', many: true, className: 'pane', render: (tab) => <ChatPane tab={tab} /> },
