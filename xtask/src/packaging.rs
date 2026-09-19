@@ -14,6 +14,11 @@
 //! - the **window** is granted no `updater:` permission. The app checks and
 //!   downloads from Rust; installing an update is not something a page may
 //!   ask for;
+//! - the **capability is scoped to a webview and not to a window**, because
+//!   tauri enables a window-scoped capability on *every* webview inside that
+//!   window whatever the `webviews` list says. The moment this window holds a
+//!   second webview showing somebody else's page, `windows: ["main"]` hands
+//!   devpit's whole command surface to it;
 //! - the **image the Linux binary is built on** decides who can run it. A
 //!   binary links against the glibc of the machine that made it and runs on
 //!   that version or newer, never older, so the oldest image that can build
@@ -28,7 +33,7 @@ use crate::Finding;
 const IDENTIFIER: &str = "dev.devpit.app";
 const BASE: &str = "apps/desktop/tauri.conf.json";
 const OVERLAY: &str = "apps/desktop/tauri.release.conf.json";
-const CAPABILITIES: &str = "apps/desktop/capabilities/default.json";
+const CAPABILITIES: &str = "apps/desktop/capabilities";
 const RELEASE: &str = ".github/workflows/release.yml";
 
 pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
@@ -97,20 +102,69 @@ pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
         );
     }
 
-    let granted: Vec<String> = json(root, CAPABILITIES)
-        .get("permissions")
-        .and_then(|p| p.as_array())
-        .map(|p| {
-            p.iter()
-                .filter_map(|one| one.as_str().map(ToOwned::to_owned))
-                .collect()
-        })
-        .unwrap_or_default();
-    for permission in updater_permissions(&granted) {
-        refuse(
-            CAPABILITIES,
-            format!("the window is granted {permission}: installing is not the page's to ask for"),
-        );
+    /* The unstable API, and whether anybody has read this version of it. */
+    let lock = std::fs::read_to_string(root.join("Cargo.lock")).unwrap_or_default();
+    let manifest =
+        std::fs::read_to_string(root.join("apps/desktop/Cargo.toml")).unwrap_or_default();
+    if manifest.contains("\"unstable\"") {
+        match tauri_locked(&lock) {
+            Some(found) if found == TAURI_READ => {}
+            Some(found) => refuse(
+                "apps/desktop/Cargo.toml",
+                format!(
+                    "tauri is {found} and the unstable API was last read at {TAURI_READ}. \
+                     `unstable` means Window::add_child may change between minor releases — \
+                     read what moved, then raise TAURI_READ in xtask/src/packaging.rs"
+                ),
+            ),
+            None => refuse(
+                "Cargo.lock",
+                "no tauri version to check the unstable API against".to_owned(),
+            ),
+        }
+    }
+
+    /* Every file in the folder, not just `default.json`: tauri loads them all,
+    so a second file scoped to a window would restore the hole while a guard
+    that read one name reported ok. */
+    for (named, capability) in capabilities_in(root) {
+        if let Some(windows) = capability.get("windows").and_then(|w| w.as_array()) {
+            let names: Vec<&str> = windows.iter().filter_map(|one| one.as_str()).collect();
+            refuse(
+                &named,
+                format!(
+                    "scoped to window {}; a window-scoped capability reaches every webview \
+                     inside it, browser panes included. Scope it with `webviews`",
+                    names.join(", ")
+                ),
+            );
+        }
+        if capability
+            .get("webviews")
+            .and_then(|w| w.as_array())
+            .is_none_or(Vec::is_empty)
+        {
+            refuse(
+                &named,
+                "names no webviews; nothing in the window could call a command".to_owned(),
+            );
+        }
+
+        let granted: Vec<String> = capability
+            .get("permissions")
+            .and_then(|p| p.as_array())
+            .map(|p| {
+                p.iter()
+                    .filter_map(|one| one.as_str().map(ToOwned::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for permission in updater_permissions(&granted) {
+            refuse(
+                &named,
+                format!("grants {permission}: installing is not the page's to ask for"),
+            );
+        }
     }
 
     findings
@@ -125,6 +179,36 @@ fn updater_permissions(granted: &[String]) -> Vec<String> {
         .filter(|one| one.starts_with("updater:"))
         .cloned()
         .collect()
+}
+
+/// The tauri this repo has read the unstable API of.
+///
+/// `apps/desktop` turns on tauri's `unstable` feature for one thing:
+/// `Window::add_child`, which the browser pane is made of. Unstable means the
+/// API may change between *minor* releases, and `version = "2"` in a manifest
+/// accepts every one of them — so a plain `cargo update` could change what
+/// that call does with nobody reading anything.
+///
+/// This is the tripwire. Raising tauri means raising this line, and raising
+/// this line means somebody looked.
+const TAURI_READ: &str = "2.11.5";
+
+/// The tauri the lockfile actually pins, if it can be read.
+///
+/// Its own function so the test can hand it a lockfile rather than the repo.
+fn tauri_locked(lock: &str) -> Option<String> {
+    let mut lines = lock.lines();
+    while let Some(line) = lines.next() {
+        if line.trim() == "name = \"tauri\"" {
+            return lines
+                .next()?
+                .trim()
+                .strip_prefix("version = \"")?
+                .strip_suffix('"')
+                .map(ToOwned::to_owned);
+        }
+    }
+    None
 }
 
 /// The oldest Ubuntu that can build this, and the one every Linux leg names.
@@ -156,6 +240,28 @@ fn above_the_floor(workflow: &str) -> Vec<String> {
         })
         .map(|image| format!("ubuntu-{image}"))
         .collect()
+}
+
+/// Every capability file tauri would load, by path and parsed.
+fn capabilities_in(root: &Path) -> Vec<(String, serde_json::Value)> {
+    let folder = root.join(CAPABILITIES);
+    let Ok(entries) = std::fs::read_dir(&folder) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|one| one == "json") {
+            let named = format!("{CAPABILITIES}/{}", entry.file_name().to_string_lossy());
+            let parsed = std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|text| serde_json::from_str(&text).ok())
+                .unwrap_or(serde_json::Value::Null);
+            found.push((named, parsed));
+        }
+    }
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found
 }
 
 fn json(root: &Path, relative: &str) -> serde_json::Value {

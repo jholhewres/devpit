@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window is allowed to reach. `core:default` does not grant the window controls a frameless titlebar needs, so they are named explicitly.",
-  "windows": [
+  "description": "What the main webview is allowed to reach. `core:default` does not grant the window controls a frameless titlebar needs, so they are named explicitly. Scoped by WEBVIEW and not by window: tauri enables a window-scoped capability on every webview in that window regardless of this list (tauri-utils/src/acl/capability.rs:150-157), so once this window holds a browser webview, `windows: [main]` would hand devpit's whole command surface to whatever page is loaded in it.",
+  "webviews": [
     "main"
   ],
   "permissions": [

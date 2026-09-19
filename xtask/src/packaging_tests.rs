@@ -78,3 +78,24 @@ fn the_publishing_job_is_not_a_builder() {
     assert!(above_the_floor(MATRIX).is_empty());
     assert!(MATRIX.contains("runs-on: ubuntu-24.04"));
 }
+
+/// The tripwire on the unstable API: a lockfile that moved past what anybody
+/// read must stop the build rather than quietly change what add_child does.
+#[test]
+fn the_tauri_version_is_read_out_of_the_lockfile() {
+    const LOCK: &str = "\n[[package]]\nname = \"tauri\"\nversion = \"2.11.5\"\n\n[[package]]\nname = \"wry\"\nversion = \"0.55.1\"\n";
+    assert_eq!(tauri_locked(LOCK).as_deref(), Some("2.11.5"));
+    assert_eq!(tauri_locked("").as_deref(), None);
+    /* A lockfile naming some other crate's version is not tauri's. */
+    assert_eq!(
+        tauri_locked("[[package]]\nname = \"wry\"\nversion = \"0.55.1\"\n").as_deref(),
+        None
+    );
+}
+
+/// And the tree as it stands agrees with what was read.
+#[test]
+fn the_unstable_api_in_this_tree_is_one_somebody_read() {
+    let lock = std::fs::read_to_string(crate::workspace_root().join("Cargo.lock")).unwrap();
+    assert_eq!(tauri_locked(&lock).as_deref(), Some(TAURI_READ));
+}
