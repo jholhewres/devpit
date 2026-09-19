@@ -9,3 +9,17 @@ chat_frames carries Ask and Frame, which chat.send streams over a Channel specta
 permission_questions carries Question, which arrives on an event
 terminal_happenings carries Happening, the payload of terminal:happening
 card_happenings carries CardHappening, the payload of card:happening
+browser_showings carries Showing, the payload of browser:showing
+
+browser_drivings carries Drove, the payload of browser:driven
+
+# `browser_act` is the one command here a *person* never calls: it is what an
+# agent would use to drive a page. And that is the honest state of US-028 in
+# plan 24 — the mechanism exists, is escaped, is gated behind a grant the
+# person makes, and has eight tests; what does not exist is the bridge from an
+# agent to it. devpit's agents are CLIs, so reaching this means an MCP server
+# or the hook endpoint, and neither is built. The command stays because the
+# grant, the escaping and the page-read are the hard half; this line comes out
+# when the bridge arrives.
+browser_act an agent drives a page with it; the agent-side bridge is not built yet
+browser_read an agent reads a page with it; same bridge, same absence

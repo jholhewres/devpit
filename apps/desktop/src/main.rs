@@ -10,6 +10,9 @@ mod asking;
 mod attaching;
 mod board;
 mod branches;
+mod browser;
+mod browser_cookies;
+mod browser_driving;
 mod claims;
 mod columns;
 mod commands;
@@ -130,6 +133,9 @@ fn main() {
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
         .manage(update::Updating::default())
+        /* Empty, and filled only by somebody granting a pane. */
+        .manage(browser_driving::Granted::default())
+        .manage(browser::Sessions::default())
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.

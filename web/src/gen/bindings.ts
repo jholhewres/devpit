@@ -331,6 +331,86 @@ export const commands = {
 	 *  ceiling. A second reader here would be a second place for those to drift.
 	 */
 	workspaceFile: (path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("workspace_file", { path })),
+	/**
+	 *  Opens a page in a webview of its own, over the pane that asked.
+	 * 
+	 *  Off the main webview's tree entirely: this is a sibling inside the window,
+	 *  not an iframe, so the page cannot reach the document devpit draws.
+	 */
+	browserOpen: (pane: string, url: string, place: Where, session: string) => typedError<string, RpcError>(__TAURI_INVOKE("browser_open", { pane, url, place, session })),
+	/**
+	 *  Moves and resizes a pane's webview, which the window will not do for us:
+	 *  a child webview is placed in window coordinates and knows nothing about the
+	 *  layout that decided them.
+	 */
+	browserPlace: (pane: string, place: Where) => typedError<null, RpcError>(__TAURI_INVOKE("browser_place", { pane, place })),
+	/**
+	 *  Closes a pane's webview.
+	 * 
+	 *  Called when the pane closes, and answering that it was already gone is the
+	 *  right answer rather than a failure — a pane closing twice is ordinary.
+	 */
+	browserClose: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_close", { pane })),
+	browserBack: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_back", { pane })),
+	browserForward: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_forward", { pane })),
+	browserStop: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_stop", { pane })),
+	/**
+	 *  Carries [`Showing`] into the generated contract, and does nothing else.
+	 * 
+	 *  specta writes down what a *command* can reach, and an event payload is
+	 *  reachable from none — so the window would have no type for what arrives on
+	 *  `browser:showing`. The same shape as `terminal_happenings` and
+	 *  `card_happenings`, and listed beside them in
+	 *  `xtask/uncalled-commands.txt` for the same reason.
+	 */
+	browserShowings: () => __TAURI_INVOKE<Showing>("browser_showings"),
+	/**
+	 *  What emptying a session would remove, asked before anything is removed.
+	 * 
+	 *  A logout is not undoable and the session is somebody's signed-in state, so
+	 *  the screen gets to say what goes rather than reporting it afterwards.
+	 */
+	browserSessionHeld: (session: string) => typedError<Kept, RpcError>(__TAURI_INVOKE("browser_session_held", { session })),
+	/**
+	 *  Empties one session, and only that one.
+	 * 
+	 *  The other sessions are other directories and are not touched. A pane still
+	 *  showing a page from this session keeps showing it — what goes is what is on
+	 *  disk, and the next open starts signed out.
+	 */
+	browserSessionForget: (session: string) => typedError<Kept, RpcError>(__TAURI_INVOKE("browser_session_forget", { session })),
+	/**
+	 *  Every cookie store on this machine, with what stands in the way of each.
+	 * 
+	 *  Listing is not importing. This is what a person chooses from.
+	 */
+	browserStores: () => typedError<Store[], RpcError>(__TAURI_INVOKE("browser_stores")),
+	/**
+	 *  Reads one store, keeps the domains asked for, and gives them to a pane.
+	 * 
+	 *  The store is named by the path `browser_stores` reported, and checked
+	 *  against that list rather than trusted: a path from a screen is not a path
+	 *  this process opens on request.
+	 */
+	browserImport: (pane: string, path: string, domains: string[]) => typedError<Taken, RpcError>(__TAURI_INVOKE("browser_import", { pane, path, domains })),
+	/**  Lets an agent drive this pane, or stops letting it. */
+	browserGrant: (pane: string, may: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("browser_grant", { pane, may })),
+	/**  Does one thing to a page on an agent's behalf. */
+	browserAct: (pane: string, act: Act) => typedError<null, RpcError>(__TAURI_INVOKE("browser_act", { pane, act })),
+	/**
+	 *  Reads the page as structure, and waits for the answer.
+	 * 
+	 *  `eval_with_callback` hands the result to a closure rather than returning
+	 *  it, so the answer comes back over a channel. With a deadline: a page that
+	 *  never answers — one still loading, one that navigated away mid-read —
+	 *  must not leave an agent waiting forever.
+	 */
+	browserRead: (pane: string) => typedError<string, RpcError>(__TAURI_INVOKE("browser_read", { pane })),
+	/**
+	 *  Carries [`Drove`] into the generated contract, and does nothing else — the
+	 *  same shape as `browser_showings` and for the same reason.
+	 */
+	browserDrivings: () => __TAURI_INVOKE<Drove>("browser_drivings"),
 	/**  `path.open` — opens a file or folder in whatever the desktop uses for it. */
 	pathOpen: (path: string) => typedError<Opened, RpcError>(__TAURI_INVOKE("path_open", { path })),
 	/**
@@ -939,6 +1019,15 @@ export type Account = {
 	createdAt: string,
 };
 
+/**  What an agent asked a page to do. */
+export type Act = 
+/**  Put text into the element a selector names. */
+{ act: "type"; selector: string; text: string } | 
+/**  Click the element a selector names. */
+{ act: "click"; selector: string } | 
+/**  Scroll the page by a number of viewport heights. */
+{ act: "scroll"; by: number | null };
+
 /**  An agent on this machine, as the step picker needs it. */
 export type Agent = {
 	/**  The name in the file's frontmatter — what a step stores. */
@@ -1462,6 +1551,11 @@ export type Doing =
 /**  It ended. */
 "gone";
 
+export type Drove = {
+	pane: string,
+	said: string,
+};
+
 /**
  *  One environment variable a profile sets before its program starts.
  * 
@@ -1698,6 +1792,24 @@ export type Installation = {
 	profiles: string[],
 	/**  Whether the default profile runs against it — where the panels start. */
 	default: boolean,
+};
+
+/**
+ *  What a session is keeping, so emptying it can say so before it happens.
+ * 
+ *  Not `Held`: `workspace.rs` already exports one, and two types with one name
+ *  is a contract that will not generate.
+ */
+export type Kept = {
+	session: string,
+	/**
+	 *  How many bytes the session's directory takes. `f64` rather than `u64`:
+	 *  specta refuses a type that could lose precision crossing into
+	 *  JavaScript, and a browser session is not measured in exabytes.
+	 */
+	bytes: number | null,
+	/**  Whether anything is there at all. */
+	used: boolean,
 };
 
 /**
@@ -2506,6 +2618,28 @@ export type Severity =
 /**  Said for the record. */
 "noted";
 
+/**
+ *  What a page is doing, told to the window as it happens.
+ * 
+ *  A webview does not report its address back, and remembering the last url
+ *  devpit asked for is not the same thing: a link, a redirect or a form leaves
+ *  the bar saying where the page *was* sent rather than where it *is*. So the
+ *  real one is read on every load and sent over.
+ */
+export type Showing = {
+	/**  The pane whose page this is. */
+	pane: string,
+	/**  Where the page actually is, as the webview reports it. */
+	url: string,
+	/**
+	 *  What the page calls itself, once it has finished loading and has had
+	 *  the chance to set one. Empty while it is still arriving, and empty for
+	 *  a page that names itself nothing — a tab then falls back to the url,
+	 *  which is what a browser has always done.
+	 */
+	title: string,
+};
+
 /**  A sign-in that has started but not finished. */
 export type SignIn = {
 	/**
@@ -2717,6 +2851,19 @@ export type StepKind =
 /**  A command of yours: tests, a build, a deploy. */
 "command";
 
+/**  A cookie store on this machine that a pane could be given. */
+export type Store = {
+	/**  What to call it on screen: `Google Chrome · Profile 1`. */
+	family: string,
+	/**  Where it is, which is also how a caller names it back. */
+	path: string,
+	/**
+	 *  Whether reading it needs a key from the desktop keyring, and whether
+	 *  this machine can ask for one. Empty when nothing stands in the way.
+	 */
+	warning: string,
+};
+
 /**
  *  One capability of the desktop UI a plugin can occupy.
  * 
@@ -2731,6 +2878,20 @@ export type Surface =
 { type: "pane"; many: boolean } | 
 /**  A pin shown on the card face. */
 { type: "cardPin" };
+
+/**  What an import actually did. */
+export type Taken = {
+	/**  Which store it came from. */
+	family: string,
+	/**
+	 *  How many cookies moved. `u32` rather than `usize`: specta refuses to
+	 *  export a type that could lose precision crossing into JavaScript, and a
+	 *  count that needs more than four billion is not a cookie store.
+	 */
+	count: number,
+	/**  Which domains they were for, in the order they were asked for. */
+	domains: string[],
+};
 
 /**
  *  The appearance the window uses.
@@ -2893,6 +3054,14 @@ export type WhatRan = {
 	baseRevision: string | null,
 	headRevision: string | null,
 	inAWorktree: boolean | null,
+};
+
+/**  Where a browser webview sits inside the window, in logical pixels. */
+export type Where = {
+	x: number | null,
+	y: number | null,
+	width: number | null,
+	height: number | null,
 };
 
 /**  Who asked for a run and what carried it out. */

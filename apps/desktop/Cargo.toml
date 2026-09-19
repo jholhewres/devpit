@@ -12,6 +12,7 @@ devpit-pty = { path = "../../crates/pty" }
 devpit-rpc = { path = "../../crates/rpc" }
 devpit-tmux = { path = "../../crates/tmux" }
 devpit-agentcli = { path = "../../crates/agentcli" }
+devpit-cookies = { path = "../../crates/cookies" }
 devpit-steps = { path = "../../crates/steps" }
 portable-pty = "0.9.0"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -20,7 +21,17 @@ serde_json = "1.0.151"
 sha2 = "0.10"
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 specta-typescript = "0.0.12"
-tauri = { version = "2", features = [] }
+# `unstable` is on for one thing: `Window::add_child`, which is the only way
+# to put a second webview inside this window and is gated behind it
+# (tauri-2.11.5, src/window/mod.rs:1127). It is what the browser pane is made
+# of.
+#
+# The cost is named so nobody pays it by accident: an unstable API may change
+# between *minor* tauri releases, so raising this version is something to read
+# release notes for rather than bump. `xtask/src/packaging.rs` holds the
+# tripwire: `TAURI_READ` pins the version whose unstable API this repo has
+# read, and the check refuses a lockfile past it.
+tauri = { version = "2", features = ["unstable"] }
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
 ulid = "3.0.0"
