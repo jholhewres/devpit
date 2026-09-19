@@ -7,6 +7,7 @@ members = [
     "crates/pty",
     "crates/tmux",
     "crates/agentcli",
+    "crates/cookies",
     "crates/steps",
     "apps/desktop",
     "xtask",
@@ -27,6 +28,7 @@ devpit-pty = { path = "crates/pty" }
 devpit-tmux = { path = "crates/tmux" }
 devpit-agentcli = { path = "crates/agentcli" }
 devpit-steps = { path = "crates/steps" }
+devpit-cookies = { path = "crates/cookies" }
 
 # The binary stays open all day with several fronts live. Size and startup are
 # not vanity here — and now measured: against `opt-level = 3`, "s" is 9.81 MB

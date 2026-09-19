@@ -1,0 +1,28 @@
+[package]
+name = "devpit-cookies"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# The three browser families keep their cookies in SQLite or in a format of
+# their own. Two of the three are SQLite, and `bundled` for the same reason
+# `devpit-core` uses it: the store must not depend on what this machine
+# happens to have installed.
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+# Chromium encrypts its values. This is not somewhere to be clever: the
+# primitives come from the RustCrypto crates and nothing here implements a
+# cipher.
+#
+# AES-128 in CBC, which is what Chromium uses on Linux and macOS. `aes-gcm`
+# was declared here first and never used — on those platforms the scheme is
+# CBC with a fixed IV, not GCM. It was removed rather than left compiling.
+cbc = { version = "0.1", features = ["alloc"] }
+aes = "0.8"
+pbkdf2 = { version = "0.12", features = ["simple"] }
+hmac = "0.12"
+sha1 = "0.10"
+# Chromium 130 puts the SHA-256 of the cookie's host in front of the
+# plaintext. Comparing it is what replaced a heuristic that guessed from
+# whether the bytes looked printable — and ate accented values.
+sha2 = "0.10"
