@@ -60,3 +60,10 @@ anyhow = "1.0.104"
 # the daemon, not this.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+# Placing a browser pane's page, and nothing else. The page is a second webview
+# inside this window, and on GTK neither tauri nor wry will put it where it
+# belongs — `browser_gtk` reaches for the widget and does it. Pinned to the
+# version tauri already resolves so this adds no tree of its own.
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+gtk = "0.18"
