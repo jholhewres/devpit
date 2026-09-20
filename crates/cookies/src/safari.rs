@@ -33,7 +33,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::{Cookie, Refused, Secret};
+use crate::{Cookie, Profile, Refused, Secret};
 
 /// Safari counts from 2001-01-01, and the rest of the world from 1970-01-01.
 const TO_UNIX: f64 = 978_307_200.0;
@@ -150,19 +150,26 @@ pub fn read(store: &Path) -> Result<Vec<Cookie>, Refused> {
 }
 
 /// Safari's store, where macOS keeps it. Empty everywhere else.
-pub fn stores_in(home: &Path) -> Vec<(String, PathBuf)> {
+pub fn stores_in(home: &Path) -> Vec<Profile> {
     if !cfg!(target_os = "macos") {
         return Vec::new();
     }
+    /* No profile name: Safari has one cookie jar per user and always has, so
+    naming it would be inventing a distinction the browser does not make. */
+    let one = |path: PathBuf| Profile {
+        family: "Safari".to_owned(),
+        name: String::new(),
+        path,
+    };
     let store = home.join("Library/Cookies/Cookies.binarycookies");
     if store.is_file() {
-        return vec![("Safari".to_owned(), store)];
+        return vec![one(store)];
     }
     /* Sandboxed Safari keeps it somewhere else, and has since Mojave. */
     let contained =
         home.join("Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies");
     if contained.is_file() {
-        return vec![("Safari".to_owned(), contained)];
+        return vec![one(contained)];
     }
     Vec::new()
 }

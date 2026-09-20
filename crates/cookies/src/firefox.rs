@@ -10,11 +10,11 @@
 //! cookie an expiry in the wrong millennium, which reads as "the import did
 //! nothing" because the webview drops them all.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use rusqlite::{Connection, OpenFlags};
 
-use crate::{Cookie, Refused, Secret};
+use crate::{Cookie, Profile, Refused, Secret};
 
 /// Every cookie in a Firefox store, opened read-only.
 pub fn read(store: &Path) -> Result<Vec<Cookie>, Refused> {
@@ -70,24 +70,23 @@ pub fn read(store: &Path) -> Result<Vec<Cookie>, Refused> {
 ///
 /// A profile that has never been opened has no `cookies.sqlite`, and it is
 /// left out rather than offered as an import that would find nothing.
-pub fn stores_in(home: &Path) -> Vec<(String, PathBuf)> {
+pub fn stores_in(home: &Path) -> Vec<Profile> {
     let root = home.join(".mozilla/firefox");
     let Ok(entries) = std::fs::read_dir(&root) else {
         return Vec::new();
     };
-    let mut found: Vec<(String, PathBuf)> = entries
+    let mut found: Vec<Profile> = entries
         .flatten()
         .filter_map(|entry| {
             let store = entry.path().join("cookies.sqlite");
-            store.is_file().then(|| {
-                (
-                    format!("Firefox · {}", entry.file_name().to_string_lossy()),
-                    store,
-                )
+            store.is_file().then(|| Profile {
+                family: "Firefox".to_owned(),
+                name: entry.file_name().to_string_lossy().into_owned(),
+                path: store,
             })
         })
         .collect();
-    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found.sort_by(|a, b| a.name.cmp(&b.name));
     found
 }
 

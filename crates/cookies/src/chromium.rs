@@ -21,14 +21,14 @@
 //! RustCrypto ones; what is here is the shape of the file and the shape of the
 //! key.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use rusqlite::{Connection, OpenFlags};
 
 use sha2::{Digest, Sha256};
 
-use crate::{Cookie, Refused, Secret};
+use crate::{Cookie, Profile, Refused, Secret};
 
 type Decryptor = cbc::Decryptor<aes::Aes128>;
 
@@ -266,7 +266,7 @@ fn held(store: &Path, err: rusqlite::Error) -> Refused {
 /// A list of where to look, not a promise that anything is there. The caller
 /// asks a person which of these to read — nothing is imported because it was
 /// found.
-pub fn stores_in(home: &Path) -> Vec<(String, PathBuf)> {
+pub fn stores_in(home: &Path) -> Vec<Profile> {
     let families = [
         ("Google Chrome", ".config/google-chrome"),
         ("Chromium", ".config/chromium"),
@@ -275,7 +275,7 @@ pub fn stores_in(home: &Path) -> Vec<(String, PathBuf)> {
         ("Vivaldi", ".config/vivaldi"),
     ];
     let mut found = Vec::new();
-    for (name, under) in families {
+    for (family, under) in families {
         let root = home.join(under);
         if !root.is_dir() {
             continue;
@@ -289,12 +289,15 @@ pub fn stores_in(home: &Path) -> Vec<(String, PathBuf)> {
         for entry in entries.flatten() {
             let store = entry.path().join("Cookies");
             if store.is_file() {
-                let profile = entry.file_name().to_string_lossy().into_owned();
-                found.push((format!("{name} · {profile}"), store));
+                found.push(Profile {
+                    family: family.to_owned(),
+                    name: entry.file_name().to_string_lossy().into_owned(),
+                    path: store,
+                });
             }
         }
     }
-    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found.sort_by(|a, b| (&a.family, &a.name).cmp(&(&b.family, &b.name)));
     found
 }
 

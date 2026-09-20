@@ -62,6 +62,24 @@ impl fmt::Debug for Secret {
     }
 }
 
+/// One cookie store found on this machine: which browser, which profile of
+/// it, and where the file is.
+///
+/// The browser and the profile are two fields rather than one label because a
+/// menu asks them one at a time — *from Chrome*, then *which Chrome*. Joined
+/// into `Google Chrome · Profile 1`, the only way back to the two halves is to
+/// split on a separator that a profile name is allowed to contain.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Profile {
+    /// The browser: `Google Chrome`, `Firefox`, `Safari`.
+    pub family: String,
+    /// The profile inside it: `Default`, `Profile 1`, a Firefox profile
+    /// directory. Empty where the browser keeps only one, which is Safari.
+    pub name: String,
+    /// The store itself, which is also how a caller names it back.
+    pub path: PathBuf,
+}
+
 /// One cookie, in the shape a webview is told about.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Cookie {
