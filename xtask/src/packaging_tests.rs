@@ -99,3 +99,53 @@ fn the_unstable_api_in_this_tree_is_one_somebody_read() {
     let lock = std::fs::read_to_string(crate::workspace_root().join("Cargo.lock")).unwrap();
     assert_eq!(tauri_locked(&lock).as_deref(), Some(TAURI_READ));
 }
+
+/// The guard's prefix and the app's have to be the same string, or the guard
+/// is looking for a label nothing is ever called.
+#[test]
+fn the_browser_prefix_this_guard_refuses_is_the_one_the_app_uses() {
+    let source = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../apps/desktop/src/browser.rs"),
+    )
+    .expect("browser.rs");
+    assert!(
+        source.contains(&format!("const MINE: &str = \"{BROWSER}\"")),
+        "browser.rs no longer labels panes `{BROWSER}`, so this guard refuses nothing"
+    );
+}
+
+/// A pattern in `webviews` is the hole this whole guard exists for: browser
+/// panes live in the same window, and a glob is how one of them ends up
+/// holding every command devpit has.
+#[test]
+fn a_webview_pattern_is_refused_however_harmless_it_looks() {
+    let refused = |webviews: serde_json::Value| {
+        let capability = serde_json::json!({
+            "identifier": "test",
+            "webviews": webviews,
+            "permissions": ["core:default"],
+        });
+        capability_findings(&capability)
+    };
+
+    assert!(
+        refused(serde_json::json!(["main"])).is_empty(),
+        "an exact label was refused"
+    );
+    for pattern in [
+        serde_json::json!(["*"]),
+        serde_json::json!(["devpit-*"]),
+        serde_json::json!(["main", "devpit-browser:?"]),
+        serde_json::json!(["[dm]ain"]),
+    ] {
+        assert!(
+            !refused(pattern.clone()).is_empty(),
+            "{pattern} was allowed through"
+        );
+    }
+    /* And a browser pane named outright is refused for what it is. */
+    assert!(
+        !refused(serde_json::json!(["devpit-browser:abc"])).is_empty(),
+        "a browser pane was granted devpit's commands"
+    );
+}

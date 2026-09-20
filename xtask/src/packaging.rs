@@ -128,43 +128,77 @@ pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
     so a second file scoped to a window would restore the hole while a guard
     that read one name reported ok. */
     for (named, capability) in capabilities_in(root) {
-        if let Some(windows) = capability.get("windows").and_then(|w| w.as_array()) {
-            let names: Vec<&str> = windows.iter().filter_map(|one| one.as_str()).collect();
-            refuse(
-                &named,
-                format!(
-                    "scoped to window {}; a window-scoped capability reaches every webview \
-                     inside it, browser panes included. Scope it with `webviews`",
-                    names.join(", ")
-                ),
-            );
+        for what in capability_findings(&capability) {
+            refuse(&named, what);
         }
-        if capability
-            .get("webviews")
-            .and_then(|w| w.as_array())
-            .is_none_or(Vec::is_empty)
-        {
-            refuse(
-                &named,
-                "names no webviews; nothing in the window could call a command".to_owned(),
-            );
-        }
+    }
 
-        let granted: Vec<String> = capability
-            .get("permissions")
-            .and_then(|p| p.as_array())
-            .map(|p| {
-                p.iter()
-                    .filter_map(|one| one.as_str().map(ToOwned::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default();
-        for permission in updater_permissions(&granted) {
-            refuse(
-                &named,
-                format!("grants {permission}: installing is not the page's to ask for"),
-            );
+    findings
+}
+
+/// What is wrong with one capability file, if anything.
+///
+/// Its own function so a test can hand it a capability rather than a
+/// repository. It returns the complaints and leaves naming the file to the
+/// caller, which already knows it. Every rule here is about the same hazard: this window holds
+/// webviews that are **not devpit** — a browser pane is somebody else's page —
+/// and a capability that reaches one of them hands it every command the app
+/// has.
+fn capability_findings(capability: &serde_json::Value) -> Vec<String> {
+    let mut findings = Vec::new();
+    let mut refuse = |what: String| findings.push(what);
+
+    if let Some(windows) = capability.get("windows").and_then(|w| w.as_array()) {
+        let names: Vec<&str> = windows.iter().filter_map(|one| one.as_str()).collect();
+        refuse(format!(
+            "scoped to window {}; a window-scoped capability reaches every webview \
+             inside it, browser panes included. Scope it with `webviews`",
+            names.join(", ")
+        ));
+    }
+
+    let webviews: Vec<&str> = capability
+        .get("webviews")
+        .and_then(|w| w.as_array())
+        .map(|w| w.iter().filter_map(|one| one.as_str()).collect())
+        .unwrap_or_default();
+    if webviews.is_empty() {
+        refuse("names no webviews; nothing in the window could call a command".to_owned());
+    }
+
+    /* The list takes globs, and a browser pane is a webview in the same
+    window. A pattern is refused outright rather than checked for whether it
+    happens to match a page today: `devpit-*` does not look like a hole, and
+    it is one. Every label devpit gives its own webviews is fixed and short,
+    so naming them is no hardship. */
+    for one in &webviews {
+        if one.contains(['*', '?', '[']) {
+            refuse(format!(
+                "names the webview pattern `{one}`; a pattern can match a browser pane, \
+                 which is somebody else's page holding devpit's commands. Name each \
+                 webview outright"
+            ));
         }
+        if one.starts_with(BROWSER) {
+            refuse(format!(
+                "names `{one}`, which is a browser pane: that is a page, not devpit"
+            ));
+        }
+    }
+
+    let granted: Vec<String> = capability
+        .get("permissions")
+        .and_then(|p| p.as_array())
+        .map(|p| {
+            p.iter()
+                .filter_map(|one| one.as_str().map(ToOwned::to_owned))
+                .collect()
+        })
+        .unwrap_or_default();
+    for permission in updater_permissions(&granted) {
+        refuse(format!(
+            "grants {permission}: installing is not the page's to ask for"
+        ));
     }
 
     findings
@@ -243,6 +277,12 @@ fn above_the_floor(workflow: &str) -> Vec<String> {
 }
 
 /// Every capability file tauri would load, by path and parsed.
+/// The prefix every browser pane's webview label carries.
+///
+/// Kept in step with `apps/desktop/src/browser.rs` by the test below rather
+/// than by hope: the whole point of this guard is that the two agree.
+const BROWSER: &str = "devpit-browser:";
+
 fn capabilities_in(root: &Path) -> Vec<(String, serde_json::Value)> {
     let folder = root.join(CAPABILITIES);
     let Ok(entries) = std::fs::read_dir(&folder) else {
