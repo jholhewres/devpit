@@ -29,13 +29,29 @@ use tauri::Manager as _;
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Store {
-    /// What to call it on screen: `Google Chrome · Profile 1`.
+    /// The browser: `Google Chrome`, `Firefox`, `Safari`.
     pub family: String,
+    /// The profile inside it: `Default`, `Profile 1`. Empty for a browser that
+    /// keeps one jar, which is how a menu knows not to ask a second question.
+    pub profile: String,
     /// Where it is, which is also how a caller names it back.
     pub path: String,
     /// Whether reading it needs a key from the desktop keyring, and whether
     /// this machine can ask for one. Empty when nothing stands in the way.
     pub warning: String,
+}
+
+impl Store {
+    /// The one-line name, for a sentence rather than for a menu: the menu asks
+    /// browser and profile separately, and a report of what was taken has to
+    /// fit in `Brought 12 cookies from …`.
+    pub(crate) fn named(&self) -> String {
+        if self.profile.is_empty() {
+            self.family.clone()
+        } else {
+            format!("{} · {}", self.family, self.profile)
+        }
+    }
 }
 
 /// What an import actually did.
@@ -109,32 +125,29 @@ pub async fn browser_stores() -> Result<Vec<Store>, RpcError> {
     let home = home();
     let mut found = Vec::new();
 
-    for (family, path) in chromium::stores_in(&home) {
-        let path: std::path::PathBuf = path;
+    for one in chromium::stores_in(&home) {
         /* Said now rather than after a failed import: a profile encrypted
         under a keyring secret refuses every value at once, and without this
         sentence that is indistinguishable from a corrupt store. */
-        let warning = match keys::password_for(&keys::TRUSTED, &family).1 {
+        let warning = match keys::password_for(&keys::TRUSTED, &one.family).1 {
             keys::Found::Unreachable { why } => why,
             _ => String::new(),
         };
         found.push(Store {
-            family,
-            path: path.display().to_string(),
+            family: one.family,
+            profile: one.name,
+            path: one.path.display().to_string(),
             warning,
         });
     }
-    for (family, path) in firefox::stores_in(&home) {
+    for one in firefox::stores_in(&home)
+        .into_iter()
+        .chain(safari::stores_in(&home))
+    {
         found.push(Store {
-            family,
-            path: path.display().to_string(),
-            warning: String::new(),
-        });
-    }
-    for (family, path) in safari::stores_in(&home) {
-        found.push(Store {
-            family,
-            path: path.display().to_string(),
+            family: one.family,
+            profile: one.name,
+            path: one.path.display().to_string(),
             warning: String::new(),
         });
     }
@@ -146,6 +159,11 @@ pub async fn browser_stores() -> Result<Vec<Store>, RpcError> {
 /// The store is named by the path `browser_stores` reported, and checked
 /// against that list rather than trusted: a path from a screen is not a path
 /// this process opens on request.
+///
+/// An empty `domains` takes the profile whole. That is the wider of the two
+/// doors and it is deliberate — it is what picking a browser out of the menu
+/// means, and a menu that quietly took a *subset* of what it said would be
+/// worse than one that takes what it names.
 #[tauri::command]
 #[specta::specta]
 pub async fn browser_import(
@@ -154,14 +172,6 @@ pub async fn browser_import(
     path: String,
     domains: Vec<String>,
 ) -> Result<Taken, RpcError> {
-    if domains.is_empty() {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            "name at least one domain to import — an import of everything is not an offer devpit makes"
-                .to_owned(),
-        ));
-    }
-
     /* The store has to be one this machine actually offered. */
     let offered = browser_stores().await?;
     let store = offered.iter().find(|one| one.path == path).ok_or_else(|| {
@@ -172,17 +182,33 @@ pub async fn browser_import(
     })?;
 
     let at = std::path::Path::new(&path);
-    let read: Result<Vec<Cookie>, Refused> = if store.family.starts_with("Firefox") {
-        firefox::read(at)
-    } else if store.family.starts_with("Safari") {
-        safari::read(at)
-    } else {
-        let (password, _) = keys::password_for(&keys::TRUSTED, &store.family);
-        chromium::read(at, &password)
+    /* Exact, not a prefix: `family` is the browser's own name now that the
+    profile is a field of its own, so `Firefox` is `Firefox` and there is no
+    label to match the front of. */
+    let read: Result<Vec<Cookie>, Refused> = match store.family.as_str() {
+        "Firefox" => firefox::read(at),
+        "Safari" => safari::read(at),
+        _ => {
+            let (password, _) = keys::password_for(&keys::TRUSTED, &store.family);
+            chromium::read(at, &password)
+        }
     };
     let found = read.map_err(|refused| RpcError::new(ErrorCode::Invalid, refused.to_string()))?;
 
-    let keep = wanted(found, &domains);
+    /* No domains means the whole profile, which is what picking a browser
+    from the menu does. It used to be refused outright, on the grounds that
+    bringing a GitHub session over is not agreeing to hand over a bank that
+    lives in the same file — and that is still true, which is why the menu
+    says what a whole-profile import takes before it offers it. Naming domains
+    still narrows it, and the pane's own host is what the field is filled with.
+
+    `Taken` reports the count either way, so an import is visible afterwards
+    rather than silent. */
+    let keep = if domains.is_empty() {
+        found
+    } else {
+        wanted(found, &domains)
+    };
     let label =
         crate::browser::label_for(&pane).map_err(|why| RpcError::new(ErrorCode::Invalid, why))?;
     let webview = window.get_webview(&label).ok_or_else(|| {
@@ -201,14 +227,14 @@ pub async fn browser_import(
         webview.set_cookie(built).map_err(|_| {
             RpcError::internal(format!(
                 "the page would not take the cookies from {}",
-                store.family
+                store.named()
             ))
         })?;
         count += 1;
     }
 
     Ok(Taken {
-        family: store.family.clone(),
+        family: store.named(),
         count,
         domains,
     })

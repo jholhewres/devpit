@@ -266,6 +266,22 @@ pub async fn browser_open(
         )
         .map_err(|err| RpcError::internal(format!("the browser pane would not open: {err}")))?;
 
+    /* Placed again, on purpose, and on GTK by hand. `add_child` takes a
+    position; wry applies it only where the window's container is a `GtkFixed`
+    or an X11 child, and tauri gives it neither — so the page was packed into
+    the window's vertical box and drew *under* the app at half its height.
+    `browser_gtk` is what puts it in its pane; the calls below are what tauri
+    honours everywhere else. */
+    if let Some(made) = window.get_webview(&label) {
+        made.set_position(tauri::LogicalPosition::new(place.x, place.y))
+            .and_then(|()| made.set_size(tauri::LogicalSize::new(place.width, place.height)))
+            .map_err(|err| {
+                RpcError::internal(format!("the browser pane would not take its place: {err}"))
+            })?;
+        #[cfg(all(unix, not(target_os = "macos")))]
+        crate::browser_gtk::hold(&window, &made, place);
+    }
+
     sessions.now_in(&pane, named);
     Ok(label)
 }
@@ -287,6 +303,8 @@ pub async fn browser_place(
         return Ok(());
     };
     let place = sized(place);
+    #[cfg(all(unix, not(target_os = "macos")))]
+    crate::browser_gtk::place(&webview, place);
     webview
         .set_position(tauri::LogicalPosition::new(place.x, place.y))
         .and_then(|()| webview.set_size(tauri::LogicalSize::new(place.width, place.height)))
@@ -372,6 +390,41 @@ pub async fn browser_stop(window: tauri::Window, pane: String) -> Result<(), Rpc
     history(&window, &pane, "window.stop()").await
 }
 
+/// Finds the next run of text in the page, forwards or back.
+///
+/// `window.find` rather than anything of tauri's, for the same reason `back`
+/// and `forward` go through `history`: a tauri webview has no find, and this
+/// is the one every engine has had since Netscape. WebKitGTK implements it,
+/// and it wraps and highlights the way a person expects.
+///
+/// What it cannot do is count. `window.find` answers *whether* it moved, not
+/// how many matches there are, and there is no other way to ask from inside
+/// the page — so the bar says "no match" or says nothing, and never shows the
+/// `3 / 17` a browser with an engine hook would.
+#[tauri::command]
+#[specta::specta]
+pub async fn browser_find(
+    window: tauri::Window,
+    pane: String,
+    what: String,
+    backwards: bool,
+) -> Result<(), RpcError> {
+    let what = what.trim();
+    if what.is_empty() {
+        return Ok(());
+    }
+    /* Through the same escaping the agent's own reads use, because this is a
+    string a person typed going into script: a quote or a line separator in
+    the box would otherwise end the literal and run what followed. */
+    let needle = crate::browser_driving::as_json(what);
+    history(
+        &window,
+        &pane,
+        &format!("window.find({needle}, false, {backwards}, true)"),
+    )
+    .await
+}
+
 /// What a session is keeping, so emptying it can say so before it happens.
 ///
 /// Not `Held`: `workspace.rs` already exports one, and two types with one name
@@ -400,6 +453,35 @@ fn weighs(at: &Path) -> u64 {
             Err(_) => 0,
         })
         .sum()
+}
+
+/// Every session a pane could be put in: the usual one, and whatever else has
+/// been made.
+///
+/// Read off the disk rather than kept in a list somewhere, because the disk is
+/// where a session *is* — a directory of cookies, storage and logins. A list
+/// that drifted from it would offer a session that signs you into nothing, or
+/// hide one that is still holding a login.
+///
+/// [`USUAL`] is always first and always present, even before anything has
+/// opened in it. A menu whose first entry appears only after it has been used
+/// is a menu with nothing in it the first time somebody looks.
+#[tauri::command]
+#[specta::specta]
+pub async fn browser_sessions() -> Result<Vec<String>, RpcError> {
+    let root = devpit_core::Store::root().map_err(|err| RpcError::internal(err.to_string()))?;
+    let mut names = vec![USUAL.to_owned()];
+    if let Ok(entries) = std::fs::read_dir(root.join("browser")) {
+        let mut made: Vec<String> = entries
+            .flatten()
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name != USUAL)
+            .collect();
+        made.sort();
+        names.extend(made);
+    }
+    Ok(names)
 }
 
 /// What emptying a session would remove, asked before anything is removed.
@@ -440,6 +522,52 @@ pub async fn browser_session_forget(session: String) -> Result<Kept, RpcError> {
         session,
         bytes: 0.0,
         used: false,
+    })
+}
+
+/// Where a pane's webview actually ended up, against where it was asked to go.
+///
+/// Exists because a screenshot showed a page drawn somewhere other than its
+/// pane and reading the code could not settle it: `add_child` and
+/// `set_position` take **logical** pixels and `position()` reports
+/// **physical** ones, so the two agree only while the scale factor is 1. This
+/// reports both and lets a test do the arithmetic rather than assuming.
+///
+/// On GTK it asks the toolkit instead, because tauri cannot answer. wry fills
+/// in a child webview's size and leaves its position at the origin whatever it
+/// is (`wry-0.55.1/src/webkitgtk/mod.rs:824-851`) — so this command reported
+/// `x = 0` for every page, which is a number that looks like a defect and is
+/// really a blank. A test comparing it against a pane could not have passed,
+/// and could not have failed for the right reason either.
+#[tauri::command]
+#[specta::specta]
+pub async fn browser_where(window: tauri::Window, pane: String) -> Result<Where, RpcError> {
+    let label = label_for(&pane).map_err(refused)?;
+    let webview = window
+        .get_webview(&label)
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that pane has no page".to_owned()))?;
+    #[cfg(all(unix, not(target_os = "macos")))]
+    if let Some(found) = crate::browser_gtk::spot(&webview) {
+        /* Already logical: GTK allocates in application pixels and leaves the
+        scale factor to GDK, which is why wry converts *into* logical before
+        allocating. Dividing again would report a page at half its size on
+        every screen that is not 1×. */
+        return Ok(found);
+    }
+    let at = webview
+        .position()
+        .map_err(|err| RpcError::internal(format!("the page would not say where it is: {err}")))?;
+    let size = webview.size().map_err(|err| {
+        RpcError::internal(format!("the page would not say how big it is: {err}"))
+    })?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+    /* Back into logical, which is what the window asked for and what the
+    caller can compare against its own `getBoundingClientRect`. */
+    Ok(Where {
+        x: f64::from(at.x) / scale,
+        y: f64::from(at.y) / scale,
+        width: f64::from(size.width) / scale,
+        height: f64::from(size.height) / scale,
     })
 }
 

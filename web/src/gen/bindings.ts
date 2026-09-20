@@ -351,9 +351,40 @@ export const commands = {
 	 *  right answer rather than a failure — a pane closing twice is ordinary.
 	 */
 	browserClose: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_close", { pane })),
+	/**
+	 *  Where a pane's webview actually ended up, against where it was asked to go.
+	 * 
+	 *  Exists because a screenshot showed a page drawn somewhere other than its
+	 *  pane and reading the code could not settle it: `add_child` and
+	 *  `set_position` take **logical** pixels and `position()` reports
+	 *  **physical** ones, so the two agree only while the scale factor is 1. This
+	 *  reports both and lets a test do the arithmetic rather than assuming.
+	 * 
+	 *  On GTK it asks the toolkit instead, because tauri cannot answer. wry fills
+	 *  in a child webview's size and leaves its position at the origin whatever it
+	 *  is (`wry-0.55.1/src/webkitgtk/mod.rs:824-851`) — so this command reported
+	 *  `x = 0` for every page, which is a number that looks like a defect and is
+	 *  really a blank. A test comparing it against a pane could not have passed,
+	 *  and could not have failed for the right reason either.
+	 */
+	browserWhere: (pane: string) => typedError<Where, RpcError>(__TAURI_INVOKE("browser_where", { pane })),
 	browserBack: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_back", { pane })),
 	browserForward: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_forward", { pane })),
 	browserStop: (pane: string) => typedError<null, RpcError>(__TAURI_INVOKE("browser_stop", { pane })),
+	/**
+	 *  Finds the next run of text in the page, forwards or back.
+	 * 
+	 *  `window.find` rather than anything of tauri's, for the same reason `back`
+	 *  and `forward` go through `history`: a tauri webview has no find, and this
+	 *  is the one every engine has had since Netscape. WebKitGTK implements it,
+	 *  and it wraps and highlights the way a person expects.
+	 * 
+	 *  What it cannot do is count. `window.find` answers *whether* it moved, not
+	 *  how many matches there are, and there is no other way to ask from inside
+	 *  the page — so the bar says "no match" or says nothing, and never shows the
+	 *  `3 / 17` a browser with an engine hook would.
+	 */
+	browserFind: (pane: string, what: string, backwards: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("browser_find", { pane, what, backwards })),
 	/**
 	 *  Carries [`Showing`] into the generated contract, and does nothing else.
 	 * 
@@ -364,6 +395,20 @@ export const commands = {
 	 *  `xtask/uncalled-commands.txt` for the same reason.
 	 */
 	browserShowings: () => __TAURI_INVOKE<Showing>("browser_showings"),
+	/**
+	 *  Every session a pane could be put in: the usual one, and whatever else has
+	 *  been made.
+	 * 
+	 *  Read off the disk rather than kept in a list somewhere, because the disk is
+	 *  where a session *is* — a directory of cookies, storage and logins. A list
+	 *  that drifted from it would offer a session that signs you into nothing, or
+	 *  hide one that is still holding a login.
+	 * 
+	 *  [`USUAL`] is always first and always present, even before anything has
+	 *  opened in it. A menu whose first entry appears only after it has been used
+	 *  is a menu with nothing in it the first time somebody looks.
+	 */
+	browserSessions: () => typedError<string[], RpcError>(__TAURI_INVOKE("browser_sessions")),
 	/**
 	 *  What emptying a session would remove, asked before anything is removed.
 	 * 
@@ -380,6 +425,57 @@ export const commands = {
 	 */
 	browserSessionForget: (session: string) => typedError<Kept, RpcError>(__TAURI_INVOKE("browser_session_forget", { session })),
 	/**
+	 *  Shows the menu under the control that asked for it.
+	 * 
+	 *  `at` is the control's own rectangle in the main window's logical
+	 *  coordinates — the same thing a browser pane sends for where its page goes,
+	 *  measured the same way. This turns it into a place on the screen.
+	 */
+	browserMenuShow: (pane: string, at: Where, showing: MenuFor) => typedError<null, RpcError>(__TAURI_INVOKE("browser_menu_show", { pane, at, showing })),
+	/**
+	 *  Puts the menu away.
+	 * 
+	 *  Hidden and not closed: closing would throw away the frontend it has loaded,
+	 *  and the next opening would load it again.
+	 */
+	browserMenuHide: () => typedError<null, RpcError>(__TAURI_INVOKE("browser_menu_hide")),
+	/**
+	 *  What the menu is open for, asked by the menu itself as it mounts.
+	 * 
+	 *  Answers nothing when the menu has never been opened, which is a state the
+	 *  window can be in: it is built hidden and it draws nothing until it knows.
+	 */
+	browserMenuShowing: () => typedError<{
+	pane: string,
+	/**
+	 *  Where the pane's page is, which is the site the import offers to narrow
+	 *  to. Empty for a pane with nothing open.
+	 */
+	at: string,
+	session: string,
+	/**  The page-width preset's id, or none for the whole pane. */
+	viewport: string | null,
+	granted: boolean,
+} | null, RpcError>(__TAURI_INVOKE("browser_menu_showing")),
+	/**
+	 *  Carries back what the menu was used to do.
+	 * 
+	 *  The menu is in another window and the pane's state lives in `main`, so this
+	 *  is the way across. It emits to `main` by name rather than broadcasting: an
+	 *  event every webview hears is an event a *page* could hear, and a page is
+	 *  the one thing in this window that is not ours.
+	 */
+	browserMenuDid: (pane: string, did: Did) => typedError<null, RpcError>(__TAURI_INVOKE("browser_menu_did", { pane, did })),
+	/**
+	 *  Carries [`MenuFor`] and [`Did`] into the generated contract.
+	 * 
+	 *  specta writes down what a *command* can reach, and neither of these is
+	 *  reachable from one — `MenuFor` goes out on an event and `Did` comes back as
+	 *  an argument that the window has to be able to name. Listed in
+	 *  `xtask/uncalled-commands.txt` beside the others of its kind.
+	 */
+	browserMenus: () => __TAURI_INVOKE<[MenuFor, Did]>("browser_menus"),
+	/**
 	 *  Every cookie store on this machine, with what stands in the way of each.
 	 * 
 	 *  Listing is not importing. This is what a person chooses from.
@@ -391,6 +487,11 @@ export const commands = {
 	 *  The store is named by the path `browser_stores` reported, and checked
 	 *  against that list rather than trusted: a path from a screen is not a path
 	 *  this process opens on request.
+	 * 
+	 *  An empty `domains` takes the profile whole. That is the wider of the two
+	 *  doors and it is deliberate — it is what picking a browser out of the menu
+	 *  means, and a menu that quietly took a *subset* of what it said would be
+	 *  worse than one that takes what it names.
 	 */
 	browserImport: (pane: string, path: string, domains: string[]) => typedError<Taken, RpcError>(__TAURI_INVOKE("browser_import", { pane, path, domains })),
 	/**  Lets an agent drive this pane, or stops letting it. */
@@ -1540,6 +1641,24 @@ export type DeleteRefusal = {
 	forcible: boolean,
 };
 
+/**
+ *  What somebody did in the menu, on its way back to the pane that owns it.
+ * 
+ *  The menu runs in another window, so it cannot reach the pane's React state.
+ *  Commands that need no window — listing sessions, reading a store, granting
+ *  — it calls itself; anything that changes what the *pane* shows comes back
+ *  through here.
+ */
+export type Did = 
+/**  Put the pane in this session, which reopens the page in it. */
+{ did: "session"; session: string } | 
+/**  Hold the page at this width, or at the pane's own when none. */
+{ did: "viewport"; viewport: string | null } | 
+/**  Whether an agent may drive this page. */
+{ did: "grant"; granted: boolean } | 
+/**  Something to tell the person, in the pane's own strip. */
+{ did: "said"; said: string };
+
 /**  What a session is doing, as its agent last said. */
 export type Doing = 
 /**  It began and has said nothing since. */
@@ -1891,6 +2010,27 @@ export type Membership = {
 	 *  telling them it expired is kinder than pretending they never signed in.
 	 */
 	expired: boolean,
+};
+
+/**
+ *  What the menu is being opened for, sent to it the moment it is shown.
+ * 
+ *  Everything it needs to draw itself correctly on the first frame. A menu
+ *  that opened and *then* asked which session was current would show the wrong
+ *  tick for as long as the round trip took, and the tick is the one thing
+ *  somebody opens this to check.
+ */
+export type MenuFor = {
+	pane: string,
+	/**
+	 *  Where the pane's page is, which is the site the import offers to narrow
+	 *  to. Empty for a pane with nothing open.
+	 */
+	at: string,
+	session: string,
+	/**  The page-width preset's id, or none for the whole pane. */
+	viewport: string | null,
+	granted: boolean,
 };
 
 export type Message = {
@@ -2853,8 +2993,13 @@ export type StepKind =
 
 /**  A cookie store on this machine that a pane could be given. */
 export type Store = {
-	/**  What to call it on screen: `Google Chrome · Profile 1`. */
+	/**  The browser: `Google Chrome`, `Firefox`, `Safari`. */
 	family: string,
+	/**
+	 *  The profile inside it: `Default`, `Profile 1`. Empty for a browser that
+	 *  keeps one jar, which is how a menu knows not to ask a second question.
+	 */
+	profile: string,
 	/**  Where it is, which is also how a caller names it back. */
 	path: string,
 	/**

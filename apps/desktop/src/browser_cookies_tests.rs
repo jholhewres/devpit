@@ -80,8 +80,14 @@ fn only_the_domains_asked_for_leave_the_store() {
     assert!(!keep.iter().any(|one| one.name == "fake"));
 }
 
+/// `wanted` narrows and never widens: no domains means no domains matched.
+///
+/// The *command* reads this the other way round — an empty list there means
+/// the profile whole, which is what picking a browser out of the menu does —
+/// and that decision lives in `browser_import`, not here, so that the
+/// narrowing itself stays a function with one meaning.
 #[test]
-fn asking_for_nothing_takes_nothing() {
+fn narrowing_to_nothing_keeps_nothing() {
     let found = vec![cookie(".github.com", "session")];
     assert!(wanted(found, &[]).is_empty());
 }
@@ -96,4 +102,65 @@ fn several_domains_are_all_honoured() {
     let keep = wanted(found, &["github.com".to_owned(), "gitlab.com".to_owned()]);
     assert_eq!(keep.len(), 2);
     assert!(!keep.iter().any(|one| one.name == "c"));
+}
+
+/// The dispatch `browser_import` does is an exact match on the browser's name
+/// now that the profile is a field of its own — so every name the crate can
+/// produce has to be one of the three arms, and a Firefox read must never be
+/// handed to the Chromium reader because the label gained a word.
+///
+/// Read off the crate rather than restated: a list written here would agree
+/// with the code on the day it was written and never again.
+#[test]
+fn every_browser_the_crate_names_reaches_the_reader_that_understands_it() {
+    let home = tempfile::tempdir().expect("a temporary home");
+    let home = home.path();
+
+    std::fs::create_dir_all(home.join(".mozilla/firefox/abc.default")).expect("a firefox profile");
+    std::fs::write(
+        home.join(".mozilla/firefox/abc.default/cookies.sqlite"),
+        b"",
+    )
+    .expect("a store");
+    std::fs::create_dir_all(home.join(".config/google-chrome/Profile 1"))
+        .expect("a chrome profile");
+    std::fs::write(home.join(".config/google-chrome/Profile 1/Cookies"), b"").expect("a store");
+
+    for one in devpit_cookies::firefox::stores_in(home) {
+        assert_eq!(
+            one.family, "Firefox",
+            "a firefox store called itself {}",
+            one.family
+        );
+        assert!(!one.name.is_empty(), "a firefox profile has no name");
+    }
+    for one in devpit_cookies::chromium::stores_in(home) {
+        assert!(
+            one.family != "Firefox" && one.family != "Safari",
+            "{} would be read by the wrong reader",
+            one.family
+        );
+        assert!(!one.name.is_empty(), "a chromium profile has no name");
+    }
+}
+
+/// Two fields for the menu, one sentence for a report. Safari keeps one jar
+/// and names no profile, so its sentence must not end in a dangling separator.
+#[test]
+fn a_store_names_itself_in_one_line_without_an_empty_half() {
+    let with = Store {
+        family: "Google Chrome".to_owned(),
+        profile: "Profile 1".to_owned(),
+        path: "/x".to_owned(),
+        warning: String::new(),
+    };
+    assert_eq!(with.named(), "Google Chrome · Profile 1");
+
+    let alone = Store {
+        family: "Safari".to_owned(),
+        profile: String::new(),
+        path: "/x".to_owned(),
+        warning: String::new(),
+    };
+    assert_eq!(alone.named(), "Safari");
 }

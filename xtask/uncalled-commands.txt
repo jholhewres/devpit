@@ -23,3 +23,15 @@ browser_drivings carries Drove, the payload of browser:driven
 # when the bridge arrives.
 browser_act an agent drives a page with it; the agent-side bridge is not built yet
 browser_read an agent reads a page with it; same bridge, same absence
+
+# Not for the window: the e2e calls it through `__TAURI_INTERNALS__` to ask
+# where a page actually ended up, because the driver cannot see into a native
+# child webview and a screenshot raised the question that reading the code
+# could not settle. `add_child` takes logical pixels and `position()` reports
+# physical ones; this is what makes the two comparable.
+browser_where the e2e asks the window where a page really is; the driver cannot see one
+
+# The menu is a window of its own, so its two payloads cross a boundary specta
+# cannot see from a command: `MenuFor` goes out on `browser:menu-for` and `Did`
+# comes back as an argument the window has to be able to name.
+browser_menus carries MenuFor and Did, the payloads the menu window is told and answers with

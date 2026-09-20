@@ -13,6 +13,11 @@ mod branches;
 mod browser;
 mod browser_cookies;
 mod browser_driving;
+mod browser_menu;
+// Where tauri draws with GTK, which is every unix that is not macOS. A child
+// webview is placed by hand there; the module says why.
+#[cfg(all(unix, not(target_os = "macos")))]
+mod browser_gtk;
 mod claims;
 mod columns;
 mod commands;
@@ -136,10 +141,20 @@ fn main() {
         /* Empty, and filled only by somebody granting a pane. */
         .manage(browser_driving::Granted::default())
         .manage(browser::Sessions::default())
+        /* What the browser menu was last opened for, so its window can ask. */
+        .manage(browser_menu::Opening::default())
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.
             tauri::Manager::manage(app, sessions::SessionState::new(app.handle().clone()));
+            // The window rebuilt around a container that can hold a page
+            // *beside* the app rather than under it. Done now, while the
+            // window has exactly one webview in it, so the swap has nothing to
+            // disturb; see `browser_gtk` for what GTK does otherwise.
+            #[cfg(all(unix, not(target_os = "macos")))]
+            if let Some(main) = tauri::Manager::get_webview_window(app, "main") {
+                browser_gtk::settle(&main);
+            }
             // The catalogue is compiled in and pinned by a test, so a manifest
             // breaking the contract is a build defect: loud where it is being
             // written; logged in release, where `plugin_data` refuses it on use
