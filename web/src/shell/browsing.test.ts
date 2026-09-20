@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { aim, boxOf, moved, shown } from './browsing'
+import { aim, boxOf, grouped, inset, moved, shown, VIEWPORTS } from './browsing'
 
 const at = (typed: string): string => {
   const aimed = aim(typed)
@@ -102,5 +102,63 @@ describe('where the pane sits', () => {
     expect(moved(box, { ...box })).toBe(false)
     expect(moved(box, { ...box, x: 1 })).toBe(true)
     expect(moved(box, { ...box, height: 101 })).toBe(true)
+  })
+})
+
+describe('the stores a menu asks about', () => {
+  const store = (family: string, profile: string) => ({
+    family,
+    profile,
+    path: `/home/x/${family}/${profile}`,
+    warning: '',
+  })
+
+  /* The shape the menu is built on: browser first, then which one of it. */
+  it('gathers the profiles of a browser under that browser', () => {
+    const found = grouped([
+      store('Google Chrome', 'Default'),
+      store('Google Chrome', 'Profile 1'),
+      store('Firefox', 'work.default'),
+    ])
+    expect(found.map((one) => one.family)).toEqual(['Google Chrome', 'Firefox'])
+    expect(found[0].profiles.map((one) => one.name)).toEqual(['Default', 'Profile 1'])
+    expect(found[1].profiles).toHaveLength(1)
+  })
+
+  /* A browser with one profile is one row, not a submenu with one thing in
+     it — which is the whole reason the menu branches on the count. */
+  it('keeps a lone profile a lone profile', () => {
+    expect(grouped([store('Firefox', 'default')])[0].profiles).toHaveLength(1)
+  })
+
+  it('has nothing to group when nothing was found', () => {
+    expect(grouped([])).toEqual([])
+  })
+})
+
+describe('holding the page at a width', () => {
+  const hole = { x: 100, y: 40, width: 900, height: 600 }
+
+  it('is the pane itself when no width was chosen', () => {
+    expect(inset(hole, null)).toEqual(hole)
+  })
+
+  it('centres the page and leaves the top alone', () => {
+    const at = inset(hole, { id: 'm', label: 'M', width: 400, height: 800 })
+    expect(at.width).toBe(400)
+    expect(at.x).toBe(350)
+    expect(at.y).toBe(40)
+  })
+
+  /* The bug this whole area of the app has been about: a page wider than its
+     pane is a page drawn over the sidebar. */
+  it('never hands out a box bigger than the hole', () => {
+    for (const one of VIEWPORTS) {
+      const at = inset(hole, one)
+      expect(at.width).toBeLessThanOrEqual(hole.width)
+      expect(at.height).toBeLessThanOrEqual(hole.height)
+      expect(at.x).toBeGreaterThanOrEqual(hole.x)
+      expect(at.x + at.width).toBeLessThanOrEqual(hole.x + hole.width)
+    }
   })
 })

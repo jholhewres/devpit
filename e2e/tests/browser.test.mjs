@@ -95,6 +95,46 @@ async function go(address) {
   await settle(700)
 }
 
+/**
+ * Clicks the control that opens the browser menu.
+ *
+ * The menu is a window of its own, and that is not a style choice: a pane's
+ * page is a second native webview, two native webviews have no z-order between
+ * them, and a panel drawn in the main document came out behind the site.
+ *
+ * **This suite cannot look inside that window.** WebKitWebDriver hands out one
+ * handle, for the webview it attached to, and the menu is not it — so what is
+ * asserted here is what the main window can still see, which is the thing the
+ * window was built for: the page does not move. The panel's own rows are
+ * covered by `BrowserMenu`'s unit tests, in jsdom, where they can be.
+ */
+async function clickMenu() {
+  await window.executeScript(function () {
+    const hit = Array.prototype.slice
+      .call(document.querySelectorAll('[aria-label="Browser menu"]'))
+      .filter(function (node) {
+        return node.offsetParent !== null
+      })
+      .pop()
+    if (!hit) throw new Error('no browser menu control on screen')
+    hit.click()
+  })
+  await settle(1000)
+}
+
+/**
+ * Puts the menu window away.
+ *
+ * Every test that opens it must call this. The window is always-on-top and
+ * takes focus, so one left open sat over the app for the rest of the run —
+ * the next test's clicks went into it, nothing answered, and the whole file
+ * ran out its ten minutes. That is how this suite learned to close it.
+ */
+async function closeMenu() {
+  await window.executeScript('return window.__TAURI_INTERNALS__.invoke("browser_menu_hide", {})')
+  await settle(500)
+}
+
 const has = (selector) =>
   window.executeScript(
     function (selector) {
@@ -164,21 +204,305 @@ describe('the browser pane', () => {
     assert.ok(hole && hole.height > 100, 'the hole lost its size once a page was opened')
   })
 
-  test('offers to bring a signed-in session, and does not bring one on its own', async () => {
+  /* The question a screenshot raised and reading could not settle: the page
+     looked drawn somewhere other than its pane.
+
+     `add_child` and `set_position` take **logical** pixels; `position()`
+     reports **physical** ones. The two agree only while the scale factor is
+     1, and this machine's is — so a display where it is not would have moved
+     the page and nothing here would have said so. `browser_where` converts
+     back to logical, and this compares it with the hole's own rectangle. */
+  test('the page is drawn over its own hole and nowhere else', async () => {
     await openPane('Browser')
-    await window.findElement(By.css('[aria-label="Bring a signed-in session"]')).click()
-    await settle(800)
+    await go('localhost:17800')
+    await settle(1400)
 
-    assert.ok(await has('.bsession'), 'the sign-in offer did not open')
-    const chooser = await window.findElement(By.css('.bsession select'))
-    assert.equal(await chooser.getAttribute('value'), '', 'a browser was chosen for the person')
+    const hole = await boxOf(window, '.browser__page')
+    assert.ok(hole, 'no hole to compare against')
+    assert.ok(hole.width > 100 && hole.height > 100, `the hole is ${hole.width}x${hole.height}`)
 
-    /* The button that would import is off until both halves are answered —
-       which browser, and for which domain. Nothing is taken by opening this. */
-    const bring = await window.findElement(By.xpath('//button[text()="Bring the session"]'))
-    assert.equal(await bring.isEnabled(), false, 'the import button was live with nothing chosen')
+    const pane = await window.executeScript(
+      'return document.querySelector(".browser__page")?.dataset?.paneId ?? null',
+    )
+    assert.ok(pane, 'the hole does not say which pane it is')
 
-    await shoot(window, 'browser-signin', await boxOf(window, '.browser'))
+    const actual = await window.executeScript(
+      function (pane) {
+        return window.__TAURI_INTERNALS__.invoke('browser_where', { pane: pane })
+      },
+      pane,
+    )
+    assert.ok(actual, 'the window would not say where the page is')
+
+    /* Within a pixel: a rounded logical value and a physical one divided by
+       the scale will not always land on the same integer. */
+    for (const side of ['x', 'y', 'width', 'height']) {
+      assert.ok(
+        Math.abs(actual[side] - hole[side]) <= 2,
+        `the page's ${side} is ${actual[side]} and the hole's is ${hole[side]}`,
+      )
+    }
+  })
+
+  /* Three controls became one, and then the one left this document.
+  
+     There was a key that opened an import form, a chip that opened a session
+     list, and a sign-out inside the import panel next to the routine action.
+     They became one overflow menu — and that menu had to become a *window*,
+     because a pane's page is a second native webview and a panel drawn beside
+     it came out behind the site.
+  
+     **The assertion is that the page is untouched.** Hiding the page while the
+     menu was open would have worked too, and shrinking it to sit below the
+     menu would have worked too; both cost the page something, and this is the
+     test that says which one was built. */
+  test('the menu leaves this document, and the page does not move for it', async () => {
+    await openPane('Browser')
+    await go('localhost:17800')
+    await settle(900)
+
+    const before = await boxOf(window, '.browser__page')
+    assert.ok(before, 'no hole to compare against')
+    const pane = await window.executeScript(
+      'return document.querySelector(".browser__page")?.dataset?.paneId ?? null',
+    )
+    const where = () =>
+      window.executeScript(
+        function (pane) {
+          return window.__TAURI_INTERNALS__.invoke('browser_where', { pane: pane })
+        },
+        pane,
+      )
+    const wasAt = await where()
+    assert.ok(wasAt, 'the window would not say where the page is')
+
+    try {
+      await clickMenu()
+
+      /* No panel here any more. It used to be drawn into the pane, which is
+         exactly what put it behind the site. */
+      assert.equal(await has('.bmenu__panel'), false, 'the menu is still in this document')
+
+      /* And the page is where it was — not hidden, not moved, not resized. */
+      const after = await boxOf(window, '.browser__page')
+      assert.ok(after, 'the hole went away while the menu was open')
+      for (const side of ['x', 'y', 'width', 'height']) {
+        assert.equal(
+          after[side],
+          before[side],
+          `opening the menu moved the hole's ${side} from ${before[side]} to ${after[side]}`,
+        )
+      }
+
+      const nowAt = await where()
+      assert.ok(nowAt, 'the page stopped saying where it is while the menu was open')
+      for (const side of ['x', 'y', 'width', 'height']) {
+        assert.ok(
+          Math.abs(nowAt[side] - wasAt[side]) <= 2,
+          `opening the menu moved the page's ${side} from ${wasAt[side]} to ${nowAt[side]}`,
+        )
+      }
+    } finally {
+      await closeMenu()
+    }
+
+    const said = await complaints(window)
+    assert.deepEqual(said.errors, [], 'opening the menu wrote to console.error')
+
+    await shoot(window, 'browser-menu', await boxOf(window, '.browser'))
+  })
+
+  /* The two chips that used to hold the bar open: one printed the session's
+     name and did nothing at all, the other was a switch. Both are rows in the
+     menu now — the session with a tick on it, the switch with a sentence
+     saying what it turns on. */
+  test('the bar carries no chips any more', async () => {
+    await openPane('Browser')
+
+    assert.equal(await has('.browser__bar .chip'), false, 'a chip is back in the bar')
+    assert.equal(await has('.browser__session'), false, 'the session chip is back in the bar')
+    /* And the control that replaced them is there. */
+    assert.ok(
+      await window.findElement(By.css('[aria-label="Browser menu"]')),
+      'the bar has no menu control',
+    )
+  })
+
+  /* A width, not a device — and the hole is the ceiling. A preset wider than
+     the pane would put most of the page under the sidebar, which is the bug
+     this whole area of the app has been about.
+  
+     Driven through the command rather than through the menu, because the menu
+     is a window this suite cannot reach into. What is being tested is the
+     placing, and the placing is the same whichever control asked for it. */
+  test('a page width narrows the page and never widens it past the pane', async () => {
+    await openPane('Browser')
+    await go('localhost:17800')
+    await settle(900)
+
+    const hole = await boxOf(window, '.browser__page')
+    assert.ok(hole, 'no hole to compare against')
+    const pane = await window.executeScript(
+      'return document.querySelector(".browser__page")?.dataset?.paneId ?? null',
+    )
+
+    /* The command the menu window itself calls, which emits to this window —
+       the real path, not a stand-in for it. Only the control that reaches it
+       is out of this suite's reach. */
+    await window.executeScript(
+      function (pane) {
+        return window.__TAURI_INTERNALS__.invoke('browser_menu_did', {
+          pane: pane,
+          did: { did: 'viewport', viewport: 'mobile-m' },
+        })
+      },
+      pane,
+    )
+    await settle(1400)
+
+    const actual = await window.executeScript(
+      function (pane) {
+        return window.__TAURI_INTERNALS__.invoke('browser_where', { pane: pane })
+      },
+      pane,
+    )
+    assert.ok(actual, 'the window would not say where the page is')
+    assert.ok(
+      actual.width <= hole.width + 2,
+      `the page is ${actual.width} wide inside a ${hole.width} pane`,
+    )
+    assert.ok(
+      actual.width < hole.width,
+      `picking Mobile M left the page ${actual.width} wide, the pane's own width`,
+    )
+    /* Centred, so the narrowed page is not shoved against the sidebar. */
+    assert.ok(actual.x > hole.x, `the narrowed page starts at ${actual.x}, the pane's left edge`)
+  })
+
+  /* Resizing the window is where the placement is easiest to get wrong and
+     hardest to see: the page has to follow the pane through every frame of a
+     drag, and the container has to do it without re-laying out devpit's own
+     interface twice a frame — which is what made the whole app strobe while
+     the edge was being dragged.
+  
+     The strobing itself is not assertable. What is assertable is that the page
+     is still over its hole afterwards, at the new size, which is what breaks
+     if the container stops placing it. */
+  test('the page follows its pane when the window is resized', async () => {
+    await openPane('Browser')
+    await go('localhost:17800')
+    await settle(900)
+
+    const pane = await window.executeScript(
+      'return document.querySelector(".browser__page")?.dataset?.paneId ?? null',
+    )
+    assert.ok(pane, 'the hole does not say which pane it is')
+
+    /* Back to the pane's own width first.
+  
+       A page held at a preset width is **centred** in its pane, so page and
+       hole are deliberately different and comparing them proves nothing about
+       following a resize. The first version of this test did compare them, on
+       a pane the previous test had left on Mobile M, and read the centring as
+       the page being 86px adrift — which cost two wrong fixes before the trace
+       said the page had been right all along. */
+    await window.executeScript(
+      function (pane) {
+        return window.__TAURI_INTERNALS__.invoke('browser_menu_did', {
+          pane: pane,
+          did: { did: 'viewport', viewport: null },
+        })
+      },
+      pane,
+    )
+    await settle(900)
+
+    const was = await window.manage().window().getRect()
+    try {
+      await window.manage().window().setRect({
+        width: Math.max(900, was.width - 220),
+        height: Math.max(700, was.height - 160),
+        x: was.x,
+        y: was.y,
+      })
+      await settle(1500)
+
+      const hole = await boxOf(window, '.browser__page')
+      assert.ok(hole, 'the hole went away with the window resize')
+      assert.ok(hole.width > 100 && hole.height > 100, `the hole is ${hole.width}x${hole.height}`)
+
+      const actual = await window.executeScript(
+        function (pane) {
+          return window.__TAURI_INTERNALS__.invoke('browser_where', { pane: pane })
+        },
+        pane,
+      )
+      assert.ok(actual, 'the window would not say where the page is')
+      for (const side of ['x', 'y', 'width', 'height']) {
+        assert.ok(
+          Math.abs(actual[side] - hole[side]) <= 2,
+          `after resizing, the page's ${side} is ${actual[side]} and the hole's is ${hole[side]}`,
+        )
+      }
+    } finally {
+      /* Back to the size every other test measured against. */
+      await window.manage().window().setRect(was)
+      await settle(1200)
+    }
+
+    const said = await complaints(window)
+    assert.deepEqual(said.errors, [], 'resizing the window wrote to console.error')
+  })
+
+  /* Ctrl-F cannot reach the page: the key goes to the other webview and this
+     document never sees it. So the bar carries a button for the same thing,
+     and that is what this drives.
+  
+     The assertion that matters is that **the hole does not move**. Find was a
+     row of its own, and a new row changes the pane's height, moves the hole
+     and resizes the native webview — which is a page being re-laid out, and
+     reads as the page reloading. It takes the address field's slot now. */
+  test('find takes the address slot and leaves the page where it is', async () => {
+    await openPane('Browser')
+    await go('localhost:17800')
+    await settle(700)
+
+    const before = await boxOf(window, '.browser__page')
+    assert.ok(before, 'no hole to compare against')
+
+    await window.findElement(By.css('[aria-label="Find in page"]')).click()
+    await settle(500)
+
+    const bar = await boxOf(window, '.bfind')
+    assert.ok(bar, 'the find control opened nothing')
+
+    const after = await boxOf(window, '.browser__page')
+    assert.ok(after, 'the hole went away with find open')
+    for (const side of ['x', 'y', 'width', 'height']) {
+      assert.equal(
+        after[side],
+        before[side],
+        `opening find moved the page's ${side} from ${before[side]} to ${after[side]}`,
+      )
+    }
+
+    /* And the address bar is gone while it is open, because it is the same
+       slot — not two fields fighting over one row. */
+    assert.equal(await has('[aria-label="Address"]'), false, 'both fields are in the bar at once')
+
+    await fill(window, '.bfind__in', 'devpit')
+    await window.findElement(By.css('.bfind__in')).sendKeys(Key.ENTER)
+    await settle(600)
+
+    const said = await complaints(window)
+    assert.deepEqual(said.errors, [], 'finding in the page wrote to console.error')
+
+    await shoot(window, 'browser-find', await boxOf(window, '.browser'))
+
+    /* Closed, and the address is back — the next test types into it. */
+    await window.findElement(By.css('[aria-label="Close find"]')).click()
+    await settle(400)
+    assert.ok(await has('[aria-label="Address"]'), 'closing find did not bring the address back')
   })
 
   /* The sidebar's account card owns `.signin`, and this pane's sheet is
