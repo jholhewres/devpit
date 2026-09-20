@@ -153,3 +153,82 @@ export function hostOf(url: string): string {
     return ''
   }
 }
+
+/** A browser on this machine, with the profiles of it that can be read. */
+export interface Family {
+  readonly family: string
+  readonly profiles: readonly { readonly path: string; readonly name: string; readonly warning: string }[]
+}
+
+/**
+ * The stores on this machine, as a menu asks about them: browser first, then
+ * which profile of it.
+ *
+ * One question at a time because that is how somebody looks for their login —
+ * *the Chrome one*, then *my work Chrome*. A flat list of
+ * `Google Chrome · Profile 1` makes them read the browser name five times to
+ * find the profile, and it is the shape that hid the profile entirely on the
+ * first version of this menu.
+ *
+ * Order is kept as it arrives; Rust already sorted it by browser and profile.
+ */
+export function grouped(stores: readonly { family: string; profile: string; path: string; warning: string }[]): Family[] {
+  const families: Family[] = []
+  for (const store of stores) {
+    const one = { path: store.path, name: store.profile, warning: store.warning }
+    const held = families.find((found) => found.family === store.family)
+    if (held) (held.profiles as { path: string; name: string; warning: string }[]).push(one)
+    else families.push({ family: store.family, profiles: [one] })
+  }
+  return families
+}
+
+/** A width to show a page at, for looking at a layout that is not this one. */
+export interface Viewport {
+  readonly id: string
+  readonly label: string
+  readonly width: number
+  readonly height: number
+}
+
+/*
+ * The sizes a page can be held at.
+ *
+ * **This is a size and not a device.** A real device toolbar also sends a
+ * phone's user agent, reports touch, and sets a device pixel ratio, and all
+ * three need an engine hook devpit's webview does not have. What this does is
+ * make the page narrow, which is what moves a responsive layout — and the menu
+ * says so rather than implying a phone.
+ *
+ * The numbers are Chrome DevTools', so a layout checked here and a layout
+ * checked there break at the same place.
+ */
+export const VIEWPORTS: readonly Viewport[] = [
+  { id: 'mobile-s', label: 'Mobile S', width: 320, height: 568 },
+  { id: 'mobile-m', label: 'Mobile M', width: 375, height: 667 },
+  { id: 'mobile-l', label: 'Mobile L', width: 425, height: 812 },
+  { id: 'tablet', label: 'Tablet', width: 768, height: 1024 },
+  { id: 'laptop', label: 'Laptop', width: 1024, height: 768 },
+  { id: 'laptop-l', label: 'Laptop L', width: 1440, height: 900 },
+  { id: 'desktop', label: 'Desktop', width: 1920, height: 1080 },
+]
+
+/**
+ * The box to give the page inside the hole the pane measured.
+ *
+ * Without a preset it is the hole. With one, the page is that size, centred,
+ * and **never larger than the hole** — a 1920-wide preset in a 700-wide pane
+ * would otherwise put most of the page under the sidebar, which is the bug
+ * this whole area of the app has been about.
+ */
+export function inset(hole: Where, viewport: Viewport | null): Where {
+  if (!viewport) return hole
+  const width = Math.min(viewport.width, hole.width)
+  const height = Math.min(viewport.height, hole.height)
+  return {
+    x: hole.x + Math.round((hole.width - width) / 2),
+    y: hole.y,
+    width,
+    height,
+  }
+}
