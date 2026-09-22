@@ -20,9 +20,11 @@ const text = (name: string): string => readFileSync(resolve(SHELL, name), 'utf8'
  *  or as a quoted combo anywhere else — a palette row's `meta`, a hint. */
 function announced(): { file: string; combo: string }[] {
   const found: { file: string; combo: string }[] = []
-  /* tileKeys.ts owns the keys of a focused tile, and its own table is held
-     against its own listener in tileKeys.test.tsx. */
-  for (const file of shipped.filter((name) => name !== 'shortcuts.ts' && name !== 'tileKeys.ts')) {
+  /* tileKeys.ts owns the keys of a focused tile, and terminalClipboard.ts a
+     terminal's copy and paste; each table is held against its own listener
+     in its own test. */
+  const own = ['shortcuts.ts', 'tileKeys.ts', 'terminalClipboard.ts']
+  for (const file of shipped.filter((name) => !own.includes(name))) {
     for (const match of text(file).matchAll(/title="[^"]*\(([⇧⌥⌘][^)]*)\)"/g)) {
       found.push({ file, combo: match[1]! })
     }

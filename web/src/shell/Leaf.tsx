@@ -1,13 +1,15 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { attach, scrollback, type Attached } from './attach'
 import { drawOnTheGpu, measureWideCharacters } from './terminalAddons'
 import { reason } from './reason'
 import { ask, commands } from './live'
 import { contrastFor, darkNow, options, palette } from './terminal'
+import { clipboardKey, copySelection, pasteClipboard } from './terminalClipboard'
+import { TerminalMenu } from './TerminalMenu'
 import { picturesAsPaths } from './terminalPaste'
 import { useMarks } from './useMarks'
 
@@ -22,9 +24,14 @@ import { useMarks } from './useMarks'
 export function Leaf({
   paneId,
   projectId,
+  onSplit,
+  onClosePane,
 }: {
   paneId: string
   projectId: string
+  /** What the right-click menu offers for the pane, from the tab that owns it. */
+  onSplit?: (direction: 'horizontal' | 'vertical') => void
+  onClosePane?: () => void
 }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -32,6 +39,7 @@ export function Leaf({
      terminal as usable as it was. */
   const [pasteFailed, setPasteFailed] = useState<string | null>(null)
   const [term, setTerm] = useState<Terminal | null>(null)
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const box = host.current
@@ -53,6 +61,25 @@ export function Leaf({
     drawOnTheGpu(terminal)
     const pasted = picturesAsPaths(projectId, (path) => terminal.paste(path), setPasteFailed)
     box.addEventListener('paste', pasted, true)
+    /* Copy and paste keys, taken before xterm's textarea sees them: on
+       WebKitGTK neither reaches a clipboard from there (`terminalClipboard`). */
+    const keys = (event: KeyboardEvent): void => {
+      const act = clipboardKey(event)
+      if (!act) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (act === 'copy') void copySelection(terminal)
+      else void pasteClipboard(terminal, projectId).then(setPasteFailed)
+    }
+    box.addEventListener('keydown', keys, true)
+    /* The terminal's own right-click, kept from the window's menu, which
+       leaves text fields — and xterm's input is one — to the webview. */
+    const menu = (event: MouseEvent): void => {
+      event.preventDefault()
+      event.stopPropagation()
+      setMenuAt({ x: event.clientX, y: event.clientY })
+    }
+    box.addEventListener('contextmenu', menu, true)
 
     /* The pane is `display: none` until its tab is active and animates in on a
        transform, so a fit in this tick measures nothing and xterm ends up with
@@ -140,18 +167,24 @@ export function Leaf({
       watch.disconnect()
       shown?.disconnect()
       box.removeEventListener('paste', pasted, true)
+      box.removeEventListener('keydown', keys, true)
+      box.removeEventListener('contextmenu', menu, true)
       live?.detach()
       terminal.dispose()
     }
   }, [projectId, paneId])
 
   useMarks(term, paneId)
+  const closeMenu = useCallback(() => setMenuAt(null), [])
 
   return (
     <>
       {error && <div className="exempty__t">{error}</div>}
       {pasteFailed && <div className="exempty__t">{pasteFailed}</div>}
       <div className="termhost" ref={host} />
+      {menuAt && term && (
+        <TerminalMenu at={menuAt} terminal={term} projectId={projectId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} />
+      )}
     </>
   )
 }

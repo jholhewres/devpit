@@ -137,6 +137,9 @@ fn main() {
     // session — ensure, split, write, resize — is in the generated contract.
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // The terminal's copy and paste. The webview's own clipboard is not
+        // reachable from a terminal on WebKitGTK, and it cannot read a picture.
+        .plugin(tauri_plugin_clipboard_manager::init())
         // Checking and downloading are the app's; installing is not — see
         // `update` for why only an AppImage is ever installed from here.
         .plugin(tauri_plugin_updater::Builder::new().build())

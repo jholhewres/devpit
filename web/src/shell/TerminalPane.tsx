@@ -154,7 +154,9 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
         focused={focused}
         onFocus={focus}
         onRatio={settle}
-        leaf={(leafId) => <Leaf key={leafId} paneId={leafId} projectId={projectId} />}
+        leaf={(leafId) => (
+          <Leaf key={leafId} paneId={leafId} projectId={projectId} onSplit={split} onClosePane={pane.closePane} />
+        )}
       />
     </>
   )
