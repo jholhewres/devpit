@@ -11,6 +11,7 @@
 use std::path::{Path, PathBuf};
 
 mod chrome;
+mod clients;
 mod environment;
 mod naming;
 mod pane;
@@ -101,11 +102,9 @@ impl Server {
     pub fn ensure_session(&self, session: &str, window: &str, cwd: &Path) -> Result<(), TmuxError> {
         if self.has_session(session)? {
             environment::clean_once(self)?;
-            if !self
-                .list_windows(session)?
-                .iter()
-                .any(|name| name == window)
-            {
+            let windows = self.list_windows(session)?;
+            clients::prune(self, session, &windows);
+            if !windows.iter().any(|name| name == window) {
                 self.new_window(session, window, cwd)?;
             }
             self.ensure_client_session(session, window)?;
