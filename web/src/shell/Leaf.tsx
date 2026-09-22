@@ -10,6 +10,7 @@ import { ask, commands } from './live'
 import { contrastFor, darkNow, options, palette } from './terminal'
 import { clipboardKey, copySelection, pasteClipboard } from './terminalClipboard'
 import { TerminalMenu } from './TerminalMenu'
+import { guardComposition } from './terminalIme'
 import { picturesAsPaths } from './terminalPaste'
 import { useMarks } from './useMarks'
 
@@ -80,6 +81,7 @@ export function Leaf({
       setMenuAt({ x: event.clientX, y: event.clientY })
     }
     box.addEventListener('contextmenu', menu, true)
+    const unguard = guardComposition(box, (data) => terminal.input(data, true))
 
     /* The pane is `display: none` until its tab is active and animates in on a
        transform, so a fit in this tick measures nothing and xterm ends up with
@@ -175,6 +177,7 @@ export function Leaf({
       box.removeEventListener('paste', pasted, true)
       box.removeEventListener('keydown', keys, true)
       box.removeEventListener('contextmenu', menu, true)
+      unguard()
       live?.detach()
       terminal.dispose()
     }
