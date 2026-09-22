@@ -97,6 +97,12 @@ export function Leaf({
       /* Scrollback first, then the stream, or new output lands above what came
          before it. */
       const past = await scrollback(paneId)
+      /* A mount dropped while that was on its way must not attach at all: an
+         attach arriving after the live mount's is the newer claim, wins the
+         pane, and is let go at once — leaving the terminal on screen with
+         nobody attached and "a newer client already owns that pane". React
+         mounts twice in development, so there it was every restart. */
+      if (dropped) return
       if (past) terminal.write(past)
 
       const attached = attach(
