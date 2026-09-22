@@ -377,11 +377,14 @@ fn reply(stream: &mut TcpStream, body: &str) {
 /// What the window is told, in the words it draws.
 fn describe(happening: &Happening) -> (String, String) {
     let said = match &happening.event {
+        Event::Prompted => "took a prompt".to_owned(),
         Event::Using { tool } => format!("running {tool}"),
         Event::Used { tool } => format!("finished {tool}"),
         Event::Stopped { said } => said
             .clone()
             .unwrap_or_else(|| "finished the turn".to_owned()),
+        Event::Failed { error: Some(error) } => format!("stopped on an error: {error}"),
+        Event::Failed { error: None } => "stopped on an error".to_owned(),
         Event::SubagentStarted {
             kind: Some(kind), ..
         } => format!("started a {kind} subagent"),

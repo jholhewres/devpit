@@ -48,8 +48,15 @@ pub enum Event {
     Using { tool: String },
     /// Finished a tool.
     Used { tool: String },
+    /// A person sent a prompt, so a turn has begun — the only word a turn that
+    /// answers in text alone ever sends before its `Stop`.
+    Prompted,
     /// The turn ended, with the last thing it said.
     Stopped { said: Option<String> },
+    /// The turn ended on an error — an API failure, a rate limit — with the
+    /// CLI's word for it. No `Stop` follows one, so without it the card would
+    /// say `working` until the next prompt.
+    Failed { error: Option<String> },
     /// A subagent began, known so far only by its id and type.
     SubagentStarted { agent: String, kind: Option<String> },
     /// The `Agent` call that launched a subagent returned, naming it. In 2.1.270
@@ -93,6 +100,12 @@ struct Raw {
     transcript_path: Option<String>,
     #[serde(default)]
     reason: Option<String>,
+    #[serde(default)]
+    notification_type: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
 }
 
 /// What an `Agent` call returns, read apart from [`Raw`]: other tools answer
@@ -143,9 +156,11 @@ pub fn read(payload: &str) -> Option<Happening> {
                 None => Event::Used { tool },
             }
         }
+        "UserPromptSubmit" => Event::Prompted,
         "Stop" => Event::Stopped {
             said: raw.last_assistant_message,
         },
+        "StopFailure" => Event::Failed { error: raw.error },
         "SubagentStart" => Event::SubagentStarted {
             agent: raw.agent_id?,
             kind: raw.agent_type,
@@ -153,7 +168,10 @@ pub fn read(payload: &str) -> Option<Happening> {
         "SubagentStop" => Event::SubagentDone {
             agent: raw.agent_id,
         },
-        "Notification" | "PermissionRequest" => Event::Waiting,
+        "Notification" if waits_on_someone(raw.notification_type.as_deref()) => Event::Waiting,
+        // A compaction starts the same session over, often in the middle of a
+        // turn; read as a start, it told a working card it was only open.
+        "SessionStart" if raw.source.as_deref() == Some("compact") => return None,
         "SessionStart" => Event::SessionStarted,
         "SessionEnd" => Event::SessionEnded { reason: raw.reason },
         _ => return None,
@@ -165,6 +183,19 @@ pub fn read(payload: &str) -> Option<Happening> {
         cwd: raw.cwd,
         transcript_path: raw.transcript_path,
     })
+}
+
+/// Whether a notification is the agent stopped on a person.
+///
+/// Not all of them are: `idle_prompt` comes a minute after a turn that has
+/// already ended, and `auth_success` is news, not a question. Both rang the
+/// bell as though something were blocked. A CLI too old to send a type only
+/// ever notified to ask, so no type still reads as waiting.
+fn waits_on_someone(notification_type: Option<&str>) -> bool {
+    matches!(
+        notification_type,
+        None | Some("permission_prompt") | Some("elicitation_dialog")
+    )
 }
 
 fn launched(payload: &str) -> Option<LaunchedAgent> {

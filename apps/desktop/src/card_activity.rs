@@ -20,13 +20,15 @@ use devpit_rpc::{CardHappening, CardSession, SessionKind};
 pub(crate) fn state_of_event(event: &Event) -> Option<Doing> {
     match event {
         Event::SessionStarted => Some(Doing::Open),
-        Event::Using { .. }
+        Event::Prompted
+        | Event::Using { .. }
         | Event::Used { .. }
         | Event::SubagentStarted { .. }
         | Event::Delegated { .. }
         | Event::SubagentDone { .. } => Some(Doing::Working),
         Event::Waiting => Some(Doing::Waiting),
         Event::Stopped { .. } => Some(Doing::Done),
+        Event::Failed { .. } => Some(Doing::Failed),
         Event::SessionEnded { reason } if reason.as_deref() == Some("clear") => None,
         Event::SessionEnded { .. } => Some(Doing::Gone),
     }
@@ -35,13 +37,14 @@ pub(crate) fn state_of_event(event: &Event) -> Option<Doing> {
 /// The word a pane's own event carries.
 ///
 /// Panes have only ever said these three; a session beginning or ending
-/// reaches the window as its own event.
+/// reaches the window as its own event. A turn that failed has ended all the
+/// same, and a pane left saying `working` would wait for it forever.
 pub(crate) fn pane_word(doing: Option<Doing>) -> Option<&'static str> {
     match doing? {
         Doing::Working => Some("working"),
         Doing::Waiting => Some("waiting"),
-        Doing::Done => Some("done"),
-        Doing::Open | Doing::Failed | Doing::Gone => None,
+        Doing::Done | Doing::Failed => Some("done"),
+        Doing::Open | Doing::Gone => None,
     }
 }
 

@@ -32,7 +32,13 @@ pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
     let hooks: Vec<String> = [
         ("PreToolUse", &consult),
         ("PostToolUse", &tell),
+        // A turn begins here, and a turn that only answers in text says
+        // nothing else before its `Stop`.
+        ("UserPromptSubmit", &tell),
         ("Stop", &tell),
+        // The end of a turn an error cut short, which sends no `Stop`.
+        ("StopFailure", &tell),
+        ("SubagentStart", &tell),
         ("SubagentStop", &tell),
         ("Notification", &tell),
         // Which session a pane's agent is in, and when it has gone, so a pane

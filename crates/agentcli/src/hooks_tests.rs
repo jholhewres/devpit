@@ -188,3 +188,54 @@ fn a_session_is_heard_starting_and_ending_with_its_reason() {
         }
     );
 }
+
+/// Only a notification that asks something is the agent waiting. `idle_prompt`
+/// arrives a minute after a turn that already ended, and rang the bell as
+/// though the agent were blocked.
+#[test]
+fn only_a_notification_that_asks_is_waiting() {
+    let notified = |kind: &str| {
+        read(&format!(
+            r#"{{"session_id":"abc","hook_event_name":"Notification","message":"m","notification_type":"{kind}"}}"#
+        ))
+    };
+    for asking in ["permission_prompt", "elicitation_dialog"] {
+        assert_eq!(notified(asking).expect(asking).event, Event::Waiting);
+    }
+    for telling in ["idle_prompt", "auth_success"] {
+        assert_eq!(notified(telling), None, "{telling}");
+    }
+}
+
+/// A turn that answers in text alone sends nothing before its `Stop` but this.
+#[test]
+fn a_prompt_begins_a_turn() {
+    let payload = r#"{"session_id":"abc","hook_event_name":"UserPromptSubmit","prompt":"hi","source":"user"}"#;
+    assert_eq!(read(payload).expect("read").event, Event::Prompted);
+}
+
+/// No `Stop` follows a turn an error cut short.
+#[test]
+fn a_turn_that_failed_says_why() {
+    let payload = r#"{"session_id":"abc","hook_event_name":"StopFailure","error":"rate_limit"}"#;
+    assert_eq!(
+        read(payload).expect("read").event,
+        Event::Failed {
+            error: Some("rate_limit".to_owned())
+        }
+    );
+}
+
+/// A compaction restarts the same session, often mid-turn: it is not a start.
+#[test]
+fn a_compaction_is_not_a_session_starting() {
+    let started = |source: &str| {
+        read(&format!(
+            r#"{{"session_id":"abc","hook_event_name":"SessionStart","source":"{source}"}}"#
+        ))
+    };
+    assert_eq!(started("compact"), None);
+    for source in ["startup", "resume", "clear"] {
+        assert_eq!(started(source).expect(source).event, Event::SessionStarted);
+    }
+}

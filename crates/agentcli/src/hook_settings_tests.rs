@@ -24,7 +24,10 @@ fn only_the_hook_that_can_be_answered_prints_what_came_back() {
     );
     for reporting in [
         "PostToolUse",
+        "UserPromptSubmit",
         "Stop",
+        "StopFailure",
+        "SubagentStart",
         "SubagentStop",
         "Notification",
         "SessionStart",

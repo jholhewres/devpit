@@ -8,6 +8,8 @@ use super::*;
 fn each_hook_means_what_the_table_says() {
     let rows: Vec<(Event, Option<Doing>)> = vec![
         (Event::SessionStarted, Some(Doing::Open)),
+        (Event::Prompted, Some(Doing::Working)),
+        (Event::Failed { error: None }, Some(Doing::Failed)),
         (
             Event::Using {
                 tool: "Edit".to_owned(),
@@ -64,7 +66,7 @@ fn a_pane_still_says_only_its_three_words() {
     assert_eq!(pane_word(Some(Doing::Waiting)), Some("waiting"));
     assert_eq!(pane_word(Some(Doing::Done)), Some("done"));
     assert_eq!(pane_word(Some(Doing::Open)), None);
-    assert_eq!(pane_word(Some(Doing::Failed)), None);
+    assert_eq!(pane_word(Some(Doing::Failed)), Some("done"));
     assert_eq!(pane_word(Some(Doing::Gone)), None);
     assert_eq!(pane_word(None), None);
 }
