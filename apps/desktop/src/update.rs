@@ -44,6 +44,11 @@ pub(crate) enum Event {
         command: String,
         path: String,
     },
+    /// That package is in: polkit ran it and the package manager said yes.
+    /// What is left is the restart.
+    PackageIn {
+        version: String,
+    },
     /// Not now.
     Cancel,
     /// Put it in.
@@ -98,6 +103,13 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
         (S::Downloading { .. }, E::Manual { command, path }) => {
             Some(S::ManualInstall { command, path })
         }
+        // Installed on disk and still running the old version, which is the
+        // same place an AppImage is once its bytes are verified: ready, and
+        // waiting only for the work in flight and the restart. Left in
+        // `ManualInstall`, the old process checked again, found its own
+        // version still behind the feed, and offered the update it had just
+        // installed — which read as the install not having happened.
+        (S::ManualInstall { .. }, E::PackageIn { version }) => Some(S::Ready { version }),
         (S::Ready { .. }, E::Blocked { runs, turns, since }) => {
             Some(S::Waiting { runs, turns, since })
         }
@@ -271,14 +283,32 @@ pub struct Updating {
     pub(crate) window_ready: tokio::sync::Notify,
     pub(crate) found: std::sync::Mutex<Option<tauri_plugin_updater::Update>>,
     pub(crate) downloaded: std::sync::Mutex<Option<(String, Vec<u8>)>>,
-    /// A package written to the cache, and what it hashed to when it was
-    /// verified. Checked again before its command is shown.
-    pub(crate) package: std::sync::Mutex<Option<(std::path::PathBuf, String)>>,
+    /// A package written to the cache. Checked again before its command is
+    /// shown.
+    pub(crate) package: std::sync::Mutex<Option<Package>>,
+    /// Whether that package is already on the disk — polkit ran it and the
+    /// package manager said yes. From then on the only thing left is to
+    /// restart into it, which is exactly what a `.deb` update never did.
+    pub(crate) package_in: std::sync::atomic::AtomicBool,
     /// Taken by the one install under way. The watcher keeping a wait and a
     /// person choosing to stop the work can reach the installer in the same
     /// seconds, and the second one must neither take the update from the
     /// first nor call it failed.
     pub(crate) claimed: std::sync::atomic::AtomicBool,
+}
+
+/// A package written to the cache for the package manager to install.
+///
+/// The version travels with it because nothing else remembers it: the
+/// plugin's `Update` is consumed by the download, and `ManualInstall` carries
+/// the command and the path, not what they install. Restarting into a package
+/// needs to be able to say which one.
+#[derive(Clone)]
+pub(crate) struct Package {
+    pub(crate) path: std::path::PathBuf,
+    /// What it hashed to when it was verified.
+    pub(crate) digest: String,
+    pub(crate) version: String,
 }
 
 impl Updating {
@@ -943,9 +973,17 @@ pub(crate) fn why_not_here(kind: InstallKind) -> Option<&'static str> {
     }
 }
 
-pub(crate) fn quit_steps(kind: InstallKind) -> Vec<QuitStep> {
+/// What quitting for an update involves, for a kind of install.
+///
+/// `package_in` is whether a `.deb` is already on the disk. Before, quitting
+/// is not how it goes in — polkit is. After, quitting is the *only* thing left:
+/// the package manager has replaced the binary, and this process is still the
+/// old one until it restarts. That second half was missing, so a `.deb` that
+/// installed never ran.
+pub(crate) fn quit_steps(kind: InstallKind, package_in: bool) -> Vec<QuitStep> {
     match kind {
         InstallKind::AppImage => vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart],
+        InstallKind::Deb if package_in => vec![QuitStep::AskTheWindow, QuitStep::Restart],
         InstallKind::Deb => vec![QuitStep::ItsOwnInstaller],
         // Nothing to do to a build nobody installs from here.
         InstallKind::Unmanaged | InstallKind::ExternallyManaged => Vec::new(),
@@ -999,7 +1037,7 @@ pub fn update_restart_ready(updating: tauri::State<'_, Updating>) {
 #[tauri::command]
 #[specta::specta]
 pub fn update_package(updating: tauri::State<'_, Updating>) -> Result<String, RpcError> {
-    let (path, digest) = updating
+    let package = updating
         .package
         .lock()
         .ok()
@@ -1007,10 +1045,10 @@ pub fn update_package(updating: tauri::State<'_, Updating>) -> Result<String, Rp
         .ok_or_else(|| RpcError::internal("no package has been downloaded"))?;
 
     let folder = crate::update_deb::cache_dir();
-    crate::update_deb::still_ours(&path, &folder, &digest)
+    crate::update_deb::still_ours(&package.path, &folder, &package.digest)
         .map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why.said().to_owned()))?;
 
-    crate::update_deb::install_command(&path, &crate::update_deb::TRUSTED)
+    crate::update_deb::install_command(&package.path, &crate::update_deb::TRUSTED)
         .map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why))
 }
 
@@ -1027,10 +1065,29 @@ pub fn update_package(updating: tauri::State<'_, Updating>) -> Result<String, Rp
 ///
 /// `Ok(false)` is polkit refused or the person cancelled, which is an answer
 /// and not a failure — the offer stays good and the card says so.
+///
+/// **`Ok(true)` restarts into the new version**, or waits for the work in the
+/// way and then does. It used to stop at the install: the package manager put
+/// the new binary on the disk, this process went on running the old one, and
+/// the card checked again — from the old version, which still found the feed
+/// newer than itself and offered the update it had just installed. Somebody
+/// clicked Install, typed their password, and watched nothing happen.
+///
+/// Through `install` and not a bare restart, so the rule every update keeps
+/// holds here too: a run or a conversation in flight is waited for, not killed
+/// by a restart the person did not know would come.
+///
+/// Answering after the package is in is never an error, whatever the restart
+/// does: the card falls back to showing the command on an error, and offering
+/// a command for a package that is already installed is the same confusion
+/// with extra steps. The restart's own state reaches the card as it happens.
 #[tauri::command]
 #[specta::specta]
-pub fn update_install_package(updating: tauri::State<'_, Updating>) -> Result<bool, RpcError> {
-    let (path, digest) = updating
+pub async fn update_install_package(
+    app: tauri::AppHandle,
+    updating: tauri::State<'_, Updating>,
+) -> Result<bool, RpcError> {
+    let package = updating
         .package
         .lock()
         .ok()
@@ -1038,23 +1095,51 @@ pub fn update_install_package(updating: tauri::State<'_, Updating>) -> Result<bo
         .ok_or_else(|| RpcError::internal("no package has been downloaded"))?;
 
     let folder = crate::update_deb::cache_dir();
-    crate::update_deb::still_ours(&path, &folder, &digest)
+    crate::update_deb::still_ours(&package.path, &folder, &package.digest)
         .map_err(|why| RpcError::new(devpit_rpc::ErrorCode::Conflict, why.said().to_owned()))?;
 
-    let argv =
-        crate::update_deb::elevated(&path, &crate::update_deb::TRUSTED).ok_or_else(|| {
+    let argv = crate::update_deb::elevated(&package.path, &crate::update_deb::TRUSTED).ok_or_else(
+        || {
             RpcError::new(
                 devpit_rpc::ErrorCode::Conflict,
                 "this machine has no pkexec, so the command is yours to run".to_owned(),
             )
-        })?;
+        },
+    )?;
 
-    let (program, rest) = argv.split_first().expect("elevated never returns empty");
-    let ended = std::process::Command::new(program)
-        .args(rest)
-        .status()
-        .map_err(|err| RpcError::internal(format!("the installer would not start: {err}")))?;
-    Ok(ended.success())
+    /* Off the async runtime: this waits for as long as the person takes to
+    type a password into polkit's dialog, and a runtime worker held that long
+    is one every other command queues behind. */
+    let ended = tauri::async_runtime::spawn_blocking(move || {
+        let (program, rest) = argv.split_first().expect("elevated never returns empty");
+        std::process::Command::new(program).args(rest).status()
+    })
+    .await
+    .map_err(|err| RpcError::internal(format!("the installer did not come back: {err}")))?
+    .map_err(|err| RpcError::internal(format!("the installer would not start: {err}")))?;
+    if !ended.success() {
+        return Ok(false);
+    }
+
+    updating
+        .package_in
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let now = updating.state();
+    if let Some(ready) = next(
+        &now,
+        Event::PackageIn {
+            version: package.version.clone(),
+        },
+    ) {
+        updating.moved_to(&app, ready);
+    }
+    if let Err(err) = install(app, updating, WhenWorkIsInTheWay::Wait).await {
+        eprintln!(
+            "devpit-update {} is in but the restart did not happen: {}",
+            package.version, err.message
+        );
+    }
+    Ok(true)
 }
 
 /// `update.install` — put it in and come back.
@@ -1154,14 +1239,43 @@ async fn install(
     };
 
     let kind = kind_here();
-    let steps = quit_steps(kind);
-    if !steps.contains(&QuitStep::Install) {
+    let steps = quit_steps(
+        kind,
+        updating
+            .package_in
+            .load(std::sync::atomic::Ordering::SeqCst),
+    );
+    if !steps.contains(&QuitStep::Restart) {
         return Err(refused(RpcError::new(
             devpit_rpc::ErrorCode::Conflict,
             why_not_here(kind)
                 .unwrap_or("this build is not one devpit installs over")
                 .to_owned(),
         )));
+    }
+
+    // A package the package manager has already put in: nothing to hand to
+    // an installer, only the window to let settle and the restart. The same
+    // wait for the work in flight has already happened above — that is the
+    // point of coming through here rather than restarting from the card.
+    if !steps.contains(&QuitStep::Install) {
+        let version = updating
+            .package
+            .lock()
+            .ok()
+            .and_then(|held| held.as_ref().map(|package| package.version.clone()))
+            .unwrap_or_default();
+        let going = next(&state, Event::Install).ok_or_else(|| {
+            RpcError::internal("an install the rules allow but the table does not")
+        })?;
+        updating.moved_to(&app, going);
+        let _ = tauri::Emitter::emit(&app, "update:before-restart", ());
+        if !window_saved(&updating.window_ready, THE_WINDOW_GETS).await {
+            eprintln!("devpit-update the window did not answer in time; going on");
+        }
+        force_the_exit_eventually();
+        eprintln!("devpit-update {version} is in; restarting into it");
+        app.restart();
     }
 
     // The update first: taking the bytes and then finding nothing to install
@@ -1389,7 +1503,11 @@ pub async fn update_download(
         let (path, digest) = crate::update_deb::keep(&bytes, &version)
             .map_err(|why| RpcError::internal(format!("the package could not be kept: {why}")))?;
         if let Ok(mut held) = updating.package.lock() {
-            *held = Some((path.clone(), digest.clone()));
+            *held = Some(Package {
+                path: path.clone(),
+                digest: digest.clone(),
+                version: version.clone(),
+            });
         }
         let shown = crate::update_deb::still_ours(&path, &crate::update_deb::cache_dir(), &digest)
             .map_err(|why| why.said().to_owned())

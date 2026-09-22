@@ -145,6 +145,22 @@ export const commands = {
 	 * 
 	 *  `Ok(false)` is polkit refused or the person cancelled, which is an answer
 	 *  and not a failure — the offer stays good and the card says so.
+	 * 
+	 *  **`Ok(true)` restarts into the new version**, or waits for the work in the
+	 *  way and then does. It used to stop at the install: the package manager put
+	 *  the new binary on the disk, this process went on running the old one, and
+	 *  the card checked again — from the old version, which still found the feed
+	 *  newer than itself and offered the update it had just installed. Somebody
+	 *  clicked Install, typed their password, and watched nothing happen.
+	 * 
+	 *  Through `install` and not a bare restart, so the rule every update keeps
+	 *  holds here too: a run or a conversation in flight is waited for, not killed
+	 *  by a restart the person did not know would come.
+	 * 
+	 *  Answering after the package is in is never an error, whatever the restart
+	 *  does: the card falls back to showing the command on an error, and offering
+	 *  a command for a package that is already installed is the same confusion
+	 *  with extra steps. The restart's own state reaches the card as it happens.
 	 */
 	updateInstallPackage: () => typedError<boolean, RpcError>(__TAURI_INVOKE("update_install_package")),
 	/**

@@ -89,7 +89,7 @@ function offer(
         /* devpit still does not ask for root. `pkexec` hands the job to
            polkit, which puts up the system's own dialog and takes the
            password itself. */
-        calm: 'Your system will ask for your password.',
+        calm: 'Your system will ask for your password, and devpit restarts into the new version once it is in.',
         action: 'Install',
       }
     case 'failed':
@@ -223,7 +223,12 @@ export function UpdateCard(): React.JSX.Element | null {
      the person runs themselves — which is what this card used to be. */
   const installPackage = (): void => {
     void ask(() => commands.updateInstallPackage()).then((answer) => {
-      if (answer.data === true) return checkAgain()
+      /* Installed: the app restarts into it, or waits for the work in the way
+         and then does, and either arrives here as the status it moves to.
+         This used to check again — from the old version, still running, which
+         found the feed newer than itself and offered the update it had just
+         installed. The password had been typed and nothing seemed to happen. */
+      if (answer.data === true) return
       if (answer.data === false) return
       copyCommand()
     })

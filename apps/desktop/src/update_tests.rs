@@ -355,22 +355,89 @@ fn the_plan_follows_the_choice_and_what_is_running() {
 /// `kill_server`/`kill-server` anywhere under `apps/desktop`.
 #[test]
 fn the_update_path_never_kills_tmux() {
-    let appimage = quit_steps(InstallKind::AppImage);
-    assert_eq!(
-        appimage,
-        vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart]
-    );
+    for package_in in [false, true] {
+        let appimage = quit_steps(InstallKind::AppImage, package_in);
+        assert_eq!(
+            appimage,
+            vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart]
+        );
 
-    // A package is shown, never installed from here.
+        // And nothing at all for a build nobody installs over.
+        assert!(quit_steps(InstallKind::Unmanaged, package_in).is_empty());
+        assert!(quit_steps(InstallKind::ExternallyManaged, package_in).is_empty());
+    }
+
+    // A package is not put in by quitting: polkit does that.
     assert_eq!(
-        quit_steps(InstallKind::Deb),
+        quit_steps(InstallKind::Deb, false),
         vec![QuitStep::ItsOwnInstaller],
         "a .deb would mean asking for root"
     );
+}
 
-    // And nothing at all for a build nobody installs over.
-    assert!(quit_steps(InstallKind::Unmanaged).is_empty());
-    assert!(quit_steps(InstallKind::ExternallyManaged).is_empty());
+/// The half a `.deb` was missing.
+///
+/// Once polkit has run and the package manager has put the new binary on the
+/// disk, this process is still the old one. Quitting is all that is left, and
+/// it has to come with the window's moment to save — but never with an
+/// `Install`, which for a `.deb` would be devpit asking for root.
+#[test]
+fn a_package_that_is_in_is_restarted_into_and_never_installed_again() {
+    let steps = quit_steps(InstallKind::Deb, true);
+    assert_eq!(steps, vec![QuitStep::AskTheWindow, QuitStep::Restart]);
+    assert!(
+        !steps.contains(&QuitStep::Install),
+        "a .deb that is in would be installed a second time, as root"
+    );
+}
+
+/// What the card shows once the package is in.
+///
+/// Left in `ManualInstall`, the old process checked again, found its own
+/// version still behind the feed, and offered the update it had just
+/// installed. `Ready` is where an AppImage waits once its bytes are verified:
+/// the same place, waiting for the same two things — the work in flight, and
+/// the restart.
+#[test]
+fn a_package_that_is_in_is_ready_rather_than_offered_again() {
+    let manual = UpdateStatus::ManualInstall {
+        command: "pkexec apt install ./devpit_0.1.6_amd64.deb".to_owned(),
+        path: "/home/x/.cache/devpit/updates/devpit_0.1.6_amd64.deb".to_owned(),
+    };
+    assert_eq!(
+        next(
+            &manual,
+            Event::PackageIn {
+                version: "0.1.6".to_owned()
+            }
+        ),
+        Some(UpdateStatus::Ready {
+            version: "0.1.6".to_owned()
+        })
+    );
+
+    /* Only from there. A package cannot be "in" from a state that never
+    offered one, and a stray answer from polkit must not move an update that
+    is somewhere else entirely. */
+    for elsewhere in [
+        UpdateStatus::Idle,
+        UpdateStatus::Checking,
+        UpdateStatus::Installing,
+        UpdateStatus::Ready {
+            version: "0.1.6".to_owned(),
+        },
+    ] {
+        assert_eq!(
+            next(
+                &elsewhere,
+                Event::PackageIn {
+                    version: "0.1.6".to_owned()
+                }
+            ),
+            None,
+            "{elsewhere:?} moved on a package it never offered"
+        );
+    }
 }
 
 /// The window says it is done, and the update goes on at once.

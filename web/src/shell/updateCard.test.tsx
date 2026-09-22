@@ -137,11 +137,25 @@ describe('the update card', () => {
     /* devpit still does not ask for root: polkit does, and the card says so
        rather than letting the dialog arrive unannounced. */
     expect(screen.getByText(/system will ask for your password/)).toBeTruthy()
+    /* And what happens after it, said before the password rather than
+       discovered: the app restarts into what it installed. */
+    expect(screen.getByText(/restarts into the new version/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
     await waitFor(() => expect(installedPackage).toHaveBeenCalled())
-    /* It checked again, which is how the card learns the new version is in. */
-    await waitFor(() => expect(checked).toHaveBeenCalled())
+
+    /* It does NOT check again. This test used to require that it did, on the
+       belief that checking is how the card learns the new version is in — and
+       it cannot be: the check runs in the process that is still the old
+       version, finds the feed newer than itself, and offers the update it has
+       just installed. Rust restarts into the package instead, and the card
+       follows the status it is told. */
+    await new Promise((settle) => setTimeout(settle, 50))
+    expect(checked).not.toHaveBeenCalled()
+
+    /* The status Rust moves to arrives, and the card shows it. */
+    say({ type: 'installing' })
+    expect(screen.queryByText('Install the update')).toBeNull()
   })
 
   /* A machine with no pkexec: the command comes back, copied, which is what
