@@ -56,6 +56,8 @@ mod heads_down;
 mod history;
 mod in_flight;
 mod index;
+#[cfg(target_os = "linux")]
+mod input_method;
 mod installations;
 mod kept_out;
 mod kinds;
@@ -114,6 +116,10 @@ mod worktrees;
 mod wsfiles;
 
 fn main() {
+    // Before anything starts GTK, and before any thread exists.
+    #[cfg(target_os = "linux")]
+    input_method::use_the_desktops();
+
     // Regenerated on every dev run so `make dev` keeps the frontend types in
     // step while screens are being written. The test does the same thing and
     // fails when the committed file is stale, which is what covers a build

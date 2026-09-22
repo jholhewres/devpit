@@ -109,8 +109,11 @@ jobs:
             echo "Tauri v2 needs webkit2gtk 4.1. Raise the image or pin the one that has it."
             exit 1
           fi
+          # ibus-gtk3 so linuxdeploy's gtk plugin finds im-ibus.so and bundles
+          # it: without it the AppImage's module list has no IBus, and dead
+          # keys typed through IBus arrive doubled (see `input_method.rs`).
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
-            libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev
+            libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev ibus-gtk3
 
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
