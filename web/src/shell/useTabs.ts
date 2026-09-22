@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
 import { attached, closed, drafted as taken, focused, launched as sent, moved, opened, renamed, type Strip, type Tab } from './strip'
-import { empty, remember, remembered } from './tabs'
+import { remember, remembered } from './tabs'
 
 export type Where = 'strip' | 'sidebar'
 
@@ -35,13 +35,34 @@ export interface Tabs {
 }
 
 /* The strip belongs to the project: switching restores what that one had
-   open, and the window itself opens on the empty state. */
+   open, and the window itself opens on the empty state.
+
+   The strip is held with the project it belongs to, and swapped in the same
+   render the project changes. Swapped in an effect, it lagged one commit
+   behind: the old project's terminal tabs rendered once under the new
+   project, asked it for their layout, and each left a shell in a tmux window
+   of the wrong project that nothing could reach again. */
+interface Held {
+  readonly projectId: string | null
+  readonly strip: Strip
+}
+
 export function useTabs(projectId: string | null): Tabs {
-  const [strip, setStrip] = useState<Strip>(empty)
+  const [held, setHeld] = useState<Held>(() => ({ projectId, strip: remembered(projectId) }))
   const [renaming, setRenaming] = useState<Renaming | null>(null)
 
-  useEffect(() => setStrip(remembered(projectId)), [projectId])
-  useEffect(() => remember(projectId, strip), [projectId, strip])
+  let current = held
+  if (held.projectId !== projectId) {
+    current = { projectId, strip: remembered(projectId) }
+    setHeld(current)
+  }
+  const strip = current.strip
+
+  const setStrip = useCallback(
+    (next: (was: Strip) => Strip) => setHeld((was) => ({ ...was, strip: next(was.strip) })),
+    [],
+  )
+  useEffect(() => remember(held.projectId, held.strip), [held])
 
   const show = useCallback(
     (kind: PaneName, tab: Partial<Tab> = {}) =>
