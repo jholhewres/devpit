@@ -17,10 +17,10 @@ import type { ITerminalOptions, ITheme } from '@xterm/xterm'
    selection blue (#3e4451) disappears into the grey instruction blocks the
    agent CLIs print, so the selection is lifted until it reads as one. */
 const DARK: ITheme = {
-  background: '#151515',
+  background: '#282c34',
   foreground: '#e2e2e2',
   cursor: '#e2e2e2',
-  cursorAccent: '#151515',
+  cursorAccent: '#282c34',
   selectionBackground: '#5a7898',
   selectionForeground: '#ffffff',
   black: '#1d1f21',

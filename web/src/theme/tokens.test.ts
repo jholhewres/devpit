@@ -56,6 +56,6 @@ describe('the palette', () => {
     /* A shell paints its own ANSI palette for a dark ground. Repainting the
        terminal white leaves those colours on the wrong background. */
     const light = css.slice(css.indexOf(":root[data-theme='light']"))
-    expect(light).toMatch(/--terminal:\s*#151515/)
+    expect(light).toMatch(/--terminal:\s*#282c34/)
   })
 })
