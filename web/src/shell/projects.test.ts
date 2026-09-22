@@ -4,7 +4,7 @@ import type { Project } from '../gen/bindings'
 import { forgotten, found, remote, since, type Open } from './projects'
 
 const project = (id: string): Project =>
-  ({ id, name: id, rootPath: `/tmp/${id}`, group: null, accent: '#000', worktrees: [], unreadable: null, origin: null, lastOpenedAt: null })
+  ({ id, name: id, rootPath: `/tmp/${id}`, group: null, accent: '#000', worktrees: [], unreadable: null, origin: null, lastOpenedAt: null, icon: null, color: null })
 
 const open = (ids: string[], current: string | null = ids[0] ?? null): Open => ({
   projects: ids.map(project),

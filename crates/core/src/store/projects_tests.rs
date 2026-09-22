@@ -47,6 +47,37 @@ fn renaming_changes_the_name_and_not_the_folder() {
     assert_eq!(row.root_path, root.to_string_lossy());
 }
 
+/// The edit dialog sets name, group and mark together, and clears what it
+/// leaves empty.
+#[test]
+fn an_edit_sets_the_group_and_the_mark_and_can_clear_them() {
+    let (dir, store) = store();
+    let root = dir.path().join("site");
+    std::fs::create_dir_all(&root).expect("create");
+    let id = store.add_project(&root, None).expect("add");
+
+    assert!(store
+        .edit_project(
+            &id,
+            "Site",
+            Some("Clients"),
+            Some("icon:rocket"),
+            Some("#e2795b")
+        )
+        .expect("edit"));
+    let row = store.project(&id).expect("read").expect("there");
+    assert_eq!(row.name, "Site");
+    assert_eq!(row.group.as_deref(), Some("Clients"));
+    assert_eq!(row.icon.as_deref(), Some("icon:rocket"));
+    assert_eq!(row.color.as_deref(), Some("#e2795b"));
+
+    assert!(store
+        .edit_project(&id, "Site", None, None, None)
+        .expect("clear"));
+    let row = store.project(&id).expect("read").expect("there");
+    assert_eq!((row.group, row.icon, row.color), (None, None, None));
+}
+
 #[test]
 fn a_project_remembers_its_remote_and_when_it_was_opened() {
     // Both were written on the way in and read by nothing, so the list

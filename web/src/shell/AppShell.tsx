@@ -6,6 +6,7 @@ import { ask, commands } from './live'
 import { Grips } from './Grips'
 import { Onboarding } from './Onboarding'
 import { Overlays } from './Overlays'
+import { ProjectRail } from './ProjectRail'
 import { Panes } from './Panes'
 import { ResizeEdges } from './ResizeEdges'
 import { RightPanel } from './RightPanel'
@@ -117,6 +118,7 @@ function Window(): React.JSX.Element {
       <TopBar onAddProject={() => setAdding(true)} />
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
+        <ProjectRail onAddProject={() => setAdding(true)} onRemove={setRemoving} />
         <Sidebar onSearch={openPalette} onSignIn={() => setSignIn(true)} />
         <Panes />
         <RightPanel onOpenFile={openInTab} />

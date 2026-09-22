@@ -1,0 +1,70 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { Project } from '../gen/bindings'
+
+const edited = vi.fn()
+vi.mock('./live', () => ({
+  ask: (call: () => unknown) => Promise.resolve(call()),
+  commands: {
+    projectEdit: (...args: unknown[]) => {
+      edited(...args)
+      return { data: { projects: [] }, error: null }
+    },
+  },
+}))
+
+const project = (over: Partial<Project> = {}): Project => ({
+  id: 'p1',
+  name: 'site',
+  rootPath: '/home/me/site',
+  group: null,
+  accent: '#6f8fbf',
+  worktrees: [],
+  unreadable: null,
+  origin: null,
+  lastOpenedAt: null,
+  icon: null,
+  color: null,
+  ...over,
+})
+
+const shell = {
+  projects: [project(), project({ id: 'p2', name: 'api', group: 'Clients' })],
+  reloadProjects: vi.fn(),
+}
+vi.mock('./useShell', () => ({ useShell: () => shell }))
+
+import { ProjectDialog } from './ProjectDialog'
+
+afterEach(() => {
+  cleanup()
+  edited.mockReset()
+})
+
+describe('the project dialog', () => {
+  it('saves the name, group, icon and colour together', async () => {
+    const close = vi.fn()
+    render(<ProjectDialog project={project()} onClose={close} />)
+    fireEvent.change(screen.getByDisplayValue('site'), { target: { value: 'Site' } })
+    fireEvent.change(screen.getByPlaceholderText('None'), { target: { value: 'Clients' } })
+    fireEvent.click(screen.getByTitle('rocket'))
+    fireEvent.click(screen.getByTitle('#62c987'))
+    fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(close).toHaveBeenCalled())
+    expect(edited).toHaveBeenCalledWith('p1', 'Site', 'Clients', 'icon:rocket', '#62c987')
+    expect(shell.reloadProjects).toHaveBeenCalled()
+  })
+
+  it('takes an emoji as the icon', async () => {
+    render(<ProjectDialog project={project()} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('…or an emoji'), { target: { value: '🚀' } })
+    fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(edited).toHaveBeenCalledWith('p1', 'site', null, '🚀', null))
+  })
+
+  it('offers the groups other projects are in', () => {
+    const { container } = render(<ProjectDialog project={project()} onClose={vi.fn()} />)
+    expect([...container.querySelectorAll('datalist option')].map((one) => one.getAttribute('value'))).toEqual(['Clients'])
+  })
+})

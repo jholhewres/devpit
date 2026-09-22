@@ -31,4 +31,6 @@ export const STANDIN: Project = {
   unreadable: null,
   origin: null,
   lastOpenedAt: null,
+  icon: null,
+  color: null,
 }

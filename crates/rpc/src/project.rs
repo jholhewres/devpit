@@ -145,6 +145,11 @@ pub struct Project {
     /// Seconds since the epoch; see `Commit::committed_at` for why `f64`.
     /// Absent for a project registered and never opened.
     pub last_opened_at: Option<f64>,
+    /// The icon a person chose: `icon:<name>` from the app's own set, or an
+    /// emoji. Absent until somebody chooses; the rail then draws initials.
+    pub icon: Option<String>,
+    /// The colour chosen with it, as `#rrggbb`.
+    pub color: Option<String>,
 }
 
 // ── Responses ────────────────────────────────────────────────────────────

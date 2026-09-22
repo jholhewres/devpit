@@ -204,6 +204,13 @@ fn a_row_written_before_a_migration_survives_it() {
             .execute_batch(&format!("ALTER TABLE run DROP COLUMN {column};"))
             .unwrap_or_else(|err| panic!("dropping {column}: {err}"));
     }
+    // 020's columns too, or going back to 16 leaves them for 020 to add twice.
+    store
+        .conn()
+        .execute_batch(
+            "ALTER TABLE project DROP COLUMN icon; ALTER TABLE project DROP COLUMN color;",
+        )
+        .expect("undo 020");
     store
         .conn()
         .execute_batch("PRAGMA user_version = 16;")

@@ -18,6 +18,10 @@ pub struct ProjectRow {
     pub accent: String,
     pub origin: Option<String>,
     pub last_opened_at: Option<i64>,
+    /// The icon a person chose, when they chose one.
+    pub icon: Option<String>,
+    /// And the colour, as `#rrggbb`.
+    pub color: Option<String>,
 }
 
 /// The default trust workspace, created on first use.
@@ -55,7 +59,7 @@ impl Store {
     pub fn projects(&self) -> Result<Vec<ProjectRow>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT p.id, p.name, p.root_path, p.group_name, w.color, \
-                    p.origin_url, p.last_opened_at \
+                    p.origin_url, p.last_opened_at, p.icon, p.color \
              FROM project p JOIN trust_workspace w ON w.id = p.trust_workspace_id \
              WHERE p.archived_at IS NULL \
              ORDER BY p.last_opened_at DESC NULLS LAST, p.created_at ASC",
@@ -71,6 +75,8 @@ impl Store {
                     accent: row.get(4)?,
                     origin: row.get(5)?,
                     last_opened_at: row.get(6)?,
+                    icon: row.get(7)?,
+                    color: row.get(8)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -83,7 +89,7 @@ impl Store {
             .conn
             .query_row(
                 "SELECT p.id, p.name, p.root_path, p.group_name, w.color, \
-                        p.origin_url, p.last_opened_at \
+                        p.origin_url, p.last_opened_at, p.icon, p.color \
                  FROM project p JOIN trust_workspace w ON w.id = p.trust_workspace_id \
                  WHERE p.id = ?1",
                 [id],
@@ -96,6 +102,8 @@ impl Store {
                         accent: row.get(4)?,
                         origin: row.get(5)?,
                         last_opened_at: row.get(6)?,
+                        icon: row.get(7)?,
+                        color: row.get(8)?,
                     })
                 },
             )
@@ -194,6 +202,24 @@ impl Store {
             "UPDATE project SET name = ?2, revision = revision + 1 \
              WHERE id = ?1 AND archived_at IS NULL",
             rusqlite::params![id, name],
+        )?;
+        Ok(changed > 0)
+    }
+
+    /// Everything the edit dialog sets at once: the name, the group it is
+    /// listed under, and its mark. `None` clears a group, icon or colour.
+    pub fn edit_project(
+        &self,
+        id: &str,
+        name: &str,
+        group: Option<&str>,
+        icon: Option<&str>,
+        color: Option<&str>,
+    ) -> Result<bool, StoreError> {
+        let changed = self.conn.execute(
+            "UPDATE project SET name = ?2, group_name = ?3, icon = ?4, color = ?5, \
+             revision = revision + 1 WHERE id = ?1 AND archived_at IS NULL",
+            rusqlite::params![id, name, group, icon, color],
         )?;
         Ok(changed > 0)
     }

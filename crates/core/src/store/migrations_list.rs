@@ -588,4 +588,16 @@ ALTER TABLE run ADD COLUMN carried_by TEXT;
 ALTER TABLE run ADD COLUMN carried_profile TEXT;
 "#,
     },
+    // Migration 020 — how a project looks in the rail.
+    Migration {
+        version: 20,
+        sql: r#"
+-- The mark a person gave a project: an icon of the app's own set or an emoji,
+-- and a colour. Both NULL until somebody chooses — the rail then draws the
+-- initials in a hue taken from the id, so an untouched project still looks
+-- like itself and not like its neighbour.
+ALTER TABLE project ADD COLUMN icon TEXT;
+ALTER TABLE project ADD COLUMN color TEXT;
+"#,
+    },
 ];

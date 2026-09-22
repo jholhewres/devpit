@@ -1,0 +1,80 @@
+/* ── The project rail ──────────────────────────────────────────────────
+   One icon per project down the left edge, like a chat app's server list.
+   The column is 56px and stays 56px: on hover the panel inside it widens
+   over the sidebar into cards with names, so nothing beside it moves. The
+   widening waits a moment, because a pointer crossing the edge on its way
+   somewhere else is not asking for names. */
+.app { --rail-w: 56px; }
+.rail { position: relative; z-index: 30; min-width: 0; height: 100%; }
+.rail__panel { position: absolute; inset: 0 auto 0 0; width: var(--rail-w); display: flex; flex-direction: column; padding: 10px 0 8px; background: var(--sidebar, var(--canvas)); border-right: 1px solid var(--border); overflow: hidden; transition: width 170ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 170ms ease; }
+.rail:hover .rail__panel { width: 248px; box-shadow: 10px 0 32px var(--shade); transition-delay: 250ms; }
+.rail__list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 4px; scrollbar-width: none; }
+
+/* A group: a rule between groups while narrow, its name when wide. */
+.rail__sect { display: flex; flex-direction: column; gap: 4px; }
+.rail__sect + .rail__sect { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.rail__group { height: 18px; padding: 0 14px; display: flex; align-items: center; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; overflow: hidden; }
+.rail__group span { opacity: 0; transition: opacity 120ms ease; }
+.rail:hover .rail__group span { opacity: 1; transition-delay: 300ms; }
+.rail__panel:not(:hover) .rail__group { height: 0; }
+
+/* A card: mark, then name over branch and tabs. */
+.rail__i { position: relative; flex: none; display: flex; align-items: center; gap: 10px; height: 44px; margin: 0 6px; padding: 0 4px; border-radius: 10px; text-align: left; color: var(--text-2); transition: background-color 120ms ease; }
+.rail:hover .rail__i:hover { background: var(--sidebar-item); }
+.rail:hover .rail__i[aria-current='true'] { background: var(--overlay-strong); }
+.rail__ico { position: relative; flex: none; display: flex; }
+.rail__text { min-width: 0; display: flex; flex-direction: column; gap: 1px; opacity: 0; transition: opacity 120ms ease; }
+.rail:hover .rail__text { opacity: 1; transition-delay: 300ms; }
+.rail__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
+.rail__i[aria-current='true'] .rail__n { font-weight: 600; }
+.rail__s { display: flex; gap: 6px; min-width: 0; font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.rail__b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 10.5px; }
+.rail__t { flex: none; color: var(--success); }
+
+/* Discord's mark for "you are here": a pill on the edge, tall for the one in
+   front, a stub under the pointer. */
+.rail__pill { position: absolute; left: -6px; top: 50%; width: 4px; height: 0; border-radius: 0 4px 4px 0; background: var(--text); transform: translateY(-50%); transition: height 150ms ease; }
+.rail__i:hover .rail__pill { height: 16px; }
+.rail__i[aria-current='true'] .rail__pill { height: 30px; }
+
+/* Active — tabs open — is a dot on the mark's corner, ringed in the rail's
+   own ground so it reads over any colour. */
+.rail__dot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--success); border: 2.5px solid var(--sidebar, var(--canvas)); transform: scale(0); transition: transform 150ms ease; }
+.rail__i[data-active='true'] .rail__dot { transform: scale(1); }
+
+.rail__i[data-unreadable='true'] .pmark { filter: grayscale(1); opacity: .5; }
+.rail__i[data-dragging='true'] { opacity: .4; }
+.rail__add { margin-top: 6px; }
+
+/* A project's mark: its icon or initials, in its colour. */
+.pmark { flex: none; display: flex; align-items: center; justify-content: center; border-radius: 11px; font-size: 13px; font-weight: 650; letter-spacing: .02em; color: hsl(var(--hue, 220) 70% 80%); background: hsl(var(--hue, 220) 45% 50% / .22); transition: border-radius 150ms ease, background-color 150ms ease; }
+.pmark[data-chosen='true'] { color: var(--mark); background: color-mix(in srgb, var(--mark) 22%, transparent); }
+.rail__i:hover .pmark, .rail__i[aria-current='true'] .pmark { border-radius: 13px; }
+.rail__i[aria-current='true'] .pmark { color: #fff; background: hsl(var(--hue, 220) 50% 46%); }
+.rail__i[aria-current='true'] .pmark[data-chosen='true'] { background: var(--mark); }
+.pmark__emoji { line-height: 1; }
+.pmark--add { width: 36px; height: 36px; color: var(--success); background: var(--overlay); }
+.rail__add:hover .pmark--add { color: #fff; background: color-mix(in srgb, var(--success) 70%, transparent); }
+:root[data-theme='light'] .pmark { color: hsl(var(--hue, 220) 55% 35%); }
+:root[data-theme='light'] .pmark[data-chosen='true'] { color: color-mix(in srgb, var(--mark) 75%, #000); }
+:root[data-theme='light'] .rail__i[aria-current='true'] .pmark { color: #fff; }
+
+/* ── The project dialog ───────────────────────────────────────────── */
+.pdlg { width: 460px; display: flex; flex-direction: column; gap: 14px; }
+.pdlg__head { display: flex; align-items: center; gap: 14px; }
+.pdlg__head .addpj__d { margin: 2px 0 0; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+.pdlg__f { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-2); }
+.pdlg__f > span { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.pdlg__f input:not([type='color']) { height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--composer); color: var(--text); font: inherit; font-size: 13px; outline: none; }
+.pdlg__f input:focus { border-color: var(--border-strong); }
+.pdlg__icons { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
+.pdlg__icon { height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--text-2); background: var(--overlay); font-size: 12px; font-weight: 600; }
+.pdlg__icon:hover { background: var(--overlay-strong); color: var(--text); }
+.pdlg__icon[aria-pressed='true'] { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.pdlg__emoji { width: 140px; }
+.pdlg__colours { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pdlg__sw { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); }
+.pdlg__sw[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px var(--text); }
+.pdlg__sw--auto { background: conic-gradient(#e2795b, #e0b36a, #62c987, #5b9be2, #b46fd6, #e2795b); }
+.pdlg__pick { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.pdlg__acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }

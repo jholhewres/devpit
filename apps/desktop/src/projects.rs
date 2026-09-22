@@ -70,6 +70,8 @@ fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
         accent: row.accent,
         origin: row.origin,
         last_opened_at: row.last_opened_at.map(|at| at as f64),
+        icon: row.icon,
+        color: row.color,
         worktrees,
         unreadable,
     }
@@ -280,6 +282,76 @@ pub fn project_rename(project_id: String, name: String) -> Result<ProjectList, R
         return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
     }
     project_list()
+}
+
+/// `project.edit` — a project's name, group and mark, from the dialog that
+/// sets them together.
+///
+/// An empty group, icon or colour clears it. The colour is `#rrggbb` and
+/// nothing else, because it is written into a style; the icon is short, because
+/// it is either one of the app's own names or a single emoji.
+#[tauri::command]
+#[specta::specta]
+pub fn project_edit(
+    project_id: String,
+    name: String,
+    group: Option<String>,
+    icon: Option<String>,
+    color: Option<String>,
+) -> Result<ProjectList, RpcError> {
+    let wanted = name.trim();
+    if wanted.is_empty() {
+        return Err(RpcError::new(ErrorCode::Invalid, "a project needs a name"));
+    }
+    if wanted.chars().count() > 120 {
+        return Err(RpcError::new(ErrorCode::Invalid, "that name is too long"));
+    }
+    let given = |value: &Option<String>| {
+        value
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    };
+    let group = given(&group);
+    let icon = given(&icon);
+    let color = given(&color);
+    if group
+        .as_deref()
+        .is_some_and(|group| group.chars().count() > 60)
+    {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "that group name is too long",
+        ));
+    }
+    if icon
+        .as_deref()
+        .is_some_and(|icon| icon.chars().count() > 32)
+    {
+        return Err(RpcError::new(ErrorCode::Invalid, "that is not an icon"));
+    }
+    if color.as_deref().is_some_and(|color| !is_hex_colour(color)) {
+        return Err(RpcError::new(ErrorCode::Invalid, "a colour is #rrggbb"));
+    }
+
+    let store = store()?;
+    if !store.edit_project(
+        &project_id,
+        wanted,
+        group.as_deref(),
+        icon.as_deref(),
+        color.as_deref(),
+    )? {
+        return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
+    }
+    project_list()
+}
+
+fn is_hex_colour(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value[1..].chars().all(|letter| letter.is_ascii_hexdigit())
 }
 
 /// `project.changes` — what has changed in a checkout, with the size of each edit.

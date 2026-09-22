@@ -33,6 +33,8 @@ const project = (over: Partial<Project> = {}): Project => ({
   unreadable: null,
   origin: null,
   lastOpenedAt: null,
+  icon: null,
+  color: null,
   ...over,
 })
 

@@ -59,6 +59,15 @@ export const commands = {
 	 *  do to make its own rows read better.
 	 */
 	projectRename: (projectId: string, name: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_rename", { projectId, name })),
+	/**
+	 *  `project.edit` — a project's name, group and mark, from the dialog that
+	 *  sets them together.
+	 * 
+	 *  An empty group, icon or colour clears it. The colour is `#rrggbb` and
+	 *  nothing else, because it is written into a style; the icon is short, because
+	 *  it is either one of the app's own names or a single emoji.
+	 */
+	projectEdit: (projectId: string, name: string, group: string | null, icon: string | null, color: string | null) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_edit", { projectId, name, group, icon, color })),
 	/**  `chat.history` — everything said in this conversation, in order. */
 	chatHistory: (projectId: string, conversationId: string) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId })),
 	/**
@@ -2502,6 +2511,13 @@ export type Project = {
 	 *  Absent for a project registered and never opened.
 	 */
 	lastOpenedAt: number | null,
+	/**
+	 *  The icon a person chose: `icon:<name>` from the app's own set, or an
+	 *  emoji. Absent until somebody chooses; the rail then draws initials.
+	 */
+	icon: string | null,
+	/**  The colour chosen with it, as `#rrggbb`. */
+	color: string | null,
 };
 
 export type ProjectChanges = {
