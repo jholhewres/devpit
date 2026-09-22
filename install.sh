@@ -135,6 +135,7 @@ install_appimage() {
   mv "$file" "$bin/devpit"
   chmod 755 "$bin/devpit"
   say "devpit $version is at $bin/devpit"
+  launcher "$bin/devpit"
   # `ldconfig` lives in /sbin, which is not on every user's PATH.
   if ! { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -q 'libfuse\.so\.2'; then
     say "an AppImage needs FUSE 2, which this machine does not seem to have."
@@ -144,6 +145,46 @@ install_appimage() {
     *":$bin:"*) say "run it with: devpit" ;;
     *) say "$bin is not on your PATH — run it with: $bin/devpit" ;;
   esac
+}
+
+# Puts devpit in the application menu, with its icon.
+#
+# A .deb does this through the package; an AppImage in ~/.local/bin is only a
+# file, and without this it opened from a terminal and nowhere else. The entry
+# and the icons come out of the AppImage itself — the file whose checksum was
+# just checked — so they are the ones this version ships.
+#
+# `StartupWMClass` is what makes the running window group under this icon in
+# a dock rather than appear as a second, anonymous app. Never fatal: a missing
+# icon is a cosmetic loss, not a reason to leave devpit half installed.
+launcher() {
+  image=$1
+  share="${XDG_DATA_HOME:-$HOME/.local/share}"
+  (cd "$work" && "$image" --appimage-extract 'usr/share/icons/*' >/dev/null 2>&1) || true
+  if [ -d "$work/squashfs-root/usr/share/icons/hicolor" ]; then
+    for icon in "$work"/squashfs-root/usr/share/icons/hicolor/*/apps/devpit-desktop.png; do
+      [ -f "$icon" ] || continue
+      size=$(basename "$(dirname "$(dirname "$icon")")")
+      mkdir -p "$share/icons/hicolor/$size/apps"
+      cp "$icon" "$share/icons/hicolor/$size/apps/devpit-desktop.png"
+    done
+    command -v gtk-update-icon-cache >/dev/null 2>&1 &&
+      gtk-update-icon-cache -q -t "$share/icons/hicolor" 2>/dev/null || true
+  fi
+  mkdir -p "$share/applications"
+  cat >"$share/applications/devpit.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=devpit
+Exec="$image"
+Icon=devpit-desktop
+StartupWMClass=devpit-desktop
+Terminal=false
+Categories=Development;
+EOF
+  command -v update-desktop-database >/dev/null 2>&1 &&
+    update-desktop-database -q "$share/applications" 2>/dev/null || true
+  say "devpit is in your application menu"
 }
 
 install_macos() {

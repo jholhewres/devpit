@@ -154,8 +154,9 @@ curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh |
 
 It picks the file that fits the machine, **refuses to install anything that
 does not match the release's `SHA256SUMS`**, and puts it in place: the `.deb`
-through apt on Debian and Ubuntu, the AppImage into `~/.local/bin` on other
-Linux, and `devpit.app` into Applications on macOS. Read
+through apt on Debian and Ubuntu, the AppImage into `~/.local/bin` — with an
+entry and an icon in the application menu — on other Linux, and `devpit.app`
+into Applications on macOS. Read
 [`install.sh`](install.sh) before piping it into a shell — it is short on
 purpose. Run it again at any time to catch up; it says so when there is
 nothing to do.
@@ -213,6 +214,28 @@ is what an installed devpit checks before it replaces itself, against a public
 key compiled into the binary you are already running. A first download has no
 such binary to check it with, which is what `SHA256SUMS` is for — and what
 `install.sh` checks for you.
+
+### Uninstalling, or switching
+
+Removing devpit never removes your work. Projects, cards, conversations and
+the terminal sessions live in `~/.devpit`, which belongs to you and not to the
+package — so a reinstall, in any format, opens exactly where you left off.
+
+- **`.deb`** — `sudo apt remove devpit`
+- **AppImage** — `rm ~/.local/bin/devpit ~/.local/share/applications/devpit.desktop ~/.local/share/icons/hicolor/*/apps/devpit-desktop.png`
+- **macOS** — `rm -rf /Applications/devpit.app`
+
+To erase everything, remove `~/.devpit` as well — and `~/.devpit-dev`, if you
+ever ran a development build.
+
+To switch from the `.deb` to the AppImage, remove the package and run the
+installer with `DEVPIT_FORMAT=appimage`; without it, a machine that has apt is
+given the `.deb` again:
+
+```sh
+sudo apt remove devpit
+curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | DEVPIT_FORMAT=appimage sh
+```
 
 [releases]: https://github.com/jholhewres/devpit/releases/latest
 
