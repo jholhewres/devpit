@@ -119,3 +119,20 @@ fn the_secret_is_read_from_a_file_and_never_typed_into_the_command() {
         "the secret's header was written into the command: {settings}"
     );
 }
+
+/// devpit's read tools are allowed without a question; its writes still ask.
+#[test]
+fn the_board_can_be_read_without_asking_and_written_only_by_asking() {
+    let written = settings_json(Path::new("/tmp/endpoint"), Path::new("/tmp/hook-auth"));
+    let parsed: serde_json::Value = serde_json::from_str(&written).expect("valid json");
+    let allowed: Vec<&str> = parsed["permissions"]["allow"]
+        .as_array()
+        .expect("allow list")
+        .iter()
+        .filter_map(|one| one.as_str())
+        .collect();
+    assert!(allowed.contains(&"mcp__devpit__devpit_board"));
+    assert!(allowed
+        .iter()
+        .all(|tool| !tool.contains("comment") && !tool.contains("move")));
+}

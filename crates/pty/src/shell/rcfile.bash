@@ -38,6 +38,13 @@ elif [[ -f "$HOME/.profile" ]]; then source "$HOME/.profile"
 fi
 [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
 
+# Where `devpit-agent` lives, after their config, which may set PATH outright;
+# tmux will not carry a PATH of ours (`-e PATH=` is ignored).
+if [[ -n "${DEVPIT_BIN:-}" && ":$PATH:" != *":$DEVPIT_BIN:"* ]]; then
+  export PATH="$DEVPIT_BIN:$PATH"
+fi
+builtin unset DEVPIT_BIN
+
 # Without bracketed paste, older readline reads each newline of a pasted
 # multiline command as Enter and breaks it into PS2 continuations.
 [[ $- == *i* ]] && bind 'set enable-bracketed-paste on' 2>/dev/null

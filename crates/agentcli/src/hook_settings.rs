@@ -56,7 +56,10 @@ pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
     })
     .collect();
 
-    format!("{{\"hooks\":{{{}}}}}", hooks.join(","))
+    // devpit's own read tools need no question each time: they only read
+    // the board this agent is working on. Writing still asks.
+    let allowed = r#""permissions":{"allow":["mcp__devpit__devpit_context","mcp__devpit__devpit_board","mcp__devpit__devpit_card"]}"#;
+    format!("{{\"hooks\":{{{}}},{allowed}}}", hooks.join(","))
 }
 
 /// The shell one hook runs.

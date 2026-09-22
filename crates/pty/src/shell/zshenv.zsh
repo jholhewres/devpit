@@ -29,6 +29,10 @@ builtin unfunction __devpit_usable_zdotdir
 builtin typeset -ga __devpit_features
 __devpit_features=(${(s:,:)${DEVPIT_SHELL_FEATURES:-}})
 builtin unset DEVPIT_SHELL_FEATURES
+# Where `devpit-agent` lives. Put on PATH after their config, which is free to
+# set PATH outright; tmux will not carry a PATH of ours (`-e PATH=` is ignored).
+builtin typeset -g __devpit_bin="${DEVPIT_BIN:-}"
+builtin unset DEVPIT_BIN
 __devpit_wants() { (( ${__devpit_features[(Ie)$1]} )) }
 
 # Inside tmux, every escape sequence tmux does not itself understand is eaten
@@ -69,6 +73,10 @@ __devpit_init() {
   (( $+__devpit_init_done )) && return 0
   builtin typeset -g __devpit_init_done=1
   builtin typeset -g precmd_functions preexec_functions
+  if [[ -n "$__devpit_bin" && ":$PATH:" != *":$__devpit_bin:"* ]]; then
+    builtin export PATH="$__devpit_bin:$PATH"
+  fi
+  builtin unset __devpit_bin
 
   if __devpit_wants marks; then
     # Substituted in place, not appended: this function is running from inside

@@ -31,10 +31,20 @@ pub(crate) fn wrapped_shell() -> Result<devpit_tmux::Shell, RpcError> {
         features,
         std::env::var("ZDOTDIR").ok().as_deref(),
     );
+    let mut env = launch.env;
+    // `devpit-agent` on the terminal's PATH, so any agent with a shell — not
+    // only the two that take an MCP flag — can reach the board. Named rather
+    // than set: tmux ignores `-e PATH=`, and the startup file puts it on PATH
+    // after the person's own config.
+    if let Some(bin) = crate::agent_reach::exe()
+        .and_then(|exe| crate::agent_reach::cli_shim(&Store::root().ok()?, &exe))
+    {
+        env.push(("DEVPIT_BIN".to_owned(), bin.display().to_string()));
+    }
     Ok(devpit_tmux::Shell {
         program: launch.program,
         args: launch.args,
-        env: launch.env,
+        env,
     })
 }
 
@@ -401,14 +411,37 @@ pub(crate) fn profile_id(id: &str) -> String {
 ///
 /// Without the settings file the line is just the agent's name, which is what
 /// it always was.
-fn launch_line(launch: &str, settings_flag: Option<&str>) -> String {
-    let Some(flag) = settings_flag else {
-        return launch.to_owned();
-    };
-    let Some(settings) = hook_settings() else {
-        return launch.to_owned();
-    };
-    format!("{launch} {}", flag.replace("{}", &settings))
+///
+/// The MCP server rides the same way and under the same switch: devpit's
+/// tools on the line of the agents devpit starts (`agent_reach`).
+fn launch_line(launch: &str, agent: &str, settings_flag: Option<&str>) -> String {
+    let mut line = launch.to_owned();
+    if let Some(settings) = settings_flag.and_then(|_| hook_settings()) {
+        line.push(' ');
+        line.push_str(&settings_flag.unwrap_or_default().replace("{}", &settings));
+    }
+    if let Some(tools) = devpit_tools(agent) {
+        line.push(' ');
+        line.push_str(&tools);
+    }
+    line
+}
+
+/// The flags that give this agent devpit's MCP tools, if it takes them.
+fn devpit_tools(agent: &str) -> Option<String> {
+    if !integrated() {
+        return None;
+    }
+    let root = Store::root().ok()?;
+    crate::agent_reach::mcp_flags(agent, &crate::agent_reach::exe()?, &root.join("mcp.json"))
+}
+
+/// Whether devpit reaches into the agents it starts at all — hooks, tools.
+/// Switched off, an agent starts exactly as it would by hand.
+fn integrated() -> bool {
+    crate::projects::store()
+        .map(|store| crate::agent_choice::hooks_on(&store))
+        .unwrap_or(true)
 }
 
 /// The line that starts this id, whether it names a profile or an agent.
@@ -422,7 +455,7 @@ pub(crate) fn to_start(id: &str) -> Result<String, RpcError> {
             if let Some(found) = profiles.iter().find(|one| one.id == id && one.mine) {
                 let flag = devpit_pty::agents::known(&found.base).and_then(|one| one.settings_flag);
                 let said = devpit_agentcli::running::line(&devpit_agentcli::running::runner(found));
-                return Ok(launch_line(&said, flag));
+                return Ok(launch_line(&said, &found.base, flag));
             }
         }
     }
@@ -432,7 +465,7 @@ pub(crate) fn to_start(id: &str) -> Result<String, RpcError> {
             format!("{id} is not an agent this build knows"),
         )
     })?;
-    Ok(launch_line(agent.launch, agent.settings_flag))
+    Ok(launch_line(agent.launch, agent.id, agent.settings_flag))
 }
 
 /// Where the hook settings live, written if they are not there yet.
@@ -443,10 +476,7 @@ pub(crate) fn to_start(id: &str) -> Result<String, RpcError> {
 fn hook_settings() -> Option<String> {
     // Switched off means the flag is never added, so the agent is started
     // exactly as it would have been by hand.
-    if !crate::projects::store()
-        .map(|store| crate::agent_choice::hooks_on(&store))
-        .unwrap_or(true)
-    {
+    if !integrated() {
         return None;
     }
     let root = Store::root().ok()?;
