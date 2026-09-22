@@ -6,6 +6,29 @@
 
 TAURI := ./node_modules/.bin/tauri
 
+# Nothing of an installed AppImage reaches a recipe.
+#
+# A terminal inside the AppImage devpit inherits the AppImage's environment:
+# LD_LIBRARY_PATH, GIO_EXTRA_MODULES, GTK_PATH and the rest point into its
+# mount. `make dev` run from there loaded the installed app's libraries, and
+# WebKit died looking for its helper processes inside that mount. Every
+# variable whose value points into an AppImage mount is kept from the recipes,
+# with the AppImage's own names — so development works from inside whichever
+# devpit is installed, whatever version it is. The app does the same for the
+# shells it starts (`devpit_pty::host_env`); this covers a shell started before
+# that existed.
+#
+# By entry, not by variable: PATH carries the mount among the person's own
+# directories, and dropping all of it takes cargo with it. A variable left
+# with no entries is not passed on at all.
+empty :=
+space := $(empty) $(empty)
+colon := :
+mount_free = $(subst $(space),$(colon),$(strip $(foreach entry,$(subst $(colon), ,$($(1))),$(if $(findstring /.mount_,$(entry)),,$(entry)))))
+APPIMAGE_ENV := $(shell env | sed -n 's|^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\.mount_.*|\1|p')
+$(foreach name,$(APPIMAGE_ENV),$(if $(call mount_free,$(name)),$(eval export $(name) := $(call mount_free,$(name))),$(eval unexport $(name))))
+unexport APPDIR APPIMAGE ARGV0 OWD
+
 # The tests get a home of their own.
 #
 # `Store::root` is under `dirs::home_dir()`, so a suite run against the real
