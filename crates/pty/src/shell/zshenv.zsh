@@ -33,6 +33,13 @@ builtin unset DEVPIT_SHELL_FEATURES
 # set PATH outright; tmux will not carry a PATH of ours (`-e PATH=` is ignored).
 builtin typeset -g __devpit_bin="${DEVPIT_BIN:-}"
 builtin unset DEVPIT_BIN
+# What an agent typed here is started with, the same as one devpit starts:
+# its hooks, and devpit's tools. Kept in the shell, not exported to its
+# children.
+builtin typeset -g __devpit_claude_settings="${DEVPIT_CLAUDE_SETTINGS:-}"
+builtin typeset -g __devpit_claude_mcp="${DEVPIT_CLAUDE_MCP:-}"
+builtin typeset -g __devpit_codex_exe="${DEVPIT_CODEX_EXE:-}"
+builtin unset DEVPIT_CLAUDE_SETTINGS DEVPIT_CLAUDE_MCP DEVPIT_CODEX_EXE
 __devpit_wants() { (( ${__devpit_features[(Ie)$1]} )) }
 
 # Inside tmux, every escape sequence tmux does not itself understand is eaten
@@ -77,6 +84,32 @@ __devpit_init() {
     builtin export PATH="$__devpit_bin:$PATH"
   fi
   builtin unset __devpit_bin
+
+  # Wrappers for the agents typed by hand, defined only where the person has
+  # no function of that name — theirs wins. An alias still works: it expands
+  # to the name, and the name finds this. The flags go first, in `=` form,
+  # because `--mcp-config` takes several values and would swallow a
+  # subcommand written after it; and not when the line already carries them,
+  # which a line devpit typed itself does.
+  if [[ -n "$__devpit_claude_settings$__devpit_claude_mcp" ]] && (( ! $+functions[claude] )); then
+    claude() {
+      builtin local -a __devpit_with
+      [[ -z "$__devpit_claude_settings" || " $* " == *" --settings"* ]] || __devpit_with+=("--settings=$__devpit_claude_settings")
+      [[ -z "$__devpit_claude_mcp" || " $* " == *" --mcp-config"* ]] || __devpit_with+=("--mcp-config=$__devpit_claude_mcp")
+      command claude "${__devpit_with[@]}" "$@"
+    }
+  fi
+  if [[ -n "$__devpit_codex_exe" ]] && (( ! $+functions[codex] )); then
+    codex() {
+      if [[ " $* " == *"mcp_servers.devpit"* ]]; then
+        command codex "$@"
+      else
+        command codex -c "mcp_servers.devpit.command=\"$__devpit_codex_exe\"" \
+          -c 'mcp_servers.devpit.args=["mcp"]' \
+          -c 'mcp_servers.devpit.env={DEVPIT_AGENT_ID="codex"}' "$@"
+      fi
+    }
+  fi
 
   if __devpit_wants marks; then
     # Substituted in place, not appended: this function is running from inside

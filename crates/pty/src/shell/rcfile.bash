@@ -45,6 +45,33 @@ if [[ -n "${DEVPIT_BIN:-}" && ":$PATH:" != *":$DEVPIT_BIN:"* ]]; then
 fi
 builtin unset DEVPIT_BIN
 
+# Agents typed by hand get what one devpit starts gets: its hooks and its
+# tools. Only where the person has no function of that name; flags first, in
+# `=` form (`--mcp-config` takes several values), and not twice.
+__devpit_claude_settings="${DEVPIT_CLAUDE_SETTINGS:-}"
+__devpit_claude_mcp="${DEVPIT_CLAUDE_MCP:-}"
+__devpit_codex_exe="${DEVPIT_CODEX_EXE:-}"
+builtin unset DEVPIT_CLAUDE_SETTINGS DEVPIT_CLAUDE_MCP DEVPIT_CODEX_EXE
+if [[ -n "$__devpit_claude_settings$__devpit_claude_mcp" ]] && ! declare -F claude >/dev/null; then
+  claude() {
+    local -a with=()
+    [[ -z "$__devpit_claude_settings" || " $* " == *" --settings"* ]] || with+=("--settings=$__devpit_claude_settings")
+    [[ -z "$__devpit_claude_mcp" || " $* " == *" --mcp-config"* ]] || with+=("--mcp-config=$__devpit_claude_mcp")
+    command claude "${with[@]}" "$@"
+  }
+fi
+if [[ -n "$__devpit_codex_exe" ]] && ! declare -F codex >/dev/null; then
+  codex() {
+    if [[ " $* " == *"mcp_servers.devpit"* ]]; then
+      command codex "$@"
+    else
+      command codex -c "mcp_servers.devpit.command=\"$__devpit_codex_exe\"" \
+        -c 'mcp_servers.devpit.args=["mcp"]' \
+        -c 'mcp_servers.devpit.env={DEVPIT_AGENT_ID="codex"}' "$@"
+    fi
+  }
+fi
+
 # Without bracketed paste, older readline reads each newline of a pasted
 # multiline command as Enter and breaks it into PS2 continuations.
 [[ $- == *i* ]] && bind 'set enable-bracketed-paste on' 2>/dev/null

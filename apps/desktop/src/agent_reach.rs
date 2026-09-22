@@ -39,7 +39,9 @@ pub(crate) fn mcp_flags(agent: &str, exe: &Path, config: &Path) -> Option<String
                 devpit_core::home::write_private(config, wanted.as_bytes()).ok()?;
             }
             let path = config.to_str()?;
-            (!path.contains('\'')).then(|| format!("--mcp-config '{path}'"))
+            // `=`, because the flag takes several files: written as two words
+            // it swallowed whatever came after it, a subcommand included.
+            (!path.contains('\'')).then(|| format!("--mcp-config='{path}'"))
         }
         "codex" => Some(format!(
             "-c 'mcp_servers.devpit.command=\"{exe}\"' -c 'mcp_servers.devpit.args=[\"mcp\"]' \

@@ -5,7 +5,7 @@ fn claude_is_given_a_config_file_it_reads_for_this_session_only() {
     let dir = tempfile::tempdir().expect("tempdir");
     let config = dir.path().join("mcp.json");
     let flags = mcp_flags("claude", Path::new("/opt/devpit"), &config).expect("flags");
-    assert_eq!(flags, format!("--mcp-config '{}'", config.display()));
+    assert_eq!(flags, format!("--mcp-config='{}'", config.display()));
     let written: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&config).expect("read")).expect("json");
     assert_eq!(written["mcpServers"]["devpit"]["command"], "/opt/devpit");

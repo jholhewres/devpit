@@ -73,7 +73,7 @@ const TOOLS: [Tool; 7] = [
 
 /// Serves MCP on stdin/stdout until the client hangs up.
 pub fn serve(root: &Path) -> i32 {
-    let cwd = std::env::current_dir().unwrap_or_default();
+    let cwd = crate::standing();
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
     for line in stdin.lock().lines() {

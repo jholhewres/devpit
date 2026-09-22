@@ -41,11 +41,41 @@ pub(crate) fn wrapped_shell() -> Result<devpit_tmux::Shell, RpcError> {
     {
         env.push(("DEVPIT_BIN".to_owned(), bin.display().to_string()));
     }
+    env.extend(typed_agents());
     Ok(devpit_tmux::Shell {
         program: launch.program,
         args: launch.args,
         env,
     })
+}
+
+/// What the shell's startup file needs to start `claude` and `codex` typed
+/// by hand the way devpit starts them: the hook settings, Claude's MCP file,
+/// and the binary Codex is pointed at. Nothing, with the switch off.
+fn typed_agents() -> Vec<(String, String)> {
+    if !integrated() {
+        return Vec::new();
+    }
+    let Ok(root) = Store::root() else {
+        return Vec::new();
+    };
+    let mut env = Vec::new();
+    if hook_settings().is_some() {
+        env.push((
+            "DEVPIT_CLAUDE_SETTINGS".to_owned(),
+            root.join("hooks.json").display().to_string(),
+        ));
+    }
+    if let Some(exe) = crate::agent_reach::exe() {
+        let config = root.join("mcp.json");
+        if crate::agent_reach::mcp_flags("claude", &exe, &config).is_some() {
+            env.push(("DEVPIT_CLAUDE_MCP".to_owned(), config.display().to_string()));
+        }
+        if crate::agent_reach::mcp_flags("codex", &exe, &config).is_some() {
+            env.push(("DEVPIT_CODEX_EXE".to_owned(), exe.display().to_string()));
+        }
+    }
+    env
 }
 
 /// `session.running` — what each of a project's panes has in the foreground.

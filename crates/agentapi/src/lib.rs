@@ -16,3 +16,16 @@ pub mod guide;
 pub mod mcp;
 
 pub use client::ask;
+
+/// Where the agent is standing.
+///
+/// Not the process's own directory when this runs from an AppImage: the
+/// AppImage's launcher changes into its mount before it starts the binary, and
+/// leaves the directory it was started from in `OWD`. Read as it was, every
+/// question came from `/tmp/.mount_…/usr`, which is no project.
+pub fn standing() -> std::path::PathBuf {
+    match std::env::var_os("OWD") {
+        Some(owd) if !owd.is_empty() => std::path::PathBuf::from(owd),
+        _ => std::env::current_dir().unwrap_or_default(),
+    }
+}

@@ -8,7 +8,7 @@ use crate::{client, guide};
 
 /// Runs one `devpit agent` command and answers with the exit code.
 pub fn run(root: &Path, args: &[String]) -> i32 {
-    let cwd = std::env::current_dir().unwrap_or_default();
+    let cwd = crate::standing();
     match parsed(args) {
         Ok(Parsed::Guide) => {
             print!("{}", guide::GUIDE);
