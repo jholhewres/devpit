@@ -12,6 +12,7 @@ devpit-pty = { path = "../../crates/pty" }
 devpit-rpc = { path = "../../crates/rpc" }
 devpit-tmux = { path = "../../crates/tmux" }
 devpit-agentcli = { path = "../../crates/agentcli" }
+devpit-agentapi = { path = "../../crates/agentapi" }
 devpit-cookies = { path = "../../crates/cookies" }
 devpit-steps = { path = "../../crates/steps" }
 portable-pty = "0.9.0"

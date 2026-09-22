@@ -118,6 +118,12 @@ mod worktrees;
 mod wsfiles;
 
 fn main() {
+    // `devpit agent …` and `devpit mcp` are an agent reaching the running
+    // app, not a second window: answered here, before anything starts GTK.
+    if let Some(code) = agent_door() {
+        std::process::exit(code);
+    }
+
     // Before anything starts GTK, and before any thread exists.
     #[cfg(target_os = "linux")]
     input_method::use_the_desktops();
@@ -233,4 +239,24 @@ fn main() {
         .invoke_handler(handler::handler())
         .run(tauri::generate_context!())
         .expect("the window did not open");
+}
+
+/// The exit code of an agent's command, when the arguments are one.
+fn agent_door() -> Option<i32> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let first = args.first()?.as_str();
+    if first != "agent" && first != "mcp" {
+        return None;
+    }
+    let root = match devpit_core::Store::root() {
+        Ok(root) => root,
+        Err(err) => {
+            eprintln!("devpit: cannot find where devpit keeps its state: {err}");
+            return Some(1);
+        }
+    };
+    Some(match first {
+        "mcp" => devpit_agentapi::mcp::serve(&root),
+        _ => devpit_agentapi::cli::run(&root, &args[1..]),
+    })
 }

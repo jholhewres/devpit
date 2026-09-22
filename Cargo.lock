@@ -768,6 +768,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "devpit-agentapi"
+version = "0.1.8"
+dependencies = [
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "devpit-agentcli"
 version = "0.1.8"
 dependencies = [
@@ -812,6 +820,7 @@ version = "0.1.8"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "devpit-agentapi",
  "devpit-agentcli",
  "devpit-cookies",
  "devpit-core",

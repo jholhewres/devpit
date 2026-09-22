@@ -9,6 +9,7 @@ members = [
     "crates/agentcli",
     "crates/cookies",
     "crates/steps",
+    "crates/agentapi",
     "apps/desktop",
     "xtask",
 ]
