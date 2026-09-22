@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PaneRunning } from '../gen/bindings'
-import { agentIn, busyIn, inTab, stopsOnClose } from './running'
+import { agentIn, busyIn, inTab, same, stopsOnClose } from './running'
 import type { Tab } from './strip'
 
 const pane = (paneId: string, over: Partial<PaneRunning> = {}): PaneRunning => ({
@@ -74,5 +74,18 @@ describe('what closing a tab would stop', () => {
      to raise the agent's wording rather than the build's. */
   it('warns about the agent when a split is running both', () => {
     expect(stopsOnClose([build('a'), claude('b')], tab(['a', 'b']))?.kind).toBe('agent')
+  })
+})
+
+describe('same', () => {
+  it('holds when every pane says what it said', () => {
+    expect(same([pane('a'), pane('b')], [pane('a'), pane('b')])).toBe(true)
+  })
+
+  it('breaks on any field that changed, or a pane that came or went', () => {
+    expect(same([pane('a')], [pane('a', { busy: true })])).toBe(false)
+    expect(same([pane('a')], [pane('a', { agent: 'claude' })])).toBe(false)
+    expect(same([pane('a')], [pane('a'), pane('b')])).toBe(false)
+    expect(same([pane('a'), pane('b')], [pane('b'), pane('a')])).toBe(false)
   })
 })

@@ -89,3 +89,21 @@ export function doingIn(
   const here = agentIn(running, tab)
   return here ? (doing[here.paneId] ?? null) : null
 }
+
+/** Whether two answers from the process table say the same thing. */
+export function same(was: readonly PaneRunning[], now: readonly PaneRunning[]): boolean {
+  return (
+    was.length === now.length &&
+    was.every((one, at) => {
+      const other = now[at]
+      return (
+        other !== undefined &&
+        one.paneId === other.paneId &&
+        one.command === other.command &&
+        one.busy === other.busy &&
+        one.agent === other.agent &&
+        one.label === other.label
+      )
+    })
+  )
+}

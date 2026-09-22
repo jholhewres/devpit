@@ -96,8 +96,13 @@ export function Leaf({
     })
     themed.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 
+    /* The observer fires for every pixel of a drag, per visible pane. The pty
+       only cares about the grid, so it is told only when rows or columns
+       actually changed. */
     const watch = new ResizeObserver(() => {
+      const before = { rows: terminal.rows, cols: terminal.cols }
       refit()
+      if (terminal.rows === before.rows && terminal.cols === before.cols) return
       void live?.resize(terminal.rows, terminal.cols).then((applied) => {
         /* The pty clamps; the grid follows what it actually got. */
         if (applied && (applied.rows !== terminal.rows || applied.cols !== terminal.cols)) {
