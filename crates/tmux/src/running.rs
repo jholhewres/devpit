@@ -4,8 +4,6 @@
 //! decides how the binary is found, how the socket is named on the line, and
 //! what a non-zero exit turns into.
 
-use std::process::Command;
-
 use crate::{Server, TmuxError};
 
 pub(crate) fn require(server: &Server, args: &[&str]) -> Result<std::process::Output, TmuxError> {
@@ -20,7 +18,7 @@ pub(crate) fn require(server: &Server, args: &[&str]) -> Result<std::process::Ou
 }
 
 pub(crate) fn run(server: &Server, args: &[&str]) -> Result<std::process::Output, TmuxError> {
-    Command::new("tmux")
+    devpit_pty::host_env::command("tmux")
         .arg("-S")
         .arg(&server.socket)
         .args(args)

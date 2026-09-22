@@ -23,7 +23,7 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use devpit_core::{preference, Store};
 use devpit_rpc::{ErrorCode, RpcError};
@@ -150,7 +150,7 @@ fn present(commands: &[String]) -> HashSet<String> {
         .join("; ");
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_owned());
-    let Ok(output) = Command::new(shell)
+    let Ok(output) = devpit_pty::host_env::command(shell)
         .args(["-ic", &asked])
         // Nulled, or an interactive shell that decides to read from it hangs
         // this process for as long as the window is open.
@@ -295,7 +295,7 @@ pub fn apps_open(app_id: String, path: String) -> Result<(), RpcError> {
     }
 
     let folder = allowed(&store, &path)?;
-    Command::new(&app.command)
+    devpit_pty::host_env::command(&app.command)
         .arg(&folder)
         .stdin(Stdio::null())
         .stdout(Stdio::null())

@@ -267,7 +267,7 @@ fn ask_the_shell(names: &[String]) -> std::collections::HashSet<String> {
         .collect::<Vec<_>>()
         .join("; ");
 
-    let Ok(output) = std::process::Command::new(&shell)
+    let Ok(output) = devpit_pty::host_env::command(&shell)
         .args(["-ic", &script])
         // Nothing to read. An interactive shell that inherits a terminal can
         // sit waiting on it forever, and this runs at startup — a hang here

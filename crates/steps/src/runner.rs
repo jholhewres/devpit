@@ -7,7 +7,7 @@
 
 use std::io::BufReader;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -46,7 +46,7 @@ pub fn run(
     }
 
     let started = Instant::now();
-    let mut spawning = Command::new("sh");
+    let mut spawning = devpit_pty::host_env::command("sh");
     spawning
         .arg("-c")
         .arg(command)

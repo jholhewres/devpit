@@ -3,6 +3,8 @@
 //! Apart from `lib_tests.rs` because those are pure argv assertions that run
 //! anywhere, and these two step aside when the binary is missing.
 
+use std::process::Command;
+
 use super::*;
 
 /// The whole handle round-trip, against the installed CLI.

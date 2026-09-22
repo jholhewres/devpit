@@ -729,6 +729,7 @@ dependencies = [
 name = "devpit-agentcli"
 version = "0.1.7"
 dependencies = [
+ "devpit-pty",
  "devpit-rpc",
  "serde",
  "serde_json",
@@ -801,6 +802,7 @@ dependencies = [
 name = "devpit-git"
 version = "0.1.7"
 dependencies = [
+ "devpit-pty",
  "devpit-rpc",
  "sha2 0.11.0",
  "tempfile",
@@ -832,6 +834,7 @@ dependencies = [
 name = "devpit-steps"
 version = "0.1.7"
 dependencies = [
+ "devpit-pty",
  "libc",
  "serde",
  "serde_json",

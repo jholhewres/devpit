@@ -10,7 +10,6 @@
 //! them.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::GitError;
 
@@ -23,7 +22,7 @@ pub struct Changed {
 }
 
 fn git(root: &Path, index: Option<&Path>, args: &[&str]) -> Result<String, GitError> {
-    let mut command = Command::new("git");
+    let mut command = devpit_pty::host_env::command("git");
     command
         .arg("-c")
         .arg("core.quotepath=false")

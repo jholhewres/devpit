@@ -148,7 +148,7 @@ mod tests {
         fixture::commit(&main, "first");
 
         let side = dir.path().join("side");
-        let ok = std::process::Command::new("git")
+        let ok = devpit_pty::host_env::command("git")
             .arg("-C")
             .arg(&main)
             .args(["worktree", "add", "-q", "-b", "side"])

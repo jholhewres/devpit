@@ -1,7 +1,6 @@
 //! `git clone`, into a folder this product owns.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::GitError;
 
@@ -50,7 +49,7 @@ pub fn clone(url: &str, parent: &Path) -> Result<PathBuf, GitError> {
         });
     }
 
-    let output = Command::new("git")
+    let output = devpit_pty::host_env::command("git")
         // Never prompt. A clone that stops on a credential question with no
         // terminal attached hangs the command and the window with it; failing
         // with "authentication required" is a thing the screen can say.

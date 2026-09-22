@@ -7,7 +7,7 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use crate::headless_stream::read_stream;
 use crate::{headless_argv, AgentError, PROGRAM};
@@ -87,28 +87,29 @@ pub fn run_turn_cancellable(
         turn.settings,
         turn.session_id,
     );
-    let mut child = Command::new(turn.runner.map_or(PROGRAM, |one| one.program.as_str()))
-        .args(
-            turn.runner
-                .map_or_else(|| argv[1..].to_vec(), |one| one.argv(&argv[1..])),
-        )
-        .current_dir(turn.cwd)
-        // The profile first, then the step's own: the profile says which
-        // account this runs under, and the step's context is about this one
-        // turn. A collision is the turn's to win.
-        .envs(
-            turn.runner
-                .map(|one| one.env.clone())
-                .unwrap_or_default()
-                .iter()
-                .chain(turn.env.iter())
-                .map(|(key, value)| (key, value)),
-        )
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|_| AgentError::NotInstalled)?;
+    let mut child =
+        devpit_pty::host_env::command(turn.runner.map_or(PROGRAM, |one| one.program.as_str()))
+            .args(
+                turn.runner
+                    .map_or_else(|| argv[1..].to_vec(), |one| one.argv(&argv[1..])),
+            )
+            .current_dir(turn.cwd)
+            // The profile first, then the step's own: the profile says which
+            // account this runs under, and the step's context is about this one
+            // turn. A collision is the turn's to win.
+            .envs(
+                turn.runner
+                    .map(|one| one.env.clone())
+                    .unwrap_or_default()
+                    .iter()
+                    .chain(turn.env.iter())
+                    .map(|(key, value)| (key, value)),
+            )
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|_| AgentError::NotInstalled)?;
 
     on_start(child.id());
 

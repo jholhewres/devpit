@@ -4,7 +4,6 @@
 //! "this is not a repository" are answered once rather than in each caller.
 
 use std::path::Path;
-use std::process::Command;
 
 use crate::GitError;
 
@@ -20,7 +19,7 @@ use crate::GitError;
 /// commands where that is the contract use this; everything else goes through
 /// `run`, which is strict.
 pub(crate) fn run_diffing(root: &Path, args: &[&str]) -> Result<String, GitError> {
-    let output = Command::new("git")
+    let output = devpit_pty::host_env::command("git")
         .arg("-c")
         .arg("core.quotepath=false")
         .arg("-C")
@@ -46,7 +45,7 @@ pub(crate) fn run_diffing(root: &Path, args: &[&str]) -> Result<String, GitError
 }
 
 pub(crate) fn run(root: &Path, args: &[&str]) -> Result<String, GitError> {
-    let output = Command::new("git")
+    let output = devpit_pty::host_env::command("git")
         .arg("-c")
         .arg("core.quotepath=false")
         .arg("-C")
@@ -102,7 +101,6 @@ pub(crate) fn identify(path: &Path) -> String {
 #[cfg(test)]
 pub(crate) mod fixture {
     use std::path::Path;
-    use std::process::Command;
 
     /// A real repository in a tempdir.
     ///
@@ -116,7 +114,7 @@ pub(crate) mod fixture {
             vec!["config", "user.name", "Test"],
             vec!["config", "commit.gpgsign", "false"],
         ] {
-            let ok = Command::new("git")
+            let ok = devpit_pty::host_env::command("git")
                 .arg("-C")
                 .arg(dir)
                 .args(&args)
@@ -130,7 +128,7 @@ pub(crate) mod fixture {
 
     pub fn commit(dir: &Path, message: &str) {
         for args in [vec!["add", "-A"], vec!["commit", "-q", "-m", message]] {
-            Command::new("git")
+            devpit_pty::host_env::command("git")
                 .arg("-C")
                 .arg(dir)
                 .args(&args)

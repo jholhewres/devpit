@@ -24,6 +24,7 @@
 
 pub mod agents;
 mod foreground;
+pub mod host_env;
 mod osc;
 mod reader;
 mod ring;

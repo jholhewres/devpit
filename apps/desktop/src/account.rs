@@ -296,7 +296,7 @@ mod browser {
             ("xdg-open", &[])
         };
 
-        let opened = std::process::Command::new(program)
+        let opened = devpit_pty::host_env::command(program)
             .args(args)
             .arg(url)
             .stdout(std::process::Stdio::null())

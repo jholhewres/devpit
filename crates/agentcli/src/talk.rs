@@ -5,7 +5,7 @@
 
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use devpit_rpc::{Part, SessionInit, TurnEnd};
 
@@ -64,7 +64,7 @@ pub fn say(
 ) -> Result<Said, AgentError> {
     let argv = argv(turn);
 
-    let mut child = Command::new(turn.command)
+    let mut child = devpit_pty::host_env::command(turn.command)
         .args(&argv)
         .current_dir(turn.cwd)
         .envs(turn.env.iter().map(|(key, value)| (key, value)))

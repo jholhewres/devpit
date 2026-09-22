@@ -178,6 +178,7 @@ pub async fn session_attach(
     for arg in &argv[1..] {
         builder.arg(arg);
     }
+    devpit_pty::host_env::scrub_pty(&mut builder);
     builder.env("TERM", "xterm-256color");
 
     let claimed = state.claims.take_for(&pane_id, &client_id)?;

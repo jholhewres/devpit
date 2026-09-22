@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+devpit-pty = { path = "../pty" }
 devpit-rpc = { path = "../rpc" }
 sha2 = "0.11.0"
 thiserror = "2.0.20"

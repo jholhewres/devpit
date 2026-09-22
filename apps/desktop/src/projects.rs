@@ -320,7 +320,7 @@ pub(crate) fn checkout(root: &Path, worktree_id: Option<&str>) -> PathBuf {
 
 /// Reads `remote.origin.url`, which is what makes two clones one project.
 fn origin_url(root: &Path) -> Option<String> {
-    let output = std::process::Command::new("git")
+    let output = devpit_pty::host_env::command("git")
         .arg("-C")
         .arg(root)
         .args(["config", "--get", "remote.origin.url"])

@@ -37,7 +37,6 @@ pub use session::{AgentSession, Kind, Status};
 pub use transcript::transcript_path;
 
 use std::path::Path;
-use std::process::Command;
 
 /// The binary this crate drives. Overridable for tests and for anyone whose
 /// install is not on the default path.
@@ -61,7 +60,7 @@ pub enum AgentError {
 /// "not installed" instead of showing an empty list that looks like "no
 /// sessions".
 pub fn available() -> bool {
-    Command::new(PROGRAM)
+    devpit_pty::host_env::command(PROGRAM)
         .arg("--version")
         .output()
         .map(|out| out.status.success())
@@ -76,7 +75,8 @@ pub fn list(
     runner: Option<&running::Runner>,
     cwd: Option<&Path>,
 ) -> Result<Vec<AgentSession>, AgentError> {
-    let mut command = Command::new(runner.map_or(PROGRAM, |one| one.program.as_str()));
+    let mut command =
+        devpit_pty::host_env::command(runner.map_or(PROGRAM, |one| one.program.as_str()));
     // Asked of the binary that started these sessions, under its account: a
     // different build knows nothing about them and would answer "none".
     command.envs(runner.map(|one| one.env.clone()).unwrap_or_default());
@@ -147,7 +147,7 @@ pub fn start_background(
     settings: Option<&str>,
 ) -> Result<String, AgentError> {
     let argv = background_argv(runner, session_id, worktree, model, settings);
-    let output = Command::new(&argv[0])
+    let output = devpit_pty::host_env::command(&argv[0])
         .args(&argv[1..])
         .current_dir(cwd)
         // The profile says which account starts this session, and a session

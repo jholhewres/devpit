@@ -85,7 +85,7 @@ fn hand_over(
     what: impl AsRef<std::ffi::OsStr>,
     shown: &str,
 ) -> Result<Opened, RpcError> {
-    let ran = std::process::Command::new(argv[0])
+    let ran = devpit_pty::host_env::command(argv[0])
         .args(&argv[1..])
         .arg(what)
         .spawn();

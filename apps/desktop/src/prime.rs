@@ -87,7 +87,7 @@ pub fn run(
 
     for line in &prime.run {
         on_line(&format!("$ {line}"));
-        let output = std::process::Command::new("sh")
+        let output = devpit_pty::host_env::command("sh")
             .arg("-c")
             .arg(line)
             .current_dir(at)

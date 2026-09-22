@@ -9,9 +9,9 @@
 //! one client and fight the layout we persist.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 mod chrome;
+mod environment;
 mod naming;
 mod pane;
 mod running;
@@ -63,7 +63,7 @@ impl Server {
     }
 
     fn available_at(program: &Path) -> bool {
-        Command::new(program)
+        devpit_pty::host_env::command(program)
             .arg("-V")
             .output()
             .map(|out| out.status.success())
@@ -100,6 +100,7 @@ impl Server {
     /// Creates the session if needed, with status off, named window `window`.
     pub fn ensure_session(&self, session: &str, window: &str, cwd: &Path) -> Result<(), TmuxError> {
         if self.has_session(session)? {
+            environment::clean_once(self)?;
             if !self
                 .list_windows(session)?
                 .iter()
