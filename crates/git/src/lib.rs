@@ -49,7 +49,7 @@ pub use basing::{allowed as base_allowed, chosen as base_chosen, worktree_at, Re
 pub use branches::{branch_at, branches, switch, Branch};
 pub use clone::{clone, folder_for};
 pub use discard::discard;
-pub use front::{changed_since, diff_file, diff_since, head_of, remove_front, unsaved_in};
+pub use front::{at_head, changed_since, diff_since, head_of, remove_front, unsaved_in};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
     assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,

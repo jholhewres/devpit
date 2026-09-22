@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 
-import { parse, sides, type Hunk, type Row } from './diff'
-import { DiffText as Text } from './DiffText'
+import { FileDiff } from './FileDiff'
+import { Columns, Rows } from './GitIcons'
 import { ask, commands } from './live'
+import { PatchView } from './PatchView'
 import type { Tab } from './strip'
 import { useShell } from './useShell'
 
@@ -13,127 +14,80 @@ import { useShell } from './useShell'
  * a card's is against the base it started from, and the two answer different
  * questions. A pane that shows one and implies the other is worse than a pane
  * that shows neither.
+ *
+ * A file's diff is the whole file lined up, editable on the side that is on
+ * disk (`FileDiff`). A commit's diff spans many files and has no one file to
+ * line up against, so it is the patch (`PatchView`).
  */
-
-/* One hunk at a time past this many: a file with four thousand changed lines
-   should not decide how long the window is frozen. */
-const HUNKS_AT_ONCE = 40
 
 export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
   const { project, close } = useShell()
   const path = tab.path ?? null
+  /* A commit's diff and a file's diff are two questions, and the tab says
+     which one it is asking. */
+  const ofCommit = tab.id.startsWith('commit:')
+
+  const bar = (controls: React.ReactNode): React.JSX.Element => (
+    <div className="pane__bar dbar">
+      <span className="pane__t">
+        <b>{path?.split('/').pop() ?? 'Diff'}</b>
+        {ofCommit ? ' · this commit' : ' · against HEAD'}
+      </span>
+      <span className="drag" />
+      {controls}
+      <button className="sq26" onClick={() => close(tab.id)} aria-label="Close diff">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+      </button>
+    </div>
+  )
+
+  if (!project || !path) return bar(null)
+  if (ofCommit) return <CommitDiff projectId={project.id} sha={path} bar={bar} />
+  return <FileDiff key={path} projectId={project.id} path={path} bar={bar} />
+}
+
+function CommitDiff({
+  projectId,
+  sha,
+  bar,
+}: {
+  projectId: string
+  sha: string
+  bar: (controls: React.ReactNode) => React.JSX.Element
+}): React.JSX.Element {
   const [raw, setRaw] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [split, setSplit] = useState(false)
   /* Off by default: most diffs are read for what changed, and a page of dots
      is noise until the change *is* the whitespace. */
   const [spaces, setSpaces] = useState(false)
-  const [shown, setShown] = useState(HUNKS_AT_ONCE)
-
-  /* A commit's diff and a file's diff are two questions, and the tab says
-     which one it is asking. */
-  const ofCommit = tab.id.startsWith('commit:')
 
   useEffect(() => {
-    if (!project || !path) return
-    setShown(HUNKS_AT_ONCE)
-    const call = ofCommit
-      ? () => commands.commitDiff(project.id, null, path)
-      : () => commands.fileDiff(project.id, null, path)
-    void ask(call).then((answer) => {
+    void ask(() => commands.commitDiff(projectId, null, sha)).then((answer) => {
       setRaw(answer.data ?? '')
       setError(answer.error)
     })
-  }, [project, path, ofCommit])
-
-  const files = parse(raw)
-  const hunks = files.flatMap((file) => file.hunks)
-  const renamed = files.find((file) => file.from)
-  const binary = files.some((file) => file.binary)
+  }, [projectId, sha])
 
   return (
     <>
-      <div className="pane__bar">
-        <span className="pane__t">
-          <b>{path?.split('/').pop() ?? 'Diff'}</b>
-          {ofCommit ? ' · this commit' : ' · against HEAD'}
-        </span>
-        <span className="drag" />
-        <button className="chip" aria-pressed={spaces} onClick={() => setSpaces((was) => !was)}>
-          {spaces ? 'Hide whitespace' : 'Show whitespace'}
-        </button>
-        <button className="chip" onClick={() => setSplit((was) => !was)}>
-          {split ? 'Unified' : 'Side by side'}
-        </button>
-        <button className="sq26" onClick={() => close(tab.id)} aria-label="Close diff">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-        </button>
-      </div>
-
-      <div className="code">
-        {error && <div className="exempty__t">{error}</div>}
-        {renamed && (
-          <div className="diff__moved">
-            renamed from <code>{renamed.from}</code>
-          </div>
-        )}
-        {binary && <div className="exempty__t">This file is binary; there is nothing to line up.</div>}
-        {!error && !binary && hunks.length === 0 && (
-          <div className="exempty__t">
-            {ofCommit ? 'This commit changed nothing.' : 'No change against HEAD.'}
-          </div>
-        )}
-
-        {hunks.slice(0, shown).map((hunk, at) =>
-          split ? <Split key={at} hunk={hunk} spaces={spaces} /> : <Unified key={at} hunk={hunk} spaces={spaces} />,
-        )}
-
-        {hunks.length > shown && (
-          <button className="btn" onClick={() => setShown((was) => was + HUNKS_AT_ONCE)}>
-            Show {Math.min(HUNKS_AT_ONCE, hunks.length - shown)} more of {hunks.length} hunks
+      {bar(
+        <>
+          <button className="dbtn" aria-pressed={spaces} onClick={() => setSpaces((was) => !was)} title={spaces ? 'Hide whitespace' : 'Show whitespace'}>
+            Whitespace
           </button>
+          <button className="dbtn" aria-pressed={split} onClick={() => setSplit((was) => !was)} title={split ? 'Unified' : 'Side by side'}>
+            {split ? <Rows /> : <Columns />}
+          </button>
+        </>,
+      )}
+      <div className="code">
+        {error ? (
+          <div className="exempty__t">{error}</div>
+        ) : (
+          <PatchView key={sha} raw={raw} split={split} spaces={spaces} empty="This commit changed nothing." />
         )}
       </div>
     </>
   )
 }
-
-function Unified({ hunk, spaces }: { hunk: Hunk; spaces: boolean }): React.JSX.Element {
-  return (
-    <div className="diff">
-      <div className="diff__at">{hunk.header}</div>
-      {hunk.rows.map((row, at) => (
-        <div className="diff__l" data-d={row.kind} key={at}>
-          <Text text={row.text} spaces={spaces} />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function Split({ hunk, spaces }: { hunk: Hunk; spaces: boolean }): React.JSX.Element {
-  const { left, right } = sides(hunk)
-  return (
-    <div className="diff">
-      <div className="diff__at">{hunk.header}</div>
-      <div className="diff__two">
-        <div>
-          {left.map((row, at) => (
-            <Half key={at} row={row} spaces={spaces} />
-          ))}
-        </div>
-        <div>
-          {right.map((row, at) => (
-            <Half key={at} row={row} spaces={spaces} />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const Half = ({ row, spaces }: { row: Row | null; spaces: boolean }): React.JSX.Element => (
-  <div className="diff__l" data-d={row?.kind ?? 'gap'}>
-    <Text text={row?.text ?? ''} spaces={spaces} />
-  </div>
-)

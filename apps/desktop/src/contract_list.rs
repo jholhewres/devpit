@@ -154,7 +154,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         staging::changes_commit,
         staging::changes_discard,
         saves::file_write,
-        diffs::file_diff,
+        diffs::file_at_head,
         diffs::commit_diff,
         in_flight::run_cancel,
         front::card_archive,

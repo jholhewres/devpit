@@ -156,7 +156,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         staging::changes_commit,
         staging::changes_discard,
         saves::file_write,
-        diffs::file_diff,
+        diffs::file_at_head,
         diffs::commit_diff,
         in_flight::run_cancel,
         front::card_archive,

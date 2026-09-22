@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import type { Change } from '../gen/bindings'
 import { foldered, folders, paths, type Node } from './changeTree'
 import { FileGlyph } from './FileGlyph'
+import { Minus, Plus, Trash, Undo } from './GitIcons'
 import { mark } from './tree'
 
 /*
@@ -15,10 +16,16 @@ import { mark } from './tree'
  * Open by default, and that is the point of the folding in `changeTree`:
  * somebody opening this panel wants to see what changed, not to go looking for
  * it. Closing is for putting aside a folder you have already read.
+ *
+ * Or as a list, as Orca offers: each file once, its folder dimmed beside its
+ * name. Better when the changes are few and far apart.
  */
+
+export type View = 'tree' | 'list'
 
 export function ChangeRows({
   changes,
+  view = 'tree',
   staged,
   busy,
   onOpen,
@@ -27,6 +34,7 @@ export function ChangeRows({
   onDiscard,
 }: {
   changes: readonly Change[]
+  view?: View
   /** Whether these are already in the index, which decides what the button on
    *  a row does. */
   staged: boolean
@@ -37,14 +45,18 @@ export function ChangeRows({
   onStage: (paths: string[]) => void
   onDiscard: (change: Change) => void
 }): React.JSX.Element {
-  const tree = useMemo(() => foldered(changes), [changes])
+  const tree = useMemo(
+    () => (view === 'tree' ? foldered(changes) : changes.map(asFile)),
+    [changes, view],
+  )
   const [shut, setShut] = useState<ReadonlySet<string>>(() => new Set())
 
   const rows = (nodes: readonly Node[], depth: number): React.JSX.Element[] =>
     nodes.flatMap((node) => {
-      const pad = { paddingLeft: `${10 + depth * 12}px` }
       if (node.kind === 'file') {
         const { change } = node
+        const pad = { paddingLeft: `${20 + depth * 12}px` }
+        const folder = view === 'list' ? change.path.split('/').slice(0, -1).join('/') : ''
         return [
           <div
             className="gitrow gitrow--file"
@@ -58,6 +70,7 @@ export function ChangeRows({
                 <FileGlyph path={change.path} />
               </span>
               <span className="gitrow__n">{node.name}</span>
+              {folder && <span className="gitrow__dir">{folder}</span>}
             </button>
             <span className="gitrow__end">
               {change.added > 0 && <span className="add">+{change.added}</span>}
@@ -72,10 +85,10 @@ export function ChangeRows({
                 className="gitrow__act"
                 disabled={busy}
                 onClick={() => onDiscard(change)}
-                title="Discard"
+                title={change.status === 'untracked' ? 'Delete' : 'Discard'}
                 aria-label={`Discard ${change.path}`}
               >
-                &#8634;
+                {change.status === 'untracked' ? <Trash /> : <Undo />}
               </button>
               <button
                 className="gitrow__act"
@@ -84,7 +97,7 @@ export function ChangeRows({
                 title={staged ? 'Take out of the commit' : 'Put in the commit'}
                 aria-label={`${staged ? 'Unstage' : 'Stage'} ${change.path}`}
               >
-                {staged ? '−' : '+'}
+                {staged ? <Minus /> : <Plus />}
               </button>
             </span>
           </div>,
@@ -92,6 +105,7 @@ export function ChangeRows({
       }
 
       const open = !shut.has(node.path)
+      const pad = { paddingLeft: `${8 + depth * 12}px` }
       return [
         <div className="gitrow gitrow--dir" key={node.path}>
           <button
@@ -108,8 +122,8 @@ export function ChangeRows({
             }
           >
             <span className="gitrow__chev" data-open={open}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 6 6 6-6 6" />
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 18 6-6-6-6" />
               </svg>
             </span>
             <span className="gitrow__n">{node.name}</span>
@@ -128,7 +142,7 @@ export function ChangeRows({
               title={staged ? 'Take all of these out' : 'Put all of these in'}
               aria-label={`${staged ? 'Unstage' : 'Stage'} everything in ${node.path}`}
             >
-              {staged ? '−' : '+'}
+              {staged ? <Minus /> : <Plus />}
             </button>
           </span>
         </div>,
@@ -153,3 +167,9 @@ export function ChangeRows({
     </>
   )
 }
+
+const asFile = (change: Change): Node => ({
+  kind: 'file',
+  name: change.path.split('/').pop() ?? change.path,
+  change,
+})

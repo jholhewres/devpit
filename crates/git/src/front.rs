@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use crate::{run, run_diffing, GitError};
+use crate::{run, GitError};
 
 /// The commit a front started from.
 ///
@@ -36,23 +36,19 @@ pub fn diff_since(worktree: &Path, base_ref: &str) -> Result<String, GitError> {
     run(worktree, &["diff", base_ref])
 }
 
-/// The diff of one file, as it stands in the checkout.
+/// A file as `HEAD` holds it — the left side of the Changes panel's diff.
 ///
-/// `HEAD` here, not a base ref, and the difference is the question being
-/// asked: the Changes panel is "what is uncommitted right now", while a card's
-/// front asks "what changed on this line of work". Two questions, two answers.
-///
-/// An untracked file has nothing to diff against, so its whole content is
-/// shown as added — which is what it is, and an empty diff would read as a
-/// file with no changes in it.
-pub fn diff_file(worktree: &Path, path: &str) -> Result<String, GitError> {
-    let tracked = run(worktree, &["ls-files", "--error-unmatch", "--", path]).is_ok();
-    if tracked {
-        return run_diffing(worktree, &["diff", "HEAD", "--", path]);
+/// `None` when `HEAD` has no such file: an untracked or newly added file, or a
+/// repository with no commit yet. That is an empty left side, not a failure,
+/// so it is asked for first rather than read out of an error.
+pub fn at_head(worktree: &Path, path: &str) -> Result<Option<String>, GitError> {
+    // `./` makes the path relative to the worktree, not to the repository
+    // root, which is what every other path here is.
+    let object = format!("HEAD:./{path}");
+    if run(worktree, &["cat-file", "-e", &object]).is_err() {
+        return Ok(None);
     }
-    // `--no-index` exits 1 whenever the files differ, which they always do
-    // against /dev/null. That exit is the diff, not a failure.
-    run_diffing(worktree, &["diff", "--no-index", "--", "/dev/null", path])
+    run(worktree, &["show", &object]).map(Some)
 }
 
 /// Work in the checkout that no commit holds.

@@ -45,3 +45,23 @@ export const discardLoses = (status: Change['status']): DiscardLoss => {
       return 'file'
   }
 }
+
+/* Tree or list, remembered per window. A panel that cannot remember its view
+   still has to draw one, so a storage that throws reads as the default. */
+const VIEW_KEY = 'devpit.changes.view'
+
+export const savedView = (): 'tree' | 'list' => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'tree'
+  } catch {
+    return 'tree'
+  }
+}
+
+export const rememberView = (view: 'tree' | 'list'): void => {
+  try {
+    localStorage.setItem(VIEW_KEY, view)
+  } catch {
+    /* Remembering is a convenience; the choice still applies. */
+  }
+}

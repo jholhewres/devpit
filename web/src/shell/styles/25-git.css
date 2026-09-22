@@ -1,0 +1,85 @@
+/* ── Source control, as Orca draws it ─────────────────────────────────
+   Measured from Orca's panel rather than approximated: 24px rows, 12px
+   names with the folder dimmed beside them, a 16px column for the status
+   letter, headings in small capitals that fold their group. Loaded last, so
+   these are the rules the panel ends up with. */
+
+/* The panel's head: branch, counts and tools, then the message and the one
+   button. */
+.git__head { gap: 6px; padding: 6px 12px 8px; }
+.git__row { gap: 4px; min-height: 28px; }
+.git__up { margin-right: 4px; }
+.git__find { height: 26px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--composer); color: var(--text); font: inherit; font-size: 12px; outline: none; }
+.git__find:focus { border-color: var(--border-strong); }
+.git__msg { min-height: 56px; padding: 6px 8px; border-radius: 6px; font-size: 12px; line-height: 1.5; }
+.git__msg:focus { border-color: var(--border-strong); box-shadow: 0 0 0 1px var(--border-strong); }
+.git__go { height: 26px; font-size: 12px; }
+.git__body { padding: 0 0 8px; }
+
+/* A heading: the whole row lights, the chevron turns, the actions arrive. */
+.scm__head { position: relative; display: flex; align-items: center; gap: 4px; margin: 12px 12px 4px 4px; padding-right: 4px; border-radius: 6px; }
+.scm__head:hover { background: var(--sidebar-item); }
+.scm__toggle { flex: 1; min-width: 0; min-height: 24px; display: flex; align-items: center; gap: 4px; padding: 2px 4px; text-align: left; font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); }
+.scm__head:hover .scm__toggle { color: var(--text); }
+.scm__chev { display: flex; color: var(--text-3); transition: transform 120ms ease; }
+.scm__chev[data-open='false'] { transform: rotate(-90deg); }
+.scm__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scm__n { font-size: 11px; font-weight: 500; letter-spacing: 0; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.scm__acts { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 100ms ease; }
+.scm__head:hover .scm__acts, .scm__acts:focus-within { opacity: 1; }
+@media (hover: none) { .scm__acts { opacity: 1; } }
+
+/* A row. */
+.gitrow { height: 24px; gap: 4px; padding-right: 12px; font-size: 12px; }
+.gitrow:hover { background: color-mix(in srgb, var(--sidebar-item) 70%, transparent); }
+.gitrow[aria-current='true'] { background: var(--sidebar-item); }
+.gitrow__open { gap: 6px; height: 100%; }
+.gitrow__n { flex: none; max-width: 100%; }
+.gitrow--file .gitrow__n { color: var(--text); }
+/* The folder beside the name, in list view: dimmer and smaller, and the
+   first thing to give way when the panel is narrow. */
+.gitrow__dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--text-3); }
+.gitrow__end { gap: 6px; font-size: 10px; }
+.gitrow__end .add { color: var(--success); }
+.gitrow__end .del { color: var(--danger); }
+.gitrow__end .row__g { width: 16px; text-align: center; font-size: 10px; font-weight: 700; }
+.gitrow__c { width: 16px; text-align: center; color: var(--text-3); }
+.gitrow__does { gap: 2px; padding: 0 12px 0 8px; background: var(--raised); }
+.gitrow__act { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--text-2); }
+.gitrow__act:hover { background: var(--overlay-strong); color: var(--text); }
+.gitrow__all { margin: 2px 12px 2px auto; }
+
+/* ── The diff pane ─────────────────────────────────────────────────── */
+.dbar { border-bottom: 1px solid var(--border); gap: 2px; }
+.dbtn { height: 24px; min-width: 24px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: 5px; font-size: 12px; color: var(--text-3); }
+.dbtn:hover { background: var(--overlay); color: var(--text); }
+.dbtn[aria-pressed='true'] { background: var(--overlay-strong); color: var(--text); }
+.dbtn--go { padding: 0 10px; margin-left: 4px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+.dbtn--go:hover { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+.dbar__sep { width: 1px; height: 14px; margin: 0 4px; background: var(--border-strong); }
+
+/* The editors fill the pane and scroll inside themselves. */
+.mdiff { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+.mdiff > .cm-editor, .mdiff > .cm-mergeView { flex: 1; min-width: 0; height: 100%; }
+.mdiff .cm-mergeView { overflow: auto; }
+.mdiff .cm-editor { background: var(--canvas); color: var(--text); font-size: 12px; }
+.mdiff .cm-scroller { font-family: var(--mono); line-height: 1.6; }
+.mdiff .cm-editor.cm-focused { outline: none; }
+.mdiff .cm-content { caret-color: var(--text); }
+.mdiff .cm-cursor { border-left-color: var(--text); }
+.mdiff .cm-selectionBackground, .mdiff .cm-focused .cm-selectionBackground { background: color-mix(in srgb, var(--accent) 28%, transparent) !important; }
+.mdiff .cm-gutters { background: var(--canvas); border-right: 1px solid var(--border); color: var(--ghost); }
+.mdiff .cm-lineNumbers .cm-gutterElement { padding: 0 8px 0 12px; }
+.mdiff .cm-mergeView .cm-merge-a { border-right: 1px solid var(--border); }
+
+/* What changed: a tinted line, and a stronger tint on the characters. */
+.mdiff .cm-merge-a .cm-changedLine, .mdiff .cm-deletedChunk { background: color-mix(in srgb, var(--danger) 13%, transparent); }
+.mdiff .cm-merge-b .cm-changedLine, .mdiff .cm-inlineChangedLine { background: color-mix(in srgb, var(--success) 12%, transparent); }
+.mdiff .cm-merge-a .cm-changedText, .mdiff .cm-deletedChunk .cm-deletedText { background: color-mix(in srgb, var(--danger) 32%, transparent); text-decoration: none; }
+.mdiff .cm-merge-b .cm-changedText, .mdiff .cm-inlineChangedLine .cm-changedText { background: color-mix(in srgb, var(--success) 30%, transparent); text-decoration: none; }
+.mdiff .cm-changeGutter { width: 3px; padding: 0; }
+.mdiff .cm-merge-a .cm-changedLineGutter, .mdiff .cm-deletedLineGutter { background: var(--danger); }
+.mdiff .cm-merge-b .cm-changedLineGutter, .mdiff .cm-changedLineGutter { background: var(--success); }
+/* A folded stretch of unchanged lines: a quiet bar that opens on a click. */
+.mdiff .cm-collapsedLines { padding: 3px 12px; background: var(--overlay); color: var(--text-3); font-family: var(--ui); font-size: 11.5px; cursor: pointer; }
+.mdiff .cm-collapsedLines:hover { background: var(--overlay-strong); color: var(--text-2); }

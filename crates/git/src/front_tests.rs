@@ -88,37 +88,6 @@ fn uncommitted_work_counts_as_this_front_s_change() {
 }
 
 #[test]
-fn a_tracked_file_diffs_against_head() {
-    let repo = repository();
-    std::fs::write(repo.path().join("start"), "changed\n").expect("write");
-
-    let diff = diff_file(repo.path(), "start").expect("diff");
-    assert!(diff.contains("-first"), "{diff}");
-    assert!(diff.contains("+changed"), "{diff}");
-}
-
-/// An untracked file has nothing to diff against, and an empty answer
-/// would read as a file with no changes in it.
-#[test]
-fn an_untracked_file_shows_as_added() {
-    let repo = repository();
-    std::fs::write(repo.path().join("new.txt"), "brand new\n").expect("write");
-
-    let diff = diff_file(repo.path(), "new.txt").expect("diff");
-    assert!(diff.contains("+brand new"), "{diff}");
-}
-
-/// A file nobody touched has an empty diff, which is the truthful answer.
-#[test]
-fn an_unchanged_file_diffs_to_nothing() {
-    let repo = repository();
-    assert!(diff_file(repo.path(), "start")
-        .expect("diff")
-        .trim()
-        .is_empty());
-}
-
-#[test]
 fn a_clean_checkout_has_nothing_unsaved() {
     let repo = repository();
     assert!(unsaved_in(repo.path()).expect("status").is_empty());
@@ -166,4 +135,18 @@ fn a_clean_front_is_removed() {
 
     remove_front(root, &front).expect("remove");
     assert!(!front.is_dir(), "the checkout is still there");
+}
+
+/// The left side of the panel's diff: what `HEAD` holds, or nothing at all.
+#[test]
+fn a_file_at_head_is_what_the_last_commit_holds() {
+    let repo = repository();
+    std::fs::write(repo.path().join("start"), "changed\n").expect("write");
+    std::fs::write(repo.path().join("new.txt"), "new\n").expect("write");
+
+    assert_eq!(
+        at_head(repo.path(), "start").expect("read").as_deref(),
+        Some("first\n")
+    );
+    assert_eq!(at_head(repo.path(), "new.txt").expect("read"), None);
 }

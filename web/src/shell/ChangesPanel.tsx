@@ -1,12 +1,15 @@
 import { useState } from 'react'
 
 import type { Change } from '../gen/bindings'
-import { ChangeRows } from './ChangeRows'
-import { grouped, stageable } from './changes'
+import { ChangeRows, type View } from './ChangeRows'
+import { ChangeSection } from './ChangeSection'
+import { grouped, rememberView, savedView, stageable } from './changes'
 import { counted, primary } from './primary'
 import { DiscardConfirm } from './DiscardConfirm'
+import { List, Minus, Plus, Search, Trash, Tree, Undo } from './GitIcons'
 import { ask, commands } from './live'
 import { Skeleton } from './Skeleton'
+import { abandoned, committed } from './typing'
 import { useShell } from './useShell'
 import type { UseTree } from './useTree'
 
@@ -18,42 +21,42 @@ import type { UseTree } from './useTree'
  * the click, so the panel cannot drift from the index.
  */
 
+type Group = 'staged' | 'changed' | 'untracked'
+
 export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
   const { project, show, active } = useShell()
   /* The row of the file on screen is marked, so the list and the pane agree
-     about where you are. A panel that looks the same whatever is open makes
-     you read the tab bar to find out. */
+     about where you are. */
   const onScreen = active?.kind === 'diff' ? (active.path ?? null) : null
-
   /* A row in Changes opens the diff, not the file: the question the panel is
      answering is what changed, and the file alone does not answer it. */
   const openDiff = (path: string): void =>
     show('diff', { id: `diff:${path}`, path, title: `${path.split('/').pop()} diff` })
+
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState<string | null>(null)
-  const [discarding, setDiscarding] = useState<Change | null>(null)
+  const [discarding, setDiscarding] = useState<readonly Change[] | null>(null)
+  const [view, setView] = useState<View>(savedView)
+  const [finding, setFinding] = useState<string | null>(null)
+  const [shut, setShut] = useState<ReadonlySet<Group>>(() => new Set())
 
-  const groups = grouped(tree.changes)
+  const wanted = finding?.trim().toLowerCase() ?? ''
+  const shown = wanted ? tree.changes.filter((change) => change.path.toLowerCase().includes(wanted)) : tree.changes
+  const groups = grouped(shown)
   const act1 = primary(tree.changes, message)
   const here = project?.worktrees.find((worktree) => worktree.current) ?? project?.worktrees[0]
 
-  const act = (
-    call: () => Promise<unknown>,
-  ): void => {
+  const act = (call: () => Promise<unknown>): void => {
     if (!project) return
     setBusy(true)
     void call()
       .then(() => tree.reload())
       .finally(() => setBusy(false))
   }
-
-  const stage = (paths: string[]): void =>
-    act(() => ask(() => commands.changesStage(project!.id, null, paths)))
-  const unstage = (paths: string[]): void =>
-    act(() => ask(() => commands.changesUnstage(project!.id, null, paths)))
-  const discard = (paths: string[]): void =>
-    act(() => ask(() => commands.changesDiscard(project!.id, null, paths)))
+  const stage = (paths: string[]): void => act(() => ask(() => commands.changesStage(project!.id, null, paths)))
+  const unstage = (paths: string[]): void => act(() => ask(() => commands.changesUnstage(project!.id, null, paths)))
+  const discard = (paths: string[]): void => act(() => ask(() => commands.changesDiscard(project!.id, null, paths)))
 
   const commit = (): void => {
     if (!project) return
@@ -70,48 +73,47 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
       })
       .finally(() => setBusy(false))
   }
+  const go = (): void => (act1.doing === 'stage' ? stage(stageable(tree.changes)) : commit())
 
-  const Group = ({
-    title,
-    rows,
-    staged,
-  }: {
-    title: string
-    rows: readonly Change[]
-    staged: boolean
-  }): React.JSX.Element | null =>
-    rows.length === 0 ? null : (
-      <>
-        <div className="git__group">
-          <span>{title}</span>
-          <span className="git__count">{rows.length}</span>
-          {/* The section's own action, beside its name. `Unstage all` used to
-              be a chip at the top that applied to a group two screens down. */}
-          <button
-            className="gitrow__act"
-            disabled={busy}
-            onClick={() =>
-              staged
-                ? unstage(rows.map((change) => change.path))
-                : stage(rows.map((change) => change.path))
-            }
-            title={staged ? 'Take all of these out' : 'Put all of these in'}
-            aria-label={`${staged ? 'Unstage' : 'Stage'} everything ${title.toLowerCase()}`}
-          >
-            {staged ? '−' : '+'}
-          </button>
-        </div>
-        <ChangeRows
-          changes={rows}
-          staged={staged}
-          busy={busy}
-          onOpen={openDiff}
-          onScreen={onScreen}
-          onStage={staged ? unstage : stage}
-          onDiscard={setDiscarding}
-        />
-      </>
+  const turn = (next: View): void => {
+    setView(next)
+    rememberView(next)
+  }
+
+  const section = (group: Group, title: string, rows: readonly Change[]): React.JSX.Element => {
+    const staged = group === 'staged'
+    const paths = rows.map((change) => change.path)
+    const name = title.toLowerCase()
+    return (
+      <ChangeSection
+        title={title}
+        count={rows.length}
+        open={!shut.has(group)}
+        onToggle={() =>
+          setShut((was) => {
+            const next = new Set(was)
+            if (next.has(group)) next.delete(group)
+            else next.add(group)
+            return next
+          })
+        }
+        actions={
+          <>
+            {!staged && (
+              <button className="gitrow__act" disabled={busy} onClick={() => setDiscarding(rows)} title={group === 'untracked' ? 'Delete all' : 'Discard all'} aria-label={`Discard everything ${name}`}>
+                {group === 'untracked' ? <Trash /> : <Undo />}
+              </button>
+            )}
+            <button className="gitrow__act" disabled={busy} onClick={() => (staged ? unstage(paths) : stage(paths))} title={staged ? 'Unstage all' : 'Stage all'} aria-label={`${staged ? 'Unstage' : 'Stage'} everything ${name}`}>
+              {staged ? <Minus /> : <Plus />}
+            </button>
+          </>
+        }
+      >
+        <ChangeRows changes={rows} view={view} staged={staged} busy={busy} onOpen={openDiff} onScreen={onScreen} onStage={staged ? unstage : stage} onDiscard={(change) => setDiscarding([change])} />
+      </ChangeSection>
     )
+  }
 
   return (
     <>
@@ -124,26 +126,34 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
             <span className="add">+{counted(tree.totals.added)}</span>
             <span className="del">&minus;{counted(tree.totals.removed)}</span>
           </span>
+          <button className="dbtn" aria-pressed={finding !== null} onClick={() => setFinding((was) => (was === null ? '' : null))} title="Filter files" aria-label="Filter files">
+            <Search />
+          </button>
+          <button className="dbtn" onClick={() => turn(view === 'tree' ? 'list' : 'tree')} title={view === 'tree' ? 'View as list' : 'View as tree'} aria-label={view === 'tree' ? 'View as list' : 'View as tree'}>
+            {view === 'tree' ? <List /> : <Tree />}
+          </button>
         </div>
+        {finding !== null && (
+          <input className="git__find" autoFocus placeholder="Filter files" value={finding} onChange={(event) => setFinding(event.target.value)} onKeyDown={(event) => abandoned(event) && setFinding(null)} aria-label="Filter files by path" />
+        )}
 
-        {/* At the top, and that is the change: the message used to sit under a
-            list forty rows long, so the field you were composing in moved as
-            you read and was off the screen by the time you had read it. */}
+        {/* At the top: the message used to sit under a list forty rows long,
+            and was off the screen by the time you had read what changed. */}
         <textarea
           className="git__msg"
-          placeholder="What changed, and why"
+          placeholder="Message (⌘/Ctrl+Enter to commit)"
           value={message}
           onChange={(event) => setMessage(event.target.value)}
+          onKeyDown={(event) => {
+            if (committed(event) && (event.metaKey || event.ctrlKey) && !busy && !act1.disabled) {
+              event.preventDefault()
+              go()
+            }
+          }}
           aria-label="Commit message"
         />
-
         {/* One button, not three. What it says is decided in `primary.ts`. */}
-        <button
-          className="btn btn--go git__go"
-          disabled={busy || act1.disabled}
-          title={act1.why ?? undefined}
-          onClick={() => (act1.doing === 'stage' ? stage(stageable(tree.changes)) : commit())}
-        >
+        <button className="btn btn--go git__go" disabled={busy || act1.disabled} title={act1.why ?? undefined} onClick={go}>
           {act1.label}
         </button>
         {act1.why && <span className="git__why">{act1.why}</span>}
@@ -158,17 +168,18 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
             {said && <span className="exempty__d">{said}</span>}
           </div>
         )}
-        <Group title="Staged" rows={groups.staged} staged={true} />
-        <Group title="Changed" rows={groups.changed} staged={false} />
-        <Group title="Untracked" rows={groups.untracked} staged={false} />
+        {wanted && shown.length === 0 && <div className="exempty__t">No changed file matches.</div>}
+        {section('staged', 'Staged', groups.staged)}
+        {section('changed', 'Changed', groups.changed)}
+        {section('untracked', 'Untracked', groups.untracked)}
       </div>
 
       {discarding && (
         <DiscardConfirm
-          change={discarding}
+          changes={discarding}
           onClose={() => setDiscarding(null)}
           onConfirm={() => {
-            discard([discarding.path])
+            discard(discarding.map((change) => change.path))
             setDiscarding(null)
           }}
         />
