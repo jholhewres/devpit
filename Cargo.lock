@@ -769,7 +769,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-agentcli"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "devpit-pty",
  "devpit-rpc",
@@ -781,7 +781,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-cookies"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "aes",
  "cbc",
@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-core"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "dirs",
  "rusqlite",
@@ -808,7 +808,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-desktop"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -843,7 +843,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-git"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "devpit-pty",
  "devpit-rpc",
@@ -854,7 +854,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-pty"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "libc",
@@ -865,7 +865,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-rpc"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "devpit-core",
  "serde",
@@ -875,7 +875,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-steps"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "devpit-pty",
  "libc",
@@ -887,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-tmux"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "devpit-agentcli",
  "devpit-pty",
@@ -6157,7 +6157,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "base64 0.22.1",
  "minisign-verify",
