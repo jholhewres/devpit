@@ -59,6 +59,12 @@ strip = "debuginfo"
 
 # The shell rebuilds on every screen change in dev; without this the webview
 # wait dominates the cycle.
+# File and line in a backtrace, and no more. Full debug info is most of what a
+# dev build and its tests spend linking and writing to disk, and a debugger
+# session that needs local variables can turn it back on for itself.
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.dev.package."*"]
 opt-level = 2
 
