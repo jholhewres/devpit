@@ -64,7 +64,8 @@ describe('the project dialog', () => {
   })
 
   it('offers the groups other projects are in', () => {
-    const { container } = render(<ProjectDialog project={project()} onClose={vi.fn()} />)
-    expect([...container.querySelectorAll('datalist option')].map((one) => one.getAttribute('value'))).toEqual(['Clients'])
+    render(<ProjectDialog project={project()} onClose={vi.fn()} />)
+    /* On the document: the dialog is drawn through a portal, out of the rail. */
+    expect([...document.querySelectorAll('datalist option')].map((one) => one.getAttribute('value'))).toEqual(['Clients'])
   })
 })

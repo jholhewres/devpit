@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -39,7 +40,9 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
       .finally(() => setBusy(false))
   }
 
-  return (
+  /* On the app's frame, where the other dialogs are: opened from the rail,
+     whose panel clips, it was drawn cut off at the rail's edge. */
+  return createPortal(
     <div className="ask" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()} onKeyDown={(event) => abandoned(event) && onClose()}>
       <div className="addpj__box pdlg" role="dialog" aria-modal="true" aria-labelledby="pdlgT">
         <div className="pdlg__head">
@@ -115,6 +118,7 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.querySelector('.app') ?? document.body,
   )
 }
