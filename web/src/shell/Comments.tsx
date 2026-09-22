@@ -21,6 +21,8 @@ const NAMES: Readonly<Record<string, string>> = {
   codex: 'Codex',
   gemini: 'Gemini',
   opencode: 'OpenCode',
+  /* An agent that wrote through devpit without saying which one it is. */
+  agent: 'Agent',
 }
 
 const nameOf = (author: string): string => NAMES[author] ?? author

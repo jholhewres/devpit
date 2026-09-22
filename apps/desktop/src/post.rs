@@ -37,6 +37,9 @@ pub struct Posted {
     /// judged in `listener::authorized`: parsing a request and deciding
     /// whether to trust it are two jobs.
     pub secret: Option<String>,
+    /// Posted to `/agent` — a question from an agent (`agent_api`) — rather
+    /// than to `/hook`, a report.
+    pub agent: bool,
 }
 
 /// The body of a POST, or nothing.
@@ -58,6 +61,7 @@ pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
     let mut length = 0usize;
     let mut pane = None;
     let mut secret = None;
+    let mut agent = false;
     let mut first = true;
     let mut seen = 0usize;
 
@@ -89,6 +93,10 @@ pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
             // not a header, and the only place the pane could travel without
             // touching the JSON the agent itself wrote.
             pane = pane_in(line);
+            agent = line
+                .split_whitespace()
+                .nth(1)
+                .is_some_and(|target| target == "/agent" || target.starts_with("/agent?"));
             first = false;
             continue;
         }
@@ -112,6 +120,7 @@ pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
         body: String::from_utf8(body).ok()?,
         pane,
         secret,
+        agent,
     })
 }
 

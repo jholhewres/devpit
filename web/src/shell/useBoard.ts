@@ -73,6 +73,17 @@ export function useBoard(projectId: string | null): UseBoard {
      events were emitted by the backend and nothing listened to either. */
   useEffect(() => onCarried<string>('run:changed', () => reload()), [reload])
 
+  /* An agent wrote to the board — a comment, a card, a move — through
+     `devpit agent` or devpit's MCP tools. Only this project's board reads
+     itself again. */
+  useEffect(
+    () =>
+      onCarried<string>('board:changed', (changed) => {
+        if (changed === projectId) reload()
+      }),
+    [reload, projectId],
+  )
+
   /* What a step is printing as it prints it, by card. Held apart from the
      board rather than folded into it: this arrives many times a second and
      re-reading the whole board on each line would be a board that stutters

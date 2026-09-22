@@ -153,6 +153,14 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     }
     let body = &posted.body;
 
+    // A question from an agent, not a report about one: answered with what it
+    // asked for, and nothing about it reaches the hook path below.
+    if posted.agent {
+        trace(&format!("post seq={seq} agent"));
+        reply(&mut stream, &crate::agent_api::answer(Some(&app), body));
+        return;
+    }
+
     // A tool this session wants to be asked about holds the connection until
     // a person answers. Everything else is answered at once and empty, which
     // leaves the CLI's own permission mode in charge — a board step running

@@ -175,7 +175,7 @@ pub fn card_set_due(
 }
 
 /// What a comment body has to be before it is written.
-fn sayable(body: &str) -> Result<&str, RpcError> {
+pub(crate) fn sayable(body: &str) -> Result<&str, RpcError> {
     let said = body.trim();
     if said.is_empty() {
         return Err(RpcError::new(

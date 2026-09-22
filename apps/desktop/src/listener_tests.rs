@@ -266,6 +266,7 @@ fn a_background_session_waiting_reaches_its_card() {
         body: BACKGROUND_WAITING.to_owned(),
         pane: None,
         secret: None,
+        agent: false,
     };
     hear_post(&sink, &posted, next_seq());
 
@@ -322,6 +323,7 @@ fn a_hook_from_an_archived_cards_pane_does_not_bring_it_back() {
         body: PAYLOAD.to_owned(),
         pane: Some(LEAF.to_owned()),
         secret: None,
+        agent: false,
     };
     hear_post(&sink, &posted, next_seq());
     assert!(!sink

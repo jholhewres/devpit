@@ -219,3 +219,25 @@ fn the_pane_is_found_beside_other_parameters() {
         Some("leaf_two".to_owned())
     );
 }
+
+/// An agent's question and a hook's report arrive on the same door and are
+/// told apart by the path, before anything reads the body.
+#[test]
+fn a_post_to_agent_is_a_question_and_to_hook_a_report() {
+    let asked = read_post(std::io::Cursor::new(
+        "POST /agent HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes(),
+    ))
+    .expect("read");
+    assert!(asked.agent);
+    let told = read_post(std::io::Cursor::new(
+        "POST /hook?pane=leaf_1 HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes(),
+    ))
+    .expect("read");
+    assert!(!told.agent);
+    // A path that merely starts with the word is neither.
+    let neither = read_post(std::io::Cursor::new(
+        "POST /agents HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes(),
+    ))
+    .expect("read");
+    assert!(!neither.agent);
+}
