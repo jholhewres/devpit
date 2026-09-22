@@ -19,5 +19,8 @@ pub fn app_info(app: tauri::AppHandle) -> Result<AppInfo, RpcError> {
         version: app.package_info().version.to_string(),
         platform: std::env::consts::OS.to_owned(),
         state_path: Store::default_path()?.display().to_string(),
+        /* The same switch that picks the home (`devpit_core::ROOT_NAME`), so
+        the badge and the data cannot disagree about which devpit this is. */
+        dev: cfg!(debug_assertions),
     })
 }

@@ -8,7 +8,7 @@ TAURI := ./node_modules/.bin/tauri
 
 # The tests get a home of their own.
 #
-# `Store::root` is `dirs::home_dir()/.devpit`, so a suite run against the real
+# `Store::root` is under `dirs::home_dir()`, so a suite run against the real
 # HOME opened — and migrated — the store someone actually uses. The XDG
 # directories go with it, because a cache written to `~/.cache` is the same
 # mistake one directory over.
@@ -36,8 +36,24 @@ help: ## Show this help
 setup: ## Install dependencies
 	pnpm install
 
-dev: node_modules ## Run the app with hot reload
-	$(TAURI) dev
+# A devpit of its own, beside the installed one, so devpit can be worked on
+# from inside devpit.
+#
+# A debug build keeps `~/.devpit-dev` instead of `~/.devpit` (`Store::root`),
+# and every other thing devpit keeps hangs off that: the store, the tmux
+# server's socket, the hook endpoint an agent reports to. Run against the
+# installed home instead, the two wrote their listener ports over each other's
+# and one of them stopped hearing its agents, and a migration here migrated
+# data the installed version then could not read.
+#
+# The overlay gives it an identifier of its own too. WebKit keeps the window's
+# localStorage by identifier, and two processes writing one WebKit store at
+# once is not something to find out about in the middle of a session.
+#
+# HOME is left alone on purpose: agent credentials, git and gh are the same
+# ones the installed devpit uses, so agents run here the way they run there.
+dev: node_modules ## Run the app with hot reload, on a home of its own
+	$(TAURI) dev --config apps/desktop/tauri.dev.conf.json
 
 build: node_modules ## Bundle a release binary, frontend included
 	$(TAURI) build

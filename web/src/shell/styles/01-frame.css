@@ -47,6 +47,13 @@
 .logo:has(img[src]) { background: none; border: none; box-shadow: 0 1px 4px var(--shade); }
 .mark { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mark:not([src]) { display: none; }
+/* A development build, beside the mark. Warm and small: it has to be seen at a
+   glance by someone with two devpits open, and must not read as an error. */
+.top__dev {
+  flex: none; padding: 1px 6px; border-radius: 5px;
+  font: 600 10px/1.5 var(--mono); letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid currentColor; opacity: 0.85;
+}
 
 /* At rest this used to be bare text, which reads as the window's title —
    the one thing a control must not look like. It carries its own surface

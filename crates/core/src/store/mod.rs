@@ -60,6 +60,24 @@ pub use plugins::{DRAWINGS_PLUGIN, DRAWING_EXTENSION};
 pub use projects::ProjectRow;
 pub use settings::key as preference;
 
+/// The folder an installed devpit keeps everything in, under the home.
+pub const RELEASE_ROOT: &str = ".devpit";
+
+/// The folder a devpit being worked on keeps everything in — `make dev`, or
+/// any debug build. Beside the installed one's and never inside it.
+pub const DEV_ROOT: &str = ".devpit-dev";
+
+/// Which of the two this build is.
+///
+/// By build profile rather than by a variable somebody sets, because the
+/// failure it prevents is silent: a development build on the installed home
+/// works perfectly until the two of them are open at once.
+pub const ROOT_NAME: &str = if cfg!(debug_assertions) {
+    DEV_ROOT
+} else {
+    RELEASE_ROOT
+};
+
 pub struct Store {
     conn: Connection,
 }
@@ -163,10 +181,22 @@ impl Store {
     /// that is refused where the socket is made, not here: this function is
     /// read by tests and tools that never open a terminal.
     ///
-    /// `DEVPIT_HOME` is how one machine runs two devpits — an installed one on
-    /// `~/.devpit` and a development one somewhere else — without either
-    /// seeing the other's projects, conversations or terminal history. Empty
-    /// counts as unset, so `DEVPIT_HOME= devpit` is the installed home rather
+    /// One machine runs two devpits — the installed one and the one being
+    /// worked on — and they must not see each other's projects, conversations
+    /// or terminals. **A debug build keeps [`DEV_ROOT`] and a release build
+    /// [`RELEASE_ROOT`]**, so that separation holds without anybody having to
+    /// remember it. It used to rest on setting `DEVPIT_HOME` by hand, and
+    /// `make dev` without it opened the installed devpit's own home: the two
+    /// wrote their listener ports over each other's in `hook-endpoint`, so one
+    /// of them stopped hearing its agents, and a migration in the build being
+    /// worked on migrated data the installed version then could not read.
+    ///
+    /// Everything devpit keeps derives from here — the store, the tmux socket,
+    /// the hook endpoint baked into each agent's `--settings`, the browser
+    /// sessions — so this one choice is the whole of it.
+    ///
+    /// `DEVPIT_HOME` still wins over both, for a home somewhere else entirely.
+    /// Empty counts as unset, so `DEVPIT_HOME= devpit` is the usual home rather
     /// than the filesystem root.
     pub fn root() -> Result<PathBuf, StoreError> {
         if let Some(set) = std::env::var_os("DEVPIT_HOME").filter(|set| !set.is_empty()) {
@@ -174,7 +204,7 @@ impl Store {
         }
         Ok(dirs::home_dir()
             .ok_or(StoreError::NoDataDirectory)?
-            .join(".devpit"))
+            .join(ROOT_NAME))
     }
 
     pub fn default_path() -> Result<PathBuf, StoreError> {

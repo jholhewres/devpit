@@ -167,7 +167,11 @@ pub fn source_of(dir: &Path) -> String {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
     match named.as_str() {
-        ".devpit" => "yours".to_owned(),
+        /* Both homes: a development build keeps `.devpit-dev` beside the
+        installed `.devpit` (`devpit_core::DEV_ROOT`), and its own agents are
+        just as much yours. Written out rather than imported because this
+        crate does not depend on core. */
+        ".devpit" | ".devpit-dev" => "yours".to_owned(),
         "" => "unknown".to_owned(),
         // `~/.claude/agents` would read as ".claude", which is a path showing
         // through into the screen — and so would `~/.claude-claudin`, which is

@@ -1216,6 +1216,13 @@ export type AppInfo = {
 	 *  question of anyone taking a backup or filing a bug.
 	 */
 	statePath: string,
+	/**
+	 *  Whether this is a devpit being worked on rather than the installed one.
+	 *  A debug build keeps a home of its own, and the window says so on its
+	 *  face: two devpits open side by side look identical otherwise, and the
+	 *  one you are testing in is not the one holding your real work.
+	 */
+	dev: boolean,
 };
 
 /**  A card off the board, as the Archived list shows it. */

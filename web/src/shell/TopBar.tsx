@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import mark from '../assets/brand/mark.png'
 import { BranchPicker } from './BranchPicker'
 import { HeadsDown } from './HeadsDownControl'
+import { ask, commands } from './live'
 import { Notices } from './Notices'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
@@ -33,6 +34,13 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
   const [bellOpen, setBellOpen] = useState(false)
   const { totals } = useTree(project?.id ?? null)
   const here = project?.worktrees.find((tree) => tree.current) ?? project?.worktrees[0]
+  /* Whether this is the devpit being worked on. It keeps its own home, so the
+     projects in it are not the real ones — and two devpits side by side look
+     identical without this. */
+  const [dev, setDev] = useState(false)
+  useEffect(() => {
+    void ask(() => commands.appInfo()).then((answer) => setDev(answer.data?.dev === true))
+  }, [])
 
   return (
     <header className="top" data-tauri-drag-region>
@@ -40,6 +48,11 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
         <span className="logo">
           <img className="mark" alt="devpit" src={mark} />
         </span>
+        {dev && (
+          <span className="top__dev" title="A development build, on its own home — not your installed devpit">
+            dev
+          </span>
+        )}
         <ProjectPicker onAdd={onAddProject} />
         {/* Beside the picker because it answers the question the picker asks:
             the picker changes which project you are in, and this is the view

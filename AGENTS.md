@@ -19,9 +19,32 @@ messages, docs, workflows. No exceptions.
 ```sh
 make test     # guards, Rust tests, frontend tests — run this before saying done
 make fmt      # rustfmt + prettier; run it after any Rust edit
-make dev      # the app, hot reload
+make dev      # the app, hot reload, on a home of its own (see below)
 make build    # release bundle
 ```
+
+### Working on devpit from inside devpit
+
+A development build and the installed devpit run side by side and **share
+nothing of devpit's**. Keep it that way:
+
+- **A debug build keeps `~/.devpit-dev`; a release build keeps `~/.devpit`.**
+  The split is by build profile (`devpit_core::ROOT_NAME`), not by a variable,
+  so `make dev` cannot open the installed devpit's projects. The store, the
+  tmux socket and the hook endpoint all live under that root. Two devpits on
+  one root write their listener ports over each other's, and one of them stops
+  hearing its agents without a word.
+- **`make dev` gives the window its own identifier** (`tauri.dev.conf.json`),
+  which is what keeps WebKit's localStorage apart.
+- **HOME is shared on purpose.** Agent credentials, git and gh are the same as
+  the installed devpit's, so agents launched from the dev build work normally.
+- **A dev build says so**: a `dev` badge beside the mark and `devpit (dev)` as
+  the window title.
+- **`make test` and `make e2e` are always safe** to run from a devpit terminal:
+  both use a home under `target/` and the e2e refuses the real one.
+- Never run the dev build with `DEVPIT_HOME=~/.devpit`. `DEVPIT_HOME` exists for
+  a home somewhere else entirely, and pointing it at the installed one undoes
+  the whole separation.
 
 `help setup dev build test fmt clean`, and `e2e` for the WebDriver suite. The
 list is short because the Makefile is the interface everyone reads: a target

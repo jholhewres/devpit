@@ -241,3 +241,20 @@ fn a_row_written_before_a_migration_survives_it() {
     );
     assert_eq!(store.evidence_of(&run).expect("read"), None);
 }
+
+/// A build being worked on never opens the installed devpit's home.
+///
+/// Held by the build profile so it cannot be forgotten: two devpits on one
+/// home write their listener ports over each other's in `hook-endpoint`, and
+/// one of them stops hearing its agents without a word — the board just goes
+/// quiet. Tests are debug builds, so this runs as the development side of the
+/// rule, which is the side that can do the damage.
+#[test]
+#[cfg(debug_assertions)]
+fn a_debug_build_keeps_a_home_apart_from_the_installed_one() {
+    assert_eq!(ROOT_NAME, DEV_ROOT);
+    assert_ne!(ROOT_NAME, RELEASE_ROOT);
+    /* Beside it, not inside it: a home nested in the installed one would be
+    taken with it by anything that clears that folder. */
+    assert!(!DEV_ROOT.starts_with(&format!("{RELEASE_ROOT}/")));
+}

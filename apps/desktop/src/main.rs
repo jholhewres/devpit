@@ -155,6 +155,14 @@ fn main() {
             if let Some(main) = tauri::Manager::get_webview_window(app, "main") {
                 browser_gtk::settle(&main);
             }
+            // A development build says so where the window is listed —
+            // the taskbar, alt-tab — because the window draws its own frame
+            // and the title is otherwise seen nowhere. The top bar's badge is
+            // the other half, for when both devpits are on screen.
+            #[cfg(debug_assertions)]
+            if let Some(main) = tauri::Manager::get_webview_window(app, "main") {
+                let _ = main.set_title("devpit (dev)");
+            }
             // The catalogue is compiled in and pinned by a test, so a manifest
             // breaking the contract is a build defect: loud where it is being
             // written; logged in release, where `plugin_data` refuses it on use
