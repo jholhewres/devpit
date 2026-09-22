@@ -33,7 +33,14 @@ pub const PANE_ENV: &str = "DEVPIT_PANE";
 /// The `--` is load-bearing: without it tmux reads the shell's own flags as
 /// its own, and `--rcfile` becomes an error rather than an argument.
 pub fn window_args(shell: Option<&Shell>, window: &str) -> Vec<String> {
-    let mut args = vec!["-e".to_owned(), format!("{PANE_ENV}={window}")];
+    // `COLORTERM` too: programs ask it, not tmux, whether 24-bit colour is
+    // drawn, and the terminal on the other side draws it.
+    let mut args = vec![
+        "-e".to_owned(),
+        format!("{PANE_ENV}={window}"),
+        "-e".to_owned(),
+        "COLORTERM=truecolor".to_owned(),
+    ];
     let Some(shell) = shell else {
         // Still worth setting: a person who types `claude` into an unwrapped
         // shell should be as visible as one who picks it from the menu.

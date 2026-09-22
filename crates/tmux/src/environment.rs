@@ -39,6 +39,9 @@ pub(crate) fn clean_once(server: &Server) -> Result<(), TmuxError> {
                 .collect::<Vec<_>>(),
         )?;
     }
+    // A server started before devpit declared it also learns the client
+    // draws true colour (`chrome::TRUE_COLOUR`).
+    let _ = server.run(&crate::chrome::TRUE_COLOUR);
     if let Ok(mut seen) = done.lock() {
         seen.insert(server.socket.clone());
     }

@@ -90,7 +90,7 @@ fn a_window_with_no_shell_configured_is_started_as_tmux_always_did() {
     environment is the only thing that reaches the agent's own hooks. */
     assert_eq!(
         server.shell_args("leaf_one"),
-        ["-e", "DEVPIT_PANE=leaf_one"]
+        ["-e", "DEVPIT_PANE=leaf_one", "-e", "COLORTERM=truecolor"]
     );
 }
 
@@ -107,6 +107,8 @@ fn a_wrapped_shell_rides_in_after_the_double_dash() {
         [
             "-e",
             "DEVPIT_PANE=leaf_one",
+            "-e",
+            "COLORTERM=truecolor",
             "-e",
             "DEVPIT_SHELL_FEATURES=marks",
             "--",

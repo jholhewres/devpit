@@ -35,12 +35,28 @@ pub(crate) const QUIET: [[&str; 2]; 6] = [
 /// the first time a project opens a terminal, while somebody is watching an
 /// empty pane.
 pub(crate) fn one_line() -> Vec<&'static str> {
-    let mut argv = Vec::with_capacity(QUIET.len() * 4);
+    let mut argv = Vec::with_capacity(QUIET.len() * 4 + 5);
     for (at, [name, value]) in QUIET.iter().enumerate() {
         if at > 0 {
             argv.push(";");
         }
         argv.extend(["set-option", "-g", name, value]);
     }
+    argv.push(";");
+    argv.extend(TRUE_COLOUR);
     argv
 }
+
+/// That the terminal on the other side — xterm.js, attached as
+/// `xterm-256color` — draws 24-bit colour.
+///
+/// Without it tmux turned every RGB colour a program wrote into its nearest
+/// of 256, and Claude Code, seeing no `COLORTERM` either, drew its diff's
+/// added lines on navy instead of green. A fixed index, not `-a`, so setting it
+/// again on every new session is the same setting, not one more copy.
+pub(crate) const TRUE_COLOUR: [&str; 4] = [
+    "set-option",
+    "-s",
+    "terminal-features[9]",
+    "xterm-256color:RGB",
+];
