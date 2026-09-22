@@ -1,10 +1,23 @@
+import { useEffect, useState } from 'react'
+
 import mark from '../assets/brand/mark.png'
+import { keptAfter, type KeptTab } from './kept'
 import { PANE_MOUNTS } from './paneMounts'
+import type { Tab } from './strip'
 import { useShell } from './useShell'
 import { SHORTCUTS } from './shortcuts'
 
 export function Panes(): React.JSX.Element {
   const { open, active, show, close, project } = useShell()
+  const here = project?.id ?? ''
+
+  /* Tabs of the projects left behind, still mounted. Worked out after the
+     render, and read without this project's own: those come from `open`,
+     under the same keys, so a tab that moves from one list to the other is
+     the same element and never mounts again. */
+  const [kept, setKept] = useState<readonly KeptTab[]>([])
+  useEffect(() => setKept((was) => keptAfter(was, here || null, open, keeps)), [here, open])
+  const elsewhere = kept.filter((one) => one.projectId !== here)
 
   return (
     <section className="mid">
@@ -33,13 +46,14 @@ export function Panes(): React.JSX.Element {
 
             {PANE_MOUNTS.flatMap((mount) =>
               mount.many
-                ? open
-                    .filter((tab) => tab.kind === mount.name)
-                    .map((tab) => (
-                      <div key={tab.id} className={mount.className} data-pane={mount.name} data-show={String(active?.id === tab.id)}>
-                        {mount.render(tab)}
-                      </div>
-                    ))
+                ? [
+                    ...open.filter((tab) => tab.kind === mount.name).map((tab) => ({ projectId: here, tab })),
+                    ...(mount.keep ? elsewhere.filter((one) => one.tab.kind === mount.name) : []),
+                  ].map(({ projectId, tab }) => (
+                    <div key={tab.id} className={mount.className} data-pane={mount.name} data-show={String(projectId === here && active?.id === tab.id)}>
+                      {mount.render(tab, projectId)}
+                    </div>
+                  ))
                 : [
                     <div key={mount.name} className={mount.className} data-pane={mount.name} data-show={String(active?.kind === mount.name)}>
                       {mount.render(close)}
@@ -52,3 +66,6 @@ export function Panes(): React.JSX.Element {
       </section>
   )
 }
+
+const keeps = (tab: Tab): boolean =>
+  PANE_MOUNTS.some((mount) => mount.many && mount.keep === true && mount.name === tab.kind)

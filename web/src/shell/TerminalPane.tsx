@@ -21,8 +21,8 @@ import { useShell } from './useShell'
  * what one tab shows, which is what the word means.
  */
 
-export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { project, attach, launched } = useShell()
+export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }): React.JSX.Element {
+  const { attach, launched } = useShell()
   const [tree, setTree] = useState<LayoutNode | null>(null)
   const [focused, setFocused] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -30,9 +30,9 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!project) return
+    if (!projectId) return
     let dropped = false
-    void ask(() => commands.sessionEnsure(project.id, tab.id, null)).then((answer) => {
+    void ask(() => commands.sessionEnsure(projectId, tab.id, null)).then((answer) => {
       if (dropped) return
       if (!answer.data) return setError(answer.error ?? 'could not open a terminal')
       setTree(answer.data.tree)
@@ -41,12 +41,12 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
     return () => {
       dropped = true
     }
-  }, [project, tab.id])
+  }, [projectId, tab.id])
 
   const split = useCallback(
     (direction: 'horizontal' | 'vertical') => {
-      if (!project || !focused) return
-      void ask(() => commands.sessionSplit(project.id, tab.id, focused, direction, null)).then(
+      if (!projectId || !focused) return
+      void ask(() => commands.sessionSplit(projectId, tab.id, focused, direction, null)).then(
         (answer) => {
           if (!answer.data) return setError(answer.error ?? 'could not split')
           setTree(answer.data.tree)
@@ -54,7 +54,7 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
         },
       )
     },
-    [project, tab.id, focused],
+    [projectId, tab.id, focused],
   )
 
   /* The shortcuts every terminal with splits uses. Only while this tab is the
@@ -73,25 +73,25 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
 
   const settle = useCallback(
     (splitId: string, ratio: number) => {
-      if (!project) return
-      void ask(() => commands.sessionSetRatio(project.id, tab.id, splitId, ratio)).then(
+      if (!projectId) return
+      void ask(() => commands.sessionSetRatio(projectId, tab.id, splitId, ratio)).then(
         (answer) => {
           if (answer.data) setTree(answer.data.tree)
         },
       )
     },
-    [project, tab.id],
+    [projectId, tab.id],
   )
 
   const focus = useCallback(
     (leafId: string) => {
       setFocused((was) => {
-        if (was === leafId || !project) return was
-        void ask(() => commands.sessionFocus(project.id, tab.id, leafId))
+        if (was === leafId || !projectId) return was
+        void ask(() => commands.sessionFocus(projectId, tab.id, leafId))
         return leafId
       })
     },
-    [project, tab.id],
+    [projectId, tab.id],
   )
 
   /* The tab is told which leaves it is showing, because the strip and the
@@ -111,18 +111,18 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
      second one into the first one. */
   const sent = useRef(false)
   useEffect(() => {
-    if (!project || !focused || !tab.launch || sent.current) return
+    if (!projectId || !focused || !tab.launch || sent.current) return
     sent.current = true
     const agent = tab.launch
     launched(tab.id)
-    void ask(() => commands.sessionLaunchAgent(project.id, focused, agent)).then((answer) => {
+    void ask(() => commands.sessionLaunchAgent(projectId, focused, agent)).then((answer) => {
       /* A notice, not the fatal error. The terminal is open and working
          whether or not the agent was started for you, and replacing a working
          terminal with a sentence takes away the one thing that still lets you
          type the command yourself. */
       if (answer.error) setNotice(answer.error)
     })
-  }, [project, focused, tab.launch, tab.id, launched])
+  }, [projectId, focused, tab.launch, tab.id, launched])
 
   const layoutTo = useCallback((next: LayoutNode, focusedId: string) => {
     setTree(next)
@@ -154,7 +154,7 @@ export function TerminalPane({ tab }: { tab: Tab }): React.JSX.Element {
         focused={focused}
         onFocus={focus}
         onRatio={settle}
-        leaf={(leafId) => <Leaf key={leafId} paneId={leafId} projectId={project?.id ?? ''} />}
+        leaf={(leafId) => <Leaf key={leafId} paneId={leafId} projectId={projectId} />}
       />
     </>
   )

@@ -30,7 +30,9 @@ interface Many {
   readonly name: PaneName
   readonly many: true
   readonly className: string
-  render(tab: Tab): React.JSX.Element
+  /** Stays mounted, hidden, after its project is left (see `kept.ts`). */
+  readonly keep?: boolean
+  render(tab: Tab, projectId: string): React.JSX.Element
 }
 
 export type PaneMount = Single | Many
@@ -89,7 +91,13 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
   { name: 'chat', many: true, className: 'pane', render: (tab) => <ChatPane tab={tab} /> },
   { name: 'diff', many: true, className: 'pane pane--file', render: (tab) => <DiffPane tab={tab} /> },
   { name: 'file', many: true, className: 'pane pane--file', render: (tab) => <FilePane tab={tab} /> },
-  { name: 'term', many: true, className: 'pane pane--term', render: (tab) => <TerminalPane tab={tab} /> },
+  {
+    name: 'term',
+    many: true,
+    keep: true,
+    className: 'pane pane--term',
+    render: (tab, projectId) => <TerminalPane tab={tab} projectId={projectId} />,
+  },
   /* A note tab with no file is the list of notes. */
   {
     name: 'note',
