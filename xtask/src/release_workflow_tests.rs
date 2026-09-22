@@ -115,3 +115,36 @@ fn the_called_end_to_end_workflow_is_pinned() {
     );
     assert!(!unpinned(&loosened).is_empty());
 }
+
+/// `install.sh` is how a release reaches somebody new, and it is served from
+/// `main` — not from a tag. A syntax error in it breaks every first install
+/// the moment it is pushed, with no release involved and nothing in CI that
+/// runs it.
+///
+/// Parsed by `sh`, because that is what the README pipes it into, and by
+/// `dash` where there is one: it is `/bin/sh` on Debian and Ubuntu and it
+/// refuses the bashisms a bash-backed `sh` lets through.
+#[test]
+fn the_installer_parses_in_the_shell_it_is_piped_into() {
+    let script = crate::workspace_root().join("install.sh");
+    assert!(
+        script.is_file(),
+        "there is no install.sh for the README to point at"
+    );
+    for shell in ["sh", "dash"] {
+        let ran = std::process::Command::new(shell)
+            .arg("-n")
+            .arg(&script)
+            .output();
+        let Ok(ran) = ran else {
+            /* `sh` is on every machine this builds on; `dash` is not on a Mac. */
+            assert_ne!(shell, "sh", "there is no sh to parse the installer with");
+            continue;
+        };
+        assert!(
+            ran.status.success(),
+            "install.sh does not parse in {shell}: {}",
+            String::from_utf8_lossy(&ran.stderr)
+        );
+    }
+}

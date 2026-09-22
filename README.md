@@ -146,66 +146,73 @@ toll gate.
 
 ## Installing
 
-Linux and macOS are on the [latest release][releases]. On Linux, take the
-AppImage unless you have a reason not to: it is the one that updates itself.
-
-The commands below name `0.1.4` because the version is part of the file name.
-Check the releases page for the current one, or let an installed devpit update
-itself and never type a version again.
-
-**AppImage (Linux).** devpit checks for a new version, verifies its signature,
-installs it over itself and restarts. Your terminals keep running through it —
-they are tmux sessions, and tmux does not go down with the window.
+One line, on Linux or macOS, and it always takes the latest release:
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.4_amd64.AppImage
-chmod +x devpit_0.1.4_amd64.AppImage
-./devpit_0.1.4_amd64.AppImage
+curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | sh
 ```
 
-**`.deb` (Debian, Ubuntu).** devpit downloads the new version and verifies it,
-then shows you the command and never runs it. Installing a system package means
-asking for root, and devpit does not ask for root on your behalf.
+It picks the file that fits the machine, **refuses to install anything that
+does not match the release's `SHA256SUMS`**, and puts it in place: the `.deb`
+through apt on Debian and Ubuntu, the AppImage into `~/.local/bin` on other
+Linux, and `devpit.app` into Applications on macOS. Read
+[`install.sh`](install.sh) before piping it into a shell — it is short on
+purpose. Run it again at any time to catch up; it says so when there is
+nothing to do.
 
-```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/devpit_0.1.4_amd64.deb
-sudo apt install ./devpit_0.1.4_amd64.deb
-```
+Three settings, all optional: `DEVPIT_VERSION=0.1.7` installs that version,
+`DEVPIT_FORMAT=appimage` takes the AppImage even where apt is available, and
+`DEVPIT_DRY_RUN=1` downloads and verifies without installing.
 
-**`.dmg` (macOS).** Apple silicon only — an M1 or later. There is no Intel
-build yet: the runner that makes one is the last Intel image GitHub has and it
-is on its way out, so the answer for an Intel Mac is a universal binary, which
-is not built yet. devpit updates itself here: it downloads the `.app`, checks
-the signature and replaces itself.
+### Staying up to date
 
-The download is **not signed with an Apple Developer ID and not notarised**, so
-the first open is refused by Gatekeeper with "devpit is damaged" or "cannot be
-opened". That is the missing certificate talking, not the file. Open it once
-with right-click → Open, or clear the quarantine flag yourself:
+Once installed, devpit checks for a new release when it opens and once a day
+after, and says so in a card — nothing to run by hand. The switch is in
+Settings → General, on unless you turn it off. Your terminals keep running
+through an update: they are tmux sessions, and tmux does not go down with the
+window.
+
+- **AppImage** — downloads, verifies the signature, installs over itself and
+  restarts.
+- **`.deb`** — downloads and verifies, then installs through polkit, which asks
+  for your password: devpit never holds root itself. It restarts into the new
+  version once the package is in. (Updating *to* 0.1.6 still needed closing and
+  reopening devpit by hand; from 0.1.6 on it restarts itself.)
+- **macOS** — downloads the `.app`, checks the signature and replaces itself.
+
+### By hand
+
+Every file is on the [latest release][releases], and the name carries the
+version, so take the current one from that page:
+
+- Linux: `devpit_<version>_amd64.deb` / `_arm64.deb`, or
+  `devpit_<version>_amd64.AppImage` / `_aarch64.AppImage`.
+- macOS: `devpit_<version>_universal.dmg`, for Apple silicon and Intel alike.
+
+The macOS build is **not signed with an Apple Developer ID and not
+notarised**, so a copy downloaded through a browser is refused by Gatekeeper
+the first time with "devpit is damaged" or "cannot be opened". That is the
+missing certificate talking, not the file. Open it once with right-click →
+Open, or clear the quarantine flag yourself — after checking `SHA256SUMS`:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/devpit.app
 ```
 
-Check `SHA256SUMS` first if you are going to do that — see below.
-
 **Windows** is not built yet. The terminal is tmux and tmux is not a thing
-there, so it is a port rather than a build; it is not in this release.
+there, so it is a port rather than a build.
 
-Every release carries a `SHA256SUMS`, and checking it is one line:
+Every release carries a `SHA256SUMS`, and checking a download is one line:
 
 ```sh
-curl -LO https://github.com/jholhewres/devpit/releases/latest/download/SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
 The `.sig` beside each package is the updater's, not a substitute for this: it
 is what an installed devpit checks before it replaces itself, against a public
 key compiled into the binary you are already running. A first download has no
-such binary to check it with, which is what `SHA256SUMS` is for.
-
-Automatic checking is a switch in Settings → General, and it is on unless you
-turn it off.
+such binary to check it with, which is what `SHA256SUMS` is for — and what
+`install.sh` checks for you.
 
 [releases]: https://github.com/jholhewres/devpit/releases/latest
 
