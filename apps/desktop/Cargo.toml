@@ -31,7 +31,13 @@ specta-typescript = "0.0.12"
 # release notes for rather than bump. `xtask/src/packaging.rs` holds the
 # tripwire: `TAURI_READ` pins the version whose unstable API this repo has
 # read, and the check refuses a lockfile past it.
-tauri = { version = "2", features = ["unstable"] }
+# `macos-private-api` is what makes a transparent window exist on macOS at
+# all: without it `WebviewWindowBuilder::transparent` is not compiled there and
+# the build fails on Apple's machine alone. The cost is the App Store, which
+# refuses an app that touches private API — devpit ships its own dmg, deb and
+# AppImage, so there is nothing to lose. The main window already asked for
+# transparency in tauri.conf.json; this is what honours it.
+tauri = { version = "2", features = ["unstable", "macos-private-api"] }
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
 ulid = "3.0.0"

@@ -47,3 +47,34 @@ jobs:
       # `make test` builds in debug, so a module gated wrong for release
       # compiles there and fails only when someone ships. It did once.
       - run: make build
+
+  # Linux is where this is written, and macOS is where it breaks: a method the
+  # webview exposes on one platform and not the other compiles here and fails
+  # there. Until this job existed, Apple's compiler first saw the code on a
+  # tag — which is how v0.1.5 died at `.transparent(true)`, a call that needs
+  # `macos-private-api` to exist at all on macOS.
+  #
+  # `make test-rust` and not a bespoke `cargo check`: the guards and the Rust
+  # tests are the bar, and CI does not invent commands nobody can run by hand.
+  # The frontend is left to the Linux job, which already builds it once.
+  #
+  # Windows is absent on purpose. `release.yml` ships Linux and macOS, and a
+  # platform nobody releases is a platform nobody should be blocked by.
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v4.2.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: make setup
+      - run: make test-rust
