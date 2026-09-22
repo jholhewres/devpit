@@ -161,3 +161,55 @@ fn two_platforms_may_name_the_same_download() {
         found["darwin-x86_64"]["url"]
     );
 }
+
+/// `SHA256SUMS` is for a first download, and on a Mac that is the `.dmg`.
+///
+/// It was built from the updater's list, which leaves the dmg out on purpose
+/// and names the universal tarball once per Mac. So it shipped without the dmg
+/// and with the tarball twice — and `sha256sum -c --ignore-missing`, the
+/// README's own line, checked nothing for anybody on a Mac.
+#[test]
+fn the_checksums_name_the_dmg_and_nothing_twice() {
+    let tarball = ("devpit.app.tar.gz".to_owned(), b"app".to_vec());
+    let updater = vec![
+        ("devpit_0.1.7_amd64.deb".to_owned(), b"deb".to_vec()),
+        tarball.clone(),
+        /* The universal build, answering for the second Mac. */
+        tarball.clone(),
+    ];
+    let dmgs = vec![("devpit_0.1.7_universal.dmg".to_owned(), b"dmg".to_vec())];
+
+    let listed = for_a_person(&updater, dmgs);
+    let names: Vec<&str> = listed.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "devpit_0.1.7_amd64.deb",
+            "devpit.app.tar.gz",
+            "devpit_0.1.7_universal.dmg"
+        ]
+    );
+}
+
+/// The dmg is read from the folder the bundler writes it to, and only a dmg.
+#[test]
+fn the_dmgs_are_found_where_the_bundler_leaves_them() {
+    let bundle = tempfile::tempdir().expect("a bundle");
+    let dmg = bundle.path().join("dmg");
+    std::fs::create_dir_all(&dmg).expect("the dmg folder");
+    std::fs::write(dmg.join("devpit_0.1.7_universal.dmg"), b"image").expect("a dmg");
+    std::fs::write(dmg.join("bundle_dmg.sh"), b"#!/bin/sh").expect("the bundler's script");
+
+    let found = dmgs_in(bundle.path());
+    assert_eq!(
+        found.len(),
+        1,
+        "{:?}",
+        found.iter().map(|(n, _)| n).collect::<Vec<_>>()
+    );
+    assert_eq!(found[0].0, "devpit_0.1.7_universal.dmg");
+    assert_eq!(found[0].1, b"image");
+
+    /* A Linux runner has no dmg folder at all, and that is nothing, not an error. */
+    assert!(dmgs_in(&bundle.path().join("nowhere")).is_empty());
+}

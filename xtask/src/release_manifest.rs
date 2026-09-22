@@ -87,6 +87,48 @@ pub(crate) fn checksums(files: &[(String, Vec<u8>)]) -> String {
     said
 }
 
+/// What `SHA256SUMS` lists: every file a person might download first, once.
+///
+/// Not the updater's list, which it used to be. That one leaves the `.dmg` out
+/// on purpose — the updater never installs one — and names the universal
+/// `.app.tar.gz` once per Mac it answers for, because the updater resolves by
+/// target. `SHA256SUMS` is for the opposite reader: somebody's first download,
+/// which on a Mac *is* the `.dmg`. Built from the updater's list, it shipped
+/// without the dmg and with the tarball twice, and the README's own line —
+/// `sha256sum -c --ignore-missing` — checked nothing for anybody on a Mac and
+/// said so to nobody.
+pub(crate) fn for_a_person(
+    updater: &[(String, Vec<u8>)],
+    dmgs: Vec<(String, Vec<u8>)>,
+) -> Vec<(String, Vec<u8>)> {
+    let mut listed: Vec<(String, Vec<u8>)> = Vec::new();
+    for (name, bytes) in updater.iter().cloned().chain(dmgs) {
+        if !listed.iter().any(|(seen, _)| *seen == name) {
+            listed.push((name, bytes));
+        }
+    }
+    listed
+}
+
+/// The `.dmg` files one runner's bundle left, which nothing else reads.
+pub(crate) fn dmgs_in(bundle: &Path) -> Vec<(String, Vec<u8>)> {
+    let Ok(entries) = std::fs::read_dir(bundle.join("dmg")) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = path.file_name()?.to_str()?.to_owned();
+            if !name.ends_with(".dmg") {
+                return None;
+            }
+            let bytes = std::fs::read(&path).ok()?;
+            Some((name, bytes))
+        })
+        .collect()
+}
+
 /// The public key the app ships, out of its own config.
 pub(crate) fn pubkey_of(root: &Path) -> Option<String> {
     let text = std::fs::read_to_string(root.join("apps/desktop/tauri.conf.json")).ok()?;
@@ -280,11 +322,16 @@ pub fn run(root: &Path, version: &str, notes: &str, date: &str) -> Result<Vec<Pa
     }
 
     let sums = out.join("SHA256SUMS");
-    let listed: Vec<(String, Vec<u8>)> = checked
+    let updater: Vec<(String, Vec<u8>)> = checked
         .iter()
         .map(|(_, _, name, bytes, _)| (name.clone(), bytes.clone()))
         .collect();
-    std::fs::write(&sums, checksums(&listed)).map_err(|err| err.to_string())?;
+    let dmgs = dirs
+        .iter()
+        .flat_map(|(bundle, _)| dmgs_in(bundle))
+        .collect();
+    std::fs::write(&sums, checksums(&for_a_person(&updater, dmgs)))
+        .map_err(|err| err.to_string())?;
     written.push(sums);
 
     Ok(written)
