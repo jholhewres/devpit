@@ -8,6 +8,7 @@ import { drawOnTheGpu, measureWideCharacters } from './terminalAddons'
 import { reason } from './reason'
 import { ask, commands } from './live'
 import { contrastFor, darkNow, options, palette } from './terminal'
+import { picturesAsPaths } from './terminalPaste'
 import { useMarks } from './useMarks'
 
 /*
@@ -27,6 +28,9 @@ export function Leaf({
 }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  /* Beside the terminal, not instead of it: a paste that failed leaves the
+     terminal as usable as it was. */
+  const [pasteFailed, setPasteFailed] = useState<string | null>(null)
   const [term, setTerm] = useState<Terminal | null>(null)
 
   useEffect(() => {
@@ -47,6 +51,8 @@ export function Leaf({
     // After `open`, which is when there is a canvas to take a context from.
     measureWideCharacters(terminal)
     drawOnTheGpu(terminal)
+    const pasted = picturesAsPaths(projectId, (path) => terminal.paste(path), setPasteFailed)
+    box.addEventListener('paste', pasted, true)
 
     /* The pane is `display: none` until its tab is active and animates in on a
        transform, so a fit in this tick measures nothing and xterm ends up with
@@ -133,6 +139,7 @@ export function Leaf({
       themed.disconnect()
       watch.disconnect()
       shown?.disconnect()
+      box.removeEventListener('paste', pasted, true)
       live?.detach()
       terminal.dispose()
     }
@@ -143,6 +150,7 @@ export function Leaf({
   return (
     <>
       {error && <div className="exempty__t">{error}</div>}
+      {pasteFailed && <div className="exempty__t">{pasteFailed}</div>}
       <div className="termhost" ref={host} />
     </>
   )
