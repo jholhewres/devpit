@@ -192,20 +192,20 @@ pub fn parse_field(raw: &str, name: &str) -> Option<u64> {
 
 /// How many ticks a second this machine counts.
 ///
-/// `sysconf(_SC_CLK_TCK)`, which is 100 everywhere this runs — but reading it
+/// `sysconf(_SC_CLK_TCK)`, which is 100 almost everywhere — but reading it
 /// rather than writing 100 down means a machine where it is not 100 reports a
-/// percentage rather than a number four times too large.
+/// percentage rather than a number four times too large. 100 when the call
+/// has no answer.
 pub fn ticks_per_second() -> u64 {
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     {
-        // No libc dependency for one constant: the kernel exposes it, and 100
-        // is the answer on every configuration this ships to.
-        100
+        // SAFETY: `sysconf` reads a constant and has no preconditions.
+        let ticks = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+        if ticks > 0 {
+            return ticks as u64;
+        }
     }
-    #[cfg(not(target_os = "linux"))]
-    {
-        100
-    }
+    100
 }
 
 #[cfg(test)]

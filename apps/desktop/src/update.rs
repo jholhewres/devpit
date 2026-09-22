@@ -160,7 +160,9 @@ pub(crate) fn due(last: Option<f64>, now: f64, failures: u32, enabled: bool) -> 
     let wait = if failures == 0 {
         A_DAY
     } else {
-        (AFTER_A_FAILURE * 2f64.powi(failures as i32 - 1)).min(AT_MOST)
+        // Clamped before the cast: past a few doublings the cap has already
+        // won, and a count near `u32::MAX` would wrap to a negative exponent.
+        (AFTER_A_FAILURE * 2f64.powi(failures.min(20) as i32 - 1)).min(AT_MOST)
     };
     now - last >= wait
 }
@@ -343,7 +345,15 @@ impl Updating {
 ///
 /// The switch is read every cycle rather than once: turning it off is meant to
 /// take effect without a restart.
+///
+/// Not in a development build, unless a test hands it a feed: `make dev` has
+/// no release to compare itself with, and every session printed
+/// `devpit-update failed` for a check that could only fail. Asking by hand
+/// still works.
 pub(crate) fn watch(app: tauri::AppHandle) {
+    if cfg!(debug_assertions) && fixture_feed().is_none() {
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         let mut last: Option<f64> = None;
         let mut failures: u32 = 0;

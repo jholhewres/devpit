@@ -160,12 +160,8 @@ pub fn notices_sweep_due(app: tauri::AppHandle) -> Result<Notices, RpcError> {
         .map(|since| since.as_secs() as i64)
         .unwrap_or_default();
 
-    let already: std::collections::HashSet<String> = store
-        .notices(devpit_core::limits::NOTICES_KEPT)?
-        .into_iter()
-        .filter(|row| row.kind == kind::DUE)
-        .filter_map(|row| row.card_id)
-        .collect();
+    let already: std::collections::HashSet<String> =
+        store.cards_noticed(kind::DUE)?.into_iter().collect();
 
     let mut rang = false;
     for (card_id, project_id, title) in store.overdue_cards(now)? {

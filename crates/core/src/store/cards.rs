@@ -209,6 +209,20 @@ impl Store {
     /// left those five in whatever order SQLite felt like, which is the same
     /// list drawn differently on every read. The id is a ULID, ordered by the
     /// millisecond it was minted in, so it breaks the tie the right way.
+    /// The cards that already have a notice of this kind, read or not.
+    ///
+    /// Asked of the whole table, not of the newest page: a card noticed as due
+    /// three hundred notices ago is still noticed.
+    pub fn cards_noticed(&self, kind: &str) -> Result<Vec<String>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT card_id FROM notice WHERE kind = ?1 AND card_id IS NOT NULL",
+        )?;
+        let rows = stmt
+            .query_map([kind], |row| row.get(0))?
+            .collect::<Result<Vec<String>, _>>()?;
+        Ok(rows)
+    }
+
     pub fn notices(&self, limit: i64) -> Result<Vec<NoticeRow>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, project_id, kind, title, detail, card_id, created_at, read_at \
