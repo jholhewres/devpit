@@ -68,6 +68,11 @@ export const commands = {
 	 *  it is either one of the app's own names or a single emoji.
 	 */
 	projectEdit: (projectId: string, name: string, group: string | null, icon: string | null, color: string | null) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_edit", { projectId, name, group, icon, color })),
+	/**
+	 *  `project.group_rename` — a group's name, changed on every project in it.
+	 *  An empty name takes them out of the group.
+	 */
+	projectGroupRename: (from: string, to: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_group_rename", { from, to })),
 	/**  `chat.history` — everything said in this conversation, in order. */
 	chatHistory: (projectId: string, conversationId: string) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId })),
 	/**

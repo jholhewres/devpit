@@ -31,6 +31,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         projects::project_forget,
         projects::project_rename,
         projects::project_edit,
+        projects::project_group_rename,
         chat::chat_history,
         threads::chat_list,
         outside_sessions::chat_outside,

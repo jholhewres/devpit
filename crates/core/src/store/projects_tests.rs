@@ -47,6 +47,36 @@ fn renaming_changes_the_name_and_not_the_folder() {
     assert_eq!(row.root_path, root.to_string_lossy());
 }
 
+/// A group is renamed everywhere at once, and emptied when the name is.
+#[test]
+fn a_group_is_renamed_across_its_projects() {
+    let (dir, store) = store();
+    let ids: Vec<String> = ["a", "b", "c"]
+        .iter()
+        .map(|name| {
+            let root = dir.path().join(name);
+            std::fs::create_dir_all(&root).expect("create");
+            store.add_project(&root, None).expect("add")
+        })
+        .collect();
+    for id in &ids[..2] {
+        store
+            .edit_project(id, "x", Some("Work"), None, None)
+            .expect("edit");
+    }
+
+    assert_eq!(
+        store.rename_group("Work", Some("Clients")).expect("rename"),
+        2
+    );
+    let group = |id: &str| store.project(id).expect("read").expect("there").group;
+    assert_eq!(group(&ids[0]).as_deref(), Some("Clients"));
+    assert_eq!(group(&ids[2]), None);
+
+    assert_eq!(store.rename_group("Clients", None).expect("ungroup"), 2);
+    assert_eq!(group(&ids[1]), None);
+}
+
 /// The edit dialog sets name, group and mark together, and clears what it
 /// leaves empty.
 #[test]

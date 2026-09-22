@@ -47,7 +47,8 @@ describe('the project dialog', () => {
     const close = vi.fn()
     render(<ProjectDialog project={project()} onClose={close} />)
     fireEvent.change(screen.getByDisplayValue('site'), { target: { value: 'Site' } })
-    fireEvent.change(screen.getByPlaceholderText('None'), { target: { value: 'Clients' } })
+    fireEvent.click(screen.getByText('No group'))
+    fireEvent.click(screen.getByRole('option', { name: 'Clients' }))
     fireEvent.click(screen.getByTitle('rocket'))
     fireEvent.click(screen.getByTitle('#62c987'))
     fireEvent.click(screen.getByText('Save'))
@@ -63,9 +64,14 @@ describe('the project dialog', () => {
     await waitFor(() => expect(edited).toHaveBeenCalledWith('p1', 'site', null, '🚀', null))
   })
 
-  it('offers the groups other projects are in', () => {
+  it('offers the groups other projects are in, and a new one', () => {
     render(<ProjectDialog project={project()} onClose={vi.fn()} />)
-    /* On the document: the dialog is drawn through a portal, out of the rail. */
-    expect([...document.querySelectorAll('datalist option')].map((one) => one.getAttribute('value'))).toEqual(['Clients'])
+    fireEvent.click(screen.getByText('No group'))
+    expect(screen.getAllByRole('option').map((one) => one.textContent)).toEqual(['No group', 'Clients'])
+    fireEvent.click(screen.getByText('New group…'))
+    const typed = screen.getByPlaceholderText('Group name')
+    fireEvent.change(typed, { target: { value: 'Side' } })
+    fireEvent.keyDown(typed, { key: 'Enter' })
+    expect(screen.getByText('Side')).toBeTruthy()
   })
 })

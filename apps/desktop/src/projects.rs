@@ -348,6 +348,22 @@ pub fn project_edit(
     project_list()
 }
 
+/// `project.group_rename` — a group's name, changed on every project in it.
+/// An empty name takes them out of the group.
+#[tauri::command]
+#[specta::specta]
+pub fn project_group_rename(from: String, to: String) -> Result<ProjectList, RpcError> {
+    let to = to.trim();
+    if to.chars().count() > 60 {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "that group name is too long",
+        ));
+    }
+    store()?.rename_group(&from, (!to.is_empty()).then_some(to))?;
+    project_list()
+}
+
 fn is_hex_colour(value: &str) -> bool {
     value.len() == 7
         && value.starts_with('#')

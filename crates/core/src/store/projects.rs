@@ -224,6 +224,17 @@ impl Store {
         Ok(changed > 0)
     }
 
+    /// Renames a group across every project in it; an empty name ungroups
+    /// them. Answers how many projects moved.
+    pub fn rename_group(&self, from: &str, to: Option<&str>) -> Result<usize, StoreError> {
+        let changed = self.conn.execute(
+            "UPDATE project SET group_name = ?2, revision = revision + 1 \
+             WHERE group_name = ?1 AND archived_at IS NULL",
+            rusqlite::params![from, to],
+        )?;
+        Ok(changed)
+    }
+
     /// Marks a project as the one being worked in, which is what orders the list.
     pub fn touch_project(&self, id: &str) -> Result<(), StoreError> {
         self.conn.execute(

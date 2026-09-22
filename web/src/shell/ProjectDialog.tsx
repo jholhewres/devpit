@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { Project } from '../gen/bindings'
+import { GroupPicker } from './GroupPicker'
 import { ask, commands } from './live'
 import { COLOURS, ICONS, iconName, ProjectMark } from './ProjectMark'
 import { abandoned, committed } from './typing'
@@ -58,15 +59,10 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
           <input autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => committed(event) && save()} />
         </label>
 
-        <label className="pdlg__f">
+        <div className="pdlg__f">
           <span>Group</span>
-          <input value={group} list="pdlg-groups" placeholder="None" onChange={(event) => setGroup(event.target.value)} />
-          <datalist id="pdlg-groups">
-            {groups.map((one) => (
-              <option key={one} value={one} />
-            ))}
-          </datalist>
-        </label>
+          <GroupPicker value={group} groups={groups} onChange={setGroup} />
+        </div>
 
         <div className="pdlg__f">
           <span>Icon</span>

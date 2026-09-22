@@ -88,3 +88,29 @@ export function sections(list: readonly Project[]): readonly Section[] {
   }
   return out
 }
+
+/* Which groups are folded, remembered per window. */
+const SHUT_KEY = 'devpit.rail.shut'
+
+export function savedShut(): ReadonlySet<string> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(SHUT_KEY) ?? '[]')
+    return new Set(Array.isArray(raw) ? raw.filter((one): one is string => typeof one === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+export function saveShut(shut: ReadonlySet<string>): void {
+  try {
+    localStorage.setItem(SHUT_KEY, JSON.stringify([...shut]))
+  } catch {
+    /* Folding still applies for as long as the window is open. */
+  }
+}
+
+/** What a group shows: all of it when open; folded, only the project in
+ *  front, so folding a group never hides where you are. */
+export function shown(section: Section, folded: boolean, current: string | null): readonly Project[] {
+  return folded ? section.projects.filter((project) => project.id === current) : section.projects
+}
