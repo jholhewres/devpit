@@ -14,10 +14,11 @@ use crate::{
     cards, chat, checkpoint, checkpoint_findings, checkpoint_preview, claude_plugin, cloning,
     columns, commands, diffs, files, filetree, front, happening, heads_down, history, in_flight,
     index, installations, mcp, moving, notices, openers, outside_sessions, pane_screen, panels,
-    panes, pasting, paths, plan_limits, plugin_data, plugins, project_naming, projects, receipts,
-    regrouping, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
-    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, threads, update,
-    watching, workspace, worktree_base, worktrees, wsfiles,
+    panes, pasting, paths, plan_limits, plugin_data, plugins, project_naming, projects,
+    reading_path, receipts, regrouping, reveal, rewinding, runs_list, saves, search,
+    session_search, sessions, settings, shell_launch, skills, slash, sources, spend_history,
+    staging, steering, steps, threads, update, watching, workspace, worktree_base, worktrees,
+    wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -153,6 +154,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         notices::notices_mark_all,
         notices::notices_sweep_due,
         files::file_read,
+        reading_path::path_read,
         paths::path_create,
         paths::path_move,
         paths::path_delete,

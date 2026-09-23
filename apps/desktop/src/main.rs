@@ -92,6 +92,7 @@ mod prime;
 mod project_naming;
 mod projects;
 mod question;
+mod reading_path;
 mod receipts;
 mod reconcile;
 mod refusing;

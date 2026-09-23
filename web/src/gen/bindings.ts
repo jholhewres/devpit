@@ -831,6 +831,8 @@ export const commands = {
 	noticesSweepDue: () => typedError<Notices, RpcError>(__TAURI_INVOKE("notices_sweep_due")),
 	/**  `file.read` — the text of a file, or why it is not text. */
 	fileRead: (projectId: string, worktreeId: string | null, path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("file_read", { projectId, worktreeId, path })),
+	/**  `path.read` — what is at an absolute path, as `file.read` answers. */
+	pathRead: (path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("path_read", { path })),
 	/**
 	 *  `path.create` — a new empty file, or a new folder.
 	 * 

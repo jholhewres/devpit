@@ -129,7 +129,10 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
           <Code
             text={edit.text}
             language={path ? ofPath(path) : null}
-            onChange={edit.change}
+            /* A file outside the project is shown, not edited: saving goes
+               through the project it belongs to. */
+            onChange={path?.startsWith('/') ? undefined : edit.change}
+            readOnly={path?.startsWith('/')}
             line={line}
           />
         )}

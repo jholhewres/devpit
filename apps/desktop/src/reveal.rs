@@ -39,7 +39,7 @@ pub(crate) fn openable(roots: &[PathBuf], home: &Path, path: &Path) -> Option<Pa
         .then_some(resolved)
 }
 
-fn allowed(path: &str) -> Result<PathBuf, RpcError> {
+pub(crate) fn allowed(path: &str) -> Result<PathBuf, RpcError> {
     let store = Store::open_default()?;
     let mut roots: Vec<PathBuf> = store
         .projects()?

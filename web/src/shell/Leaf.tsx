@@ -15,6 +15,8 @@ import { picturesAsPaths } from './terminalPaste'
 import { wheelToTmux } from './terminalWheel'
 import { useMarks } from './useMarks'
 import { menuPoint } from './menuRules'
+import { useShellPick } from './shellStore'
+import { linkPaths } from './terminalPathLinks'
 
 /*
  * One terminal, attached to one pane.
@@ -53,6 +55,11 @@ export function Leaf({
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
   const onTerminalRef = useRef(onTerminal)
   onTerminalRef.current = onTerminal
+  /* Where a path clicked in the terminal opens: read at the click, so the
+     terminal is not rebuilt when the project or the tabs change. */
+  const opening = useShellPick((shell) => ({ show: shell.show, root: shell.project?.rootPath ?? null }))
+  const openingRef = useRef(opening)
+  openingRef.current = opening
 
   useEffect(() => {
     const box = host.current
@@ -69,6 +76,7 @@ export function Leaf({
     const fit = new FitAddon()
     terminal.loadAddon(fit)
     terminal.open(box)
+    const linked = linkPaths(terminal, openingRef)
     // After `open`, which is when there is a canvas to take a context from.
     measureWideCharacters(terminal)
     /* tmux sends only what changes, so a screen that was emptied under it —
@@ -251,6 +259,7 @@ export function Leaf({
       box.removeEventListener('keydown', keys, true)
       box.removeEventListener('contextmenu', menu, true)
       unguard()
+      linked.dispose()
       live?.detach()
       terminal.dispose()
     }

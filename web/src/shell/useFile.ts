@@ -37,7 +37,10 @@ export function useFile(path: string | null): Editing {
   const load = useCallback(() => {
     if (!project || !path) return
     const mine = ++reading.current
-    void ask(() => commands.fileRead(project.id, null, path)).then((answer) => {
+    /* A full path — one clicked in a terminal — is read where it is, if it is
+       somewhere the app may open; a project path through the project. */
+    const read = path.startsWith('/') ? () => commands.pathRead(path) : () => commands.fileRead(project.id, null, path)
+    void ask(read).then((answer) => {
       if (mine !== reading.current) return
       setFile(answer.data ?? null)
       setText(answer.data?.text ?? '')
