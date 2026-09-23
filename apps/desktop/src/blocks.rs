@@ -23,9 +23,24 @@ struct Pane {
 #[derive(Default)]
 pub struct Blocks {
     panes: Mutex<HashMap<String, Arc<Mutex<Pane>>>>,
+    /// Which project each pane is in, for the bell.
+    projects: Mutex<HashMap<String, String>>,
 }
 
+/// A command this long that ends while the window is elsewhere rings the
+/// bell: long enough that you went to do something else while it ran.
+const WORTH_TELLING_MS: u64 = 10_000;
+
 impl Blocks {
+    /// Says which project a pane belongs to; the tap knows when it arms one.
+    pub(crate) fn belongs(&self, pane_id: &str, project_id: &str) {
+        let mut projects = self
+            .projects
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        projects.insert(pane_id.to_owned(), project_id.to_owned());
+    }
+
     fn pane(&self, pane_id: &str) -> Arc<Mutex<Pane>> {
         let mut panes = self
             .panes
@@ -84,8 +99,43 @@ pub(crate) fn heard(app: &tauri::AppHandle, pane_id: &str, chunk: &[u8]) {
         },
     );
     for block in ended {
+        told_if_long(app, &blocks, pane_id, &block.head);
         history.push(block);
     }
+}
+
+/// Rings the bell for a long command that ended while the window was not in
+/// front — which is when a finished build would otherwise go unnoticed.
+fn told_if_long(app: &tauri::AppHandle, blocks: &Blocks, pane_id: &str, head: &Head) {
+    let Some(ended) = head.ended_at else { return };
+    if ended.saturating_sub(head.started_at) < WORTH_TELLING_MS || head.interactive {
+        return;
+    }
+    let focused =
+        tauri::Manager::get_webview_window(app, "main").and_then(|window| window.is_focused().ok());
+    if focused != Some(false) {
+        return;
+    }
+    let line = head.command.as_deref().unwrap_or("A command");
+    let short: String = line.chars().take(60).collect();
+    let title = match head.code {
+        Some(0) => format!("{short} finished"),
+        Some(code) => format!("{short} failed (exit {code})"),
+        None => format!("{short} ended"),
+    };
+    let project = blocks
+        .projects
+        .lock()
+        .ok()
+        .and_then(|projects| projects.get(pane_id).cloned());
+    crate::notices::ring(
+        app,
+        project.as_deref(),
+        crate::notices::kind::COMMAND,
+        &title,
+        head.cwd.as_deref(),
+        None,
+    );
 }
 
 /// `pane.blocks` — every block this pane has kept, oldest first and the one

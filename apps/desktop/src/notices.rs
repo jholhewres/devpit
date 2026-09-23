@@ -28,6 +28,8 @@ pub mod kind {
     pub const AGENT: &str = "agent";
     pub const DUE: &str = "due";
     pub const IRREVERSIBLE: &str = "irreversible";
+    /// A terminal command that took a while finished while nobody looked.
+    pub const COMMAND: &str = "command";
 }
 
 /// The event the window listens on so the bell updates without asking.

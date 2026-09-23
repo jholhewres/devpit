@@ -214,7 +214,11 @@ pub(crate) fn listen(state: &State<SessionState>, project_id: &str, layout: &Ses
         return;
     };
     let session = devpit_tmux::Server::session_name(project_id);
+    let blocks = tauri::Manager::try_state::<crate::blocks::Blocks>(state.app());
     for (leaf_id, _) in layout.tree.leaves() {
+        if let Some(blocks) = &blocks {
+            blocks.belongs(leaf_id, project_id);
+        }
         let target = devpit_tmux::Server::target(&session, leaf_id);
         state.taps.watch(state.app(), &server, leaf_id, &target);
     }
