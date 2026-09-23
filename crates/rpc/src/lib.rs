@@ -28,6 +28,7 @@ pub mod review;
 pub mod runs;
 pub mod search;
 pub mod session;
+pub mod session_regroup;
 pub mod session_tree;
 pub mod settings;
 pub mod spend;

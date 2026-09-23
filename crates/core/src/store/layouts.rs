@@ -75,6 +75,37 @@ impl Store {
     }
 }
 
+/// One tab's tree, as a write of [`Store::regroup_pane_layouts`].
+pub struct PaneLayoutWrite<'a> {
+    pub tab_id: &'a str,
+    pub tree: &'a str,
+    pub focused_id: &'a str,
+}
+
+impl Store {
+    /// Writes some tabs' trees and forgets others', all or none.
+    ///
+    /// A pane moving between tabs is in exactly one tree before and after. A
+    /// crash between two separate writes would leave it in both, or in none —
+    /// and a leaf in no tree is a shell nothing can reach again.
+    pub fn regroup_pane_layouts(
+        &self,
+        project_id: &str,
+        writes: &[PaneLayoutWrite<'_>],
+        forget: &[&str],
+    ) -> Result<(), StoreError> {
+        let tx = self.conn.unchecked_transaction()?;
+        for write in writes {
+            self.set_pane_layout(project_id, write.tab_id, write.tree, write.focused_id)?;
+        }
+        for tab_id in forget {
+            self.forget_pane_layout(project_id, tab_id)?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+}
+
 /// A tab a card named, and the tree in it.
 pub struct CardTabLayout {
     pub project_id: String,
@@ -175,5 +206,28 @@ mod tests {
         store.forget_pane_layout(&id, "tab_a").expect("forget");
         assert!(store.pane_layout(&id, "tab_a").expect("read").is_none());
         assert!(store.pane_layout(&id, "tab_b").expect("read").is_some());
+    }
+
+    #[test]
+    fn a_regroup_writes_and_forgets_in_one_go() {
+        let (dir, store) = store();
+        let root = dir.path().join("project");
+        std::fs::create_dir_all(&root).expect("create");
+        let id = store.add_project(Path::new(&root), None).expect("add");
+        store.set_pane_layout(&id, "tab_a", "A", "a").expect("a");
+        store.set_pane_layout(&id, "tab_b", "B", "b").expect("b");
+
+        let joined = super::PaneLayoutWrite {
+            tab_id: "tab_b",
+            tree: "AB",
+            focused_id: "a",
+        };
+        store
+            .regroup_pane_layouts(&id, &[joined], &["tab_a"])
+            .expect("regroup");
+
+        assert!(store.pane_layout(&id, "tab_a").expect("read").is_none());
+        let (tree, focused) = store.pane_layout(&id, "tab_b").expect("read").expect("b");
+        assert_eq!((tree.as_str(), focused.as_str()), ("AB", "a"));
     }
 }
