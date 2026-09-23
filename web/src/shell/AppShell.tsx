@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react'
 
 import './shell.css'
 import { ContextMenu } from './ContextMenu'
-import { ask, commands } from './live'
 import { Grips } from './Grips'
-import { Onboarding } from './Onboarding'
 import { Overlays } from './Overlays'
 import { ProjectRail } from './ProjectRail'
 import { Panes } from './Panes'
@@ -39,7 +37,7 @@ export function AppShell(): React.JSX.Element {
  */
 function Window(): React.JSX.Element {
   const shell = useShell()
-  const { side, files, widths, signedIn, projects, palette, openPalette, closePalette } = shell
+  const { side, files, widths, signedIn, palette, openPalette, closePalette } = shell
   const [signIn, setSignIn] = useState(false)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
@@ -126,14 +124,6 @@ function Window(): React.JSX.Element {
       </div>
 
       <StatusStrip />
-
-      {/* No project, nothing to show: the setup screen is the empty state. */}
-      {projects.length === 0 && (
-        <Onboarding
-          onAddProject={() => setAdding(true)}
-          onDone={() => void ask(() => commands.settingsFinishOnboarding())}
-        />
-      )}
 
       <Overlays
         signIn={signIn}

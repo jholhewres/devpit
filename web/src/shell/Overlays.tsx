@@ -1,12 +1,20 @@
+import { lazy, Suspense } from 'react'
+
 import { AddProject } from './AddProject'
-import { Palette } from './Palette'
+import { ask, commands } from './live'
 import { RemoveProject } from './RemoveProject'
 import { ManagerPane } from './ManagerPane'
-import { Settings } from './Settings'
 import { SignIn } from './SignIn'
 import { StopRunning } from './StopRunning'
 import { UpdateCard } from './UpdateCard'
 import { useShell } from './useShell'
+
+/* Opened by hand, or only while there is no project: none belongs in the
+   chunk every launch parses. Each has its own boundary, so one loading does
+   not hide the others; a local chunk takes a frame, so the fallback is none. */
+const Onboarding = lazy(() => import('./Onboarding').then((module) => ({ default: module.Onboarding })))
+const Palette = lazy(() => import('./Palette').then((module) => ({ default: module.Palette })))
+const Settings = lazy(() => import('./Settings').then((module) => ({ default: module.Settings })))
 
 /*
  * Everything that opens over the window.
@@ -36,12 +44,25 @@ export function Overlays({
   onRemovingClose: () => void
 }): React.JSX.Element {
   const shell = useShell()
-  const { palette, closePalette, closing, prefs, forgetProject } = shell
+  const { palette, closePalette, closing, prefs, forgetProject, projects } = shell
 
   return (
     <>
+      {/* No project, nothing to show: the setup screen is the empty state. */}
+      {projects.length === 0 && (
+        <Suspense fallback={null}>
+          <Onboarding
+            onAddProject={onAdd}
+            onDone={() => void ask(() => commands.settingsFinishOnboarding())}
+          />
+        </Suspense>
+      )}
       <UpdateCard />
-      {palette && <Palette onClose={closePalette} />}
+      {palette && (
+        <Suspense fallback={null}>
+          <Palette onClose={closePalette} />
+        </Suspense>
+      )}
       {closing && (
         <StopRunning
           closing={closing}
@@ -62,7 +83,11 @@ export function Overlays({
         />
       )}
       {shell.managing && <ManagerPane />}
-      {prefs && <Settings pane={prefs} onAddProject={onAdd} onRemove={onRemove} />}
+      {prefs && (
+        <Suspense fallback={null}>
+          <Settings pane={prefs} onAddProject={onAdd} onRemove={onRemove} />
+        </Suspense>
+      )}
     </>
   )
 }

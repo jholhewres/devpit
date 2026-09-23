@@ -1,4 +1,4 @@
-import { cpSync, existsSync, readFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve, sep } from 'node:path'
 
@@ -79,13 +79,48 @@ function excalidrawFontsBuild(): Plugin {
       root = config.root
     },
     closeBundle() {
-      cpSync(fontsDir, resolve(root, outDir, 'excalidraw/fonts'), { recursive: true })
+      // Xiaolai, the CJK fallback, is 13 MB of the 14. Its faces only claim CJK
+      // ranges, so Latin text never asks for it; CJK text finds it missing and
+      // the webview falls back to a system font (the CSP keeps esm.sh out).
+      cpSync(fontsDir, resolve(root, outDir, 'excalidraw/fonts'), {
+        recursive: true,
+        filter: (source) => !source.startsWith(join(fontsDir, 'Xiaolai')),
+      })
+    },
+  }
+}
+
+/*
+ * Tauri embeds all of `frontendDist` in the binary, and the maps were over
+ * half of it. They are moved beside `dist` rather than dropped, so a stack
+ * trace can still be read against the build that produced it.
+ */
+function sourcemapsBesideDist(): Plugin {
+  let outDir = 'dist'
+  let root = process.cwd()
+
+  return {
+    name: 'sourcemaps-beside-dist',
+    apply: 'build',
+    configResolved(config) {
+      outDir = config.build.outDir
+      root = config.root
+    },
+    closeBundle() {
+      const from = resolve(root, outDir)
+      const to = `${from}-sourcemaps`
+      rmSync(to, { recursive: true, force: true })
+      for (const rel of readdirSync(from, { recursive: true, encoding: 'utf8' })) {
+        if (!rel.endsWith('.map')) continue
+        mkdirSync(dirname(join(to, rel)), { recursive: true })
+        renameSync(join(from, rel), join(to, rel))
+      }
     },
   }
 }
 
 export default defineConfig({
-  plugins: [react(), excalidrawFontsDev(), excalidrawFontsBuild()],
+  plugins: [react(), excalidrawFontsDev(), excalidrawFontsBuild(), sourcemapsBesideDist()],
   server: {
     port: DEV_PORT,
     // Fail loudly instead of drifting to another port: `devUrl` in
@@ -96,7 +131,8 @@ export default defineConfig({
   },
   build: {
     // A stack trace out of the webview should be readable without shipping
-    // the whole toolchain.
-    sourcemap: true
+    // the whole toolchain — or the maps: 'hidden' leaves no comment pointing
+    // at a file the bundle no longer has.
+    sourcemap: 'hidden'
   }
 })

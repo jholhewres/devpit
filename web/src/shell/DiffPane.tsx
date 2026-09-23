@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
-import { FileDiff } from './FileDiff'
 import { Columns, Rows } from './GitIcons'
 import { ask, commands } from './live'
 import { PatchView } from './PatchView'
 import type { Tab } from './strip'
 import { useShell } from './useShell'
+
+/* The merge editor is CodeMirror and its merge view: loaded with the first
+   file diff opened, not with the window. */
+const FileDiff = lazy(() => import('./FileDiff').then((module) => ({ default: module.FileDiff })))
 
 /*
  * A diff, unified or side by side.
@@ -43,7 +46,11 @@ export function DiffPane({ tab }: { tab: Tab }): React.JSX.Element {
 
   if (!project || !path) return bar(null)
   if (ofCommit) return <CommitDiff projectId={project.id} sha={path} bar={bar} />
-  return <FileDiff key={path} projectId={project.id} path={path} bar={bar} />
+  return (
+    <Suspense fallback={bar(null)}>
+      <FileDiff key={path} projectId={project.id} path={path} bar={bar} />
+    </Suspense>
+  )
 }
 
 function CommitDiff({
