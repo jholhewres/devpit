@@ -11,11 +11,13 @@ import { ask, commands } from './live'
 
    Its own file because two surfaces ask now — the launcher palette and a
    card's Work section — and a copy in each is a copy that disagrees. */
-export function useKnownAgents(): readonly KnownAgent[] {
+export function useKnownAgents(asked = 0): readonly KnownAgent[] {
   const [agents, setAgents] = useState<readonly KnownAgent[]>([])
+  /* `asked` changes to ask again — Settings' Refresh, which has to see a CLI
+     installed since the pane opened. */
   useEffect(() => {
-    void ask(() => commands.agentsKnown()).then((asked) => setAgents(asked.data ?? []))
-  }, [])
+    void ask(() => commands.agentsKnown()).then((answer) => setAgents(answer.data ?? []))
+  }, [asked])
   return agents
 }
 

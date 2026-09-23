@@ -34,9 +34,11 @@ export function ProviderRows(): React.JSX.Element {
   const [open, setOpen] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [busy, setBusy] = useState(false)
-  const agents = useKnownAgents()
+  const [asked, setAsked] = useState(0)
+  const agents = useKnownAgents(asked)
 
   const refresh = useCallback(() => {
+    setAsked((was) => was + 1)
     void ask(() => commands.agentProfiles()).then((answer) => {
       setProfiles(answer.data ?? [])
       setError(answer.error)

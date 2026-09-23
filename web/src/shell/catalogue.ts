@@ -45,6 +45,10 @@ export function catalogue(
   profiles: readonly Profile[],
   choice: { defaultId: string; disabled?: readonly string[] },
 ): readonly Entry[] {
+  /* The choice comes back from every toggle, while `agents` was asked when
+     the pane opened, so the choice is the one that knows. */
+  const on = (id: string, said: boolean): boolean => (choice.disabled ? !choice.disabled.includes(id) : said)
+
   const mine: Entry[] = profiles
     .filter((profile) => profile.mine)
     .map((profile) => ({
@@ -52,7 +56,7 @@ export function catalogue(
       label: profile.label,
       launch: profile.command,
       installed: profile.reach !== 'missing',
-      enabled: true,
+      enabled: on(profile.id, profile.enabled !== false),
       isDefault: choice.defaultId === profile.id,
       mine: true,
       profile,
@@ -75,7 +79,7 @@ export function catalogue(
          changed; the catalogue's own flag was read once and goes stale.
          Absent reads as offered: an older answer that does not carry it must
          not hide every agent on the list. */
-      enabled: choice.disabled ? !choice.disabled.includes(agent.id) : agent.enabled !== false,
+      enabled: on(agent.id, agent.enabled !== false),
       isDefault: choice.defaultId === agent.id,
       mine: false,
       profile: null,
