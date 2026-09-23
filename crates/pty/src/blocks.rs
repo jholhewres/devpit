@@ -21,7 +21,7 @@ pub const MOST_OUTPUT: usize = 1024 * 1024;
 /// A command's facts, without its output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Head {
-    /// Rises with every block this pane has had, across the app's life.
+    /// Rises with every block this pane has had, across restarts too.
     pub id: u64,
     pub command: Option<String>,
     pub cwd: Option<String>,
@@ -35,6 +35,8 @@ pub struct Head {
     pub interactive: bool,
     /// The start of its output was dropped to keep the end.
     pub truncated: bool,
+    /// Marked by the person, to find it again in a long list.
+    pub bookmarked: bool,
 }
 
 /// One command, as far as it has got.
@@ -97,6 +99,12 @@ impl Segmenter {
     /// The block still running, if one is.
     pub fn running(&self) -> Option<&Block> {
         self.running.as_ref()
+    }
+
+    /// Carries on numbering after blocks kept from before a restart, so an
+    /// id never names two blocks.
+    pub fn resume_after(&mut self, id: u64) {
+        self.next_id = self.next_id.max(id);
     }
 
     /// Whether this pane's shell has been heard marking its prompts.
@@ -234,6 +242,7 @@ impl Segmenter {
                         code: None,
                         interactive: false,
                         truncated: false,
+                        bookmarked: false,
                     },
                     output: Vec::new(),
                 };
@@ -313,6 +322,18 @@ impl History {
 
     pub fn get(&self, id: u64) -> Option<&Block> {
         self.blocks.iter().find(|block| block.head.id == id)
+    }
+
+    /// Sets or takes away a block's bookmark; its head as it now is.
+    pub fn bookmark(&mut self, id: u64, on: bool) -> Option<Head> {
+        let block = self.blocks.iter_mut().find(|block| block.head.id == id)?;
+        block.head.bookmarked = on;
+        Some(block.head.clone())
+    }
+
+    /// The newest id kept, for numbering on from it.
+    pub fn last_id(&self) -> Option<u64> {
+        self.blocks.back().map(|block| block.head.id)
     }
 
     pub fn clear(&mut self) {

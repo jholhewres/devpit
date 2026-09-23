@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { CommandBlock } from '../gen/bindings'
-import { changed, EMPTY, finished, happened, modeOf, runningOf } from './paneBlocks'
+import { changed, EMPTY, finished, happened, jumpTarget, modeOf, runningOf } from './paneBlocks'
 
 const block = (id: number, over: Partial<CommandBlock> = {}): CommandBlock => ({
   id,
@@ -12,6 +12,7 @@ const block = (id: number, over: Partial<CommandBlock> = {}): CommandBlock => ({
   code: null,
   interactive: false,
   truncated: false,
+  bookmarked: false,
   ...over,
 })
 
@@ -45,5 +46,23 @@ describe('a terminal’s blocks', () => {
 
   it('keeps the folder the shell last named', () => {
     expect(happened(EMPTY, { paneId: 'p', what: 'cwd', detail: '/home' }).cwd).toBe('/home')
+  })
+
+  it('jumps between bookmarked blocks, or between every block when none is', () => {
+    const plain = [block(1), block(2), block(3)]
+    expect(jumpTarget(plain, null, -1)).toBe(3)
+    expect(jumpTarget(plain, 3, -1)).toBe(2)
+    expect(jumpTarget(plain, 1, -1)).toBe(1)
+    expect(jumpTarget(plain, 2, 1)).toBe(3)
+    expect(jumpTarget(plain, 3, 1)).toBeNull()
+    expect(jumpTarget(plain, null, 1)).toBeNull()
+
+    const marked = [block(1, { bookmarked: true }), block(2), block(3, { bookmarked: true }), block(4)]
+    expect(jumpTarget(marked, null, -1)).toBe(3)
+    expect(jumpTarget(marked, 3, -1)).toBe(1)
+    expect(jumpTarget(marked, 1, 1)).toBe(3)
+    expect(jumpTarget(marked, 3, 1)).toBeNull()
+    /* From a block that was cleared away: as from the bottom. */
+    expect(jumpTarget(marked, 99, -1)).toBe(3)
   })
 })

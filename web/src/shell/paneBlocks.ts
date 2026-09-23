@@ -65,6 +65,26 @@ export function runningOf(state: BlockState): CommandBlock | null {
   return last && last.endedAt === null ? last : null
 }
 
+/**
+ * Where Alt+↑ or Alt+↓ goes from the block last jumped to: the bookmarked
+ * block before or after it, or simply the block before or after when none is
+ * bookmarked. `from` null is the bottom of the list, where the next line is
+ * typed; going down past the last stop answers null, back to it. Going up past
+ * the first stays there.
+ */
+export function jumpTarget(blocks: readonly CommandBlock[], from: number | null, by: -1 | 1): number | null {
+  const marked = blocks.filter((one) => one.bookmarked)
+  const stops = marked.length > 0 ? marked : blocks
+  const at = from === null ? -1 : blocks.findIndex((one) => one.id === from)
+  const index = (one: CommandBlock): number => blocks.indexOf(one)
+  if (by < 0) {
+    const before = at < 0 ? stops : stops.filter((one) => index(one) < at)
+    return before[before.length - 1]?.id ?? (at < 0 ? null : from)
+  }
+  if (at < 0) return null
+  return stops.find((one) => index(one) > at)?.id ?? null
+}
+
 /** The finished blocks, oldest first. */
 export const finished = (state: BlockState): readonly CommandBlock[] => state.blocks.filter((one) => one.endedAt !== null)
 

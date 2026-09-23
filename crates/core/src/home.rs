@@ -167,6 +167,11 @@ impl ProjectHome {
         self.dir().join("pasted")
     }
 
+    /// Each terminal's finished commands, kept across restarts.
+    pub fn blocks(&self) -> PathBuf {
+        self.dir().join("blocks")
+    }
+
     /// A plugin's own files, relative to `dir()`, `/` separated.
     ///
     /// Relative so the caller resolves it against a folder it trusts, which is

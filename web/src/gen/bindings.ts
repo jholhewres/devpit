@@ -1024,8 +1024,13 @@ export const commands = {
 	paneBlocks: (paneId: string) => typedError<PaneBlocks, RpcError>(__TAURI_INVOKE("pane_blocks", { paneId })),
 	/**  `block.output` — what a block printed, as the terminal received it. */
 	blockOutput: (paneId: string, blockId: number | null) => typedError<string, RpcError>(__TAURI_INVOKE("block_output", { paneId, blockId })),
-	/**  `pane.blocks_clear` — forgets a pane's finished blocks. */
+	/**  `pane.blocks_clear` — forgets a pane's finished blocks, kept ones too. */
 	paneBlocksClear: (paneId: string) => typedError<null, RpcError>(__TAURI_INVOKE("pane_blocks_clear", { paneId })),
+	/**
+	 *  `block.bookmark` — marks a finished block to find it again, or unmarks
+	 *  it. Kept with the block, and told to every window like any change to one.
+	 */
+	blockBookmark: (paneId: string, blockId: number | null, on: boolean) => typedError<CommandBlock, RpcError>(__TAURI_INVOKE("block_bookmark", { paneId, blockId, on })),
 	/**
 	 *  `terminal.block_changes` — the shape `terminal:block` carries, so the
 	 *  generated contract knows it (the reason `terminal.happenings` exists).
@@ -1642,7 +1647,7 @@ export type ColumnDeleted = {
 /**  One command a pane ran, or is running. */
 export type CommandBlock = {
 	/**
-	 *  Rises with every block the pane has had while the app ran. `f64`
+	 *  Rises with every block the pane has had, across restarts. `f64`
 	 *  because it crosses into a JavaScript number.
 	 */
 	id: number | null,
@@ -1658,6 +1663,8 @@ export type CommandBlock = {
 	interactive: boolean,
 	/**  Its output was too long, and the start of it was dropped. */
 	truncated: boolean,
+	/**  Marked by the person, to jump back to it. */
+	bookmarked: boolean,
 };
 
 /**  One line of the card's conversation. */

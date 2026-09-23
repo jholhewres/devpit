@@ -7,7 +7,7 @@ import { CommandInput, type CommandInputHandle } from './CommandInput'
 import { recalled, remember, withLine } from './commandHistory'
 import { Leaf } from './Leaf'
 import { ask, commands } from './live'
-import { finished, modeOf } from './paneBlocks'
+import { finished, jumpTarget, modeOf } from './paneBlocks'
 import { useFollow } from './useFollow'
 import { usePaneBlocks } from './usePaneBlocks'
 import { useShell } from './useShell'
@@ -85,6 +85,7 @@ export function BlockTerm({
   const done = finished(state)
   const last = done[done.length - 1]
   const list = useFollow<HTMLDivElement>(`${done.length}:${mode}`)
+  const [jumped, setJumped] = useState<number | null>(null)
 
   useEffect(() => {
     void homeFolder().then(setHomeDir)
@@ -122,15 +123,37 @@ export function BlockTerm({
     void ask(() => commands.paneSubmit(projectId, paneId, line))
   }
 
+  /* Alt+↑/↓ walks the blocks — the bookmarked ones when there are any — from
+     wherever the keyboard is except the live terminal, whose programs may
+     want those keys themselves. Down past the last goes back to the editor. */
+  const jump = (event: React.KeyboardEvent): void => {
+    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    if (event.target instanceof Element && event.target.closest('.bterm__live')) return
+    event.preventDefault()
+    event.stopPropagation()
+    const next = jumpTarget(done, jumped, event.key === 'ArrowUp' ? -1 : 1)
+    setJumped(next)
+    const box = list.current
+    if (next === null) {
+      box?.scrollTo({ top: box.scrollHeight })
+      input.current?.focus()
+      return
+    }
+    box?.querySelector(`[data-block-id="${next}"]`)?.scrollIntoView({ block: 'start' })
+  }
+
+  const bookmark = (id: number | null, on: boolean): void => void ask(() => commands.blockBookmark(paneId, id, on))
+
   const classic = (on: boolean): void => {
     saveClassic(paneId, on)
     setWanted(!on)
   }
 
   return (
-    <div className="bterm" data-mode={mode} data-pane-id={paneId}>
+    <div className="bterm" data-mode={mode} data-pane-id={paneId} onKeyDownCapture={jump}>
       {(mode === 'idle' || mode === 'running') && (
-        <div className="bterm__list" ref={list}>
+        <div className="bterm__list" ref={list} tabIndex={-1}>
           {done.length === 0 && <div className="bterm__empty">Commands you run here show up as blocks.</div>}
           {done.map((block) => (
             <BlockCard
@@ -139,8 +162,10 @@ export function BlockTerm({
               block={block}
               cols={cols}
               home={homeDir}
+              jumped={jumped === block.id}
               onRerun={run}
               onEdit={(line) => input.current?.set(line)}
+              onBookmark={(on) => bookmark(block.id, on)}
             />
           ))}
         </div>

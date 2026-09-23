@@ -82,6 +82,7 @@ pub fn workspace_read(project_id: Option<String>) -> Result<Workspace, RpcError>
     if let Some(mine) = &mine {
         held.push(measure("sessions/", mine.sessions()));
         held.push(measure("prime.json", mine.prime()));
+        held.push(measure("blocks/", mine.blocks()));
     }
     held.push(measure("worktrees/", home.join("worktrees")));
 

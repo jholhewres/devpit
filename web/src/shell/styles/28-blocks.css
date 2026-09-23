@@ -24,6 +24,11 @@
 .blk__head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px 6px 14px; cursor: default; background: var(--canvas); }
 .blk[data-outcome='failed'] .blk__head { background: color-mix(in srgb, var(--danger) 7%, var(--canvas)); }
 .blk__head:hover .blk__more { opacity: 1; }
+/* Bookmarked: a small flag by the dot. Jumped to: the accent down its edge. */
+.blk__mark { flex: none; display: inline-flex; color: var(--accent); }
+.blk__mark svg { width: 12px; height: 12px; fill: currentColor; }
+.blk[data-jumped='true']::before { background: var(--accent); }
+.bterm__list:focus { outline: none; }
 .blk__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
 .blk[data-outcome='ok'] .blk__dot { background: var(--success); }
 .blk[data-outcome='failed'] .blk__dot { background: var(--danger); }

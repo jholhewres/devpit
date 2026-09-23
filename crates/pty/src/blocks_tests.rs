@@ -122,6 +122,7 @@ fn history_forgets_the_oldest_first() {
                 code: None,
                 interactive: false,
                 truncated: false,
+                bookmarked: false,
             },
             output: Vec::new(),
         });
@@ -129,6 +130,36 @@ fn history_forgets_the_oldest_first() {
     assert_eq!(history.heads().len(), MOST_BLOCKS);
     assert!(history.get(0).is_none());
     assert!(history.get(MOST_BLOCKS as u64 + 4).is_some());
+    assert_eq!(history.last_id(), Some(MOST_BLOCKS as u64 + 4));
+}
+
+#[test]
+fn a_bookmark_is_set_on_a_kept_block_and_nowhere_else() {
+    let (_, ended) = run(&[format!("{}{}", tmux("133;C"), tmux("133;D;0")).as_bytes()]);
+    let mut history = History::default();
+    for one in ended {
+        history.push(one);
+    }
+    let id = history.last_id().expect("a block");
+    assert!(history
+        .bookmark(id, true)
+        .is_some_and(|head| head.bookmarked));
+    assert!(history.get(id).is_some_and(|one| one.head.bookmarked));
+    assert!(history.bookmark(id + 1, true).is_none(), "no such block");
+}
+
+#[test]
+fn numbering_resumes_after_the_blocks_kept_from_before() {
+    let mut segmenter = Segmenter::new();
+    segmenter.resume_after(41);
+    let mut started = Vec::new();
+    segmenter.feed(
+        format!("{}{}", tmux("133;C"), tmux("133;D;0")).as_bytes(),
+        1,
+        |_| {},
+        |one, _| started.push(one),
+    );
+    assert!(matches!(started.first(), Some(Cut::Started(head)) if head.id == 42));
 }
 
 /// A block as the test compares it: line, folder, output, code.

@@ -7,7 +7,7 @@ use specta::Type;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandBlock {
-    /// Rises with every block the pane has had while the app ran. `f64`
+    /// Rises with every block the pane has had, across restarts. `f64`
     /// because it crosses into a JavaScript number.
     pub id: f64,
     pub command: Option<String>,
@@ -22,6 +22,8 @@ pub struct CommandBlock {
     pub interactive: bool,
     /// Its output was too long, and the start of it was dropped.
     pub truncated: bool,
+    /// Marked by the person, to jump back to it.
+    pub bookmarked: bool,
 }
 
 /// A block that started or ended, in the pane it belongs to.

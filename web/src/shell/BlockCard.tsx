@@ -4,7 +4,7 @@ import { memo, useEffect, useState } from 'react'
 import type { CommandBlock } from '../gen/bindings'
 import { plain, rendered, type Line } from './blockRender'
 import { filtered, linked, outcome, shortPath, took } from './blockText'
-import { Copy, Pencil, Search, Undo } from './GitIcons'
+import { Bookmark, Copy, Pencil, Search, Undo } from './GitIcons'
 import { ask, commands } from './live'
 import { RailMenu, type RailItem } from './RailMenu'
 import { darkNow, palette } from './terminal'
@@ -31,15 +31,20 @@ export const BlockCard = memo(function BlockCard({
   block,
   cols,
   home,
+  jumped,
   onRerun,
   onEdit,
+  onBookmark,
 }: {
   paneId: string
   block: CommandBlock
   cols: number
   home: string | null
+  /** The block the last Alt+↑/↓ landed on. */
+  jumped: boolean
   onRerun: (line: string) => void
   onEdit: (line: string) => void
+  onBookmark: (on: boolean) => void
 }): React.JSX.Element {
   const key = `${paneId}:${block.id}:${cols}`
   const [lines, setLines] = useState<readonly Line[] | null>(drawn.get(key) ?? null)
@@ -78,10 +83,12 @@ export const BlockCard = memo(function BlockCard({
     { label: 'Run again', glyph: <Undo />, act: () => onRerun(line) },
     { label: 'Edit and run', glyph: <Pencil />, act: () => onEdit(line) },
     { label: query === null ? 'Filter output…' : 'Stop filtering', glyph: <Search />, act: () => setQuery(query === null ? '' : null) },
+    'rule',
+    { label: block.bookmarked ? 'Remove bookmark' : 'Bookmark this block', glyph: <Bookmark />, act: () => onBookmark(!block.bookmarked) },
   ]
 
   return (
-    <article className="blk" data-outcome={state} data-open={open ? 'true' : 'false'}>
+    <article className="blk" data-block-id={block.id} data-outcome={state} data-open={open ? 'true' : 'false'} data-jumped={jumped ? 'true' : undefined}>
       <header
         className="blk__head"
         onClick={() => setOpen(!open)}
@@ -91,6 +98,11 @@ export const BlockCard = memo(function BlockCard({
         }}
       >
         <span className="blk__dot" aria-label={state} />
+        {block.bookmarked && (
+          <span className="blk__mark" title="Bookmarked — Alt+↑ and Alt+↓ jump between bookmarks">
+            <Bookmark />
+          </span>
+        )}
         <code className="blk__cmd" title={line}>
           {line || <span className="blk__nocmd">command</span>}
         </code>

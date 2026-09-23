@@ -186,6 +186,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         blocks::pane_blocks,
         blocks::block_output,
         blocks::pane_blocks_clear,
+        blocks::block_bookmark,
         blocks::terminal_block_changes,
         blocks::pane_submit,
         blocks::folder_glance,

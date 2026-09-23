@@ -188,6 +188,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         blocks::pane_blocks,
         blocks::block_output,
         blocks::pane_blocks_clear,
+        blocks::block_bookmark,
         blocks::terminal_block_changes,
         blocks::pane_submit,
         blocks::folder_glance,

@@ -4,7 +4,7 @@ import type { CommandBlock } from '../gen/bindings'
 import { filtered, linked, outcome, shortPath, took } from './blockText'
 
 const block = (over: Partial<CommandBlock>): CommandBlock => ({
-  id: 1, command: 'x', cwd: null, startedAt: 0, endedAt: 0, code: 0, interactive: false, truncated: false, ...over,
+  id: 1, command: 'x', cwd: null, startedAt: 0, endedAt: 0, code: 0, interactive: false, truncated: false, bookmarked: false, ...over,
 })
 
 describe('a block’s header', () => {
