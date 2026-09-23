@@ -18,6 +18,9 @@ pub enum Frame {
     Part { message_id: String, part: Part },
     /// A tool call moved on.
     CallState { call_id: String, state: CallState },
+    /// The CLI named its session. A new conversation learns it here, while
+    /// the turn runs, rather than from the head written after it.
+    Session { session_id: String },
     /// The turn is over. Absence of frames is not an ending.
     Ended { end: TurnEnd },
 }

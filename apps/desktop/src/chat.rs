@@ -220,6 +220,7 @@ pub async fn chat_send(
     let collected = parts.clone();
     let sink = on_frame.clone();
     let answer = answer_id.clone();
+    let hold = crate::asking::holding(mode.as_deref(), &app, on_frame.clone());
 
     // Claimed before anything is spawned, and released by the guard however
     // this returns.
@@ -252,6 +253,7 @@ pub async fn chat_send(
                 permission: mode.as_deref(),
                 effort: thinking.as_deref(),
                 control: Some(&control),
+                on_session: Some(&hold),
             },
             |part| {
                 collected

@@ -15,6 +15,7 @@ fn turn(budget: Option<f64>) -> Say<'static> {
         permission: None,
         effort: None,
         control: None,
+        on_session: None,
     }
 }
 
@@ -74,6 +75,7 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
         permission: None,
         effort: None,
         control: None,
+        on_session: None,
     };
     // A script written a moment ago can be "text file busy" to exec while
     // another test forks with it still open, and `say` reports any failed
@@ -154,6 +156,7 @@ fn a_chat_turn_runs_under_its_profile_env() {
         permission: None,
         effort: None,
         control: None,
+        on_session: None,
     };
     // Same retry as the test above, for the same reason: a script written a
     // moment ago can be "text file busy" while another test forks.

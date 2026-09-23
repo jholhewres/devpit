@@ -1836,6 +1836,11 @@ export type Frame =
 { type: "part"; message_id: string; part: Part } | 
 /**  A tool call moved on. */
 { type: "call_state"; call_id: string; state: CallState } | 
+/**
+ *  The CLI named its session. A new conversation learns it here, while
+ *  the turn runs, rather than from the head written after it.
+ */
+{ type: "session"; session_id: string } | 
 /**  The turn is over. Absence of frames is not an ending. */
 { type: "ended"; end: TurnEnd };
 

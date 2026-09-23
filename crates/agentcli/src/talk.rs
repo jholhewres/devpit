@@ -37,6 +37,11 @@ pub struct Say<'a> {
     pub effort: Option<&'a str>,
     /// Where the turn's stdin is kept while it runs, for control requests.
     pub control: Option<&'a crate::control::Control>,
+    /// Told the CLI's session id as soon as the stream names it, while the
+    /// turn is still running. A new conversation has no id until then, and
+    /// whatever is keyed by it — being asked before a tool runs — would
+    /// otherwise start only on the next turn.
+    pub on_session: Option<&'a (dyn Fn(&str) + Sync)>,
 }
 
 /// A turn, and the thread it belongs to on the CLI's side.
@@ -94,6 +99,7 @@ pub fn say(
         driver,
         BufReader::new(stdout).lines().map_while(Result::ok),
         &control,
+        turn.on_session,
         on_part,
     );
 

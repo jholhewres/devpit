@@ -29,6 +29,7 @@ pub(crate) fn follow(
     driver: &dyn Driver,
     lines: impl Iterator<Item = String>,
     control: &Control,
+    on_session: Option<&(dyn Fn(&str) + Sync)>,
     mut on_part: impl FnMut(Part),
 ) -> Heard {
     let mut heard = Heard::default();
@@ -37,6 +38,9 @@ pub(crate) fn follow(
 
     for line in lines {
         if let Some(seen) = driver.session(&line) {
+            if heard.session_id.as_deref() != Some(seen.as_str()) {
+                on_session.inspect(|tell| tell(&seen));
+            }
             heard.session_id = Some(seen);
         }
         heard.anchor = driver.anchor(&line).or(heard.anchor);
@@ -63,3 +67,7 @@ pub(crate) fn follow(
 
     heard
 }
+
+#[cfg(test)]
+#[path = "talk_stream_tests.rs"]
+mod tests;

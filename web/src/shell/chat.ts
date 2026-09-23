@@ -38,7 +38,9 @@ export function applied(messages: readonly Message[], frame: Frame): readonly Me
           : message,
       )
     case 'call_state':
-      return messages.map((message) => ({
+      /* Only a message still arriving has calls that move: an answered one
+         is left as it is, rather than walked on every frame of a long thread. */
+      return messages.map((message) => !message.streaming ? message : ({
         ...message,
         parts: message.parts.map((part) =>
           part.kind === 'tool_call' && part.id === frame.call_id

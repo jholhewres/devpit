@@ -40,6 +40,31 @@ pub struct Question {
     pub cwd: String,
 }
 
+/// The chat mode that stops to ask — the screen's `ASKS`. A turn started in
+/// it is held from the moment its session is named, so a new conversation's
+/// first turn asks too, not only the ones after it.
+pub const ASKING_MODE: &str = "manual";
+
+/// What a chat turn does with its session id once the stream names it: tells
+/// the screen, and in the asking mode starts holding that session's tools —
+/// so the screen that shows the question already knows whose it is.
+pub fn holding(
+    mode: Option<&str>,
+    app: &tauri::AppHandle,
+    frames: tauri::ipc::Channel<devpit_rpc::Frame>,
+) -> impl Fn(&str) + Sync + Send {
+    let app = (mode == Some(ASKING_MODE)).then(|| app.clone());
+    move |session: &str| {
+        if let Some(app) = &app {
+            use tauri::Manager;
+            app.state::<Asking>().ask_from_now(session, true);
+        }
+        let _ = frames.send(devpit_rpc::Frame::Session {
+            session_id: session.to_owned(),
+        });
+    }
+}
+
 /// What a person answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]

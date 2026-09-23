@@ -158,7 +158,9 @@ export function useChat(conversationId: string): Chat {
         permission,
         effort,
       }
-      const started = send(turn, (frame) => setMessages((was) => applied(was, frame)))
+      const started = send(turn, (frame) =>
+        frame.type === 'session' ? setSession(frame.session_id) : setMessages((was) => applied(was, frame)),
+      )
       if (!started) return setError('not running in the app')
       setSending(true)
       setError(null)
