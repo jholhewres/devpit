@@ -38,6 +38,7 @@ mod snapshot;
 mod sourcing;
 pub mod standing;
 mod status;
+mod weblink;
 mod worktrees;
 
 use std::path::PathBuf;
@@ -62,6 +63,7 @@ pub use snapshot::{changed_between, snapshot, Changed};
 pub use sourcing::{hidden_as, hidden_in, origin_of, shown, word_of};
 pub use standing::standing_at;
 pub use status::{changes, status, Status};
+pub use weblink::{commit_link, web_url, CommitLink};
 pub use worktrees::{worktree_path, worktrees};
 
 #[derive(Debug, thiserror::Error)]

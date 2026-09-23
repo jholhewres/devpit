@@ -686,6 +686,8 @@ export const commands = {
 	 *  invalidate a remembered sha.
 	 */
 	projectHistory: (projectId: string, worktreeId: string | null, skip: number | null) => typedError<ProjectHistory, RpcError>(__TAURI_INVOKE("project_history", { projectId, worktreeId, skip })),
+	/**  `project.commit_link` — what a commit's menu copies and opens. */
+	projectCommitLink: (projectId: string, worktreeId: string | null, sha: string) => typedError<CommitRef, RpcError>(__TAURI_INVOKE("project_commit_link", { projectId, worktreeId, sha })),
 	/**
 	 *  `project.search` — every line matching `pattern`, grouped by file.
 	 * 
@@ -1703,6 +1705,12 @@ export type Commit = {
 	 *  and against the reader's clock.
 	 */
 	committedAt: number | null,
+};
+
+/**  A commit named in full, and its page on the remote's forge if it has one. */
+export type CommitRef = {
+	full: string,
+	url: string | null,
 };
 
 /**

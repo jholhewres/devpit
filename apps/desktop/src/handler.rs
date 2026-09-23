@@ -124,6 +124,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         index::project_files,
         projects::project_changes,
         history::project_history,
+        history::project_commit_link,
         search::project_search,
         branches::branch_list,
         branches::branch_switch,

@@ -122,6 +122,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         index::project_files,
         projects::project_changes,
         history::project_history,
+        history::project_commit_link,
         search::project_search,
         branches::branch_list,
         branches::branch_switch,

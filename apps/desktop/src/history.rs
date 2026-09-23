@@ -49,3 +49,46 @@ pub(crate) fn project_history_now(
 
     Ok(ProjectHistory { commits, has_more })
 }
+
+/// A commit named in full, and its page on the remote's forge if it has one.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitRef {
+    pub full: String,
+    pub url: Option<String>,
+}
+
+/// `project.commit_link` — what a commit's menu copies and opens.
+#[tauri::command]
+#[specta::specta]
+pub async fn project_commit_link(
+    project_id: String,
+    worktree_id: Option<String>,
+    sha: String,
+) -> Result<CommitRef, RpcError> {
+    crate::off_main::blocking(move || project_commit_link_now(project_id, worktree_id, sha)).await
+}
+
+/// [`project_commit_link`], on the calling thread.
+pub(crate) fn project_commit_link_now(
+    project_id: String,
+    worktree_id: Option<String>,
+    sha: String,
+) -> Result<CommitRef, RpcError> {
+    // A commit id, and nothing git would read as an option or a range.
+    if sha.is_empty() || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(RpcError::new(
+            devpit_rpc::ErrorCode::Invalid,
+            "that is not a commit id",
+        ));
+    }
+    let store = store()?;
+    let (_, root) = locate(&store, &project_id)?;
+    let root = checkout(&root, worktree_id.as_deref());
+    let link =
+        devpit_git::commit_link(&root, &sha).map_err(|err| RpcError::internal(err.to_string()))?;
+    Ok(CommitRef {
+        full: link.full,
+        url: link.url,
+    })
+}

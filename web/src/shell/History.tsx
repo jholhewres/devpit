@@ -4,6 +4,7 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import type { Commit } from '../gen/bindings'
 import { appended, byDay, matches, since, subjectOf } from './commitLog'
 import { ask, commands } from './live'
+import { CommitMenu, type CommitAt } from './CommitMenu'
 import { Skeleton } from './Skeleton'
 import { CHANGED } from './useTree'
 import { useShell } from './useShell'
@@ -31,6 +32,8 @@ export function History(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
+  const [menu, setMenu] = useState<CommitAt | null>(null)
+  const closeMenu = useCallback(() => setMenu(null), [])
   const end = useRef<HTMLDivElement>(null)
 
   const load = useCallback(() => {
@@ -98,11 +101,14 @@ export function History(): React.JSX.Element {
     })
   }
 
+  const openCommit = (commit: Commit): void => show('diff', { id: `commit:${commit.sha}`, path: commit.sha, title: commit.sha })
+
   const now = new Date()
   const shown = commits.filter((one) => matches(one, query))
 
   return (
     <div className="hist">
+      {menu && project && <CommitMenu projectId={project.id} at={menu} onOpen={openCommit} onClose={closeMenu} />}
       {commits.length > 0 && (
         <label className="hist__find">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
@@ -131,8 +137,12 @@ export function History(): React.JSX.Element {
               <button
                 key={commit.sha}
                 className="hist__row"
-                title={commit.subject}
-                onClick={() => show('diff', { id: `commit:${commit.sha}`, path: commit.sha, title: commit.sha })}
+                data-menu={menu?.commit.sha === commit.sha ? 'true' : undefined}
+                onClick={() => openCommit(commit)}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  setMenu({ commit, x: event.clientX, y: event.clientY })
+                }}
               >
                 <span className="hist__top">
                   {said.kind && (
