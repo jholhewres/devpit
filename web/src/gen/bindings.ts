@@ -1029,6 +1029,13 @@ export const commands = {
 	 */
 	paneCompose: (projectId: string, paneId: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("pane_compose", { projectId, paneId, text })),
 	/**
+	 *  `folder.complete` — what the last word typed in a terminal's editor could
+	 *  finish as: the entries of the folder it names, relative to where the shell
+	 *  is, `~` read as home. A folder ends in `/` so the next Tab goes into it.
+	 *  Hidden entries only when the word asks for them with a leading dot.
+	 */
+	folderComplete: (cwd: string, word: string) => typedError<string[], RpcError>(__TAURI_INVOKE("folder_complete", { cwd, word })),
+	/**
 	 *  `pane.scrollback` — what this pane has printed, oldest kept byte first.
 	 * 
 	 *  This is what makes reopening a window show a terminal rather than an empty

@@ -76,3 +76,4 @@
 .abar__b:hover, .abar__b[data-on='true'] { background: var(--overlay-strong); color: var(--text); border-color: var(--border-strong); }
 .abar__compose { padding: 8px 10px 0 12px; }
 .abar__field { width: 100%; resize: none; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--composer, var(--canvas)); color: var(--text); font: inherit; font-size: 13px; line-height: 1.45; outline: none; }
+.cin__choices { max-height: 220px; }

@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 
 import type { FolderGlance } from '../gen/bindings'
 import { searched, suggestion } from './commandHistory'
+import { common, finished, wordAt } from './completing'
 import { shortPath } from './blockText'
 import { Folder } from './GitIcons'
 import { ask, commands } from './live'
@@ -42,6 +43,8 @@ export const CommandInput = forwardRef<CommandInputHandle, {
   const [search, setSearch] = useState<string | null>(null)
   const [pick, setPick] = useState(0)
   const [glance, setGlance] = useState<FolderGlance | null>(null)
+  /* Tab's choices when it could not choose alone, and which one is lit. */
+  const [choices, setChoices] = useState<{ start: number; caret: number; found: readonly string[]; at: number } | null>(null)
   const field = useRef<HTMLTextAreaElement>(null)
 
   useImperativeHandle(handle, () => ({
@@ -88,8 +91,49 @@ export const CommandInput = forwardRef<CommandInputHandle, {
     setText(history[next]!)
   }
 
+  const put = (start: number, caret: number, word: string): void => {
+    const next = finished(text, start, caret, word)
+    setText(next.text)
+    setWalk(null)
+    requestAnimationFrame(() => field.current?.setSelectionRange(next.caret, next.caret))
+  }
+
+  /* Tab with nothing to accept: the word under the cursor, finished from the
+     folder it names — alone when there is one answer, as far as they agree
+     when there are several, and the rest offered to choose from. */
+  const complete = (box: HTMLTextAreaElement): void => {
+    if (!cwd) return
+    const caret = box.selectionStart
+    const { start, word } = wordAt(text, caret)
+    void ask(() => commands.folderComplete(cwd, word)).then((answer) => {
+      const found = answer.data ?? []
+      if (found.length === 0) return
+      if (found.length === 1) return put(start, caret, found[0]!)
+      const shared = common(found)
+      if (shared.length > word.length) put(start, caret, shared)
+      setChoices({ start, caret: start + Math.max(shared.length, word.length), found, at: 0 })
+    })
+  }
+
   const onKey = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     const box = event.currentTarget
+    if (choices) {
+      if (abandoned(event)) {
+        event.preventDefault()
+        return setChoices(null)
+      }
+      if (event.key === 'Tab' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        const by = event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey) ? -1 : 1
+        return setChoices({ ...choices, at: (choices.at + by + choices.found.length) % choices.found.length })
+      }
+      if (committed(event)) {
+        event.preventDefault()
+        put(choices.start, choices.caret, choices.found[choices.at]!)
+        return setChoices(null)
+      }
+      setChoices(null)
+    }
     const atStart = box.selectionStart === 0 || !text.slice(0, box.selectionStart).includes('\n')
     const atEnd = !text.slice(box.selectionEnd).includes('\n')
     if (event.ctrlKey && event.key.toLowerCase() === 'l') {
@@ -116,6 +160,11 @@ export const CommandInput = forwardRef<CommandInputHandle, {
     if (ghost && (event.key === 'Tab' || (event.key === 'ArrowRight' && box.selectionStart === text.length))) {
       event.preventDefault()
       setText(text + ghost)
+      return
+    }
+    if (event.key === 'Tab' && !event.shiftKey) {
+      event.preventDefault()
+      complete(box)
       return
     }
     if (event.key === 'ArrowUp' && atStart && !event.shiftKey) {
@@ -165,6 +214,16 @@ export const CommandInput = forwardRef<CommandInputHandle, {
           {found.length === 0 && <div className="cin__none">Nothing in history matches.</div>}
           {found.map((one, at) => (
             <button key={one} className="cin__hit" role="option" aria-selected={at === pick} onMouseEnter={() => setPick(at)} onMouseDown={(event) => { event.preventDefault(); setSearch(null); setText(one); field.current?.focus() }}>
+              {one}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {choices && (
+        <div className="cin__search cin__choices" role="listbox" aria-label="Completions">
+          {choices.found.map((one, at) => (
+            <button key={one} className="cin__hit" role="option" aria-selected={at === choices.at} onMouseDown={(event) => { event.preventDefault(); put(choices.start, choices.caret, one); setChoices(null) }}>
               {one}
             </button>
           ))}

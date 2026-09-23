@@ -239,3 +239,84 @@ pub fn pane_compose(project_id: String, pane_id: String, text: String) -> Result
         .paste_and_send(&devpit_tmux::Server::target(&session, &pane_id), &text)
         .map_err(|err| RpcError::internal(err.to_string()))
 }
+
+/// How many completions a Tab offers. Past this the word needs more letters.
+const MOST_COMPLETIONS: usize = 60;
+
+/// `folder.complete` — what the last word typed in a terminal's editor could
+/// finish as: the entries of the folder it names, relative to where the shell
+/// is, `~` read as home. A folder ends in `/` so the next Tab goes into it.
+/// Hidden entries only when the word asks for them with a leading dot.
+#[tauri::command]
+#[specta::specta]
+pub fn folder_complete(cwd: String, word: String) -> Result<Vec<String>, RpcError> {
+    Ok(completions(
+        std::path::Path::new(&cwd),
+        &word,
+        std::env::var("HOME").ok().as_deref(),
+    ))
+}
+
+pub(crate) fn completions(cwd: &std::path::Path, word: &str, home: Option<&str>) -> Vec<String> {
+    let (dir, stem) = match word.rfind('/') {
+        Some(at) => (&word[..=at], &word[at + 1..]),
+        None => ("", word),
+    };
+    let base = if let Some(rest) =
+        dir.strip_prefix("~/")
+            .or(if dir == "~/" { Some("") } else { None })
+    {
+        match home {
+            Some(home) => std::path::Path::new(home).join(rest),
+            None => return Vec::new(),
+        }
+    } else if dir.starts_with('/') {
+        std::path::PathBuf::from(dir)
+    } else {
+        cwd.join(dir)
+    };
+    let Ok(entries) = std::fs::read_dir(&base) else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.starts_with(stem) || (name.starts_with('.') && !stem.starts_with('.')) {
+                return None;
+            }
+            let folder = entry.path().is_dir();
+            Some(format!("{dir}{name}{}", if folder { "/" } else { "" }))
+        })
+        .collect();
+    found.sort_by_key(|one| one.to_lowercase());
+    found.truncate(MOST_COMPLETIONS);
+    found
+}
+
+#[cfg(test)]
+mod completion_tests {
+    use super::completions;
+
+    #[test]
+    fn a_word_finishes_as_the_entries_of_the_folder_it_names() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/main.rs"), "").unwrap();
+        std::fs::write(dir.path().join("Cargo.toml"), "").unwrap();
+        std::fs::write(dir.path().join(".env"), "").unwrap();
+        assert_eq!(completions(dir.path(), "s", None), ["src/"]);
+        assert_eq!(completions(dir.path(), "src/m", None), ["src/main.rs"]);
+        assert_eq!(
+            completions(dir.path(), "", None),
+            ["Cargo.toml", "src/"],
+            "no hidden ones unasked"
+        );
+        assert_eq!(completions(dir.path(), ".e", None), [".env"]);
+        let home = dir.path().to_string_lossy().into_owned();
+        assert_eq!(
+            completions(std::path::Path::new("/"), "~/sr", Some(&home)),
+            ["~/src/"]
+        );
+    }
+}
