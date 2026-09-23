@@ -153,13 +153,15 @@ fn script(shell: &str, at: &str, name: &str) -> String {
     if Path::new(shell).file_name().and_then(|one| one.to_str()) == Some("fish") {
         // An alias in fish is a function.
         return format!(
-            "set -gx PATH '{at}' $PATH; if not functions -q {name}; touch '{at}/.refused'; exit 0; end; begin; env -0 2>/dev/null; or env; end > '{at}/.base'; {run}"
+            "status job-control none; set -gx PATH '{at}' $PATH; if not functions -q {name}; touch '{at}/.refused'; exit 0; end; begin; env -0 2>/dev/null; or env; end > '{at}/.base'; {run}"
         );
     }
     // bash answers `type -t`, zsh `whence -w`; any other shell answers neither
-    // and is refused.
+    // and is refused. Job control off first: an interactive shell that has it
+    // — macOS's bash does — starts the function's programs in groups of their
+    // own, which the timeout's signal to the shell's group never reaches.
     format!(
-        "PATH='{at}':\"$PATH\"; export PATH; case \"$( {{ if [ -n \"$ZSH_VERSION\" ]; then whence -w {name}; else type -t {name}; fi; }} 2>/dev/null )\" in *function|*alias) ;; *) : > '{at}/.refused'; exit 0;; esac; (env -0 2>/dev/null || env) > '{at}/.base'; {run}"
+        "set +m 2>/dev/null; PATH='{at}':\"$PATH\"; export PATH; case \"$( {{ if [ -n \"$ZSH_VERSION\" ]; then whence -w {name}; else type -t {name}; fi; }} 2>/dev/null )\" in *function|*alias) ;; *) : > '{at}/.refused'; exit 0;; esac; (env -0 2>/dev/null || env) > '{at}/.base'; {run}"
     )
 }
 
