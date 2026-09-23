@@ -24,6 +24,20 @@ pub fn config_dir_from(home: &Path, said: Option<&str>) -> PathBuf {
     }
 }
 
+/// The configuration directory a process started with `env` would use.
+///
+/// The process's own environment carries over to the child, so what it
+/// `inherited` counts when `env` says nothing; when `env` names the variable at
+/// all, that is the value the child sees, empty included.
+pub fn config_dir_of(home: &Path, env: &[(String, String)], inherited: Option<&str>) -> PathBuf {
+    let own = env
+        .iter()
+        .rev()
+        .find(|(name, _)| name == "CLAUDE_CONFIG_DIR")
+        .map(|(_, value)| value.as_str());
+    config_dir_from(home, own.or(inherited))
+}
+
 /// The CLI's settings file, which is where its MCP servers are written.
 ///
 /// Not simply inside the directory above. With nothing set, the CLI keeps
@@ -92,6 +106,23 @@ mod tests {
         assert_eq!(
             settings_file_from(home, Some("/home/someone/.claude-other")),
             Path::new("/home/someone/.claude-other/.claude.json")
+        );
+    }
+
+    #[test]
+    fn a_profiles_own_directory_wins_over_the_inherited_one() {
+        let home = Path::new("/home/someone");
+        let env = [(
+            "CLAUDE_CONFIG_DIR".to_owned(),
+            "/home/someone/.claude-b".to_owned(),
+        )];
+        assert_eq!(
+            config_dir_of(home, &env, Some("/home/someone/.claude-a")),
+            Path::new("/home/someone/.claude-b")
+        );
+        assert_eq!(
+            config_dir_of(home, &[], Some("/home/someone/.claude-a")),
+            Path::new("/home/someone/.claude-a")
         );
     }
 
