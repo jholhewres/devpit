@@ -61,7 +61,7 @@ pub use plugins::{
     catalogue, validate, validate_catalogue, DataSpec, Permission, PluginError, PluginList,
     PluginManifest, PluginState, PluginUninstalled, Surface,
 };
-pub use profile::{Declared, EnvVar, Profile, Reach};
+pub use profile::{Declared, EnvVar, Profile, Reach, ReadCommand};
 pub use project::{
     Change, Commit, FileNode, GitStatus, Project, ProjectChanges, ProjectHistory, ProjectList,
     ProjectTree, Worktree, WorktreeOrigin,

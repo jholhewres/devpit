@@ -279,6 +279,17 @@ export const commands = {
 	 */
 	agentProfileSave: (declared: Declared) => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profile_save", { declared })),
 	/**
+	 *  `agent.profile_read` — what a command of the person's own does, read by
+	 *  running it in their shell with stand-ins for the agents (`shell_probe`).
+	 *  Nothing when it starts none of them.
+	 */
+	agentProfileRead: (command: string) => typedError<{
+	/**  The agent it runs, by `devpit_pty::agents` id. */
+	base: string,
+	args: string[],
+	env: EnvVar[],
+} | null, RpcError>(__TAURI_INVOKE("agent_profile_read", { command })),
+	/**
 	 *  `agent.profile_remove` — forgets one.
 	 * 
 	 *  Refused while a board step still names it. A step holds the id as a plain
@@ -2738,6 +2749,17 @@ export type Reach =
 "shell_only" | 
 /**  Neither. Nothing here can start it. */
 "missing";
+
+/**
+ *  A command of the person's own — a shell function such as `claudin` —
+ *  read by running it: the agent it starts, and what it starts it with.
+ */
+export type ReadCommand = {
+	/**  The agent it runs, by `devpit_pty::agents` id. */
+	base: string,
+	args: string[],
+	env: EnvVar[],
+};
 
 export type RejectedAgent = {
 	file: string,

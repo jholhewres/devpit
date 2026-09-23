@@ -144,3 +144,14 @@ impl Profile {
         self.reach == Reach::Runnable
     }
 }
+
+/// A command of the person's own — a shell function such as `claudin` —
+/// read by running it: the agent it starts, and what it starts it with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadCommand {
+    /// The agent it runs, by `devpit_pty::agents` id.
+    pub base: String,
+    pub args: Vec<String>,
+    pub env: Vec<EnvVar>,
+}

@@ -182,3 +182,28 @@ pub(crate) fn runner_for(
 #[cfg(test)]
 #[path = "agent_profiles_tests.rs"]
 mod tests;
+
+/// `agent.profile_read` — what a command of the person's own does, read by
+/// running it in their shell with stand-ins for the agents (`shell_probe`).
+/// Nothing when it starts none of them.
+#[tauri::command]
+#[specta::specta]
+pub fn agent_profile_read(command: String) -> Result<Option<devpit_rpc::ReadCommand>, RpcError> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_owned());
+    let programs: Vec<&str> = devpit_pty::agents::KNOWN
+        .iter()
+        .map(|one| one.launch)
+        .collect();
+    let probed = crate::shell_probe::probe(&shell, command.trim(), &programs)
+        .map_err(|why| RpcError::new(ErrorCode::Invalid, why))?;
+    Ok(probed.and_then(|found| {
+        let base = devpit_pty::agents::KNOWN
+            .iter()
+            .find(|one| one.launch == found.program)?;
+        Some(devpit_rpc::ReadCommand {
+            base: base.id.to_owned(),
+            args: found.args,
+            env: found.env,
+        })
+    }))
+}

@@ -98,6 +98,7 @@ mod session_search;
 mod sessions;
 mod settings;
 mod shell_launch;
+mod shell_probe;
 mod skills;
 mod slash;
 mod sources;

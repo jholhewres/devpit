@@ -18,6 +18,8 @@ const hooked = vi.fn()
 
 const opened: string[] = []
 
+const readBack = vi.fn()
+
 vi.mock('./live', () => ({
   ask: (call: () => unknown) =>
     Promise.resolve(
@@ -35,6 +37,7 @@ vi.mock('./live', () => ({
     agentHooksSet: (on: boolean) => (hooked(on), { ...choice, hooks: on }),
     agentProfileSave: (declared: Declared) => (saved(declared), listed),
     agentProfileRemove: (id: string) => (removed(id), listed),
+    agentProfileRead: (command: string) => readBack(command),
   },
 }))
 
@@ -163,6 +166,7 @@ describe('what exactly does each one run', () => {
     // An override and an account are the same three fields.
     await shown()
     fireEvent.click(screen.getByLabelText('Show how Claude Code is started'))
+    fireEvent.click(screen.getByText(/Details —/))
     expect(screen.getByLabelText('Program')).toBeTruthy()
     expect(screen.getByLabelText('Arguments')).toBeTruthy()
     expect(screen.getByText('Add variable')).toBeTruthy()
@@ -171,6 +175,7 @@ describe('what exactly does each one run', () => {
   it('saves an override against the agent it was opened from', async () => {
     await shown()
     fireEvent.click(screen.getByLabelText('Show how Claude Code is started'))
+    fireEvent.click(screen.getByText(/Details —/))
     fireEvent.change(screen.getByLabelText('Arguments'), {
       target: { value: '--permission-mode bypassPermissions' },
     })
@@ -269,6 +274,7 @@ describe('declaring another account or endpoint', () => {
     await shown()
     fireEvent.click(screen.getByText('New profile'))
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'claudin' } })
+    fireEvent.click(screen.getByText(/Details —/))
     fireEvent.change(screen.getByLabelText('Config directory'), {
       target: { value: '~/.claude-claudin' },
     })
@@ -285,6 +291,7 @@ describe('declaring another account or endpoint', () => {
     await shown()
     fireEvent.click(screen.getByText('New profile'))
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'glm' } })
+    fireEvent.click(screen.getByText(/Details —/))
     fireEvent.change(screen.getByLabelText('Endpoint'), {
       target: { value: 'https://api.z.ai/api/anthropic' },
     })
@@ -342,6 +349,30 @@ describe('a switch you can switch back', () => {
     await shown()
     const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
     expect(picker.textContent).not.toContain('Codex')
+  })
+})
+
+describe('a profile from a command of your own', () => {
+  it('is a name and the command you already type — what it sets is read, not asked for', async () => {
+    readBack.mockReturnValue({
+      base: 'claude',
+      args: ['--permission-mode', 'bypassPermissions'],
+      env: [{ name: 'CLAUDE_CONFIG_DIR', value: '/home/me/.claude-two' }],
+    })
+    await shown()
+    fireEvent.click(screen.getByText('New profile'))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'claudin' } })
+    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'claudin' } })
+    fireEvent.blur(screen.getByLabelText('Command'))
+    expect(await screen.findByText(/with CLAUDE_CONFIG_DIR/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(saved).toHaveBeenCalled())
+    const sent = saved.mock.calls.at(-1)![0] as Declared
+    expect(readBack).toHaveBeenCalledWith('claudin')
+    expect(sent.base).toBe('claude')
+    expect(sent.command).toBe('')
+    expect(sent.env).toEqual([{ name: 'CLAUDE_CONFIG_DIR', value: '/home/me/.claude-two' }])
+    expect(sent.args).toEqual(['--permission-mode', 'bypassPermissions'])
   })
 })
 

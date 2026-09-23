@@ -62,6 +62,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         agent_choice::agent_hooks_set,
         agent_profiles::agent_profiles,
         agent_profiles::agent_profile_save,
+        agent_profiles::agent_profile_read,
         agent_profiles::agent_profile_remove,
         chat::chat_attach,
         pasting::chat_paste,
