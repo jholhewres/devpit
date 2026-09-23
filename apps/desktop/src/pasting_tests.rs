@@ -29,7 +29,7 @@ fn text_that_is_not_base64_is_refused() {
 
 #[test]
 fn a_project_id_that_is_a_path_is_refused() {
-    let refused = chat_paste("../x".to_owned(), "image/png".to_owned(), "aGk=".to_owned())
+    let refused = chat_paste_now("../x".to_owned(), "image/png".to_owned(), "aGk=".to_owned())
         .expect_err("refused");
     assert_eq!(refused.code, ErrorCode::Forbidden);
 }

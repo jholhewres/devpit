@@ -946,7 +946,12 @@ export const commands = {
 	sessionEnsure: (projectId: string, tabId: string, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_ensure", { projectId, tabId, worktreeId })),
 	/**  `session.focus` — persists which leaf receives the next split or action. */
 	sessionFocus: (projectId: string, tabId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_focus", { projectId, tabId, leafId })),
-	/**  `session.split` — a new tmux window and a split node in the tree. */
+	/**
+	 *  `session.split` — a new tmux window and a split node in the tree.
+	 * 
+	 *  Off the main thread: it waits on tmux, and a split that held the window
+	 *  still for it looked like a window that had hung.
+	 */
 	sessionSplit: (projectId: string, tabId: string, leafId: string, direction: SplitDirection, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_split", { projectId, tabId, leafId, direction, worktreeId })),
 	/**
 	 *  `session.close_leaf` — the pane goes, and its tmux window with it.
@@ -956,6 +961,8 @@ export const commands = {
 	 * 
 	 *  Refuses the last pane. A session with no pane is not a layout, and the
 	 *  refusal says so rather than persisting an empty tree the screen cannot draw.
+	 * 
+	 *  Off the main thread, for the same reason as [`session_split`].
 	 */
 	sessionCloseLeaf: (projectId: string, tabId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_close_leaf", { projectId, tabId, leafId })),
 	/**

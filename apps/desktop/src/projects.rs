@@ -44,7 +44,7 @@ pub(crate) fn locate(
 /// two fields and three of the four copies would have compiled without them
 /// had they been optional, which is how a list ends up disagreeing with the
 /// row that was just added to it.
-fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
+pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
     let root = PathBuf::from(&row.root_path);
     let hidden = crate::sources::hidden(store);
     let (worktrees, unreadable) =
@@ -119,40 +119,6 @@ pub fn project_add(root_path: String) -> Result<Project, RpcError> {
     let origin = origin_url(&root);
     let id = store.add_project(&root, origin.as_deref())?;
 
-    let row = store
-        .project(&id)?
-        .ok_or_else(|| RpcError::internal("the project vanished between write and read"))?;
-
-    Ok(drawn(&store, row))
-}
-
-/// `project.clone` — clones a remote and registers where it landed.
-///
-/// `into` is the parent folder, and it is optional: someone deciding *whether*
-/// to add a project should not be stopped to answer *where*. Left out, it goes
-/// to `~/.devpit/repos/`, and the path is shown before the clone runs.
-#[tauri::command]
-#[specta::specta]
-pub fn project_clone(url: String, into: Option<String>) -> Result<Project, RpcError> {
-    // Somewhere of their choosing when they chose one. The app's own folder is
-    // the answer to "I do not want to decide", not a place to be put.
-    let parent = match into.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
-        Some(chosen) => std::path::PathBuf::from(chosen),
-        None => Store::root()?.join("repos"),
-    };
-
-    let into = devpit_git::clone(url.trim(), &parent).map_err(|err| match err {
-        devpit_git::GitError::Missing => RpcError::new(ErrorCode::Unsupported, err.to_string()),
-        // A clone that failed because the folder is taken is a conflict the
-        // person can act on, not an internal error.
-        devpit_git::GitError::Failed { ref stderr, .. } if stderr.contains("already exists") => {
-            RpcError::new(ErrorCode::Conflict, err.to_string())
-        }
-        other => RpcError::internal(other.to_string()),
-    })?;
-
-    let store = store()?;
-    let id = store.add_project(&into, Some(url.trim()))?;
     let row = store
         .project(&id)?
         .ok_or_else(|| RpcError::internal("the project vanished between write and read"))?;
@@ -373,7 +339,15 @@ fn is_hex_colour(value: &str) -> bool {
 /// `project.changes` — what has changed in a checkout, with the size of each edit.
 #[tauri::command]
 #[specta::specta]
-pub fn project_changes(
+pub async fn project_changes(
+    project_id: String,
+    worktree_id: Option<String>,
+) -> Result<ProjectChanges, RpcError> {
+    crate::off_main::blocking(move || project_changes_now(project_id, worktree_id)).await
+}
+
+/// [`project_changes`], on the calling thread.
+pub(crate) fn project_changes_now(
     project_id: String,
     worktree_id: Option<String>,
 ) -> Result<ProjectChanges, RpcError> {

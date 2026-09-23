@@ -27,7 +27,16 @@ pub(crate) fn tree_error(err: devpit_core::TreeError) -> RpcError {
 /// the root.
 #[tauri::command]
 #[specta::specta]
-pub fn project_tree(
+pub async fn project_tree(
+    project_id: String,
+    worktree_id: Option<String>,
+    path: String,
+) -> Result<ProjectTree, RpcError> {
+    crate::off_main::blocking(move || project_tree_now(project_id, worktree_id, path)).await
+}
+
+/// [`project_tree`], on the calling thread.
+pub(crate) fn project_tree_now(
     project_id: String,
     worktree_id: Option<String>,
     path: String,

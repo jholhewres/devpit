@@ -277,7 +277,12 @@ pub async fn apps_remove(app_id: String) -> Result<Vec<OpenApp>, RpcError> {
 /// process runs terminals, and reaching it is reaching the machine.
 #[tauri::command]
 #[specta::specta]
-pub fn apps_open(app_id: String, path: String) -> Result<(), RpcError> {
+pub async fn apps_open(app_id: String, path: String) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || apps_open_now(app_id, path)).await
+}
+
+/// [`apps_open`], on the calling thread.
+pub(crate) fn apps_open_now(app_id: String, path: String) -> Result<(), RpcError> {
     let store = store()?;
     let app = stored(&store)?
         .into_iter()

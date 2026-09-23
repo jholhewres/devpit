@@ -53,7 +53,16 @@ pub fn branch_list(project_id: String, worktree_id: Option<String>) -> Result<Br
 /// lost, and a summary here would name fewer.
 #[tauri::command]
 #[specta::specta]
-pub fn branch_switch(
+pub async fn branch_switch(
+    project_id: String,
+    worktree_id: Option<String>,
+    name: String,
+) -> Result<Branches, RpcError> {
+    crate::off_main::blocking(move || branch_switch_now(project_id, worktree_id, name)).await
+}
+
+/// [`branch_switch`], on the calling thread.
+pub(crate) fn branch_switch_now(
     project_id: String,
     worktree_id: Option<String>,
     name: String,

@@ -65,7 +65,12 @@ fn branch_in(path: &Path) -> Option<String> {
 /// each one takes and the work each one is holding.
 #[tauri::command]
 #[specta::specta]
-pub fn worktree_list(project_id: String) -> Result<Worktrees, RpcError> {
+pub async fn worktree_list(project_id: String) -> Result<Worktrees, RpcError> {
+    crate::off_main::blocking(move || worktree_list_now(project_id)).await
+}
+
+/// [`worktree_list`], on the calling thread.
+pub(crate) fn worktree_list_now(project_id: String) -> Result<Worktrees, RpcError> {
     let store = store()?;
     let home = home()?;
     let dir = home.join("worktrees").join(&project_id);
@@ -105,7 +110,16 @@ pub fn worktree_list(project_id: String) -> Result<Worktrees, RpcError> {
 /// refusal names what would be lost rather than saying "it is dirty".
 #[tauri::command]
 #[specta::specta]
-pub fn worktree_remove(
+pub async fn worktree_remove(
+    project_id: String,
+    card_id: String,
+    even_dirty: bool,
+) -> Result<Removed, RpcError> {
+    crate::off_main::blocking(move || worktree_remove_now(project_id, card_id, even_dirty)).await
+}
+
+/// [`worktree_remove`], on the calling thread.
+pub(crate) fn worktree_remove_now(
     project_id: String,
     card_id: String,
     even_dirty: bool,

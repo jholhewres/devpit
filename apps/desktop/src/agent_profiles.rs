@@ -87,7 +87,12 @@ pub(crate) fn all(store: &Store) -> Result<Vec<Profile>, RpcError> {
 /// `agent.profiles` — the accounts this machine can talk to.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_profiles() -> Result<Vec<Profile>, RpcError> {
+pub async fn agent_profiles() -> Result<Vec<Profile>, RpcError> {
+    crate::off_main::blocking(agent_profiles_now).await
+}
+
+/// [`agent_profiles`], on the calling thread.
+pub(crate) fn agent_profiles_now() -> Result<Vec<Profile>, RpcError> {
     all(&crate::projects::store()?)
 }
 
@@ -98,7 +103,12 @@ pub fn agent_profiles() -> Result<Vec<Profile>, RpcError> {
 /// than in the window, because the window can be reloaded mid-edit.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_profile_save(declared: Declared) -> Result<Vec<Profile>, RpcError> {
+pub async fn agent_profile_save(declared: Declared) -> Result<Vec<Profile>, RpcError> {
+    crate::off_main::blocking(move || agent_profile_save_now(declared)).await
+}
+
+/// [`agent_profile_save`], on the calling thread.
+pub(crate) fn agent_profile_save_now(declared: Declared) -> Result<Vec<Profile>, RpcError> {
     devpit_agentcli::declaring::allowed(&declared, |base| base_of(base).is_some())
         .map_err(|why| RpcError::new(ErrorCode::Invalid, why.to_string()))?;
     let home = crate::installations::home()?;
@@ -127,7 +137,12 @@ pub fn agent_profile_save(declared: Declared) -> Result<Vec<Profile>, RpcError> 
 /// and nowhere near the symptom.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_profile_remove(id: String) -> Result<Vec<Profile>, RpcError> {
+pub async fn agent_profile_remove(id: String) -> Result<Vec<Profile>, RpcError> {
+    crate::off_main::blocking(move || agent_profile_remove_now(id)).await
+}
+
+/// [`agent_profile_remove`], on the calling thread.
+pub(crate) fn agent_profile_remove_now(id: String) -> Result<Vec<Profile>, RpcError> {
     let store = crate::projects::store()?;
     let used = store.steps_using_profile(&id)?;
     if !used.is_empty() {
@@ -188,7 +203,16 @@ mod tests;
 /// Nothing when it starts none of them.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_profile_read(command: String) -> Result<Option<devpit_rpc::ReadCommand>, RpcError> {
+pub async fn agent_profile_read(
+    command: String,
+) -> Result<Option<devpit_rpc::ReadCommand>, RpcError> {
+    crate::off_main::blocking(move || agent_profile_read_now(command)).await
+}
+
+/// [`agent_profile_read`], on the calling thread.
+pub(crate) fn agent_profile_read_now(
+    command: String,
+) -> Result<Option<devpit_rpc::ReadCommand>, RpcError> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_owned());
     let programs: Vec<&str> = devpit_pty::agents::KNOWN
         .iter()

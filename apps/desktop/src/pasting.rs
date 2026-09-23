@@ -44,7 +44,16 @@ pub(crate) fn decoded(data: &str) -> Result<Vec<u8>, RpcError> {
 /// `chat.paste` — keeps a pasted picture and answers with it as an attachment.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_paste(
+pub async fn chat_paste(
+    project_id: String,
+    media_type: String,
+    data: String,
+) -> Result<Attachment, RpcError> {
+    crate::off_main::blocking(move || chat_paste_now(project_id, media_type, data)).await
+}
+
+/// [`chat_paste`], on the calling thread.
+pub(crate) fn chat_paste_now(
     project_id: String,
     media_type: String,
     data: String,

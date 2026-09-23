@@ -75,7 +75,12 @@ pub(crate) fn hidden(store: &Store) -> String {
 /// `worktree.sources` — the kinds this project has, and which are shown.
 #[tauri::command]
 #[specta::specta]
-pub fn worktree_sources(project_id: Option<String>) -> Result<Vec<Source>, RpcError> {
+pub async fn worktree_sources(project_id: Option<String>) -> Result<Vec<Source>, RpcError> {
+    crate::off_main::blocking(move || worktree_sources_now(project_id)).await
+}
+
+/// [`worktree_sources`], on the calling thread.
+pub(crate) fn worktree_sources_now(project_id: Option<String>) -> Result<Vec<Source>, RpcError> {
     let store = store()?;
     let stored = hidden(&store);
 
@@ -107,7 +112,16 @@ pub fn worktree_sources(project_id: Option<String>) -> Result<Vec<Source>, RpcEr
 /// `worktree.source_show` — shows or hides one kind.
 #[tauri::command]
 #[specta::specta]
-pub fn worktree_source_show(
+pub async fn worktree_source_show(
+    project_id: Option<String>,
+    source_id: String,
+    shown: bool,
+) -> Result<Vec<Source>, RpcError> {
+    crate::off_main::blocking(move || worktree_source_show_now(project_id, source_id, shown)).await
+}
+
+/// [`worktree_source_show`], on the calling thread.
+pub(crate) fn worktree_source_show_now(
     project_id: Option<String>,
     source_id: String,
     shown: bool,
@@ -139,5 +153,5 @@ pub fn worktree_source_show(
     }
     store.set_preference(preference::WORKTREES_HIDDEN, &devpit_git::hidden_as(&set))?;
 
-    worktree_sources(project_id)
+    worktree_sources_now(project_id)
 }

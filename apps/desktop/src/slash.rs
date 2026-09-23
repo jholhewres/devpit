@@ -58,7 +58,12 @@ pub(crate) fn recall(home: &Path, profile_id: &str) -> Option<SessionInit> {
 /// did not say it has.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_slash_commands(profile_id: String) -> Result<Vec<String>, RpcError> {
+pub async fn chat_slash_commands(profile_id: String) -> Result<Vec<String>, RpcError> {
+    crate::off_main::blocking(move || chat_slash_commands_now(profile_id)).await
+}
+
+/// [`chat_slash_commands`], on the calling thread.
+pub(crate) fn chat_slash_commands_now(profile_id: String) -> Result<Vec<String>, RpcError> {
     if !plain(&profile_id) {
         return Err(RpcError::new(ErrorCode::Forbidden, "that is not a profile"));
     }
@@ -104,6 +109,6 @@ mod tests {
         let home = tempfile::tempdir().expect("tempdir");
         remember(home.path(), "../escape", Some(&init()));
         assert!(!home.path().join("escape.json").exists());
-        assert!(chat_slash_commands("../escape".into()).is_err());
+        assert!(chat_slash_commands_now("../escape".into()).is_err());
     }
 }

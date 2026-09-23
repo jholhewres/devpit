@@ -22,7 +22,16 @@ const HISTORY: u32 = 8;
 /// invalidate a remembered sha.
 #[tauri::command]
 #[specta::specta]
-pub fn project_history(
+pub async fn project_history(
+    project_id: String,
+    worktree_id: Option<String>,
+    skip: Option<u32>,
+) -> Result<ProjectHistory, RpcError> {
+    crate::off_main::blocking(move || project_history_now(project_id, worktree_id, skip)).await
+}
+
+/// [`project_history`], on the calling thread.
+pub(crate) fn project_history_now(
     project_id: String,
     worktree_id: Option<String>,
     skip: Option<u32>,

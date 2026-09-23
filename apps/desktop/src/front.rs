@@ -19,7 +19,12 @@ fn store() -> Result<Store, RpcError> {
 /// from this one with every commit anyone lands on the base branch.
 #[tauri::command]
 #[specta::specta]
-pub fn card_diff(card_id: String) -> Result<Front, RpcError> {
+pub async fn card_diff(card_id: String) -> Result<Front, RpcError> {
+    crate::off_main::blocking(move || card_diff_now(card_id)).await
+}
+
+/// [`card_diff`], on the calling thread.
+pub(crate) fn card_diff_now(card_id: String) -> Result<Front, RpcError> {
     let store = store()?;
     let card = store
         .card(&card_id)?
@@ -56,7 +61,20 @@ pub fn card_diff(card_id: String) -> Result<Front, RpcError> {
 /// that work nobody committed was not worth keeping.
 #[tauri::command]
 #[specta::specta]
-pub fn card_archive(project_id: String, card_id: String, force: bool) -> Result<Board, RpcError> {
+pub async fn card_archive(
+    project_id: String,
+    card_id: String,
+    force: bool,
+) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || card_archive_now(project_id, card_id, force)).await
+}
+
+/// [`card_archive`], on the calling thread.
+pub(crate) fn card_archive_now(
+    project_id: String,
+    card_id: String,
+    force: bool,
+) -> Result<Board, RpcError> {
     let store = store()?;
 
     if !force {

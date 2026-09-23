@@ -205,7 +205,20 @@ pub fn terminal_block_changes() -> Result<Vec<BlockChanged>, RpcError> {
 /// command rather than running each as it arrives.
 #[tauri::command]
 #[specta::specta]
-pub fn pane_submit(project_id: String, pane_id: String, line: String) -> Result<(), RpcError> {
+pub async fn pane_submit(
+    project_id: String,
+    pane_id: String,
+    line: String,
+) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || pane_submit_now(project_id, pane_id, line)).await
+}
+
+/// [`pane_submit`], on the calling thread.
+pub(crate) fn pane_submit_now(
+    project_id: String,
+    pane_id: String,
+    line: String,
+) -> Result<(), RpcError> {
     crate::sessions::holding(&project_id, &pane_id)?;
     let session = devpit_tmux::Server::session_name(&project_id);
     crate::sessions::tmux_server()?
@@ -217,7 +230,12 @@ pub fn pane_submit(project_id: String, pane_id: String, line: String) -> Result<
 /// the terminal's prompt chips. Nothing outside a repository.
 #[tauri::command]
 #[specta::specta]
-pub fn folder_glance(folder: String) -> Result<Option<FolderGlance>, RpcError> {
+pub async fn folder_glance(folder: String) -> Result<Option<FolderGlance>, RpcError> {
+    crate::off_main::blocking(move || folder_glance_now(folder)).await
+}
+
+/// [`folder_glance`], on the calling thread.
+pub(crate) fn folder_glance_now(folder: String) -> Result<Option<FolderGlance>, RpcError> {
     let found = devpit_git::glance(std::path::Path::new(&folder))
         .map_err(|err| RpcError::internal(err.to_string()))?;
     Ok(found.map(|one| FolderGlance {
@@ -232,7 +250,20 @@ pub fn folder_glance(folder: String) -> Result<Option<FolderGlance>, RpcError> {
 /// program in the pane (an agent's TUI) as one paste and sent.
 #[tauri::command]
 #[specta::specta]
-pub fn pane_compose(project_id: String, pane_id: String, text: String) -> Result<(), RpcError> {
+pub async fn pane_compose(
+    project_id: String,
+    pane_id: String,
+    text: String,
+) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || pane_compose_now(project_id, pane_id, text)).await
+}
+
+/// [`pane_compose`], on the calling thread.
+pub(crate) fn pane_compose_now(
+    project_id: String,
+    pane_id: String,
+    text: String,
+) -> Result<(), RpcError> {
     crate::sessions::holding(&project_id, &pane_id)?;
     let session = devpit_tmux::Server::session_name(&project_id);
     crate::sessions::tmux_server()?
@@ -325,7 +356,12 @@ mod completion_tests {
 /// prompt is drawn again and heard. Answers whether it pressed one.
 #[tauri::command]
 #[specta::specta]
-pub fn pane_nudge(project_id: String, pane_id: String) -> Result<bool, RpcError> {
+pub async fn pane_nudge(project_id: String, pane_id: String) -> Result<bool, RpcError> {
+    crate::off_main::blocking(move || pane_nudge_now(project_id, pane_id)).await
+}
+
+/// [`pane_nudge`], on the calling thread.
+pub(crate) fn pane_nudge_now(project_id: String, pane_id: String) -> Result<bool, RpcError> {
     crate::sessions::holding(&project_id, &pane_id)?;
     let session = devpit_tmux::Server::session_name(&project_id);
     crate::sessions::tmux_server()?

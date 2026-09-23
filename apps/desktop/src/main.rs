@@ -23,6 +23,7 @@ mod browser_menu;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod browser_gtk;
 mod claims;
+mod cloning;
 mod columns;
 mod commands;
 mod rewinding;
@@ -71,8 +72,10 @@ mod mcp;
 mod mcp_reading;
 mod moving;
 mod notices;
+mod off_main;
 mod openers;
 mod outside_sessions;
+mod pane_screen;
 mod panels;
 mod panes;
 mod pasting;

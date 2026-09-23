@@ -10,7 +10,7 @@
 use devpit_core::tree::TreeError;
 use devpit_rpc::{ErrorCode, RpcError};
 
-use crate::filetree::project_tree;
+use crate::filetree::project_tree_now;
 use crate::roots::root_of;
 use devpit_rpc::ProjectTree;
 
@@ -42,7 +42,7 @@ pub fn path_create(
 ) -> Result<ProjectTree, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_core::paths::create(&root, &path, folder).map_err(refused)?;
-    project_tree(project_id, worktree_id, String::new())
+    project_tree_now(project_id, worktree_id, String::new())
 }
 
 /// `path.move` — renames or moves, which are the same operation.
@@ -56,7 +56,7 @@ pub fn path_move(
 ) -> Result<ProjectTree, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_core::paths::move_to(&root, &from, &to).map_err(refused)?;
-    project_tree(project_id, worktree_id, String::new())
+    project_tree_now(project_id, worktree_id, String::new())
 }
 
 /// `path.delete` — removes a file, or a folder and everything under it.
@@ -72,5 +72,5 @@ pub fn path_delete(
 ) -> Result<ProjectTree, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_core::paths::remove(&root, &path).map_err(refused)?;
-    project_tree(project_id, worktree_id, String::new())
+    project_tree_now(project_id, worktree_id, String::new())
 }

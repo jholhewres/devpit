@@ -13,7 +13,16 @@ use crate::roots::root_of;
 /// whose right side is the file on disk. `None` when `HEAD` has no such file.
 #[tauri::command]
 #[specta::specta]
-pub fn file_at_head(
+pub async fn file_at_head(
+    project_id: String,
+    worktree_id: Option<String>,
+    path: String,
+) -> Result<Option<String>, RpcError> {
+    crate::off_main::blocking(move || file_at_head_now(project_id, worktree_id, path)).await
+}
+
+/// [`file_at_head`], on the calling thread.
+pub(crate) fn file_at_head_now(
     project_id: String,
     worktree_id: Option<String>,
     path: String,
@@ -27,7 +36,16 @@ pub fn file_at_head(
 /// `commit.diff` — the patch one commit introduced.
 #[tauri::command]
 #[specta::specta]
-pub fn commit_diff(
+pub async fn commit_diff(
+    project_id: String,
+    worktree_id: Option<String>,
+    sha: String,
+) -> Result<String, RpcError> {
+    crate::off_main::blocking(move || commit_diff_now(project_id, worktree_id, sha)).await
+}
+
+/// [`commit_diff`], on the calling thread.
+pub(crate) fn commit_diff_now(
     project_id: String,
     worktree_id: Option<String>,
     sha: String,

@@ -113,7 +113,15 @@ pub fn plugin_set_enabled(
 /// `plugin.install` — installs one in this project, on.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_install(project_id: String, plugin_id: String) -> Result<PluginList, RpcError> {
+pub async fn plugin_install(project_id: String, plugin_id: String) -> Result<PluginList, RpcError> {
+    crate::off_main::blocking(move || plugin_install_now(project_id, plugin_id)).await
+}
+
+/// [`plugin_install`], on the calling thread.
+pub(crate) fn plugin_install_now(
+    project_id: String,
+    plugin_id: String,
+) -> Result<PluginList, RpcError> {
     install(&store()?, &project_id, &plugin_id)
 }
 
@@ -121,7 +129,17 @@ pub fn plugin_install(project_id: String, plugin_id: String) -> Result<PluginLis
 /// `delete_data`.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_uninstall(
+pub async fn plugin_uninstall(
+    project_id: String,
+    plugin_id: String,
+    delete_data: bool,
+) -> Result<PluginUninstalled, RpcError> {
+    crate::off_main::blocking(move || plugin_uninstall_now(project_id, plugin_id, delete_data))
+        .await
+}
+
+/// [`plugin_uninstall`], on the calling thread.
+pub(crate) fn plugin_uninstall_now(
     project_id: String,
     plugin_id: String,
     delete_data: bool,

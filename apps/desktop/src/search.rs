@@ -21,7 +21,22 @@ const MAX_HITS: usize = 2_000;
 /// engine can parse.
 #[tauri::command]
 #[specta::specta]
-pub fn project_search(
+pub async fn project_search(
+    project_id: String,
+    worktree_id: Option<String>,
+    pattern: String,
+    match_case: bool,
+    word: bool,
+    regex: bool,
+) -> Result<SearchHits, RpcError> {
+    crate::off_main::blocking(move || {
+        project_search_now(project_id, worktree_id, pattern, match_case, word, regex)
+    })
+    .await
+}
+
+/// [`project_search`], on the calling thread.
+pub(crate) fn project_search_now(
     project_id: String,
     worktree_id: Option<String>,
     pattern: String,

@@ -66,7 +66,15 @@ pub fn worktree_base_read(project_id: Option<String>) -> Result<WorktreeBase, Rp
 /// field that silently rewrites what was typed is a field nobody trusts twice.
 #[tauri::command]
 #[specta::specta]
-pub fn worktree_base_write(
+pub async fn worktree_base_write(
+    project_id: Option<String>,
+    typed: String,
+) -> Result<WorktreeBase, RpcError> {
+    crate::off_main::blocking(move || worktree_base_write_now(project_id, typed)).await
+}
+
+/// [`worktree_base_write`], on the calling thread.
+pub(crate) fn worktree_base_write_now(
     project_id: Option<String>,
     typed: String,
 ) -> Result<WorktreeBase, RpcError> {

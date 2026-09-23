@@ -5,7 +5,7 @@
 
 use devpit_rpc::{Commit, ErrorCode, ProjectChanges, RpcError};
 
-use crate::projects::project_changes;
+use crate::projects::project_changes_now;
 use crate::roots::root_of;
 
 fn git_error(err: devpit_git::GitError) -> RpcError {
@@ -33,33 +33,60 @@ fn resolved(root: &std::path::Path, paths: &[String]) -> Result<(), RpcError> {
 /// otherwise have to predict what staging did to every other row.
 #[tauri::command]
 #[specta::specta]
-pub fn changes_stage(
+pub async fn changes_stage(
+    project_id: String,
+    worktree_id: Option<String>,
+    paths: Vec<String>,
+) -> Result<ProjectChanges, RpcError> {
+    crate::off_main::blocking(move || changes_stage_now(project_id, worktree_id, paths)).await
+}
+
+/// [`changes_stage`], on the calling thread.
+pub(crate) fn changes_stage_now(
     project_id: String,
     worktree_id: Option<String>,
     paths: Vec<String>,
 ) -> Result<ProjectChanges, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_git::stage(&root, &paths).map_err(git_error)?;
-    project_changes(project_id, worktree_id)
+    project_changes_now(project_id, worktree_id)
 }
 
 /// `changes.unstage` — takes them back out. The file on disk is not touched.
 #[tauri::command]
 #[specta::specta]
-pub fn changes_unstage(
+pub async fn changes_unstage(
+    project_id: String,
+    worktree_id: Option<String>,
+    paths: Vec<String>,
+) -> Result<ProjectChanges, RpcError> {
+    crate::off_main::blocking(move || changes_unstage_now(project_id, worktree_id, paths)).await
+}
+
+/// [`changes_unstage`], on the calling thread.
+pub(crate) fn changes_unstage_now(
     project_id: String,
     worktree_id: Option<String>,
     paths: Vec<String>,
 ) -> Result<ProjectChanges, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_git::unstage(&root, &paths).map_err(git_error)?;
-    project_changes(project_id, worktree_id)
+    project_changes_now(project_id, worktree_id)
 }
 
 /// `changes.commit` — commits what is staged.
 #[tauri::command]
 #[specta::specta]
-pub fn changes_commit(
+pub async fn changes_commit(
+    project_id: String,
+    worktree_id: Option<String>,
+    message: String,
+) -> Result<Commit, RpcError> {
+    crate::off_main::blocking(move || changes_commit_now(project_id, worktree_id, message)).await
+}
+
+/// [`changes_commit`], on the calling thread.
+pub(crate) fn changes_commit_now(
     project_id: String,
     worktree_id: Option<String>,
     message: String,
@@ -76,7 +103,16 @@ pub fn changes_commit(
 /// because that second case cannot be undone from here.
 #[tauri::command]
 #[specta::specta]
-pub fn changes_discard(
+pub async fn changes_discard(
+    project_id: String,
+    worktree_id: Option<String>,
+    paths: Vec<String>,
+) -> Result<ProjectChanges, RpcError> {
+    crate::off_main::blocking(move || changes_discard_now(project_id, worktree_id, paths)).await
+}
+
+/// [`changes_discard`], on the calling thread.
+pub(crate) fn changes_discard_now(
     project_id: String,
     worktree_id: Option<String>,
     paths: Vec<String>,
@@ -84,7 +120,7 @@ pub fn changes_discard(
     let root = root_of(&project_id, worktree_id.as_deref())?;
     resolved(&root, &paths)?;
     devpit_git::discard(&root, &paths).map_err(git_error)?;
-    project_changes(project_id, worktree_id)
+    project_changes_now(project_id, worktree_id)
 }
 
 #[cfg(test)]

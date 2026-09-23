@@ -12,10 +12,29 @@ use ulid::Ulid;
 use crate::sessions::{layout_of, locate_cwd, persist, store, tmux_err, tmux_server, SessionState};
 
 /// `session.split` — a new tmux window and a split node in the tree.
+///
+/// Off the main thread: it waits on tmux, and a split that held the window
+/// still for it looked like a window that had hung.
 #[tauri::command]
 #[specta::specta]
-pub fn session_split(
-    state: State<SessionState>,
+pub async fn session_split(
+    app: tauri::AppHandle,
+    project_id: String,
+    tab_id: String,
+    leaf_id: String,
+    direction: SplitDirection,
+    worktree_id: Option<String>,
+) -> Result<SessionLayout, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_split_now(&state, project_id, tab_id, leaf_id, direction, worktree_id)
+    })
+    .await
+}
+
+/// [`session_split`], on the calling thread.
+pub(crate) fn session_split_now(
+    state: &State<SessionState>,
     project_id: String,
     tab_id: String,
     leaf_id: String,
@@ -67,11 +86,27 @@ pub fn session_split(
 ///
 /// Refuses the last pane. A session with no pane is not a layout, and the
 /// refusal says so rather than persisting an empty tree the screen cannot draw.
+///
+/// Off the main thread, for the same reason as [`session_split`].
 #[tauri::command]
 #[specta::specta]
-pub fn session_close_leaf(
+pub async fn session_close_leaf(
     app: tauri::AppHandle,
-    state: State<SessionState>,
+    project_id: String,
+    tab_id: String,
+    leaf_id: String,
+) -> Result<SessionLayout, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_close_leaf_now(app.clone(), &state, project_id, tab_id, leaf_id)
+    })
+    .await
+}
+
+/// [`session_close_leaf`], on the calling thread.
+pub(crate) fn session_close_leaf_now(
+    app: tauri::AppHandle,
+    state: &State<SessionState>,
     project_id: String,
     tab_id: String,
     leaf_id: String,
