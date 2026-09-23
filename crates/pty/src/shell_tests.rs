@@ -6,16 +6,32 @@ fn a_shell_is_known_by_its_last_segment() {
     assert_eq!(kind_of("bash"), Kind::Bash);
     /* A login shell is spelled with a leading dash in the process table. */
     assert_eq!(kind_of("-zsh"), Kind::Zsh);
-    assert_eq!(kind_of("/usr/bin/fish"), Kind::Other);
+    assert_eq!(kind_of("/usr/bin/fish"), Kind::Fish);
+    assert_eq!(kind_of("/usr/bin/nu"), Kind::Other);
 }
 
 #[test]
 fn a_shell_we_have_no_startup_file_for_runs_unwrapped() {
-    /* Rather than wrongly: `--rcfile` handed to fish is an error, not a
+    /* Rather than wrongly: `--rcfile` handed to nu is an error, not a
     fallback. */
-    let it = launch("/usr/bin/fish", Path::new("/w"), &[Feature::Marks], None);
+    let it = launch("/usr/bin/nu", Path::new("/w"), &[Feature::Marks], None);
     assert!(it.args.is_empty());
     assert!(it.env.is_empty());
+}
+
+#[test]
+fn fish_is_wrapped_through_an_init_command_after_its_own_config() {
+    let it = launch(
+        "/usr/bin/fish",
+        Path::new("/w/it's"),
+        &[Feature::Marks],
+        None,
+    );
+    assert_eq!(
+        it.args,
+        ["--init-command", "source '/w/it\\'s/fish/init.fish'"]
+    );
+    assert_eq!(it.env[0].1, "marks");
 }
 
 #[test]
@@ -83,7 +99,11 @@ fn a_wrapper_destroys_the_request_before_their_config_runs() {
     for (_, body) in files() {
         let unset = body
             .find("DEVPIT_SHELL_FEATURES")
-            .zip(body.find("unset DEVPIT_SHELL_FEATURES"))
+            // `unset` in bash and zsh, `set -e` in fish.
+            .zip(
+                body.find("unset DEVPIT_SHELL_FEATURES")
+                    .or_else(|| body.find("set -e DEVPIT_SHELL_FEATURES")),
+            )
             .expect("the wrapper reads and unsets the request");
         assert!(unset.0 <= unset.1, "it is read before it is unset");
         let sources_theirs = body.find(".zshenv\"").or_else(|| body.find(".bashrc"));
@@ -126,7 +146,7 @@ fn a_wrapper_speaks_through_tmux_when_it_is_inside_one() {
     reaches the client — measured both ways. */
     for (path, body) in files() {
         assert!(
-            body.contains("${TMUX:-}"),
+            body.contains("${TMUX:-}") || body.contains("set -q TMUX"),
             "{} does not ask whether it is inside tmux",
             path.display()
         );

@@ -192,7 +192,17 @@ fn spawn_reader(app: tauri::AppHandle, leaf_id: String, path: PathBuf, listening
 /// What the window is told — the same event an attached pane sends, so the
 /// screen has one thing to listen to whether or not it is looking.
 fn report(app: &tauri::AppHandle, leaf_id: &str, told: Told) {
-    let _ = app.emit("terminal:happening", said(leaf_id, told));
+    if heard_by_tap(&told) {
+        let _ = app.emit("terminal:happening", said(leaf_id, told));
+    }
+}
+
+/// Which of the two streams speaks for what. The tap hears the pane itself —
+/// prompts, commands, exits, titles, the cwd. A clipboard request is the one
+/// thing tmux answers for its client (`set-clipboard`), so that one comes from
+/// the attached side; heard on both, it would be copied twice.
+pub(crate) fn heard_by_tap(told: &Told) -> bool {
+    !matches!(told, Told::Clipboard(_))
 }
 
 /// Starts listening to every leaf the layout has.

@@ -21,6 +21,7 @@ pub fn said(pane_id: &str, told: devpit_pty::Told) -> Happening {
         // a code that was never reported is absent, and absent is not zero.
         Told::CommandEnded { code } => ("finished", code.map(|code| code.to_string())),
         Told::Clipboard(payload) => ("clipboard", Some(payload)),
+        Told::Command(line) => ("command", Some(line)),
     };
     Happening {
         pane_id: pane_id.to_owned(),

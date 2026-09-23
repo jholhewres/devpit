@@ -49,6 +49,9 @@ pub enum Told {
     /// line. A missing code is not a zero, and reporting it as one would
     /// paint a green mark for a command nobody ran.
     CommandEnded { code: Option<i32> },
+    /// `OSC 777;devpit-cmd;<line>`, from devpit's own shell hooks as a
+    /// command starts: the line that was run, which OSC 133 does not carry.
+    Command(String),
     /// OSC 52. A program asked for something to be put on the clipboard,
     /// which is how copying works inside `nvim`, `fzf` and `tmux` over ssh.
     Clipboard(String),
@@ -160,6 +163,9 @@ fn read(body: &[u8]) -> Option<Told> {
             let (_, payload) = rest.split_once(';')?;
             Some(Told::Clipboard(payload.to_owned()))
         }
+        "777" => rest
+            .strip_prefix("devpit-cmd;")
+            .map(|line| Told::Command(line.to_owned())),
         "133" => match rest.split(';').next()? {
             "A" => Some(Told::PromptBegan),
             "C" => Some(Told::OutputBegan),
@@ -218,3 +224,7 @@ fn percent_decoded(text: &str) -> String {
 #[cfg(test)]
 #[path = "osc_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "osc_line_tests.rs"]
+mod line_tests;

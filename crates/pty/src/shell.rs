@@ -88,8 +88,9 @@ pub fn encode(features: &[Feature]) -> String {
 pub enum Kind {
     Bash,
     Zsh,
+    Fish,
     /// A shell we have no startup file for. It runs unwrapped rather than
-    /// wrongly: a `--rcfile` handed to `fish` is an error, not a fallback.
+    /// wrongly: a `--rcfile` handed to `nu` is an error, not a fallback.
     Other,
 }
 
@@ -98,6 +99,7 @@ pub fn kind_of(shell: &str) -> Kind {
     match leaf.trim_start_matches('-') {
         "bash" => Kind::Bash,
         "zsh" => Kind::Zsh,
+        "fish" => Kind::Fish,
         _ => Kind::Other,
     }
 }
@@ -164,6 +166,21 @@ pub fn launch(shell: &str, root: &Path, features: &[Feature], env_zdotdir: Optio
                 env,
             }
         }
+        // `--init-command` runs after their own config, so ours is added to
+        // it rather than read in its place. Single-quoted for fish, which
+        // takes a backslash-escaped quote inside one.
+        Kind::Fish => {
+            let file = root.join("fish").join("init.fish");
+            let quoted = file
+                .to_string_lossy()
+                .replace('\\', "\\\\")
+                .replace('\'', "\\'");
+            Launch {
+                program: shell.to_owned(),
+                args: vec!["--init-command".to_owned(), format!("source '{quoted}'")],
+                env: vec![(FEATURES_ENV.to_owned(), encode(features))],
+            }
+        }
         Kind::Other => plain,
     }
 }
@@ -173,6 +190,7 @@ pub fn files() -> Vec<(PathBuf, String)> {
     vec![
         (PathBuf::from("bash").join("rcfile"), BASH.to_owned()),
         (PathBuf::from("zsh").join(".zshenv"), ZSH.to_owned()),
+        (PathBuf::from("fish").join("init.fish"), FISH.to_owned()),
     ]
 }
 
@@ -191,6 +209,13 @@ const BASH: &str = include_str!("shell/rcfile.bash");
 /// config, because that config can replace `precmd_functions` wholesale. The
 /// hooks are prepended to the existing arrays rather than assigned over them.
 const ZSH: &str = include_str!("shell/zshenv.zsh");
+
+/// The startup file for fish.
+///
+/// fish 4 marks its own prompts; there only the line that ran is added. An
+/// older fish gets the marks from here, through its `fish_prompt`,
+/// `fish_preexec` and `fish_postexec` events.
+const FISH: &str = include_str!("shell/init.fish");
 
 /// Where the startup files live, keyed by a hash of the exact bytes.
 ///

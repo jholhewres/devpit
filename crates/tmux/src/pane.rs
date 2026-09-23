@@ -23,8 +23,14 @@ pub(crate) fn unpipe(server: &Server, target: &str) -> Result<(), TmuxError> {
     Ok(())
 }
 
+/// Types a line into a pane and presses Enter.
+///
+/// `-l`, and Enter apart: without it tmux reads each word of the line as a
+/// possible key name, so a command containing `Enter`, `Space` or `C-c` typed
+/// something other than what it said.
 pub(crate) fn send_keys(server: &Server, target: &str, keys: &str) -> Result<(), TmuxError> {
-    server.require(&["send-keys", "-t", target, keys, "Enter"])?;
+    server.require(&["send-keys", "-t", target, "-l", "--", keys])?;
+    server.require(&["send-keys", "-t", target, "Enter"])?;
     Ok(())
 }
 

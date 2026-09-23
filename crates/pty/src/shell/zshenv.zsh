@@ -62,10 +62,20 @@ __devpit_precmd() {
     __devpit_osc "133;D;$code"
     builtin unset __devpit_running
   fi
+  # Where the shell is, every prompt: the next block's header names it. `%`
+  # and spaces are the two a path carries that a URI cannot.
+  builtin local here="${PWD//\%/%25}"
+  __devpit_osc "7;file://${HOST:-}${here// /%20}"
   __devpit_osc '133;A'
 }
 
 __devpit_preexec() {
+  # The line as typed, which OSC 133 does not carry. The terminator bytes are
+  # taken out — they would end the sequence early — and a pasted script is cut
+  # to a header's length.
+  builtin local line="${1//$'\a'/}"
+  line="${line//$'\e'/}"
+  __devpit_osc "777;devpit-cmd;${line[1,2000]}"
   __devpit_osc '133;C'
   # typeset -g: a plain assignment inside a function warns under
   # warn_create_global, above every command the person runs.

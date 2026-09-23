@@ -240,6 +240,13 @@ pub async fn session_attach(
     let telling_pane = pane_id.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(one) = told.recv().await {
+            // Only what tmux itself relays to its client. Everything the shell
+            // and its programs say is heard by the pane's tap (`tap.rs`), which
+            // listens with or without a window — relayed from here as well, it
+            // reached the screen twice.
+            if crate::tap::heard_by_tap(&one) {
+                continue;
+            }
             let _ = telling.emit("terminal:happening", said(&telling_pane, one));
         }
     });

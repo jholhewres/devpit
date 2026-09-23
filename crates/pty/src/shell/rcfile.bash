@@ -86,8 +86,33 @@ if [[ -n "$__devpit_marks" ]]; then
       __devpit_osc "133;D;$code"
       unset __devpit_running
     fi
+    # Where the shell is, every prompt: a `cd` is a command like any other, and
+    # the next block's header names the folder it ran in. `%` and spaces are
+    # the two a path carries that a URI cannot.
+    local here="${PWD//%/%25}"
+    __devpit_osc "7;file://${HOSTNAME:-}${here// /%20}"
     __devpit_osc '133;A'
     return "$code"
+  }
+
+  # The line being run, which OSC 133 does not carry: the history's newest
+  # entry when it is this command's, the simple command bash is about to run
+  # when history kept nothing (a leading space, history off). The terminator
+  # bytes are taken out — they would end the sequence early — and the length
+  # is capped, because a pasted script is not a header.
+  __devpit_line() {
+    local line=''
+    if [[ -n "${HISTCMD:-}" && "$HISTCMD" != "${__devpit_seen_histcmd:-}" ]]; then
+      line="$(HISTTIMEFORMAT='' builtin history 1)"
+      line="${line#"${line%%[![:space:]]*}"}"
+      line="${line#*[[:space:]]}"
+      line="${line#"${line%%[![:space:]]*}"}"
+    fi
+    __devpit_seen_histcmd="${HISTCMD:-}"
+    [[ -n "$line" ]] || line="$BASH_COMMAND"
+    line="${line//$'\a'/}"
+    line="${line//$'\e'/}"
+    __devpit_osc "777;devpit-cmd;${line:0:2000}"
   }
 
   # Command start. The guards are the whole difficulty: DEBUG fires for every
@@ -102,6 +127,7 @@ if [[ -n "$__devpit_marks" ]]; then
     [[ -z "${__devpit_their_trap:-}" ]] || eval "$__devpit_their_trap" || true
     # A chained trap can fire twice for one command; only the first emits.
     [[ -z "${__devpit_running:-}" ]] || return 0
+    __devpit_line
     __devpit_osc '133;C'
     __devpit_running=1
   }
