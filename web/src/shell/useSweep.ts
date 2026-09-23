@@ -13,13 +13,16 @@ import { sweeping, type Strip, type Sweep } from './strip'
  * something.
  */
 export function useSweep(
-  strip: Strip,
+  open: Strip['open'],
+  active: Strip['active'],
   close: (id: string) => void,
 ): (id: string, what: Sweep) => void {
+  /* The strip's parts, not a strip built by the caller: a literal is a new
+     object every render, and this callback is part of the shell's context. */
   return useCallback(
     (id, what) => {
-      for (const going of sweeping(strip, id, what)) close(going)
+      for (const going of sweeping({ open, active }, id, what)) close(going)
     },
-    [strip, close],
+    [open, active, close],
   )
 }

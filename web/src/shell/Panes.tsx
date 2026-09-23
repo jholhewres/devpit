@@ -19,6 +19,16 @@ export function Panes(): React.JSX.Element {
   useEffect(() => setKept((was) => keptAfter(was, here || null, open, keeps)), [here, open])
   const elsewhere = kept.filter((one) => one.projectId !== here)
 
+  /* A pane drawn once — the files, the capabilities — mounts the first time
+     it is opened, not at start: each reads and subscribes on mount, for a
+     screen nobody may open. Once opened it stays. The board is the exception
+     (`eager`): what it shows arrives only as events. */
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
+  const activeKind = active?.kind
+  useEffect(() => {
+    if (activeKind && !opened.has(activeKind)) setOpened((was) => new Set(was).add(activeKind))
+  }, [activeKind, opened])
+
   return (
     <section className="mid">
 
@@ -49,16 +59,21 @@ export function Panes(): React.JSX.Element {
                 ? [
                     ...open.filter((tab) => tab.kind === mount.name).map((tab) => ({ projectId: here, tab })),
                     ...(mount.keep ? elsewhere.filter((one) => one.tab.kind === mount.name) : []),
-                  ].map(({ projectId, tab }) => (
-                    <div key={tab.id} className={mount.className} data-pane={mount.name} data-show={String(projectId === here && active?.id === tab.id)}>
-                      {mount.render(tab, projectId)}
-                    </div>
-                  ))
-                : [
-                    <div key={mount.name} className={mount.className} data-pane={mount.name} data-show={String(active?.kind === mount.name)}>
-                      {mount.render(close)}
-                    </div>,
-                  ],
+                  ].map(({ projectId, tab }) => {
+                    const shown = projectId === here && active?.id === tab.id
+                    return (
+                      <div key={tab.id} className={mount.className} data-pane={mount.name} data-show={String(shown)}>
+                        {mount.render(tab, projectId)}
+                      </div>
+                    )
+                  })
+                : !mount.eager && !opened.has(mount.name) && active?.kind !== mount.name
+                  ? []
+                  : [
+                      <div key={mount.name} className={mount.className} data-pane={mount.name} data-show={String(active?.kind === mount.name)}>
+                        {mount.render(close)}
+                      </div>,
+                    ],
             )}
 
           </div>

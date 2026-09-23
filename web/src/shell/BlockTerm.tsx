@@ -10,7 +10,7 @@ import { ask, commands } from './live'
 import { finished, jumpTarget, modeOf } from './paneBlocks'
 import { useFollow } from './useFollow'
 import { usePaneBlocks } from './usePaneBlocks'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /*
  * A terminal as blocks, the way Warp draws one.
@@ -74,8 +74,9 @@ export function BlockTerm({
   onSeparate?: () => void
 }): React.JSX.Element {
   const { state, clear } = usePaneBlocks(paneId)
-  const { running } = useShell()
-  const front = running.find((one) => one.paneId === paneId && one.agent)
+  /* Only this pane's entry: the list changes whenever any terminal's command
+     does, and every block list re-rendered with it. */
+  const front = useShellPick((shell) => shell.running.find((one) => one.paneId === paneId && one.agent) ?? null)
   const agent = front?.label ?? null
   const [wanted, setWanted] = useState(() => !classicPanes().has(paneId))
   const [history, setHistory] = useState(() => recalled(projectId))

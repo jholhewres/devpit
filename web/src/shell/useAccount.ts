@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Account, SignIn } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -109,5 +109,8 @@ export function useAccount(): Membership {
     await ask(() => commands.accountSignOut())
   }, [cancelSignIn])
 
-  return { account, loading, expired, signingIn, failed, origin, signIn, signOut, cancelSignIn }
+  return useMemo(
+    () => ({ account, loading, expired, signingIn, failed, origin, signIn, signOut, cancelSignIn }),
+    [account, loading, expired, signingIn, failed, origin, signIn, signOut, cancelSignIn],
+  )
 }

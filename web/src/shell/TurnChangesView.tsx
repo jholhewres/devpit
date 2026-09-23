@@ -1,6 +1,6 @@
 import type { Part } from '../gen/bindings'
 import { byAgent, totals, type TurnFile } from './turnChanges'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /*
  * The files a finished turn changed, under the turn that changed them.
@@ -11,7 +11,7 @@ import { useShell } from './useShell'
  */
 
 export function TurnChanges({ files, parts }: { files: readonly TurnFile[]; parts: readonly Part[] }): React.JSX.Element | null {
-  const { show } = useShell()
+  const show = useShellPick((shell) => shell.show)
   if (files.length === 0) return null
   const { added, removed } = totals(files)
 

@@ -20,10 +20,15 @@ export function afterState(
   state: AgentState,
   inFront: readonly string[],
 ): Unread {
+  // Working again, or waiting on you, is not a finish to catch up on; a
+  // finish in front of you leaves the set as it was.
+  const wanted = state !== 'done' ? false : inFront.includes(paneId) ? unread.has(paneId) : true
+  // The same set when nothing changed: a new one is a new context value, and
+  // every agent report would re-render the whole shell for nothing.
+  if (wanted === unread.has(paneId)) return unread
   const next = new Set(unread)
-  if (state === 'done' && !inFront.includes(paneId)) next.add(paneId)
-  // Working again, or waiting on you, is not a finish to catch up on.
-  if (state !== 'done') next.delete(paneId)
+  if (wanted) next.add(paneId)
+  else next.delete(paneId)
   return next
 }
 

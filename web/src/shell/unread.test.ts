@@ -57,3 +57,12 @@ describe('the shell keeping track of it', () => {
     expect(result.current.size).toBe(0)
   })
 })
+
+describe('afterState when nothing changes', () => {
+  it('hands back the same set, so the shell does not re-render', () => {
+    const some = new Set(['leaf_2'])
+    expect(afterState(some, 'leaf_2', 'done', [])).toBe(some)
+    expect(afterState(some, 'leaf_3', 'working', [])).toBe(some)
+    expect(afterState(some, 'leaf_2', 'done', ['leaf_2'])).toBe(some)
+  })
+})

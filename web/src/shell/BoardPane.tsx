@@ -12,7 +12,7 @@ import { reordered } from './laneOrder'
 import { BoardToolbar } from './BoardToolbar'
 import { endOf, matches } from './board'
 import { MoveConfirm } from './CardLane'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /*
  * The board, and the two gestures that are the whole point of it.
@@ -28,7 +28,8 @@ import { useShell } from './useShell'
  */
 
 export function BoardPane(): React.JSX.Element {
-  const { project, wantedCard, openCard, active } = useShell()
+  /* Mounted from the start: it renders when what it shows changes, not with everything else. */
+  const { project, wantedCard, openCard, inFront } = useShellPick((s) => ({ project: s.project, wantedCard: s.wantedCard, openCard: s.openCard, inFront: s.active?.kind === 'board' }))
   const live = useBoard(project?.id ?? null)
   const drag = useDrag()
   /* The card being read. Held here rather than on the tile, because a tile
@@ -166,7 +167,7 @@ export function BoardPane(): React.JSX.Element {
 
         {/* Only while the board shows: a pane behind another tab stays mounted,
             and a hidden card took the chat's Escape and kept its stop from arming. */}
-        {opened && active?.kind === 'board' && (
+        {opened && inFront && (
           <CardPane
             key={opened}
             cardId={opened}

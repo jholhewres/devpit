@@ -9,7 +9,7 @@ import { Split } from './Split'
 import { shortcutFor } from './shortcuts'
 import { leaves } from './splits'
 import type { Tab } from './strip'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /*
  * One tab's terminals, arranged as its tree says.
@@ -22,7 +22,7 @@ import { useShell } from './useShell'
  */
 
 export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }): React.JSX.Element {
-  const { attach, launched } = useShell()
+  const { attach, launched } = useShellPick((shell) => ({ attach: shell.attach, launched: shell.launched }))
   const [tree, setTree] = useState<LayoutNode | null>(null)
   const [focused, setFocused] = useState('')
   const [error, setError] = useState<string | null>(null)

@@ -6,7 +6,7 @@ import { Folder, Pencil } from './GitIcons'
 import { ask, commands } from './live'
 import { PluginChip } from './PluginChip'
 import { abandoned, committed } from './typing'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /*
  * The strip under a terminal while an agent runs in it.
@@ -36,7 +36,7 @@ export function AgentBar({
   /** The keyboard goes back to the terminal. */
   onSent: () => void
 }): React.JSX.Element {
-  const { toggleFiles } = useShell()
+  const toggleFiles = useShellPick((shell) => shell.toggleFiles)
   const [composing, setComposing] = useState(false)
   const [text, setText] = useState('')
   const [glance, setGlance] = useState<FolderGlance | null>(null)

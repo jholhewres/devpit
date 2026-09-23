@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -76,13 +76,16 @@ export function useProjects(): Projects {
     return asked.error
   }, [])
 
-  return {
-    project: found(open),
-    projects: open.projects,
-    projectsError,
-    setProject,
-    forgetProject,
-    renameProject,
-    reloadProjects,
-  }
+  return useMemo(
+    () => ({
+      project: found(open),
+      projects: open.projects,
+      projectsError,
+      setProject,
+      forgetProject,
+      renameProject,
+      reloadProjects,
+    }),
+    [open, projectsError, setProject, forgetProject, renameProject, reloadProjects],
+  )
 }

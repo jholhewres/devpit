@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import type { PaneRunning } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -88,5 +88,8 @@ export function useClosing({
   const cancelClose = useCallback(() => setClosing(null), [])
   const setConfirmStop = useCallback((asked: boolean | null) => setStop(asked ?? true), [])
 
-  return { close, closing, confirmClose, cancelClose, setConfirmStop }
+  return useMemo(
+    () => ({ close, closing, confirmClose, cancelClose, setConfirmStop }),
+    [close, closing, confirmClose, cancelClose, setConfirmStop],
+  )
 }

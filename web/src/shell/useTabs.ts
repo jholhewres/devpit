@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
@@ -119,20 +119,25 @@ export function useTabs(projectId: string | null): Tabs {
   const drafted = useCallback((id: string) => setStrip((was) => taken(was, id)), [])
   const replace = useCallback((id: string, tab: Tab) => setStrip((was) => replaced(was, id, tab)), [])
 
-  return {
-    open: strip.open,
-    active: focused(strip),
-    show,
-    close,
-    join,
-    focus,
-    move,
-    rename,
-    attach,
-    launched,
-    drafted,
-    replace,
-    renaming,
-    setRenaming,
-  }
+  /* One object per change, not per render: this is spread into the shell's
+     context, and a new object here re-rendered every screen that reads it. */
+  return useMemo(
+    () => ({
+      open: strip.open,
+      active: focused(strip),
+      show,
+      close,
+      join,
+      focus,
+      move,
+      rename,
+      attach,
+      launched,
+      drafted,
+      replace,
+      renaming,
+      setRenaming,
+    }),
+    [strip, show, close, join, focus, move, rename, attach, launched, drafted, replace, renaming],
+  )
 }

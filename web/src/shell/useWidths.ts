@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ask, commands } from './live'
 import { fits, WIDE, type Panel, type Widths } from './sizing'
@@ -61,5 +61,5 @@ export function useWidths(): Sizing {
     })
   }, [])
 
-  return { widths, setWidth, keepWidths }
+  return useMemo(() => ({ widths, setWidth, keepWidths }), [widths, setWidth, keepWidths])
 }

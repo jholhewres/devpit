@@ -1,5 +1,5 @@
 import type { Message } from '../gen/bindings'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 type RewoundPart = Extract<Message['parts'][number], { kind: 'rewound' }>
 
@@ -7,7 +7,7 @@ type RewoundPart = Extract<Message['parts'][number], { kind: 'rewound' }>
    says it is whole, so nobody has to guess which copy still has the later
    turns. */
 export function Rewound({ part }: { part: RewoundPart }): React.JSX.Element {
-  const { show } = useShell()
+  const show = useShellPick((shell) => shell.show)
   return (
     <div className="rwnd">
       Went back to turn {part.turn} of{' '}

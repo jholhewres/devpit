@@ -8,7 +8,7 @@ import { OpenIn } from './OpenIn'
 import type { PaneName } from './paneList'
 import { useOpeners } from './useOpeners'
 import { usePlugins } from './usePlugins'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /*
  * The files pinned to a card.
@@ -38,7 +38,7 @@ export function Attachments({
   onUnpin: (id: string) => void
 }): React.JSX.Element {
   const openers = useOpeners()
-  const { show } = useShell()
+  const show = useShellPick((shell) => shell.show)
   const { offers } = usePlugins()
 
   const add = async (): Promise<void> => {

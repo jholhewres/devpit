@@ -6,7 +6,7 @@ import { ask, commands } from './live'
 import { withSkills } from './pills'
 import { PROFILES_CHANGED } from './profiles'
 import { onPermissionAsked } from './window'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /** The card a conversation is filed under. */
 export interface ChatCard {
@@ -59,7 +59,7 @@ export interface Chat {
 }
 
 export function useChat(conversationId: string): Chat {
-  const { project, show } = useShell()
+  const { project, show } = useShellPick((shell) => ({ project: shell.project, show: shell.show }))
   const [messages, setMessages] = useState<readonly Message[]>([])
   const [rewindable, setRewindable] = useState<readonly string[]>([])
   const [skills, setSkills] = useState<readonly string[]>([])

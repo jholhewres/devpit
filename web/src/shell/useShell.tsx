@@ -1,9 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from 'react'
 
 import { who } from './account'
-import { ask, commands } from './live'
 import { useOverlays } from './useOverlays'
-import type { Shell, Theme } from './shape'
+import type { Shell } from './shape'
 import { useAccount } from './useAccount'
 import { useAgents } from './useAgents'
 import { useClosing } from './useClosing'
@@ -15,6 +14,8 @@ import { useWidths } from './useWidths'
 import { useTabs } from './useTabs'
 import { useProjects } from './useProjects'
 import { useRunning } from './useRunning'
+import { useTheme } from './useTheme'
+import { createShellStore, ShellStoreContext } from './shellStore'
 
 export type { Closing } from './useClosing'
 export type { PrefsPane, Theme } from './shape'
@@ -30,7 +31,6 @@ export function useShell(): Shell {
 export function ShellProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [side, setSide] = useState(true)
   const [files, setFiles] = useState(true)
-  const [theme, setThemeState] = useState<Theme>('system')
   const overlays = useOverlays()
   const [palette, setPalette] = useState(false)
   const [wantedCard, setWantedCard] = useState<string | null>(null)
@@ -61,25 +61,9 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const guard = useClosing({ open: tabs.open, closeNow: tabs.close, running, unsaved })
   const { setConfirmStop } = guard
 
-  const sweep = useSweep({ open: tabs.open, active: tabs.active?.id ?? null }, guard.close)
+  const sweep = useSweep(tabs.open, tabs.active?.id ?? null, guard.close)
 
-  /* The choice is written where the next launch will find it; the window
-     paints from local state so the click does not wait on disk. */
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next)
-    document.documentElement.dataset.theme = next
-    void ask(() => commands.settingsWrite(next, null, null, null, null))
-  }, [])
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    void ask(() => commands.settingsRead()).then((asked) => {
-      if (!asked.data) return
-      setThemeState(asked.data.theme)
-      /* Null is "never asked", and never-asked asks. */
-      setConfirmStop(asked.data.confirmStop)
-    })
-  }, [setConfirmStop])
+  const { theme, setTheme } = useTheme(setConfirmStop)
 
   const value = useMemo<Shell>(
     () => ({
@@ -130,6 +114,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       unread,
       subagents,
       agentSessions,
+      sweep,
       markUnsaved,
       side,
       files,
@@ -144,5 +129,19 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
     ],
   )
 
-  return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>
+  /* The same shell, for the components that read one slice of it
+     (`useShellPick`): put while rendering so a child mounting now reads it,
+     announced once the render is committed. */
+  const [store] = useState(() => createShellStore(value))
+  store.put(value)
+  useLayoutEffect(() => {
+    store.put(value)
+    store.tell()
+  }, [store, value])
+
+  return (
+    <ShellStoreContext.Provider value={store}>
+      <ShellContext.Provider value={value}>{children}</ShellContext.Provider>
+    </ShellStoreContext.Provider>
+  )
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useCallback, useContext, useMemo } from 'react'
 
 import { Diagram } from './Diagram'
 import { ofName } from './languages'
@@ -7,7 +7,7 @@ import { Painted } from './Painted'
 import { blocks, external, resolved, spans, type Block, type Span } from './markdown'
 import { ask, commands } from './live'
 import { cut, locate, styleOf, type Chunk } from './veil'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 
 /*
  * Markdown, drawn from parsed blocks.
@@ -54,12 +54,19 @@ export function Markdown({
   opens?: (path: string) => void
 }): React.JSX.Element {
   const fading = chunks?.length ? { source, chunks, now: now ?? Date.now(), cursor: 0 } : null
+  /* Once here, not in every link: a long answer has hundreds of them. */
+  const show = useShellPick((shell) => shell.show)
+  const opener = useCallback(
+    (here: string) => (opens ? opens(here) : show('file', { id: `file:${here}`, path: here })),
+    [opens, show],
+  )
+  const parsed = useMemo(() => blocks(source), [source])
 
   return (
     <Veil.Provider value={fading}>
       <div className="md">
-        <Opening.Provider value={opens ?? null}>
-          {blocks(source).map((block, at) => (
+        <Opening.Provider value={opener}>
+          {parsed.map((block, at) => (
             <Piece key={at} block={block} path={path ?? ''} />
           ))}
         </Opening.Provider>
@@ -153,7 +160,6 @@ function Inline({ text, path }: { text: string; path: string }): React.JSX.Eleme
 }
 
 function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
-  const { show } = useShell()
   const opens = useContext(Opening)
 
   switch (span.kind) {
@@ -181,8 +187,7 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
                window is not a browser and must not become one. */
             if (external(span.href)) return void ask(() => commands.pathOpen(span.href))
             const here = resolved(path, span.href)
-            if (opens) return opens(here)
-            show('file', { id: `file:${here}`, path: here })
+            opens?.(here)
           }}
         >
           {span.text}

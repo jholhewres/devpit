@@ -21,7 +21,8 @@ vi.mock('./TerminalPane', () => ({ TerminalPane: () => <div>term</div> }))
 vi.mock('./WorkspacePane', () => ({ WorkspacePane: () => <div>workspace</div> }))
 
 /* One open tab per kind you can have several of, so every many-instance
-   mount has a tab to render from. Single-instance kinds mount unconditionally. */
+   mount has a tab to render from. A single-instance kind mounts once it is
+   the one in front, and stays. */
 const open: Tab[] = [
   { id: 'browser_1', kind: 'browser' },
   { id: 'chat_1', kind: 'chat' },
@@ -33,7 +34,7 @@ const open: Tab[] = [
 ]
 /* `projects` is empty rather than absent: the Manager reads the list to fill
    its filter, and a shell without one is a shell no window ever has. */
-const shell = {
+const shell: { open: Tab[]; active: Tab | null; [key: string]: unknown } = {
   open,
   active: null,
   show: vi.fn(),
@@ -49,9 +50,34 @@ afterEach(cleanup)
 
 describe('the pane mount table', () => {
   it('opens every pane name to an element carrying it', () => {
-    render(<Panes />)
+    const { rerender } = render(<Panes />)
     for (const { name } of PANES) {
+      if (!document.querySelector(`[data-pane="${name}"]`)) {
+        shell.active = { id: name, kind: name }
+        rerender(<Panes />)
+      }
       expect(document.querySelector(`[data-pane="${name}"]`), `missing data-pane for ${name}`).not.toBeNull()
     }
+    shell.active = null
+  })
+
+  it('mounts a single-instance pane only once it has been opened, then keeps it', () => {
+    shell.active = null
+    const { rerender } = render(<Panes />)
+    expect(document.querySelector('[data-pane="skills"]')).toBeNull()
+    shell.active = { id: 'skills', kind: 'skills' }
+    rerender(<Panes />)
+    expect(document.querySelector('[data-pane="skills"]')).not.toBeNull()
+    shell.active = null
+    rerender(<Panes />)
+    expect(document.querySelector('[data-pane="skills"]')).not.toBeNull()
+  })
+
+  /* The board hears sessions and progress only as events, so it is there
+     from the start even if nobody opened it. */
+  it('mounts the board at start', () => {
+    shell.active = null
+    render(<Panes />)
+    expect(document.querySelector('[data-pane="board"]')).not.toBeNull()
   })
 })

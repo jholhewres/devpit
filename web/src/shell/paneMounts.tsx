@@ -23,6 +23,10 @@ interface Single {
   readonly name: PaneName
   readonly many: false
   readonly className: string
+  /** Mounted at start rather than on first open: what it shows arrives only
+   *  as events — the board's sessions and a run's progress — and a pane that
+   *  mounted late would never have heard them. */
+  readonly eager?: boolean
   render(close: (id: string) => void): React.JSX.Element
 }
 
@@ -30,6 +34,7 @@ interface Many {
   readonly name: PaneName
   readonly many: true
   readonly className: string
+
   /** Stays mounted, hidden, after its project is left (see `kept.ts`). */
   readonly keep?: boolean
   render(tab: Tab, projectId: string): React.JSX.Element
@@ -47,6 +52,7 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
   {
     name: 'board',
     many: false,
+    eager: true,
     className: 'pane',
     render: (close) => (
       <>
