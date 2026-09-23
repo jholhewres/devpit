@@ -198,3 +198,8 @@
 .queued__t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .queued__x { flex: none; background: none; border: 0; color: var(--text-3); cursor: pointer; padding: 0 2px; }
 .queued__x:hover { color: var(--text); }
+
+/* `@file`: the name first, where the eye looks, and its folder after it. */
+.mention__i { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.mention__n { flex: none; }
+.mention__d { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 11.5px; }

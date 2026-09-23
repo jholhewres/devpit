@@ -21,6 +21,8 @@ import { Queued } from './Queued'
 import { SendButton } from './SendButton'
 import { useQueue } from './useQueue'
 import { SlashMenu } from './SlashMenu'
+import { MentionMenu } from './MentionMenu'
+import { useMention } from './useMention'
 import { useChat } from './useChat'
 import { useSlash } from './useSlash'
 import { useShell } from './useShell'
@@ -49,6 +51,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
      eye went up to read. */
   const box = useFollow<HTMLDivElement>(chat.messages)
   const field = useRef<HTMLTextAreaElement>(null)
+  const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
 
   const mine = active?.id === tab.id
 
@@ -155,9 +158,10 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
 
             <SkillPills picked={chat.skills} onChange={chat.setSkills} />
             <SlashMenu slash={slash} />
+            <MentionMenu menu={mention} />
             <textarea
               className="composer__ph"
-              placeholder="Do anything…"
+              placeholder="Do anything… @ for a file, / for a command"
               ref={field}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
@@ -165,7 +169,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               onKeyDown={(event) => {
                 /* Enter sends, Shift+Enter is a new line — and `committed`
                    keeps the Enter that finishes an accented letter out. */
-                if (slash.keyDown(event)) return
+                if (slash.keyDown(event) || mention.keyDown(event)) return
                 if (committed(event) && !event.shiftKey) {
                   event.preventDefault()
                   send()

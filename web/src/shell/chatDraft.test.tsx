@@ -54,7 +54,7 @@ const draft = '# Wire the board\n\nAll of it.\n\nPinned files:\n- /w/notes.md'
 describe('a chat opened from a card', () => {
   it('has the card in its composer, and sends nothing', () => {
     render(<ChatPane tab={{ id: 'conv_1', kind: 'chat', draft }} />)
-    expect((screen.getByPlaceholderText('Do anything…') as HTMLTextAreaElement).value).toBe(draft)
+    expect((screen.getByPlaceholderText(/^Do anything…/) as HTMLTextAreaElement).value).toBe(draft)
     expect(taken).toHaveBeenCalledWith('conv_1')
     expect(said).not.toHaveBeenCalled()
     // Its corner names the card it is about.
