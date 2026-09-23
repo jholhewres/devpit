@@ -15,7 +15,11 @@ afterEach(() => vi.restoreAllMocks())
    is what every pane used before this, so falling back to it is not a
    degraded mode — it is the old one. */
 describe('the renderer a pane draws with', () => {
-  const terminal = (): { loadAddon: ReturnType<typeof vi.fn> } => ({ loadAddon: vi.fn() })
+  const terminal = (): { loadAddon: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn>; rows: number } => ({
+    loadAddon: vi.fn(),
+    refresh: vi.fn(),
+    rows: 24,
+  })
 
   it('loads the GPU renderer and watches for the context going away', () => {
     withAContext({})
@@ -42,18 +46,22 @@ describe('the renderer a pane draws with', () => {
   /* The loss handler is the half that is easy to forget: an addon left loaded
      after its context is gone draws nothing at all, and a blank pane is worse
      than a slow one. */
-  it('disposes the addon when the context is lost', () => {
+  it('disposes the addon when the context is lost, and draws the screen again', () => {
     withAContext({})
     const dispose = vi.fn()
+    const lost = vi.fn()
     const heard: (() => void)[] = []
-    drawOnTheGpu(terminal() as never, () => ({
+    const pane = terminal()
+    drawOnTheGpu(pane as never, () => ({
       dispose,
       onContextLoss: (then: () => void) => heard.push(then),
-    }) as never)
+    }) as never, lost)
 
     expect(heard).toHaveLength(1)
     heard[0]!()
     expect(dispose).toHaveBeenCalledOnce()
+    expect(pane.refresh).toHaveBeenCalledWith(0, 23)
+    expect(lost).toHaveBeenCalledOnce()
   })
 
   /* The case every test run and every headless box is in. Asked before the

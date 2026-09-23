@@ -40,6 +40,9 @@ function hasAContext(): boolean {
 export function drawOnTheGpu(
   terminal: Terminal,
   make: () => Addon = () => new WebglAddon(),
+  /* Told once the GPU context is gone and xterm is back on the DOM renderer,
+     which starts from an empty screen. */
+  lost: () => void = () => {},
 ): boolean {
   // Asked before the addon is built, not caught after: a machine with no GPU
   // context — a headless box, a test — does not throw here, it hands back
@@ -48,7 +51,11 @@ export function drawOnTheGpu(
   if (!hasAContext()) return false
   try {
     const webgl = make() as WebglAddon
-    webgl.onContextLoss(() => webgl.dispose())
+    webgl.onContextLoss(() => {
+      webgl.dispose()
+      terminal.refresh(0, terminal.rows - 1)
+      lost()
+    })
     terminal.loadAddon(webgl)
     return true
   } catch {

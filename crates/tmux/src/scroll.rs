@@ -69,6 +69,29 @@ pub(crate) fn argv(target: &str, lines: i32) -> Vec<String> {
 }
 
 impl Server {
+    /// Has tmux draw every client of this leaf again from scratch.
+    ///
+    /// A terminal that was rebuilt, or lost its GPU context, holds nothing of
+    /// what tmux drew before, and tmux only sends what changes — so it stayed
+    /// blank but for the cursor until the program next printed.
+    pub fn redraw(&self, session: &str, window: &str) -> Result<(), TmuxError> {
+        let client_session = crate::naming::client_session(session, window);
+        let listed = self.require(&[
+            "list-clients",
+            "-t",
+            &client_session,
+            "-F",
+            "#{client_name}",
+        ])?;
+        for client in String::from_utf8_lossy(&listed.stdout)
+            .lines()
+            .filter(|one| !one.is_empty())
+        {
+            let _ = self.run(&["refresh-client", "-t", client]);
+        }
+        Ok(())
+    }
+
     /// Scrolls `target` by `lines` — negative is up, into the history — or,
     /// with zero, leaves the history for the live screen.
     pub fn scroll(&self, target: &str, lines: i32) -> Result<(), TmuxError> {

@@ -60,7 +60,11 @@ export function Leaf({
     terminal.open(box)
     // After `open`, which is when there is a canvas to take a context from.
     measureWideCharacters(terminal)
-    drawOnTheGpu(terminal)
+    /* tmux sends only what changes, so a screen that was emptied under it —
+       a rebuilt terminal, a lost GPU context, a pane coming back — stays blank
+       but for the cursor until the program next prints. Asked for whole. */
+    const redraw = (): void => void ask(() => commands.sessionRedraw(projectId, paneId))
+    drawOnTheGpu(terminal, undefined, redraw)
     const pasted = picturesAsPaths(projectId, (path) => terminal.paste(path), setPasteFailed)
     box.addEventListener('paste', pasted, true)
     /* Copy and paste keys, taken before xterm's textarea sees them: on
@@ -157,6 +161,7 @@ export function Leaf({
       told = { rows: terminal.rows, cols: terminal.cols }
       /* The grid may have been fitted while the attach was on its way. */
       refit()
+      setTimeout(() => !dropped && redraw(), 150)
       terminal.onData((data) => wheel.typed(data, (typed) => live?.write(typed)))
       setTerm(terminal)
     })().catch((thrown: unknown) => {
@@ -192,6 +197,7 @@ export function Leaf({
             if (!entries.some((entry) => entry.isIntersecting)) return
             refit()
             terminal.refresh(0, terminal.rows - 1)
+            if (live) redraw()
           })
     shown?.observe(box)
 

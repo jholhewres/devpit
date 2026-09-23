@@ -178,6 +178,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         panes::session_write,
         panes::session_resize,
         panes::session_scroll,
+        panes::session_redraw,
         panes::pane_scrollback,
         panes::session_detach,
         shell_launch::session_running,

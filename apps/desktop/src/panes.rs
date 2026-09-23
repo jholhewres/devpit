@@ -108,6 +108,17 @@ pub fn session_scroll(project_id: String, pane_id: String, lines: i32) -> Result
         .map_err(|err| RpcError::internal(err.to_string()))
 }
 
+/// `session.redraw` — tmux draws this leaf's screen again, whole.
+#[tauri::command]
+#[specta::specta]
+pub fn session_redraw(project_id: String, pane_id: String) -> Result<(), RpcError> {
+    crate::sessions::holding(&project_id, &pane_id)?;
+    let session = devpit_tmux::Server::session_name(&project_id);
+    crate::sessions::tmux_server()?
+        .redraw(&session, &pane_id)
+        .map_err(|err| RpcError::internal(err.to_string()))
+}
+
 /// `pane.scrollback` — what this pane has printed, oldest kept byte first.
 ///
 /// This is what makes reopening a window show a terminal rather than an empty
