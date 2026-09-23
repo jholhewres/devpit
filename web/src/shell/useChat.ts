@@ -73,6 +73,9 @@ export function useChat(conversationId: string): Chat {
   const [permission, setPermission] = useState(MODES[0].id)
   const [effort, setEffort] = useState<string | null>(null)
   const [files, setFiles] = useState<readonly Attachment[]>([])
+  /* A pasted picture has no path the window can draw, so its preview is kept
+     here, by the path the backend gave it. */
+  const [previews, setPreviews] = useState<Readonly<Record<string, string>>>({})
   const [asked, setAsked] = useState<readonly Question[]>([])
   const [session, setSession] = useState<string | null>(null)
   const [card, setCard] = useState<ChatCard | null>(null)
@@ -207,6 +210,10 @@ export function useChat(conversationId: string): Chat {
       setSending(true)
       setError(null)
       setFiles([])
+      setPreviews((was) => {
+        for (const shown of Object.values(was)) URL.revokeObjectURL(shown)
+        return {}
+      })
       /* Picked for one turn, like the attachments: a skill left on would
          silently shape every message after it. */
       setSkills([])
@@ -262,10 +269,6 @@ export function useChat(conversationId: string): Chat {
     },
     [project],
   )
-
-  /* A pasted picture has no path the window can draw, so its preview is kept
-     here, by the path the backend gave it. */
-  const [previews, setPreviews] = useState<Readonly<Record<string, string>>>({})
 
   const paste = useCallback(
     (file: Blob) => {
