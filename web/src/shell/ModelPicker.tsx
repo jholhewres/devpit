@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AgentGlyph } from './AgentGlyph'
 import { useAway } from './away'
 import { accountHint, current, keyOf, rowsFor, SHELF, stepTab, type Row } from './modelPick'
-import { modelHint, modelName } from './models'
+import { modelBlurb, modelHint, modelName } from './models'
 import { installationOf } from './outside'
 import { committed } from './typing'
 import { counted, useAccountInfo } from './useAccountInfo'
@@ -224,12 +224,14 @@ export function ModelPicker({
                     }}
                   >
                     <span className="mpick__check" aria-hidden="true">{mine ? '✓' : ''}</span>
-                    <span className="mpick__b">
+                    {/* One line: the name, what it is for, and — across
+                        accounts — whose. The alias the CLI is passed is on
+                        hover, for anyone checking what is actually sent. */}
+                    <span className="mpick__b" title={modelHint(row.model, env)}>
                       <span className="mpick__n">{modelName(row.model, env)}</span>
                       <span className="mpick__p">
-                        {/* Across accounts, say whose; within one, the rail already did. */}
                         {!browsing && <span className="mpick__who">{row.profile.label}</span>}
-                        <code className="mpick__id">{modelHint(row.model, env)}</code>
+                        {modelBlurb(row.model, env)}
                       </span>
                     </span>
                     <span
@@ -261,7 +263,7 @@ export function ModelPicker({
               <div className="mpick__foot" title={info?.directory}>
                 {info ? (
                   <>
-                    <span className="mpick__dir">{info.directory}</span>
+                    <span className="mpick__dir">{info.directory.replace(/^\/(home|Users)\/[^/]+/, '~')}</span>
                     {counted(info) && <span>{counted(info)}</span>}
                   </>
                 ) : (
@@ -269,12 +271,7 @@ export function ModelPicker({
                 )}
               </div>
             )}
-            {usable.length === 1 && !fixed && (
-              <p className="mpick__hint">
-                A second sign-in or a gateway such as z.ai is another account — add it in Settings,
-                Providers.
-              </p>
-            )}
+
           </div>
         </div>
       )}

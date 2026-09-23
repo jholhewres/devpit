@@ -10,7 +10,7 @@ const glm = [
 describe('what a model is called on screen', () => {
   /* A fine argument to the CLI, and a label that names no model. */
   it('says whose default it is rather than the word default', () => {
-    expect(modelName('default')).toBe("The account's default")
+    expect(modelName('default')).toBe('Account default')
   })
 
   it('names an alias by the version it runs', () => {

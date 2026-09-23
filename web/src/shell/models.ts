@@ -17,6 +17,19 @@ const ALIASES: Readonly<Record<string, string>> = {
   haiku: 'Haiku 4.5',
   fable: 'Fable 5.1',
   best: 'Best available',
+  opusplan: 'Opus Plan',
+}
+
+/* What each is for, in a few words, beside its name. From the same docs as
+   the table above; a model this does not know gets no line rather than a
+   guess. */
+const FOR: Readonly<Record<string, string>> = {
+  default: 'Whatever this account picks',
+  opus: 'Most capable',
+  sonnet: 'Fast and capable',
+  haiku: 'Fastest and lightest',
+  fable: 'May bill usage credits',
+  best: 'The strongest available',
   opusplan: 'Opus plans, Sonnet builds',
 }
 
@@ -47,7 +60,7 @@ export function movedTo(model: string, env: readonly EnvVar[] = []): string | nu
 export function modelName(model: string, env: readonly EnvVar[] = []): string {
   const moved = movedTo(model, env)
   if (moved) return modelName(moved)
-  if (model === 'default') return "The account's default"
+  if (model === 'default') return 'Account default'
   const wide = model.endsWith(WIDE)
   const bare = wide ? model.slice(0, -WIDE.length) : model
   const dated = DATED.exec(bare)
@@ -75,3 +88,11 @@ export function modelsOf(text: string): string[] {
 }
 
 export const modelsText = (models: readonly string[]): string => models.join(', ')
+
+/* A few words on what a model is for — or, where a profile sends the alias
+   somewhere else, where it goes. */
+export function modelBlurb(model: string, env: readonly EnvVar[] = []): string {
+  const moved = movedTo(model, env)
+  if (moved) return `→ ${moved}`
+  return FOR[model.replace(WIDE, '')] ?? ''
+}

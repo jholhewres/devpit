@@ -54,9 +54,11 @@ describe('the model picker', () => {
   it('shows versions, what is sent, and which one this chat is on', () => {
     opened([claude], 'claude')
     const current = screen.getByRole('option', { selected: true })
-    expect(within(current).getByText("The account's default")).toBeTruthy()
+    expect(within(current).getByText('Account default')).toBeTruthy()
     const opus = screen.getByText('Opus 5.5').closest('[role="option"]') as HTMLElement
-    expect(within(opus).getByText('opus')).toBeTruthy()
+    // What it is for beside the name; the alias sent, on hover.
+    expect(within(opus).getByText('Most capable')).toBeTruthy()
+    expect(within(opus).getByTitle('opus')).toBeTruthy()
   })
 
   it('picks the account and the model together', () => {
@@ -79,13 +81,12 @@ describe('the model picker', () => {
   it('says where the account on the rail keeps its configuration', async () => {
     opened([claude, claudin], 'claude')
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Accounts' })).getByText('claudin'))
-    await waitFor(() => expect(screen.getByText('/home/me/.claude-claudin')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('~/.claude-claudin')).toBeTruthy())
     expect(await screen.findByText('3 skills · 1 MCP server')).toBeTruthy()
   })
 
   it('points at Providers when there is only one account', () => {
     opened([claude], 'claude')
-    expect(screen.getByText(/add it in Settings, Providers/)).toBeTruthy()
     fireEvent.click(screen.getByText('+ Add an account'))
     expect(openPrefs).toHaveBeenCalledWith('providers')
   })
