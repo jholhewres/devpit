@@ -60,6 +60,7 @@ pub(crate) fn open_card_chat(
         title: Some(card.title),
         rewind: Default::default(),
         cwd: Some(cwd.display().to_string()),
+        context: None,
     };
     write_listed(sessions, conversation_id, &head)
         .map_err(|err| RpcError::internal(err.to_string()))?;

@@ -209,6 +209,7 @@ export const commands = {
 	/**  The CLI's own word, kept rather than flattened into "failed". */
 	stopReason: string | null,
 	isError: boolean,
+	context: Context | null,
 } | null, RpcError>(__TAURI_INVOKE("chat_cancel", { conversationId })),
 	/**
 	 *  `chat.stop_task` — stops one background task of the turn in flight.
@@ -1581,6 +1582,16 @@ export type Commit = {
 	committedAt: number | null,
 };
 
+/**
+ *  How full the model's context was at the end of a turn, in tokens: what
+ *  the last request carried, against the window it had. What a person needs
+ *  to see before the CLI compacts — or refuses — on its own.
+ */
+export type Context = {
+	used: number,
+	window: number,
+};
+
 export type Conversation = {
 	id: string,
 	projectId: string,
@@ -1607,6 +1618,8 @@ export type Conversation = {
 	sessionId: string | null,
 	messages: Message[],
 	costUsd: number | null,
+	/**  How full the context was when the last turn ended. */
+	context?: Context | null,
 	/**
 	 *  The turns a rewind can fork at: those whose place in the CLI's
 	 *  transcript was kept. Earlier turns ran before it was.
@@ -3129,6 +3142,7 @@ export type TurnEnd = {
 	/**  The CLI's own word, kept rather than flattened into "failed". */
 	stopReason: string | null,
 	isError: boolean,
+	context: Context | null,
 };
 
 /**  One thing an update is waiting for. */

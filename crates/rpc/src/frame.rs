@@ -8,6 +8,16 @@ use specta::Type;
 
 use crate::chat::{CallState, Message, Part, TurnEnd};
 
+/// How full the model's context was at the end of a turn, in tokens: what
+/// the last request carried, against the window it had. What a person needs
+/// to see before the CLI compacts — or refuses — on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Context {
+    pub used: u32,
+    pub window: u32,
+}
+
 /// What the stream carries, one frame at a time.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { Ask, Attachment, Message, Profile, Question } from '../gen/bindings'
+import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import { applied, ASKS, fixedTo, MODES, send, withFiles } from './chat'
 import { ask, commands } from './live'
 import { withSkills } from './pills'
@@ -25,6 +25,8 @@ export interface Chat {
   readonly model: string | null
   /** What every turn so far has cost. */
   readonly cost: number
+  /** How full the context was when the last turn ended. */
+  readonly context: Context | null
   readonly permission: string
   readonly effort: string | null
   readonly files: readonly Attachment[]
@@ -65,6 +67,7 @@ export function useChat(conversationId: string): Chat {
   const [profileId, setProfileId] = useState<string | null>(null)
   const [model, setModel] = useState<string | null>(null)
   const [cost, setCost] = useState(0)
+  const [context, setContext] = useState<Context | null>(null)
   const [permission, setPermission] = useState(MODES[0].id)
   const [effort, setEffort] = useState<string | null>(null)
   const [files, setFiles] = useState<readonly Attachment[]>([])
@@ -91,6 +94,7 @@ export function useChat(conversationId: string): Chat {
         setProfileId(belongs)
         setModel(past.data.model)
         setCost(past.data.costUsd ?? 0)
+        setContext(past.data.context ?? null)
         setSession(past.data.sessionId)
         const { cardId, cardTitle, cardOnBoard } = past.data
         setCard(cardId ? { id: cardId, title: cardTitle, onBoard: cardOnBoard } : null)
@@ -171,6 +175,7 @@ export function useChat(conversationId: string): Chat {
       void started.end
         .then((end) => {
           setCost((was) => was + (end.costUsd ?? 0))
+          if (end.context) setContext(end.context)
           /* A turn's place in the CLI's transcript is known once it has run. */
           void ask(() => commands.chatHistory(project.id, conversationId)).then(
             (past) => {
@@ -270,6 +275,7 @@ export function useChat(conversationId: string): Chat {
     profileId,
     model,
     cost,
+    context,
     permission,
     effort,
     files,

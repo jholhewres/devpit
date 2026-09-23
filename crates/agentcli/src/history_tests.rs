@@ -32,6 +32,7 @@ fn head(profile: &str, cost: f64) -> Head {
         title: None,
         rewind: Default::default(),
         cwd: None,
+        context: None,
     }
 }
 

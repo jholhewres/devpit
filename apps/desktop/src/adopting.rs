@@ -54,6 +54,7 @@ pub(crate) fn adopt(
             title,
             rewind: Default::default(),
             cwd,
+            context: None,
         },
     )
 }

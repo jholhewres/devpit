@@ -109,10 +109,15 @@ pub fn say(
         .wait()
         .map_err(|err| AgentError::Unreadable(err.to_string()))?;
 
-    let (stop_reason, cost_usd, is_error) = heard.ended.unwrap_or_else(|| {
+    let (stop_reason, cost_usd, is_error, context) = heard.ended.unwrap_or_else(|| {
         // No end frame means the turn was stopped, not that it finished. A
         // conversation that shows those the same way is lying about one.
-        (Some("interrupted".to_owned()), None, !status.success())
+        (
+            Some("interrupted".to_owned()),
+            None,
+            !status.success(),
+            None,
+        )
     });
 
     Ok(Said {
@@ -122,6 +127,7 @@ pub fn say(
             duration_ms: Some(started.elapsed().as_millis() as f64),
             stop_reason,
             is_error,
+            context,
         },
         session_id: heard.session_id,
         init: heard.init,

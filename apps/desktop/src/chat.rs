@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use devpit_agentcli::driver::driver;
-use devpit_agentcli::head::{after_turn, head_path, read_head, remaining, settled, write_head};
+use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head};
 use devpit_agentcli::store::{append, conversation_path, read};
 use devpit_agentcli::talk::{say, Said, Say};
 use devpit_rpc::{
@@ -71,6 +71,7 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
         model: head.as_ref().and_then(|head| head.model.clone()),
         session_id: head.as_ref().and_then(|head| head.session_id.clone()),
         cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
+        context: head.as_ref().and_then(|head| head.context),
         rewindable: head
             .as_ref()
             .map(|head| {
@@ -299,10 +300,8 @@ pub async fn chat_send(
         anchor,
     } = said;
     crate::slash::remember(&home, &profile_id, init.as_ref());
-    let _ = write_head(
-        &head_file,
-        &after_turn(opening, &turn_id, end.cost_usd, session_id, anchor),
-    );
+    let head = crate::chat_turn::after(opening, &turn_id, &end, session_id, anchor);
+    let _ = write_head(&head_file, &head);
 
     let end = TurnEnd { turn_id, ..end };
     let _ = on_frame.send(Frame::Ended { end: end.clone() });

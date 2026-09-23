@@ -35,6 +35,7 @@ pub(crate) fn opening(
         title: head.and_then(|head| head.title.clone()),
         rewind: head.map(|head| head.rewind.clone()).unwrap_or_default(),
         cwd: head.and_then(|head| head.cwd.clone()),
+        context: head.and_then(|head| head.context),
     }
 }
 
@@ -57,3 +58,20 @@ pub(crate) fn turn_cwd(fixed: Option<&str>, asked: &str) -> Result<String, RpcEr
 #[cfg(test)]
 #[path = "chat_turn_tests.rs"]
 mod tests;
+
+/// The head after a turn, holding how full the context was when it ended. A
+/// turn that reported none — stopped before its end frame — keeps the last
+/// known reading rather than blanking the meter.
+pub(crate) fn after(
+    opening: Head,
+    turn_id: &str,
+    end: &devpit_rpc::TurnEnd,
+    session_id: Option<String>,
+    anchor: Option<String>,
+) -> Head {
+    let kept = opening.context;
+    Head {
+        context: end.context.or(kept),
+        ..devpit_agentcli::head::after_turn(opening, turn_id, end.cost_usd, session_id, anchor)
+    }
+}

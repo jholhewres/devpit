@@ -104,6 +104,7 @@ pub fn conversations(dir: &Path) -> Vec<Summary> {
                 title: None,
                 rewind: Default::default(),
                 cwd: None,
+                context: None,
             });
             Some(Summary {
                 // The person's own words first — the decision above — and the

@@ -143,4 +143,5 @@ pub struct TurnEnd {
     /// The CLI's own word, kept rather than flattened into "failed".
     pub stop_reason: Option<String>,
     pub is_error: bool,
+    pub context: Option<crate::frame::Context>,
 }

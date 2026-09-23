@@ -81,7 +81,31 @@ fn the_end_carries_the_clis_own_reason() {
             stop_reason: Some("success".to_owned()),
             cost_usd: Some(0.42),
             is_error: false,
+            context: None,
         }
+    );
+}
+
+/// Recorded from Claude Code 2.1.270, trimmed: the last request's tokens
+/// against the main model's window — not the summed `usage`, which counts a
+/// cached prompt once per request a tool turn made.
+#[test]
+fn the_end_says_how_full_the_context_is() {
+    let line = r#"{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.03,
+        "usage":{"input_tokens":20,"cache_read_input_tokens":27000,"output_tokens":9,
+          "iterations":[
+            {"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":13868,"cache_creation_input_tokens":0},
+            {"input_tokens":10,"output_tokens":4,"cache_read_input_tokens":13868,"cache_creation_input_tokens":14167}]},
+        "modelUsage":{"claude-haiku-4-5-20251001":{"contextWindow":200000,"maxOutputTokens":32000}}}"#;
+    let Read::Ended { context, .. } = Claude.read(line) else {
+        panic!("an end");
+    };
+    assert_eq!(
+        context,
+        Some(devpit_rpc::Context {
+            used: 10 + 13868 + 14167 + 4,
+            window: 200_000,
+        })
     );
 }
 

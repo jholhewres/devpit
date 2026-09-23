@@ -46,6 +46,7 @@ fn two_turns(home: &Path) {
             effort: None,
             title: None,
             cwd: None,
+            context: None,
             rewind: Rewind {
                 fork_at: None,
                 anchors: vec![anchor("turn_1", "u-1"), anchor("turn_2", "u-2")],

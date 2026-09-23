@@ -4,7 +4,7 @@
 //! turns those lines into the typed parts the contract carries, so a new CLI
 //! is a new file here and nothing else.
 
-use devpit_rpc::{Part, SessionInit};
+use devpit_rpc::{Context, Part, SessionInit};
 
 use crate::claude_lines::{assistant_parts, system, tool_results};
 
@@ -18,6 +18,7 @@ pub enum Read {
         stop_reason: Option<String>,
         cost_usd: Option<f64>,
         is_error: bool,
+        context: Option<Context>,
     },
     /// The CLI described itself: its commands, skills and model.
     Init(SessionInit),
@@ -107,6 +108,7 @@ impl Driver for Claude {
                     .get("is_error")
                     .and_then(|flag| flag.as_bool())
                     .unwrap_or(false),
+                context: context_of(&value),
             },
             Some("assistant") => Read::Parts(assistant_parts(&value)),
             Some("user") => Read::Parts(tool_results(&value)),
@@ -135,6 +137,29 @@ impl Driver for Claude {
         }
         value.get("uuid")?.as_str().map(str::to_owned)
     }
+}
+
+/// Measured on 2.1.270: `usage.iterations` holds one entry per request the
+/// turn made, and the last one is what the context held when it ended — the
+/// top-level `usage` sums them, which overcounts any turn that used a tool.
+/// The window is the main model's, from `modelUsage`.
+fn context_of(result: &serde_json::Value) -> Option<Context> {
+    let last = result.get("usage")?.get("iterations")?.as_array()?.last()?;
+    let tokens = |key: &str| last.get(key).and_then(|n| n.as_u64()).unwrap_or(0);
+    let used = tokens("input_tokens")
+        + tokens("cache_read_input_tokens")
+        + tokens("cache_creation_input_tokens")
+        + tokens("output_tokens");
+    let window = result
+        .get("modelUsage")?
+        .as_object()?
+        .values()
+        .filter_map(|model| model.get("contextWindow")?.as_u64())
+        .max()?;
+    Some(Context {
+        used: u32::try_from(used).ok()?,
+        window: u32::try_from(window).ok()?,
+    })
 }
 
 /// The driver a conversation named, or nothing when it is not installed.

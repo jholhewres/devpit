@@ -19,7 +19,12 @@ pub(crate) struct Heard {
     pub anchor: Option<String>,
     /// The CLI's own reason, cost and error flag. `None` when the stream ended
     /// without an end frame, which means the turn was stopped.
-    pub ended: Option<(Option<String>, Option<f64>, bool)>,
+    pub ended: Option<(
+        Option<String>,
+        Option<f64>,
+        bool,
+        Option<devpit_rpc::Context>,
+    )>,
 }
 
 /// Follows the stream, handing each part to `on_part` as it arrives, and
@@ -53,8 +58,9 @@ pub(crate) fn follow(
                 stop_reason,
                 cost_usd,
                 is_error,
+                context,
             } => {
-                heard.ended = Some((stop_reason, cost_usd, is_error));
+                heard.ended = Some((stop_reason, cost_usd, is_error, context));
                 result_seen = true;
             }
             Read::Init(said) => heard.init = Some(said),

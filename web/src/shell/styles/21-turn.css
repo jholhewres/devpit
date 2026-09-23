@@ -32,6 +32,9 @@ button.ecard__p:hover { color: var(--text); text-decoration: underline; }
 .pcorner__card { max-width: 220px; padding: 0 6px; overflow: hidden; font-size: 11.5px; color: var(--text-3); text-overflow: ellipsis; white-space: nowrap; }
 button.pcorner__card:hover { color: var(--text); background: var(--overlay-strong); border-radius: 6px; }
 .pcorner__cost { padding: 0 6px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.pcorner__ctx { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; cursor: default; }
+.pcorner__ctx[data-level='filling'] { color: var(--warning); }
+.pcorner__ctx[data-level='full'] { color: var(--danger); }
 /* Over a terminal the corner would cover its last columns, so it waits for the pointer. */
 .pane[data-pane='term'] .pcorner { opacity: 0; transition: opacity 120ms; background: var(--terminal); }
 .pane[data-pane='term']:hover .pcorner, .pane[data-pane='term'] .pcorner:focus-within { opacity: 1; }

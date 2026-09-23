@@ -13,6 +13,7 @@ fn head(profile: &str) -> Head {
         title: None,
         rewind: Default::default(),
         cwd: None,
+        context: None,
     }
 }
 
@@ -93,6 +94,7 @@ fn opened(fork_at: Option<&str>) -> crate::head::Head {
             anchors: Vec::new(),
         },
         cwd: None,
+        context: None,
     }
 }
 

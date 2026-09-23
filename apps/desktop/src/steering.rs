@@ -80,6 +80,7 @@ pub fn chat_cancel(
         duration_ms: None,
         stop_reason: Some("cancelled".to_owned()),
         is_error: false,
+        context: None,
     }))
 }
 

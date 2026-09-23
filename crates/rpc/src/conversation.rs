@@ -33,6 +33,9 @@ pub struct Conversation {
     pub session_id: Option<String>,
     pub messages: Vec<Message>,
     pub cost_usd: f64,
+    /// How full the context was when the last turn ended.
+    #[serde(default)]
+    pub context: Option<crate::frame::Context>,
     /// The turns a rewind can fork at: those whose place in the CLI's
     /// transcript was kept. Earlier turns ran before it was.
     #[serde(default)]

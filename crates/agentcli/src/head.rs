@@ -41,6 +41,9 @@ pub struct Head {
     /// card or took in a session: a session resumed anywhere else is not found.
     #[serde(default)]
     pub cwd: Option<String>,
+    /// How full the context was when the last turn ended.
+    #[serde(default)]
+    pub context: Option<devpit_rpc::Context>,
 }
 
 /// Where each turn sits in the CLI's own transcript, and a fork still to run.
