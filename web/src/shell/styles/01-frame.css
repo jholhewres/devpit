@@ -12,6 +12,9 @@
  * middle of a screen it is supposed to fill reads as a bug. */
 .app { position: relative; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--canvas); border: 1px solid var(--border-strong); border-radius: 11px; }
 .app[data-max='true'] { border-radius: 0; border-color: transparent; }
+/* An opaque window has nothing behind its corners to round against. */
+:root[data-frame='square'] body { background: var(--canvas); }
+:root[data-frame='square'] .app { border-radius: 0; }
 
 /* Invisible, and only the cursor says they are there — which is what a window
    edge does. Fixed rather than absolute: these sit on the window boundary and
