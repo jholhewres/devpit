@@ -42,7 +42,7 @@ const empty = (): Building => ({ folders: new Map(), files: [] })
 export function foldered(changes: readonly Change[]): readonly Node[] {
   const root = empty()
   for (const change of changes) {
-    const parts = change.path.split('/')
+    const parts = bare(change.path).split('/')
     parts.pop()
     let here = root
     for (const part of parts) {
@@ -70,7 +70,7 @@ function laid(here: Building, prefix: string): readonly Node[] {
     .map((change) => ({
       kind: 'file' as const,
       change,
-      name: change.path.split('/').pop() ?? change.path,
+      name: bare(change.path).split('/').pop() ?? change.path,
     }))
     .sort((one, two) => one.name.localeCompare(two.name))
   return [...folders, ...files]
@@ -117,3 +117,8 @@ export function paths(nodes: readonly Node[]): string[] {
     node.kind === 'folder' ? paths(node.children) : [node.change.path],
   )
 }
+
+/* A path without its trailing slash. git names an untracked repository inside
+   this one as `dir/`, and split on `/` that ended in an empty name — a row with
+   an icon and nothing beside it. */
+export const bare = (path: string): string => path.replace(/\/+$/, '')

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import type { Change } from '../gen/bindings'
-import { foldered, folders, paths, type Node } from './changeTree'
+import { bare, foldered, folders, paths, type Node } from './changeTree'
 import { FileGlyph } from './FileGlyph'
 import { Minus, Plus, Trash, Undo } from './GitIcons'
 import { mark } from './tree'
@@ -56,7 +56,7 @@ export function ChangeRows({
       if (node.kind === 'file') {
         const { change } = node
         const pad = { paddingLeft: `${20 + depth * 12}px` }
-        const folder = view === 'list' ? change.path.split('/').slice(0, -1).join('/') : ''
+        const folder = view === 'list' ? bare(change.path).split('/').slice(0, -1).join('/') : ''
         return [
           <div
             className="gitrow gitrow--file"
@@ -170,6 +170,6 @@ export function ChangeRows({
 
 const asFile = (change: Change): Node => ({
   kind: 'file',
-  name: change.path.split('/').pop() ?? change.path,
+  name: bare(change.path).split('/').pop() ?? change.path,
   change,
 })

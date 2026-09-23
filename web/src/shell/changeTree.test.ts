@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Change } from '../gen/bindings'
-import { foldered, folders, paths, type Folder, type Node } from './changeTree'
+import { bare, foldered, folders, paths, type Folder, type Node } from './changeTree'
 
 const change = (path: string, over: Partial<Change> = {}): Change => ({
   path,
@@ -98,5 +98,12 @@ describe('what a folder row can act on', () => {
 
   it('counts a single file as itself', () => {
     expect(paths(tree)).toContain('z.rs')
+  })
+})
+
+describe('a repository inside this one', () => {
+  it('is named by its folder, not by the empty text after its slash', () => {
+    expect(bare('.claude/worktrees/agent-1/')).toBe('.claude/worktrees/agent-1')
+    expect(bare('src/main.rs')).toBe('src/main.rs')
   })
 })
