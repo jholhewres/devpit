@@ -109,25 +109,25 @@ pub fn say(
         .wait()
         .map_err(|err| AgentError::Unreadable(err.to_string()))?;
 
-    let (stop_reason, cost_usd, is_error, context) = heard.ended.unwrap_or_else(|| {
+    let ending = heard.ended.unwrap_or_else(|| {
         // No end frame means the turn was stopped, not that it finished. A
         // conversation that shows those the same way is lying about one.
-        (
-            Some("interrupted".to_owned()),
-            None,
-            !status.success(),
-            None,
-        )
+        crate::talk_stream::Ending {
+            stop_reason: Some("interrupted".to_owned()),
+            cost_usd: None,
+            is_error: !status.success(),
+            context: None,
+        }
     });
 
     Ok(Said {
         end: TurnEnd {
             turn_id: String::new(),
-            cost_usd,
+            cost_usd: ending.cost_usd,
             duration_ms: Some(started.elapsed().as_millis() as f64),
-            stop_reason,
-            is_error,
-            context,
+            stop_reason: ending.stop_reason,
+            is_error: ending.is_error,
+            context: ending.context,
         },
         session_id: heard.session_id,
         init: heard.init,
