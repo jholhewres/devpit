@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { AgentGlyph } from './AgentGlyph'
 import { useAway } from './away'
-import { modelName } from './models'
+import { accountHint, current, keyOf, rowsFor, SHELF, stepTab, type Row } from './modelPick'
+import { modelHint, modelName } from './models'
+import { installationOf } from './outside'
 import { committed } from './typing'
+import { counted, useAccountInfo } from './useAccountInfo'
+import { useInstallations } from './useInstallations'
+import { useShell } from './useShell'
 import type { Profile } from '../gen/bindings'
 
 /*
@@ -13,19 +19,13 @@ import type { Profile } from '../gen/bindings'
  * account. Once the conversation has spoken the account is fixed, and only
  * that account's models are offered.
  *
- * The rail down the left is the account, the list is its models, and the star
- * is a shelf across all of them — the ones you actually reach for, which is
- * rarely the whole catalogue.
+ * The rail names each account and says what makes it that account — two
+ * profiles of one CLI wear the same mark, so a mark and a letter was a control
+ * nobody could read. The foot says where the account keeps its history,
+ * skills and MCP servers, which is what changes when the rail does.
  */
 
 const FAVOURITES = 'devpit.favourite-models'
-
-interface Row {
-  readonly profile: Profile
-  readonly model: string
-}
-
-const keyOf = (row: Row): string => `${row.profile.id}:${row.model}`
 
 export function ModelPicker({
   profiles,
@@ -41,10 +41,11 @@ export function ModelPicker({
   fixed: string | null
   onPick: (profileId: string, model: string) => void
 }): React.JSX.Element {
+  const { project, openPrefs } = useShell()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [at, setAt] = useState(0)
-  const [tab, setTab] = useState<string>(profileId ?? '')
+  const [tab, setTab] = useState<string>(profileId ?? SHELF)
   const [stars, setStars] = useState<readonly string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(FAVOURITES) ?? '[]') as string[]
@@ -55,6 +56,7 @@ export function ModelPicker({
   const box = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLInputElement>(null)
   useAway(box, useCallback(() => setOpen(false), []), open)
+  const { list: installations } = useInstallations()
 
   const usable = useMemo(
     () => (fixed ? profiles.filter((one) => one.id === fixed) : profiles),
@@ -65,24 +67,16 @@ export function ModelPicker({
     if (!open) return
     setQuery('')
     setAt(0)
-    setTab(profileId ?? usable[0]?.id ?? '')
+    setTab(profileId ?? usable[0]?.id ?? SHELF)
     field.current?.focus()
   }, [open, profileId, usable])
 
-  const needle = query.trim().toLowerCase()
-  /* A search reaches every account; without one, the rail decides. Anything
-     else would hide the model you just typed the name of. */
-  const searched = needle ? usable : usable.filter((one) => tab === '' || one.id === tab)
-  const rows: Row[] = searched.flatMap((profile) =>
-    (profile.models ?? [])
-      .map((one) => ({ profile, model: one }))
-      .filter((row) => {
-        if (!needle && tab === '' && !stars.includes(keyOf(row))) return false
-        return (
-          !needle ||
-          `${modelName(row.model)} ${row.model} ${profile.label}`.toLowerCase().includes(needle)
-        )
-      }),
+  const rows = rowsFor(usable, tab, query, stars)
+  const browsing = !query && tab !== SHELF
+  const viewed = usable.find((one) => one.id === (browsing ? tab : profileId))
+  const info = useAccountInfo(
+    open ? (installationOf(viewed, installations)?.directory ?? null) : null,
+    project?.id ?? null,
   )
 
   const star = (row: Row): void =>
@@ -104,8 +98,18 @@ export function ModelPicker({
     onPick(row.profile.id, row.model)
   }
 
+  const goTo = (next: string): void => {
+    setTab(next)
+    setQuery('')
+    setAt(0)
+  }
+
   const here = profiles.find((one) => one.id === profileId)
-  const label = here ? modelName(model ?? here.models?.[0] ?? '') : 'No agent CLI'
+  const on = current(here, model)
+  const name = here ? modelName(on, here.env ?? []) : 'No agent CLI'
+  /* The account on the chip only when there is more than one to confuse it
+     with: a lone account named on every chip is noise. */
+  const label = here && profiles.length > 1 ? `${here.label} · ${name}` : name
 
   return (
     <div className="ctl" ref={box}>
@@ -113,52 +117,48 @@ export function ModelPicker({
         className="chip"
         aria-label="Account and model"
         aria-expanded={open}
-        title={here ? `${here.label} · ${label}` : undefined}
+        title={here ? `${here.label} · ${modelHint(on, here.env ?? [])}` : undefined}
         onClick={() => setOpen((was) => !was)}
       >
-        <Mark className="chip__sun" />
+        <span className="chip__sun"><AgentGlyph agent={here?.id ?? ''} base={here?.base || here?.driver} /></span>
         <span className="ctl__l">{label}</span>
       </button>
 
       {open && (
         <div className="mpick" role="dialog" aria-label="Account and model">
-          <div className="mpick__rail">
+          <nav className="mpick__rail" aria-label="Accounts">
             <button
               className="mpick__tab"
-              aria-label="Favourites"
-              aria-pressed={tab === '' && !query}
-              data-on={tab === '' && !query}
-              onClick={() => {
-                setTab('')
-                setQuery('')
-                setAt(0)
-              }}
+              aria-pressed={tab === SHELF && !query}
+              data-on={tab === SHELF && !query}
+              onClick={() => goTo(SHELF)}
             >
-              <Star on={false} size={15} />
+              <span className="mpick__ti"><Star on={false} size={14} /></span>
+              <span className="mpick__tb"><span className="mpick__tn">Favourites</span></span>
             </button>
             <span className="mpick__sep" />
             {usable.map((profile) => (
               <button
                 className="mpick__tab"
                 key={profile.id}
-                aria-label={profile.label}
                 aria-pressed={tab === profile.id && !query}
                 data-on={tab === profile.id && !query}
-                title={profile.label}
-                onClick={() => {
-                  setTab(profile.id)
-                  setQuery('')
-                  setAt(0)
-                }}
+                title={`${profile.label} — ${profile.command}`}
+                onClick={() => goTo(profile.id)}
               >
-                {/* The mark says which agent; the letter says which account.
-                    Two accounts of one CLI wear the same mark, so the mark
-                    alone would be a control that cannot be read. */}
-                <Mark />
-                <span className="mpick__tabl">{profile.label.slice(0, 1).toUpperCase()}</span>
+                <span className="mpick__ti"><AgentGlyph agent={profile.id} base={profile.base || profile.driver} /></span>
+                <span className="mpick__tb">
+                  <span className="mpick__tn">{profile.label}</span>
+                  <span className="mpick__ts">{accountHint(profile)}</span>
+                </span>
+                {profile.id === profileId && <span className="mpick__live" aria-label="This chat's account" />}
               </button>
             ))}
-          </div>
+            {/* Where another account comes from, said where it is missed. */}
+            <button className="mpick__add" onClick={() => (setOpen(false), openPrefs('providers'))}>
+              {usable.length > 1 || fixed ? 'Manage accounts' : '+ Add an account'}
+            </button>
+          </nav>
 
           <div className="mpick__main">
             <div className="mpick__q">
@@ -166,20 +166,24 @@ export function ModelPicker({
               <input
                 ref={field}
                 className="mpick__in"
-                placeholder="Search models…"
+                placeholder={fixed ? 'Search this account’s models…' : 'Search models on every account…'}
                 value={query}
                 spellCheck={false}
+                aria-label="Search models"
                 onChange={(event) => {
                   setQuery(event.target.value)
                   setAt(0)
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === 'ArrowDown') {
+                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                     event.preventDefault()
-                    setAt((was) => (was + 1) % Math.max(rows.length, 1))
-                  } else if (event.key === 'ArrowUp') {
+                    const step = event.key === 'ArrowDown' ? 1 : -1
+                    setAt((was) => (was + step + rows.length) % Math.max(rows.length, 1))
+                  } else if (!query && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+                    /* Along the rail with the field still focused, so the
+                       arrows and Enter never have to leave the keyboard. */
                     event.preventDefault()
-                    setAt((was) => (was - 1 + rows.length) % Math.max(rows.length, 1))
+                    goTo(stepTab(usable, tab, event.key === 'ArrowRight' ? 1 : -1))
                   } else if (committed(event)) {
                     event.preventDefault()
                     choose(rows[at])
@@ -188,18 +192,19 @@ export function ModelPicker({
               />
             </div>
 
-            <div className="mpick__list">
+            <div className="mpick__list" role="listbox" aria-label="Models">
               {rows.length === 0 && (
                 <div className="mpick__none">
                   {query
                     ? 'No model by that name.'
-                    : tab === ''
+                    : tab === SHELF
                       ? 'Star a model to keep it here.'
                       : 'No models reported.'}
                 </div>
               )}
               {rows.map((row, index) => {
-                const mine = row.profile.id === profileId && row.model === model
+                const env = row.profile.env ?? []
+                const mine = row.profile.id === profileId && row.model === on
                 const starred = stars.includes(keyOf(row))
                 return (
                   <div
@@ -218,11 +223,13 @@ export function ModelPicker({
                       }
                     }}
                   >
+                    <span className="mpick__check" aria-hidden="true">{mine ? '✓' : ''}</span>
                     <span className="mpick__b">
-                      <span className="mpick__n">{modelName(row.model)}</span>
+                      <span className="mpick__n">{modelName(row.model, env)}</span>
                       <span className="mpick__p">
-                        <Mark size={10} />
-                        {row.profile.label}
+                        {/* Across accounts, say whose; within one, the rail already did. */}
+                        {!browsing && <span className="mpick__who">{row.profile.label}</span>}
+                        <code className="mpick__id">{modelHint(row.model, env)}</code>
                       </span>
                     </span>
                     <span
@@ -249,18 +256,31 @@ export function ModelPicker({
                 )
               })}
             </div>
+
+            {viewed?.driver === 'claude' && installations.length > 0 && (
+              <div className="mpick__foot" title={info?.directory}>
+                {info ? (
+                  <>
+                    <span className="mpick__dir">{info.directory}</span>
+                    {counted(info) && <span>{counted(info)}</span>}
+                  </>
+                ) : (
+                  <span>{viewed.label}&rsquo;s config directory is not on this machine yet.</span>
+                )}
+              </div>
+            )}
+            {usable.length === 1 && !fixed && (
+              <p className="mpick__hint">
+                A second sign-in or a gateway such as z.ai is another account — add it in Settings,
+                Providers.
+              </p>
+            )}
           </div>
         </div>
       )}
     </div>
   )
 }
-
-const Mark = ({ className, size = 12 }: { className?: string; size?: number }): React.JSX.Element => (
-  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
-    <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" />
-  </svg>
-)
 
 const Star = ({ on, size }: { on: boolean; size: number }): React.JSX.Element => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
