@@ -61,53 +61,49 @@ pub(crate) fn project_tree_now(
     Ok(ProjectTree { nodes })
 }
 
-type Kept = std::sync::Mutex<
-    Option<std::collections::HashMap<std::path::PathBuf, (std::time::Instant, devpit_git::Status)>>,
->;
-static KEPT: Kept = std::sync::Mutex::new(None);
+/// One checkout's status, and when it was last worked out.
+type Flight = std::sync::Mutex<Option<(std::time::Instant, devpit_git::Status)>>;
 
-/// Forgets the status kept for `root`: something here just changed a file,
-/// and the next tree read must see it.
-pub(crate) fn forget_status(root: &std::path::Path) {
-    if let Ok(mut kept) = KEPT.lock() {
-        if let Some(all) = kept.as_mut() {
-            all.remove(root);
-        }
-    }
-}
+static FLIGHTS: std::sync::Mutex<
+    Option<std::collections::HashMap<std::path::PathBuf, std::sync::Arc<Flight>>>,
+> = std::sync::Mutex::new(None);
 
-/// The checkout's git status, shared by the folders read together.
+/// The checkout's git status, worked out once for the folders read together.
 ///
 /// A tree refreshing — the window coming back, a file saved — asks for every
 /// open folder at once, and each used to run a full `git status` of its own:
-/// ten open folders were eleven walks of the whole repository. One answer is
-/// kept for two seconds per checkout. A status that fails is said on stderr
-/// and read as clean, so the tree still draws.
+/// ten open folders were eleven walks of the whole repository. Now they
+/// queue on one lock per checkout: the first works it out, and the others,
+/// which arrived while it was working, take its answer. An answer finished
+/// before a request arrived is never reused, so nothing here is ever older
+/// than the request — a stage, a commit, a checkout in the terminal is seen
+/// by the next read. A status that fails is said on stderr and read as
+/// clean, so the tree still draws.
 fn status_of(root: &std::path::Path) -> devpit_git::Status {
-    use std::collections::HashMap;
-    use std::time::{Duration, Instant};
-
-    const FOR: Duration = Duration::from_secs(2);
-
-    if let Ok(kept) = KEPT.lock() {
-        if let Some((at, status)) = kept.as_ref().and_then(|all| all.get(root)) {
-            if at.elapsed() < FOR {
-                return status.clone();
-            }
-        }
-    }
-    let read = match devpit_git::status(root) {
-        Ok(read) => read,
-        Err(err) => {
-            eprintln!("git status in {}: {err}", root.display());
-            return devpit_git::Status::default();
-        }
+    let asked = std::time::Instant::now();
+    let flight = {
+        let Ok(mut all) = FLIGHTS.lock() else {
+            return devpit_git::status(root).unwrap_or_default();
+        };
+        std::sync::Arc::clone(
+            all.get_or_insert_with(std::collections::HashMap::new)
+                .entry(root.to_path_buf())
+                .or_default(),
+        )
     };
-    if let Ok(mut kept) = KEPT.lock() {
-        let all = kept.get_or_insert_with(HashMap::new);
-        all.retain(|_, (at, _)| at.elapsed() < FOR);
-        all.insert(root.to_path_buf(), (Instant::now(), read.clone()));
+    let Ok(mut held) = flight.lock() else {
+        return devpit_git::status(root).unwrap_or_default();
+    };
+    if let Some((finished, status)) = held.as_ref() {
+        if *finished >= asked {
+            return status.clone();
+        }
     }
+    let read = devpit_git::status(root).unwrap_or_else(|err| {
+        eprintln!("git status in {}: {err}", root.display());
+        devpit_git::Status::default()
+    });
+    *held = Some((std::time::Instant::now(), read.clone()));
     read
 }
 

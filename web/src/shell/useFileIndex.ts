@@ -31,7 +31,13 @@ const FRESH = 30_000
 export function useFileIndex(projectId: string | null): UseFileIndex {
   const cache = useRef(new Map<string, Cached>())
   const [entry, setEntry] = useState<Cached | null>(null)
-  const [loading, setLoading] = useState(false)
+  /* Which projects have a walk on its way: loading is this project's, so a
+     walk for the one open a moment ago cannot leave this one spinning. */
+  const [walking, setWalking] = useState<ReadonlySet<string>>(() => new Set())
+  const loading = projectId !== null && walking.has(projectId)
+  /* Bumped by a change: a walk that started before it lists the files as they
+     were, and is not kept. */
+  const generation = useRef(new Map<string, number>())
 
   useEffect(() => {
     setEntry(projectId ? (cache.current.get(projectId) ?? null) : null)
@@ -61,7 +67,10 @@ export function useFileIndex(projectId: string | null): UseFileIndex {
     const onVisible = (): void => {
       if (document.visibilityState === 'visible') drop(false)
     }
-    const onChanged = (): void => drop(true)
+    const onChanged = (): void => {
+      if (projectId) generation.current.set(projectId, (generation.current.get(projectId) ?? 0) + 1)
+      drop(true)
+    }
     window.addEventListener('focus', onFocus)
     window.addEventListener(CHANGED, onChanged)
     document.addEventListener('visibilitychange', onVisible)
@@ -78,16 +87,22 @@ export function useFileIndex(projectId: string | null): UseFileIndex {
   current.current = projectId
 
   const ensure = useCallback((): void => {
-    if (!projectId || cache.current.has(projectId)) return
-    setLoading(true)
+    if (!projectId || cache.current.has(projectId) || walking.has(projectId)) return
+    const started = generation.current.get(projectId) ?? 0
+    setWalking((was) => new Set(was).add(projectId))
     void ask(() => commands.projectFiles(projectId, null)).then((asked) => {
+      setWalking((was) => {
+        const next = new Set(was)
+        next.delete(projectId)
+        return next
+      })
       const found: Cached = { paths: asked.data?.paths ?? [], partial: asked.data?.partial ?? false, at: Date.now() }
+      if ((generation.current.get(projectId) ?? 0) !== started) return
       cache.current.set(projectId, found)
       if (current.current !== projectId) return
       setEntry(found)
-      setLoading(false)
     })
-  }, [projectId])
+  }, [projectId, walking])
 
   return { paths: entry?.paths ?? null, partial: entry?.partial ?? false, loading, ensure }
 }

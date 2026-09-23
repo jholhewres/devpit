@@ -60,7 +60,6 @@ pub(crate) fn file_write_now(
     }
 
     written_whole(&resolved, text.as_bytes()).map_err(|err| RpcError::internal(err.to_string()))?;
-    crate::filetree::forget_status(&root);
 
     Ok(FileSaved {
         bytes: text.len() as f64,

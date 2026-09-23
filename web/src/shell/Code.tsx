@@ -104,9 +104,24 @@ export function Code({
      work over the whole file, and done on every keystroke they made typing
      in a large one lag. React draws the field first and these when it can,
      dropping the ones a newer keystroke already replaced. */
-  const shown = useDeferredValue(text)
+  const deferred = useDeferredValue(text)
+  /* Only where it pays: in a small file the painted letters trailing the
+     caret by a render is a flicker for nothing. */
+  const shown = text.length > 50_000 ? deferred : text
   const lines = useMemo(() => numbered(shown), [shown])
   const painted = useMemo(() => <Painted text={shown} language={language} />, [shown, language])
+
+  /* The painting and the gutter scroll with the field, but only when it
+     scrolls; a deferred painting that grows afterwards is put back level. */
+  useLayoutEffect(() => {
+    const box = field.current
+    if (!box) return
+    if (behind.current) {
+      behind.current.scrollTop = box.scrollTop
+      behind.current.scrollLeft = box.scrollLeft
+    }
+    if (gutter.current) gutter.current.scrollTop = box.scrollTop
+  }, [shown])
 
   useLayoutEffect(() => {
     const box = field.current

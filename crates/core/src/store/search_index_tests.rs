@@ -134,7 +134,7 @@ fn a_deleted_transcript_leaves_the_index() {
         .expect("index");
     }
 
-    let dropped = forget_missing(conn, "prj_1", &["/i/p/kept.jsonl".to_owned()]).expect("forget");
+    let dropped = forget_missing(conn, "/i/p", &["/i/p/kept.jsonl".to_owned()]).expect("forget");
     assert_eq!(dropped, 1);
     let hits = search(conn, "lexer", Some("prj_1"), 10).expect("search");
     assert_eq!(
@@ -144,4 +144,7 @@ fn a_deleted_transcript_leaves_the_index() {
         ["kept"]
     );
     assert_eq!(recorded(conn, "/i/p/gone.jsonl").expect("read"), None);
+    // Another folder is not touched by a refresh of this one.
+    assert_eq!(forget_missing(conn, "/other/p", &[]).expect("forget"), 0);
+    assert!(recorded(conn, "/i/p/kept.jsonl").expect("read").is_some());
 }

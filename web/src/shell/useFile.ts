@@ -26,7 +26,6 @@ export function useFile(path: string | null): Editing {
   const { project } = useShell()
   const [file, setFile] = useState<FileContents | null>(null)
   const [text, setText] = useState('')
-  const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [clash, setClash] = useState<string | null>(null)
@@ -44,7 +43,6 @@ export function useFile(path: string | null): Editing {
       if (mine !== reading.current) return
       setFile(answer.data ?? null)
       setText(answer.data?.text ?? '')
-      setDirty(false)
       setClash(null)
       setError(answer.error)
     })
@@ -64,7 +62,6 @@ export function useFile(path: string | null): Editing {
                built on, or every save after the first reads as stale — and
                what was saved becomes what "changed" is measured against. */
             setFile((was) => (was ? { ...was, readAt: answer.data!.readAt, text: saved } : was))
-            setDirty(false)
             setClash(null)
             setError(null)
           } else if (answer.code === 'conflict') {
@@ -80,6 +77,11 @@ export function useFile(path: string | null): Editing {
     [project, path, text],
   )
 
+  /* Worked out, not kept: typing while a save is on its way leaves the file
+     unsaved, and a flag cleared by the save said otherwise — a tab that
+     closed without asking and lost what was typed. */
+  const dirty = file !== null && text !== (file.text ?? '')
+
   return {
     file,
     text,
@@ -87,10 +89,7 @@ export function useFile(path: string | null): Editing {
     error,
     saving,
     clash,
-    change: (next: string) => {
-      setText(next)
-      setDirty(next !== (file?.text ?? ''))
-    },
+    change: setText,
     save: () => write(file?.readAt ?? 0),
     reload: load,
     /* Zero means "built on no read", which `is_stale` lets through. That is

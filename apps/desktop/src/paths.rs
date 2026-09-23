@@ -52,7 +52,6 @@ pub(crate) fn path_create_now(
 ) -> Result<ProjectTree, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_core::paths::create(&root, &path, folder).map_err(refused)?;
-    crate::filetree::forget_status(&root);
     project_tree_now(project_id, worktree_id, String::new())
 }
 
@@ -77,7 +76,6 @@ pub(crate) fn path_move_now(
 ) -> Result<ProjectTree, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_core::paths::move_to(&root, &from, &to).map_err(refused)?;
-    crate::filetree::forget_status(&root);
     project_tree_now(project_id, worktree_id, String::new())
 }
 
@@ -103,6 +101,5 @@ pub(crate) fn path_delete_now(
 ) -> Result<ProjectTree, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_core::paths::remove(&root, &path).map_err(refused)?;
-    crate::filetree::forget_status(&root);
     project_tree_now(project_id, worktree_id, String::new())
 }

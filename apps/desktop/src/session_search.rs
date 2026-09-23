@@ -69,22 +69,29 @@ pub(crate) fn refresh(
 ) -> Result<(), RpcError> {
     let conn = store.conn();
     let folder = devpit_agentcli::outside::folder_name(root);
-    let mut present: Vec<String> = Vec::new();
     for installation in installations {
         let dir = installation.join("projects").join(&folder);
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
+        // A folder that is not there holds nothing; one that could not be
+        // read is left as the index has it.
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                search_index::forget_missing(conn, &dir.display().to_string(), &[])?;
+                continue;
+            }
+            Err(_) => continue,
         };
+        let mut present: Vec<String> = Vec::new();
         for path in entries
             .filter_map(Result::ok)
             .map(|entry| entry.path())
             .filter(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
         {
+            let key = path.display().to_string();
+            present.push(key.clone());
             let Some((size, mtime)) = size_and_mtime(&path) else {
                 continue;
             };
-            let key = path.display().to_string();
-            present.push(key.clone());
             if !search_index::stale(search_index::recorded(conn, &key)?, size, mtime) {
                 continue;
             }
@@ -108,8 +115,8 @@ pub(crate) fn refresh(
                     .collect::<Vec<_>>(),
             )?;
         }
+        search_index::forget_missing(conn, &dir.display().to_string(), &present)?;
     }
-    search_index::forget_missing(conn, project_id, &present)?;
     Ok(())
 }
 

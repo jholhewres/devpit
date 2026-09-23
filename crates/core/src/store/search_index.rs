@@ -78,22 +78,30 @@ pub fn replace_file(
     Ok(())
 }
 
-/// Drops what the index holds for this project's transcripts that are no
-/// longer on disk, so a hit never points at a conversation that was deleted.
-/// `present` is every transcript path the refresh just found.
+/// Drops what the index holds under `folder` — one installation's folder of
+/// one project's transcripts, read in full just now — for files no longer in
+/// it, so a hit never points at a conversation that was deleted.
+///
+/// Scoped to a folder that was read, never to a project: an installation that
+/// could not be read this time keeps its index rather than losing it to a
+/// passing error. Found through `session_file`'s key, not the text table.
 pub fn forget_missing(
     conn: &Connection,
-    project: &str,
+    folder: &str,
     present: &[String],
 ) -> Result<usize, StoreError> {
+    let prefix = format!("{}/", folder.trim_end_matches('/'));
     let mut statement =
-        conn.prepare("SELECT DISTINCT path FROM session_text WHERE project = ?1")?;
+        conn.prepare("SELECT path FROM session_file WHERE path >= ?1 AND path < ?2")?;
     let known: Vec<String> = statement
-        .query_map(params![project], |row| row.get(0))?
+        .query_map(params![prefix, format!("{prefix}\u{10FFFF}")], |row| {
+            row.get(0)
+        })?
         .collect::<Result<_, _>>()?;
+    let present: std::collections::HashSet<&str> = present.iter().map(String::as_str).collect();
     let gone: Vec<&String> = known
         .iter()
-        .filter(|path| !present.contains(path))
+        .filter(|path| !present.contains(path.as_str()))
         .collect();
     if gone.is_empty() {
         return Ok(0);
