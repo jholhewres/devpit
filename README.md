@@ -138,7 +138,8 @@ toll gate.
 
 ## Requirements
 
-- **Linux**, X11 or Wayland. macOS and Windows are not built yet.
+- **Linux**, X11 or Wayland, is the build. macOS has a universal build that is
+  not signed or notarised (see [By hand](#by-hand)); Windows is not built yet.
 - **`tmux`**. Terminals are tmux panes, which is how they outlive the window.
 - **[Claude Code](https://claude.com/claude-code)** (`claude` on your PATH).
   Chat, agent steps and session steps all run through it; it is the only CLI

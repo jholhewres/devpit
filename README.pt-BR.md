@@ -140,7 +140,8 @@ trabalho, não uma cancela.
 
 ## Requisitos
 
-- **Linux**, X11 ou Wayland. macOS e Windows ainda não são construídos.
+- **Linux**, X11 ou Wayland, é o build. macOS tem um build universal sem
+  assinatura nem notarização; Windows ainda não é construído.
 - **`tmux`**. Os terminais são painéis do tmux, e é por isso que eles
   sobrevivem à janela.
 - **[Claude Code](https://claude.com/claude-code)** (`claude` no PATH). Chat,
