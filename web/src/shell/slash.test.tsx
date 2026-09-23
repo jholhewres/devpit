@@ -45,6 +45,19 @@ describe('the slash menu', () => {
     expect(setPrompt).toHaveBeenCalledWith('/compact ')
   })
 
+  /* The CLI calls /resume terminal-only, so the chat never offered it; it is
+     devpit's own now, and opens the picker instead of reaching the CLI. */
+  it('offers /resume, and picking it opens the picker instead of typing it', async () => {
+    const setPrompt = vi.fn()
+    const { result } = renderHook(() => useSlash('claude', '/res', setPrompt))
+    await waitFor(() => expect(result.current.items).toEqual(['resume']))
+    act(() => result.current.choose('resume'))
+    expect(setPrompt).toHaveBeenCalledWith('')
+    expect(result.current.own).toBe('resume')
+    act(() => result.current.closeOwn())
+    expect(result.current.own).toBeNull()
+  })
+
   it('does not take Enter when nothing matches, so the message still sends', async () => {
     const { result } = renderHook(() => useSlash('claude', 'hello', vi.fn()))
     await waitFor(() => expect(result.current.items).toEqual([]))
@@ -54,7 +67,7 @@ describe('the slash menu', () => {
 
   it('draws the items and picks on press', () => {
     const choose = vi.fn()
-    render(<SlashMenu slash={{ items: ['compact', 'clear'], at: 1, choose, keyDown: () => false }} />)
+    render(<SlashMenu slash={{ items: ['compact', 'clear'], at: 1, choose, keyDown: () => false, own: null, closeOwn: vi.fn() }} />)
     expect(screen.getByRole('option', { name: '/clear' }).getAttribute('aria-selected')).toBe('true')
     fireEvent.mouseDown(screen.getByRole('option', { name: '/compact' }))
     expect(choose).toHaveBeenCalledWith('compact')

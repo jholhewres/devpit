@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
-import { matching, picked, slashQuery } from './slash'
+import { matching, offeredWith, OWN, picked, slashQuery } from './slash'
 import { abandoned, committed } from './typing'
 
 /*
@@ -17,23 +17,32 @@ export interface Slash {
   readonly at: number
   choose: (command: string) => void
   keyDown: (event: React.KeyboardEvent) => boolean
+  /** One of devpit's own commands (`slash.OWN`), chosen and still open. */
+  readonly own: string | null
+  closeOwn: () => void
 }
 
 export function useSlash(profileId: string | null, prompt: string, setPrompt: (next: string) => void): Slash {
+  /* devpit's own commands are done here, not sent to the CLI. */
+  const [own, setOwn] = useState<string | null>(null)
   const [known, setKnown] = useState<readonly string[]>([])
   const [at, setAt] = useState(0)
   const [dismissed, setDismissed] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!profileId) return setKnown([])
-    void ask(() => commands.chatSlashCommands(profileId)).then((answer) => setKnown(answer.data ?? []))
+    if (!profileId) return setKnown(OWN)
+    void ask(() => commands.chatSlashCommands(profileId)).then((answer) => setKnown(offeredWith(answer.data ?? [])))
   }, [profileId])
 
   const query = slashQuery(prompt)
   const items = query === null || prompt === dismissed ? [] : matching(known, query)
   useEffect(() => setAt(0), [query])
 
-  const choose = (command: string): void => setPrompt(picked(command))
+  const choose = (command: string): void => {
+    if (!OWN.includes(command)) return setPrompt(picked(command))
+    setPrompt('')
+    setOwn(command)
+  }
 
   const keyDown = (event: React.KeyboardEvent): boolean => {
     if (items.length === 0) return false
@@ -56,5 +65,5 @@ export function useSlash(profileId: string | null, prompt: string, setPrompt: (n
     return false
   }
 
-  return { items, at, choose, keyDown }
+  return { items, at, choose, keyDown, own, closeOwn: () => setOwn(null) }
 }

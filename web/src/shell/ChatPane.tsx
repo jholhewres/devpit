@@ -14,6 +14,7 @@ import { PaneCorner } from './PaneCorner'
 import { picturesTo } from './pasting'
 import { Turn } from './Turn'
 import { SkillPills } from './SkillPills'
+import { ResumePicker } from './ResumePicker'
 import { SlashMenu } from './SlashMenu'
 import { useChat } from './useChat'
 import { useSlash } from './useSlash'
@@ -191,6 +192,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           </div>
 
           <ChatWhere />
+          {slash.own === 'resume' && <ResumePicker onClose={slash.closeOwn} />}
         </div>
       </div>
     </>

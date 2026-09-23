@@ -28,3 +28,14 @@ export function matching(commands: readonly string[], query: string): readonly s
 /* The composer's text once a command is picked: the command and a space, so
    its arguments can follow without another keystroke. */
 export const picked = (command: string): string => `/${command} `
+
+/* Commands devpit answers itself, offered first. `/resume` is one: the CLI
+   lists it as a terminal-only command, which the chat leaves out, so a chat
+   had no way back into an earlier conversation from where you type. */
+export const OWN: readonly string[] = ['resume']
+
+/* The menu's list: devpit's own, then the CLI's, once each. */
+export const offeredWith = (cli: readonly string[]): readonly string[] => [
+  ...OWN,
+  ...cli.filter((one) => !OWN.includes(one)),
+]
