@@ -97,10 +97,20 @@ export function Leaf({
     /* A resize sent while the attach is still being claimed is refused; it is
        asked again shortly, a few times, rather than lost. */
     let retries = 0
+    /* The grid follows the box at once; the pty hears about it once the box
+       has stopped moving. A split animating open is a dozen sizes in a few
+       frames, and each one is a SIGWINCH the agent answers by redrawing —
+       Claude Code clears its screen to do that, and a burst of them left it
+       blank or drawn at a size already gone. */
+    let settling: ReturnType<typeof setTimeout> | undefined
     const refit = (): void => {
       if (box.clientWidth >= 2 && box.clientHeight >= 2) fit.fit()
+      clearTimeout(settling)
+      settling = setTimeout(tell, 60)
+    }
+    const tell = (): void => {
       const { rows, cols } = terminal
-      if (!live || (told?.rows === rows && told.cols === cols)) return
+      if (dropped || !live || (told?.rows === rows && told.cols === cols)) return
       told = { rows, cols }
       void live.resize(rows, cols).then((applied) => {
         /* The pty clamps; the grid follows what it actually got. */
@@ -184,6 +194,7 @@ export function Leaf({
 
     return () => {
       dropped = true
+      clearTimeout(settling)
       setTerm(null)
       themed.disconnect()
       watch.disconnect()
