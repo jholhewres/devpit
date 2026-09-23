@@ -14,9 +14,9 @@ function Rail({ onDrop, onClick }: { onDrop: (grab: Grab, spot: Spot) => void; o
       <button data-drop="project" data-key="a" onPointerDown={drag.press({ kind: 'project', id: 'a' })} onClick={() => drag.clicked() && onClick()}>
         a
       </button>
-      <button data-drop="group" data-key="Work">
+      <div data-drop="group" data-key="Work">
         Work
-      </button>
+      </div>
     </div>
   )
 }

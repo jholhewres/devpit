@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 
 import type { Commit } from '../gen/bindings'
-import { appended, byDay, matches, since, subjectOf } from './history'
+import { appended, byDay, matches, since, subjectOf } from './commitLog'
 import { ask, commands } from './live'
 import { Skeleton } from './Skeleton'
 import { CHANGED } from './useTree'

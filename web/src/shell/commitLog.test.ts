@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Commit } from '../gen/bindings'
-import { appended, byDay, dayOf, matches, since, subjectOf } from './history'
+import { appended, byDay, dayOf, matches, since, subjectOf } from './commitLog'
 
 const commit = (sha: string, committedAt: number | null, subject = 'fix: x'): Commit => ({ sha, subject, author: 'Jhol', committedAt })
 
