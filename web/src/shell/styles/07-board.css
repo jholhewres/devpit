@@ -134,6 +134,8 @@
 .undo { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 14px; padding: 7px 8px 7px 14px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 12px 30px var(--shade); font-size: 12.5px; color: var(--text); animation: rise 180ms ease-out both; }
 .undo__b { padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 550; color: var(--accent); }
 .undo__b:hover { background: var(--overlay-strong); }
+/* The same place says why something asked for did not happen (`Problem`). */
+.undo[role='alert'] { border-color: color-mix(in srgb, var(--danger) 45%, var(--border-strong)); }
 
 body[data-dragging='true'] { cursor: grabbing; }
 body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
@@ -170,3 +172,6 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 /* A tile here is not dragged: it goes somewhere. */
 .mgr__tile { cursor: pointer; border-left: 2px solid var(--tile-accent, var(--border)); }
 .mgr__who { display: block; margin-bottom: 5px; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
+/* A refusal sits above the board's undo rather than on it: the undo has a
+   timer, and a reason covering its button would spend it. */
+.undo[role='alert'] { bottom: 70px; }

@@ -5,6 +5,7 @@ import type { Commit } from '../gen/bindings'
 import { appended, byDay, matches, since, subjectOf } from './commitLog'
 import { ask, commands } from './live'
 import { CommitMenu, type CommitAt } from './CommitMenu'
+import { menuPoint } from './menuRules'
 import { Skeleton } from './Skeleton'
 import { CHANGED } from './useTree'
 import { useShell } from './useShell'
@@ -141,7 +142,7 @@ export function History(): React.JSX.Element {
                 onClick={() => openCommit(commit)}
                 onContextMenu={(event) => {
                   event.preventDefault()
-                  setMenu({ commit, x: event.clientX, y: event.clientY })
+                  setMenu({ commit, ...menuPoint(event) })
                 }}
               >
                 <span className="hist__top">

@@ -61,6 +61,10 @@ export function useMention(
       return true
     }
     if (abandoned(event)) {
+      /* The menu's Escape: it closes the menu and goes no further, where a
+         second one would arm the stop of the agent behind the field. */
+      event.preventDefault()
+      event.stopPropagation()
       setDismissed(prompt)
       return true
     }

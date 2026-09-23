@@ -1,8 +1,10 @@
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useState } from 'react'
 
 import { ask, commands } from './live'
 import type { ActionId } from './fileMenu'
 import { useShell } from './useShell'
+import { went } from './problems'
 import { changed } from './useTree'
 
 /*
@@ -49,11 +51,19 @@ export function useFileActions(onActed: () => void): FileActions {
     onActed()
     if (!act || !path) return
     if (act === 'open') {
+      /* A folder opens where it is, in the tree; only a file is a tab. */
+      const row = document.querySelector<HTMLElement>(`[data-ctx="file"][data-path="${CSS.escape(path)}"]`)
+      if (row?.dataset.kind === 'folder') {
+        if (row.getAttribute('aria-expanded') !== 'true') row.click()
+        return
+      }
       shell.show('file', { id: `file:${path}`, path, title: path.split('/').pop() })
       return
     }
     if (act === 'copyPath') {
-      void navigator.clipboard?.writeText(path)
+      /* Through the app: WebKitGTK's own clipboard is not one other programs
+         read reliably. */
+      void writeText(path).catch(() => went({ error: 'the path could not be copied' }))
       return
     }
     if (act === 'newFile' || act === 'newFolder') {
@@ -68,7 +78,7 @@ export function useFileActions(onActed: () => void): FileActions {
       setDeleting(path)
       return
     }
-    if (root) void ask(() => commands.pathReveal(`${root}/${path}`))
+    if (root) void ask(() => commands.pathReveal(`${root}/${path}`)).then(went)
   }
 
   const close = (): void => {
@@ -84,7 +94,10 @@ export function useFileActions(onActed: () => void): FileActions {
     const folder = naming.folder
     const project = shell.project.id
     close()
-    void ask(() => commands.pathCreate(project, null, full, folder)).then(changed)
+    void ask(() => commands.pathCreate(project, null, full, folder)).then((answer) => {
+      went(answer)
+      changed()
+    })
   }
 
   /* Rename is `path.move` with both ends in one folder — the backend makes no
@@ -96,7 +109,10 @@ export function useFileActions(onActed: () => void): FileActions {
     const from = renaming
     const project = shell.project.id
     close()
-    void ask(() => commands.pathMove(project, null, from, to)).then(changed)
+    void ask(() => commands.pathMove(project, null, from, to)).then((answer) => {
+      went(answer)
+      changed()
+    })
   }
 
   const destroy = (): void => {
@@ -104,7 +120,10 @@ export function useFileActions(onActed: () => void): FileActions {
     const path = deleting
     const project = shell.project.id
     close()
-    void ask(() => commands.pathDelete(project, null, path)).then(changed)
+    void ask(() => commands.pathDelete(project, null, path)).then((answer) => {
+      went(answer)
+      changed()
+    })
   }
 
   return { run, naming, renaming, deleting, close, create, rename, destroy }

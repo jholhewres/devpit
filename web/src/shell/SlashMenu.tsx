@@ -1,4 +1,5 @@
 import type { Slash } from './useSlash'
+import { intoView } from './intoView'
 
 /* The commands matching what was typed after `/`, above the field. */
 export function SlashMenu({ slash }: { slash: Slash }): React.JSX.Element | null {
@@ -11,6 +12,7 @@ export function SlashMenu({ slash }: { slash: Slash }): React.JSX.Element | null
           className="slash__i"
           role="option"
           aria-selected={index === slash.at}
+          ref={index === slash.at ? intoView : undefined}
           // Down, not click: a click moves focus out of the field first.
           onMouseDown={(event) => {
             event.preventDefault()

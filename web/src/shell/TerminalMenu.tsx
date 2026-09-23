@@ -1,11 +1,9 @@
 import type { Terminal } from '@xterm/xterm'
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
 
 import { Clipboard, Close, Columns, Copy, Plus, Rows, SelectAll } from './GitIcons'
+import { Menu, MenuItem, MenuRule } from './Menu'
 import { SHORTCUTS } from './shortcuts'
 import { clipboardLabels, copySelection, pasteClipboard } from './terminalClipboard'
-import { abandoned } from './typing'
 
 /*
  * A terminal's right-click, in Orca's order: what to do with text first, then
@@ -42,72 +40,34 @@ export function TerminalMenu({
   /** Absent for the only pane of a tab, which already has a tab of its own. */
   onSeparate?: () => void
 }): React.JSX.Element {
-  const menu = useRef<HTMLDivElement>(null)
   const keys = clipboardLabels()
-
-  /* Opened near an edge, nudged back inside rather than drawn half off. */
-  useLayoutEffect(() => {
-    const el = menu.current
-    if (!el) return
-    const box = el.getBoundingClientRect()
-    el.style.left = `${Math.min(at.x, window.innerWidth - box.width - 8)}px`
-    el.style.top = `${Math.min(at.y, window.innerHeight - box.height - 8)}px`
-  }, [at])
-
-  useEffect(() => {
-    const outside = (event: MouseEvent): void => {
-      if (!menu.current?.contains(event.target as Node)) onClose()
-    }
-    const key = (event: KeyboardEvent): void => {
-      if (abandoned(event)) onClose()
-    }
-    document.addEventListener('mousedown', outside, true)
-    document.addEventListener('keydown', key)
-    window.addEventListener('blur', onClose)
-    return () => {
-      document.removeEventListener('mousedown', outside, true)
-      document.removeEventListener('keydown', key)
-      window.removeEventListener('blur', onClose)
-    }
-  }, [onClose])
 
   const run = (act: () => void | Promise<unknown>) => () => {
     onClose()
     void Promise.resolve(act()).finally(() => terminal.focus())
   }
 
-  const item = (label: string, glyph: React.ReactNode, act: () => void | Promise<unknown>, key?: string, disabled = false): React.JSX.Element => (
-    <button className="ctx__i" role="menuitem" disabled={disabled} onClick={run(act)}>
-      <span className="ctx__g">{glyph}</span>
-      {label}
-      {key && <span className="ctx__k">{key}</span>}
-    </button>
-  )
-
-  /* On the body: a pane slides in on a transform, and a fixed box inside a
-     transformed one is placed against the pane, not the window. */
-  return createPortal(
-    <div className="ctx" ref={menu} role="menu" style={{ left: at.x, top: at.y }}>
-      {item('Copy', <Copy />, () => copySelection(terminal), keys.copy, !terminal.hasSelection())}
-      {item('Select All', <SelectAll />, () => terminal.selectAll())}
-      {item('Paste', <Clipboard />, () => pasteClipboard(terminal, projectId).then(onFailed), keys.paste)}
+  return (
+    <Menu at={at} label="Terminal actions" onClose={onClose}>
+      <MenuItem label="Copy" glyph={<Copy />} keys={keys.copy} disabled={!terminal.hasSelection()} onPick={run(() => copySelection(terminal))} />
+      <MenuItem label="Select all" glyph={<SelectAll />} onPick={run(() => terminal.selectAll())} />
+      <MenuItem label="Paste" glyph={<Clipboard />} keys={keys.paste} onPick={run(() => pasteClipboard(terminal, projectId).then(onFailed))} />
       {onSplit && (
         <>
-          <div className="ctx__rule" />
-          {item('Split Right', <Columns />, () => onSplit('horizontal'), SHORTCUTS.splitRight)}
-          {item('Split Down', <Rows />, () => onSplit('vertical'), SHORTCUTS.splitDown)}
+          <MenuRule />
+          <MenuItem label="Split right" glyph={<Columns />} keys={SHORTCUTS.splitRight} onPick={run(() => onSplit('horizontal'))} />
+          <MenuItem label="Split down" glyph={<Rows />} keys={SHORTCUTS.splitDown} onPick={run(() => onSplit('vertical'))} />
         </>
       )}
       {onBlocks && (
         <>
-          <div className="ctx__rule" />
-          {item('Show as Blocks', <Rows />, onBlocks)}
+          <MenuRule />
+          <MenuItem label="Show as blocks" glyph={<Rows />} onPick={run(onBlocks)} />
         </>
       )}
-      {(onClosePane || onSeparate) && <div className="ctx__rule" />}
-      {onSeparate && item('Move to New Tab', <Plus />, onSeparate)}
-      {onClosePane && item('Close Pane', <Close />, onClosePane)}
-    </div>,
-    document.body,
+      {(onClosePane || onSeparate) && <MenuRule />}
+      {onSeparate && <MenuItem label="Move to new tab" glyph={<Plus />} onPick={run(onSeparate)} />}
+      {onClosePane && <MenuItem label="Close pane" glyph={<Close />} bad onPick={run(onClosePane)} />}
+    </Menu>
   )
 }

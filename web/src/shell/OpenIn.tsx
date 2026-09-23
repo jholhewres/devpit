@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import type { OpenApp } from '../gen/bindings'
 import { useAway } from './away'
 import { ask, commands } from './live'
+import { went } from './problems'
 
 /*
  * "Open in", where a folder is.
@@ -29,7 +30,7 @@ export function OpenIn({
 
   const hand = (app: OpenApp): void => {
     setOpen(false)
-    void ask(() => commands.appsOpen(app.id, path))
+    void ask(() => commands.appsOpen(app.id, path)).then(went)
   }
 
   if (usable.length === 1) {

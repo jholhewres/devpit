@@ -14,6 +14,7 @@ import { guardComposition } from './terminalIme'
 import { picturesAsPaths } from './terminalPaste'
 import { wheelToTmux } from './terminalWheel'
 import { useMarks } from './useMarks'
+import { menuPoint } from './menuRules'
 
 /*
  * One terminal, attached to one pane.
@@ -100,7 +101,7 @@ export function Leaf({
     const menu = (event: MouseEvent): void => {
       event.preventDefault()
       event.stopPropagation()
-      setMenuAt({ x: event.clientX, y: event.clientY })
+      setMenuAt(menuPoint(event))
     }
     box.addEventListener('contextmenu', menu, true)
     const unguard = guardComposition(box, (data) => terminal.input(data, true))

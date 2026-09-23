@@ -8,6 +8,7 @@ import { Bookmark, Copy, Pencil, Search, Undo } from './GitIcons'
 import { ask, commands } from './live'
 import { RailMenu, type RailItem } from './RailMenu'
 import { darkNow, palette } from './terminal'
+import { menuPoint } from './menuRules'
 
 /*
  * One command, as a block: what ran, where, how long, how it ended — and
@@ -116,7 +117,7 @@ export const BlockCard = memo(function BlockCard({
         onClick={() => setOpen(!open)}
         onContextMenu={(event) => {
           event.preventDefault()
-          setMenu({ x: event.clientX, y: event.clientY })
+          setMenu(menuPoint(event))
         }}
       >
         <span className="blk__dot" aria-label={state} />
@@ -138,7 +139,7 @@ export const BlockCard = memo(function BlockCard({
           aria-label="Block actions"
           onClick={(event) => {
             event.stopPropagation()
-            setMenu({ x: event.clientX, y: event.clientY })
+            setMenu(menuPoint(event))
           }}
         >
           ⋯
@@ -204,7 +205,7 @@ export const BlockCard = memo(function BlockCard({
         </div>
       )}
 
-      {menu && <RailMenu at={menu} items={items} onClose={() => setMenu(null)} />}
+      {menu && <RailMenu at={menu} items={items} label="Block actions" onClose={() => setMenu(null)} />}
     </article>
   )
 })

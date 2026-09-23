@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { shortcutFor } from './shortcuts'
+import { SHORTCUTS, shortcutFor } from './shortcuts'
 import { useShell } from './useShell'
 import { abandoned } from './typing'
 
@@ -66,7 +66,7 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
         className="pick"
         aria-haspopup="true"
         aria-expanded={open}
-        title="Switch project (⌘P)"
+        title={`Switch project (${SHORTCUTS.project})`}
         onClick={(event) => {
           event.stopPropagation()
           setQuery('')

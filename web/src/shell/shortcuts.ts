@@ -19,17 +19,23 @@ export type Shortcut =
   | 'focus'
   | 'next'
 
+/* ⌘ on a Mac, Ctrl everywhere else: a Linux title that printed ⌘ named a key
+   the keyboard does not have. */
+const mac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
+const key = (letter: string, shift = false): string =>
+  mac ? `${shift ? '⇧' : ''}⌘${letter}` : `Ctrl+${shift ? 'Shift+' : ''}${letter}`
+
 /** How each one is written where it is announced, exactly as a title prints it. */
 export const SHORTCUTS: Readonly<Record<Shortcut, string>> = {
-  palette: '⌘K',
-  terminal: '⌘T',
-  chat: '⌘N',
-  project: '⌘P',
-  settings: '⌘,',
-  splitRight: '⇧⌘D',
-  splitDown: '⇧⌘E',
-  focus: '⇧⌘F',
-  next: '⇧⌘N',
+  palette: key('K'),
+  terminal: key('T'),
+  chat: key('N'),
+  project: key('P'),
+  settings: key(','),
+  splitRight: key('D', true),
+  splitDown: key('E', true),
+  focus: key('F', true),
+  next: key('N', true),
 }
 
 const PLAIN: Readonly<Record<string, Shortcut>> = {

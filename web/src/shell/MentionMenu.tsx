@@ -1,4 +1,5 @@
 import type { MentionMenu as Menu } from './useMention'
+import { intoView } from './intoView'
 
 /* The project's files matching what was typed after `@`, above the field —
    the slash menu's place and look, since only one is ever open. */
@@ -14,6 +15,7 @@ export function MentionMenu({ menu }: { menu: Menu }): React.JSX.Element | null 
             className="slash__i mention__i"
             role="option"
             aria-selected={index === menu.at}
+            ref={index === menu.at ? intoView : undefined}
             onMouseDown={(event) => {
               event.preventDefault()
               menu.choose(path)

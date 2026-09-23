@@ -7,6 +7,7 @@ import { SessionRows } from './SessionRowsView'
 import { Threads } from './Threads'
 import { useKit } from './useKit'
 import { useShell, type PrefsPane } from './useShell'
+import { SHORTCUTS } from './shortcuts'
 
 /*
  * The left column: what you start, what is running, and who you are.
@@ -66,12 +67,12 @@ export function Sidebar({
               <button className="newmenu__item" role="menuitem" onClick={() => open('chat')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" /></svg></span>
                 <span className="newmenu__label">Chat</span>
-                <span className="newmenu__key">&#8984;N</span>
+                <span className="newmenu__key">{SHORTCUTS.chat}</span>
               </button>
               <button className="newmenu__item" role="menuitem" onClick={() => open('term')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m4 17 6-6-6-6M12 19h8" /></svg></span>
                 <span className="newmenu__label">Terminal</span>
-                <span className="newmenu__key">&#8984;T</span>
+                <span className="newmenu__key">{SHORTCUTS.terminal}</span>
               </button>
               {/* Beside Chat and Terminal because it is that kind of thing:
                   something you open to work in, not a panel about the
@@ -86,7 +87,7 @@ export function Sidebar({
               <button className="newmenu__item" role="menuitem" onClick={() => open('board')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
                 <span className="newmenu__label">Card on the board</span>
-                <span className="newmenu__key">&#8984;&#8679;N</span>
+                <span className="newmenu__key">{SHORTCUTS.next}</span>
               </button>
             </div>
           </div>

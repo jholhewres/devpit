@@ -1,6 +1,5 @@
 import type { SessionEntry } from './sessionMenu'
 import { keyLabel } from './tileKeys'
-import { moved } from './wsbrowse'
 
 /*
  * A card's menu, as data, so `wired` can count it.
@@ -37,13 +36,3 @@ export const cardMenu = (hands: CardHands): readonly SessionEntry[] => [
   { label: 'Archive', key: keyLabel('archive'), run: hands.archive },
   { label: 'Delete…', bad: true, run: hands.remove },
 ]
-
-/** Which entry an arrow key, Home or End lands on from entry `at`, or null for
- *  a key the menu leaves alone. */
-export function menuFocus(key: string, at: number, count: number): number | null {
-  if (count === 0) return null
-  if (key === 'Home') return 0
-  if (key === 'End') return count - 1
-  if (key === 'ArrowDown' || key === 'ArrowUp') return moved(at, key === 'ArrowDown' ? 1 : -1, count)
-  return null
-}

@@ -46,8 +46,15 @@ describe('every shortcut the window announces', () => {
     expect(announced().filter(({ combo }) => !known.has(combo))).toEqual([])
   })
 
+  /* Announced through the map (`SHORTCUTS.chat`) now, so a Linux title says
+     Ctrl: what is counted is the screens that read it, plus any literal left. */
   it('is announced somewhere at all, or this guard is checking nothing', () => {
-    expect(announced().length).toBeGreaterThanOrEqual(4)
+    const reads = shipped
+      .filter((name) => name !== 'shortcuts.ts')
+      .map(text)
+      .join('\n')
+      .match(/SHORTCUTS\.\w+/g)
+    expect(announced().length + (reads?.length ?? 0)).toBeGreaterThanOrEqual(4)
   })
 
   /* The other half of the drift: a key in the map that no screen reads. */

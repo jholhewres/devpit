@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 
 import { AddProject } from './AddProject'
 import { ask, commands } from './live'
+import { Problem } from './Problem'
 import { RemoveProject } from './RemoveProject'
 import { ManagerPane } from './ManagerPane'
 import { SignIn } from './SignIn'
@@ -58,6 +59,7 @@ export function Overlays({
         </Suspense>
       )}
       <UpdateCard />
+      <Problem />
       {palette && (
         <Suspense fallback={null}>
           <Palette onClose={closePalette} />

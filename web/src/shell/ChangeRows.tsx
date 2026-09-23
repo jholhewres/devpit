@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 
 import type { Change } from '../gen/bindings'
+import { ChangeMenu } from './ChangeMenu'
+import { menuPoint } from './menuRules'
 import { bare, foldered, folders, paths, type Node } from './changeTree'
 import { FileGlyph } from './FileGlyph'
 import { Minus, Plus, Trash, Undo } from './GitIcons'
@@ -50,6 +52,7 @@ export function ChangeRows({
     [changes, view],
   )
   const [shut, setShut] = useState<ReadonlySet<string>>(() => new Set())
+  const [menu, setMenu] = useState<{ change: Change; x: number; y: number } | null>(null)
 
   const rows = (nodes: readonly Node[], depth: number): React.JSX.Element[] =>
     nodes.flatMap((node) => {
@@ -62,6 +65,10 @@ export function ChangeRows({
             className="gitrow gitrow--file"
             key={change.path}
             aria-current={change.path === onScreen ? 'true' : undefined}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              setMenu({ change, ...menuPoint(event) })
+            }}
           >
             <button className="gitrow__open" style={pad} onClick={() => onOpen(change.path)}>
               {/* Coloured by the git status, so the shape says what kind of
@@ -164,6 +171,18 @@ export function ChangeRows({
         </button>
       )}
       {rows(tree, 0)}
+      {menu && (
+        <ChangeMenu
+          change={menu.change}
+          at={menu}
+          staged={staged}
+          busy={busy}
+          onOpen={onOpen}
+          onStage={onStage}
+          onDiscard={onDiscard}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </>
   )
 }

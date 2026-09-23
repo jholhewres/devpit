@@ -11,6 +11,7 @@ import { ordered, placed, saveGroups, savedGroups, saveOrder, savedOrder, saveSh
 import { remembered } from './tabs'
 import { useRailDrag, type Grab, type Spot } from './useRailDrag'
 import { useShell } from './useShell'
+import { menuPoint } from './menuRules'
 
 /*
  * Every project, one icon each, down the left edge.
@@ -189,7 +190,7 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                       onContextMenu={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
-                        setMenu({ x: event.clientX, y: event.clientY, items: projectMenu(one) })
+                        setMenu({ ...menuPoint(event), items: projectMenu(one) })
                       }}
                     >
                       <span className="rail__pill" />

@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 
 import type { Card, Played } from '../gen/bindings'
 import { CardEnding, deleteBody, type Ending } from './CardHeader'
-import { cardMenu, menuFocus } from './cardMenu'
+import { cardMenu } from './cardMenu'
+import { claimMenu, menuFocus } from './menuRules'
 import { RunConfirm } from './Lane'
 import { LanePicker } from './LanePicker'
 import { abandoned } from './typing'
@@ -73,17 +74,23 @@ export function CardMenu({
 
   useEffect(() => {
     if (!listing) return
-    const away = (event: PointerEvent): void => {
+    /* One menu at a time, like every other menu (`claimMenu`), and closed by
+       a right-click elsewhere as well as a click. */
+    const release = claimMenu(onClose)
+    const away = (event: Event): void => {
       if (!box.current?.contains(event.target as Node)) onClose()
     }
     const key = (event: KeyboardEvent): void => {
       if (abandoned(event)) onClose()
     }
-    document.addEventListener('pointerdown', away)
+    document.addEventListener('pointerdown', away, true)
+    document.addEventListener('contextmenu', away, true)
     window.addEventListener('keydown', key)
     window.addEventListener('blur', onClose)
     return () => {
-      document.removeEventListener('pointerdown', away)
+      release()
+      document.removeEventListener('pointerdown', away, true)
+      document.removeEventListener('contextmenu', away, true)
       window.removeEventListener('keydown', key)
       window.removeEventListener('blur', onClose)
     }

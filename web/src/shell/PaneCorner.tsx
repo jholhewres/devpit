@@ -1,4 +1,5 @@
 import { useShell } from './useShell'
+import { SHORTCUTS } from './shortcuts'
 
 /*
  * What a pane can do, as a few icons in its corner rather than a title bar.
@@ -70,10 +71,10 @@ export function PaneCorner({
       </button>
       {onSplit && (
         <>
-          <button className="sq26" aria-label="Split right" title="Split right (⇧⌘D)" onClick={() => onSplit('horizontal')}>
+          <button className="sq26" aria-label="Split right" title={`Split right (${SHORTCUTS.splitRight})`} onClick={() => onSplit('horizontal')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M12 4v16" /></svg>
           </button>
-          <button className="sq26" aria-label="Split down" title="Split down (⇧⌘E)" onClick={() => onSplit('vertical')}>
+          <button className="sq26" aria-label="Split down" title={`Split down (${SHORTCUTS.splitDown})`} onClick={() => onSplit('vertical')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 12h18" /></svg>
           </button>
         </>

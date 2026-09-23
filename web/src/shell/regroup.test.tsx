@@ -55,12 +55,12 @@ describe("a terminal's right-click", () => {
   it('moves the pane to a tab of its own', () => {
     const separate = vi.fn()
     menu(separate)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to New Tab' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to new tab' }))
     expect(separate).toHaveBeenCalledOnce()
   })
 
   it('does not offer it for the only pane of a tab', () => {
     menu()
-    expect(screen.queryByRole('menuitem', { name: 'Move to New Tab' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Move to new tab' })).toBeNull()
   })
 })

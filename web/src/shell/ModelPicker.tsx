@@ -10,6 +10,7 @@ import { counted, useAccountInfo } from './useAccountInfo'
 import { useInstallations } from './useInstallations'
 import { useShell } from './useShell'
 import type { Profile } from '../gen/bindings'
+import { intoView } from './intoView'
 
 /*
  * Which account and model this conversation runs on.
@@ -213,6 +214,7 @@ export function ModelPicker({
                     role="option"
                     aria-selected={mine}
                     data-at={index === at}
+                    ref={index === at ? intoView : undefined}
                     tabIndex={0}
                     onMouseEnter={() => setAt(index)}
                     onClick={() => choose(row)}

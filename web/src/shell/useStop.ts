@@ -16,7 +16,8 @@ import { isArmed, pressed, same, stops, type Armed } from './stop'
 /** What takes Escape for itself while it is open. `:not([hidden])` because the
     sidebar keeps its menus mounted and hidden, and counting those meant the
     double Escape never armed the stop at all. */
-export const OWNS_ESCAPE = '[role="menu"]:not([hidden]), [role="dialog"]:not([hidden])'
+export const OWNS_ESCAPE =
+  '[role="menu"]:not([hidden]), [role="dialog"]:not([hidden]), [role="listbox"]:not([hidden])'
 
 export function useStop(
   active: boolean,

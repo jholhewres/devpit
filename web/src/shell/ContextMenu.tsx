@@ -1,13 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { FileDialogs } from './FileDialogs'
 import { FILE_MENU } from './fileMenu'
+import { Menu, MenuItem, MenuRule } from './Menu'
+import { menuPoint } from './menuRules'
 import { sessionMenu, type SessionEntry } from './sessionMenu'
 import { joinable } from './strip'
 import { tabMenu, type TabEntry } from './tabMenu'
+import { composing } from './typing'
 import { useFileActions } from './useFileActions'
 import { useShell } from './useShell'
-import { abandoned } from './typing'
 
 /*
  * An item names an action or is not offered.
@@ -31,6 +33,8 @@ type Item = SessionEntry | TabEntry
  */
 const STATIC: Record<string, readonly Item[]> = { file: FILE_MENU }
 
+const NAMES: Record<string, string> = { file: 'File actions', session: 'Session actions', tab: 'Tab actions' }
+
 interface At {
   readonly kind: string
   readonly x: number
@@ -41,10 +45,13 @@ interface At {
   readonly path: string | null
 }
 
+/** The row an event happened on, if it is one with a menu. */
+const rowOf = (target: EventTarget | null): HTMLElement | null =>
+  target instanceof Element ? target.closest<HTMLElement>('[data-ctx]') : null
+
 export function ContextMenu(): React.JSX.Element {
   const { focus, close, sweep, join, open: tabs, setRenaming } = useShell()
   const [at, setAt] = useState<At | null>(null)
-  const menu = useRef<HTMLDivElement>(null)
   const actions = useFileActions(() => setAt(null))
 
   /* Built here because its items act on the shell, which only a component
@@ -59,6 +66,15 @@ export function ContextMenu(): React.JSX.Element {
     }),
   }
 
+  const pick = (item: Item, row: { id: string; path: string | null }): void => {
+    if (item.run) {
+      setAt(null)
+      item.run(row.id)
+      return
+    }
+    actions.run(item.act, row.path)
+  }
+
   useEffect(() => {
     const open = (event: MouseEvent): void => {
       /* A text field keeps the system's menu: cut, copy and paste are the
@@ -66,80 +82,56 @@ export function ContextMenu(): React.JSX.Element {
          to offer in their place. */
       const on = event.target as HTMLElement | null
       if (on?.closest('input, textarea, [contenteditable="true"]')) return
+      /* A right-click on the menu itself leaves it as it is. */
+      if (on?.closest('[role="menu"]')) {
+        event.preventDefault()
+        return
+      }
 
       /* Everywhere else it is off, and unconditionally: a path that forgets
          to preventDefault is a path where Reload and View Source appear. */
       event.preventDefault()
-      const target = on?.closest('[data-ctx]') as HTMLElement | null
+      const target = rowOf(on)
       const kind = target?.dataset.ctx
       setAt(
         kind && (kind === 'session' || kind === 'tab' || STATIC[kind])
-          ? {
-              kind,
-              x: event.clientX,
-              y: event.clientY,
-              id: target?.dataset.id ?? '',
-              path: target?.dataset.path ?? null,
-            }
+          ? { kind, ...menuPoint(event), id: target?.dataset.id ?? '', path: target?.dataset.path ?? null }
           : null,
       )
     }
-    const shut = (): void => setAt(null)
-    const key = (event: KeyboardEvent): void => {
-      if (abandoned(event)) setAt(null)
-    }
     document.addEventListener('contextmenu', open)
-    document.addEventListener('click', shut)
-    document.addEventListener('keydown', key)
-    window.addEventListener('blur', shut)
-    return () => {
-      document.removeEventListener('contextmenu', open)
-      document.removeEventListener('click', shut)
-      document.removeEventListener('keydown', key)
-      window.removeEventListener('blur', shut)
-    }
+    return () => document.removeEventListener('contextmenu', open)
   }, [])
 
-  /* Measured once it is in the document, then nudged back inside — a menu
-     opened near an edge otherwise opens half off screen. */
-  useLayoutEffect(() => {
-    const el = menu.current
-    if (!el || !at) return
-    const box = el.getBoundingClientRect()
-    el.style.left = `${Math.min(at.x, window.innerWidth - box.width - 8)}px`
-    el.style.top = `${Math.min(at.y, window.innerHeight - box.height - 8)}px`
-  }, [at])
-
-  const menuBody = !at ? null : (
-    <div className="ctx" ref={menu} role="menu" style={{ left: at.x, top: at.y }}>
-      {menus[at.kind]?.map((item, index) =>
-        item.rule ? (
-          <div key={index} className="ctx__rule" />
-        ) : (
-          <button
-            key={index}
-            className={item.bad ? 'ctx__i ctx__i--bad' : 'ctx__i'}
-            role="menuitem"
-            onClick={() => {
-              if (item.run) {
-                setAt(null)
-                item.run(at.id)
-                return
-              }
-              actions.run(item.act, at.path)
-            }}
-          >
-            {item.label}
-            {item.key && <span className="ctx__k">{item.key}</span>}
-          </button>
-        ),
-      )}
-    </div>
-  )
+  /* The keys a menu prints beside an entry work on the row without it:
+     F2 on a focused file or session renames it. Every render, since the
+     entries act on this render's shell. */
+  useEffect(() => {
+    const key = (event: KeyboardEvent): void => {
+      if (event.key !== 'F2' || composing(event)) return
+      const row = rowOf(event.target)
+      const item = row && menus[row.dataset.ctx ?? '']?.find((one) => one.key === 'F2')
+      if (!row || !item) return
+      event.preventDefault()
+      pick(item, { id: row.dataset.id ?? '', path: row.dataset.path ?? null })
+    }
+    document.addEventListener('keydown', key)
+    return () => document.removeEventListener('keydown', key)
+  })
 
   return (
     <>
-      {menuBody}
+      {at && (
+        <Menu at={at} label={NAMES[at.kind] ?? 'Actions'} onClose={() => setAt(null)}>
+          {menus[at.kind]?.map((item, index) =>
+            item.rule ? (
+              <MenuRule key={index} />
+            ) : (
+              <MenuItem key={index} label={item.label ?? ''} keys={item.key} bad={item.bad} onPick={() => pick(item, at)} />
+            ),
+          )}
+        </Menu>
+      )}
       <FileDialogs actions={actions} />
     </>
   )

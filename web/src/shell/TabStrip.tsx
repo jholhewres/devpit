@@ -6,6 +6,7 @@ import { Rename } from './Rename'
 import { busyIn, doingIn } from './running'
 import { twice, type Clicked, type Tab } from './strip'
 import { useShell } from './useShell'
+import { SHORTCUTS } from './shortcuts'
 
 /*
  * The strip is the order. A tab is appended when it opens and only moves when
@@ -207,7 +208,7 @@ export function TabStrip(): React.JSX.Element {
           goes to start something, and most of the time the something is an
           agent. A plain terminal is the first row in it, and ⌘T still opens
           one without stopping to ask. */}
-      <button className="tab tab--new" title="Open something new (⌘K)" aria-label="Open something new" onClick={openPalette}>
+      <button className="tab tab--new" title={`Open something new (${SHORTCUTS.palette})`} aria-label="Open something new" onClick={openPalette}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>

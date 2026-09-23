@@ -6,6 +6,7 @@ import { profileFor, scopeOf, sessionInScope, threadInScope, titled, type Scope 
 import { abandoned, committed } from './typing'
 import { named } from './useInstallations'
 import { useShell } from './useShell'
+import { intoView } from './intoView'
 
 /*
  * `/resume` in a chat: every earlier conversation of this project, to pick
@@ -159,6 +160,7 @@ export function ResumePicker({
               className="resume__o"
               role="option"
               aria-selected={index === at}
+              ref={index === at ? intoView : undefined}
               onMouseEnter={() => setAt(index)}
               onClick={() => pick(row)}
             >
