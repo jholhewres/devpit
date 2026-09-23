@@ -33,6 +33,10 @@ pub struct Say<'a> {
     pub fork_at: Option<&'a str>,
     /// What the agent may do without asking. The CLI's own word for it.
     pub permission: Option<&'a str>,
+    /// devpit's hook settings. A supervised turn asks through the
+    /// `PreToolUse` hook, and a turn without it has nobody to ask: the CLI,
+    /// printing rather than talking, refuses every write instead.
+    pub settings: Option<&'a str>,
     /// How hard to think. One of what the driver's `efforts` lists.
     pub effort: Option<&'a str>,
     /// Where the turn's stdin is kept while it runs, for control requests.

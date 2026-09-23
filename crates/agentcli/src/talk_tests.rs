@@ -13,6 +13,7 @@ fn turn(budget: Option<f64>) -> Say<'static> {
         session_id: None,
         fork_at: None,
         permission: None,
+        settings: None,
         effort: None,
         control: None,
         on_session: None,
@@ -73,6 +74,7 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
         session_id: Some("old"),
         fork_at: None,
         permission: None,
+        settings: None,
         effort: None,
         control: None,
         on_session: None,
@@ -154,6 +156,7 @@ fn a_chat_turn_runs_under_its_profile_env() {
         session_id: None,
         fork_at: None,
         permission: None,
+        settings: None,
         effort: None,
         control: None,
         on_session: None,
@@ -177,4 +180,19 @@ fn a_chat_turn_runs_under_its_profile_env() {
         Some("the-profile-account"),
         "the turn did not run under the profile's environment"
     );
+}
+
+/// A supervised turn asks through devpit's `PreToolUse` hook; without the
+/// settings that carry it, the CLI has nobody to ask and refuses every write.
+#[test]
+fn a_turn_carries_devpits_hook_settings_as_one_word() {
+    let with = Say {
+        settings: Some("/home/someone/.devpit/hooks.json"),
+        ..turn(None)
+    };
+    let flags = argv(&with);
+    assert!(flags.contains(&"--settings=/home/someone/.devpit/hooks.json".to_owned()));
+    assert!(!argv(&turn(None))
+        .iter()
+        .any(|a| a.starts_with("--settings")));
 }

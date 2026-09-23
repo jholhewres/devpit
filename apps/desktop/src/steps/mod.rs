@@ -54,7 +54,7 @@ pub(crate) fn fresh_session_id() -> String {
 /// Next to the state rather than in a temp file: a turn that outlives the app
 /// still has a file to read, and a path that changes every run would be a new
 /// file on disk for every card moved.
-fn hook_settings() -> Option<String> {
+pub(crate) fn hook_settings() -> Option<String> {
     let root = Store::root().ok()?;
     let endpoint = devpit_agentcli::endpoint_file(&root);
     let path = root.join("hooks.json");

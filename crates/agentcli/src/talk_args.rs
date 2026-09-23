@@ -38,6 +38,11 @@ pub(crate) fn argv(turn: &Say<'_>) -> Vec<String> {
             argv.push(format!("--resume-session-at={at}"));
         }
     }
+    if let Some(settings) = turn.settings {
+        // `=`, because the flag takes several files: written as two words it
+        // would swallow whatever came after it.
+        argv.push(format!("--settings={settings}"));
+    }
     if let Some(mode) = turn.permission {
         argv.push("--permission-mode".to_owned());
         argv.push(mode.to_owned());

@@ -247,6 +247,7 @@ pub async fn chat_send(
     let control = steering.hold(&conversation_id);
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
     let said = tauri::async_runtime::spawn_blocking(move || {
+        let hooks = crate::steps::hook_settings();
         let checkout = std::path::Path::new(&cwd);
         let before = crate::turn_changes::before(checkout);
         let said = say(
@@ -263,6 +264,7 @@ pub async fn chat_send(
                 session_id: resuming.as_deref(),
                 fork_at: forking.as_deref(),
                 permission: mode.as_deref(),
+                settings: hooks.as_deref(),
                 effort: thinking.as_deref(),
                 control: Some(&control),
                 on_session: Some(&hold),

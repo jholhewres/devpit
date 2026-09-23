@@ -118,3 +118,7 @@
 .gpick__o--new { color: var(--text-3); }
 .gpick__rule { height: 1px; margin: 4px 2px; background: var(--border); }
 .gpick__new { width: 100%; height: 30px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--composer); color: var(--text); font: inherit; font-size: 12.5px; outline: none; }
+/* A project and a group are things you click: the pointer says so, and the
+   grip while one is being dragged. */
+.rail__i, .rail__group, .rail__b { cursor: pointer; }
+.rail__i[data-dragging='true'], .rail__group[data-dragging='true'] { cursor: grabbing; }
