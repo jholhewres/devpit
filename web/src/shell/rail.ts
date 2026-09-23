@@ -74,19 +74,44 @@ export interface Section {
   readonly projects: readonly Project[]
 }
 
-/** The ordered projects, cut into their groups: the ungrouped ones first, then
- *  each group where its first project stands. */
-export function sections(list: readonly Project[]): readonly Section[] {
-  const out: { group: string | null; projects: Project[] }[] = []
+/** The ordered projects, cut into their groups: the ungrouped ones first,
+ *  then the groups in the order the person put them, and any group not
+ *  placed yet where its first project stands. */
+export function sections(list: readonly Project[], groupOrder: readonly string[] = []): readonly Section[] {
   const loose = list.filter((project) => !project.group)
-  if (loose.length > 0) out.push({ group: null, projects: loose })
+  const groups: { group: string; projects: Project[] }[] = []
   for (const project of list) {
     if (!project.group) continue
-    const found = out.find((one) => one.group === project.group)
+    const found = groups.find((one) => one.group === project.group)
     if (found) found.projects.push(project)
-    else out.push({ group: project.group, projects: [project] })
+    else groups.push({ group: project.group, projects: [project] })
   }
-  return out
+  const at = (group: string): number => {
+    const placed = groupOrder.indexOf(group)
+    return placed < 0 ? groupOrder.length + groups.findIndex((one) => one.group === group) : placed
+  }
+  groups.sort((a, b) => at(a.group) - at(b.group))
+  return [...(loose.length > 0 ? [{ group: null, projects: loose }] : []), ...groups]
+}
+
+/* The order of the groups, remembered per window like the order of projects. */
+const GROUPS_KEY = 'devpit.rail.groups'
+
+export function savedGroups(): readonly string[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(GROUPS_KEY) ?? '[]')
+    return Array.isArray(raw) ? raw.filter((one): one is string => typeof one === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function saveGroups(order: readonly string[]): void {
+  try {
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(order))
+  } catch {
+    /* The order still applies for as long as the window is open. */
+  }
 }
 
 /* Which groups are folded, remembered per window. */
@@ -109,8 +134,37 @@ export function saveShut(shut: ReadonlySet<string>): void {
   }
 }
 
-/** What a group shows: all of it when open; folded, only the project in
- *  front, so folding a group never hides where you are. */
-export function shown(section: Section, folded: boolean, current: string | null): readonly Project[] {
-  return folded ? section.projects.filter((project) => project.id === current) : section.projects
+/** What a group shows: all of it when open, nothing when folded. */
+export function shown(section: Section, folded: boolean): readonly Project[] {
+  return folded ? [] : section.projects
+}
+
+/* Whether the rail lists only the projects with tabs open. */
+const ACTIVE_KEY = 'devpit.rail.active'
+
+export function savedActiveOnly(): boolean {
+  try {
+    return localStorage.getItem(ACTIVE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveActiveOnly(on: boolean): void {
+  try {
+    localStorage.setItem(ACTIVE_KEY, on ? '1' : '0')
+  } catch {
+    /* The filter still applies for as long as the window is open. */
+  }
+}
+
+/** The sections cut down to what is active — tabs open, or in front — and
+ *  without the groups that leaves empty. */
+export function activeOnly(
+  cut: readonly Section[],
+  active: (project: Project) => boolean,
+): readonly Section[] {
+  return cut
+    .map((section) => ({ ...section, projects: section.projects.filter(active) }))
+    .filter((section) => section.projects.length > 0)
 }

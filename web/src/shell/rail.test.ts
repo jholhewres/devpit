@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Project } from '../gen/bindings'
-import { hueOf, initials, moved, ordered, sections } from './rail'
+import { activeOnly, hueOf, initials, moved, ordered, sections, shown } from './rail'
 
 const project = (id: string, name = id, group: string | null = null): Project =>
   ({ id, name, group, rootPath: `/w/${name}` }) as unknown as Project
@@ -50,5 +50,35 @@ describe('groups in the rail', () => {
 
   it('has no empty section when every project is in a group', () => {
     expect(sections([project('a', 'a', 'Work')]).map((one) => one.group)).toEqual(['Work'])
+  })
+})
+
+describe('the order of groups', () => {
+  const list = [project('a', 'a', 'Work'), project('b', 'b', 'Home'), project('c')]
+
+  it('follows the order the person gave the groups, ungrouped first', () => {
+    expect(sections(list, ['Home', 'Work']).map((one) => one.group)).toEqual([null, 'Home', 'Work'])
+  })
+
+  it('puts a group nobody placed where its first project stands, after the placed ones', () => {
+    expect(sections(list, ['Home']).map((one) => one.group)).toEqual([null, 'Home', 'Work'])
+    expect(sections(list, []).map((one) => one.group)).toEqual([null, 'Work', 'Home'])
+  })
+
+  it('shows nothing of a folded group', () => {
+    const [work] = sections([project('a', 'a', 'Work')])
+    expect(shown(work!, true)).toEqual([])
+    expect(shown(work!, false).map((one) => one.id)).toEqual(['a'])
+  })
+})
+
+describe('only the active projects', () => {
+  it('keeps what is active and drops the groups left empty', () => {
+    const cut = sections([project('a', 'a', 'Work'), project('b', 'b', 'Home'), project('c')])
+    const kept = activeOnly(cut, (one) => one.id !== 'b')
+    expect(kept.map((one) => [one.group, one.projects.map((p) => p.id)])).toEqual([
+      [null, ['c']],
+      ['Work', ['a']],
+    ])
   })
 })
