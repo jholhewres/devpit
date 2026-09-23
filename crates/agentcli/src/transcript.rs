@@ -12,18 +12,12 @@ use std::path::{Path, PathBuf};
 
 /// Where a session's transcript lives.
 ///
-/// The directory is the working directory with every character that is not a
-/// letter or digit replaced by `-`. A path with dots, slashes and underscores
-/// all collapse the same way.
+/// The folder is named by `outside::folder_name`, the one spelling of the
+/// CLI's rule — the readers and this writer used to disagree about `_`.
 pub fn transcript_path(home: &Path, cwd: &Path, session_id: &str) -> PathBuf {
-    let slug: String = cwd
-        .to_string_lossy()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-        .collect();
     home.join(".claude")
         .join("projects")
-        .join(slug)
+        .join(crate::outside::folder_name(cwd))
         .join(format!("{session_id}.jsonl"))
 }
 
