@@ -160,3 +160,22 @@ pub struct ReadCommand {
     pub args: Vec<String>,
     pub env: Vec<EnvVar>,
 }
+
+/// Whether a CLI configuration directory holds a sign-in.
+///
+/// Three answers, because on macOS the sign-in lives in the Keychain and the
+/// directory cannot say either way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Credentials {
+    Saved,
+    Missing,
+    Unknown,
+}
+
+/// `agent.signed_in`'s answer. An object, so the next field has somewhere to go.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedIn {
+    pub state: Credentials,
+}

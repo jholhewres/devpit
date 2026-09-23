@@ -12,6 +12,8 @@
 
 use std::path::{Path, PathBuf};
 
+use devpit_rpc::Credentials;
+
 /// The configuration directory, given a home and what an environment says.
 ///
 /// Takes the value rather than reading it so the rule can be tested without a
@@ -36,6 +38,19 @@ pub fn config_dir_of(home: &Path, env: &[(String, String)], inherited: Option<&s
         .find(|(name, _)| name == "CLAUDE_CONFIG_DIR")
         .map(|(_, value)| value.as_str());
     config_dir_from(home, own.or(inherited))
+}
+
+/// Whether `dir` holds a sign-in: `.credentials.json`, which is where the CLI
+/// keeps it everywhere but macOS. Only asks that the file exists.
+pub fn sign_in_at(dir: &Path) -> Credentials {
+    if cfg!(target_os = "macos") {
+        return Credentials::Unknown;
+    }
+    if dir.join(".credentials.json").is_file() {
+        Credentials::Saved
+    } else {
+        Credentials::Missing
+    }
 }
 
 /// The CLI's settings file, which is where its MCP servers are written.
@@ -124,6 +139,19 @@ mod tests {
             config_dir_of(home, &[], Some("/home/someone/.claude-a")),
             Path::new("/home/someone/.claude-a")
         );
+    }
+
+    #[test]
+    fn a_directory_with_a_saved_sign_in_says_so() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        if cfg!(target_os = "macos") {
+            // The Keychain holds it there, so the file says nothing either way.
+            assert_eq!(sign_in_at(dir.path()), Credentials::Unknown);
+            return;
+        }
+        assert_eq!(sign_in_at(dir.path()), Credentials::Missing);
+        std::fs::write(dir.path().join(".credentials.json"), "{}").expect("write");
+        assert_eq!(sign_in_at(dir.path()), Credentials::Saved);
     }
 
     #[test]

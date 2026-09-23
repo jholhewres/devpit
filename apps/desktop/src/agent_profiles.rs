@@ -14,7 +14,7 @@
 use devpit_agentcli::profile::{profiles, Base};
 use devpit_core::store::preference;
 use devpit_core::Store;
-use devpit_rpc::{Declared, ErrorCode, Profile, RpcError};
+use devpit_rpc::{Declared, ErrorCode, Profile, RpcError, SignedIn};
 
 /// What a base agent lends, looked up in the agent catalogue.
 fn base_of(id: &str) -> Option<Base> {
@@ -210,6 +210,34 @@ fn remove(store: &Store, id: &str) -> Result<(), RpcError> {
     let mut list = to_edit(store)?;
     list.retain(|one| one.id != id);
     save(store, &list)
+}
+
+/// `agent.signed_in` — whether the directory a profile names holds a sign-in.
+///
+/// Asked with the field's text rather than a saved profile, so the editor
+/// answers for what is typed. Empty is what a child inherits: this process's
+/// own `CLAUDE_CONFIG_DIR`, else `~/.claude`.
+#[tauri::command]
+#[specta::specta]
+pub async fn agent_signed_in(dir: String) -> Result<SignedIn, RpcError> {
+    crate::off_main::blocking(move || agent_signed_in_now(&dir)).await
+}
+
+fn agent_signed_in_now(dir: &str) -> Result<SignedIn, RpcError> {
+    use devpit_agentcli::cli_config;
+    let home = crate::installations::home()?;
+    let dir = dir.trim();
+    let env = if dir.is_empty() {
+        Vec::new()
+    } else {
+        let at = devpit_agentcli::declaring::at_home_value(dir, &home.to_string_lossy());
+        vec![("CLAUDE_CONFIG_DIR".to_owned(), at)]
+    };
+    let inherited = std::env::var("CLAUDE_CONFIG_DIR").ok();
+    let found = cli_config::config_dir_of(&home, &env, inherited.as_deref());
+    Ok(SignedIn {
+        state: cli_config::sign_in_at(&found),
+    })
 }
 
 /// The profile this step names, as something that can be started.
