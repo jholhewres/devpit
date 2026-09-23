@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { pastedPicture } from './pasting'
+import { keptAsPicture, pastedPicture } from './pasting'
 import { clipboardPng } from './terminalClipboard'
 
 /*
@@ -24,15 +24,23 @@ export function useTaking(chat: { paste: (file: Blob) => void; attach: (paths: r
     event.preventDefault()
     void clipboardPng().then((png) => png && chat.paste(png))
   }
-  /* Pictures dropped in are kept like a pasted one, wherever they came from;
-     other files are attached by path, and only from inside the project. */
+  /* Pictures dropped in are kept like a pasted one, wherever they came from,
+     when the chat can keep them; other files are attached by path, and only
+     from inside the project. */
   const { paste: keep, attach } = chat
   const dropped = useCallback(
     ({ paths, files }: { paths: readonly string[]; files: readonly File[] }) => {
-      const pictures = files.filter((file) => file.type.startsWith('image/'))
+      const pictures = files.filter(keptAsPicture)
       for (const picture of pictures) keep(picture)
-      const named = new Set(pictures.map((picture) => picture.name))
-      const rest = paths.filter((path) => !named.has(path.slice(path.lastIndexOf('/') + 1)))
+      /* A dropped file carries its name and not its folder, so each kept
+         picture accounts for one path of that name, not every one. */
+      const named = pictures.map((picture) => picture.name)
+      const rest = paths.filter((path) => {
+        const at = named.indexOf(path.slice(path.lastIndexOf('/') + 1))
+        if (at < 0) return true
+        named.splice(at, 1)
+        return false
+      })
       if (rest.length > 0) attach(rest)
     },
     [keep, attach],

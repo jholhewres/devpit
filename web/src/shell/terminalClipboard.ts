@@ -2,6 +2,7 @@ import { readImage, readText, writeText } from '@tauri-apps/plugin-clipboard-man
 import type { Terminal } from '@xterm/xterm'
 
 import { ask, commands } from './live'
+import { KEPT_BYTES } from './pasting'
 import { reason } from './reason'
 
 /*
@@ -61,6 +62,7 @@ export async function pasteClipboard(terminal: Terminal, projectId: string): Pro
   try {
     const picture = await readImage()
     const { width, height } = await picture.size()
+    if (width * height > MAX_PIXELS) return 'the picture on the clipboard is too big to paste'
     const data = pngOf(await picture.rgba(), width, height)
     const answer = await ask(() => commands.chatPaste(projectId, 'image/png', data))
     if (!answer.data) return answer.error ?? 'the picture could not be kept'
@@ -77,21 +79,32 @@ export async function clipboardPng(): Promise<Blob | null> {
   try {
     const picture = await readImage()
     const { width, height } = await picture.size()
-    const data = pngOf(await picture.rgba(), width, height)
-    return new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], { type: 'image/png' })
+    // Refused before its pixels cross over: an 8K screen is 130 MB of them.
+    if (width * height > MAX_PIXELS) return null
+    const canvas = canvasOf(await picture.rgba(), width, height)
+    const png = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'))
+    return png && png.size <= KEPT_BYTES ? png : null
   } catch {
     return null
   }
 }
 
-/** Raw RGBA as a base64 PNG, drawn through a canvas. */
-function pngOf(rgba: Uint8Array, width: number, height: number): string {
+/** The most pixels a clipboard picture may have to be taken: a 5K screen. */
+const MAX_PIXELS = 40_000_000
+
+/** Raw RGBA drawn on a canvas, to encode from. */
+function canvasOf(rgba: Uint8Array, width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d')
   if (!context) throw new Error('there is no canvas to encode the picture with')
   context.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0)
-  const url = canvas.toDataURL('image/png')
+  return canvas
+}
+
+/** Raw RGBA as a base64 PNG. */
+function pngOf(rgba: Uint8Array, width: number, height: number): string {
+  const url = canvasOf(rgba, width, height).toDataURL('image/png')
   return url.slice(url.indexOf(',') + 1)
 }

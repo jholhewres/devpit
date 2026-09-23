@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Ask, Attachment, Context, Frame, Message, Profile, Question } from '../gen/bindings'
 import { applied, ASKS, fixedTo, MODES, send, withFiles } from './chat'
 import { ask, commands } from './live'
+import { KEPT_BYTES } from './pasting'
 import { withSkills } from './pills'
 import { PROFILES_CHANGED } from './profiles'
 import { onPermissionAsked } from './window'
@@ -269,6 +270,8 @@ export function useChat(conversationId: string): Chat {
   const paste = useCallback(
     (file: Blob) => {
       if (!project) return
+      // Said here rather than after the whole picture was encoded and sent.
+      if (file.size > KEPT_BYTES) return setError('that picture is over 8 MB, too big to attach')
       const reader = new FileReader()
       reader.onload = () => {
         const url = typeof reader.result === 'string' ? reader.result : ''
@@ -277,7 +280,9 @@ export function useChat(conversationId: string): Chat {
           if (answer.error) return setError(answer.error)
           const kept = answer.data
           if (!kept) return
-          setPreviews((was) => ({ ...was, [kept.path]: url }))
+          // Drawn from the blob, not kept as a second copy of it in text.
+          const shown = URL.createObjectURL(file)
+          setPreviews((was) => ({ ...was, [kept.path]: shown }))
           setFiles((was) => [...was, kept])
         })
       }
@@ -286,10 +291,15 @@ export function useChat(conversationId: string): Chat {
     [project],
   )
 
-  const detach = useCallback(
-    (path: string) => setFiles((was) => was.filter((file) => file.path !== path)),
-    [],
-  )
+  const detach = useCallback((path: string) => {
+    setFiles((was) => was.filter((file) => file.path !== path))
+    setPreviews((was) => {
+      if (!(path in was)) return was
+      URL.revokeObjectURL(was[path]!)
+      const { [path]: _gone, ...rest } = was
+      return rest
+    })
+  }, [])
 
   const rewind = useCallback(
     (turnId: string) => {

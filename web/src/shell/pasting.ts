@@ -33,5 +33,23 @@ export function droppedPaths(data: DataTransfer | null): string[] {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.startsWith('file://'))
-    .map((line) => decodeURIComponent(new URL(line).pathname))
+    .flatMap((line) => {
+      /* One entry that does not parse costs that entry, not the drop; and a
+         file on another host is not at that path on this one. */
+      try {
+        const url = new URL(line)
+        if (url.host !== '' && url.host !== 'localhost') return []
+        return [decodeURIComponent(url.pathname)]
+      } catch {
+        return []
+      }
+    })
+}
+
+/* The pictures the chat keeps as a paste, as `chat_paste` takes them: other
+   pictures, and bigger ones, are attached by path like any file. */
+const KEPT_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
+export const KEPT_BYTES = 8 * 1024 * 1024
+export function keptAsPicture(file: Blob): boolean {
+  return KEPT_TYPES.has(file.type) && file.size <= KEPT_BYTES
 }
