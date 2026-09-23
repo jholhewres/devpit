@@ -1689,6 +1689,12 @@ export type Declared = {
 	command?: string,
 	args?: string[],
 	env?: EnvVar[],
+	/**
+	 *  The models offered in place of the driver's. A gateway such as z.ai
+	 *  serves none of Anthropic's, so its profile names its own. Empty keeps
+	 *  the driver's list.
+	 */
+	models?: string[],
 };
 
 /**  Why a card was not deleted. */
@@ -2497,10 +2503,16 @@ export type Profile = {
 	 */
 	mine?: boolean,
 	/**
-	 *  The models the composer may pick from. They belong to the driver, and
-	 *  are carried here so one call answers the whole selector.
+	 *  The models the composer may pick from: the profile's own when it
+	 *  named some, the driver's otherwise. Carried here so one call answers
+	 *  the whole selector.
 	 */
 	models?: string[],
+	/**
+	 *  The models the person listed, as written — what the editor opens with.
+	 *  Kept apart from `models`, which a save would otherwise make theirs.
+	 */
+	ownModels?: string[],
 	/**
 	 *  How hard the agent may be asked to think. Empty when the CLI has no
 	 *  such control, and the composer then draws no chip at all.

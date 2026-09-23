@@ -98,6 +98,7 @@ fn a_profile_secret_does_not_reach_a_stored_log() {
             base: "claude".to_owned(),
             command: "claude".to_owned(),
             args: vec![],
+            models: Vec::new(),
             env: vec![devpit_rpc::EnvVar {
                 name: "ANTHROPIC_AUTH_TOKEN".to_owned(),
                 value: "sk-live-0123456789abcdef".to_owned(),

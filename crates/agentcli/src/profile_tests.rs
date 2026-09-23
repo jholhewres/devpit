@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::profile::{found, profiles, reach, Base, Declared, Reach};
+use crate::profile::{found, offered, profiles, reach, Base, Declared, Reach};
 
 fn declared(id: &str, command: &str) -> Declared {
     Declared {
@@ -9,6 +9,7 @@ fn declared(id: &str, command: &str) -> Declared {
         base: "claude".to_owned(),
         command: command.to_owned(),
         args: Vec::new(),
+        models: Vec::new(),
         env: Vec::new(),
     }
 }
@@ -133,4 +134,23 @@ fn discovery_leaves_out_what_nothing_can_reach() {
         all.iter().all(|p| p.installed()),
         "discovery listed something nothing can start"
     );
+}
+
+#[test]
+fn a_profile_that_names_models_offers_those_after_the_accounts_default() {
+    // `glm` runs against z.ai, which serves none of the driver's aliases.
+    let mut glm = declared("glm", "sh");
+    glm.models = vec!["glm-5.3[1m]".to_owned(), "glm-4.7".to_owned()];
+    let all = profiles(&[glm, declared("plain", "sh")], base, &nothing());
+    assert_eq!(all[0].models, ["default", "glm-5.3[1m]", "glm-4.7"]);
+    // The editor reopens what was typed, not what the picker offers.
+    assert_eq!(all[0].own_models, ["glm-5.3[1m]", "glm-4.7"]);
+    assert_eq!(all[1].models, offered(&[], "claude"));
+    assert!(all[1].models.len() > 1, "the driver's own list");
+}
+
+#[test]
+fn a_default_the_person_placed_is_not_added_twice() {
+    let own = ["glm-4.7".to_owned(), "default".to_owned()];
+    assert_eq!(offered(&own, "claude"), ["glm-4.7", "default"]);
 }

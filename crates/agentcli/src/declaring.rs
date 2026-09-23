@@ -32,6 +32,8 @@ pub enum Refused {
     NotAVariableName(String),
     /// The same variable set twice, where only the last would have counted.
     SetTwice(String),
+    /// A model name with a space or shell punctuation in it.
+    NotAModel(String),
 }
 
 impl std::fmt::Display for Refused {
@@ -52,6 +54,9 @@ impl std::fmt::Display for Refused {
                 write!(out, "{name} is not a variable name — letters, digits and underscore, not starting with a digit")
             }
             Self::SetTwice(name) => write!(out, "{name} is set twice"),
+            Self::NotAModel(model) => {
+                write!(out, "{model} is not a model name — letters, digits and . - _ : / @, with [1m] allowed at the end")
+            }
         }
     }
 }
@@ -79,6 +84,19 @@ pub fn is_a_variable_name(name: &str) -> bool {
         .next()
         .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
         && letters.all(|letter| letter.is_ascii_alphanumeric() || letter == '_')
+}
+
+/// Whether a string is a model the CLI could be passed.
+///
+/// Stricter than an argument, because it is a name and not a flag: the `[1m]`
+/// suffix is the one place brackets belong, and only at the end.
+pub fn is_a_model(model: &str) -> bool {
+    let bare = model.strip_suffix("[1m]").unwrap_or(model);
+    !bare.is_empty()
+        && model.len() <= 128
+        && bare
+            .chars()
+            .all(|letter| letter.is_ascii_alphanumeric() || "._-:/@".contains(letter))
 }
 
 /// Whether this profile can be saved, and why not when it cannot.
@@ -109,7 +127,29 @@ pub fn allowed(declared: &Declared, knows_base: impl Fn(&str) -> bool) -> Result
         }
         seen.push(&var.name);
     }
+    if let Some(model) = declared.models.iter().find(|one| !is_a_model(one)) {
+        return Err(Refused::NotAModel(model.clone()));
+    }
     Ok(())
+}
+
+/// The profile with `~` and `$HOME` at the front of a value made absolute.
+///
+/// A value is handed to a spawned process as it is, and single-quoted where it
+/// is typed, so no shell ever expands it — `~/.claude-claudin` pasted from a
+/// `.zshrc` would otherwise name a folder called `~`.
+pub fn at_home(mut declared: Declared, home: &str) -> Declared {
+    for var in &mut declared.env {
+        let rest = ["~/", "$HOME/", "${HOME}/"]
+            .iter()
+            .find_map(|lead| var.value.strip_prefix(lead));
+        if let Some(rest) = rest {
+            var.value = format!("{}/{rest}", home.trim_end_matches('/'));
+        } else if ["~", "$HOME", "${HOME}"].contains(&var.value.as_str()) {
+            var.value = home.to_owned();
+        }
+    }
+    declared
 }
 
 /// A value as one shell word.

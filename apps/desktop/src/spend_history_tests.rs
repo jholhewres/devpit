@@ -168,6 +168,7 @@ fn an_installation_pointed_at_another_provider_is_not_billed() {
         base: "claude".to_owned(),
         command: String::new(),
         args: Vec::new(),
+        models: Vec::new(),
         env: vec![devpit_rpc::EnvVar {
             name: "ANTHROPIC_BASE_URL".to_owned(),
             value: url.to_owned(),

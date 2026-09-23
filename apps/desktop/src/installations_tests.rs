@@ -11,6 +11,7 @@ fn profile(id: &str, base: &str, config: Option<&str>) -> Declared {
         base: base.to_owned(),
         command: String::new(),
         args: Vec::new(),
+        models: Vec::new(),
         env: config
             .map(|dir| EnvVar {
                 name: "CLAUDE_CONFIG_DIR".to_owned(),

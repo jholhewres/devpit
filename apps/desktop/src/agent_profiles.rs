@@ -98,9 +98,11 @@ pub fn agent_profiles() -> Result<Vec<Profile>, RpcError> {
 /// than in the window, because the window can be reloaded mid-edit.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_profile_save(mut declared: Declared) -> Result<Vec<Profile>, RpcError> {
+pub fn agent_profile_save(declared: Declared) -> Result<Vec<Profile>, RpcError> {
     devpit_agentcli::declaring::allowed(&declared, |base| base_of(base).is_some())
         .map_err(|why| RpcError::new(ErrorCode::Invalid, why.to_string()))?;
+    let home = crate::installations::home()?;
+    let mut declared = devpit_agentcli::declaring::at_home(declared, &home.to_string_lossy());
 
     declared.label = declared.label.trim().to_owned();
     if declared.id.trim().is_empty() {

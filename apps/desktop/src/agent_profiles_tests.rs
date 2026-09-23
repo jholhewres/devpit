@@ -18,6 +18,7 @@ fn glm() -> Declared {
             "--permission-mode".to_owned(),
             "bypassPermissions".to_owned(),
         ],
+        models: Vec::new(),
         env: vec![
             EnvVar {
                 name: "ANTHROPIC_BASE_URL".to_owned(),

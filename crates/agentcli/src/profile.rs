@@ -68,6 +68,23 @@ fn models_of(name: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// A profile's own models, led by `default` — what the account runs with no
+/// `--model` at all is always a choice — or the driver's when it named none.
+pub fn offered(own: &[String], driver: &str) -> Vec<String> {
+    if own.is_empty() {
+        return models_of(driver);
+    }
+    let mut all = Vec::with_capacity(own.len() + 1);
+    if !own.iter().any(|one| one == DEFAULT_MODEL) {
+        all.push(DEFAULT_MODEL.to_owned());
+    }
+    all.extend(own.iter().cloned());
+    all
+}
+
+/// What the CLI is passed when nobody picked a model.
+const DEFAULT_MODEL: &str = "default";
+
 fn efforts_of(name: &str) -> (Vec<String>, Option<String>) {
     driver(name)
         .map(|found| {
@@ -130,7 +147,8 @@ pub fn profiles(
                 args: one.args.clone(),
                 env: one.env.clone(),
                 mine: true,
-                models: models_of(&lent.driver),
+                models: offered(&one.models, &lent.driver),
+                own_models: one.models.clone(),
                 efforts,
                 effort_default,
             }
@@ -161,6 +179,7 @@ pub fn profiles(
             env: Vec::new(),
             mine: false,
             models: models_of(driver),
+            own_models: Vec::new(),
             efforts,
             effort_default,
         });

@@ -13,6 +13,7 @@ fn profile() -> Declared {
         base: "claude".to_owned(),
         command: String::new(),
         args: Vec::new(),
+        models: Vec::new(),
         env: Vec::new(),
     }
 }
@@ -207,4 +208,43 @@ fn no_refusal_ever_quotes_a_value() {
     ];
     let why = allowed(&twice, known).expect_err("it should refuse");
     assert!(!why.to_string().contains(secret), "{why}");
+}
+
+#[test]
+fn a_model_may_carry_the_wide_context_suffix_and_nothing_a_shell_reads() {
+    for good in ["opus", "glm-5.3[1m]", "claude-opus-5-5", "org/model:tag@v1"] {
+        assert!(is_a_model(good), "{good} should be a model");
+    }
+    for bad in ["", "[1m]", "glm 5", "a[1m]b", "$(id)", "a;b", "glm[2m]"] {
+        assert!(!is_a_model(bad), "{bad} should not be a model");
+    }
+    let mut odd = profile();
+    odd.models = vec!["glm-5.3".to_owned(), "glm 5".to_owned()];
+    assert_eq!(
+        allowed(&odd, known),
+        Err(Refused::NotAModel("glm 5".to_owned()))
+    );
+}
+
+#[test]
+fn a_home_at_the_front_of_a_value_is_made_absolute() {
+    // Pasted from a `.zshrc`, where the shell expanded it; nothing here will.
+    let mut claudin = profile();
+    claudin.env = vec![
+        var("CLAUDE_CONFIG_DIR", "~/.claude-claudin"),
+        var("ONE", "$HOME/.claude-glm"),
+        var("TWO", "${HOME}"),
+        var("TOKEN", "a~/b"),
+    ];
+    let done = at_home(claudin, "/home/someone/");
+    let values: Vec<&str> = done.env.iter().map(|one| one.value.as_str()).collect();
+    assert_eq!(
+        values,
+        [
+            "/home/someone/.claude-claudin",
+            "/home/someone/.claude-glm",
+            "/home/someone/",
+            "a~/b"
+        ]
+    );
 }
