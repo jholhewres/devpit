@@ -64,7 +64,12 @@ impl std::error::Error for RpcError {}
 /// screen: "database is locked" helps nobody.
 impl From<devpit_core::StoreError> for RpcError {
     fn from(err: devpit_core::StoreError) -> Self {
-        Self::internal(err.to_string())
+        match err {
+            // Busy, not Conflict: a conflict is the board's "move it anyway?",
+            // and no answer to it lets a second run into the same checkout.
+            devpit_core::StoreError::AlreadyRunning => Self::new(ErrorCode::Busy, err.to_string()),
+            err => Self::internal(err.to_string()),
+        }
     }
 }
 

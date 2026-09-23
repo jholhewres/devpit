@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Notices } from '../gen/bindings'
 import { held } from './headsDown'
 import { ask, commands } from './live'
+import { inOrder } from './inOrder'
 import { useFocus } from './useHeadsDown'
 import { onEvent } from './window'
 
@@ -67,7 +68,7 @@ export function useNotices(): Bell {
       ? Math.max(0, seen.unread - waiting.filter((one) => one.readAt === null).length)
       : seen.unread,
     waiting,
-    markRead: (id) => void ask(() => commands.noticesMark(id)).then(take),
+    markRead: (id) => void inOrder('notices', () => ask(() => commands.noticesMark(id))).then(take),
     markAllRead: () => void ask(() => commands.noticesMarkAll()).then(take),
     reload,
   }

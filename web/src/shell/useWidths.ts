@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ask, commands } from './live'
+import { inOrder } from './inOrder'
 import { fits, WIDE, type Panel, type Widths } from './sizing'
 import { onResized } from './window'
 
@@ -56,7 +57,7 @@ export function useWidths(): Sizing {
       /* On the drop and never during the drag: a preference row rewritten on
          every pointer move is a disk write per frame for a number nobody
          reads until the next launch. */
-      void ask(() => commands.panelWidthsWrite(next.sidebar, next.files))
+      void inOrder('widths', () => ask(() => commands.panelWidthsWrite(next.sidebar, next.files)))
       return next
     })
   }, [])

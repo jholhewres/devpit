@@ -211,6 +211,11 @@ fn a_row_written_before_a_migration_survives_it() {
             "ALTER TABLE project DROP COLUMN icon; ALTER TABLE project DROP COLUMN color;",
         )
         .expect("undo 020");
+    // And 021's index, which the upgrade makes again.
+    store
+        .conn()
+        .execute_batch("DROP INDEX run_one_running;")
+        .expect("undo 021");
     store
         .conn()
         .execute_batch("PRAGMA user_version = 16;")

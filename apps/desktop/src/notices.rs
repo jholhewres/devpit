@@ -176,6 +176,13 @@ pub async fn notices_sweep_due(app: tauri::AppHandle) -> Result<Notices, RpcErro
 
 /// [`notices_sweep_due`], on the calling thread.
 pub(crate) fn notices_sweep_due_now(app: tauri::AppHandle) -> Result<Notices, RpcError> {
+    // One sweep at a time: it reads which cards were already told about and
+    // then writes the rest, and two sweeps at once — both windows answering
+    // the same timer — would each write the same notice.
+    static SWEEPING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one = SWEEPING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let store = store()?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

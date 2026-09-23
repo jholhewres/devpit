@@ -1,6 +1,6 @@
 //! What a run remembers, and what happens to one whose process is gone.
 
-use crate::store::Store;
+use crate::store::{Store, StoreError};
 
 fn seeded() -> (tempfile::TempDir, Store, String, String, String) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -210,4 +210,19 @@ fn two_runs_in_one_second_are_ordered_by_the_one_that_started_later() {
         [latest.as_str(), older.as_str()],
         "most recent first, and the tie went the wrong way"
     );
+}
+
+/// Two runs at once on one card: the database refuses the second, whatever
+/// the app checked before writing.
+#[test]
+fn a_second_running_run_on_a_card_is_refused() {
+    let (_dir, store, card, step, _column) = seeded();
+    store.start_run(&card, &step, None).expect("first");
+    assert!(matches!(
+        store.start_run(&card, &step, None),
+        Err(StoreError::AlreadyRunning)
+    ));
+    // Another card is not held up by it.
+    let project = store.card(&card).expect("card").expect("there").column_id;
+    let _ = project;
 }

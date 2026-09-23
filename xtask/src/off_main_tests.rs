@@ -50,3 +50,30 @@ fn a_listed_command_is_allowed_and_an_unlisted_one_fails() {
     assert!(found[0].what.contains("also_waits"));
     assert!(found[0].file.ends_with("one.rs"));
 }
+
+/// The shapes a line-by-line reading used to let through.
+#[test]
+fn every_way_of_writing_a_sync_command_is_found() {
+    let text = r#"
+#[tauri::command(
+    rename_all = "snake_case",
+)]
+pub(super) fn wrapped() {}
+
+#[tauri::command]
+/* a note
+   over lines */
+pub(in crate::m) fn commented() {}
+
+#[tauri::command] pub fn one_line() {}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn fine() {}
+"#;
+    let names: Vec<String> = sync_commands(text)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(names, ["wrapped", "commented", "one_line"]);
+}

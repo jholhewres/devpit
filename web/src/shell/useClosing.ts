@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import type { PaneRunning } from '../gen/bindings'
 import { ask, commands } from './live'
+import { inOrder } from './inOrder'
 import { stopsOnClose, type Stops } from './running'
 import type { Tab } from './strip'
 
@@ -80,7 +81,7 @@ export function useClosing({
       })
       if (!dontAskAgain) return
       setStop(false)
-      void ask(() => commands.settingsWrite(null, null, false, null, null))
+      void inOrder('settings', () => ask(() => commands.settingsWrite(null, null, false, null, null)))
     },
     [closeNow],
   )

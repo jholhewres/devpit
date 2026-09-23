@@ -7,6 +7,7 @@ mod card_links;
 mod cards;
 mod evidence;
 mod folders;
+mod lanes;
 mod layouts;
 mod migrations;
 pub mod pane_agents;
@@ -42,6 +43,12 @@ pub enum StoreError {
     /// Names the drawing, never a path: this message reaches the screen.
     #[error("could not export drawing {drawing}: {reason}")]
     Export { drawing: String, reason: String },
+
+    /// A second run asked for on a card that already has one going. Refused by
+    /// the database (`run_one_running`), so two commands at once cannot both
+    /// pass a check made before either wrote.
+    #[error("a run is already going on this card")]
+    AlreadyRunning,
 }
 
 pub use board::{CardRow, ColumnRow, StepRow, StepUse, DEFAULT_COLUMNS};

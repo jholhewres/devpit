@@ -30,10 +30,15 @@ fn a_run_is_linked_once_it_has_a_session_of_its_own() {
     let step = store
         .create_step(&project, "agent", "review", "{}", false)
         .expect("step");
-    let spoke = store.start_run(&card, &step, None).expect("run");
-    store
+    // One at a time, as the database now insists: the one with no session
+    // ran and ended before the one that has a session started.
+    let quiet = store
         .start_run(&card, &step, None)
         .expect("a run with no session");
+    store
+        .finish_run(&quiet, "ok", None, None, None, None)
+        .expect("finish");
+    let spoke = store.start_run(&card, &step, None).expect("run");
     store.set_run_session(&spoke, "s-1").expect("session");
     store.set_run_cwd(&spoke, "/w/card").expect("cwd");
     assert_eq!(
@@ -184,13 +189,17 @@ fn a_run_made_later_is_listed_first_even_when_its_id_sorts_lower() {
         .expect("step");
 
     let same_second = 1_700_000_000_i64;
-    for (id, session) in [("run_ZZZZ_older", "s-old"), ("run_AAAA_newer", "s-new")] {
+    // The older one ended: one card holds one running run at a time.
+    for (id, session, state) in [
+        ("run_ZZZZ_older", "s-old", "ok"),
+        ("run_AAAA_newer", "s-new", "running"),
+    ] {
         store
             .conn()
             .execute(
                 "INSERT INTO run (id, card_id, step_id, state, started_at, session_id) \
-                 VALUES (?1, ?2, ?3, 'running', ?4, ?5)",
-                rusqlite::params![id, card, step, same_second, session],
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![id, card, step, state, same_second, session],
             )
             .expect("insert");
     }

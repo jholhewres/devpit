@@ -120,6 +120,12 @@ fn agent_run(seeded: &Seeded, card: &str, session: &str, cwd: Option<&Path>) {
             .set_run_cwd(&run, &cwd.display().to_string())
             .expect("cwd");
     }
+    // Ended, as a card holds one running run at a time and some tests give
+    // a card two.
+    seeded
+        .store
+        .finish_run(&run, "ok", None, None, None, None)
+        .expect("finish");
 }
 
 fn card_without_checkout(seeded: &Seeded) -> String {

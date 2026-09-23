@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { Settings as Stored } from '../gen/bindings'
 import { ask, commands } from './live'
+import { inOrder } from './inOrder'
 import { PrefsSide } from './PrefsSide'
 import { OpenApps } from './OpenApps'
 import { ProjectRows } from './ProjectRows'
@@ -38,13 +39,15 @@ export function Settings({
   /* Each toggle writes only its own field: the command takes null for
      "leave this one alone", so one switch cannot overwrite another. */
   const set = (field: Flag, next: boolean): void => {
-    void ask(() =>
-      commands.settingsWrite(
-        null,
-        field === 'automaticUpdates' ? next : null,
-        field === 'confirmStop' ? next : null,
-        null,
-        field === 'focusMode' ? next : null,
+    void inOrder('settings', () =>
+      ask(() =>
+        commands.settingsWrite(
+          null,
+          field === 'automaticUpdates' ? next : null,
+          field === 'confirmStop' ? next : null,
+          null,
+          field === 'focusMode' ? next : null,
+        ),
       ),
     ).then((answer) => setFlags(answer.data ?? flags))
   }
@@ -166,7 +169,7 @@ export function Settings({
             <TerminalContrast
               value={flags?.terminalContrast ?? null}
               onPick={(value) =>
-                void ask(() => commands.settingsWrite(null, null, null, value, null)).then((answer) =>
+                void inOrder('settings', () => ask(() => commands.settingsWrite(null, null, null, value, null))).then((answer) =>
                   setFlags(answer.data ?? flags),
                 )
               }

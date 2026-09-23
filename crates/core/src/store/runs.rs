@@ -52,12 +52,20 @@ impl Store {
         from_column: Option<&str>,
     ) -> Result<String, StoreError> {
         let id = format!("run_{}", ulid::Ulid::generate());
-        self.conn.execute(
+        let inserted = self.conn.execute(
             "INSERT INTO run (id, card_id, step_id, state, started_at, from_column) \
              VALUES (?1, ?2, ?3, 'running', ?4, ?5)",
             rusqlite::params![id, card_id, step_id, now(), from_column],
-        )?;
-        Ok(id)
+        );
+        match inserted {
+            Ok(_) => Ok(id),
+            Err(rusqlite::Error::SqliteFailure(failure, _))
+                if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+            {
+                Err(StoreError::AlreadyRunning)
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 
     /// Where the card stood when this run started, if it was recorded.

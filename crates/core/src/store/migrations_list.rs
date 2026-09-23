@@ -600,4 +600,25 @@ ALTER TABLE project ADD COLUMN icon TEXT;
 ALTER TABLE project ADD COLUMN color TEXT;
 "#,
     },
+    // Migration 021 — one running run per card, held by the database.
+    Migration {
+        version: 21,
+        sql: r#"
+-- Checked in the app, and only safe while every command ran one at a time on
+-- the window's thread. Now they run in parallel, so a double click on Play or
+-- a drop followed by Play can both pass the check. The rule lives here, where
+-- no two connections can both pass it.
+--
+-- A card already holding two (from before this) keeps its newest; the others
+-- are closed as failed and say why. Run ids are ULIDs, so the greatest is the
+-- latest.
+UPDATE run
+   SET state = 'failed',
+       output = COALESCE(output, 'another run was going on this card; this one was closed so only one runs'),
+       ended_at = COALESCE(ended_at, started_at)
+ WHERE state = 'running'
+   AND id NOT IN (SELECT MAX(id) FROM run WHERE state = 'running' GROUP BY card_id);
+CREATE UNIQUE INDEX run_one_running ON run(card_id) WHERE state = 'running';
+"#,
+    },
 ];

@@ -31,6 +31,10 @@ fn two_runs_of_one_card_speak_in_different_sessions() {
         store
             .set_run_session(&run, &fresh_session_id())
             .expect("session");
+        // One after the other: a card holds one running run at a time.
+        store
+            .finish_run(&run, "ok", None, None, None, None)
+            .expect("finish");
     }
     let links = store.card_links(&card).expect("links");
     assert_eq!(links.runs.len(), 2);
