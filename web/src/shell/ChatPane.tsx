@@ -16,6 +16,9 @@ import { Turn } from './Turn'
 import { SkillPills } from './SkillPills'
 import { ResumePicker } from './ResumePicker'
 import { useFollow } from './useFollow'
+import { Queued } from './Queued'
+import { SendButton } from './SendButton'
+import { useQueue } from './useQueue'
 import { SlashMenu } from './SlashMenu'
 import { useChat } from './useChat'
 import { useSlash } from './useSlash'
@@ -52,8 +55,6 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (tab.draft !== undefined) drafted(tab.id)
   }, [tab.draft, tab.id, drafted])
 
-
-
   /* A conversation is called the first thing you said in it. Only once, and
      only while it is unnamed: a tab you renamed keeps the name you gave it. */
   const said = chat.messages.find((one) => one.role === 'user')
@@ -63,11 +64,22 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (name) rename(tab.id, name)
   }, [rename, said, tab.id, tab.title])
 
+  /* Typed while a turn runs, a message waits for it rather than being refused. */
+  const queue = useQueue(chat.sending, chat.say)
   const send = (): void => {
-    if (!ready(prompt, chat.sending, chat.profileId)) return
-    chat.say(prompt)
+    if (!ready(prompt, false, chat.profileId)) return
+    if (chat.sending) queue.add(prompt)
+    else chat.say(prompt)
     setPrompt('')
     box.current?.scrollTo({ top: box.current.scrollHeight })
+  }
+
+  /* A stop hands what was queued back to the composer: it was meant for a
+     turn that is no longer going to happen as planned. */
+  const halt = (): void => {
+    const back = queue.takeAll()
+    if (back) setPrompt((was) => [back, was].filter(Boolean).join('\n\n'))
+    chat.stop()
   }
 
   /* The turn in flight is the one still streaming; arming is tied to it so a
@@ -75,7 +87,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const showEsc = useStop(
     chat.sending && mine,
     targetOf(tab.id, chat.messages.find((one) => one.streaming)?.turnId ?? null),
-    chat.stop,
+    halt,
   )
 
   const spent = money(chat.cost)
@@ -118,6 +130,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               in the thread, where it scrolls away from you. */}
           <Asked questions={chat.asked} onAnswer={chat.answer} />
           <ComposerStatus conversationId={tab.id} messages={chat.messages} />
+          <Queued queue={queue} />
 
           <div className="composer__in">
             {chat.files.length > 0 && (
@@ -164,28 +177,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
                   is not the person's job. Cancelling the press instead would
                   be cheaper and would swallow the click that opens the menu. */}
               <Chips chat={chat} refocus={() => field.current?.focus()} />
-              {chat.sending ? (
-                <button
-                  className="send"
-                  onClick={chat.stop}
-                  aria-label={showEsc ? 'Press Escape again to stop' : 'Stop'}
-                >
-                  {showEsc ? (
-                    <span className="send__esc">Esc</span>
-                  ) : (
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
-                  )}
-                </button>
-              ) : (
-                <button
-                  className="send"
-                  onClick={send}
-                  disabled={!ready(prompt, chat.sending, chat.profileId)}
-                  aria-label="Send"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-                </button>
-              )}
+              <SendButton sending={chat.sending} showEsc={showEsc} can={ready(prompt, chat.sending, chat.profileId)} onSend={send} onStop={halt} />
             </div>
           </div>
 
