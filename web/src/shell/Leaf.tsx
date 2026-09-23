@@ -28,12 +28,18 @@ export function Leaf({
   projectId,
   onSplit,
   onClosePane,
+  onTerminal,
+  onBlocks,
 }: {
   paneId: string
   projectId: string
   /** What the right-click menu offers for the pane, from the tab that owns it. */
   onSplit?: (direction: 'horizontal' | 'vertical') => void
   onClosePane?: () => void
+  /** The live terminal, to whoever draws around it (`BlockTerm`). */
+  onTerminal?: (terminal: Terminal | null) => void
+  /** Offered on the right-click when the pane is drawn plain: back to blocks. */
+  onBlocks?: () => void
 }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +48,8 @@ export function Leaf({
   const [pasteFailed, setPasteFailed] = useState<string | null>(null)
   const [term, setTerm] = useState<Terminal | null>(null)
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
+  const onTerminalRef = useRef(onTerminal)
+  onTerminalRef.current = onTerminal
 
   useEffect(() => {
     const box = host.current
@@ -168,6 +176,7 @@ export function Leaf({
       setTimeout(() => !dropped && redraw(), 150)
       terminal.onData((data) => wheel.typed(data, (typed) => live?.write(typed)))
       setTerm(terminal)
+      onTerminalRef.current?.(terminal)
     })().catch((thrown: unknown) => {
       /* Every step above talks to the backend, and a rejection here used to
          vanish: the pane mounted, drew a cursor, and never attached. */
@@ -209,6 +218,7 @@ export function Leaf({
       dropped = true
       clearTimeout(settling)
       setTerm(null)
+      onTerminalRef.current?.(null)
       themed.disconnect()
       watch.disconnect()
       shown?.disconnect()
@@ -230,7 +240,7 @@ export function Leaf({
       {pasteFailed && <div className="exempty__t">{pasteFailed}</div>}
       <div className="termhost" ref={host} />
       {menuAt && term && (
-        <TerminalMenu at={menuAt} terminal={term} projectId={projectId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} />
+        <TerminalMenu at={menuAt} terminal={term} projectId={projectId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} onBlocks={onBlocks} />
       )}
     </>
   )

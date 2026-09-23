@@ -28,6 +28,7 @@ export function TerminalMenu({
   onFailed,
   onSplit,
   onClosePane,
+  onBlocks,
 }: {
   at: { readonly x: number; readonly y: number }
   terminal: Terminal
@@ -36,6 +37,7 @@ export function TerminalMenu({
   onFailed: (why: string | null) => void
   onSplit?: (direction: 'horizontal' | 'vertical') => void
   onClosePane?: () => void
+  onBlocks?: () => void
 }): React.JSX.Element {
   const menu = useRef<HTMLDivElement>(null)
   const keys = clipboardLabels()
@@ -91,6 +93,12 @@ export function TerminalMenu({
           <div className="ctx__rule" />
           {item('Split Right', <Columns />, () => onSplit('horizontal'), SHORTCUTS.splitRight)}
           {item('Split Down', <Rows />, () => onSplit('vertical'), SHORTCUTS.splitDown)}
+        </>
+      )}
+      {onBlocks && (
+        <>
+          <div className="ctx__rule" />
+          {item('Show as Blocks', <Rows />, onBlocks)}
         </>
       )}
       {onClosePane && (

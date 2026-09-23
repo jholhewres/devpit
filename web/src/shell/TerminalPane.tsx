@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { LayoutNode } from '../gen/bindings'
 import { ask, commands } from './live'
-import { Leaf } from './Leaf'
+import { BlockTerm } from './BlockTerm'
 import { usePaneActions } from './paneActions'
 import { PaneCorner } from './PaneCorner'
 import { Split } from './Split'
@@ -155,7 +155,7 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
         onFocus={focus}
         onRatio={settle}
         leaf={(leafId) => (
-          <Leaf key={leafId} paneId={leafId} projectId={projectId} onSplit={split} onClosePane={pane.closePane} />
+          <BlockTerm key={leafId} paneId={leafId} projectId={projectId} onSplit={split} onClosePane={pane.closePane} />
         )}
       />
     </>

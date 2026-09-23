@@ -1,0 +1,68 @@
+/* ── A terminal as blocks ────────────────────────────────────────────────
+   The blocks above, the editor below, the live terminal between them only
+   while something runs. The terminal's own font throughout, so a block reads
+   as the output it was. */
+.bterm {
+  --term-font: "SF Mono", "Menlo", "Monaco", "Cascadia Mono", "Consolas", "DejaVu Sans Mono", "Liberation Mono", "Symbols Nerd Font Mono", "MesloLGS Nerd Font", "JetBrainsMono Nerd Font", monospace;
+  display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0;
+}
+.bterm__list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 6px 0 4px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+.bterm__live { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+/* At the prompt the live terminal steps out of the way — kept, attached, at
+   its last size, so the next command comes back to it without a resize. */
+.bterm[data-mode='idle'] .bterm__live { flex: 0 0 0; height: 0; overflow: hidden; visibility: hidden; }
+/* While a command runs: the blocks above keep a strip, the command the rest. */
+.bterm[data-mode='running'] .bterm__list { flex: 0 1 35%; }
+.bterm[data-mode='running'] .bterm__live { flex: 1 1 65%; border-top: 1px solid var(--border); }
+.bterm__empty { padding: 18px 16px; font-size: 12.5px; color: var(--text-3); }
+
+/* A block: a header that stays put while its output scrolls under it. */
+.blk { position: relative; border-bottom: 1px solid var(--border); }
+.blk::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: transparent; }
+.blk[data-outcome='failed']::before { background: var(--danger); }
+.blk[data-outcome='failed'] { background: color-mix(in srgb, var(--danger) 5%, transparent); }
+.blk__head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px 6px 14px; cursor: default; background: var(--canvas); }
+.blk[data-outcome='failed'] .blk__head { background: color-mix(in srgb, var(--danger) 7%, var(--canvas)); }
+.blk__head:hover .blk__more { opacity: 1; }
+.blk__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
+.blk[data-outcome='ok'] .blk__dot { background: var(--success); }
+.blk[data-outcome='failed'] .blk__dot { background: var(--danger); }
+.blk__cmd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--term-font); font-size: 13px; font-weight: 600; color: var(--text); }
+.blk__nocmd { font-weight: 400; color: var(--text-3); font-style: italic; }
+.blk__meta { flex: none; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.blk__cwd { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--term-font); }
+.blk__code { color: var(--danger); font-weight: 600; }
+.blk__more { flex: none; width: 22px; height: 20px; border-radius: 5px; color: var(--text-3); opacity: 0; transition: opacity 100ms ease; line-height: 1; }
+.blk__more:hover { background: var(--overlay-strong); color: var(--text); }
+.blk__out { padding: 0 14px 8px 14px; }
+.blk__pre { margin: 0; font-family: var(--term-font); font-size: 13px; line-height: 1.35; color: var(--text); white-space: pre; overflow-x: auto; scrollbar-width: thin; }
+.blk__line { min-height: 1.35em; }
+.blk__note { padding: 2px 0 4px; font-size: 12px; color: var(--text-3); }
+.blk__all { display: block; margin: 0 0 4px; padding: 0; font-size: 11.5px; color: var(--accent); }
+.blk__all:disabled { color: var(--text-3); cursor: default; }
+.blk__filter { display: flex; align-items: center; gap: 6px; margin: 0 14px 6px; padding: 0 8px; height: 26px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text-3); font-size: 11px; }
+.blk__filter input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--text); font: inherit; font-size: 12.5px; }
+
+/* The editor. */
+.cin { position: relative; flex: none; border-top: 1px solid var(--border); padding: 6px 10px 8px 12px; background: var(--canvas); }
+.cin__chips { display: flex; align-items: center; gap: 6px; min-width: 0; margin-bottom: 4px; }
+.cin__chip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 45%; height: 20px; padding: 0 7px; border: 1px solid var(--border); border-radius: 5px; font-family: var(--term-font); font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cin__chip--git { color: var(--accent); }
+.cin__diff { color: var(--text-3); }
+.cin__add { color: var(--success); }
+.cin__del { color: var(--danger); }
+.cin__classic { margin-left: auto; height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11px; color: var(--text-3); }
+.cin__classic:hover { background: var(--overlay-strong); color: var(--text); }
+.cin__box { display: flex; align-items: flex-start; gap: 8px; }
+.cin__caret { flex: none; padding-top: 2px; font-family: var(--term-font); font-size: 13px; color: var(--success); }
+.cin__edit { position: relative; flex: 1; min-width: 0; }
+.cin__field, .cin__ghost { width: 100%; margin: 0; padding: 2px 0; border: 0; font-family: var(--term-font); font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
+.cin__field { position: relative; display: block; resize: none; background: none; outline: none; color: var(--text); caret-color: var(--text); }
+.cin__field::placeholder { color: var(--ghost); }
+.cin__ghost { position: absolute; inset: 0; color: var(--ghost); pointer-events: none; }
+.cin__typed { color: transparent; }
+.cin__search { position: absolute; left: 10px; right: 10px; bottom: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; padding: 4px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--raised); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
+.cin__sq { height: 28px; margin-bottom: 4px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--composer, var(--canvas)); color: var(--text); font: inherit; font-size: 12.5px; outline: none; }
+.cin__hit { padding: 4px 8px; border-radius: 5px; text-align: left; font-family: var(--term-font); font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cin__hit[aria-selected='true'] { background: var(--overlay-strong); color: var(--text); }
+.cin__none { padding: 8px; font-size: 12px; color: var(--text-3); }
