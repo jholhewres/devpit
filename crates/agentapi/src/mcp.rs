@@ -74,6 +74,7 @@ const TOOLS: [Tool; 7] = [
 /// Serves MCP on stdin/stdout until the client hangs up.
 pub fn serve(root: &Path) -> i32 {
     let cwd = crate::standing();
+    let offered = !beside_the_flag(root);
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
     for line in stdin.lock().lines() {
@@ -81,9 +82,11 @@ pub fn serve(root: &Path) -> i32 {
         if line.trim().is_empty() {
             continue;
         }
-        let answer = handle(&line, &|method, params| {
-            client::ask(root, method, params, &cwd)
-        });
+        let answer = handle_offering(
+            &line,
+            &|method, params| client::ask(root, method, params, &cwd),
+            offered,
+        );
         if let Some(answer) = answer {
             if writeln!(stdout, "{answer}")
                 .and_then(|()| stdout.flush())
@@ -96,10 +99,48 @@ pub fn serve(root: &Path) -> i32 {
     0
 }
 
+/// Set by the devpit plugin for Claude Code on the server it starts.
+pub const FROM_PLUGIN: &str = "DEVPIT_MCP_PLUGIN";
+
+/// Whether this is the plugin's server in a session that devpit also started
+/// with `--mcp-config`: the same tools twice, under two names. The plugin's
+/// copy then offers none.
+fn beside_the_flag(root: &Path) -> bool {
+    if std::env::var_os(FROM_PLUGIN).is_none() {
+        return false;
+    }
+    let ours = root.join("mcp.json").display().to_string();
+    parent_argv().is_some_and(|argv| argv.contains("--mcp-config") && argv.contains(&ours))
+}
+
+/// The command line of the process that started this one — the agent.
+fn parent_argv() -> Option<String> {
+    let parent = std::os::unix::process::parent_id();
+    if let Ok(raw) = std::fs::read(format!("/proc/{parent}/cmdline")) {
+        return Some(String::from_utf8_lossy(&raw).replace('\0', " "));
+    }
+    let out = std::process::Command::new("ps")
+        .args(["-o", "args=", "-p", &parent.to_string()])
+        .output()
+        .ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
 /// One JSON-RPC message in, at most one out. `ask` is the app.
+#[cfg(test)]
 pub(crate) fn handle(
     line: &str,
     ask: &dyn Fn(&str, Value) -> Result<Value, String>,
+) -> Option<String> {
+    handle_offering(line, ask, true)
+}
+
+/// [`handle`], offering the tools or, where another server already does,
+/// none.
+pub(crate) fn handle_offering(
+    line: &str,
+    ask: &dyn Fn(&str, Value) -> Result<Value, String>,
+    offered: bool,
 ) -> Option<String> {
     let Ok(message) = serde_json::from_str::<Value>(line) else {
         return Some(error(Value::Null, -32700, "that is not JSON"));
@@ -120,6 +161,7 @@ pub(crate) fn handle(
             "instructions": guide::INSTRUCTIONS,
         }),
         "ping" => json!({}),
+        "tools/list" if !offered => json!({ "tools": [] }),
         "tools/list" => json!({ "tools": TOOLS.iter().map(|tool| json!({
             "name": tool.name,
             "description": tool.description,

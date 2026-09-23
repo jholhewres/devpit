@@ -194,7 +194,7 @@ export const CommandInput = forwardRef<CommandInputHandle, {
             {glance.branch}
             {glance.files > 0 && (
               <span className="cin__diff">
-                {glance.files} · <span className="cin__add">+{glance.added}</span> <span className="cin__del">-{glance.removed}</span>
+                {glance.files} · <span className="cin__add">+{glance.added}</span> <span className="cin__del">−{glance.removed}</span>
               </span>
             )}
           </span>
@@ -231,7 +231,6 @@ export const CommandInput = forwardRef<CommandInputHandle, {
       )}
 
       <div className="cin__box">
-        <span className="cin__caret" aria-hidden="true">❯</span>
         <div className="cin__edit">
           {ghost && (
             <div className="cin__ghost" aria-hidden="true">

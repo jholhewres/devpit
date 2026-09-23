@@ -4,6 +4,7 @@ import type { FolderGlance } from '../gen/bindings'
 import { shortPath } from './blockText'
 import { Folder, Pencil } from './GitIcons'
 import { ask, commands } from './live'
+import { PluginChip } from './PluginChip'
 import { abandoned, committed } from './typing'
 import { useShell } from './useShell'
 
@@ -20,6 +21,7 @@ export function AgentBar({
   projectId,
   paneId,
   agent,
+  agentId,
   cwd,
   home,
   onSent,
@@ -27,6 +29,8 @@ export function AgentBar({
   projectId: string
   paneId: string
   agent: string
+  /** `claude`, `codex` — which agent, where `agent` is what it is called. */
+  agentId: string | null
   cwd: string | null
   home: string | null
   /** The keyboard goes back to the terminal. */
@@ -115,11 +119,12 @@ export function AgentBar({
           </span>
         )}
         <span className="abar__gap" />
+        {agentId === 'claude' && <PluginChip />}
         <button className="abar__b" onClick={toggleFiles} title="The project's files">
-          <Folder size={12} /> Files
+          <Folder size={14} /> Files
         </button>
         <button className="abar__b" data-on={composing ? 'true' : undefined} onClick={() => setComposing(!composing)} title="Write the next message in an editor (Ctrl+G)">
-          <Pencil size={12} /> Compose
+          <Pencil size={14} /> Compose
         </button>
       </div>
     </div>

@@ -289,6 +289,13 @@ export const commands = {
 	args: string[],
 	env: EnvVar[],
 } | null, RpcError>(__TAURI_INVOKE("agent_profile_read", { command })),
+	/**  `claude_plugin.state` — the plugin in each Claude installation. */
+	claudePluginState: () => typedError<ClaudePluginInstallation[], RpcError>(__TAURI_INVOKE("claude_plugin_state")),
+	/**
+	 *  `claude_plugin.install` — installs or brings up to date the plugin in every
+	 *  Claude installation that is behind. Answers what each one ended as.
+	 */
+	claudePluginInstall: () => typedError<ClaudePluginInstallation[], RpcError>(__TAURI_INVOKE("claude_plugin_install")),
 	/**
 	 *  `agent.profile_remove` — forgets one.
 	 * 
@@ -1610,6 +1617,17 @@ export type Checkout = {
 	/**  False when the row names a folder that is no longer there. */
 	exists: boolean,
 };
+
+export type ClaudePluginInstallation = {
+	directory: string,
+	profiles: string[],
+	state: ClaudePluginState,
+};
+
+/**  Where the plugin stands in one installation. */
+export type ClaudePluginState = "missing" | 
+/**  Installed from an earlier build of the plugin. */
+"outdated" | "current";
 
 export type Column = {
 	id: string,

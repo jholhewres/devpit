@@ -7,6 +7,38 @@
 use std::path::Path;
 
 /// The settings a turn is launched with, so its hooks reach us.
+pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
+    // devpit's own read tools need no question each time: they only read
+    // the board this agent is working on. Writing still asks.
+    let allowed = r#""permissions":{"allow":["mcp__devpit__devpit_context","mcp__devpit__devpit_board","mcp__devpit__devpit_card"]}"#;
+    // Said to every hook this session runs, so the plugin's copy of the same
+    // hooks (`plugin_hooks_json`) knows these already report and stays quiet.
+    let marked = format!(r#""env":{{"{HOOKED}":"1"}}"#);
+    format!(
+        "{{\"hooks\":{},{allowed},{marked}}}",
+        hooks(endpoint_file, auth_file, "")
+    )
+}
+
+/// The same hooks, as the devpit plugin for Claude Code carries them.
+///
+/// A plugin reaches every session of the installation it is installed in —
+/// one typed by hand, one started through the person's own shell function —
+/// which the flags on a launch line cannot. So each hook first checks that it
+/// runs inside a devpit terminal, and that the session was not also launched
+/// with the flags: two copies of a hook would report every event twice.
+pub fn plugin_hooks_json(endpoint_file: &Path, auth_file: &Path) -> String {
+    let guard = format!(
+        "[ -n \"${pane}\" ] && [ -z \"${HOOKED}\" ] || exit 0; ",
+        pane = devpit_tmux_pane_env()
+    );
+    format!("{{\"hooks\":{}}}", hooks(endpoint_file, auth_file, &guard))
+}
+
+/// Set in the environment of a session launched with devpit's settings.
+pub const HOOKED: &str = "DEVPIT_HOOKED";
+
+/// The events devpit hears, each running `guard` and then its post.
 ///
 /// `curl` rather than a helper binary: it is already on the machine, and a
 /// helper would be one more thing to ship, find and keep in step.
@@ -15,19 +47,19 @@ use std::path::Path;
 /// makes, so an app that has gone away has to cost it a second and a half,
 /// not a hang. `--noproxy` because a proxy in the environment must not be
 /// consulted for a loopback address.
-pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
+fn hooks(endpoint_file: &Path, auth_file: &Path, guard: &str) -> String {
     let file = endpoint_file.display().to_string();
     let auth = auth_file.display().to_string();
 
     // Told and forgotten. The reply is discarded and the budget is short,
     // because these only report what happened and the agent is waiting.
-    let tell = post(&file, &auth, "1.5", false);
+    let tell = format!("{guard}{}", post(&file, &auth, "1.5", false));
 
     // `PreToolUse` is the one that can be answered, so its reply is printed:
     // the app either sends back a decision or sends back nothing, and nothing
     // leaves the CLI's own permission mode in charge. The budget is long
     // because on this one the answer is a person.
-    let consult = post(&file, &auth, "125", true);
+    let consult = format!("{guard}{}", post(&file, &auth, "125", true));
 
     let hooks: Vec<String> = [
         ("PreToolUse", &consult),
@@ -55,11 +87,7 @@ pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
         )
     })
     .collect();
-
-    // devpit's own read tools need no question each time: they only read
-    // the board this agent is working on. Writing still asks.
-    let allowed = r#""permissions":{"allow":["mcp__devpit__devpit_context","mcp__devpit__devpit_board","mcp__devpit__devpit_card"]}"#;
-    format!("{{\"hooks\":{{{}}},{allowed}}}", hooks.join(","))
+    format!("{{{}}}", hooks.join(","))
 }
 
 /// The shell one hook runs.

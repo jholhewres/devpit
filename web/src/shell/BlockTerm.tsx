@@ -54,7 +54,8 @@ let home: Promise<string | null> | null = null
 function homeFolder(): Promise<string | null> {
   home ??= ask(() => commands.appInfo()).then((answer) => {
     const state = answer.data?.statePath
-    return state ? state.replace(/\/[^/]+\/?$/, '') || null : null
+    // `<home>/.devpit/state.db`: two steps up, not one.
+    return state ? state.replace(/\/[^/]+\/[^/]+\/?$/, '') || null : null
   })
   return home
 }
@@ -74,7 +75,8 @@ export function BlockTerm({
 }): React.JSX.Element {
   const { state, clear } = usePaneBlocks(paneId)
   const { running } = useShell()
-  const agent = running.find((one) => one.paneId === paneId && one.agent)?.label ?? null
+  const front = running.find((one) => one.paneId === paneId && one.agent)
+  const agent = front?.label ?? null
   const [wanted, setWanted] = useState(() => !classicPanes().has(paneId))
   const [history, setHistory] = useState(() => recalled(projectId))
   const [homeDir, setHomeDir] = useState<string | null>(null)
@@ -152,7 +154,9 @@ export function BlockTerm({
 
   return (
     <div className="bterm" data-mode={mode} data-pane-id={paneId} onKeyDownCapture={jump}>
-      {(mode === 'idle' || mode === 'running') && (
+      {/* While a command runs, only blocks that exist take room from it: an
+          empty list above a build was half the pane saying nothing. */}
+      {(mode === 'idle' || (mode === 'running' && done.length > 0)) && (
         <div className="bterm__list" ref={list} tabIndex={-1}>
           {done.length === 0 && <div className="bterm__empty">Commands you run here show up as blocks.</div>}
           {done.map((block) => (
@@ -188,7 +192,7 @@ export function BlockTerm({
         />
       </div>
       {agent && mode !== 'idle' && (
-        <AgentBar projectId={projectId} paneId={paneId} agent={agent} cwd={state.cwd} home={homeDir} onSent={() => terminal.current?.focus()} />
+        <AgentBar projectId={projectId} paneId={paneId} agent={agent} agentId={front?.agent ?? null} cwd={state.cwd} home={homeDir} onSent={() => terminal.current?.focus()} />
       )}
       {mode === 'idle' && (
         <CommandInput

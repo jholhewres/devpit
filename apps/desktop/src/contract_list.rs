@@ -11,13 +11,13 @@ use tauri_specta::{collect_commands, Builder};
 use crate::{
     account, adopting, agent_choice, agent_profiles, arranging, asking, blocks, board, branches,
     browser, browser_cookies, browser_driving, browser_menu, card_chat, card_work, cards, chat,
-    checkpoint, checkpoint_findings, checkpoint_preview, cloning, columns, commands, diffs, files,
-    filetree, front, happening, heads_down, history, in_flight, index, installations, mcp, moving,
-    notices, openers, outside_sessions, pane_screen, panels, panes, pasting, paths, plan_limits,
-    plugin_data, plugins, projects, receipts, regrouping, reveal, rewinding, runs_list, saves,
-    search, session_search, sessions, settings, shell_launch, skills, slash, sources,
-    spend_history, staging, steering, steps, threads, update, watching, workspace, worktree_base,
-    worktrees, wsfiles,
+    checkpoint, checkpoint_findings, checkpoint_preview, claude_plugin, cloning, columns, commands,
+    diffs, files, filetree, front, happening, heads_down, history, in_flight, index, installations,
+    mcp, moving, notices, openers, outside_sessions, pane_screen, panels, panes, pasting, paths,
+    plan_limits, plugin_data, plugins, projects, receipts, regrouping, reveal, rewinding,
+    runs_list, saves, search, session_search, sessions, settings, shell_launch, skills, slash,
+    sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
+    worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -62,6 +62,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         agent_profiles::agent_profiles,
         agent_profiles::agent_profile_save,
         agent_profiles::agent_profile_read,
+        claude_plugin::claude_plugin_state,
+        claude_plugin::claude_plugin_install,
         agent_profiles::agent_profile_remove,
         chat::chat_attach,
         pasting::chat_paste,

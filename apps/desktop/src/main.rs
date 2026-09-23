@@ -50,6 +50,7 @@ mod checkout;
 mod checkpoint;
 mod checkpoint_findings;
 mod checkpoint_preview;
+mod claude_plugin;
 #[cfg(any(debug_assertions, test))]
 mod contract;
 mod cycles;

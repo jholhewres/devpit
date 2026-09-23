@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::hook_settings::settings_json;
+use crate::hook_settings::{plugin_hooks_json, settings_json, HOOKED};
 
 /// The reporting hooks throw the reply away; the one that can be answered
 /// prints it, because that reply is the decision.
@@ -135,4 +135,52 @@ fn the_board_can_be_read_without_asking_and_written_only_by_asking() {
     assert!(allowed
         .iter()
         .all(|tool| !tool.contains("comment") && !tool.contains("move")));
+}
+
+/// A session launched with the settings says so to its hooks, which is what
+/// keeps the plugin's copies from reporting the same event again.
+#[test]
+fn the_settings_mark_the_session_as_already_reporting() {
+    let written = settings_json(Path::new("/tmp/endpoint"), Path::new("/tmp/hook-auth"));
+    let parsed: serde_json::Value = serde_json::from_str(&written).expect("valid json");
+    assert_eq!(parsed["env"][HOOKED], "1");
+}
+
+/// The plugin's hooks run only inside a devpit terminal, and only where the
+/// launch line did not already bring the same hooks.
+#[test]
+fn the_plugin_hooks_stay_quiet_outside_a_pane_and_beside_the_settings() {
+    let written = plugin_hooks_json(Path::new("/tmp/endpoint"), Path::new("/tmp/hook-auth"));
+    let parsed: serde_json::Value = serde_json::from_str(&written).expect("valid json");
+    let hooks = parsed["hooks"].as_object().expect("hooks");
+    assert!(hooks.contains_key("PreToolUse") && hooks.contains_key("SessionStart"));
+    for (event, entries) in hooks {
+        let command = entries[0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            command.starts_with("[ -n \"$DEVPIT_PANE\" ] && [ -z \"$DEVPIT_HOOKED\" ] || exit 0; "),
+            "{event}: {command}"
+        );
+    }
+
+    let run = |env: &[(&str, &str)]| {
+        let command = hooks["Stop"][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap_or_default();
+        // The post replaced by a word, so what is tested is the guard.
+        let guard = command.split("; ").next().unwrap_or_default();
+        let mut shell = std::process::Command::new("sh");
+        shell.arg("-c").arg(format!("{guard}; echo posted"));
+        shell.env_remove("DEVPIT_PANE").env_remove(HOOKED);
+        for (name, value) in env {
+            shell.env(name, value);
+        }
+        String::from_utf8_lossy(&shell.output().expect("sh").stdout)
+            .trim()
+            .to_owned()
+    };
+    assert_eq!(run(&[]), "");
+    assert_eq!(run(&[("DEVPIT_PANE", "leaf_1")]), "posted");
+    assert_eq!(run(&[("DEVPIT_PANE", "leaf_1"), (HOOKED, "1")]), "");
 }
