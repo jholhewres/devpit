@@ -34,6 +34,7 @@ export function Leaf({
   onTerminal,
   onBlocks,
   onSeparate,
+  cwd = null,
 }: {
   paneId: string
   projectId: string
@@ -45,6 +46,8 @@ export function Leaf({
   /** Offered on the right-click when the pane is drawn plain: back to blocks. */
   onBlocks?: () => void
   onSeparate?: () => void
+  /** The shell's folder, when it says so: where a relative path it prints is. */
+  cwd?: string | null
 }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -58,8 +61,8 @@ export function Leaf({
   /* Where a path clicked in the terminal opens: read at the click, so the
      terminal is not rebuilt when the project or the tabs change. */
   const opening = useShellPick((shell) => ({ show: shell.show, root: shell.project?.rootPath ?? null }))
-  const openingRef = useRef(opening)
-  openingRef.current = opening
+  const openingRef = useRef({ ...opening, cwd })
+  openingRef.current = { ...opening, cwd }
 
   useEffect(() => {
     const box = host.current

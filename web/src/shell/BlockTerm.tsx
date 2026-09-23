@@ -189,6 +189,7 @@ export function BlockTerm({
           onSplit={onSplit}
           onClosePane={onClosePane}
           onSeparate={onSeparate}
+          cwd={state.cwd}
           onTerminal={(one) => {
             terminal.current = one
             if (!one) return
