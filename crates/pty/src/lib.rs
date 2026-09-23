@@ -24,6 +24,7 @@
 
 pub mod agents;
 pub mod blocks;
+mod coalesce;
 mod foreground;
 pub mod host_env;
 pub mod journal;

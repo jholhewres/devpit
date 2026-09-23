@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc;
 
-use crate::{Counters, RingBuffer, Scanner, Told, BETWEEN_READS, FRAME};
+use crate::{Counters, RingBuffer, Scanner, Told, BETWEEN_READS};
 
 /// What a failed read means for the session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,16 +66,20 @@ pub(crate) fn start(
     tx: mpsc::Sender<Vec<u8>>,
     told_tx: mpsc::Sender<Told>,
 ) {
+    // Frames are cut on a thread of their own (`coalesce.rs`): this one spends
+    // its time blocked in `read`, and a flush that waits on a read waits on
+    // the program's next word.
+    let (chunks, heard) = std::sync::mpsc::sync_channel::<Vec<u8>>(64);
+    let framing = Arc::clone(&counters);
+    std::thread::spawn(move || crate::coalesce::run(heard, tx, framing));
+
     // A blocking thread, not a tokio task: reading a pty fd blocks, and
     // blocking inside the runtime starves every other task on that worker.
     std::thread::spawn(move || {
         let mut buf = [0u8; 64 * 1024];
-        let mut pending: Vec<u8> = Vec::with_capacity(64 * 1024);
-        let mut last_flush = std::time::Instant::now();
         let mut scanner = Scanner::new();
 
         loop {
-            let mut had_nothing = false;
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
@@ -89,12 +93,16 @@ pub(crate) fn start(
                     scanner.scan(chunk, |one| {
                         let _ = told_tx.try_send(one);
                     });
-                    pending.extend_from_slice(chunk);
+                    // Full means the screen is behind: waiting here is the
+                    // backpressure that reaches the writing process.
+                    if chunks.send(chunk.to_vec()).is_err() {
+                        break;
+                    }
                 }
                 Err(error) => {
                     let exited = matches!(child.try_wait(), Ok(Some(_)));
                     match after_read(&error, exited) {
-                        AfterRead::Again => had_nothing = true,
+                        AfterRead::Again => std::thread::sleep(BETWEEN_READS),
                         AfterRead::Ended => break,
                         AfterRead::Broken => {
                             eprintln!("the pty stopped being readable: {error}");
@@ -103,34 +111,12 @@ pub(crate) fn start(
                     }
                 }
             }
-
-            // Coalesce: hand over a frame's worth at a time rather than every
-            // read. Under a flood this turns tens of thousands of tiny
-            // messages into about sixty per second.
-            //
-            // Reached on a retry too, not only after a successful read: bytes
-            // that arrived just before a transient error would otherwise sit
-            // in `pending` for as long as the pty stayed quiet.
-            if last_flush.elapsed() >= FRAME && !pending.is_empty() {
-                counters.frames.fetch_add(1, Ordering::Relaxed);
-                if tx.blocking_send(std::mem::take(&mut pending)).is_err() {
-                    break;
-                }
-                pending = Vec::with_capacity(64 * 1024);
-                last_flush = std::time::Instant::now();
-            }
-
-            if had_nothing {
-                std::thread::sleep(BETWEEN_READS);
-            }
-        }
-
-        if !pending.is_empty() {
-            counters.frames.fetch_add(1, Ordering::Relaxed);
-            let _ = tx.blocking_send(pending);
         }
 
         let _ = child.wait();
+        // Dropped only now: the frames end once the child is reaped, as they
+        // always have.
+        drop(chunks);
     });
 }
 
