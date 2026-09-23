@@ -15,6 +15,7 @@ import { picturesTo } from './pasting'
 import { Turn } from './Turn'
 import { SkillPills } from './SkillPills'
 import { ResumePicker } from './ResumePicker'
+import { useFollow } from './useFollow'
 import { SlashMenu } from './SlashMenu'
 import { useChat } from './useChat'
 import { useSlash } from './useSlash'
@@ -40,7 +41,9 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   /* A chat opened from a card starts with the card in the composer, unsent. */
   const [prompt, setPrompt] = useState(tab.draft ?? '')
   const slash = useSlash(chat.profileId, prompt, setPrompt)
-  const box = useRef<HTMLDivElement>(null)
+  /* New output belongs at the bottom, where the eye already is — unless the
+     eye went up to read. */
+  const box = useFollow<HTMLDivElement>(chat.messages)
   const field = useRef<HTMLTextAreaElement>(null)
 
   const mine = active?.id === tab.id
@@ -60,16 +63,11 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (name) rename(tab.id, name)
   }, [rename, said, tab.id, tab.title])
 
-  /* New output belongs at the bottom, where the eye already is. */
-  useEffect(() => {
-    const scroll = box.current
-    if (scroll) scroll.scrollTop = scroll.scrollHeight
-  }, [chat.messages])
-
   const send = (): void => {
     if (!ready(prompt, chat.sending, chat.profileId)) return
     chat.say(prompt)
     setPrompt('')
+    box.current?.scrollTo({ top: box.current.scrollHeight })
   }
 
   /* The turn in flight is the one still streaming; arming is tied to it so a

@@ -171,13 +171,21 @@ export function useChat(conversationId: string): Chat {
           setCost((was) => was + (end.costUsd ?? 0))
           /* A turn's place in the CLI's transcript is known once it has run. */
           void ask(() => commands.chatHistory(project.id, conversationId)).then(
-            (past) => live.current && past.data && setRewindable(past.data.rewindable ?? []),
+            (past) => {
+              if (!live.current || !past.data) return
+              setRewindable(past.data.rewindable ?? [])
+              /* A new conversation learns its session from its first turn; until
+                 then nothing could tell it to stop and ask. */
+              setSession(past.data.sessionId)
+            },
           )
         })
         .catch((thrown: { message?: string }) => setError(thrown.message ?? 'the turn failed'))
         .finally(() => {
           if (!live.current) return
           setSending(false)
+          /* A question the turn left behind has nobody waiting on it now. */
+          setAsked([])
           /* The first turn settles the account for good. */
           setFixed(profileId)
         })
@@ -247,7 +255,9 @@ export function useChat(conversationId: string): Chat {
   )
 
   const stop = useCallback(() => {
-    void ask(() => commands.chatCancel(conversationId)).then(() => setSending(false))
+    /* The turn's own end clears `sending`: a stop that reached no process yet
+       leaves the turn running, and the send button must not come back under it. */
+    void ask(() => commands.chatCancel(conversationId))
   }, [conversationId])
 
   return {
