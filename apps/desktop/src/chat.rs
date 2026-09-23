@@ -55,6 +55,8 @@ pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conve
         eprintln!("{conversation_id}: {skipped} unreadable line(s)");
     }
     let head = read_head(&head_path(&sessions, &conversation_id));
+    let messages =
+        crate::adopted_history::or_backfilled(messages, head.as_ref(), &project_id, &file);
     let card = crate::card_chat::conversation_card(&crate::projects::store()?, &conversation_id)?;
     Ok(Conversation {
         id: conversation_id,

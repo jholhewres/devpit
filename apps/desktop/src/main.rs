@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod account;
+mod adopted_history;
 mod adopting;
 mod advancing;
 mod agent_api;

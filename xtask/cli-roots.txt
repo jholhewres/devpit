@@ -5,6 +5,7 @@
 # is built by `devpit_core::home::ProjectHome`, and the guard fails anywhere
 # else that spells one.
 
+apps/desktop/src/adopted_history.rs 1
 apps/desktop/src/session_search.rs 1
 apps/desktop/src/session_search_tests.rs 1
 crates/agentcli/src/outside.rs 1
