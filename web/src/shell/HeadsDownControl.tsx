@@ -99,6 +99,9 @@ export function HeadsDown({
   useEffect(() => {
     const key = (event: KeyboardEvent): void => {
       if (shortcutFor(event) !== 'focus') return
+      // Off in Settings means off for the key too; a focus already on can
+      // still be left.
+      if (!offered && !focus) return
       event.preventDefault()
       toggle()
     }
