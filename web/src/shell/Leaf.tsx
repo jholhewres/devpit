@@ -86,14 +86,35 @@ export function Leaf({
     /* The pane is `display: none` until its tab is active and animates in on a
        transform, so a fit in this tick measures nothing and xterm ends up with
        zero columns. Fit only once the box has a size. */
-    const refit = (): void => {
-      if (box.clientWidth < 2 || box.clientHeight < 2) return
-      fit.fit()
-    }
-    requestAnimationFrame(refit)
-
     let live: Attached | null = null
     let dropped = false
+    /* What the pty was last told, not what the grid was a moment ago: a fit
+       that ran while nothing was attached yet — or on coming back into view,
+       where the box did not change size — moved the grid and told nobody, and
+       every later comparison against the grid found nothing to send. The pty
+       stayed at 80×24 under a terminal twice as wide. */
+    let told: { rows: number; cols: number } | null = null
+    /* A resize sent while the attach is still being claimed is refused; it is
+       asked again shortly, a few times, rather than lost. */
+    let retries = 0
+    const refit = (): void => {
+      if (box.clientWidth >= 2 && box.clientHeight >= 2) fit.fit()
+      const { rows, cols } = terminal
+      if (!live || (told?.rows === rows && told.cols === cols)) return
+      told = { rows, cols }
+      void live.resize(rows, cols).then((applied) => {
+        /* The pty clamps; the grid follows what it actually got. */
+        if (applied && (applied.rows !== terminal.rows || applied.cols !== terminal.cols)) {
+          told = { rows: applied.rows, cols: applied.cols }
+          terminal.resize(applied.cols, applied.rows)
+        }
+        retries = 0
+      }, () => {
+        told = null
+        if (!dropped && retries++ < 10) setTimeout(refit, 200)
+      })
+    }
+    requestAnimationFrame(refit)
 
     void (async () => {
       /* Scrollback first, then the stream, or new output lands above what came
@@ -120,6 +141,9 @@ export function Leaf({
       )
       if (dropped) return attached?.detach()
       live = attached
+      told = { rows: terminal.rows, cols: terminal.cols }
+      /* The grid may have been fitted while the attach was on its way. */
+      refit()
       terminal.onData((data) => live?.write(data))
       setTerm(terminal)
     })().catch((thrown: unknown) => {
@@ -140,17 +164,7 @@ export function Leaf({
     /* The observer fires for every pixel of a drag, per visible pane. The pty
        only cares about the grid, so it is told only when rows or columns
        actually changed. */
-    const watch = new ResizeObserver(() => {
-      const before = { rows: terminal.rows, cols: terminal.cols }
-      refit()
-      if (terminal.rows === before.rows && terminal.cols === before.cols) return
-      void live?.resize(terminal.rows, terminal.cols).then((applied) => {
-        /* The pty clamps; the grid follows what it actually got. */
-        if (applied && (applied.rows !== terminal.rows || applied.cols !== terminal.cols)) {
-          terminal.resize(applied.cols, applied.rows)
-        }
-      })
-    })
+    const watch = new ResizeObserver(refit)
     watch.observe(box)
 
     /* A pane is `display: none` while another tab is in front. The rows
