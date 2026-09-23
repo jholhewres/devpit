@@ -70,8 +70,12 @@ impl Driver for Claude {
         "claude"
     }
 
+    /// The CLI's own aliases rather than dated ids: an alias follows the
+    /// provider (Bedrock, a gateway, `ANTHROPIC_DEFAULT_OPUS_MODEL`), and an id
+    /// pinned here would be wrong on every one of them. `default` leads because
+    /// it is what the account would run anyway.
     fn models(&self) -> &'static [&'static str] {
-        &["default", "opus", "sonnet", "haiku"]
+        &["default", "opus", "sonnet", "haiku", "fable", "opusplan"]
     }
 
     /// `--effort`, as the CLI's own help lists it.

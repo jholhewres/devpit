@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAway } from './away'
-import { modelName } from './chat'
+import { modelName } from './models'
 import { committed } from './typing'
 import type { Profile } from '../gen/bindings'
 

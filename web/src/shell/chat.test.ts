@@ -8,7 +8,6 @@ import {
   fixedTo,
   effortName,
   MODES,
-  modelName,
   modeName,
   money,
   ready,
@@ -175,17 +174,6 @@ describe('what the agent may do without asking', () => {
     expect(ASKS('manual')).toBe(true)
     expect(ASKS('acceptEdits')).toBe(false)
     expect(ASKS('bypassPermissions')).toBe(false)
-  })
-})
-
-describe('what a model is called on screen', () => {
-  /* A fine argument to the CLI, and a label that names no model. */
-  it('says whose default it is rather than the word default', () => {
-    expect(modelName('default')).toBe("The account's default")
-  })
-
-  it('leaves a real model name alone', () => {
-    expect(modelName('opus')).toBe('opus')
   })
 })
 

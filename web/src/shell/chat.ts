@@ -147,13 +147,6 @@ export function withFiles(prompt: string, files: readonly Attachment[]): string 
   return `${files.map((file) => `@${file.path}`).join(' ')}\n${prompt}`
 }
 
-/* What a model is called on screen.
-
-   `default` is what the CLI is passed when nobody picked, and it is a fine
-   argument and a useless label — it names no model to the person reading it. */
-export const modelName = (model: string): string =>
-  model === 'default' ? "The account's default" : model
-
 /* Whether a conversation stopped with the person's message unanswered.
 
    The answer is written when the turn ends, so an app that closed part way

@@ -116,6 +116,15 @@ fn a_driver_that_is_not_installed_is_absent_rather_than_swapped() {
     assert!(driver("codex").is_none());
 }
 
+#[test]
+fn claude_offers_the_accounts_default_first_and_aliases_not_dated_ids() {
+    // A dated id is right on one provider; the alias is right on all of them.
+    let models = Claude.models();
+    assert_eq!(models.first(), Some(&"default"));
+    assert!(models.contains(&"fable"));
+    assert!(models.iter().all(|model| !model.starts_with("claude-")));
+}
+
 /// A real turn of Claude Code 2.1.270, sanitized: a subagent, an edit, a
 /// checklist and a backgrounded command. The shapes asserted here were read off
 /// this recording, not the documentation.
