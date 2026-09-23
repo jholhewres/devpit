@@ -46,7 +46,13 @@ jobs:
 
       # `make test` builds in debug, so a module gated wrong for release
       # compiles there and fails only when someone ships. It did once.
+      #
+      # A question about the release profile's code, not its optimisation:
+      # without LTO and with parallel codegen it is answered minutes sooner.
       - run: make build
+        env:
+          CARGO_PROFILE_RELEASE_LTO: 'off'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
 
   # Linux is where this is written, and macOS is where it breaks: a method the
   # webview exposes on one platform and not the other compiles here and fails

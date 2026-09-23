@@ -6,9 +6,9 @@ on:
   push:
     tags: ['v*']
 
-# The one permission this needs, and no other.
-permissions:
-  contents: write
+# Nothing by default: each job asks for what it needs, and the one that runs
+# every npm dependency cannot write.
+permissions: {}
 
 jobs:
   # The e2e is **not** a gate here. It runs nightly and on request
@@ -84,6 +84,10 @@ jobs:
             rust-target: universal-apple-darwin
             out: target/universal-apple-darwin/release
     runs-on: ${{ matrix.os }}
+    # Reading the code, and whether CI already passed on it.
+    permissions:
+      contents: read
+      actions: read
     steps:
       # Every action is pinned to a commit: a tag can be moved, and a moved tag
       # is somebody else's code inside a job that holds the signing key.
@@ -92,6 +96,18 @@ jobs:
         # it there, and it can write releases.
         with:
           persist-credentials: false
+
+      # Asked first, before any dependency's code has run on this machine:
+      # it is the one step that holds the job's token.
+      - name: Whether CI already passed on this commit
+        id: ci
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          passed=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&status=success" \
+            --jq '.total_count' 2>/dev/null || echo 0)
+          echo "passed=$([ "${passed:-0}" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       # The same system packages CI installs, plus what the AppImage needs:
       # linuxdeploy's gtk plugin reads librsvg-2.0.pc. macOS builds against the
@@ -155,19 +171,36 @@ jobs:
       # two runs without saying anything about what a Mac builds. What every
       # runner still answers to is the Rust half, because that is the half
       # that asks the operating system questions.
+      #
+      # The frontend half is skipped when CI already passed on this very
+      # commit: it is jsdom, the same on every machine, and CI ran it minutes
+      # before the tag. The Rust half still runs on every runner, because it
+      # is what asks this machine — 22.04's glibc, its tmux — its questions.
       - run: make test
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && steps.ci.outputs.passed != 'true'
       - run: make test-rust
-        if: runner.os != 'Linux'
+        if: runner.os != 'Linux' || steps.ci.outputs.passed == 'true'
 
       # Everything that runs somebody else's code happens here, without the
       # key: the frontend build runs every npm dependency, and cargo runs every
       # crate's build script. The binary is the one the next step packs.
+      #
+      # The frontend is built first, on its own, and both `tauri build`s below
+      # get the very same `--config`: tauri hands its merged config to cargo,
+      # and a config that differed between the two made the bundle step build
+      # the whole binary again, fat LTO and all, minutes per runner.
+      - name: Build the frontend, without the key
+        run: pnpm --filter ./web build
       - name: Build the release binary, without the key
+        env:
+          # Thin LTO on the Mac, which builds two targets one after the other
+          # and sets how long a release takes; fat LTO elsewhere.
+          CARGO_PROFILE_RELEASE_LTO: ${{ runner.os == 'macOS' && 'thin' || 'true' }}
         run: |
           ./node_modules/.bin/tauri build --no-bundle \
             ${{ matrix.rust-target && format('--target {0}', matrix.rust-target) || '' }} \
-            --config apps/desktop/tauri.release.conf.json
+            --config apps/desktop/tauri.release.conf.json \
+            --config '{"build":{"beforeBuildCommand":""}}'
 
       # The floor, proved on the artifact rather than assumed from the image.
       # A dependency that starts reaching past 2.35 — a crate, a toolchain
@@ -210,6 +243,7 @@ jobs:
       # it opens this the first time. The README says so.
       - name: Bundle and sign
         env:
+          CARGO_PROFILE_RELEASE_LTO: ${{ runner.os == 'macOS' && 'thin' || 'true' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
@@ -269,6 +303,9 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-24.04
+    # Writing the release, and nothing else.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
