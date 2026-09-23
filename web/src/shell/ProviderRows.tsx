@@ -5,6 +5,7 @@ import { AgentRow } from './AgentRow'
 import { AgentGlyph } from './AgentGlyph'
 import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from './catalogue'
 import { ask, commands } from './live'
+import { ProfileEditor } from './ProfileEditor'
 import { blank, declaredFrom, draftOf, type Draft } from './profiles'
 import { useKnownAgents } from './useKnownAgents'
 
@@ -21,6 +22,9 @@ import { useKnownAgents } from './useKnownAgents'
  */
 
 const NO_AGENT = ''
+/* The editor's open id while it holds a profile that does not exist yet. No
+   agent or minted profile id can be this. */
+const NEW = '+new'
 
 export function ProviderRows(): React.JSX.Element {
   const [profiles, setProfiles] = useState<readonly Profile[]>([])
@@ -118,6 +122,14 @@ export function ProviderRows(): React.JSX.Element {
     )
   }
 
+  /* Another account or endpoint of an agent already here — `claudin`, `glm`.
+     Claude Code first, since it is the one those variables mean anything to. */
+  const create = (): void => {
+    if (open === NEW) return setOpen(null)
+    setOpen(NEW)
+    setDraft(blank(agents.find((one) => one.id === 'claude')?.id ?? agents[0]?.id ?? ''))
+  }
+
   return (
     <>
       <div className="card2">
@@ -204,6 +216,27 @@ export function ProviderRows(): React.JSX.Element {
             {checked && <div className="card2__when">Checked {checked}</div>}
           </div>
         </div>
+
+        <div className="provnew">
+          <span className="provnew__d">
+            Another account or endpoint of the same CLI — a second sign-in in its own config
+            directory, or a gateway such as z.ai — is a profile. Each one shows up in the
+            chat&rsquo;s model picker with its own history, skills and MCP servers.
+          </span>
+          <button className="card2__go" aria-expanded={open === NEW} onClick={create}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            New profile
+          </button>
+        </div>
+        {open === NEW && draft && (
+          <ProfileEditor
+            draft={draft}
+            agents={agents}
+            onChange={setDraft}
+            onSave={save}
+            onCancel={() => setOpen(null)}
+          />
+        )}
 
         {error && <p className="acc__note">{error}</p>}
         {!error && entries.length === 0 && (

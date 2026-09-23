@@ -52,6 +52,8 @@ export interface Draft {
   readonly command: string
   readonly args: readonly string[]
   readonly env: readonly EnvVar[]
+  /** The models it offers instead of the driver's; empty keeps those. */
+  readonly models: readonly string[]
 }
 
 /** Whether a draft says enough to be saved. */
@@ -68,6 +70,9 @@ export function draftOf(profile: Profile): Draft {
     command: profile.command,
     args: profile.args ?? [],
     env: profile.env ?? [],
+    /* Its own list, not `models`: that one has the driver's filled in, and
+       saving it back would make the driver's list this profile's forever. */
+    models: profile.ownModels ?? [],
   }
 }
 
@@ -80,6 +85,7 @@ export function declaredFrom(draft: Draft): Declared {
     command: draft.command.trim(),
     args: [...draft.args],
     env: [...draft.env],
+    models: [...draft.models],
   }
 }
 
@@ -101,7 +107,7 @@ export function secret(name: string): boolean {
 
 /** A draft for a profile that does not exist yet. */
 export function blank(base: string): Draft {
-  return { id: '', label: '', base, command: '', args: [], env: [] }
+  return { id: '', label: '', base, command: '', args: [], env: [], models: [] }
 }
 
 /** The same list with one variable changed, added or dropped. */
@@ -114,4 +120,46 @@ export function withVar(
   if (next === null) copy.splice(at, 1)
   else copy[at] = next
   return copy
+}
+
+/*
+ * The variables that make a profile another account or another endpoint.
+ *
+ * `claudin` is `CLAUDE_CONFIG_DIR` and nothing else; `glm` is a base URL and a
+ * token. They get fields of their own so nobody has to remember the names, and
+ * stay ordinary variables underneath: a profile saved before these fields
+ * existed opens with its values already in them.
+ */
+export const ACCOUNT = {
+  config: 'CLAUDE_CONFIG_DIR',
+  url: 'ANTHROPIC_BASE_URL',
+  token: 'ANTHROPIC_AUTH_TOKEN',
+} as const
+
+export const ACCOUNT_VARS: readonly string[] = Object.values(ACCOUNT)
+
+/** Which agents read those variables. Another CLI would ignore them. */
+export const hasAccountFields = (base: string): boolean => base === 'claude'
+
+/** One variable's value, or empty when it is not set. */
+export function valueOf(env: readonly EnvVar[], name: string): string {
+  return env.find((one) => one.name === name)?.value ?? ''
+}
+
+/* The list with one named variable set in place, added at the end, or — when
+   emptied — dropped: an exported-but-empty `CLAUDE_CONFIG_DIR` is the shape
+   that reads as the filesystem root. */
+export function withValue(env: readonly EnvVar[], name: string, value: string): EnvVar[] {
+  const at = env.findIndex((one) => one.name === name)
+  if (value === '') return at < 0 ? [...env] : withVar(env, at, null)
+  return at < 0 ? [...env, { name, value }] : withVar(env, at, { name, value })
+}
+
+/* The variables the plain list still shows, each with its place in the whole
+   list — `withVar` edits by position, and the positions are the full list's. */
+export function others(
+  env: readonly EnvVar[],
+  hidden: readonly string[],
+): { readonly one: EnvVar; readonly at: number }[] {
+  return env.map((one, at) => ({ one, at })).filter(({ one }) => !hidden.includes(one.name))
 }

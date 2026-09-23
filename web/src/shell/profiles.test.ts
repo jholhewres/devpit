@@ -3,15 +3,21 @@ import { describe, expect, it } from 'vitest'
 import type { Profile } from '../gen/bindings'
 import type { Draft } from './profiles'
 import {
+  ACCOUNT,
+  ACCOUNT_VARS,
   argsOf,
   argsText,
   blank,
   declaredFrom,
   draftOf,
+  hasAccountFields,
   masked,
   ordered,
+  others,
   ready,
   secret,
+  valueOf,
+  withValue,
   withVar,
 } from './profiles'
 
@@ -163,9 +169,60 @@ describe('the boundary between a form and the wire', () => {
     expect(out.command).toBe('claude')
   })
 
+  /* `models` has the driver's list filled in; saving that back would pin the
+     driver's list on this profile for good. */
+  it('opens with the models the person typed, not the ones offered', () => {
+    const glm = profile({ models: ['default', 'glm-4.7'], ownModels: ['glm-4.7'] })
+    expect(draftOf(glm).models).toEqual(['glm-4.7'])
+    expect(draftOf(profile({ models: ['default', 'opus'] })).models).toEqual([])
+    expect(declaredFrom({ ...blank('claude'), models: ['glm-4.7'] }).models).toEqual(['glm-4.7'])
+  })
+
   it('keeps the id, so a rename is not a new profile', () => {
     // The whole reason the id is minted rather than derived from the name.
     const out = declaredFrom({ ...blank('claude'), id: '01J', label: 'Renamed' })
     expect(out.id).toBe('01J')
+  })
+})
+
+describe('the account fields over the variable list', () => {
+  const env = [
+    { name: 'A', value: '1' },
+    { name: 'CLAUDE_CONFIG_DIR', value: '/c' },
+  ]
+
+  it('edits a named variable where it already is', () => {
+    expect(withValue(env, ACCOUNT.config, '/d')).toEqual([
+      { name: 'A', value: '1' },
+      { name: 'CLAUDE_CONFIG_DIR', value: '/d' },
+    ])
+    expect(valueOf(env, ACCOUNT.config)).toBe('/c')
+    expect(valueOf(env, ACCOUNT.url)).toBe('')
+  })
+
+  it('adds a missing one at the end', () => {
+    expect(withValue(env, ACCOUNT.url, 'https://x').at(-1)).toEqual({
+      name: 'ANTHROPIC_BASE_URL',
+      value: 'https://x',
+    })
+  })
+
+  /* Exported but empty, `CLAUDE_CONFIG_DIR` reads as the filesystem root. */
+  it('drops one that was emptied rather than keeping it blank', () => {
+    expect(withValue(env, ACCOUNT.config, '')).toEqual([{ name: 'A', value: '1' }])
+    expect(withValue(env, ACCOUNT.url, '')).toEqual(env)
+  })
+
+  it('leaves the rest to the plain list, at their places in the whole', () => {
+    const rest = others([...env, { name: 'B', value: '2' }], ACCOUNT_VARS)
+    expect(rest.map(({ one, at }) => [one.name, at])).toEqual([
+      ['A', 0],
+      ['B', 2],
+    ])
+  })
+
+  it('only offers the fields to the agent that reads them', () => {
+    expect(hasAccountFields('claude')).toBe(true)
+    expect(hasAccountFields('codex')).toBe(false)
   })
 })

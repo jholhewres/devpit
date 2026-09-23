@@ -229,8 +229,24 @@ describe('what exactly does each one run', () => {
     known = []
     await shown()
     fireEvent.click(screen.getByLabelText('Show how GLM is started'))
+    const token = screen.getByLabelText('Token') as HTMLInputElement
+    expect(token.type).toBe('password')
+    fireEvent.click(screen.getByLabelText('Show token'))
+    expect(token.type).toBe('text')
+  })
+
+  it('hides any other secret among the plain variables too', async () => {
+    listed = [
+      profile('01JGLM', {
+        label: 'GLM',
+        env: [{ name: 'ANTHROPIC_API_KEY', value: 'sk-secret-value' }],
+      }),
+    ]
+    known = []
+    await shown()
+    fireEvent.click(screen.getByLabelText('Show how GLM is started'))
     expect(screen.queryByDisplayValue('sk-secret-value')).toBeNull()
-    fireEvent.click(screen.getByLabelText('Show ANTHROPIC_AUTH_TOKEN'))
+    fireEvent.click(screen.getByLabelText('Show ANTHROPIC_API_KEY'))
     expect(screen.getByDisplayValue('sk-secret-value')).toBeTruthy()
   })
 
@@ -244,6 +260,60 @@ describe('what exactly does each one run', () => {
     known = []
     await shown()
     expect(screen.queryByText(/sk-secret-value/)).toBeNull()
+  })
+})
+
+describe('declaring another account or endpoint', () => {
+  /* `claudin` as a person would declare it: a name and a folder. */
+  it('saves a new profile whose config directory is the variable the CLI reads', async () => {
+    await shown()
+    fireEvent.click(screen.getByText('New profile'))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'claudin' } })
+    fireEvent.change(screen.getByLabelText('Config directory'), {
+      target: { value: '~/.claude-claudin' },
+    })
+    fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(saved).toHaveBeenCalled())
+    const sent = saved.mock.calls[0][0] as Declared
+    expect(sent.id).toBe('')
+    expect(sent.base).toBe('claude')
+    expect(sent.env).toEqual([{ name: 'CLAUDE_CONFIG_DIR', value: '~/.claude-claudin' }])
+  })
+
+  /* `glm`: an endpoint, a token, and models z.ai actually serves. */
+  it('carries the endpoint, the token and its own models', async () => {
+    await shown()
+    fireEvent.click(screen.getByText('New profile'))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'glm' } })
+    fireEvent.change(screen.getByLabelText('Endpoint'), {
+      target: { value: 'https://api.z.ai/api/anthropic' },
+    })
+    fireEvent.change(screen.getByLabelText('Token'), { target: { value: 'sk-x' } })
+    fireEvent.change(screen.getByLabelText('Models'), { target: { value: 'glm-5.3[1m], glm-4.7' } })
+    fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(saved).toHaveBeenCalled())
+    const sent = saved.mock.calls[0][0] as Declared
+    expect(sent.env?.map((one) => one.name)).toEqual(['ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN'])
+    expect(sent.models).toEqual(['glm-5.3[1m]', 'glm-4.7'])
+  })
+
+  /* A profile saved before the fields existed opens with its values in them,
+     and the plain list does not show the same variable a second time. */
+  it('reads an older profile into the fields, once', async () => {
+    listed = [
+      profile('01JCL', {
+        label: 'claudin',
+        env: [
+          { name: 'CLAUDE_CONFIG_DIR', value: '/home/someone/.claude-claudin' },
+          { name: 'DISABLE_TELEMETRY', value: '1' },
+        ],
+      }),
+    ]
+    known = []
+    await shown()
+    fireEvent.click(screen.getByLabelText('Show how claudin is started'))
+    expect(screen.getAllByDisplayValue('/home/someone/.claude-claudin')).toHaveLength(1)
+    expect(screen.getByDisplayValue('DISABLE_TELEMETRY')).toBeTruthy()
   })
 })
 

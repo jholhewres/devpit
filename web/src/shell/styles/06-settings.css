@@ -66,6 +66,9 @@
 .card2__go { flex: none; height: 28px; padding: 0 11px; border-radius: 7px; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); background: var(--overlay-strong); white-space: nowrap; }
 .card2__go:hover { color: var(--text); }
 .card2__when { margin-top: 6px; font-size: 11px; color: var(--ghost); text-align: right; }
+.provnew { display: flex; align-items: center; gap: 14px; padding: 10px 12px; margin-bottom: 10px; border-radius: 9px; border: 1px dashed var(--border-strong); }
+.provnew__d { flex: 1; min-width: 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
+.provnew + .oapp { margin-bottom: 10px; }
 
 /* The default picker: chips that wrap, because twelve agents do not fit on a
    line and a row that scrolls sideways hides the one you are looking for. */

@@ -322,6 +322,12 @@ body[data-account='out'] .acct { display: none; }
 .fld__l { font-size: 11px; color: var(--text-3); }
 .fld__b { height: 32px; padding: 0 10px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); display: flex; align-items: center; font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fld__b:focus-within { border-color: var(--border-strong); }
+.fld__h { font-size: 11px; line-height: 1.45; color: var(--ghost); }
+.fld__two { display: flex; gap: 10px; }
+.fld__secret { gap: 6px; padding-right: 4px; }
+.fld__secret input { flex: 1; min-width: 0; border: 0; background: none; color: inherit; font: inherit; outline: none; }
+.fld__eye { flex: none; height: 24px; padding: 0 8px; border-radius: 6px; font-size: 11px; color: var(--text-3); }
+.fld__eye:hover { background: var(--overlay); color: var(--text); }
 .acc__sub { margin: 26px 0 10px; font-size: 12px; font-weight: 550; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
 .acc__row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 16px; background: var(--raised); border-radius: 10px; }
 .acc__row + .acc__row { margin-top: 6px; }

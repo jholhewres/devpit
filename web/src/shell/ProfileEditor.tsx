@@ -1,8 +1,19 @@
 import { useState } from 'react'
 
 import type { KnownAgent } from '../gen/bindings'
+import { AccountFields } from './AccountFields'
 import type { Draft } from './profiles'
-import { argsOf, argsText, masked, ready, secret, withVar } from './profiles'
+import {
+  ACCOUNT_VARS,
+  argsOf,
+  argsText,
+  hasAccountFields,
+  masked,
+  others,
+  ready,
+  secret,
+  withVar,
+} from './profiles'
 import { committed } from './typing'
 
 /*
@@ -95,8 +106,12 @@ export function ProfileEditor({
         />
       </label>
 
-      <span className="fld__l">Environment</span>
-      {draft.env.map((one, at) => (
+      <AccountFields key={draft.id} draft={draft} set={set} />
+
+      {/* The account fields' variables are theirs; listing them here too
+          would be two places to edit one value. */}
+      <span className="fld__l">{hasAccountFields(draft.base) ? 'Other variables' : 'Environment'}</span>
+      {others(draft.env, hasAccountFields(draft.base) ? ACCOUNT_VARS : []).map(({ one, at }) => (
         <div className="oapp" key={at}>
           <input
             className="fld__b"
