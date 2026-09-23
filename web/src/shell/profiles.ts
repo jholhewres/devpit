@@ -163,3 +163,9 @@ export function others(
 ): { readonly one: EnvVar; readonly at: number }[] {
   return env.map((one, at) => ({ one, at })).filter(({ one }) => !hidden.includes(one.name))
 }
+
+/* Said when a profile is saved, removed or switched: whatever lists them —
+   the chat's picker, the terminal's agents — reads them again, rather than
+   showing the list as it was when it opened. */
+export const PROFILES_CHANGED = 'devpit:profiles-changed'
+export const profilesChanged = (): void => void window.dispatchEvent(new Event(PROFILES_CHANGED))

@@ -154,3 +154,20 @@ fn a_default_the_person_placed_is_not_added_twice() {
     let own = ["glm-4.7".to_owned(), "default".to_owned()];
     assert_eq!(offered(&own, "claude"), ["glm-4.7", "default"]);
 }
+
+#[test]
+fn another_account_of_the_same_cli_leaves_the_plain_one_listed() {
+    // A gateway profile runs `claude` with variables of its own: it is not
+    // the default sign-in, and must not hide it.
+    let mut glm = declared("glm", "claude");
+    glm.env = vec![devpit_rpc::EnvVar {
+        name: "ANTHROPIC_BASE_URL".to_owned(),
+        value: "https://example.test".to_owned(),
+    }];
+    let knows: HashSet<String> = ["claude".to_owned()].into();
+    let listed = profiles(&[glm], base, &knows);
+    assert!(
+        listed.iter().any(|one| one.id == "claude" && !one.mine),
+        "{listed:?}"
+    );
+}

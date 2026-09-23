@@ -156,7 +156,18 @@ pub fn profiles(
         .collect();
 
     for (command, label, driver) in DISCOVERED {
-        if all.iter().any(|profile| profile.command == *command) {
+        // Named already only by the same thing: its own id (an override of
+        // it), or the same command started exactly the same way. A `glm` or a
+        // second sign-in runs `claude` too, with variables of its own — it is
+        // another account, not this one, and hiding the plain one behind it
+        // left nobody able to pick their default sign-in.
+        let named = all.iter().any(|profile| {
+            profile.id == *command
+                || (profile.command == *command
+                    && profile.env.is_empty()
+                    && profile.args.is_empty())
+        });
+        if named {
             continue;
         }
         // Discovery, so something absent is left out entirely — a declared

@@ -4,6 +4,7 @@ import type { Ask, Attachment, Context, Message, Profile, Question } from '../ge
 import { applied, ASKS, fixedTo, MODES, send, withFiles } from './chat'
 import { ask, commands } from './live'
 import { withSkills } from './pills'
+import { PROFILES_CHANGED } from './profiles'
 import { onPermissionAsked } from './window'
 import { useShell } from './useShell'
 
@@ -113,6 +114,16 @@ export function useChat(conversationId: string): Chat {
       live.current = false
     }
   }, [project, conversationId])
+
+  /* A profile saved or switched in Settings is in the picker at once. */
+  useEffect(() => {
+    const again = (): void =>
+      void ask(() => commands.agentProfiles()).then((found) => {
+        if (live.current && found.data) setProfiles(found.data.filter((profile) => profile.path !== null))
+      })
+    window.addEventListener(PROFILES_CHANGED, again)
+    return () => window.removeEventListener(PROFILES_CHANGED, again)
+  }, [])
 
   /* The session is told to hold its tools only in the mode that asks. Holding
      them in a mode that never asks would wait for a question nobody sends. */

@@ -6,7 +6,7 @@ import { AgentGlyph } from './AgentGlyph'
 import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from './catalogue'
 import { ask, commands } from './live'
 import { ProfileEditor } from './ProfileEditor'
-import { blank, declaredFrom, draftOf, type Draft } from './profiles'
+import { blank, declaredFrom, draftOf, profilesChanged, type Draft } from './profiles'
 import { useKnownAgents } from './useKnownAgents'
 
 /*
@@ -57,6 +57,7 @@ export function ProviderRows(): React.JSX.Element {
     void call()
       .then((answer) => {
         setError(answer.error)
+        if (!answer.error) profilesChanged()
         return answer
       })
       .finally(() => setBusy(false))

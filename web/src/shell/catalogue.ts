@@ -43,7 +43,7 @@ export interface Entry {
 export function catalogue(
   agents: readonly KnownAgent[],
   profiles: readonly Profile[],
-  choice: { defaultId: string },
+  choice: { defaultId: string; disabled?: readonly string[] },
 ): readonly Entry[] {
   const mine: Entry[] = profiles
     .filter((profile) => profile.mine)
@@ -71,10 +71,11 @@ export function catalogue(
       label: agent.label,
       launch: agent.launch,
       installed: agent.installed,
-      /* Absent reads as offered. The field is optional on the wire, and an
-         older answer that simply does not carry it must not hide every agent
-         on the list. */
-      enabled: agent.enabled !== false,
+      /* The choice as it stands now decides — it is what the switch just
+         changed; the catalogue's own flag was read once and goes stale.
+         Absent reads as offered: an older answer that does not carry it must
+         not hide every agent on the list. */
+      enabled: choice.disabled ? !choice.disabled.includes(agent.id) : agent.enabled !== false,
       isDefault: choice.defaultId === agent.id,
       mine: false,
       profile: null,

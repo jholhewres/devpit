@@ -322,6 +322,7 @@ describe('a switch you can switch back', () => {
     // Filtering the list the pane itself reads is how an agent turned off
     // becomes an agent nobody can turn back on.
     known = [agent('codex', { label: 'Codex', enabled: false })]
+    choice = { defaultId: '', disabled: ['codex'], hooks: true }
     await shown()
     expect(screen.getByText('Codex')).toBeTruthy()
     expect(screen.getByText('Enabled')).toBeTruthy()
@@ -329,6 +330,7 @@ describe('a switch you can switch back', () => {
 
   it('turns it back on', async () => {
     known = [agent('codex', { label: 'Codex', enabled: false })]
+    choice = { defaultId: '', disabled: ['codex'], hooks: true }
     await shown()
     fireEvent.click(screen.getByText('Enabled'))
     await waitFor(() => expect(switched).toHaveBeenCalledWith('codex', true))
@@ -336,9 +338,21 @@ describe('a switch you can switch back', () => {
 
   it('keeps it out of the default picker while it is off', async () => {
     known = [agent('codex', { label: 'Codex', enabled: false })]
+    choice = { defaultId: '', disabled: ['codex'], hooks: true }
     await shown()
     const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
     expect(picker.textContent).not.toContain('Codex')
+  })
+})
+
+describe('a switch that shows what it did', () => {
+  it('reads as switched the moment it is, not after the pane is opened again', async () => {
+    // The catalogue's own flag is read once; the choice is what the switch changes.
+    known = [agent('codex', { label: 'Codex', enabled: false })]
+    choice = { defaultId: '', disabled: [], hooks: true }
+    await shown()
+    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
+    expect(picker.textContent).toContain('Codex')
   })
 })
 
