@@ -6,11 +6,20 @@
 
 use std::path::Path;
 
+/// devpit's own read tools, allowed without a question: they only read the
+/// board the agent is working on. Writing still asks.
+pub const ALLOWED_TOOLS: &[&str] = &[
+    "mcp__devpit__devpit_context",
+    "mcp__devpit__devpit_board",
+    "mcp__devpit__devpit_card",
+];
+
 /// The settings a turn is launched with, so its hooks reach us.
 pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
-    // devpit's own read tools need no question each time: they only read
-    // the board this agent is working on. Writing still asks.
-    let allowed = r#""permissions":{"allow":["mcp__devpit__devpit_context","mcp__devpit__devpit_board","mcp__devpit__devpit_card"]}"#;
+    let allowed = format!(
+        r#""permissions":{{"allow":{}}}"#,
+        serde_json::to_string(ALLOWED_TOOLS).unwrap_or_else(|_| "[]".into())
+    );
     // Said to every hook this session runs, so the plugin's copy of the same
     // hooks (`plugin_hooks_json`) knows these already report and stays quiet.
     let marked = format!(r#""env":{{"{HOOKED}":"1"}}"#);

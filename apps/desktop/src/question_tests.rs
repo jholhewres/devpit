@@ -45,3 +45,28 @@ fn a_payload_with_no_tool_use_id_is_not_a_question() {
 fn something_that_is_not_json_is_not_a_question() {
     assert!(question_in("not json").is_none());
 }
+
+#[test]
+fn supervised_asks_only_before_a_change() {
+    use super::changes_something;
+    for asks in [
+        "Bash",
+        "Edit",
+        "Write",
+        "MultiEdit",
+        "NotebookEdit",
+        "mcp__github__create_issue",
+    ] {
+        assert!(changes_something(asks), "{asks}");
+    }
+    for left in [
+        "Read",
+        "Grep",
+        "Glob",
+        "TodoWrite",
+        "WebFetch",
+        "mcp__devpit__devpit_board",
+    ] {
+        assert!(!changes_something(left), "{left}");
+    }
+}

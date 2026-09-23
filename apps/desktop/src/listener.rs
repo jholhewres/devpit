@@ -166,9 +166,11 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     // leaves the CLI's own permission mode in charge — a board step running
     // where nobody is watching must never wait on a window.
     let held = question_in(body).filter(|question| {
-        app.try_state::<Asking>()
-            .map(|asking| asking.asks(&question.session_id))
-            .unwrap_or(false)
+        crate::question::changes_something(&question.tool)
+            && app
+                .try_state::<Asking>()
+                .map(|asking| asking.asks(&question.session_id))
+                .unwrap_or(false)
     });
 
     if let Some(question) = held {

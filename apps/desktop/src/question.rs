@@ -46,6 +46,16 @@ pub fn question_in(body: &str) -> Option<Question> {
     .filter(|question| !question.id.is_empty())
 }
 
+/// Whether a tool changes something, which is what Supervised asks about:
+/// "Ask before commands and file changes". A read, a search or devpit's own
+/// board tools — which the chat's settings already allow — are left to the
+/// CLI's permission mode, so the window never asks before a `Read`.
+pub fn changes_something(tool: &str) -> bool {
+    const CHANGING: &[&str] = &["Bash", "Edit", "Write", "MultiEdit", "NotebookEdit"];
+    CHANGING.contains(&tool)
+        || (tool.starts_with("mcp__") && !devpit_agentcli::ALLOWED_TOOLS.contains(&tool))
+}
+
 #[cfg(test)]
 #[path = "question_tests.rs"]
 mod tests;
