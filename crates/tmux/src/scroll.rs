@@ -108,6 +108,29 @@ pub(crate) fn argv(target: &str, lines: i32, state: Held) -> Option<Vec<String>>
 }
 
 impl Server {
+    /// Types `line` at a pane's prompt and runs it: the line cleared, the
+    /// screen cleared, the text — pasted, bracketed, when it is several lines
+    /// — then Enter. Literal throughout, so no word of it is read as a key.
+    pub fn submit(&self, target: &str, line: &str) -> Result<(), TmuxError> {
+        self.require(&["send-keys", "-t", target, "C-e", "C-u", "C-l"])?;
+        if line.contains('\n') {
+            self.require(&["set-buffer", "-b", "devpit-submit", "--", line])?;
+            self.require(&[
+                "paste-buffer",
+                "-p",
+                "-d",
+                "-b",
+                "devpit-submit",
+                "-t",
+                target,
+            ])?;
+        } else {
+            self.require(&["send-keys", "-t", target, "-l", "--", line])?;
+        }
+        self.require(&["send-keys", "-t", target, "Enter"])?;
+        Ok(())
+    }
+
     /// Has tmux draw every client of this leaf again from scratch.
     ///
     /// A terminal that was rebuilt, or lost its GPU context, holds nothing of

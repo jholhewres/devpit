@@ -27,7 +27,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use devpit_pty::{Scanner, Told};
+use devpit_pty::Told;
 use tauri::Emitter;
 
 use crate::happening::said;
@@ -174,7 +174,6 @@ fn spawn_reader(app: tauri::AppHandle, leaf_id: String, path: PathBuf, listening
         else {
             return;
         };
-        let mut scanner = Scanner::new();
         let mut buffer = [0u8; 8192];
         while listening.load(Ordering::Relaxed) {
             let read = match fifo.read(&mut buffer) {
@@ -182,16 +181,16 @@ fn spawn_reader(app: tauri::AppHandle, leaf_id: String, path: PathBuf, listening
                 Ok(read) => read,
                 Err(_) => break,
             };
-            scanner.scan(&buffer[..read], |told| {
-                report(&app, &leaf_id, told);
-            });
+            // Cut into blocks there, and what it says about itself reported
+            // from there — one scan of the stream, not two.
+            crate::blocks::heard(&app, &leaf_id, &buffer[..read]);
         }
     });
 }
 
 /// What the window is told — the same event an attached pane sends, so the
 /// screen has one thing to listen to whether or not it is looking.
-fn report(app: &tauri::AppHandle, leaf_id: &str, told: Told) {
+pub(crate) fn report(app: &tauri::AppHandle, leaf_id: &str, told: Told) {
     if heard_by_tap(&told) {
         let _ = app.emit("terminal:happening", said(leaf_id, told));
     }

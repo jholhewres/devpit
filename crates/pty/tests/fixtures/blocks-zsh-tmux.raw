@@ -1,0 +1,9 @@
+[1m[7m%[27m[1m[0m                                                                                                    ]7;file://host/home/user/Workspace/private/devpit]133;A[0m[27m[24m[Jhost% [K[?1h=[?2004h[H[2J[0m[27m[24m[Jhost% [Kpprintf "\033[32mgreen\033[0m line\n"[?1l>[?2004l
+]777;devpit-cmd;printf "\033[32mgreen\033[0m line\n"]133;C[32mgreen[0m line
+[1m[7m%[27m[1m[0m                                                                                                    ]133;D;0]7;file://host/home/user/Workspace/private/devpit]133;A[0m[27m[24m[Jhost% [K[?1h=[?2004h[H[2J[0m[27m[24m[Jhost% [Kffor i in 1 2 3; do printf "\rstep $i"; done; echo[?1l>[?2004l
+]777;devpit-cmd;for i in 1 2 3; do printf "\rstep $i"; done; echo]133;Cstep 1step 2step 3
+[1m[7m%[27m[1m[0m                                                                                                    ]133;D;0]7;file://host/home/user/Workspace/private/devpit]133;A[0m[27m[24m[Jhost% [K[?1h=[?2004h[H[2J[0m[27m[24m[Jhost% [Klls /nonexistent[?1l>[?2004l
+]777;devpit-cmd;ls /nonexistent]133;Cls: cannot access '/nonexistent': No such file or directory
+[1m[7m%[27m[1m[0m                                                                                                    ]133;D;2]7;file://host/home/user/Workspace/private/devpit]133;A[0m[27m[24m[Jhost% [K[?1h=[?2004h[H[2J[0m[27m[24m[Jhost% [Kccd /usr && pwd[?1l>[?2004l
+]777;devpit-cmd;cd /usr && pwd]133;C/usr
+[1m[7m%[27m[1m[0m                                                                                                    ]133;D;0]7;file://host/usr]133;A[0m[27m[24m[Jhost% [K[?1h=[?2004h

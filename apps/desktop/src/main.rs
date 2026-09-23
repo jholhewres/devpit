@@ -11,6 +11,7 @@ mod agent_reach;
 mod arranging;
 mod asking;
 mod attaching;
+mod blocks;
 mod board;
 mod branches;
 mod browser;
@@ -155,6 +156,7 @@ fn main() {
         .manage(chat::Talking::default())
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
+        .manage(blocks::Blocks::default())
         .manage(update::Updating::default())
         /* Empty, and filled only by somebody granting a pane. */
         .manage(browser_driving::Granted::default())

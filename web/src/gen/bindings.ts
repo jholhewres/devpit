@@ -990,6 +990,40 @@ export const commands = {
 	/**  `session.redraw` — tmux draws this leaf's screen again, whole. */
 	sessionRedraw: (projectId: string, paneId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("session_redraw", { projectId, paneId })),
 	/**
+	 *  `pane.blocks` — every block this pane has kept, oldest first and the one
+	 *  still running last, with where its shell stands.
+	 */
+	paneBlocks: (paneId: string) => typedError<PaneBlocks, RpcError>(__TAURI_INVOKE("pane_blocks", { paneId })),
+	/**  `block.output` — what a block printed, as the terminal received it. */
+	blockOutput: (paneId: string, blockId: number | null) => typedError<string, RpcError>(__TAURI_INVOKE("block_output", { paneId, blockId })),
+	/**  `pane.blocks_clear` — forgets a pane's finished blocks. */
+	paneBlocksClear: (paneId: string) => typedError<null, RpcError>(__TAURI_INVOKE("pane_blocks_clear", { paneId })),
+	/**
+	 *  `terminal.block_changes` — the shape `terminal:block` carries, so the
+	 *  generated contract knows it (the reason `terminal.happenings` exists).
+	 */
+	terminalBlockChanges: () => typedError<BlockChanged[], RpcError>(__TAURI_INVOKE("terminal_block_changes")),
+	/**
+	 *  `pane.submit` — a line typed in the terminal's own input, run in the pane.
+	 * 
+	 *  Whatever the shell's line already holds is cleared first — the end of it,
+	 *  then all of it back to the prompt, which is `C-e C-u` in bash, zsh and
+	 *  fish alike — and the screen too, so the running command starts on a clean
+	 *  one. Several lines go as a bracketed paste, so the shell takes them as one
+	 *  command rather than running each as it arrives.
+	 */
+	paneSubmit: (projectId: string, paneId: string, line: string) => typedError<null, RpcError>(__TAURI_INVOKE("pane_submit", { projectId, paneId, line })),
+	/**
+	 *  `folder.glance` — a folder's branch and its difference from `HEAD`, for
+	 *  the terminal's prompt chips. Nothing outside a repository.
+	 */
+	folderGlance: (folder: string) => typedError<{
+	branch: string,
+	files: number,
+	added: number,
+	removed: number,
+} | null, RpcError>(__TAURI_INVOKE("folder_glance", { folder })),
+	/**
 	 *  `pane.scrollback` — what this pane has printed, oldest kept byte first.
 	 * 
 	 *  This is what makes reopening a window show a terminal rather than an empty
@@ -1296,6 +1330,12 @@ export type Attachment = {
 	kind: string,
 };
 
+/**  A block that started or ended, in the pane it belongs to. */
+export type BlockChanged = {
+	paneId: string,
+	block: CommandBlock,
+};
+
 /**
  *  Response of `board.get`.
  * 
@@ -1552,6 +1592,27 @@ export type Column = {
 export type ColumnDeleted = {
 	deleted: boolean,
 	cardsInTheWay: number,
+};
+
+/**  One command a pane ran, or is running. */
+export type CommandBlock = {
+	/**
+	 *  Rises with every block the pane has had while the app ran. `f64`
+	 *  because it crosses into a JavaScript number.
+	 */
+	id: number | null,
+	command: string | null,
+	/**  Where it ran, when the shell said. */
+	cwd: string | null,
+	/**  Unix milliseconds. */
+	startedAt: number | null,
+	endedAt: number | null,
+	/**  Absent while running, and for a command that ended without saying. */
+	code: number | null,
+	/**  It took the whole screen, so its output is drawing, not lines. */
+	interactive: boolean,
+	/**  Its output was too long, and the start of it was dropped. */
+	truncated: boolean,
 };
 
 /**  One line of the card's conversation. */
@@ -1838,6 +1899,14 @@ export type Finding = {
 	 *  is a claim, not a finding.
 	 */
 	why: string,
+};
+
+/**  A folder's git state, for a terminal's prompt chips. */
+export type FolderGlance = {
+	branch: string,
+	files: number,
+	added: number,
+	removed: number,
 };
 
 /**
@@ -2179,6 +2248,21 @@ export type OutsideSession = {
 	installation: string,
 	/**  Unix seconds. */
 	lastAt: number | null,
+};
+
+/**  A pane's blocks, and where its shell stands. */
+export type PaneBlocks = {
+	/**  Oldest first; the one still running, if any, last. */
+	blocks: CommandBlock[],
+	/**
+	 *  The shell has been heard marking its prompts since the app started, so
+	 *  its commands can be drawn as blocks.
+	 */
+	integrated: boolean,
+	/**  It is at its prompt, waiting for a line. */
+	atPrompt: boolean,
+	/**  The folder it last said it was in. */
+	cwd: string | null,
 };
 
 /**  One pane, and the whole process tree under it. */

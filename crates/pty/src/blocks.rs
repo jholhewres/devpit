@@ -48,6 +48,9 @@ pub struct Block {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cut {
     Started(Head),
+    /// The running block learnt something new about itself: it took the whole
+    /// screen.
+    Changed(Head),
     Ended(Head),
 }
 
@@ -77,6 +80,13 @@ pub struct Segmenter {
     held_sequence: Option<usize>,
     /// The rest of an envelope's closing `ESC \`, when a chunk ended inside it.
     expect_close: &'static [u8],
+    /// A prompt has been seen: the shell's hooks are in place, so its commands
+    /// can be shown as blocks at all.
+    integrated: bool,
+    /// The last thing heard was a prompt, with no command since.
+    at_prompt: bool,
+    /// The running block turned interactive during the last feed.
+    changed: bool,
 }
 
 impl Segmenter {
@@ -87,6 +97,21 @@ impl Segmenter {
     /// The block still running, if one is.
     pub fn running(&self) -> Option<&Block> {
         self.running.as_ref()
+    }
+
+    /// Whether this pane's shell has been heard marking its prompts.
+    pub fn integrated(&self) -> bool {
+        self.integrated
+    }
+
+    /// Whether the shell is at its prompt, waiting for a line.
+    pub fn at_prompt(&self) -> bool {
+        self.at_prompt
+    }
+
+    /// The folder the shell last said it was in.
+    pub fn cwd(&self) -> Option<&str> {
+        self.cwd.as_deref()
     }
 
     /// Feeds a chunk of the raw stream. `told` hears every sequence as the
@@ -157,6 +182,11 @@ impl Segmenter {
         };
         self.keep(&data[cursor..hold]);
         self.held = data[hold..].to_vec();
+        if std::mem::take(&mut self.changed) {
+            if let Some(block) = &self.running {
+                cut(Cut::Changed(block.head.clone()), None);
+            }
+        }
     }
 
     fn keep(&mut self, bytes: &[u8]) {
@@ -168,6 +198,7 @@ impl Segmenter {
         }
         if !block.head.interactive && contains(bytes, ALT_SCREEN) {
             block.head.interactive = true;
+            self.changed = true;
         }
         block.output.extend_from_slice(bytes);
         if block.output.len() > MOST_OUTPUT {
@@ -189,6 +220,7 @@ impl Segmenter {
                 _ => self.announced = Some(line),
             },
             Told::OutputBegan => {
+                self.at_prompt = false;
                 // A start with one still running: that one ended unsaid.
                 self.end(None, now_ms, cut);
                 self.next_id += 1;
@@ -214,6 +246,8 @@ impl Segmenter {
             Told::PromptBegan => {
                 self.end(None, now_ms, cut);
                 self.announced = None;
+                self.integrated = true;
+                self.at_prompt = true;
             }
             Told::Title(_) | Told::Clipboard(_) => {}
         }

@@ -176,3 +176,19 @@ fn two_commands_cut_into_three_reads_anywhere_come_out_the_same() {
         }
     }
 }
+
+#[test]
+fn a_pane_says_whether_it_is_at_its_prompt_and_when_a_command_takes_the_screen() {
+    let mut segmenter = Segmenter::new();
+    let mut cuts = Vec::new();
+    assert!(!segmenter.integrated());
+    let prompt = format!("{}{}", tmux("7;file://h/w"), tmux("133;A"));
+    segmenter.feed(prompt.as_bytes(), 1, |_| {}, |one, _| cuts.push(one));
+    assert!(segmenter.integrated() && segmenter.at_prompt());
+    assert_eq!(segmenter.cwd(), Some("/w"));
+    let vim = format!("{}{}", tmux("777;devpit-cmd;vim"), tmux("133;C"));
+    segmenter.feed(vim.as_bytes(), 2, |_| {}, |one, _| cuts.push(one));
+    assert!(!segmenter.at_prompt());
+    segmenter.feed(b"\x1b[?1049h", 3, |_| {}, |one, _| cuts.push(one));
+    assert!(matches!(cuts.last(), Some(Cut::Changed(head)) if head.interactive));
+}

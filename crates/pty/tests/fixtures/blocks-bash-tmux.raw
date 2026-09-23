@@ -1,0 +1,9 @@
+]7;file://host/home/user/Workspace/private/devpit]133;A[?2004huser@host:/home/user/Workspace/private/devpit$ [H[2Juser@host:/home/user/Workspace/private/devpit$ printf "\033[32mgreen\033[0m line\n"
+[?2004l]777;devpit-cmd;printf "\033[32mgreen\033[0m line\n"]133;C[32mgreen[0m line
+]133;D;0]7;file://host/home/user/Workspace/private/devpit]133;A[?2004huser@host:/home/user/Workspace/private/devpit$ [H[2Juser@host:/home/user/Workspace/private/devpit$ for i in 1 2 3; do printf "\rstep $i"; done; echo
+[?2004l]777;devpit-cmd;for i in 1 2 3; do printf "\rstep $i"; done; echo]133;Cstep 1step 2step 3
+]133;D;0]7;file://host/home/user/Workspace/private/devpit]133;A[?2004huser@host:/home/user/Workspace/private/devpit$ [H[2Juser@host:/home/user/Workspace/private/devpit$ ls /nonexistent
+[?2004l]777;devpit-cmd;ls /nonexistent]133;Cls: cannot access '/nonexistent': No such file or directory
+]133;D;2]7;file://host/home/user/Workspace/private/devpit]133;A[?2004huser@host:/home/user/Workspace/private/devpit$ [H[2Juser@host:/home/user/Workspace/private/devpit$ cd /usr && pwd
+[?2004l]777;devpit-cmd;cd /usr && pwd]133;C/usr
+]133;D;0]7;file://host/usr]133;A[?2004huser@host:/usr$ 

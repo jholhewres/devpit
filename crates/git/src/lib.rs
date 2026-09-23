@@ -24,6 +24,7 @@ mod branches_tests;
 mod clone;
 mod discard;
 mod front;
+mod glance;
 pub mod index;
 #[cfg(test)]
 mod index_tests;
@@ -50,6 +51,7 @@ pub use branches::{branch_at, branches, switch, Branch};
 pub use clone::{clone, folder_for};
 pub use discard::discard;
 pub use front::{at_head, changed_since, diff_since, head_of, remove_front, unsaved_in};
+pub use glance::{glance, Glance};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
     assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,

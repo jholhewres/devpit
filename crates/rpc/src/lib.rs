@@ -9,6 +9,7 @@
 
 pub mod account;
 pub mod agents;
+pub mod blocks;
 pub mod board;
 pub mod card;
 pub mod chat;
@@ -37,6 +38,7 @@ pub mod usage;
 
 pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
+pub use blocks::{BlockChanged, CommandBlock, FolderGlance, PaneBlocks};
 pub use board::{Board, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use card::{
     ArchivedCard, ArchivedCards, CardDeleted, CardDetail, CardTerminal, Checkout, Comment,

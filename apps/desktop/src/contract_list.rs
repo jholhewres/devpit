@@ -9,14 +9,14 @@
 use tauri_specta::{collect_commands, Builder};
 
 use crate::{
-    account, adopting, agent_choice, agent_profiles, arranging, asking, board, branches, browser,
-    browser_cookies, browser_driving, browser_menu, card_chat, card_work, cards, chat, checkpoint,
-    checkpoint_findings, checkpoint_preview, columns, commands, diffs, files, filetree, front,
-    happening, heads_down, history, in_flight, index, installations, mcp, moving, notices, openers,
-    outside_sessions, panels, panes, pasting, paths, plan_limits, plugin_data, plugins, projects,
-    receipts, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
-    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, threads, update,
-    watching, workspace, worktree_base, worktrees, wsfiles,
+    account, adopting, agent_choice, agent_profiles, arranging, asking, blocks, board, branches,
+    browser, browser_cookies, browser_driving, browser_menu, card_chat, card_work, cards, chat,
+    checkpoint, checkpoint_findings, checkpoint_preview, columns, commands, diffs, files, filetree,
+    front, happening, heads_down, history, in_flight, index, installations, mcp, moving, notices,
+    openers, outside_sessions, panels, panes, pasting, paths, plan_limits, plugin_data, plugins,
+    projects, receipts, reveal, rewinding, runs_list, saves, search, session_search, sessions,
+    settings, shell_launch, skills, slash, sources, spend_history, staging, steering, steps,
+    threads, update, watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -179,6 +179,12 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         panes::session_resize,
         panes::session_scroll,
         panes::session_redraw,
+        blocks::pane_blocks,
+        blocks::block_output,
+        blocks::pane_blocks_clear,
+        blocks::terminal_block_changes,
+        blocks::pane_submit,
+        blocks::folder_glance,
         panes::pane_scrollback,
         panes::session_detach,
         shell_launch::session_running,
