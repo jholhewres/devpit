@@ -6,7 +6,7 @@ import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
 import { withSkills } from './pills'
-import { PROFILES_CHANGED } from './profiles'
+import { offers, PROFILES_CHANGED } from './profiles'
 import { onChatWoke, onPermissionAsked } from './window'
 import { useShellPick } from './shellStore'
 
@@ -61,6 +61,11 @@ export interface Chat {
   say: (prompt: string) => void
   stop: () => void
 }
+
+/* What the composer can pick: something devpit can spawn, switched on, or
+   the account this conversation already belongs to. */
+const pickable = (all: readonly Profile[], belongs: string | null): Profile[] =>
+  all.filter((profile) => profile.path !== null).filter(offers(belongs))
 
 export function useChat(conversationId: string): Chat {
   const { project, show } = useShellPick((shell) => ({ project: shell.project, show: shell.show }))
@@ -129,9 +134,9 @@ export function useChat(conversationId: string): Chat {
         ask(() => commands.agentProfiles()),
       ])
       if (!live.current) return
+      const belongs = past.data ? fixedTo(past.data) : null
       if (past.data) {
         setMessages(past.data.messages)
-        const belongs = fixedTo(past.data)
         setFixed(belongs)
         setProfileId(belongs)
         setModel(past.data.model)
@@ -145,7 +150,7 @@ export function useChat(conversationId: string): Chat {
         setRewindable(past.data.rewindable ?? [])
         rejoined(project.id)
       }
-      const installed = (found.data ?? []).filter((profile) => profile.path !== null)
+      const installed = pickable(found.data ?? [], belongs)
       setProfiles(installed)
       /* The driver's own default, until someone picks otherwise. */
       setEffort((was) => was ?? installed[0]?.effortDefault ?? null)
@@ -184,11 +189,11 @@ export function useChat(conversationId: string): Chat {
   useEffect(() => {
     const again = (): void =>
       void ask(() => commands.agentProfiles()).then((found) => {
-        if (live.current && found.data) setProfiles(found.data.filter((profile) => profile.path !== null))
+        if (live.current && found.data) setProfiles(pickable(found.data, fixed))
       })
     window.addEventListener(PROFILES_CHANGED, again)
     return () => window.removeEventListener(PROFILES_CHANGED, again)
-  }, [])
+  }, [fixed])
 
   /* The session is told to hold its tools only in the mode that asks. Holding
      them in a mode that never asks would wait for a question nobody sends. */

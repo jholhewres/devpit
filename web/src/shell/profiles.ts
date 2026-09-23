@@ -13,6 +13,16 @@ import type { Declared, EnvVar, Profile } from '../gen/bindings'
  * finished. The markup reads them.
  */
 
+/*
+ * Whether a menu offers this profile. A missing switch reads as on, as it
+ * does for `agents.known`; the one already `chosen` stays, so a conversation
+ * or a step on an account switched off since still shows what it runs.
+ */
+export const offers =
+  (chosen: string | null) =>
+  (profile: Profile): boolean =>
+    profile.enabled !== false || profile.id === chosen
+
 /** Arguments as one line, because that is how a person says them. */
 export function argsOf(line: string): string[] {
   return line.split(/\s+/).filter((word) => word.length > 0)
