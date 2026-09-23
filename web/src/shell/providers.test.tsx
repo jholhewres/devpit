@@ -189,6 +189,9 @@ describe('what exactly does each one run', () => {
     const sent = saved.mock.calls[0]![0] as Declared
     expect(sent.base).toBe('claude')
     expect(sent.args).toEqual(['--permission-mode', 'bypassPermissions'])
+    // Under the built-in's own id: the switch, the default and every step
+    // that named `claude` keep meaning this row.
+    expect(sent.id).toBe('claude')
   })
 
   it('keeps the id when a profile is renamed', async () => {

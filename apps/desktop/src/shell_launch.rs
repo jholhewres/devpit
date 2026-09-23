@@ -225,18 +225,29 @@ pub async fn agents_known() -> Result<Vec<KnownAgent>, RpcError> {
                 enabled: on(&one.id),
                 homepage: String::new(),
             });
-        mine.chain(devpit_pty::agents::KNOWN.iter().map(|one| KnownAgent {
+        let built = devpit_pty::agents::KNOWN.iter().map(|one| KnownAgent {
             id: one.id.to_owned(),
             label: one.label.to_owned(),
             launch: one.launch.to_owned(),
             installed: knows.contains(program_of(one.launch)),
             enabled: on(one.id),
             homepage: one.homepage.to_owned(),
-        }))
-        .collect()
+        });
+        joined(mine.collect(), built)
     })
     .await
     .map_err(|err| RpcError::internal(err.to_string()))
+}
+
+/// The person's own first, then every built-in they have not overridden.
+///
+/// An override keeps the built-in's id, so listing both would be one id on two
+/// rows, each starting something different.
+fn joined(mine: Vec<KnownAgent>, built: impl Iterator<Item = KnownAgent>) -> Vec<KnownAgent> {
+    let taken: Vec<String> = mine.iter().map(|one| one.id.clone()).collect();
+    mine.into_iter()
+        .chain(built.filter(|one| !taken.contains(&one.id)))
+        .collect()
 }
 
 /// The program a launch line starts, which is its first word.

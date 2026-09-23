@@ -171,3 +171,19 @@ fn another_account_of_the_same_cli_leaves_the_plain_one_listed() {
         "{listed:?}"
     );
 }
+
+#[test]
+fn an_override_saved_under_a_built_ins_id_takes_its_place() {
+    // Editing Claude Code keeps the id `claude`, so what pointed at it still
+    // does — and the discovered row it replaces must not come back beside it.
+    let all = profiles(
+        &[declared("claude", "claude-beta")],
+        base,
+        &knows(&["claude", "claude-beta"]),
+    );
+    assert_eq!(all.iter().filter(|one| one.id == "claude").count(), 1);
+    assert!(all
+        .iter()
+        .find(|one| one.id == "claude")
+        .is_some_and(|one| one.mine));
+}

@@ -114,14 +114,16 @@ export function ProviderRows(): React.JSX.Element {
     )
 
   /* Opening a built-in starts a profile based on it: an override and an
-     account are the same three fields, so they are the same editor. */
+     account are the same three fields, so they are the same editor. It keeps
+     the built-in's id, so the switch, the default and the steps that named it
+     still mean this row. */
   const opened = (entry: Entry): void => {
     if (open === entry.id) return setOpen(null)
     setOpen(entry.id)
     setDraft(
       entry.profile
         ? draftOf(entry.profile)
-        : { ...blank(entry.id), label: entry.label, command: '' },
+        : { ...blank(entry.id), id: entry.id, label: entry.label, command: '' },
     )
   }
 

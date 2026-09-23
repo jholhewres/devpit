@@ -76,3 +76,31 @@ fn the_program_of_a_launch_line_is_its_first_word() {
     assert_eq!(program_of("cursor-agent"), "cursor-agent");
     assert_eq!(program_of("orca claude-teams"), "orca");
 }
+
+fn known_agent(id: &str, label: &str) -> KnownAgent {
+    KnownAgent {
+        id: id.to_owned(),
+        label: label.to_owned(),
+        launch: id.to_owned(),
+        installed: true,
+        enabled: true,
+        homepage: String::new(),
+    }
+}
+
+#[test]
+fn an_override_replaces_the_built_in_it_was_opened_from() {
+    // One id, one row: a menu listing `claude` twice starts the override from
+    // one of them and the bare CLI from the other.
+    let all = joined(
+        vec![known_agent("claude", "Claude Code (mine)")],
+        vec![
+            known_agent("claude", "Claude Code"),
+            known_agent("codex", "Codex"),
+        ]
+        .into_iter(),
+    );
+    let ids: Vec<&str> = all.iter().map(|one| one.id.as_str()).collect();
+    assert_eq!(ids, ["claude", "codex"]);
+    assert_eq!(all[0].label, "Claude Code (mine)");
+}
