@@ -68,9 +68,18 @@ impl Scanner {
     pub fn new() -> Self {
         Self::default()
     }
+    /// How many bytes of an unfinished sequence are held for the next chunk.
+    pub fn carried(&self) -> usize {
+        self.carried.len()
+    }
 
     /// Feeds a chunk, calling `heard` for each complete sequence in it.
     pub fn scan(&mut self, chunk: &[u8], mut heard: impl FnMut(Told)) {
+        self.scan_spans(chunk, |told, _| heard(told));
+    }
+    /// As [`Scanner::scan`], also saying where in `chunk` each sequence sits
+    /// — what cutting the stream into commands needs (`blocks`).
+    pub fn scan_spans(&mut self, chunk: &[u8], mut heard: impl FnMut(Told, Span)) {
         // The pre-filter. With nothing carried and no introducer here, the
         // only thing that could matter is a lone ESC at the very end, which is
         // the first half of an introducer split across the boundary.
@@ -83,10 +92,12 @@ impl Scanner {
         }
 
         let mut input = std::mem::take(&mut self.carried);
+        let shift = input.len();
         input.extend_from_slice(chunk);
 
-        let mut rest = &input[..];
+        let mut at = 0;
         loop {
+            let rest = &input[at..];
             let Some(start) = find_introducer(rest) else {
                 // Nothing left that could open a sequence. A trailing ESC is
                 // still worth keeping for the same reason as above.
@@ -97,28 +108,37 @@ impl Scanner {
                 return;
             };
             let body_at = &rest[start + 2..];
-            match terminator(body_at) {
-                Some((end, after)) => {
-                    if let Some(told) = read(&body_at[..end]) {
-                        heard(told);
-                    }
-                    rest = &body_at[after..];
-                }
-                None => {
-                    // Unfinished. Carry it, bounded — and when it is past the
-                    // ceiling, drop it rather than keep growing: a sequence
-                    // this long is not one any shell writes.
-                    let unfinished = &rest[start..];
-                    self.carried = if unfinished.len() <= MOST_CARRIED {
-                        unfinished.to_vec()
-                    } else {
-                        Vec::new()
-                    };
-                    return;
-                }
+            let Some((end, after)) = terminator(body_at) else {
+                // Unfinished. Carry it, bounded — and when it is past the
+                // ceiling, drop it rather than keep growing: a sequence
+                // this long is not one any shell writes.
+                let unfinished = &rest[start..];
+                self.carried = if unfinished.len() <= MOST_CARRIED {
+                    unfinished.to_vec()
+                } else {
+                    Vec::new()
+                };
+                return;
+            };
+            let span = Span {
+                start: (at + start).checked_sub(shift),
+                end: at + start + 2 + after - shift,
+            };
+            if let Some(told) = read(&body_at[..end]) {
+                heard(told, span);
             }
+            at += start + 2 + after;
         }
     }
+}
+
+/// Where a sequence sits in the chunk it finished in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    /// Where it began, or `None` when that was in an earlier chunk.
+    pub start: Option<usize>,
+    /// The first byte after it.
+    pub end: usize,
 }
 
 fn contains_introducer(bytes: &[u8]) -> bool {

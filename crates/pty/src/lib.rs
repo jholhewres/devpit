@@ -23,6 +23,7 @@
 //! Points 3 and 4 are not built yet; the shape here is what they attach to.
 
 pub mod agents;
+pub mod blocks;
 mod foreground;
 pub mod host_env;
 mod osc;
@@ -33,7 +34,7 @@ mod stopping;
 pub mod usage;
 
 pub use foreground::{all_on as fronts_on, at_a_prompt, looking, on as front_on, Front, Settling};
-pub use osc::{Scanner, Told, MOST_CARRIED};
+pub use osc::{Scanner, Span, Told, MOST_CARRIED};
 pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;
 pub use stopping::{stop, stop_group, Stopped, GRACE};
