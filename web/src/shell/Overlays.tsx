@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 
 import { AddProject } from './AddProject'
 import { ask, commands } from './live'
@@ -14,7 +14,8 @@ import { useShell } from './useShell'
    chunk every launch parses. Each has its own boundary, so one loading does
    not hide the others; a local chunk takes a frame, so the fallback is none. */
 const Onboarding = lazy(() => import('./Onboarding').then((module) => ({ default: module.Onboarding })))
-const Palette = lazy(() => import('./Palette').then((module) => ({ default: module.Palette })))
+const loadPalette = (): Promise<typeof import('./Palette')> => import('./Palette')
+const Palette = lazy(() => loadPalette().then((module) => ({ default: module.Palette })))
 const Settings = lazy(() => import('./Settings').then((module) => ({ default: module.Settings })))
 
 /*
@@ -46,6 +47,13 @@ export function Overlays({
 }): React.JSX.Element {
   const shell = useShell()
   const { palette, closePalette, closing, prefs, forgetProject, projects } = shell
+  /* The palette is fetched once the window is idle, not at Ctrl+K: until it
+     is there nothing takes the focus, and the keys typed after the shortcut
+     went to the terminal. */
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 1))
+    idle(() => void loadPalette())
+  }, [])
 
   return (
     <>

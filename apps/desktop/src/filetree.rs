@@ -61,7 +61,7 @@ pub(crate) fn project_tree_now(
     Ok(ProjectTree { nodes })
 }
 
-/// One checkout's status, and when it was last worked out.
+/// One checkout's status, and when the read that produced it began.
 type Flight = std::sync::Mutex<Option<(std::time::Instant, devpit_git::Status)>>;
 
 static FLIGHTS: std::sync::Mutex<
@@ -73,12 +73,12 @@ static FLIGHTS: std::sync::Mutex<
 /// A tree refreshing — the window coming back, a file saved — asks for every
 /// open folder at once, and each used to run a full `git status` of its own:
 /// ten open folders were eleven walks of the whole repository. Now they
-/// queue on one lock per checkout: the first works it out, and the others,
-/// which arrived while it was working, take its answer. An answer finished
-/// before a request arrived is never reused, so nothing here is ever older
-/// than the request — a stage, a commit, a checkout in the terminal is seen
-/// by the next read. A status that fails is said on stderr and read as
-/// clean, so the tree still draws.
+/// queue on one lock per checkout, and an answer is shared only with the
+/// requests that were already waiting when it *started*: the folders of one
+/// refresh arrive together and take one walk, and nothing read before a
+/// request was made is ever handed to it — a stage, a commit, a checkout in
+/// the terminal is seen by the next read. A status that fails is said on
+/// stderr and read as clean, so the tree still draws.
 fn status_of(root: &std::path::Path) -> devpit_git::Status {
     let asked = std::time::Instant::now();
     let flight = {
@@ -94,16 +94,17 @@ fn status_of(root: &std::path::Path) -> devpit_git::Status {
     let Ok(mut held) = flight.lock() else {
         return devpit_git::status(root).unwrap_or_default();
     };
-    if let Some((finished, status)) = held.as_ref() {
-        if *finished >= asked {
+    if let Some((started, status)) = held.as_ref() {
+        if *started >= asked {
             return status.clone();
         }
     }
+    let started = std::time::Instant::now();
     let read = devpit_git::status(root).unwrap_or_else(|err| {
         eprintln!("git status in {}: {err}", root.display());
         devpit_git::Status::default()
     });
-    *held = Some((std::time::Instant::now(), read.clone()));
+    *held = Some((started, read.clone()));
     read
 }
 
