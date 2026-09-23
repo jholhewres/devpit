@@ -1024,6 +1024,11 @@ export const commands = {
 	removed: number,
 } | null, RpcError>(__TAURI_INVOKE("folder_glance", { folder })),
 	/**
+	 *  `pane.compose` — a message written in devpit's own editor, handed to the
+	 *  program in the pane (an agent's TUI) as one paste and sent.
+	 */
+	paneCompose: (projectId: string, paneId: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("pane_compose", { projectId, paneId, text })),
+	/**
 	 *  `pane.scrollback` — what this pane has printed, oldest kept byte first.
 	 * 
 	 *  This is what makes reopening a window show a terminal rather than an empty

@@ -1,6 +1,7 @@
 import type { Terminal } from '@xterm/xterm'
 import { useEffect, useRef, useState } from 'react'
 
+import { AgentBar } from './AgentBar'
 import { BlockCard } from './BlockCard'
 import { CommandInput, type CommandInputHandle } from './CommandInput'
 import { recalled, remember, withLine } from './commandHistory'
@@ -9,6 +10,7 @@ import { ask, commands } from './live'
 import { finished, modeOf } from './paneBlocks'
 import { useFollow } from './useFollow'
 import { usePaneBlocks } from './usePaneBlocks'
+import { useShell } from './useShell'
 
 /*
  * A terminal as blocks, the way Warp draws one.
@@ -69,6 +71,8 @@ export function BlockTerm({
   onClosePane?: () => void
 }): React.JSX.Element {
   const { state, clear } = usePaneBlocks(paneId)
+  const { running } = useShell()
+  const agent = running.find((one) => one.paneId === paneId && one.agent)?.label ?? null
   const [wanted, setWanted] = useState(() => !classicPanes().has(paneId))
   const [history, setHistory] = useState(() => recalled(projectId))
   const [homeDir, setHomeDir] = useState<string | null>(null)
@@ -108,7 +112,7 @@ export function BlockTerm({
   }
 
   return (
-    <div className="bterm" data-mode={mode}>
+    <div className="bterm" data-mode={mode} data-pane-id={paneId}>
       {(mode === 'idle' || mode === 'running') && (
         <div className="bterm__list" ref={list}>
           {done.length === 0 && <div className="bterm__empty">Commands you run here show up as blocks.</div>}
@@ -141,6 +145,9 @@ export function BlockTerm({
           onBlocks={!wanted ? () => classic(false) : undefined}
         />
       </div>
+      {agent && mode !== 'idle' && (
+        <AgentBar projectId={projectId} paneId={paneId} agent={agent} cwd={state.cwd} home={homeDir} onSent={() => terminal.current?.focus()} />
+      )}
       {mode === 'idle' && (
         <CommandInput
           ref={input}

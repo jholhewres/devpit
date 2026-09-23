@@ -108,6 +108,24 @@ pub(crate) fn argv(target: &str, lines: i32, state: Held) -> Option<Vec<String>>
 }
 
 impl Server {
+    /// Hands `text` to whatever runs in a pane as one bracketed paste, then
+    /// Enter: what an agent's TUI takes as one message, however many lines.
+    /// Nothing is cleared first — the program's own input is its business.
+    pub fn paste_and_send(&self, target: &str, text: &str) -> Result<(), TmuxError> {
+        self.require(&["set-buffer", "-b", "devpit-compose", "--", text])?;
+        self.require(&[
+            "paste-buffer",
+            "-p",
+            "-d",
+            "-b",
+            "devpit-compose",
+            "-t",
+            target,
+        ])?;
+        self.require(&["send-keys", "-t", target, "Enter"])?;
+        Ok(())
+    }
+
     /// Types `line` at a pane's prompt and runs it: the line cleared, the
     /// screen cleared, the text — pasted, bracketed, when it is several lines
     /// — then Enter. Literal throughout, so no word of it is read as a key.

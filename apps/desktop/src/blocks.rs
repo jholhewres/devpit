@@ -227,3 +227,15 @@ pub fn folder_glance(folder: String) -> Result<Option<FolderGlance>, RpcError> {
         removed: one.removed,
     }))
 }
+
+/// `pane.compose` — a message written in devpit's own editor, handed to the
+/// program in the pane (an agent's TUI) as one paste and sent.
+#[tauri::command]
+#[specta::specta]
+pub fn pane_compose(project_id: String, pane_id: String, text: String) -> Result<(), RpcError> {
+    crate::sessions::holding(&project_id, &pane_id)?;
+    let session = devpit_tmux::Server::session_name(&project_id);
+    crate::sessions::tmux_server()?
+        .paste_and_send(&devpit_tmux::Server::target(&session, &pane_id), &text)
+        .map_err(|err| RpcError::internal(err.to_string()))
+}
