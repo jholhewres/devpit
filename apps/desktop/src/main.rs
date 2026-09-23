@@ -26,6 +26,8 @@ mod claims;
 mod cloning;
 mod columns;
 mod commands;
+#[cfg(all(unix, not(target_os = "macos")))]
+mod frame_gtk;
 mod rewinding;
 mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the
@@ -179,6 +181,7 @@ fn main() {
             #[cfg(all(unix, not(target_os = "macos")))]
             if let Some(main) = tauri::Manager::get_webview_window(app, "main") {
                 browser_gtk::settle(&main);
+                frame_gtk::repaint_on_state_change(&main);
             }
             // A development build says so where the window is listed —
             // the taskbar, alt-tab — because the window draws its own frame

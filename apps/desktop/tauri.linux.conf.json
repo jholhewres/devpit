@@ -8,7 +8,7 @@
         "minWidth": 900,
         "minHeight": 600,
         "decorations": false,
-        "transparent": false,
+        "transparent": true,
         "label": "main",
         "dragDropEnabled": false
       }

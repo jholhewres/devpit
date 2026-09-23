@@ -21,12 +21,6 @@ import './index.css'
  */
 const isMenu = (window as unknown as { __DEVPIT_MENU__?: boolean }).__DEVPIT_MENU__ === true
 
-// Linux draws an opaque window (`tauri.linux.conf.json`), so the frame is
-// square there: a transparent one left the last frame on screen when the
-// window was maximized or restored — the content at its old size over a stale
-// copy of itself — and rounded corners on an opaque window are four notches.
-if (/Linux/.test(navigator.platform)) document.documentElement.dataset.frame = 'square'
-
 // Before anything renders: a policy that blocks something during startup is
 // exactly the case nobody can debug from a blank window.
 watchCsp()
