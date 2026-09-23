@@ -92,11 +92,12 @@ pub(crate) fn commands(store: &Store) -> Vec<String> {
 
 /// Every profile this machine can offer: the declared ones and the discovered.
 pub(crate) fn all(store: &Store) -> Result<Vec<Profile>, RpcError> {
-    Ok(profiles(
-        &stored(store)?,
-        base_of,
-        crate::shell_launch::shell_knows(),
-    ))
+    let off = crate::agent_choice::disabled(store);
+    let mut all = profiles(&stored(store)?, base_of, crate::shell_launch::shell_knows());
+    for one in &mut all {
+        one.enabled = !off.contains(&one.id);
+    }
+    Ok(all)
 }
 
 /// `agent.profiles` — the accounts this machine can talk to.

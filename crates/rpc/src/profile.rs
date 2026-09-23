@@ -126,6 +126,11 @@ pub struct Profile {
     pub efforts: Vec<String>,
     #[serde(default)]
     pub effort_default: Option<String>,
+    /// Whether it is offered. Carried here because the composer and the step
+    /// editor read this list, and a switch only `agents.known` saw switched
+    /// nothing off for them.
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 impl Profile {

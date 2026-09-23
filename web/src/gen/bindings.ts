@@ -2847,6 +2847,12 @@ export type Profile = {
 	 */
 	efforts?: string[],
 	effortDefault?: string | null,
+	/**
+	 *  Whether it is offered. Carried here because the composer and the step
+	 *  editor read this list, and a switch only `agents.known` saw switched
+	 *  nothing off for them.
+	 */
+	enabled?: boolean,
 };
 
 /**
