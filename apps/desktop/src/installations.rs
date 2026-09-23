@@ -27,6 +27,9 @@ pub struct Installation {
     /// The profiles that run against it. Empty for the one this process would
     /// use with no profile at all.
     pub profiles: Vec<String>,
+    /// The same profiles by id, which a label is not: two can share a name.
+    #[serde(default)]
+    pub ids: Vec<String>,
     /// Whether the default profile runs against it — where the panels start.
     pub default: bool,
 }
@@ -39,6 +42,7 @@ pub(crate) struct Found {
     /// settings file sits beside the default directory and inside a named one.
     pub said: Option<String>,
     pub profiles: Vec<String>,
+    pub ids: Vec<String>,
     pub default: bool,
 }
 
@@ -60,6 +64,7 @@ pub(crate) fn found_for(
         directory: config_dir_from(home, process_said),
         said: process_said.map(ToOwned::to_owned),
         profiles: Vec::new(),
+        ids: Vec::new(),
         default: false,
     }];
     for profile in declared.iter().filter(|one| one.base == CATALOGUED) {
@@ -74,12 +79,14 @@ pub(crate) fn found_for(
         match all.iter_mut().find(|had| had.directory == directory) {
             Some(had) => {
                 had.profiles.push(profile.label.clone());
+                had.ids.push(profile.id.clone());
                 had.default |= default;
             }
             None if exists(&directory) => all.push(Found {
                 directory,
                 said: said.map(ToOwned::to_owned),
                 profiles: vec![profile.label.clone()],
+                ids: vec![profile.id.clone()],
                 default,
             }),
             None => {}
@@ -147,6 +154,7 @@ pub fn cli_installations() -> Result<Vec<Installation>, RpcError> {
         .map(|one| Installation {
             directory: one.directory.display().to_string(),
             profiles: one.profiles,
+            ids: one.ids,
             default: one.default,
         })
         .collect())

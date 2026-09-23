@@ -160,6 +160,7 @@ fn an_installation_pointed_at_another_provider_is_not_billed() {
         directory: PathBuf::from("/h/.claude-glm"),
         said: Some("/h/.claude-glm".to_owned()),
         profiles: vec!["glm".to_owned()],
+        ids: vec!["p1".to_owned()],
         default: false,
     };
     let profile = |url: &str| Declared {

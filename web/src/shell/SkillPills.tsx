@@ -1,32 +1,42 @@
 import { useEffect, useState } from 'react'
 
+import type { Profile } from '../gen/bindings'
 import { ask, commands } from './live'
+import { installationOf } from './outside'
 import { added, removed } from './pills'
+import { useInstallations } from './useInstallations'
 
 /*
  * The skills picked for this turn, as pills beside the attachments, and the
  * picker that adds them.
  *
- * The picker lists the default installation's skills, the same catalogue the
- * Skills panel shows — a skill that is not installed is not offered.
+ * The picker lists the skills of the installation the chat's profile runs
+ * against — `claudin` has its own — the same catalogue the Skills panel
+ * shows for it. A skill that is not installed there is not offered.
  */
 
 export function SkillPills({
   picked,
   onChange,
+  profile,
 }: {
   picked: readonly string[]
   onChange: (next: readonly string[]) => void
+  profile: Profile | undefined
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const [installed, setInstalled] = useState<readonly string[]>([])
+  /* Keyed by the directory they were read from, so switching account never
+     shows the last one's list for a moment. */
+  const [installed, setInstalled] = useState<{ from: string | null; names: readonly string[] } | null>(null)
+  const { list } = useInstallations()
+  const directory = installationOf(profile, list)?.directory ?? null
 
   useEffect(() => {
-    if (!open || installed.length > 0) return
-    void ask(() => commands.skillsList(null)).then((answer) =>
-      setInstalled((answer.data?.skills ?? []).map((skill) => skill.name)),
+    if (!open || installed?.from === directory) return
+    void ask(() => commands.skillsList(directory)).then((answer) =>
+      setInstalled({ from: directory, names: (answer.data?.skills ?? []).map((skill) => skill.name) }),
     )
-  }, [open, installed.length])
+  }, [open, directory, installed?.from])
 
   return (
     <div className="pills">
@@ -40,7 +50,7 @@ export function SkillPills({
       </button>
       {open && (
         <div className="pills__menu" role="listbox" aria-label="Skills">
-          {installed.map((skill) => (
+          {(installed?.from === directory ? installed.names : []).map((skill) => (
             <button
               key={skill}
               className="pills__o"

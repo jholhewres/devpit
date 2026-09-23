@@ -1977,6 +1977,8 @@ export type Installation = {
 	 *  use with no profile at all.
 	 */
 	profiles: string[],
+	/**  The same profiles by id, which a label is not: two can share a name. */
+	ids?: string[],
 	/**  Whether the default profile runs against it — where the panels start. */
 	default: boolean,
 };

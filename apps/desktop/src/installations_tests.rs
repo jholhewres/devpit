@@ -61,6 +61,8 @@ fn two_profiles_on_one_directory_are_one_catalogue() {
     let found = found_for(Path::new(HOME), None, &declared, "", |_| true);
     assert_eq!(found.len(), 3);
     assert_eq!(found[2].profiles, ["glm", "glm-fast"]);
+    // By id as well, which is what the chat matches a profile on.
+    assert_eq!(found[2].ids, ["glm", "glm-fast"]);
 }
 
 #[test]

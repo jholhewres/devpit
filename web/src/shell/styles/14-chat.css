@@ -181,6 +181,13 @@
 /* `/resume`: every earlier conversation, filtered as it is typed. */
 .resume { padding: 6px; }
 .resume__in { display: flex; flex-direction: column; gap: 6px; }
+.resume__top { display: flex; align-items: center; gap: 6px; }
+.resume__top .resume__find { flex: 1; min-width: 0; }
+/* Whose history this is. Says the account, not "filter", because the account
+   is what somebody recognises. */
+.resume__scope { flex: none; max-width: 40%; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 11.5px; color: var(--text-2); background: var(--overlay-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resume__scope:hover { color: var(--text); }
+.resume__scope[aria-pressed='true'] { color: var(--accent); }
 .resume__find { height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--composer); color: var(--text); font: inherit; font-size: 13px; outline: none; }
 .resume__list { max-height: min(360px, 50vh); overflow-y: auto; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 .resume__o { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 8px; text-align: left; }

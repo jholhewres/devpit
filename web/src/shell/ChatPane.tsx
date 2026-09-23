@@ -156,10 +156,10 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               </div>
             )}
 
-            <SkillPills picked={chat.skills} onChange={chat.setSkills} />
+            <SkillPills picked={chat.skills} onChange={chat.setSkills} profile={chat.profiles.find((one) => one.id === chat.profileId)} />
             <SlashMenu slash={slash} />
             <MentionMenu menu={mention} />
-            {slash.own === 'resume' && <ResumePicker from={tab.id} onClose={() => (slash.closeOwn(), field.current?.focus())} />}
+            {slash.own === 'resume' && <ResumePicker from={tab.id} profileId={chat.profileId} onClose={() => (slash.closeOwn(), field.current?.focus())} />}
             <textarea
               className="composer__ph"
               placeholder="Do anything… @ for a file, / for a command"

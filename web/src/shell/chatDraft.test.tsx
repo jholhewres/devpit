@@ -19,6 +19,7 @@ const chat = {
   error: null,
   sending: false,
   profileId: 'prof_1',
+  profiles: [],
   cost: 0,
   session: null,
   card: { id: 'card_1', title: 'Wire the board', onBoard: false },

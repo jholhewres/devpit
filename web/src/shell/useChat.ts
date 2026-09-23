@@ -282,7 +282,12 @@ export function useChat(conversationId: string): Chat {
     asked,
     sending,
     error,
-    pick: setProfileId,
+    /* Another account is another installation, whose skills are not these:
+       a pill picked on one would name nothing on the other. */
+    pick: (next: string) => {
+      if (next !== profileId) setSkills([])
+      setProfileId(next)
+    },
     setModel,
     setPermission,
     setEffort,
