@@ -159,6 +159,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
             <SkillPills picked={chat.skills} onChange={chat.setSkills} />
             <SlashMenu slash={slash} />
             <MentionMenu menu={mention} />
+            {slash.own === 'resume' && <ResumePicker from={tab.id} onClose={() => (slash.closeOwn(), field.current?.focus())} />}
             <textarea
               className="composer__ph"
               placeholder="Do anything… @ for a file, / for a command"
@@ -188,7 +189,6 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           </div>
 
           <ChatWhere />
-          {slash.own === 'resume' && <ResumePicker from={tab.id} onClose={slash.closeOwn} />}
         </div>
       </div>
     </>

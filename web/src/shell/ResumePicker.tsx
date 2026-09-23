@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 
 import type { Installation, OutsideSession, Profile, Thread } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -9,7 +8,8 @@ import { useShell } from './useShell'
 
 /*
  * `/resume` in a chat: every earlier conversation of this project, to pick
- * one up where it stopped.
+ * one up where it stopped — listed where the slash menu opens, above the
+ * composer, the way the terminal lists them in place rather than in a dialog.
  *
  * Both kinds the sidebar lists apart — devpit's own chats, and sessions
  * started in a terminal — in one list, newest first, because from the
@@ -69,9 +69,9 @@ export function ResumePicker({ from, onClose }: { from: string; onClose: () => v
     void row.open().then((failed) => (failed ? setError(failed) : onClose()))
   }
 
-  return createPortal(
-    <div className="ask" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="addpj__box resume" role="dialog" aria-modal="true" aria-label="Resume a conversation">
+  return (
+    <div className="slash resume" role="dialog" aria-label="Resume a conversation">
+      <div className="resume__in">
         <input
           className="resume__find"
           autoFocus
@@ -80,6 +80,10 @@ export function ResumePicker({ from, onClose }: { from: string; onClose: () => v
           onChange={(event) => {
             setWanted(event.target.value)
             setAt(0)
+          }}
+          onBlur={(event) => {
+            /* Away from the list — a click elsewhere — is a no. */
+            if (!event.currentTarget.closest('.resume')?.contains(event.relatedTarget as Node | null)) onClose()
           }}
           onKeyDown={(event) => {
             if (abandoned(event)) onClose()
@@ -112,8 +116,7 @@ export function ResumePicker({ from, onClose }: { from: string; onClose: () => v
           {reading && shown.length > 0 && <div className="resume__none">Still reading the terminal's sessions…</div>}
         </div>
       </div>
-    </div>,
-    document.querySelector('.app') ?? document.body,
+    </div>
   )
 }
 
