@@ -98,4 +98,38 @@ else if contains -- marks $__devpit_features
         end
     end
 end
+# A shell typed here, and a login on another machine, keep their commands as
+# blocks: they start through the same startup files as this one. Only a bare
+# interactive `bash` or `zsh`, and only where the person has no function of
+# that name. `DEVPIT_SSH_WRAP=0` leaves ssh alone.
+if contains -- marks $__devpit_features
+    set -g __devpit_root (string replace -r -- '/fish/init\.fish$' '' (status filename))
+    if not functions -q bash; and test -r "$__devpit_root/bash/rcfile"
+        function bash --wraps bash
+            if test (count $argv) -eq 0; and isatty stdin; and isatty stdout
+                env DEVPIT_SHELL_FEATURES=marks bash --rcfile "$__devpit_root/bash/rcfile"
+            else
+                command bash $argv
+            end
+        end
+    end
+    if not functions -q zsh; and test -r "$__devpit_root/zsh/.zshenv"
+        function zsh --wraps zsh
+            if test (count $argv) -eq 0; and isatty stdin; and isatty stdout
+                env DEVPIT_ORIG_ZDOTDIR="$ZDOTDIR" ZDOTDIR="$__devpit_root/zsh" DEVPIT_SHELL_FEATURES=marks zsh
+            else
+                command zsh $argv
+            end
+        end
+    end
+    if not functions -q ssh; and test -r "$__devpit_root/ssh/login.sh"
+        function ssh --wraps ssh
+            if test "$DEVPIT_SSH_WRAP" != 0; and isatty stdin; and isatty stdout
+                command sh "$__devpit_root/ssh/login.sh" "$__devpit_root" $argv
+            else
+                command ssh $argv
+            end
+        end
+    end
+end
 set -e __devpit_features __devpit_own_marks

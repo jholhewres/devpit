@@ -1,5 +1,13 @@
 use super::*;
 
+/// The files a shell reads at startup, without the ssh wrapper they call.
+fn startup_files() -> Vec<(PathBuf, String)> {
+    files()
+        .into_iter()
+        .filter(|(path, _)| !path.starts_with("ssh"))
+        .collect()
+}
+
 #[test]
 fn a_shell_is_known_by_its_last_segment() {
     assert_eq!(kind_of("/usr/bin/zsh"), Kind::Zsh);
@@ -96,7 +104,7 @@ fn installing_writes_every_file_and_the_marker() {
 fn a_wrapper_destroys_the_request_before_their_config_runs() {
     /* An exported switch lives in the terminal's environment and is inherited
     by everything launched from it, including another devpit. */
-    for (_, body) in files() {
+    for (_, body) in startup_files() {
         let unset = body
             .find("DEVPIT_SHELL_FEATURES")
             // `unset` in bash and zsh, `set -e` in fish.
@@ -144,7 +152,7 @@ fn a_wrapper_speaks_through_tmux_when_it_is_inside_one() {
     among them, so a shell reporting its prompt boundaries reports them to
     tmux and to nobody else. The passthrough DCS is the only form that
     reaches the client — measured both ways. */
-    for (path, body) in files() {
+    for (path, body) in startup_files() {
         assert!(
             body.contains("${TMUX:-}") || body.contains("set -q TMUX"),
             "{} does not ask whether it is inside tmux",

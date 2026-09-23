@@ -11,6 +11,12 @@
 //! OSC 133 sequences the scanner already understands, plus two private ones
 //! that say the shell is up and which process it is.
 //!
+//! The marks follow the person further than the first shell. A bare `bash` or
+//! `zsh` typed inside a wrapped shell starts through the same files, and an
+//! interactive `ssh` carries them to the other machine (`shell/login.sh`), so
+//! the commands run there are blocks too. `DEVPIT_SSH_WRAP=0` turns the second
+//! off; anything that is not a plain login is plain ssh either way.
+//!
 //! Three rules, all learnt from Orca's wrapper, all of which cost them a
 //! defect first:
 //!
@@ -191,6 +197,7 @@ pub fn files() -> Vec<(PathBuf, String)> {
         (PathBuf::from("bash").join("rcfile"), BASH.to_owned()),
         (PathBuf::from("zsh").join(".zshenv"), ZSH.to_owned()),
         (PathBuf::from("fish").join("init.fish"), FISH.to_owned()),
+        (PathBuf::from("ssh").join("login.sh"), LOGIN.to_owned()),
     ]
 }
 
@@ -216,6 +223,13 @@ const ZSH: &str = include_str!("shell/zshenv.zsh");
 /// older fish gets the marks from here, through its `fish_prompt`,
 /// `fish_preexec` and `fish_postexec` events.
 const FISH: &str = include_str!("shell/init.fish");
+
+/// What an interactive `ssh` typed in a wrapped shell runs instead.
+///
+/// One POSIX `sh` script for all three shells, so the reading of ssh's
+/// arguments is written once. It sends this side's bash and zsh startup files
+/// across and starts the remote login shell through the one that fits.
+const LOGIN: &str = include_str!("shell/login.sh");
 
 /// Where the startup files live, keyed by a hash of the exact bytes.
 ///

@@ -41,13 +41,19 @@ builtin typeset -g __devpit_claude_mcp="${DEVPIT_CLAUDE_MCP:-}"
 builtin typeset -g __devpit_codex_exe="${DEVPIT_CODEX_EXE:-}"
 builtin unset DEVPIT_CLAUDE_SETTINGS DEVPIT_CLAUDE_MCP DEVPIT_CODEX_EXE
 __devpit_wants() { (( ${__devpit_features[(Ie)$1]} )) }
+# Set by the ssh wrapper on the far side of a login: the marks travel back
+# through a tmux on this side, which the remote shell cannot see.
+builtin typeset -g __devpit_passthrough="${DEVPIT_PASSTHROUGH:-}"
+builtin unset DEVPIT_PASSTHROUGH
+# The folder the startup files live in, for starting another shell with them.
+builtin typeset -g __devpit_root="${${(%):-%x}:h:h}"
 
 # Inside tmux, every escape sequence tmux does not itself understand is eaten
 # before it reaches the client — OSC 133 among them. tmux forwards a sequence
 # wrapped in its own passthrough DCS, with each ESC inside doubled, and only
 # when `allow-passthrough` is on. Outside tmux the plain form is what works.
 __devpit_osc() {
-  if [[ -n "${TMUX:-}" ]]; then
+  if [[ -n "${TMUX:-}$__devpit_passthrough" ]]; then
     builtin printf '\033Ptmux;\033\033]%s\007\033\\' "$1"
   else
     builtin printf '\033]%s\007' "$1"
@@ -126,6 +132,39 @@ __devpit_init() {
     # precmd_functions right now, and appending would leave it there.
     precmd_functions=(${precmd_functions:/__devpit_init/__devpit_precmd})
     preexec_functions=(__devpit_preexec ${preexec_functions[@]})
+
+    # A shell typed here, and a login on another machine, keep their commands
+    # as blocks: they start through these same startup files. Only a bare
+    # interactive `bash` or `zsh`, and only where the person has no function
+    # of that name. `DEVPIT_SSH_WRAP=0` leaves ssh alone.
+    if (( ! $+functions[bash] )) && [[ -r "$__devpit_root/bash/rcfile" ]]; then
+      bash() {
+        if (( $# == 0 )) && [[ -t 0 && -t 1 ]]; then
+          DEVPIT_SHELL_FEATURES=marks command bash --rcfile "$__devpit_root/bash/rcfile"
+        else
+          command bash "$@"
+        fi
+      }
+    fi
+    if (( ! $+functions[zsh] )) && [[ -r "$__devpit_root/zsh/.zshenv" ]]; then
+      zsh() {
+        if (( $# == 0 )) && [[ -t 0 && -t 1 ]]; then
+          DEVPIT_ORIG_ZDOTDIR="${ZDOTDIR:-}" ZDOTDIR="$__devpit_root/zsh" \
+            DEVPIT_SHELL_FEATURES=marks command zsh
+        else
+          command zsh "$@"
+        fi
+      }
+    fi
+    if (( ! $+functions[ssh] )) && [[ -r "$__devpit_root/ssh/login.sh" ]]; then
+      ssh() {
+        if [[ "${DEVPIT_SSH_WRAP:-1}" != 0 && -t 0 && -t 1 ]]; then
+          command sh "$__devpit_root/ssh/login.sh" "$__devpit_root" "$@"
+        else
+          command ssh "$@"
+        fi
+      }
+    fi
   else
     precmd_functions=(${precmd_functions:#__devpit_init})
   fi

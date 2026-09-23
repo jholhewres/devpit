@@ -9,13 +9,19 @@
 __devpit_features=",${DEVPIT_SHELL_FEATURES:-},"
 builtin unset DEVPIT_SHELL_FEATURES
 __devpit_wants() { [[ "$__devpit_features" == *",$1,"* ]]; }
+# Set by the ssh wrapper on the far side of a login: the marks travel back
+# through a tmux on this side, which the remote shell cannot see.
+__devpit_passthrough="${DEVPIT_PASSTHROUGH:-}"
+builtin unset DEVPIT_PASSTHROUGH
+# The folder the startup files live in, for starting another shell with them.
+__devpit_root="${BASH_SOURCE[0]%/bash/rcfile}"
 
 # Inside tmux, every escape sequence tmux does not itself understand is eaten
 # before it reaches the client — OSC 133 among them. tmux forwards a sequence
 # wrapped in its own passthrough DCS, with each ESC inside doubled, and only
 # when `allow-passthrough` is on. Outside tmux the plain form is what works.
 __devpit_osc() {
-  if [[ -n "${TMUX:-}" ]]; then
+  if [[ -n "${TMUX:-}$__devpit_passthrough" ]]; then
     printf '\033Ptmux;\033\033]%s\007\033\\' "$1"
   else
     printf '\033]%s\007' "$1"
@@ -158,6 +164,39 @@ if [[ -n "$__devpit_marks" ]]; then
     PROMPT_COMMAND=(__devpit_precmd "${PROMPT_COMMAND[@]+"${PROMPT_COMMAND[@]}"}" __devpit_epilogue)
   else
     PROMPT_COMMAND="__devpit_precmd${PROMPT_COMMAND:+; $PROMPT_COMMAND}; __devpit_epilogue"
+  fi
+
+  # A shell typed here, and a login on another machine, keep their commands as
+  # blocks: they start through these same startup files. Only a bare
+  # interactive `bash` or `zsh`, and only where the person has no function of
+  # that name. `DEVPIT_SSH_WRAP=0` leaves ssh alone.
+  if ! declare -F bash >/dev/null && [[ -r "$__devpit_root/bash/rcfile" ]]; then
+    bash() {
+      if (( $# == 0 )) && [[ -t 0 && -t 1 ]]; then
+        DEVPIT_SHELL_FEATURES=marks command bash --rcfile "$__devpit_root/bash/rcfile"
+      else
+        command bash "$@"
+      fi
+    }
+  fi
+  if ! declare -F zsh >/dev/null && [[ -r "$__devpit_root/zsh/.zshenv" ]]; then
+    zsh() {
+      if (( $# == 0 )) && [[ -t 0 && -t 1 ]]; then
+        DEVPIT_ORIG_ZDOTDIR="${ZDOTDIR:-}" ZDOTDIR="$__devpit_root/zsh" \
+          DEVPIT_SHELL_FEATURES=marks command zsh
+      else
+        command zsh "$@"
+      fi
+    }
+  fi
+  if ! declare -F ssh >/dev/null && [[ -r "$__devpit_root/ssh/login.sh" ]]; then
+    ssh() {
+      if [[ "${DEVPIT_SSH_WRAP:-1}" != 0 && -t 0 && -t 1 ]]; then
+        command sh "$__devpit_root/ssh/login.sh" "$__devpit_root" "$@"
+      else
+        command ssh "$@"
+      fi
+    }
   fi
 
   # Armed only now: bash treats the commands in this very file as foreground
