@@ -64,11 +64,13 @@ export function BlockTerm({
   projectId,
   onSplit,
   onClosePane,
+  onSeparate,
 }: {
   paneId: string
   projectId: string
   onSplit?: (direction: 'horizontal' | 'vertical') => void
   onClosePane?: () => void
+  onSeparate?: () => void
 }): React.JSX.Element {
   const { state, clear } = usePaneBlocks(paneId)
   const { running } = useShell()
@@ -149,6 +151,7 @@ export function BlockTerm({
           projectId={projectId}
           onSplit={onSplit}
           onClosePane={onClosePane}
+          onSeparate={onSeparate}
           onTerminal={(one) => {
             terminal.current = one
             if (!one) return

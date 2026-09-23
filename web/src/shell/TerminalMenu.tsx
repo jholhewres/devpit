@@ -2,7 +2,7 @@ import type { Terminal } from '@xterm/xterm'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
-import { Clipboard, Close, Columns, Copy, Rows, SelectAll } from './GitIcons'
+import { Clipboard, Close, Columns, Copy, Plus, Rows, SelectAll } from './GitIcons'
 import { SHORTCUTS } from './shortcuts'
 import { clipboardLabels, copySelection, pasteClipboard } from './terminalClipboard'
 import { abandoned } from './typing'
@@ -29,6 +29,7 @@ export function TerminalMenu({
   onSplit,
   onClosePane,
   onBlocks,
+  onSeparate,
 }: {
   at: { readonly x: number; readonly y: number }
   terminal: Terminal
@@ -38,6 +39,8 @@ export function TerminalMenu({
   onSplit?: (direction: 'horizontal' | 'vertical') => void
   onClosePane?: () => void
   onBlocks?: () => void
+  /** Absent for the only pane of a tab, which already has a tab of its own. */
+  onSeparate?: () => void
 }): React.JSX.Element {
   const menu = useRef<HTMLDivElement>(null)
   const keys = clipboardLabels()
@@ -101,12 +104,9 @@ export function TerminalMenu({
           {item('Show as Blocks', <Rows />, onBlocks)}
         </>
       )}
-      {onClosePane && (
-        <>
-          <div className="ctx__rule" />
-          {item('Close Pane', <Close />, onClosePane)}
-        </>
-      )}
+      {(onClosePane || onSeparate) && <div className="ctx__rule" />}
+      {onSeparate && item('Move to New Tab', <Plus />, onSeparate)}
+      {onClosePane && item('Close Pane', <Close />, onClosePane)}
     </div>,
     document.body,
   )

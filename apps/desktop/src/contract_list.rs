@@ -14,9 +14,9 @@ use crate::{
     checkpoint, checkpoint_findings, checkpoint_preview, columns, commands, diffs, files, filetree,
     front, happening, heads_down, history, in_flight, index, installations, mcp, moving, notices,
     openers, outside_sessions, panels, panes, pasting, paths, plan_limits, plugin_data, plugins,
-    projects, receipts, reveal, rewinding, runs_list, saves, search, session_search, sessions,
-    settings, shell_launch, skills, slash, sources, spend_history, staging, steering, steps,
-    threads, update, watching, workspace, worktree_base, worktrees, wsfiles,
+    projects, receipts, regrouping, reveal, rewinding, runs_list, saves, search, session_search,
+    sessions, settings, shell_launch, skills, slash, sources, spend_history, staging, steering,
+    steps, threads, update, watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -176,6 +176,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         arranging::session_close_leaf,
         arranging::session_close_tab,
         arranging::session_set_ratio,
+        regrouping::session_join_tabs,
+        regrouping::session_separate_leaf,
         panes::session_write,
         panes::session_resize,
         panes::session_scroll,

@@ -240,6 +240,11 @@ pub(crate) fn tab_for_card(card_id: &str) -> String {
 
 const CARD_TAB: &str = "tab_card_";
 
+/// Whether a tab id is in the card namespace, plain id or not.
+pub(crate) fn is_card_tab(tab_id: &str) -> bool {
+    tab_id.starts_with(CARD_TAB)
+}
+
 /// The card a tab was named for, when it was — and only a plain id: a tab id
 /// comes from the window, which can send anything.
 pub(crate) fn card_of_tab(tab_id: &str) -> Option<&str> {

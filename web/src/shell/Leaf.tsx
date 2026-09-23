@@ -30,6 +30,7 @@ export function Leaf({
   onClosePane,
   onTerminal,
   onBlocks,
+  onSeparate,
 }: {
   paneId: string
   projectId: string
@@ -40,6 +41,7 @@ export function Leaf({
   onTerminal?: (terminal: Terminal | null) => void
   /** Offered on the right-click when the pane is drawn plain: back to blocks. */
   onBlocks?: () => void
+  onSeparate?: () => void
 }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -240,7 +242,7 @@ export function Leaf({
       {pasteFailed && <div className="exempty__t">{pasteFailed}</div>}
       <div className="termhost" ref={host} />
       {menuAt && term && (
-        <TerminalMenu at={menuAt} terminal={term} projectId={projectId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} onBlocks={onBlocks} />
+        <TerminalMenu at={menuAt} terminal={term} projectId={projectId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} onBlocks={onBlocks} onSeparate={onSeparate} />
       )}
     </>
   )

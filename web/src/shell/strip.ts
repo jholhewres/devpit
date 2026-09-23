@@ -34,6 +34,11 @@ export interface Tab {
   /** Words a chat tab was opened with, for its composer. Put there once and
       never sent: the person reads them first. Cleared once they are in. */
   readonly draft?: string
+  /** Counts the times another tab's panes were moved into this one's tree.
+
+      The tree is read when the pane mounts, and a join happens from the
+      strip, which cannot reach it: a new count is what says read it again. */
+  readonly regrouped?: number
 }
 
 export interface Strip {
@@ -77,6 +82,26 @@ export function closed(strip: Strip, id: string): Strip {
     /* Closing the one you are looking at lands on the neighbour. */
     active: strip.active === id ? (open[Math.min(at, open.length - 1)]?.id ?? null) : strip.active,
   }
+}
+
+/* `from`'s panes now live in `into`'s tree, so `from` leaves the strip
+   without the close that would end its shells, and `into` reads its tree again. */
+export function joined(strip: Strip, from: string, into: string): Strip {
+  if (!strip.open.some((tab) => tab.id === into)) return strip
+  const open = strip.open
+    .filter((tab) => tab.id !== from)
+    .map((tab) => (tab.id === into ? { ...tab, regrouped: (tab.regrouped ?? 0) + 1 } : tab))
+  return { open, active: into }
+}
+
+/* The terminal tabs another terminal tab can be joined into. A card's tab is
+   how the card finds its panes, so it neither joins nor is joined — and one
+   saved before tabs carried `cardId` is refused by the backend, which owns
+   the card tabs' ids. */
+export function joinable(open: readonly Tab[], from: string): Tab[] {
+  const source = open.find((tab) => tab.id === from)
+  if (source?.kind !== 'term' || source.cardId) return []
+  return open.filter((tab) => tab.kind === 'term' && tab.id !== from && !tab.cardId)
 }
 
 /** Which of the open tabs a "close the others" answers about. */

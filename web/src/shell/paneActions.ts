@@ -22,6 +22,8 @@ export interface PaneActions {
   armed: boolean
   /* Goes on with the pane's agent conversation in a chat, when its session is known. */
   toChat: (() => void) | null
+  /* Moves the pane in front to a tab of its own; null when it is the only one. */
+  separate: (() => void) | null
 }
 
 export function usePaneActions({
@@ -69,6 +71,18 @@ export function usePaneActions({
     void closeLeaf()
   }, [several, close, tab.id, busy, armed, focused, closeLeaf])
 
+  /* The tab id is minted here so the tree is filed under it before the tab
+     opens and asks for it — the other order would give the tab a new shell. */
+  const separate = useCallback(() => {
+    if (!project) return
+    const id = crypto.randomUUID()
+    void ask(() => commands.sessionSeparateLeaf(project.id, tab.id, focused, id)).then((answer) => {
+      if (!answer.data) return onNotice(answer.error ?? 'could not move that pane')
+      onLayout(answer.data.tree, answer.data.focusedId)
+      show('term', { id })
+    })
+  }, [project, tab.id, focused, onLayout, onNotice, show])
+
   const known = agentSessions[focused]
   const toChat = useCallback(() => {
     if (!project || !known) return
@@ -94,5 +108,5 @@ export function usePaneActions({
 
   const closeLabel = armed && busy ? `Press again to stop ${busy.label}` : several ? 'Close pane' : 'Close terminal'
 
-  return { closePane, closeLabel, armed, toChat: known ? toChat : null }
+  return { closePane, closeLabel, armed, toChat: known ? toChat : null, separate: several ? separate : null }
 }

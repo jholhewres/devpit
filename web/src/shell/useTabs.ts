@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
-import { attached, closed, drafted as taken, focused, launched as sent, moved, opened, renamed, replaced, type Strip, type Tab } from './strip'
+import { attached, closed, drafted as taken, focused, joined, launched as sent, moved, opened, renamed, replaced, type Strip, type Tab } from './strip'
 import { remember, remembered } from './tabs'
 
 export type Where = 'strip' | 'sidebar'
@@ -17,6 +17,8 @@ export interface Tabs {
   readonly active: Tab | null
   show: (kind: PaneName, tab?: Partial<Tab>) => void
   close: (id: string) => void
+  /** Moves every pane of `from` beside `into`'s, and `from` leaves the strip. */
+  join: (from: string, into: string) => Promise<string | null>
   focus: (id: string) => void
   move: (id: string, to: number) => void
   rename: (id: string, title: string) => void
@@ -89,6 +91,20 @@ export function useTabs(projectId: string | null): Tabs {
     [projectId],
   )
 
+  /* Answers the refusal, or null. The strip changes only once the backend
+     has moved the panes: dropping the tab first and failing would be a
+     close that forgot to end its shells. */
+  const join = useCallback(
+    async (from: string, into: string): Promise<string | null> => {
+      if (!projectId) return 'no project is open'
+      const answer = await ask(() => commands.sessionJoinTabs(projectId, from, into, 'horizontal'))
+      if (!answer.data) return answer.error ?? 'could not join those tabs'
+      setStrip((was) => joined(was, from, into))
+      return null
+    },
+    [projectId],
+  )
+
   const focus = useCallback((id: string) => setStrip((was) => ({ ...was, active: id })), [])
   const move = useCallback((id: string, to: number) => setStrip((was) => moved(was, id, to)), [])
   const rename = useCallback(
@@ -108,6 +124,7 @@ export function useTabs(projectId: string | null): Tabs {
     active: focused(strip),
     show,
     close,
+    join,
     focus,
     move,
     rename,

@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FileDialogs } from './FileDialogs'
 import { FILE_MENU } from './fileMenu'
 import { sessionMenu, type SessionEntry } from './sessionMenu'
+import { joinable } from './strip'
 import { tabMenu, type TabEntry } from './tabMenu'
 import { useFileActions } from './useFileActions'
 import { useShell } from './useShell'
@@ -41,7 +42,7 @@ interface At {
 }
 
 export function ContextMenu(): React.JSX.Element {
-  const { focus, close, sweep, setRenaming } = useShell()
+  const { focus, close, sweep, join, open: tabs, setRenaming } = useShell()
   const [at, setAt] = useState<At | null>(null)
   const menu = useRef<HTMLDivElement>(null)
   const actions = useFileActions(() => setAt(null))
@@ -50,7 +51,7 @@ export function ContextMenu(): React.JSX.Element {
      can reach. The list itself is data — see `sessionMenu`. */
   const menus: Record<string, readonly Item[]> = {
     ...STATIC,
-    tab: tabMenu({ close, sweep }),
+    tab: tabMenu({ close, sweep, join: (from, into) => void join(from, into) }, at ? joinable(tabs, at.id) : []),
     session: sessionMenu({
       focus,
       close,

@@ -29,6 +29,7 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
   /* Something went wrong beside the terminal rather than instead of it. */
   const [notice, setNotice] = useState<string | null>(null)
 
+  /* `regrouped` is a join rewriting this tree from the strip. */
   useEffect(() => {
     if (!projectId) return
     let dropped = false
@@ -41,7 +42,7 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
     return () => {
       dropped = true
     }
-  }, [projectId, tab.id])
+  }, [projectId, tab.id, tab.regrouped])
 
   const split = useCallback(
     (direction: 'horizontal' | 'vertical') => {
@@ -155,7 +156,7 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
         onFocus={focus}
         onRatio={settle}
         leaf={(leafId) => (
-          <BlockTerm key={leafId} paneId={leafId} projectId={projectId} onSplit={split} onClosePane={pane.closePane} />
+          <BlockTerm key={leafId} paneId={leafId} projectId={projectId} onSplit={split} onClosePane={pane.closePane} onSeparate={pane.separate ?? undefined} />
         )}
       />
     </>

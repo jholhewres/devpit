@@ -975,6 +975,16 @@ export const commands = {
 	 */
 	sessionSetRatio: (projectId: string, tabId: string, splitId: string, ratio: number | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_set_ratio", { projectId, tabId, splitId, ratio })),
 	/**
+	 *  `session.join_tabs` — every pane of `from_tab_id` beside `into_tab_id`'s,
+	 *  and `from_tab_id` gone. Answers the joined layout.
+	 */
+	sessionJoinTabs: (projectId: string, fromTabId: string, intoTabId: string, direction: SplitDirection) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_join_tabs", { projectId, fromTabId, intoTabId, direction })),
+	/**
+	 *  `session.separate_leaf` — one pane out of `tab_id` into `new_tab_id`, a
+	 *  tab the window is about to open. Answers what is left in `tab_id`.
+	 */
+	sessionSeparateLeaf: (projectId: string, tabId: string, leafId: string, newTabId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_separate_leaf", { projectId, tabId, leafId, newTabId })),
+	/**
 	 *  `session.write` — bytes into the attached client of a leaf.
 	 * 
 	 *  The count comes back rather than a bare unit: a keystroke that went nowhere
