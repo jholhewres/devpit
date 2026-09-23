@@ -1,0 +1,19 @@
+/*
+ * Search and filter fields, one treatment for all of them.
+ *
+ * Each panel drew its own: radii from 6 to 8px, and no answer to the pointer
+ * at all, so a field read as a label until it was clicked. Here they share a
+ * softer corner, show the pointer resting on them, and settle into focus.
+ */
+.hist__find, .git__find, .fb__find, .sk__find, .prefs__find, .mgr__find, .resume__find {
+  border-radius: 6px;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.hist__find:hover, .git__find:hover, .fb__find:hover, .sk__find:hover, .prefs__find:hover, .mgr__find:hover, .resume__find:hover {
+  border-color: var(--border-strong);
+}
+.hist__find:focus-within, .git__find:focus, .fb__find:focus, .sk__find:focus-within, .prefs__find:focus-within, .mgr__find:focus, .resume__find:focus {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 2px var(--overlay-strong);
+  outline: none;
+}
