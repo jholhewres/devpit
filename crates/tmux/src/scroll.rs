@@ -74,7 +74,10 @@ impl Server {
     /// A terminal that was rebuilt, or lost its GPU context, holds nothing of
     /// what tmux drew before, and tmux only sends what changes — so it stayed
     /// blank but for the cursor until the program next printed.
-    pub fn redraw(&self, session: &str, window: &str) -> Result<(), TmuxError> {
+    ///
+    /// Answers whether there was a client to draw: one still connecting is
+    /// not listed yet, and the caller asks again.
+    pub fn redraw(&self, session: &str, window: &str) -> Result<bool, TmuxError> {
         let client_session = crate::naming::client_session(session, window);
         let listed = self.require(&[
             "list-clients",
@@ -83,13 +86,12 @@ impl Server {
             "-F",
             "#{client_name}",
         ])?;
-        for client in String::from_utf8_lossy(&listed.stdout)
-            .lines()
-            .filter(|one| !one.is_empty())
-        {
+        let listed = String::from_utf8_lossy(&listed.stdout).into_owned();
+        let clients: Vec<&str> = listed.lines().filter(|one| !one.is_empty()).collect();
+        for client in &clients {
             let _ = self.run(&["refresh-client", "-t", client]);
         }
-        Ok(())
+        Ok(!clients.is_empty())
     }
 
     /// Scrolls `target` by `lines` — negative is up, into the history — or,

@@ -7,7 +7,7 @@
 //! is ours, on our own socket, so a global here reaches every session,
 //! including the ones made later.
 
-pub(crate) const QUIET: [[&str; 2]; 6] = [
+pub(crate) const QUIET: [[&str; 2]; 9] = [
     // A status bar inside a pane we already chrome is noise, and it steals a
     // row from the agent's TUI.
     ["status", "off"],
@@ -26,12 +26,23 @@ pub(crate) const QUIET: [[&str; 2]; 6] = [
     // `OSC 133;A` never reaches the attached client, and the same sequence
     // wrapped in tmux's own passthrough always does.
     ["allow-passthrough", "on"],
+    // Each window at the size of the client that last used it. Every leaf's
+    // client session shares the group's windows, and tmux before 3.2 sized a
+    // window to the *smallest* client — a hidden pane attached at a stale size
+    // shrank the agent in the visible one.
+    ["window-size", "latest"],
+    // Focus in and out reach the program inside, which is how an agent's TUI
+    // knows to redraw when you come back to it.
+    ["focus-events", "on"],
+    // What the wheel scrolls back through. The default two thousand lines runs
+    // out long before the pane's own ring does.
+    ["history-limit", "10000"],
 ];
 
 /// Every option above, as one tmux invocation.
 ///
 /// tmux takes several commands on a line separated by a bare `;`, so setting
-/// six options costs one process rather than six. It matters where it runs:
+/// every option costs one process rather than one each. It matters where it runs:
 /// the first time a project opens a terminal, while somebody is watching an
 /// empty pane.
 pub(crate) fn one_line() -> Vec<&'static str> {

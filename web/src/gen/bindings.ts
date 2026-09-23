@@ -988,7 +988,7 @@ export const commands = {
 	 */
 	sessionScroll: (projectId: string, paneId: string, lines: number) => typedError<null, RpcError>(__TAURI_INVOKE("session_scroll", { projectId, paneId, lines })),
 	/**  `session.redraw` — tmux draws this leaf's screen again, whole. */
-	sessionRedraw: (projectId: string, paneId: string) => typedError<null, RpcError>(__TAURI_INVOKE("session_redraw", { projectId, paneId })),
+	sessionRedraw: (projectId: string, paneId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("session_redraw", { projectId, paneId })),
 	/**
 	 *  `pane.scrollback` — what this pane has printed, oldest kept byte first.
 	 * 

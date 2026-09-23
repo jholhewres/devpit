@@ -111,7 +111,7 @@ pub fn session_scroll(project_id: String, pane_id: String, lines: i32) -> Result
 /// `session.redraw` — tmux draws this leaf's screen again, whole.
 #[tauri::command]
 #[specta::specta]
-pub fn session_redraw(project_id: String, pane_id: String) -> Result<(), RpcError> {
+pub fn session_redraw(project_id: String, pane_id: String) -> Result<bool, RpcError> {
     crate::sessions::holding(&project_id, &pane_id)?;
     let session = devpit_tmux::Server::session_name(&project_id);
     crate::sessions::tmux_server()?
