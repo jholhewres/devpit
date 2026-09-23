@@ -14,7 +14,9 @@ use devpit_rpc::{ErrorCode, FileContents, FileKind, RpcError};
 
 use crate::kinds::{kind_of, media_type};
 
-use crate::refusing::{not_a_file, past_the_ceiling, too_big_to_draw};
+use crate::refusing::{
+    not_a_file, past_the_ceiling, too_big_to_draw, MOST_BYTES, MOST_MEDIA_BYTES,
+};
 use crate::roots::root_of;
 
 pub(crate) fn modified(path: &Path) -> f64 {
@@ -24,6 +26,25 @@ pub(crate) fn modified(path: &Path) -> f64 {
         .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|since| since.as_millis() as f64)
         .unwrap_or_default()
+}
+
+/// Reads at most the largest ceiling of `resolved`, and the size to judge it
+/// by. A file past it is read for its first bytes only, which is all the
+/// sniffing needs; the whole of a multi-gigabyte file never reaches memory.
+pub(crate) fn read_bounded(resolved: &Path, bytes: u64) -> std::io::Result<(Vec<u8>, u64)> {
+    use std::io::Read as _;
+
+    let ceiling = MOST_BYTES.max(MOST_MEDIA_BYTES);
+    let file = std::fs::File::open(resolved)?;
+    if bytes > ceiling {
+        let mut head = Vec::new();
+        file.take(512).read_to_end(&mut head)?;
+        return Ok((head, bytes));
+    }
+    match devpit_core::data_files::read_within(file, ceiling)? {
+        Some(raw) => Ok((raw, bytes)),
+        None => Ok((Vec::new(), ceiling + 1)),
+    }
 }
 
 /// `file.read` — the text of a file, or why it is not text.
@@ -63,10 +84,11 @@ pub(crate) fn contents(root: &Path, path: String) -> Result<FileContents, RpcErr
         });
     }
 
-    let raw = match std::fs::read(&resolved) {
-        Ok(raw) => raw,
-        Err(err) => return Err(RpcError::internal(err.to_string())),
-    };
+    // Never more than the most this could show: a file past every ceiling is
+    // only sniffed, and one that grew past it since `metadata` is refused as
+    // if it had been that size all along.
+    let (raw, bytes) =
+        read_bounded(&resolved, bytes).map_err(|err| RpcError::internal(err.to_string()))?;
     let head = &raw[..raw.len().min(512)];
     let kind = kind_of(&path, head);
 

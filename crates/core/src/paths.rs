@@ -8,49 +8,56 @@
 //! is nothing there yet to canonicalise. This resolves the parent — which does
 //! exist — through symlinks and containment the same way `resolve` does, then
 //! checks the final segment by name: no separator, no `..`, not empty, and no
-//! `.git` in any segment — the repository's own database is not a file this
-//! hands out a writable path to. A name that already exists is handed to
-//! `resolve` itself instead of assembled by hand, so a symlink sitting there
-//! is caught by the same canonicalise-then-check every other path goes
-//! through; only a name genuinely absent falls back to the parent-only
-//! answer, which is the one case `resolve` cannot make. A symlink planted at
-//! that exact name *after* this check is a race this does not close, the same
-//! one every check-then-write here already lives with.
+//! `.git` in any segment, before or after symlinks. A name that exists goes
+//! through `resolve` itself, so a symlink there is caught; a symlink planted
+//! *after* this check is a race this does not close.
 
 use std::path::{Path, PathBuf};
 
 use crate::tree::{resolve, TreeError};
 
-/// Whether any segment of `relative` is `.git` — the repository's own
-/// database, not a file this hands out a writable path to.
-///
-/// `pub(crate)`, not private: `paths_tests.rs` is a sibling file, the same
-/// shape as `tree_tests.rs`, and calls this directly rather than only
-/// reaching it through `resolve_new`.
+/// Whether any segment of `relative` is `.git`, in any case (`.GIT` is the
+/// same folder on macOS). `pub(crate)` so `paths_tests.rs` can call it.
 pub(crate) fn touches_git(relative: &str) -> bool {
-    relative.split('/').any(|segment| segment == ".git")
+    relative
+        .split('/')
+        .any(|segment| segment.eq_ignore_ascii_case(".git"))
+}
+
+/// Whether `resolved`, already canonical, sits inside `.git` below `root` —
+/// the string check misses a symlinked folder that leads there.
+fn under_git(root: &Path, resolved: &Path) -> bool {
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    resolved.strip_prefix(&root).is_ok_and(|rest| {
+        rest.components()
+            .any(|part| part.as_os_str().eq_ignore_ascii_case(".git"))
+    })
+}
+
+fn clear_of_git(root: &Path, resolved: PathBuf) -> Result<PathBuf, TreeError> {
+    if under_git(root, &resolved) {
+        return Err(TreeError::Outside { path: resolved });
+    }
+    Ok(resolved)
+}
+
+/// The parent resolved through symlinks, with the final name joined as
+/// written. The root however it is spelled — `""`, `.`, `sub/..` — ends in an
+/// empty, `.` or `..` name, and is refused here.
+fn beside_parent(root: &Path, relative: &str) -> Result<PathBuf, TreeError> {
+    let relative = relative.trim_end_matches('/');
+    let (parent, name) = relative.rsplit_once('/').unwrap_or(("", relative));
+    if name.is_empty() || name == "." || name == ".." || touches_git(relative) {
+        return Err(TreeError::Outside {
+            path: root.join(relative),
+        });
+    }
+    Ok(resolve(root, parent)?.join(name))
 }
 
 /// Resolves `relative` against `root` without requiring it to exist.
 pub fn resolve_new(root: &Path, relative: &str) -> Result<PathBuf, TreeError> {
-    let relative = relative.trim_end_matches('/');
-    let (parent, name) = match relative.rsplit_once('/') {
-        Some((parent, name)) => (parent, name),
-        None => ("", relative),
-    };
-
-    if name.is_empty() || name == "." || name == ".." {
-        return Err(TreeError::Outside {
-            path: root.join(relative),
-        });
-    }
-    if touches_git(relative) {
-        return Err(TreeError::Outside {
-            path: root.join(relative),
-        });
-    }
-
-    let candidate = resolve(root, parent)?.join(name);
+    let candidate = beside_parent(root, relative)?;
 
     // `symlink_metadata`, not `exists`: `exists` follows the link and asks
     // about its *target*, so a broken symlink — pointing at nothing — reads
@@ -60,10 +67,28 @@ pub fn resolve_new(root: &Path, relative: &str) -> Result<PathBuf, TreeError> {
     // broken link fails that canonicalisation and is refused, correctly: the
     // name is taken by something this cannot vouch for.
     if candidate.symlink_metadata().is_ok() {
-        return resolve(root, relative);
+        return clear_of_git(root, resolve(root, relative)?);
     }
+    clear_of_git(root, candidate)
+}
 
-    Ok(candidate)
+/// An existing file whose contents may be rewritten: `resolve`, and nowhere
+/// inside `.git`, where a written hook is code git runs.
+pub fn resolve_writable(root: &Path, relative: &str) -> Result<PathBuf, TreeError> {
+    clear_of_git(root, resolve(root, relative)?)
+}
+
+/// The entry at `relative` itself, a symlink kept as the link: what a delete
+/// or a move acts on is the row that was clicked, never what it points at.
+fn resolve_entry(root: &Path, relative: &str) -> Result<PathBuf, TreeError> {
+    let entry = beside_parent(root, relative)?;
+    entry
+        .symlink_metadata()
+        .map_err(|source| TreeError::Unreadable {
+            path: entry.clone(),
+            source,
+        })?;
+    clear_of_git(root, entry)
 }
 
 /// Creates an empty file, or a folder, at `relative`.
@@ -91,11 +116,10 @@ pub fn create(root: &Path, relative: &str, is_dir: bool) -> Result<(), TreeError
 /// Moves or renames `from` to `to` — the same operation either way, since a
 /// rename is a move within one directory.
 ///
-/// `from` is resolved with `resolve`, not `resolve_new`: there is nothing to
-/// move that is not already there. `to` is refused when it is already taken,
-/// the same check `create` makes for the same reason.
+/// `from` must already be there, and a symlink moves as the link. `to` is
+/// refused when it is already taken, the same check `create` makes.
 pub fn move_to(root: &Path, from: &str, to: &str) -> Result<(), TreeError> {
-    let source = resolve(root, from)?;
+    let source = resolve_entry(root, from)?;
     let destination = resolve_new(root, to)?;
     if destination.symlink_metadata().is_ok() {
         return Err(TreeError::AlreadyExists { path: destination });
@@ -110,11 +134,11 @@ pub fn move_to(root: &Path, from: &str, to: &str) -> Result<(), TreeError> {
 /// Removes whatever is at `relative` — a file, or a folder and everything
 /// under it.
 ///
-/// `resolve`, not `resolve_new`: there is nothing to delete that is not
-/// already there, and `resolve` is what requires it to exist.
+/// A symlink is removed as the link: `is_dir` would follow it, and
+/// `remove_dir_all` would then empty the folder it points at.
 pub fn remove(root: &Path, relative: &str) -> Result<(), TreeError> {
-    let target = resolve(root, relative)?;
-    let removed = if target.is_dir() {
+    let target = resolve_entry(root, relative)?;
+    let removed = if target.symlink_metadata().is_ok_and(|meta| meta.is_dir()) {
         std::fs::remove_dir_all(&target)
     } else {
         std::fs::remove_file(&target)

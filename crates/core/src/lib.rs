@@ -13,6 +13,8 @@ pub mod data_files;
 pub mod home;
 pub mod paths;
 #[cfg(test)]
+mod paths_guard_tests;
+#[cfg(test)]
 mod paths_tests;
 pub mod store;
 pub mod tree;

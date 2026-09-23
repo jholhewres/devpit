@@ -93,3 +93,34 @@ fn a_named_pipe_is_refused_instead_of_waited_on() {
     );
     assert!(read.text.is_none());
 }
+
+/// A file past every ceiling is sniffed, never loaded: a sparse file of
+/// 64 MB comes back as its first bytes only.
+#[test]
+fn a_file_past_the_ceiling_is_never_read_whole() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let file = dir.path().join("huge.log");
+    let handle = std::fs::File::create(&file).expect("create");
+    handle.set_len(64 * 1024 * 1024).expect("grow");
+
+    let (raw, bytes) = read_bounded(&file, 64 * 1024 * 1024).expect("read");
+    assert!(raw.len() <= 512, "read {} bytes", raw.len());
+    assert_eq!(bytes, 64 * 1024 * 1024);
+    assert!(past_the_ceiling("huge.log", bytes).is_some());
+}
+
+/// A file that grew past the ceiling after it was measured is refused, not
+/// read whole: `read_within` stops one byte past it.
+#[test]
+fn a_file_that_grew_past_the_ceiling_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let file = dir.path().join("grew.log");
+    std::fs::File::create(&file)
+        .expect("create")
+        .set_len(16 * 1024 * 1024)
+        .expect("grow");
+
+    let (raw, bytes) = read_bounded(&file, 0).expect("read");
+    assert!(raw.is_empty());
+    assert!(past_the_ceiling("grew.log", bytes).is_some());
+}

@@ -88,6 +88,62 @@ pub fn temp_for(dir: &Path, name: &str) -> PathBuf {
     dir.join(format!(".{name}.tmp"))
 }
 
+/// Replaces the file at `target` in one step, as its own permissions.
+///
+/// Written to a temp file beside it — a name no other save uses, made with
+/// `create_new`, which neither overwrites another save's temp nor follows a
+/// link planted at that name — then renamed over it. The temp is made with the
+/// target's mode before a byte goes in, so a `0600` file's contents are never
+/// readable by others in between. The folder is synced after the rename, so a
+/// crash leaves the old contents or the new ones.
+pub fn replace_keeping(target: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    let folder = target.parent().unwrap_or(Path::new("."));
+    let name = target
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let temp = folder.join(format!(
+        ".{name}.{}-{}.tmp",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if let Ok(meta) = std::fs::metadata(target) {
+        use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
+        options.mode(meta.permissions().mode() & 0o7777);
+    }
+    let mut made_temp = false;
+    let written = options
+        .open(&temp)
+        .and_then(|mut file| {
+            made_temp = true;
+            file.write_all(bytes)?;
+            file.sync_all()
+        })
+        .and_then(|()| {
+            // `mode` is filtered by the umask; set it again, still before the
+            // rename makes the file visible under its name.
+            if let Ok(meta) = std::fs::metadata(target) {
+                std::fs::set_permissions(&temp, meta.permissions())?;
+            }
+            std::fs::rename(&temp, target)
+        });
+    if written.is_err() && made_temp {
+        let _ = std::fs::remove_file(&temp);
+    }
+    if written.is_ok() {
+        if let Ok(dir) = std::fs::File::open(folder) {
+            let _ = dir.sync_all();
+        }
+    }
+    written
+}
+
 /// Writes `bytes` beside `dir/name`, then renames over it, so a reader sees
 /// the old file or the new one and never half of either.
 ///
