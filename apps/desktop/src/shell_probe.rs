@@ -69,10 +69,22 @@ exit 0
 /// `None` when it called none of them — an absolute path, a script that does
 /// something else — which is a command this cannot read.
 pub(crate) fn probe(shell: &str, name: &str, programs: &[&str]) -> Result<Option<Probed>, String> {
+    probe_within(shell, name, programs, WAITS)
+}
+
+fn probe_within(
+    shell: &str,
+    name: &str,
+    programs: &[&str],
+    waits: Duration,
+) -> Result<Option<Probed>, String> {
     if !name
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
         || name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.starts_with('-')
     {
         return Err("only a command's name can be read, not a line".to_owned());
     }
@@ -88,30 +100,32 @@ pub(crate) fn probe(shell: &str, name: &str, programs: &[&str]) -> Result<Option
         }
     }
     let at = dir.path().display().to_string().replace('\'', "'\\''");
-    // The baseline is taken in the same shell, after the same config, just
-    // before the function runs: only what the function adds differs.
-    let script = format!(
-        "PATH='{at}':\"$PATH\"; export PATH; (env -0 2>/dev/null || env) > '{at}/.base'; {name} {MARK} </dev/null >/dev/null 2>&1"
-    );
+    let script = script(shell, &at, name);
     let mut command = devpit_pty::host_env::command(shell);
     for (name, _) in std::env::vars() {
         if AGENTS_OWN.iter().any(|prefix| name.starts_with(prefix)) {
             command.env_remove(&name);
         }
     }
-    let mut child = command
+    // Standing in the scratch folder: an alias is text, and whatever it runs
+    // before the marker runs relative to here rather than to wherever the app
+    // was started from.
+    command
         .args(["-ic", &script])
+        .current_dir(dir.path())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|err| err.to_string())?;
+        .stderr(Stdio::null());
+    // A session of its own: whatever the function starts is ended with the
+    // shell on a timeout, and no terminal of this app's is there to take.
+    devpit_steps::descendants::in_a_session_of_its_own(&mut command);
+    let mut child = command.spawn().map_err(|err| err.to_string())?;
     let started = Instant::now();
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
-            Ok(None) if started.elapsed() > WAITS => {
-                let _ = child.kill();
+            Ok(None) if started.elapsed() > waits => {
+                devpit_steps::descendants::end_it_all(&mut child);
                 return Err(format!(
                     "{name} did not finish — it may be waiting for something"
                 ));
@@ -120,7 +134,33 @@ pub(crate) fn probe(shell: &str, name: &str, programs: &[&str]) -> Result<Option
             Err(err) => return Err(err.to_string()),
         }
     }
+    // A program or a script on the `PATH` is not run to be read: it is kept
+    // as a program, which is what it is, and runs when the profile does.
+    if dir.path().join(".refused").exists() {
+        return Ok(None);
+    }
     read(dir.path())
+}
+
+/// The line the shell runs. The name is run only once the shell has said it is
+/// a function or an alias of the person's own: a program on the `PATH` —
+/// `reboot` — would otherwise be started with the marker as its argument.
+///
+/// The baseline is taken in the same shell, after the same config, just before
+/// the function runs: only what the function adds differs.
+fn script(shell: &str, at: &str, name: &str) -> String {
+    let run = format!("{name} {MARK} </dev/null >/dev/null 2>&1");
+    if Path::new(shell).file_name().and_then(|one| one.to_str()) == Some("fish") {
+        // An alias in fish is a function.
+        return format!(
+            "set -gx PATH '{at}' $PATH; if not functions -q {name}; touch '{at}/.refused'; exit 0; end; begin; env -0 2>/dev/null; or env; end > '{at}/.base'; {run}"
+        );
+    }
+    // bash answers `type -t`, zsh `whence -w`; any other shell answers neither
+    // and is refused.
+    format!(
+        "PATH='{at}':\"$PATH\"; export PATH; case \"$( {{ if [ -n \"$ZSH_VERSION\" ]; then whence -w {name}; else type -t {name}; fi; }} 2>/dev/null )\" in *function|*alias) ;; *) : > '{at}/.refused'; exit 0;; esac; (env -0 2>/dev/null || env) > '{at}/.base'; {run}"
+    )
 }
 
 /// A folder of its own for the stand-ins, gone when the probe is.
@@ -270,5 +310,88 @@ mod tests {
     #[test]
     fn only_a_name_is_run() {
         assert!(probe("/bin/sh", "rm -rf /", &["claude"]).is_err());
+        assert!(probe("/bin/sh", ".", &["claude"]).is_err());
+        assert!(probe("/bin/sh", "..", &["claude"]).is_err());
+        assert!(probe("/bin/sh", "-a", &["claude"]).is_err());
+    }
+
+    #[test]
+    fn a_program_on_the_path_is_refused_without_being_run() {
+        let (dir, shell) = shell_with("");
+        let ran = dir.path().join("ran");
+        let bin = dir.path().join("bin");
+        std::fs::create_dir(&bin).expect("bin");
+        std::fs::write(
+            bin.join("boom"),
+            format!("#!/bin/sh\ntouch '{}'\n", ran.display()),
+        )
+        .expect("boom");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(bin.join("boom"), std::fs::Permissions::from_mode(0o755))
+                .expect("chmod");
+        }
+        std::fs::write(
+            dir.path().join("rc"),
+            format!("PATH='{}':\"$PATH\"\n", bin.display()),
+        )
+        .expect("rc");
+
+        assert_eq!(probe(&shell, "boom", &["claude"]), Ok(None));
+        assert_eq!(probe(&shell, "true", &["claude"]), Ok(None));
+        assert!(!ran.exists(), "the program was started");
+    }
+
+    #[test]
+    fn an_alias_is_read_like_a_function() {
+        let (_dir, shell) = shell_with("alias short='command claude --fast'\n");
+        let probed = probe(&shell, "short", &["claude"])
+            .expect("ran")
+            .expect("read");
+        assert_eq!(probed.args, ["--fast"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn what_a_function_left_running_ends_with_it() {
+        let (dir, shell) = shell_with("");
+        let pid_file = dir.path().join("pid");
+        std::fs::write(
+            dir.path().join("rc"),
+            format!(
+                "slow() {{ sh -c 'echo $$ > \"{}\"; exec sleep 30'; }}\n",
+                pid_file.display()
+            ),
+        )
+        .expect("rc");
+
+        // Three seconds, not one: an interactive shell reading its rc on a
+        // loaded machine can take a second before the function even starts.
+        let ended = probe_within(&shell, "slow", &["claude"], Duration::from_secs(3));
+        assert!(ended.is_err());
+        let pid: i32 = std::fs::read_to_string(&pid_file)
+            .expect("the function ran")
+            .trim()
+            .parse()
+            .expect("pid");
+        let waited = Instant::now();
+        // A zombie nobody reaped is gone as far as this is concerned: dead,
+        // only not yet collected — which is the case in a container without
+        // an init.
+        let zombie = || {
+            std::fs::read_to_string(format!("/proc/{pid}/stat")).is_ok_and(|stat| {
+                stat.rsplit_once(") ")
+                    .is_some_and(|(_, rest)| rest.starts_with('Z'))
+            })
+        };
+        // SAFETY: signal 0 sends nothing; it asks whether the pid still exists.
+        while unsafe { libc::kill(pid, 0) } == 0 && !zombie() {
+            assert!(
+                waited.elapsed() < Duration::from_secs(3),
+                "the sleep outlived the probe"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 }

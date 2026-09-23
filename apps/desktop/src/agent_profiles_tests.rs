@@ -198,6 +198,29 @@ fn a_preference_nobody_can_parse_reads_as_an_empty_list() {
 }
 
 #[test]
+fn a_preference_nobody_can_parse_is_never_written_over() {
+    // Saving over it would lose every profile the person had, for one typo.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = open(dir.path());
+    let broken = "[{\"id\": \"01JGLM\", \"label\": \"GLM\"";
+    store
+        .set_preference(preference::AGENT_PROFILES, broken)
+        .expect("write");
+    let mut one = glm();
+    one.id = "01JNEW".to_owned();
+
+    assert!(upsert(&store, one).is_err());
+    assert!(remove(&store, "01JGLM").is_err());
+    assert_eq!(
+        store
+            .preference(preference::AGENT_PROFILES)
+            .expect("read")
+            .as_deref(),
+        Some(broken)
+    );
+}
+
+#[test]
 fn a_subagent_name_is_not_a_profile() {
     // `config.agent` is a subagent from somebody's frontmatter and
     // `config.profile` is which account runs the step. They share the JSON and

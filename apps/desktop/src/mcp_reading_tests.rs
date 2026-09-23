@@ -91,3 +91,81 @@ fn the_user_wide_servers_are_still_read_from_the_top_level() {
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].name, "everywhere");
 }
+
+#[test]
+fn a_token_in_a_url_is_not_shown() {
+    assert_eq!(
+        masked_url("https://user:hunter2@mcp.example/sse?token=abc&mode=x#k=v"),
+        "https://***@mcp.example/sse?token=***&mode=***#***"
+    );
+    assert_eq!(
+        masked_url("https://mcp.example/mcp"),
+        "https://mcp.example/mcp"
+    );
+}
+
+#[test]
+fn a_secret_flag_keeps_its_name_and_loses_its_value() {
+    assert_eq!(
+        masked_args(&[
+            "--api-key",
+            "sk-123",
+            "--auth-token=abc",
+            "--password",
+            "p",
+            "--port",
+            "80",
+            "http://u:p@h/x?q=1",
+        ]),
+        [
+            "--api-key",
+            "***",
+            "--auth-token=***",
+            "--password",
+            "***",
+            "--port",
+            "80",
+            "http://***@h/x?q=***",
+        ]
+    );
+}
+
+#[test]
+fn a_server_line_shows_no_secret() {
+    let found = servers_in(
+        r#"{"mcpServers": {
+            "a": { "url": "https://mcp.example/?apiKey=sk-1" },
+            "b": { "command": "npx", "args": ["srv", "--secret", "s3"] }
+        }}"#,
+        "user",
+    );
+    assert_eq!(found[0].reached_by, "https://mcp.example/?apiKey=***");
+    assert_eq!(found[1].reached_by, "npx srv --secret ***");
+}
+
+/// The forms a credential takes in real MCP configs beyond `--api-key`.
+#[test]
+fn headers_env_pairs_and_keys_in_a_path_are_masked() {
+    let shown = masked_args(&[
+        "mcp-remote",
+        "https://mcp.example.com/api/mcp/s/a1b2c3d4e5f6g7h8i9j0k1l2m3/mcp",
+        "--header",
+        "Authorization: Bearer sk-live-1234",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN=ghp_abc123",
+        "API_KEY=xyz",
+        "--max-depth",
+        "3",
+    ])
+    .join(" ");
+    for leaked in [
+        "a1b2c3d4e5f6g7h8i9j0k1l2m3",
+        "sk-live-1234",
+        "ghp_abc123",
+        "xyz",
+    ] {
+        assert!(!shown.contains(leaked), "{leaked} shown in: {shown}");
+    }
+    assert!(shown.contains("/api/mcp/s/"), "{shown}");
+    assert!(shown.contains("--max-depth 3"), "{shown}");
+}

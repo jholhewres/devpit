@@ -28,7 +28,7 @@ const LOOK: Duration = Duration::from_millis(20);
 
 /// Puts the command in a session of its own, so its descendants share one
 /// process group and can be ended together.
-pub(crate) fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
+pub fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
     // SAFETY: `setsid` is async-signal-safe and touches nothing shared with
     // this process after the fork — which is the whole contract of `pre_exec`.
     unsafe {
@@ -45,7 +45,7 @@ pub(crate) fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
 /// Terminate first, so a runner that cleans up after itself gets to; then kill
 /// what is left. Reporting an end before observing one is the bug this module
 /// exists to remove, so the wait is not optional.
-pub(crate) fn end_it_all(child: &mut Child) {
+pub fn end_it_all(child: &mut Child) {
     let group = child.id() as i32;
     signal(group, libc::SIGTERM);
     if gone(child, GRACE) {

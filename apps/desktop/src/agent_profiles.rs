@@ -25,16 +25,31 @@ fn base_of(id: &str) -> Option<Base> {
 }
 
 fn stored(store: &Store) -> Result<Vec<Declared>, RpcError> {
+    // A preference that cannot be parsed reads as an empty list: it is one row
+    // in a settings table, and refusing to draw the pane over it would make a
+    // typo unrecoverable from inside the app.
+    Ok(editable(store)?.unwrap_or_default())
+}
+
+/// The stored list, or `None` when it cannot be parsed. Saving over a list
+/// that could not be read would write every other profile out of existence.
+fn editable(store: &Store) -> Result<Option<Vec<Declared>>, RpcError> {
     let raw = store
         .preference(preference::AGENT_PROFILES)?
         .unwrap_or_default();
     if raw.trim().is_empty() {
-        return Ok(Vec::new());
+        return Ok(Some(Vec::new()));
     }
-    // A preference that cannot be parsed is an empty list, not an error: it is
-    // one row in a settings table, and refusing to draw the pane over it would
-    // make a typo unrecoverable from inside the app.
-    Ok(serde_json::from_str(&raw).unwrap_or_default())
+    Ok(serde_json::from_str(&raw).ok())
+}
+
+/// [`editable`], refusing to go on when the list cannot be read.
+fn to_edit(store: &Store) -> Result<Vec<Declared>, RpcError> {
+    editable(store)?.ok_or_else(|| {
+        RpcError::internal(
+            "the stored agent profiles cannot be read, so nothing was changed — fix or clear them first",
+        )
+    })
 }
 
 pub(crate) fn save(store: &Store, declared: &[Declared]) -> Result<(), RpcError> {
@@ -120,13 +135,18 @@ pub(crate) fn agent_profile_save_now(declared: Declared) -> Result<Vec<Profile>,
     }
 
     let store = crate::projects::store()?;
-    let mut list = stored(&store)?;
+    upsert(&store, declared)?;
+    all(&store)
+}
+
+/// Puts one profile on the stored list, in place when its id is already there.
+fn upsert(store: &Store, declared: Declared) -> Result<(), RpcError> {
+    let mut list = to_edit(store)?;
     match list.iter_mut().find(|one| one.id == declared.id) {
         Some(existing) => *existing = declared,
         None => list.push(declared),
     }
-    save(&store, &list)?;
-    all(&store)
+    save(store, &list)
 }
 
 /// `agent.profile_remove` — forgets one.
@@ -144,7 +164,13 @@ pub async fn agent_profile_remove(id: String) -> Result<Vec<Profile>, RpcError> 
 /// [`agent_profile_remove`], on the calling thread.
 pub(crate) fn agent_profile_remove_now(id: String) -> Result<Vec<Profile>, RpcError> {
     let store = crate::projects::store()?;
-    let used = store.steps_using_profile(&id)?;
+    remove(&store, &id)?;
+    all(&store)
+}
+
+/// Takes one profile off the stored list, unless a step still names it.
+fn remove(store: &Store, id: &str) -> Result<(), RpcError> {
+    let used = store.steps_using_profile(id)?;
     if !used.is_empty() {
         // Named, with their boards: "a step uses it" on a machine with six
         // projects tells somebody there is a problem and not where it is.
@@ -167,10 +193,9 @@ pub(crate) fn agent_profile_remove_now(id: String) -> Result<Vec<Profile>, RpcEr
         ));
     }
 
-    let mut list = stored(&store)?;
+    let mut list = to_edit(store)?;
     list.retain(|one| one.id != id);
-    save(&store, &list)?;
-    all(&store)
+    save(store, &list)
 }
 
 /// The profile this step names, as something that can be started.
