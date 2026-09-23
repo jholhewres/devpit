@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 
 import type { Commit } from '../gen/bindings'
+import { appended, byDay, matches, since, subjectOf } from './history'
 import { ask, commands } from './live'
 import { Skeleton } from './Skeleton'
+import { CHANGED } from './useTree'
 import { useShell } from './useShell'
 
 /*
- * What was committed here, most recent first.
+ * What was committed here, most recent first, under the day it was made.
  *
  * Local history only. Nothing fetches, so what is listed is what this
  * checkout has — and the branch chip beside it says how far behind that is.
  *
- * Loaded one page at a time: `hasMore` is what the backend already knows, so
- * the button disappears the moment there is nothing older to load, without
- * this screen guessing from a short page.
+ * A row is two lines, because one could not hold both halves of the
+ * question: the subject, with its kind as a badge rather than a prefix eating
+ * the width, and who, when and which commit under it. Older pages load as
+ * the list is scrolled to its end; the list comes back fresh when the window
+ * does, or when something here changed the repository.
  */
 
 export function History(): React.JSX.Element {
@@ -24,12 +29,13 @@ export function History(): React.JSX.Element {
   // fetched yet", not "no commits", and the two must not draw the same.
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [copied, setCopied] = useState<string | null>(null)
+  const end = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    setCommits([])
-    setHasMore(false)
-    setError(null)
+  const load = useCallback(() => {
     if (!project) {
+      setCommits([])
       setLoading(false)
       return
     }
@@ -42,19 +48,67 @@ export function History(): React.JSX.Element {
     })
   }, [project])
 
-  const older = (): void => {
-    if (!project) return
+  useEffect(() => {
+    setCommits([])
+    setHasMore(false)
+    setError(null)
+    load()
+  }, [load])
+
+  /* A commit made from a terminal, an agent or another window moves nothing
+     here; coming back to the window, or a change announced in it, does. */
+  useEffect(() => {
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') load()
+    }
+    window.addEventListener('focus', load)
+    window.addEventListener(CHANGED, load)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', load)
+      window.removeEventListener(CHANGED, load)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [load])
+
+  const older = useCallback((): void => {
+    if (!project || loading) return
     setLoading(true)
     void ask(() => commands.projectHistory(project.id, null, commits.length)).then((answer) => {
-      setCommits((was) => [...was, ...(answer.data?.commits ?? [])])
+      setCommits((was) => appended(was, answer.data?.commits ?? []))
       setHasMore(answer.data?.hasMore ?? false)
       setError(answer.error)
       setLoading(false)
     })
+  }, [project, loading, commits.length])
+
+  /* The end of the list coming into view is the ask for more. */
+  useEffect(() => {
+    const at = end.current
+    if (!at || !hasMore || typeof IntersectionObserver === 'undefined') return
+    const watch = new IntersectionObserver((seen) => seen.some((one) => one.isIntersecting) && older())
+    watch.observe(at)
+    return () => watch.disconnect()
+  }, [hasMore, older])
+
+  const copy = (sha: string): void => {
+    void writeText(sha).then(() => {
+      setCopied(sha)
+      setTimeout(() => setCopied((was) => (was === sha ? null : was)), 1200)
+    })
   }
 
+  const now = new Date()
+  const shown = commits.filter((one) => matches(one, query))
+
   return (
-    <>
+    <div className="hist">
+      {commits.length > 0 && (
+        <label className="hist__find">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <input value={query} placeholder="Filter commits" spellCheck={false} aria-label="Filter commits" onChange={(event) => setQuery(event.target.value)} />
+        </label>
+      )}
       {error && (
         <div className="exempty">
           <span className="exempty__t">{error}</span>
@@ -66,30 +120,60 @@ export function History(): React.JSX.Element {
           <span className="exempty__t">No commits yet.</span>
         </div>
       )}
-      {commits.map((commit) => (
-        <button
-          className="gitrow"
-          key={commit.sha}
-          onClick={() =>
-            show('diff', {
-              id: `commit:${commit.sha}`,
-              path: commit.sha,
-              title: commit.sha,
-            })
-          }
-        >
-          <span className="gitrow__n">{commit.subject}</span>
-          <span className="gitrow__end">
-            <span className="branchmenu__s">{commit.author}</span>
-            <code>{commit.sha}</code>
-          </span>
-        </button>
+      {commits.length > 0 && shown.length === 0 && <div className="hist__none">No loaded commit matches.</div>}
+
+      {byDay(shown, now).map((group) => (
+        <section key={group.day} className="hist__group">
+          <div className="hist__day">{group.day}</div>
+          {group.commits.map((commit) => {
+            const said = subjectOf(commit.subject)
+            return (
+              <button
+                key={commit.sha}
+                className="hist__row"
+                title={commit.subject}
+                onClick={() => show('diff', { id: `commit:${commit.sha}`, path: commit.sha, title: commit.sha })}
+              >
+                <span className="hist__top">
+                  {said.kind && (
+                    <span className="hist__kind" data-kind={said.breaking ? 'breaking' : said.kind}>
+                      {said.kind}
+                      {said.scope && <span className="hist__scope">{said.scope}</span>}
+                    </span>
+                  )}
+                  <span className="hist__s">{said.text}</span>
+                </span>
+                <span className="hist__meta">
+                  <span className="hist__who">{commit.author}</span>
+                  {commit.committedAt !== null && <span>{since(commit.committedAt, now.getTime())}</span>}
+                  <span
+                    className="hist__sha"
+                    role="button"
+                    title={copied === commit.sha ? 'Copied' : 'Copy the commit id'}
+                    data-copied={copied === commit.sha ? 'true' : undefined}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      copy(commit.sha)
+                    }}
+                  >
+                    {copied === commit.sha ? 'copied' : commit.sha}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+        </section>
       ))}
-      {hasMore && (
-        <button className="btn" disabled={loading} onClick={older}>
-          {loading ? 'Loading…' : 'Load older commits'}
-        </button>
-      )}
-    </>
+
+      <div ref={end} className="hist__end">
+        {hasMore ? (
+          <button className="hist__more" disabled={loading} onClick={older}>
+            {loading ? 'Loading older…' : 'Load older commits'}
+          </button>
+        ) : (
+          commits.length > 0 && !query && <span>The first commit</span>
+        )}
+      </div>
+    </div>
   )
 }

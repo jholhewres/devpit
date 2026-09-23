@@ -19,7 +19,7 @@ const tree = {
   reload: vi.fn(),
 }
 
-vi.mock('./useTree', () => ({ useTree: () => tree }))
+vi.mock('./useTree', () => ({ useTree: () => tree, CHANGED: 'devpit:tree-changed' }))
 vi.mock('./useShell', () => ({
   useShell: () => ({ project: null, files: true, show: vi.fn() }),
 }))
