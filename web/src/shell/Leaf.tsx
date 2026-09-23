@@ -12,6 +12,7 @@ import { clipboardKey, copySelection, pasteClipboard } from './terminalClipboard
 import { TerminalMenu } from './TerminalMenu'
 import { guardComposition } from './terminalIme'
 import { picturesAsPaths } from './terminalPaste'
+import { wheelToTmux } from './terminalWheel'
 import { useMarks } from './useMarks'
 
 /*
@@ -82,6 +83,7 @@ export function Leaf({
     }
     box.addEventListener('contextmenu', menu, true)
     const unguard = guardComposition(box, (data) => terminal.input(data, true))
+    const wheel = wheelToTmux(terminal, box, projectId, paneId)
 
     /* The pane is `display: none` until its tab is active and animates in on a
        transform, so a fit in this tick measures nothing and xterm ends up with
@@ -106,6 +108,7 @@ export function Leaf({
     const refit = (): void => {
       if (box.clientWidth >= 2 && box.clientHeight >= 2) fit.fit()
       clearTimeout(settling)
+      wheel.dispose()
       settling = setTimeout(tell, 60)
     }
     const tell = (): void => {
@@ -154,7 +157,7 @@ export function Leaf({
       told = { rows: terminal.rows, cols: terminal.cols }
       /* The grid may have been fitted while the attach was on its way. */
       refit()
-      terminal.onData((data) => live?.write(data))
+      terminal.onData((data) => wheel.typed(data, (typed) => live?.write(typed)))
       setTerm(terminal)
     })().catch((thrown: unknown) => {
       /* Every step above talks to the backend, and a rejection here used to

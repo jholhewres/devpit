@@ -980,6 +980,14 @@ export const commands = {
 	 */
 	sessionResize: (paneId: string, rows: number, cols: number) => typedError<PaneSize, RpcError>(__TAURI_INVOKE("session_resize", { paneId, rows, cols })),
 	/**
+	 *  `session.scroll` — a wheel over a leaf: its history, or its program's
+	 *  arrow keys when one holds the screen. Zero goes back to the live screen.
+	 * 
+	 *  Asked of tmux rather than sent through the pty: the client draws on the
+	 *  alternate screen, where a wheel is arrow keys and the shell echoes them.
+	 */
+	sessionScroll: (projectId: string, paneId: string, lines: number) => typedError<null, RpcError>(__TAURI_INVOKE("session_scroll", { projectId, paneId, lines })),
+	/**
 	 *  `pane.scrollback` — what this pane has printed, oldest kept byte first.
 	 * 
 	 *  This is what makes reopening a window show a terminal rather than an empty

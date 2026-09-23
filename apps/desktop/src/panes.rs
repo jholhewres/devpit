@@ -93,6 +93,21 @@ pub fn session_resize(
     })
 }
 
+/// `session.scroll` — a wheel over a leaf: its history, or its program's
+/// arrow keys when one holds the screen. Zero goes back to the live screen.
+///
+/// Asked of tmux rather than sent through the pty: the client draws on the
+/// alternate screen, where a wheel is arrow keys and the shell echoes them.
+#[tauri::command]
+#[specta::specta]
+pub fn session_scroll(project_id: String, pane_id: String, lines: i32) -> Result<(), RpcError> {
+    crate::sessions::holding(&project_id, &pane_id)?;
+    let session = devpit_tmux::Server::session_name(&project_id);
+    crate::sessions::tmux_server()?
+        .scroll(&devpit_tmux::Server::target(&session, &pane_id), lines)
+        .map_err(|err| RpcError::internal(err.to_string()))
+}
+
 /// `pane.scrollback` — what this pane has printed, oldest kept byte first.
 ///
 /// This is what makes reopening a window show a terminal rather than an empty

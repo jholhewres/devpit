@@ -16,6 +16,7 @@ mod environment;
 mod naming;
 mod pane;
 mod running;
+mod scroll;
 mod shell;
 pub use shell::{parse_running, Running, Shell};
 
