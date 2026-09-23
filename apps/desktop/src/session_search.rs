@@ -69,6 +69,7 @@ pub(crate) fn refresh(
 ) -> Result<(), RpcError> {
     let conn = store.conn();
     let folder = devpit_agentcli::outside::folder_name(root);
+    let mut present: Vec<String> = Vec::new();
     for installation in installations {
         let dir = installation.join("projects").join(&folder);
         let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -83,6 +84,7 @@ pub(crate) fn refresh(
                 continue;
             };
             let key = path.display().to_string();
+            present.push(key.clone());
             if !search_index::stale(search_index::recorded(conn, &key)?, size, mtime) {
                 continue;
             }
@@ -107,6 +109,7 @@ pub(crate) fn refresh(
             )?;
         }
     }
+    search_index::forget_missing(conn, project_id, &present)?;
     Ok(())
 }
 

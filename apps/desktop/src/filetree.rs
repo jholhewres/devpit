@@ -45,7 +45,7 @@ pub(crate) fn project_tree_now(
     let (_, root) = locate(&store, &project_id)?;
     let root = checkout(&root, worktree_id.as_deref());
 
-    let read = devpit_git::status(&root).unwrap_or_default();
+    let read = status_of(&root);
 
     let nodes = tree::children(&root, &path)
         .map_err(tree_error)?
@@ -59,6 +59,56 @@ pub(crate) fn project_tree_now(
         .collect();
 
     Ok(ProjectTree { nodes })
+}
+
+type Kept = std::sync::Mutex<
+    Option<std::collections::HashMap<std::path::PathBuf, (std::time::Instant, devpit_git::Status)>>,
+>;
+static KEPT: Kept = std::sync::Mutex::new(None);
+
+/// Forgets the status kept for `root`: something here just changed a file,
+/// and the next tree read must see it.
+pub(crate) fn forget_status(root: &std::path::Path) {
+    if let Ok(mut kept) = KEPT.lock() {
+        if let Some(all) = kept.as_mut() {
+            all.remove(root);
+        }
+    }
+}
+
+/// The checkout's git status, shared by the folders read together.
+///
+/// A tree refreshing — the window coming back, a file saved — asks for every
+/// open folder at once, and each used to run a full `git status` of its own:
+/// ten open folders were eleven walks of the whole repository. One answer is
+/// kept for two seconds per checkout. A status that fails is said on stderr
+/// and read as clean, so the tree still draws.
+fn status_of(root: &std::path::Path) -> devpit_git::Status {
+    use std::collections::HashMap;
+    use std::time::{Duration, Instant};
+
+    const FOR: Duration = Duration::from_secs(2);
+
+    if let Ok(kept) = KEPT.lock() {
+        if let Some((at, status)) = kept.as_ref().and_then(|all| all.get(root)) {
+            if at.elapsed() < FOR {
+                return status.clone();
+            }
+        }
+    }
+    let read = match devpit_git::status(root) {
+        Ok(read) => read,
+        Err(err) => {
+            eprintln!("git status in {}: {err}", root.display());
+            return devpit_git::Status::default();
+        }
+    };
+    if let Ok(mut kept) = KEPT.lock() {
+        let all = kept.get_or_insert_with(HashMap::new);
+        all.retain(|_, (at, _)| at.elapsed() < FOR);
+        all.insert(root.to_path_buf(), (Instant::now(), read.clone()));
+    }
+    read
 }
 
 /// How much a status wants to be seen, when several are collapsed into one row.

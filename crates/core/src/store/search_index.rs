@@ -78,6 +78,35 @@ pub fn replace_file(
     Ok(())
 }
 
+/// Drops what the index holds for this project's transcripts that are no
+/// longer on disk, so a hit never points at a conversation that was deleted.
+/// `present` is every transcript path the refresh just found.
+pub fn forget_missing(
+    conn: &Connection,
+    project: &str,
+    present: &[String],
+) -> Result<usize, StoreError> {
+    let mut statement =
+        conn.prepare("SELECT DISTINCT path FROM session_text WHERE project = ?1")?;
+    let known: Vec<String> = statement
+        .query_map(params![project], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
+    let gone: Vec<&String> = known
+        .iter()
+        .filter(|path| !present.contains(path))
+        .collect();
+    if gone.is_empty() {
+        return Ok(0);
+    }
+    let tx = conn.unchecked_transaction()?;
+    for path in &gone {
+        tx.execute("DELETE FROM session_text WHERE path = ?1", params![path])?;
+        tx.execute("DELETE FROM session_file WHERE path = ?1", params![path])?;
+    }
+    tx.commit()?;
+    Ok(gone.len())
+}
+
 /// What the index last recorded for a file.
 pub fn recorded(conn: &Connection, path: &str) -> Result<Option<(i64, i64)>, StoreError> {
     let mut statement = conn.prepare("SELECT size, mtime FROM session_file WHERE path = ?1")?;

@@ -1,3 +1,4 @@
+import { wantLine } from './revealLine'
 import type { SearchFile } from '../gen/bindings'
 import { looksLikeDotfile, type FindFlags, type FindHit } from './find'
 
@@ -73,19 +74,22 @@ export function SearchResults({
    duplicated here rather than reached into. */
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-function mark(text: string, query: string, flags: FindFlags): React.ReactNode {
+/* The query as one pattern, built once for the whole list rather than for
+   every line drawn. Null when there is nothing to mark, or it does not parse. */
+function patternOf(query: string, flags: FindFlags): RegExp | null {
   const needle = query.trim()
-  if (!needle) return text
-
+  if (!needle) return null
   const body = flags.regex ? needle : escape(needle)
   const withWord = flags.word ? `\\b(?:${body})\\b` : body
-  let pattern: RegExp
   try {
-    pattern = new RegExp(withWord, flags.case ? '' : 'i')
+    return new RegExp(withWord, flags.case ? '' : 'i')
   } catch {
-    return text
+    return null
   }
+}
 
+function mark(text: string, pattern: RegExp | null): React.ReactNode {
+  if (!pattern) return text
   const found = pattern.exec(text)
   if (!found) return text
   const at = found.index
@@ -143,6 +147,7 @@ export function ContentResults({
   }
 
   const included = files.reduce((total, file) => total + file.lines.length, 0)
+  const pattern = patternOf(query, flags)
 
   return (
     <div className="results">
@@ -152,9 +157,16 @@ export function ContentResults({
             {file.path}
           </button>
           {file.lines.map((hit) => (
-            <button key={hit.line} className="cresult__line" onClick={() => onOpen(file.path)}>
+            <button
+              key={hit.line}
+              className="cresult__line"
+              onClick={() => {
+                onOpen(file.path)
+                wantLine(file.path, hit.line)
+              }}
+            >
               <span className="cresult__n">{hit.line}</span>
-              <span className="cresult__t">{mark(hit.text, query, flags)}</span>
+              <span className="cresult__t">{mark(hit.text, pattern)}</span>
             </button>
           ))}
         </div>

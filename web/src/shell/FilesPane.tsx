@@ -243,7 +243,9 @@ export function FilesPane(): React.JSX.Element {
           </div>
         </div>
 
-        {picked && (
+        {/* A folder picked with the arrows is only highlighted; the preview is
+            for files, and a folder is entered with Enter. */}
+        {picked && !rows.find((row) => row.path === picked)?.isDir && (
           <WorkspaceFile
             path={picked}
             full={fullPath(root, picked)}

@@ -8,6 +8,7 @@ import { Markdown } from './MarkdownView'
 import type { Tab } from './strip'
 import { useFile } from './useFile'
 import { useShell } from './useShell'
+import { useWantedLine } from './revealLine'
 
 /*
  * One file, one tab.
@@ -21,6 +22,7 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
   const { close, active, markUnsaved } = useShell()
   const path = tab.path ?? null
   const edit = useFile(path)
+  const line = useWantedLine(path, edit.file !== null)
   const [preview, setPreview] = useState(true)
 
   const mine = active?.id === tab.id
@@ -128,6 +130,7 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
             text={edit.text}
             language={path ? ofPath(path) : null}
             onChange={edit.change}
+            line={line}
           />
         )}
       </div>

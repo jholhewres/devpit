@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ask, commands } from './live'
+import { CHANGED } from './useTree'
 
 export interface UseFileIndex {
   readonly paths: readonly string[] | null
@@ -15,7 +16,14 @@ export interface UseFileIndex {
 interface Cached {
   readonly paths: readonly string[]
   readonly partial: boolean
+  /** When it was walked: a focus drops only an index older than `FRESH`. */
+  readonly at: number
 }
+
+/* Coming back to the window drops an index older than this. A focus is
+   frequent and a walk is up to forty thousand files, so one that is seconds
+   old is kept; what this app itself changes drops it at once (`CHANGED`). */
+const FRESH = 30_000
 
 /* The flat index behind name search: one fetch per project, not one per
    keystroke. `ensure` is a no-op once the project is in the cache, so a
@@ -42,29 +50,40 @@ export function useFileIndex(projectId: string | null): UseFileIndex {
      that from `Changes.tsx` for one edge case was not worth the coupling —
      the next focus or visibility change clears it regardless. */
   useEffect(() => {
-    const drop = (): void => {
+    const drop = (always: boolean): void => {
       if (!projectId) return
+      const had = cache.current.get(projectId)
+      if (!had || (!always && Date.now() - had.at < FRESH)) return
       cache.current.delete(projectId)
       setEntry(null)
     }
-    const onFocus = (): void => drop()
+    const onFocus = (): void => drop(false)
     const onVisible = (): void => {
-      if (document.visibilityState === 'visible') drop()
+      if (document.visibilityState === 'visible') drop(false)
     }
+    const onChanged = (): void => drop(true)
     window.addEventListener('focus', onFocus)
+    window.addEventListener(CHANGED, onChanged)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener(CHANGED, onChanged)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [projectId])
+
+  /* The project asked for now: an answer for the one open a moment ago is
+     cached under its own name and not shown in this one. */
+  const current = useRef(projectId)
+  current.current = projectId
 
   const ensure = useCallback((): void => {
     if (!projectId || cache.current.has(projectId)) return
     setLoading(true)
     void ask(() => commands.projectFiles(projectId, null)).then((asked) => {
-      const found: Cached = { paths: asked.data?.paths ?? [], partial: asked.data?.partial ?? false }
+      const found: Cached = { paths: asked.data?.paths ?? [], partial: asked.data?.partial ?? false, at: Date.now() }
       cache.current.set(projectId, found)
+      if (current.current !== projectId) return
       setEntry(found)
       setLoading(false)
     })

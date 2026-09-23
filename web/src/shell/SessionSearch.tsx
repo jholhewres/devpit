@@ -26,7 +26,14 @@ export function SessionSearch(): React.JSX.Element | null {
   const [looking, setLooking] = useState(false)
 
   useEffect(() => {
-    if (!project || !query.trim()) return setHits([])
+    /* Cleared with the query: a search still on its way when the field was
+       emptied used to leave "Reading transcripts…" and its error behind. */
+    if (!project || !query.trim()) {
+      setHits([])
+      setLooking(false)
+      setError(null)
+      return
+    }
     let current = true
     const timer = window.setTimeout(() => {
       setLooking(true)

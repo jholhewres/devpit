@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { FileContents } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -31,9 +31,14 @@ export function useFile(path: string | null): Editing {
   const [saving, setSaving] = useState(false)
   const [clash, setClash] = useState<string | null>(null)
 
+  /* Only the latest read lands: a slow read of the file open a moment ago
+     must not fill the one open now. */
+  const reading = useRef(0)
   const load = useCallback(() => {
     if (!project || !path) return
+    const mine = ++reading.current
     void ask(() => commands.fileRead(project.id, null, path)).then((answer) => {
+      if (mine !== reading.current) return
       setFile(answer.data ?? null)
       setText(answer.data?.text ?? '')
       setDirty(false)
@@ -48,17 +53,23 @@ export function useFile(path: string | null): Editing {
     (readAt: number) => {
       if (!project || !path) return
       setSaving(true)
-      void ask(() => commands.fileWrite(project.id, null, path, text, readAt))
+      const saved = text
+      void ask(() => commands.fileWrite(project.id, null, path, saved, readAt))
         .then((answer) => {
           if (answer.data) {
             /* The mtime the save produced becomes the one the next save is
-               built on, or every save after the first reads as stale. */
-            setFile((was) => (was ? { ...was, readAt: answer.data!.readAt } : was))
+               built on, or every save after the first reads as stale — and
+               what was saved becomes what "changed" is measured against. */
+            setFile((was) => (was ? { ...was, readAt: answer.data!.readAt, text: saved } : was))
             setDirty(false)
             setClash(null)
             setError(null)
-          } else {
+          } else if (answer.code === 'conflict') {
             setClash(answer.error)
+          } else {
+            /* A refusal that is not the file moving on — no permission, a
+               full disk — is said as itself, not as a conflict to overwrite. */
+            setError(answer.error)
           }
         })
         .finally(() => setSaving(false))

@@ -1,9 +1,10 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useDeferredValue, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { onEnter, onTab, unit, type Edit } from './indenting'
 import type { Language } from './languages'
 import { Painted } from './Painted'
 import { abandoned, committed, composing } from './typing'
+import { offsetOf } from './revealLine'
 
 /*
  * An editor with colour, which is a textarea with a painting behind it.
@@ -78,10 +79,14 @@ export function Code({
   language,
   onChange,
   readOnly,
+  line,
 }: {
   text: string
   language: Language | null
   onChange?: (text: string) => void
+  /** A line to put the caret on and bring into view, from 1 — and a new
+   *  object each time it is asked, so asking twice moves twice. */
+  line?: { readonly at: number } | null
   readOnly?: boolean
 }): React.JSX.Element {
   const behind = useRef<HTMLPreElement>(null)
@@ -95,6 +100,25 @@ export function Code({
      TypeScript one by two, and a setting would be a question with a wrong
      answer half the time. */
   const step = useMemo(() => unit(text), [text])
+  /* The painting and the line numbers follow the text a beat behind: they are
+     work over the whole file, and done on every keystroke they made typing
+     in a large one lag. React draws the field first and these when it can,
+     dropping the ones a newer keystroke already replaced. */
+  const shown = useDeferredValue(text)
+  const lines = useMemo(() => numbered(shown), [shown])
+  const painted = useMemo(() => <Painted text={shown} language={language} />, [shown, language])
+
+  useLayoutEffect(() => {
+    const box = field.current
+    if (!line || !box || !text) return
+    const from = offsetOf(text, line.at)
+    const to = text.indexOf('\n', from)
+    box.focus()
+    box.setSelectionRange(from, to < 0 ? text.length : to)
+    const height = Number.parseFloat(getComputedStyle(box).lineHeight) || 18
+    box.scrollTop = Math.max(0, (line.at - 1) * height - box.clientHeight / 3)
+    // Keyed on the ask alone: a line is gone to once, not chased while typing.
+  }, [line])
 
   useLayoutEffect(() => {
     const put = wanted.current
@@ -106,10 +130,10 @@ export function Code({
   return (
     <div className="code__wrap">
       <pre className="code__lines" ref={gutter} aria-hidden="true">
-        {numbered(text)}
+        {lines}
       </pre>
       <pre className="code__paint" ref={behind} aria-hidden="true">
-        <Painted text={text} language={language} />
+        {painted}
         {/* A trailing newline leaves the painting one line shorter than the
             field, and the last line of a file is where a caret usually is. */}
         {'\n'}

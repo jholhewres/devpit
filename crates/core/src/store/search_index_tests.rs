@@ -111,3 +111,37 @@ fn what_a_person_types_is_never_a_syntax_error() {
     }
     assert_eq!(expression("   "), None);
 }
+
+/// A transcript deleted from disk leaves the index with the next refresh, so
+/// no hit points at a conversation that is gone.
+#[test]
+fn a_deleted_transcript_leaves_the_index() {
+    let (_dir, store) = store();
+    let conn = store.conn();
+    for (path, id) in [("/i/p/kept.jsonl", "kept"), ("/i/p/gone.jsonl", "gone")] {
+        replace_file(
+            conn,
+            &TranscriptFile {
+                path,
+                session_id: id,
+                project: "prj_1",
+                installation: "/i",
+                size: 1,
+                mtime: 1,
+            },
+            &[("user", "the lexer again")],
+        )
+        .expect("index");
+    }
+
+    let dropped = forget_missing(conn, "prj_1", &["/i/p/kept.jsonl".to_owned()]).expect("forget");
+    assert_eq!(dropped, 1);
+    let hits = search(conn, "lexer", Some("prj_1"), 10).expect("search");
+    assert_eq!(
+        hits.iter()
+            .map(|hit| hit.session_id.as_str())
+            .collect::<Vec<_>>(),
+        ["kept"]
+    );
+    assert_eq!(recorded(conn, "/i/p/gone.jsonl").expect("read"), None);
+}
