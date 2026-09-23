@@ -47,7 +47,12 @@ pub(crate) fn findings(store: &Store, run_id: &str) -> Result<Found, RpcError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn checkpoint_findings(run_id: String) -> Result<Found, RpcError> {
+pub async fn checkpoint_findings(run_id: String) -> Result<Found, RpcError> {
+    crate::off_main::blocking(move || checkpoint_findings_now(run_id)).await
+}
+
+/// [`checkpoint_findings`], on the calling thread.
+pub(crate) fn checkpoint_findings_now(run_id: String) -> Result<Found, RpcError> {
     findings(&crate::board::store()?, &run_id)
 }
 

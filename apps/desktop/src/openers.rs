@@ -199,7 +199,12 @@ pub async fn apps_list() -> Result<Vec<OpenApp>, RpcError> {
 /// `apps.known` — what the Add menu offers.
 #[tauri::command]
 #[specta::specta]
-pub fn apps_known() -> Result<Vec<KnownApp>, RpcError> {
+pub async fn apps_known() -> Result<Vec<KnownApp>, RpcError> {
+    crate::off_main::blocking(apps_known_now).await
+}
+
+/// [`apps_known`], on the calling thread.
+pub(crate) fn apps_known_now() -> Result<Vec<KnownApp>, RpcError> {
     Ok(KNOWN
         .iter()
         .map(|(id, label, command)| KnownApp {

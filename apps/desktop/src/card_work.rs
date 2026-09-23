@@ -117,7 +117,21 @@ pub(crate) fn bell_for(step_name: &str, irreversible: bool, card_title: &str) ->
 /// with no undo is not fired by a click somebody might not have meant.
 #[tauri::command]
 #[specta::specta]
-pub fn card_play(
+pub async fn card_play(
+    app: tauri::AppHandle,
+    project_id: String,
+    card_id: String,
+    confirmed: bool,
+) -> Result<Played, RpcError> {
+    crate::off_main::blocking(move || {
+        let in_flight = tauri::Manager::state::<Arc<crate::in_flight::InFlight>>(&app);
+        card_play_now(in_flight, app.clone(), project_id, card_id, confirmed)
+    })
+    .await
+}
+
+/// [`card_play`], on the calling thread.
+pub(crate) fn card_play_now(
     in_flight: State<Arc<crate::in_flight::InFlight>>,
     app: tauri::AppHandle,
     project_id: String,

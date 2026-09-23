@@ -157,7 +157,16 @@ pub(crate) fn detail_of(project_id: String, card_id: String) -> Result<CardDetai
 /// the reader's timezone and this process has no business reinterpreting it.
 #[tauri::command]
 #[specta::specta]
-pub fn card_set_due(
+pub async fn card_set_due(
+    project_id: String,
+    card_id: String,
+    due_at: Option<f64>,
+) -> Result<CardDetail, RpcError> {
+    crate::off_main::blocking(move || card_set_due_now(project_id, card_id, due_at)).await
+}
+
+/// [`card_set_due`], on the calling thread.
+pub(crate) fn card_set_due_now(
     project_id: String,
     card_id: String,
     due_at: Option<f64>,
@@ -200,7 +209,16 @@ pub(crate) fn sayable(body: &str) -> Result<&str, RpcError> {
 /// `card.comment` — says something on the card.
 #[tauri::command]
 #[specta::specta]
-pub fn card_comment(
+pub async fn card_comment(
+    project_id: String,
+    card_id: String,
+    body: String,
+) -> Result<CardDetail, RpcError> {
+    crate::off_main::blocking(move || card_comment_now(project_id, card_id, body)).await
+}
+
+/// [`card_comment`], on the calling thread.
+pub(crate) fn card_comment_now(
     project_id: String,
     card_id: String,
     body: String,
@@ -213,7 +231,18 @@ pub fn card_comment(
 /// `card.comment_edit` — changes one, and says that it changed.
 #[tauri::command]
 #[specta::specta]
-pub fn card_comment_edit(
+pub async fn card_comment_edit(
+    project_id: String,
+    card_id: String,
+    comment_id: String,
+    body: String,
+) -> Result<CardDetail, RpcError> {
+    crate::off_main::blocking(move || card_comment_edit_now(project_id, card_id, comment_id, body))
+        .await
+}
+
+/// [`card_comment_edit`], on the calling thread.
+pub(crate) fn card_comment_edit_now(
     project_id: String,
     card_id: String,
     comment_id: String,
@@ -229,7 +258,17 @@ pub fn card_comment_edit(
 /// `card.comment_delete` — takes one out of the conversation.
 #[tauri::command]
 #[specta::specta]
-pub fn card_comment_delete(
+pub async fn card_comment_delete(
+    project_id: String,
+    card_id: String,
+    comment_id: String,
+) -> Result<CardDetail, RpcError> {
+    crate::off_main::blocking(move || card_comment_delete_now(project_id, card_id, comment_id))
+        .await
+}
+
+/// [`card_comment_delete`], on the calling thread.
+pub(crate) fn card_comment_delete_now(
     project_id: String,
     card_id: String,
     comment_id: String,
@@ -248,7 +287,17 @@ pub fn card_comment_delete(
 /// outside the project is a pin that must not be made.
 #[tauri::command]
 #[specta::specta]
-pub fn card_pin(
+pub async fn card_pin(
+    project_id: String,
+    card_id: String,
+    path: String,
+    label: Option<String>,
+) -> Result<CardDetail, RpcError> {
+    crate::off_main::blocking(move || card_pin_now(project_id, card_id, path, label)).await
+}
+
+/// [`card_pin`], on the calling thread.
+pub(crate) fn card_pin_now(
     project_id: String,
     card_id: String,
     path: String,
@@ -284,7 +333,16 @@ pub fn card_pin(
 /// `card.unpin` — unpins one. The file on disk is never touched.
 #[tauri::command]
 #[specta::specta]
-pub fn card_unpin(
+pub async fn card_unpin(
+    project_id: String,
+    card_id: String,
+    pin_id: String,
+) -> Result<CardDetail, RpcError> {
+    crate::off_main::blocking(move || card_unpin_now(project_id, card_id, pin_id)).await
+}
+
+/// [`card_unpin`], on the calling thread.
+pub(crate) fn card_unpin_now(
     project_id: String,
     card_id: String,
     pin_id: String,

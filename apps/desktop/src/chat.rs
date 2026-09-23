@@ -11,9 +11,7 @@ use devpit_agentcli::driver::driver;
 use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head};
 use devpit_agentcli::store::{append, conversation_path, read};
 use devpit_agentcli::talk::{say, Said, Say};
-use devpit_rpc::{
-    Ask, Attachment, Conversation, ErrorCode, Frame, Message, Part, Role, RpcError, TurnEnd,
-};
+use devpit_rpc::{Ask, Conversation, ErrorCode, Frame, Message, Part, Role, RpcError, TurnEnd};
 use tauri::ipc::Channel;
 
 use crate::card_activity::Doing;
@@ -45,7 +43,18 @@ fn id(prefix: &str) -> String {
 /// `chat.history` — everything said in this conversation, in order.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_history(project_id: String, conversation_id: String) -> Result<Conversation, RpcError> {
+pub async fn chat_history(
+    project_id: String,
+    conversation_id: String,
+) -> Result<Conversation, RpcError> {
+    crate::off_main::blocking(move || chat_history_now(project_id, conversation_id)).await
+}
+
+/// [`chat_history`], on the calling thread.
+pub(crate) fn chat_history_now(
+    project_id: String,
+    conversation_id: String,
+) -> Result<Conversation, RpcError> {
     let sessions = crate::projects::project_home(&project_id)?.sessions();
     let file = conversation_path(&sessions, &conversation_id);
     let (messages, skipped) = read(&file);
@@ -319,30 +328,4 @@ pub async fn chat_send(
 #[specta::specta]
 pub fn chat_frames(_ask: Option<Ask>) -> Result<Vec<Frame>, RpcError> {
     Ok(Vec::new())
-}
-
-/// `chat.attach` — a dropped file, as something the agent can be pointed at.
-///
-/// The absolute path never reaches the screen or the prompt: it says nothing
-/// on another machine, and a path outside the project is refused here rather
-/// than read.
-#[tauri::command]
-#[specta::specta]
-pub fn chat_attach(project_id: String, path: String) -> Result<Attachment, RpcError> {
-    let store = crate::projects::store()?;
-    let (_, root) = crate::projects::locate(&store, &project_id)?;
-    let absolute = PathBuf::from(&path);
-    let relative = devpit_core::tree::relative_to(&root, &absolute)
-        .map_err(|_| RpcError::new(ErrorCode::Invalid, "that file is not in the project"))?;
-    Ok(Attachment {
-        name: absolute
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| relative.clone()),
-        kind: absolute
-            .extension()
-            .map(|ext| ext.to_string_lossy().to_lowercase())
-            .unwrap_or_default(),
-        path: relative,
-    })
 }

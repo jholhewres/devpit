@@ -142,7 +142,20 @@ pub struct PaneScrollback {
 /// `session.detach` — closes only this app's client; tmux keeps the shell.
 #[tauri::command]
 #[specta::specta]
-pub fn session_detach(
+pub async fn session_detach(
+    app: tauri::AppHandle,
+    pane_id: String,
+    client_id: String,
+) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_detach_now(state, pane_id, client_id)
+    })
+    .await
+}
+
+/// [`session_detach`], on the calling thread.
+pub(crate) fn session_detach_now(
     state: State<SessionState>,
     pane_id: String,
     client_id: String,

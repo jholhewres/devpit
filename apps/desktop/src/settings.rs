@@ -32,7 +32,12 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
 /// `settings.read` — everything the first run and the settings screen need.
 #[tauri::command]
 #[specta::specta]
-pub fn settings_read() -> Result<Settings, RpcError> {
+pub async fn settings_read() -> Result<Settings, RpcError> {
+    crate::off_main::blocking(settings_read_now).await
+}
+
+/// [`settings_read`], on the calling thread.
+pub(crate) fn settings_read_now() -> Result<Settings, RpcError> {
     read(&store()?)
 }
 
@@ -42,7 +47,27 @@ pub fn settings_read() -> Result<Settings, RpcError> {
 /// has to predict what a write did to the rest of it.
 #[tauri::command]
 #[specta::specta]
-pub fn settings_write(
+pub async fn settings_write(
+    theme: Option<Theme>,
+    automatic_updates: Option<bool>,
+    confirm_stop: Option<bool>,
+    terminal_contrast: Option<f64>,
+    focus_mode: Option<bool>,
+) -> Result<Settings, RpcError> {
+    crate::off_main::blocking(move || {
+        settings_write_now(
+            theme,
+            automatic_updates,
+            confirm_stop,
+            terminal_contrast,
+            focus_mode,
+        )
+    })
+    .await
+}
+
+/// [`settings_write`], on the calling thread.
+pub(crate) fn settings_write_now(
     theme: Option<Theme>,
     automatic_updates: Option<bool>,
     confirm_stop: Option<bool>,
@@ -81,7 +106,12 @@ pub fn settings_write(
 /// one is not a first run.
 #[tauri::command]
 #[specta::specta]
-pub fn settings_finish_onboarding() -> Result<Settings, RpcError> {
+pub async fn settings_finish_onboarding() -> Result<Settings, RpcError> {
+    crate::off_main::blocking(settings_finish_onboarding_now).await
+}
+
+/// [`settings_finish_onboarding`], on the calling thread.
+pub(crate) fn settings_finish_onboarding_now() -> Result<Settings, RpcError> {
     let store = store()?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

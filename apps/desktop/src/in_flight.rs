@@ -76,7 +76,20 @@ impl InFlight {
 /// you to distrust every red row on it.
 #[tauri::command]
 #[specta::specta]
-pub fn run_cancel(
+pub async fn run_cancel(
+    app: tauri::AppHandle,
+    card_id: String,
+    run_id: String,
+) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<Arc<InFlight>>(&app);
+        run_cancel_now(app.clone(), state, card_id, run_id)
+    })
+    .await
+}
+
+/// [`run_cancel`], on the calling thread.
+pub(crate) fn run_cancel_now(
     app: AppHandle,
     state: State<'_, Arc<InFlight>>,
     card_id: String,

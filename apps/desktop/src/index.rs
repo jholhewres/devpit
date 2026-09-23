@@ -77,7 +77,15 @@ fn walk(root: &Path, at: &Path, into: &mut Vec<String>) -> bool {
 /// `project.files` — every file in the project, for the search field.
 #[tauri::command]
 #[specta::specta]
-pub fn project_files(
+pub async fn project_files(
+    project_id: String,
+    worktree_id: Option<String>,
+) -> Result<FileIndex, RpcError> {
+    crate::off_main::blocking(move || project_files_now(project_id, worktree_id)).await
+}
+
+/// [`project_files`], on the calling thread.
+pub(crate) fn project_files_now(
     project_id: String,
     worktree_id: Option<String>,
 ) -> Result<FileIndex, RpcError> {

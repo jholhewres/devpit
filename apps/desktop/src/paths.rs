@@ -34,7 +34,17 @@ fn refused(err: TreeError) -> RpcError {
 /// than predicting what its own click did, so it cannot drift from the disk.
 #[tauri::command]
 #[specta::specta]
-pub fn path_create(
+pub async fn path_create(
+    project_id: String,
+    worktree_id: Option<String>,
+    path: String,
+    folder: bool,
+) -> Result<ProjectTree, RpcError> {
+    crate::off_main::blocking(move || path_create_now(project_id, worktree_id, path, folder)).await
+}
+
+/// [`path_create`], on the calling thread.
+pub(crate) fn path_create_now(
     project_id: String,
     worktree_id: Option<String>,
     path: String,
@@ -48,7 +58,17 @@ pub fn path_create(
 /// `path.move` — renames or moves, which are the same operation.
 #[tauri::command]
 #[specta::specta]
-pub fn path_move(
+pub async fn path_move(
+    project_id: String,
+    worktree_id: Option<String>,
+    from: String,
+    to: String,
+) -> Result<ProjectTree, RpcError> {
+    crate::off_main::blocking(move || path_move_now(project_id, worktree_id, from, to)).await
+}
+
+/// [`path_move`], on the calling thread.
+pub(crate) fn path_move_now(
     project_id: String,
     worktree_id: Option<String>,
     from: String,
@@ -65,7 +85,16 @@ pub fn path_move(
 /// time this runs, that decision has been made.
 #[tauri::command]
 #[specta::specta]
-pub fn path_delete(
+pub async fn path_delete(
+    project_id: String,
+    worktree_id: Option<String>,
+    path: String,
+) -> Result<ProjectTree, RpcError> {
+    crate::off_main::blocking(move || path_delete_now(project_id, worktree_id, path)).await
+}
+
+/// [`path_delete`], on the calling thread.
+pub(crate) fn path_delete_now(
     project_id: String,
     worktree_id: Option<String>,
     path: String,

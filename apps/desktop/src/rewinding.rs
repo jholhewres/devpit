@@ -98,7 +98,16 @@ pub(crate) fn rewind(
 /// Answers its id, which the window opens as a chat tab.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_rewind(
+pub async fn chat_rewind(
+    project_id: String,
+    conversation_id: String,
+    turn_id: String,
+) -> Result<String, RpcError> {
+    crate::off_main::blocking(move || chat_rewind_now(project_id, conversation_id, turn_id)).await
+}
+
+/// [`chat_rewind`], on the calling thread.
+pub(crate) fn chat_rewind_now(
     project_id: String,
     conversation_id: String,
     turn_id: String,

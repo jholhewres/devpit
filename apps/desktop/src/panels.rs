@@ -62,7 +62,12 @@ fn read(store: &devpit_core::Store, key: &str, fallback: u32) -> u32 {
 /// `panel.widths` — how wide the panels were left.
 #[tauri::command]
 #[specta::specta]
-pub fn panel_widths() -> Result<Widths, RpcError> {
+pub async fn panel_widths() -> Result<Widths, RpcError> {
+    crate::off_main::blocking(panel_widths_now).await
+}
+
+/// [`panel_widths`], on the calling thread.
+pub(crate) fn panel_widths_now() -> Result<Widths, RpcError> {
     let store = crate::projects::store()?;
     Ok(Widths {
         sidebar: read(&store, preference::SIDEBAR_WIDTH, WIDE.sidebar),
@@ -78,7 +83,12 @@ pub fn panel_widths() -> Result<Widths, RpcError> {
 /// until the next launch.
 #[tauri::command]
 #[specta::specta]
-pub fn panel_widths_write(sidebar: u32, files: u32) -> Result<Widths, RpcError> {
+pub async fn panel_widths_write(sidebar: u32, files: u32) -> Result<Widths, RpcError> {
+    crate::off_main::blocking(move || panel_widths_write_now(sidebar, files)).await
+}
+
+/// [`panel_widths_write`], on the calling thread.
+pub(crate) fn panel_widths_write_now(sidebar: u32, files: u32) -> Result<Widths, RpcError> {
     let held = Widths { sidebar, files }.held();
     let store = crate::projects::store()?;
     store.set_preference(preference::SIDEBAR_WIDTH, &held.sidebar.to_string())?;

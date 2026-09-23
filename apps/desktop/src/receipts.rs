@@ -39,7 +39,21 @@ fn plain(id: &str) -> bool {
 /// `chat.receipt` — records an answered question in the conversation.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_receipt(
+pub async fn chat_receipt(
+    project_id: String,
+    conversation_id: String,
+    tool: String,
+    input: String,
+    allowed: bool,
+) -> Result<Message, RpcError> {
+    crate::off_main::blocking(move || {
+        chat_receipt_now(project_id, conversation_id, tool, input, allowed)
+    })
+    .await
+}
+
+/// [`chat_receipt`], on the calling thread.
+pub(crate) fn chat_receipt_now(
     project_id: String,
     conversation_id: String,
     tool: String,
@@ -115,7 +129,7 @@ mod tests {
 
     #[test]
     fn an_id_that_is_a_path_is_refused() {
-        let refused = chat_receipt("../x".into(), "c".into(), "Bash".into(), "{}".into(), true)
+        let refused = chat_receipt_now("../x".into(), "c".into(), "Bash".into(), "{}".into(), true)
             .expect_err("refused");
         assert_eq!(refused.code, ErrorCode::Forbidden);
         assert!(!plain("a/b") && !plain(".hidden") && !plain(""));

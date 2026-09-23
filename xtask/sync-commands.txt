@@ -1,0 +1,31 @@
+# Commands allowed to stay a plain `fn`, which Tauri runs on the thread the
+# window draws on. One `name reason` per line; every other command is `async`
+# and does its work through `off_main::blocking`.
+#
+# A command belongs here only when it answers from memory or hands a few bytes
+# to something that is already open. Anything that reads a file, runs a
+# process, asks git or tmux, or opens the store does not.
+
+# Carry a type specta can only reach through a command; they return nothing.
+chat_frames exists for its types and returns nothing
+permission_questions exists for its types
+terminal_happenings exists for its types
+terminal_block_changes exists for its types
+card_happenings exists for its types
+browser_showings exists for its types
+browser_drivings exists for its types
+
+# Keystrokes and resizes to a pty already open: a write to its master, which
+# must not queue behind blocking work.
+session_write writes keystrokes to an open pty
+session_resize resizes an open pty
+
+# In-memory state.
+permission_answer answers a question held in memory
+update_restart_ready wakes a thread that is already waiting
+browser_menus exists for its types
+pane_scrollback reads the ring an attached pane already holds in memory
+permission_ask_from_now sets a flag on a session held in memory
+chat_stop_task signals a task the running turn already holds
+chat_cancel signals the turn already running
+app_info answers from the build and a path it computes

@@ -11,7 +11,12 @@ use devpit_rpc::{Conversations, RpcError, Thread};
 /// left a file nobody could reach again.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_list(project_id: String) -> Result<Conversations, RpcError> {
+pub async fn chat_list(project_id: String) -> Result<Conversations, RpcError> {
+    crate::off_main::blocking(move || chat_list_now(project_id)).await
+}
+
+/// [`chat_list`], on the calling thread.
+pub(crate) fn chat_list_now(project_id: String) -> Result<Conversations, RpcError> {
     Ok(Conversations {
         conversations: devpit_agentcli::history::conversations(
             &crate::projects::project_home(&project_id)?.sessions(),

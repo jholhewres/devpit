@@ -4,7 +4,7 @@
 use devpit_core::Store;
 use devpit_rpc::{Board, ColumnDeleted, ErrorCode, RpcError, StepKind};
 
-use crate::board::board_get;
+use crate::board::board_get_now;
 
 fn store() -> Result<Store, RpcError> {
     Ok(Store::open_default()?)
@@ -12,29 +12,48 @@ fn store() -> Result<Store, RpcError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn column_create(project_id: String, name: String) -> Result<Board, RpcError> {
+pub async fn column_create(project_id: String, name: String) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || column_create_now(project_id, name)).await
+}
+
+/// [`column_create`], on the calling thread.
+pub(crate) fn column_create_now(project_id: String, name: String) -> Result<Board, RpcError> {
     let store = store()?;
     let position = store.columns(&project_id)?.len() as i64;
     store.create_column(&project_id, &name, position)?;
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn column_rename(
+pub async fn column_rename(
+    project_id: String,
+    column_id: String,
+    name: String,
+) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || column_rename_now(project_id, column_id, name)).await
+}
+
+/// [`column_rename`], on the calling thread.
+pub(crate) fn column_rename_now(
     project_id: String,
     column_id: String,
     name: String,
 ) -> Result<Board, RpcError> {
     store()?.rename_column(&column_id, &name)?;
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn column_reorder(project_id: String, ids: Vec<String>) -> Result<Board, RpcError> {
+pub async fn column_reorder(project_id: String, ids: Vec<String>) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || column_reorder_now(project_id, ids)).await
+}
+
+/// [`column_reorder`], on the calling thread.
+pub(crate) fn column_reorder_now(project_id: String, ids: Vec<String>) -> Result<Board, RpcError> {
     store()?.reorder_columns(&project_id, &ids)?;
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 /// What deleting a lane does with the cards that point at it.
@@ -85,7 +104,16 @@ pub(crate) fn where_cards_go(
 /// asking a question it cannot phrase.
 #[tauri::command]
 #[specta::specta]
-pub fn column_delete(
+pub async fn column_delete(
+    project_id: String,
+    column_id: String,
+    move_to: Option<String>,
+) -> Result<ColumnDeleted, RpcError> {
+    crate::off_main::blocking(move || column_delete_now(project_id, column_id, move_to)).await
+}
+
+/// [`column_delete`], on the calling thread.
+pub(crate) fn column_delete_now(
     project_id: String,
     column_id: String,
     move_to: Option<String>,
@@ -120,7 +148,19 @@ pub fn column_delete(
 
 #[tauri::command]
 #[specta::specta]
-pub fn step_create(
+pub async fn step_create(
+    project_id: String,
+    kind: String,
+    name: String,
+    config: String,
+    irreversible: bool,
+) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || step_create_now(project_id, kind, name, config, irreversible))
+        .await
+}
+
+/// [`step_create`], on the calling thread.
+pub(crate) fn step_create_now(
     project_id: String,
     kind: String,
     name: String,
@@ -133,7 +173,7 @@ pub fn step_create(
         return Err(RpcError::new(ErrorCode::Invalid, why));
     }
     store.create_step(&project_id, &kind, &name, &config, irreversible)?;
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 /// `step.update` — what a step does, changed where it already runs.
@@ -143,7 +183,21 @@ pub fn step_create(
 /// was when they ran.
 #[tauri::command]
 #[specta::specta]
-pub fn step_update(
+pub async fn step_update(
+    project_id: String,
+    step_id: String,
+    name: String,
+    config: String,
+    irreversible: bool,
+) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || {
+        step_update_now(project_id, step_id, name, config, irreversible)
+    })
+    .await
+}
+
+/// [`step_update`], on the calling thread.
+pub(crate) fn step_update_now(
     project_id: String,
     step_id: String,
     name: String,
@@ -160,7 +214,7 @@ pub fn step_update(
         return Err(RpcError::new(ErrorCode::Invalid, why));
     }
     store.update_step(&step_id, &name, &config, irreversible)?;
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 /// Why this step cannot be deleted, or nothing.
@@ -193,7 +247,12 @@ pub(crate) fn step_delete_refusal(ran: usize, running: usize) -> Option<String> 
 /// `step.delete` — a step nothing has run, and the lanes that pointed at it.
 #[tauri::command]
 #[specta::specta]
-pub fn step_delete(project_id: String, step_id: String) -> Result<Board, RpcError> {
+pub async fn step_delete(project_id: String, step_id: String) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || step_delete_now(project_id, step_id)).await
+}
+
+/// [`step_delete`], on the calling thread.
+pub(crate) fn step_delete_now(project_id: String, step_id: String) -> Result<Board, RpcError> {
     let store = store()?;
     let (ran, running) = store.step_runs(&step_id)?;
     if let Some(why) = step_delete_refusal(ran, running) {
@@ -202,19 +261,28 @@ pub fn step_delete(project_id: String, step_id: String) -> Result<Board, RpcErro
     if !store.delete_step(&step_id)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such step"));
     }
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 /// `column.set_step` — what this lane runs, or nothing.
 #[tauri::command]
 #[specta::specta]
-pub fn column_set_step(
+pub async fn column_set_step(
+    project_id: String,
+    column_id: String,
+    step_id: Option<String>,
+) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || column_set_step_now(project_id, column_id, step_id)).await
+}
+
+/// [`column_set_step`], on the calling thread.
+pub(crate) fn column_set_step_now(
     project_id: String,
     column_id: String,
     step_id: Option<String>,
 ) -> Result<Board, RpcError> {
     store()?.set_column_step(&column_id, step_id.as_deref())?;
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 /// `column.set_flow` — where a pass goes, and how much the lane decides.
@@ -223,7 +291,18 @@ pub fn column_set_step(
 /// card to itself, and it cannot advance to a lane that is not on this board.
 #[tauri::command]
 #[specta::specta]
-pub fn column_set_flow(
+pub async fn column_set_flow(
+    project_id: String,
+    column_id: String,
+    on_pass: Option<String>,
+    autonomy: String,
+) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || column_set_flow_now(project_id, column_id, on_pass, autonomy))
+        .await
+}
+
+/// [`column_set_flow`], on the calling thread.
+pub(crate) fn column_set_flow_now(
     project_id: String,
     column_id: String,
     on_pass: Option<String>,
@@ -271,7 +350,7 @@ pub fn column_set_flow(
     if !store.set_column_flow(&column_id, on_pass.as_deref(), autonomy.stored())? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such column"));
     }
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 /// Why a step cannot be saved, or nothing.

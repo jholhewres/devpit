@@ -94,7 +94,12 @@ pub(crate) fn uninstall(
 /// `plugin.list` — the catalogue, and what this project has on.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_list(project_id: String) -> Result<PluginList, RpcError> {
+pub async fn plugin_list(project_id: String) -> Result<PluginList, RpcError> {
+    crate::off_main::blocking(move || plugin_list_now(project_id)).await
+}
+
+/// [`plugin_list`], on the calling thread.
+pub(crate) fn plugin_list_now(project_id: String) -> Result<PluginList, RpcError> {
     listed(&store()?, &project_id)
 }
 
@@ -102,7 +107,16 @@ pub fn plugin_list(project_id: String) -> Result<PluginList, RpcError> {
 /// either way.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_set_enabled(
+pub async fn plugin_set_enabled(
+    project_id: String,
+    plugin_id: String,
+    enabled: bool,
+) -> Result<PluginList, RpcError> {
+    crate::off_main::blocking(move || plugin_set_enabled_now(project_id, plugin_id, enabled)).await
+}
+
+/// [`plugin_set_enabled`], on the calling thread.
+pub(crate) fn plugin_set_enabled_now(
     project_id: String,
     plugin_id: String,
     enabled: bool,

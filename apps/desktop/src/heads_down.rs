@@ -51,7 +51,12 @@ pub(crate) fn parse(held: Option<&str>) -> Option<HeadsDown> {
 /// `focus.read` — the focus that is on, if one is.
 #[tauri::command]
 #[specta::specta]
-pub fn focus_read() -> Result<Option<HeadsDown>, RpcError> {
+pub async fn focus_read() -> Result<Option<HeadsDown>, RpcError> {
+    crate::off_main::blocking(focus_read_now).await
+}
+
+/// [`focus_read`], on the calling thread.
+pub(crate) fn focus_read_now() -> Result<Option<HeadsDown>, RpcError> {
     let store = crate::projects::store()?;
     Ok(parse(store.preference(preference::HEADS_DOWN)?.as_deref()))
 }
@@ -62,7 +67,15 @@ pub fn focus_read() -> Result<Option<HeadsDown>, RpcError> {
 /// focus, and the window asks for the new one in the same breath.
 #[tauri::command]
 #[specta::specta]
-pub fn focus_write(
+pub async fn focus_write(
+    project_id: Option<String>,
+    minutes: Option<u32>,
+) -> Result<Option<HeadsDown>, RpcError> {
+    crate::off_main::blocking(move || focus_write_now(project_id, minutes)).await
+}
+
+/// [`focus_write`], on the calling thread.
+pub(crate) fn focus_write_now(
     project_id: Option<String>,
     minutes: Option<u32>,
 ) -> Result<Option<HeadsDown>, RpcError> {
@@ -117,7 +130,16 @@ const A_PAGE: i64 = 100;
 /// where what matters fell off the end of it.
 #[tauri::command]
 #[specta::specta]
-pub fn focus_waiting(
+pub async fn focus_waiting(
+    project_id: String,
+    since: f64,
+    after: Option<String>,
+) -> Result<Waiting, RpcError> {
+    crate::off_main::blocking(move || focus_waiting_now(project_id, since, after)).await
+}
+
+/// [`focus_waiting`], on the calling thread.
+pub(crate) fn focus_waiting_now(
     project_id: String,
     since: f64,
     after: Option<String>,

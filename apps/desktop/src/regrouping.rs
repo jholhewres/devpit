@@ -32,7 +32,22 @@ pub(crate) fn refuse_join(from: &str, into: &str) -> Option<&'static str> {
 /// and `from_tab_id` gone. Answers the joined layout.
 #[tauri::command]
 #[specta::specta]
-pub fn session_join_tabs(
+pub async fn session_join_tabs(
+    app: tauri::AppHandle,
+    project_id: String,
+    from_tab_id: String,
+    into_tab_id: String,
+    direction: SplitDirection,
+) -> Result<SessionLayout, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_join_tabs_now(state, project_id, from_tab_id, into_tab_id, direction)
+    })
+    .await
+}
+
+/// [`session_join_tabs`], on the calling thread.
+pub(crate) fn session_join_tabs_now(
     state: State<SessionState>,
     project_id: String,
     from_tab_id: String,
@@ -71,7 +86,22 @@ pub fn session_join_tabs(
 /// tab the window is about to open. Answers what is left in `tab_id`.
 #[tauri::command]
 #[specta::specta]
-pub fn session_separate_leaf(
+pub async fn session_separate_leaf(
+    app: tauri::AppHandle,
+    project_id: String,
+    tab_id: String,
+    leaf_id: String,
+    new_tab_id: String,
+) -> Result<SessionLayout, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_separate_leaf_now(state, project_id, tab_id, leaf_id, new_tab_id)
+    })
+    .await
+}
+
+/// [`session_separate_leaf`], on the calling thread.
+pub(crate) fn session_separate_leaf_now(
     state: State<SessionState>,
     project_id: String,
     tab_id: String,

@@ -122,14 +122,24 @@ pub fn run_ended(app: &tauri::AppHandle, store: &Store, card_id: &str, step: &st
 /// `notices.read` — the list, and how many are unread.
 #[tauri::command]
 #[specta::specta]
-pub fn notices_read() -> Result<Notices, RpcError> {
+pub async fn notices_read() -> Result<Notices, RpcError> {
+    crate::off_main::blocking(notices_read_now).await
+}
+
+/// [`notices_read`], on the calling thread.
+pub(crate) fn notices_read_now() -> Result<Notices, RpcError> {
     answer(&store()?)
 }
 
 /// `notices.mark` — marks one read.
 #[tauri::command]
 #[specta::specta]
-pub fn notices_mark(notice_id: String) -> Result<Notices, RpcError> {
+pub async fn notices_mark(notice_id: String) -> Result<Notices, RpcError> {
+    crate::off_main::blocking(move || notices_mark_now(notice_id)).await
+}
+
+/// [`notices_mark`], on the calling thread.
+pub(crate) fn notices_mark_now(notice_id: String) -> Result<Notices, RpcError> {
     let store = store()?;
     store.read_notice(&notice_id)?;
     answer(&store)
@@ -141,7 +151,12 @@ pub fn notices_mark(notice_id: String) -> Result<Notices, RpcError> {
 /// you meant to come back to is gone.
 #[tauri::command]
 #[specta::specta]
-pub fn notices_mark_all() -> Result<Notices, RpcError> {
+pub async fn notices_mark_all() -> Result<Notices, RpcError> {
+    crate::off_main::blocking(notices_mark_all_now).await
+}
+
+/// [`notices_mark_all`], on the calling thread.
+pub(crate) fn notices_mark_all_now() -> Result<Notices, RpcError> {
     let store = store()?;
     store.read_all_notices()?;
     answer(&store)
@@ -155,7 +170,12 @@ pub fn notices_mark_all() -> Result<Notices, RpcError> {
 /// on every launch and every board read.
 #[tauri::command]
 #[specta::specta]
-pub fn notices_sweep_due(app: tauri::AppHandle) -> Result<Notices, RpcError> {
+pub async fn notices_sweep_due(app: tauri::AppHandle) -> Result<Notices, RpcError> {
+    crate::off_main::blocking(move || notices_sweep_due_now(app.clone())).await
+}
+
+/// [`notices_sweep_due`], on the calling thread.
+pub(crate) fn notices_sweep_due_now(app: tauri::AppHandle) -> Result<Notices, RpcError> {
     let store = store()?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

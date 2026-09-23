@@ -50,7 +50,16 @@ pub(crate) fn read_bounded(resolved: &Path, bytes: u64) -> std::io::Result<(Vec<
 /// `file.read` — the text of a file, or why it is not text.
 #[tauri::command]
 #[specta::specta]
-pub fn file_read(
+pub async fn file_read(
+    project_id: String,
+    worktree_id: Option<String>,
+    path: String,
+) -> Result<FileContents, RpcError> {
+    crate::off_main::blocking(move || file_read_now(project_id, worktree_id, path)).await
+}
+
+/// [`file_read`], on the calling thread.
+pub(crate) fn file_read_now(
     project_id: String,
     worktree_id: Option<String>,
     path: String,

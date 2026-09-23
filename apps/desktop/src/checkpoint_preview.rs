@@ -78,7 +78,15 @@ fn to_shout(key: &str) -> String {
 
 #[tauri::command]
 #[specta::specta]
-pub fn checkpoint_preview(card_id: String, step_id: String) -> Result<WouldRun, RpcError> {
+pub async fn checkpoint_preview(card_id: String, step_id: String) -> Result<WouldRun, RpcError> {
+    crate::off_main::blocking(move || checkpoint_preview_now(card_id, step_id)).await
+}
+
+/// [`checkpoint_preview`], on the calling thread.
+pub(crate) fn checkpoint_preview_now(
+    card_id: String,
+    step_id: String,
+) -> Result<WouldRun, RpcError> {
     previewed(&crate::board::store()?, &card_id, &step_id)
 }
 

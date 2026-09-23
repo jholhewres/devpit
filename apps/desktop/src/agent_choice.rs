@@ -73,14 +73,24 @@ pub(crate) fn disabled(store: &devpit_core::Store) -> Vec<String> {
 /// `agent.choice` — the default and the ones switched off.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_choice() -> Result<AgentChoice, RpcError> {
+pub async fn agent_choice() -> Result<AgentChoice, RpcError> {
+    crate::off_main::blocking(agent_choice_now).await
+}
+
+/// [`agent_choice`], on the calling thread.
+pub(crate) fn agent_choice_now() -> Result<AgentChoice, RpcError> {
     Ok(read(&crate::projects::store()?))
 }
 
 /// `agent.default_set` — what a new terminal opens.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_default_set(id: String) -> Result<AgentChoice, RpcError> {
+pub async fn agent_default_set(id: String) -> Result<AgentChoice, RpcError> {
+    crate::off_main::blocking(move || agent_default_set_now(id)).await
+}
+
+/// [`agent_default_set`], on the calling thread.
+pub(crate) fn agent_default_set_now(id: String) -> Result<AgentChoice, RpcError> {
     let store = crate::projects::store()?;
     store.set_preference(preference::AGENT_DEFAULT, &id)?;
     Ok(read(&store))
@@ -93,7 +103,12 @@ pub fn agent_default_set(id: String) -> Result<AgentChoice, RpcError> {
 /// clears it instead, which is a state the screen can draw.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_enabled_set(id: String, on: bool) -> Result<AgentChoice, RpcError> {
+pub async fn agent_enabled_set(id: String, on: bool) -> Result<AgentChoice, RpcError> {
+    crate::off_main::blocking(move || agent_enabled_set_now(id, on)).await
+}
+
+/// [`agent_enabled_set`], on the calling thread.
+pub(crate) fn agent_enabled_set_now(id: String, on: bool) -> Result<AgentChoice, RpcError> {
     let store = crate::projects::store()?;
     let mut choice = read(&store);
 
@@ -116,7 +131,12 @@ pub fn agent_enabled_set(id: String, on: bool) -> Result<AgentChoice, RpcError> 
 /// `agent.hooks_set` — whether devpit asks for progress at all.
 #[tauri::command]
 #[specta::specta]
-pub fn agent_hooks_set(on: bool) -> Result<AgentChoice, RpcError> {
+pub async fn agent_hooks_set(on: bool) -> Result<AgentChoice, RpcError> {
+    crate::off_main::blocking(move || agent_hooks_set_now(on)).await
+}
+
+/// [`agent_hooks_set`], on the calling thread.
+pub(crate) fn agent_hooks_set_now(on: bool) -> Result<AgentChoice, RpcError> {
     let store = crate::projects::store()?;
     store.set_preference_flag(preference::AGENT_HOOKS, on)?;
     Ok(read(&store))

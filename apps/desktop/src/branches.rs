@@ -43,7 +43,18 @@ fn read(root: &std::path::Path) -> Result<Branches, RpcError> {
 /// `branch.list` — the local branches, the current one first.
 #[tauri::command]
 #[specta::specta]
-pub fn branch_list(project_id: String, worktree_id: Option<String>) -> Result<Branches, RpcError> {
+pub async fn branch_list(
+    project_id: String,
+    worktree_id: Option<String>,
+) -> Result<Branches, RpcError> {
+    crate::off_main::blocking(move || branch_list_now(project_id, worktree_id)).await
+}
+
+/// [`branch_list`], on the calling thread.
+pub(crate) fn branch_list_now(
+    project_id: String,
+    worktree_id: Option<String>,
+) -> Result<Branches, RpcError> {
     read(&root_of(&project_id, worktree_id.as_deref())?)
 }
 

@@ -65,7 +65,12 @@ fn measure(name: &str, path: PathBuf) -> Held {
 /// `workspace.read` — the devpit workspace, row by row, with real sizes.
 #[tauri::command]
 #[specta::specta]
-pub fn workspace_read(project_id: Option<String>) -> Result<Workspace, RpcError> {
+pub async fn workspace_read(project_id: Option<String>) -> Result<Workspace, RpcError> {
+    crate::off_main::blocking(move || workspace_read_now(project_id)).await
+}
+
+/// [`workspace_read`], on the calling thread.
+pub(crate) fn workspace_read_now(project_id: Option<String>) -> Result<Workspace, RpcError> {
     let home: PathBuf =
         Store::root().map_err(|err| RpcError::new(ErrorCode::Internal, err.to_string()))?;
     let mine = project_id
@@ -112,7 +117,12 @@ pub struct Spend {
 /// measured is the thing this milestone exists to delete.
 #[tauri::command]
 #[specta::specta]
-pub fn usage_read(project_id: String) -> Result<Spend, RpcError> {
+pub async fn usage_read(project_id: String) -> Result<Spend, RpcError> {
+    crate::off_main::blocking(move || usage_read_now(project_id)).await
+}
+
+/// [`usage_read`], on the calling thread.
+pub(crate) fn usage_read_now(project_id: String) -> Result<Spend, RpcError> {
     let store = Store::open_default()?;
     let (usd, runs) = store.project_spend(&project_id)?;
     Ok(Spend {

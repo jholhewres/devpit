@@ -155,7 +155,12 @@ fn sources_of(directory: Option<&str>) -> Result<(String, Vec<PathBuf>), RpcErro
 /// profile's when none is named.
 #[tauri::command]
 #[specta::specta]
-pub fn skills_list(directory: Option<String>) -> Result<Skills, RpcError> {
+pub async fn skills_list(directory: Option<String>) -> Result<Skills, RpcError> {
+    crate::off_main::blocking(move || skills_list_now(directory)).await
+}
+
+/// [`skills_list`], on the calling thread.
+pub(crate) fn skills_list_now(directory: Option<String>) -> Result<Skills, RpcError> {
     let (directory, sources) = sources_of(directory.as_deref())?;
     if sources.is_empty() {
         return Ok(Skills {
@@ -195,7 +200,15 @@ fn found(name: &str, sources: Vec<PathBuf>) -> Option<PathBuf> {
 /// `skills.read` — the whole of one skill's `SKILL.md`.
 #[tauri::command]
 #[specta::specta]
-pub fn skills_read(name: String, directory: Option<String>) -> Result<SkillDoc, RpcError> {
+pub async fn skills_read(name: String, directory: Option<String>) -> Result<SkillDoc, RpcError> {
+    crate::off_main::blocking(move || skills_read_now(name, directory)).await
+}
+
+/// [`skills_read`], on the calling thread.
+pub(crate) fn skills_read_now(
+    name: String,
+    directory: Option<String>,
+) -> Result<SkillDoc, RpcError> {
     // A name with a separator in it is a path pretending to be a name.
     if name.contains(['/', '\\']) || name.starts_with('.') {
         return Err(RpcError::new(ErrorCode::Forbidden, "that is not a skill"));

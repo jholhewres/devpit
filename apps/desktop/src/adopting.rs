@@ -66,7 +66,21 @@ pub(crate) fn adopt(
 /// the session ran in.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_adopt(
+pub async fn chat_adopt(
+    project_id: String,
+    session_id: String,
+    profile_id: String,
+    title: Option<String>,
+    card_id: Option<String>,
+) -> Result<String, RpcError> {
+    crate::off_main::blocking(move || {
+        chat_adopt_now(project_id, session_id, profile_id, title, card_id)
+    })
+    .await
+}
+
+/// [`chat_adopt`], on the calling thread.
+pub(crate) fn chat_adopt_now(
     project_id: String,
     session_id: String,
     profile_id: String,
@@ -143,11 +157,12 @@ mod tests {
             ("p", "../a", "p"),
             ("p", "a", ".hidden"),
         ] {
-            let refused = chat_adopt(project.into(), session.into(), profile.into(), None, None)
-                .expect_err("refused");
+            let refused =
+                chat_adopt_now(project.into(), session.into(), profile.into(), None, None)
+                    .expect_err("refused");
             assert_eq!(refused.code, ErrorCode::Forbidden);
         }
-        let refused = chat_adopt(
+        let refused = chat_adopt_now(
             "p".into(),
             "a".into(),
             "p".into(),

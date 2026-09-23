@@ -232,7 +232,19 @@ fn told_if_long(app: &tauri::AppHandle, blocks: &Blocks, pane_id: &str, head: &H
 /// still running last, with where its shell stands.
 #[tauri::command]
 #[specta::specta]
-pub fn pane_blocks(state: State<'_, Blocks>, pane_id: String) -> Result<PaneBlocks, RpcError> {
+pub async fn pane_blocks(app: tauri::AppHandle, pane_id: String) -> Result<PaneBlocks, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<Blocks>(&app);
+        pane_blocks_now(state, pane_id)
+    })
+    .await
+}
+
+/// [`pane_blocks`], on the calling thread.
+pub(crate) fn pane_blocks_now(
+    state: State<'_, Blocks>,
+    pane_id: String,
+) -> Result<PaneBlocks, RpcError> {
     let pane = state.restored(&pane_id);
     let pane = pane.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut blocks: Vec<CommandBlock> = pane.history.heads().iter().map(view).collect();
@@ -250,7 +262,20 @@ pub fn pane_blocks(state: State<'_, Blocks>, pane_id: String) -> Result<PaneBloc
 /// `block.output` — what a block printed, as the terminal received it.
 #[tauri::command]
 #[specta::specta]
-pub fn block_output(
+pub async fn block_output(
+    app: tauri::AppHandle,
+    pane_id: String,
+    block_id: f64,
+) -> Result<String, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<Blocks>(&app);
+        block_output_now(state, pane_id, block_id)
+    })
+    .await
+}
+
+/// [`block_output`], on the calling thread.
+pub(crate) fn block_output_now(
     state: State<'_, Blocks>,
     pane_id: String,
     block_id: f64,
@@ -269,7 +294,19 @@ pub fn block_output(
 /// `pane.blocks_clear` — forgets a pane's finished blocks, kept ones too.
 #[tauri::command]
 #[specta::specta]
-pub fn pane_blocks_clear(state: State<'_, Blocks>, pane_id: String) -> Result<(), RpcError> {
+pub async fn pane_blocks_clear(app: tauri::AppHandle, pane_id: String) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<Blocks>(&app);
+        pane_blocks_clear_now(state, pane_id)
+    })
+    .await
+}
+
+/// [`pane_blocks_clear`], on the calling thread.
+pub(crate) fn pane_blocks_clear_now(
+    state: State<'_, Blocks>,
+    pane_id: String,
+) -> Result<(), RpcError> {
     let pane = state.restored(&pane_id);
     let mut pane = pane.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     pane.history.clear();
@@ -283,7 +320,21 @@ pub fn pane_blocks_clear(state: State<'_, Blocks>, pane_id: String) -> Result<()
 /// it. Kept with the block, and told to every window like any change to one.
 #[tauri::command]
 #[specta::specta]
-pub fn block_bookmark(
+pub async fn block_bookmark(
+    app: tauri::AppHandle,
+    pane_id: String,
+    block_id: f64,
+    on: bool,
+) -> Result<CommandBlock, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<Blocks>(&app);
+        block_bookmark_now(app.clone(), state, pane_id, block_id, on)
+    })
+    .await
+}
+
+/// [`block_bookmark`], on the calling thread.
+pub(crate) fn block_bookmark_now(
     app: tauri::AppHandle,
     state: State<'_, Blocks>,
     pane_id: String,
@@ -405,7 +456,12 @@ const MOST_COMPLETIONS: usize = 60;
 /// Hidden entries only when the word asks for them with a leading dot.
 #[tauri::command]
 #[specta::specta]
-pub fn folder_complete(cwd: String, word: String) -> Result<Vec<String>, RpcError> {
+pub async fn folder_complete(cwd: String, word: String) -> Result<Vec<String>, RpcError> {
+    crate::off_main::blocking(move || folder_complete_now(cwd, word)).await
+}
+
+/// [`folder_complete`], on the calling thread.
+pub(crate) fn folder_complete_now(cwd: String, word: String) -> Result<Vec<String>, RpcError> {
     Ok(completions(
         std::path::Path::new(&cwd),
         &word,

@@ -68,7 +68,12 @@ fn listed(row: ListedRun, steps: &[Step]) -> ProjectRun {
 
 #[tauri::command]
 #[specta::specta]
-pub fn runs_list(query: RunsQuery) -> Result<RunsPage, RpcError> {
+pub async fn runs_list(query: RunsQuery) -> Result<RunsPage, RpcError> {
+    crate::off_main::blocking(move || runs_list_now(query)).await
+}
+
+/// [`runs_list`], on the calling thread.
+pub(crate) fn runs_list_now(query: RunsQuery) -> Result<RunsPage, RpcError> {
     page(&crate::board::store()?, &query, PAGE)
 }
 

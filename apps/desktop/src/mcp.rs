@@ -63,7 +63,15 @@ fn take(found: Vec<Server>, path: &Path, into: &mut Vec<Server>, sources: &mut V
 /// the default profile's when none is named.
 #[tauri::command]
 #[specta::specta]
-pub fn mcp_list(
+pub async fn mcp_list(
+    project_id: Option<String>,
+    directory: Option<String>,
+) -> Result<Servers, RpcError> {
+    crate::off_main::blocking(move || mcp_list_now(project_id, directory)).await
+}
+
+/// [`mcp_list`], on the calling thread.
+pub(crate) fn mcp_list_now(
     project_id: Option<String>,
     directory: Option<String>,
 ) -> Result<Servers, RpcError> {

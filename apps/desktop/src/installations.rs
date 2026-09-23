@@ -148,7 +148,12 @@ pub(crate) fn chosen(wanted: Option<&str>) -> Result<Found, RpcError> {
 /// `cli.installations` — what the Skills and MCP panels can switch between.
 #[tauri::command]
 #[specta::specta]
-pub fn cli_installations() -> Result<Vec<Installation>, RpcError> {
+pub async fn cli_installations() -> Result<Vec<Installation>, RpcError> {
+    crate::off_main::blocking(cli_installations_now).await
+}
+
+/// [`cli_installations`], on the calling thread.
+pub(crate) fn cli_installations_now() -> Result<Vec<Installation>, RpcError> {
     Ok(found()?
         .into_iter()
         .map(|one| Installation {

@@ -56,7 +56,12 @@ fn answer(store: &Store, project_id: Option<&str>) -> Result<WorktreeBase, RpcEr
 /// `worktree.base_read` — where new worktrees go, and an example of it.
 #[tauri::command]
 #[specta::specta]
-pub fn worktree_base_read(project_id: Option<String>) -> Result<WorktreeBase, RpcError> {
+pub async fn worktree_base_read(project_id: Option<String>) -> Result<WorktreeBase, RpcError> {
+    crate::off_main::blocking(move || worktree_base_read_now(project_id)).await
+}
+
+/// [`worktree_base_read`], on the calling thread.
+pub(crate) fn worktree_base_read_now(project_id: Option<String>) -> Result<WorktreeBase, RpcError> {
     answer(&store()?, project_id.as_deref())
 }
 

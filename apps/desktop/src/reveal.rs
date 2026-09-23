@@ -139,7 +139,12 @@ pub(crate) fn web_address(url: &str) -> Result<&str, RpcError> {
 /// `webkitgtk/mod.rs:487`), so the click did nothing at all.
 #[tauri::command]
 #[specta::specta]
-pub fn url_open(url: String) -> Result<Opened, RpcError> {
+pub async fn url_open(url: String) -> Result<Opened, RpcError> {
+    crate::off_main::blocking(move || url_open_now(url)).await
+}
+
+/// [`url_open`], on the calling thread.
+pub(crate) fn url_open_now(url: String) -> Result<Opened, RpcError> {
     let address = web_address(&url)?;
     hand_over(opener(), address, address)
 }
@@ -158,7 +163,12 @@ fn opener() -> &'static [&'static str] {
 /// `path.open` — opens a file or folder in whatever the desktop uses for it.
 #[tauri::command]
 #[specta::specta]
-pub fn path_open(path: String) -> Result<Opened, RpcError> {
+pub async fn path_open(path: String) -> Result<Opened, RpcError> {
+    crate::off_main::blocking(move || path_open_now(path)).await
+}
+
+/// [`path_open`], on the calling thread.
+pub(crate) fn path_open_now(path: String) -> Result<Opened, RpcError> {
     let target = allowed(&path)?;
     let shown = target.display().to_string();
     hand_over(opener(), &target, &shown)
@@ -170,7 +180,12 @@ pub fn path_open(path: String) -> Result<Opened, RpcError> {
 /// was asked for was the folder with the file highlighted in it.
 #[tauri::command]
 #[specta::specta]
-pub fn path_reveal(path: String) -> Result<Opened, RpcError> {
+pub async fn path_reveal(path: String) -> Result<Opened, RpcError> {
+    crate::off_main::blocking(move || path_reveal_now(path)).await
+}
+
+/// [`path_reveal`], on the calling thread.
+pub(crate) fn path_reveal_now(path: String) -> Result<Opened, RpcError> {
     let target = allowed(&path)?;
     let shown = target.display().to_string();
     if cfg!(target_os = "macos") {

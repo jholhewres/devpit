@@ -86,7 +86,12 @@ pub fn agents_dir() -> Result<PathBuf, RpcError> {
 /// typo waiting to fail at the moment the step runs.
 #[tauri::command]
 #[specta::specta]
-pub fn agents_list() -> Result<devpit_rpc::Agents, RpcError> {
+pub async fn agents_list() -> Result<devpit_rpc::Agents, RpcError> {
+    crate::off_main::blocking(agents_list_now).await
+}
+
+/// [`agents_list`], on the calling thread.
+pub(crate) fn agents_list_now() -> Result<devpit_rpc::Agents, RpcError> {
     let dir = agents_dir()?;
     let catalogue = devpit_agentcli::read_every_agent(&devpit_agentcli::seed_sources());
     Ok(devpit_rpc::Agents {

@@ -170,7 +170,22 @@ pub(crate) fn session_close_leaf_now(
 /// arranged. The tree clamps, so neither side can be dragged out of reach.
 #[tauri::command]
 #[specta::specta]
-pub fn session_set_ratio(
+pub async fn session_set_ratio(
+    app: tauri::AppHandle,
+    project_id: String,
+    tab_id: String,
+    split_id: String,
+    ratio: f64,
+) -> Result<SessionLayout, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_set_ratio_now(state, project_id, tab_id, split_id, ratio)
+    })
+    .await
+}
+
+/// [`session_set_ratio`], on the calling thread.
+pub(crate) fn session_set_ratio_now(
     state: State<SessionState>,
     project_id: String,
     tab_id: String,
@@ -205,7 +220,20 @@ pub fn session_set_ratio(
 /// scrollback and the layout both keyed on.
 #[tauri::command]
 #[specta::specta]
-pub fn session_close_tab(
+pub async fn session_close_tab(
+    app: tauri::AppHandle,
+    project_id: String,
+    tab_id: String,
+) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_close_tab_now(app.clone(), state, project_id, tab_id)
+    })
+    .await
+}
+
+/// [`session_close_tab`], on the calling thread.
+pub(crate) fn session_close_tab_now(
     app: tauri::AppHandle,
     state: State<SessionState>,
     project_id: String,

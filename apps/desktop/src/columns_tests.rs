@@ -84,10 +84,10 @@ fn a_step_nothing_has_run_is_deleted() {
 fn an_edit_is_refused_by_the_same_rule_as_a_new_step() {
     let source = include_str!("columns.rs");
     let update = source
-        .split("pub fn step_update(")
+        .split("fn step_update_now(")
         .nth(1)
         .expect("step_update is in this file");
-    let body = update.split("\npub fn ").next().unwrap_or(update);
+    let body = update.split("\npub").next().unwrap_or(update);
     assert!(
         body.contains("refused(&step.kind, &config)"),
         "step_update saves a config nothing checked"

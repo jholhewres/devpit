@@ -71,10 +71,10 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     if !METHODS.contains(&asked.method.as_str()) {
         return Err(format!("devpit does not answer `{}`", asked.method));
     }
-    let projects = crate::projects::project_list().map_err(said)?.projects;
+    let projects = crate::projects::project_list_now().map_err(said)?.projects;
     let project = project_at(&projects, Path::new(&asked.cwd))
         .ok_or_else(|| format!("no devpit project contains {}", asked.cwd))?;
-    let board = crate::board::board_get(project.id.clone()).map_err(said)?;
+    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
 
     let text = |name: &str| {
         asked
@@ -107,7 +107,7 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
                 None => first_column(&board)?.id.clone(),
             };
             let body = text("body").unwrap_or_default();
-            let card = crate::board::card_create(board.project_id.clone(), column, title, body)
+            let card = crate::board::card_create_now(board.project_id.clone(), column, title, body)
                 .map_err(said)?;
             json!({ "id": card.id, "title": card.title, "columnId": card.column_id })
         }
@@ -115,9 +115,13 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
             let card = on_board(&board, &card_id)?;
             let title = text("title").unwrap_or_else(|| card.title.clone());
             let body = text("body").unwrap_or_else(|| card.body.clone());
-            let changed =
-                crate::board::card_update(board.project_id.clone(), card_id.clone(), title, body)
-                    .map_err(said)?;
+            let changed = crate::board::card_update_now(
+                board.project_id.clone(),
+                card_id.clone(),
+                title,
+                body,
+            )
+            .map_err(said)?;
             json!({ "id": changed.id, "title": changed.title })
         }
         "move" => moved(app, &board, &card_id, &text("columnId").unwrap_or_default())?,
@@ -142,7 +146,7 @@ fn moved(app: Option<&AppHandle>, board: &Board, card_id: &str, to: &str) -> Res
         .iter()
         .filter(|card| card.column_id == column.id)
         .count() as i32;
-    let changed = crate::moving::card_move(
+    let changed = crate::moving::card_move_now(
         app.state::<std::sync::Arc<crate::in_flight::InFlight>>(),
         app.clone(),
         board.project_id.clone(),

@@ -120,7 +120,15 @@ pub(crate) fn places_for(
 /// folder exists, and opening on a list of ULIDs is not an answer.
 #[tauri::command]
 #[specta::specta]
-pub fn workspace_list(
+pub async fn workspace_list(
+    project_id: Option<String>,
+    path: Option<String>,
+) -> Result<WorkspaceListing, RpcError> {
+    crate::off_main::blocking(move || workspace_list_now(project_id, path)).await
+}
+
+/// [`workspace_list`], on the calling thread.
+pub(crate) fn workspace_list_now(
     project_id: Option<String>,
     path: Option<String>,
 ) -> Result<WorkspaceListing, RpcError> {
@@ -160,7 +168,12 @@ pub fn workspace_list(
 /// ceiling. A second reader here would be a second place for those to drift.
 #[tauri::command]
 #[specta::specta]
-pub fn workspace_file(path: String) -> Result<FileContents, RpcError> {
+pub async fn workspace_file(path: String) -> Result<FileContents, RpcError> {
+    crate::off_main::blocking(move || workspace_file_now(path)).await
+}
+
+/// [`workspace_file`], on the calling thread.
+pub(crate) fn workspace_file_now(path: String) -> Result<FileContents, RpcError> {
     let root = Store::root().map_err(|err| RpcError::internal(err.to_string()))?;
     crate::files::contents(&root, path)
 }

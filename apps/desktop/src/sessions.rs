@@ -276,7 +276,21 @@ pub(crate) fn ensure_at(
 /// `session.focus` — persists which leaf receives the next split or action.
 #[tauri::command]
 #[specta::specta]
-pub fn session_focus(
+pub async fn session_focus(
+    app: tauri::AppHandle,
+    project_id: String,
+    tab_id: String,
+    leaf_id: String,
+) -> Result<SessionLayout, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        session_focus_now(state, project_id, tab_id, leaf_id)
+    })
+    .await
+}
+
+/// [`session_focus`], on the calling thread.
+pub(crate) fn session_focus_now(
     state: State<SessionState>,
     project_id: String,
     tab_id: String,

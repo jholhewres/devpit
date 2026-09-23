@@ -122,7 +122,12 @@ fn runs_of(store: &Store, card_id: &str, steps: &[Step]) -> Result<Vec<Run>, Rpc
 /// `board.get` — the columns, the cards and the steps of a project.
 #[tauri::command]
 #[specta::specta]
-pub fn board_get(project_id: String) -> Result<Board, RpcError> {
+pub async fn board_get(project_id: String) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || board_get_now(project_id)).await
+}
+
+/// [`board_get`], on the calling thread.
+pub(crate) fn board_get_now(project_id: String) -> Result<Board, RpcError> {
     let store = store()?;
     store.ensure_board(&project_id)?;
     let steps = steps_of(&store, &project_id)?;
@@ -163,7 +168,17 @@ pub fn board_get(project_id: String) -> Result<Board, RpcError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn card_create(
+pub async fn card_create(
+    project_id: String,
+    column_id: String,
+    title: String,
+    body: String,
+) -> Result<Card, RpcError> {
+    crate::off_main::blocking(move || card_create_now(project_id, column_id, title, body)).await
+}
+
+/// [`card_create`], on the calling thread.
+pub(crate) fn card_create_now(
     project_id: String,
     column_id: String,
     title: String,
@@ -177,7 +192,17 @@ pub fn card_create(
 
 #[tauri::command]
 #[specta::specta]
-pub fn card_update(
+pub async fn card_update(
+    project_id: String,
+    card_id: String,
+    title: String,
+    body: String,
+) -> Result<Card, RpcError> {
+    crate::off_main::blocking(move || card_update_now(project_id, card_id, title, body)).await
+}
+
+/// [`card_update`], on the calling thread.
+pub(crate) fn card_update_now(
     project_id: String,
     card_id: String,
     title: String,

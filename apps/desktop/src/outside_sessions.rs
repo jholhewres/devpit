@@ -24,7 +24,12 @@ fn known(sessions: &Path) -> HashSet<String> {
 /// `chat.outside` — sessions of this project started outside devpit.
 #[tauri::command]
 #[specta::specta]
-pub fn chat_outside(project_id: String) -> Result<Vec<OutsideSession>, RpcError> {
+pub async fn chat_outside(project_id: String) -> Result<Vec<OutsideSession>, RpcError> {
+    crate::off_main::blocking(move || chat_outside_now(project_id)).await
+}
+
+/// [`chat_outside`], on the calling thread.
+pub(crate) fn chat_outside_now(project_id: String) -> Result<Vec<OutsideSession>, RpcError> {
     let store = crate::projects::store()?;
     let (_, root) = crate::projects::locate(&store, &project_id)?;
     let sessions =

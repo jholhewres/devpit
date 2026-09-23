@@ -6,7 +6,7 @@ use devpit_rpc::{
 };
 use tauri::State;
 
-use crate::board::board_get;
+use crate::board::board_get_now;
 use crate::sessions::{layout_of, tab_for_card, SessionState};
 
 fn store() -> Result<Store, RpcError> {
@@ -96,7 +96,7 @@ pub(crate) fn card_archive_now(
 
     store.archive_card(&card_id)?;
     crate::card_activity::card_ended(&card_id);
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 /// Why `card.delete` will not go ahead, or nothing.
@@ -136,7 +136,21 @@ pub(crate) fn delete_refusal(
 /// `card.delete` — the card and what hangs off it, never its checkout or branch.
 #[tauri::command]
 #[specta::specta]
-pub fn card_delete(
+pub async fn card_delete(
+    app: tauri::AppHandle,
+    project_id: String,
+    card_id: String,
+    force: bool,
+) -> Result<CardDeleted, RpcError> {
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        card_delete_now(state, project_id, card_id, force)
+    })
+    .await
+}
+
+/// [`card_delete`], on the calling thread.
+pub(crate) fn card_delete_now(
     state: State<SessionState>,
     project_id: String,
     card_id: String,
@@ -215,7 +229,12 @@ const ARCHIVED_AT_MOST: i64 = 200;
 /// `board.archived` — the cards off the board, newest first.
 #[tauri::command]
 #[specta::specta]
-pub fn board_archived(project_id: String) -> Result<ArchivedCards, RpcError> {
+pub async fn board_archived(project_id: String) -> Result<ArchivedCards, RpcError> {
+    crate::off_main::blocking(move || board_archived_now(project_id)).await
+}
+
+/// [`board_archived`], on the calling thread.
+pub(crate) fn board_archived_now(project_id: String) -> Result<ArchivedCards, RpcError> {
     let cards = store()?
         .archived_cards(&project_id, ARCHIVED_AT_MOST)?
         .into_iter()
@@ -232,7 +251,12 @@ pub fn board_archived(project_id: String) -> Result<ArchivedCards, RpcError> {
 /// `card.restore` — an archived card back on the board.
 #[tauri::command]
 #[specta::specta]
-pub fn card_restore(project_id: String, card_id: String) -> Result<Board, RpcError> {
+pub async fn card_restore(project_id: String, card_id: String) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || card_restore_now(project_id, card_id)).await
+}
+
+/// [`card_restore`], on the calling thread.
+pub(crate) fn card_restore_now(project_id: String, card_id: String) -> Result<Board, RpcError> {
     let store = store()?;
     of_project(&store, &project_id, &card_id)?;
     if !store.restore_card(&card_id)? {
@@ -241,7 +265,7 @@ pub fn card_restore(project_id: String, card_id: String) -> Result<Board, RpcErr
             "that card is not archived",
         ));
     }
-    board_get(project_id)
+    board_get_now(project_id)
 }
 
 #[cfg(test)]

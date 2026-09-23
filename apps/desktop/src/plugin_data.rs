@@ -344,14 +344,34 @@ pub(crate) fn pin(
 /// `plugin.data.list` — the plugin's files in this project.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_data_list(project_id: String, plugin_id: String) -> Result<PluginFiles, RpcError> {
+pub async fn plugin_data_list(
+    project_id: String,
+    plugin_id: String,
+) -> Result<PluginFiles, RpcError> {
+    crate::off_main::blocking(move || plugin_data_list_now(project_id, plugin_id)).await
+}
+
+/// [`plugin_data_list`], on the calling thread.
+pub(crate) fn plugin_data_list_now(
+    project_id: String,
+    plugin_id: String,
+) -> Result<PluginFiles, RpcError> {
     list(&store()?, &Store::root()?, &project_id, &plugin_id)
 }
 
 /// `plugin.data.read` — one file's text.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_data_read(
+pub async fn plugin_data_read(
+    project_id: String,
+    plugin_id: String,
+    name: String,
+) -> Result<PluginFileText, RpcError> {
+    crate::off_main::blocking(move || plugin_data_read_now(project_id, plugin_id, name)).await
+}
+
+/// [`plugin_data_read`], on the calling thread.
+pub(crate) fn plugin_data_read_now(
     project_id: String,
     plugin_id: String,
     name: String,
@@ -362,7 +382,21 @@ pub fn plugin_data_read(
 /// `plugin.data.write` — saves, refusing a change it never saw.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_data_write(
+pub async fn plugin_data_write(
+    project_id: String,
+    plugin_id: String,
+    name: String,
+    text: String,
+    expected_modified: Option<f64>,
+) -> Result<PluginFileSaved, RpcError> {
+    crate::off_main::blocking(move || {
+        plugin_data_write_now(project_id, plugin_id, name, text, expected_modified)
+    })
+    .await
+}
+
+/// [`plugin_data_write`], on the calling thread.
+pub(crate) fn plugin_data_write_now(
     project_id: String,
     plugin_id: String,
     name: String,
@@ -384,7 +418,16 @@ pub fn plugin_data_write(
 /// `plugin.data.delete` — removes one file.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_data_delete(
+pub async fn plugin_data_delete(
+    project_id: String,
+    plugin_id: String,
+    name: String,
+) -> Result<PluginFileRemoved, RpcError> {
+    crate::off_main::blocking(move || plugin_data_delete_now(project_id, plugin_id, name)).await
+}
+
+/// [`plugin_data_delete`], on the calling thread.
+pub(crate) fn plugin_data_delete_now(
     project_id: String,
     plugin_id: String,
     name: String,
@@ -395,7 +438,18 @@ pub fn plugin_data_delete(
 /// `plugin.data.pin` — pins one file to a card, answering with the card.
 #[tauri::command]
 #[specta::specta]
-pub fn plugin_data_pin(
+pub async fn plugin_data_pin(
+    project_id: String,
+    plugin_id: String,
+    name: String,
+    card_id: String,
+) -> Result<CardDetail, RpcError> {
+    crate::off_main::blocking(move || plugin_data_pin_now(project_id, plugin_id, name, card_id))
+        .await
+}
+
+/// [`plugin_data_pin`], on the calling thread.
+pub(crate) fn plugin_data_pin_now(
     project_id: String,
     plugin_id: String,
     name: String,

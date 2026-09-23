@@ -46,7 +46,31 @@ fn refused_before_moving(
 /// going on it. It is never consent to an irreversible step.
 #[tauri::command]
 #[specta::specta]
-pub fn card_move(
+pub async fn card_move(
+    app: tauri::AppHandle,
+    project_id: String,
+    card_id: String,
+    column_id: String,
+    position: i32,
+    confirmed: bool,
+) -> Result<CardChanged, RpcError> {
+    crate::off_main::blocking(move || {
+        let in_flight = tauri::Manager::state::<Arc<crate::in_flight::InFlight>>(&app);
+        card_move_now(
+            in_flight,
+            app.clone(),
+            project_id,
+            card_id,
+            column_id,
+            position,
+            confirmed,
+        )
+    })
+    .await
+}
+
+/// [`card_move`], on the calling thread.
+pub(crate) fn card_move_now(
     in_flight: State<Arc<crate::in_flight::InFlight>>,
     app: AppHandle,
     project_id: String,

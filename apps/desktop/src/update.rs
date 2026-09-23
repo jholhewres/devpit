@@ -771,7 +771,16 @@ pub(crate) fn holding_for(
 /// is whether *this* is worth interrupting.
 #[tauri::command]
 #[specta::specta]
-pub fn update_running(
+pub async fn update_running(app: tauri::AppHandle) -> Result<UpdateWork, RpcError> {
+    crate::off_main::blocking(move || {
+        let talking = tauri::Manager::state::<crate::chat::Talking>(&app);
+        update_running_now(talking)
+    })
+    .await
+}
+
+/// [`update_running`], on the calling thread.
+pub(crate) fn update_running_now(
     talking: tauri::State<'_, crate::chat::Talking>,
 ) -> Result<UpdateWork, RpcError> {
     let mut work = blocking_now(&talking)?;
@@ -1046,7 +1055,16 @@ pub fn update_restart_ready(updating: tauri::State<'_, Updating>) {
 /// verified gets its own sentence and no command at all.
 #[tauri::command]
 #[specta::specta]
-pub fn update_package(updating: tauri::State<'_, Updating>) -> Result<String, RpcError> {
+pub async fn update_package(app: tauri::AppHandle) -> Result<String, RpcError> {
+    crate::off_main::blocking(move || {
+        let updating = tauri::Manager::state::<Updating>(&app);
+        update_package_now(updating)
+    })
+    .await
+}
+
+/// [`update_package`], on the calling thread.
+pub(crate) fn update_package_now(updating: tauri::State<'_, Updating>) -> Result<String, RpcError> {
     let package = updating
         .package
         .lock()

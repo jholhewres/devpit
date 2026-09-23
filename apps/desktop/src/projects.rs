@@ -84,7 +84,12 @@ pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
 /// list would read as one that was never added.
 #[tauri::command]
 #[specta::specta]
-pub fn project_list() -> Result<ProjectList, RpcError> {
+pub async fn project_list() -> Result<ProjectList, RpcError> {
+    crate::off_main::blocking(project_list_now).await
+}
+
+/// [`project_list`], on the calling thread.
+pub(crate) fn project_list_now() -> Result<ProjectList, RpcError> {
     let store = store()?;
 
     let projects = store
@@ -99,7 +104,12 @@ pub fn project_list() -> Result<ProjectList, RpcError> {
 /// `project.add` — registers a folder, or opens the one already registered.
 #[tauri::command]
 #[specta::specta]
-pub fn project_add(root_path: String) -> Result<Project, RpcError> {
+pub async fn project_add(root_path: String) -> Result<Project, RpcError> {
+    crate::off_main::blocking(move || project_add_now(root_path)).await
+}
+
+/// [`project_add`], on the calling thread.
+pub(crate) fn project_add_now(root_path: String) -> Result<Project, RpcError> {
     let root = PathBuf::from(shellexpand_home(&root_path));
     if !root.is_dir() {
         return Err(RpcError::new(
@@ -132,11 +142,16 @@ pub fn project_add(root_path: String) -> Result<Project, RpcError> {
 /// see next time is the order you built by using it.
 #[tauri::command]
 #[specta::specta]
-pub fn project_open(project_id: String) -> Result<ProjectList, RpcError> {
+pub async fn project_open(project_id: String) -> Result<ProjectList, RpcError> {
+    crate::off_main::blocking(move || project_open_now(project_id)).await
+}
+
+/// [`project_open`], on the calling thread.
+pub(crate) fn project_open_now(project_id: String) -> Result<ProjectList, RpcError> {
     let store = store()?;
     locate(&store, &project_id)?;
     store.touch_project(&project_id)?;
-    project_list()
+    project_list_now()
 }
 
 /// `project.forget` — takes a project out of the list.
@@ -152,18 +167,29 @@ pub fn project_open(project_id: String) -> Result<ProjectList, RpcError> {
 /// still never touched — that is the one promise this command makes.
 #[tauri::command]
 #[specta::specta]
-pub fn project_forget(project_id: String, wipe_workspace: bool) -> Result<ProjectList, RpcError> {
+pub async fn project_forget(
+    project_id: String,
+    wipe_workspace: bool,
+) -> Result<ProjectList, RpcError> {
+    crate::off_main::blocking(move || project_forget_now(project_id, wipe_workspace)).await
+}
+
+/// [`project_forget`], on the calling thread.
+pub(crate) fn project_forget_now(
+    project_id: String,
+    wipe_workspace: bool,
+) -> Result<ProjectList, RpcError> {
     let store = store()?;
 
     if !wipe_workspace {
         if !store.forget_project(&project_id)? {
             return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
         }
-        return project_list();
+        return project_list_now();
     }
 
     erase(&store, &Store::root()?, &project_id)?;
-    project_list()
+    project_list_now()
 }
 
 /// Erases the row and deletes the project's folder under the workspace.
@@ -225,115 +251,6 @@ pub(crate) fn home_refusal(err: HomeError) -> RpcError {
         HomeError::Removal(_) | HomeError::Store(_) => ErrorCode::Internal,
     };
     RpcError::new(code, err.to_string())
-}
-
-/// `project.rename` — what this project is called in devpit.
-///
-/// The name is the app's, not git's: the folder on disk keeps whatever it was
-/// called, because renaming somebody's checkout is not a thing a list should
-/// do to make its own rows read better.
-#[tauri::command]
-#[specta::specta]
-pub fn project_rename(project_id: String, name: String) -> Result<ProjectList, RpcError> {
-    let wanted = name.trim();
-    if wanted.is_empty() {
-        return Err(RpcError::new(ErrorCode::Invalid, "a project needs a name"));
-    }
-    if wanted.chars().count() > 120 {
-        return Err(RpcError::new(ErrorCode::Invalid, "that name is too long"));
-    }
-
-    let store = store()?;
-    if !store.rename_project(&project_id, wanted)? {
-        return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
-    }
-    project_list()
-}
-
-/// `project.edit` — a project's name, group and mark, from the dialog that
-/// sets them together.
-///
-/// An empty group, icon or colour clears it. The colour is `#rrggbb` and
-/// nothing else, because it is written into a style; the icon is short, because
-/// it is either one of the app's own names or a single emoji.
-#[tauri::command]
-#[specta::specta]
-pub fn project_edit(
-    project_id: String,
-    name: String,
-    group: Option<String>,
-    icon: Option<String>,
-    color: Option<String>,
-) -> Result<ProjectList, RpcError> {
-    let wanted = name.trim();
-    if wanted.is_empty() {
-        return Err(RpcError::new(ErrorCode::Invalid, "a project needs a name"));
-    }
-    if wanted.chars().count() > 120 {
-        return Err(RpcError::new(ErrorCode::Invalid, "that name is too long"));
-    }
-    let given = |value: &Option<String>| {
-        value
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(ToOwned::to_owned)
-    };
-    let group = given(&group);
-    let icon = given(&icon);
-    let color = given(&color);
-    if group
-        .as_deref()
-        .is_some_and(|group| group.chars().count() > 60)
-    {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            "that group name is too long",
-        ));
-    }
-    if icon
-        .as_deref()
-        .is_some_and(|icon| icon.chars().count() > 32)
-    {
-        return Err(RpcError::new(ErrorCode::Invalid, "that is not an icon"));
-    }
-    if color.as_deref().is_some_and(|color| !is_hex_colour(color)) {
-        return Err(RpcError::new(ErrorCode::Invalid, "a colour is #rrggbb"));
-    }
-
-    let store = store()?;
-    if !store.edit_project(
-        &project_id,
-        wanted,
-        group.as_deref(),
-        icon.as_deref(),
-        color.as_deref(),
-    )? {
-        return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
-    }
-    project_list()
-}
-
-/// `project.group_rename` — a group's name, changed on every project in it.
-/// An empty name takes them out of the group.
-#[tauri::command]
-#[specta::specta]
-pub fn project_group_rename(from: String, to: String) -> Result<ProjectList, RpcError> {
-    let to = to.trim();
-    if to.chars().count() > 60 {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            "that group name is too long",
-        ));
-    }
-    store()?.rename_group(&from, (!to.is_empty()).then_some(to))?;
-    project_list()
-}
-
-fn is_hex_colour(value: &str) -> bool {
-    value.len() == 7
-        && value.starts_with('#')
-        && value[1..].chars().all(|letter| letter.is_ascii_hexdigit())
 }
 
 /// `project.changes` — what has changed in a checkout, with the size of each edit.

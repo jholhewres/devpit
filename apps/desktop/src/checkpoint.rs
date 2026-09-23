@@ -104,7 +104,12 @@ fn as_whose(whose: &WhoseRun) -> Whose {
 
 #[tauri::command]
 #[specta::specta]
-pub fn checkpoint_read(run_id: String) -> Result<Checked, RpcError> {
+pub async fn checkpoint_read(run_id: String) -> Result<Checked, RpcError> {
+    crate::off_main::blocking(move || checkpoint_read_now(run_id)).await
+}
+
+/// [`checkpoint_read`], on the calling thread.
+pub(crate) fn checkpoint_read_now(run_id: String) -> Result<Checked, RpcError> {
     checked(&crate::board::store()?, &run_id)
 }
 

@@ -100,7 +100,7 @@ fn ids_that_are_paths_are_refused() {
         [("../p", "c", "t"), ("p", "c/../d", "t"), ("p", "c", ".t")]
     {
         let refused =
-            chat_rewind(project.into(), conversation.into(), turn.into()).expect_err("refused");
+            chat_rewind_now(project.into(), conversation.into(), turn.into()).expect_err("refused");
         assert_eq!(refused.code, ErrorCode::Forbidden);
     }
 }
