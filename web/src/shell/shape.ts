@@ -56,6 +56,8 @@ export interface Shell {
   attach: (id: string, panes: readonly string[]) => void
   launched: (id: string) => void
   drafted: (id: string) => void
+  /** Puts another tab in this one's place. */
+  replace: (id: string, tab: Tab) => void
   /** What each of the project's panes has in front of it.
 
       Polled once for the window rather than once per surface: the strip, the

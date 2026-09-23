@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
 import type { PaneName } from './paneList'
-import { attached, closed, drafted as taken, focused, launched as sent, moved, opened, renamed, type Strip, type Tab } from './strip'
+import { attached, closed, drafted as taken, focused, launched as sent, moved, opened, renamed, replaced, type Strip, type Tab } from './strip'
 import { remember, remembered } from './tabs'
 
 export type Where = 'strip' | 'sidebar'
@@ -25,6 +25,8 @@ export interface Tabs {
   launched: (id: string) => void
   /** Forgets the words a chat was opened with, once they are in its composer. */
   drafted: (id: string) => void
+  /** Puts another tab in this one's place. */
+  replace: (id: string, tab: Tab) => void
   /** Which tab is being renamed, and on which surface.
 
       The surface is not decoration: the strip and the sidebar draw the same
@@ -99,6 +101,7 @@ export function useTabs(projectId: string | null): Tabs {
   )
   const launched = useCallback((id: string) => setStrip((was) => sent(was, id)), [])
   const drafted = useCallback((id: string) => setStrip((was) => taken(was, id)), [])
+  const replace = useCallback((id: string, tab: Tab) => setStrip((was) => replaced(was, id, tab)), [])
 
   return {
     open: strip.open,
@@ -111,6 +114,7 @@ export function useTabs(projectId: string | null): Tabs {
     attach,
     launched,
     drafted,
+    replace,
     renaming,
     setRenaming,
   }

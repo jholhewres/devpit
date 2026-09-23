@@ -6,6 +6,7 @@ import {
   focused,
   many,
   moved,
+  replaced,
   nextName,
   opened,
   renamed,
@@ -228,5 +229,28 @@ describe('which tabs a sweep closes', () => {
      leave the screen while the shells keep running. */
   it('a tab that is not open names nothing', () => {
     expect(sweeping(four(), 'nope', 'all')).toEqual([])
+  })
+})
+
+describe('a tab swapped in its own place', () => {
+  const strip: Strip = {
+    open: [
+      { id: 'a', kind: 'term' },
+      { id: 'here', kind: 'chat' },
+      { id: 'b', kind: 'term' },
+    ],
+    active: 'here',
+  }
+
+  it('takes the place of the one it replaces', () => {
+    const next = replaced(strip, 'here', { id: 'earlier', kind: 'chat', title: 'Old talk' })
+    expect(next.open.map((tab) => tab.id)).toEqual(['a', 'earlier', 'b'])
+    expect(next.active).toBe('earlier')
+  })
+
+  it('focuses one already open instead of showing it twice', () => {
+    const next = replaced(strip, 'here', { id: 'b', kind: 'term' })
+    expect(next.open.map((tab) => tab.id)).toEqual(['a', 'b'])
+    expect(next.active).toBe('b')
   })
 })

@@ -193,6 +193,14 @@ export function drafted(strip: Strip, id: string): Strip {
   }
 }
 
+/* A tab swapped for another in its own place — a chat that `/resume` points
+   at an earlier conversation. Already open elsewhere, that one is focused and
+   this one goes, rather than the same conversation standing in two tabs. */
+export function replaced(strip: Strip, id: string, tab: Tab): Strip {
+  if (strip.open.some((other) => other.id === tab.id)) return { ...closed(strip, id), active: tab.id }
+  return { open: strip.open.map((other) => (other.id === id ? tab : other)), active: tab.id }
+}
+
 export const focused = (strip: Strip): Tab | null =>
   strip.open.find((tab) => tab.id === strip.active) ?? null
 

@@ -188,7 +188,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           </div>
 
           <ChatWhere />
-          {slash.own === 'resume' && <ResumePicker onClose={slash.closeOwn} />}
+          {slash.own === 'resume' && <ResumePicker from={tab.id} onClose={slash.closeOwn} />}
         </div>
       </div>
     </>
