@@ -140,7 +140,10 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
   ]
 
   return (
-    <nav className="rail" aria-label="Projects">
+    /* Held open while something is dragged: WebKit drops `:hover` during a
+       drag, and a rail that folds to icons under the pointer moves every
+       target out from under it. */
+    <nav className="rail" aria-label="Projects" data-held={dragging || menu || editing ? 'true' : undefined}>
       <div className="rail__panel">
         <button
           className="rail__filter"
@@ -175,6 +178,8 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                     drag={{
                       onDragStart: (event) => {
                         event.dataTransfer.effectAllowed = 'move'
+                        /* WebKit starts no drag that carries no data. */
+                        event.dataTransfer.setData('text/plain', section.group!)
                         setDragging({ kind: 'group', name: section.group! })
                       },
                       onDragEnd: done,
@@ -184,7 +189,10 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                         setOver(`group:${section.group}`)
                       },
                       onDragLeave: () => setOver(null),
-                      onDrop: () => dropOnGroup(section.group!),
+                      onDrop: (event) => {
+                        event.preventDefault()
+                        dropOnGroup(section.group!)
+                      },
                     }}
                   />
                 )}
@@ -204,6 +212,7 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                       draggable
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = 'move'
+                        event.dataTransfer.setData('text/plain', one.id)
                         setDragging({ kind: 'project', id: one.id })
                       }}
                       onDragEnd={done}
@@ -213,7 +222,10 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                         setOver(one.id)
                       }}
                       onDragLeave={() => setOver(null)}
-                      onDrop={() => dropOnProject(one)}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        dropOnProject(one)
+                      }}
                       onClick={() => one.id !== project?.id && setProject(one.id)}
                       onContextMenu={(event) => {
                         event.preventDefault()

@@ -7,21 +7,24 @@
 .app { --rail-w: 56px; }
 .rail { position: relative; z-index: 30; min-width: 0; height: 100%; }
 .rail__panel { position: absolute; inset: 0 auto 0 0; width: var(--rail-w); display: flex; flex-direction: column; padding: 10px 0 8px; background: var(--sidebar, var(--canvas)); border-right: 1px solid var(--border); overflow: hidden; transition: width 170ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 170ms ease; }
-.rail:hover .rail__panel { width: 248px; box-shadow: 10px 0 32px var(--shade); transition-delay: 250ms; }
+:is(.rail:hover, .rail[data-held='true']) .rail__panel { width: 248px; box-shadow: 10px 0 32px var(--shade); transition-delay: 250ms; }
 .rail__list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; scrollbar-color: transparent transparent; }
 /* The scrollbar shows when the rail is in use, and not while it is a strip
    of icons. */
-.rail:hover .rail__list { scrollbar-color: var(--scroll-thumb) transparent; }
+:is(.rail:hover, .rail[data-held='true']) .rail__list { scrollbar-color: var(--scroll-thumb) transparent; }
 
-/* The filter: every project, or only the ones with tabs open. A dot while
-   narrow — hollow for all, filled for active — and its words when wide. */
-.rail__filter { flex: none; display: flex; align-items: center; gap: 10px; height: 26px; margin: 0 6px 8px; padding: 0 16px; border-radius: 8px; color: var(--text-3); font-size: 11.5px; white-space: nowrap; overflow: hidden; }
+/* The filter: every project, or only the ones with tabs open. Only in the
+   open rail — folded to icons it takes no room — with a dot, hollow for all
+   and filled for active, before its words. */
+.rail__filter { flex: none; display: flex; align-items: center; gap: 10px; height: 0; margin: 0 6px; opacity: 0; pointer-events: none; transition: height 170ms cubic-bezier(0.2, 0.7, 0.3, 1), margin 170ms, opacity 120ms; padding: 0 16px; border-radius: 8px; color: var(--text-3); font-size: 11.5px; white-space: nowrap; overflow: hidden; }
 .rail__filter:hover { background: var(--sidebar-item); color: var(--text-2); }
 .rail__fdot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--text-3); }
 .rail__filter[aria-pressed='true'] .rail__fdot { border-color: var(--success); background: var(--success); }
 .rail__filter[aria-pressed='true'] { color: var(--text-2); }
 .rail__ftext { opacity: 0; transition: opacity 120ms ease; }
-.rail:hover .rail__ftext { opacity: 1; transition-delay: 300ms; }
+:is(.rail:hover, .rail[data-held='true']) .rail__ftext { opacity: 1; transition-delay: 300ms; }
+/* Part of the open rail only: folded to icons, it is not there at all. */
+:is(.rail:hover, .rail[data-held='true']) .rail__filter { height: 26px; margin: 0 6px 8px; opacity: 1; pointer-events: auto; transition-delay: 250ms; }
 
 /* A group: its heading keeps one height whether the rail is narrow or wide,
    so nothing below it moves when the rail widens — narrow, the heading is a
@@ -31,10 +34,10 @@
 .rail__sect + .rail__sect { margin-top: 4px; }
 .rail__group { position: relative; flex: none; display: flex; align-items: center; gap: 6px; height: 20px; margin: 0 6px; padding: 0 6px 0 8px; border-radius: 6px; text-align: left; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; overflow: hidden; }
 .rail__group::before { content: ''; position: absolute; left: 12px; right: 12px; top: 50%; height: 1px; background: var(--border-strong); transition: opacity 120ms ease; }
-.rail:hover .rail__group::before { opacity: 0; transition-delay: 250ms; }
-.rail:hover .rail__group:hover { background: var(--sidebar-item); color: var(--text-2); }
+:is(.rail:hover, .rail[data-held='true']) .rail__group::before { opacity: 0; transition-delay: 250ms; }
+:is(.rail:hover, .rail[data-held='true']) .rail__group:hover { background: var(--sidebar-item); color: var(--text-2); }
 .rail__group > span { opacity: 0; transition: opacity 120ms ease; }
-.rail:hover .rail__group > span { opacity: 1; transition-delay: 300ms; }
+:is(.rail:hover, .rail[data-held='true']) .rail__group > span { opacity: 1; transition-delay: 300ms; }
 .rail__gname { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .rail__gchev { flex: none; display: flex; color: var(--ghost); transition: transform 150ms ease; }
 .rail__gchev[data-open='false'] { transform: rotate(-90deg); }
@@ -46,11 +49,11 @@
 
 /* A card: mark, then name over branch and tabs. */
 .rail__i { position: relative; flex: none; display: flex; align-items: center; gap: 10px; height: 44px; margin: 0 6px; padding: 0 4px; border-radius: 10px; text-align: left; color: var(--text-2); transition: background-color 120ms ease; }
-.rail:hover .rail__i:hover { background: var(--sidebar-item); }
-.rail:hover .rail__i[aria-current='true'] { background: var(--overlay-strong); }
+:is(.rail:hover, .rail[data-held='true']) .rail__i:hover { background: var(--sidebar-item); }
+:is(.rail:hover, .rail[data-held='true']) .rail__i[aria-current='true'] { background: var(--overlay-strong); }
 .rail__ico { position: relative; flex: none; display: flex; }
 .rail__text { min-width: 0; display: flex; flex-direction: column; gap: 1px; opacity: 0; transition: opacity 120ms ease; }
-.rail:hover .rail__text { opacity: 1; transition-delay: 300ms; }
+:is(.rail:hover, .rail[data-held='true']) .rail__text { opacity: 1; transition-delay: 300ms; }
 .rail__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
 .rail__i[aria-current='true'] .rail__n { font-weight: 600; }
 .rail__s { display: flex; gap: 6px; min-width: 0; font-size: 11px; color: var(--text-3); white-space: nowrap; }
