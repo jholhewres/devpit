@@ -175,6 +175,18 @@ pub async fn workspace_file(path: String) -> Result<FileContents, RpcError> {
 /// [`workspace_file`], on the calling thread.
 pub(crate) fn workspace_file_now(path: String) -> Result<FileContents, RpcError> {
     let root = Store::root().map_err(|err| RpcError::internal(err.to_string()))?;
+    // The files devpit keeps owner-only hold its secrets and its store: listed
+    // in the workspace, never read into the window.
+    let first = path
+        .split('/')
+        .find(|part| !part.is_empty())
+        .unwrap_or_default();
+    if devpit_core::home::private_name(first) {
+        return Err(RpcError::new(
+            devpit_rpc::ErrorCode::Forbidden,
+            "that file holds a secret and is not shown",
+        ));
+    }
     crate::files::contents(&root, path)
 }
 

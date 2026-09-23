@@ -544,6 +544,12 @@ pub fn moved(store: &Store, root: &Path, path: &Path) -> Option<PathBuf> {
 /// store and its journals (profile environments live there, tokens and all),
 /// the port the hooks post to, the secret they carry, the commands the agent
 /// CLI runs, and the account token.
+/// Whether `name`, a file directly under the devpit home, is one of the files
+/// kept owner-only because it holds a secret or the store.
+pub fn private_name(name: &str) -> bool {
+    PRIVATE.contains(&name) || name == "mcp.json"
+}
+
 const PRIVATE: &[&str] = &[
     "state.db",
     "state.db-wal",

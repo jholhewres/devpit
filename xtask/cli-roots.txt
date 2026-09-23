@@ -6,6 +6,7 @@
 # else that spells one.
 
 apps/desktop/src/adopted_history.rs 1
+apps/desktop/src/reading_path_tests.rs 1
 apps/desktop/src/session_search.rs 1
 apps/desktop/src/session_search_tests.rs 1
 crates/agentcli/src/outside.rs 1
