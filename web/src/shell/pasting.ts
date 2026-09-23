@@ -24,3 +24,14 @@ export const picturesTo =
     paste(picture)
   }
 
+
+/* The paths a drop from the file manager names: WebKitGTK hands the files
+   over without their paths, and says where they are in `text/uri-list`. */
+export function droppedPaths(data: DataTransfer | null): string[] {
+  const list = data?.getData('text/uri-list') ?? ''
+  return list
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('file://'))
+    .map((line) => decodeURIComponent(new URL(line).pathname))
+}

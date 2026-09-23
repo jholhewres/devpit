@@ -20,8 +20,22 @@ import { darkNow, palette } from './terminal'
  */
 
 /* Drawn once per block and width, and kept: a list scrolled back through
-   should not run a terminal per block every time it re-renders. */
+   should not run a terminal per block every time it re-renders. Bounded, the
+   oldest going first: a day of commands at a few widths would otherwise all
+   stay in memory. */
 const drawn = new Map<string, readonly Line[]>()
+const MOST_DRAWN = 300
+function recall(key: string): readonly Line[] | null {
+  const lines = drawn.get(key)
+  if (!lines) return null
+  keep(key, lines)
+  return lines
+}
+function keep(key: string, lines: readonly Line[]): void {
+  drawn.delete(key)
+  drawn.set(key, lines)
+  while (drawn.size > MOST_DRAWN) drawn.delete(drawn.keys().next().value as string)
+}
 
 /* Past this many lines the block shows its end and offers the rest. */
 const FIRST_SHOWN = 400
@@ -44,10 +58,18 @@ export const BlockCard = memo(function BlockCard({
   jumped: boolean
   onRerun: (line: string) => void
   onEdit: (line: string) => void
-  onBookmark: (on: boolean) => void
+  /** Stable across renders, so `memo` holds: the block is named here. */
+  onBookmark: (id: number | null, on: boolean) => void
 }): React.JSX.Element {
   const key = `${paneId}:${block.id}:${cols}`
-  const [lines, setLines] = useState<readonly Line[] | null>(drawn.get(key) ?? null)
+  /* Drawn for one width: a new width reads the cache or draws again, and the
+     lines of the old one stay on screen until the new ones are ready. */
+  const [drawnFor, setDrawnFor] = useState<{ key: string; lines: readonly Line[] } | null>(() => {
+    const cached = recall(key)
+    return cached ? { key, lines: cached } : null
+  })
+  const current = drawnFor?.key === key ? drawnFor.lines : recall(key)
+  const lines = current ?? drawnFor?.lines ?? null
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [query, setQuery] = useState<string | null>(null)
   const [all, setAll] = useState(false)
@@ -55,18 +77,18 @@ export const BlockCard = memo(function BlockCard({
   const state = outcome(block)
 
   useEffect(() => {
-    if (lines || block.interactive) return
+    if (current || block.interactive) return
     let live = true
     void ask(() => commands.blockOutput(paneId, block.id)).then(async (answer) => {
       if (!live || answer.data === null) return
       const next = await rendered(answer.data, cols, palette(darkNow()))
-      drawn.set(key, next)
-      if (live) setLines(next)
+      keep(key, next)
+      if (live) setDrawnFor({ key, lines: next })
     })
     return () => {
       live = false
     }
-  }, [lines, block.interactive, block.id, paneId, cols, key])
+  }, [current, block.interactive, block.id, paneId, cols, key])
 
   const text = lines ? plain(lines) : ''
   const kept = lines && query !== null ? filtered(text.split('\n'), query) : null
@@ -84,7 +106,7 @@ export const BlockCard = memo(function BlockCard({
     { label: 'Edit and run', glyph: <Pencil />, act: () => onEdit(line) },
     { label: query === null ? 'Filter output…' : 'Stop filtering', glyph: <Search />, act: () => setQuery(query === null ? '' : null) },
     'rule',
-    { label: block.bookmarked ? 'Remove bookmark' : 'Bookmark this block', glyph: <Bookmark />, act: () => onBookmark(!block.bookmarked) },
+    { label: block.bookmarked ? 'Remove bookmark' : 'Bookmark this block', glyph: <Bookmark />, act: () => onBookmark(block.id, !block.bookmarked) },
   ]
 
   return (

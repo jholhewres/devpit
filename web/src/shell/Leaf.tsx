@@ -4,7 +4,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { attach, scrollback, type Attached } from './attach'
-import { drawOnTheGpu, measureWideCharacters } from './terminalAddons'
+import { gpuWhileShown, measureWideCharacters } from './terminalAddons'
 import { reason } from './reason'
 import { ask, commands } from './live'
 import { contrastFor, darkNow, options, palette } from './terminal'
@@ -78,7 +78,10 @@ export function Leaf({
         /* A client still connecting is not listed yet: asked again shortly. */
         if (drawn.data === false && tries > 1 && !dropped) setTimeout(() => redraw(tries - 1), 200)
       })
-    drawOnTheGpu(terminal, undefined, () => redraw())
+    const gpu = gpuWhileShown(terminal, () => redraw())
+    /* Where there is no observer to say the pane is on screen, it is assumed
+       to be; otherwise the observer's first answer turns the GPU on. */
+    if (typeof IntersectionObserver === 'undefined') gpu.show()
     const pasted = picturesAsPaths(projectId, (path) => terminal.paste(path), setPasteFailed)
     box.addEventListener('paste', pasted, true)
     /* Copy and paste keys, taken before xterm's textarea sees them: on
@@ -123,11 +126,21 @@ export function Leaf({
        Claude Code clears its screen to do that, and a burst of them left it
        blank or drawn at a size already gone. */
     let settling: ReturnType<typeof setTimeout> | undefined
+    let releasing: ReturnType<typeof setTimeout> | undefined
+    /* At most once a frame: the observer fires for every pixel of a drag or
+       of the side panel sliding, and each fit measures the box. */
+    let framed = false
     const refit = (): void => {
-      if (box.clientWidth >= 2 && box.clientHeight >= 2) fit.fit()
-      clearTimeout(settling)
-      wheel.dispose()
-      settling = setTimeout(tell, 60)
+      if (framed) return
+      framed = true
+      requestAnimationFrame(() => {
+        framed = false
+        if (dropped) return
+        if (box.clientWidth >= 2 && box.clientHeight >= 2) fit.fit()
+        clearTimeout(settling)
+        wheel.dispose()
+        settling = setTimeout(tell, 60)
+      })
     }
     const tell = (): void => {
       const { rows, cols } = terminal
@@ -209,7 +222,15 @@ export function Leaf({
       typeof IntersectionObserver === 'undefined'
         ? null
         : new IntersectionObserver((entries) => {
-            if (!entries.some((entry) => entry.isIntersecting)) return
+            /* Given back only after a while off screen: a quick look at another
+               tab and back should not rebuild the renderer and its glyphs. */
+            if (!entries.some((entry) => entry.isIntersecting)) {
+              clearTimeout(releasing)
+              releasing = setTimeout(() => gpu.hide(), 20_000)
+              return
+            }
+            clearTimeout(releasing)
+            gpu.show()
             refit()
             terminal.refresh(0, terminal.rows - 1)
             if (live) redraw(1)
@@ -219,6 +240,7 @@ export function Leaf({
     return () => {
       dropped = true
       clearTimeout(settling)
+      clearTimeout(releasing)
       setTerm(null)
       onTerminalRef.current?.(null)
       themed.disconnect()

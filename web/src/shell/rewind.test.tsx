@@ -21,9 +21,9 @@ const answer: Message = {
 describe('going back to an earlier turn', () => {
   it('is offered on a finished turn a fork can start from', () => {
     const rewind = vi.fn()
-    render(<Turn message={answer} rewind={rewind} />)
+    render(<Turn message={answer} onRewind={rewind} />)
     fireEvent.click(screen.getByLabelText('Go back to this turn'))
-    expect(rewind).toHaveBeenCalledOnce()
+    expect(rewind).toHaveBeenCalledWith('turn_1')
   })
 
   /* A turn that ran before its place in the CLI's transcript was kept has
@@ -34,7 +34,7 @@ describe('going back to an earlier turn', () => {
   })
 
   it('is not offered while the turn is still arriving', () => {
-    render(<Turn message={{ ...answer, streaming: true }} rewind={vi.fn()} />)
+    render(<Turn message={{ ...answer, streaming: true }} onRewind={vi.fn()} />)
     expect(screen.queryByLabelText('Go back to this turn')).toBeNull()
   })
 

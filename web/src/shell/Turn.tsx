@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import { Acts } from './ActsRows'
 import type { Message } from '../gen/bindings'
@@ -16,7 +16,17 @@ import { advanced, opened } from './veil'
  * paragraphs is one nobody reads twice.
  */
 
-export function Turn({ message, rewind }: { message: Message; rewind?: () => void }): React.JSX.Element {
+/* Memoized: a chunk of the answer being written changes one message, and
+   every turn above it used to parse and draw its markdown again. */
+export const Turn = memo(function Turn({
+  message,
+  onRewind,
+}: {
+  message: Message
+  /** Present when this turn can be rewound to; called with its turn id. */
+  onRewind?: (turnId: string) => void
+}): React.JSX.Element {
+  const rewind = onRewind && message.turnId ? () => onRewind(message.turnId!) : undefined
   const receipt = message.parts.find((part) => part.kind === 'receipt')
   if (message.role === 'system' && receipt?.kind === 'receipt') return <Receipt part={receipt} />
   const rewound = message.parts.find((part) => part.kind === 'rewound')
@@ -52,7 +62,7 @@ export function Turn({ message, rewind }: { message: Message; rewind?: () => voi
       {!message.streaming && <Foot message={message} rewind={rewind} />}
     </article>
   )
-}
+})
 
 /* The answer, under the fade while it is still arriving.
 

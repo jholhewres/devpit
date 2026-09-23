@@ -41,7 +41,7 @@ describe('a block’s bookmark', () => {
     expect(container.querySelector('.blk__mark')).toBeNull()
     fireEvent.click(screen.getByLabelText('Block actions'))
     fireEvent.click(screen.getByText('Bookmark this block'))
-    expect(onBookmark).toHaveBeenCalledWith(true)
+    expect(onBookmark).toHaveBeenCalledWith(7, true)
   })
 
   it('shows on the header, and is taken away from the same menu', () => {
@@ -49,6 +49,6 @@ describe('a block’s bookmark', () => {
     expect(container.querySelector('.blk__mark')).not.toBeNull()
     fireEvent.click(screen.getByLabelText('Block actions'))
     fireEvent.click(screen.getByText('Remove bookmark'))
-    expect(onBookmark).toHaveBeenCalledWith(false)
+    expect(onBookmark).toHaveBeenCalledWith(7, false)
   })
 })

@@ -21,10 +21,20 @@ type Addon = { dispose: () => void }
 function hasAContext(): boolean {
   try {
     const canvas = document.createElement('canvas')
-    return canvas.getContext('webgl2') !== null
+    const probe = canvas.getContext('webgl2')
+    /* Given back at once: a probe left to the collector is one more of the
+       few contexts the page may hold. */
+    loseContextOf(probe)
+    return probe !== null
   } catch {
     return false
   }
+}
+
+/** Ends a WebGL context now rather than whenever the collector gets to it. */
+function loseContextOf(context: unknown): void {
+  const gl = context as { getExtension?: (name: string) => { loseContext?: () => void } | null } | null
+  gl?.getExtension?.('WEBGL_lose_context')?.loseContext?.()
 }
 
 /**
@@ -61,6 +71,44 @@ export function drawOnTheGpu(
   } catch {
     return false
   }
+}
+
+/**
+ * The GPU renderer only while the terminal is on screen.
+ *
+ * WebKitGTK gives a page a small number of live WebGL contexts — about
+ * sixteen — and every pane of every tab held one, hidden or not. Past the
+ * limit the oldest lose theirs and fall back to drawing in the DOM, which is
+ * the slow path, on the panes somebody is looking at. A pane that leaves the
+ * screen gives its context back and takes one again when it returns.
+ */
+export function gpuWhileShown(terminal: Terminal, lost: () => void): { show: () => void; hide: () => void } {
+  let held: WebglAddon | null = null
+  const show = (): void => {
+    if (held) return
+    let made: WebglAddon | null = null
+    const drawn = drawOnTheGpu(
+      terminal,
+      () => (made = new WebglAddon()),
+      () => {
+        held = null
+        lost()
+      },
+    )
+    held = drawn ? made : null
+  }
+  const hide = (): void => {
+    if (!held) return
+    /* The canvas before the addon goes: `dispose` takes it out of the page
+       and leaves its context to the collector. Disposed first, so the
+       renderer's own context-lost watch is gone before the context is ended —
+       otherwise its timer would fire `lost` for a pane that is fine. */
+    const canvas = terminal.element?.querySelector('canvas') ?? null
+    held.dispose()
+    held = null
+    loseContextOf(canvas?.getContext('webgl2') ?? null)
+  }
+  return { show, hide }
 }
 
 /**

@@ -32,7 +32,10 @@ export function ComposerStatus({
   for (const task of tasks) if (!since.current.has(task.id)) since.current.set(task.id, Date.now())
   useEffect(() => {
     if (tasks.length === 0) return
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    /* A window nobody is looking at does not need its clock ticking. */
+    const timer = window.setInterval(() => {
+      if (!document.hidden) setNow(Date.now())
+    }, 1000)
     return () => window.clearInterval(timer)
   }, [tasks.length])
 

@@ -229,3 +229,10 @@
 .mention__i { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .mention__n { flex: none; }
 .mention__d { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 11.5px; }
+/* A turn out of view is not laid out or painted: a long conversation used to
+   cost every turn in it on each chunk of the answer being written. The size
+   it last had is kept, so the scrollbar does not jump. */
+.turn { content-visibility: auto; contain-intrinsic-size: auto 180px; }
+/* The last few always drawn: they are what a conversation opens at, and the
+   scroll pinned to its end has to measure them for real. */
+.turn:nth-last-child(-n + 3) { content-visibility: visible; }

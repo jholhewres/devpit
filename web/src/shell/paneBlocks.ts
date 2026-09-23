@@ -45,15 +45,17 @@ export function changed(state: BlockState, change: BlockChanged): BlockState {
   }
 }
 
-/** What the pane said about itself. */
+/** What the pane said about itself — the same state when it changes nothing,
+ *  since a shell repeats its prompt and its folder far more often than
+ *  either moves, and a new state is a new render of the whole block list. */
 export function happened(state: BlockState, happening: Happening): BlockState {
   switch (happening.what) {
     case 'prompt':
-      return { ...state, integrated: true, atPrompt: true }
+      return state.integrated && state.atPrompt ? state : { ...state, integrated: true, atPrompt: true }
     case 'running':
-      return { ...state, atPrompt: false }
+      return state.atPrompt ? { ...state, atPrompt: false } : state
     case 'cwd':
-      return happening.detail ? { ...state, cwd: happening.detail } : state
+      return happening.detail && happening.detail !== state.cwd ? { ...state, cwd: happening.detail } : state
     default:
       return state
   }

@@ -12,7 +12,7 @@ import { ComposerStatus } from './ComposerStatus'
 import { CopySession } from './CopySession'
 import { DropTarget } from './DropTarget'
 import { PaneCorner } from './PaneCorner'
-import { picturesTo } from './pasting'
+import { useTaking } from './useTaking'
 import { Turn } from './Turn'
 import { SkillPills } from './SkillPills'
 import { ResumePicker } from './ResumePicker'
@@ -44,6 +44,7 @@ import { committed } from './typing'
 export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const { active, project, rename, drafted } = useShell()
   const chat = useChat(tab.id)
+  const { pasted, dropped } = useTaking(chat)
   /* A chat opened from a card starts with the card in the composer, unsent. */
   const [prompt, setPrompt] = useState(tab.draft ?? '')
   const slash = useSlash(chat.profileId, prompt, setPrompt)
@@ -106,7 +107,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         {chat.session && <CopySession id={chat.session} />}
       </PaneCorner>
 
-      <DropTarget mine={mine} onDrop={chat.attach} />
+      <DropTarget mine={mine} onDrop={dropped} />
       <div className="scroll" ref={box}>
         {empty ? (
           <div className="chat__blank">
@@ -122,7 +123,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <div className="thread">
             {chat.error && <div className="exempty__t">{chat.error}</div>}
             {chat.messages.map((message) => (
-              <Turn key={message.id} message={message} rewind={message.turnId && chat.rewindable.includes(message.turnId) ? () => chat.rewind(message.turnId!) : undefined} />
+              <Turn key={message.id} message={message} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
             ))}
             {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
           </div>
@@ -166,7 +167,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               ref={field}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              onPaste={picturesTo(chat.paste)}
+              onPaste={pasted}
               onKeyDown={(event) => {
                 /* Enter sends, Shift+Enter is a new line — and `committed`
                    keeps the Enter that finishes an accented letter out. */

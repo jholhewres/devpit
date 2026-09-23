@@ -50,7 +50,9 @@ export function applied(messages: readonly Message[], frame: Frame): readonly Me
       }))
     case 'ended':
       /* The turn is over, so nothing is still arriving. */
-      return messages.map((message) => ({ ...message, streaming: false }))
+      /* Only the ones that were: a finished message keeps its identity, so
+         its memoized turn does not draw again. */
+      return messages.map((message) => (message.streaming ? { ...message, streaming: false } : message))
     default:
       return messages
   }

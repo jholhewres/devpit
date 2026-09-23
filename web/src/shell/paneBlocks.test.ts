@@ -66,3 +66,14 @@ describe('a terminal’s blocks', () => {
     expect(jumpTarget(marked, 99, -1)).toBe(3)
   })
 })
+
+describe('a happening that changes nothing', () => {
+  it('hands back the same state, so the pane does not render again', () => {
+    const at = happened(EMPTY, { paneId: 'p', what: 'prompt', detail: null })
+    expect(happened(at, { paneId: 'p', what: 'prompt', detail: null })).toBe(at)
+    const there = happened(at, { paneId: 'p', what: 'cwd', detail: '/w' })
+    expect(happened(there, { paneId: 'p', what: 'cwd', detail: '/w' })).toBe(there)
+    const running = happened(there, { paneId: 'p', what: 'running', detail: null })
+    expect(happened(running, { paneId: 'p', what: 'running', detail: null })).toBe(running)
+  })
+})

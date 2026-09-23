@@ -71,6 +71,19 @@ export async function pasteClipboard(terminal: Terminal, projectId: string): Pro
   }
 }
 
+/** The picture on the system clipboard as a PNG, or null when it holds none.
+ *  Read through the app: a paste event in WebKitGTK carries no picture. */
+export async function clipboardPng(): Promise<Blob | null> {
+  try {
+    const picture = await readImage()
+    const { width, height } = await picture.size()
+    const data = pngOf(await picture.rgba(), width, height)
+    return new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], { type: 'image/png' })
+  } catch {
+    return null
+  }
+}
+
 /** Raw RGBA as a base64 PNG, drawn through a canvas. */
 function pngOf(rgba: Uint8Array, width: number, height: number): string {
   const canvas = document.createElement('canvas')

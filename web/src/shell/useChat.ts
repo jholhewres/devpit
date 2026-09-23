@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
+import type { Ask, Attachment, Context, Frame, Message, Profile, Question } from '../gen/bindings'
 import { applied, ASKS, fixedTo, MODES, send, withFiles } from './chat'
 import { ask, commands } from './live'
 import { withSkills } from './pills'
@@ -173,9 +173,35 @@ export function useChat(conversationId: string): Chat {
         permission,
         effort,
       }
-      const started = send(turn, (frame) =>
-        frame.type === 'session' ? setSession(frame.session_id) : setMessages((was) => applied(was, frame)),
-      )
+      /* Frames arrive many to a paint while an answer streams; they are
+         applied together, once per frame drawn, rather than one render each. */
+      let pending: Frame[] = []
+      let scheduled: { cancel: () => void } | null = null
+      const flush = (): void => {
+        scheduled?.cancel()
+        scheduled = null
+        if (pending.length === 0) return
+        const frames = pending
+        pending = []
+        setMessages((was) => frames.reduce(applied, was))
+      }
+      /* A hidden window gets no animation frames in WebKitGTK, and an answer
+         must keep arriving while nobody looks: a timer stands in there. */
+      const schedule = (): void => {
+        if (scheduled) return
+        if (document.hidden) {
+          const timer = setTimeout(flush, 100)
+          scheduled = { cancel: () => clearTimeout(timer) }
+        } else {
+          const frame = requestAnimationFrame(flush)
+          scheduled = { cancel: () => cancelAnimationFrame(frame) }
+        }
+      }
+      const started = send(turn, (frame) => {
+        if (frame.type === 'session') return setSession(frame.session_id)
+        pending.push(frame)
+        schedule()
+      })
       if (!started) return setError('not running in the app')
       setSending(true)
       setError(null)
@@ -185,6 +211,7 @@ export function useChat(conversationId: string): Chat {
       setSkills([])
       void started.end
         .then((end) => {
+          flush()
           setCost((was) => was + (end.costUsd ?? 0))
           if (end.context) setContext(end.context)
           /* A turn's place in the CLI's transcript is known once it has run. */
@@ -200,6 +227,9 @@ export function useChat(conversationId: string): Chat {
         })
         .catch((thrown: { message?: string }) => setError(thrown.message ?? 'the turn failed'))
         .finally(() => {
+          /* Whatever is still waiting for a frame is in before the turn is
+             said to be over. */
+          flush()
           if (!live.current) return
           setSending(false)
           /* A question the turn left behind has nobody waiting on it now. */

@@ -1,5 +1,5 @@
 import type { Terminal } from '@xterm/xterm'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { AgentBar } from './AgentBar'
 import { BlockCard } from './BlockCard'
@@ -82,6 +82,15 @@ export function BlockTerm({
   const [history, setHistory] = useState(() => recalled(projectId))
   const [homeDir, setHomeDir] = useState<string | null>(null)
   const [cols, setCols] = useState(100)
+  const resized = useRef<{ dispose(): void } | null>(null)
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      resized.current?.dispose()
+      if (settle.current) clearTimeout(settle.current)
+    },
+    [],
+  )
   const terminal = useRef<Terminal | null>(null)
   const input = useRef<CommandInputHandle>(null)
   const mode = modeOf(state, wanted)
@@ -121,10 +130,15 @@ export function BlockTerm({
     if (line) setHistory((was) => (was[0] === line.trim() ? was : withLine(was, line)))
   }, [last?.id, last?.command])
 
-  const run = (line: string): void => {
-    setHistory(remember(projectId, line))
-    void ask(() => commands.paneSubmit(projectId, paneId, line))
-  }
+  /* Stable, so a block that did not change skips its render (`memo`). */
+  const run = useCallback(
+    (line: string): void => {
+      setHistory(remember(projectId, line))
+      void ask(() => commands.paneSubmit(projectId, paneId, line))
+    },
+    [projectId, paneId],
+  )
+  const edit = useCallback((line: string) => input.current?.set(line), [])
 
   /* Alt+↑/↓ walks the blocks — the bookmarked ones when there are any — from
      wherever the keyboard is except the live terminal, whose programs may
@@ -146,7 +160,10 @@ export function BlockTerm({
     box?.querySelector(`[data-block-id="${next}"]`)?.scrollIntoView({ block: 'start' })
   }
 
-  const bookmark = (id: number | null, on: boolean): void => void ask(() => commands.blockBookmark(paneId, id, on))
+  const bookmark = useCallback(
+    (id: number | null, on: boolean): void => void ask(() => commands.blockBookmark(paneId, id, on)),
+    [paneId],
+  )
 
   const classic = (on: boolean): void => {
     saveClassic(paneId, on)
@@ -169,8 +186,8 @@ export function BlockTerm({
               home={homeDir}
               jumped={jumped === block.id}
               onRerun={run}
-              onEdit={(line) => input.current?.set(line)}
-              onBookmark={(on) => bookmark(block.id, on)}
+              onEdit={edit}
+              onBookmark={bookmark}
             />
           ))}
         </div>
@@ -186,8 +203,14 @@ export function BlockTerm({
             terminal.current = one
             if (!one) return
             setCols(one.cols)
-            /* Blocks are drawn at the pane's width, so they rewrap with it. */
-            one.onResize((size) => setCols(size.cols))
+            /* Blocks are drawn at the pane's width, so they rewrap with it —
+               once the width settles, not on every column of a drag, which
+               drew every block again per step. */
+            resized.current?.dispose()
+            resized.current = one.onResize((size) => {
+              if (settle.current) clearTimeout(settle.current)
+              settle.current = setTimeout(() => setCols(size.cols), 150)
+            })
           }}
           onBlocks={!wanted ? () => classic(false) : undefined}
         />

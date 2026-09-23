@@ -1,5 +1,4 @@
 import { listen } from '@tauri-apps/api/event'
-import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import type { Happening, Question } from '../gen/bindings'
@@ -96,45 +95,7 @@ export function draggingAfter(type: string): boolean {
   return type === 'enter' || type === 'over'
 }
 
-/**
- * Calls back when files start or stop being dragged over the window.
- *
- * The drop itself lands on the window, not on an element, so there is no DOM
- * event to hang a target on — the pane draws its target from this.
- */
-export function onFilesDragging(then: (over: boolean) => void): () => void {
-  if (!inTauri()) return () => {}
-  let dropped = false
-  let drop: (() => void) | undefined
-  void getCurrentWebview()
-    .onDragDropEvent((event) => then(draggingAfter(event.payload.type)))
-    .then((unlisten) => {
-      if (dropped) unlisten()
-      else drop = unlisten
-    })
-  return () => {
-    dropped = true
-    drop?.()
-  }
-}
 
-export function onFilesDropped(then: (paths: readonly string[]) => void): () => void {
-  if (!inTauri()) return () => {}
-  let dropped = false
-  let drop: (() => void) | undefined
-  void getCurrentWebview()
-    .onDragDropEvent((event) => {
-      if (event.payload.type === 'drop') then(event.payload.paths)
-    })
-    .then((unlisten) => {
-      if (dropped) unlisten()
-      else drop = unlisten
-    })
-  return () => {
-    dropped = true
-    drop?.()
-  }
-}
 
 /**
  * Calls back when an agent asks to be allowed to do something.
@@ -170,16 +131,60 @@ export function onPermissionAsked(then: (question: Question) => void): () => voi
  * `apps/desktop/src/tap.rs`.
  */
 export function onHappening(then: (happening: Happening) => void): () => void {
+  return shared<Happening>('terminal:happening', then)
+}
+
+/*
+ * One Tauri listener per event name, however many parts of the window listen.
+ *
+ * Every `listen` is its own callback across the IPC boundary, and the payload
+ * is parsed once for each. A pane used to open two or three of them on the
+ * same event, so with ten panes a terminal's every prompt crossed thirty
+ * times. Here it crosses once and is handed to each subscriber; the listener
+ * goes away with the last of them.
+ */
+const listeners = new Map<string, { subscribers: Set<(payload: unknown) => void>; drop?: () => void; dropped?: boolean }>()
+
+function shared<T>(name: string, then: (payload: T) => void): () => void {
   if (!inTauri()) return () => {}
-  let dropped = false
-  let drop: (() => void) | undefined
-  void listen<Happening>('terminal:happening', (event) => then(event.payload)).then((unlisten) => {
-    if (dropped) unlisten()
-    else drop = unlisten
-  })
+  let entry = listeners.get(name)
+  if (!entry) {
+    const made: { subscribers: Set<(payload: unknown) => void>; drop?: () => void; dropped?: boolean } = { subscribers: new Set() }
+    entry = made
+    listeners.set(name, made)
+    void listen<unknown>(name, (event) => {
+      /* Each on its own: one subscriber throwing does not keep the event from
+         the rest, and one that left during the dispatch is not called. */
+      for (const one of [...made.subscribers]) {
+        if (!made.subscribers.has(one)) continue
+        try {
+          one(event.payload)
+        } catch (thrown) {
+          reportError(thrown)
+        }
+      }
+    }).then(
+      (unlisten) => {
+        if (made.dropped) unlisten()
+        else made.drop = unlisten
+      },
+      /* Never heard: the next subscriber tries again. */
+      () => {
+        if (listeners.get(name) === made) listeners.delete(name)
+      },
+    )
+  }
+  /* Its own function, so the same callback subscribed twice is two entries. */
+  const mine = (payload: unknown): void => then(payload as T)
+  entry.subscribers.add(mine)
+  const held = entry
   return () => {
-    dropped = true
-    drop?.()
+    held.subscribers.delete(mine)
+    if (held.subscribers.size === 0 && listeners.get(name) === held) {
+      listeners.delete(name)
+      held.dropped = true
+      held.drop?.()
+    }
   }
 }
 
@@ -214,15 +219,5 @@ export function onEvent(name: string, then: () => void): () => void {
  * `run:progress` is a pair.
  */
 export function onCarried<T>(name: string, then: (payload: T) => void): () => void {
-  if (!inTauri()) return () => {}
-  let dropped = false
-  let drop: (() => void) | undefined
-  void listen<T>(name, (event) => then(event.payload)).then((unlisten) => {
-    if (dropped) unlisten()
-    else drop = unlisten
-  })
-  return () => {
-    dropped = true
-    drop?.()
-  }
+  return shared<T>(name, then)
 }
