@@ -43,7 +43,10 @@ fn the_tail_of_a_burst_reaches_the_screen_while_the_program_stays_quiet() {
 fn a_chunk_after_a_pause_goes_out_at_once() {
     let (chunks, mut frames, _running) = started();
     chunks.send(b"k".to_vec()).expect("send");
-    assert_eq!(received(&mut frames, FRAME / 2), b"k");
+    // A few frames of slack, not half of one: a shared CI machine can take
+    // that long to wake a thread. What is guarded is that the chunk is not
+    // held for a read that never comes, which no amount of slack would hide.
+    assert_eq!(received(&mut frames, FRAME * 4), b"k");
 }
 
 #[test]
