@@ -40,6 +40,17 @@ export function ordered(projects: readonly Project[], order: readonly string[]):
   return [...placed, ...loose]
 }
 
+/** `id` put just before or just after `to` — which side is the pointer's:
+ *  the upper half of a row is before it, the lower half after. */
+export function placed(order: readonly string[], id: string, to: string, after: boolean): readonly string[] {
+  if (id === to) return order
+  const without = order.filter((one) => one !== id)
+  const index = without.indexOf(to)
+  if (index < 0) return order
+  const at = after ? index + 1 : index
+  return [...without.slice(0, at), id, ...without.slice(at)]
+}
+
 /** `id` moved to where `to` is. */
 export function moved(order: readonly string[], id: string, to: string): readonly string[] {
   if (id === to) return order
@@ -137,34 +148,4 @@ export function saveShut(shut: ReadonlySet<string>): void {
 /** What a group shows: all of it when open, nothing when folded. */
 export function shown(section: Section, folded: boolean): readonly Project[] {
   return folded ? [] : section.projects
-}
-
-/* Whether the rail lists only the projects with tabs open. */
-const ACTIVE_KEY = 'devpit.rail.active'
-
-export function savedActiveOnly(): boolean {
-  try {
-    return localStorage.getItem(ACTIVE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-export function saveActiveOnly(on: boolean): void {
-  try {
-    localStorage.setItem(ACTIVE_KEY, on ? '1' : '0')
-  } catch {
-    /* The filter still applies for as long as the window is open. */
-  }
-}
-
-/** The sections cut down to what is active — tabs open, or in front — and
- *  without the groups that leaves empty. */
-export function activeOnly(
-  cut: readonly Section[],
-  active: (project: Project) => boolean,
-): readonly Section[] {
-  return cut
-    .map((section) => ({ ...section, projects: section.projects.filter(active) }))
-    .filter((section) => section.projects.length > 0)
 }

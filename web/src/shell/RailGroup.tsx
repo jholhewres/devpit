@@ -6,7 +6,7 @@ import { abandoned, committed } from './typing'
 /*
  * A group's heading in the rail: click to fold it, right-click to rename it
  * or ungroup its projects, drag it to put the group somewhere else, drop a
- * project on it to move the project in. Renaming happens in place — the
+ * project on it to move the project in (`useRailDrag`). Renaming happens in place — the
  * heading becomes the field — because a dialog for one word is a detour.
  */
 
@@ -15,21 +15,27 @@ export function RailGroup({
   folded,
   renaming,
   over,
+  grabbed,
   onToggle,
   onMenu,
   onRename,
-  drag,
+  onPress,
+  clicked,
 }: {
   name: string
   folded: boolean
   renaming: boolean
-  /** Something is being dragged over it that it would take. */
-  over: boolean
+  /** Where a drag over it would land: before, after, or into the group. */
+  over: string | undefined
+  /** It is the thing being dragged. */
+  grabbed: boolean
   onToggle: () => void
   onMenu: (at: { x: number; y: number }) => void
   /** The new name, or null when the rename was abandoned. */
   onRename: (to: string | null) => void
-  drag: Pick<React.HTMLAttributes<HTMLElement>, 'onDragStart' | 'onDragEnd' | 'onDragOver' | 'onDragLeave' | 'onDrop'>
+  onPress: (event: React.PointerEvent) => void
+  /** False for the click that ends a drag. */
+  clicked: () => boolean
 }): React.JSX.Element {
   const [typed, setTyped] = useState(name)
   if (renaming) {
@@ -54,10 +60,12 @@ export function RailGroup({
     <button
       className="rail__group"
       aria-expanded={!folded}
-      data-over={over ? 'true' : undefined}
-      draggable
-      {...drag}
-      onClick={onToggle}
+      data-over={over}
+      data-dragging={grabbed ? 'true' : undefined}
+      data-drop="group"
+      data-key={name}
+      onPointerDown={onPress}
+      onClick={() => clicked() && onToggle()}
       onContextMenu={(event) => {
         event.preventDefault()
         event.stopPropagation()

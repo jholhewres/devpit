@@ -7,8 +7,9 @@ import { ProjectDialog } from './ProjectDialog'
 import { ProjectMark } from './ProjectMark'
 import { RailGroup } from './RailGroup'
 import { RailMenu, type RailItem } from './RailMenu'
-import { activeOnly, moved, ordered, saveActiveOnly, savedActiveOnly, saveGroups, savedGroups, saveOrder, savedOrder, saveShut, savedShut, sections, shown } from './rail'
+import { ordered, placed, saveGroups, savedGroups, saveOrder, savedOrder, saveShut, savedShut, sections, shown } from './rail'
 import { remembered } from './tabs'
+import { useRailDrag, type Grab, type Spot } from './useRailDrag'
 import { useShell } from './useShell'
 
 /*
@@ -21,23 +22,19 @@ import { useShell } from './useShell'
  *
  * A project with tabs open is *active*, and says so with a dot: that is where
  * work was left. Right-click edits its name, group and mark; dragging puts it
- * somewhere else, and the order is the person's. Groups fold, and are renamed
- * or dissolved from their own heading.
+ * somewhere else — beside another project, into another group — and the order
+ * is the person's. Groups fold, move by their heading, and are renamed or
+ * dissolved from it.
  */
 
 type Menu = { x: number; y: number; items: readonly RailItem[] }
-
-/** What is being dragged: a project, or a whole group by its heading. */
-type Drag = { kind: 'project'; id: string } | { kind: 'group'; name: string }
 
 export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => void; onRemove: (id: string) => void }): React.JSX.Element {
   const { projects, project, setProject, open, reloadProjects } = useShell()
   const [order, setOrder] = useState<readonly string[]>(savedOrder)
   const [shut, setShut] = useState<ReadonlySet<string>>(savedShut)
-  const [dragging, setDragging] = useState<Drag | null>(null)
-  const [over, setOver] = useState<string | null>(null)
   const [groupOrder, setGroupOrder] = useState<readonly string[]>(savedGroups)
-  const [onlyActive, setOnlyActive] = useState(savedActiveOnly)
+  const scroller = useRef<HTMLDivElement>(null)
   const [editing, setEditing] = useState<Project | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
@@ -59,14 +56,6 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
   const tabsOf = (id: string): number => (id === project?.id ? open.length : remembered(id).open.length)
 
   const all = useMemo(() => sections(list, groupOrder), [list, groupOrder])
-  /* Active is tabs open; the project in front always stays, or the filter
-     would hide where you are. */
-  const cut = onlyActive ? activeOnly(all, (one) => one.id === project?.id || tabsOf(one.id) > 0) : all
-
-  const done = (): void => {
-    setDragging(null)
-    setOver(null)
-  }
 
   /* A project into another group keeps everything else about it; only the
      group changes, the same edit the dialog makes. */
@@ -75,35 +64,47 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
       ? Promise.resolve()
       : ask(() => commands.projectEdit(one.id, one.name, group, one.icon, one.color)).then(() => reloadProjects())
 
-  /** A project dropped on another: placed where it is, in its group. */
-  const dropOnProject = (target: Project): void => {
-    if (dragging?.kind !== 'project' || dragging.id === target.id) return done()
-    const moving = list.find((one) => one.id === dragging.id)
-    const next = moved(list.map((one) => one.id), dragging.id, target.id)
+  const putProject = (id: string, beside: string, after: boolean): void => {
+    const next = placed(list.map((one) => one.id), id, beside, after)
     setOrder(next)
     saveOrder(next)
-    if (moving) void regroup(moving, target.group ?? null)
-    done()
   }
 
-  /** On a heading: a project joins the group; a group takes that place. */
-  const dropOnGroup = (target: string): void => {
-    if (dragging?.kind === 'project') {
-      const moving = list.find((one) => one.id === dragging.id)
-      if (moving) void regroup(moving, target)
-    } else if (dragging?.kind === 'group' && dragging.name !== target) {
-      const names = all.flatMap((one) => (one.group ? [one.group] : []))
-      const next = moved(names, dragging.name, target)
-      setGroupOrder(next)
-      saveGroups(next)
+  const drop = (grab: Grab, spot: Spot): void => {
+    if (grab.kind === 'project') {
+      const moving = list.find((one) => one.id === grab.id)
+      if (!moving) return
+      if (spot.kind === 'project') {
+        const target = list.find((one) => one.id === spot.key)
+        if (!target || target.id === moving.id) return
+        /* Beside a project is in its group, wherever the project came from. */
+        putProject(moving.id, target.id, spot.after)
+        void regroup(moving, target.group ?? null)
+        return
+      }
+      /* On a heading: into that group, at its top. */
+      const first = all.find((one) => one.group === spot.key)?.projects[0]
+      if (first && first.id !== moving.id) putProject(moving.id, first.id, false)
+      void regroup(moving, spot.key)
+      return
     }
-    done()
+    /* A group lands beside the group of whatever it was dropped on. */
+    const target = spot.kind === 'group' ? spot.key : list.find((one) => one.id === spot.key)?.group
+    if (!target || target === grab.name) return
+    const names = all.flatMap((one) => (one.group ? [one.group] : []))
+    const next = placed(names, grab.name, target, spot.after)
+    setGroupOrder(next)
+    saveGroups(next)
   }
-
-  /* Only what the target can take shows it would: a group over a project is
-     not a move anywhere. */
-  const takes = (target: 'project' | 'group'): boolean =>
-    dragging !== null && (target === 'group' || dragging.kind === 'project')
+  const drag = useRailDrag(scroller, drop)
+  const overOf = (kind: Spot['kind'], key: string): string | undefined => {
+    const spot = drag.spot
+    if (!drag.grab || !spot || spot.kind !== kind || spot.key !== key) return undefined
+    /* A project over a heading goes into the group; everything else goes
+       beside what it is over. */
+    if (drag.grab.kind === 'project' && kind === 'group') return 'into'
+    return spot.after ? 'after' : 'before'
+  }
 
   const fold = (group: string): void => {
     const next = new Set(shut)
@@ -143,22 +144,10 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
     /* Held open while something is dragged: WebKit drops `:hover` during a
        drag, and a rail that folds to icons under the pointer moves every
        target out from under it. */
-    <nav className="rail" aria-label="Projects" data-held={dragging || menu || editing ? 'true' : undefined}>
+    <nav className="rail" aria-label="Projects" data-held={drag.grab || menu || editing ? 'true' : undefined}>
       <div className="rail__panel">
-        <button
-          className="rail__filter"
-          aria-pressed={onlyActive}
-          title={onlyActive ? 'Show every project' : 'Show only projects with tabs open'}
-          onClick={() => {
-            setOnlyActive(!onlyActive)
-            saveActiveOnly(!onlyActive)
-          }}
-        >
-          <span className="rail__fdot" />
-          <span className="rail__ftext">{onlyActive ? 'Active projects' : 'All projects'}</span>
-        </button>
-        <div className="rail__list">
-          {cut.map((section) => {
+        <div className="rail__list" ref={scroller}>
+          {all.map((section) => {
             const folded = section.group !== null && shut.has(section.group)
             return (
               <div className="rail__sect" key={section.group ?? ''} data-folded={folded ? 'true' : undefined}>
@@ -166,7 +155,6 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                   <RailGroup
                     name={section.group}
                     folded={folded}
-                    over={over === `group:${section.group}`}
                     renaming={renaming === section.group}
                     onToggle={() => fold(section.group!)}
                     onMenu={(at) => setMenu({ ...at, items: groupMenu(section.group!) })}
@@ -175,25 +163,10 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                       setRenaming(null)
                       if (to !== null && to.trim() !== section.group) renameGroup(section.group!, to)
                     }}
-                    drag={{
-                      onDragStart: (event) => {
-                        event.dataTransfer.effectAllowed = 'move'
-                        /* WebKit starts no drag that carries no data. */
-                        event.dataTransfer.setData('text/plain', section.group!)
-                        setDragging({ kind: 'group', name: section.group! })
-                      },
-                      onDragEnd: done,
-                      onDragOver: (event) => {
-                        if (!takes('group')) return
-                        event.preventDefault()
-                        setOver(`group:${section.group}`)
-                      },
-                      onDragLeave: () => setOver(null),
-                      onDrop: (event) => {
-                        event.preventDefault()
-                        dropOnGroup(section.group!)
-                      },
-                    }}
+                    over={overOf('group', section.group)}
+                    grabbed={drag.grab?.kind === 'group' && drag.grab.name === section.group}
+                    onPress={drag.press({ kind: 'group', name: section.group })}
+                    clicked={drag.clicked}
                   />
                 )}
                 {shown(section, folded).map((one) => {
@@ -206,27 +179,13 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                       aria-current={one.id === project?.id ? 'true' : undefined}
                       data-active={tabs > 0 ? 'true' : undefined}
                       data-unreadable={one.unreadable ? 'true' : undefined}
-                      data-dragging={dragging?.kind === 'project' && dragging.id === one.id ? 'true' : undefined}
-                      data-over={over === one.id ? 'true' : undefined}
+                      data-dragging={drag.grab?.kind === 'project' && drag.grab.id === one.id ? 'true' : undefined}
+                      data-over={overOf('project', one.id)}
+                      data-drop="project"
+                      data-key={one.id}
                       title={one.unreadable ?? undefined}
-                      draggable
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = 'move'
-                        event.dataTransfer.setData('text/plain', one.id)
-                        setDragging({ kind: 'project', id: one.id })
-                      }}
-                      onDragEnd={done}
-                      onDragOver={(event) => {
-                        if (!takes('project')) return
-                        event.preventDefault()
-                        setOver(one.id)
-                      }}
-                      onDragLeave={() => setOver(null)}
-                      onDrop={(event) => {
-                        event.preventDefault()
-                        dropOnProject(one)
-                      }}
-                      onClick={() => one.id !== project?.id && setProject(one.id)}
+                      onPointerDown={drag.press({ kind: 'project', id: one.id })}
+                      onClick={() => drag.clicked() && one.id !== project?.id && setProject(one.id)}
                       onContextMenu={(event) => {
                         event.preventDefault()
                         event.stopPropagation()

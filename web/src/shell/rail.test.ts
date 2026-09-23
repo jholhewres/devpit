@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Project } from '../gen/bindings'
-import { activeOnly, hueOf, initials, moved, ordered, sections, shown } from './rail'
+import { hueOf, initials, moved, ordered, placed, sections, shown } from './rail'
 
 const project = (id: string, name = id, group: string | null = null): Project =>
   ({ id, name, group, rootPath: `/w/${name}` }) as unknown as Project
@@ -72,13 +72,11 @@ describe('the order of groups', () => {
   })
 })
 
-describe('only the active projects', () => {
-  it('keeps what is active and drops the groups left empty', () => {
-    const cut = sections([project('a', 'a', 'Work'), project('b', 'b', 'Home'), project('c')])
-    const kept = activeOnly(cut, (one) => one.id !== 'b')
-    expect(kept.map((one) => [one.group, one.projects.map((p) => p.id)])).toEqual([
-      [null, ['c']],
-      ['Work', ['a']],
-    ])
+describe('a drop beside a row', () => {
+  it('lands before or after it, from either direction', () => {
+    expect(placed(['a', 'b', 'c', 'd'], 'a', 'c', false)).toEqual(['b', 'a', 'c', 'd'])
+    expect(placed(['a', 'b', 'c', 'd'], 'a', 'c', true)).toEqual(['b', 'c', 'a', 'd'])
+    expect(placed(['a', 'b', 'c', 'd'], 'd', 'a', false)).toEqual(['d', 'a', 'b', 'c'])
+    expect(placed(['a', 'b'], 'a', 'a', true)).toEqual(['a', 'b'])
   })
 })
