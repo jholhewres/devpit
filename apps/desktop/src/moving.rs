@@ -30,6 +30,19 @@ fn what_runs(step: Option<&Step>) -> Option<&Step> {
     }
 }
 
+/// What this particular move sets off: the lane's rule, and only for a card
+/// that arrived and has nothing else going on it.
+///
+/// A reorder within a lane is not an arrival, and restarting its step would
+/// file a run that "came from" where it already was. "Move it anyway" moves
+/// the card; it does not let a second process into the same checkout.
+fn what_a_move_runs(step: Option<&Step>, same_lane: bool, still_running: bool) -> Option<&Step> {
+    if same_lane || still_running {
+        return None;
+    }
+    what_runs(step)
+}
+
 /// Why a move is refused before the card is written, if it is: only when the
 /// lane would start a step that an update in progress refuses.
 fn refused_before_moving(
@@ -84,14 +97,16 @@ pub(crate) fn card_move_now(
     // Read before the move: a step that sends the card back needs somewhere to
     // send it, and after the write the previous column is gone.
     let came_from = store.card(&card_id)?.map(|card| card.column_id);
+    let same_lane = came_from.as_deref() == Some(column_id.as_str());
 
     // A run still going is work in flight. Moving the card out from under it
-    // is allowed, but only on purpose.
+    // is allowed, but only on purpose — and a reorder within its own lane does
+    // not take it out from under anything, so it is not asked about.
     let still_running = store
         .runs(&card_id)?
         .iter()
         .any(|run| run.state == "running");
-    if still_running && !confirmed {
+    if still_running && !confirmed && !same_lane {
         return Err(RpcError::new(
             ErrorCode::Conflict,
             "a run is still going on this card — move it anyway?",
@@ -107,6 +122,7 @@ pub(crate) fn card_move_now(
     let step = landed
         .and_then(|column| column.step_id)
         .and_then(|id| steps.iter().find(|s| s.id == id).cloned());
+    let runs = what_a_move_runs(step.as_ref(), same_lane, still_running);
 
     // Refused before anything is written: a move whose step an update would
     // refuse used to land in the store while the board put the card back.
@@ -114,13 +130,13 @@ pub(crate) fn card_move_now(
         tauri::Manager::try_state::<crate::update::Updating>(&app).map(|updating| updating.state());
     // Busy, not Conflict: a conflict is the question "move it anyway?", and
     // no answer to it gets past an update that is going in.
-    if let Some(why) = refused_before_moving(step.as_ref(), update.as_ref()) {
+    if let Some(why) = refused_before_moving(runs, update.as_ref()) {
         return Err(RpcError::new(ErrorCode::Busy, why.to_owned()));
     }
 
     store.move_card(&card_id, &column_id, position as i64)?;
 
-    let started = match what_runs(step.as_ref()) {
+    let started = match runs {
         None => None,
         // Never an irreversible step: `what_runs` sends those to the play
         // button, which is where the bell for one rings.

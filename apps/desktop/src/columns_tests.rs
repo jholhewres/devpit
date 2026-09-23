@@ -74,6 +74,49 @@ fn a_step_nothing_has_run_is_deleted() {
     assert_eq!(step_delete_refusal(0, 0), None);
 }
 
+/// The line continuation in the refusals used to carry the next line's indent
+/// into the sentence.
+#[test]
+fn a_step_refusal_reads_as_one_sentence() {
+    for why in [step_delete_refusal(1, 0), step_delete_refusal(4, 0)] {
+        let why = why.expect("refused");
+        assert!(!why.contains("  "), "{why}");
+    }
+}
+
+/// Positions are unique per board and a delete leaves a gap: a new lane at the
+/// count of lanes landed on the last lane's position and was refused.
+#[test]
+fn a_lane_is_created_after_a_middle_one_is_deleted() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let middle = store.columns(&project).expect("columns")[1].id.clone();
+    store.delete_column(&middle).expect("delete");
+
+    let made = create_lane(&store, &project, "later").expect("created");
+    let lanes = store.columns(&project).expect("columns");
+    assert_eq!(
+        lanes.last().map(|lane| lane.id.as_str()),
+        Some(made.as_str())
+    );
+}
+
+/// With every lane gone, the next one is the first.
+#[test]
+fn a_lane_made_on_an_empty_board_is_at_the_start() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    for lane in store.columns(&project).expect("columns") {
+        store.delete_column(&lane.id).expect("delete");
+    }
+    create_lane(&store, &project, "first").expect("created");
+    assert_eq!(store.columns(&project).expect("columns")[0].position, 0);
+}
+
 /// An edit goes through the rule that refused the step when it was made.
 ///
 /// Read off the source: the alternative is a store, a project and a board to
@@ -87,7 +130,7 @@ fn an_edit_is_refused_by_the_same_rule_as_a_new_step() {
         .split("fn step_update_now(")
         .nth(1)
         .expect("step_update is in this file");
-    let body = update.split("\npub").next().unwrap_or(update);
+    let body = update.split("\n}\n").next().unwrap_or(update);
     assert!(
         body.contains("refused(&step.kind, &config)"),
         "step_update saves a config nothing checked"

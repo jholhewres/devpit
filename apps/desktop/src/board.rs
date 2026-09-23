@@ -95,7 +95,7 @@ pub(crate) fn live_sessions(store: &Store, project_id: &str) -> Vec<devpit_agent
     listed
 }
 
-fn runs_of(store: &Store, card_id: &str, steps: &[Step]) -> Result<Vec<Run>, RpcError> {
+pub(crate) fn runs_of(store: &Store, card_id: &str, steps: &[Step]) -> Result<Vec<Run>, RpcError> {
     Ok(store
         .runs(card_id)?
         .into_iter()

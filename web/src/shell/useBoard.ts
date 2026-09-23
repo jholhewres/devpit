@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Board, CardHappening, CardSession, ColumnDeleted, Played, Step } from '../gen/bindings'
-import { endOf, landed, lanes, moveQuestion, placed, type Lane } from './board'
+import { endOf, landed, lanes, moveQuestion, type Lane } from './board'
 import { shifted } from './laneOrder'
 import { ask, commands } from './live'
 import { onCarried } from './window'
@@ -54,16 +54,34 @@ export function useBoard(projectId: string | null): UseBoard {
   const [board, setBoard] = useState<Board | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const reload = useCallback(() => {
-    if (!projectId) {
-      setBoard(null)
-      return
-    }
-    void ask(() => commands.boardGet(projectId)).then((asked) => {
-      setError(asked.error)
-      if (asked.data) setBoard(asked.data)
-    })
+  /* Only the latest read lands: a slow answer — or one for the project that
+     was open a moment ago — arriving after a newer one would put the board
+     back in time. */
+  const asking = useRef(0)
+  /* The project open now: a read or a move answered after a switch belongs to
+     the board that was left, and lands nowhere. */
+  const current = useRef(projectId)
+  useLayoutEffect(() => {
+    current.current = projectId
   }, [projectId])
+  const read = useCallback(
+    (saysError: boolean, orElse?: Board) => {
+      const mine = ++asking.current
+      if (!projectId) {
+        setBoard(null)
+        return
+      }
+      void ask(() => commands.boardGet(projectId)).then((asked) => {
+        if (mine !== asking.current || projectId !== current.current) return
+        if (saysError) setError(asked.error)
+        if (asked.data) setBoard(asked.data)
+        /* A read that failed after a refusal leaves the card where it was. */
+        else if (orElse) setBoard(orElse)
+      })
+    },
+    [projectId],
+  )
+  const reload = useCallback(() => read(true), [read])
 
   useEffect(reload, [reload])
 
@@ -71,7 +89,18 @@ export function useBoard(projectId: string | null): UseBoard {
      only ever caught up when somebody touched it — a step finishing in the
      background left the tile reading `running` until the next drag. The two
      events were emitted by the backend and nothing listened to either. */
-  useEffect(() => onCarried<string>('run:changed', () => reload()), [reload])
+  /* Carries the card; another project's run is none of this board's business. */
+  const shown = useRef<Board | null>(null)
+  useLayoutEffect(() => {
+    shown.current = board
+  }, [board])
+  useEffect(
+    () =>
+      onCarried<string>('run:changed', (cardId) => {
+        if (shown.current?.cards.some((card) => card.id === cardId)) reload()
+      }),
+    [reload],
+  )
 
   /* An agent wrote to the board — a comment, a card, a move — through
      `devpit agent` or devpit's MCP tools. Only this project's board reads
@@ -119,15 +148,36 @@ export function useBoard(projectId: string | null): UseBoard {
 
   const [asked, setAsked] = useState<{ question: string; confirm: () => void } | null>(null)
 
+  /* Moves go to the app one after another, in the order they were made: two
+     quick drops of one card run on separate threads there, and the one that
+     finished last would otherwise be where the card ends up. */
+  const moving = useRef<Promise<unknown>>(Promise.resolve())
+
   /* The drop shows immediately and is put back if the command refuses — a
      card that snaps to where it was is how you learn the move failed. */
   const send = useCallback(
     (cardId: string, columnId: string, position: number, landing: Board) => {
       if (!projectId || !board) return
       const before = board
+      /* A read already in flight describes the board before this drop. */
+      asking.current += 1
       setBoard(landing)
-      void ask(() => commands.cardMove(projectId, cardId, columnId, position, false)).then((answer) => {
-        if (answer.error) setBoard(before)
+      const moved = moving.current.then(() => ask(() => commands.cardMove(projectId, cardId, columnId, position, false)))
+      moving.current = moved
+      void moved.then((answer) => {
+        if (projectId !== current.current) return
+        /* Refused: the board as it is now, read again — not a snapshot from
+           before the drop, which would also undo whatever arrived since. */
+        if (answer.error) read(false, before)
+        /* Taken: the card as the store wrote it, and a started run read in. */
+        else if (answer.data?.started) reload()
+        else if (answer.data) {
+          const card = answer.data.card
+          /* Laid out the way the store lays out a lane — renumbered from
+             nought — with the card the board already holds, so its activity
+             stays `card:happening`'s to change. */
+          setBoard((was) => was && landed(was, card.id, card.columnId, card.position))
+        }
         const question = moveQuestion(answer, false)
         if (question === null) return setError(answer.error)
         /* Answered later, so the board is read again rather than guessed. */
@@ -139,8 +189,11 @@ export function useBoard(projectId: string | null): UseBoard {
         setAsked({ question, confirm })
       })
     },
-    [board, projectId, reload],
+    [board, projectId, read, reload],
   )
+
+  /* A question about a move on the board that was left is not this board's. */
+  useEffect(() => setAsked(null), [projectId])
 
   const move = useCallback(
     (cardId: string, columnId: string, at: number) => {
@@ -151,9 +204,11 @@ export function useBoard(projectId: string | null): UseBoard {
 
   const moveToEnd = useCallback(
     (cardId: string, columnId: string) => {
+      /* Past the last card; laid out as the store lays out the lane it lands
+         in, renumbered from nought, so no two cards end up sharing a slot. */
       const lane = lanes(board).find((one) => one.column.id === columnId)
       const end = endOf(lane?.cards ?? [])
-      if (board) send(cardId, columnId, end, placed(board, cardId, columnId, end))
+      if (board) send(cardId, columnId, end, landed(board, cardId, columnId, end))
     },
     [board, send],
   )

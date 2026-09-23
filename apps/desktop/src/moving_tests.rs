@@ -51,3 +51,27 @@ fn a_move_an_update_refuses_writes_nothing() {
     );
     assert!(refused_before_moving(Some(&step(false)), None).is_none());
 }
+
+/// A reorder within the lane is not an arrival. Nothing starts, so no run is
+/// filed as having come from the lane it never left.
+#[test]
+fn a_move_within_the_lane_starts_nothing() {
+    assert!(what_a_move_runs(Some(&step(false)), true, false).is_none());
+    assert!(what_a_move_runs(Some(&step(false)), false, false).is_some());
+}
+
+/// "Move it anyway" moves the card. A second run in the same checkout is what
+/// `card.play` refuses, and a confirmed move must not get round it.
+#[test]
+fn a_confirmed_move_over_a_run_starts_no_second_run() {
+    assert!(what_a_move_runs(Some(&step(false)), false, true).is_none());
+}
+
+/// A run that ends after its card was moved elsewhere on purpose chains from
+/// nothing: the lane it stands in now ran a different step, or none.
+#[test]
+fn a_run_chains_only_from_the_lane_that_ran_it() {
+    assert!(crate::chaining::ran_here(Some("step_a"), "step_a"));
+    assert!(!crate::chaining::ran_here(Some("step_b"), "step_a"));
+    assert!(!crate::chaining::ran_here(None, "step_a"));
+}

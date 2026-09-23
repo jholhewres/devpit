@@ -33,9 +33,9 @@ export function landed(board: Board, cardId: string, columnId: string, at: numbe
   }
 }
 
-/** Where the end of a lane is: past the highest position, not the count. A
- *  move keeps the position it is sent and nothing renumbers, so once a card
- *  has left a lane its count can be a position another card holds. */
+/** Where the end of a lane is: past the highest position, never one a card
+ *  holds. The store renumbers the lane a card lands in, and a position past
+ *  the end is the end. */
 export function endOf(cards: readonly Card[]): number {
   return cards.reduce((end, card) => Math.max(end, card.position + 1), 0)
 }

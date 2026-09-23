@@ -18,10 +18,13 @@ pub async fn column_create(project_id: String, name: String) -> Result<Board, Rp
 
 /// [`column_create`], on the calling thread.
 pub(crate) fn column_create_now(project_id: String, name: String) -> Result<Board, RpcError> {
-    let store = store()?;
-    let position = store.columns(&project_id)?.len() as i64;
-    store.create_column(&project_id, &name, position)?;
+    create_lane(&store()?, &project_id, &name)?;
     board_get_now(project_id)
+}
+
+/// A new lane at the right-hand end (`Store::create_column_at_end`).
+pub(crate) fn create_lane(store: &Store, project_id: &str, name: &str) -> Result<String, RpcError> {
+    Ok(store.create_column_at_end(project_id, name)?)
 }
 
 #[tauri::command]
@@ -232,13 +235,15 @@ pub(crate) fn step_delete_refusal(ran: usize, running: usize) -> Option<String> 
     }
     if ran == 1 {
         return Some(
-            "a card was run by this step and still shows it —              set the lanes to run nothing instead"
+            "a card was run by this step and still shows it — \
+             set the lanes to run nothing instead"
                 .to_owned(),
         );
     }
     if ran > 1 {
         return Some(format!(
-            "{ran} runs were done by this step and the cards still show them —              set the lanes to run nothing instead"
+            "{ran} runs were done by this step and the cards still show them — \
+             set the lanes to run nothing instead"
         ));
     }
     None

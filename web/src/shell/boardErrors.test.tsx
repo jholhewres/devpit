@@ -60,6 +60,29 @@ vi.mock('./useShell', () => ({
 const laneOf = (lanes: ReturnType<typeof useBoard>['lanes'], id: string): string | undefined =>
   lanes.find((lane) => lane.cards.some((one) => one.id === id))?.column.id
 
+describe('reading the board again', () => {
+  /* A slow answer arriving after a newer one would put the board back in time. */
+  it('keeps the newest answer when an older one lands last', async () => {
+    const live = await import('./live')
+    const slow = board()
+    slow.cards = []
+    let calls = 0
+    const release: Array<() => void> = []
+    const spy = vi.spyOn(live.commands, 'boardGet').mockImplementation(() => {
+      calls += 1
+      const answer = calls === 1 ? slow : board()
+      return new Promise((done) => release.push(() => done(answer))) as never
+    })
+    const { result } = renderHook(() => useBoard('p1'))
+    act(() => result.current.reload())
+    await waitFor(() => expect(release).toHaveLength(2))
+    await act(async () => release[1]!())
+    await act(async () => release[0]!())
+    expect(laneOf(result.current.lanes, 'card_1')).toBe('col_1')
+    spy.mockRestore()
+  })
+})
+
 describe('a board command that is refused', () => {
   it('puts a moved card back where it was and says why', async () => {
     const { result } = renderHook(() => useBoard('p1'))

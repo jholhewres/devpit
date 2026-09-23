@@ -74,7 +74,8 @@ describe('a move while a run is still going on the card', () => {
     act(() => result.current.answer(true))
     await waitFor(() => expect(moved).toHaveBeenLastCalledWith('p1', 'a', 'done', 0, true))
     expect(result.current.asked).toBeNull()
-    await waitFor(() => expect(read).toHaveBeenCalledTimes(2))
+    /* Opening, putting the card back when the move was refused, and after the yes. */
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(3))
   })
 
   it('from the open card is asked, and made once the answer is yes', async () => {

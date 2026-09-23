@@ -130,6 +130,26 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
     let _ = app.emit("run:changed", &card);
 }
 
+/// The thread's own store, or nothing and the run closed as failed.
+///
+/// Decided before the thread starts: a thread that could not open the store
+/// had nothing to close the row with, and the run read `running` for ever.
+pub fn store_for_thread(
+    store: &Store,
+    run_id: &str,
+    opened: Result<Store, devpit_core::store::StoreError>,
+) -> Option<Store> {
+    let err = match opened {
+        Ok(own) => return Some(own),
+        Err(err) => err,
+    };
+    let why = format!("could not open the store to carry out this run: {err}");
+    if let Err(err) = store.finish_run(run_id, "failed", Some(&why), None, None, None) {
+        eprintln!("could not record the end of run {run_id}: {err}");
+    }
+    None
+}
+
 /// How a run ended, as its row says it. A person's stop wins over whatever the
 /// killed process looked like on its way out.
 fn end_state(cancelled: bool, ok: bool) -> &'static str {

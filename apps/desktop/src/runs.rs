@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use devpit_core::store::{Carried, WhoseRun};
 use devpit_core::Store;
-use devpit_rpc::{ErrorCode, RpcError, Run, RunState, Step, StepKind};
+use devpit_rpc::{ErrorCode, RpcError, Run, Step, StepKind};
 use tauri::AppHandle;
 
 use crate::card_activity::{run_heard, run_reference, Doing};
@@ -100,45 +100,37 @@ pub fn start_chained(
         Doing::Working,
     );
 
-    let card = card_id.to_owned();
-    let id = run_id.clone();
-    // Read before the move: the row the command returns describes the step
-    // that is about to run, and the thread takes ownership of the step itself.
-    let step_id = step.id.clone();
-    let step_name = step.name.clone();
-    let step = step.clone();
-    // The chain needs the same registry the run itself is watched in.
-    let chained = Arc::clone(&in_flight);
-    std::thread::spawn(move || {
-        // Its own connection: SQLite handles are not shared across threads,
-        // and the row it has to close is already committed.
-        let Ok(store) = Store::open_default() else {
-            return;
-        };
-        working::carry_out(
-            working::Carrying {
-                app,
-                in_flight,
-                chained,
-                run_id: id,
-                card_id: card,
-                session_id,
-                step,
-                hops,
-            },
-            &store,
-        );
-    });
-
-    Ok(Run {
-        id: run_id,
-        step_id,
-        step_name,
-        state: RunState::Running,
-        output: None,
-        exit_code: None,
-        cost_usd: None,
-        duration_ms: None,
-        started_at: 0.0,
-    })
+    // Its own connection, moved in rather than shared, and the row it has to
+    // close is already committed.
+    let Some(own) = working::store_for_thread(store, &run_id, Store::open_default()) else {
+        run_heard(&app, card_id, &run_reference(store, &run_id), Doing::Failed);
+        // Rung like any run that failed with nobody watching.
+        crate::notices::run_ended(&app, store, card_id, &step.name, false);
+        return opened(store, card_id, &run_id, step);
+    };
+    let carrying = working::Carrying {
+        app,
+        // The chain needs the same registry the run itself is watched in.
+        chained: Arc::clone(&in_flight),
+        in_flight,
+        run_id: run_id.clone(),
+        card_id: card_id.to_owned(),
+        session_id,
+        step: step.clone(),
+        hops,
+    };
+    std::thread::spawn(move || working::carry_out(carrying, &own));
+    opened(store, card_id, &run_id, step)
 }
+
+/// The run as its row reads, so the time on it is the one the board shows.
+fn opened(store: &Store, card_id: &str, run_id: &str, step: &Step) -> Result<Run, RpcError> {
+    crate::board::runs_of(store, card_id, std::slice::from_ref(step))?
+        .into_iter()
+        .find(|run| run.id == run_id)
+        .ok_or_else(|| RpcError::internal("the run just opened is not in the store"))
+}
+
+#[cfg(test)]
+#[path = "runs_tests.rs"]
+mod tests;

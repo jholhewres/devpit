@@ -57,6 +57,11 @@ fn lane_of(
 
 /// Applies whatever the rule decided.
 ///
+/// Whether the card still stands in a lane that runs the step that just ran.
+pub(crate) fn ran_here(lane_step: Option<&str>, step_id: &str) -> bool {
+    lane_step == Some(step_id)
+}
+
 /// Errors are swallowed deliberately: this runs after the work is already
 /// done and recorded, and a card that failed to move is a card in the wrong
 /// column — not a run that should be reported as having failed.
@@ -75,6 +80,19 @@ pub fn after(
     let Ok(Some(project_id)) = store.project_id_of_card(card_id) else {
         return;
     };
+    // A card moved on purpose while its run was going now stands in a lane
+    // this run's verdict says nothing about. Chaining from there would skip
+    // that lane's step on a pass, or pull the card back on a send-back —
+    // either one against the move the person just confirmed.
+    let lane_step = store.columns(&project_id).ok().and_then(|columns| {
+        columns
+            .into_iter()
+            .find(|column| column.id == card.column_id)
+            .and_then(|column| column.step_id)
+    });
+    if !ran_here(lane_step.as_deref(), &step.id) {
+        return;
+    }
     let Some((autonomy, on_pass, target_is_irreversible)) =
         lane_of(store, &project_id, &card.column_id)
     else {

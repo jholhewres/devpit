@@ -53,8 +53,9 @@ describe('a card picked into another lane', () => {
     expect(result.current.lanes[1]!.cards.map((one) => one.id)).toEqual(['b', 'c', 'a'])
   })
 
-  /* `done` held a card at 1 that has left: its count is 1, and 1 is taken by nobody,
-     but 2 is c's. The end is past c, and past the card just put there. */
+  /* `done` held a card at 1 that has left: c is at 2. The first card goes past
+     c; the lane is then renumbered from nought, as the store renumbers it, so
+     the next end is past the two cards now at 0 and 1. */
   it('goes past the last card, not to the count, once a card has left the lane', async () => {
     moved.mockClear()
     cards = () => [card('a', 'todo', 0), card('d', 'todo', 1), card('c', 'done', 2)]
@@ -63,7 +64,7 @@ describe('a card picked into another lane', () => {
     act(() => result.current.moveToEnd('a', 'done'))
     await waitFor(() => expect(moved).toHaveBeenCalledWith('p1', 'a', 'done', 3, false))
     act(() => result.current.moveToEnd('d', 'done'))
-    await waitFor(() => expect(moved).toHaveBeenCalledWith('p1', 'd', 'done', 4, false))
+    await waitFor(() => expect(moved).toHaveBeenCalledWith('p1', 'd', 'done', 2, false))
     expect(result.current.lanes[1]!.cards.map((one) => one.id)).toEqual(['c', 'a', 'd'])
   })
 })
