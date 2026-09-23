@@ -88,6 +88,20 @@ export function BlockTerm({
     void homeFolder().then(setHomeDir)
   }, [])
 
+  /* A pane whose shell has not been heard at a prompt since the app started
+     — it was already running — is nudged once to draw one, so it can be
+     shown as blocks. Only where the shell is idle in front (`pane.nudge`). */
+  const integrated = useRef(state.integrated)
+  integrated.current = state.integrated
+  useEffect(() => {
+    if (!wanted) return
+    /* Once per pane and choice: a shell with no hooks would be nudged forever. */
+    const later = setTimeout(() => {
+      if (!integrated.current) void ask(() => commands.paneNudge(projectId, paneId))
+    }, 900)
+    return () => clearTimeout(later)
+  }, [paneId, projectId, wanted])
+
   /* The keyboard goes where the work is: the editor at the prompt, the live
      terminal while something runs and may be asking for input. */
   useEffect(() => {

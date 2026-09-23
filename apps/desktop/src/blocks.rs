@@ -320,3 +320,15 @@ mod completion_tests {
         );
     }
 }
+
+/// `pane.nudge` — an Enter in a pane whose shell is idle in front, so the
+/// prompt is drawn again and heard. Answers whether it pressed one.
+#[tauri::command]
+#[specta::specta]
+pub fn pane_nudge(project_id: String, pane_id: String) -> Result<bool, RpcError> {
+    crate::sessions::holding(&project_id, &pane_id)?;
+    let session = devpit_tmux::Server::session_name(&project_id);
+    crate::sessions::tmux_server()?
+        .nudge(&devpit_tmux::Server::target(&session, &pane_id))
+        .map_err(|err| RpcError::internal(err.to_string()))
+}

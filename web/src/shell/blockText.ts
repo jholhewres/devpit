@@ -35,3 +35,21 @@ export function filtered(lines: readonly string[], query: string): readonly numb
   if (words.length === 0) return lines.map((_, at) => at)
   return lines.flatMap((line, at) => (words.every((word) => line.toLowerCase().includes(word)) ? [at] : []))
 }
+
+/* An address in a line of output: http or https, up to the first space or
+   the punctuation that usually closes a sentence around one. */
+const URL_IN = /https?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?)\]}]/g
+
+/** A piece of output text, split where it names a web address. */
+export function linked(text: string): readonly { text: string; url?: string }[] {
+  const out: { text: string; url?: string }[] = []
+  let at = 0
+  for (const match of text.matchAll(URL_IN)) {
+    const start = match.index ?? 0
+    if (start > at) out.push({ text: text.slice(at, start) })
+    out.push({ text: match[0], url: match[0] })
+    at = start + match[0].length
+  }
+  if (at < text.length || out.length === 0) out.push({ text: text.slice(at) })
+  return out
+}

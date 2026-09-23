@@ -189,6 +189,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         blocks::folder_glance,
         blocks::pane_compose,
         blocks::folder_complete,
+        blocks::pane_nudge,
         panes::pane_scrollback,
         panes::session_detach,
         panes::session_attach,

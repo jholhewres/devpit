@@ -1036,6 +1036,11 @@ export const commands = {
 	 */
 	folderComplete: (cwd: string, word: string) => typedError<string[], RpcError>(__TAURI_INVOKE("folder_complete", { cwd, word })),
 	/**
+	 *  `pane.nudge` — an Enter in a pane whose shell is idle in front, so the
+	 *  prompt is drawn again and heard. Answers whether it pressed one.
+	 */
+	paneNudge: (projectId: string, paneId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("pane_nudge", { projectId, paneId })),
+	/**
 	 *  `pane.scrollback` — what this pane has printed, oldest kept byte first.
 	 * 
 	 *  This is what makes reopening a window show a terminal rather than an empty

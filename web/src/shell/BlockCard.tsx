@@ -3,7 +3,7 @@ import { memo, useEffect, useState } from 'react'
 
 import type { CommandBlock } from '../gen/bindings'
 import { plain, rendered, type Line } from './blockRender'
-import { filtered, outcome, shortPath, took } from './blockText'
+import { filtered, linked, outcome, shortPath, took } from './blockText'
 import { Copy, Pencil, Search, Undo } from './GitIcons'
 import { ask, commands } from './live'
 import { RailMenu, type RailItem } from './RailMenu'
@@ -148,7 +148,18 @@ export const BlockCard = memo(function BlockCard({
                           opacity: run.dim ? 0.6 : undefined,
                         }}
                       >
-                        {run.text}
+                        {linked(run.text).map((piece, p) =>
+                          piece.url ? (
+                            <a key={p} className="blk__link" href={piece.url} title={`Open ${piece.url}`} onClick={(event) => {
+                              event.preventDefault()
+                              void ask(() => commands.urlOpen(piece.url!))
+                            }}>
+                              {piece.text}
+                            </a>
+                          ) : (
+                            piece.text
+                          ),
+                        )}
                       </span>
                     ))}
                   </div>

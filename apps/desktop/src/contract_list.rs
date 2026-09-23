@@ -187,6 +187,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         blocks::folder_glance,
         blocks::pane_compose,
         blocks::folder_complete,
+        blocks::pane_nudge,
         panes::pane_scrollback,
         panes::session_detach,
         shell_launch::session_running,

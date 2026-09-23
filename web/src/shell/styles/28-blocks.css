@@ -77,3 +77,5 @@
 .abar__compose { padding: 8px 10px 0 12px; }
 .abar__field { width: 100%; resize: none; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--composer, var(--canvas)); color: var(--text); font: inherit; font-size: 13px; line-height: 1.45; outline: none; }
 .cin__choices { max-height: 220px; }
+.blk__link { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; cursor: pointer; }
+.blk__link:hover { text-decoration-color: currentColor; }

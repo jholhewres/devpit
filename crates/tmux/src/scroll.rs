@@ -107,7 +107,34 @@ pub(crate) fn argv(target: &str, lines: i32, state: Held) -> Option<Vec<String>>
     Some(argv)
 }
 
+/// The shells a nudge may press Enter in: at their prompt, an empty line runs
+/// nothing and draws the prompt again.
+const SHELLS: [&str; 5] = ["bash", "zsh", "fish", "sh", "dash"];
+
 impl Server {
+    /// Presses Enter in a pane whose shell is in front, so it draws its prompt
+    /// — and its hooks mark it. A pane started before the app was can be drawn
+    /// as blocks only once it has been heard at a prompt. Anything else in
+    /// front is left alone: an Enter there would be a keystroke nobody typed.
+    pub fn nudge(&self, target: &str) -> Result<bool, TmuxError> {
+        let front = self.require(&[
+            "display-message",
+            "-p",
+            "-t",
+            target,
+            "#{pane_current_command}",
+        ])?;
+        let front = String::from_utf8_lossy(&front.stdout)
+            .trim()
+            .trim_start_matches('-')
+            .to_owned();
+        if !SHELLS.contains(&front.as_str()) {
+            return Ok(false);
+        }
+        self.require(&["send-keys", "-t", target, "Enter"])?;
+        Ok(true)
+    }
+
     /// Hands `text` to whatever runs in a pane as one bracketed paste, then
     /// Enter: what an agent's TUI takes as one message, however many lines.
     /// Nothing is cleared first — the program's own input is its business.
