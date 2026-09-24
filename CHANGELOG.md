@@ -5,6 +5,8 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
+## 0.1.15 — 2026-09-24
+
 ### Orchestrator
 
 - **Orchestrators**, at the top of the project rail. **New orchestrator** asks
