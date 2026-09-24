@@ -128,7 +128,17 @@ describe('manual item 10 — a card chat moves the dot', () => {
     await backToTheBoard()
     const composers = (await window.findElements(By.css('textarea.composer__ph'))).length
     await openCardMenu(window, 'Chat moves the dot')
-    await press(window, 'Chat about this card')
+    // From this card's own menu: the card opened in item 9 has a button of
+    // the same words, and the first one on screen was sometimes that one.
+    const pressed = await window.executeScript(function () {
+      const menu = document.querySelector('[role="menu"][aria-label="Chat moves the dot actions"]')
+      const hit = menu && Array.prototype.slice.call(menu.querySelectorAll('button')).find(function (one) {
+        return one.innerText.trim().split('\n')[0].trim() === 'Chat about this card'
+      })
+      if (hit) hit.click()
+      return Boolean(hit)
+    })
+    assert.ok(pressed, 'the card menu has no "Chat about this card"')
     // Its own composer, and only that: the card's title is on the board the
     // whole time, so waiting for it proved nothing and a fast run typed into
     // item 9's chat instead.
