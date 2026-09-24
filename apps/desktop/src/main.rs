@@ -57,6 +57,7 @@ mod contract;
 mod cycles;
 mod diffs;
 mod error_reports;
+mod error_sender;
 mod files;
 mod filetree;
 mod front;
@@ -178,6 +179,20 @@ fn main() {
         .manage(browser::Sessions::default())
         /* What the browser menu was last opened for, so its window can ask. */
         .manage(browser_menu::Opening::default())
+        .manage(error_sender::Presence::new(devpit_core::reports::now()))
+        // Whether somebody is at the window, for reports that only go when
+        // nobody is.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Focused(focused) = event {
+                if window.label() == "main" {
+                    if let Some(presence) =
+                        tauri::Manager::try_state::<error_sender::Presence>(window)
+                    {
+                        presence.focus(*focused, devpit_core::reports::now());
+                    }
+                }
+            }
+        })
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.
@@ -249,6 +264,8 @@ fn main() {
             // Looks for a newer devpit while the switch says to. Started
             // last: it is the one thing here that can wait.
             update::watch(app.handle().clone());
+            // Sends the error reports the person switched on, when idle.
+            error_sender::watch(app.handle().clone());
             // A run still marked `running` after a restart is a run whose
             // thread died with the last process. Closed here, before anything
             // draws, or the card says it is working forever.

@@ -4,6 +4,7 @@ import type { Settings as Stored } from '../gen/bindings'
 import { ask, commands } from './live'
 import { inOrder } from './inOrder'
 import { PrefsSide } from './PrefsSide'
+import { ErrorReportsPreview } from './ErrorReportsPreview'
 import { OpenApps } from './OpenApps'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
@@ -114,9 +115,10 @@ export function Settings({
               <span className="sw"></span>
             </button>
             <button className="pref" role="switch" aria-checked={on('errorReports')} onClick={() => set('errorReports', !on('errorReports'))}>
-              <span className="pref__body"><span className="pref__t">Error reports</span><span className="pref__d">Keep devpit&rsquo;s own errors, without paths or your work, for an anonymous report. Turning it off deletes them.</span></span>
+              <span className="pref__body"><span className="pref__t">Error reports</span><span className="pref__d">Send devpit&rsquo;s own errors, without paths or your work, anonymously and only while devpit sits idle. Turning it off deletes what was kept.</span></span>
               <span className="sw"></span>
             </button>
+            {on('errorReports') && <ErrorReportsPreview />}
             <OpenApps />
             <UpdateSettings />
           </section>

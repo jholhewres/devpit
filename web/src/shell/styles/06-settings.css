@@ -341,3 +341,7 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .pdet:hover { color: var(--text); }
 .pref__d[data-read='read'] { color: var(--success); }
 .pref__d[data-read='failed'] { color: var(--danger); }
+
+/* The error report preview: the request body, read before it leaves. */
+.errprev { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 6px 0 12px; }
+.errprev__body { align-self: stretch; margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--inset); font-family: var(--mono); font-size: 11.5px; line-height: 1.55; max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; }

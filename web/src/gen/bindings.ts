@@ -1211,6 +1211,13 @@ export const commands = {
 	 *  than the window having to know the switch.
 	 */
 	errorsReport: (message: string, stack: string | null) => typedError<null, RpcError>(__TAURI_INVOKE("errors_report", { message, stack })),
+	/**  `errors.preview` — what the next report would send, exactly. */
+	errorsPreview: () => typedError<ErrorReportsPreview, RpcError>(__TAURI_INVOKE("errors_preview")),
+	/**
+	 *  `presence.seen` — the window was used. The window sends it at most once a
+	 *  minute, which is all [`AWAY`] needs.
+	 */
+	presenceSeen: () => typedError<null, RpcError>(__TAURI_INVOKE("presence_seen")),
 	checkpointRead: (runId: string) => typedError<Checked, RpcError>(__TAURI_INVOKE("checkpoint_read", { runId })),
 	checkpointFindings: (runId: string) => typedError<Found, RpcError>(__TAURI_INVOKE("checkpoint_findings", { runId })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
@@ -1905,6 +1912,14 @@ export type ErrorCode = "unauthenticated" |
  *  files, so reaching it is reaching the machine.
  */
 "forbidden" | "not_found" | "conflict" | "rate_limited" | "invalid" | "unsupported" | "busy" | "internal";
+
+/**  What the next error report would send, for the person to read first. */
+export type ErrorReportsPreview = {
+	/**  Errors kept and not yet reported. */
+	waiting: number,
+	/**  The next request's body, exactly as it would go. */
+	next: string,
+};
 
 /**
  *  What is in a file, or why it is not shown.

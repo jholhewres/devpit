@@ -100,6 +100,39 @@ impl ErrorLog {
         }
     }
 
+    /// The next errors to report: the ones waiting longest.
+    pub fn next_batch(&self, most: usize) -> Vec<Entry> {
+        let mut entries = self.read();
+        entries.sort_by_key(|entry| entry.first_seen);
+        entries.truncate(most);
+        entries
+    }
+
+    /// Takes out what a report carried. An error seen again while the batch
+    /// was out keeps the occurrences the report did not include.
+    pub fn forget_sent(&self, sent: &[Entry]) -> std::io::Result<()> {
+        let mut entries = self.read();
+        for gone in sent {
+            if let Some(at) = entries
+                .iter()
+                .position(|entry| entry.fingerprint == gone.fingerprint)
+            {
+                let entry = &mut entries[at];
+                if entry.count <= gone.count {
+                    entries.remove(at);
+                } else {
+                    entry.count -= gone.count;
+                    entry.first_seen = gone.last_seen;
+                }
+            }
+        }
+        if entries.is_empty() {
+            self.wipe()
+        } else {
+            self.write(&entries)
+        }
+    }
+
     /// Nothing kept: the file goes, not just its contents, and neither does a
     /// write that stopped before its rename.
     pub fn wipe(&self) -> std::io::Result<()> {
@@ -571,7 +604,36 @@ fn take(recorder: Option<&mut Recorder>, report: Report<'_>) {
     }
 }
 
-fn now() -> u64 {
+/// The log being written to, if the person has reports on. The lock is held
+/// for `then`, so nothing is recorded between reading a batch and forgetting it.
+pub fn with_current<T>(then: impl FnOnce(&ErrorLog) -> T) -> Option<T> {
+    let current = ON.lock().unwrap_or_else(PoisonError::into_inner);
+    current.as_ref().map(|recorder| then(&recorder.log))
+}
+
+/// Seconds since the epoch as RFC 3339, in UTC — what the server reads.
+pub fn rfc3339(seconds: u64) -> String {
+    let days = (seconds / 86_400) as i64;
+    let rest = seconds % 86_400;
+    // Days to a civil date, after Howard Hinnant's `civil_from_days`.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rest / 3_600,
+        rest % 3_600 / 60,
+        rest % 60
+    )
+}
+
+pub fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|since| since.as_secs())

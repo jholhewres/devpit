@@ -75,6 +75,16 @@ pub struct Settings {
     pub error_reports: Option<bool>,
 }
 
+/// What the next error report would send, for the person to read first.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorReportsPreview {
+    /// Errors kept and not yet reported.
+    pub waiting: u32,
+    /// The next request's body, exactly as it would go.
+    pub next: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::Theme;

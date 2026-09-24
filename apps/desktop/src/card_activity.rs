@@ -89,6 +89,13 @@ pub(crate) struct Activities {
 }
 
 impl Activities {
+    /// Whether any agent is working right now, on any card.
+    pub(crate) fn anyone_working(&self) -> bool {
+        self.heard
+            .values()
+            .any(|heard| heard.state == Doing::Working)
+    }
+
     /// Every pane heard from, on any card.
     pub(crate) fn pane_keys(&self) -> Vec<Key> {
         self.heard

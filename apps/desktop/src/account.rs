@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 /// Where the accounts server lives. Overridable so a build can be pointed at a
 /// local one without editing this file.
-fn origin() -> String {
+pub(crate) fn origin() -> String {
     std::env::var("DEVPIT_ACCOUNT_ORIGIN")
         .ok()
         .filter(|value| !value.is_empty())
@@ -30,7 +30,7 @@ fn in_flight() -> &'static Mutex<Option<String>> {
     PENDING.get_or_init(|| Mutex::new(None))
 }
 
-fn client() -> Result<reqwest::Client, RpcError> {
+pub(crate) fn client() -> Result<reqwest::Client, RpcError> {
     reqwest::Client::builder()
         // A request that hangs must not hang the pane that made it.
         .timeout(Duration::from_secs(20))

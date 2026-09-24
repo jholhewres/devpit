@@ -455,3 +455,50 @@ fn a_panic_while_the_lock_is_held_does_not_wait_for_it() {
     drop(held);
     assert!(answered.is_ok(), "the panic path waited on the lock");
 }
+
+/// Sending: the oldest first, and what was sent leaves — but only what was
+/// sent. An error that happened again while the batch was out stays, with
+/// the occurrences nobody has reported yet.
+#[test]
+fn the_next_batch_is_the_oldest_and_sent_ones_leave() {
+    let (_dir, log) = log();
+    for (seen, message) in [(30, "c"), (10, "a"), (20, "b")] {
+        log.add(report(message), seen, None).expect("add");
+    }
+    let batch = log.next_batch(2);
+    let sent: Vec<_> = batch.iter().map(|entry| entry.message.as_str()).collect();
+    assert_eq!(sent, ["a", "b"]);
+
+    log.add(report("a"), 40, None).expect("again while out");
+    log.forget_sent(&batch).expect("forget");
+
+    let left = log.read();
+    let a = left
+        .iter()
+        .find(|entry| entry.message == "a")
+        .expect("a stays");
+    assert_eq!(a.count, 1, "the occurrence after the batch");
+    assert!(
+        left.iter().all(|entry| entry.message != "b"),
+        "b was sent whole"
+    );
+    assert!(
+        left.iter().any(|entry| entry.message == "c"),
+        "c was not sent"
+    );
+}
+
+#[test]
+fn forgetting_the_last_one_removes_the_file() {
+    let (_dir, log) = log();
+    log.add(report("only"), 1, None).expect("add");
+    log.forget_sent(&log.next_batch(5)).expect("forget");
+    assert!(!log.path().exists());
+}
+
+#[test]
+fn a_time_reads_as_rfc_3339() {
+    assert_eq!(rfc3339(0), "1970-01-01T00:00:00Z");
+    assert_eq!(rfc3339(1_790_268_922), "2026-09-24T16:55:22Z");
+    assert_eq!(rfc3339(951_782_400), "2000-02-29T00:00:00Z");
+}

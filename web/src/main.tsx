@@ -4,6 +4,7 @@ import App from './App'
 import { answerBeforeRestart } from './shell/beforeRestart'
 import { BrowserMenuWindow } from './shell/BrowserMenuWindow'
 import { watchCsp } from './shell/csp'
+import { reportPresence } from './shell/presence'
 import { reportUncaught } from './shell/uncaught'
 import './index.css'
 
@@ -27,6 +28,8 @@ const isMenu = (window as unknown as { __DEVPIT_MENU__?: boolean }).__DEVPIT_MEN
 watchCsp()
 // Errors nothing else caught, for the report the person may have switched on.
 reportUncaught()
+// And whether somebody is at it, so those reports go only when nobody is.
+if (!isMenu) reportPresence()
 // And the window answers when an update is about to restart it. Not the menu:
 // it holds nothing anybody would lose, and it is closed by the restart anyway.
 if (!isMenu) answerBeforeRestart()

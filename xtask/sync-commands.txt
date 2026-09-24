@@ -29,3 +29,6 @@ permission_ask_from_now sets a flag on a session held in memory
 chat_stop_task signals a task the running turn already holds
 chat_cancel signals the turn already running
 app_info answers from the build and a path it computes
+
+# Answers from memory.
+presence_seen stores one number in an atomic

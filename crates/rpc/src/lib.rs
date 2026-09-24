@@ -76,7 +76,7 @@ pub use session::{
     AgentPresence, KnownAgent, LayoutNode, PaneKind, PaneRunning, PaneSize, SessionLayout,
     SplitDirection,
 };
-pub use settings::{Settings, Theme};
+pub use settings::{ErrorReportsPreview, Settings, Theme};
 pub use spend::{
     PlanLimits, PlanWindow, SpendCard, SpendDay, SpendHistory, SpendInstallation, SpendRow,
     SpendSession, SpendShare, TokenCounts,
