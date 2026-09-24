@@ -14,6 +14,11 @@ release notes are taken from here when a version is tagged.
   with a brief, `docs/`, `artifacts/` and `context/` — and a chat that opens on
   its last conversation. Right-click reveals its folder or removes it; the
   folder is kept. It is not listed among the projects.
+- **An orchestrator keeps listening between your messages.** Its process
+  stays, so a session's reply — or the notice it asked for when one went idle
+  — wakes it, and what it says appears in its chat, marked as not in answer to
+  you. Stop interrupts the turn and leaves it listening. It opens in Accept
+  edits; in the supervised mode it cannot listen.
 - **Answer a session from the orchestrator.** A session in a devpit terminal
   that is waiting on you can be answered from the Sessions panel: what you
   type goes into its terminal as yours. A message from the orchestrator
