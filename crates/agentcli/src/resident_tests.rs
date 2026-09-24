@@ -45,6 +45,32 @@ fn turn(command: &str) -> Say<'_> {
     }
 }
 
+/// Starts the stand-in, with the retry the turn tests use: a script written a
+/// moment ago can be "text file busy" while another test forks with it open.
+fn started(command: &str, tell: mpsc::Sender<String>) -> Resident {
+    (0..5)
+        .find_map(|_| {
+            let tell = tell.clone();
+            match Resident::start(
+                driver("claude").expect("driver"),
+                &turn(command),
+                Arc::new(|_: &str| {}),
+                move |one| {
+                    if let Some(line) = said(&one) {
+                        let _ = tell.send(line);
+                    }
+                },
+            ) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    None
+                }
+                other => Some(other.expect("started")),
+            }
+        })
+        .expect("the stand-in started within five tries")
+}
+
 fn said(heard: &Heard) -> Option<String> {
     match heard {
         Heard::Part(Part::Text { text, .. }) => Some(text.clone()),
@@ -63,17 +89,7 @@ fn it_stays_between_turns_and_is_heard_when_woken() {
     let command = cli.to_string_lossy().into_owned();
 
     let (tell, heard) = mpsc::channel();
-    let resident = Resident::start(
-        driver("claude").expect("driver"),
-        &turn(&command),
-        Arc::new(|_: &str| {}),
-        move |one| {
-            if let Some(line) = said(&one) {
-                let _ = tell.send(line);
-            }
-        },
-    )
-    .expect("started");
+    let resident = started(&command, tell);
 
     let next = || {
         heard
@@ -107,17 +123,7 @@ fn a_process_that_dies_mid_turn_is_heard_as_gone() {
     let command = cli.to_string_lossy().into_owned();
 
     let (tell, heard) = mpsc::channel();
-    let resident = Resident::start(
-        driver("claude").expect("driver"),
-        &turn(&command),
-        Arc::new(|_: &str| {}),
-        move |one| {
-            if let Some(line) = said(&one) {
-                let _ = tell.send(line);
-            }
-        },
-    )
-    .expect("started");
+    let resident = started(&command, tell);
     assert!(resident.say("go"));
     let next = || {
         heard
