@@ -43,6 +43,9 @@ pub(crate) fn argv(turn: &Say<'_>) -> Vec<String> {
         // would swallow whatever came after it.
         argv.push(format!("--settings={settings}"));
     }
+    if let Some(config) = turn.mcp_config {
+        argv.push(format!("--mcp-config={config}"));
+    }
     if let Some(mode) = turn.permission {
         argv.push("--permission-mode".to_owned());
         argv.push(mode.to_owned());

@@ -37,6 +37,9 @@ pub struct Say<'a> {
     /// `PreToolUse` hook, and a turn without it has nobody to ask: the CLI,
     /// printing rather than talking, refuses every write instead.
     pub settings: Option<&'a str>,
+    /// devpit's MCP file, so a chat has the board's tools the way a terminal
+    /// does, without depending on a plugin being installed.
+    pub mcp_config: Option<&'a str>,
     /// How hard to think. One of what the driver's `efforts` lists.
     pub effort: Option<&'a str>,
     /// Where the turn's stdin is kept while it runs, for control requests.

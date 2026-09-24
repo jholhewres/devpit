@@ -20,6 +20,14 @@ pub(crate) fn exe() -> Option<PathBuf> {
     }
 }
 
+/// The MCP file a chat turn is handed, for the one driver that takes it.
+/// Written with the terminal's own flags, so both reach the same server.
+pub(crate) fn chat_mcp(driver: &str) -> Option<String> {
+    let config = devpit_core::Store::root().ok()?.join("mcp.json");
+    mcp_flags(driver, &exe()?, &config)?;
+    (driver == "claude").then(|| config.display().to_string())
+}
+
 /// What to add to an agent's launch line so it has devpit's tools, or
 /// nothing for an agent with no per-session way to be given them.
 ///

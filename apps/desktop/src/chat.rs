@@ -183,6 +183,7 @@ pub async fn chat_send(
     // line it types and a step gets it from its runner; a chat was the one
     // path that spawned the binary with none of it.
     let env = devpit_agentcli::running::runner(&profile).env;
+    let mcp = crate::agent_reach::chat_mcp(&profile.driver);
 
     let file = conversation_path(&sessions, &conversation_id);
     let turn_id = id("turn");
@@ -271,6 +272,7 @@ pub async fn chat_send(
                 fork_at: forking.as_deref(),
                 permission: mode.as_deref(),
                 settings: hooks.as_deref(),
+                mcp_config: mcp.as_deref(),
                 effort: thinking.as_deref(),
                 control: Some(&control),
                 on_session: Some(&hold),

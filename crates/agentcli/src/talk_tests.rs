@@ -14,6 +14,7 @@ fn turn(budget: Option<f64>) -> Say<'static> {
         fork_at: None,
         permission: None,
         settings: None,
+        mcp_config: None,
         effort: None,
         control: None,
         on_session: None,
@@ -75,6 +76,7 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
         fork_at: None,
         permission: None,
         settings: None,
+        mcp_config: None,
         effort: None,
         control: None,
         on_session: None,
@@ -157,6 +159,7 @@ fn a_chat_turn_runs_under_its_profile_env() {
         fork_at: None,
         permission: None,
         settings: None,
+        mcp_config: None,
         effort: None,
         control: None,
         on_session: None,
@@ -195,4 +198,18 @@ fn a_turn_carries_devpits_hook_settings_as_one_word() {
     assert!(!argv(&turn(None))
         .iter()
         .any(|a| a.starts_with("--settings")));
+}
+
+/// A chat has the board's tools the way a terminal does: devpit's MCP file,
+/// as one word so it cannot swallow the flag after it.
+#[test]
+fn a_chat_turn_is_handed_devpits_tools() {
+    let with = Say {
+        mcp_config: Some("/home/someone/.devpit/mcp.json"),
+        ..turn(None)
+    };
+    assert!(argv(&with).contains(&"--mcp-config=/home/someone/.devpit/mcp.json".to_owned()));
+    assert!(!argv(&turn(None))
+        .iter()
+        .any(|a| a.starts_with("--mcp-config")));
 }
