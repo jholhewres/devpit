@@ -7,11 +7,17 @@ release notes are taken from here when a version is tagged.
 
 ### Orchestrator
 
-- **An orchestrator per Claude Code account**, at the top of the project rail.
-  The first time, it makes a folder of its own under `~/.devpit/orchestrator/`
-  — a git repository with a brief, `docs/`, `artifacts/` and `context/` — and
-  opens a chat there; after that it picks up the last conversation. Its chat
-  speaks as that account only, and it is not listed among the projects.
+- **Orchestrators**, at the top of the project rail. **New orchestrator** asks
+  which account it runs as — by the command that starts it, a shell function
+  included — and a name; an account can have several. Each gets a folder of
+  its own under `~/.devpit/orchestrator/<account>/<name>/` — a git repository
+  with a brief, `docs/`, `artifacts/` and `context/` — and a chat that opens on
+  its last conversation. Right-click reveals its folder or removes it; the
+  folder is kept. It is not listed among the projects.
+- **Answer a session from the orchestrator.** A session in a devpit terminal
+  that is waiting on you can be answered from the Sessions panel: what you
+  type goes into its terminal as yours. A message from the orchestrator
+  approves nothing there — that is Claude Code's rule, and it stays.
 - **It sees every project and every session of its account.** Its agent can
   list the projects and their lanes, work on any project's board, and see the
   Claude Code sessions running now — by the name it messages them with, busy or
@@ -40,6 +46,8 @@ release notes are taken from here when a version is tagged.
 - A relative link in a card's chat opens the file in the card's own checkout.
 - **A chat has the board's tools**, as a terminal does, without the Claude
   Code plugin installed.
+- **Sessions devpit starts hear the account's other sessions** whatever mode
+  either runs in, instead of holding each message until approved by hand.
 
 ### Highlights
 
