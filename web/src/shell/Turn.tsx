@@ -2,7 +2,9 @@ import { memo, useEffect, useRef, useState } from 'react'
 
 import { Acts } from './ActsRows'
 import type { Message } from '../gen/bindings'
+import { inFolder } from './markdown'
 import { Markdown } from './MarkdownView'
+import { useShellPick } from './shellStore'
 import { Rewound } from './Rewound'
 import { TurnChanges } from './TurnChangesView'
 import { advanced, opened } from './veil'
@@ -21,8 +23,11 @@ import { advanced, opened } from './veil'
 export const Turn = memo(function Turn({
   message,
   onRewind,
+  folder,
 }: {
   message: Message
+  /** Where the conversation runs; relative links in the answer are read there. */
+  folder?: string | null
   /** Present when this turn can be rewound to; called with its turn id. */
   onRewind?: (turnId: string) => void
 }): React.JSX.Element {
@@ -55,7 +60,7 @@ export const Turn = memo(function Turn({
         </pre>
       ))}
       {answers.map((part, at) => (
-        <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} />
+        <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} folder={folder ?? null} />
       ))}
       {!message.streaming && <TurnChanges files={changed} parts={message.parts} />}
       {message.streaming && <Working />}
@@ -69,14 +74,15 @@ export const Turn = memo(function Turn({
    The veil's state is a ref rather than state: it is bookkeeping about what
    has already been drawn, and putting it in `useState` would ask React to
    re-render in order to record that a render happened. */
-function Reply({ source, live }: { source: string; live: boolean }): React.JSX.Element {
+function Reply({ source, live, folder }: { source: string; live: boolean; folder: string | null }): React.JSX.Element {
+  const show = useShellPick((shell) => shell.show)
   const veil = useRef(opened(source))
   const now = Date.now()
   const chunks = advanced(veil.current, source, live, now)
 
   return (
     <div className="reply">
-      <Markdown source={source} chunks={chunks} now={now} />
+      <Markdown source={source} chunks={chunks} now={now} opens={folder ? (here) => { const path = inFolder(folder, here); show('file', { id: `file:${path}`, path }) } : undefined} />
     </div>
   )
 }

@@ -30,7 +30,7 @@ function tokensIn(selector: string): Set<string> {
 }
 
 /* Sizes and faces are the same in every theme; only colour changes. */
-const NOT_A_COLOUR = new Set(['--sidebar-w', '--content-max', '--files-w', '--ui', '--mono'])
+const NOT_A_COLOUR = new Set(['--sidebar-w', '--content-max', '--chat-max', '--files-w', '--ui', '--mono'])
 
 describe('the palette', () => {
   const dark = tokensIn(':root {')

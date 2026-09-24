@@ -80,6 +80,9 @@ pub(crate) fn chat_history_now(
             .map(|head| head.profile.clone())
             .unwrap_or_default(),
         model: head.as_ref().and_then(|head| head.model.clone()),
+        permission: head.as_ref().and_then(|head| head.permission.clone()),
+        effort: head.as_ref().and_then(|head| head.effort.clone()),
+        cwd: head.as_ref().and_then(|head| head.cwd.clone()),
         session_id: head.as_ref().and_then(|head| head.session_id.clone()),
         cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
         context: head.as_ref().and_then(|head| head.context),
@@ -108,6 +111,7 @@ pub async fn chat_send(
     app: tauri::AppHandle,
     state: State<'_, Talking>,
     steering: State<'_, crate::steering::Steering>,
+    relay: State<'_, crate::chat_relay::Relay>,
     ask: Ask,
     on_frame: Channel<Frame>,
 ) -> Result<TurnEnd, RpcError> {
@@ -122,6 +126,8 @@ pub async fn chat_send(
         permission,
         effort,
     } = ask;
+    // Every frame goes through the relay, so a chat reopened mid-turn can join.
+    let (on_frame, _relaying) = relay.open(&conversation_id, on_frame);
     let home = home();
     let sessions = crate::projects::project_home(&project_id)?.sessions();
     let head_file = head_path(&sessions, &conversation_id);

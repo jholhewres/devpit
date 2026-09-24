@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { Asked } from './Asked'
 import { Chips } from './Chips'
@@ -17,6 +17,8 @@ import { Turn } from './Turn'
 import { SkillPills } from './SkillPills'
 import { ResumePicker } from './ResumePicker'
 import { useFollow } from './useFollow'
+import { useDraft } from './useDraft'
+import { JumpToEnd } from './JumpToEnd'
 import { Queued } from './Queued'
 import { SendButton } from './SendButton'
 import { useQueue } from './useQueue'
@@ -46,11 +48,11 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const chat = useChat(tab.id)
   const { pasted, dropped } = useTaking(chat)
   /* A chat opened from a card starts with the card in the composer, unsent. */
-  const [prompt, setPrompt] = useState(tab.draft ?? '')
+  const [prompt, setPrompt] = useDraft(tab.id, tab.draft)
   const slash = useSlash(chat.profileId, prompt, setPrompt)
   /* New output belongs at the bottom, where the eye already is — unless the
      eye went up to read. */
-  const box = useFollow<HTMLDivElement>(chat.messages)
+  const follow = useFollow<HTMLDivElement>(chat.messages)
   const field = useRef<HTMLTextAreaElement>(null)
   const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
 
@@ -76,7 +78,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (chat.sending) queue.add(prompt)
     else chat.say(prompt)
     setPrompt('')
-    box.current?.scrollTo({ top: box.current.scrollHeight })
+    follow.toEnd()
   }
 
   /* A stop hands what was queued back to the composer: it was meant for a
@@ -108,7 +110,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
       </PaneCorner>
 
       <DropTarget mine={mine} onDrop={dropped} />
-      <div className="scroll" ref={box}>
+      <div className="scroll" ref={follow.box}>
         {empty ? (
           <div className="chat__blank">
             <div className="chat__ask">
@@ -123,7 +125,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <div className="thread">
             {chat.error && <div className="exempty__t">{chat.error}</div>}
             {chat.messages.map((message) => (
-              <Turn key={message.id} message={message} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
+              <Turn key={message.id} message={message} folder={chat.folder} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
             ))}
             {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
           </div>
@@ -132,6 +134,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
 
       <div className="composer">
         <div className="composer__col">
+          <JumpToEnd away={follow.away} onJump={follow.toEnd} />
           {/* The question sits above the composer, where your hands are — not
               in the thread, where it scrolls away from you. */}
           <Asked questions={chat.asked} onAnswer={chat.answer} />

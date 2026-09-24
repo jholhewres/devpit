@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { Ask, Attachment, Context, Frame, Message, Profile, Question } from '../gen/bindings'
-import { applied, ASKS, fixedTo, MODES, send, withFiles } from './chat'
+import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
+import { applied, ASKS, batched, fixedTo, MODES, rejoin, send, withFiles } from './chat'
+import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
 import { withSkills } from './pills'
@@ -31,6 +32,8 @@ export interface Chat {
   readonly context: Context | null
   readonly permission: string
   readonly effort: string | null
+  /** The folder the conversation runs in, once a turn has fixed it. */
+  readonly folder?: string | null
   readonly files: readonly Attachment[]
   /** What the agent is waiting to be allowed to do. */
   readonly asked: readonly Question[]
@@ -72,6 +75,7 @@ export function useChat(conversationId: string): Chat {
   const [context, setContext] = useState<Context | null>(null)
   const [permission, setPermission] = useState(MODES[0].id)
   const [effort, setEffort] = useState<string | null>(null)
+  const [folder, setFolder] = useState<string | null>(null)
   const [files, setFiles] = useState<readonly Attachment[]>([])
   /* A pasted picture has no path the window can draw, so its preview is kept
      here, by the path the backend gave it. */
@@ -82,6 +86,34 @@ export function useChat(conversationId: string): Chat {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const live = useRef(true)
+  /* What the conversation's own head said it last ran with; the profile's
+     last pick only fills what that leaves empty. */
+  const stored = useRef<Modes>({})
+
+  /* A turn still running when this chat opens — it was left, or the window
+     reloaded — is joined where it is, instead of being said to have died. */
+  const rejoined = (projectId: string): void => {
+    const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
+    const running = rejoin(conversationId, (frame) => {
+      if (!live.current) return
+      setSending(true)
+      if (frame.type === 'session') setSession(frame.session_id)
+      else push(frame)
+    })
+    void running?.then((was) => {
+      flush()
+      if (!was || !live.current) return
+      setSending(false)
+      // The transcript holds the answer as it was saved, costs and all.
+      void ask(() => commands.chatHistory(projectId, conversationId)).then((past) => {
+        if (!live.current || !past.data) return
+        setMessages(past.data.messages)
+        setCost(past.data.costUsd ?? 0)
+        setContext(past.data.context ?? null)
+        setRewindable(past.data.rewindable ?? [])
+      })
+    })
+  }
 
   useEffect(() => {
     live.current = true
@@ -98,12 +130,15 @@ export function useChat(conversationId: string): Chat {
         setFixed(belongs)
         setProfileId(belongs)
         setModel(past.data.model)
+        setFolder(past.data.cwd ?? null)
+        stored.current = { permission: past.data.permission ?? undefined, effort: past.data.effort ?? undefined }
         setCost(past.data.costUsd ?? 0)
         setContext(past.data.context ?? null)
         setSession(past.data.sessionId)
         const { cardId, cardTitle, cardOnBoard } = past.data
         setCard(cardId ? { id: cardId, title: cardTitle, onBoard: cardOnBoard } : null)
         setRewindable(past.data.rewindable ?? [])
+        rejoined(project.id)
       }
       const installed = (found.data ?? []).filter((profile) => profile.path !== null)
       setProfiles(installed)
@@ -118,6 +153,14 @@ export function useChat(conversationId: string): Chat {
       live.current = false
     }
   }, [project, conversationId])
+
+  /* Reopened, a conversation goes back to the mode it ran in; a new one to the
+     last pick on its profile, instead of the most careful mode every time. */
+  useEffect(() => {
+    const open = reopened(conversationId, stored.current, profileId)
+    if (open.permission) setPermission(open.permission)
+    if (open.effort) setEffort(open.effort)
+  }, [profileId, conversationId])
 
   /* A profile saved or switched in Settings is in the picker at once. */
   useEffect(() => {
@@ -177,35 +220,8 @@ export function useChat(conversationId: string): Chat {
         permission,
         effort,
       }
-      /* Frames arrive many to a paint while an answer streams; they are
-         applied together, once per frame drawn, rather than one render each. */
-      let pending: Frame[] = []
-      let scheduled: { cancel: () => void } | null = null
-      const flush = (): void => {
-        scheduled?.cancel()
-        scheduled = null
-        if (pending.length === 0) return
-        const frames = pending
-        pending = []
-        setMessages((was) => frames.reduce(applied, was))
-      }
-      /* A hidden window gets no animation frames in WebKitGTK, and an answer
-         must keep arriving while nobody looks: a timer stands in there. */
-      const schedule = (): void => {
-        if (scheduled) return
-        if (document.hidden) {
-          const timer = setTimeout(flush, 100)
-          scheduled = { cancel: () => clearTimeout(timer) }
-        } else {
-          const frame = requestAnimationFrame(flush)
-          scheduled = { cancel: () => cancelAnimationFrame(frame) }
-        }
-      }
-      const started = send(turn, (frame) => {
-        if (frame.type === 'session') return setSession(frame.session_id)
-        pending.push(frame)
-        schedule()
-      })
+      const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
+      const started = send(turn, (frame) => (frame.type === 'session' ? setSession(frame.session_id) : push(frame)))
       if (!started) return setError('not running in the app')
       setSending(true)
       setError(null)
@@ -332,6 +348,7 @@ export function useChat(conversationId: string): Chat {
     context,
     permission,
     effort,
+    folder,
     files,
     asked,
     sending,
@@ -343,8 +360,16 @@ export function useChat(conversationId: string): Chat {
       setProfileId(next)
     },
     setModel,
-    setPermission,
-    setEffort,
+    setPermission: (mode: string) => {
+      setPermission(mode)
+      remember(conversationKey(conversationId), { permission: mode })
+      if (profileId) remember(profileId, { permission: mode })
+    },
+    setEffort: (next: string) => {
+      setEffort(next)
+      remember(conversationKey(conversationId), { effort: next })
+      if (profileId) remember(profileId, { effort: next })
+    },
     attach,
     paste,
     previews,

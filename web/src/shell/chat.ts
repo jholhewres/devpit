@@ -25,12 +25,51 @@ export function send(ask: Ask, onFrame: (frame: Frame) => void): Sent | null {
   return { end: invoke('chat_send', { ask, onFrame: channel }) as Promise<TurnEnd> }
 }
 
+/* The turn already running in a conversation, from where it is: what it sent
+   before this chat was open, then the rest. Resolves when it ends — `false`
+   at once when nothing was running. */
+export function rejoin(conversationId: string, onFrame: (frame: Frame) => void): Promise<boolean> | null {
+  if (!inTauri()) return null
+  const channel = new Channel<Frame>()
+  channel.onmessage = onFrame
+  return invoke('chat_rejoin', { conversationId, onFrame: channel }) as Promise<boolean>
+}
+
+/* Frames arrive many to a paint while an answer streams; they are applied
+   together, once per frame drawn, rather than one render each. A hidden
+   window gets no animation frames in WebKitGTK, so a timer stands in there. */
+export function batched(apply: (frames: readonly Frame[]) => void): { push: (frame: Frame) => void; flush: () => void } {
+  let pending: Frame[] = []
+  let scheduled: { cancel: () => void } | null = null
+  const flush = (): void => {
+    scheduled?.cancel()
+    scheduled = null
+    if (pending.length === 0) return
+    const frames = pending
+    pending = []
+    apply(frames)
+  }
+  const push = (frame: Frame): void => {
+    pending.push(frame)
+    if (scheduled) return
+    if (document.hidden) {
+      const timer = setTimeout(flush, 100)
+      scheduled = { cancel: () => clearTimeout(timer) }
+    } else {
+      const frame = requestAnimationFrame(flush)
+      scheduled = { cancel: () => cancelAnimationFrame(frame) }
+    }
+  }
+  return { push, flush }
+}
+
 /* What the parts of an open message become as frames arrive. A function, so
    the test calls the rule instead of restating it. */
 export function applied(messages: readonly Message[], frame: Frame): readonly Message[] {
   switch (frame.type) {
     case 'opened':
-      return [...messages, frame.message]
+      /* A rejoined turn repeats the message the transcript already holds. */
+      return messages.some((one) => one.id === frame.message.id) ? messages : [...messages, frame.message]
     case 'part':
       return messages.map((message) =>
         message.id === frame.message_id

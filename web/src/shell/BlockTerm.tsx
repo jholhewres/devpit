@@ -86,7 +86,7 @@ export function BlockTerm({
   const mode = modeOf(state, wanted)
   const done = finished(state)
   const last = done[done.length - 1]
-  const list = useFollow<HTMLDivElement>(`${done.length}:${mode}`)
+  const list = useFollow<HTMLDivElement>(`${done.length}:${mode}`).box
   const [jumped, setJumped] = useState<number | null>(null)
 
   useEffect(() => {

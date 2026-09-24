@@ -228,3 +228,11 @@ describe('a turn the app closed on', () => {
     expect(unanswered([], false)).toBe(false)
   })
 })
+
+describe('a rejoined turn', () => {
+  it('does not show again a message the transcript already holds', () => {
+    const held = applied([], opened('msg_1'))
+    expect(applied(held, opened('msg_1'))).toHaveLength(1)
+    expect(applied(held, opened('msg_2'))).toHaveLength(2)
+  })
+})

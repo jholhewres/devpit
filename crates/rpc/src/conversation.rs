@@ -28,6 +28,15 @@ pub struct Conversation {
     pub profile: String,
     /// The model within that provider, which the composer may change.
     pub model: Option<String>,
+    /// The permission mode and effort the last turn ran with, so reopening the
+    /// conversation does not quietly fall back to the most careful mode.
+    #[serde(default)]
+    pub permission: Option<String>,
+    #[serde(default)]
+    pub effort: Option<String>,
+    /// The folder its turns run in, which a relative link in an answer is read against.
+    #[serde(default)]
+    pub cwd: Option<String>,
     /// The CLI's own id for this thread, once it has run a turn. It is what
     /// ties a permission question back to the conversation that raised it.
     pub session_id: Option<String>,

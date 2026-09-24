@@ -94,6 +94,8 @@
 
   --sidebar-w: 252px;
   --content-max: 720px;
+  /* The chat's one column, wider than prose: it carries code, diffs and tool rows. */
+  --chat-max: 896px;
   --files-w: 340px;
 
   --ui: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, system-ui, sans-serif;

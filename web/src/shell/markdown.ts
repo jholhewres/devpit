@@ -194,6 +194,13 @@ export function spans(text: string): Span[] {
    relative one is a link inside the project and stays here. */
 export const external = (href: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(href)
 
+/* A path an answer names, as the file to open: against the folder the
+   conversation runs in when it has one, which for a card is its checkout. */
+export function inFolder(folder: string | null, here: string): string {
+  if (!folder || here.startsWith('/')) return here
+  return resolved(`${folder.replace(/\/$/, '')}/_`, here)
+}
+
 /* An image path in a markdown file is relative to the file, not to the
    project root — `./logo.png` in `docs/a/b.md` is `docs/a/logo.png`. */
 export function resolved(fileP: string, src: string): string {

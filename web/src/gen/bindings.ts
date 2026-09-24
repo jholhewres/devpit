@@ -1777,6 +1777,14 @@ export type Conversation = {
 	/**  The model within that provider, which the composer may change. */
 	model: string | null,
 	/**
+	 *  The permission mode and effort the last turn ran with, so reopening the
+	 *  conversation does not quietly fall back to the most careful mode.
+	 */
+	permission?: string | null,
+	effort?: string | null,
+	/**  The folder its turns run in, which a relative link in an answer is read against. */
+	cwd?: string | null,
+	/**
 	 *  The CLI's own id for this thread, once it has run a turn. It is what
 	 *  ties a permission question back to the conversation that raised it.
 	 */

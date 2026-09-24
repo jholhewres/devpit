@@ -45,6 +45,7 @@ mod card_work;
 mod cards;
 mod chaining;
 mod chat;
+mod chat_relay;
 mod chat_running;
 mod chat_turn;
 mod checkout;
@@ -170,6 +171,7 @@ fn main() {
         // `update` for why only an AppImage is ever installed from here.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(chat::Talking::default())
+        .manage(chat_relay::Relay::default())
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
         .manage(blocks::Blocks::default())
