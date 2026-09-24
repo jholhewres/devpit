@@ -23,8 +23,13 @@ pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
     // Said to every hook this session runs, so the plugin's copy of the same
     // hooks (`plugin_hooks_json`) knows these already report and stays quiet.
     let marked = format!(r#""env":{{"{HOOKED}":"1"}}"#);
+    // A session devpit starts hears the account's other sessions whatever
+    // mode either runs in. Without it a bypassing session held every message
+    // from one that asks, and the reverse, until someone approved it by hand.
+    // A message still approves nothing: that rule is the CLI's and stays.
+    let inbound = r#""crossSessionInbound":"accept""#;
     format!(
-        "{{\"hooks\":{},{allowed},{marked}}}",
+        "{{\"hooks\":{},{allowed},{marked},{inbound}}}",
         hooks(endpoint_file, auth_file, "")
     )
 }

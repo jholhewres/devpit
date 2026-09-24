@@ -98,6 +98,15 @@ fn the_settings_are_json_the_cli_can_read() {
     }
 }
 
+/// A session devpit starts takes messages from the account's other sessions
+/// whatever mode either runs in; left unset, the CLI held them for approval.
+#[test]
+fn a_session_devpit_starts_hears_its_accounts_other_sessions() {
+    let settings = settings_json(Path::new("/tmp/endpoint"), Path::new("/tmp/hook-auth"));
+    let parsed: serde_json::Value = serde_json::from_str(&settings).expect("valid JSON");
+    assert_eq!(parsed["crossSessionInbound"], "accept");
+}
+
 /// The secret rides in a header read from a file, never in the command itself.
 ///
 /// Everything in that command line is visible to anything on the machine that
