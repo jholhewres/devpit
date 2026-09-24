@@ -5,6 +5,22 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
+### Chat
+
+- **A chat you leave keeps going.** Switch project or reload the window in the
+  middle of an answer and, coming back, the answer so far is there and the
+  rest keeps arriving — Stop included. It no longer says the app closed about
+  a turn that was still running.
+- **The mode you pick stays picked.** Full access, Accept edits or Supervised
+  survives switching tabs, reopening the conversation and restarting devpit,
+  and a new conversation starts in the last mode picked on that account.
+- **Unsent text is kept** per conversation until you send or clear it.
+- **The thread follows the answer as it grows** — text streaming into place,
+  a block opening — and stops when you scroll up to read, with a button back
+  to the latest.
+- **A wider thread**: one 896px column for messages, the composer and replies.
+- A relative link in a card's chat opens the file in the card's own checkout.
+
 ### Highlights
 
 - **Error reports, opt-in.** A new switch in Settings → General, off unless you
