@@ -38,8 +38,33 @@ pub(crate) fn follow(
     lines: impl Iterator<Item = String>,
     control: &Control,
     on_session: Option<&(dyn Fn(&str) + Sync)>,
-    mut on_part: impl FnMut(Part),
+    on_part: impl FnMut(Part),
 ) -> Heard {
+    let (heard, _) = one_turn(driver, lines, control, on_session, on_part, false);
+    heard
+}
+
+/// One turn of a process that stays: stops reading once the turn is over —
+/// its result in and nothing of it still running — and leaves stdin open for
+/// the next. `false` beside it when the stream ended first.
+pub(crate) fn next_turn(
+    driver: &dyn Driver,
+    lines: impl Iterator<Item = String>,
+    control: &Control,
+    on_session: Option<&(dyn Fn(&str) + Sync)>,
+    on_part: impl FnMut(Part),
+) -> (Heard, bool) {
+    one_turn(driver, lines, control, on_session, on_part, true)
+}
+
+fn one_turn(
+    driver: &dyn Driver,
+    lines: impl Iterator<Item = String>,
+    control: &Control,
+    on_session: Option<&(dyn Fn(&str) + Sync)>,
+    mut on_part: impl FnMut(Part),
+    stays: bool,
+) -> (Heard, bool) {
     let mut heard = Heard::default();
     let mut running = Running::default();
     let mut result_seen = false;
@@ -75,11 +100,14 @@ pub(crate) fn follow(
             Read::Nothing => {}
         }
         if may_close(result_seen, &running) {
+            if stays {
+                return (heard, true);
+            }
             control.close();
         }
     }
 
-    heard
+    (heard, false)
 }
 
 #[cfg(test)]

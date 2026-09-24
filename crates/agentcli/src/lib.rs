@@ -295,6 +295,7 @@ pub mod outside;
 pub mod profile;
 #[cfg(test)]
 mod profile_tests;
+pub mod resident;
 pub mod running;
 pub mod skills;
 mod sources;

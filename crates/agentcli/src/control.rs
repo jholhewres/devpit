@@ -52,12 +52,28 @@ impl Control {
         self.write(&stop_task_request(task_id))
     }
 
+    /// Asks the CLI to stop the turn it is on, and keep running: what stopping
+    /// is for a process that stays to hear the next message.
+    pub fn interrupt(&self) -> bool {
+        self.write(&interrupt_request())
+    }
+
     /// Lets go of stdin, which is what lets the CLI exit.
     pub(crate) fn close(&self) {
         if let Ok(mut held) = self.stdin.lock() {
             held.take();
         }
     }
+}
+
+/// The control request that stops the turn in flight: `{subtype: "interrupt"}`.
+pub fn interrupt_request() -> String {
+    serde_json::json!({
+        "type": "control_request",
+        "request_id": format!("interrupt-{}", std::process::id()),
+        "request": { "subtype": "interrupt" },
+    })
+    .to_string()
 }
 
 /// The control request that stops one task, as the CLI's own schema names it:
