@@ -5,11 +5,18 @@ use super::*;
 #[test]
 fn a_background_session_carries_only_what_it_was_given() {
     assert_eq!(
-        background_argv(None, None, None, None, None),
+        background_argv(None, None, None, None, None, None),
         ["claude", "--bg"]
     );
     assert_eq!(
-        background_argv(None, Some("uuid-1"), Some("fix-auth"), Some("opus"), None),
+        background_argv(
+            None,
+            Some("uuid-1"),
+            Some("fix-auth"),
+            Some("opus"),
+            None,
+            None
+        ),
         [
             "claude",
             "--bg",
@@ -68,7 +75,7 @@ fn a_background_session_starts_under_its_profile() {
         args: vec!["--profile".to_owned(), "work".to_owned()],
         env: Vec::new(),
     };
-    let argv = background_argv(Some(&named), Some("s-1"), None, None, None);
+    let argv = background_argv(Some(&named), Some("s-1"), None, None, None, None);
     assert_eq!(argv[0], "/opt/claw/bin/claw");
     assert_eq!(argv[1..4], ["--profile", "work", "--bg"]);
     assert_eq!(attach_argv(Some(&named), "a1b2")[0], "/opt/claw/bin/claw");
@@ -86,15 +93,15 @@ fn a_background_session_starts_under_its_profile() {
     // Same retry as the turn tests: a script written a moment ago can be "text
     // file busy" while another test forks with it open.
     let short = (0..5)
-        .find_map(
-            |_| match start_background(dir.path(), Some(&stand_in), None, None, None, None) {
+        .find_map(|_| {
+            match start_background(dir.path(), Some(&stand_in), None, None, None, None, None) {
                 Err(AgentError::NotInstalled) => {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     None
                 }
                 other => Some(other),
-            },
-        )
+            }
+        })
         .expect("the stand-in never started")
         .expect("a handle");
 
@@ -135,4 +142,18 @@ fn a_headless_turn_names_its_session() {
         .position(|a| a == "--session-id")
         .expect("no session id in the line");
     assert_eq!(argv[at + 1], id);
+}
+
+/// Work handed to a background session goes in as its own argument, after
+/// `--`, with the name other sessions reach it by.
+#[test]
+fn a_handed_session_is_named_and_asked_as_arguments() {
+    let handed = Handed {
+        name: "api-fix",
+        prompt: "fix it; rm -rf /",
+    };
+    let argv = background_argv(None, None, None, None, None, Some(&handed));
+    let at = argv.iter().position(|a| a == "--name").expect("named");
+    assert_eq!(argv[at + 1], "api-fix");
+    assert_eq!(&argv[argv.len() - 2..], ["--", "fix it; rm -rf /"]);
 }

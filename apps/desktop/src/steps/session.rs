@@ -64,6 +64,7 @@ pub fn start(
         None,
         config.model.as_deref(),
         super::hook_settings().as_deref(),
+        None,
     )
     .map_err(|err| err.to_string())?;
 

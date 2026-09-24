@@ -42,7 +42,7 @@ fn a_real_background_session_can_be_started_and_stopped() {
             .expect("git");
     }
 
-    let short = start_background(dir.path(), None, None, None, None, None)
+    let short = start_background(dir.path(), None, None, None, None, None, None)
         .expect("the CLI started a session but no handle came back");
     assert!(is_handle(&short), "{short} is not a handle");
 

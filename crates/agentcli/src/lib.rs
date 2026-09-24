@@ -95,6 +95,13 @@ pub fn list(
     session::parse_list(&output.stdout)
 }
 
+/// What a background session is started with when someone hands it work: the
+/// name other sessions message it by, and the first thing it is asked.
+pub struct Handed<'a> {
+    pub name: &'a str,
+    pub prompt: &'a str,
+}
+
 /// The argv that starts a session in the background.
 ///
 /// Returned rather than run so the caller can log it, and so a test can assert
@@ -105,6 +112,7 @@ pub fn background_argv(
     worktree: Option<&str>,
     model: Option<&str>,
     settings: Option<&str>,
+    handed: Option<&Handed<'_>>,
 ) -> Vec<String> {
     let mut argv = vec![runner
         .map_or(PROGRAM, |one| one.program.as_str())
@@ -130,6 +138,14 @@ pub fn background_argv(
         argv.push("--settings".to_owned());
         argv.push(path.to_owned());
     }
+    if let Some(handed) = handed {
+        argv.push("--name".to_owned());
+        argv.push(handed.name.to_owned());
+        // Its own argument, never spliced into a shell line: nothing here is
+        // run through a shell, so the prompt cannot become syntax.
+        argv.push("--".to_owned());
+        argv.push(handed.prompt.to_owned());
+    }
     argv
 }
 
@@ -145,8 +161,9 @@ pub fn start_background(
     worktree: Option<&str>,
     model: Option<&str>,
     settings: Option<&str>,
+    handed: Option<&Handed<'_>>,
 ) -> Result<String, AgentError> {
-    let argv = background_argv(runner, session_id, worktree, model, settings);
+    let argv = background_argv(runner, session_id, worktree, model, settings, handed);
     let output = devpit_pty::host_env::command(&argv[0])
         .args(&argv[1..])
         .current_dir(cwd)
