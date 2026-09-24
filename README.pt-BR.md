@@ -134,6 +134,20 @@ orquestrador atrás disso: nada agenda trabalho, nada tenta de novo, e uma
 sequência de raias em `auto` é uma que você montou raia por raia e consegue
 ver.
 
+### Um orquestrador, quando você quiser
+
+Um orquestrador é um chat que você conduz e que enxerga todos os projetos de uma
+vez. Criado no topo do rail — com qual conta do Claude Code ele roda e um nome —
+ele lista os projetos e seus quadros, vê as sessões da conta rodando agora e
+pode entregar o trabalho de um card a uma sessão nova: no checkout do próprio
+card, ligada ao card, no quadro como qualquer outra. Ele ouve essas sessões entre
+as suas mensagens e diz no chat o que elas relataram.
+
+Quem decide continua sendo você. Ele nunca move um card para uma raia com etapa,
+nada do que ele faz roda num temporizador, e uma mensagem dele não aprova nada em
+outra sessão — quando uma espera por você, você responde pelo painel Sessions do
+orquestrador, como você mesmo.
+
 **Sem card, só o terminal.** Abra o devpit, digite, e sua CLI de agente se
 comporta exatamente como sempre se comportou. O quadro é uma fonte opcional de
 trabalho, não uma cancela.

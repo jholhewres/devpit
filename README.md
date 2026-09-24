@@ -132,6 +132,20 @@ What happens next is the lane's setting, and you choose it per lane:
 is no orchestrator behind this: nothing schedules work, nothing retries, and a
 chain of `auto` lanes is one you built lane by lane and can see.
 
+### An orchestrator, when you want one
+
+An orchestrator is a chat you drive that sees every project at once. Made from
+the top of the rail — which Claude Code account it runs as, and a name — it
+lists the projects and their boards, sees the account's sessions running now,
+and can hand a card's work to a new session: in the card's own checkout, linked
+to the card, on the board like any other. It hears those sessions between your
+messages and says what they reported in its chat.
+
+It is still you deciding. It never moves a card into a lane that runs a step,
+nothing it does runs on a timer, and a message it sends approves nothing in
+another session — when one waits on you, you answer it from the orchestrator's
+Sessions panel, as yourself.
+
 **No card, just a terminal.** Open devpit, type into it, and your agent CLI
 behaves exactly as it always has. The board is an optional source of work, not a
 toll gate.

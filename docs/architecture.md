@@ -120,3 +120,26 @@ which lanes those are.
 That shape is deliberate. Orchestration that keeps itself going is
 orchestration you cannot see, and the problem this project attacks is losing
 sight of what is happening.
+
+## An orchestrator is a chat you drive
+
+The orchestrator is you — or a chat you drive, whose every session is on the
+board. It is a project devpit keeps for itself, under `orchestrator/<account>/
+<name>`, known by its folder rather than by a column, so it gets the chat, the
+files and the agent API's scope the way any project does. From there, and only
+from there, the agent API reaches past one project: `devpit_projects`,
+`devpit_sessions`, a `project` on the board tools, and `devpit_start_session`,
+which starts a background session in a card's own checkout and links it to the
+card.
+
+The limits are the point:
+
+- **Visible.** Every session it starts is on a card, on the board.
+- **No steps.** The gate that refuses an agent a lane with a step applies to it
+  too; starting a step stays the person's move.
+- **No consent by proxy.** A message between sessions approves nothing — the
+  CLI's rule. A session waiting on the person is answered from the
+  orchestrator's Sessions panel, which types into that session's own terminal as
+  the person. That path is the window's alone; no agent reaches it.
+- **Heard, not polling.** Its conversation keeps one process between turns, so a
+  session's reply wakes it; nothing here runs it on a timer.
