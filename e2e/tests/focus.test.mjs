@@ -76,7 +76,8 @@ describe('a focus, in the running app', () => {
       'return document.querySelector(".hdown")?.getAttribute("title") ?? null',
     )
     assert.ok(title, 'no focus control in the top bar')
-    assert.match(title, /⇧⌘F/, 'the control does not announce its key')
+    // Said the way this platform writes it: ⇧⌘F on a Mac, Ctrl+Shift+F elsewhere.
+    assert.match(title, /⇧⌘F|Ctrl\+Shift\+F/, 'the control does not announce its key')
   })
 
   test('going in is remembered by the app, not only by the window', async () => {
