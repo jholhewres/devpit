@@ -19,6 +19,8 @@ import { ResumePicker } from './ResumePicker'
 import { useFollow } from './useFollow'
 import { useDraft } from './useDraft'
 import { JumpToEnd } from './JumpToEnd'
+import { ComposerFiles } from './ComposerFiles'
+import { OrchestratorSessions } from './OrchestratorSessions'
 import { Queued } from './Queued'
 import { SendButton } from './SendButton'
 import { useQueue } from './useQueue'
@@ -110,6 +112,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
       </PaneCorner>
 
       <DropTarget mine={mine} onDrop={dropped} />
+      {project?.orchestrator && <OrchestratorSessions profileId={project.orchestrator} />}
       <div className="scroll" ref={follow.box}>
         {empty ? (
           <div className="chat__blank">
@@ -142,23 +145,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <Queued queue={queue} />
 
           <div className="composer__in">
-            {chat.files.length > 0 && (
-              <div className="composer__files">
-                {chat.files.map((file) => (
-                  <button
-                    key={file.path}
-                    className="chip"
-                    onClick={() => chat.detach(file.path)}
-                    title={`${file.path} — click to remove`}
-                  >
-                    {chat.previews[file.path] && (
-                      <img className="chip__thumb" src={chat.previews[file.path]} alt="" />
-                    )}
-                    {file.name} ✕
-                  </button>
-                ))}
-              </div>
-            )}
+            <ComposerFiles chat={chat} />
 
             <SkillPills picked={chat.skills} onChange={chat.setSkills} profile={chat.profiles.find((one) => one.id === chat.profileId)} />
             <SlashMenu slash={slash} />

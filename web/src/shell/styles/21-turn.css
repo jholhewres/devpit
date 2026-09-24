@@ -40,6 +40,22 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .pane[data-pane='term']:hover .pcorner, .pane[data-pane='term'] .pcorner:focus-within { opacity: 1; }
 /* The thread starts under the corner, not behind it. */
 .pane[data-pane='chat'] > .scroll { padding-top: 36px; }
+
+/* An orchestrator's sessions, down the right of its chat. Over the thread's
+   margin on a wide pane; folded to its heading on a narrow one. */
+.osess { position: absolute; top: 44px; right: 12px; z-index: 20; width: 248px; max-height: calc(100% - 200px); display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.osess__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; background: none; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
+.osess__count { color: var(--text-3); font-weight: 500; }
+.osess__list { margin: 0; padding: 0 4px 6px; list-style: none; overflow-y: auto; }
+.osess__none { padding: 6px 8px; font-size: 12px; color: var(--text-3); }
+.osess__row { width: 100%; display: grid; grid-template-columns: 8px 1fr; column-gap: 8px; align-items: center; padding: 6px; border: 0; border-radius: 6px; background: none; color: var(--text-2); text-align: left; cursor: pointer; }
+.osess__row:hover:not(:disabled) { background: var(--overlay); }
+.osess__row:disabled { cursor: default; }
+.osess__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+.osess__dot[data-status='busy'] { background: var(--accent); }
+.osess__name { font-family: var(--mono); font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osess__where { grid-column: 2; font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) { .osess:not([data-open]) { width: auto; } }
 .chat__drop { position: absolute; inset: 6px; z-index: 20; display: flex; align-items: center; justify-content: center; border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--canvas)); pointer-events: none; }
 .chat__dropt { font-size: 13px; color: var(--accent); }
 
