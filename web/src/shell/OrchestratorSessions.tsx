@@ -22,6 +22,10 @@ export function OrchestratorSessions({ profileId }: { profileId: string }): Reac
   const { setProject, show, openCard } = useShell()
   const [sessions, setSessions] = useState<readonly LiveSession[]>([])
   const [open, setOpen] = useState(true)
+  /* The one session being answered, and what is typed for it. */
+  const [replying, setReplying] = useState<string | null>(null)
+  const [reply, setReply] = useState('')
+  const [said, setSaid] = useState<string | null>(null)
 
   useEffect(() => {
     let gone = false
@@ -48,6 +52,19 @@ export function OrchestratorSessions({ profileId }: { profileId: string }): Reac
     }
   }
 
+  /* Typed into that session's own terminal, as the person: a message from
+     the orchestrator would approve nothing there, and must not. */
+  const answer = (one: LiveSession): void => {
+    const text = reply.trim()
+    if (!text) return
+    void ask(() => commands.orchestratorReply(profileId, one.name, text)).then((sent) => {
+      setSaid(sent.error ?? `Sent to ${one.name}`)
+      if (sent.error) return
+      setReply('')
+      setReplying(null)
+    })
+  }
+
   const busy = sessions.filter((one) => one.status === 'busy').length
   return (
     <aside className="osess" data-open={open ? 'true' : undefined} aria-label="Sessions">
@@ -59,16 +76,27 @@ export function OrchestratorSessions({ profileId }: { profileId: string }): Reac
         <ul className="osess__list">
           {sessions.length === 0 && <li className="osess__none">Nothing running on this account.</li>}
           {sessions.map((one) => (
-            <li key={one.name}>
+            <li key={one.name} className="osess__item">
               <button className="osess__row" onClick={() => go(one)} disabled={!one.projectId} title={one.cwd}>
                 <span className="osess__dot" data-status={one.status} />
                 <span className="osess__name">{one.name}</span>
                 <span className="osess__where">{one.projectName ?? 'outside devpit'}{one.cardId ? ' · card' : ''}</span>
               </button>
+              {one.inDevpit && (
+                <button className="osess__answer" onClick={() => setReplying((was) => (was === one.name ? null : one.name))} title="Reply in its terminal, as you" aria-label={`Reply to ${one.name}`}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 6 6v5" /></svg>
+                </button>
+              )}
+              {replying === one.name && (
+                <form className="osess__reply" onSubmit={(event) => (event.preventDefault(), answer(one))}>
+                  <input autoFocus value={reply} maxLength={4000} placeholder="As you, in its terminal" onChange={(event) => setReply(event.target.value)} />
+                </form>
+              )}
             </li>
           ))}
         </ul>
       )}
+      {open && said && <p className="osess__said">{said}</p>}
     </aside>
   )
 }

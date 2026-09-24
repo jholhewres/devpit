@@ -21,6 +21,9 @@ pub struct LiveSession {
     pub card_id: Option<String>,
     /// Milliseconds since the epoch, when its status last changed.
     pub since: Option<f64>,
+    /// Whether it runs in one of devpit's own terminals, where a reply can be
+    /// typed for the person.
+    pub in_devpit: bool,
 }
 
 /// A list, so tomorrow's field has somewhere to go.

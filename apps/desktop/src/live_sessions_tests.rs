@@ -3,7 +3,7 @@ use std::path::Path;
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{card_of, read};
+use super::{card_of, pane_target, read};
 
 fn project(id: &str, root: &Path, orchestrator: Option<&str>) -> Project {
     serde_json::from_value(json!({
@@ -93,4 +93,15 @@ fn only_devpits_card_checkouts_name_a_card() {
     );
     assert_eq!(card_of(worktrees, &worktrees.join("prj_1/other")), None);
     assert_eq!(card_of(worktrees, Path::new("/elsewhere/card_9")), None);
+}
+
+#[test]
+fn only_a_devpit_terminal_can_be_typed_into() {
+    assert_eq!(
+        pane_target("devpit_prj_1__leaf_9").as_deref(),
+        Some("devpit_prj_1__leaf_9:leaf_9")
+    );
+    assert_eq!(pane_target("main"), None);
+    assert_eq!(pane_target("other_prj__leaf_9"), None);
+    assert_eq!(pane_target("devpit_prj;rm__leaf_9"), None);
 }

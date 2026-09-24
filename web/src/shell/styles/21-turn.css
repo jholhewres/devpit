@@ -55,6 +55,12 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .osess__dot[data-status='busy'] { background: var(--accent); }
 .osess__name { font-family: var(--mono); font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .osess__where { grid-column: 2; font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osess__item { position: relative; }
+.osess__answer { position: absolute; top: 6px; right: 4px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 5px; background: none; color: var(--text-3); cursor: pointer; }
+.osess__answer:hover { color: var(--text); background: var(--overlay); }
+.osess__reply { padding: 2px 6px 6px 22px; }
+.osess__reply input { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--inset); color: var(--text); font-size: 12px; }
+.osess__said { margin: 0; padding: 4px 10px 8px; font-size: 11px; color: var(--text-3); }
 @media (max-width: 1100px) { .osess:not([data-open]) { width: auto; } }
 .chat__drop { position: absolute; inset: 6px; z-index: 20; display: flex; align-items: center; justify-content: center; border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--canvas)); pointer-events: none; }
 .chat__dropt { font-size: 13px; color: var(--accent); }
