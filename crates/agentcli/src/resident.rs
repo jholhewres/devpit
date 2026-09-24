@@ -25,6 +25,23 @@ use crate::talk_args::argv;
 use crate::talk_stream::next_turn;
 use crate::AgentError;
 
+/// How long a closed process gets to finish on its own before it is ended.
+const GRACE: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Whether the process is still there and still this one: a zombie or a pid
+/// already handed to someone else is not signalled.
+fn still_running(pid: u32) -> bool {
+    std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        .ok()
+        .and_then(|stat| {
+            stat.rsplit(')')
+                .next()
+                .map(|rest| rest.trim_start().chars().next())
+        })
+        .flatten()
+        .is_some_and(|state| state != 'Z')
+}
+
 /// What the process says, a turn at a time.
 pub enum Heard {
     Part(Part),
@@ -115,9 +132,20 @@ impl Resident {
         self.control.interrupt()
     }
 
-    /// Lets it exit: with stdin closed the CLI finishes and goes.
+    /// Lets it exit: with stdin closed the CLI finishes and goes. One that
+    /// is still there a while later — hung on a tool, a stalled retry — is
+    /// ended, rather than left running for as long as devpit does.
     pub fn close(&self) {
         self.control.close();
+        let pid = self.pid;
+        std::thread::spawn(move || {
+            std::thread::sleep(GRACE);
+            if still_running(pid) {
+                let _ = std::process::Command::new("kill")
+                    .args(["-TERM", &pid.to_string()])
+                    .status();
+            }
+        });
     }
 
     pub fn pid(&self) -> u32 {

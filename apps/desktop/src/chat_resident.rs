@@ -249,6 +249,13 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
                 let _ = tell.send(Heard::Ended(said));
                 *now = Listening::Nobody;
             }
+            // Gone mid-turn: that turn fails, and the conversation is left
+            // quiet so the next one starts a new process instead of waiting
+            // for this one for ever.
+            (Listening::Person(tell), Heard::Gone) => {
+                let _ = tell.send(Heard::Gone);
+                *now = Listening::Nobody;
+            }
             (Listening::Person(tell), heard) => {
                 let _ = tell.send(heard);
             }

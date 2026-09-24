@@ -91,3 +91,38 @@ fn it_stays_between_turns_and_is_heard_when_woken() {
     resident.close();
     assert_eq!(next(), "<gone>");
 }
+
+/// A process that dies halfway through a turn is reported gone, with no end
+/// frame: the turn failed, and whoever waits on it hears so instead of waiting.
+#[test]
+fn a_process_that_dies_mid_turn_is_heard_as_gone() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join("fake-claude");
+    std::fs::write(
+        &cli,
+        "#!/bin/sh\nread -r _first\nprintf '{\"type\":\"assistant\",\"message\":{\"id\":\"m-1\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"half\"}]},\"session_id\":\"s-1\"}\\n'\nexit 3\n",
+    )
+    .expect("script");
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let command = cli.to_string_lossy().into_owned();
+
+    let (tell, heard) = mpsc::channel();
+    let resident = Resident::start(
+        driver("claude").expect("driver"),
+        &turn(&command),
+        Arc::new(|_: &str| {}),
+        move |one| {
+            if let Some(line) = said(&one) {
+                let _ = tell.send(line);
+            }
+        },
+    )
+    .expect("started");
+    assert!(resident.say("go"));
+    let next = || {
+        heard
+            .recv_timeout(Duration::from_secs(5))
+            .expect("heard in time")
+    };
+    assert_eq!((next(), next()), ("half".to_owned(), "<gone>".to_owned()));
+}
