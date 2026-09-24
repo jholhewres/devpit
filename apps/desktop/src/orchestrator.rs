@@ -10,10 +10,17 @@ use std::path::Path;
 use devpit_core::Store;
 use devpit_rpc::{ErrorCode, Project, RpcError};
 
+/// devpit's half of the brief: rewritten on every opening, so an orchestrator
+/// made by an older build learns how this one works. `CLAUDE.md` imports it.
+const DEVPIT_BRIEF: (&str, &str) = (
+    ".devpit/orchestrator.md",
+    include_str!("orchestrator_devpit.md"),
+);
+
 /// What a new orchestrator's folder starts with. Written only when missing:
 /// the person edits these, and a second opening must not undo that.
 const SEEDED: &[(&str, &str)] = &[
-    ("CLAUDE.md", include_str!("orchestrator_brief.md")),
+    ("CLAUDE.md", include_str!("orchestrator_claude.md")),
     ("docs/.gitkeep", ""),
     ("artifacts/.gitkeep", ""),
     ("context/.gitkeep", ""),
@@ -80,8 +87,15 @@ pub(crate) fn orchestrator_open_now(profile_id: String) -> Result<Project, RpcEr
         .unwrap_or(made))
 }
 
-/// Writes what a new orchestrator starts with, leaving what is there alone.
+/// Writes devpit's brief as this build has it, and what a new orchestrator
+/// starts with, leaving the rest alone.
 pub(crate) fn seed(folder: &Path) -> std::io::Result<()> {
+    let (name, text) = DEVPIT_BRIEF;
+    let brief = folder.join(name);
+    if std::fs::read_to_string(&brief).ok().as_deref() != Some(text) {
+        std::fs::create_dir_all(brief.parent().unwrap_or(folder))?;
+        std::fs::write(&brief, text)?;
+    }
     for (name, text) in SEEDED {
         let path = folder.join(name);
         if path.exists() {
