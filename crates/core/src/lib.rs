@@ -16,6 +16,7 @@ pub mod paths;
 mod paths_guard_tests;
 #[cfg(test)]
 mod paths_tests;
+pub mod reports;
 pub mod store;
 pub mod tree;
 #[cfg(test)]

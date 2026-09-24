@@ -104,7 +104,10 @@ pub fn carry_out(carrying: Carrying, store: &Store) {
     // A failure to record is worth saying out loud: the run finished and
     // the screen would otherwise show it running forever.
     match closed {
-        Err(err) => eprintln!("could not record the end of run {id}: {err}"),
+        Err(err) => devpit_core::reports::background(
+            "run registration",
+            &format!("could not record the end of run {id}: {err}"),
+        ),
         // Closed already: a person stopped it, and the card heard that then.
         Ok(false) => {}
         Ok(true) => run_heard(&app, &card, &run_reference(store, &id), state_of_run(ended)),
@@ -145,7 +148,10 @@ pub fn store_for_thread(
     };
     let why = format!("could not open the store to carry out this run: {err}");
     if let Err(err) = store.finish_run(run_id, "failed", Some(&why), None, None, None) {
-        eprintln!("could not record the end of run {run_id}: {err}");
+        devpit_core::reports::background(
+            "run registration",
+            &format!("could not record the end of run {run_id}: {err}"),
+        );
     }
     None
 }

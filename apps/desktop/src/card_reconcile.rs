@@ -169,11 +169,13 @@ pub(crate) fn last_opened(projects: &[devpit_core::ProjectRow]) -> Option<String
 /// already runs when they are opened.
 pub(crate) fn rebuild_on_start(app: tauri::AppHandle) {
     std::thread::spawn(move || {
+        // A store that would not open was kept where the error was made.
         let Ok(store) = crate::projects::store() else {
             return;
         };
-        let Ok(projects) = store.projects() else {
-            return;
+        let projects = match store.projects() {
+            Ok(projects) => projects,
+            Err(err) => return devpit_core::reports::background("card reconcile", &err),
         };
         let Some(project_id) = last_opened(&projects) else {
             return;

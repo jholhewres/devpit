@@ -34,15 +34,30 @@ pub struct RpcError {
 }
 
 impl RpcError {
+    /// An `Internal` is a bug by definition, so it is kept for the error
+    /// report here, where every one of them is made, with the place that made
+    /// it: the response itself cannot be reached on its way to the window.
+    #[track_caller]
     pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
-        Self {
+        let error = Self {
             code,
             message: message.into(),
             retry_after_ms: None,
             details: None,
+        };
+        if code == ErrorCode::Internal {
+            let at = std::panic::Location::caller().to_string();
+            devpit_core::reports::record(devpit_core::reports::Report {
+                kind: "internal",
+                location: Some(&at),
+                message: &error.message,
+                stack: None,
+            });
         }
+        error
     }
 
+    #[track_caller]
     pub fn internal(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::Internal, message)
     }
@@ -63,6 +78,7 @@ impl std::error::Error for RpcError {}
 /// Store errors cross into the contract without leaking SQLite detail to the
 /// screen: "database is locked" helps nobody.
 impl From<devpit_core::StoreError> for RpcError {
+    #[track_caller]
     fn from(err: devpit_core::StoreError) -> Self {
         match err {
             // Busy, not Conflict: a conflict is the board's "move it anyway?",

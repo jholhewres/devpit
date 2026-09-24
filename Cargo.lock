@@ -817,6 +817,7 @@ dependencies = [
  "dirs",
  "rusqlite",
  "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.20",
@@ -876,6 +877,7 @@ name = "devpit-pty"
 version = "0.1.14"
 dependencies = [
  "anyhow",
+ "devpit-core",
  "libc",
  "portable-pty",
  "tempfile",
@@ -891,6 +893,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "tempfile",
 ]
 
 [[package]]

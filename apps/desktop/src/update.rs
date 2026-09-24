@@ -916,7 +916,10 @@ impl InTheWay for Stopping<'_> {
         if let Err(err) =
             crate::in_flight::stop_run(self.app, self.in_flight, &store, &card_id, run_id)
         {
-            eprintln!("devpit-update could not stop a run: {}", err.message);
+            devpit_core::reports::background(
+                "devpit-update",
+                &format!("could not stop a run: {}", err.message),
+            );
         }
     }
 
@@ -1162,9 +1165,12 @@ pub async fn update_install_package(
         updating.moved_to(&app, ready);
     }
     if let Err(err) = install(app, updating, WhenWorkIsInTheWay::Wait).await {
-        eprintln!(
-            "devpit-update {} is in but the restart did not happen: {}",
-            package.version, err.message
+        devpit_core::reports::background(
+            "devpit-update",
+            &format!(
+                "{} is in but the restart did not happen: {}",
+                package.version, err.message
+            ),
         );
     }
     Ok(true)
@@ -1351,7 +1357,7 @@ async fn install(
         updating
             .claimed
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        eprintln!("devpit-update the installer refused: {err}");
+        devpit_core::reports::background("devpit-update", &format!("the installer refused: {err}"));
         let failed = UpdateStatus::Failed {
             message: why_the_install_failed(&err),
             recoverable: false,

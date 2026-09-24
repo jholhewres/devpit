@@ -26,6 +26,7 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
             .and_then(|value| value.parse::<f64>().ok())
             .filter(|value| CONTRAST.contains(value)),
         focus_mode: store.preference_flag(preference::FOCUS_MODE)?,
+        error_reports: store.preference_flag(preference::ERROR_REPORTS)?,
     })
 }
 
@@ -53,6 +54,7 @@ pub async fn settings_write(
     confirm_stop: Option<bool>,
     terminal_contrast: Option<f64>,
     focus_mode: Option<bool>,
+    error_reports: Option<bool>,
 ) -> Result<Settings, RpcError> {
     crate::off_main::blocking(move || {
         settings_write_now(
@@ -61,6 +63,7 @@ pub async fn settings_write(
             confirm_stop,
             terminal_contrast,
             focus_mode,
+            error_reports,
         )
     })
     .await
@@ -73,6 +76,7 @@ pub(crate) fn settings_write_now(
     confirm_stop: Option<bool>,
     terminal_contrast: Option<f64>,
     focus_mode: Option<bool>,
+    error_reports: Option<bool>,
 ) -> Result<Settings, RpcError> {
     let store = store()?;
     if let Some(chosen) = theme {
@@ -86,6 +90,10 @@ pub(crate) fn settings_write_now(
     }
     if let Some(offered) = focus_mode {
         store.set_preference_flag(preference::FOCUS_MODE, offered)?;
+    }
+    if let Some(kept) = error_reports {
+        // Now, not at the next start: off means nothing kept from this moment.
+        crate::error_reports::choose(&store, &devpit_core::Store::root()?, kept)?;
     }
     if let Some(contrast) = terminal_contrast {
         if !CONTRAST.contains(&contrast) {

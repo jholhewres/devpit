@@ -90,7 +90,10 @@ pub fn start_chained(
             },
         },
     ) {
-        eprintln!("could not record whose run {run_id} is: {err}");
+        devpit_core::reports::background(
+            "run registration",
+            &format!("could not record whose run {run_id} is: {err}"),
+        );
     }
     // Heard in the one order everything else about the card is heard in.
     run_heard(

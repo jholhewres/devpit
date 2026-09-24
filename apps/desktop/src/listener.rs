@@ -35,7 +35,10 @@ pub fn start(app: AppHandle, root: &Path) {
     let listener = match TcpListener::bind((Ipv4Addr::LOCALHOST, 0)) {
         Ok(listener) => listener,
         Err(err) => {
-            eprintln!("no hook listener, the board will poll instead: {err}");
+            devpit_core::reports::background(
+                "hook listener",
+                &format!("none, the board will poll instead: {err}"),
+            );
             return;
         }
     };
@@ -54,14 +57,20 @@ pub fn start(app: AppHandle, root: &Path) {
     // written at all: a hook that found a port to post to but no secret to
     // carry would post and, from the next story on, be refused.
     let Some(secret) = fresh_secret() else {
-        eprintln!("no hook listener: the system gave out no randomness");
+        devpit_core::reports::background(
+            "hook listener",
+            &"none: the system gave out no randomness",
+        );
         return;
     };
     if let Err(err) = devpit_core::home::write_private(
         &devpit_agentcli::auth_file(root),
         format!("{}: {secret}\n", devpit_agentcli::HOOK_HEADER).as_bytes(),
     ) {
-        eprintln!("could not write the hook secret: {err}");
+        devpit_core::reports::background(
+            "hook listener",
+            &format!("could not write the hook secret: {err}"),
+        );
         return;
     }
     let _ = SECRET.set(secret);
@@ -70,7 +79,10 @@ pub fn start(app: AppHandle, root: &Path) {
     if let Err(err) =
         devpit_core::home::write_private(&endpoint, format!("http://{address}/hook").as_bytes())
     {
-        eprintln!("could not publish the hook endpoint: {err}");
+        devpit_core::reports::background(
+            "hook listener",
+            &format!("could not publish the hook endpoint: {err}"),
+        );
         return;
     }
 

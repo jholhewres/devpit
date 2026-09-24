@@ -69,6 +69,10 @@ pub struct Settings {
     /// "never asked": an unfinished thing does not get to be the default by
     /// virtue of nobody having had an opinion about it yet.
     pub focus_mode: Option<bool>,
+    /// Whether devpit keeps its own errors for an anonymous report.
+    ///
+    /// Opt-in: `null` is off. Turning it off deletes what was kept.
+    pub error_reports: Option<bool>,
 }
 
 #[cfg(test)]

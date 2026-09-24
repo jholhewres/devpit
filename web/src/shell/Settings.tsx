@@ -8,6 +8,7 @@ import { OpenApps } from './OpenApps'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
+import { flagOn, type Flag } from './settingsFlags'
 import { SkillsPane } from './SkillsPane'
 import { TerminalContrast } from './TerminalContrast'
 import { UpdateSettings } from './UpdateSettings'
@@ -16,9 +17,6 @@ import { Worktrees } from './Worktrees'
 
 /* Settings takes the window. Back and Escape leave; the gear and every
    account-menu row land here on the pane they name. */
-
-/* The yes/no settings, named once. */
-type Flag = 'automaticUpdates' | 'confirmStop' | 'focusMode'
 
 export function Settings({
   pane,
@@ -47,16 +45,13 @@ export function Settings({
           field === 'confirmStop' ? next : null,
           null,
           field === 'focusMode' ? next : null,
+          field === 'errorReports' ? next : null,
         ),
       ),
     ).then((answer) => setFlags(answer.data ?? flags))
   }
 
-  /* Null is "never asked", and two of these default to on: updates, and the
-     prompt that stands between somebody and losing what a terminal was doing.
-     The focus mode is the exception — it is unfinished, and an unfinished
-     thing does not become the default by nobody having an opinion yet. */
-  const on = (field: Flag): boolean => flags?.[field] ?? field !== 'focusMode'
+  const on = (field: Flag): boolean => flagOn(flags, field)
 
   return (
     <div className="prefs" data-open="true">
@@ -118,6 +113,10 @@ export function Settings({
               <span className="pref__body"><span className="pref__t">Focus mode</span><span className="pref__d">Unfinished. A door for one project: what arrives from another waits until you come out.</span></span>
               <span className="sw"></span>
             </button>
+            <button className="pref" role="switch" aria-checked={on('errorReports')} onClick={() => set('errorReports', !on('errorReports'))}>
+              <span className="pref__body"><span className="pref__t">Error reports</span><span className="pref__d">Keep devpit&rsquo;s own errors, without paths or your work, for an anonymous report. Turning it off deletes them.</span></span>
+              <span className="sw"></span>
+            </button>
             <OpenApps />
             <UpdateSettings />
           </section>
@@ -169,7 +168,7 @@ export function Settings({
             <TerminalContrast
               value={flags?.terminalContrast ?? null}
               onPick={(value) =>
-                void inOrder('settings', () => ask(() => commands.settingsWrite(null, null, null, value, null))).then((answer) =>
+                void inOrder('settings', () => ask(() => commands.settingsWrite(null, null, null, value, null, null))).then((answer) =>
                   setFlags(answer.data ?? flags),
                 )
               }

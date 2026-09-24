@@ -1195,7 +1195,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null, focusMode: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast, focusMode })),
+	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null, focusMode: boolean | null, errorReports: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast, focusMode, errorReports })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -1204,6 +1204,13 @@ export const commands = {
 	 *  one is not a first run.
 	 */
 	settingsFinishOnboarding: () => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_finish_onboarding")),
+	/**
+	 *  `errors.report` — an error the window caught and nothing else handled.
+	 * 
+	 *  Accepted whether or not reports are on: off, it is dropped here rather
+	 *  than the window having to know the switch.
+	 */
+	errorsReport: (message: string, stack: string | null) => typedError<null, RpcError>(__TAURI_INVOKE("errors_report", { message, stack })),
 	checkpointRead: (runId: string) => typedError<Checked, RpcError>(__TAURI_INVOKE("checkpoint_read", { runId })),
 	checkpointFindings: (runId: string) => typedError<Found, RpcError>(__TAURI_INVOKE("checkpoint_findings", { runId })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
@@ -3000,6 +3007,12 @@ export type Settings = {
 	 *  virtue of nobody having had an opinion about it yet.
 	 */
 	focusMode: boolean | null,
+	/**
+	 *  Whether devpit keeps its own errors for an anonymous report.
+	 * 
+	 *  Opt-in: `null` is off. Turning it off deletes what was kept.
+	 */
+	errorReports: boolean | null,
 };
 
 /**

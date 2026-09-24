@@ -4,6 +4,7 @@ import App from './App'
 import { answerBeforeRestart } from './shell/beforeRestart'
 import { BrowserMenuWindow } from './shell/BrowserMenuWindow'
 import { watchCsp } from './shell/csp'
+import { reportUncaught } from './shell/uncaught'
 import './index.css'
 
 /*
@@ -24,6 +25,8 @@ const isMenu = (window as unknown as { __DEVPIT_MENU__?: boolean }).__DEVPIT_MEN
 // Before anything renders: a policy that blocks something during startup is
 // exactly the case nobody can debug from a blank window.
 watchCsp()
+// Errors nothing else caught, for the report the person may have switched on.
+reportUncaught()
 // And the window answers when an update is about to restart it. Not the menu:
 // it holds nothing anybody would lose, and it is closed by the restart anyway.
 if (!isMenu) answerBeforeRestart()

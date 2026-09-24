@@ -105,7 +105,10 @@ pub(crate) fn start(
                         AfterRead::Again => std::thread::sleep(BETWEEN_READS),
                         AfterRead::Ended => break,
                         AfterRead::Broken => {
-                            eprintln!("the pty stopped being readable: {error}");
+                            devpit_core::reports::background(
+                                "pty reader",
+                                &format!("stopped being readable: {error}"),
+                            );
                             break;
                         }
                     }

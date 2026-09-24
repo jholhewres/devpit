@@ -56,6 +56,7 @@ mod claude_plugin;
 mod contract;
 mod cycles;
 mod diffs;
+mod error_reports;
 mod files;
 mod filetree;
 mod front;
@@ -141,6 +142,9 @@ fn main() {
     #[cfg(target_os = "linux")]
     input_method::use_the_desktops();
 
+    // Kept only once the switch is on; installed first so none is missed.
+    devpit_core::reports::keep_panics();
+
     // Regenerated on every dev run so `make dev` keeps the frontend types in
     // step while screens are being written. The test does the same thing and
     // fails when the committed file is stale, which is what covers a build
@@ -217,6 +221,7 @@ fn main() {
                 for (path, err) in devpit_core::home::harden(&root) {
                     eprintln!("{} was left as it was: {err}", path.display());
                 }
+                error_reports::resume(&root);
             }
             // Project folders named and moved before anything reads one. Here
             // and not in `Store::open`, so a test opening a store moves
