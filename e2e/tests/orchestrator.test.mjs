@@ -52,6 +52,15 @@ describe('the orchestrator', () => {
     assert.ok(answered, `the chat did not run in the orchestrator's folder. On screen: ${(await text(window)).slice(-400)}`)
   })
 
+  test('hears another session between the person\'s messages, and says so in its chat', async () => {
+    await fill(window, 'textarea.composer__ph', 'wake me when the other session is done')
+    const woken = await window
+      .wait(async () => (await text(window)).includes('the other session says it is done'), 20000)
+      .catch(() => false)
+    assert.ok(woken, `a turn woken by another session never reached the chat. On screen: ${(await text(window)).slice(-400)}`)
+    assert.ok((await text(window)).includes('Not in answer to you'), 'the woken turn reads as an answer to the person')
+  })
+
   test('shows the sessions of its account beside the chat', async () => {
     const panel = await window.wait(until.elementLocated(By.css('.osess')), 10000)
     assert.ok(await panel.isDisplayed(), 'the sessions panel is not on screen')

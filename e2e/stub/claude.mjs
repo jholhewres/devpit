@@ -142,7 +142,30 @@ function attach(short) {
  * anything else replays the recorded turn, whose frames are real.
  */
 async function headless() {
-  const prompt = await firstPrompt()
+  // Prompt after prompt for as long as stdin is open: a chat turn closes it
+  // after one answer, and a conversation that stays keeps it for the next.
+  for await (const prompt of userPrompts()) {
+    await answer(prompt)
+    if (/\bwake\b/.test(prompt)) {
+      // What a message from another session does to an idle one: a turn
+      // nobody here asked for.
+      await new Promise((done) => setTimeout(done, 2500))
+      const recorded = readFileSync(fixture(), 'utf8').split('\n').filter(Boolean)
+      const session = valueOf('--resume') ?? valueOf('--session-id') ?? JSON.parse(recorded[0]).session_id
+      console.log(JSON.stringify({ ...JSON.parse(recorded[0]), cwd: process.cwd(), session_id: session }))
+      const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+      said.session_id = session
+      said.message.id = `woken-${Date.now()}`
+      said.message.content = [{ type: 'text', text: 'the other session says it is done' }]
+      console.log(JSON.stringify(said))
+      const result = JSON.parse(recorded[recorded.length - 1])
+      console.log(JSON.stringify({ ...result, result: 'the other session says it is done', session_id: session }))
+    }
+  }
+  process.exit(0)
+}
+
+async function answer(prompt) {
   // What was asked of the stub, for the person reading a failed run.
   appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ argv, cwd: process.cwd(), prompt })}\n`)
   const recorded = readFileSync(fixture(), 'utf8').split('\n').filter(Boolean)
@@ -183,29 +206,22 @@ async function headless() {
     }
   }
   fireHooks('Stop', {}, session)
-  process.exit(0)
 }
 
-/** The first user message on stdin, skipping whatever control lines precede it. */
-function firstPrompt() {
-  return new Promise((done) => {
-    const lines = createInterface({ input: process.stdin })
-    lines.on('line', (line) => {
-      let message
-      try {
-        message = JSON.parse(line)
-      } catch {
-        return
-      }
-      if (message.type !== 'user') return
-      const content = message.message?.content
-      // Resolved before closing: closing emits 'close' synchronously, and the
-      // close handler would resolve with nothing first.
-      done(Array.isArray(content) ? content.map((part) => part.text ?? '').join('') : String(content ?? ''))
-      lines.close()
-    })
-    lines.once('close', () => done(''))
-  })
+/** Each user message on stdin, skipping whatever control lines come between. */
+async function* userPrompts() {
+  const lines = createInterface({ input: process.stdin })
+  for await (const line of lines) {
+    let message
+    try {
+      message = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (message.type !== 'user') continue
+    const content = message.message?.content
+    yield Array.isArray(content) ? content.map((part) => part.text ?? '').join('') : String(content ?? '')
+  }
 }
 
 function fixture() {
