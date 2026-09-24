@@ -79,6 +79,10 @@
 .pmark__emoji { line-height: 1; }
 .pmark--add { width: 36px; height: 36px; color: var(--success); background: var(--overlay); }
 .rail__add:hover .pmark--add { color: #fff; background: color-mix(in srgb, var(--success) 70%, transparent); }
+/* The orchestrators, above the projects and ruled off from them. */
+.rail__orch { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.pmark--orch { width: 36px; height: 36px; color: var(--accent); background: var(--overlay); }
+.rail__i[aria-current='true'] .pmark--orch { color: #fff; background: color-mix(in srgb, var(--accent) 70%, transparent); }
 :root[data-theme='light'] .pmark { color: hsl(var(--hue, 220) 55% 35%); }
 :root[data-theme='light'] .pmark[data-chosen='true'] { color: color-mix(in srgb, var(--mark) 75%, #000); }
 :root[data-theme='light'] .rail__i[aria-current='true'] .pmark { color: #fff; }

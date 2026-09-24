@@ -139,6 +139,9 @@ pub struct Project {
     /// Why the repository could not be read, when it could not be. Present and
     /// non-null is the only honest way to draw a project whose git is missing.
     pub unreadable: Option<String>,
+    /// The profile whose orchestrator this is, when it is one: known by its
+    /// folder being devpit's own, not by anything stored about it.
+    pub orchestrator: Option<String>,
     /// `remote.origin.url`, read when the project was registered. What tells
     /// two checkouts of one repository apart from two unrelated folders.
     pub origin: Option<String>,

@@ -25,6 +25,17 @@ pub fn folder_for(url: &str) -> Option<String> {
     plain.then(|| name.to_owned())
 }
 
+/// Makes `dir` a repository of its own, if it is not one already.
+///
+/// Asked of `dir` itself, not of whatever repository above it would answer:
+/// a folder inside another checkout would otherwise pass as initialised.
+pub fn init(dir: &Path) -> Result<(), GitError> {
+    if dir.join(".git").exists() {
+        return Ok(());
+    }
+    crate::invoke::run(dir, &["init", "--initial-branch=main", "-q"]).map(|_| ())
+}
+
 /// Clones `url` into `parent/<name>` and returns where it landed.
 ///
 /// The destination must not already exist: git would refuse anyway, and

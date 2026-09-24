@@ -146,7 +146,8 @@ export function useChat(conversationId: string): Chat {
       setEffort((was) => was ?? installed[0]?.effortDefault ?? null)
       /* Nothing picked and only one account installed: pick it. Asking which
          of one is a question with no answer. */
-      setProfileId((was) => was ?? (installed.length === 1 ? installed[0].id : null))
+      /* An orchestrator speaks as its own account, always. */
+      setProfileId((was) => was ?? project.orchestrator ?? (installed.length === 1 ? installed[0].id : null))
       setError(past.error ?? found.error)
     })()
     return () => {
@@ -340,7 +341,8 @@ export function useChat(conversationId: string): Chat {
   return {
     messages,
     card,
-    profiles,
+    /* In an orchestrator the one account it belongs to is the only choice. */
+    profiles: project?.orchestrator ? profiles.filter((one) => one.id === project.orchestrator) : profiles,
     fixed,
     profileId,
     model,

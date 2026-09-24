@@ -29,6 +29,7 @@ mod columns;
 mod commands;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod frame_gtk;
+mod orchestrator;
 mod rewinding;
 mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the

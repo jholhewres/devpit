@@ -31,6 +31,7 @@ const project = (over: Partial<Project> = {}): Project => ({
   accent: '#6f8fbf',
   worktrees: [],
   unreadable: null,
+    orchestrator: null,
   origin: null,
   lastOpenedAt: null,
   icon: null,

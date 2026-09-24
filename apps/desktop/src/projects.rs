@@ -72,6 +72,10 @@ pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
         last_opened_at: row.last_opened_at.map(|at| at as f64),
         icon: row.icon,
         color: row.color,
+        orchestrator: devpit_core::Store::root()
+            .ok()
+            .and_then(|home| home.canonicalize().ok())
+            .and_then(|home| devpit_core::home::orchestrator_of(&home, &root)),
         worktrees,
         unreadable,
     }

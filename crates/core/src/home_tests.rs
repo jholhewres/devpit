@@ -875,3 +875,20 @@ fn a_new_state_root_is_private_from_the_moment_it_exists() {
     // And an existing one is left alone: tightening is harden's job.
     make_private_root(&root).expect("again");
 }
+
+#[test]
+fn an_orchestrator_is_known_by_its_folder() {
+    let root = Path::new("/home/me/.devpit");
+    let folder = orchestrator_dir(root, "claudin").expect("a plain id");
+    assert_eq!(folder, root.join("orchestrator").join("claudin"));
+    assert_eq!(orchestrator_of(root, &folder).as_deref(), Some("claudin"));
+    assert_eq!(orchestrator_of(root, &folder.join("docs")), None);
+    assert_eq!(orchestrator_of(root, Path::new("/home/me/work/app")), None);
+}
+
+#[test]
+fn an_orchestrator_is_never_named_outside_its_folder() {
+    let root = Path::new("/home/me/.devpit");
+    assert_eq!(orchestrator_dir(root, "../projects"), None);
+    assert_eq!(orchestrator_dir(root, ""), None);
+}

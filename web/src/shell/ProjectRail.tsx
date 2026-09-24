@@ -6,6 +6,7 @@ import { ask, commands } from './live'
 import { ProjectDialog } from './ProjectDialog'
 import { ProjectMark } from './ProjectMark'
 import { RailGroup } from './RailGroup'
+import { RailOrchestrators } from './RailOrchestrators'
 import { RailMenu, type RailItem } from './RailMenu'
 import { ordered, placed, saveGroups, savedGroups, saveOrder, savedOrder, saveShut, savedShut, sections, shown } from './rail'
 import { remembered } from './tabs'
@@ -39,7 +40,8 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
   const [editing, setEditing] = useState<Project | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
-  const list = useMemo(() => ordered(projects, order), [projects, order])
+  /* Orchestrators are drawn apart, above; they are not the person's projects. */
+  const list = useMemo(() => ordered(projects.filter((one) => !one.orchestrator), order), [projects, order])
 
   /* A project that was not here a moment ago was just added: offer its mark
      while it is the thing being looked at. Not on the first list, which is
@@ -147,6 +149,7 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
        target out from under it. */
     <nav className="rail" aria-label="Projects" data-held={drag.grab || menu || editing ? 'true' : undefined}>
       <div className="rail__panel">
+        <RailOrchestrators />
         <div className="rail__list" ref={scroller}>
           {all.map((section) => {
             const folded = section.group !== null && shut.has(section.group)

@@ -12,10 +12,10 @@ use crate::{
     cards, chat, chat_relay, checkpoint, checkpoint_findings, checkpoint_preview, claude_plugin,
     cloning, columns, commands, diffs, error_reports, error_sender, files, filetree, front,
     happening, heads_down, history, in_flight, index, installations, mcp, moving, notices, openers,
-    outside_sessions, pane_screen, panels, panes, pasting, paths, plan_limits, plugin_data,
-    plugins, project_naming, projects, reading_path, receipts, regrouping, reveal, rewinding,
-    runs_list, saves, search, session_search, sessions, settings, shell_launch, skills, slash,
-    sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
+    orchestrator, outside_sessions, pane_screen, panels, panes, pasting, paths, plan_limits,
+    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reveal,
+    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
+    slash, sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
     worktree_base, worktrees, wsfiles,
 };
 
@@ -54,6 +54,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         session_search::sessions_search,
         chat::chat_send,
         chat_relay::chat_rejoin,
+        orchestrator::orchestrator_open,
         steering::chat_cancel,
         steering::chat_stop_task,
         chat::chat_frames,

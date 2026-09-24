@@ -19,7 +19,9 @@ import { useShell } from './useShell'
  */
 
 export function ManagerPane(): React.JSX.Element {
-  const { projects, setProject, show, openCard, closeManager } = useShell()
+  const { projects: every, setProject, show, openCard, closeManager } = useShell()
+  /* An orchestrator's board is its own notes, not work across projects. */
+  const projects = useMemo(() => every.filter((one) => !one.orchestrator), [every])
   const [boards, setBoards] = useState<readonly ProjectBoard[] | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)

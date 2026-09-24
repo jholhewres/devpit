@@ -29,6 +29,7 @@ export const STANDIN: Project = {
   accent: '#e2795b',
   worktrees: [],
   unreadable: null,
+    orchestrator: null,
   origin: null,
   lastOpenedAt: null,
   icon: null,

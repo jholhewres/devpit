@@ -244,6 +244,8 @@ export const commands = {
 	/**  How hard to think. Absent keeps what the conversation already had. */
 	effort: string | null,
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
+	/**  `orchestrator.open` — this profile's orchestrator, made on first use. */
+	orchestratorOpen: (profileId: string) => typedError<Project, RpcError>(__TAURI_INVOKE("orchestrator_open", { profileId })),
 	/**  `panel.widths` — how wide the panels were left. */
 	panelWidths: () => typedError<Widths, RpcError>(__TAURI_INVOKE("panel_widths")),
 	/**
@@ -2742,6 +2744,11 @@ export type Project = {
 	 *  non-null is the only honest way to draw a project whose git is missing.
 	 */
 	unreadable: string | null,
+	/**
+	 *  The profile whose orchestrator this is, when it is one: known by its
+	 *  folder being devpit's own, not by anything stored about it.
+	 */
+	orchestrator: string | null,
 	/**
 	 *  `remote.origin.url`, read when the project was registered. What tells
 	 *  two checkouts of one repository apart from two unrelated folders.

@@ -11,6 +11,7 @@ use crate::data_files;
 use crate::store::{Store, StoreError};
 
 const PROJECTS: &str = "projects";
+const ORCHESTRATOR: &str = "orchestrator";
 
 /// What the bell calls a folder that could not be moved.
 pub const FOLDER_NOTICE: &str = "folder";
@@ -33,6 +34,21 @@ pub enum HomeError {
     Removal(#[source] std::io::Error),
     #[error(transparent)]
     Store(#[from] StoreError),
+}
+
+/// An orchestrator's folder: one per agent profile, where its conversations
+/// run and its documents are kept. `None` for a name that is not a plain id.
+pub fn orchestrator_dir(root: &Path, profile_id: &str) -> Option<PathBuf> {
+    plain_id(profile_id).then(|| root.join(ORCHESTRATOR).join(profile_id))
+}
+
+/// The profile whose orchestrator `folder` is, if it is one. Read from the
+/// path, so a project needs no column to say it is an orchestrator.
+pub fn orchestrator_of(root: &Path, folder: &Path) -> Option<String> {
+    let rest = folder.strip_prefix(root.join(ORCHESTRATOR)).ok()?;
+    let mut parts = rest.components();
+    let profile = parts.next()?.as_os_str().to_str()?;
+    (parts.next().is_none() && plain_id(profile)).then(|| profile.to_owned())
 }
 
 /// The folder every project's own folder sits in.
