@@ -31,20 +31,23 @@ after(async () => {
 })
 
 describe('the orchestrator', () => {
-  test('opens from the rail into a folder of its own, and answers from there', async () => {
-    const entry = await window.wait(until.elementLocated(By.css('.rail__orch .rail__i')), 15000)
+  test('is made from the rail, into a folder of its own, and answers from there', async () => {
+    const plus = await window.wait(until.elementLocated(By.css('.rail__orchnew')), 15000)
     await window.executeScript(function (button) {
       button.click()
-    }, entry)
+    }, plus)
+    await fill(window, '.pdlg input', 'Client work')
     await window.wait(until.elementLocated(By.css('textarea.composer__ph')), 20000)
+    assert.ok((await text(window)).includes('What should we orchestrate?'), 'the orchestrator opened on the projects\' blank state')
 
-    const folder = join(home, '.devpit', 'orchestrator', 'claude')
+    const folder = join(home, '.devpit', 'orchestrator', 'claude', 'client-work')
     assert.ok(existsSync(join(folder, 'CLAUDE.md')), 'the brief was not written')
+    assert.ok(existsSync(join(folder, '.devpit', 'orchestrator.md')), "devpit's half of the brief was not written")
     assert.ok(existsSync(join(folder, '.git')), 'the folder is not a repository')
 
     await fill(window, 'textarea.composer__ph', 'pwd')
     const answered = await window
-      .wait(async () => (await text(window)).includes(join('orchestrator', 'claude')), 20000)
+      .wait(async () => (await text(window)).includes(join('orchestrator', 'claude', 'client-work')), 20000)
       .catch(() => false)
     assert.ok(answered, `the chat did not run in the orchestrator's folder. On screen: ${(await text(window)).slice(-400)}`)
   })

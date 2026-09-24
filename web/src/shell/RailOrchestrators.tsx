@@ -1,39 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
 
-import type { Profile, Thread } from '../gen/bindings'
+import type { Project, Thread } from '../gen/bindings'
+import { Folder, Plus, Trash } from './GitIcons'
 import { ask, commands } from './live'
-import { PROFILES_CHANGED } from './profiles'
+import { OrchestratorDialog } from './OrchestratorDialog'
+import type { RailItem } from './RailMenu'
+import { menuPoint } from './menuRules'
 import { useShell } from './useShell'
 
 /*
- * One orchestrator per Claude Code account, above the projects.
+ * The orchestrators, above the projects.
  *
- * An orchestrator is a project devpit keeps for itself, so opening one is
- * opening a project — made the first time, with its brief and its folders.
- * It is shown apart because it is not work of the person's: it is where they
- * look at all of it at once.
+ * Each is a project devpit keeps for itself — its own folder, brief and
+ * notes — speaking as one account; several may share an account. They are
+ * made here, not added, and shown apart because they are not work of the
+ * person's: they are where the person looks at all of it at once.
  */
-
-/** Only Claude Code reaches its other sessions, which is what one is for. */
-export const orchestrable = (profile: Profile): boolean => profile.driver === 'claude' && profile.path !== null
 
 /** The conversation to pick back up: the one last spoken in. */
 export const lastSpoken = (threads: readonly Thread[]): Thread | undefined =>
   [...threads].sort((a, b) => (b.lastAt ?? 0) - (a.lastAt ?? 0))[0]
 
-export function RailOrchestrators(): React.JSX.Element | null {
-  const { project, setProject, show, open } = useShell()
-  const [claudes, setClaudes] = useState<readonly Profile[]>([])
-  const [failed, setFailed] = useState<string | null>(null)
-  const arriving = useRef<string | null>(null)
+type Menu = (at: { x: number; y: number }, items: readonly RailItem[]) => void
 
-  useEffect(() => {
-    const read = (): void =>
-      void ask(() => commands.agentProfiles()).then((found) => setClaudes((found.data ?? []).filter(orchestrable)))
-    read()
-    window.addEventListener(PROFILES_CHANGED, read)
-    return () => window.removeEventListener(PROFILES_CHANGED, read)
-  }, [])
+export function RailOrchestrators({ onMenu, onRemove }: { onMenu: Menu; onRemove: (id: string) => void }): React.JSX.Element {
+  const { projects, project, setProject, show, open, reloadProjects } = useShell()
+  const [making, setMaking] = useState(false)
+  const arriving = useRef<string | null>(null)
+  const mine = projects.filter((one) => one.orchestrator)
 
   /* Arriving with nothing open picks up where it was left: its last
      conversation, or a new one. Tabs it still had are left as they were. */
@@ -46,24 +40,33 @@ export function RailOrchestrators(): React.JSX.Element | null {
     })
   }, [project, open.length, show])
 
-  const enter = (profile: Profile): void =>
-    void ask(() => commands.orchestratorOpen(profile.id)).then((made) => {
-      setFailed(made.error)
-      if (!made.data) return
-      arriving.current = made.data.id
-      setProject(made.data.id)
-    })
+  /* devpit's half of the brief is brought up to this build on the way in. */
+  const enter = (one: Project): void => {
+    void ask(() => commands.orchestratorRefresh(one.id))
+    arriving.current = one.id
+    if (one.id !== project?.id) setProject(one.id)
+  }
 
-  if (claudes.length === 0) return null
+  const menu = (one: Project): readonly RailItem[] => [
+    { label: 'Reveal folder', glyph: <Folder />, act: () => void ask(() => commands.pathReveal(one.rootPath)) },
+    'rule',
+    { label: 'Remove…', glyph: <Trash />, act: () => onRemove(one.id), bad: true },
+  ]
+
   return (
     <div className="rail__sect rail__orch" role="group" aria-label="Orchestrators">
-      {claudes.map((one) => (
+      {mine.map((one) => (
         <button
           key={one.id}
           className="rail__i"
-          aria-current={project?.orchestrator === one.id ? 'true' : undefined}
-          title={failed ?? `Orchestrator — ${one.label}`}
+          aria-current={one.id === project?.id ? 'true' : undefined}
+          title={one.rootPath}
           onClick={() => enter(one)}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onMenu(menuPoint(event), menu(one))
+          }}
         >
           <span className="rail__pill" />
           <span className="rail__ico">
@@ -72,11 +75,33 @@ export function RailOrchestrators(): React.JSX.Element | null {
             </span>
           </span>
           <span className="rail__text">
-            <span className="rail__n">Orchestrator</span>
-            <span className="rail__s">{one.label}</span>
+            <span className="rail__n">{one.name}</span>
+            <span className="rail__s">orchestrator</span>
           </span>
         </button>
       ))}
+      <button className="rail__i rail__orchnew" onClick={() => setMaking(true)} title="New orchestrator">
+        <span className="rail__pill" />
+        <span className="rail__ico">
+          <span className="pmark pmark--orch pmark--orchnew">
+            <Plus size={14} />
+          </span>
+        </span>
+        <span className="rail__text">
+          <span className="rail__n">New orchestrator</span>
+        </span>
+      </button>
+      {making && (
+        <OrchestratorDialog
+          onClose={() => setMaking(false)}
+          onMade={(made) => {
+            setMaking(false)
+            reloadProjects()
+            arriving.current = made.id
+            setProject(made.id)
+          }}
+        />
+      )}
     </div>
   )
 }

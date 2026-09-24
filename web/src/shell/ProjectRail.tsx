@@ -149,7 +149,7 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
        target out from under it. */
     <nav className="rail" aria-label="Projects" data-held={drag.grab || menu || editing ? 'true' : undefined}>
       <div className="rail__panel">
-        <RailOrchestrators />
+        <RailOrchestrators onMenu={(at, items) => setMenu({ ...at, items })} onRemove={onRemove} />
         <div className="rail__list" ref={scroller}>
           {all.map((section) => {
             const folded = section.group !== null && shut.has(section.group)

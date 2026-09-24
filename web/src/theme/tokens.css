@@ -70,6 +70,8 @@
 
   --warning: #e0b36a;
   --success: #62c987;
+  /* The orchestrator's own colour, apart from the accent a project work wears. */
+  --orchestrate: #a595f5;
   --danger: #e2726a;
 
   /* Syntax. Five roles and no more: a lexer knows comments, strings, numbers,
@@ -142,6 +144,7 @@
 
   --warning: #9a6a14;
   --success: #2c8551;
+  --orchestrate: #5a48c2;
   --danger: #bb4038;
 
   --syn-comment: #746d63;
@@ -189,6 +192,8 @@
     --on-inverse: #f7f6f3;
     --warning: #9a6a14;
     --success: #2c8551;
+    --orchestrate: #5a48c2;
+  --orchestrate: #5a48c2;
     --danger: #bb4038;
 
     --syn-comment: #746d63;

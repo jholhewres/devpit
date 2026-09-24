@@ -244,10 +244,29 @@ export const commands = {
 	/**  How hard to think. Absent keeps what the conversation already had. */
 	effort: string | null,
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
-	/**  `orchestrator.open` — this profile's orchestrator, made on first use. */
-	orchestratorOpen: (profileId: string) => typedError<Project, RpcError>(__TAURI_INVOKE("orchestrator_open", { profileId })),
+	/**
+	 *  `orchestrator.create` — a new orchestrator speaking as this profile.
+	 * 
+	 *  Several may share a profile: each is its own folder, brief and notes, and
+	 *  all of them reach the same sessions, since those belong to the account.
+	 */
+	orchestratorCreate: (profileId: string, name: string) => typedError<Project, RpcError>(__TAURI_INVOKE("orchestrator_create", { profileId, name })),
+	/**
+	 *  `orchestrator.refresh` — devpit's half of an orchestrator's brief, brought
+	 *  up to this build as it is opened.
+	 */
+	orchestratorRefresh: (projectId: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_refresh", { projectId })),
 	/**  `orchestrator.sessions` — what this profile's account has running now. */
 	orchestratorSessions: (profileId: string) => typedError<LiveSessions, RpcError>(__TAURI_INVOKE("orchestrator_sessions", { profileId })),
+	/**
+	 *  `orchestrator.reply` — types the person's own words into a session's
+	 *  terminal, as if they had gone there and typed them.
+	 * 
+	 *  The window's alone: no agent reaches it. A message from another session
+	 *  approves nothing, by the CLI's rule; this is the person answering, and it
+	 *  must stay only theirs to send.
+	 */
+	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
 	/**  `panel.widths` — how wide the panels were left. */
 	panelWidths: () => typedError<Widths, RpcError>(__TAURI_INVOKE("panel_widths")),
 	/**
@@ -2259,6 +2278,11 @@ export type LiveSession = {
 	cardId: string | null,
 	/**  Milliseconds since the epoch, when its status last changed. */
 	since: number | null,
+	/**
+	 *  Whether it runs in one of devpit's own terminals, where a reply can be
+	 *  typed for the person.
+	 */
+	inDevpit: boolean,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */

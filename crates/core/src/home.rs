@@ -36,19 +36,27 @@ pub enum HomeError {
     Store(#[from] StoreError),
 }
 
-/// An orchestrator's folder: one per agent profile, where its conversations
-/// run and its documents are kept. `None` for a name that is not a plain id.
-pub fn orchestrator_dir(root: &Path, profile_id: &str) -> Option<PathBuf> {
-    plain_id(profile_id).then(|| root.join(ORCHESTRATOR).join(profile_id))
+/// An orchestrator's folder, `orchestrator/<profile>/<name>`: where its
+/// conversations run and its documents are kept. The profile is in the path
+/// so the folder alone says which account it speaks as. `None` for a part
+/// that is not a plain id.
+pub fn orchestrator_dir(root: &Path, profile_id: &str, name: &str) -> Option<PathBuf> {
+    (plain_id(profile_id) && plain_id(name))
+        .then(|| root.join(ORCHESTRATOR).join(profile_id).join(name))
 }
 
 /// The profile whose orchestrator `folder` is, if it is one. Read from the
 /// path, so a project needs no column to say it is an orchestrator.
 pub fn orchestrator_of(root: &Path, folder: &Path) -> Option<String> {
     let rest = folder.strip_prefix(root.join(ORCHESTRATOR)).ok()?;
-    let mut parts = rest.components();
-    let profile = parts.next()?.as_os_str().to_str()?;
-    (parts.next().is_none() && plain_id(profile)).then(|| profile.to_owned())
+    let parts: Vec<&str> = rest
+        .components()
+        .filter_map(|part| part.as_os_str().to_str())
+        .collect();
+    match parts.as_slice() {
+        [profile, name] if plain_id(profile) && plain_id(name) => Some((*profile).to_owned()),
+        _ => None,
+    }
 }
 
 /// The folder every project's own folder sits in.

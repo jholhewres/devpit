@@ -26,15 +26,28 @@ const SEEDED: &[(&str, &str)] = &[
     ("context/.gitkeep", ""),
 ];
 
-/// `orchestrator.open` — this profile's orchestrator, made on first use.
+/// `orchestrator.create` — a new orchestrator speaking as this profile.
+///
+/// Several may share a profile: each is its own folder, brief and notes, and
+/// all of them reach the same sessions, since those belong to the account.
 #[tauri::command]
 #[specta::specta]
-pub async fn orchestrator_open(profile_id: String) -> Result<Project, RpcError> {
-    crate::off_main::blocking(move || orchestrator_open_now(profile_id)).await
+pub async fn orchestrator_create(profile_id: String, name: String) -> Result<Project, RpcError> {
+    crate::off_main::blocking(move || orchestrator_create_now(profile_id, name)).await
 }
 
-/// [`orchestrator_open`], on the calling thread.
-pub(crate) fn orchestrator_open_now(profile_id: String) -> Result<Project, RpcError> {
+/// [`orchestrator_create`], on the calling thread.
+pub(crate) fn orchestrator_create_now(
+    profile_id: String,
+    name: String,
+) -> Result<Project, RpcError> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 60 {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "an orchestrator needs a name of up to 60 characters",
+        ));
+    }
     let store = crate::projects::store()?;
     let profile = crate::agent_profiles::all(&store)?
         .into_iter()
@@ -52,8 +65,18 @@ pub(crate) fn orchestrator_open_now(profile_id: String) -> Result<Project, RpcEr
             "an orchestrator runs on Claude Code",
         ));
     }
+    // Refused here rather than at its first message, which would say less.
+    if profile.path.is_none() {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            format!(
+                "devpit has not read what {} runs yet — open it in Settings → Providers",
+                profile.command
+            ),
+        ));
+    }
     let root = Store::root().map_err(|err| RpcError::internal(err.to_string()))?;
-    let folder = devpit_core::home::orchestrator_dir(&root, &profile.id).ok_or_else(|| {
+    let folder = free_folder(&root, &profile.id, name).ok_or_else(|| {
         RpcError::new(
             ErrorCode::Invalid,
             "that profile's name cannot name a folder",
@@ -61,21 +84,13 @@ pub(crate) fn orchestrator_open_now(profile_id: String) -> Result<Project, RpcEr
     })?;
     seed(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
     devpit_git::init(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
-
     let here = folder
         .canonicalize()
         .map_err(|err| RpcError::internal(err.to_string()))?;
-    if let Some(row) = store
-        .projects()?
-        .into_iter()
-        .find(|row| Path::new(&row.root_path) == here)
-    {
-        return Ok(crate::projects::drawn(&store, row));
-    }
     let made = crate::projects::project_add_now(here.display().to_string())?;
     let named = crate::project_naming::project_edit_now(
         made.id.clone(),
-        format!("Orchestrator · {}", profile.label),
+        format!("{name} · {}", profile.command),
         None,
         None,
         None,
@@ -85,6 +100,52 @@ pub(crate) fn orchestrator_open_now(profile_id: String) -> Result<Project, RpcEr
         .into_iter()
         .find(|one| one.id == made.id)
         .unwrap_or(made))
+}
+
+/// `orchestrator.refresh` — devpit's half of an orchestrator's brief, brought
+/// up to this build as it is opened.
+#[tauri::command]
+#[specta::specta]
+pub async fn orchestrator_refresh(project_id: String) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let store = crate::projects::store()?;
+        let (_, root) = crate::projects::locate(&store, &project_id)?;
+        seed(&root).map_err(|err| RpcError::internal(err.to_string()))
+    })
+    .await
+}
+
+/// A folder for `name` under this profile that nothing is using yet.
+pub(crate) fn free_folder(root: &Path, profile: &str, name: &str) -> Option<std::path::PathBuf> {
+    let base = slug(name);
+    (0..100).find_map(|n| {
+        let tried = if n == 0 {
+            base.clone()
+        } else {
+            format!("{base}-{n}")
+        };
+        devpit_core::home::orchestrator_dir(root, profile, &tried).filter(|folder| !folder.exists())
+    })
+}
+
+/// A folder name from a person's name for it. Only the folder is plain; the
+/// name they gave is what the rail shows.
+pub(crate) fn slug(name: &str) -> String {
+    let mut out = String::new();
+    for ch in name.chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    let kept: String = out.trim_matches('-').chars().take(40).collect();
+    let kept = kept.trim_end_matches('-');
+    if kept.is_empty() {
+        "orchestrator".to_owned()
+    } else {
+        kept.to_owned()
+    }
 }
 
 /// Writes devpit's brief as this build has it, and what a new orchestrator

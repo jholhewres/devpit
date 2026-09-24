@@ -1,4 +1,4 @@
-use super::seed;
+use super::{free_folder, seed, slug};
 
 #[test]
 fn a_new_orchestrator_starts_with_its_brief_and_folders() {
@@ -42,4 +42,15 @@ fn devpits_half_of_the_brief_follows_the_build() {
         brief.contains("devpit_sessions"),
         "the brief was left as an older build wrote it"
     );
+}
+
+#[test]
+fn a_second_orchestrator_of_one_name_gets_a_folder_of_its_own() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let first = free_folder(dir.path(), "claudin", "Client work").expect("a folder");
+    assert!(first.ends_with("orchestrator/claudin/client-work"));
+    std::fs::create_dir_all(&first).expect("made");
+    let second = free_folder(dir.path(), "claudin", "Client work").expect("a folder");
+    assert!(second.ends_with("orchestrator/claudin/client-work-1"));
+    assert_eq!(slug("   "), "orchestrator");
 }
