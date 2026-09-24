@@ -19,6 +19,11 @@ release notes are taken from here when a version is tagged.
   — wakes it, and what it says appears in its chat, marked as not in answer to
   you. Stop interrupts the turn and leaves it listening. It opens in Accept
   edits; in the supervised mode it cannot listen.
+- **An orchestrator hands work to sessions.** Given a card, it starts a new
+  Claude Code session of its account in the background, in the card's own
+  checkout, linked to the card — on the board like any other — and named, so
+  it can message it and hear when it is done. Only an orchestrator can, and
+  only on a card.
 - **Answer a session from the orchestrator.** A session in a devpit terminal
   that is waiting on you can be answered from the Sessions panel: what you
   type goes into its terminal as yours. A message from the orchestrator
