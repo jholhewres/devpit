@@ -1,0 +1,96 @@
+use std::path::Path;
+
+use devpit_rpc::Project;
+use serde_json::json;
+
+use super::{card_of, read};
+
+fn project(id: &str, root: &Path, orchestrator: Option<&str>) -> Project {
+    serde_json::from_value(json!({
+        "id": id, "name": id, "rootPath": root.display().to_string(), "group": null,
+        "accent": "#000000", "worktrees": [], "unreadable": null, "orchestrator": orchestrator,
+        "origin": null, "lastOpenedAt": null, "icon": null, "color": null,
+    }))
+    .expect("a project")
+}
+
+fn listing(dir: &Path, pid: i32, name: &str, cwd: &Path) {
+    let body = json!({ "pid": pid, "name": name, "status": "busy", "kind": "interactive",
+        "cwd": cwd.display().to_string(), "statusUpdatedAt": 1.0 });
+    std::fs::write(dir.join(format!("{pid}.json")), body.to_string()).expect("listing");
+    // The CLI's key file beside it is not a listing.
+    std::fs::write(dir.join(format!("{pid}.abc.key")), "secret").expect("key");
+}
+
+#[test]
+fn a_live_session_is_placed_on_its_project_and_card() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sessions = dir.path().join("sessions");
+    let app = dir.path().join("app");
+    let worktrees = dir.path().join("worktrees");
+    let checkout = worktrees.join("prj_1").join("card_7");
+    for path in [&sessions, &app, &checkout] {
+        std::fs::create_dir_all(path).expect("mkdir");
+    }
+    listing(&sessions, 10, "api-worker", &app);
+    listing(&sessions, 11, "card-worker", &checkout);
+
+    let found = read(
+        &sessions,
+        |_| true,
+        &[project("prj_1", &app, None)],
+        &worktrees,
+    );
+    let names: Vec<_> = found
+        .iter()
+        .map(|one| {
+            (
+                one.name.as_str(),
+                one.project_id.as_deref(),
+                one.card_id.as_deref(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        names,
+        [
+            ("api-worker", Some("prj_1"), None),
+            ("card-worker", None, Some("card_7"))
+        ]
+    );
+}
+
+#[test]
+fn a_dead_session_and_the_orchestrators_own_are_left_out() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sessions = dir.path().join("sessions");
+    let orch = dir.path().join("orchestrator").join("claude");
+    for path in [&sessions, &orch] {
+        std::fs::create_dir_all(path).expect("mkdir");
+    }
+    listing(&sessions, 20, "gone", dir.path());
+    listing(&sessions, 21, "me", &orch);
+
+    let found = read(
+        &sessions,
+        |pid| pid != 20,
+        &[project("orch", &orch, Some("claude"))],
+        dir.path(),
+    );
+    assert!(
+        found.is_empty(),
+        "{:?}",
+        found.iter().map(|one| &one.name).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn only_devpits_card_checkouts_name_a_card() {
+    let worktrees = Path::new("/home/me/.devpit/worktrees");
+    assert_eq!(
+        card_of(worktrees, &worktrees.join("prj_1/card_9/src")).as_deref(),
+        Some("card_9")
+    );
+    assert_eq!(card_of(worktrees, &worktrees.join("prj_1/other")), None);
+    assert_eq!(card_of(worktrees, Path::new("/elsewhere/card_9")), None);
+}

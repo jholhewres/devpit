@@ -10,7 +10,9 @@ fn project(id: &str, root: &Path, worktrees: &[&Path]) -> Project {
         "worktrees": worktrees.iter().map(|tree| json!({
             "id": tree.display().to_string(),
             "branch": "main",
-            "folder": tree.display().to_string(),
+            // As git lists it: the last segment here, the whole path apart.
+            "folder": tree.file_name().map(|name| name.to_string_lossy().into_owned()),
+            "path": tree.display().to_string(),
             "ahead": 0,
             "behind": 0,
             "dirtyFiles": null,
@@ -99,4 +101,42 @@ fn a_lane_with_a_step_is_behind_the_gate() {
     let step = json!({ "id": "stp_1", "kind": "command", "name": "Tests", "config": "{}", "irreversible": false });
     let refused = gate(&lane(step)).expect_err("gated");
     assert!(refused.contains("`Review` runs a step"), "{refused}");
+}
+
+fn orchestrator(id: &str, root: &Path) -> Project {
+    let mut one = project(id, root, &[]);
+    one.orchestrator = Some("claude".to_owned());
+    one
+}
+
+#[test]
+fn only_an_orchestrator_reaches_another_project() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let projects = vec![
+        project("prj_app", &dir.path().join("app"), &[]),
+        project("prj_api", &dir.path().join("api"), &[]),
+        orchestrator("prj_orch", &dir.path().join("orch")),
+    ];
+    let (app, orch) = (&projects[0], &projects[2]);
+
+    assert_eq!(
+        reached(&projects, orch, Some("prj_api")).map(|one| one.id.as_str()),
+        Ok("prj_api")
+    );
+    assert_eq!(
+        reached(&projects, orch, Some("PRJ_API")).map(|one| one.id.as_str()),
+        Ok("prj_api")
+    );
+    assert_eq!(
+        reached(&projects, app, None).map(|one| one.id.as_str()),
+        Ok("prj_app")
+    );
+    assert!(
+        reached(&projects, app, Some("prj_api")).is_err(),
+        "a project agent reached another project"
+    );
+    assert!(
+        reached(&projects, orch, Some("prj_orch")).is_err(),
+        "an orchestrator was reachable as a project"
+    );
 }

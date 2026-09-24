@@ -246,6 +246,8 @@ export const commands = {
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
 	/**  `orchestrator.open` — this profile's orchestrator, made on first use. */
 	orchestratorOpen: (profileId: string) => typedError<Project, RpcError>(__TAURI_INVOKE("orchestrator_open", { profileId })),
+	/**  `orchestrator.sessions` — what this profile's account has running now. */
+	orchestratorSessions: (profileId: string) => typedError<LiveSessions, RpcError>(__TAURI_INVOKE("orchestrator_sessions", { profileId })),
 	/**  `panel.widths` — how wide the panels were left. */
 	panelWidths: () => typedError<Widths, RpcError>(__TAURI_INVOKE("panel_widths")),
 	/**
@@ -2242,6 +2244,28 @@ title?: string } | { type: "split";
  */
 id?: string; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
 
+export type LiveSession = {
+	/**  The name another session messages it by. */
+	name: string,
+	/**  The CLI's own word: `busy` or `idle`. */
+	status: string,
+	/**  `interactive` or `background`. */
+	kind: string,
+	/**  Local only: the folder it runs in. */
+	cwd: string,
+	projectId: string | null,
+	projectName: string | null,
+	/**  The card whose checkout it runs in, when it runs in one. */
+	cardId: string | null,
+	/**  Milliseconds since the epoch, when its status last changed. */
+	since: number | null,
+};
+
+/**  A list, so tomorrow's field has somewhere to go. */
+export type LiveSessions = {
+	sessions: LiveSession[],
+};
+
 /**
  *  What the account pane draws.
  * 
@@ -3590,6 +3614,8 @@ export type Worktree = {
 	branch: string,
 	/**  Last path segment. The whole path is a tooltip; it never fits a row. */
 	folder: string,
+	/**  The whole path, resolved. Local only, like the project's root. */
+	path: string,
 	ahead: number,
 	behind: number,
 	/**

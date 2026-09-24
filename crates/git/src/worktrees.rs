@@ -35,6 +35,7 @@ pub fn worktrees(root: &Path, mine: &[PathBuf]) -> Result<Vec<Worktree>, GitErro
         found.push(Worktree {
             id: identify(&here),
             branch: branch_of(block, &read),
+            path: here.display().to_string(),
             folder: here
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())

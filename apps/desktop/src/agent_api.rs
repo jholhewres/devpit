@@ -42,8 +42,9 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 8] = [
-    "context", "board", "card", "comment", "create", "update", "move", "methods",
+pub(crate) const METHODS: [&str; 10] = [
+    "context", "board", "card", "comment", "create", "update", "move", "methods", "projects",
+    "sessions",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -72,9 +73,8 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
         return Err(format!("devpit does not answer `{}`", asked.method));
     }
     let projects = crate::projects::project_list_now().map_err(said)?.projects;
-    let project = project_at(&projects, Path::new(&asked.cwd))
+    let here = project_at(&projects, Path::new(&asked.cwd))
         .ok_or_else(|| format!("no devpit project contains {}", asked.cwd))?;
-    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
 
     let text = |name: &str| {
         asked
@@ -83,6 +83,20 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
             .and_then(Value::as_str)
             .map(str::to_owned)
     };
+    match asked.method.as_str() {
+        "projects" => {
+            orchestrating(here)?;
+            return Ok(every_project(&projects));
+        }
+        "sessions" => {
+            let profile = orchestrating(here)?;
+            let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
+            return Ok(json!(live.sessions));
+        }
+        _ => {}
+    }
+    let project = reached(&projects, here, text("project").as_deref())?;
+    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
     let card_id = text("cardId").unwrap_or_default();
     let answer = match asked.method.as_str() {
         "context" => context(project, &board),
@@ -133,6 +147,57 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
         }
     }
     Ok(answer)
+}
+
+/// The profile whose orchestrator the agent stands in, or why it is refused:
+/// seeing past its own project is what an orchestrator is for, and only that.
+fn orchestrating(here: &Project) -> Result<&str, String> {
+    here.orchestrator
+        .as_deref()
+        .ok_or_else(|| "only an orchestrator sees past its own project".to_owned())
+}
+
+/// The project a call is about: where the agent stands, or — for an
+/// orchestrator only — the one it names, by id or by name.
+pub(crate) fn reached<'a>(
+    projects: &'a [Project],
+    here: &'a Project,
+    named: Option<&str>,
+) -> Result<&'a Project, String> {
+    let Some(named) = named.map(str::trim).filter(|named| !named.is_empty()) else {
+        return Ok(here);
+    };
+    orchestrating(here)?;
+    projects
+        .iter()
+        .filter(|one| one.orchestrator.is_none())
+        .find(|one| one.id == named || one.name.eq_ignore_ascii_case(named))
+        .ok_or_else(|| format!("no project called `{named}` — devpit_projects lists them"))
+}
+
+/// Every project an orchestrator can work on, with its lanes and how many
+/// cards each holds: enough to choose where to look, not the boards whole.
+fn every_project(projects: &[Project]) -> Value {
+    let listed: Vec<Value> = projects
+        .iter()
+        .filter(|one| one.orchestrator.is_none())
+        .map(|one| {
+            let lanes = crate::board::board_get_now(one.id.clone())
+                .map(|board| {
+                    board
+                        .columns
+                        .iter()
+                        .map(|column| {
+                            let cards = board.cards.iter().filter(|card| card.column_id == column.id).count();
+                            json!({ "name": column.name, "cards": cards, "runsAStep": column.step.is_some() })
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            json!({ "id": one.id, "name": one.name, "group": one.group, "root": one.root_path, "lanes": lanes })
+        })
+        .collect();
+    json!(listed)
 }
 
 /// A move, behind the gate: into a lane without a step, to its end.
@@ -198,7 +263,7 @@ pub(crate) fn project_at<'a>(projects: &'a [Project], cwd: &Path) -> Option<&'a 
                     project
                         .worktrees
                         .iter()
-                        .map(|tree| PathBuf::from(&tree.folder)),
+                        .map(|tree| PathBuf::from(&tree.path)),
                 )
                 .map(move |root| (project, resolved(&root)))
         })

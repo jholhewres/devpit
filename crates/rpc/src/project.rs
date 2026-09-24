@@ -59,6 +59,8 @@ pub struct Worktree {
     pub branch: String,
     /// Last path segment. The whole path is a tooltip; it never fits a row.
     pub folder: String,
+    /// The whole path, resolved. Local only, like the project's root.
+    pub path: String,
     pub ahead: u32,
     pub behind: u32,
     /// Files with uncommitted work, or `null` when git could not be read.

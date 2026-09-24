@@ -29,6 +29,7 @@ mod columns;
 mod commands;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod frame_gtk;
+mod live_sessions;
 mod orchestrator;
 mod rewinding;
 mod runs_list;

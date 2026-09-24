@@ -20,6 +20,7 @@ pub mod file;
 pub mod focus;
 mod frame;
 pub mod front;
+pub mod live;
 pub mod plugin_data;
 pub mod plugins;
 pub mod profile;
@@ -55,6 +56,7 @@ pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};
 pub use frame::{Context, Frame};
 pub use front::Front;
+pub use live::{LiveSession, LiveSessions};
 pub use plugin_data::{
     PluginFile, PluginFileRemoved, PluginFileSaved, PluginFileText, PluginFiles,
 };
