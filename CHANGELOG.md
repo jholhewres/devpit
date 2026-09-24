@@ -12,6 +12,16 @@ release notes are taken from here when a version is tagged.
   — a git repository with a brief, `docs/`, `artifacts/` and `context/` — and
   opens a chat there; after that it picks up the last conversation. Its chat
   speaks as that account only, and it is not listed among the projects.
+- **It sees every project and every session of its account.** Its agent can
+  list the projects and their lanes, work on any project's board, and see the
+  Claude Code sessions running now — by the name it messages them with, busy or
+  idle, and the project and card each works in. The same list sits beside its
+  chat. It still never moves a card into a lane that runs a step.
+- **Its brief keeps up with devpit.** devpit's instructions live in
+  `.devpit/orchestrator.md` and are rewritten when devpit updates; `CLAUDE.md`
+  imports them and is yours alone.
+- An agent started in a card's checkout reaches its own board again; the
+  board's tools used to answer that no project contained it.
 
 ### Chat
 
