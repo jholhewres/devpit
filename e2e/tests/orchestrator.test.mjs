@@ -4,12 +4,13 @@
  */
 
 import { strict as assert } from 'node:assert'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { By, until } from 'selenium-webdriver'
 
 import { fill, settle, text } from '../lib/drive.mjs'
+import { seedRepo } from '../lib/home.mjs'
 import { invoke } from '../lib/seed.mjs'
 import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
 
@@ -62,8 +63,36 @@ describe('the orchestrator', () => {
   })
 
   test('shows the sessions of its account beside the chat', async () => {
-    const panel = await window.wait(until.elementLocated(By.css('.osess')), 10000)
-    assert.ok(await panel.isDisplayed(), 'the sessions panel is not on screen')
+    const shown = await window
+      .wait(
+        () =>
+          window.executeScript(function () {
+            return Array.prototype.slice.call(document.querySelectorAll('.osess')).some(function (one) {
+              return one.offsetParent !== null
+            })
+          }),
+        10000,
+      )
+      .catch(() => false)
+    const count = await window.executeScript('return document.querySelectorAll(".osess").length')
+    assert.ok(shown, `the sessions panel is not on screen (${count} in the page)`)
+  })
+
+  test('hands a card to a session of its account, linked to the card — and nothing else may', async () => {
+    const repo = seedRepo(home, 'handed')
+    const project = await invoke(window, 'project_add', { rootPath: repo })
+    const lanes = (await invoke(window, 'board_get', { projectId: project.id })).columns
+    const card = await invoke(window, 'card_create', { projectId: project.id, columnId: lanes[0].id, title: 'Fix the login timeout', body: '' })
+    const orchestrator = join(home, '.devpit', 'orchestrator', 'claude', 'client-work')
+
+    const handed = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, orchestrator)
+    assert.ok(handed.ok, `the orchestrator could not hand the card: ${JSON.stringify(handed)}`)
+    assert.match(handed.ok.name, /^fix-the-login-timeout-/)
+    const detail = await invoke(window, 'card_detail', { projectId: project.id, cardId: card.id })
+    assert.ok(detail.sessions.length > 0, 'the handed session is not on its card')
+
+    const refused = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, repo)
+    assert.match(refused.error ?? '', /only an orchestrator/)
   })
 
   test('is not listed among the projects', async () => {
@@ -77,3 +106,17 @@ describe('the orchestrator', () => {
     assert.ok(!projects.some((name) => name.startsWith('Orchestrator')), `listed as a project: ${projects.join(', ')}`)
   })
 })
+
+/** What an agent's MCP server posts to the app, from `cwd`. */
+async function ask(method, params, cwd) {
+  const root = join(home, '.devpit')
+  const endpoint = readFileSync(join(root, 'hook-endpoint'), 'utf8').trim()
+  const [name, value] = readFileSync(join(root, 'hook-auth'), 'utf8').trim().split(/:\s*/)
+  const address = endpoint.replace(/\/hook$/, '/agent')
+  const answer = await fetch(address, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', [name]: value },
+    body: JSON.stringify({ method, params, cwd, author: 'claude' }),
+  })
+  return answer.json()
+}
