@@ -5,6 +5,14 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
+### Orchestrator
+
+- **An orchestrator per Claude Code account**, at the top of the project rail.
+  The first time, it makes a folder of its own under `~/.devpit/orchestrator/`
+  — a git repository with a brief, `docs/`, `artifacts/` and `context/` — and
+  opens a chat there; after that it picks up the last conversation. Its chat
+  speaks as that account only, and it is not listed among the projects.
+
 ### Chat
 
 - **A chat you leave keeps going.** Switch project or reload the window in the
@@ -20,6 +28,8 @@ release notes are taken from here when a version is tagged.
   to the latest.
 - **A wider thread**: one 896px column for messages, the composer and replies.
 - A relative link in a card's chat opens the file in the card's own checkout.
+- **A chat has the board's tools**, as a terminal does, without the Claude
+  Code plugin installed.
 
 ### Highlights
 
