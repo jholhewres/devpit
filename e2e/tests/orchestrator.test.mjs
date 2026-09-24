@@ -49,6 +49,11 @@ describe('the orchestrator', () => {
     assert.ok(answered, `the chat did not run in the orchestrator's folder. On screen: ${(await text(window)).slice(-400)}`)
   })
 
+  test('shows the sessions of its account beside the chat', async () => {
+    const panel = await window.wait(until.elementLocated(By.css('.osess')), 10000)
+    assert.ok(await panel.isDisplayed(), 'the sessions panel is not on screen')
+  })
+
   test('is not listed among the projects', async () => {
     const projects = await window.executeScript(function () {
       return Array.prototype.slice
