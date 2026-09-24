@@ -42,13 +42,13 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 10] = [
+pub(crate) const METHODS: [&str; 11] = [
     "context", "board", "card", "comment", "create", "update", "move", "methods", "projects",
-    "sessions",
+    "sessions", "start",
 ];
 
 /// The methods that change the board, and so tell the window.
-const WRITES: [&str; 4] = ["comment", "create", "update", "move"];
+const WRITES: [&str; 5] = ["comment", "create", "update", "move", "start"];
 
 /// Answers one posted question with a JSON body: `{"ok": …}` or `{"error": …}`.
 ///
@@ -139,6 +139,13 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
             json!({ "id": changed.id, "title": changed.title })
         }
         "move" => moved(app, &board, &card_id, &text("columnId").unwrap_or_default())?,
+        "start" => crate::handing::hand(
+            &board,
+            orchestrating(here)?,
+            &card_id,
+            &text("prompt").unwrap_or_default(),
+            text("name").as_deref(),
+        )?,
         _ => unreachable!("checked against METHODS above"),
     };
     if WRITES.contains(&asked.method.as_str()) {

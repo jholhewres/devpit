@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 9] = [
+const TOOLS: [Tool; 10] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -50,6 +50,12 @@ const TOOLS: [Tool; 9] = [
         method: "sessions",
         description: "Orchestrator only: this account's Claude Code sessions running now — the name to message each by, busy or idle, and the project and card it works in.",
         input: || json!({ "type": "object", "properties": {} }),
+    },
+    Tool {
+        name: "devpit_start_session",
+        method: "start",
+        description: "Orchestrator only: hand a card's work to a new Claude Code session of this account, started in the background in the card's own checkout and linked to the card, so it shows on the board. Answers with the name to message it by; pass notify_when_idle when you message it to hear when it is done.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "The project, by id or name." }, "cardId": { "type": "string" }, "prompt": { "type": "string", "description": "What to do: the brief the session starts with. The card's own text is not sent for you." }, "name": { "type": "string", "description": "The name to message it by. Defaults to the card's title." } }, "required": ["project", "cardId", "prompt"] }),
     },
     Tool {
         name: "devpit_card",

@@ -27,6 +27,10 @@ message, when the person asks or when a piece of work is finished.
   - `devpit_projects` — every project, its group and its board at a glance.
   - `devpit_sessions` — the sessions of this account running now: name,
     status, project and card.
+  - `devpit_start_session` — hand a card's work to a new session of this
+    account: it starts in the card's own checkout, shows on the card, and
+    answers with the name to message it by. No card yet? Create one first —
+    work without a card is work nobody can see.
   - `devpit_board`, `devpit_card`, `devpit_comment`, `devpit_create_card`,
     `devpit_update_card`, `devpit_move_card` — pass `project` to work on
     another project's board.
@@ -48,7 +52,9 @@ say so if the person expects you to.
 1. Look before acting: `devpit_projects` and `devpit_sessions`, then
    `context/sessions.md`.
 2. Say what you are about to start, and where, before starting it.
-3. Wait with `notify_when_idle`, not by asking again and again.
+3. Hand work with `devpit_start_session`, then `SendMessage` it with
+   `notify_when_idle` so you hear when it is done — you keep listening between
+   the person's messages.
 4. End each round with a short account: what ran, where, and how it stands.
    Write the same to `context/sessions.md`.
 
