@@ -20,6 +20,7 @@ import { useFollow } from './useFollow'
 import { useDraft } from './useDraft'
 import { JumpToEnd } from './JumpToEnd'
 import { ComposerFiles } from './ComposerFiles'
+import { ChatBlank } from './ChatBlank'
 import { OrchestratorSessions } from './OrchestratorSessions'
 import { Queued } from './Queued'
 import { SendButton } from './SendButton'
@@ -115,15 +116,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
       {project?.orchestrator && <OrchestratorSessions profileId={project.orchestrator} />}
       <div className="scroll" ref={follow.box}>
         {empty ? (
-          <div className="chat__blank">
-            <div className="chat__ask">
-              <svg className="chat__mark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" /></svg>
-              <h2 className="chat__q">
-                What should we build{project ? ' in ' : ''}
-                {project && <span className="chat__where">{project.name}</span>}?
-              </h2>
-            </div>
-          </div>
+          <ChatBlank project={project} onTry={(text) => (setPrompt(text), field.current?.focus())} />
         ) : (
           <div className="thread">
             {chat.error && <div className="exempty__t">{chat.error}</div>}
