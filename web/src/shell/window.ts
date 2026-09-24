@@ -221,3 +221,22 @@ export function onEvent(name: string, then: () => void): () => void {
 export function onCarried<T>(name: string, then: (payload: T) => void): () => void {
   return shared<T>(name, then)
 }
+
+/**
+ * Calls back when a conversation whose process stays is woken by another
+ * session and starts a turn nobody here asked for — with its id, so an open
+ * chat can join it.
+ */
+export function onChatWoke(then: (conversationId: string) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void listen<string>('chat:woke', (event) => then(event.payload)).then((unlisten) => {
+    if (dropped) unlisten()
+    else drop = unlisten
+  })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}

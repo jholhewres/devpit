@@ -48,6 +48,7 @@ mod cards;
 mod chaining;
 mod chat;
 mod chat_relay;
+mod chat_resident;
 mod chat_running;
 mod chat_turn;
 mod checkout;
@@ -174,6 +175,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(chat::Talking::default())
         .manage(chat_relay::Relay::default())
+        .manage(chat_resident::Residents::default())
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
         .manage(blocks::Blocks::default())

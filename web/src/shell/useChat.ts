@@ -7,7 +7,7 @@ import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
 import { withSkills } from './pills'
 import { PROFILES_CHANGED } from './profiles'
-import { onPermissionAsked } from './window'
+import { onChatWoke, onPermissionAsked } from './window'
 import { useShellPick } from './shellStore'
 
 /** The card a conversation is filed under. */
@@ -92,28 +92,33 @@ export function useChat(conversationId: string): Chat {
 
   /* A turn still running when this chat opens — it was left, or the window
      reloaded — is joined where it is, instead of being said to have died. */
-  const rejoined = (projectId: string): void => {
-    const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
-    const running = rejoin(conversationId, (frame) => {
-      if (!live.current) return
-      setSending(true)
-      if (frame.type === 'session') setSession(frame.session_id)
-      else push(frame)
-    })
-    void running?.then((was) => {
-      flush()
-      if (!was || !live.current) return
-      setSending(false)
-      // The transcript holds the answer as it was saved, costs and all.
-      void ask(() => commands.chatHistory(projectId, conversationId)).then((past) => {
-        if (!live.current || !past.data) return
-        setMessages(past.data.messages)
-        setCost(past.data.costUsd ?? 0)
-        setContext(past.data.context ?? null)
-        setRewindable(past.data.rewindable ?? [])
+  const rejoined = useCallback(
+    (projectId: string, woken = false): void => {
+      const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
+      const running = rejoin(conversationId, (frame) => {
+        if (!live.current) return
+        setSending(true)
+        if (frame.type === 'session') setSession(frame.session_id)
+        else push(frame)
       })
-    })
-  }
+      void running?.then((was) => {
+        flush()
+        /* A woken turn can be over before this asks to join it — a short
+           answer to a message. It was written down; read it from there. */
+        if ((!was && !woken) || !live.current) return
+        setSending(false)
+        // The transcript holds the answer as it was saved, costs and all.
+        void ask(() => commands.chatHistory(projectId, conversationId)).then((past) => {
+          if (!live.current || !past.data) return
+          setMessages(past.data.messages)
+          setCost(past.data.costUsd ?? 0)
+          setContext(past.data.context ?? null)
+          setRewindable(past.data.rewindable ?? [])
+        })
+      })
+    },
+    [conversationId],
+  )
 
   useEffect(() => {
     live.current = true
@@ -153,15 +158,27 @@ export function useChat(conversationId: string): Chat {
     return () => {
       live.current = false
     }
-  }, [project, conversationId])
+  }, [project, conversationId, rejoined])
 
   /* Reopened, a conversation goes back to the mode it ran in; a new one to the
      last pick on its profile, instead of the most careful mode every time. */
   useEffect(() => {
     const open = reopened(conversationId, stored.current, profileId)
-    if (open.permission) setPermission(open.permission)
+    // An orchestrator in the supervised mode would be deaf between turns:
+    // its process stays only when nothing waits on a question.
+    const permission = open.permission ?? (project?.orchestrator ? 'acceptEdits' : undefined)
+    if (permission) setPermission(permission)
     if (open.effort) setEffort(open.effort)
-  }, [profileId, conversationId])
+  }, [profileId, conversationId, project?.orchestrator])
+
+  /* Woken by another session, an orchestrator answers without being asked:
+     that turn is joined here the way one left running is. */
+  useEffect(() => {
+    if (!project) return
+    return onChatWoke((woken) => {
+      if (woken === conversationId) rejoined(project.id, true)
+    })
+  }, [project, conversationId, rejoined])
 
   /* A profile saved or switched in Settings is in the picker at once. */
   useEffect(() => {

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use devpit_agentcli::driver::driver;
 use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head};
 use devpit_agentcli::store::{append, conversation_path, read};
-use devpit_agentcli::talk::{say, Said, Say};
+use devpit_agentcli::talk::{Said, Say};
 use devpit_rpc::{Ask, Conversation, ErrorCode, Frame, Message, Part, Role, RpcError, TurnEnd};
 use tauri::ipc::Channel;
 
@@ -240,6 +240,14 @@ pub async fn chat_send(
     let sink = on_frame.clone();
     let answer = answer_id.clone();
     let hold = crate::asking::holding(mode.as_deref(), &app, on_frame.clone());
+    let staying = crate::chat_resident::staying(
+        &app,
+        &project_id,
+        &conversation_id,
+        &sessions,
+        &profile.driver,
+        mode.as_deref(),
+    );
 
     // Claimed before anything is spawned, and released by the guard however
     // this returns.
@@ -257,7 +265,8 @@ pub async fn chat_send(
         let hooks = crate::steps::hook_settings();
         let checkout = std::path::Path::new(&cwd);
         let before = crate::turn_changes::before(checkout);
-        let said = say(
+        let said = crate::chat_resident::or_say(
+            staying,
             driver.as_ref(),
             &Say {
                 command: &path,

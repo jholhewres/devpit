@@ -68,10 +68,15 @@ pub fn chat_stop_task(
 #[tauri::command]
 #[specta::specta]
 pub fn chat_cancel(
+    app: tauri::AppHandle,
     state: State<'_, crate::chat::Talking>,
     conversation_id: String,
 ) -> Result<Option<devpit_rpc::TurnEnd>, RpcError> {
-    if !stop_turn(&state, &conversation_id) {
+    // A conversation whose process stays is interrupted, not ended: ending it
+    // would leave it deaf to the sessions it follows.
+    let stopped = crate::chat_resident::interrupt(&app, &conversation_id)
+        || stop_turn(&state, &conversation_id);
+    if !stopped {
         return Ok(None);
     }
     Ok(Some(devpit_rpc::TurnEnd {
