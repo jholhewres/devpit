@@ -156,7 +156,19 @@ async function headless() {
   const init = JSON.parse(recorded[0])
   console.log(JSON.stringify({ ...init, cwd: process.cwd(), session_id: session }))
 
-  if (/\bpwd\b/.test(prompt)) {
+  if (/\bslow\b/.test(prompt)) {
+    // Half an answer, a long pause, then the rest: long enough for a test to
+    // leave the chat, or reload the window, in the middle of the turn.
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.content = [{ type: 'text', text: 'first half of a slow answer' }]
+    console.log(JSON.stringify(said))
+    await new Promise((done) => setTimeout(done, 10000))
+    said.message.content = [{ type: 'text', text: 'second half of a slow answer' }]
+    console.log(JSON.stringify(said))
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'second half of a slow answer', session_id: session }))
+  } else if (/\bpwd\b/.test(prompt)) {
     const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
     said.session_id = session
     said.message.content = [{ type: 'text', text: process.cwd() }]
