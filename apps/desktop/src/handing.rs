@@ -55,7 +55,7 @@ pub(crate) fn hand(
             prompt,
         }),
     )
-    .map_err(|err| err.to_string())?;
+    .map_err(|err| untrusted(&err.to_string(), &cwd).unwrap_or_else(|| err.to_string()))?;
 
     let transcript = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
@@ -78,6 +78,24 @@ pub(crate) fn hand(
         "cwd": cwd.display().to_string(),
         "next": "Message it by this name with SendMessage, and pass notify_when_idle to hear when it is done.",
     }))
+}
+
+/// What to do when Claude Code will not start in the card's checkout because
+/// nobody has told it to trust that folder yet. Trust is inherited, so the
+/// folder all checkouts sit in, trusted once, covers every card after it.
+/// devpit does not write the CLI's own settings to do it: running sessions
+/// rewrite that file, and a second writer is how it gets corrupted.
+pub(crate) fn untrusted(said: &str, cwd: &std::path::Path) -> Option<String> {
+    said.contains("not trusted").then(|| {
+        let base = cwd.parent().and_then(|p| p.parent()).unwrap_or(cwd);
+        format!(
+            "Claude Code does not trust {} yet, so it will not start a session there. \
+             Ask the person to run `claude` once in {} and accept the trust prompt — that \
+             covers every card's checkout — then hand the card again.",
+            cwd.display(),
+            base.display()
+        )
+    })
 }
 
 /// A name another session can address: the card's words, short, plain, and
@@ -111,7 +129,16 @@ pub(crate) fn session_name(title: &str, card_id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::session_name;
+    use super::{session_name, untrusted};
+
+    #[test]
+    fn an_untrusted_checkout_says_which_folder_to_trust_once() {
+        let cwd = std::path::Path::new("/home/me/.devpit/worktrees/prj_1/card_9");
+        let said =
+            untrusted("Workspace not trusted. Run `claude` in … once", cwd).expect("explained");
+        assert!(said.contains("/home/me/.devpit/worktrees "), "{said}");
+        assert_eq!(untrusted("some other failure", cwd), None);
+    }
 
     #[test]
     fn a_session_is_named_after_its_card_and_told_apart_by_its_id() {

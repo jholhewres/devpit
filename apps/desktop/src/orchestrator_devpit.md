@@ -31,6 +31,8 @@ message, when the person asks or when a piece of work is finished.
     account: it starts in the card's own checkout, shows on the card, and
     answers with the name to message it by. No card yet? Create one first —
     work without a card is work nobody can see.
+    If it answers that Claude Code does not trust the folder, tell the person
+    exactly that: it is theirs to allow, once.
   - `devpit_board`, `devpit_card`, `devpit_comment`, `devpit_create_card`,
     `devpit_update_card`, `devpit_move_card` — pass `project` to work on
     another project's board.
