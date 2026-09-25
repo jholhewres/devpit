@@ -5,6 +5,20 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
+## 0.1.17 — 2026-09-25
+
+### Orchestrator
+
+- **Continue an orchestrator remotely.** A phone button on its chat continues
+  the same conversation in a terminal with Remote Control on, named
+  `devpit-<name>` in claude.ai and the Claude app — hooks and devpit's tools
+  included. Close the terminal and write in the chat to carry on at the desk.
+
+### Fixes
+
+- A choice in a dialog or in Providers is a form field whose list opens under
+  it, instead of the chat's chip menu floating over the dialog's buttons.
+
 ## 0.1.16 — 2026-09-24
 
 ### Fixes
