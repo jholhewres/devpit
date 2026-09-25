@@ -290,6 +290,22 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
     let transcript = staying.transcript.clone();
     let head = staying.head.clone();
     let answers = staying.app.clone();
+    // Where the CLI logs this conversation: who woke a turn is written there.
+    let home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
+    let config_dir = turn
+        .env
+        .iter()
+        .find(|(key, _)| key == "CLAUDE_CONFIG_DIR")
+        .map(|(_, value)| value.clone());
+    let logs = devpit_agentcli::peers::logs_of(
+        &devpit_agentcli::cli_config::config_dir_from(&home, config_dir.as_deref()),
+        &turn
+            .cwd
+            .canonicalize()
+            .unwrap_or_else(|_| turn.cwd.to_path_buf()),
+    );
     let resident = Resident::start(driver, turn, Arc::new(|_: &str| {}), move |heard| {
         if let Heard::Control(said) = heard {
             crate::chat_remote::answered(&answers, said);
@@ -312,7 +328,7 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
                 let _ = tell.send(heard);
             }
             (Listening::Nobody, Heard::Part(part)) => {
-                let mut woken = woke(&app, &conversation);
+                let mut woken = woke(&app, &conversation, &logs);
                 woken.heard(part);
                 *now = Listening::Woken(woken);
             }
@@ -340,7 +356,11 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
 
 /// A turn nobody here asked for has begun: opened in the conversation and
 /// announced, so an open chat joins it through the relay.
-fn woke(app: &AppHandle, conversation: &str) -> Woken {
+fn woke(app: &AppHandle, conversation: &str, logs: &std::path::Path) -> Woken {
+    let woken_by = Part::Text {
+        text: crate::delegations::woken_label(logs),
+        parent: None,
+    };
     let relay = app.state::<crate::chat_relay::Relay>();
     let (frames, relaying) = relay.open(conversation, Channel::new(|_| Ok(())));
     let turn_id = format!("turn_{}", ulid::Ulid::generate());
@@ -349,7 +369,7 @@ fn woke(app: &AppHandle, conversation: &str) -> Woken {
         id: answer_id.clone(),
         turn_id: Some(turn_id.clone()),
         role: Role::Assistant,
-        parts: vec![WOKEN_BY.clone()],
+        parts: vec![woken_by.clone()],
         created_at: now(),
         streaming: true,
     };
@@ -358,21 +378,11 @@ fn woke(app: &AppHandle, conversation: &str) -> Woken {
     Woken {
         turn_id,
         answer_id,
-        parts: vec![WOKEN_BY.clone()],
+        parts: vec![woken_by],
         frames,
         _relaying: relaying,
     }
 }
-
-/// Said at the top of a turn nobody here asked for, so it does not read as an
-/// answer to something the person said.
-static WOKEN_BY: std::sync::LazyLock<Part> = std::sync::LazyLock::new(|| {
-    Part::Text {
-    text: "↪ *Not from this chat — written from your phone or claude.ai, another session wrote, or work it left running finished.*\n\n"
-        .to_owned(),
-    parent: None,
-}
-});
 
 impl Woken {
     fn heard(&mut self, part: Part) {

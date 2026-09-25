@@ -14,3 +14,4 @@ crates/agentcli/src/outside_tests.rs 1
 crates/agentcli/src/transcript.rs 1
 crates/agentcli/src/spend_scan.rs 1
 crates/agentcli/src/spend_scan_tests.rs 6
+crates/agentcli/src/peers.rs 1   # the CLI's session logs of a folder, under its config

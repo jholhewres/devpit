@@ -310,6 +310,7 @@ pub mod history;
 #[cfg(test)]
 mod history_tests;
 pub mod outside;
+pub mod peers;
 pub mod profile;
 #[cfg(test)]
 mod profile_tests;
