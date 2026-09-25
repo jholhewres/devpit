@@ -19,10 +19,10 @@ vi.mock('./live', () => ({
       listed(projectId, directory)
       return {
         servers: [...catalogue],
-        sources: ['/home/me/.claude-claudin/.claude.json'],
+        sources: ['/home/me/.claude-2/.claude.json'],
         problem: catalogue.length === 0 ? 'no MCP server is configured for the agent CLI' : null,
         manageWith: 'claude mcp',
-        directory: '/home/me/.claude-claudin',
+        directory: '/home/me/.claude-2',
       }
     },
   },
@@ -33,7 +33,7 @@ vi.mock('./useShell', () => ({ useShell: () => ({ project, close: vi.fn() }) }))
 
 beforeEach(() => {
   listed.mockClear()
-  installs = [{ directory: '/home/me/.claude-claudin', profiles: ['claudin'], default: true }]
+  installs = [{ directory: '/home/me/.claude-2', profiles: ['claude2'], default: true }]
   catalogue = [
     { name: 'reports', scope: 'project', reachedBy: 'npx reports-mcp' },
     { name: 'anchored', scope: 'user', reachedBy: 'https://anchored.example/mcp' },
@@ -69,7 +69,7 @@ describe('the MCP panel', () => {
 
   it('names the directory it read, because it is not always ~/.claude', async () => {
     render(<McpPane />)
-    expect(await screen.findByText('/home/me/.claude-claudin')).toBeTruthy()
+    expect(await screen.findByText('/home/me/.claude-2')).toBeTruthy()
   })
 
   it('re-reads on demand, because `claude mcp add` happens in a terminal', async () => {

@@ -1,6 +1,6 @@
 //! What a person's own agent command does, read by running it.
 //!
-//! `claudin` and `glm` are usually shell functions: a `claude` with a config
+//! `claude2` and `glm` are usually shell functions: a `claude` with a config
 //! directory, an endpoint and a token in front of it. A function exists in an
 //! interactive shell and nowhere else, so the chat and the board — which start
 //! a program, not a shell — could not use one, and the person was asked to
@@ -261,9 +261,9 @@ mod tests {
     #[test]
     fn a_function_is_read_as_its_program_its_arguments_and_what_it_set() {
         let (_dir, shell) = shell_with(
-            "claudin() { CLAUDE_CONFIG_DIR=\"$HOME/.claude-two\" ANTHROPIC_MODEL='glm-5.3[1m]' command claude --verbose \"$@\"; }\n",
+            "claude2() { CLAUDE_CONFIG_DIR=\"$HOME/.claude-two\" ANTHROPIC_MODEL='glm-5.3[1m]' command claude --verbose \"$@\"; }\n",
         );
-        let probed = probe(&shell, "claudin", &["claude", "codex"])
+        let probed = probe(&shell, "claude2", &["claude", "codex"])
             .expect("ran")
             .expect("read");
         assert_eq!(probed.program, "claude");

@@ -24,9 +24,9 @@ describe('how far this machine gets', () => {
   })
 
   it('does not call a shell function missing', () => {
-    // The bug this replaces: `claudin` is a function in .zshrc with no file,
+    // The bug this replaces: `claude2` is a function in .zshrc with no file,
     // and the row said "not on the PATH" about a command the terminal runs.
-    const said = told(profile({ reach: 'shell_only', command: 'claudin' }))
+    const said = told(profile({ reach: 'shell_only', command: 'claude2' }))
     expect(said.sub).not.toMatch(/not found|PATH/)
     expect(said.off).toBe(false)
   })

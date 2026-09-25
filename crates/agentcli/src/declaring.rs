@@ -136,7 +136,7 @@ pub fn allowed(declared: &Declared, knows_base: impl Fn(&str) -> bool) -> Result
 /// The profile with `~` and `$HOME` at the front of a value made absolute.
 ///
 /// A value is handed to a spawned process as it is, and single-quoted where it
-/// is typed, so no shell ever expands it — `~/.claude-claudin` pasted from a
+/// is typed, so no shell ever expands it — `~/.claude-2` pasted from a
 /// `.zshrc` would otherwise name a folder called `~`.
 pub fn at_home(mut declared: Declared, home: &str) -> Declared {
     for var in &mut declared.env {

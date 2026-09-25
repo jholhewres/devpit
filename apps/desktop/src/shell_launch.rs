@@ -173,7 +173,7 @@ fn named(
         .and_then(|front| devpit_pty::agents::recognise(&front.argv));
 
     // What devpit started beats what the process looks like, and only here.
-    // `glm` and `claudin` are the same binary with the same argv — they differ
+    // `glm` and `claude2` are the same binary with the same argv — they differ
     // in environment alone, and telling them apart from outside would mean
     // reading another process's environ, which is where its tokens live.
     // devpit does not have to: it knows because it started it.
@@ -247,7 +247,7 @@ fn program_of(launch: &str) -> &str {
 /// Every command name worth asking the shell about.
 ///
 /// The agents a menu can start, plus the commands profile discovery looks for
-/// — `claudin` is in the second list and not the first, and it is exactly the
+/// — `claude2` is in the second list and not the first, and it is exactly the
 /// name this whole mechanism exists for.
 fn names_to_probe() -> Vec<String> {
     let launches = devpit_pty::agents::KNOWN

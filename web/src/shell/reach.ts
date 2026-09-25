@@ -4,7 +4,7 @@ import type { Profile } from '../gen/bindings'
  * How far this machine gets with a command, said out loud.
  *
  * Three answers, because "installed" was a yes/no and it was wrong about the
- * machine it was written on: `claudin` there is a shell function, so the row
+ * machine it was written on: `claude2` there is a shell function, so the row
  * said "not on the PATH" about a command its owner watches their terminal run
  * every day. The terminal types into their shell and can start it; devpit
  * spawns a process and cannot.

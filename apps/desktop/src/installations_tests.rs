@@ -29,12 +29,12 @@ fn directories(found: &[Found]) -> Vec<&str> {
         .collect()
 }
 
-/// The machine this was written for: `claude` with nothing set, `claudin` and
+/// The machine this was written for: `claude` with nothing set, `claude2` and
 /// `glm` each with a directory of their own.
 fn this_machine() -> Vec<Declared> {
     vec![
         profile("claude-main", "claude", None),
-        profile("claudin", "claude", Some("/home/me/.claude-claudin")),
+        profile("claude2", "claude", Some("/home/me/.claude-2")),
         profile("glm", "claude", Some("/home/me/.claude-glm")),
     ]
 }
@@ -46,7 +46,7 @@ fn each_configuration_directory_is_one_installation() {
         directories(&found),
         [
             "/home/me/.claude",
-            "/home/me/.claude-claudin",
+            "/home/me/.claude-2",
             "/home/me/.claude-glm"
         ]
     );
@@ -103,7 +103,7 @@ fn the_settings_file_follows_what_the_profile_said() {
     // installation so MCP can ask.
     let found = found_for(Path::new(HOME), None, &this_machine(), "", |_| true);
     assert_eq!(found[0].said, None);
-    assert_eq!(found[1].said.as_deref(), Some("/home/me/.claude-claudin"));
+    assert_eq!(found[1].said.as_deref(), Some("/home/me/.claude-2"));
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn a_directory_the_screen_names_must_be_one_of_the_list() {
     // This process reads whatever it is pointed at, so a path from the window
     // is only accepted when it is one of these.
     let found = || found_for(Path::new(HOME), None, &this_machine(), "", |_| true);
-    assert!(pick(found(), Some("/home/me/.claude-claudin")).is_ok());
+    assert!(pick(found(), Some("/home/me/.claude-2")).is_ok());
     let refused = pick(found(), Some("/etc")).expect_err("a refusal");
     assert_eq!(refused.code, ErrorCode::Forbidden);
 }

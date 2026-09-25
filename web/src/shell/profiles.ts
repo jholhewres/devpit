@@ -5,7 +5,7 @@ import type { Declared, EnvVar, Profile } from '../gen/bindings'
  *
  * The shape is measured rather than designed: five of these existed as shell
  * functions in one `.zshrc` before devpit had anywhere to put them, and every
- * one was environment, a program and some arguments. `glm` and `claudin`
+ * one was environment, a program and some arguments. `glm` and `claude2`
  * differ in nothing but the environment.
  *
  * The parts here are the ones a test can hold: turning a line of arguments
@@ -125,7 +125,7 @@ export function withVar(
 /*
  * The variables that make a profile another account or another endpoint.
  *
- * `claudin` is `CLAUDE_CONFIG_DIR` and nothing else; `glm` is a base URL and a
+ * `claude2` is `CLAUDE_CONFIG_DIR` and nothing else; `glm` is a base URL and a
  * token. They get fields of their own so nobody has to remember the names, and
  * stay ordinary variables underneath: a profile saved before these fields
  * existed opens with its values already in them.

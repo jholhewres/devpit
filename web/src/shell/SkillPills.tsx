@@ -11,7 +11,7 @@ import { useInstallations } from './useInstallations'
  * picker that adds them.
  *
  * The picker lists the skills of the installation the chat's profile runs
- * against — `claudin` has its own — the same catalogue the Skills panel
+ * against — `claude2` has its own — the same catalogue the Skills panel
  * shows for it. A skill that is not installed there is not offered.
  */
 

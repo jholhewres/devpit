@@ -53,12 +53,12 @@ describe('what tells two accounts of one CLI apart', () => {
   })
 
   it('names the config folder when it signs in elsewhere', () => {
-    const claudin = profile({ env: [{ name: 'CLAUDE_CONFIG_DIR', value: '/home/me/.claude-claudin' }] })
-    expect(accountHint(claudin)).toBe('.claude-claudin')
+    const claude2 = profile({ env: [{ name: 'CLAUDE_CONFIG_DIR', value: '/home/me/.claude-2' }] })
+    expect(accountHint(claude2)).toBe('.claude-2')
   })
 
   it('says a plain one is the default sign-in, and names an unusual program', () => {
     expect(accountHint(claude)).toBe('Default sign-in')
-    expect(accountHint(profile({ command: 'claudin' }))).toBe('claudin')
+    expect(accountHint(profile({ command: 'claude2' }))).toBe('claude2')
   })
 })

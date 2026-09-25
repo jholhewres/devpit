@@ -33,7 +33,7 @@ vi.mock('./live', () => ({
       return {
         skills: [...catalogue],
         problem: catalogue.length === 0 ? 'no skills directory on this machine' : null,
-        directory: directory ?? '/home/me/.claude-claudin',
+        directory: directory ?? '/home/me/.claude-2',
       }
     },
     skillsRead: (name: string, directory: string | null) => {
@@ -51,7 +51,7 @@ beforeEach(() => {
   listed.mockClear()
   read.mockClear()
   catalogue = [skill({ name: 'tdd' }), skill({ name: 'ai-slop-cleaner', source: 'claude' })]
-  installs = [{ directory: '/home/me/.claude-claudin', profiles: ['claudin'], default: true }]
+  installs = [{ directory: '/home/me/.claude-2', profiles: ['claude2'], default: true }]
 })
 
 /*
@@ -76,7 +76,7 @@ describe('the skills panel', () => {
     // Two installations of the same CLI hold different sets. A list from the
     // wrong one raises nothing and looks exactly right.
     render(<SkillsPane />)
-    expect(await screen.findByText('/home/me/.claude-claudin')).toBeTruthy()
+    expect(await screen.findByText('/home/me/.claude-2')).toBeTruthy()
   })
 
   it('re-reads on demand, because a skill arrives from a terminal', async () => {
@@ -118,7 +118,7 @@ describe('the skills panel', () => {
   })
 
   it('switches to another installation and reads its skills from there', async () => {
-    // claude, claudin and glm are one CLI with three catalogues.
+    // claude, claude2 and glm are one CLI with three catalogues.
     installs = [
       { directory: '/home/me/.claude', profiles: ['claude'], default: true },
       { directory: '/home/me/.claude-glm', profiles: ['glm'], default: false },

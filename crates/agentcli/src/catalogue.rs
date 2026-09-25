@@ -174,7 +174,7 @@ pub fn source_of(dir: &Path) -> String {
         ".devpit" | ".devpit-dev" => "yours".to_owned(),
         "" => "unknown".to_owned(),
         // `~/.claude/agents` would read as ".claude", which is a path showing
-        // through into the screen — and so would `~/.claude-claudin`, which is
+        // through into the screen — and so would `~/.claude-2`, which is
         // what a second installation of the same CLI is actually called.
         other if other.starts_with(".claude") => "claude".to_owned(),
         other => other.to_owned(),

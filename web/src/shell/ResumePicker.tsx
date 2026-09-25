@@ -20,7 +20,7 @@ import { intoView } from './intoView'
  * profile that runs against the installation that wrote it.
  *
  * Narrowed to the account the chat is on, because each account keeps its own
- * history: `claudin`'s conversations are not in `~/.claude`. One click widens
+ * history: `claude2`'s conversations are not in `~/.claude`. One click widens
  * it, for the conversation somebody remembers having on another account.
  */
 

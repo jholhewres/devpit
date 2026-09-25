@@ -3,7 +3,7 @@
 //!
 //! The flags on a launch line (`shell_launch::launch_line`) reach only the
 //! agents devpit starts, and the shell wrappers step aside for a person's own
-//! `claude` function — so `claudin`, `glm` and the like ran with neither the
+//! `claude` function — so `claude2`, `glm` and the like ran with neither the
 //! hooks nor the tools. A plugin is how Warp reaches the same sessions, and
 //! it is the person's choice: nothing here runs until they press Install.
 //!

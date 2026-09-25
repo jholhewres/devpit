@@ -8,7 +8,7 @@ import { ask, commands } from './live'
  * "Install devpit plugin", in the strip under a terminal running Claude Code.
  *
  * The plugin is what gives a session started by the person's own command —
- * `claudin`, a function, an alias — devpit's hooks and board tools, which the
+ * `claude2`, a function, an alias — devpit's hooks and board tools, which the
  * flags devpit puts on its own launch lines never reach. Installing is theirs
  * to choose, so it is offered here and done on a click, the way Warp offers
  * its own.

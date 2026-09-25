@@ -6,10 +6,10 @@ import { modelsOf, modelsText } from './models'
 
 /*
  * What makes a profile another account, another endpoint, or another set of
- * models — the three things `claudin` and `glm` actually differ in.
+ * models — the three things `claude2` and `glm` actually differ in.
  *
  * Each account field is a variable underneath, written into the same list the
- * plain editor shows; they are here because a person declaring `claudin`
+ * plain editor shows; they are here because a person declaring `claude2`
  * should not need to know the name `CLAUDE_CONFIG_DIR`.
  */
 

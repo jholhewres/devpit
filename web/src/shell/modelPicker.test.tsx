@@ -13,9 +13,9 @@ vi.mock('./live', () => ({
   commands: {
     cliInstallations: () => [
       { directory: '/home/me/.claude', profiles: [], ids: [], default: true },
-      { directory: '/home/me/.claude-claudin', profiles: ['claudin'], ids: ['p_claudin'], default: false },
+      { directory: '/home/me/.claude-2', profiles: ['claude2'], ids: ['p_claude2'], default: false },
     ],
-    skillsList: (directory: string) => ({ skills: directory.endsWith('claudin') ? [{}, {}, {}] : [{}], problem: null, directory }),
+    skillsList: (directory: string) => ({ skills: directory.endsWith('claude-2') ? [{}, {}, {}] : [{}], problem: null, directory }),
     mcpList: (_: string, directory: string) => ({ servers: [{}], sources: [], problem: null, manageWith: '', directory }),
   },
 }))
@@ -24,10 +24,10 @@ const profile = (over: Partial<Profile>): Profile =>
   ({ id: 'p', label: 'p', command: 'claude', driver: 'claude', path: '/bin/claude', reach: 'runnable', base: 'claude', args: [], env: [], mine: true, models: ['default', 'opus', 'sonnet'], efforts: [], effortDefault: null, ...over }) as Profile
 
 const claude = profile({ id: 'claude', label: 'Claude Code', mine: false, base: '' })
-const claudin = profile({
-  id: 'p_claudin',
-  label: 'claudin',
-  env: [{ name: 'CLAUDE_CONFIG_DIR', value: '/home/me/.claude-claudin' }],
+const claude2 = profile({
+  id: 'p_claude2',
+  label: 'claude2',
+  env: [{ name: 'CLAUDE_CONFIG_DIR', value: '/home/me/.claude-2' }],
 })
 
 beforeEach(() => {
@@ -44,10 +44,10 @@ function opened(profiles: Profile[], profileId: string | null, onPick = vi.fn())
 describe('the model picker', () => {
   /* Two profiles of one CLI wear one mark; the rail has to say which is which. */
   it('names every account on the rail, with what makes it that account', () => {
-    opened([claude, claudin], 'claude')
+    opened([claude, claude2], 'claude')
     const rail = screen.getByRole('navigation', { name: 'Accounts' })
-    expect(within(rail).getByText('claudin')).toBeTruthy()
-    expect(within(rail).getByText('.claude-claudin')).toBeTruthy()
+    expect(within(rail).getByText('claude2')).toBeTruthy()
+    expect(within(rail).getByText('.claude-2')).toBeTruthy()
     expect(within(rail).getByText('Default sign-in')).toBeTruthy()
   })
 
@@ -62,26 +62,26 @@ describe('the model picker', () => {
   })
 
   it('picks the account and the model together', () => {
-    const onPick = opened([claude, claudin], 'claude')
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Accounts' })).getByText('claudin'))
+    const onPick = opened([claude, claude2], 'claude')
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Accounts' })).getByText('claude2'))
     fireEvent.click(screen.getByText('Sonnet 5'))
-    expect(onPick).toHaveBeenCalledWith('p_claudin', 'sonnet')
+    expect(onPick).toHaveBeenCalledWith('p_claude2', 'sonnet')
   })
 
   it('moves along the rail with the arrows while the search is empty', () => {
-    const onPick = opened([claude, claudin], 'claude')
+    const onPick = opened([claude, claude2], 'claude')
     const field = screen.getByLabelText('Search models')
     fireEvent.keyDown(field, { key: 'ArrowRight' })
     fireEvent.keyDown(field, { key: 'ArrowDown' })
     fireEvent.keyDown(field, { key: 'Enter' })
-    expect(onPick).toHaveBeenCalledWith('p_claudin', 'opus')
+    expect(onPick).toHaveBeenCalledWith('p_claude2', 'opus')
   })
 
   /* What changes with the account: where its history, skills and MCP live. */
   it('says where the account on the rail keeps its configuration', async () => {
-    opened([claude, claudin], 'claude')
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Accounts' })).getByText('claudin'))
-    await waitFor(() => expect(screen.getByText('~/.claude-claudin')).toBeTruthy())
+    opened([claude, claude2], 'claude')
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Accounts' })).getByText('claude2'))
+    await waitFor(() => expect(screen.getByText('~/.claude-2')).toBeTruthy())
     expect(await screen.findByText('3 skills · 1 MCP server')).toBeTruthy()
   })
 

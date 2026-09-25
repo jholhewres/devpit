@@ -56,7 +56,7 @@ export const current = (profile: Profile | undefined, model: string | null): str
 /*
  * One line under an account's name saying what makes it that account.
  *
- * Two profiles of one CLI look the same by their mark; what tells `claudin`
+ * Two profiles of one CLI look the same by their mark; what tells `claude2`
  * from `glm` is where it signs in and where it sends requests, so that is
  * what the line says — the endpoint's host first, since that is the bigger
  * difference, then the config folder.

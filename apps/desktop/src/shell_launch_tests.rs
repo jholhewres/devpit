@@ -23,7 +23,7 @@ fn names(pairs: &[(&str, &str)]) -> HashMap<String, String> {
  *
  * Two sources, and which wins is the point. Reading the process answers for
  * every terminal, including the ones devpit never touched, and it cannot tell
- * `glm` from `claudin` — same binary, same arguments, different environment.
+ * `glm` from `claude2` — same binary, same arguments, different environment.
  * The record answers only for panes devpit started, and for those it is exact.
  */
 

@@ -91,7 +91,7 @@ fn a_file_on_the_path_is_runnable() {
 
 #[test]
 fn a_name_only_the_shell_knows_is_shell_only() {
-    // The case this exists for: `claudin` here is a function in `.zshrc` with
+    // The case this exists for: `claude2` here is a function in `.zshrc` with
     // no file anywhere. The terminal runs it; `Command::new` cannot.
     let (how, where_) = reach("definitely-not-a-real-command", true);
     assert_eq!(how, Reach::ShellOnly);

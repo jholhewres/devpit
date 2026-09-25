@@ -91,8 +91,8 @@ describe('which profile the composer may use', () => {
   const shellOnly = (id: string): Profile => ({ ...profile(id, null), reach: 'shell_only' })
 
   it('offers every runnable profile before the first turn', () => {
-    const all = [profile('claude', '/usr/bin/claude'), profile('claudin', '/usr/bin/claudin')]
-    expect(choices(all, null).map((one) => one.id)).toEqual(['claude', 'claudin'])
+    const all = [profile('claude', '/usr/bin/claude'), profile('claude2', '/usr/bin/claude2')]
+    expect(choices(all, null).map((one) => one.id)).toEqual(['claude', 'claude2'])
   })
 
   it('leaves out a profile nothing can start', () => {
@@ -106,8 +106,8 @@ describe('which profile the composer may use', () => {
   })
 
   it('offers only the one the conversation belongs to', () => {
-    const all = [profile('claude', '/usr/bin/claude'), profile('claudin', '/usr/bin/claudin')]
-    expect(choices(all, 'claudin').map((one) => one.id)).toEqual(['claudin'])
+    const all = [profile('claude', '/usr/bin/claude'), profile('claude2', '/usr/bin/claude2')]
+    expect(choices(all, 'claude2').map((one) => one.id)).toEqual(['claude2'])
   })
 
   it('reads a conversation with no turns as belonging to nobody', () => {
@@ -115,7 +115,7 @@ describe('which profile the composer may use', () => {
   })
 
   it('reads a conversation that has spoken as fixed', () => {
-    expect(fixedTo({ profile: 'claudin' } as Conversation)).toBe('claudin')
+    expect(fixedTo({ profile: 'claude2' } as Conversation)).toBe('claude2')
   })
 })
 

@@ -139,7 +139,7 @@ fn a_line_it_cannot_read_is_dropped_rather_than_guessed_at() {
 /*
  * Which profile devpit started in a pane.
  *
- * `glm` and `claudin` are the same binary run with the same arguments; they
+ * `glm` and `claude2` are the same binary run with the same arguments; they
  * differ in environment alone. Nothing outside the process can tell them
  * apart without reading its environ, which is where its token lives. So the
  * answer is recorded at the moment devpit starts one — in tmux, because tmux

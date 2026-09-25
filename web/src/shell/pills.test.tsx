@@ -12,17 +12,17 @@ vi.mock('./live', () => ({
   commands: {
     cliInstallations: () => [
       { directory: '/home/me/.claude', profiles: [], ids: [], default: true },
-      { directory: '/home/me/.claude-claudin', profiles: ['claudin'], ids: ['p_claudin'], default: false },
+      { directory: '/home/me/.claude-2', profiles: ['claude2'], ids: ['p_claude2'], default: false },
     ],
     skillsList: (directory: string | null) =>
-      directory === '/home/me/.claude-claudin'
-        ? { skills: [{ name: 'only-on-claudin' }], problem: null, directory }
+      directory === '/home/me/.claude-2'
+        ? { skills: [{ name: 'only-on-claude2' }], problem: null, directory }
         : { skills: [{ name: 'tdd' }, { name: 'ai-slop-cleaner' }], problem: null, directory: '/home/me/.claude' },
   },
 }))
 
-const claudin = {
-  id: 'p_claudin', label: 'claudin', command: 'claude', driver: 'claude', path: '/bin/claude', reach: 'runnable', mine: true,
+const claude2 = {
+  id: 'p_claude2', label: 'claude2', command: 'claude', driver: 'claude', path: '/bin/claude', reach: 'runnable', mine: true,
 } as Profile
 
 describe('the prompt a pill makes', () => {
@@ -55,9 +55,9 @@ describe('the skill pills', () => {
 
   /* Each account has its own ~/.claude-*; its skills are the ones it runs. */
   it("offers the skills of the installation the chat's profile runs against", async () => {
-    render(<SkillPills picked={[]} onChange={vi.fn()} profile={claudin} />)
+    render(<SkillPills picked={[]} onChange={vi.fn()} profile={claude2} />)
     fireEvent.click(screen.getByText('+ Skill'))
-    expect(await screen.findByRole('option', { name: 'only-on-claudin' })).toBeTruthy()
+    expect(await screen.findByRole('option', { name: 'only-on-claude2' })).toBeTruthy()
     expect(screen.queryByRole('option', { name: 'tdd' })).toBeNull()
   })
 

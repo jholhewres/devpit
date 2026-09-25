@@ -306,13 +306,13 @@ fn two_accounts_differing_in_environment_alone_stay_two() {
     let store = open(dir.path());
 
     written(&store, glm());
-    let mut claudin = glm();
-    claudin.label = "Claudin".to_owned();
-    claudin.env = vec![EnvVar {
+    let mut claude2 = glm();
+    claude2.label = "Claude 2".to_owned();
+    claude2.env = vec![EnvVar {
         name: "CLAUDE_CONFIG_DIR".to_owned(),
-        value: "/home/someone/.claude-claudin".to_owned(),
+        value: "/home/someone/.claude-2".to_owned(),
     }];
-    written(&store, claudin);
+    written(&store, claude2);
 
     let lines: Vec<String> = all(&store)
         .expect("resolve")

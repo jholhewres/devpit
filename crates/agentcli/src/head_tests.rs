@@ -19,7 +19,7 @@ fn head(profile: &str) -> Head {
 
 #[test]
 fn a_new_conversation_takes_the_profile_it_is_given() {
-    assert_eq!(settled(None, "claudin"), Ok(()));
+    assert_eq!(settled(None, "claude2"), Ok(()));
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn the_same_profile_runs() {
 
 #[test]
 fn another_account_is_refused_by_name() {
-    assert_eq!(settled(Some(&head("claude")), "claudin"), Err("claude"));
+    assert_eq!(settled(Some(&head("claude")), "claude2"), Err("claude"));
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn a_head_survives_the_round_trip() {
         created_at: 12.0,
         cost_usd: 0.4,
         session_id: Some("sess_1".to_owned()),
-        ..head("claudin")
+        ..head("claude2")
     };
     write_head(&path, &written).unwrap();
     assert_eq!(read_head(&path), Some(written));

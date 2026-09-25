@@ -229,19 +229,19 @@ fn a_model_may_carry_the_wide_context_suffix_and_nothing_a_shell_reads() {
 #[test]
 fn a_home_at_the_front_of_a_value_is_made_absolute() {
     // Pasted from a `.zshrc`, where the shell expanded it; nothing here will.
-    let mut claudin = profile();
-    claudin.env = vec![
-        var("CLAUDE_CONFIG_DIR", "~/.claude-claudin"),
+    let mut claude2 = profile();
+    claude2.env = vec![
+        var("CLAUDE_CONFIG_DIR", "~/.claude-2"),
         var("ONE", "$HOME/.claude-glm"),
         var("TWO", "${HOME}"),
         var("TOKEN", "a~/b"),
     ];
-    let done = at_home(claudin, "/home/someone/");
+    let done = at_home(claude2, "/home/someone/");
     let values: Vec<&str> = done.env.iter().map(|one| one.value.as_str()).collect();
     assert_eq!(
         values,
         [
-            "/home/someone/.claude-claudin",
+            "/home/someone/.claude-2",
             "/home/someone/.claude-glm",
             "/home/someone/",
             "a~/b"
