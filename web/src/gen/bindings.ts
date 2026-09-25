@@ -266,6 +266,13 @@ export const commands = {
 	artifactsList: (projectId: string) => typedError<Artifacts, RpcError>(__TAURI_INVOKE("artifacts_list", { projectId })),
 	/**  `artifacts.remove` — one of them, gone. */
 	artifactRemove: (projectId: string, name: string) => typedError<null, RpcError>(__TAURI_INVOKE("artifact_remove", { projectId, name })),
+	/**  `orchestrator.links` — the projects this orchestrator is linked to. */
+	orchestratorLinks: (projectId: string) => typedError<string[], RpcError>(__TAURI_INVOKE("orchestrator_links", { projectId })),
+	/**
+	 *  `orchestrator.link` — the projects it is linked to, as the person chose
+	 *  them. Only projects, never another orchestrator.
+	 */
+	orchestratorLink: (projectId: string, linked: string[]) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_link", { projectId, linked })),
 	/**
 	 *  `mcp.appTools` — the tools of this account, in this folder, that come
 	 *  with a page.
@@ -2334,11 +2341,6 @@ export type LiveSession = {
 	 *  one of devpit's and stopped on one.
 	 */
 	waiting: PendingPrompt | null,
-	/**
-	 *  The account it runs under when it is not the orchestrator's own: it
-	 *  cannot be messaged from here, only read and answered in its terminal.
-	 */
-	account: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */

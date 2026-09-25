@@ -133,6 +133,11 @@ describe('the orchestrator', () => {
     const lanes = (await invoke(window, 'board_get', { projectId: project.id })).columns
     const card = await invoke(window, 'card_create', { projectId: project.id, columnId: lanes[0].id, title: 'Fix the login timeout', body: '' })
     const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
+    const orchestratorId = (await invoke(window, 'project_list')).projects.find((one) => one.orchestrator)?.id
+    // Not linked, the project is out of the orchestrator's reach.
+    const unlinked = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, orchestrator)
+    assert.match(unlinked.error ?? '', /not linked/)
+    await invoke(window, 'orchestrator_link', { projectId: orchestratorId, linked: [project.id] })
 
     const handed = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, orchestrator)
     assert.ok(handed.ok, `the orchestrator could not hand the card: ${JSON.stringify(handed)}`)

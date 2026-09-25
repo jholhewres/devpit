@@ -13,11 +13,11 @@ use crate::{
     checkpoint_preview, claude_plugin, cloning, columns, commands, diffs, error_reports,
     error_sender, files, filetree, front, happening, heads_down, history, in_flight, index,
     installations, live_answer, live_sessions, mcp, mcp_apps, moving, notices, openers,
-    orchestrator, outside_sessions, pane_screen, panels, panes, pasting, paths, plan_limits,
-    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reveal,
-    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
-    slash, sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
-    worktree_base, worktrees, wsfiles,
+    orchestrator, orchestrator_links, outside_sessions, pane_screen, panels, panes, pasting, paths,
+    plan_limits, plugin_data, plugins, project_naming, projects, reading_path, receipts,
+    regrouping, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
+    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, threads, update,
+    watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -60,6 +60,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         orchestrator::orchestrator_account,
         artifacts::artifacts_list,
         artifacts::artifact_remove,
+        orchestrator_links::orchestrator_links,
+        orchestrator_links::orchestrator_link,
         mcp_apps::mcp_app_tools,
         mcp_apps::mcp_app_open,
         mcp_apps::mcp_app_call,

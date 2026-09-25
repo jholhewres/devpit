@@ -109,7 +109,13 @@ fn respond_in(
     match asked.method.as_str() {
         "projects" => {
             orchestrating(here)?;
-            return Ok(every_project(projects));
+            let linked = crate::orchestrator_links::linked(Path::new(&here.root_path));
+            let mine: Vec<Project> = projects
+                .iter()
+                .filter(|one| linked.contains(&one.id))
+                .cloned()
+                .collect();
+            return Ok(every_project(&mine));
         }
         "sessions" => {
             let profile = orchestrating(here)?;
@@ -131,6 +137,7 @@ fn respond_in(
         _ => {}
     }
     let project = reached(projects, here, text("project").as_deref())?;
+    crate::orchestrator_links::reaches(here, project)?;
     if asked.method.starts_with("artifact") {
         return crate::artifacts::respond(
             &asked.method,

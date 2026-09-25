@@ -36,6 +36,7 @@ mod live_prompt;
 mod live_sessions;
 mod mcp_apps;
 mod orchestrator;
+mod orchestrator_links;
 mod rewinding;
 mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the

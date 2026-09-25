@@ -89,24 +89,25 @@ pub async fn orchestrator_refresh(project_id: String) -> Result<(), RpcError> {
     .await
 }
 
-/// The folders an orchestrator reads beyond its own: every project's. Nothing
-/// for a project, which stays inside itself.
+/// The folders an orchestrator reads beyond its own: the projects the person
+/// linked it to. Nothing for a project, which stays inside itself.
 pub(crate) fn reaches(project_id: &str) -> Vec<String> {
     let Ok(listed) = crate::projects::project_list_now() else {
         return Vec::new();
     };
-    let is_orchestrator = listed
+    let Some(here) = listed
         .projects
         .iter()
-        .any(|one| one.id == project_id && one.orchestrator.is_some());
-    if !is_orchestrator {
+        .find(|one| one.id == project_id && one.orchestrator.is_some())
+    else {
         return Vec::new();
-    }
+    };
+    let linked = crate::orchestrator_links::linked(Path::new(&here.root_path));
     listed
         .projects
-        .into_iter()
-        .filter(|one| one.orchestrator.is_none())
-        .map(|one| one.root_path)
+        .iter()
+        .filter(|one| linked.contains(&one.id))
+        .map(|one| one.root_path.clone())
         .collect()
 }
 
@@ -146,14 +147,7 @@ fn orchestrable(
 
 /// Which account an orchestrator speaks as, said in its own folder.
 pub(crate) fn speaks_as(folder: &Path, profile_id: &str) -> std::io::Result<()> {
-    let file = folder.join(devpit_core::home::ORCHESTRATOR_SETTINGS);
-    if let Some(parent) = file.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(
-        file,
-        serde_json::json!({ "profile": profile_id }).to_string(),
-    )
+    crate::orchestrator_links::set(folder, "profile", serde_json::json!(profile_id))
 }
 
 /// `orchestrator.account` — the account an orchestrator speaks as, changed.
