@@ -26,7 +26,13 @@ const ALLOWED_IN_DEV: [&str; 3] = [
 ];
 
 /// Directives that may name nothing at all.
-const MUST_BE_NONE: [&str; 2] = ["frame-src", "object-src"];
+const MUST_BE_NONE: [&str; 1] = ["object-src"];
+
+/// Frames come from one place: the scheme a page of an MCP App is served on
+/// (`mcp_apps.rs`), an origin of its own, sandboxed — written the two ways
+/// Tauri spells a custom scheme, Linux and macOS, then Windows. Nothing on the
+/// network is framed.
+const FRAMES: [&str; 2] = ["mcpapp:", "http://mcpapp.localhost"];
 
 pub fn the_csp_forbids_what_the_app_never_needs(root: &Path) -> Vec<Finding> {
     let path = root.join("apps/desktop/tauri.conf.json");
@@ -110,6 +116,17 @@ fn refusals(policy: &str, allowed: &[&str]) -> Vec<String> {
                 "{name} names {} instead of 'none'",
                 sources.join(" ")
             ));
+        }
+        if name == "frame-src" {
+            if let Some(other) = sources
+                .iter()
+                .find(|one| **one != "'none'" && !FRAMES.contains(one))
+            {
+                said.push(format!(
+                    "frame-src names {other}: only MCP App pages are framed"
+                ));
+            }
+            continue;
         }
         for source in sources {
             let remote = source.starts_with("http://")

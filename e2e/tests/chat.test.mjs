@@ -216,3 +216,46 @@ describe('Remote Control in a project chat', () => {
     }
   })
 })
+
+describe('MCP Apps in a chat', () => {
+  test('a tool that comes with a page shows it, hands it the call, and runs its calls only when let', async () => {
+    await fill(window, 'textarea[data-e2e="mine"]', 'show me the app')
+    const frame = await window.wait(until.elementLocated(By.css('.mcpapp__frame')), 60000).catch(() => null)
+    assert.ok(frame, `the page never showed. On screen: ${(await text(window)).slice(-400)}`)
+    // Sandboxed, and on a scheme of its own.
+    assert.equal(await frame.getAttribute('sandbox'), 'allow-scripts allow-forms')
+    assert.match(await frame.getAttribute('src'), /mcpapp/)
+
+    await window.switchTo().frame(frame)
+    const handed = await window
+      .wait(async () => {
+        const got = await window.findElement(By.id('got')).getText()
+        const result = await window.findElement(By.id('result')).getText()
+        return got.includes('world') && result.includes('shown')
+      }, 20000)
+      .catch(() => false)
+    assert.ok(handed, 'the page was not handed its call and result')
+    // Its origin is opaque: no devpit IPC, no window, no storage.
+    assert.equal(await window.findElement(By.id('reach')).getText(), 'nothing')
+    await window.findElement(By.id('call')).click()
+    await window.switchTo().defaultContent()
+
+    // The page's call waits for the person.
+    const asked = await window.wait(until.elementLocated(By.css('.mcpapp__ask')), 10000).catch(() => null)
+    assert.ok(asked, 'the page ran a tool without asking')
+    await press(window, 'Allow once')
+
+    await window.switchTo().frame(await window.findElement(By.css('.mcpapp__frame')))
+    const called = await window
+      .wait(async () => (await window.findElement(By.id('called')).getText()).includes('echo'), 20000)
+      .catch(() => false)
+    await window.switchTo().defaultContent()
+    assert.ok(called, 'the call the person allowed never answered the page')
+
+    const calls = readFileSync(join(home, '.claude', 'stub-calls.log'), 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    const ran = calls.find((one) => one.app?.subtype === 'mcp_call')
+    // Its own server's tool, through a host started as one.
+    assert.equal(ran?.app?.tool, 'mcp__stubapps__echo')
+    assert.equal(ran?.appsHost, '1')
+  })
+})

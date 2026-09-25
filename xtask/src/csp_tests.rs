@@ -42,6 +42,22 @@ fn a_policy_that_lets_anything_through_is_refused() {
     .iter()
     .any(|said| said.contains("frame-src names 'self'")));
 
+    // MCP App pages are framed from their own scheme, and nothing else is.
+    assert!(refusals(
+        &OURS.replace(
+            "frame-src 'none'",
+            "frame-src mcpapp: http://mcpapp.localhost"
+        ),
+        &ALLOWED
+    )
+    .is_empty());
+    assert!(refusals(
+        &OURS.replace("frame-src 'none'", "frame-src mcpapp: https://jira.example"),
+        &ALLOWED
+    )
+    .iter()
+    .any(|said| said.contains("frame-src names https://jira.example")));
+
     // A host nobody allowed, even a quiet-looking one.
     assert!(refusals(
         &OURS.replace("ipc:", "ipc: https://telemetry.example"),

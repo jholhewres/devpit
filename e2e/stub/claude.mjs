@@ -264,6 +264,19 @@ async function answer(prompt) {
     console.log(JSON.stringify(said))
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'second half of a slow answer', session_id: session }))
+  } else if (/\bthe app\b/.test(prompt)) {
+    // A call of the tool that comes with a page, and its result.
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.id = `app-${Date.now()}`
+    said.message.content = [{ type: 'tool_use', id: 'toolu_app1', name: 'mcp__stubapps__show', input: { hello: 'world' } }]
+    console.log(JSON.stringify(said))
+    console.log(JSON.stringify({ type: 'user', session_id: session, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_app1', content: '{"shown":true}' }] } }))
+    said.message.id = `app-said-${Date.now()}`
+    said.message.content = [{ type: 'text', text: 'here is the page' }]
+    console.log(JSON.stringify(said))
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'here is the page', session_id: session }))
   } else if (/\bpwd\b/.test(prompt)) {
     const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
     said.session_id = session
@@ -281,6 +294,37 @@ async function answer(prompt) {
   fireHooks('Stop', {}, session)
 }
 
+/** What the CLI answers a page's host with, for a server called `stubapps`. */
+function appAnswer(request) {
+  if (request.subtype === 'mcp_status') {
+    return { mcpServers: [{ name: 'stubapps', status: 'connected', tools: [{ name: 'show', _meta: { ui: { resourceUri: 'ui://stub/show.html', prefersBorder: true } } }, { name: 'plain' }] }] }
+  }
+  if (request.subtype === 'mcp_read_resource') {
+    const page = `<!doctype html><html><body><p id="got">waiting</p><p id="result">no result</p><button id="call">call</button><p id="called">not called</p><p id="reach">unchecked</p><script>
+      // What the page can reach of the window it sits in: nothing, it should say.
+      const reach = [];
+      if (typeof window.__TAURI_INTERNALS__ !== 'undefined' || typeof window.__TAURI__ !== 'undefined' || typeof window.ipc !== 'undefined') reach.push('tauri');
+      try { if (parent.document) reach.push('parent') } catch { }
+      try { localStorage.getItem('x'); reach.push('storage') } catch { }
+      fetch('ipc://localhost/project_list', { method: 'POST' }).then(() => { reach.push('ipc'); show() }, () => {}).finally(show);
+      function show() { document.getElementById('reach').textContent = reach.length ? reach.join(',') : 'nothing' }
+      show();
+      let next = 1; const pending = {};
+      const ask = (method, params) => new Promise((done) => { const id = next++; pending[id] = done; parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*') });
+      addEventListener('message', (event) => {
+        const m = event.data || {};
+        if (m.id && pending[m.id]) { pending[m.id](m); delete pending[m.id]; return }
+        if (m.method === 'ui/notifications/tool-input') document.getElementById('got').textContent = JSON.stringify(m.params.arguments);
+        if (m.method === 'ui/notifications/tool-result') document.getElementById('result').textContent = JSON.stringify(m.params.structuredContent);
+      });
+      document.getElementById('call').onclick = async () => { const r = await ask('tools/call', { name: 'echo', arguments: { x: 1 } }); document.getElementById('called').textContent = JSON.stringify(r.result || r.error) };
+      ask('ui/initialize', { protocolVersion: '2026-01-26' }).then(() => parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized' }, '*'));
+    </script></body></html>`
+    return { contents: [{ uri: request.uri, mimeType: 'text/html;profile=mcp-app', text: page }] }
+  }
+  return { content: [{ type: 'text', text: JSON.stringify({ echo: request.arguments, tool: request.tool }) }] }
+}
+
 /** Each user message on stdin, skipping whatever control lines come between. */
 async function* userPrompts() {
   const lines = createInterface({ input: process.stdin })
@@ -296,6 +340,13 @@ async function* userPrompts() {
       appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ argv, cwd: process.cwd(), control: message.request })}\n`)
       const response = message.request.enabled ? { session_url: 'https://claude.ai/code/session_stub' } : {}
       console.log(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response } }))
+      continue
+    }
+    // MCP Apps, answered as the CLI does when it hosts them: one server with
+    // one tool that comes with a page, the page, and the page's calls.
+    if (message.type === 'control_request' && ['mcp_status', 'mcp_read_resource', 'mcp_call'].includes(message.request?.subtype)) {
+      appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ app: message.request, appsHost: process.env.CLAUDE_CODE_MCP_APPS_HOST ?? null })}\n`)
+      console.log(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response: appAnswer(message.request) } }))
       continue
     }
     if (message.type !== 'user') continue

@@ -266,6 +266,18 @@ export const commands = {
 	artifactsList: (projectId: string) => typedError<Artifacts, RpcError>(__TAURI_INVOKE("artifacts_list", { projectId })),
 	/**  `artifacts.remove` — one of them, gone. */
 	artifactRemove: (projectId: string, name: string) => typedError<null, RpcError>(__TAURI_INVOKE("artifact_remove", { projectId, name })),
+	/**
+	 *  `mcp.appTools` — the tools of this account, in this folder, that come
+	 *  with a page.
+	 */
+	mcpAppTools: (profileId: string, cwd: string) => typedError<McpAppTool[], RpcError>(__TAURI_INVOKE("mcp_app_tools", { profileId, cwd })),
+	/**  `mcp.appOpen` — the page that comes with a tool, ready to be served. */
+	mcpAppOpen: (profileId: string, cwd: string, called: string) => typedError<McpAppPage, RpcError>(__TAURI_INVOKE("mcp_app_open", { profileId, cwd, called })),
+	/**
+	 *  `mcp.appCall` — a page calling a tool of its own server, once the person
+	 *  has let it. The answer is the CLI's, as JSON.
+	 */
+	mcpAppCall: (profileId: string, cwd: string, called: string, tool: string, input: string) => typedError<string, RpcError>(__TAURI_INVOKE("mcp_app_call", { profileId, cwd, called, tool, input })),
 	/**  `orchestrator.sessions` — what this profile's account has running now. */
 	orchestratorSessions: (profileId: string) => typedError<LiveSessions, RpcError>(__TAURI_INVOKE("orchestrator_sessions", { profileId })),
 	/**
@@ -2332,6 +2344,19 @@ export type LiveSession = {
 /**  A list, so tomorrow's field has somewhere to go. */
 export type LiveSessions = {
 	sessions: LiveSession[],
+};
+
+export type McpAppPage = {
+	/**  Its id on the `mcpapp:` scheme. */
+	id: string,
+	bordered: boolean,
+};
+
+export type McpAppTool = {
+	/**  The tool as the model calls it: `mcp__<server>__<tool>`. */
+	called: string,
+	server: string,
+	bordered: boolean,
 };
 
 /**

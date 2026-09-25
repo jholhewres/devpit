@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Asked } from './Asked'
 import { Chips } from './Chips'
@@ -11,6 +11,7 @@ import { ContextMeter } from './ContextMeter'
 import { ComposerStatus } from './ComposerStatus'
 import { CopySession } from './CopySession'
 import { DocPeek } from './DocPeek'
+import { AppsScopeContext } from './mcpApps'
 import { DropTarget } from './DropTarget'
 import { PaneCorner } from './PaneCorner'
 import { useTaking } from './useTaking'
@@ -64,6 +65,12 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const mine = active?.id === tab.id
   /* A file an answer names opens beside the conversation, not over it. */
   const [peek, setPeek] = useState<string | null>(null)
+  /* Where a page an MCP tool came with is asked for: this conversation's
+     account, in its folder. */
+  const scope = useMemo(
+    () => (chat.profileId && chat.folder ? { profileId: chat.profileId, cwd: chat.folder } : null),
+    [chat.profileId, chat.folder],
+  )
 
   useEffect(() => {
     if (tab.draft !== undefined) drafted(tab.id)
@@ -123,13 +130,15 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         {empty ? (
           <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => (setPrompt(text), field.current?.focus())} />
         ) : (
-          <div className="thread">
-            {chat.error && <div className="exempty__t">{chat.error}</div>}
-            {chat.messages.map((message) => (
-              <Turn key={message.id} message={message} folder={chat.folder} onOpen={setPeek} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
-            ))}
-            {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
-          </div>
+          <AppsScopeContext.Provider value={scope}>
+            <div className="thread">
+              {chat.error && <div className="exempty__t">{chat.error}</div>}
+              {chat.messages.map((message) => (
+                <Turn key={message.id} message={message} folder={chat.folder} onOpen={setPeek} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
+              ))}
+              {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
+            </div>
+          </AppsScopeContext.Provider>
         )}
       </div>
 

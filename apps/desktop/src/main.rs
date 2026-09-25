@@ -34,6 +34,7 @@ mod handing;
 mod live_answer;
 mod live_prompt;
 mod live_sessions;
+mod mcp_apps;
 mod orchestrator;
 mod rewinding;
 mod runs_list;
@@ -182,6 +183,11 @@ fn main() {
         .manage(chat_relay::Relay::default())
         .manage(chat_resident::Residents::default())
         .manage(chat_remote::Remotes::default())
+        .manage(mcp_apps::McpApps::default())
+        // A page that came with an MCP tool, on an origin of its own.
+        .register_uri_scheme_protocol("mcpapp", |ctx, request| {
+            mcp_apps::serve(ctx.app_handle(), request.uri().path())
+        })
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
         .manage(blocks::Blocks::default())
