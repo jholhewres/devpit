@@ -389,3 +389,24 @@ fn a_profile_switched_off_says_so_in_the_list() {
     assert_eq!(enabled(&off.id), Some(false));
     assert_eq!(enabled(&on.id), Some(true));
 }
+
+#[test]
+fn a_home_written_before_it_was_made_absolute_is_made_absolute_on_the_way_out() {
+    // Profiles saved before `at_home` ran on save still hold a literal `~`,
+    // which no shell ever expands and which names a folder called `~`.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = open(dir.path());
+    let mut old = glm();
+    old.env[1].value = "~/.claude-glm".to_owned();
+    written(&store, old);
+
+    let home = crate::installations::home().expect("home");
+    let back = stored(&store).expect("read");
+    assert_eq!(
+        back[0].env[1].value,
+        format!(
+            "{}/.claude-glm",
+            home.to_string_lossy().trim_end_matches('/')
+        )
+    );
+}

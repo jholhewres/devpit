@@ -40,7 +40,20 @@ fn editable(store: &Store) -> Result<Option<Vec<Declared>>, RpcError> {
     if raw.trim().is_empty() {
         return Ok(Some(Vec::new()));
     }
-    Ok(serde_json::from_str(&raw).ok())
+    let Some(list) = serde_json::from_str::<Vec<Declared>>(&raw).ok() else {
+        return Ok(None);
+    };
+    // Also on the way out: profiles saved before `at_home` ran on save still
+    // hold a literal `~`, and re-saving each one is not something to ask.
+    let Ok(home) = crate::installations::home() else {
+        return Ok(Some(list));
+    };
+    let home = home.to_string_lossy();
+    Ok(Some(
+        list.into_iter()
+            .map(|one| devpit_agentcli::declaring::at_home(one, &home))
+            .collect(),
+    ))
 }
 
 /// [`editable`], refusing to go on when the list cannot be read.
