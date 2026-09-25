@@ -42,9 +42,9 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 11] = [
+pub(crate) const METHODS: [&str; 12] = [
     "context", "board", "card", "comment", "create", "update", "move", "methods", "projects",
-    "sessions", "start",
+    "sessions", "start", "screen",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -75,7 +75,16 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     let projects = crate::projects::project_list_now().map_err(said)?.projects;
     let here = project_at(&projects, Path::new(&asked.cwd))
         .ok_or_else(|| format!("no devpit project contains {}", asked.cwd))?;
+    respond_in(app, &projects, here, asked)
+}
 
+/// A method asked by the agent standing in `here`, among `projects`.
+fn respond_in(
+    app: Option<&AppHandle>,
+    projects: &[Project],
+    here: &Project,
+    asked: &Asked,
+) -> Result<Value, String> {
     let text = |name: &str| {
         asked
             .params
@@ -86,16 +95,28 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     match asked.method.as_str() {
         "projects" => {
             orchestrating(here)?;
-            return Ok(every_project(&projects));
+            return Ok(every_project(projects));
         }
         "sessions" => {
             let profile = orchestrating(here)?;
             let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
             return Ok(json!(live.sessions));
         }
+        "screen" => {
+            let profile = orchestrating(here)?;
+            let name = text("name").ok_or("which session? pass its name")?;
+            return Ok(
+                match crate::live_sessions::screen_for(profile, &name).map_err(said)? {
+                    Some((screen, waiting)) => json!({ "screen": screen, "waiting": waiting }),
+                    None => {
+                        json!({ "screen": null, "waiting": null, "note": "not in a devpit terminal, so its screen is not readable" })
+                    }
+                },
+            );
+        }
         _ => {}
     }
-    let project = reached(&projects, here, text("project").as_deref())?;
+    let project = reached(projects, here, text("project").as_deref())?;
     let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
     let card_id = text("cardId").unwrap_or_default();
     let answer = match asked.method.as_str() {

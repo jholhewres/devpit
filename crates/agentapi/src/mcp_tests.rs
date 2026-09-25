@@ -81,3 +81,11 @@ fn an_unknown_method_is_a_protocol_error() {
     );
     assert_eq!(said["error"]["code"], -32601);
 }
+
+#[test]
+fn no_tool_answers_a_question_a_session_is_stopped_on() {
+    // Answering a prompt is the person's, from the window; an agent only reads.
+    assert!(!TOOLS
+        .iter()
+        .any(|tool| tool.method.contains("answer") || tool.method.contains("press")));
+}

@@ -140,3 +140,24 @@ fn only_an_orchestrator_reaches_another_project() {
         "an orchestrator was reachable as a project"
     );
 }
+
+#[test]
+fn a_project_agent_reads_no_session_and_nothing_answers_a_prompt() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let projects = vec![project("prj_app", &dir.path().join("app"), &[])];
+    for method in ["projects", "sessions", "screen"] {
+        let asked: Asked = serde_json::from_value(json!({
+            "method": method, "params": { "name": "anyone" }, "cwd": "",
+        }))
+        .expect("asked");
+        let refused = respond_in(None, &projects, &projects[0], &asked).expect_err(method);
+        assert!(
+            refused.contains("only an orchestrator"),
+            "{method}: {refused}"
+        );
+    }
+    // A session's question is the person's to answer: no agent method presses.
+    assert!(!METHODS
+        .iter()
+        .any(|method| method.contains("answer") || method.contains("press")));
+}
