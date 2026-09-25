@@ -49,6 +49,8 @@ pub enum Heard {
     Ended(Said),
     /// The process is gone: exited, killed, or its stream closed.
     Gone,
+    /// The CLI's answer to a control request, as it wrote it.
+    Control(serde_json::Value),
 }
 
 /// The process that stays, and its stdin.
@@ -64,8 +66,16 @@ impl Resident {
         driver: Box<dyn Driver>,
         turn: &Say<'_>,
         on_session: Arc<dyn Fn(&str) + Send + Sync>,
-        mut on: impl FnMut(Heard) + Send + 'static,
+        on: impl FnMut(Heard) + Send + 'static,
     ) -> Result<Self, AgentError> {
+        // Shared by the turn reader and the line watcher below, which both
+        // hand things on while one turn is being read.
+        let on = std::sync::Arc::new(std::sync::Mutex::new(on));
+        let tell = move |heard: Heard| {
+            if let Ok(mut on) = on.lock() {
+                on(heard);
+            }
+        };
         let mut child = devpit_pty::host_env::command(turn.command)
             .args(argv(turn))
             .current_dir(turn.cwd)
@@ -82,7 +92,19 @@ impl Resident {
 
         let reading = control.clone();
         std::thread::spawn(move || {
-            let mut lines = BufReader::new(stdout).lines().map_while(Result::ok);
+            // Control answers are not turn frames; they are handed on as
+            // they pass, and the turn reader never sees a difference.
+            let watching = tell.clone();
+            let mut lines = BufReader::new(stdout)
+                .lines()
+                .map_while(Result::ok)
+                .inspect(move |line| {
+                    if line.contains("\"control_response\"") {
+                        if let Ok(said) = serde_json::from_str::<serde_json::Value>(line) {
+                            watching(Heard::Control(said["response"].clone()));
+                        }
+                    }
+                });
             loop {
                 let started = Instant::now();
                 let (heard, whole) = next_turn(
@@ -90,10 +112,10 @@ impl Resident {
                     lines.by_ref(),
                     &reading,
                     Some(on_session.as_ref()),
-                    |part| on(Heard::Part(part)),
+                    |part| tell(Heard::Part(part)),
                 );
                 if let Some(ending) = heard.ended {
-                    on(Heard::Ended(Said {
+                    tell(Heard::Ended(Said {
                         end: TurnEnd {
                             turn_id: String::new(),
                             cost_usd: ending.cost_usd,
@@ -112,7 +134,7 @@ impl Resident {
                 }
             }
             let _ = child.wait();
-            on(Heard::Gone);
+            tell(Heard::Gone);
         });
 
         Ok(Self { control, pid })
@@ -125,6 +147,15 @@ impl Resident {
             "message": { "role": "user", "content": [{ "type": "text", "text": prompt }] }
         });
         self.control.write(&message.to_string())
+    }
+
+    /// Sends a control request under `id`; its answer comes back as
+    /// [`Heard::Control`]. False when it no longer listens.
+    pub fn control(&self, id: &str, request: serde_json::Value) -> bool {
+        self.control.write(
+            &serde_json::json!({ "type": "control_request", "request_id": id, "request": request })
+                .to_string(),
+        )
     }
 
     /// Stops the turn it is on and keeps it running.
