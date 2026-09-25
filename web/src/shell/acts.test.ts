@@ -174,7 +174,7 @@ describe('what is running in a pane', () => {
   })
 
   it('knows an agent from anything else', () => {
-    expect(isAgent('claudin')).toBe(true)
+    expect(isAgent('claude')).toBe(true)
     expect(isAgent('zsh')).toBe(false)
   })
 })

@@ -115,7 +115,7 @@ export function ProfileEditor({
           value={typed}
           spellCheck={false}
           aria-label="Command"
-          placeholder="claudin"
+          placeholder="claude-work"
           onChange={(event) => {
             setTyped(event.target.value)
             setRead(null)
@@ -126,7 +126,7 @@ export function ProfileEditor({
       </label>
       <p className="pref__d" data-read={read?.kind}>
         {read?.say ??
-          'What you type in a terminal to start it — an agent such as claude, or a function of your own such as claudin. devpit reads what it sets.'}
+          'What you type in a terminal to start it — an agent such as claude, or a function of your own such as claude-work. devpit reads what it sets.'}
       </p>
 
       <button className="pdet" aria-expanded={details} onClick={() => setDetails(!details)}>

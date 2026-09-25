@@ -59,8 +59,9 @@ pub const KNOWN: &[Known] = &[
         id: "claude",
         label: "Claude Code",
         launch: "claude",
-        // `claudin` is a second account's binary; it is still Claude Code.
-        wears: &["claude", "claudin"],
+        // A second account is a function in front of the same binary, so the
+        // process is still `claude`; its own name never reaches this list.
+        wears: &["claude"],
         // Verified against `claude --help`: "load *additional* settings
         // from", so it adds our hooks rather than replacing what the person
         // has configured.

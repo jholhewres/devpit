@@ -101,10 +101,7 @@ fn efforts_of(name: &str) -> (Vec<String>, Option<String>) {
 ///
 /// Named for what it is rather than `KNOWN`, which is already the agent
 /// catalogue in `devpit_pty::agents` and answers a different question.
-pub const DISCOVERED: &[(&str, &str, &str)] = &[
-    ("claude", "Claude Code", "claude"),
-    ("claudin", "Claude Code (second account)", "claude"),
-];
+pub const DISCOVERED: &[(&str, &str, &str)] = &[("claude", "Claude Code", "claude")];
 
 /// Every profile: the declared ones first, then the discovered commands this
 /// machine can reach and that are not already named.

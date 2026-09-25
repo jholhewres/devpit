@@ -304,7 +304,6 @@ export function headline(rows: readonly Act[], live: boolean): string {
    second differently, so the list is here rather than in the component. */
 const AGENTS: Readonly<Record<string, string>> = {
   claude: 'Claude Code',
-  claudin: 'Claude Code',
   codex: 'Codex',
   gemini: 'Gemini',
   cursor: 'Cursor',
