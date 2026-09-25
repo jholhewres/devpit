@@ -143,7 +143,8 @@ describe('what the browser menu offers', () => {
   it('says what signing out costs before it is worth pressing', async () => {
     draw()
     const out = await screen.findByRole('menuitem', { name: /sign out/i })
-    expect(out.textContent).toMatch(/4 KB/)
+    // The size is read after the item is drawn; on a busy runner, a moment after.
+    await waitFor(() => expect(out.textContent).toMatch(/4 KB/))
     expect(out.textContent).toMatch(/other sessions are untouched/i)
   })
 
