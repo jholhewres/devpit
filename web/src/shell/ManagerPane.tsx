@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
-import type { Board } from '../gen/bindings'
-import { ask, commands } from './live'
-import { type Filters, lanesOf, NO_FILTERS, type ProjectBoard, tally } from './manager'
+import { type Filters, lanesOf, NO_FILTERS, tally } from './manager'
+import { useProjectBoards } from './useProjectBoards'
 import { useShell } from './useShell'
 
 /*
@@ -22,40 +21,8 @@ export function ManagerPane(): React.JSX.Element {
   const { projects: every, setProject, show, openCard, closeManager } = useShell()
   /* An orchestrator's board is its own notes, not work across projects. */
   const projects = useMemo(() => every.filter((one) => !one.orchestrator), [every])
-  const [boards, setBoards] = useState<readonly ProjectBoard[] | null>(null)
-  const [failed, setFailed] = useState<string | null>(null)
+  const { boards, failed } = useProjectBoards(projects)
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
-
-  useEffect(() => {
-    let dropped = false
-    if (projects.length === 0) {
-      setBoards([])
-      return () => {
-        dropped = true
-      }
-    }
-    void (async () => {
-      const read = await Promise.all(
-        projects.map(async (project) => ({
-          project,
-          answer: await ask<Board>(() => commands.boardGet(project.id)),
-        })),
-      )
-      if (dropped) return
-      /* A project whose board will not open is named, once, rather than
-         taking the whole view down with it: the others are still readable. */
-      const refused = read.filter((one) => one.answer.data === null)
-      setFailed(
-        refused.length === 0
-          ? null
-          : `${refused.map((one) => one.project.name).join(', ')}: ${refused[0]?.answer.error ?? 'the board did not open'}`,
-      )
-      setBoards(read.flatMap(({ project, answer }) => (answer.data ? [{ project, board: answer.data }] : [])))
-    })()
-    return () => {
-      dropped = true
-    }
-  }, [projects])
 
   const lanes = useMemo(() => (boards === null ? [] : lanesOf(boards, filters)), [boards, filters])
 

@@ -24,6 +24,9 @@ export function Sidebar({
   onSignIn: () => void
 }): React.JSX.Element {
   const shell = useShell()
+  /* An orchestrator has no board of its own to show: the projects' boards
+     are in its right panel. */
+  const orchestrating = Boolean(shell.project?.orchestrator)
   const account = shell.account
   const kit = useKit()
   const [menu, setMenu] = useState<'new' | 'kit' | 'acct' | null>(null)
@@ -84,11 +87,13 @@ export function Sidebar({
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18" /></svg></span>
                 <span className="newmenu__label">Browser</span>
               </button>
+{!orchestrating && (
               <button className="newmenu__item" role="menuitem" onClick={() => open('board')}>
                 <span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
                 <span className="newmenu__label">Card on the board</span>
                 <span className="newmenu__key">{SHORTCUTS.next}</span>
               </button>
+              )}
             </div>
           </div>
         </div>
@@ -101,10 +106,12 @@ export function Sidebar({
             </button>
           </div>
 
+{!orchestrating && (
           <button className="act" onClick={() => open('board')} aria-pressed={showing('board')}>
             <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
             <span className="act__label">Board</span>
           </button>
+          )}
 
           <button className="act" onClick={() => open('files')} aria-pressed={showing('files')}>
             <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg></span>
