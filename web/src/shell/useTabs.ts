@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ask, commands } from './live'
+import { useWantedPane } from './useWantedPane'
 import type { PaneName } from './paneList'
 import { attached, closed, drafted as taken, focused, joined, launched as sent, moved, opened, renamed, replaced, type Strip, type Tab } from './strip'
 import { remember, remembered } from './tabs'
@@ -29,6 +30,8 @@ export interface Tabs {
   drafted: (id: string) => void
   /** Puts another tab in this one's place. */
   replace: (id: string, tab: Tab) => void
+  /** Brings the tab holding this pane to the front once it is open. */
+  openPane: (paneId: string | null) => void
   /** Which tab is being renamed, and on which surface.
 
       The surface is not decoration: the strip and the sidebar draw the same
@@ -119,6 +122,8 @@ export function useTabs(projectId: string | null): Tabs {
   const drafted = useCallback((id: string) => setStrip((was) => taken(was, id)), [])
   const replace = useCallback((id: string, tab: Tab) => setStrip((was) => replaced(was, id, tab)), [])
 
+  const openPane = useWantedPane(strip.open, focus)
+
   /* One object per change, not per render: this is spread into the shell's
      context, and a new object here re-rendered every screen that reads it. */
   return useMemo(
@@ -137,7 +142,8 @@ export function useTabs(projectId: string | null): Tabs {
       replace,
       renaming,
       setRenaming,
+      openPane,
     }),
-    [strip, show, close, join, focus, move, rename, attach, launched, drafted, replace, renaming],
+    [strip, show, close, join, focus, move, rename, attach, launched, drafted, replace, renaming, openPane],
   )
 }

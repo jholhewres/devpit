@@ -264,6 +264,19 @@ async function answer(prompt) {
     console.log(JSON.stringify(said))
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'second half of a slow answer', session_id: session }))
+  } else if (/\bdelegate\b/.test(prompt)) {
+    // Work handed to another session, the way an orchestrator hands it.
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.id = `deleg-${Date.now()}`
+    said.message.content = [{ type: 'tool_use', id: 'toolu_deleg1', name: 'SendMessage', input: { to: 'worker-1', summary: 'Fix the login timeout', message: 'Take the card and fix it.' } }]
+    console.log(JSON.stringify(said))
+    console.log(JSON.stringify({ type: 'user', session_id: session, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_deleg1', content: 'sent' }] } }))
+    said.message.id = `deleg-said-${Date.now()}`
+    said.message.content = [{ type: 'text', text: 'handed to worker-1' }]
+    console.log(JSON.stringify(said))
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'handed to worker-1', session_id: session }))
   } else if (/\bthe app\b/.test(prompt)) {
     // A call of the tool that comes with a page, and its result.
     const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))

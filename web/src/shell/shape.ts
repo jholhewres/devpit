@@ -134,6 +134,9 @@ export interface Shell {
       notification opens it again. */
   readonly wantedCard: string | null
   openCard: (cardId: string | null) => void
+  /** Brings the tab holding this terminal pane to the front, once the
+   *  project it belongs to has its tabs open. */
+  openPane: (paneId: string | null) => void
 
   /** Whether the sidebar has asked for the runs, and the board's job to clear.
 

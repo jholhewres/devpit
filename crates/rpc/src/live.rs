@@ -27,6 +27,17 @@ pub struct LiveSession {
     /// The question it is stopped on, read off its terminal, when it is in
     /// one of devpit's and stopped on one.
     pub waiting: Option<PendingPrompt>,
+    /// The devpit terminal it runs in, to open right here: present exactly
+    /// when `in_devpit` is.
+    pub pane: Option<LivePane>,
+}
+
+/// A devpit terminal, as a tab attaches to it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LivePane {
+    pub project_id: String,
+    pub pane_id: String,
 }
 
 /// A list, so tomorrow's field has somewhere to go.

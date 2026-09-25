@@ -7,6 +7,7 @@ import { Markdown } from './MarkdownView'
 import { useShellPick } from './shellStore'
 import { Rewound } from './Rewound'
 import { TurnApps } from './TurnApps'
+import { TurnDelegations } from './TurnDelegations'
 import { TurnChanges } from './TurnChangesView'
 import { advanced, opened } from './veil'
 
@@ -58,6 +59,7 @@ export const Turn = memo(function Turn({
   return (
     <article className="turn">
       <Acts parts={doing} live={message.streaming} />
+      <TurnDelegations parts={message.parts} />
       <TurnApps parts={message.parts} />
       {said.map((content, at) => (
         <pre className="said__cmd" key={`c${at}`}>

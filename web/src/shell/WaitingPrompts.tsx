@@ -19,10 +19,14 @@ export function WaitingPrompts({
   profileId,
   sessions,
   onAnswered,
+  onOpen,
 }: {
   profileId: string
   sessions: readonly LiveSession[]
   onAnswered: () => void
+  /** Opens the session's own terminal here: for an answer the choices do not
+   *  hold — words of its own, a question only its screen explains. */
+  onOpen?: (session: LiveSession) => void
 }): React.JSX.Element | null {
   // Per session: the pick in flight, so a second click cannot land on the
   // question after this one, and what the last pick was told.
@@ -66,6 +70,11 @@ export function WaitingPrompts({
               <button className="wprompt__o wprompt__esc" disabled={busy} onClick={() => answer(one, null)} title="Dismiss the question (Esc)">
                 Esc
               </button>
+              {onOpen && one.pane && (
+                <button className="wprompt__o wprompt__esc" onClick={() => onOpen(one)} title="Open its terminal here and answer in it">
+                  Open terminal
+                </button>
+              )}
             </div>
             {said[one.name] && <p className="osess__said">{said[one.name]}</p>}
           </div>

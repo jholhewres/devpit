@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { LiveSession } from '../gen/bindings'
-import { inOrder } from './OrchestratorSessions'
+import { inOrder } from './liveStatus'
 import { WaitingPrompts } from './WaitingPrompts'
 
 const answered = vi.fn()

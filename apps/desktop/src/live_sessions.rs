@@ -56,6 +56,7 @@ pub(crate) fn read(
             // The screen only of a session that is listed, and read once.
             let target = listed.tmux.as_deref().and_then(pane_target);
             let in_devpit = target.is_some();
+            let pane = target.as_deref().and_then(pane_of);
             let waiting = target
                 .and_then(|target| screen(&target))
                 .and_then(|shown| crate::live_prompt::pending(&shown));
@@ -69,6 +70,7 @@ pub(crate) fn read(
                 since: listed.status_updated_at,
                 in_devpit,
                 waiting,
+                pane,
                 cwd,
             })
         })
@@ -110,6 +112,17 @@ pub(crate) fn pane_target(listed: &str) -> Option<String> {
         && plain(session)
         && plain(window))
     .then(|| format!("{client}:{window}"))
+}
+
+/// The project and pane a devpit terminal's target names:
+/// `devpit_<project>__<leaf>:<leaf>`.
+pub(crate) fn pane_of(target: &str) -> Option<devpit_rpc::LivePane> {
+    let (client, _) = target.split_once(':')?;
+    let (session, window) = client.split_once("__")?;
+    Some(devpit_rpc::LivePane {
+        project_id: session.strip_prefix("devpit_")?.to_owned(),
+        pane_id: window.to_owned(),
+    })
 }
 
 /// A devpit terminal's screen as it is now, or nothing when tmux cannot say.
@@ -254,7 +267,7 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
 /// This profile's account's config folder — where its sessions are listed.
 /// Only its own: an orchestrator sees the sessions of the account it speaks
 /// as, never another's.
-fn config_of(profile_id: &str) -> Result<std::path::PathBuf, RpcError> {
+pub(crate) fn config_of(profile_id: &str) -> Result<std::path::PathBuf, RpcError> {
     let store = crate::projects::store()?;
     crate::agent_profiles::all(&store)?
         .iter()

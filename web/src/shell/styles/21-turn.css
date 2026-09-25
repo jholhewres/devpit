@@ -45,36 +45,18 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 
 /* An orchestrator's sessions, down the right of its chat. Over the thread's
    margin on a wide pane; folded to its heading on a narrow one. */
-.osess { position: absolute; top: 44px; right: 12px; z-index: 20; width: 248px; max-height: calc(100% - 200px); display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
-.osess__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; background: none; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
-.osess__count { color: var(--text-3); font-weight: 500; }
-.osess__list { margin: 0; padding: 0 4px 6px; list-style: none; overflow-y: auto; }
-.osess__none { padding: 6px 8px; font-size: 12px; color: var(--text-3); }
-.osess__row { width: 100%; display: grid; grid-template-columns: 8px 1fr; column-gap: 8px; align-items: center; padding: 6px; border: 0; border-radius: 6px; background: none; color: var(--text-2); text-align: left; cursor: pointer; }
-.osess__row:hover:not(:disabled) { background: var(--overlay); }
-.osess__row:disabled { cursor: default; }
-.osess__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
-.osess__dot[data-status='busy'] { background: var(--accent); }
-.osess__name { font-family: var(--mono); font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.osess__where { grid-column: 2; font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.osess__item { position: relative; }
-.osess__answer { position: absolute; top: 6px; right: 4px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 5px; background: none; color: var(--text-3); cursor: pointer; }
-.osess__answer:hover { color: var(--text); background: var(--overlay); }
-.osess__reply { padding: 2px 6px 6px 22px; }
-.osess__reply input { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--inset); color: var(--text); font-size: 12px; }
-.osess__said { margin: 0; padding: 4px 10px 8px; font-size: 11px; color: var(--text-3); }
 /* Questions sessions are stopped on, above the list: the thing to act on. */
-.wprompt { margin: 0 4px 6px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--orchestrate) 10%, transparent); border: 1px solid color-mix(in srgb, var(--orchestrate) 35%, var(--border)); }
-.wprompt__t { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--orchestrate); }
-.wprompt__i + .wprompt__i { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
-.wprompt__who { margin: 0; display: flex; flex-direction: column; }
-.wprompt__q { margin: 4px 0 6px; font-size: 12px; line-height: 1.45; color: var(--text); }
-.wprompt__opts { display: flex; flex-direction: column; gap: 3px; }
-.wprompt__o { display: flex; align-items: baseline; gap: 6px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
-.wprompt__o:hover { color: var(--text); border-color: var(--orchestrate); }
+.wprompt { margin: 0 0 8px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--warning) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border)); }
+.wprompt__t { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--warning); }
+.wprompt__i + .wprompt__i { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.wprompt__who { margin: 0; display: flex; align-items: baseline; gap: 8px; }
+.wprompt__q { margin: 4px 0 8px; font-size: 13px; line-height: 1.45; color: var(--text); }
+.wprompt__opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wprompt__o { display: flex; align-items: baseline; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.wprompt__o:hover:not(:disabled) { color: var(--text); border-color: var(--warning); }
+.wprompt__o:disabled { opacity: .55; cursor: default; }
 .wprompt__n { flex: none; font-family: var(--mono); font-size: 11px; color: var(--text-3); }
 .wprompt__esc { align-self: flex-start; font-family: var(--mono); font-size: 11px; }
-@media (max-width: 1100px) { .osess:not([data-open]) { width: auto; } }
 .chat__drop { position: absolute; inset: 6px; z-index: 20; display: flex; align-items: center; justify-content: center; border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--canvas)); pointer-events: none; }
 .chat__dropt { font-size: 13px; color: var(--accent); }
 
@@ -140,3 +122,30 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .mcpapp__note { font-size: 12px; color: var(--text-3); }
 .mcpapp__ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); background: var(--raised); font-size: 12.5px; color: var(--text-2); }
 .mcpapp__ask > span { flex: 1; min-width: 180px; }
+
+/* Work a turn handed to another session. */
+.deleg { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; align-self: stretch; width: 100%; }
+.deleg__card { width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--raised); }
+.deleg__h { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; width: 100%; padding: 7px 10px; text-align: left; font-size: 12.5px; }
+.deleg__to { font: 12px var(--mono); color: var(--orchestrate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deleg__what { grid-column: 1 / -1; grid-row: 2; color: var(--text); overflow-wrap: anywhere; }
+.deleg__state { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
+.deleg__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex: none; }
+.deleg__card[data-state='busy'] .deleg__dot, .deleg__dot[data-state='busy'] { background: var(--accent); }
+.deleg__card[data-state='waiting'] .deleg__dot, .deleg__dot[data-state='waiting'] { background: var(--warning); }
+.deleg__card[data-state='idle'] .deleg__dot, .deleg__dot[data-state='idle'] { background: var(--success); }
+.deleg__msg { margin: 0; padding: 0 10px 9px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); white-space: pre-wrap; }
+
+/* A session's terminal, opened over the orchestrator's chat. */
+.sterm { display: flex; flex-direction: column; width: min(1100px, 92vw); height: min(760px, 86vh); border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 24px 64px var(--shade); overflow: hidden; }
+.sterm__bar { flex: none; display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--border); }
+.sterm__name { font: 600 12.5px var(--mono); color: var(--text); }
+.sterm__where { flex: 1; min-width: 0; font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sterm__body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term-bg, var(--surface)); }
+.sterm__body .termhost { flex: 1; min-height: 0; }
+.deleg__acts { display: flex; gap: 6px; padding: 0 10px 9px; }
+
+/* The sessions an orchestrator works with, counted in its chat's corner. */
+.pcorner__sess { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.pcorner__sess:hover { color: var(--text); background: var(--overlay); }
+.pcorner__sess b { color: var(--warning); font-weight: 600; }

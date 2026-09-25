@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { LiveSession } from '../gen/bindings'
-import { inOrder } from './OrchestratorSessions'
+import { inOrder } from './liveStatus'
 
 const session = (name: string, status: string): LiveSession => ({ name, status }) as unknown as LiveSession
 

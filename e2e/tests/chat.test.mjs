@@ -27,6 +27,11 @@ let repo
 const card = async (title) =>
   (await invoke(window, 'board_get', { projectId: project.id })).cards.find((one) => one.title === title)
 
+/** Until no answer is being written: typed during one, a message waits in the queue. */
+async function idle() {
+  await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 90000)
+}
+
 async function backToTheBoard() {
   await escape(window)
   await press(window, 'Board')
@@ -198,6 +203,8 @@ describe('Remote Control in a project chat', () => {
       document.querySelector('textarea[data-e2e="mine"]').closest('.pane').querySelector('[aria-label="Remote Control"]').click()
     })
     await settle(500)
+    // After the last answer is whole: typed during it, this waits in the queue.
+    await idle()
     await fill(window, 'textarea[data-e2e="mine"]', 'still there?')
     const open = await window
       .wait(until.elementLocated(By.css('[aria-label="Open on claude.ai"]')), 30000)
@@ -209,6 +216,11 @@ describe('Remote Control in a project chat', () => {
       .map((line) => JSON.parse(line))
       .find((call) => call.control?.enabled)
     assert.match(asked?.control?.name ?? '', /^devpit-/)
+    // Left as it was found: off, and the chat free for the next test.
+    await window.executeScript(function () {
+      document.querySelector('textarea[data-e2e="mine"]').closest('.pane').querySelector('[aria-label="Remote Control"]').click()
+    })
+    await idle()
     // The mode is remembered per profile; later chats start where they did.
     if (supervised) {
       await press(window, 'Full access')
@@ -219,6 +231,7 @@ describe('Remote Control in a project chat', () => {
 
 describe('MCP Apps in a chat', () => {
   test('a tool that comes with a page shows it, hands it the call, and runs its calls only when let', async () => {
+    await idle()
     await fill(window, 'textarea[data-e2e="mine"]', 'show me the app')
     const frame = await window.wait(until.elementLocated(By.css('.mcpapp__frame')), 60000).catch(() => null)
     assert.ok(frame, `the page never showed. On screen: ${(await text(window)).slice(-400)}`)
@@ -237,11 +250,15 @@ describe('MCP Apps in a chat', () => {
     assert.ok(handed, 'the page was not handed its call and result')
     // Its origin is opaque: no devpit IPC, no window, no storage.
     assert.equal(await window.findElement(By.id('reach')).getText(), 'nothing')
-    await window.findElement(By.id('call')).click()
-    await window.switchTo().defaultContent()
-
-    // The page's call waits for the person.
-    const asked = await window.wait(until.elementLocated(By.css('.mcpapp__ask')), 10000).catch(() => null)
+    // The page's call waits for the person. Clicked again if the page was not
+    // listening yet — a click it never heard is not a call it made.
+    let asked = null
+    for (let tries = 0; tries < 3 && !asked; tries += 1) {
+      await window.findElement(By.id('call')).click()
+      await window.switchTo().defaultContent()
+      asked = await window.wait(until.elementLocated(By.css('.mcpapp__ask')), 5000).catch(() => null)
+      if (!asked) await window.switchTo().frame(await window.findElement(By.css('.mcpapp__frame')))
+    }
     assert.ok(asked, 'the page ran a tool without asking')
     await press(window, 'Allow once')
 
@@ -257,5 +274,20 @@ describe('MCP Apps in a chat', () => {
     // Its own server's tool, through a host started as one.
     assert.equal(ran?.app?.tool, 'mcp__stubapps__echo')
     assert.equal(ran?.appsHost, '1')
+  })
+})
+
+describe('work handed to another session', () => {
+  test('shows as a card with whom, what, and how that session stands', async () => {
+    await idle()
+    await fill(window, 'textarea[data-e2e="mine"]', 'delegate it')
+    const card = await window.wait(until.elementLocated(By.css('.deleg__card')), 30000).catch(() => null)
+    assert.ok(card, `no card for the work handed on. On screen: ${(await text(window)).slice(-400)}`)
+    // Its words as they are in the page: WebKit's driver leaves out text a
+    // clipped box could hide, even when there is room for all of it.
+    const said = await window.executeScript('return document.querySelector(".deleg__card").textContent')
+    assert.ok(said.includes('worker-1') && said.includes('Fix the login timeout'), said)
+    // No such session is running in the e2e: it says so rather than guessing.
+    assert.ok(said.includes('not running'), said)
   })
 })

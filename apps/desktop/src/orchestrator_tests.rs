@@ -17,6 +17,9 @@ fn a_new_orchestrator_starts_with_its_brief_and_folders() {
     // Its folder is notes, organised, and never a repository.
     assert!(brief.contains("`context/projects/<project>.md`"));
     assert!(brief.contains("never initialise one or commit"));
+    // Memory and the account's MCP servers, always.
+    assert!(brief.contains("Use every memory tool this account has"));
+    assert!(brief.contains("Use the MCP servers this account has"));
     for kept in [
         "docs",
         "artifacts",

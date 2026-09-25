@@ -28,6 +28,7 @@ mod claims;
 mod cloning;
 mod columns;
 mod commands;
+mod delegations;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod frame_gtk;
 mod handing;

@@ -24,7 +24,7 @@ import { JumpToEnd } from './JumpToEnd'
 import { ComposerFiles } from './ComposerFiles'
 import { ChatBlank } from './ChatBlank'
 import { RemoteToggle } from './RemoteToggle'
-import { OrchestratorSessions } from './OrchestratorSessions'
+import { SessionsChip, SessionsWaiting } from './OrchestratorChat'
 import { Queued } from './Queued'
 import { SendButton } from './SendButton'
 import { useQueue } from './useQueue'
@@ -121,11 +121,11 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         <ContextMeter context={chat.context} />
         {spent && <span className="pcorner__cost" title="What this conversation has cost">{spent}</span>}
         {chat.session && <CopySession id={chat.session} />}
+        {project?.orchestrator && <SessionsChip profileId={project.orchestrator} />}
         {project && <RemoteToggle projectId={project.id} conversationId={tab.id} sending={chat.sending} supervised={ASKS(chat.permission)} />}
       </PaneCorner>
 
       <DropTarget mine={mine} onDrop={dropped} />
-      {project?.orchestrator && <OrchestratorSessions profileId={project.orchestrator} />}
       <div className="scroll" ref={follow.box}>
         {empty ? (
           <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => (setPrompt(text), field.current?.focus())} />
@@ -147,6 +147,9 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <JumpToEnd away={follow.away} onJump={follow.toEnd} />
           {/* The question sits above the composer, where your hands are — not
               in the thread, where it scrolls away from you. */}
+          {/* A session stopped on the person, answered from here: the one
+              thing about the others that cannot wait for a glance aside. */}
+          {project?.orchestrator && <SessionsWaiting profileId={project.orchestrator} />}
           <Asked questions={chat.asked} onAnswer={chat.answer} />
           <ComposerStatus conversationId={tab.id} messages={chat.messages} />
           <Queued queue={queue} />

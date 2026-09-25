@@ -5,6 +5,7 @@ import { Explorer } from './ExplorerView'
 import { History } from './History'
 import { ArtifactsView } from './ArtifactsView'
 import { OrchestratorBoards } from './OrchestratorBoards'
+import { SessionsView } from './SessionsView'
 import { useExplorerState } from './useExplorerState'
 import { useFileIndex } from './useFileIndex'
 import { useShell } from './useShell'
@@ -20,30 +21,46 @@ const FOLDER = 'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.
 const UPLOAD = 'M12 16V4M8 8l4-4 4 4M4 20h16'
 const BOARDS = 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM9 3v18M15 3v18'
 const ARCHIVE = 'M3 4h18v4H3ZM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4'
+const PEOPLE = 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'
 const CLOCK = 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'
 
 /* Explorer or Changes: two questions about the same tree, so one is answered
    at a time rather than both being half-visible. The three views' own
    markup lives in `Explorer.tsx`, `Changes.tsx` and `History.tsx` — this
    file is just the tab bar and the project the tabs share. */
+/** Opens the right panel on an orchestrator's tab: `detail` is the tab. */
+export const SHOW_PANEL = 'devpit:show-panel'
+
 export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void }): React.JSX.Element {
-  const { project, files, active } = useShell()
+  const { project, files, active, toggleFiles } = useShell()
   const tree = useTree(project?.id ?? null)
   const index = useFileIndex(project?.id ?? null)
   const { view: chosen, setView, mode, setMode, query, setQuery } = useExplorerState(project?.id ?? null)
   /* An orchestrator's folder is its notes, not a repository: nothing to
-     commit and no history. What it has instead is every project's board,
-     shown first — that is what its conversations are about. */
+     commit and no history. What it has instead: the sessions it works with,
+     first, and the boards of the projects it is linked to. */
   const git = !project?.orchestrator
-  const [boards, setBoards] = useState(true)
+  const [orch, setOrch] = useState<'sessions' | 'boards' | 'tree'>('sessions')
   /* Artifacts are every project's, outside the three views the explorer
      remembers, so which one is on is kept here. */
   const [arts, setArts] = useState(false)
-  const view = arts ? 'artifacts' : git ? chosen : boards ? 'boards' : 'tree'
+  const view = arts ? 'artifacts' : git ? chosen : orch
   const pick = (next: () => void): void => {
     setArts(false)
     next()
   }
+
+  /* Asked for from elsewhere — the chat's session count — opened if hidden. */
+  useEffect(() => {
+    const wanted = (event: Event): void => {
+      const tab = (event as CustomEvent<'sessions' | 'boards'>).detail
+      setArts(false)
+      setOrch(tab)
+      if (!files) toggleFiles()
+    }
+    window.addEventListener(SHOW_PANEL, wanted)
+    return () => window.removeEventListener(SHOW_PANEL, wanted)
+  }, [files, toggleFiles])
 
   /* Follows the focused tab, not a click remembered here — opening a file
      from the palette or from Changes must highlight the same row. */
@@ -72,13 +89,18 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
           aria-selected={view === 'tree'}
           title="Explorer"
           aria-label="Explorer"
-          onClick={() => pick(() => (setBoards(false), setView('tree')))}
+          onClick={() => pick(() => (setOrch('tree'), setView('tree')))}
         >
           <Icon d={FOLDER} size={15} />
           {tree.nodes.length > 0 && <span className="rtab__n">{tree.nodes.length}</span>}
         </button>
         {!git && (
-          <button className="rtab" aria-selected={view === 'boards'} title="Boards" aria-label="Boards" onClick={() => pick(() => setBoards(true))}>
+          <button className="rtab rtab--lead" aria-selected={view === 'sessions'} title="Sessions" aria-label="Sessions" onClick={() => pick(() => setOrch('sessions'))}>
+            <Icon d={PEOPLE} size={15} />
+          </button>
+        )}
+        {!git && (
+          <button className="rtab rtab--lead" aria-selected={view === 'boards'} title="Boards" aria-label="Boards" onClick={() => pick(() => setOrch('boards'))}>
             <Icon d={BOARDS} size={15} />
           </button>
         )}
@@ -129,6 +151,12 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
       <div className="rview" data-rview="changes" data-open={String(view === 'changes')}>
         <Changes tree={tree} />
       </div>
+
+      {!git && (
+        <div className="rview" data-rview="sessions" data-open={String(view === 'sessions')}>
+          <SessionsView shown={files && view === 'sessions'} />
+        </div>
+      )}
 
       {!git && (
         <div className="rview" data-rview="boards" data-open={String(view === 'boards')}>

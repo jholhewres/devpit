@@ -266,6 +266,11 @@ export const commands = {
 	artifactsList: (projectId: string) => typedError<Artifacts, RpcError>(__TAURI_INVOKE("artifacts_list", { projectId })),
 	/**  `artifacts.remove` — one of them, gone. */
 	artifactRemove: (projectId: string, name: string) => typedError<null, RpcError>(__TAURI_INVOKE("artifact_remove", { projectId, name })),
+	/**
+	 *  `orchestrator.agents` — every session an orchestrator has written to or
+	 *  heard from, with what passed, most recent first.
+	 */
+	orchestratorAgents: (projectId: string) => typedError<AgentThread[], RpcError>(__TAURI_INVOKE("orchestrator_agents", { projectId })),
 	/**  `orchestrator.links` — the projects this orchestrator is linked to. */
 	orchestratorLinks: (projectId: string) => typedError<string[], RpcError>(__TAURI_INVOKE("orchestrator_links", { projectId })),
 	/**
@@ -1369,8 +1374,26 @@ export type AgentChoice = {
 	hooks: boolean,
 };
 
+export type AgentEvent = {
+	/**  `sent`, `heard` or `idle`. */
+	kind: string,
+	/**  When, as the CLI wrote it (RFC 3339). */
+	at: string,
+	/**  The request's summary, for one that was sent. */
+	summary: string | null,
+	text: string,
+};
+
 /**  Who is running in the leaf. `none` is a plain shell. */
 export type AgentPresence = "none";
+
+export type AgentThread = {
+	/**  The session, by the name it is messaged by. */
+	name: string,
+	lastAt: string,
+	/**  Oldest first. */
+	events: AgentEvent[],
+};
 
 /**
  *  Response of `agents.list`.
@@ -2316,6 +2339,12 @@ title?: string } | { type: "split";
  */
 id?: string; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
 
+/**  A devpit terminal, as a tab attaches to it. */
+export type LivePane = {
+	projectId: string,
+	paneId: string,
+};
+
 export type LiveSession = {
 	/**  The name another session messages it by. */
 	name: string,
@@ -2341,6 +2370,11 @@ export type LiveSession = {
 	 *  one of devpit's and stopped on one.
 	 */
 	waiting: PendingPrompt | null,
+	/**
+	 *  The devpit terminal it runs in, to open right here: present exactly
+	 *  when `in_devpit` is.
+	 */
+	pane: LivePane | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */

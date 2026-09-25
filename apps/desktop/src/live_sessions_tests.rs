@@ -3,7 +3,7 @@ use std::path::Path;
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{card_of, pane_target, read};
+use super::{card_of, pane_of, pane_target, read};
 
 fn project(id: &str, root: &Path, orchestrator: Option<&str>) -> Project {
     serde_json::from_value(json!({
@@ -134,4 +134,16 @@ fn a_session_in_a_devpit_terminal_says_the_question_it_is_stopped_on() {
     let waiting = found[0].waiting.as_ref().expect("waiting on a question");
     assert_eq!(waiting.question, "Proceed?");
     assert_eq!(waiting.options.len(), 2);
+}
+
+#[test]
+fn a_devpit_terminal_is_opened_by_its_project_and_pane() {
+    let target = pane_target("devpit_prj_01AB__leaf_01CD:@3.%3").expect("a target");
+    assert_eq!(
+        pane_of(&target),
+        Some(devpit_rpc::LivePane {
+            project_id: "prj_01AB".into(),
+            pane_id: "leaf_01CD".into(),
+        })
+    );
 }

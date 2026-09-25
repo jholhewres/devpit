@@ -26,6 +26,9 @@ import { linkPaths } from './terminalPathLinks'
  * siblings never tears it down and loses its attachment.
  */
 
+/** Said when a view that took a pane from its tab lets it go. */
+export const PANE_FREED = 'devpit:pane-freed'
+
 export function Leaf({
   paneId,
   projectId,
@@ -56,6 +59,16 @@ export function Leaf({
   const [pasteFailed, setPasteFailed] = useState<string | null>(null)
   const [term, setTerm] = useState<Terminal | null>(null)
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
+  /* Another view held this pane a while — a session opened beside an
+     orchestrator's chat — and gave it back: attached again, from scratch. */
+  const [round, setRound] = useState(0)
+  useEffect(() => {
+    const back = (event: Event): void => {
+      if ((event as CustomEvent<string>).detail === paneId) setRound((was) => was + 1)
+    }
+    window.addEventListener(PANE_FREED, back)
+    return () => window.removeEventListener(PANE_FREED, back)
+  }, [paneId])
   const onTerminalRef = useRef(onTerminal)
   onTerminalRef.current = onTerminal
   /* Where a path clicked in the terminal opens: read at the click, so the
@@ -266,7 +279,7 @@ export function Leaf({
       live?.detach()
       terminal.dispose()
     }
-  }, [projectId, paneId])
+  }, [projectId, paneId, round])
 
   useMarks(term, paneId)
   const closeMenu = useCallback(() => setMenuAt(null), [])

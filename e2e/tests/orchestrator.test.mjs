@@ -56,6 +56,8 @@ describe('the orchestrator', () => {
   })
 
   test('hears another session between the person\'s messages, and says so in its chat', async () => {
+    // After the last answer is whole: typed during it, this waits in the queue.
+    await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 30000)
     await fill(window, 'textarea.composer__ph', 'wake me when the other session is done')
     const woken = await window
       .wait(async () => (await text(window)).includes('the other session says it is done'), 20000)
@@ -86,15 +88,17 @@ describe('the orchestrator', () => {
       .wait(
         () =>
           window.executeScript(function () {
-            return Array.prototype.slice.call(document.querySelectorAll('.osess')).some(function (one) {
+            return Array.prototype.slice.call(document.querySelectorAll('.sess')).some(function (one) {
               return one.offsetParent !== null
             })
           }),
         10000,
       )
       .catch(() => false)
-    const count = await window.executeScript('return document.querySelectorAll(".osess").length')
+    const count = await window.executeScript('return document.querySelectorAll(".sess").length')
     assert.ok(shown, `the sessions panel is not on screen (${count} in the page)`)
+    // Counted in the chat's corner too, which opens the panel.
+    assert.ok((await text(window)).includes('sessions'), 'the chat does not count its sessions')
   })
 
   test('shows a question a session is stopped on, and answers it as the person', async () => {
@@ -125,6 +129,46 @@ describe('the orchestrator', () => {
     // The arrow and Enter arrived apart: Enter waited for the cursor on screen.
     const keys = calls().filter((call) => call.keys !== undefined).map((call) => call.keys)
     assert.deepEqual(keys, ['\u001b[B', '\r'])
+  })
+
+  test("opens a session's own terminal over the chat, to work in it as the person", async () => {
+    // A real devpit terminal: a project's tab, its tmux window, the stub in it.
+    const repo = seedRepo(home, 'termed')
+    const project = await invoke(window, 'project_add', { rootPath: repo })
+    const layout = await invoke(window, 'session_ensure', { projectId: project.id, tabId: 'tab_e2e_termed', worktreeId: null })
+    const target = `devpit_${project.id}:${layout.focusedId}`
+    const stub = join(process.env.E2E_ROOT, 'e2e', 'stub', 'claude.mjs')
+    tmux(home, 'send-keys', '-t', target, '-l', `${process.execPath} ${stub} --name termed-stub`)
+    tmux(home, 'send-keys', '-t', target, 'Enter')
+
+    const button = await window
+      .wait(until.elementLocated(By.css('[aria-label="Open termed-stub\'s terminal here"]')), 20000)
+      .catch(() => null)
+    assert.ok(button, 'the session in a devpit terminal has no way to open it here')
+    await window.executeScript(function (one) {
+      one.click()
+    }, button)
+    // Attached, not refused: the terminal is there and no reason is shown.
+    const attached = await window
+      .wait(async () => (await window.findElements(By.css('.sterm .xterm-helper-textarea'))).length > 0, 15000)
+      .catch(() => false)
+    const refused = await window.executeScript('return document.querySelector(".sterm .exempty__t")?.textContent ?? ""')
+    assert.ok(attached && !refused, `the terminal did not attach: ${refused}`)
+
+    // Typed here, as the person, it reaches the session. The terminal draws on
+    // a canvas; what the session shows is read from tmux.
+    const screen = () => tmux(home, 'capture-pane', '-p', '-t', target)
+    await settle(1500)
+    await window.executeScript('document.querySelector(".sterm .xterm-helper-textarea").focus()')
+    await window.actions().sendKeys('ask me').perform()
+    await window.actions().sendKeys('\uE007').perform()
+    const asked = await window.wait(async () => String(screen()).includes('Pick a slice?'), 15000).catch(() => false)
+    assert.ok(asked, `what was typed never reached the session. It shows: ${String(screen()).slice(-300)}`)
+
+    await window.executeScript('document.querySelector(".sterm [aria-label=\'Close the terminal\']").click()')
+    const closed = await window.wait(async () => (await window.findElements(By.css('.sterm'))).length === 0, 5000).catch(() => false)
+    assert.ok(closed, 'the terminal did not close')
+    tmux(home, 'send-keys', '-t', target, 'Escape')
   })
 
   test('hands a card to a session of its account, linked to the card — and nothing else may', async () => {

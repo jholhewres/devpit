@@ -1,0 +1,48 @@
+import { useState } from 'react'
+
+import type { LiveSession } from '../gen/bindings'
+import { refreshSessions, useLiveSessions } from './liveStatus'
+import { SHOW_PANEL } from './RightPanel'
+import { SessionTerminal } from './SessionTerminal'
+import { useShell } from './useShell'
+import { WaitingPrompts } from './WaitingPrompts'
+
+/*
+ * What an orchestrator's chat adds for the sessions it works with: their
+ * count in its corner, which opens the Sessions panel, and — above the
+ * composer — every question one of them is stopped on, answered from here or
+ * in its own terminal opened over the chat.
+ */
+
+export function SessionsChip({ profileId }: { profileId: string }): React.JSX.Element {
+  const live = useLiveSessions(profileId)
+  const waiting = live.filter((one) => one.waiting).length
+  return (
+    <button className="pcorner__sess" onClick={() => window.dispatchEvent(new CustomEvent(SHOW_PANEL, { detail: 'sessions' }))} title="The sessions this orchestrator works with">
+      {live.length} {live.length === 1 ? 'session' : 'sessions'}
+      {waiting > 0 && <b> · {waiting} waiting</b>}
+    </button>
+  )
+}
+
+export function SessionsWaiting({ profileId }: { profileId: string }): React.JSX.Element {
+  const { setProject, openPane } = useShell()
+  const live = useLiveSessions(profileId)
+  const [terminal, setTerminal] = useState<LiveSession | null>(null)
+  return (
+    <>
+      <WaitingPrompts profileId={profileId} sessions={live} onAnswered={() => refreshSessions(profileId)} onOpen={setTerminal} />
+      {terminal && (
+        <SessionTerminal
+          session={terminal}
+          onClose={() => setTerminal(null)}
+          onGo={() => {
+            setTerminal(null)
+            if (terminal.projectId) setProject(terminal.projectId)
+            if (terminal.pane) openPane(terminal.pane.paneId)
+          }}
+        />
+      )}
+    </>
+  )
+}
