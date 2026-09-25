@@ -3,6 +3,36 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.19 — 2026-09-25
+
+### Orchestrator
+
+- **Waiting sessions are found again.** 0.1.18 did not recognise the
+  terminals real Claude Code sessions run in, so "Waiting on you" and Reply
+  never showed for them. They do now.
+- **Sessions of every account.** The Sessions panel lists the Claude Code
+  sessions of all your accounts, each marked with the account it runs under.
+  Those of another account can be read and answered from the panel; only the
+  orchestrator's own account can be messaged.
+- **Notes, organised, without git.** An orchestrator reads every project's
+  folder, keeps what it learns in `context/projects/`, your preferences in
+  `context/preferences.md` and decisions in `decisions/`. Its folder is no
+  longer a git repository, and the Changes and History tabs are gone for it.
+- **Asks before starting a session.** Work goes to the session already
+  running in a project; a new one is started only after asking, in the card's
+  own checkout or the project's folder, as you choose.
+- **Easier to add and tell apart.** A new orchestrator is one click away in
+  the rail, and each one gets a colour of its own.
+
+### Chat
+
+- **Remote Control in any chat.** A project's chat can be reached from
+  claude.ai and the Claude app too — outside the Supervised mode, which runs a
+  process per turn.
+- **Links you can click.** Web addresses and file paths in an answer are
+  links, and web addresses in a terminal open in the browser. A file an answer
+  names opens beside the chat, and expands into a tab.
+
 ## 0.1.18 — 2026-09-25
 
 ### Orchestrator
