@@ -10,6 +10,16 @@ fn a_root_becomes_the_folder_the_cli_uses() {
 }
 
 #[test]
+fn an_underscore_becomes_a_dash_like_every_other_non_alphanumeric() {
+    // Measured: the CLI keeps `/home/a/whmcs_br/led-billing` under
+    // `-home-a-whmcs-br-led-billing`, and a folder keeping the `_` is empty.
+    assert_eq!(
+        folder_name(Path::new("/home/a/whmcs_br/led billing@2")),
+        "-home-a-whmcs-br-led-billing-2"
+    );
+}
+
+#[test]
 fn the_last_title_wins() {
     let transcript = concat!(
         "{\"type\":\"user\",\"message\":{\"content\":\"hi\"}}\n",

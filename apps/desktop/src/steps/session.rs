@@ -68,9 +68,17 @@ pub fn start(
     )
     .map_err(|err| err.to_string())?;
 
-    let transcript = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| agent::transcript_path(&home, &cwd, session_id));
+    // The profile's own directory, or the one this process hands down: a
+    // second account keeps its transcripts under its own `projects/`.
+    let transcript = std::env::var_os("HOME").map(PathBuf::from).map(|home| {
+        let env = runner
+            .as_ref()
+            .map(|one| one.env.as_slice())
+            .unwrap_or_default();
+        let inherited = std::env::var("CLAUDE_CONFIG_DIR").ok();
+        let dir = agent::cli_config::config_dir_of(&home, env, inherited.as_deref());
+        agent::transcript_path(&dir, &cwd, session_id)
+    });
 
     store
         .link_session(

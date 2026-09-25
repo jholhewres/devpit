@@ -83,6 +83,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         claude_plugin::claude_plugin_install,
         agent_profiles::agent_profile_remove,
         attaching_chat::chat_attach,
+        agent_profiles::agent_signed_in,
         pasting::chat_paste,
         receipts::chat_receipt,
         slash::chat_slash_commands,

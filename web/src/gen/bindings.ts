@@ -375,6 +375,14 @@ export const commands = {
 	 *  than read.
 	 */
 	chatAttach: (projectId: string, path: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_attach", { projectId, path })),
+	/**
+	 *  `agent.signed_in` — whether the directory a profile names holds a sign-in.
+	 * 
+	 *  Asked with the field's text rather than a saved profile, so the editor
+	 *  answers for what is typed. Empty is what a child inherits: this process's
+	 *  own `CLAUDE_CONFIG_DIR`, else `~/.claude`.
+	 */
+	agentSignedIn: (dir: string) => typedError<SignedIn, RpcError>(__TAURI_INVOKE("agent_signed_in", { dir })),
 	/**  `chat.paste` — keeps a pasted picture and answers with it as an attachment. */
 	chatPaste: (projectId: string, mediaType: string, data: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_paste", { projectId, mediaType, data })),
 	/**  `chat.receipt` — records an answered question in the conversation. */
@@ -1881,6 +1889,14 @@ export type Conversations = {
 	conversations: Thread[],
 };
 
+/**
+ *  Whether a CLI configuration directory holds a sign-in.
+ * 
+ *  Three answers, because on macOS the sign-in lives in the Keychain and the
+ *  directory cannot say either way.
+ */
+export type Credentials = "saved" | "missing" | "unknown";
+
 /**  What a plugin's data folder is allowed to hold. */
 export type DataSpec = {
 	/**  Each with its leading dot, e.g. `.excalidraw`. Enforced by [`validate`]. */
@@ -2847,6 +2863,12 @@ export type Profile = {
 	 */
 	efforts?: string[],
 	effortDefault?: string | null,
+	/**
+	 *  Whether it is offered. Carried here because the composer and the step
+	 *  editor read this list, and a switch only `agents.known` saw switched
+	 *  nothing off for them.
+	 */
+	enabled?: boolean,
 };
 
 /**
@@ -3254,6 +3276,11 @@ export type SignInState =
 { state: "signed"; account: Account } | 
 /**  The code ran out, or was already used. Start again. */
 { state: "expired" };
+
+/**  `agent.signed_in`'s answer. An object, so the next field has somewhere to go. */
+export type SignedIn = {
+	state: Credentials,
+};
 
 export type Skill = {
 	name: string,

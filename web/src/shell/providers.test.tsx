@@ -14,6 +14,8 @@ const saved = vi.fn()
 const removed = vi.fn()
 const defaulted = vi.fn()
 const switched = vi.fn()
+let signIn: 'saved' | 'missing' | 'unknown' = 'saved'
+const asked: string[] = []
 const hooked = vi.fn()
 
 const opened: string[] = []
@@ -38,6 +40,7 @@ vi.mock('./live', () => ({
     agentProfileSave: (declared: Declared) => (saved(declared), listed),
     agentProfileRemove: (id: string) => (removed(id), listed),
     agentProfileRead: (command: string) => readBack(command),
+    agentSignedIn: (dir: string) => (asked.push(dir), { state: signIn }),
   },
 }))
 
@@ -71,6 +74,8 @@ beforeEach(() => {
   listed = []
   known = [agent('claude', { label: 'Claude Code' })]
   choice = { defaultId: '', disabled: [], hooks: true }
+  signIn = 'saved'
+  asked.length = 0
   refusal = null
   for (const spy of [saved, removed, defaulted, switched, hooked]) spy.mockClear()
 })
@@ -189,6 +194,9 @@ describe('what exactly does each one run', () => {
     const sent = saved.mock.calls[0]![0] as Declared
     expect(sent.base).toBe('claude')
     expect(sent.args).toEqual(['--permission-mode', 'bypassPermissions'])
+    // Under the built-in's own id: the switch, the default and every step
+    // that named `claude` keep meaning this row.
+    expect(sent.id).toBe('claude')
   })
 
   it('keeps the id when a profile is renamed', async () => {
@@ -468,5 +476,27 @@ describe('the shape of the pane', () => {
     choice = { defaultId: 'claude', disabled: [], hooks: true }
     await shown()
     expect(screen.getByRole('button', { name: 'Default agent' }).textContent).toContain('Claude Code')
+  })
+})
+
+describe('whether the account is signed in', () => {
+  it('says a directory with no sign-in has none, and how to get one', async () => {
+    // Without it, a chat on a fresh directory fails asking for /login, and
+    // the profile looks like it only works with an endpoint and a token.
+    signIn = 'missing'
+    await shown()
+    fireEvent.click(screen.getByText('New profile'))
+    fireEvent.click(screen.getByText(/Details —/))
+    fireEvent.change(screen.getByLabelText('Config directory'), { target: { value: '~/.claude-work' } })
+    await waitFor(() => expect(screen.getByText(/No sign-in here yet/)).toBeTruthy())
+    expect(asked).toContain('~/.claude-work')
+  })
+
+  it('says nothing more when the sign-in is there', async () => {
+    await shown()
+    fireEvent.click(screen.getByText('New profile'))
+    fireEvent.click(screen.getByText(/Details —/))
+    await waitFor(() => expect(screen.getByText(/Signed in/)).toBeTruthy())
+    expect(screen.queryByText(/No sign-in here yet/)).toBeNull()
   })
 })

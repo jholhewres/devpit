@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { Agent, Profile, Step } from '../gen/bindings'
 import { ask, commands } from './live'
+import { offers, onProfilesChanged } from './profiles'
 import { CONTEXT_KEYS, stepConfig, stepFields, type Fields } from './stepConfig'
 
 /*
@@ -76,7 +77,10 @@ export function StepNew({
   // which one.
   useEffect(() => {
     if (kind === 'command') return
-    void ask(() => commands.agentProfiles()).then((answer) => setProfiles(answer.data ?? []))
+    const load = (): void =>
+      void ask(() => commands.agentProfiles()).then((answer) => setProfiles(answer.data ?? []))
+    load()
+    return onProfilesChanged(load)
   }, [kind])
 
   // Offered rather than typed: a step stores an agent by the name in its
@@ -205,7 +209,7 @@ export function StepNew({
             >
               Default
             </button>
-            {profiles.map((one) => (
+            {profiles.filter(offers(fields.profile ?? null)).map((one) => (
               <button
                 className="src__o"
                 key={one.id}

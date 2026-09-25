@@ -12,6 +12,8 @@
 
 use std::path::{Path, PathBuf};
 
+use devpit_rpc::Credentials;
+
 /// The configuration directory, given a home and what an environment says.
 ///
 /// Takes the value rather than reading it so the rule can be tested without a
@@ -21,6 +23,33 @@ pub fn config_dir_from(home: &Path, said: Option<&str>) -> PathBuf {
     match named(said) {
         Some(said) => PathBuf::from(said),
         None => home.join(".claude"),
+    }
+}
+
+/// The configuration directory a process started with `env` would use.
+///
+/// The process's own environment carries over to the child, so what it
+/// `inherited` counts when `env` says nothing; when `env` names the variable at
+/// all, that is the value the child sees, empty included.
+pub fn config_dir_of(home: &Path, env: &[(String, String)], inherited: Option<&str>) -> PathBuf {
+    let own = env
+        .iter()
+        .rev()
+        .find(|(name, _)| name == "CLAUDE_CONFIG_DIR")
+        .map(|(_, value)| value.as_str());
+    config_dir_from(home, own.or(inherited))
+}
+
+/// Whether `dir` holds a sign-in: `.credentials.json`, which is where the CLI
+/// keeps it everywhere but macOS. Only asks that the file exists.
+pub fn sign_in_at(dir: &Path) -> Credentials {
+    if cfg!(target_os = "macos") {
+        return Credentials::Unknown;
+    }
+    if dir.join(".credentials.json").is_file() {
+        Credentials::Saved
+    } else {
+        Credentials::Missing
     }
 }
 
@@ -93,6 +122,36 @@ mod tests {
             settings_file_from(home, Some("/home/someone/.claude-other")),
             Path::new("/home/someone/.claude-other/.claude.json")
         );
+    }
+
+    #[test]
+    fn a_profiles_own_directory_wins_over_the_inherited_one() {
+        let home = Path::new("/home/someone");
+        let env = [(
+            "CLAUDE_CONFIG_DIR".to_owned(),
+            "/home/someone/.claude-b".to_owned(),
+        )];
+        assert_eq!(
+            config_dir_of(home, &env, Some("/home/someone/.claude-a")),
+            Path::new("/home/someone/.claude-b")
+        );
+        assert_eq!(
+            config_dir_of(home, &[], Some("/home/someone/.claude-a")),
+            Path::new("/home/someone/.claude-a")
+        );
+    }
+
+    #[test]
+    fn a_directory_with_a_saved_sign_in_says_so() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        if cfg!(target_os = "macos") {
+            // The Keychain holds it there, so the file says nothing either way.
+            assert_eq!(sign_in_at(dir.path()), Credentials::Unknown);
+            return;
+        }
+        assert_eq!(sign_in_at(dir.path()), Credentials::Missing);
+        std::fs::write(dir.path().join(".credentials.json"), "{}").expect("write");
+        assert_eq!(sign_in_at(dir.path()), Credentials::Saved);
     }
 
     #[test]

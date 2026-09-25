@@ -14,7 +14,7 @@
 use devpit_agentcli::profile::{profiles, Base};
 use devpit_core::store::preference;
 use devpit_core::Store;
-use devpit_rpc::{Declared, ErrorCode, Profile, RpcError};
+use devpit_rpc::{Declared, ErrorCode, Profile, RpcError, SignedIn};
 
 /// What a base agent lends, looked up in the agent catalogue.
 fn base_of(id: &str) -> Option<Base> {
@@ -40,7 +40,20 @@ fn editable(store: &Store) -> Result<Option<Vec<Declared>>, RpcError> {
     if raw.trim().is_empty() {
         return Ok(Some(Vec::new()));
     }
-    Ok(serde_json::from_str(&raw).ok())
+    let Some(list) = serde_json::from_str::<Vec<Declared>>(&raw).ok() else {
+        return Ok(None);
+    };
+    // Also on the way out: profiles saved before `at_home` ran on save still
+    // hold a literal `~`, and re-saving each one is not something to ask.
+    let Ok(home) = crate::installations::home() else {
+        return Ok(Some(list));
+    };
+    let home = home.to_string_lossy();
+    Ok(Some(
+        list.into_iter()
+            .map(|one| devpit_agentcli::declaring::at_home(one, &home))
+            .collect(),
+    ))
 }
 
 /// [`editable`], refusing to go on when the list cannot be read.
@@ -92,11 +105,12 @@ pub(crate) fn commands(store: &Store) -> Vec<String> {
 
 /// Every profile this machine can offer: the declared ones and the discovered.
 pub(crate) fn all(store: &Store) -> Result<Vec<Profile>, RpcError> {
-    Ok(profiles(
-        &stored(store)?,
-        base_of,
-        crate::shell_launch::shell_knows(),
-    ))
+    let off = crate::agent_choice::disabled(store);
+    let mut all = profiles(&stored(store)?, base_of, crate::shell_launch::shell_knows());
+    for one in &mut all {
+        one.enabled = !off.contains(&one.id);
+    }
+    Ok(all)
 }
 
 /// `agent.profiles` — the accounts this machine can talk to.
@@ -196,6 +210,34 @@ fn remove(store: &Store, id: &str) -> Result<(), RpcError> {
     let mut list = to_edit(store)?;
     list.retain(|one| one.id != id);
     save(store, &list)
+}
+
+/// `agent.signed_in` — whether the directory a profile names holds a sign-in.
+///
+/// Asked with the field's text rather than a saved profile, so the editor
+/// answers for what is typed. Empty is what a child inherits: this process's
+/// own `CLAUDE_CONFIG_DIR`, else `~/.claude`.
+#[tauri::command]
+#[specta::specta]
+pub async fn agent_signed_in(dir: String) -> Result<SignedIn, RpcError> {
+    crate::off_main::blocking(move || agent_signed_in_now(&dir)).await
+}
+
+fn agent_signed_in_now(dir: &str) -> Result<SignedIn, RpcError> {
+    use devpit_agentcli::cli_config;
+    let home = crate::installations::home()?;
+    let dir = dir.trim();
+    let env = if dir.is_empty() {
+        Vec::new()
+    } else {
+        let at = devpit_agentcli::declaring::at_home_value(dir, &home.to_string_lossy());
+        vec![("CLAUDE_CONFIG_DIR".to_owned(), at)]
+    };
+    let inherited = std::env::var("CLAUDE_CONFIG_DIR").ok();
+    let found = cli_config::config_dir_of(&home, &env, inherited.as_deref());
+    Ok(SignedIn {
+        state: cli_config::sign_in_at(&found),
+    })
 }
 
 /// The profile this step names, as something that can be started.
