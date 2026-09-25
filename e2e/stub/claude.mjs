@@ -10,8 +10,8 @@
  * stream the window parses here is a stream the CLI really produced.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 
@@ -61,12 +61,22 @@ if (has('--help')) {
 function interactive() {
   appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ argv, cwd: process.cwd(), interactive: true })}\n`)
   const session = valueOf('--session-id') ?? `stub-${process.pid}`
+  const listing = register()
+  process.on('exit', () => listing && rmSync(listing, { force: true }))
   fireHooks('SessionStart', { source: 'startup' }, session)
   process.stdout.write('\n  devpit end-to-end stub — type /exit to leave\n\n> ')
 
-  const lines = createInterface({ input: process.stdin })
-  lines.on('line', (line) => {
+  const onLine = (line) => {
     const said = line.trim()
+    if (said === 'ask me') {
+      lines.close()
+      choose(['One slice', 'All at once'], (picked) => {
+        appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ chose: picked })}\n`)
+        process.stdout.write(`\n  chosen: ${picked}\n> `)
+        lines = listen(onLine)
+      })
+      return
+    }
     if (said === '/exit') {
       fireHooks('SessionEnd', { reason: 'prompt_input_exit' }, session)
       // A moment for the hook's curl to leave before the process does.
@@ -87,7 +97,68 @@ function interactive() {
       fireHooks('Stop', {}, session)
     }
     process.stdout.write('> ')
-  })
+  }
+  let lines = listen(onLine)
+}
+
+function listen(onLine) {
+  const lines = createInterface({ input: process.stdin })
+  lines.on('line', onLine)
+  return lines
+}
+
+/**
+ * A question drawn the way Claude Code draws one, answered the way it is:
+ * raw keys, one read at a time — the arrows move the cursor and the screen is
+ * drawn again, Enter takes the choice under it, Escape takes none. Every read
+ * is written down, so a test sees the keys arrive apart.
+ */
+function choose(options, done) {
+  let cursor = 0
+  const draw = () => {
+    const rows = options.map((label, at) => ` ${at === cursor ? '❯' : ' '} ${at + 1}. ${label}${at === 0 ? '\n     the spine first' : ''}`)
+    process.stdout.write(`\x1b[2J\x1b[H──────────────\n Pick a slice?\n\n${rows.join('\n')}\n`)
+  }
+  const finish = (picked) => {
+    process.stdin.off('data', read)
+    if (process.stdin.isTTY) process.stdin.setRawMode(false)
+    done(picked)
+  }
+  const read = (chunk) => {
+    const keys = chunk.toString()
+    appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ keys })}\n`)
+    for (const key of keys.match(/\x1b\[[AB]|\r|\n|\x1b/g) ?? []) {
+      if (key === '\x1b[A') cursor = Math.max(0, cursor - 1)
+      else if (key === '\x1b[B') cursor = Math.min(options.length - 1, cursor + 1)
+      else if (key === '\x1b') return finish(null)
+      else return finish(options[cursor])
+    }
+    draw()
+  }
+  if (process.stdin.isTTY) process.stdin.setRawMode(true)
+  process.stdin.resume()
+  process.stdin.on('data', read)
+  draw()
+}
+
+/**
+ * Listed the way the CLI lists a live session, so devpit sees it: a file per
+ * session under the config folder, with the tmux client it runs in.
+ */
+function register() {
+  if (!process.env.TMUX) return null
+  let client = ''
+  try {
+    const [session, window] = execFileSync('tmux', ['display-message', '-p', '#S\t#W'], { encoding: 'utf8' }).trim().split('\t')
+    client = session.includes('__') ? session : `${session}__${window}`
+  } catch {
+    return null
+  }
+  const dir = join(home, '.claude', 'sessions')
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, `${process.pid}.json`)
+  writeFileSync(file, JSON.stringify({ pid: process.pid, name: valueOf('--name') ?? `stub-${process.pid}`, status: 'idle', kind: 'interactive', cwd: process.cwd(), tmux: client }))
+  return file
 }
 
 /** The sessions this stub has started, as `agents --json` reports them. */

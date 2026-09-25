@@ -11,6 +11,7 @@ import { By, until } from 'selenium-webdriver'
 
 import { fill, settle, text } from '../lib/drive.mjs'
 import { seedRepo } from '../lib/home.mjs'
+import { tmux } from '../lib/tmux.mjs'
 import { invoke } from '../lib/seed.mjs'
 import { insideTheSeededHome, openWindow } from '../lib/session.mjs'
 
@@ -97,6 +98,36 @@ describe('the orchestrator', () => {
       .catch(() => false)
     const count = await window.executeScript('return document.querySelectorAll(".osess").length')
     assert.ok(shown, `the sessions panel is not on screen (${count} in the page)`)
+  })
+
+  test('shows a question a session is stopped on, and answers it as the person', async () => {
+    // A session in one of devpit's terminals, named the way devpit names them.
+    const stub = join(process.env.E2E_ROOT, 'e2e', 'stub', 'claude.mjs')
+    const target = 'devpit_prj_e2e__leaf_e2e:leaf_e2e'
+    tmux(home, 'new-session', '-d', '-s', 'devpit_prj_e2e__leaf_e2e', '-n', 'leaf_e2e', '-e', `HOME=${home}`, `${process.execPath} ${stub} --name asking-stub`)
+    await settle(1500)
+    tmux(home, 'send-keys', '-t', target, '-l', 'ask me')
+    tmux(home, 'send-keys', '-t', target, 'Enter')
+
+    const shown = await window
+      .wait(async () => (await window.executeScript('return document.querySelector(".wprompt")?.innerText ?? ""')).includes('Pick a slice?'), 20000)
+      .catch(() => false)
+    assert.ok(shown, 'the question the session is stopped on never showed')
+    await window.executeScript(function () {
+      const pick = Array.prototype.slice.call(document.querySelectorAll('.wprompt__o')).find(function (one) {
+        return one.innerText.indexOf('All at once') >= 0
+      })
+      pick.click()
+    })
+    const log = join(home, '.claude', 'stub-calls.log')
+    const calls = () => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    const chose = await window.wait(() => calls().find((call) => call.chose !== undefined), 15000).catch(() => null)
+    tmux(home, 'kill-session', '-t', 'devpit_prj_e2e__leaf_e2e')
+    assert.ok(chose, 'nothing was chosen in the session')
+    assert.equal(chose.chose, 'All at once')
+    // The arrow and Enter arrived apart: Enter waited for the cursor on screen.
+    const keys = calls().filter((call) => call.keys !== undefined).map((call) => call.keys)
+    assert.deepEqual(keys, ['\u001b[B', '\r'])
   })
 
   test('hands a card to a session of its account, linked to the card — and nothing else may', async () => {
