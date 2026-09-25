@@ -3,10 +3,18 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
-## Unreleased
+## 0.1.18 — 2026-09-25
 
 ### Orchestrator
 
+- **Answer a waiting session from the orchestrator.** A session in one of
+  devpit's terminals that stops on a question — a permission, a choice Claude
+  asked for — shows at the top of the Sessions panel beside the chat, under
+  "Waiting on you", with its question and choices. A click answers it in that
+  session's own terminal, as you; Esc dismisses it. Nothing is pressed unless
+  the screen still shows exactly the question you clicked on, so a late or
+  double click never answers the next one. The orchestrator can read the
+  question and recommend a choice, but only you answer it.
 - **Remote Control in the orchestrator's own chat.** The phone button on its
   chat now makes this same conversation — this chat, this process — reachable
   from claude.ai and the Claude app as `devpit-<name>`, and opens its page from
