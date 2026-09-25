@@ -227,6 +227,21 @@ export function onCarried<T>(name: string, then: (payload: T) => void): () => vo
  * session and starts a turn nobody here asked for — with its id, so an open
  * chat can join it.
  */
+/** Said when a conversation reachable by Remote Control is given its page. */
+export function onRemoteConnected(then: (conversationId: string) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void listen<string>('chat:remote', (event) => then(event.payload)).then((unlisten) => {
+    if (dropped) unlisten()
+    else drop = unlisten
+  })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}
+
 export function onChatWoke(then: (conversationId: string) => void): () => void {
   if (!inTauri()) return () => {}
   let dropped = false

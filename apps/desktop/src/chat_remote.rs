@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use devpit_rpc::{RemoteState, RpcError};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// How long a connection is waited on before the chat is told it is pending.
 const WAITS: Duration = Duration::from_secs(20);
@@ -151,6 +151,10 @@ fn ask(app: &AppHandle, conversation_id: &str, enabled: bool, name: &str) -> Opt
         .map(str::to_owned)
 }
 
+/// Said when a conversation's page arrives: a process that connects with a
+/// turn answers after that turn, when the chat has already looked.
+pub(crate) const CONNECTED: &str = "chat:remote";
+
 fn remember(app: &AppHandle, conversation_id: &str, url: String) {
     if let Some(remotes) = app.try_state::<Remotes>() {
         if let Ok(mut wanted) = remotes.wanted.lock() {
@@ -159,6 +163,7 @@ fn remember(app: &AppHandle, conversation_id: &str, url: String) {
             }
         }
     }
+    let _ = app.emit(CONNECTED, conversation_id);
 }
 
 fn state_of(app: &AppHandle, conversation_id: &str) -> RemoteState {

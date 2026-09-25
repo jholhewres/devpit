@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { RemoteState } from '../gen/bindings'
 import { ask, commands } from './live'
+import { onRemoteConnected } from './window'
 
 /*
  * Remote Control for a chat — a project's or an orchestrator's: the same
@@ -29,6 +30,16 @@ export function RemoteToggle({
   useEffect(() => {
     void ask(() => commands.chatRemoteState(conversationId)).then((found) => found.data && setState(found.data))
   }, [conversationId, sending])
+
+  /* A process started by a turn connects after it: its page comes when it
+     comes, and is read then. */
+  useEffect(
+    () =>
+      onRemoteConnected((connected) => {
+        if (connected === conversationId) void ask(() => commands.chatRemoteState(conversationId)).then((found) => found.data && setState(found.data))
+      }),
+    [conversationId],
+  )
 
   const flip = (): void => {
     setBusy(true)
