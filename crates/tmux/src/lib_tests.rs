@@ -42,7 +42,7 @@ fn a_session_survives_and_echoes_through_send_keys() {
 
     let dir = tempfile::tempdir().expect("tempdir");
     let socket = dir.path().join("tmux.sock");
-    let server = Server::new(socket);
+    let server = Server::scratch(socket);
     let session = "devpit_test_session";
     let window = "leaf_test";
 

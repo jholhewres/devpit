@@ -38,7 +38,7 @@ fn a_process_that_ignores_a_hangup_is_still_stopped() {
     let socket = std::env::temp_dir().join("devpit-stopping-test.sock");
     let _ = tmux(&socket, &["kill-server"]);
 
-    let server = devpit_tmux::Server::new(socket.clone());
+    let server = devpit_tmux::Server::scratch(socket.clone());
     server
         .ensure_session("stopping_test", "leaf", home.path())
         .expect("the session");

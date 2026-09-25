@@ -24,7 +24,7 @@ fn a_pane_running_something_reports_memory_for_its_whole_tree() {
         .args(["-S", socket.to_str().expect("utf-8"), "kill-server"])
         .output();
 
-    let server = devpit_tmux::Server::new(socket.clone());
+    let server = devpit_tmux::Server::scratch(socket.clone());
     server
         .ensure_session("cost_test", "leaf", home.path())
         .expect("the session");

@@ -52,7 +52,7 @@ fn a_session_typed_into_the_target_pane_attaches_to_it() {
     // caps a unix socket at ~108 bytes and a tempdir path is nowhere near it,
     // but a per-test directory under one would be.
     let socket = std::env::temp_dir().join("devpit-attach-test.sock");
-    let server = devpit_tmux::Server::new(socket.clone());
+    let server = devpit_tmux::Server::scratch(socket.clone());
     let session = devpit_tmux::Server::session_name("attach_test");
     let leaf = "leaf_attach";
 

@@ -11,7 +11,7 @@ import { readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { seedEnv, seedHome } from './lib/home.mjs'
+import { endTmux, seedEnv, seedHome } from './lib/home.mjs'
 import {
   missingBuild,
   missingTools,
@@ -93,4 +93,8 @@ try {
   process.exitCode = await new Promise((done) => tests.on('exit', (code) => done(code ?? 1)))
 } finally {
   stopDriver(driver)
+  // The app's tmux server outlives the app — that is what it is for, on a
+  // real machine. Here it is the run's, and it goes with it: left behind, one
+  // piled up per run.
+  endTmux(seeded.home)
 }

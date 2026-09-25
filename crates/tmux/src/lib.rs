@@ -16,9 +16,11 @@ mod environment;
 mod naming;
 mod pane;
 mod running;
+mod scratch;
 mod scroll;
 mod shell;
 pub use pane::Key;
+pub use scratch::Scratch;
 pub use shell::{parse_running, Running, Shell};
 
 #[derive(Debug, thiserror::Error)]

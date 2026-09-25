@@ -22,7 +22,7 @@ fn no_session_on_our_server_draws_a_status_bar() {
         .args(["-S", socket.to_str().expect("utf-8"), "kill-server"])
         .output();
 
-    let server = devpit_tmux::Server::new(socket.clone());
+    let server = devpit_tmux::Server::scratch(socket.clone());
     server
         .ensure_session("chrome_test", "leaf", &std::env::temp_dir())
         .expect("the session");

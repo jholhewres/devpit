@@ -38,7 +38,7 @@ fn a_pane_running_a_javascript_agent_is_named_after_the_script() {
         .args(["-S", socket.to_str().expect("utf-8"), "kill-server"])
         .output();
 
-    let server = devpit_tmux::Server::new(socket.clone());
+    let server = devpit_tmux::Server::scratch(socket.clone());
     server
         .ensure_session("running_test", "leaf", home.path())
         .expect("the session");

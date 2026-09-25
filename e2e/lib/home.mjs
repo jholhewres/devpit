@@ -8,8 +8,8 @@
  * build, and a suite that *writes* to it has deleted somebody's board.
  */
 
-import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,6 +25,9 @@ const CLOSED_PORT = 'http://127.0.0.1:9'
  */
 export function seedHome(root, name = 'e2e-home') {
   const home = join(root, 'target', name)
+  // Before the folder goes: deleting it takes the socket and leaves the server
+  // running with no way to reach it — that is how a run left one behind.
+  endTmux(home)
   rmSync(home, { recursive: true, force: true })
 
   for (const dir of [
@@ -152,4 +155,11 @@ export function seedEnv({ home, feed }) {
     // The hook timings, on the app's stderr, which the driver keeps in a file.
     DEVPIT_TRACE_HOOKS: '1',
   }
+}
+
+/** Ends the tmux server on a home's devpit socket, if one is running there. */
+export function endTmux(home) {
+  const socket = join(home, '.devpit', 'tmux.sock')
+  if (!existsSync(socket)) return
+  spawnSync('tmux', ['-S', socket, 'kill-server'], { stdio: 'ignore' })
 }
