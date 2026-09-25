@@ -99,6 +99,20 @@ describe('the orchestrator', () => {
     assert.match(refused.error ?? '', /only an orchestrator/)
   })
 
+  test('continues its conversation in a terminal Remote Control can reach', async () => {
+    const button = await window.wait(until.elementLocated(By.css('[aria-label="Continue remotely"]')), 10000)
+    await window.executeScript(function (one) {
+      one.click()
+    }, button)
+    const log = join(home, '.claude', 'stub-calls.log')
+    const remote = await window
+      .wait(() => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)).find((call) => call.interactive && call.argv.includes('--remote-control')), 30000)
+      .catch(() => null)
+    assert.ok(remote, 'no terminal started the conversation with --remote-control')
+    assert.ok(remote.argv.includes('--resume'), `it did not resume the conversation: ${remote.argv.join(' ')}`)
+    assert.equal(remote.argv[remote.argv.indexOf('--remote-control') + 1], 'devpit-client-work')
+  })
+
   test('is not listed among the projects', async () => {
     const projects = await window.executeScript(function () {
       return Array.prototype.slice

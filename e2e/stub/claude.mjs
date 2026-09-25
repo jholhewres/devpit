@@ -59,6 +59,7 @@ if (has('--help')) {
  * the hooks, which is the only way the board hears any of it.
  */
 function interactive() {
+  appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ argv, cwd: process.cwd(), interactive: true })}\n`)
   const session = valueOf('--session-id') ?? `stub-${process.pid}`
   fireHooks('SessionStart', { source: 'startup' }, session)
   process.stdout.write('\n  devpit end-to-end stub — type /exit to leave\n\n> ')
