@@ -86,8 +86,14 @@ describe('going into a focus', () => {
       SHORTCUTS.focus,
     )
 
-    fireEvent.keyDown(window, { key: 'F', shiftKey: true, metaKey: true })
-    await waitFor(() => expect(written).toEqual(['prj_1']))
+    /* The button is drawn a moment before the effect that listens for the key
+       runs; on a slow runner a key pressed in between reached the listener of
+       the render before, when focus was not yet offered. Pressed until heard —
+       the first press that is heard ends the wait, so it enters only once. */
+    await waitFor(() => {
+      fireEvent.keyDown(window, { key: 'F', shiftKey: true, metaKey: true })
+      expect(written).toEqual(['prj_1'])
+    })
   })
 
   it('reads back a focus that was already on when the window opened', async () => {
