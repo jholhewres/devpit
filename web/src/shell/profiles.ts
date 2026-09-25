@@ -179,3 +179,9 @@ export function others(
    showing the list as it was when it opened. */
 export const PROFILES_CHANGED = 'devpit:profiles-changed'
 export const profilesChanged = (): void => void window.dispatchEvent(new Event(PROFILES_CHANGED))
+
+/** Calls `then` each time a profile changes; answers what stops listening. */
+export function onProfilesChanged(then: () => void): () => void {
+  window.addEventListener(PROFILES_CHANGED, then)
+  return () => window.removeEventListener(PROFILES_CHANGED, then)
+}

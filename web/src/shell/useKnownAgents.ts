@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { KnownAgent } from '../gen/bindings'
 import { ask, commands } from './live'
+import { onProfilesChanged } from './profiles'
 
 /* The agent CLIs this machine can run.
 
@@ -16,7 +17,10 @@ export function useKnownAgents(asked = 0): readonly KnownAgent[] {
   /* `asked` changes to ask again — Settings' Refresh, which has to see a CLI
      installed since the pane opened. */
   useEffect(() => {
-    void ask(() => commands.agentsKnown()).then((answer) => setAgents(answer.data ?? []))
+    const load = (): void =>
+      void ask(() => commands.agentsKnown()).then((answer) => setAgents(answer.data ?? []))
+    load()
+    return onProfilesChanged(load)
   }, [asked])
   return agents
 }

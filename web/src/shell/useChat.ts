@@ -6,7 +6,7 @@ import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
 import { withSkills } from './pills'
-import { offers, PROFILES_CHANGED } from './profiles'
+import { offers, onProfilesChanged } from './profiles'
 import { onChatWoke, onPermissionAsked } from './window'
 import { useShellPick } from './shellStore'
 
@@ -191,8 +191,7 @@ export function useChat(conversationId: string): Chat {
       void ask(() => commands.agentProfiles()).then((found) => {
         if (live.current && found.data) setProfiles(pickable(found.data, fixed))
       })
-    window.addEventListener(PROFILES_CHANGED, again)
-    return () => window.removeEventListener(PROFILES_CHANGED, again)
+    return onProfilesChanged(again)
   }, [fixed])
 
   /* The session is told to hold its tools only in the mode that asks. Holding
