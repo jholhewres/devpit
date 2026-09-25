@@ -273,6 +273,10 @@ export const commands = {
 	 *  must stay only theirs to send.
 	 */
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
+	/**  `chat.remote` — Remote Control for an orchestrator's conversation, on or off. */
+	chatRemote: (projectId: string, conversationId: string, enabled: boolean) => typedError<RemoteState, RpcError>(__TAURI_INVOKE("chat_remote", { projectId, conversationId, enabled })),
+	/**  `chat.remoteState` — whether this conversation is reachable, and where. */
+	chatRemoteState: (conversationId: string) => typedError<RemoteState, RpcError>(__TAURI_INVOKE("chat_remote_state", { conversationId })),
 	/**  `panel.widths` — how wide the panels were left. */
 	panelWidths: () => typedError<Widths, RpcError>(__TAURI_INVOKE("panel_widths")),
 	/**
@@ -1186,7 +1190,7 @@ export const commands = {
 	 *  seconds to print its first prompt, and a line sent at half a second simply
 	 *  vanished. So this waits, which is why it is async.
 	 */
-	sessionLaunchAgent: (projectId: string, paneId: string, agentId: string, resume: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("session_launch_agent", { projectId, paneId, agentId, resume })),
+	sessionLaunchAgent: (projectId: string, paneId: string, agentId: string) => typedError<string, RpcError>(__TAURI_INVOKE("session_launch_agent", { projectId, paneId, agentId })),
 	/**
 	 *  `terminal.happenings` — the shape `terminal:happening` carries.
 	 * 
@@ -2907,6 +2911,19 @@ export type ReadCommand = {
 export type RejectedAgent = {
 	file: string,
 	reason: string,
+};
+
+/**
+ *  Whether an orchestrator's conversation can be reached by Remote Control,
+ *  and where.
+ */
+export type RemoteState = {
+	on: boolean,
+	/**
+	 *  The session's page on claude.ai, once the CLI has said it. Absent while
+	 *  on but not connected yet — its process starts with the next message.
+	 */
+	url: string | null,
 };
 
 /**  What removing a worktree would cost, when it refuses. */

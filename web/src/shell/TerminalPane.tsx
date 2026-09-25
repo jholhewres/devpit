@@ -115,9 +115,8 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
     if (!projectId || !focused || !tab.launch || sent.current) return
     sent.current = true
     const agent = tab.launch
-    const resume = tab.resume ?? null
     launched(tab.id)
-    void ask(() => commands.sessionLaunchAgent(projectId, focused, agent, resume)).then((answer) => {
+    void ask(() => commands.sessionLaunchAgent(projectId, focused, agent)).then((answer) => {
       /* A notice, not the fatal error. The terminal is open and working
          whether or not the agent was started for you, and replacing a working
          terminal with a sentence takes away the one thing that still lets you

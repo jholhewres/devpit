@@ -125,6 +125,7 @@ pub(crate) fn or_say(
     };
     let residents = staying.app.state::<Residents>();
     let (tell, heard) = mpsc::channel();
+    let mut fresh = false;
     {
         let mut all = residents.0.lock().map_err(|_| AgentError::NotInstalled)?;
         let wanted = started_as(turn);
@@ -151,6 +152,7 @@ pub(crate) fn or_say(
             }
             let live = start(&staying, turn, wanted)?;
             all.insert(staying.conversation_id.clone(), live);
+            fresh = true;
         }
         let live = all
             .get(&staying.conversation_id)
@@ -159,6 +161,11 @@ pub(crate) fn or_say(
         // A woken turn still running finishes first: the person's words go
         // in after it, not into the middle of it.
         drop(all);
+        // A new process is a new connection: one asked to be reachable is
+        // reached again.
+        if fresh {
+            crate::chat_remote::reconnect(&staying.app, &staying.conversation_id);
+        }
         wait_for_quiet(&listening);
         if let Ok(mut now) = listening.lock() {
             *now = Listening::Person(tell.clone());
@@ -189,6 +196,8 @@ pub(crate) fn or_say(
         match heard.recv() {
             Ok(Heard::Part(part)) => on_part(part),
             Ok(Heard::Ended(said)) => return Ok(said),
+            // Control answers are taken before they get here.
+            Ok(Heard::Control(_)) => {}
             Ok(Heard::Gone) | Err(_) => {
                 return Err(AgentError::Unreadable(
                     "the conversation's process ended".to_owned(),
@@ -198,19 +207,22 @@ pub(crate) fn or_say(
     }
 }
 
-/// Lets this conversation's process go, for a terminal to take the session
-/// over. Nothing to do when it has none.
-pub(crate) fn release(app: &AppHandle, conversation_id: &str) {
-    let gone = app.try_state::<Residents>().and_then(|residents| {
-        residents
-            .0
-            .lock()
-            .ok()
-            .and_then(|mut all| all.remove(conversation_id))
-    });
-    if let Some(live) = gone {
-        live.resident.close();
-    }
+/// Sends a control request to this conversation's process. False when it has
+/// none running.
+pub(crate) fn control(
+    app: &AppHandle,
+    conversation_id: &str,
+    id: &str,
+    request: serde_json::Value,
+) -> bool {
+    app.try_state::<Residents>()
+        .and_then(|residents| {
+            residents.0.lock().ok().and_then(|all| {
+                all.get(conversation_id)
+                    .map(|live| live.resident.control(id, request))
+            })
+        })
+        .unwrap_or(false)
 }
 
 /// Stops the turn in flight and keeps the process. False when this
@@ -257,7 +269,12 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
     let conversation = staying.conversation_id.clone();
     let transcript = staying.transcript.clone();
     let head = staying.head.clone();
+    let answers = staying.app.clone();
     let resident = Resident::start(driver, turn, Arc::new(|_: &str| {}), move |heard| {
+        if let Heard::Control(said) = heard {
+            crate::chat_remote::answered(&answers, said);
+            return;
+        }
         let Ok(mut now) = heard_by.lock() else { return };
         match (&mut *now, heard) {
             (Listening::Person(tell), Heard::Ended(said)) => {
@@ -290,7 +307,7 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
                     woken.frames.send(Frame::Ended { end: gone() }).ok();
                 }
             }
-            (Listening::Nobody, _) => {}
+            (Listening::Nobody, _) | (_, Heard::Control(_)) => {}
         }
     })?;
     Ok(Live {
@@ -329,10 +346,12 @@ fn woke(app: &AppHandle, conversation: &str) -> Woken {
 
 /// Said at the top of a turn nobody here asked for, so it does not read as an
 /// answer to something the person said.
-static WOKEN_BY: std::sync::LazyLock<Part> = std::sync::LazyLock::new(|| Part::Text {
-    text: "↪ *Not in answer to you — another session wrote, or work it left running finished.*\n\n"
+static WOKEN_BY: std::sync::LazyLock<Part> = std::sync::LazyLock::new(|| {
+    Part::Text {
+    text: "↪ *Not from this chat — written from your phone or claude.ai, another session wrote, or work it left running finished.*\n\n"
         .to_owned(),
     parent: None,
+}
 });
 
 impl Woken {

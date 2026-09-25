@@ -32,3 +32,4 @@ app_info answers from the build and a path it computes
 
 # Answers from memory.
 presence_seen stores one number in an atomic
+chat_remote_state reads a map in memory and never waits

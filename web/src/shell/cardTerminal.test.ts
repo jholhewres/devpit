@@ -36,7 +36,7 @@ describe("a card's terminal tab", () => {
     const show = vi.fn()
     const open = [{ id: 'tab_named_by_the_backend', kind: 'term' as const }]
     expect(await openCardTerminal('p1', 'card_1', 'Wire the board', show, 'claude', open)).toBeNull()
-    expect(launched).toHaveBeenCalledWith('p1', 'leaf_1', 'claude', null)
+    expect(launched).toHaveBeenCalledWith('p1', 'leaf_1', 'claude')
     expect(show).toHaveBeenCalledWith('term', { id: 'tab_named_by_the_backend', title: 'Wire the board', cardId: 'card_1' })
   })
 

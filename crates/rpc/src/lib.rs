@@ -56,7 +56,7 @@ pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};
 pub use frame::{Context, Frame};
 pub use front::Front;
-pub use live::{LiveSession, LiveSessions};
+pub use live::{LiveSession, LiveSessions, RemoteState};
 pub use plugin_data::{
     PluginFile, PluginFileRemoved, PluginFileSaved, PluginFileText, PluginFiles,
 };

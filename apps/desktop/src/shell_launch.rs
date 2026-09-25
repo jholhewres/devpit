@@ -367,21 +367,15 @@ fn is_a_bare_name(name: &str) -> bool {
 #[tauri::command]
 #[specta::specta]
 pub async fn session_launch_agent(
-    app: tauri::AppHandle,
     state: tauri::State<'_, crate::sessions::SessionState>,
     project_id: String,
     pane_id: String,
     agent_id: String,
-    resume: Option<String>,
 ) -> Result<String, RpcError> {
     // A profile first, then a built-in agent. The same menu offers both, and
     // a profile is the more specific answer when an id is both — which it is
-    // for a discovered command, whose id *is* the command. A conversation to
-    // continue remotely says its own account and session instead.
-    let start = match resume.as_deref() {
-        Some(conversation) => crate::remote_launch::remote_line(&app, &project_id, conversation)?,
-        None => to_start(&agent_id)?,
-    };
+    // for a discovered command, whose id *is* the command.
+    let start = to_start(&agent_id)?;
 
     // The pane has to be this project's. Reached from a menu, the id comes
     // from the screen, and the screen is not the authority on what is open.

@@ -40,6 +40,8 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .pane[data-pane='term']:hover .pcorner, .pane[data-pane='term'] .pcorner:focus-within { opacity: 1; }
 /* The thread starts under the corner, not behind it. */
 .pane[data-pane='chat'] > .scroll { padding-top: 36px; }
+/* Reachable remotely: said by colour on the button that turns it off. */
+.rctl[data-on='true'] { color: var(--orchestrate); }
 
 /* An orchestrator's sessions, down the right of its chat. Over the thread's
    margin on a wide pane; folded to its heading on a narrow one. */

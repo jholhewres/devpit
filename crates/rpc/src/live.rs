@@ -32,3 +32,14 @@ pub struct LiveSession {
 pub struct LiveSessions {
     pub sessions: Vec<LiveSession>,
 }
+
+/// Whether an orchestrator's conversation can be reached by Remote Control,
+/// and where.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteState {
+    pub on: bool,
+    /// The session's page on claude.ai, once the CLI has said it. Absent while
+    /// on but not connected yet — its process starts with the next message.
+    pub url: Option<String>,
+}

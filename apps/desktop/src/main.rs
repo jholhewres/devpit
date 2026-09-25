@@ -32,7 +32,6 @@ mod frame_gtk;
 mod handing;
 mod live_sessions;
 mod orchestrator;
-mod remote_launch;
 mod rewinding;
 mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the
@@ -50,6 +49,7 @@ mod cards;
 mod chaining;
 mod chat;
 mod chat_relay;
+mod chat_remote;
 mod chat_resident;
 mod chat_running;
 mod chat_turn;
@@ -178,6 +178,7 @@ fn main() {
         .manage(chat::Talking::default())
         .manage(chat_relay::Relay::default())
         .manage(chat_resident::Residents::default())
+        .manage(chat_remote::Remotes::default())
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
         .manage(blocks::Blocks::default())
