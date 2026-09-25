@@ -3,6 +3,40 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.23 — 2026-09-25
+
+### Orchestrator
+
+- **Sessions in one panel.** The right panel opens on Sessions: grouped by
+  project, the ones waiting on you first, each with how long it has been at
+  it and what it was last asked. A session opens to its question, a reply
+  typed into its terminal as you, and everything that passed between it and
+  the orchestrator; sessions no longer running stay below with their history.
+  The chat's corner counts them and opens the panel.
+- **A session's terminal, right here.** Open any session in a devpit terminal
+  over the orchestrator's chat and work in it as you — answer what it asks,
+  type a command — without leaving; its tab takes it back when you close it.
+  "Go there" now opens its very tab.
+- **Questions above the composer.** A session stopped on a question shows
+  right above where you type, with its choices and a way into its terminal.
+- **Who woke it.** A turn another session woke says which one, and quotes what
+  it said.
+- **Handed work as cards.** Each message the orchestrator sends shows as a
+  card: to whom, what was asked, and how that session stands now.
+- **Memory and tools, always.** The orchestrator's brief now has it search and
+  save in whatever memory tools the account has, look facts up with the
+  account's MCP servers, and keep a notice that adds nothing to one line.
+
+### Chat
+
+- **Remote Control connects visibly.** A chat whose process started with a
+  message now shows its claude.ai page as soon as it arrives, instead of
+  staying on "connects with the next message".
+
+### Under the hood
+
+- Tests no longer leave tmux servers running behind them.
+
 ## 0.1.22 — 2026-09-25
 
 ### Orchestrator
