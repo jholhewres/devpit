@@ -9,6 +9,7 @@ mod advancing;
 mod agent_api;
 mod agent_reach;
 mod arranging;
+mod artifacts;
 mod asking;
 mod attaching;
 mod attaching_chat;

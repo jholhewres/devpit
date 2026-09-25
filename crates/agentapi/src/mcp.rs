@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 11] = [
+const TOOLS: [Tool; 15] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -38,6 +38,30 @@ const TOOLS: [Tool; 11] = [
         method: "board",
         description: "Every column of the project's board with its cards: id, title, comment count and last run state.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." } } }),
+    },
+    Tool {
+        name: "devpit_artifacts",
+        method: "artifacts",
+        description: "The project's artifacts: files kept for it outside its repository, in devpit's own folder for the project — never committed, and not lost to a clone, a new worktree or a clean. Each with its name and size, and the folder they are in.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." } } }),
+    },
+    Tool {
+        name: "devpit_artifact_save",
+        method: "artifact_save",
+        description: "Keep a file of the project's checkout (or one of its worktrees) as an artifact: copied, or moved with move: true. Refuses to write over one unless replace: true.",
+        input: || json!({ "type": "object", "properties": { "from": { "type": "string", "description": "The file, relative to where you are or whole; it must be inside the project." }, "name": { "type": "string", "description": "Its name among the artifacts, a relative path such as specs/api.md. Defaults to the file's name." }, "move": { "type": "boolean" }, "replace": { "type": "boolean" }, "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." } }, "required": ["from"] }),
+    },
+    Tool {
+        name: "devpit_artifact_restore",
+        method: "artifact_restore",
+        description: "Put an artifact into the project's checkout (or one of its worktrees): copied, or moved with move: true. The folder it goes into must exist. Refuses to write over a file unless replace: true.",
+        input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The artifact, as devpit_artifacts names it." }, "to": { "type": "string", "description": "Where it goes, relative to where you are or whole; inside the project." }, "move": { "type": "boolean" }, "replace": { "type": "boolean" }, "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." } }, "required": ["name", "to"] }),
+    },
+    Tool {
+        name: "devpit_artifact_remove",
+        method: "artifact_remove",
+        description: "Delete one of the project's artifacts, by name. Ask the person first unless they asked for it.",
+        input: || json!({ "type": "object", "properties": { "name": { "type": "string" }, "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." } }, "required": ["name"] }),
     },
     Tool {
         name: "devpit_projects",

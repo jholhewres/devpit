@@ -262,6 +262,10 @@ export const commands = {
 	 *  with the one they began with.
 	 */
 	orchestratorAccount: (projectId: string, profileId: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_account", { projectId, profileId })),
+	/**  `artifacts.list` — what the project keeps outside its repository. */
+	artifactsList: (projectId: string) => typedError<Artifacts, RpcError>(__TAURI_INVOKE("artifacts_list", { projectId })),
+	/**  `artifacts.remove` — one of them, gone. */
+	artifactRemove: (projectId: string, name: string) => typedError<null, RpcError>(__TAURI_INVOKE("artifact_remove", { projectId, name })),
 	/**  `orchestrator.sessions` — what this profile's account has running now. */
 	orchestratorSessions: (profileId: string) => typedError<LiveSessions, RpcError>(__TAURI_INVOKE("orchestrator_sessions", { profileId })),
 	/**
@@ -1406,6 +1410,20 @@ export type ArchivedCard = {
 /**  Response of `board.archived`: most recently archived first, at most 200. */
 export type ArchivedCards = {
 	cards: ArchivedCard[],
+};
+
+export type Artifact = {
+	/**  Relative to the artifacts folder. */
+	name: string,
+	bytes: number | null,
+	/**  Milliseconds since the epoch. */
+	modified: number | null,
+};
+
+export type Artifacts = {
+	/**  Where they are, whole: to open or reveal. */
+	folder: string,
+	items: Artifact[],
 };
 
 /**

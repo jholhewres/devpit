@@ -211,6 +211,12 @@ impl ProjectHome {
         self.dir().join("pasted")
     }
 
+    /// Files kept for the project outside its repository: saved from a
+    /// checkout by a session or the person, and never committed.
+    pub fn artifacts(&self) -> PathBuf {
+        self.dir().join("artifacts")
+    }
+
     /// Each terminal's finished commands, kept across restarts.
     pub fn blocks(&self) -> PathBuf {
         self.dir().join("blocks")

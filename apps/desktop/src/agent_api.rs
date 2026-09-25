@@ -42,9 +42,23 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 12] = [
-    "context", "board", "card", "comment", "create", "update", "move", "methods", "projects",
-    "sessions", "start", "screen",
+pub(crate) const METHODS: [&str; 16] = [
+    "context",
+    "board",
+    "card",
+    "comment",
+    "create",
+    "update",
+    "move",
+    "methods",
+    "projects",
+    "sessions",
+    "start",
+    "screen",
+    "artifacts",
+    "artifact_save",
+    "artifact_restore",
+    "artifact_remove",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -117,6 +131,14 @@ fn respond_in(
         _ => {}
     }
     let project = reached(projects, here, text("project").as_deref())?;
+    if asked.method.starts_with("artifact") {
+        return crate::artifacts::respond(
+            &asked.method,
+            project,
+            Path::new(&asked.cwd),
+            &asked.params,
+        );
+    }
     let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
     let card_id = text("cardId").unwrap_or_default();
     let answer = match asked.method.as_str() {

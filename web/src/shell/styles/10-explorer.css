@@ -58,3 +58,40 @@
 .g-m { color: var(--warning); }
 .g-a { color: var(--success); }
 
+
+/* Every project's board, beside an orchestrator's chat. */
+.oboards { display: flex; flex-direction: column; gap: 10px; height: 100%; overflow-y: auto; padding: 10px 10px 16px; scrollbar-width: thin; }
+.oboards__top { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+.oboards__t { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.oboards__all { font-size: 11.5px; color: var(--text-3); padding: 2px 6px; border-radius: 5px; }
+.oboards__all:hover { color: var(--text); background: var(--overlay); }
+.oboards__note { padding: 0 4px; font-size: 12px; color: var(--text-3); }
+.oboards__p { display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.oboards__p:last-child { border-bottom: 0; }
+.oboards__name { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--text); text-align: left; }
+.oboards__name .pmark { width: 20px; height: 20px; border-radius: 6px; font-size: 9.5px; }
+.oboards__name > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oboards__name:hover, .oboards__lname:hover, .oboards__card:hover { background: var(--overlay); }
+.oboards__n { font: 11px var(--mono); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.oboards__lname { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 3px 6px 3px 32px; border-radius: 5px; font-size: 12.5px; color: var(--text-2); text-align: left; }
+.oboards__lname[aria-expanded='true'] { color: var(--text); }
+.oboards__cards { list-style: none; margin: 0; padding: 0 0 4px 32px; }
+.oboards__card { display: block; width: 100%; padding: 3px 6px; border-radius: 5px; font-size: 12px; color: var(--text-2); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* A project's artifacts: kept outside its repository. */
+.arts { display: flex; flex-direction: column; gap: 8px; height: 100%; overflow-y: auto; padding: 10px 10px 16px; scrollbar-width: thin; }
+.arts__top { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+.arts__t { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.arts__act { font-size: 11.5px; color: var(--text-3); padding: 2px 6px; border-radius: 5px; }
+.arts__act:hover { color: var(--text); background: var(--overlay); }
+.arts__act--bad { color: var(--danger); }
+.arts__note { padding: 0 4px; font-size: 12px; line-height: 1.5; color: var(--text-3); }
+.arts__list { list-style: none; margin: 0; padding: 0; }
+.arts__i { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 5px; }
+.arts__i:hover { background: var(--overlay); }
+.arts__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 0; font-size: 12.5px; color: var(--text-2); text-align: left; }
+.arts__name:hover { color: var(--text); }
+.arts__size { font: 11px var(--mono); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.arts__x { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; color: var(--text-3); opacity: 0; }
+.arts__i:hover .arts__x, .arts__x:focus-visible { opacity: 1; }
+.arts__x:hover { color: var(--text); background: var(--overlay-strong); }

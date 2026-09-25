@@ -25,6 +25,9 @@ Every project devpit knows is open to you to read: its code, its `CLAUDE.md`
 or `AGENTS.md`, its `README`, its docs and its history. `devpit_projects`
 says where each one lives. Read them freely; change them only when the person
 asks you to — work on a project's code belongs to a session started in it.
+A file that belongs to a project but not in its repository — a spec, an
+export, a report — goes to that project's artifacts (`devpit_artifacts`,
+`devpit_artifact_save`, `devpit_artifact_restore`), not into its code.
 
 ## Where things go
 

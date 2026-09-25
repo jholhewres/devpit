@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Changes } from './ChangesPanel'
 import { Explorer } from './ExplorerView'
 import { History } from './History'
+import { ArtifactsView } from './ArtifactsView'
+import { OrchestratorBoards } from './OrchestratorBoards'
 import { useExplorerState } from './useExplorerState'
 import { useFileIndex } from './useFileIndex'
 import { useShell } from './useShell'
@@ -16,6 +18,8 @@ const Icon = ({ d, size = 15 }: { d: string; size?: number }): React.JSX.Element
 
 const FOLDER = 'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
 const UPLOAD = 'M12 16V4M8 8l4-4 4 4M4 20h16'
+const BOARDS = 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM9 3v18M15 3v18'
+const ARCHIVE = 'M3 4h18v4H3ZM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4'
 const CLOCK = 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'
 
 /* Explorer or Changes: two questions about the same tree, so one is answered
@@ -28,9 +32,18 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
   const index = useFileIndex(project?.id ?? null)
   const { view: chosen, setView, mode, setMode, query, setQuery } = useExplorerState(project?.id ?? null)
   /* An orchestrator's folder is its notes, not a repository: nothing to
-     commit and no history, so only the files. */
+     commit and no history. What it has instead is every project's board,
+     shown first — that is what its conversations are about. */
   const git = !project?.orchestrator
-  const view = git ? chosen : 'tree'
+  const [boards, setBoards] = useState(true)
+  /* Artifacts are every project's, outside the three views the explorer
+     remembers, so which one is on is kept here. */
+  const [arts, setArts] = useState(false)
+  const view = arts ? 'artifacts' : git ? chosen : boards ? 'boards' : 'tree'
+  const pick = (next: () => void): void => {
+    setArts(false)
+    next()
+  }
 
   /* Follows the focused tab, not a click remembered here — opening a file
      from the palette or from Changes must highlight the same row. */
@@ -59,11 +72,16 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
           aria-selected={view === 'tree'}
           title="Explorer"
           aria-label="Explorer"
-          onClick={() => setView('tree')}
+          onClick={() => pick(() => (setBoards(false), setView('tree')))}
         >
           <Icon d={FOLDER} size={15} />
           {tree.nodes.length > 0 && <span className="rtab__n">{tree.nodes.length}</span>}
         </button>
+        {!git && (
+          <button className="rtab" aria-selected={view === 'boards'} title="Boards" aria-label="Boards" onClick={() => pick(() => setBoards(true))}>
+            <Icon d={BOARDS} size={15} />
+          </button>
+        )}
         {git && (
           <>
           <button
@@ -71,7 +89,7 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
             aria-selected={view === 'changes'}
             title="Changes"
             aria-label="Changes"
-            onClick={() => setView('changes')}
+            onClick={() => pick(() => setView('changes'))}
           >
             <Icon d={UPLOAD} size={15} />
             {/* A zero is not news. The count is here to say there is something
@@ -83,12 +101,15 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
             aria-selected={view === 'history'}
             title="History"
             aria-label="History"
-            onClick={() => setView('history')}
+            onClick={() => pick(() => setView('history'))}
           >
             <Icon d={CLOCK} size={15} />
           </button>
           </>
         )}
+        <button className="rtab" aria-selected={view === 'artifacts'} title="Artifacts" aria-label="Artifacts" onClick={() => setArts(true)}>
+          <Icon d={ARCHIVE} size={15} />
+        </button>
       </div>
 
       <div className="rview" data-rview="tree" data-open={String(view === 'tree')}>
@@ -107,6 +128,16 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
 
       <div className="rview" data-rview="changes" data-open={String(view === 'changes')}>
         <Changes tree={tree} />
+      </div>
+
+      {!git && (
+        <div className="rview" data-rview="boards" data-open={String(view === 'boards')}>
+          <OrchestratorBoards shown={files && view === 'boards'} />
+        </div>
+      )}
+
+      <div className="rview" data-rview="artifacts" data-open={String(view === 'artifacts')}>
+        <ArtifactsView shown={files && view === 'artifacts'} />
       </div>
 
       <div className="rview" data-rview="history" data-open={String(view === 'history')}>
