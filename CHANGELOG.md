@@ -5,8 +5,6 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
-## 0.1.18 — 2026-09-25
-
 ### Orchestrator
 
 - **Remote Control in the orchestrator's own chat.** The phone button on its
