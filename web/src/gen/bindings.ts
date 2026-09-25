@@ -279,7 +279,7 @@ export const commands = {
 	 *  absent. The window's alone, like replying.
 	 */
 	orchestratorAnswer: (profileId: string, name: string, seen: PendingPrompt, choice: number | null) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_answer", { profileId, name, seen, choice })),
-	/**  `chat.remote` — Remote Control for an orchestrator's conversation, on or off. */
+	/**  `chat.remote` — Remote Control for a conversation, on or off. */
 	chatRemote: (projectId: string, conversationId: string, enabled: boolean) => typedError<RemoteState, RpcError>(__TAURI_INVOKE("chat_remote", { projectId, conversationId, enabled })),
 	/**  `chat.remoteState` — whether this conversation is reachable, and where. */
 	chatRemoteState: (conversationId: string) => typedError<RemoteState, RpcError>(__TAURI_INVOKE("chat_remote_state", { conversationId })),
@@ -2304,6 +2304,11 @@ export type LiveSession = {
 	 *  one of devpit's and stopped on one.
 	 */
 	waiting: PendingPrompt | null,
+	/**
+	 *  The account it runs under when it is not the orchestrator's own: it
+	 *  cannot be messaged from here, only read and answered in its terminal.
+	 */
+	account: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */

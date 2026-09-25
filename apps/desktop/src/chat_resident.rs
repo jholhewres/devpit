@@ -74,8 +74,8 @@ pub(crate) struct Staying {
     pub driver: String,
 }
 
-/// What a turn needs to stay, when it is to: an orchestrator's, outside the
-/// supervised mode.
+/// What a turn needs to stay, when it is to: an orchestrator's, or any chat
+/// asked to be reachable by Remote Control — outside the supervised mode.
 pub(crate) fn staying(
     app: &AppHandle,
     project_id: &str,
@@ -84,7 +84,7 @@ pub(crate) fn staying(
     driver: &str,
     mode: Option<&str>,
 ) -> Option<Staying> {
-    stays(project_id, mode).then(|| Staying {
+    stays(app, project_id, conversation_id, mode).then(|| Staying {
         app: app.clone(),
         project_id: project_id.to_owned(),
         conversation_id: conversation_id.to_owned(),
@@ -94,9 +94,13 @@ pub(crate) fn staying(
     })
 }
 
-fn stays(project_id: &str, mode: Option<&str>) -> bool {
+fn stays(app: &AppHandle, project_id: &str, conversation_id: &str, mode: Option<&str>) -> bool {
     if mode == Some(crate::asking::ASKING_MODE) {
         return false;
+    }
+    // Remote Control lives in the process, so a reachable chat keeps one.
+    if crate::chat_remote::wanted(app, conversation_id) {
+        return true;
     }
     let Ok(store) = crate::projects::store() else {
         return false;
@@ -225,6 +229,21 @@ pub(crate) fn control(
         .unwrap_or(false)
 }
 
+/// Ends this conversation's process, if it has one: a chat no longer
+/// reachable goes back to a process per turn.
+pub(crate) fn close(app: &AppHandle, conversation_id: &str) {
+    let gone = app.try_state::<Residents>().and_then(|residents| {
+        residents
+            .0
+            .lock()
+            .ok()
+            .and_then(|mut all| all.remove(conversation_id))
+    });
+    if let Some(live) = gone {
+        live.resident.close();
+    }
+}
+
 /// Stops the turn in flight and keeps the process. False when this
 /// conversation has none, so the caller stops it the other way.
 pub(crate) fn interrupt(app: &AppHandle, conversation_id: &str) -> bool {
@@ -240,12 +259,13 @@ pub(crate) fn interrupt(app: &AppHandle, conversation_id: &str) -> bool {
 
 fn started_as(turn: &Say<'_>) -> String {
     format!(
-        "{}|{:?}|{:?}|{:?}|{}",
+        "{}|{:?}|{:?}|{:?}|{}|{}",
         turn.command,
         turn.model,
         turn.permission,
         turn.effort,
-        turn.cwd.display()
+        turn.cwd.display(),
+        turn.add_dirs.join(":")
     )
 }
 

@@ -4,17 +4,31 @@ import type { RemoteState } from '../gen/bindings'
 import { ask, commands } from './live'
 
 /*
- * Remote Control for an orchestrator's chat: the same conversation, the same
- * process, reachable from the phone or claude.ai while this chat keeps
- * working. What is written there arrives here as it happens.
+ * Remote Control for a chat — a project's or an orchestrator's: the same
+ * conversation, the same process, reachable from the phone or claude.ai while
+ * this chat keeps working. What is written there arrives here as it happens.
+ * Not in the Supervised mode, which runs a process per turn to ask in.
  */
-export function RemoteToggle({ projectId, conversationId }: { projectId: string; conversationId: string }): React.JSX.Element {
+export function RemoteToggle({
+  projectId,
+  conversationId,
+  sending,
+  supervised,
+}: {
+  projectId: string
+  conversationId: string
+  /** A turn in flight: a chat waiting to connect does so as its turn starts,
+   *  so the page it was given is read again when the turn ends. */
+  sending: boolean
+  /** Supervised runs a process per turn to ask in, and there is none to reach. */
+  supervised: boolean
+}): React.JSX.Element {
   const [state, setState] = useState<RemoteState>({ on: false, url: null })
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     void ask(() => commands.chatRemoteState(conversationId)).then((found) => found.data && setState(found.data))
-  }, [conversationId])
+  }, [conversationId, sending])
 
   const flip = (): void => {
     setBusy(true)
@@ -23,14 +37,16 @@ export function RemoteToggle({ projectId, conversationId }: { projectId: string;
       .finally(() => setBusy(false))
   }
 
-  const title = !state.on
+  const title = supervised && !state.on
+    ? 'Remote Control needs Accept edits or Full access — Supervised asks in a process per turn'
+    : !state.on
     ? 'Reach this chat from your phone or claude.ai (Remote Control)'
     : state.url
       ? 'Reachable remotely — click to turn off'
       : 'Connects with the next message — click to turn off'
   return (
     <>
-      <button className="sq26 rctl" data-on={state.on ? 'true' : undefined} disabled={busy} title={title} aria-label="Remote Control" aria-pressed={state.on} onClick={flip}>
+      <button className="sq26 rctl" data-on={state.on ? 'true' : undefined} disabled={busy || (supervised && !state.on)} title={title} aria-label="Remote Control" aria-pressed={state.on} onClick={flip}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>
       </button>
       {state.on && state.url && (

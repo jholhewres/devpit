@@ -176,3 +176,43 @@ describe('manual item 10 — a card chat moves the dot', () => {
     assert.ok(seen.has('done'), `never saw done: ${[...seen].join(', ')}`)
   })
 })
+
+describe('Remote Control in a project chat', () => {
+  test('a project chat is reachable too, connecting with its next message', async () => {
+    const toggles = await window.findElements(By.css('[aria-label="Remote Control"]'))
+    assert.ok(toggles.length > 0, 'a project chat has no Remote Control')
+    // Supervised asks in a process per turn, so there is none to reach there.
+    const [supervised, off] = await window.executeScript(function () {
+      const pane = document.querySelector('textarea[data-e2e="mine"]').closest('.pane')
+      const chip = Array.prototype.slice.call(pane.querySelectorAll('button')).some(function (one) {
+        return one.innerText.trim() === 'Supervised'
+      })
+      return [chip, pane.querySelector('[aria-label="Remote Control"]').disabled]
+    })
+    assert.equal(off, supervised, `Remote Control is offered only where it can connect (supervised=${supervised}, disabled=${off})`)
+    if (supervised) {
+      await press(window, 'Supervised')
+      await press(window, 'Full access')
+    }
+    await window.executeScript(function () {
+      document.querySelector('textarea[data-e2e="mine"]').closest('.pane').querySelector('[aria-label="Remote Control"]').click()
+    })
+    await settle(500)
+    await fill(window, 'textarea[data-e2e="mine"]', 'still there?')
+    const open = await window
+      .wait(until.elementLocated(By.css('[aria-label="Open on claude.ai"]')), 30000)
+      .catch(() => null)
+    assert.ok(open, 'the project chat never said where it can be reached')
+    const asked = readFileSync(join(home, '.claude', 'stub-calls.log'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .find((call) => call.control?.enabled)
+    assert.match(asked?.control?.name ?? '', /^devpit-/)
+    // The mode is remembered per profile; later chats start where they did.
+    if (supervised) {
+      await press(window, 'Full access')
+      await press(window, 'Supervised')
+    }
+  })
+})

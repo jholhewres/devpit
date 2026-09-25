@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Asked } from './Asked'
 import { Chips } from './Chips'
-import { money, ready, unanswered } from './chat'
+import { ASKS, money, ready, unanswered } from './chat'
 import { targetOf } from './stop'
 import { titleOf, type Tab } from './strip'
 import { ChatCardChip } from './ChatCardChip'
@@ -10,6 +10,7 @@ import { ChatWhere } from './ChatWhere'
 import { ContextMeter } from './ContextMeter'
 import { ComposerStatus } from './ComposerStatus'
 import { CopySession } from './CopySession'
+import { DocPeek } from './DocPeek'
 import { DropTarget } from './DropTarget'
 import { PaneCorner } from './PaneCorner'
 import { useTaking } from './useTaking'
@@ -61,6 +62,8 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
 
   const mine = active?.id === tab.id
+  /* A file an answer names opens beside the conversation, not over it. */
+  const [peek, setPeek] = useState<string | null>(null)
 
   useEffect(() => {
     if (tab.draft !== undefined) drafted(tab.id)
@@ -111,7 +114,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         <ContextMeter context={chat.context} />
         {spent && <span className="pcorner__cost" title="What this conversation has cost">{spent}</span>}
         {chat.session && <CopySession id={chat.session} />}
-        {project?.orchestrator && <RemoteToggle projectId={project.id} conversationId={tab.id} />}
+        {project && <RemoteToggle projectId={project.id} conversationId={tab.id} sending={chat.sending} supervised={ASKS(chat.permission)} />}
       </PaneCorner>
 
       <DropTarget mine={mine} onDrop={dropped} />
@@ -123,7 +126,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <div className="thread">
             {chat.error && <div className="exempty__t">{chat.error}</div>}
             {chat.messages.map((message) => (
-              <Turn key={message.id} message={message} folder={chat.folder} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
+              <Turn key={message.id} message={message} folder={chat.folder} onOpen={setPeek} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
             ))}
             {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
           </div>
@@ -177,6 +180,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <ChatWhere />
         </div>
       </div>
+      {peek && <DocPeek path={peek} onOpen={setPeek} onClose={() => setPeek(null)} />}
     </>
   )
 }

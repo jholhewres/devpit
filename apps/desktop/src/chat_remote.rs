@@ -1,17 +1,18 @@
-//! An orchestrator's chat, reachable by Remote Control.
+//! A chat, reachable by Remote Control — an orchestrator's or a project's.
 //!
 //! The chat's own process takes a `remote_control` control request and answers
 //! with the session's page on claude.ai (measured on Claude Code 2.1.282), so
 //! the conversation on the phone is the one in this chat — same process, same
 //! turns. Messages written there wake it like any other session's, and the
-//! chat shows them as they come.
+//! chat shows them as they come. A project's chat keeps a process of its own
+//! only while it is reachable; an orchestrator's always has one.
 
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use devpit_rpc::{ErrorCode, RemoteState, RpcError};
+use devpit_rpc::{RemoteState, RpcError};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 
@@ -32,7 +33,7 @@ struct Wanted {
     url: Option<String>,
 }
 
-/// `chat.remote` — Remote Control for an orchestrator's conversation, on or off.
+/// `chat.remote` — Remote Control for a conversation, on or off.
 #[tauri::command]
 #[specta::specta]
 pub async fn chat_remote(
@@ -42,7 +43,7 @@ pub async fn chat_remote(
     enabled: bool,
 ) -> Result<RemoteState, RpcError> {
     crate::off_main::blocking(move || {
-        let name = orchestrator_name(&project_id)?;
+        let (name, orchestrating) = remote_of(&project_id)?;
         let remotes = app.state::<Remotes>();
         if enabled {
             if let Ok(mut wanted) = remotes.wanted.lock() {
@@ -64,6 +65,10 @@ pub async fn chat_remote(
                 wanted.remove(&conversation_id);
             }
             let _ = ask(&app, &conversation_id, false, &name);
+            // A project's chat kept its process only to be reachable.
+            if !orchestrating {
+                crate::chat_resident::close(&app, &conversation_id);
+            }
         }
         Ok(state_of(&app, &conversation_id))
     })
@@ -75,6 +80,19 @@ pub async fn chat_remote(
 #[specta::specta]
 pub fn chat_remote_state(app: AppHandle, conversation_id: String) -> Result<RemoteState, RpcError> {
     Ok(state_of(&app, &conversation_id))
+}
+
+/// Whether this conversation was asked to be reachable.
+pub(crate) fn wanted(app: &AppHandle, conversation_id: &str) -> bool {
+    app.try_state::<Remotes>()
+        .and_then(|remotes| {
+            remotes
+                .wanted
+                .lock()
+                .ok()
+                .map(|wanted| wanted.contains_key(conversation_id))
+        })
+        .unwrap_or(false)
 }
 
 /// A control answer from a conversation's process, handed to whoever asked.
@@ -157,28 +175,23 @@ fn state_of(app: &AppHandle, conversation_id: &str) -> RemoteState {
     }
 }
 
-/// The orchestrator's name, as the session shows it; an error for a project
-/// that is not one.
-fn orchestrator_name(project_id: &str) -> Result<String, RpcError> {
+/// The name the session shows — the project's or the orchestrator's — and
+/// whether it is an orchestrator.
+fn remote_of(project_id: &str) -> Result<(String, bool), RpcError> {
     let store = crate::projects::store()?;
     let (_, root) = crate::projects::locate(&store, project_id)?;
     let home = devpit_core::Store::root()
         .ok()
         .and_then(|home| home.canonicalize().ok())
         .unwrap_or_default();
-    if devpit_core::home::orchestrator_of(&home, &root).is_none() {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            "only an orchestrator's chat is reached remotely",
-        ));
-    }
+    let orchestrating = devpit_core::home::orchestrator_of(&home, &root).is_some();
     let name = store
         .projects()?
         .into_iter()
         .find(|row| row.id == project_id)
         .map(|row| row.name)
         .unwrap_or_default();
-    Ok(remote_name(&name))
+    Ok((remote_name(&name), orchestrating))
 }
 
 /// `devpit-<name>`, made plain: it is shown on claude.ai and in the app.
