@@ -52,7 +52,8 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
     const was = known.current
     known.current = ids
     if (!was || was.size === 0) return
-    const added = projects.find((one) => !was.has(one.id))
+    // An orchestrator is named when it is made; its mark has a default.
+    const added = projects.find((one) => !was.has(one.id) && !one.orchestrator)
     if (added) setEditing(added)
   }, [projects])
 
@@ -149,7 +150,7 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
        target out from under it. */
     <nav className="rail" aria-label="Projects" data-held={drag.grab || menu || editing ? 'true' : undefined}>
       <div className="rail__panel">
-        <RailOrchestrators onMenu={(at, items) => setMenu({ ...at, items })} onRemove={onRemove} />
+        <RailOrchestrators onMenu={(at, items) => setMenu({ ...at, items })} onRemove={onRemove} onEdit={setEditing} />
         <div className="rail__list" ref={scroller}>
           {all.map((section) => {
             const folded = section.group !== null && shut.has(section.group)

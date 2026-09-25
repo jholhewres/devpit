@@ -10,7 +10,7 @@ export const ORCHESTRATOR_TRIES = [
 
 /* An empty conversation: the question it is for. An orchestrator's is its own
    — it builds nothing itself; it keeps the rest moving. */
-export function ChatBlank({ project, onTry }: { project: Project | null; onTry: (text: string) => void }): React.JSX.Element {
+export function ChatBlank({ project, account, onTry }: { project: Project | null; account?: string; onTry: (text: string) => void }): React.JSX.Element {
   const orchestrating = Boolean(project?.orchestrator)
   return (
     <div className={orchestrating ? 'chat__blank chat__blank--orch' : 'chat__blank'}>
@@ -24,7 +24,7 @@ export function ChatBlank({ project, onTry }: { project: Project | null; onTry: 
           <>
             <h2 className="chat__q">What should we orchestrate?</h2>
             <p className="chat__sub">
-              Every project and every session of <code>{project?.orchestrator}</code> is in reach. Ask where things stand, plan across projects, or hand work to a session — you still approve what they do.
+              Every project and every session of <code>{account ?? project?.orchestrator}</code> is in reach. Ask where things stand, plan across projects, or hand work to a session — you still approve what they do.
             </p>
             <div className="chat__tries">
               {ORCHESTRATOR_TRIES.map((one) => (

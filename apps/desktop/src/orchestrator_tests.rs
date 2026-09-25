@@ -1,9 +1,9 @@
-use super::{free_folder, seed, slug};
+use super::{free_folder, seed, slug, speaks_as};
 
 #[test]
 fn a_new_orchestrator_starts_with_its_brief_and_folders() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let folder = dir.path().join("orchestrator").join("claudin");
+    let folder = dir.path().join("orchestrator").join("claude2");
     seed(&folder).expect("seeded");
     let mine = std::fs::read_to_string(folder.join("CLAUDE.md")).expect("claude.md");
     assert!(
@@ -20,7 +20,7 @@ fn a_new_orchestrator_starts_with_its_brief_and_folders() {
 #[test]
 fn opening_again_leaves_what_the_person_changed() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let folder = dir.path().join("claudin");
+    let folder = dir.path().join("claude2");
     seed(&folder).expect("seeded");
     std::fs::write(folder.join("CLAUDE.md"), "mine now").expect("edit");
     seed(&folder).expect("seeded again");
@@ -33,7 +33,7 @@ fn opening_again_leaves_what_the_person_changed() {
 #[test]
 fn devpits_half_of_the_brief_follows_the_build() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let folder = dir.path().join("claudin");
+    let folder = dir.path().join("claude2");
     seed(&folder).expect("seeded");
     std::fs::write(folder.join(".devpit/orchestrator.md"), "an older build's").expect("age it");
     seed(&folder).expect("opened again");
@@ -47,10 +47,29 @@ fn devpits_half_of_the_brief_follows_the_build() {
 #[test]
 fn a_second_orchestrator_of_one_name_gets_a_folder_of_its_own() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let first = free_folder(dir.path(), "claudin", "Client work").expect("a folder");
-    assert!(first.ends_with("orchestrator/claudin/client-work"));
+    let first = free_folder(dir.path(), "Client work").expect("a folder");
+    assert!(first.ends_with("orchestrator/client-work"));
     std::fs::create_dir_all(&first).expect("made");
-    let second = free_folder(dir.path(), "claudin", "Client work").expect("a folder");
-    assert!(second.ends_with("orchestrator/claudin/client-work-1"));
+    let second = free_folder(dir.path(), "Client work").expect("a folder");
+    assert!(second.ends_with("orchestrator/client-work-1"));
     assert_eq!(slug("   "), "orchestrator");
+}
+
+#[test]
+fn an_orchestrator_says_its_account_where_the_folder_is_read() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let folder = dir.path().join("orchestrator").join("work");
+    seed(&folder).expect("seeded");
+    speaks_as(&folder, "01M39W5J").expect("said");
+    assert_eq!(
+        devpit_core::home::orchestrator_profile(&folder).as_deref(),
+        Some("01M39W5J")
+    );
+    speaks_as(&folder, "claude").expect("changed");
+    assert_eq!(
+        devpit_core::home::orchestrator_profile(&folder).as_deref(),
+        Some("claude")
+    );
+    let ignored = std::fs::read_to_string(folder.join(".gitignore")).expect("gitignore");
+    assert!(ignored.contains(".devpit/"));
 }

@@ -49,7 +49,7 @@ pub(crate) use invoke::{identify, run, run_diffing};
 
 pub use basing::{allowed as base_allowed, chosen as base_chosen, worktree_at, Refused};
 pub use branches::{branch_at, branches, switch, Branch};
-pub use clone::{clone, folder_for, init};
+pub use clone::{clone, first_commit, folder_for, init, unborn};
 pub use discard::discard;
 pub use front::{at_head, changed_since, diff_since, head_of, remove_front, unsaved_in};
 pub use glance::{glance, Glance};

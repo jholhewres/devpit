@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { Project, Thread } from '../gen/bindings'
-import { Folder, Plus, Trash } from './GitIcons'
+import { ChevronDown, Folder, Pencil, Plus, Trash } from './GitIcons'
 import { ask, commands } from './live'
 import { OrchestratorDialog } from './OrchestratorDialog'
+import { ProjectMark } from './ProjectMark'
 import type { RailItem } from './RailMenu'
 import { menuPoint } from './menuRules'
 import { useShell } from './useShell'
 
 /*
- * The orchestrators, above the projects.
+ * The orchestrators, as a group of their own above the projects.
  *
  * Each is a project devpit keeps for itself — its own folder, brief and
  * notes — speaking as one account; several may share an account. They are
- * made here, not added, and shown apart because they are not work of the
+ * made here, not added, and grouped apart because they are not work of the
  * person's: they are where the person looks at all of it at once.
  */
 
@@ -21,11 +22,32 @@ import { useShell } from './useShell'
 export const lastSpoken = (threads: readonly Thread[]): Thread | undefined =>
   [...threads].sort((a, b) => (b.lastAt ?? 0) - (a.lastAt ?? 0))[0]
 
+const FOLDED = 'devpit.rail.orchestratorsFolded'
+
+function savedFolded(): boolean {
+  try {
+    return localStorage.getItem(FOLDED) === '1'
+  } catch {
+    return false
+  }
+}
+
 type Menu = (at: { x: number; y: number }, items: readonly RailItem[]) => void
 
-export function RailOrchestrators({ onMenu, onRemove }: { onMenu: Menu; onRemove: (id: string) => void }): React.JSX.Element {
+export function RailOrchestrators({
+  onMenu,
+  onRemove,
+  onEdit,
+}: {
+  onMenu: Menu
+  onRemove: (id: string) => void
+  /** Name, icon and colour, in the dialog every project uses. */
+  onEdit: (project: Project) => void
+}): React.JSX.Element {
   const { projects, project, setProject, show, open, reloadProjects } = useShell()
   const [making, setMaking] = useState(false)
+  const [account, setAccount] = useState<Project | null>(null)
+  const [folded, setFolded] = useState(savedFolded)
   const arriving = useRef<string | null>(null)
   const mine = projects.filter((one) => one.orchestrator)
 
@@ -47,56 +69,90 @@ export function RailOrchestrators({ onMenu, onRemove }: { onMenu: Menu; onRemove
     if (one.id !== project?.id) setProject(one.id)
   }
 
+  const fold = (): void => {
+    setFolded((was) => {
+      try {
+        localStorage.setItem(FOLDED, was ? '0' : '1')
+      } catch {
+        // Unsaved, it still folds for now.
+      }
+      return !was
+    })
+  }
+
   const menu = (one: Project): readonly RailItem[] => [
+    { label: 'Edit…', glyph: <Pencil />, act: () => onEdit(one) },
+    { label: 'Runs as…', glyph: <Pencil />, act: () => setAccount(one) },
     { label: 'Reveal folder', glyph: <Folder />, act: () => void ask(() => commands.pathReveal(one.rootPath)) },
     'rule',
     { label: 'Remove…', glyph: <Trash />, act: () => onRemove(one.id), bad: true },
   ]
 
   return (
-    <div className="rail__sect rail__orch" role="group" aria-label="Orchestrators">
-      {mine.map((one) => (
-        <button
-          key={one.id}
-          className="rail__i"
-          aria-current={one.id === project?.id ? 'true' : undefined}
-          title={one.rootPath}
-          onClick={() => enter(one)}
-          onContextMenu={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onMenu(menuPoint(event), menu(one))
-          }}
-        >
+    <div className="rail__sect rail__orch" role="group" aria-label="Orchestrators" data-folded={folded ? 'true' : undefined}>
+      <div className="rail__orchhead">
+        <button className="rail__group" aria-expanded={!folded} onClick={fold}>
+          <span className="rail__gname">Orchestrators</span>
+          <span className="rail__gchev" data-open={!folded}>
+            <ChevronDown size={12} />
+          </span>
+        </button>
+        <button className="rail__orchadd" onClick={() => setMaking(true)} title="New orchestrator" aria-label="New orchestrator">
+          <Plus size={12} />
+        </button>
+      </div>
+      {!folded &&
+        mine.map((one) => (
+          <button
+            key={one.id}
+            className="rail__i"
+            aria-current={one.id === project?.id ? 'true' : undefined}
+            title={one.rootPath}
+            onClick={() => enter(one)}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onMenu(menuPoint(event), menu(one))
+            }}
+          >
+            <span className="rail__pill" />
+            <span className="rail__ico">
+              {one.icon || one.color ? (
+                <ProjectMark project={one} />
+              ) : (
+                <span className="pmark pmark--orch">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><circle cx="4.5" cy="5" r="2" /><circle cx="19.5" cy="5" r="2" /><circle cx="4.5" cy="19" r="2" /><circle cx="19.5" cy="19" r="2" /><path d="m6 6.4 3.8 3.6M18 6.4l-3.8 3.6M6 17.6l3.8-3.6M18 17.6l-3.8-3.6" /></svg>
+                </span>
+              )}
+            </span>
+            <span className="rail__text">
+              <span className="rail__n">{one.name}</span>
+              <span className="rail__s">orchestrator</span>
+            </span>
+          </button>
+        ))}
+      {mine.length === 0 && !folded && (
+        <button className="rail__i rail__orchnew" onClick={() => setMaking(true)} title="New orchestrator">
           <span className="rail__pill" />
           <span className="rail__ico">
-            <span className="pmark pmark--orch">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><circle cx="4.5" cy="5" r="2" /><circle cx="19.5" cy="5" r="2" /><circle cx="4.5" cy="19" r="2" /><circle cx="19.5" cy="19" r="2" /><path d="m6 6.4 3.8 3.6M18 6.4l-3.8 3.6M6 17.6l3.8-3.6M18 17.6l-3.8-3.6" /></svg>
+            <span className="pmark pmark--orch pmark--orchnew">
+              <Plus size={14} />
             </span>
           </span>
           <span className="rail__text">
-            <span className="rail__n">{one.name}</span>
-            <span className="rail__s">orchestrator</span>
+            <span className="rail__n">New orchestrator</span>
           </span>
         </button>
-      ))}
-      <button className="rail__i rail__orchnew" onClick={() => setMaking(true)} title="New orchestrator">
-        <span className="rail__pill" />
-        <span className="rail__ico">
-          <span className="pmark pmark--orch pmark--orchnew">
-            <Plus size={14} />
-          </span>
-        </span>
-        <span className="rail__text">
-          <span className="rail__n">New orchestrator</span>
-        </span>
-      </button>
-      {making && (
+      )}
+      {(making || account) && (
         <OrchestratorDialog
-          onClose={() => setMaking(false)}
+          editing={account ?? undefined}
+          onClose={() => (setMaking(false), setAccount(null))}
           onMade={(made) => {
             setMaking(false)
+            setAccount(null)
             reloadProjects()
+            if (!made) return
             arriving.current = made.id
             setProject(made.id)
           }}

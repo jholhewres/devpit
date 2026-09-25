@@ -41,14 +41,18 @@ describe('the orchestrator', () => {
     await window.wait(until.elementLocated(By.css('textarea.composer__ph')), 20000)
     assert.ok((await text(window)).includes('What should we orchestrate?'), 'the orchestrator opened on the projects\' blank state')
 
-    const folder = join(home, '.devpit', 'orchestrator', 'claude', 'client-work')
+    const folder = join(home, '.devpit', 'orchestrator', 'client-work')
     assert.ok(existsSync(join(folder, 'CLAUDE.md')), 'the brief was not written')
     assert.ok(existsSync(join(folder, '.devpit', 'orchestrator.md')), "devpit's half of the brief was not written")
     assert.ok(existsSync(join(folder, '.git')), 'the folder is not a repository')
+    assert.match(readFileSync(join(folder, '.devpit', 'orchestrator.json'), 'utf8'), /"profile":"claude"/)
+    // It opens with its history begun, not with every file untracked.
+    const { execFileSync } = await import('node:child_process')
+    assert.equal(execFileSync('git', ['-C', folder, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '')
 
     await fill(window, 'textarea.composer__ph', 'pwd')
     const answered = await window
-      .wait(async () => (await text(window)).includes(join('orchestrator', 'claude', 'client-work')), 20000)
+      .wait(async () => (await text(window)).includes(join('orchestrator', 'client-work')), 20000)
       .catch(() => false)
     assert.ok(answered, `the chat did not run in the orchestrator's folder. On screen: ${(await text(window)).slice(-400)}`)
   })
@@ -83,7 +87,7 @@ describe('the orchestrator', () => {
     const project = await invoke(window, 'project_add', { rootPath: repo })
     const lanes = (await invoke(window, 'board_get', { projectId: project.id })).columns
     const card = await invoke(window, 'card_create', { projectId: project.id, columnId: lanes[0].id, title: 'Fix the login timeout', body: '' })
-    const orchestrator = join(home, '.devpit', 'orchestrator', 'claude', 'client-work')
+    const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
 
     const handed = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, orchestrator)
     assert.ok(handed.ok, `the orchestrator could not hand the card: ${JSON.stringify(handed)}`)

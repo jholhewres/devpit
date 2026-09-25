@@ -56,6 +56,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         chat_relay::chat_rejoin,
         orchestrator::orchestrator_create,
         orchestrator::orchestrator_refresh,
+        orchestrator::orchestrator_account,
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
         steering::chat_cancel,

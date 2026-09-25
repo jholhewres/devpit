@@ -2,28 +2,43 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { Profile, Project } from '../gen/bindings'
+import { ControlMenu } from './ControlMenu'
 import { ask, commands } from './live'
 import { PROFILES_CHANGED } from './profiles'
 import { abandoned, committed } from './typing'
 import { useShell } from './useShell'
 
 /*
- * A new orchestrator: which account it speaks as, by the command that starts
- * it, and a name for it. The same accounts the chat offers, Claude Code only —
- * reaching other sessions is what one is for.
+ * An orchestrator's name and the account it speaks as — made new, or, for one
+ * already there, its account changed.
+ *
+ * The accounts are the profiles configured in Providers: each one a command
+ * the person types, read once for what it sets. Claude Code only — reaching
+ * other sessions is what an orchestrator is for.
  */
 
-/** Claude Code accounts. A shell function devpit has not read yet is listed
- *  too, as something to set up rather than something missing. */
+/** Claude Code accounts. A command devpit has not read yet is listed too, as
+ *  something to set up rather than something missing. */
 export const claudeAccounts = (profiles: readonly Profile[]): readonly Profile[] =>
   profiles.filter((one) => one.driver === 'claude' && one.reach !== 'missing')
 
 export const needsReading = (profile: Profile): boolean => profile.path === null
 
-export function OrchestratorDialog({ onMade, onClose }: { onMade: (made: Project) => void; onClose: () => void }): React.JSX.Element {
+const NEW_PROFILE = '__new__'
+
+export function OrchestratorDialog({
+  editing,
+  onMade,
+  onClose,
+}: {
+  /** An orchestrator whose account is being changed; absent when making one. */
+  editing?: Project
+  onMade: (made: Project | null) => void
+  onClose: () => void
+}): React.JSX.Element {
   const { openPrefs } = useShell()
   const [accounts, setAccounts] = useState<readonly Profile[]>([])
-  const [picked, setPicked] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string | null>(editing?.orchestrator ?? null)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -41,49 +56,68 @@ export function OrchestratorDialog({ onMade, onClose }: { onMade: (made: Project
   }, [])
 
   const chosen = accounts.find((one) => one.id === picked) ?? null
-  const ready = chosen !== null && !needsReading(chosen) && name.trim() !== '' && !busy
+  const ready = chosen !== null && !needsReading(chosen) && (editing !== undefined || name.trim() !== '') && !busy
 
-  const make = (): void => {
+  const save = (): void => {
     if (!ready || !chosen) return
     setBusy(true)
-    void ask(() => commands.orchestratorCreate(chosen.id, name))
-      .then((answer) => (answer.data ? onMade(answer.data) : setError(answer.error)))
-      .finally(() => setBusy(false))
+    const asked = editing
+      ? ask(() => commands.orchestratorAccount(editing.id, chosen.id)).then((answer) => (answer.error ? setError(answer.error) : onMade(null)))
+      : ask(() => commands.orchestratorCreate(chosen.id, name)).then((answer) => (answer.data ? onMade(answer.data) : setError(answer.error)))
+    void asked.finally(() => setBusy(false))
   }
 
   return createPortal(
     <div className="ask" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()} onKeyDown={(event) => abandoned(event) && onClose()}>
       <div className="addpj__box pdlg" role="dialog" aria-modal="true" aria-labelledby="orchT">
         <div>
-          <h2 className="addpj__t" id="orchT">New orchestrator</h2>
-          <p className="addpj__d">A chat that sees every project and the sessions of its account.</p>
+          <h2 className="addpj__t" id="orchT">{editing ? `${editing.name} runs as` : 'New orchestrator'}</h2>
+          <p className="addpj__d">
+            {editing
+              ? 'Its next turn starts under this account. Conversations so far stay with the one they began with.'
+              : 'A chat that sees every project and the sessions of its account.'}
+          </p>
         </div>
-        <label className="pdlg__f">
-          <span>Name</span>
-          <input autoFocus value={name} placeholder="Work" maxLength={60} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => committed(event) && make()} />
-        </label>
+        {!editing && (
+          <label className="pdlg__f">
+            <span>Name</span>
+            <input autoFocus value={name} placeholder="Work" maxLength={60} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => committed(event) && save()} />
+          </label>
+        )}
         <div className="pdlg__f">
           <span>Runs as</span>
-          <div className="orchdlg__accounts" role="radiogroup">
-            {accounts.length === 0 && <p className="addpj__d">No Claude Code account is installed.</p>}
-            {accounts.map((one) => (
-              <button key={one.id} className="orchdlg__acct" role="radio" aria-checked={picked === one.id} onClick={() => setPicked(one.id)}>
-                <code>{one.command}</code>
-                <span>{needsReading(one) ? 'set up first' : one.label}</span>
-              </button>
-            ))}
-          </div>
+          {accounts.length === 0 ? (
+            <p className="addpj__d">No Claude Code account is configured. Add one in Settings → Providers.</p>
+          ) : (
+            <ControlMenu
+              label={chosen ? `${chosen.label} · ${chosen.command}` : 'Pick an account'}
+              title="Runs as"
+              opens="down"
+              choices={[
+                ...accounts.map((one) => ({
+                  id: one.id,
+                  label: one.label,
+                  what: needsReading(one) ? `${one.command} — set up in Providers first` : one.command,
+                  selected: one.id === picked,
+                })),
+                { id: NEW_PROFILE, label: 'New profile…', what: 'Another command of your own, in Providers' },
+              ]}
+              onPick={(id) => (id === NEW_PROFILE ? (onClose(), openPrefs('providers')) : setPicked(id))}
+            />
+          )}
           {chosen && needsReading(chosen) && (
             <p className="acc__note">
-              <code>{chosen.command}</code> is a shell function, and devpit has not read what it runs yet.{' '}
-              <button className="btn" onClick={() => (onClose(), openPrefs('providers'))}>Open it in Settings → Providers</button>
+              devpit has not read what <code>{chosen.command}</code> runs yet.{' '}
+              <button className="btn" onClick={() => (onClose(), openPrefs('providers'))}>
+                Open it in Settings → Providers
+              </button>
             </p>
           )}
         </div>
         {error && <p className="acc__note">{error}</p>}
         <div className="pdlg__acts">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn--go" disabled={!ready} onClick={make}>Create</button>
+          <button className="btn btn--go" disabled={!ready} onClick={save}>{editing ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </div>,

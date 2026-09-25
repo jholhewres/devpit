@@ -879,24 +879,39 @@ fn a_new_state_root_is_private_from_the_moment_it_exists() {
 #[test]
 fn an_orchestrator_is_known_by_its_folder() {
     let root = Path::new("/home/me/.devpit");
-    let folder = orchestrator_dir(root, "claudin", "work").expect("plain ids");
     assert_eq!(
-        folder,
-        root.join("orchestrator").join("claudin").join("work")
+        orchestrator_dir(root, "work"),
+        Some(root.join("orchestrator").join("work"))
     );
-    assert_eq!(orchestrator_of(root, &folder).as_deref(), Some("claudin"));
-    assert_eq!(orchestrator_of(root, &folder.join("docs")), None);
-    assert_eq!(
-        orchestrator_of(root, &root.join("orchestrator").join("claudin")),
-        None
-    );
+    // An older one says its profile with the path.
+    let older = root.join("orchestrator").join("claude2").join("work");
+    assert_eq!(orchestrator_of(root, &older).as_deref(), Some("claude2"));
+    assert_eq!(orchestrator_of(root, &older.join("docs")), None);
     assert_eq!(orchestrator_of(root, Path::new("/home/me/work/app")), None);
 }
 
 #[test]
 fn an_orchestrator_is_never_named_outside_its_folder() {
     let root = Path::new("/home/me/.devpit");
-    assert_eq!(orchestrator_dir(root, "../projects", "work"), None);
-    assert_eq!(orchestrator_dir(root, "claude", "../../projects"), None);
-    assert_eq!(orchestrator_dir(root, "", "work"), None);
+    assert_eq!(orchestrator_dir(root, "../projects"), None);
+    assert_eq!(orchestrator_dir(root, ""), None);
+}
+
+#[test]
+fn an_orchestrator_says_its_account_in_its_own_settings() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let folder = root.join("orchestrator").join("work");
+    std::fs::create_dir_all(folder.join(".devpit")).expect("mkdir");
+    // Made, but no account said yet: an orchestrator of nobody.
+    assert_eq!(orchestrator_of(root, &folder), None);
+    std::fs::write(
+        folder.join(ORCHESTRATOR_SETTINGS),
+        r#"{"profile":"01M39W5J"}"#,
+    )
+    .expect("settings");
+    assert_eq!(orchestrator_of(root, &folder).as_deref(), Some("01M39W5J"));
+    // A name that could leave the folder is not taken.
+    std::fs::write(folder.join(ORCHESTRATOR_SETTINGS), r#"{"profile":"../x"}"#).expect("settings");
+    assert_eq!(orchestrator_of(root, &folder), None);
 }

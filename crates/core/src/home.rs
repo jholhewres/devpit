@@ -36,27 +36,47 @@ pub enum HomeError {
     Store(#[from] StoreError),
 }
 
-/// An orchestrator's folder, `orchestrator/<profile>/<name>`: where its
-/// conversations run and its documents are kept. The profile is in the path
-/// so the folder alone says which account it speaks as. `None` for a part
-/// that is not a plain id.
-pub fn orchestrator_dir(root: &Path, profile_id: &str, name: &str) -> Option<PathBuf> {
-    (plain_id(profile_id) && plain_id(name))
-        .then(|| root.join(ORCHESTRATOR).join(profile_id).join(name))
+/// An orchestrator's folder, `orchestrator/<name>`: where its conversations
+/// run and its documents are kept. `None` for a name that is not a plain id.
+pub fn orchestrator_dir(root: &Path, name: &str) -> Option<PathBuf> {
+    plain_id(name).then(|| root.join(ORCHESTRATOR).join(name))
 }
 
-/// The profile whose orchestrator `folder` is, if it is one. Read from the
-/// path, so a project needs no column to say it is an orchestrator.
+/// Where an orchestrator says which account it speaks as: a file in its own
+/// folder, so changing it is an edit and not a move.
+pub const ORCHESTRATOR_SETTINGS: &str = ".devpit/orchestrator.json";
+
+/// The profile whose orchestrator `folder` is, if it is one: known by being
+/// devpit's own folder, so a project needs no column to say so. An older one
+/// at `orchestrator/<profile>/<name>` said its profile with the path, and
+/// still does until its settings say otherwise.
 pub fn orchestrator_of(root: &Path, folder: &Path) -> Option<String> {
     let rest = folder.strip_prefix(root.join(ORCHESTRATOR)).ok()?;
     let parts: Vec<&str> = rest
         .components()
         .filter_map(|part| part.as_os_str().to_str())
         .collect();
-    match parts.as_slice() {
+    let from_path = match parts.as_slice() {
+        [name] if plain_id(name) => None,
         [profile, name] if plain_id(profile) && plain_id(name) => Some((*profile).to_owned()),
-        _ => None,
+        _ => return None,
+    };
+    orchestrator_profile(folder).or(from_path)
+}
+
+/// The profile an orchestrator's settings name, when they name a plain one.
+pub fn orchestrator_profile(folder: &Path) -> Option<String> {
+    let file = folder.join(ORCHESTRATOR_SETTINGS);
+    // A settings file is a line of JSON; past this it is not one.
+    if std::fs::metadata(&file).ok()?.len() > 4096 {
+        return None;
     }
+    let said: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
+    said.get("profile")?
+        .as_str()
+        .filter(|id| plain_id(id))
+        .map(str::to_owned)
 }
 
 /// The folder every project's own folder sits in.

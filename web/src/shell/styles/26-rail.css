@@ -80,7 +80,13 @@
 .pmark--add { width: 36px; height: 36px; color: var(--success); background: var(--overlay); }
 .rail__add:hover .pmark--add { color: #fff; background: color-mix(in srgb, var(--success) 70%, transparent); }
 /* The orchestrators, above the projects and ruled off from them. */
-.rail__orch { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.rail__orch { margin-bottom: 4px; }
+.rail__orchhead { position: relative; display: flex; align-items: center; }
+.rail__orchhead .rail__group { flex: 1; min-width: 0; }
+/* Small and quiet: once there is one, making another is the rarer act. */
+.rail__orchadd { position: absolute; right: 8px; display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 5px; background: none; color: var(--ghost); cursor: pointer; opacity: 0; transition: opacity 120ms ease; }
+:is(.rail:hover, .rail[data-held='true']) .rail__orchadd { opacity: 1; transition-delay: 300ms; }
+.rail__orchadd:hover { color: var(--text); background: var(--sidebar-item); }
 .pmark--orch { width: 36px; height: 36px; color: var(--orchestrate); background: color-mix(in srgb, var(--orchestrate) 14%, transparent); }
 .rail__i[aria-current='true'] .pmark--orch { color: #fff; background: var(--orchestrate); }
 .pmark--orchnew { opacity: .7; }

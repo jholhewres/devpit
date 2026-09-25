@@ -36,6 +36,35 @@ pub fn init(dir: &Path) -> Result<(), GitError> {
     crate::invoke::run(dir, &["init", "--initial-branch=main", "-q"]).map(|_| ())
 }
 
+/// Whether `dir` is a repository with no commit yet.
+pub fn unborn(dir: &Path) -> bool {
+    dir.join(".git").exists()
+        && crate::invoke::run(dir, &["rev-parse", "--verify", "-q", "HEAD"]).is_err()
+}
+
+/// Records everything in `dir` as its first commit, under devpit's own name:
+/// the files devpit wrote are devpit's, and a folder that opens with a list of
+/// untracked files reads as work somebody left unsaved.
+pub fn first_commit(dir: &Path, message: &str) -> Result<(), GitError> {
+    crate::invoke::run(dir, &["add", "-A"])?;
+    crate::invoke::run(
+        dir,
+        &[
+            "-c",
+            "user.name=devpit",
+            "-c",
+            "user.email=devpit@localhost",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ],
+    )
+    .map(|_| ())
+}
+
 /// Clones `url` into `parent/<name>` and returns where it landed.
 ///
 /// The destination must not already exist: git would refuse anyway, and

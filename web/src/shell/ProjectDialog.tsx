@@ -59,10 +59,13 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
           <input autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => committed(event) && save()} />
         </label>
 
-        <div className="pdlg__f">
-          <span>Group</span>
-          <GroupPicker value={group} groups={groups} onChange={setGroup} />
-        </div>
+        {/* An orchestrator sits in the Orchestrators group, always. */}
+        {!project.orchestrator && (
+          <div className="pdlg__f">
+            <span>Group</span>
+            <GroupPicker value={group} groups={groups} onChange={setGroup} />
+          </div>
+        )}
 
         <div className="pdlg__f">
           <span>Icon</span>

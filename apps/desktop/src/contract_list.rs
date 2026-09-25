@@ -56,6 +56,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         chat::chat_frames,
         orchestrator::orchestrator_create,
         orchestrator::orchestrator_refresh,
+        orchestrator::orchestrator_account,
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
         panels::panel_widths,

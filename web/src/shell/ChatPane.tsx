@@ -116,7 +116,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
       {project?.orchestrator && <OrchestratorSessions profileId={project.orchestrator} />}
       <div className="scroll" ref={follow.box}>
         {empty ? (
-          <ChatBlank project={project} onTry={(text) => (setPrompt(text), field.current?.focus())} />
+          <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => (setPrompt(text), field.current?.focus())} />
         ) : (
           <div className="thread">
             {chat.error && <div className="exempty__t">{chat.error}</div>}

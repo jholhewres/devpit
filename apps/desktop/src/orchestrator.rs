@@ -21,6 +21,9 @@ const DEVPIT_BRIEF: (&str, &str) = (
 /// the person edits these, and a second opening must not undo that.
 const SEEDED: &[(&str, &str)] = &[
     ("CLAUDE.md", include_str!("orchestrator_claude.md")),
+    // devpit's half of the brief and the account are devpit's to rewrite;
+    // they are kept out of the history the person reads.
+    (".gitignore", ".devpit/\n"),
     ("docs/.gitkeep", ""),
     ("artifacts/.gitkeep", ""),
     ("context/.gitkeep", ""),
@@ -49,48 +52,22 @@ pub(crate) fn orchestrator_create_now(
         ));
     }
     let store = crate::projects::store()?;
-    let profile = crate::agent_profiles::all(&store)?
-        .into_iter()
-        .find(|one| one.id == profile_id)
-        .ok_or_else(|| {
-            RpcError::new(
-                ErrorCode::NotFound,
-                format!("no profile called {profile_id}"),
-            )
-        })?;
-    // Only Claude Code can reach its other sessions, which is the point.
-    if profile.driver != "claude" {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            "an orchestrator runs on Claude Code",
-        ));
-    }
-    // Refused here rather than at its first message, which would say less.
-    if profile.path.is_none() {
-        return Err(RpcError::new(
-            ErrorCode::Invalid,
-            format!(
-                "devpit has not read what {} runs yet — open it in Settings → Providers",
-                profile.command
-            ),
-        ));
-    }
+    let profile = orchestrable(&store, &profile_id)?;
     let root = Store::root().map_err(|err| RpcError::internal(err.to_string()))?;
-    let folder = free_folder(&root, &profile.id, name).ok_or_else(|| {
-        RpcError::new(
-            ErrorCode::Invalid,
-            "that profile's name cannot name a folder",
-        )
-    })?;
+    let folder = free_folder(&root, name)
+        .ok_or_else(|| RpcError::new(ErrorCode::Invalid, "that name cannot name a folder"))?;
     seed(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
+    speaks_as(&folder, &profile.id).map_err(|err| RpcError::internal(err.to_string()))?;
     devpit_git::init(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
+    devpit_git::first_commit(&folder, "An orchestrator, as devpit made it")
+        .map_err(|err| RpcError::internal(err.to_string()))?;
     let here = folder
         .canonicalize()
         .map_err(|err| RpcError::internal(err.to_string()))?;
     let made = crate::projects::project_add_now(here.display().to_string())?;
     let named = crate::project_naming::project_edit_now(
         made.id.clone(),
-        format!("{name} · {}", profile.command),
+        name.to_owned(),
         None,
         None,
         None,
@@ -110,13 +87,91 @@ pub async fn orchestrator_refresh(project_id: String) -> Result<(), RpcError> {
     crate::off_main::blocking(move || {
         let store = crate::projects::store()?;
         let (_, root) = crate::projects::locate(&store, &project_id)?;
-        seed(&root).map_err(|err| RpcError::internal(err.to_string()))
+        seed(&root).map_err(|err| RpcError::internal(err.to_string()))?;
+        // One made before orchestrators kept a history opens with every file
+        // untracked; it gets the first commit a new one is made with.
+        if devpit_git::unborn(&root) {
+            devpit_git::first_commit(&root, "An orchestrator, as devpit made it")
+                .map_err(|err| RpcError::internal(err.to_string()))?;
+        }
+        Ok(())
     })
     .await
 }
 
-/// A folder for `name` under this profile that nothing is using yet.
-pub(crate) fn free_folder(root: &Path, profile: &str, name: &str) -> Option<std::path::PathBuf> {
+/// The profile, if an orchestrator can speak as it: Claude Code, since only it
+/// reaches its other sessions, and one devpit can start rather than a shell
+/// function it has not read yet.
+fn orchestrable(
+    store: &devpit_core::Store,
+    profile_id: &str,
+) -> Result<devpit_rpc::Profile, RpcError> {
+    let profile = crate::agent_profiles::all(store)?
+        .into_iter()
+        .find(|one| one.id == profile_id)
+        .ok_or_else(|| {
+            RpcError::new(
+                ErrorCode::NotFound,
+                format!("no profile called {profile_id}"),
+            )
+        })?;
+    if profile.driver != "claude" {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "an orchestrator runs on Claude Code",
+        ));
+    }
+    if profile.path.is_none() {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            format!(
+                "devpit has not read what {} runs yet — open it in Settings → Providers",
+                profile.command
+            ),
+        ));
+    }
+    Ok(profile)
+}
+
+/// Which account an orchestrator speaks as, said in its own folder.
+pub(crate) fn speaks_as(folder: &Path, profile_id: &str) -> std::io::Result<()> {
+    let file = folder.join(devpit_core::home::ORCHESTRATOR_SETTINGS);
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(
+        file,
+        serde_json::json!({ "profile": profile_id }).to_string(),
+    )
+}
+
+/// `orchestrator.account` — the account an orchestrator speaks as, changed.
+/// Its next turn starts under that account; its conversations so far stay
+/// with the one they began with.
+#[tauri::command]
+#[specta::specta]
+pub async fn orchestrator_account(project_id: String, profile_id: String) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let store = crate::projects::store()?;
+        let profile = orchestrable(&store, &profile_id)?;
+        let (_, root) = crate::projects::locate(&store, &project_id)?;
+        let home = Store::root()
+            .ok()
+            .and_then(|home| home.canonicalize().ok())
+            .unwrap_or_default();
+        if devpit_core::home::orchestrator_of(&home, &root).is_none() {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "that project is not an orchestrator",
+            ));
+        }
+        speaks_as(&root, &profile.id).map_err(|err| RpcError::internal(err.to_string()))
+    })
+    .await
+}
+
+/// A folder for `name` that nothing is using yet.
+pub(crate) fn free_folder(root: &Path, name: &str) -> Option<std::path::PathBuf> {
     let base = slug(name);
     (0..100).find_map(|n| {
         let tried = if n == 0 {
@@ -124,7 +179,7 @@ pub(crate) fn free_folder(root: &Path, profile: &str, name: &str) -> Option<std:
         } else {
             format!("{base}-{n}")
         };
-        devpit_core::home::orchestrator_dir(root, profile, &tried).filter(|folder| !folder.exists())
+        devpit_core::home::orchestrator_dir(root, &tried).filter(|folder| !folder.exists())
     })
 }
 

@@ -256,6 +256,12 @@ export const commands = {
 	 *  up to this build as it is opened.
 	 */
 	orchestratorRefresh: (projectId: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_refresh", { projectId })),
+	/**
+	 *  `orchestrator.account` — the account an orchestrator speaks as, changed.
+	 *  Its next turn starts under that account; its conversations so far stay
+	 *  with the one they began with.
+	 */
+	orchestratorAccount: (projectId: string, profileId: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_account", { projectId, profileId })),
 	/**  `orchestrator.sessions` — what this profile's account has running now. */
 	orchestratorSessions: (profileId: string) => typedError<LiveSessions, RpcError>(__TAURI_INVOKE("orchestrator_sessions", { profileId })),
 	/**
@@ -1849,10 +1855,10 @@ export type DataSpec = {
  * 
  *  ```text
  *  glm()     = {seven ANTHROPIC_* vars} + claude + [--permission-mode bypassPermissions]
- *  claudin() = {CLAUDE_CONFIG_DIR}       + claude + [--permission-mode bypassPermissions]
+ *  claude2() = {CLAUDE_CONFIG_DIR}       + claude + [--permission-mode bypassPermissions]
  *  ```
  * 
- *  `glm` and `claudin` differ in **nothing but the environment**. So a profile
+ *  `glm` and `claude2` differ in **nothing but the environment**. So a profile
  *  is environment, program and arguments — not a command line. That matters
  *  twice: a command line would have to be handed to a shell, and a shell
  *  function cannot be spawned at all, which is why those five worked in a
@@ -2888,7 +2894,7 @@ export type Reach =
 "missing";
 
 /**
- *  A command of the person's own — a shell function such as `claudin` —
+ *  A command of the person's own — a shell function such as `claude2` —
  *  read by running it: the agent it starts, and what it starts it with.
  */
 export type ReadCommand = {
