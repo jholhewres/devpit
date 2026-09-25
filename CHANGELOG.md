@@ -3,6 +3,18 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.22 — 2026-09-25
+
+### Orchestrator
+
+- **Projects are linked by hand.** An orchestrator no longer reaches every
+  project. Link the ones it works with from its Boards panel: only those show
+  there, only their folders are open to its chat, and only they are in reach
+  of its tools. An orchestrator made before starts with none linked.
+- **Only its own account's sessions.** The Sessions panel is back to the
+  sessions of the account the orchestrator speaks as; 0.1.19 listed every
+  account's.
+
 ## 0.1.21 — 2026-09-25
 
 ### Chat
