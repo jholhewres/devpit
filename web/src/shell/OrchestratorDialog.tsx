@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { Profile, Project } from '../gen/bindings'
-import { ControlMenu } from './ControlMenu'
+import { FieldSelect } from './FieldSelect'
 import { ask, commands } from './live'
 import { PROFILES_CHANGED } from './profiles'
 import { abandoned, committed } from './typing'
@@ -89,18 +89,16 @@ export function OrchestratorDialog({
           {accounts.length === 0 ? (
             <p className="addpj__d">No Claude Code account is configured. Add one in Settings → Providers.</p>
           ) : (
-            <ControlMenu
-              label={chosen ? `${chosen.label} · ${chosen.command}` : 'Pick an account'}
-              title="Runs as"
-              opens="down"
-              choices={[
+            <FieldSelect
+              label="Runs as"
+              value={picked}
+              options={[
                 ...accounts.map((one) => ({
                   id: one.id,
                   label: one.label,
-                  what: needsReading(one) ? `${one.command} — set up in Providers first` : one.command,
-                  selected: one.id === picked,
+                  hint: needsReading(one) ? `${one.command} · set up in Providers first` : one.command,
                 })),
-                { id: NEW_PROFILE, label: 'New profile…', what: 'Another command of your own, in Providers' },
+                { id: NEW_PROFILE, label: 'New profile…', hint: 'another command of your own' },
               ]}
               onPick={(id) => (id === NEW_PROFILE ? (onClose(), openPrefs('providers')) : setPicked(id))}
             />

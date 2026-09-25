@@ -103,6 +103,16 @@
 .pdlg__f > span { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
 .pdlg__f input:not([type='color']) { height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--composer); color: var(--text); font: inherit; font-size: 13px; outline: none; }
 .pdlg__f input:focus { border-color: var(--border-strong); }
+.fsel { position: relative; }
+.fsel__b { width: 100%; height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--composer); color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.fsel__b[aria-expanded='true'], .fsel__b:focus-visible { border-color: var(--border-strong); outline: none; }
+.fsel__b svg { margin-left: auto; flex: none; color: var(--text-3); }
+.fsel__v { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fsel__h { color: var(--text-3); font-family: var(--mono); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fsel__menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 10; max-height: 240px; overflow-y: auto; padding: 4px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--raised); box-shadow: 0 8px 24px var(--shade); }
+.fsel__o { width: 100%; display: flex; align-items: baseline; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.fsel__o:hover, .fsel__o[aria-selected='true'] { background: var(--overlay); }
+.fsel__o[aria-selected='true'] .fsel__v { font-weight: 600; }
 .pdlg__icons { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
 .pdlg__icon { height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--text-2); background: var(--overlay); font-size: 12px; font-weight: 600; }
 .pdlg__icon:hover { background: var(--overlay-strong); color: var(--text); }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { AgentChoice, Profile } from '../gen/bindings'
 import { AgentRow } from './AgentRow'
-import { ControlMenu } from './ControlMenu'
+import { FieldSelect } from './FieldSelect'
 import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from './catalogue'
 import { ask, commands } from './live'
 import { ProfileEditor } from './ProfileEditor'
@@ -145,18 +145,12 @@ export function ProviderRows(): React.JSX.Element {
         {/* One menu, not a row of buttons: the row grew with every profile
             anyone declared, and a default is picked once and read often. */}
         <div className="agpick">
-          <ControlMenu
-            label={choice.defaultId === NO_AGENT ? 'No agent' : (choosable(entries).find((entry) => entry.id === choice.defaultId)?.label ?? 'No agent')}
-            title="Default agent"
-            opens="down"
-            choices={[
-              { id: NO_AGENT, label: 'No agent', what: 'A plain shell', selected: choice.defaultId === NO_AGENT },
-              ...choosable(entries).map((entry) => ({
-                id: entry.id,
-                label: entry.label,
-                what: entry.launch,
-                selected: choice.defaultId === entry.id,
-              })),
+          <FieldSelect
+            label="Default agent"
+            value={choice.defaultId}
+            options={[
+              { id: NO_AGENT, label: 'No agent', hint: 'A plain shell' },
+              ...choosable(entries).map((entry) => ({ id: entry.id, label: entry.label, hint: entry.launch })),
             ]}
             onPick={(id) => {
               if (!busy) setDefault(id)

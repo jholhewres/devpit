@@ -89,7 +89,7 @@ async function shown(): Promise<void> {
 /* The default is one menu: opened from its button, each agent an item. */
 function picker(): HTMLElement {
   fireEvent.click(screen.getByRole('button', { name: 'Default agent' }))
-  return screen.getByRole('menu', { name: 'Default agent' })
+  return screen.getByRole('listbox', { name: 'Default agent' })
 }
 
 describe('what opens when I start a terminal', () => {
@@ -110,8 +110,8 @@ describe('what opens when I start a terminal', () => {
     choice = { defaultId: 'claude', disabled: [], hooks: true }
     await shown()
     const menu = picker()
-    expect(within(menu).getByText('Claude Code').closest('[role="menuitemradio"]')?.getAttribute('aria-checked')).toBe('true')
-    expect(within(menu).getByText('No agent').closest('[role="menuitemradio"]')?.getAttribute('aria-checked')).toBe('false')
+    expect(within(menu).getByText('Claude Code').closest('[role="option"]')?.getAttribute('aria-selected')).toBe('true')
+    expect(within(menu).getByText('No agent').closest('[role="option"]')?.getAttribute('aria-selected')).toBe('false')
   })
 
   it('does not offer one that is not here', async () => {
