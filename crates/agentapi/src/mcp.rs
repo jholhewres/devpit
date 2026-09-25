@@ -204,17 +204,32 @@ pub(crate) fn handle_offering(
     let result = match method {
         "initialize" => json!({
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or(PROTOCOL),
-            "capabilities": { "tools": {} },
+            "capabilities": { "tools": {}, "resources": {} },
             "serverInfo": { "name": "devpit", "version": env!("CARGO_PKG_VERSION") },
             "instructions": guide::INSTRUCTIONS,
         }),
         "ping" => json!({}),
         "tools/list" if !offered => json!({ "tools": [] }),
-        "tools/list" => json!({ "tools": TOOLS.iter().map(|tool| json!({
-            "name": tool.name,
-            "description": tool.description,
-            "inputSchema": (tool.input)(),
-        })).collect::<Vec<_>>() }),
+        "tools/list" => json!({ "tools": TOOLS.iter().map(|tool| {
+            let mut listed = json!({
+                "name": tool.name,
+                "description": tool.description,
+                "inputSchema": (tool.input)(),
+            });
+            if let Some(meta) = crate::apps::meta_for(tool.name) {
+                listed["_meta"] = meta;
+            }
+            listed
+        }).collect::<Vec<_>>() }),
+        "resources/list" => crate::apps::listed(),
+        "resources/read" => match params
+            .get("uri")
+            .and_then(Value::as_str)
+            .and_then(crate::apps::read)
+        {
+            Some(page) => page,
+            None => return Some(error(id, -32002, "devpit has no such resource")),
+        },
         "tools/call" => call(&params, ask),
         _ => {
             return Some(error(

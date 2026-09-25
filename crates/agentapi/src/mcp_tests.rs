@@ -76,7 +76,7 @@ fn a_refusal_is_the_tools_error_not_the_protocols() {
 #[test]
 fn an_unknown_method_is_a_protocol_error() {
     let said = reply(
-        r#"{"jsonrpc":"2.0","id":5,"method":"resources/list"}"#,
+        r#"{"jsonrpc":"2.0","id":5,"method":"prompts/list"}"#,
         &never,
     );
     assert_eq!(said["error"]["code"], -32601);
@@ -88,4 +88,61 @@ fn no_tool_answers_a_question_a_session_is_stopped_on() {
     assert!(!TOOLS
         .iter()
         .any(|tool| tool.method.contains("answer") || tool.method.contains("press")));
+}
+
+#[test]
+fn the_board_card_and_sessions_come_with_pages_a_host_can_read() {
+    let ask = |_: &str, _: Value| -> Result<Value, String> { Ok(Value::Null) };
+    let listed: Value = serde_json::from_str(
+        &handle(r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#, &ask).expect("answer"),
+    )
+    .expect("json");
+    let uri = |name: &str| {
+        listed["result"]["tools"]
+            .as_array()
+            .expect("tools")
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .and_then(|tool| {
+                tool["_meta"]["ui"]["resourceUri"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+    };
+    assert_eq!(
+        uri("devpit_board").as_deref(),
+        Some("ui://devpit/board.html")
+    );
+    assert_eq!(uri("devpit_card").as_deref(), Some("ui://devpit/card.html"));
+    assert_eq!(
+        uri("devpit_sessions").as_deref(),
+        Some("ui://devpit/sessions.html")
+    );
+    assert_eq!(uri("devpit_comment"), None);
+
+    let read: Value = serde_json::from_str(
+        &handle(
+            r#"{"jsonrpc":"2.0","id":2,"method":"resources/read","params":{"uri":"ui://devpit/board.html"}}"#,
+            &ask,
+        )
+        .expect("answer"),
+    )
+    .expect("json");
+    let page = &read["result"]["contents"][0];
+    assert_eq!(page["mimeType"], crate::apps::APP_MIME);
+    let html = page["text"].as_str().expect("html");
+    assert!(html.contains("ui/initialize") && html.contains("devpit_start_session"));
+    // Nothing is fetched from anywhere: no host is granted.
+    assert!(!html.contains("src=\"http") && !html.contains("href=\"http"));
+    assert_eq!(
+        page["_meta"]["ui"]["csp"]["connectDomains"],
+        serde_json::json!([])
+    );
+
+    let missing = handle(
+        r#"{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"ui://devpit/nope.html"}}"#,
+        &ask,
+    )
+    .expect("answer");
+    assert!(missing.contains("-32002"));
 }

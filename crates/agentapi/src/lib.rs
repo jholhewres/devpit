@@ -10,6 +10,7 @@
 //! No dependency on the rest of the app: the caller hands over where devpit
 //! keeps its state, and everything else is a socket and some JSON.
 
+pub mod apps;
 pub mod cli;
 pub mod client;
 pub mod guide;
