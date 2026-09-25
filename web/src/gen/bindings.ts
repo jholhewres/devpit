@@ -273,6 +273,12 @@ export const commands = {
 	 *  must stay only theirs to send.
 	 */
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
+	/**
+	 *  `orchestrator.answer` — the person's pick on the question a session is
+	 *  stopped on: arrows to the choice and Enter, or Escape when `choice` is
+	 *  absent. The window's alone, like replying.
+	 */
+	orchestratorAnswer: (profileId: string, name: string, seen: PendingPrompt, choice: number | null) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_answer", { profileId, name, seen, choice })),
 	/**  `chat.remote` — Remote Control for an orchestrator's conversation, on or off. */
 	chatRemote: (projectId: string, conversationId: string, enabled: boolean) => typedError<RemoteState, RpcError>(__TAURI_INVOKE("chat_remote", { projectId, conversationId, enabled })),
 	/**  `chat.remoteState` — whether this conversation is reachable, and where. */
@@ -2293,6 +2299,11 @@ export type LiveSession = {
 	 *  typed for the person.
 	 */
 	inDevpit: boolean,
+	/**
+	 *  The question it is stopped on, read off its terminal, when it is in
+	 *  one of devpit's and stopped on one.
+	 */
+	waiting: PendingPrompt | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */
@@ -2571,6 +2582,17 @@ input: string; allowed: boolean } |
  *  output is worse than showing it plain.
  */
 { kind: "unknown"; text: string };
+
+/**
+ *  A question a session is stopped on, as its screen shows it: the words
+ *  above the choices, the choices, and which one its cursor is on.
+ */
+export type PendingPrompt = {
+	question: string,
+	options: PromptOption[],
+	/**  Zero-based: the option the `❯` is on. */
+	cursor: number,
+};
 
 /**
  *  What a plugin is allowed to do beyond drawing its own surfaces.
@@ -2857,6 +2879,12 @@ export type ProjectRun = {
 
 export type ProjectTree = {
 	nodes: FileNode[],
+};
+
+export type PromptOption = {
+	label: string,
+	/**  The quieter line under it, when it has one. */
+	hint: string | null,
 };
 
 /**  What the agent wants to do, as the screen puts it. */

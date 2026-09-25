@@ -40,6 +40,7 @@ fn a_live_session_is_placed_on_its_project_and_card() {
         |_| true,
         &[project("prj_1", &app, None)],
         &worktrees,
+        |_| None,
     );
     let names: Vec<_> = found
         .iter()
@@ -76,6 +77,7 @@ fn a_dead_session_and_the_orchestrators_own_are_left_out() {
         |pid| pid != 20,
         &[project("orch", &orch, Some("claude"))],
         dir.path(),
+        |_| None,
     );
     assert!(
         found.is_empty(),
@@ -104,4 +106,26 @@ fn only_a_devpit_terminal_can_be_typed_into() {
     assert_eq!(pane_target("main"), None);
     assert_eq!(pane_target("other_prj__leaf_9"), None);
     assert_eq!(pane_target("devpit_prj;rm__leaf_9"), None);
+}
+
+#[test]
+fn a_session_in_a_devpit_terminal_says_the_question_it_is_stopped_on() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sessions = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions).expect("mkdir");
+    let body = json!({ "pid": 30, "name": "asking", "status": "idle", "kind": "interactive",
+        "cwd": dir.path().display().to_string(), "tmux": "devpit_prj_1__leaf_1" });
+    std::fs::write(sessions.join("30.json"), body.to_string()).expect("listing");
+
+    let screen = "Proceed?\n❯ 1. Yes\n  2. No\n";
+    let found = read(
+        &sessions,
+        |_| true,
+        &[],
+        dir.path(),
+        |target| (target == "devpit_prj_1__leaf_1:leaf_1").then(|| screen.to_owned()),
+    );
+    let waiting = found[0].waiting.as_ref().expect("waiting on a question");
+    assert_eq!(waiting.question, "Proceed?");
+    assert_eq!(waiting.options.len(), 2);
 }

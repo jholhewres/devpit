@@ -24,6 +24,9 @@ pub struct LiveSession {
     /// Whether it runs in one of devpit's own terminals, where a reply can be
     /// typed for the person.
     pub in_devpit: bool,
+    /// The question it is stopped on, read off its terminal, when it is in
+    /// one of devpit's and stopped on one.
+    pub waiting: Option<PendingPrompt>,
 }
 
 /// A list, so tomorrow's field has somewhere to go.
@@ -42,4 +45,23 @@ pub struct RemoteState {
     /// The session's page on claude.ai, once the CLI has said it. Absent while
     /// on but not connected yet — its process starts with the next message.
     pub url: Option<String>,
+}
+
+/// A question a session is stopped on, as its screen shows it: the words
+/// above the choices, the choices, and which one its cursor is on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingPrompt {
+    pub question: String,
+    pub options: Vec<PromptOption>,
+    /// Zero-based: the option the `❯` is on.
+    pub cursor: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptOption {
+    pub label: String,
+    /// The quieter line under it, when it has one.
+    pub hint: Option<String>,
 }

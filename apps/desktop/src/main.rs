@@ -30,6 +30,8 @@ mod commands;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod frame_gtk;
 mod handing;
+mod live_answer;
+mod live_prompt;
 mod live_sessions;
 mod orchestrator;
 mod rewinding;

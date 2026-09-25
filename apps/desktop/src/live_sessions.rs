@@ -34,6 +34,7 @@ pub(crate) fn read(
     alive: impl Fn(i32) -> bool,
     projects: &[Project],
     worktrees: &Path,
+    screen: impl Fn(&str) -> Option<String>,
 ) -> Vec<LiveSession> {
     let Ok(entries) = std::fs::read_dir(sessions) else {
         return Vec::new();
@@ -46,14 +47,20 @@ pub(crate) fn read(
         .filter_map(|text| serde_json::from_str::<Listed>(&text).ok())
         .filter(|listed| listed.pid.is_some_and(&alive))
         .filter_map(|listed| {
-            let in_devpit = listed.tmux.as_deref().and_then(pane_target).is_some();
             let cwd = listed.cwd?;
+            let name = listed.name?;
             let project = crate::agent_api::project_at(projects, Path::new(&cwd));
             if project.is_some_and(|one| one.orchestrator.is_some()) {
                 return None;
             }
+            // The screen only of a session that is listed, and read once.
+            let target = listed.tmux.as_deref().and_then(pane_target);
+            let in_devpit = target.is_some();
+            let waiting = target
+                .and_then(|target| screen(&target))
+                .and_then(|shown| crate::live_prompt::pending(&shown));
             Some(LiveSession {
-                name: listed.name?,
+                name,
                 status: listed.status.unwrap_or_default(),
                 kind: listed.kind.unwrap_or_default(),
                 card_id: card_of(worktrees, Path::new(&cwd)),
@@ -61,6 +68,7 @@ pub(crate) fn read(
                 project_name: project.map(|one| one.name.clone()),
                 since: listed.status_updated_at,
                 in_devpit,
+                waiting,
                 cwd,
             })
         })
@@ -95,6 +103,43 @@ pub(crate) fn pane_target(client: &str) -> Option<String> {
     .then(|| format!("{client}:{window}"))
 }
 
+/// A devpit terminal's screen as it is now, or nothing when tmux cannot say.
+pub(crate) fn screen_of(target: &str) -> Option<String> {
+    crate::sessions::tmux_server()
+        .ok()?
+        .capture_pane(target)
+        .ok()
+}
+
+/// The end of a session's screen and the question it is stopped on, for an
+/// orchestrator to read — never to answer. `None` for a session that is not in
+/// a devpit terminal.
+pub(crate) fn screen_for(
+    profile_id: &str,
+    name: &str,
+) -> Result<Option<(String, Option<devpit_rpc::PendingPrompt>)>, RpcError> {
+    let config = config_of(profile_id)?;
+    let Some((_, client)) = listed_clients(&config.join("sessions"))
+        .into_iter()
+        .find(|(named, _)| named == name)
+    else {
+        return Err(RpcError::new(
+            ErrorCode::NotFound,
+            format!("no session called {name} is running"),
+        ));
+    };
+    let Some(shown) = pane_target(&client).and_then(|target| screen_of(&target)) else {
+        return Ok(None);
+    };
+    let lines: Vec<&str> = shown.lines().collect();
+    // The bottom of the screen is where a session says what it is doing.
+    let tail = lines[lines.len().saturating_sub(40)..]
+        .join("\n")
+        .trim_end()
+        .to_owned();
+    Ok(Some((tail, crate::live_prompt::pending(&shown))))
+}
+
 /// The longest reply typed for the person. A reply, not a document.
 const LONGEST_REPLY: usize = 4000;
 
@@ -119,28 +164,33 @@ pub async fn orchestrator_reply(
                 "a reply is between 1 and 4000 characters",
             ));
         }
-        let config = config_of(&profile_id)?;
-        let client = listed_clients(&config.join("sessions"))
-            .into_iter()
-            .find(|(named, _)| named == &name)
-            .map(|(_, client)| client)
-            .ok_or_else(|| {
-                RpcError::new(
-                    ErrorCode::NotFound,
-                    format!("no session called {name} is running"),
-                )
-            })?;
-        let target = pane_target(&client).ok_or_else(|| {
-            RpcError::new(
-                ErrorCode::Invalid,
-                format!("{name} is not in a devpit terminal"),
-            )
-        })?;
+        let target = terminal_of(&profile_id, &name)?;
         crate::sessions::tmux_server()?
             .paste_and_send(&target, text)
             .map_err(|err| RpcError::internal(err.to_string()))
     })
     .await
+}
+
+/// The devpit terminal a session of this account runs in, by its name: the
+/// only place the window types or presses anything for the person.
+pub(crate) fn terminal_of(profile_id: &str, name: &str) -> Result<String, RpcError> {
+    let config = config_of(profile_id)?;
+    let (_, client) = listed_clients(&config.join("sessions"))
+        .into_iter()
+        .find(|(named, _)| named == name)
+        .ok_or_else(|| {
+            RpcError::new(
+                ErrorCode::NotFound,
+                format!("no session called {name} is running"),
+            )
+        })?;
+    pane_target(&client).ok_or_else(|| {
+        RpcError::new(
+            ErrorCode::Invalid,
+            format!("{name} is not in a devpit terminal"),
+        )
+    })
 }
 
 /// Each live listing's name and tmux client, for the one reply that needs it.
@@ -183,8 +233,17 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
         .ok()
         .and_then(|root| root.join("worktrees").canonicalize().ok())
         .unwrap_or_default();
+    // One tmux server for every screen read in this listing.
+    let server = crate::sessions::tmux_server().ok();
+    let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
     Ok(LiveSessions {
-        sessions: read(&config.join("sessions"), alive, &projects, &worktrees),
+        sessions: read(
+            &config.join("sessions"),
+            alive,
+            &projects,
+            &worktrees,
+            screen,
+        ),
     })
 }
 

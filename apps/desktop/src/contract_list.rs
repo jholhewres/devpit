@@ -13,12 +13,12 @@ use crate::{
     board, branches, browser, browser_cookies, browser_driving, browser_menu, card_chat, card_work,
     cards, chat, chat_remote, checkpoint, checkpoint_findings, checkpoint_preview, claude_plugin,
     cloning, columns, commands, diffs, error_reports, error_sender, files, filetree, front,
-    happening, heads_down, history, in_flight, index, installations, live_sessions, mcp, moving,
-    notices, openers, orchestrator, outside_sessions, pane_screen, panels, panes, pasting, paths,
-    plan_limits, plugin_data, plugins, project_naming, projects, reading_path, receipts,
-    regrouping, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
-    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, threads, update,
-    watching, workspace, worktree_base, worktrees, wsfiles,
+    happening, heads_down, history, in_flight, index, installations, live_answer, live_sessions,
+    mcp, moving, notices, openers, orchestrator, outside_sessions, pane_screen, panels, panes,
+    pasting, paths, plan_limits, plugin_data, plugins, project_naming, projects, reading_path,
+    receipts, regrouping, reveal, rewinding, runs_list, saves, search, session_search, sessions,
+    settings, shell_launch, skills, slash, sources, spend_history, staging, steering, steps,
+    threads, update, watching, workspace, worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -59,6 +59,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         orchestrator::orchestrator_account,
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
+        live_answer::orchestrator_answer,
         chat_remote::chat_remote,
         chat_remote::chat_remote_state,
         panels::panel_widths,

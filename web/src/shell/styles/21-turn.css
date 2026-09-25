@@ -63,6 +63,17 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .osess__reply { padding: 2px 6px 6px 22px; }
 .osess__reply input { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--inset); color: var(--text); font-size: 12px; }
 .osess__said { margin: 0; padding: 4px 10px 8px; font-size: 11px; color: var(--text-3); }
+/* Questions sessions are stopped on, above the list: the thing to act on. */
+.wprompt { margin: 0 4px 6px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--orchestrate) 10%, transparent); border: 1px solid color-mix(in srgb, var(--orchestrate) 35%, var(--border)); }
+.wprompt__t { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--orchestrate); }
+.wprompt__i + .wprompt__i { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.wprompt__who { margin: 0; display: flex; flex-direction: column; }
+.wprompt__q { margin: 4px 0 6px; font-size: 12px; line-height: 1.45; color: var(--text); }
+.wprompt__opts { display: flex; flex-direction: column; gap: 3px; }
+.wprompt__o { display: flex; align-items: baseline; gap: 6px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.wprompt__o:hover { color: var(--text); border-color: var(--orchestrate); }
+.wprompt__n { flex: none; font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.wprompt__esc { align-self: flex-start; font-family: var(--mono); font-size: 11px; }
 @media (max-width: 1100px) { .osess:not([data-open]) { width: auto; } }
 .chat__drop { position: absolute; inset: 6px; z-index: 20; display: flex; align-items: center; justify-content: center; border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--canvas)); pointer-events: none; }
 .chat__dropt { font-size: 13px; color: var(--accent); }

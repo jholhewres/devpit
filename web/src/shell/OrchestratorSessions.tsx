@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { LiveSession } from '../gen/bindings'
 import { ask, commands } from './live'
 import { useShell } from './useShell'
+import { WaitingPrompts } from './WaitingPrompts'
 
 /*
  * The sessions this account has running, beside the orchestrator's chat: the
@@ -14,9 +15,10 @@ import { useShell } from './useShell'
    listing when a session's status changes, and nothing pushes it here. */
 const EVERY_MS = 3000
 
-/** Busy first — that is what is worth looking at — then by name. */
+/* Stopped on the person first, then busy — what is worth looking at — then by name. */
+const weight = (one: LiveSession): number => (one.waiting ? 2 : one.status === 'busy' ? 1 : 0)
 export const inOrder = (sessions: readonly LiveSession[]): readonly LiveSession[] =>
-  [...sessions].sort((a, b) => Number(b.status === 'busy') - Number(a.status === 'busy') || a.name.localeCompare(b.name))
+  [...sessions].sort((a, b) => weight(b) - weight(a) || a.name.localeCompare(b.name))
 
 export function OrchestratorSessions({ profileId }: { profileId: string }): React.JSX.Element {
   const { setProject, show, openCard } = useShell()
@@ -26,6 +28,8 @@ export function OrchestratorSessions({ profileId }: { profileId: string }): Reac
   const [replying, setReplying] = useState<string | null>(null)
   const [reply, setReply] = useState('')
   const [said, setSaid] = useState<string | null>(null)
+  /* Bumped after an answer, so the next question shows without waiting. */
+  const [asked, setAsked] = useState(0)
 
   useEffect(() => {
     let gone = false
@@ -41,7 +45,7 @@ export function OrchestratorSessions({ profileId }: { profileId: string }): Reac
       gone = true
       clearInterval(timer)
     }
-  }, [profileId])
+  }, [profileId, asked])
 
   const go = (one: LiveSession): void => {
     if (!one.projectId) return
@@ -72,6 +76,9 @@ export function OrchestratorSessions({ profileId }: { profileId: string }): Reac
         <span>Sessions</span>
         <span className="osess__count">{busy > 0 ? `${busy} busy · ${sessions.length}` : sessions.length}</span>
       </button>
+      {/* Above the fold, and shown folded too: a question waiting is the one
+          thing here that needs the person. */}
+      <WaitingPrompts profileId={profileId} sessions={sessions} onAnswered={() => setAsked((was) => was + 1)} />
       {open && (
         <ul className="osess__list">
           {sessions.length === 0 && <li className="osess__none">Nothing running on this account.</li>}
