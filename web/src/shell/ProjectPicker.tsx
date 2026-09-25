@@ -56,8 +56,8 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
     }
   }, [open])
 
-  const listed = projects.filter((row) =>
-    `${row.name} ${row.rootPath}`.toLowerCase().includes(query.trim().toLowerCase()),
+  const listed = projects.filter(
+    (row) => !row.orchestrator /* the rail's own group */ && `${row.name} ${row.rootPath}`.toLowerCase().includes(query.trim().toLowerCase()),
   )
 
   return (
@@ -118,7 +118,7 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
                   dropping it out would read as never having been added. */}
               <span className="prow__live" data-live={row.unreadable ? 1 : row.worktrees.length}>
                 <span className="prow__dot" />
-                {row.unreadable ? 'unreadable' : `${row.worktrees.length} worktrees`}
+                {row.unreadable ? 'unreadable' : `${row.worktrees.length} worktree${row.worktrees.length === 1 ? '' : 's'}`}
               </span>
             </button>
           ))}
