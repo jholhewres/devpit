@@ -84,13 +84,15 @@
 .rail__orchhead { position: relative; display: flex; align-items: center; }
 .rail__orchhead .rail__group { flex: 1; min-width: 0; }
 /* Small and quiet: once there is one, making another is the rarer act. */
-.rail__orchadd { position: absolute; right: 8px; display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 5px; background: none; color: var(--ghost); cursor: pointer; opacity: 0; transition: opacity 120ms ease; }
-:is(.rail:hover, .rail[data-held='true']) .rail__orchadd { opacity: 1; transition-delay: 300ms; }
+.rail__orchadd { position: absolute; right: 8px; display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 5px; background: none; color: var(--text-3); cursor: pointer; opacity: 0; transition: opacity 120ms ease; }
+:is(.rail:hover, .rail[data-held='true']) .rail__orchadd { opacity: 1; transition-delay: 250ms; }
 .rail__orchadd:hover { color: var(--text); background: var(--sidebar-item); }
-.pmark--orch { width: 36px; height: 36px; color: var(--orchestrate); background: color-mix(in srgb, var(--orchestrate) 14%, transparent); }
-.rail__i[aria-current='true'] .pmark--orch { color: #fff; background: var(--orchestrate); }
-.pmark--orchnew { opacity: .7; }
-.rail__orchnew:hover .pmark--orchnew { opacity: 1; }
+.pmark--orch { --orch: var(--orchestrate); width: 36px; height: 36px; color: var(--orch); background: color-mix(in srgb, var(--orch) 16%, transparent); }
+.rail__i[aria-current='true'] .pmark--orch { color: #fff; background: var(--orch); }
+/* Always there, folded rail or not: making another is one click, not a hover hunt. */
+.pmark--orchnew { color: var(--text-3); background: none; border: 1.5px dashed var(--border-strong); }
+.rail__orchnew:not([data-first]) .pmark--orchnew { width: 28px; height: 28px; margin-inline: 4px; }
+.rail__orchnew:hover .pmark--orchnew { color: var(--orchestrate); border-color: var(--orchestrate); }
 :root[data-theme='light'] .pmark { color: hsl(var(--hue, 220) 55% 35%); }
 :root[data-theme='light'] .pmark[data-chosen='true'] { color: color-mix(in srgb, var(--mark) 75%, #000); }
 :root[data-theme='light'] .rail__i[aria-current='true'] .pmark { color: #fff; }

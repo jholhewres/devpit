@@ -22,6 +22,16 @@ import { useShell } from './useShell'
 export const lastSpoken = (threads: readonly Thread[]): Thread | undefined =>
   [...threads].sort((a, b) => (b.lastAt ?? 0) - (a.lastAt ?? 0))[0]
 
+/** Hues an orchestrator without a colour of its own is told apart by, one
+ *  picked from its id so it keeps it. */
+const TINTS = ['#8b7cf6', '#3fa7d6', '#2bb07f', '#e0a33a', '#e0675c', '#d263b4'] as const
+
+export const tintOf = (id: string): string => {
+  let sum = 0
+  for (const ch of id) sum = (sum * 31 + ch.charCodeAt(0)) >>> 0
+  return TINTS[sum % TINTS.length]
+}
+
 const FOLDED = 'devpit.rail.orchestratorsFolded'
 
 function savedFolded(): boolean {
@@ -120,7 +130,7 @@ export function RailOrchestrators({
               {one.icon || one.color ? (
                 <ProjectMark project={one} />
               ) : (
-                <span className="pmark pmark--orch">
+                <span className="pmark pmark--orch" style={{ '--orch': tintOf(one.id) } as React.CSSProperties}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><circle cx="4.5" cy="5" r="2" /><circle cx="19.5" cy="5" r="2" /><circle cx="4.5" cy="19" r="2" /><circle cx="19.5" cy="19" r="2" /><path d="m6 6.4 3.8 3.6M18 6.4l-3.8 3.6M6 17.6l3.8-3.6M18 17.6l-3.8-3.6" /></svg>
                 </span>
               )}
@@ -131,8 +141,8 @@ export function RailOrchestrators({
             </span>
           </button>
         ))}
-      {mine.length === 0 && !folded && (
-        <button className="rail__i rail__orchnew" onClick={() => setMaking(true)} title="New orchestrator">
+      {!folded && (
+        <button className="rail__i rail__orchnew" data-first={mine.length === 0 ? 'true' : undefined} onClick={() => setMaking(true)} title="New orchestrator">
           <span className="rail__pill" />
           <span className="rail__ico">
             <span className="pmark pmark--orch pmark--orchnew">
