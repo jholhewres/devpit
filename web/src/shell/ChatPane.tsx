@@ -21,6 +21,7 @@ import { useDraft } from './useDraft'
 import { JumpToEnd } from './JumpToEnd'
 import { ComposerFiles } from './ComposerFiles'
 import { ChatBlank } from './ChatBlank'
+import { GoRemote } from './GoRemote'
 import { OrchestratorSessions } from './OrchestratorSessions'
 import { Queued } from './Queued'
 import { SendButton } from './SendButton'
@@ -110,6 +111,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         <ContextMeter context={chat.context} />
         {spent && <span className="pcorner__cost" title="What this conversation has cost">{spent}</span>}
         {chat.session && <CopySession id={chat.session} />}
+        {chat.session && project?.orchestrator && chat.profileId && <GoRemote conversationId={tab.id} account={chat.profileId} name={project.name} />}
       </PaneCorner>
 
       <DropTarget mine={mine} onDrop={dropped} />

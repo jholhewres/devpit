@@ -32,6 +32,7 @@ mod frame_gtk;
 mod handing;
 mod live_sessions;
 mod orchestrator;
+mod remote_launch;
 mod rewinding;
 mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the

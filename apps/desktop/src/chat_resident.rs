@@ -198,6 +198,21 @@ pub(crate) fn or_say(
     }
 }
 
+/// Lets this conversation's process go, for a terminal to take the session
+/// over. Nothing to do when it has none.
+pub(crate) fn release(app: &AppHandle, conversation_id: &str) {
+    let gone = app.try_state::<Residents>().and_then(|residents| {
+        residents
+            .0
+            .lock()
+            .ok()
+            .and_then(|mut all| all.remove(conversation_id))
+    });
+    if let Some(live) = gone {
+        live.resident.close();
+    }
+}
+
 /// Stops the turn in flight and keeps the process. False when this
 /// conversation has none, so the caller stops it the other way.
 pub(crate) fn interrupt(app: &AppHandle, conversation_id: &str) -> bool {

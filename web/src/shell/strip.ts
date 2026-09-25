@@ -28,6 +28,9 @@ export interface Tab {
       asks the backend for a tree before there is anything to type into.
       Cleared the moment it is sent, so it cannot be sent twice. */
   readonly launch?: string
+  /** A conversation this terminal continues, reachable by Remote Control.
+      Sent with `launch`, and cleared with it. */
+  readonly resume?: string
   /** The card a terminal tab was opened for. Absent on tabs saved before the
       backend named them, until they are opened again from the card. */
   readonly cardId?: string
@@ -200,7 +203,7 @@ export function launched(strip: Strip, id: string): Strip {
     ...strip,
     open: strip.open.map((tab) => {
       if (tab.id !== id || tab.launch === undefined) return tab
-      const { launch: _sent, ...rest } = tab
+      const { launch: _sent, resume: _resumed, ...rest } = tab
       return rest
     }),
   }

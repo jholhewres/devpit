@@ -1186,7 +1186,7 @@ export const commands = {
 	 *  seconds to print its first prompt, and a line sent at half a second simply
 	 *  vanished. So this waits, which is why it is async.
 	 */
-	sessionLaunchAgent: (projectId: string, paneId: string, agentId: string) => typedError<string, RpcError>(__TAURI_INVOKE("session_launch_agent", { projectId, paneId, agentId })),
+	sessionLaunchAgent: (projectId: string, paneId: string, agentId: string, resume: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("session_launch_agent", { projectId, paneId, agentId, resume })),
 	/**
 	 *  `terminal.happenings` — the shape `terminal:happening` carries.
 	 * 
