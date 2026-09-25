@@ -80,6 +80,11 @@ impl Resident {
             .args(argv(turn))
             .current_dir(turn.cwd)
             .envs(turn.env.iter().map(|(key, value)| (key, value)))
+            // Pages that come with MCP tools: the answers match what those pages read.
+            .env(
+                crate::apps_host::APPS_HOST_ENV.0,
+                crate::apps_host::APPS_HOST_ENV.1,
+            )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

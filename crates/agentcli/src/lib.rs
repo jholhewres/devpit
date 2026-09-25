@@ -295,6 +295,7 @@ mod tests;
 #[path = "lib_live_tests.rs"]
 mod live_tests;
 
+pub mod apps_host;
 pub mod claude_lines;
 pub mod cli_config;
 pub mod control;
