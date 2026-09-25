@@ -86,34 +86,38 @@ async function shown(): Promise<void> {
  * pane used to answer only the second, as a list of paths.
  */
 
+/* The default is one menu: opened from its button, each agent an item. */
+function picker(): HTMLElement {
+  fireEvent.click(screen.getByRole('button', { name: 'Default agent' }))
+  return screen.getByRole('menu', { name: 'Default agent' })
+}
+
 describe('what opens when I start a terminal', () => {
   it('offers a plain shell as an answer, not as a missing one', async () => {
     await shown()
-    fireEvent.click(screen.getByText('No agent'))
+    fireEvent.click(within(picker()).getByText('No agent'))
     await waitFor(() => expect(defaulted).toHaveBeenCalledWith(''))
   })
 
   it('offers each agent this machine can start', async () => {
     known = [agent('claude', { label: 'Claude Code' }), agent('codex', { label: 'Codex' })]
     await shown()
-    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
-    fireEvent.click(within(picker).getByText('Codex'))
+    fireEvent.click(within(picker()).getByText('Codex'))
     await waitFor(() => expect(defaulted).toHaveBeenCalledWith('codex'))
   })
 
   it('says which one is chosen', async () => {
     choice = { defaultId: 'claude', disabled: [], hooks: true }
     await shown()
-    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
-    expect(within(picker).getByText('Claude Code').getAttribute('aria-checked')).toBe('true')
-    expect(within(picker).getByText('No agent').getAttribute('aria-checked')).toBe('false')
+    const menu = picker()
+    expect(within(menu).getByText('Claude Code').closest('[role="menuitemradio"]')?.getAttribute('aria-checked')).toBe('true')
+    expect(within(menu).getByText('No agent').closest('[role="menuitemradio"]')?.getAttribute('aria-checked')).toBe('false')
   })
 
   it('does not offer one that is not here', async () => {
     known = [agent('gone', { label: 'Gone', installed: false })]
     await shown()
-    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
-    expect(picker.textContent).not.toContain('Gone')
+    expect(picker().textContent).not.toContain('Gone')
   })
 
   it('says when the stored default has gone away', async () => {
@@ -142,7 +146,7 @@ describe('what is on this machine', () => {
   it('does not call a shell function missing', async () => {
     // The terminal runs it every day. A row that said "not found" about it
     // was the bug this whole pane started from.
-    listed = [profile('claudin', { label: 'Claudin', reach: 'shell_only', path: null })]
+    listed = [profile('claude2', { label: 'Claude 2', reach: 'shell_only', path: null })]
     await shown()
     expect(screen.queryByText(/not found/)).toBeNull()
     expect(screen.getByText(/shell function/)).toBeTruthy()
@@ -269,21 +273,21 @@ describe('what exactly does each one run', () => {
 })
 
 describe('declaring another account or endpoint', () => {
-  /* `claudin` as a person would declare it: a name and a folder. */
+  /* `claude2` as a person would declare it: a name and a folder. */
   it('saves a new profile whose config directory is the variable the CLI reads', async () => {
     await shown()
     fireEvent.click(screen.getByText('New profile'))
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'claudin' } })
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'claude2' } })
     fireEvent.click(screen.getByText(/Details —/))
     fireEvent.change(screen.getByLabelText('Config directory'), {
-      target: { value: '~/.claude-claudin' },
+      target: { value: '~/.claude-2' },
     })
     fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(saved).toHaveBeenCalled())
     const sent = saved.mock.calls[0][0] as Declared
     expect(sent.id).toBe('')
     expect(sent.base).toBe('claude')
-    expect(sent.env).toEqual([{ name: 'CLAUDE_CONFIG_DIR', value: '~/.claude-claudin' }])
+    expect(sent.env).toEqual([{ name: 'CLAUDE_CONFIG_DIR', value: '~/.claude-2' }])
   })
 
   /* `glm`: an endpoint, a token, and models z.ai actually serves. */
@@ -309,17 +313,17 @@ describe('declaring another account or endpoint', () => {
   it('reads an older profile into the fields, once', async () => {
     listed = [
       profile('01JCL', {
-        label: 'claudin',
+        label: 'claude2',
         env: [
-          { name: 'CLAUDE_CONFIG_DIR', value: '/home/someone/.claude-claudin' },
+          { name: 'CLAUDE_CONFIG_DIR', value: '/home/someone/.claude-2' },
           { name: 'DISABLE_TELEMETRY', value: '1' },
         ],
       }),
     ]
     known = []
     await shown()
-    fireEvent.click(screen.getByLabelText('Show how claudin is started'))
-    expect(screen.getAllByDisplayValue('/home/someone/.claude-claudin')).toHaveLength(1)
+    fireEvent.click(screen.getByLabelText('Show how claude2 is started'))
+    expect(screen.getAllByDisplayValue('/home/someone/.claude-2')).toHaveLength(1)
     expect(screen.getByDisplayValue('DISABLE_TELEMETRY')).toBeTruthy()
   })
 })
@@ -347,8 +351,7 @@ describe('a switch you can switch back', () => {
     known = [agent('codex', { label: 'Codex', enabled: false })]
     choice = { defaultId: '', disabled: ['codex'], hooks: true }
     await shown()
-    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
-    expect(picker.textContent).not.toContain('Codex')
+    expect(picker().textContent).not.toContain('Codex')
   })
 })
 
@@ -361,14 +364,14 @@ describe('a profile from a command of your own', () => {
     })
     await shown()
     fireEvent.click(screen.getByText('New profile'))
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'claudin' } })
-    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'claudin' } })
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'claude2' } })
+    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'claude2' } })
     fireEvent.blur(screen.getByLabelText('Command'))
     expect(await screen.findByText(/with CLAUDE_CONFIG_DIR/)).toBeTruthy()
     fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(saved).toHaveBeenCalled())
     const sent = saved.mock.calls.at(-1)![0] as Declared
-    expect(readBack).toHaveBeenCalledWith('claudin')
+    expect(readBack).toHaveBeenCalledWith('claude2')
     expect(sent.base).toBe('claude')
     expect(sent.command).toBe('')
     expect(sent.env).toEqual([{ name: 'CLAUDE_CONFIG_DIR', value: '/home/me/.claude-two' }])
@@ -382,8 +385,7 @@ describe('a switch that shows what it did', () => {
     known = [agent('codex', { label: 'Codex', enabled: false })]
     choice = { defaultId: '', disabled: [], hooks: true }
     await shown()
-    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
-    expect(picker.textContent).toContain('Codex')
+    expect(picker().textContent).toContain('Codex')
   })
 })
 
@@ -456,17 +458,15 @@ describe('the shape of the pane', () => {
     await waitFor(() => expect(hooked).toHaveBeenCalledWith(false))
   })
 
-  it('marks each chip in the picker', async () => {
+  it('says in the picker what each one runs', async () => {
     known = [agent('claude', { label: 'Claude Code' })]
     await shown()
-    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
-    expect(picker.querySelectorAll('.agmark').length).toBeGreaterThan(0)
+    expect(picker().textContent).toContain('A plain shell')
   })
 
-  it('ticks the one that is chosen', async () => {
+  it('names the one that is chosen on the menu itself', async () => {
     choice = { defaultId: 'claude', disabled: [], hooks: true }
     await shown()
-    const picker = screen.getByRole('radiogroup', { name: 'Default agent' })
-    expect(picker.textContent).toContain('✓')
+    expect(screen.getByRole('button', { name: 'Default agent' }).textContent).toContain('Claude Code')
   })
 })

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { AgentChoice, Profile } from '../gen/bindings'
 import { AgentRow } from './AgentRow'
-import { AgentGlyph } from './AgentGlyph'
+import { ControlMenu } from './ControlMenu'
 import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from './catalogue'
 import { ask, commands } from './live'
 import { ProfileEditor } from './ProfileEditor'
@@ -123,7 +123,7 @@ export function ProviderRows(): React.JSX.Element {
     )
   }
 
-  /* Another account or endpoint of an agent already here — `claudin`, `glm`.
+  /* Another account or endpoint of an agent already here — `claude2`, `glm`.
      Claude Code first, since it is the one those variables mean anything to. */
   const create = (): void => {
     if (open === NEW) return setOpen(null)
@@ -142,34 +142,26 @@ export function ProviderRows(): React.JSX.Element {
             </div>
           </div>
         </div>
-        {/* Mutually exclusive, so radios and not tabs — and a group with a
-            name, because "No agent / Claude Code / Codex" on its own says
-            nothing about what is being chosen. */}
-        <div className="agpick" role="radiogroup" aria-label="Default agent">
-          <button
-            className="agpick__o"
-            role="radio"
-            aria-checked={choice.defaultId === NO_AGENT}
-            disabled={busy}
-            onClick={() => setDefault(NO_AGENT)}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 4 4-4 4M12 16h7" /></svg>
-            No agent
-          </button>
-          {choosable(entries).map((entry) => (
-            <button
-              className="agpick__o"
-              key={entry.id}
-              role="radio"
-              aria-checked={choice.defaultId === entry.id}
-              disabled={busy}
-              onClick={() => setDefault(entry.id)}
-            >
-              <AgentGlyph agent={entry.id} base={entry.base} />
-              {entry.label}
-              {choice.defaultId === entry.id && <span className="agpick__on">✓</span>}
-            </button>
-          ))}
+        {/* One menu, not a row of buttons: the row grew with every profile
+            anyone declared, and a default is picked once and read often. */}
+        <div className="agpick">
+          <ControlMenu
+            label={choice.defaultId === NO_AGENT ? 'No agent' : (choosable(entries).find((entry) => entry.id === choice.defaultId)?.label ?? 'No agent')}
+            title="Default agent"
+            opens="down"
+            choices={[
+              { id: NO_AGENT, label: 'No agent', what: 'A plain shell', selected: choice.defaultId === NO_AGENT },
+              ...choosable(entries).map((entry) => ({
+                id: entry.id,
+                label: entry.label,
+                what: entry.launch,
+                selected: choice.defaultId === entry.id,
+              })),
+            ]}
+            onPick={(id) => {
+              if (!busy) setDefault(id)
+            }}
+          />
         </div>
         {/* A default pointing at something absent or switched off opens
             nothing. Said here rather than discovered at the next launch. */}
