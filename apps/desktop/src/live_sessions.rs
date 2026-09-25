@@ -69,6 +69,7 @@ pub(crate) fn read(
                 since: listed.status_updated_at,
                 in_devpit,
                 waiting,
+                account: None,
                 cwd,
             })
         })
@@ -88,7 +89,16 @@ pub(crate) fn card_of(worktrees: &Path, cwd: &Path) -> Option<String> {
 /// Where to type into a session that runs in a devpit terminal: the CLI
 /// records the tmux client it runs under, `devpit_<project>__<leaf>`, and the
 /// leaf is the window. `None` for anything devpit did not name.
-pub(crate) fn pane_target(client: &str) -> Option<String> {
+pub(crate) fn pane_target(listed: &str) -> Option<String> {
+    // The CLI writes where it runs as `session:@window.%pane`; the session is
+    // devpit's client, and the rest — tmux's own ids — says nothing more.
+    let (client, at) = listed.split_once(':').unwrap_or((listed, ""));
+    if !at
+        .chars()
+        .all(|ch| ch.is_ascii_digit() || matches!(ch, '@' | '.' | '%'))
+    {
+        return None;
+    }
     let (session, window) = client.split_once("__")?;
     let plain = |part: &str| {
         !part.is_empty()
@@ -118,16 +128,7 @@ pub(crate) fn screen_for(
     profile_id: &str,
     name: &str,
 ) -> Result<Option<(String, Option<devpit_rpc::PendingPrompt>)>, RpcError> {
-    let config = config_of(profile_id)?;
-    let Some((_, client)) = listed_clients(&config.join("sessions"))
-        .into_iter()
-        .find(|(named, _)| named == name)
-    else {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            format!("no session called {name} is running"),
-        ));
-    };
+    let client = client_named(profile_id, name)?;
     let Some(shown) = pane_target(&client).and_then(|target| screen_of(&target)) else {
         return Ok(None);
     };
@@ -175,22 +176,33 @@ pub async fn orchestrator_reply(
 /// The devpit terminal a session of this account runs in, by its name: the
 /// only place the window types or presses anything for the person.
 pub(crate) fn terminal_of(profile_id: &str, name: &str) -> Result<String, RpcError> {
-    let config = config_of(profile_id)?;
-    let (_, client) = listed_clients(&config.join("sessions"))
-        .into_iter()
-        .find(|(named, _)| named == name)
-        .ok_or_else(|| {
-            RpcError::new(
-                ErrorCode::NotFound,
-                format!("no session called {name} is running"),
-            )
-        })?;
+    let client = client_named(profile_id, name)?;
     pane_target(&client).ok_or_else(|| {
         RpcError::new(
             ErrorCode::Invalid,
             format!("{name} is not in a devpit terminal"),
         )
     })
+}
+
+/// The tmux client of the session called `name`, looked for in this account
+/// first and then in the others: a terminal is typed into the same way
+/// whichever account runs in it.
+fn client_named(profile_id: &str, name: &str) -> Result<String, RpcError> {
+    accounts(profile_id)?
+        .into_iter()
+        .find_map(|(_, config)| {
+            listed_clients(&config.join("sessions"))
+                .into_iter()
+                .find(|(named, _)| named == name)
+                .map(|(_, client)| client)
+        })
+        .ok_or_else(|| {
+            RpcError::new(
+                ErrorCode::NotFound,
+                format!("no session called {name} is running"),
+            )
+        })
 }
 
 /// Each live listing's name and tmux client, for the one reply that needs it.
@@ -227,7 +239,6 @@ pub async fn orchestrator_sessions(profile_id: String) -> Result<LiveSessions, R
 
 /// [`orchestrator_sessions`], on the calling thread.
 pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions, RpcError> {
-    let config = config_of(profile_id)?;
     let projects = crate::projects::project_list_now()?.projects;
     let worktrees = devpit_core::Store::root()
         .ok()
@@ -236,22 +247,30 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // One tmux server for every screen read in this listing.
     let server = crate::sessions::tmux_server().ok();
     let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
-    Ok(LiveSessions {
-        sessions: read(
+    let mut sessions = Vec::new();
+    for (account, config) in accounts(profile_id)? {
+        for mut one in read(
             &config.join("sessions"),
             alive,
             &projects,
             &worktrees,
             screen,
-        ),
-    })
+        ) {
+            one.account = account.clone();
+            sessions.push(one);
+        }
+    }
+    Ok(LiveSessions { sessions })
 }
 
-/// The CLI configuration folder this profile's account uses.
-fn config_of(profile_id: &str) -> Result<std::path::PathBuf, RpcError> {
+/// Every Claude Code account's config folder: this one's first, unnamed, then
+/// the others under the name the person gave them. Two profiles on the same
+/// folder are one account.
+fn accounts(profile_id: &str) -> Result<Vec<(Option<String>, std::path::PathBuf)>, RpcError> {
     let store = crate::projects::store()?;
-    let profile = crate::agent_profiles::all(&store)?
-        .into_iter()
+    let profiles = crate::agent_profiles::all(&store)?;
+    let own = profiles
+        .iter()
         .find(|one| one.id == profile_id)
         .ok_or_else(|| {
             RpcError::new(
@@ -259,7 +278,20 @@ fn config_of(profile_id: &str) -> Result<std::path::PathBuf, RpcError> {
                 format!("no profile called {profile_id}"),
             )
         })?;
-    let said = devpit_agentcli::running::runner(&profile)
+    let mut found = vec![(None, config_dir(own))];
+    for one in profiles.iter().filter(|one| one.driver == "claude") {
+        let dir = config_dir(one);
+        if !found.iter().any(|(_, seen)| *seen == dir) {
+            found.push((Some(one.label.clone()), dir));
+        }
+    }
+    Ok(found)
+}
+
+/// The CLI configuration folder this profile's account uses.
+/// Where a profile's Claude Code keeps its config — and so its sessions.
+fn config_dir(profile: &devpit_rpc::Profile) -> std::path::PathBuf {
+    let said = devpit_agentcli::running::runner(profile)
         .env
         .into_iter()
         .find(|(name, _)| name == "CLAUDE_CONFIG_DIR")
@@ -267,10 +299,7 @@ fn config_of(profile_id: &str) -> Result<std::path::PathBuf, RpcError> {
     let home = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
         .unwrap_or_default();
-    Ok(devpit_agentcli::cli_config::config_dir_from(
-        &home,
-        said.as_deref(),
-    ))
+    devpit_agentcli::cli_config::config_dir_from(&home, said.as_deref())
 }
 
 #[cfg(test)]

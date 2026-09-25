@@ -103,6 +103,12 @@ fn only_a_devpit_terminal_can_be_typed_into() {
         pane_target("devpit_prj_1__leaf_9").as_deref(),
         Some("devpit_prj_1__leaf_9:leaf_9")
     );
+    // As the CLI lists it: the client, then tmux's window and pane ids.
+    assert_eq!(
+        pane_target("devpit_prj_1__leaf_9:@26.%26").as_deref(),
+        Some("devpit_prj_1__leaf_9:leaf_9")
+    );
+    assert_eq!(pane_target("devpit_prj_1__leaf_9:@2;rm"), None);
     assert_eq!(pane_target("main"), None);
     assert_eq!(pane_target("other_prj__leaf_9"), None);
     assert_eq!(pane_target("devpit_prj;rm__leaf_9"), None);

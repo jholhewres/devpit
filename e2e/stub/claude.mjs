@@ -149,8 +149,9 @@ function register() {
   if (!process.env.TMUX) return null
   let client = ''
   try {
-    const [session, window] = execFileSync('tmux', ['display-message', '-p', '#S\t#W'], { encoding: 'utf8' }).trim().split('\t')
-    client = session.includes('__') ? session : `${session}__${window}`
+    // As the CLI writes it: the session, then tmux's window and pane ids.
+    const [session, window, ids] = execFileSync('tmux', ['display-message', '-p', '#S\t#W\t#{window_id}.#{pane_id}'], { encoding: 'utf8' }).trim().split('\t')
+    client = `${session.includes('__') ? session : `${session}__${window}`}:${ids}`
   } catch {
     return null
   }
