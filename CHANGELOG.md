@@ -5,6 +5,29 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
+## 0.1.16 — 2026-09-24
+
+### Fixes
+
+- **No one machine's commands are built in.** A second account used to be
+  looked for by one person's command name; now an account is only ever a
+  command its owner declares in Providers, and the process it runs is
+  recognised as the CLI it is.
+- **The default agent is one menu** in Providers, not a row of buttons that grew
+  with every profile.
+- **An orchestrator runs as the account you pick.** The picker drew no
+  selection, so one could start as an account nobody meant. It is now a menu of
+  the accounts configured in Providers, with a way to add another. The account
+  lives in the orchestrator's own folder and **Runs as…** changes it later.
+- **Orchestrators are a group of their own** — Orchestrators, at the top of the
+  rail, folding like any group, with a quiet + — and edit like a project: name,
+  icon and colour, with a mark of their own by default. The project picker no
+  longer lists them.
+- **An orchestrator opens with its history begun**: its folder is committed when
+  it is made, and devpit's own files are kept out of it, instead of opening on
+  a list of untracked files.
+- The project picker says "1 worktree", not "1 worktrees".
+
 ## 0.1.15 — 2026-09-24
 
 ### Orchestrator
