@@ -5,6 +5,7 @@ import { ofName } from './languages'
 import { MdTable } from './MdTable'
 import { Painted } from './Painted'
 import { blocks, external, resolved, spans, type Block, type Span } from './markdown'
+import { Tick } from './MdTick'
 import { ask, commands } from './live'
 import { cut, locate, styleOf, type Chunk } from './veil'
 import { useShellPick } from './shellStore'
@@ -164,7 +165,7 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
 
   switch (span.kind) {
     case 'code':
-      return <code className="md__tick">{span.text}</code>
+      return <Tick text={span.text} opens={opens} />
     case 'strong':
       return <strong>{span.text}</strong>
     case 'em':

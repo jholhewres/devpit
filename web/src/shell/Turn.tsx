@@ -24,8 +24,11 @@ export const Turn = memo(function Turn({
   message,
   onRewind,
   folder,
+  onOpen,
 }: {
   message: Message
+  /** Where a file the answer names opens; a tab when absent. */
+  onOpen?: (path: string) => void
   /** Where the conversation runs; relative links in the answer are read there. */
   folder?: string | null
   /** Present when this turn can be rewound to; called with its turn id. */
@@ -60,7 +63,7 @@ export const Turn = memo(function Turn({
         </pre>
       ))}
       {answers.map((part, at) => (
-        <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} folder={folder ?? null} />
+        <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} folder={folder ?? null} onOpen={onOpen} />
       ))}
       {!message.streaming && <TurnChanges files={changed} parts={message.parts} />}
       {message.streaming && <Working />}
@@ -74,7 +77,17 @@ export const Turn = memo(function Turn({
    The veil's state is a ref rather than state: it is bookkeeping about what
    has already been drawn, and putting it in `useState` would ask React to
    re-render in order to record that a render happened. */
-function Reply({ source, live, folder }: { source: string; live: boolean; folder: string | null }): React.JSX.Element {
+function Reply({
+  source,
+  live,
+  folder,
+  onOpen,
+}: {
+  source: string
+  live: boolean
+  folder: string | null
+  onOpen?: (path: string) => void
+}): React.JSX.Element {
   const show = useShellPick((shell) => shell.show)
   const veil = useRef(opened(source))
   const now = Date.now()
@@ -82,7 +95,16 @@ function Reply({ source, live, folder }: { source: string; live: boolean; folder
 
   return (
     <div className="reply">
-      <Markdown source={source} chunks={chunks} now={now} opens={folder ? (here) => { const path = inFolder(folder, here); show('file', { id: `file:${path}`, path }) } : undefined} />
+      <Markdown
+        source={source}
+        chunks={chunks}
+        now={now}
+        opens={(here) => {
+          const path = inFolder(folder, here)
+          if (onOpen) onOpen(path)
+          else show('file', { id: `file:${path}`, path })
+        }}
+      />
     </div>
   )
 }

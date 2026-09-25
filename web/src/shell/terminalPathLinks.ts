@@ -3,12 +3,13 @@ import type { IBufferLine, IDisposable, Terminal } from '@xterm/xterm'
 import { homeFolder } from './homeFolder'
 import { wantLine } from './revealLine'
 import type { Shell } from './shape'
-import { openable, pathsIn } from './terminalLinks'
+import { ask, commands } from './live'
+import { openable, pathsIn, urlsIn } from './terminalLinks'
 
 /*
  * File paths in a terminal, clickable: a click opens the file in the app —
  * a picture, a PDF, a log, JSON — in the viewer that reads it, at the line
- * when one was written after the path.
+ * when one was written after the path. A web address opens in the browser.
  */
 export function linkPaths(
   terminal: Terminal,
@@ -19,8 +20,28 @@ export function linkPaths(
     provideLinks(y, answer) {
       const buffer = terminal.buffer.active
       const read = logicalLine((row) => buffer.getLine(row), y - 1, terminal.cols)
-      answer(
-        pathsIn(read.text)
+      const onRow = (start: number, end: number): { from: Cell; to: Cell } | null => {
+        const from = read.cells[start]
+        const to = read.cells[end - 1]
+        // Each row of a wrapped line is asked for; a link is answered once.
+        return from && to && from.y <= y - 1 && to.y >= y - 1 ? { from, to } : null
+      }
+      const web = urlsIn(read.text).flatMap((one) => {
+        const at = onRow(one.start, one.end)
+        return at
+          ? [
+              {
+                range: { start: { x: at.from.x + 1, y: at.from.y + 1 }, end: { x: at.to.x + at.to.width, y: at.to.y + 1 } },
+                text: one.url,
+                decorations: { underline: true, pointerCursor: true },
+                activate: () => void ask(() => commands.pathOpen(one.url)),
+              },
+            ]
+          : []
+      })
+      answer([
+        ...web,
+        ...pathsIn(read.text)
           .map((one) => ({ one, from: read.cells[one.start], to: read.cells[one.end - 1] }))
           // Each row of a wrapped line is asked for; a path is answered once.
           .filter(({ from, to }) => from && to && from.y <= y - 1 && to.y >= y - 1)
@@ -37,7 +58,7 @@ export function linkPaths(
               })
             },
           })),
-      )
+      ])
     },
   })
 }

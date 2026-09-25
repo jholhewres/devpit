@@ -6,6 +6,8 @@
  * whole reason this is hand-written instead of pulled from a package.
  */
 
+import { urlsIn } from './terminalLinks'
+
 export type Block =
   | { readonly kind: 'heading'; readonly level: number; readonly text: string }
   | { readonly kind: 'paragraph'; readonly text: string }
@@ -187,6 +189,22 @@ export function spans(text: string): Span[] {
   }
 
   if (rest.length > 0) out.push({ kind: 'text', text: rest })
+  return out.flatMap((span) => (span.kind === 'text' ? linked(span.text) : [span]))
+}
+
+/* A bare address in the prose is a link too: agents write them plainly far
+   more often than as `[text](url)`. */
+function linked(text: string): Span[] {
+  const found = urlsIn(text)
+  if (found.length === 0) return [{ kind: 'text', text }]
+  const out: Span[] = []
+  let at = 0
+  for (const one of found) {
+    if (one.start > at) out.push({ kind: 'text', text: text.slice(at, one.start) })
+    out.push({ kind: 'link', text: one.url, href: one.url })
+    at = one.end
+  }
+  if (at < text.length) out.push({ kind: 'text', text: text.slice(at) })
   return out
 }
 

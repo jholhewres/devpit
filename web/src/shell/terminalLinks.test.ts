@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { openable, pathsIn } from './terminalLinks'
+import { openable, pathsIn, urlsIn } from './terminalLinks'
 
 describe('paths in a terminal line', () => {
   it('finds the file an agent read, a path with a line, and a home path', () => {
@@ -45,5 +45,13 @@ describe('paths in a terminal line', () => {
     expect(openable('~/x/y.log', '/home/me', '/w/app', null)).toBe('/home/me/x/y.log')
     expect(openable('src/a.ts', null, '/w/app', '/w/app')).toBe('src/a.ts')
     expect(openable('/tmp/shot.png', '/home/me', '/w/app', null)).toBe('/tmp/shot.png')
+  })
+})
+
+describe('web addresses in a terminal line', () => {
+  it('are found where they are, and a path inside one is not a file', () => {
+    const line = 'open https://claude.ai/code/session_01/x.md now'
+    expect(urlsIn(line)).toEqual([{ start: 5, end: 43, url: 'https://claude.ai/code/session_01/x.md' }])
+    expect(pathsIn(line)).toEqual([])
   })
 })

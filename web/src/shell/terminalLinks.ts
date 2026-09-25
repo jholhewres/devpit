@@ -23,6 +23,25 @@ const PATH =
 /** A URL, or a host written without its scheme: what is inside is not a file. */
 const URL_SPAN = /\b[a-z][\w+.-]*:\/\/\S+|\bwww\.\S+/gi
 
+/** A web address in running text, without the punctuation that ends the
+ *  sentence it sits in: `see https://x.dev/a.` links `https://x.dev/a`. */
+const WEB = /\bhttps?:\/\/[^\s<>"'`]+/gi
+
+export interface UrlLink {
+  readonly start: number
+  readonly end: number
+  readonly url: string
+}
+
+export function urlsIn(text: string): UrlLink[] {
+  return [...text.matchAll(WEB)].map((match) => {
+    let url = match[0].replace(/[.,;:!?]+$/, '')
+    // A closing bracket belongs to the address only when it opened one.
+    while (/[)\]]$/.test(url) && (url.match(/[([]/g)?.length ?? 0) < (url.match(/[)\]]/g)?.length ?? 0)) url = url.slice(0, -1)
+    return { start: match.index, end: match.index + url.length, url }
+  })
+}
+
 export function pathsIn(text: string): PathLink[] {
   const urls = [...text.matchAll(URL_SPAN)].map((url) => [url.index, url.index + url[0].length] as const)
   const found: PathLink[] = []

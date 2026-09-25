@@ -120,3 +120,14 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .ssearch { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
 .ssearch mark { padding: 0 1px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--text); }
 
+
+/* A document an answer points at, read beside the chat. */
+.pane:has(> .peek) { position: relative; }
+.peek { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(48%, 620px); display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border-strong); box-shadow: -12px 0 32px var(--shade); }
+.peek__bar { flex: none; display: flex; align-items: center; gap: 4px; height: 38px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--border); }
+.peek__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.peek__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 24px; scrollbar-width: thin; }
+.peek__text { margin: 0; font: 12px/1.55 var(--mono); color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.peek__note { color: var(--text-3); font-size: 13px; }
+.md__path { padding: 0; border: 0; background: none; cursor: pointer; }
+.md__path:hover .md__tick { text-decoration: underline; }

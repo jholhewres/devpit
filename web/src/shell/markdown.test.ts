@@ -83,3 +83,21 @@ describe('an image path in a markdown file', () => {
     expect(resolved('docs/b.md', '/etc/a.png')).toBe('/etc/a.png')
   })
 })
+
+describe('a bare address in an answer', () => {
+  it('is a link, without the punctuation that ends the sentence', () => {
+    expect(spans('Docs at https://code.claude.com/docs/hooks. Read them.')).toEqual([
+      { kind: 'text', text: 'Docs at ' },
+      { kind: 'link', text: 'https://code.claude.com/docs/hooks', href: 'https://code.claude.com/docs/hooks' },
+      { kind: 'text', text: '. Read them.' },
+    ])
+  })
+
+  it('keeps a bracket it opened and drops one it did not', () => {
+    expect(spans('(see https://en.wikipedia.org/wiki/Tmux_(software))')[1]).toEqual({
+      kind: 'link',
+      text: 'https://en.wikipedia.org/wiki/Tmux_(software)',
+      href: 'https://en.wikipedia.org/wiki/Tmux_(software)',
+    })
+  })
+})
