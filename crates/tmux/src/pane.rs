@@ -23,15 +23,48 @@ pub(crate) fn unpipe(server: &Server, target: &str) -> Result<(), TmuxError> {
     Ok(())
 }
 
-/// Types a line into a pane and presses Enter.
-///
-/// `-l`, and Enter apart: without it tmux reads each word of the line as a
-/// possible key name, so a command containing `Enter`, `Space` or `C-c` typed
-/// something other than what it said.
-pub(crate) fn send_keys(server: &Server, target: &str, keys: &str) -> Result<(), TmuxError> {
-    server.require(&["send-keys", "-t", target, "-l", "--", keys])?;
-    server.require(&["send-keys", "-t", target, "Enter"])?;
-    Ok(())
+/// A key pressed on a pane's program, from a closed list: moving through a
+/// prompt's choices and answering it is all this is for, and a free-form key
+/// name is how `C-c` gets sent by accident.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Key {
+    Up,
+    Down,
+    Enter,
+    Escape,
+}
+
+impl Key {
+    /// tmux's own name for it.
+    pub(crate) fn named(self) -> &'static str {
+        match self {
+            Key::Up => "Up",
+            Key::Down => "Down",
+            Key::Enter => "Enter",
+            Key::Escape => "Escape",
+        }
+    }
+}
+
+impl Server {
+    /// Types a line into a pane and presses Enter.
+    ///
+    /// `-l`, and Enter apart: without it tmux reads each word of the line as a
+    /// possible key name, so a command containing `Enter`, `Space` or `C-c`
+    /// typed something other than what it said.
+    pub fn send_keys(&self, target: &str, keys: &str) -> Result<(), TmuxError> {
+        self.require(&["send-keys", "-t", target, "-l", "--", keys])?;
+        self.require(&["send-keys", "-t", target, "Enter"])?;
+        Ok(())
+    }
+
+    /// Presses `keys` on the program in a pane, in order, in one call.
+    pub fn press(&self, target: &str, keys: &[Key]) -> Result<(), TmuxError> {
+        let mut argv = vec!["send-keys", "-t", target];
+        argv.extend(keys.iter().map(|key| key.named()));
+        self.require(&argv)?;
+        Ok(())
+    }
 }
 
 pub(crate) fn capture_pane(server: &Server, target: &str) -> Result<String, TmuxError> {

@@ -18,6 +18,7 @@ mod pane;
 mod running;
 mod scroll;
 mod shell;
+pub use pane::Key;
 pub use shell::{parse_running, Running, Shell};
 
 #[derive(Debug, thiserror::Error)]
@@ -221,10 +222,6 @@ impl Server {
     /// Stops the pipe. A pane that has none is not an error.
     pub fn unpipe(&self, target: &str) -> Result<(), TmuxError> {
         pane::unpipe(self, target)
-    }
-
-    pub fn send_keys(&self, target: &str, keys: &str) -> Result<(), TmuxError> {
-        pane::send_keys(self, target, keys)
     }
 
     pub fn capture_pane(&self, target: &str) -> Result<String, TmuxError> {
