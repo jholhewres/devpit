@@ -3,6 +3,23 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.20 — 2026-09-25
+
+### Orchestrator
+
+- **Every board beside the chat.** An orchestrator no longer has a board of
+  its own. Its right panel opens on Boards: each project with its lanes and
+  how many cards each holds, a lane opening to its cards, and a card opening
+  on its project's board.
+
+### Projects
+
+- **Artifacts.** Files that belong to a project but not in its repository —
+  specs, exports, reports — are kept in its own folder in the devpit
+  workspace, safe from clones, new worktrees and cleans, and never committed.
+  The right panel's Artifacts tab lists, opens and removes them; sessions
+  keep and take them back with devpit's `devpit_artifact_*` tools.
+
 ## 0.1.19 — 2026-09-25
 
 ### Orchestrator
