@@ -3,6 +3,25 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.21 — 2026-09-25
+
+### Chat
+
+- **Pages that come with MCP tools.** Tools that bring an interactive page —
+  a Jira issue, a Confluence page, a Datadog chart — show it in the chat,
+  under the answer that called them, as they do on claude.ai. Each page runs
+  on its own origin, sandboxed, reaching only the hosts its server declared
+  and nothing of devpit's. When a page wants to run one of its server's
+  tools, you are asked first: once, or always for that page.
+
+### devpit's own tools
+
+- **The board, a card and the sessions as pages.** In any host that shows
+  MCP Apps, devpit's board opens its cards, a card can be commented on, moved
+  and handed to a new session (in its own checkout or the project's folder),
+  and the sessions show who is busy, idle or waiting on you. A waiting
+  question is still answered only in devpit.
+
 ## 0.1.20 — 2026-09-25
 
 ### Orchestrator
