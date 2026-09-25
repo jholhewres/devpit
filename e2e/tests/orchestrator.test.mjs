@@ -63,7 +63,24 @@ describe('the orchestrator', () => {
       .wait(async () => (await text(window)).includes('the other session says it is done'), 20000)
       .catch(() => false)
     assert.ok(woken, `a turn woken by another session never reached the chat. On screen: ${(await text(window)).slice(-400)}`)
-    assert.ok((await text(window)).includes('Not in answer to you'), 'the woken turn reads as an answer to the person')
+    assert.ok((await text(window)).includes('Not from this chat'), 'the woken turn reads as an answer to the person')
+  })
+
+  test('is reached by Remote Control through its own chat', async () => {
+    const toggle = await window.wait(until.elementLocated(By.css('[aria-label="Remote Control"]')), 10000)
+    await window.executeScript(function (one) {
+      one.click()
+    }, toggle)
+    const open = await window
+      .wait(until.elementLocated(By.css('[aria-label="Open on claude.ai"]')), 30000)
+      .catch(() => null)
+    assert.ok(open, 'the chat never said where it can be reached')
+    const asked = readFileSync(join(home, '.claude', 'stub-calls.log'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .find((call) => call.control?.enabled)
+    assert.equal(asked?.control?.name, 'devpit-client-work')
   })
 
   test('shows the sessions of its account beside the chat', async () => {
@@ -97,20 +114,6 @@ describe('the orchestrator', () => {
 
     const refused = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, repo)
     assert.match(refused.error ?? '', /only an orchestrator/)
-  })
-
-  test('continues its conversation in a terminal Remote Control can reach', async () => {
-    const button = await window.wait(until.elementLocated(By.css('[aria-label="Continue remotely"]')), 10000)
-    await window.executeScript(function (one) {
-      one.click()
-    }, button)
-    const log = join(home, '.claude', 'stub-calls.log')
-    const remote = await window
-      .wait(() => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)).find((call) => call.interactive && call.argv.includes('--remote-control')), 30000)
-      .catch(() => null)
-    assert.ok(remote, 'no terminal started the conversation with --remote-control')
-    assert.ok(remote.argv.includes('--resume'), `it did not resume the conversation: ${remote.argv.join(' ')}`)
-    assert.equal(remote.argv[remote.argv.indexOf('--remote-control') + 1], 'devpit-client-work')
   })
 
   test('is not listed among the projects', async () => {

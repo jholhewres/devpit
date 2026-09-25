@@ -219,6 +219,13 @@ async function* userPrompts() {
     } catch {
       continue
     }
+    // Remote Control, turned on from inside: answered with a page, as the CLI does.
+    if (message.type === 'control_request' && message.request?.subtype === 'remote_control') {
+      appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ argv, cwd: process.cwd(), control: message.request })}\n`)
+      const response = message.request.enabled ? { session_url: 'https://claude.ai/code/session_stub' } : {}
+      console.log(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response } }))
+      continue
+    }
     if (message.type !== 'user') continue
     const content = message.message?.content
     yield Array.isArray(content) ? content.map((part) => part.text ?? '').join('') : String(content ?? '')
