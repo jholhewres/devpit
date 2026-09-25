@@ -5,6 +5,18 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
+## 0.1.18 — 2026-09-25
+
+### Orchestrator
+
+- **Remote Control in the orchestrator's own chat.** The phone button on its
+  chat now makes this same conversation — this chat, this process — reachable
+  from claude.ai and the Claude app as `devpit-<name>`, and opens its page from
+  the chat. What you write there arrives in this chat as it happens, marked as
+  not from here. It replaces 0.1.17's terminal that resumed the conversation
+  beside the chat. If the chat's process is not running yet, it connects with
+  the next message; a restarted process connects again on its own.
+
 ## 0.1.17 — 2026-09-25
 
 ### Orchestrator
