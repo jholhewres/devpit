@@ -81,13 +81,13 @@ export function OrchestratorSessions({ profileId }: { profileId: string }): Reac
       <WaitingPrompts profileId={profileId} sessions={sessions} onAnswered={() => setAsked((was) => was + 1)} />
       {open && (
         <ul className="osess__list">
-          {sessions.length === 0 && <li className="osess__none">No session running.</li>}
+          {sessions.length === 0 && <li className="osess__none">Nothing running on this account.</li>}
           {sessions.map((one) => (
             <li key={one.name} className="osess__item">
               <button className="osess__row" onClick={() => go(one)} disabled={!one.projectId} title={one.cwd}>
                 <span className="osess__dot" data-status={one.status} />
                 <span className="osess__name">{one.name}</span>
-                <span className="osess__where">{one.projectName ?? 'outside devpit'}{one.cardId ? ' · card' : ''}{one.account ? ` · ${one.account}` : ''}</span>
+                <span className="osess__where">{one.projectName ?? 'outside devpit'}{one.cardId ? ' · card' : ''}</span>
               </button>
               {one.inDevpit && (
                 <button className="osess__answer" onClick={() => setReplying((was) => (was === one.name ? null : one.name))} title="Reply in its terminal, as you" aria-label={`Reply to ${one.name}`}>

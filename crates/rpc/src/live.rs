@@ -27,9 +27,6 @@ pub struct LiveSession {
     /// The question it is stopped on, read off its terminal, when it is in
     /// one of devpit's and stopped on one.
     pub waiting: Option<PendingPrompt>,
-    /// The account it runs under when it is not the orchestrator's own: it
-    /// cannot be messaged from here, only read and answered in its terminal.
-    pub account: Option<String>,
 }
 
 /// A list, so tomorrow's field has somewhere to go.

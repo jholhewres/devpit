@@ -69,7 +69,6 @@ pub(crate) fn read(
                 since: listed.status_updated_at,
                 in_devpit,
                 waiting,
-                account: None,
                 cwd,
             })
         })
@@ -185,18 +184,12 @@ pub(crate) fn terminal_of(profile_id: &str, name: &str) -> Result<String, RpcErr
     })
 }
 
-/// The tmux client of the session called `name`, looked for in this account
-/// first and then in the others: a terminal is typed into the same way
-/// whichever account runs in it.
+/// The tmux client of this account's session called `name`.
 fn client_named(profile_id: &str, name: &str) -> Result<String, RpcError> {
-    accounts(profile_id)?
+    listed_clients(&config_of(profile_id)?.join("sessions"))
         .into_iter()
-        .find_map(|(_, config)| {
-            listed_clients(&config.join("sessions"))
-                .into_iter()
-                .find(|(named, _)| named == name)
-                .map(|(_, client)| client)
-        })
+        .find(|(named, _)| named == name)
+        .map(|(_, client)| client)
         .ok_or_else(|| {
             RpcError::new(
                 ErrorCode::NotFound,
@@ -247,48 +240,34 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // One tmux server for every screen read in this listing.
     let server = crate::sessions::tmux_server().ok();
     let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
-    let mut sessions = Vec::new();
-    for (account, config) in accounts(profile_id)? {
-        for mut one in read(
-            &config.join("sessions"),
+    Ok(LiveSessions {
+        sessions: read(
+            &config_of(profile_id)?.join("sessions"),
             alive,
             &projects,
             &worktrees,
             screen,
-        ) {
-            one.account = account.clone();
-            sessions.push(one);
-        }
-    }
-    Ok(LiveSessions { sessions })
+        ),
+    })
 }
 
-/// Every Claude Code account's config folder: this one's first, unnamed, then
-/// the others under the name the person gave them. Two profiles on the same
-/// folder are one account.
-fn accounts(profile_id: &str) -> Result<Vec<(Option<String>, std::path::PathBuf)>, RpcError> {
+/// This profile's account's config folder — where its sessions are listed.
+/// Only its own: an orchestrator sees the sessions of the account it speaks
+/// as, never another's.
+fn config_of(profile_id: &str) -> Result<std::path::PathBuf, RpcError> {
     let store = crate::projects::store()?;
-    let profiles = crate::agent_profiles::all(&store)?;
-    let own = profiles
+    crate::agent_profiles::all(&store)?
         .iter()
         .find(|one| one.id == profile_id)
+        .map(config_dir)
         .ok_or_else(|| {
             RpcError::new(
                 ErrorCode::NotFound,
                 format!("no profile called {profile_id}"),
             )
-        })?;
-    let mut found = vec![(None, config_dir(own))];
-    for one in profiles.iter().filter(|one| one.driver == "claude") {
-        let dir = config_dir(one);
-        if !found.iter().any(|(_, seen)| *seen == dir) {
-            found.push((Some(one.label.clone()), dir));
-        }
-    }
-    Ok(found)
+        })
 }
 
-/// The CLI configuration folder this profile's account uses.
 /// Where a profile's Claude Code keeps its config — and so its sessions.
 fn config_dir(profile: &devpit_rpc::Profile) -> std::path::PathBuf {
     let said = devpit_agentcli::running::runner(profile)

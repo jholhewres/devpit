@@ -14,7 +14,7 @@ const draw = (sessions) => {
       el('li', { class: 'item' },
         el('span', { class: 'dot', 'data-s': one.waiting ? 'waiting' : one.status }),
         el('div', { class: 'grow' },
-          el('div', { class: 'row' }, el('strong', { text: one.name }), el('span', { class: 'muted', text: [one.projectName || 'outside devpit', one.cardId ? 'card' : null, one.account].filter(Boolean).join(' · ') })),
+          el('div', { class: 'row' }, el('strong', { text: one.name }), el('span', { class: 'muted', text: [one.projectName || 'outside devpit', one.cardId ? 'card' : null].filter(Boolean).join(' · ') })),
           one.waiting ? el('div', {}, el('div', { text: one.waiting.question }), el('div', { class: 'muted', text: `${one.waiting.options.map((option, at) => `${at + 1}. ${option.label}`).join('   ')} — answer it in devpit's Sessions panel` })) : null)))))
 }
 devpit.start({
