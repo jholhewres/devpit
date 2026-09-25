@@ -26,7 +26,11 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
   const { project, files, active } = useShell()
   const tree = useTree(project?.id ?? null)
   const index = useFileIndex(project?.id ?? null)
-  const { view, setView, mode, setMode, query, setQuery } = useExplorerState(project?.id ?? null)
+  const { view: chosen, setView, mode, setMode, query, setQuery } = useExplorerState(project?.id ?? null)
+  /* An orchestrator's folder is its notes, not a repository: nothing to
+     commit and no history, so only the files. */
+  const git = !project?.orchestrator
+  const view = git ? chosen : 'tree'
 
   /* Follows the focused tab, not a click remembered here — opening a file
      from the palette or from Changes must highlight the same row. */
@@ -60,27 +64,31 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
           <Icon d={FOLDER} size={15} />
           {tree.nodes.length > 0 && <span className="rtab__n">{tree.nodes.length}</span>}
         </button>
-        <button
-          className="rtab"
-          aria-selected={view === 'changes'}
-          title="Changes"
-          aria-label="Changes"
-          onClick={() => setView('changes')}
-        >
-          <Icon d={UPLOAD} size={15} />
-          {/* A zero is not news. The count is here to say there is something
-              to look at, and `0` says the opposite while taking the room. */}
-          {tree.changes.length > 0 && <span className="rtab__n">{tree.changes.length}</span>}
-        </button>
-        <button
-          className="rtab"
-          aria-selected={view === 'history'}
-          title="History"
-          aria-label="History"
-          onClick={() => setView('history')}
-        >
-          <Icon d={CLOCK} size={15} />
-        </button>
+        {git && (
+          <>
+          <button
+            className="rtab"
+            aria-selected={view === 'changes'}
+            title="Changes"
+            aria-label="Changes"
+            onClick={() => setView('changes')}
+          >
+            <Icon d={UPLOAD} size={15} />
+            {/* A zero is not news. The count is here to say there is something
+                to look at, and `0` says the opposite while taking the room. */}
+            {tree.changes.length > 0 && <span className="rtab__n">{tree.changes.length}</span>}
+          </button>
+          <button
+            className="rtab"
+            aria-selected={view === 'history'}
+            title="History"
+            aria-label="History"
+            onClick={() => setView('history')}
+          >
+            <Icon d={CLOCK} size={15} />
+          </button>
+          </>
+        )}
       </div>
 
       <div className="rview" data-rview="tree" data-open={String(view === 'tree')}>

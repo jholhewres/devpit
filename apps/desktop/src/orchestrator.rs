@@ -21,12 +21,12 @@ const DEVPIT_BRIEF: (&str, &str) = (
 /// the person edits these, and a second opening must not undo that.
 const SEEDED: &[(&str, &str)] = &[
     ("CLAUDE.md", include_str!("orchestrator_claude.md")),
-    // devpit's half of the brief and the account are devpit's to rewrite;
-    // they are kept out of the history the person reads.
-    (".gitignore", ".devpit/\n"),
-    ("docs/.gitkeep", ""),
-    ("artifacts/.gitkeep", ""),
-    ("context/.gitkeep", ""),
+    // Where it keeps what it learns: an orchestrator's notes, not a
+    // repository — there is no remote to push them to, so no git either.
+    ("context/projects/.keep", ""),
+    ("decisions/.keep", ""),
+    ("docs/.keep", ""),
+    ("artifacts/.keep", ""),
 ];
 
 /// `orchestrator.create` — a new orchestrator speaking as this profile.
@@ -58,9 +58,6 @@ pub(crate) fn orchestrator_create_now(
         .ok_or_else(|| RpcError::new(ErrorCode::Invalid, "that name cannot name a folder"))?;
     seed(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
     speaks_as(&folder, &profile.id).map_err(|err| RpcError::internal(err.to_string()))?;
-    devpit_git::init(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
-    devpit_git::first_commit(&folder, "An orchestrator, as devpit made it")
-        .map_err(|err| RpcError::internal(err.to_string()))?;
     let here = folder
         .canonicalize()
         .map_err(|err| RpcError::internal(err.to_string()))?;
@@ -87,16 +84,30 @@ pub async fn orchestrator_refresh(project_id: String) -> Result<(), RpcError> {
     crate::off_main::blocking(move || {
         let store = crate::projects::store()?;
         let (_, root) = crate::projects::locate(&store, &project_id)?;
-        seed(&root).map_err(|err| RpcError::internal(err.to_string()))?;
-        // One made before orchestrators kept a history opens with every file
-        // untracked; it gets the first commit a new one is made with.
-        if devpit_git::unborn(&root) {
-            devpit_git::first_commit(&root, "An orchestrator, as devpit made it")
-                .map_err(|err| RpcError::internal(err.to_string()))?;
-        }
-        Ok(())
+        seed(&root).map_err(|err| RpcError::internal(err.to_string()))
     })
     .await
+}
+
+/// The folders an orchestrator reads beyond its own: every project's. Nothing
+/// for a project, which stays inside itself.
+pub(crate) fn reaches(project_id: &str) -> Vec<String> {
+    let Ok(listed) = crate::projects::project_list_now() else {
+        return Vec::new();
+    };
+    let is_orchestrator = listed
+        .projects
+        .iter()
+        .any(|one| one.id == project_id && one.orchestrator.is_some());
+    if !is_orchestrator {
+        return Vec::new();
+    }
+    listed
+        .projects
+        .into_iter()
+        .filter(|one| one.orchestrator.is_none())
+        .map(|one| one.root_path)
+        .collect()
 }
 
 /// The profile, if an orchestrator can speak as it: Claude Code, since only it

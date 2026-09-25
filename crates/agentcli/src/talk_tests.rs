@@ -18,6 +18,7 @@ fn turn(budget: Option<f64>) -> Say<'static> {
         effort: None,
         control: None,
         on_session: None,
+        add_dirs: &[],
     }
 }
 
@@ -80,6 +81,7 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
         effort: None,
         control: None,
         on_session: None,
+        add_dirs: &[],
     };
     // A script written a moment ago can be "text file busy" to exec while
     // another test forks with it still open, and `say` reports any failed
@@ -163,6 +165,7 @@ fn a_chat_turn_runs_under_its_profile_env() {
         effort: None,
         control: None,
         on_session: None,
+        add_dirs: &[],
     };
     // Same retry as the test above, for the same reason: a script written a
     // moment ago can be "text file busy" while another test forks.
@@ -212,4 +215,17 @@ fn a_chat_turn_is_handed_devpits_tools() {
     assert!(!argv(&turn(None))
         .iter()
         .any(|a| a.starts_with("--mcp-config")));
+}
+
+#[test]
+fn every_folder_it_may_reach_is_its_own_flag() {
+    let dirs = ["/work/api".to_owned(), "/work/web app".to_owned()];
+    let with = Say {
+        add_dirs: &dirs,
+        ..turn(None)
+    };
+    let said = argv(&with);
+    assert!(said.contains(&"--add-dir=/work/api".to_owned()));
+    assert!(said.contains(&"--add-dir=/work/web app".to_owned()));
+    assert!(!argv(&turn(None)).iter().any(|a| a.starts_with("--add-dir")));
 }

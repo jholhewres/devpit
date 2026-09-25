@@ -54,6 +54,11 @@ pub(crate) fn argv(turn: &Say<'_>) -> Vec<String> {
         argv.push("--effort".to_owned());
         argv.push(effort.to_owned());
     }
+    // One `=` each: the flag takes several folders, and written apart it would
+    // swallow whatever came after it.
+    for dir in turn.add_dirs {
+        argv.push(format!("--add-dir={dir}"));
+    }
 
     argv
 }

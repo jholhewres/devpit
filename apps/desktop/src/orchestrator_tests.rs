@@ -12,7 +12,18 @@ fn a_new_orchestrator_starts_with_its_brief_and_folders() {
     );
     let brief = std::fs::read_to_string(folder.join(".devpit/orchestrator.md")).expect("brief");
     assert!(brief.contains("Never move a card into a lane that runs a step"));
-    for kept in ["docs", "artifacts", "context"] {
+    // The person answers a waiting session; the orchestrator never relays it.
+    assert!(brief.contains("do\n  not relay \"go on\" as a message"));
+    // Its folder is notes, organised, and never a repository.
+    assert!(brief.contains("`context/projects/<project>.md`"));
+    assert!(brief.contains("never initialise one or commit"));
+    for kept in [
+        "docs",
+        "artifacts",
+        "context",
+        "context/projects",
+        "decisions",
+    ] {
         assert!(folder.join(kept).is_dir(), "{kept} is missing");
     }
 }
@@ -70,6 +81,6 @@ fn an_orchestrator_says_its_account_where_the_folder_is_read() {
         devpit_core::home::orchestrator_profile(&folder).as_deref(),
         Some("claude")
     );
-    let ignored = std::fs::read_to_string(folder.join(".gitignore")).expect("gitignore");
-    assert!(ignored.contains(".devpit/"));
+    // Notes, not a repository: nothing to push them to.
+    assert!(!folder.join(".git").exists());
 }

@@ -148,31 +148,7 @@ pub async fn chat_send(
     }
     let cwd = crate::chat_turn::turn_cwd(head.as_ref().and_then(|head| head.cwd.as_deref()), &cwd)?;
 
-    let Some(profile) = crate::agent_profiles::all(&crate::projects::store()?)?
-        .into_iter()
-        .find(|found| found.id == profile_id)
-    else {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            format!("no profile called {profile_id}"),
-        ));
-    };
-    // Spawned, not typed, so a name only the shell knows is no use here — and
-    // saying so beats "not on the PATH" about something the person watches
-    // their terminal run every day.
-    let Some(path) = profile.path.clone() else {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            match profile.reach {
-                devpit_rpc::Reach::ShellOnly => format!(
-                    "{} is a shell function, so devpit cannot start it here — \
-                     name the program it runs instead",
-                    profile.command
-                ),
-                _ => format!("{} is not installed", profile.command),
-            },
-        ));
-    };
+    let (profile, path) = crate::chat_turn::spawnable(&profile_id)?;
     let Some(driver) = driver(&profile.driver) else {
         return Err(RpcError::new(
             ErrorCode::NotFound,
@@ -184,6 +160,7 @@ pub async fn chat_send(
     // path that spawned the binary with none of it.
     let env = devpit_agentcli::running::runner(&profile).env;
     let mcp = crate::agent_reach::chat_mcp(&profile.driver);
+    let reach = crate::orchestrator::reaches(&project_id);
 
     let file = conversation_path(&sessions, &conversation_id);
     let turn_id = id("turn");
@@ -285,6 +262,7 @@ pub async fn chat_send(
                 effort: thinking.as_deref(),
                 control: Some(&control),
                 on_session: Some(&hold),
+                add_dirs: &reach,
             },
             |part| {
                 collected

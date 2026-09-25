@@ -48,7 +48,7 @@ const TOOLS: [Tool; 11] = [
     Tool {
         name: "devpit_sessions",
         method: "sessions",
-        description: "Orchestrator only: this account's Claude Code sessions running now — the name to message each by, busy or idle, and the project and card it works in.",
+        description: "Orchestrator only: the Claude Code sessions running now — the name of each, busy or idle, the project and card it works in, and the question it is stopped on. One with `account` set runs under another account: you cannot message it, only read its screen and point the person to it.",
         input: || json!({ "type": "object", "properties": {} }),
     },
     Tool {
@@ -60,8 +60,8 @@ const TOOLS: [Tool; 11] = [
     Tool {
         name: "devpit_start_session",
         method: "start",
-        description: "Orchestrator only: hand a card's work to a new Claude Code session of this account, started in the background in the card's own checkout and linked to the card, so it shows on the board. Answers with the name to message it by; pass notify_when_idle when you message it to hear when it is done.",
-        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "The project, by id or name." }, "cardId": { "type": "string" }, "prompt": { "type": "string", "description": "What to do: the brief the session starts with. The card's own text is not sent for you." }, "name": { "type": "string", "description": "The name to message it by. Defaults to the card's title." } }, "required": ["project", "cardId", "prompt"] }),
+        description: "Orchestrator only: hand a card's work to a new Claude Code session of this account, started in the background and linked to the card, so it shows on the board — in the card's own checkout (a worktree), or in the project's folder with checkout: false. Ask the person first unless they asked for a new session, and which of the two unless they said. Answers with the name to message it by; pass notify_when_idle when you message it to hear when it is done.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "The project, by id or name." }, "cardId": { "type": "string" }, "prompt": { "type": "string", "description": "What to do: the brief the session starts with. The card's own text is not sent for you." }, "name": { "type": "string", "description": "The name to message it by. Defaults to the card's title." }, "checkout": { "type": "boolean", "description": "false to start in the project's own folder instead of the card's checkout. Defaults to true." } }, "required": ["project", "cardId", "prompt"] }),
     },
     Tool {
         name: "devpit_card",

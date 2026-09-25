@@ -23,6 +23,7 @@ pub(crate) fn hand(
     card_id: &str,
     prompt: &str,
     named: Option<&str>,
+    in_project: Option<&std::path::Path>,
 ) -> Result<Value, String> {
     let prompt = prompt.trim();
     if prompt.is_empty() || prompt.chars().count() > LONGEST_PROMPT {
@@ -40,7 +41,11 @@ pub(crate) fn hand(
     let store = crate::projects::store().map_err(|err| err.message)?;
     // The card's own checkout: two sessions at work in one project do not
     // write over each other, and the card's Changes show what this one did.
-    let cwd = crate::checkout::checkout_of(&store, card_id, |_| {})?;
+    // The project's folder only when the person chose it.
+    let cwd = match in_project {
+        Some(root) => root.to_path_buf(),
+        None => crate::checkout::checkout_of(&store, card_id, |_| {})?,
+    };
     let runner = crate::agent_profiles::runner_for(&store, profile_id)?;
     let session_id = crate::steps::fresh_session_id();
     let short = devpit_agentcli::start_background(

@@ -45,11 +45,8 @@ describe('the orchestrator', () => {
     const folder = join(home, '.devpit', 'orchestrator', 'client-work')
     assert.ok(existsSync(join(folder, 'CLAUDE.md')), 'the brief was not written')
     assert.ok(existsSync(join(folder, '.devpit', 'orchestrator.md')), "devpit's half of the brief was not written")
-    assert.ok(existsSync(join(folder, '.git')), 'the folder is not a repository')
+    assert.ok(!existsSync(join(folder, '.git')), 'the folder was made a repository with nowhere to push')
     assert.match(readFileSync(join(folder, '.devpit', 'orchestrator.json'), 'utf8'), /"profile":"claude"/)
-    // It opens with its history begun, not with every file untracked.
-    const { execFileSync } = await import('node:child_process')
-    assert.equal(execFileSync('git', ['-C', folder, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '')
 
     await fill(window, 'textarea.composer__ph', 'pwd')
     const answered = await window

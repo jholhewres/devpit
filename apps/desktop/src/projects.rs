@@ -47,7 +47,15 @@ pub(crate) fn locate(
 pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
     let root = PathBuf::from(&row.root_path);
     let hidden = crate::sources::hidden(store);
-    let (worktrees, unreadable) =
+    let orchestrator = devpit_core::Store::root()
+        .ok()
+        .and_then(|home| home.canonicalize().ok())
+        .and_then(|home| devpit_core::home::orchestrator_of(&home, &root));
+    // An orchestrator's folder is notes, not a repository: no checkouts to
+    // list, and no git to be unreadable for want of.
+    let (worktrees, unreadable) = if orchestrator.is_some() {
+        (Vec::new(), None)
+    } else {
         match devpit_git::worktrees(&root, &crate::sources::ours(store, &root)) {
             // Filtered here rather than on the screen: the count on the row
             // and the list behind it are the same question, and two places
@@ -60,7 +68,8 @@ pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
                 None,
             ),
             Err(err) => (Vec::new(), Some(err.to_string())),
-        };
+        }
+    };
 
     Project {
         id: row.id,
@@ -72,10 +81,7 @@ pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
         last_opened_at: row.last_opened_at.map(|at| at as f64),
         icon: row.icon,
         color: row.color,
-        orchestrator: devpit_core::Store::root()
-            .ok()
-            .and_then(|home| home.canonicalize().ok())
-            .and_then(|home| devpit_core::home::orchestrator_of(&home, &root)),
+        orchestrator,
         worktrees,
         unreadable,
     }

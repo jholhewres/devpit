@@ -42,6 +42,9 @@ pub struct Say<'a> {
     pub mcp_config: Option<&'a str>,
     /// How hard to think. One of what the driver's `efforts` lists.
     pub effort: Option<&'a str>,
+    /// Folders beyond `cwd` the agent may read and work in: every project,
+    /// for an orchestrator.
+    pub add_dirs: &'a [String],
     /// Where the turn's stdin is kept while it runs, for control requests.
     pub control: Option<&'a crate::control::Control>,
     /// Told the CLI's session id as soon as the stream names it, while the

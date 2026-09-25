@@ -166,6 +166,10 @@ fn respond_in(
             &card_id,
             &text("prompt").unwrap_or_default(),
             text("name").as_deref(),
+            // Its own checkout unless told otherwise: the project's folder is
+            // shared with whatever else runs there.
+            (asked.params.get("checkout").and_then(Value::as_bool) == Some(false))
+                .then(|| Path::new(&project.root_path)),
         )?,
         _ => unreachable!("checked against METHODS above"),
     };

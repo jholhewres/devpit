@@ -42,6 +42,7 @@ fn turn(command: &str) -> Say<'_> {
         effort: None,
         control: None,
         on_session: None,
+        add_dirs: &[],
     }
 }
 
