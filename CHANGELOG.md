@@ -3,6 +3,31 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.24 — 2026-09-26
+
+### Orchestrator
+
+- **Stop a session.** `devpit_stop_session` — and Stop in the Sessions panel —
+  ends a session and closes the terminal it ran in, its tab too when it was the
+  last pane. Only when you ask: work in flight is lost.
+- **Start a session anywhere you linked.** Asked to, the orchestrator starts
+  Claude Code in a new terminal tab of any linked project, in its folder — no
+  card and no worktree needed.
+- **New terminals and chats from the Sessions panel.** Every linked project is
+  listed there, with or without a session, and opens a new terminal right over
+  the chat or a new chat in the project.
+- **A terminal you can size.** The terminal opened over the chat resizes from
+  its edges and corners, stays centred and remembers its size; it is drawn as
+  one surface in the terminal's colour. Hiding it keeps it running; "Close
+  terminal" ends it.
+
+### Performance
+
+- Idle MCP App hosts are let go after ten minutes instead of staying until
+  devpit quits.
+- Listing sessions no longer asks git about every project every few seconds,
+  and does nothing while the window is hidden.
+
 ## 0.1.23 — 2026-09-25
 
 ### Orchestrator
