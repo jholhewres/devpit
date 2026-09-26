@@ -14,7 +14,7 @@ vi.mock('./live', () => ({
     orchestratorSessions: () => ({
       sessions: [
         live('api-b', 'api'),
-        live('web-a', 'web', { status: 'busy' }),
+        live('web-a', 'web', { status: 'busy', projectId: 'w' }),
         live('api-a', 'api', { waiting: { question: 'Deploy now?', options: [], cursor: 0 }, pane: { projectId: 'p', paneId: 'leaf_1' } }),
       ],
     }),
@@ -23,10 +23,12 @@ vi.mock('./live', () => ({
       { name: 'old-one', lastAt: '2026-09-20T10:00:00Z', events: [{ kind: 'heard', at: '2026-09-20T10:00:00Z', summary: null, text: 'Done.' }] },
     ],
     orchestratorReply: (...args: unknown[]) => (replied(...args), null),
+    orchestratorLinks: () => ['p'],
+    orchestratorStop: () => 'stopped',
   },
 }))
 vi.mock('./useShell', () => ({
-  useShell: () => ({ project: { id: 'orch', orchestrator: 'claude' }, setProject: () => {}, show: () => {}, openCard: () => {}, openPane: () => {} }),
+  useShell: () => ({ project: { id: 'orch', orchestrator: 'claude' }, projects: [{ id: 'p', name: 'api', rootPath: '/w/api' }], setProject: () => {}, show: () => {}, openCard: () => {}, openPane: () => {} }),
 }))
 
 afterEach(cleanup)

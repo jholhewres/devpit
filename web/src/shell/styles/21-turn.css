@@ -136,16 +136,42 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .deleg__card[data-state='idle'] .deleg__dot, .deleg__dot[data-state='idle'] { background: var(--success); }
 .deleg__msg { margin: 0; padding: 0 10px 9px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); white-space: pre-wrap; }
 
-/* A session's terminal, opened over the orchestrator's chat. */
-.sterm { display: flex; flex-direction: column; width: min(1100px, 92vw); height: min(760px, 86vh); border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 24px 64px var(--shade); overflow: hidden; }
-.sterm__bar { flex: none; display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--border); }
+/* A session's terminal, opened over the orchestrator's chat: one surface,
+   the terminal's own colour edge to edge, sized by its edges and corners. */
+.sterm__scrim { backdrop-filter: blur(2px); }
+.sterm { position: relative; display: flex; flex-direction: column; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); border: 1px solid var(--border-strong); border-radius: 12px; background: var(--terminal); color: var(--text); box-shadow: 0 30px 80px var(--shade), 0 0 0 1px color-mix(in srgb, var(--text) 4%, transparent); overflow: hidden; }
+.sterm[data-dragging] { user-select: none; }
+.sterm__bar { flex: none; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 6px 0 14px; border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); background: color-mix(in srgb, var(--text) 3%, var(--terminal)); }
 .sterm__name { font: 600 12.5px var(--mono); color: var(--text); }
 .sterm__where { flex: 1; min-width: 0; font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sterm__body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term-bg, var(--surface)); }
+.sterm__size { font: 11px var(--mono); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.sterm__btn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px; color: var(--text-2); }
+.sterm__btn:hover, .sterm__x:hover { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.sterm__x { display: grid; place-items: center; width: 28px; height: 26px; border-radius: 6px; color: var(--text-3); }
+.sterm__body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--terminal); }
 .sterm__body .termhost { flex: 1; min-height: 0; }
+.sterm__body .termhost .xterm { padding: 10px 6px 8px 14px; }
+/* The grips: thin along the edges, a little square at each corner. */
+.sterm__grip { position: absolute; z-index: 2; }
+.sterm__grip[data-edge='e'], .sterm__grip[data-edge='w'] { top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
+.sterm__grip[data-edge='e'] { right: -4px; }
+.sterm__grip[data-edge='w'] { left: -4px; }
+.sterm__grip[data-edge='n'], .sterm__grip[data-edge='s'] { left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
+.sterm__grip[data-edge='n'] { top: -4px; }
+.sterm__grip[data-edge='s'] { bottom: -4px; }
+.sterm__grip[data-edge='ne'], .sterm__grip[data-edge='nw'], .sterm__grip[data-edge='se'], .sterm__grip[data-edge='sw'] { width: 16px; height: 16px; }
+.sterm__grip[data-edge='se'] { right: -4px; bottom: -4px; cursor: nwse-resize; }
+.sterm__grip[data-edge='nw'] { left: -4px; top: -4px; cursor: nwse-resize; }
+.sterm__grip[data-edge='ne'] { right: -4px; top: -4px; cursor: nesw-resize; }
+.sterm__grip[data-edge='sw'] { left: -4px; bottom: -4px; cursor: nesw-resize; }
+.sterm__grip[data-edge='se']::after { content: ''; position: absolute; right: 8px; bottom: 8px; width: 7px; height: 7px; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); border-bottom-right-radius: 2px; opacity: .5; }
+
 .deleg__acts { display: flex; gap: 6px; padding: 0 10px 9px; }
 
 /* The sessions an orchestrator works with, counted in its chat's corner. */
 .pcorner__sess { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
 .pcorner__sess:hover { color: var(--text); background: var(--overlay); }
 .pcorner__sess b { color: var(--warning); font-weight: 600; }
+.sterm__warn { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.sterm__btn--bad { color: var(--danger); }
+.sterm__btn--bad:hover { color: #fff; background: var(--danger); }
