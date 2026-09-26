@@ -18,8 +18,8 @@ use crate::{
     orchestrator_links, outside_sessions, pane_screen, panels, panes, pasting, paths, plan_limits,
     plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reveal,
     rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
-    slash, sources, spend_history, staging, steering, steps, threads, update, watching, workspace,
-    worktree_base, worktrees, wsfiles,
+    slash, sources, spend_history, staging, steering, steps, stopping, threads, update, watching,
+    workspace, worktree_base, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -61,6 +61,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         artifacts::artifacts_list,
         artifacts::artifact_remove,
         delegations::orchestrator_agents,
+        stopping::orchestrator_stop,
+        stopping::terminal_close,
         orchestrator_links::orchestrator_links,
         orchestrator_links::orchestrator_link,
         mcp_apps::mcp_app_tools,

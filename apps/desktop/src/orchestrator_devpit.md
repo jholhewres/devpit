@@ -77,10 +77,14 @@ them.
     status, project and card, and the question one is stopped on.
   - `devpit_session_screen` — the last lines a session in one of devpit's
     terminals shows, and the choices of the question it waits on.
-  - `devpit_start_session` — hand a card's work to a new session of this
-    account: it starts in the card's own checkout, shows on the card, and
-    answers with the name to message it by. No card yet? Create one first —
-    work without a card is work nobody can see.
+  - `devpit_stop_session` — stop a session of this account and close the
+    terminal it runs in. Only when the person asks for it: work in flight is
+    lost.
+  - `devpit_start_session` — a new session of this account in a project,
+    only when the person asked for one. With a card, it takes the card's work
+    in the card's own checkout (or the project's folder) and shows on the
+    card. Without one, it opens in a new terminal tab in the project's folder
+    — no card, no worktree needed. It answers with the name to message it by.
     If it answers that Claude Code does not trust the folder, tell the person
     exactly that: it is theirs to allow, once.
   - `devpit_board`, `devpit_card`, `devpit_comment`, `devpit_create_card`,

@@ -271,6 +271,13 @@ export const commands = {
 	 *  heard from, with what passed, most recent first.
 	 */
 	orchestratorAgents: (projectId: string) => typedError<AgentThread[], RpcError>(__TAURI_INVOKE("orchestrator_agents", { projectId })),
+	/**  `orchestrator.stop` — the window's own way to stop a session. */
+	orchestratorStop: (profileId: string, name: string) => typedError<string, RpcError>(__TAURI_INVOKE("orchestrator_stop", { profileId, name })),
+	/**
+	 *  `terminal.close` — a devpit terminal closed from outside its tab: the
+	 *  pane, or its tab when it is the last one, and whatever runs in it.
+	 */
+	terminalClose: (projectId: string, paneId: string) => typedError<null, RpcError>(__TAURI_INVOKE("terminal_close", { projectId, paneId })),
 	/**  `orchestrator.links` — the projects this orchestrator is linked to. */
 	orchestratorLinks: (projectId: string) => typedError<string[], RpcError>(__TAURI_INVOKE("orchestrator_links", { projectId })),
 	/**

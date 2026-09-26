@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 15] = [
+const TOOLS: [Tool; 16] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -82,10 +82,16 @@ const TOOLS: [Tool; 15] = [
         input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." } }, "required": ["name"] }),
     },
     Tool {
+        name: "devpit_stop_session",
+        method: "stop",
+        description: "Orchestrator only: stop a session of this account — the agent ends and the devpit terminal it ran in is closed (its tab too, when it was the last pane). Work in flight is lost: only when the person asked for it, never on your own initiative.",
+        input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." } }, "required": ["name"] }),
+    },
+    Tool {
         name: "devpit_start_session",
         method: "start",
-        description: "Orchestrator only: hand a card's work to a new Claude Code session of this account, started in the background and linked to the card, so it shows on the board — in the card's own checkout (a worktree), or in the project's folder with checkout: false. Ask the person first unless they asked for a new session, and which of the two unless they said. Answers with the name to message it by; pass notify_when_idle when you message it to hear when it is done.",
-        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "The project, by id or name." }, "cardId": { "type": "string" }, "prompt": { "type": "string", "description": "What to do: the brief the session starts with. The card's own text is not sent for you." }, "name": { "type": "string", "description": "The name to message it by. Defaults to the card's title." }, "checkout": { "type": "boolean", "description": "false to start in the project's own folder instead of the card's checkout. Defaults to true." } }, "required": ["project", "cardId", "prompt"] }),
+        description: "Orchestrator only: start a new Claude Code session of this account in a project, only when the person asked for one. With a cardId, it takes the card's work, linked to the card — in the card's own checkout (a worktree), or in the project's folder with checkout: false. Without a cardId, it opens in a new terminal tab of the project, in its folder, with no card and no worktree. Ask which, unless the person said. Answers with the name to message it by; pass notify_when_idle when you message it to hear when it is done.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "The project, by id or name." }, "cardId": { "type": "string", "description": "The card whose work it takes. Leave out for a session of its own in the project's folder." }, "prompt": { "type": "string", "description": "What to do: the brief the session starts with. A card's own text is not sent for you." }, "name": { "type": "string", "description": "The name to message it by. Defaults to the card's title." }, "checkout": { "type": "boolean", "description": "false to start in the project's own folder instead of the card's checkout. Defaults to true." } }, "required": ["project", "prompt"] }),
     },
     Tool {
         name: "devpit_card",

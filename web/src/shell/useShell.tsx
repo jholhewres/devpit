@@ -10,6 +10,7 @@ import { usePaneSessions } from './paneSessions'
 import { useSubagents } from './subagents'
 import { useUnread } from './unread'
 import { useSweep } from './useSweep'
+import { useOutsideTabs } from './useOutsideTabs'
 import { useWidths } from './useWidths'
 import { useTabs } from './useTabs'
 import { useProjects } from './useProjects'
@@ -38,6 +39,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const membership = useAccount()
   const projects = useProjects()
   const tabs = useTabs(projects.project?.id ?? null)
+  useOutsideTabs(projects.project?.id ?? null, tabs.show, tabs.close)
   const running = useRunning(projects.project?.id ?? null)
   const doing = useAgents()
   const unread = useUnread(doing, tabs.active)

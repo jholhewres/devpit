@@ -227,6 +227,33 @@ export function onCarried<T>(name: string, then: (payload: T) => void): () => vo
  * session and starts a turn nobody here asked for — with its id, so an open
  * chat can join it.
  */
+/** A terminal tab opened or closed from outside the window — an orchestrator
+ *  starting or stopping a session. */
+export interface OutsideTab {
+  readonly projectId: string
+  readonly tabId: string
+  readonly paneId?: string
+}
+
+export function onOutsideTabs(opened: (tab: OutsideTab) => void, closed: (tab: OutsideTab) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  const drops: (() => void)[] = []
+  for (const [name, then] of [
+    ['session:tab-opened', opened],
+    ['session:tab-closed', closed],
+  ] as const) {
+    void listen<OutsideTab>(name, (event) => then(event.payload)).then((unlisten) => {
+      if (dropped) unlisten()
+      else drops.push(unlisten)
+    })
+  }
+  return () => {
+    dropped = true
+    for (const drop of drops) drop()
+  }
+}
+
 /** Said when a conversation reachable by Remote Control is given its page. */
 export function onRemoteConnected(then: (conversationId: string) => void): () => void {
   if (!inTauri()) return () => {}

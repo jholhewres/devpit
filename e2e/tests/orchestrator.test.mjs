@@ -165,10 +165,24 @@ describe('the orchestrator', () => {
     const asked = await window.wait(async () => String(screen()).includes('Pick a slice?'), 15000).catch(() => false)
     assert.ok(asked, `what was typed never reached the session. It shows: ${String(screen()).slice(-300)}`)
 
-    await window.executeScript('document.querySelector(".sterm [aria-label=\'Close the terminal\']").click()')
+    await window.executeScript('document.querySelector(".sterm [aria-label=\'Hide the terminal\']").click()')
     const closed = await window.wait(async () => (await window.findElements(By.css('.sterm'))).length === 0, 5000).catch(() => false)
     assert.ok(closed, 'the terminal did not close')
     tmux(home, 'send-keys', '-t', target, 'Escape')
+
+    // Stopped by the orchestrator: the agent ends and its terminal closes.
+    const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
+    const stopped = await ask('stop', { name: 'termed-stub' }, orchestrator)
+    assert.ok(stopped.ok, `the session could not be stopped: ${JSON.stringify(stopped)}`)
+    const windows = () => {
+      try {
+        return tmux(home, 'list-windows', '-t', `devpit_${project.id}`, '-F', '#{window_name}')
+      } catch {
+        return ''
+      }
+    }
+    const gone = await window.wait(async () => !windows().includes(layout.focusedId), 10000).catch(() => false)
+    assert.ok(gone, `its terminal is still there: ${windows()}`)
   })
 
   test('hands a card to a session of its account, linked to the card — and nothing else may', async () => {
@@ -182,6 +196,14 @@ describe('the orchestrator', () => {
     const unlinked = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, orchestrator)
     assert.match(unlinked.error ?? '', /not linked/)
     await invoke(window, 'orchestrator_link', { projectId: orchestratorId, linked: [project.id] })
+
+    // Without a card: a session of its own, in a new terminal of the project.
+    const free = await ask('start', { project: project.id, prompt: 'Look around.', name: 'free-stub' }, orchestrator)
+    assert.equal(free.ok?.name, 'free-stub', `a session without a card was refused: ${JSON.stringify(free)}`)
+    const started = await window
+      .wait(() => readFileSync(join(home, '.claude', 'stub-calls.log'), 'utf8').split('\n').some((line) => line.includes('free-stub') && line.includes('"interactive":true')), 20000)
+      .catch(() => false)
+    assert.ok(started, 'the session without a card never started in its terminal')
 
     const handed = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, orchestrator)
     assert.ok(handed.ok, `the orchestrator could not hand the card: ${JSON.stringify(handed)}`)

@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 16] = [
+pub(crate) const METHODS: [&str; 17] = [
     "context",
     "board",
     "card",
@@ -55,6 +55,7 @@ pub(crate) const METHODS: [&str; 16] = [
     "sessions",
     "start",
     "screen",
+    "stop",
     "artifacts",
     "artifact_save",
     "artifact_restore",
@@ -121,6 +122,12 @@ fn respond_in(
             let profile = orchestrating(here)?;
             let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
             return Ok(json!(live.sessions));
+        }
+        "stop" => {
+            let profile = orchestrating(here)?;
+            let app = app.ok_or("devpit's window is not running")?;
+            let name = text("name").ok_or("which session? pass its name")?;
+            return crate::stopping::stop(app, profile, &name).map_err(said);
         }
         "screen" => {
             let profile = orchestrating(here)?;
@@ -189,6 +196,18 @@ fn respond_in(
             json!({ "id": changed.id, "title": changed.title })
         }
         "move" => moved(app, &board, &card_id, &text("columnId").unwrap_or_default())?,
+        // No card: a session of its own, in the project's folder.
+        "start" if card_id.is_empty() => {
+            let app = app.ok_or("devpit's window is not running")?;
+            crate::opening::open(
+                app,
+                project,
+                orchestrating(here)?,
+                &text("prompt").unwrap_or_default(),
+                text("name").as_deref(),
+            )
+            .map_err(said)?
+        }
         "start" => crate::handing::hand(
             &board,
             orchestrating(here)?,
