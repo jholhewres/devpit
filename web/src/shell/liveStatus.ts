@@ -13,15 +13,23 @@ const EVERY_MS = 4000
 
 interface Watch {
   sessions: readonly LiveSession[]
+  /* What was last told, as text: a read that found the same is told to nobody. */
+  said: string
   heard: Set<(sessions: readonly LiveSession[]) => void>
   timer: number | null
 }
 
 const watches = new Map<string, Watch>()
 
-function read(profileId: string, watch: Watch): void {
+function read(profileId: string, watch: Watch, forced = false): void {
+  /* Nobody is looking at a hidden window; it is read again on the next tick. */
+  if (!forced && typeof document !== 'undefined' && document.hidden) return
   void ask(() => commands.orchestratorSessions(profileId)).then((answer) => {
-    watch.sessions = answer.data?.sessions ?? []
+    const sessions = answer.data?.sessions ?? []
+    const said = JSON.stringify(sessions)
+    if (said === watch.said) return
+    watch.said = said
+    watch.sessions = sessions
     for (const tell of watch.heard) tell(watch.sessions)
   })
 }
@@ -29,7 +37,7 @@ function read(profileId: string, watch: Watch): void {
 /** Reads again now — after an answer, so the next question shows at once. */
 export function refreshSessions(profileId: string): void {
   const watch = watches.get(profileId)
-  if (watch) read(profileId, watch)
+  if (watch) read(profileId, watch, true)
 }
 
 /* Stopped on the person first, then busy — what is worth looking at — then by name. */
@@ -43,13 +51,13 @@ export function useLiveSessions(profileId: string | null): readonly LiveSession[
     if (!profileId) return
     let watch = watches.get(profileId)
     if (!watch) {
-      watch = { sessions: [], heard: new Set(), timer: null }
+      watch = { sessions: [], said: '', heard: new Set(), timer: null }
       watches.set(profileId, watch)
     }
     const mine = watch
     mine.heard.add(setSessions)
     if (mine.timer === null) {
-      read(profileId, mine)
+      read(profileId, mine, true)
       mine.timer = window.setInterval(() => read(profileId, mine), EVERY_MS)
     } else setSessions(mine.sessions)
     return () => {

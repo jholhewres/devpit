@@ -211,6 +211,36 @@ fn client_named(profile_id: &str, name: &str) -> Result<String, RpcError> {
         })
 }
 
+/// This account's live session called `name`: its process and, when it runs
+/// in one of devpit's terminals, that terminal's project and pane.
+pub(crate) fn running_named(
+    profile_id: &str,
+    name: &str,
+) -> Result<(i32, Option<devpit_rpc::LivePane>), RpcError> {
+    let sessions = config_of(profile_id)?.join("sessions");
+    let found = std::fs::read_dir(&sessions)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+        .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
+        .filter_map(|text| serde_json::from_str::<Listed>(&text).ok())
+        .find(|listed| listed.name.as_deref() == Some(name) && listed.pid.is_some_and(alive));
+    let listed = found.ok_or_else(|| {
+        RpcError::new(
+            ErrorCode::NotFound,
+            format!("no session called {name} is running"),
+        )
+    })?;
+    let pane = listed
+        .tmux
+        .as_deref()
+        .and_then(pane_target)
+        .as_deref()
+        .and_then(pane_of);
+    Ok((listed.pid.unwrap_or_default(), pane))
+}
+
 /// Each live listing's name and tmux client, for the one reply that needs it.
 fn listed_clients(sessions: &Path) -> Vec<(String, String)> {
     let Ok(entries) = std::fs::read_dir(sessions) else {
@@ -236,6 +266,27 @@ pub(crate) fn alive(pid: i32) -> bool {
             || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM))
 }
 
+/// How long the project list is reused between listings. Drawing it asks git
+/// about every project's worktrees, and the sessions are read every few
+/// seconds while an orchestrator is on screen — a git per project, each time.
+const PROJECTS_FRESH: std::time::Duration = std::time::Duration::from_secs(15);
+
+static PROJECTS: std::sync::Mutex<Option<(std::time::Instant, Vec<Project>)>> =
+    std::sync::Mutex::new(None);
+
+fn recent_projects() -> Result<Vec<Project>, RpcError> {
+    if let Some((at, kept)) = PROJECTS.lock().ok().and_then(|held| held.clone()) {
+        if at.elapsed() < PROJECTS_FRESH {
+            return Ok(kept);
+        }
+    }
+    let fresh = crate::projects::project_list_now()?.projects;
+    if let Ok(mut held) = PROJECTS.lock() {
+        *held = Some((std::time::Instant::now(), fresh.clone()));
+    }
+    Ok(fresh)
+}
+
 /// `orchestrator.sessions` — what this profile's account has running now.
 #[tauri::command]
 #[specta::specta]
@@ -245,7 +296,7 @@ pub async fn orchestrator_sessions(profile_id: String) -> Result<LiveSessions, R
 
 /// [`orchestrator_sessions`], on the calling thread.
 pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions, RpcError> {
-    let projects = crate::projects::project_list_now()?.projects;
+    let projects = recent_projects()?;
     let worktrees = devpit_core::Store::root()
         .ok()
         .and_then(|root| root.join("worktrees").canonicalize().ok())

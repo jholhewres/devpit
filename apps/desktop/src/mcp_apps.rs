@@ -45,6 +45,21 @@ struct Page {
 pub(crate) struct McpApps {
     hosts: Mutex<HashMap<(String, String), Held>>,
     pages: Mutex<Vec<Page>>,
+    /// Whether the thread that lets idle hosts go is running.
+    reaping: std::sync::atomic::AtomicBool,
+}
+
+/// Lets go of every host nobody has asked anything of for a while, and of any
+/// that already stopped. Each one is a whole CLI with every server of its
+/// account connected: left, they stayed until devpit quit.
+fn reap(hosts: &mut HashMap<(String, String), Held>) {
+    hosts.retain(|_, held| {
+        let keep = held.host.alive() && held.used.elapsed() < IDLE;
+        if !keep {
+            held.host.close();
+        }
+        keep
+    });
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -229,13 +244,28 @@ fn host(app: &AppHandle, profile_id: &str, cwd: &str) -> Result<Arc<AppsHost>, R
         .hosts
         .lock()
         .map_err(|_| RpcError::internal("hosts"))?;
-    hosts.retain(|_, held| {
-        let keep = held.host.alive() && held.used.elapsed() < IDLE;
-        if !keep {
-            held.host.close();
-        }
-        keep
-    });
+    reap(&mut hosts);
+    if !state
+        .reaping
+        .swap(true, std::sync::atomic::Ordering::SeqCst)
+    {
+        let app = app.clone();
+        // Once a minute, for as long as any host is kept.
+        std::thread::spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(60));
+            let state = app.state::<McpApps>();
+            let Ok(mut hosts) = state.hosts.lock() else {
+                return;
+            };
+            reap(&mut hosts);
+            if hosts.is_empty() {
+                state
+                    .reaping
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
+                return;
+            }
+        });
+    }
     let key = (profile_id.to_owned(), cwd.to_owned());
     if let Some(held) = hosts.get_mut(&key) {
         held.used = Instant::now();
