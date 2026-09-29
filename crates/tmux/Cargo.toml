@@ -12,6 +12,8 @@ thiserror = "2.0.20"
 
 [dev-dependencies]
 devpit-agentcli = { path = "../agentcli" }
-# The stop-on-close test asks the kernel directly whether a group is there.
-libc = "0.2"
 tempfile = "3.27.0"
+
+# The stop-on-close test asks the kernel directly whether a group is there.
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"

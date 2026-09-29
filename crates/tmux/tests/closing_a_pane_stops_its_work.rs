@@ -113,9 +113,16 @@ fn one_pane(server: &devpit_tmux::Server) -> devpit_tmux::Running {
 /// Through the syscall, not `/usr/bin/kill`: that binary takes a negative pid
 /// as an option and exits zero having done nothing, so a test written on it
 /// would report success no matter what.
+#[cfg(unix)]
 fn alive(pgid: u32) -> bool {
     // SAFETY: `kill` reads no memory, and signal 0 sends nothing.
     unsafe { libc::kill(-(pgid as i32), 0) == 0 }
+}
+
+/// No groups on Windows: the leader itself is what is asked after.
+#[cfg(windows)]
+fn alive(pgid: u32) -> bool {
+    devpit_pty::process::alive(pgid as i32)
 }
 
 fn tmux(socket: &std::path::Path, args: &[&str]) -> std::io::Result<std::process::Output> {
