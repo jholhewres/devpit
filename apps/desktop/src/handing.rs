@@ -1,12 +1,12 @@
 //! `start` — an orchestrator hands a card's work to a session of its own
 //! account.
 //!
-//! The session is a background one tied to the card, in the card's own
-//! checkout: the board and the card's Sessions say it is there, it can be
-//! attached to a terminal, and it is named so the orchestrator can message it
-//! and ask to hear when it goes idle. Nothing starts anywhere else, and nothing
-//! starts out of sight — which is what an orchestrator is allowed on the
-//! condition of.
+//! The session runs in the card's terminal tab, in the card's own checkout:
+//! the person watches it and types into it like any terminal, the card's
+//! Sessions say it is there, and it is named so the orchestrator can message
+//! it and ask to hear when it goes idle. Nothing starts out of sight — which is
+//! what an orchestrator is allowed on the condition of. It used to start in the
+//! background, under the CLI's own supervisor, where nobody could watch it.
 
 use devpit_rpc::Board;
 use serde_json::{json, Value};
@@ -18,6 +18,7 @@ const LONGEST_PROMPT: usize = 8000;
 /// Starts the session and links it to the card. Answers with the name to
 /// message it by.
 pub(crate) fn hand(
+    app: &tauri::AppHandle,
     board: &Board,
     profile_id: &str,
     card_id: &str,
@@ -46,61 +47,38 @@ pub(crate) fn hand(
         Some(root) => root.to_path_buf(),
         None => crate::checkout::checkout_of(&store, card_id, |_| {})?,
     };
-    let runner = crate::agent_profiles::runner_for(&store, profile_id)?;
-    let session_id = crate::steps::fresh_session_id();
-    let short = devpit_agentcli::start_background(
-        &cwd,
-        Some(&runner),
-        Some(&session_id),
-        None,
-        None,
-        crate::steps::hook_settings().as_deref(),
-        Some(&devpit_agentcli::Handed {
-            name: &name,
-            prompt,
-        }),
-    )
-    .map_err(|err| untrusted(&err.to_string(), &cwd).unwrap_or_else(|| err.to_string()))?;
-
-    let transcript = std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .map(|home| devpit_agentcli::transcript_path(&home, &cwd, &session_id));
-    store
-        .link_session(
-            card_id,
-            &short,
-            &session_id,
-            transcript.as_ref().and_then(|path| path.to_str()),
-            cwd.to_str(),
-            Some(profile_id),
-        )
-        .map_err(|err| err.to_string())?;
+    // The card's own tab, which is how the card finds its sessions; a new one
+    // when that tab is already open, rather than typing over what runs there.
+    let card_tab = crate::sessions::tab_for_card(card_id);
+    let taken = store
+        .pane_layout(&board.project_id, &card_tab)
+        .map_err(|err| err.to_string())?
+        .is_some();
+    let tab_id = tab_to_open(card_tab, taken);
+    let line = crate::opening::launched(profile_id, &name, prompt).map_err(|err| err.message)?;
+    let pane_id = crate::opening::typed_in(app, &board.project_id, &tab_id, &cwd, &line)
+        .map_err(|err| err.message)?;
+    let _ = tauri::Emitter::emit(
+        app,
+        crate::opening::TAB_OPENED,
+        json!({ "projectId": board.project_id, "tabId": tab_id, "paneId": pane_id }),
+    );
 
     Ok(json!({
         "name": name,
-        "sessionId": session_id,
         "cardId": card_id,
         "cwd": cwd.display().to_string(),
-        "next": "Message it by this name with SendMessage, and pass notify_when_idle to hear when it is done.",
+        "next": "It runs in a terminal tab of the project, where the person can watch it. Message it by this name with SendMessage once it is up, and pass notify_when_idle to hear when it is done.",
     }))
 }
 
-/// What to do when Claude Code will not start in the card's checkout because
-/// nobody has told it to trust that folder yet. Trust is inherited, so the
-/// folder all checkouts sit in, trusted once, covers every card after it.
-/// devpit does not write the CLI's own settings to do it: running sessions
-/// rewrite that file, and a second writer is how it gets corrupted.
-pub(crate) fn untrusted(said: &str, cwd: &std::path::Path) -> Option<String> {
-    said.contains("not trusted").then(|| {
-        let base = cwd.parent().and_then(|p| p.parent()).unwrap_or(cwd);
-        format!(
-            "Claude Code does not trust {} yet, so it will not start a session there. \
-             Ask the person to run `claude` once in {} and accept the trust prompt — that \
-             covers every card's checkout — then hand the card again.",
-            cwd.display(),
-            base.display()
-        )
-    })
+/// The card's own tab, unless something already has it open.
+pub(crate) fn tab_to_open(card_tab: String, taken: bool) -> String {
+    if taken {
+        crate::opening::fresh_tab()
+    } else {
+        card_tab
+    }
 }
 
 /// A name another session can address: the card's words, short, plain, and
@@ -134,15 +112,14 @@ pub(crate) fn session_name(title: &str, card_id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{session_name, untrusted};
+    use super::{session_name, tab_to_open};
 
     #[test]
-    fn an_untrusted_checkout_says_which_folder_to_trust_once() {
-        let cwd = std::path::Path::new("/home/me/.devpit/worktrees/prj_1/card_9");
-        let said =
-            untrusted("Workspace not trusted. Run `claude` in … once", cwd).expect("explained");
-        assert!(said.contains("/home/me/.devpit/worktrees "), "{said}");
-        assert_eq!(untrusted("some other failure", cwd), None);
+    fn a_handed_session_takes_the_card_tab_and_never_types_over_one_open() {
+        assert_eq!(tab_to_open("tab_card_x".to_owned(), false), "tab_card_x");
+        let fresh = tab_to_open("tab_card_x".to_owned(), true);
+        assert_ne!(fresh, "tab_card_x");
+        assert!(fresh.starts_with("tab_"));
     }
 
     #[test]

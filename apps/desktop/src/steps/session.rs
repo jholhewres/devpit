@@ -1,7 +1,4 @@
 //! The session step: a detached session for the card, attached on request.
-use std::path::PathBuf;
-
-use devpit_agentcli as agent;
 use devpit_core::Store;
 use devpit_rpc::Step;
 use serde::Deserialize;
@@ -28,17 +25,18 @@ pub(crate) fn readable(config: &str) -> Result<SessionConfig, String> {
     serde_json::from_str(config).map_err(|err| format!("this step's config is not readable: {err}"))
 }
 
-/// Starts a background session for this card and records the handle.
+/// Starts the card's session in the card's terminal tab.
 ///
-/// The session is not brought into a terminal here. It runs detached, and the
-/// person attaches it to the target terminal when they want to sit in front of
-/// it — which is the whole point of the target being one terminal rather than
-/// a pane per card.
+/// In a terminal of the project, where the person watches it and answers it,
+/// and started by the profile's own command line — the same mode their own
+/// sessions run in. It used to start in the background, under the CLI's own
+/// supervisor: nothing showed it, and the first permission it asked for was a
+/// question nobody could see.
 ///
 /// `session_id` is new for this run and chosen before it starts: it names the
-/// transcript, and the transcript is where a session the person drove by hand
-/// reports what it spent.
+/// transcript, and the transcript is where a session reports what it spent.
 pub fn start(
+    app: &tauri::AppHandle,
     store: &Store,
     card_id: &str,
     step: &Step,
@@ -51,51 +49,82 @@ pub fn start(
     // checkout inside the repository, where it shows up in the file tree, in
     // ripgrep, and one day in a commit.
     let cwd = crate::checkout::cwd_for(store, card_id, step, |_| {})?;
+    let project_id = store
+        .project_id_of_card(card_id)
+        .map_err(|err| err.to_string())?
+        .ok_or("that card is on no project")?;
+    let title = store
+        .card(card_id)
+        .map_err(|err| err.to_string())?
+        .map(|card| card.title)
+        .unwrap_or_default();
 
-    let runner = config
+    let profile = config
         .profile
-        .as_deref()
-        .map(|id| crate::agent_profiles::runner_for(store, id))
-        .transpose()?;
-    let short_id = agent::start_background(
-        &cwd,
-        runner.as_ref(),
-        Some(session_id),
-        None,
+        .clone()
+        .unwrap_or_else(|| crate::agent_choice::default_id(store));
+    let line = launch_line(
+        &crate::shell_launch::to_start(&profile).map_err(|err| err.message)?,
+        &crate::handing::session_name(&title, card_id),
+        session_id,
         config.model.as_deref(),
-        super::hook_settings().as_deref(),
-        None,
-    )
-    .map_err(|err| err.to_string())?;
+    );
 
-    // The profile's own directory, or the one this process hands down: a
-    // second account keeps its transcripts under its own `projects/`.
-    let transcript = std::env::var_os("HOME").map(PathBuf::from).map(|home| {
-        let env = runner
-            .as_ref()
-            .map(|one| one.env.as_slice())
-            .unwrap_or_default();
-        let inherited = std::env::var("CLAUDE_CONFIG_DIR").ok();
-        let dir = agent::cli_config::config_dir_of(&home, env, inherited.as_deref());
-        agent::transcript_path(&dir, &cwd, session_id)
-    });
-
-    store
-        .link_session(
-            card_id,
-            &short_id,
-            session_id,
-            transcript.as_ref().and_then(|p| p.to_str()),
-            cwd.to_str(),
-            config.profile.as_deref(),
-        )
-        .map_err(|err| err.to_string())?;
+    let card_tab = crate::sessions::tab_for_card(card_id);
+    let taken = store
+        .pane_layout(&project_id, &card_tab)
+        .map_err(|err| err.to_string())?
+        .is_some();
+    let tab_id = crate::handing::tab_to_open(card_tab, taken);
+    let pane_id = crate::opening::typed_in(app, &project_id, &tab_id, &cwd, &line)
+        .map_err(|err| err.message)?;
+    let _ = tauri::Emitter::emit(
+        app,
+        crate::opening::TAB_OPENED,
+        serde_json::json!({ "projectId": project_id, "tabId": tab_id, "paneId": pane_id }),
+    );
 
     Ok(Finished {
         ok: true,
-        output: format!("session {short_id} is running; attach it to the terminal to drive it"),
+        output: "the session is running in the card's terminal tab".to_owned(),
         cost_usd: 0.0,
         duration_ms: 0,
         exit_code: None,
     })
+}
+
+/// The profile's command, named and given its session id and model.
+pub(crate) fn launch_line(
+    start: &str,
+    name: &str,
+    session_id: &str,
+    model: Option<&str>,
+) -> String {
+    use devpit_agentcli::declaring::quoted;
+    let mut line = format!(
+        "{start} --name {} --session-id {}",
+        quoted(name),
+        quoted(session_id)
+    );
+    if let Some(model) = model.filter(|one| !one.trim().is_empty()) {
+        line.push_str(&format!(" --model {}", quoted(model)));
+    }
+    line
+}
+
+#[cfg(test)]
+mod tests {
+    use super::launch_line;
+
+    #[test]
+    fn the_step_starts_the_profile_named_with_its_session_and_model() {
+        assert_eq!(
+            launch_line("claude --dangerously-skip-permissions", "fix-login-ab12", "s-1", Some("opus")),
+            "claude --dangerously-skip-permissions --name 'fix-login-ab12' --session-id 's-1' --model 'opus'"
+        );
+        assert_eq!(
+            launch_line("claude", "x", "s-1", Some(" ")),
+            "claude --name 'x' --session-id 's-1'"
+        );
+    }
 }

@@ -11,6 +11,8 @@ pub struct LiveSession {
     pub name: String,
     /// Its process: what tells apart two sessions that share a name.
     pub pid: i32,
+    /// A background session's job, which a terminal attaches to watch it.
+    pub job: Option<String>,
     /// The CLI's own word: `busy` or `idle`.
     pub status: String,
     /// `interactive` or `background`.

@@ -85,6 +85,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
       setTerminal({
         name: 'Terminal',
         pid: 0,
+        job: null,
         status: 'idle',
         kind: 'interactive',
         cwd: one.rootPath,
@@ -102,6 +103,16 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
   const newChat = (one: Project): void => {
     remember(one.id, opened(remembered(one.id), { id: crypto.randomUUID(), kind: 'chat' }))
     setProject(one.id)
+  }
+
+  /* A background session attached in a new tab of its project, and that
+     terminal opened here over the chat. */
+  const watch = (one: LiveSession): void => {
+    if (!profileId || !one.job || !one.projectId) return
+    const projectId = one.projectId
+    void ask(() => commands.sessionWatch(profileId, projectId, one.job!)).then((answer) => {
+      if (answer.data) setTerminal({ ...one, inDevpit: true, pane: { projectId, paneId: answer.data } })
+    })
   }
 
   const go = (one: LiveSession): void => {
@@ -208,7 +219,9 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                     </button>
                   )}
                 </div>
-                {expanded && <Details session={one} history={history} profileId={profileId} />}
+                {expanded && (
+                  <Details session={one} history={history} profileId={profileId} onWatch={one.job && one.projectId && !one.pane ? () => watch(one) : undefined} />
+                )}
               </div>
             )
           })}
@@ -247,7 +260,18 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
   )
 }
 
-function Details({ session, history, profileId }: { session: LiveSession; history: AgentThread | undefined; profileId: string | null }): React.JSX.Element {
+function Details({
+  session,
+  history,
+  profileId,
+  onWatch,
+}: {
+  session: LiveSession
+  history: AgentThread | undefined
+  profileId: string | null
+  /** A background session, opened in a terminal to be watched and typed into. */
+  onWatch?: () => void
+}): React.JSX.Element {
   const [reply, setReply] = useState('')
   const [said, setSaid] = useState<string | null>(null)
   /* Stopping asks once, in place: work in flight is lost. */
@@ -286,6 +310,13 @@ function Details({ session, history, profileId }: { session: LiveSession; histor
         <form className="sess__reply" onSubmit={(event) => (event.preventDefault(), send())}>
           <input value={reply} maxLength={4000} placeholder={`Reply in ${session.name}'s terminal, as you`} aria-label={`Reply to ${session.name}`} onChange={(event) => setReply(event.target.value)} />
         </form>
+      ) : onWatch ? (
+        <p className="sess__note">
+          Runs in the background, where nothing shows it.{' '}
+          <button className="sess__more-btn" onClick={onWatch}>
+            Watch it in a terminal
+          </button>
+        </p>
       ) : (
         <p className="sess__note">Opened outside devpit: it can be messaged, not typed into from here.</p>
       )}

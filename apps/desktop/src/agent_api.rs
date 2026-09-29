@@ -209,6 +209,7 @@ fn respond_in(
             .map_err(said)?
         }
         "start" => crate::handing::hand(
+            app.ok_or("devpit's window is not running")?,
             &board,
             orchestrating(here)?,
             &card_id,

@@ -13,12 +13,12 @@ use crate::{
     checkpoint_preview, claude_plugin, cloning, columns, commands, delegations, diffs,
     error_reports, error_sender, files, filetree, front, happening, heads_down, history, in_flight,
     index, installations, live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving, notices,
-    openers, orchestrator, orchestrator_links, outside_sessions, pane_screen, panels, panes,
-    pasting, paths, plan_limits, plugin_data, plugins, project_naming, projects, reading_path,
-    receipts, regrouping, reveal, rewinding, runs_list, saves, search, session_search, sessions,
-    settings, shell_launch, skills, slash, sources, spend_history, staging, steering, steps,
-    stopping, threads, update, watching, workspace, worktree_base, worktree_setup, worktrees,
-    wsfiles,
+    openers, opening, orchestrator, orchestrator_links, outside_sessions, pane_screen, panels,
+    panes, pasting, paths, plan_limits, plugin_data, plugins, project_naming, projects,
+    reading_path, receipts, regrouping, reveal, rewinding, runs_list, saves, search,
+    session_search, sessions, settings, shell_launch, skills, slash, sources, spend_history,
+    staging, steering, steps, stopping, threads, update, watching, workspace, worktree_base,
+    worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -177,6 +177,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         paths::path_delete,
         paths::path_import,
         mcp_health::mcp_health,
+        opening::session_watch,
         worktree_setup::project_worktree_setup,
         worktree_setup::project_worktree_setup_set,
         cards::card_unpin,

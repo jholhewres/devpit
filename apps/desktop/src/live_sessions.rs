@@ -62,9 +62,13 @@ pub(crate) fn read(
             let waiting = target
                 .and_then(|target| screen(&target))
                 .and_then(|shown| crate::live_prompt::pending(&shown));
+            let job = listed
+                .job_id
+                .filter(|_| listed.kind.as_deref() == Some("bg"));
             Some(LiveSession {
                 name,
                 pid: listed.pid.unwrap_or_default(),
+                job,
                 status: listed.status.unwrap_or_default(),
                 kind: listed.kind.unwrap_or_default(),
                 card_id: card_of(worktrees, Path::new(&cwd)),

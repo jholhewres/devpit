@@ -950,6 +950,12 @@ export const commands = {
 	 */
 	pathImport: (projectId: string, worktreeId: string | null, folder: string, sources: string[]) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_import", { projectId, worktreeId, folder, sources })),
 	mcpHealth: (projectId: string | null) => typedError<McpHealth, RpcError>(__TAURI_INVOKE("mcp_health", { projectId })),
+	/**
+	 *  `session.watch` — a background session, attached in a new terminal tab of
+	 *  its project: it ran under the CLI's own supervisor, where nobody could see
+	 *  it, and there it is watched and typed into like any other.
+	 */
+	sessionWatch: (profileId: string, projectId: string, job: string) => typedError<string, RpcError>(__TAURI_INVOKE("session_watch", { profileId, projectId, job })),
 	/**  `project.worktree_setup` — what a new worktree of this project gets. */
 	projectWorktreeSetup: (projectId: string) => typedError<WorktreeSetup, RpcError>(__TAURI_INVOKE("project_worktree_setup", { projectId })),
 	/**  `project.worktree_setup_set` — the same, written. */
@@ -2401,6 +2407,8 @@ export type LiveSession = {
 	name: string,
 	/**  Its process: what tells apart two sessions that share a name. */
 	pid: number,
+	/**  A background session's job, which a terminal attaches to watch it. */
+	job: string | null,
 	/**  The CLI's own word: `busy` or `idle`. */
 	status: string,
 	/**  `interactive` or `background`. */

@@ -14,12 +14,12 @@ use crate::{
     card_work, cards, chat, chat_remote, checkpoint, checkpoint_findings, checkpoint_preview,
     claude_plugin, cloning, columns, commands, delegations, diffs, error_reports, error_sender,
     files, filetree, front, happening, heads_down, history, in_flight, index, installations,
-    live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving, notices, openers, orchestrator,
-    orchestrator_links, outside_sessions, pane_screen, panels, panes, pasting, paths, plan_limits,
-    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reveal,
-    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
-    slash, sources, spend_history, staging, steering, steps, stopping, threads, update, watching,
-    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
+    live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving, notices, openers, opening,
+    orchestrator, orchestrator_links, outside_sessions, pane_screen, panels, panes, pasting, paths,
+    plan_limits, plugin_data, plugins, project_naming, projects, reading_path, receipts,
+    regrouping, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
+    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, stopping,
+    threads, update, watching, workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -182,6 +182,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         paths::path_delete,
         paths::path_import,
         mcp_health::mcp_health,
+        opening::session_watch,
         worktree_setup::project_worktree_setup,
         worktree_setup::project_worktree_setup_set,
         staging::changes_stage,
