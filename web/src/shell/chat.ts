@@ -25,14 +25,58 @@ export function send(ask: Ask, onFrame: (frame: Frame) => void): Sent | null {
   return { end: invoke('chat_send', { ask, onFrame: channel }) as Promise<TurnEnd> }
 }
 
-/* The turn already running in a conversation, from where it is: what it sent
-   before this chat was open, then the rest. Resolves when it ends — `false`
-   at once when nothing was running. */
-export function rejoin(conversationId: string, onFrame: (frame: Frame) => void): Promise<boolean> | null {
+/* The turns running in a conversation, from where they are: what they sent
+   before this chat was open, then the rest, one turn after another. Resolves
+   when the last ends — `false` at once when nothing was running. `leave`
+   stops the frames: a chat that has gone would otherwise be sent every one
+   until the turn ended, once per remount. */
+export interface Joined {
+  readonly running: Promise<boolean>
+  readonly leave: () => void
+}
+
+export function rejoin(conversationId: string, onFrame: (frame: Frame) => void): Joined | null {
   if (!inTauri()) return null
   const channel = new Channel<Frame>()
   channel.onmessage = onFrame
-  return invoke('chat_rejoin', { conversationId, onFrame: channel }) as Promise<boolean>
+  return {
+    running: invoke('chat_rejoin', { conversationId, onFrame: channel }) as Promise<boolean>,
+    leave: () => void invoke('chat_leave', { conversationId, channel: channel.id }).catch(() => {}),
+  }
+}
+
+/* One opening of a conversation in a chat: a mount, or the next conversation
+   shown in the same pane. A frame or an answer still on its way to one that
+   closed lands nowhere — a single flag, set again by the next opening, let an
+   old rejoin write one conversation's turn into another. */
+export interface Opening {
+  readonly open: () => boolean
+  /** Kept to be left when this opening closes. */
+  readonly join: (joined: Joined | null) => Joined | null
+  readonly close: () => void
+  /** This chat's own turn is running; a turn woken meanwhile waits for it. */
+  sending: boolean
+  woke: boolean
+}
+
+export function opening(): Opening {
+  let open = true
+  const joined = new Set<Joined>()
+  return {
+    open: () => open,
+    join: (one) => {
+      if (one && open) joined.add(one)
+      else one?.leave()
+      return one
+    },
+    close: () => {
+      open = false
+      for (const one of joined) one.leave()
+      joined.clear()
+    },
+    sending: false,
+    woke: false,
+  }
 }
 
 /* Frames arrive many to a paint while an answer streams; they are applied

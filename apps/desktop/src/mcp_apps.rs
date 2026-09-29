@@ -26,7 +26,8 @@ const FRESH: Duration = Duration::from_secs(300);
 /// Starting a host connects every server of the account; that is slow.
 const FIRST_ANSWER: Duration = Duration::from_secs(60);
 const ANSWER: Duration = Duration::from_secs(45);
-/// Pages kept to be served, newest last.
+/// Pages kept to be served. One per tool, account and folder, so a chat
+/// drawing a page again reuses it; the one least recently asked for goes.
 const PAGES: usize = 40;
 
 struct Held {
@@ -35,10 +36,15 @@ struct Held {
     used: Instant,
 }
 
+/// The account, the folder and the tool a page came with.
+type PageOf = (String, String, String);
+
 struct Page {
     id: String,
+    of: PageOf,
     html: String,
     policy: String,
+    bordered: bool,
 }
 
 #[derive(Default)]
@@ -111,6 +117,12 @@ pub async fn mcp_app_open(
     called: String,
 ) -> Result<McpAppPage, RpcError> {
     crate::off_main::blocking(move || {
+        let of = (profile_id.clone(), cwd.clone(), called.clone());
+        // A chat drawn again — a remount, a scroll back — asks for the page it
+        // already had; reading it again could start a CLI process.
+        if let Some(kept) = app.state::<McpApps>().kept(&of) {
+            return Ok(kept);
+        }
         let tool = tools(&app, &profile_id, &cwd)?
             .into_iter()
             .find(|one| one.called == called)
@@ -135,17 +147,16 @@ pub async fn mcp_app_open(
         let id = ulid::Ulid::generate().to_string().to_lowercase();
         let state = app.state::<McpApps>();
         let mut pages = state.pages.lock().map_err(|_| RpcError::internal("pages"))?;
-        pages.push(Page {
-            id: id.clone(),
-            html,
-            policy: policy(declared),
-        });
-        let over = pages.len().saturating_sub(PAGES);
-        pages.drain(..over);
-        Ok(McpAppPage {
-            id,
-            bordered: tool.bordered,
-        })
+        Ok(keep(
+            &mut pages,
+            Page {
+                id,
+                of,
+                html,
+                policy: policy(declared),
+                bordered: tool.bordered,
+            },
+        ))
     })
     .await
 }
@@ -186,15 +197,46 @@ pub async fn mcp_app_call(
     .await
 }
 
+impl McpApps {
+    /// The page already kept for this tool, moved to the newest place.
+    fn kept(&self, of: &PageOf) -> Option<McpAppPage> {
+        let mut pages = self.pages.lock().ok()?;
+        let at = pages.iter().position(|page| &page.of == of)?;
+        let page = pages.remove(at);
+        let shown = McpAppPage {
+            id: page.id.clone(),
+            bordered: page.bordered,
+        };
+        pages.push(page);
+        Some(shown)
+    }
+}
+
+/// Keeps `page` as the newest, in place of one for the same tool, and lets
+/// the least recently asked for go past [`PAGES`].
+fn keep(pages: &mut Vec<Page>, page: Page) -> McpAppPage {
+    pages.retain(|one| one.of != page.of);
+    let shown = McpAppPage {
+        id: page.id.clone(),
+        bordered: page.bordered,
+    };
+    pages.push(page);
+    let over = pages.len().saturating_sub(PAGES);
+    pages.drain(..over);
+    shown
+}
+
 /// A page, as the `mcpapp:` scheme serves it: with its policy as a header.
 pub(crate) fn serve(app: &AppHandle, path: &str) -> tauri::http::Response<Vec<u8>> {
     let id = path.trim_start_matches('/');
     let found = app.try_state::<McpApps>().and_then(|state| {
-        state.pages.lock().ok().and_then(|pages| {
-            pages
-                .iter()
-                .find(|page| page.id == id)
-                .map(|page| (page.html.clone(), page.policy.clone()))
+        state.pages.lock().ok().and_then(|mut pages| {
+            // Served is shown: the newest place, so it is not the next to go.
+            let at = pages.iter().position(|page| page.id == id)?;
+            let page = pages.remove(at);
+            let found = (page.html.clone(), page.policy.clone());
+            pages.push(page);
+            Some(found)
         })
     });
     let builder = tauri::http::Response::builder()
@@ -240,37 +282,41 @@ fn host(app: &AppHandle, profile_id: &str, cwd: &str) -> Result<Arc<AppsHost>, R
     // Only a folder the window may open: a project's, or devpit's own.
     let folder = crate::reveal::allowed(cwd)?;
     let state = app.state::<McpApps>();
-    let mut hosts = state
-        .hosts
-        .lock()
-        .map_err(|_| RpcError::internal("hosts"))?;
-    reap(&mut hosts);
-    if !state
-        .reaping
-        .swap(true, std::sync::atomic::Ordering::SeqCst)
-    {
-        let app = app.clone();
-        // Once a minute, for as long as any host is kept.
-        std::thread::spawn(move || loop {
-            std::thread::sleep(Duration::from_secs(60));
-            let state = app.state::<McpApps>();
-            let Ok(mut hosts) = state.hosts.lock() else {
-                return;
-            };
-            reap(&mut hosts);
-            if hosts.is_empty() {
-                state
-                    .reaping
-                    .store(false, std::sync::atomic::Ordering::SeqCst);
-                return;
-            }
-        });
-    }
     let key = (profile_id.to_owned(), cwd.to_owned());
-    if let Some(held) = hosts.get_mut(&key) {
-        held.used = Instant::now();
-        return Ok(held.host.clone());
+    {
+        let mut hosts = state
+            .hosts
+            .lock()
+            .map_err(|_| RpcError::internal("hosts"))?;
+        reap(&mut hosts);
+        if !state
+            .reaping
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            let app = app.clone();
+            // Once a minute, for as long as any host is kept.
+            std::thread::spawn(move || loop {
+                std::thread::sleep(Duration::from_secs(60));
+                let state = app.state::<McpApps>();
+                let Ok(mut hosts) = state.hosts.lock() else {
+                    return;
+                };
+                reap(&mut hosts);
+                if hosts.is_empty() {
+                    state
+                        .reaping
+                        .store(false, std::sync::atomic::Ordering::SeqCst);
+                    return;
+                }
+            });
+        }
+        if let Some(held) = hosts.get_mut(&key) {
+            held.used = Instant::now();
+            return Ok(held.host.clone());
+        }
     }
+    // Started without the lock: starting one connects every server of the
+    // account, and every other page's call used to wait on it.
     let (profile, path) = crate::chat_turn::spawnable(profile_id)?;
     let env = devpit_agentcli::running::runner(&profile).env;
     let mcp = crate::agent_reach::chat_mcp(&profile.driver);
@@ -282,6 +328,16 @@ fn host(app: &AppHandle, profile_id: &str, cwd: &str) -> Result<Arc<AppsHost>, R
     })
     .map_err(|why| RpcError::new(ErrorCode::Busy, why))?;
     let started = Arc::new(started);
+    let mut hosts = state
+        .hosts
+        .lock()
+        .map_err(|_| RpcError::internal("hosts"))?;
+    // Another call started one meanwhile: the one kept is the one used.
+    if let Some(held) = hosts.get_mut(&key) {
+        started.close();
+        held.used = Instant::now();
+        return Ok(held.host.clone());
+    }
     hosts.insert(
         key,
         Held {

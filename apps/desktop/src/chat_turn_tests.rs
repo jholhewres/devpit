@@ -57,3 +57,29 @@ fn a_turn_runs_where_the_conversation_was_fixed_and_refuses_a_folder_that_is_gon
         "the folder this conversation ran in is gone"
     );
 }
+
+#[test]
+fn a_turn_ending_after_a_woken_one_keeps_what_that_one_wrote() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("conv.json");
+    let began_with = opening(None, "claude", None, None, None, None, 1.0);
+    // A woken turn ended while this one waited: its session and cost are on disk.
+    let mut woken = began_with.clone();
+    woken.session_id = Some("s_woken".to_owned());
+    woken.cost_usd = 0.25;
+    devpit_agentcli::head::write_head(&file, &woken).unwrap();
+
+    let end = devpit_rpc::TurnEnd {
+        turn_id: String::new(),
+        cost_usd: Some(0.5),
+        duration_ms: None,
+        stop_reason: None,
+        is_error: false,
+        context: None,
+    };
+    settle(&file, Some(began_with), "turn_1", &end, None, None);
+
+    let now = devpit_agentcli::head::read_head(&file).unwrap();
+    assert_eq!(now.cost_usd, 0.75);
+    assert_eq!(now.session_id.as_deref(), Some("s_woken"));
+}

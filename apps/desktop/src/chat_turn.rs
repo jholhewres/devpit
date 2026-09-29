@@ -106,3 +106,51 @@ pub(crate) fn after(
         ..devpit_agentcli::head::after_turn(opening, turn_id, end.cost_usd, session_id, anchor)
     }
 }
+
+/// Head writes after a turn, one at a time: a woken turn and the person's both
+/// end in the same head, and each read-then-write erased the other's.
+static SETTLING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Writes the head after a turn onto the one on disk now — not the one the
+/// turn began with, which misses whatever ended since: a woken turn's session
+/// and cost. `fallback` stands in when there is none on disk; with neither,
+/// nothing is written.
+pub(crate) fn settle(
+    file: &std::path::Path,
+    fallback: Option<Head>,
+    turn_id: &str,
+    end: &devpit_rpc::TurnEnd,
+    session_id: Option<String>,
+    anchor: Option<String>,
+) {
+    let _held = SETTLING.lock();
+    let Some(now) = devpit_agentcli::head::read_head(file).or(fallback) else {
+        return;
+    };
+    let _ = devpit_agentcli::head::write_head(file, &after(now, turn_id, end, session_id, anchor));
+}
+
+/// The person's message and the answer about to be written under it, both
+/// shown at once; the transcript takes them only once the turn has run.
+pub(crate) fn messages(
+    turn_id: &str,
+    prompt: &str,
+    at: f64,
+) -> (devpit_rpc::Message, devpit_rpc::Message) {
+    let message = |role, parts, streaming| devpit_rpc::Message {
+        id: format!("msg_{}", ulid::Ulid::generate()),
+        turn_id: Some(turn_id.to_owned()),
+        role,
+        parts,
+        created_at: at,
+        streaming,
+    };
+    let said = devpit_rpc::Part::Text {
+        text: prompt.to_owned(),
+        parent: None,
+    };
+    (
+        message(devpit_rpc::Role::User, vec![said], false),
+        message(devpit_rpc::Role::Assistant, Vec::new(), true),
+    )
+}

@@ -16,17 +16,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use devpit_agentcli::driver::Driver;
-use devpit_agentcli::head::{read_head, write_head};
 use devpit_agentcli::resident::{Heard, Resident};
-use devpit_agentcli::store::append;
 use devpit_agentcli::talk::{say, Said, Say};
 use devpit_agentcli::AgentError;
 use devpit_rpc::{Frame, Message, Part, Role};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, Manager};
+
+use crate::chat_listening::{Ear, Woken};
 
 /// The event a woken turn is announced on, with its conversation id.
 pub(crate) const WOKE: &str = "chat:woke";
@@ -37,28 +36,7 @@ struct Live {
     /// The flags it was started with: a turn asking for others restarts it.
     started_as: String,
     project_id: String,
-    listening: Arc<Mutex<Listening>>,
-}
-
-/// Where what the process says goes right now.
-#[derive(Default)]
-enum Listening {
-    /// Nobody asked: a turn that starts now was woken.
-    #[default]
-    Nobody,
-    /// The person's turn, read by the thread that sent it.
-    Person(mpsc::Sender<Heard>),
-    /// A turn another session woke, written here as it goes.
-    Woken(Woken),
-}
-
-/// A woken turn in progress.
-struct Woken {
-    turn_id: String,
-    answer_id: String,
-    parts: Vec<Part>,
-    frames: Channel<Frame>,
-    _relaying: crate::chat_relay::Relaying,
+    ear: Arc<Ear>,
 }
 
 #[derive(Default)]
@@ -117,20 +95,25 @@ fn stays(app: &AppHandle, project_id: &str, conversation_id: &str, mode: Option<
 
 /// A turn, through the conversation's resident process when there is to be
 /// one, and as a process of its own otherwise.
+///
+/// `on_began` runs once the turn has the process, before its prompt is sent;
+/// a turn stopped while it waited for a woken one never gets there, and ends
+/// `cancelled`.
 pub(crate) fn or_say(
     staying: Option<Staying>,
     driver: &dyn Driver,
     turn: &Say<'_>,
+    on_began: impl FnOnce(),
     mut on_part: impl FnMut(Part),
     mut on_start: impl FnMut(u32),
 ) -> Result<Said, AgentError> {
     let Some(staying) = staying else {
+        on_began();
         return say(driver, turn, on_part, on_start);
     };
     let residents = staying.app.state::<Residents>();
     let (tell, heard) = mpsc::channel();
-    let mut fresh = false;
-    {
+    let ear = {
         let mut all = residents.0.lock().map_err(|_| AgentError::NotInstalled)?;
         let wanted = started_as(turn);
         if all
@@ -141,51 +124,56 @@ pub(crate) fn or_say(
                 old.resident.close();
             }
         }
-        if !all.contains_key(&staying.conversation_id) {
-            // One conversation of an orchestrator listens at a time: the one
-            // last spoken in. Two would both answer the same message.
-            let others: Vec<String> = all
+        let fresh = !all.contains_key(&staying.conversation_id);
+        if fresh {
+            let listening = all
                 .iter()
-                .filter(|(_, live)| live.project_id == staying.project_id)
-                .map(|(key, _)| key.clone())
-                .collect();
-            for key in others {
+                .map(|(key, live)| (key.as_str(), live.project_id.as_str()));
+            for key in evicted(listening, &staying.project_id, |key| {
+                crate::chat_remote::wanted(&staying.app, key)
+            }) {
                 if let Some(old) = all.remove(&key) {
                     old.resident.close();
                 }
             }
             let live = start(&staying, turn, wanted)?;
             all.insert(staying.conversation_id.clone(), live);
-            fresh = true;
         }
-        let live = all
+        let ear = all
             .get(&staying.conversation_id)
+            .map(|live| live.ear.clone())
             .ok_or(AgentError::NotInstalled)?;
-        let listening = live.listening.clone();
-        // A woken turn still running finishes first: the person's words go
-        // in after it, not into the middle of it.
         drop(all);
         // A new process is a new connection: one asked to be reachable is
         // reached again.
         if fresh {
             crate::chat_remote::reconnect(&staying.app, &staying.conversation_id);
         }
-        wait_for_quiet(&listening);
-        if let Ok(mut now) = listening.lock() {
-            *now = Listening::Person(tell.clone());
-        }
+        ear
+    };
+    // A woken turn still running finishes first: the person's words go in
+    // after it, not into the middle of it.
+    if !ear.claim(&tell) {
+        return Ok(stopped());
+    }
+    on_began();
+    {
         let mut all = residents.0.lock().map_err(|_| AgentError::NotInstalled)?;
-        let live = all
+        let spoken = all
             .get(&staying.conversation_id)
-            .ok_or(AgentError::NotInstalled)?;
-        on_start(live.resident.pid());
-        if !live.resident.say(turn.prompt) {
-            // It exited since it last spoke: a new one, told to listen.
-            all.remove(&staying.conversation_id);
-            let live = start(&staying, turn, started_as(turn))?;
-            if let Ok(mut now) = live.listening.lock() {
-                *now = Listening::Person(tell);
+            .filter(|live| Arc::ptr_eq(&live.ear, &ear))
+            .is_some_and(|live| {
+                on_start(live.resident.pid());
+                live.resident.say(turn.prompt)
+            });
+        if !spoken {
+            // It exited since it last spoke, or was closed while this turn
+            // waited: a new one, told to listen.
+            if let Some(old) = all.remove(&staying.conversation_id) {
+                old.resident.close();
             }
+            let live = start(&staying, turn, started_as(turn))?;
+            live.ear.claim(&tell);
             on_start(live.resident.pid());
             let said = live.resident.say(turn.prompt);
             all.insert(staying.conversation_id.clone(), live);
@@ -209,6 +197,21 @@ pub(crate) fn or_say(
             }
         }
     }
+}
+
+/// The residents a new one in `project` closes. One conversation of an
+/// orchestrator listens at a time — two would both answer the same message —
+/// but a chat asked to be reachable keeps its process: it is its claude.ai
+/// link, and only turning Remote Control off lets it go.
+pub(crate) fn evicted<'a>(
+    listening: impl Iterator<Item = (&'a str, &'a str)>,
+    project: &str,
+    reachable: impl Fn(&str) -> bool,
+) -> Vec<String> {
+    listening
+        .filter(|(key, of)| *of == project && !reachable(key))
+        .map(|(key, _)| key.to_owned())
+        .collect()
 }
 
 /// Sends a control request to this conversation's process. False when it has
@@ -244,14 +247,15 @@ pub(crate) fn close(app: &AppHandle, conversation_id: &str) {
     }
 }
 
-/// Stops the turn in flight and keeps the process. False when this
+/// Stops the person's turn and keeps the process: the one waiting for a woken
+/// turn stops waiting, and the woken turn goes on. False when this
 /// conversation has none, so the caller stops it the other way.
 pub(crate) fn interrupt(app: &AppHandle, conversation_id: &str) -> bool {
     app.try_state::<Residents>()
         .and_then(|residents| {
             residents.0.lock().ok().and_then(|all| {
                 all.get(conversation_id)
-                    .map(|live| live.resident.interrupt())
+                    .map(|live| live.ear.stop_waiting() || live.resident.interrupt())
             })
         })
         .unwrap_or(false)
@@ -269,22 +273,28 @@ fn started_as(turn: &Say<'_>) -> String {
     )
 }
 
-fn wait_for_quiet(listening: &Mutex<Listening>) {
-    // A woken turn is short — an answer to a message — but not bounded by
-    // anything here; the person's turn waits for as long as it takes.
-    while listening
-        .lock()
-        .is_ok_and(|now| !matches!(*now, Listening::Nobody))
-    {
-        std::thread::sleep(Duration::from_millis(100));
+/// A person's turn stopped before it had the process: nothing was said.
+fn stopped() -> Said {
+    Said {
+        end: devpit_rpc::TurnEnd {
+            turn_id: String::new(),
+            cost_usd: None,
+            duration_ms: None,
+            stop_reason: Some("cancelled".to_owned()),
+            is_error: false,
+            context: None,
+        },
+        session_id: None,
+        init: None,
+        anchor: None,
     }
 }
 
 fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, AgentError> {
     let driver =
         devpit_agentcli::driver::driver(&staying.driver).ok_or(AgentError::NotInstalled)?;
-    let listening = Arc::new(Mutex::new(Listening::Nobody));
-    let heard_by = listening.clone();
+    let ear = Arc::new(Ear::default());
+    let heard_by = ear.clone();
     let app = staying.app.clone();
     let conversation = staying.conversation_id.clone();
     let transcript = staying.transcript.clone();
@@ -311,46 +321,18 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
             crate::chat_remote::answered(&answers, said);
             return;
         }
-        let Ok(mut now) = heard_by.lock() else { return };
-        match (&mut *now, heard) {
-            (Listening::Person(tell), Heard::Ended(said)) => {
-                let _ = tell.send(Heard::Ended(said));
-                *now = Listening::Nobody;
-            }
-            // Gone mid-turn: that turn fails, and the conversation is left
-            // quiet so the next one starts a new process instead of waiting
-            // for this one for ever.
-            (Listening::Person(tell), Heard::Gone) => {
-                let _ = tell.send(Heard::Gone);
-                *now = Listening::Nobody;
-            }
-            (Listening::Person(tell), heard) => {
-                let _ = tell.send(heard);
-            }
-            (Listening::Nobody, Heard::Part(part)) => {
-                let mut woken = woke(&app, &conversation, &logs);
-                woken.heard(part);
-                *now = Listening::Woken(woken);
-            }
-            (Listening::Woken(woken), Heard::Part(part)) => woken.heard(part),
-            (Listening::Woken(_), Heard::Ended(said)) => {
-                if let Listening::Woken(woken) = std::mem::take(&mut *now) {
-                    woken.finish(&transcript, &head, said);
-                }
-            }
-            (Listening::Woken(_), Heard::Gone) => {
-                if let Listening::Woken(woken) = std::mem::take(&mut *now) {
-                    woken.frames.send(Frame::Ended { end: gone() }).ok();
-                }
-            }
-            (Listening::Nobody, _) | (_, Heard::Control(_)) => {}
-        }
+        heard_by.hear(
+            heard,
+            || woke(&app, &conversation, &logs),
+            &transcript,
+            &head,
+        );
     })?;
     Ok(Live {
         resident,
         started_as,
         project_id: staying.project_id.clone(),
-        listening,
+        ear,
     })
 }
 
@@ -370,7 +352,7 @@ fn woke(app: &AppHandle, conversation: &str, logs: &std::path::Path) -> Woken {
         turn_id: Some(turn_id.clone()),
         role: Role::Assistant,
         parts: vec![woken_by.clone()],
-        created_at: now(),
+        created_at: crate::chat_listening::now(),
         streaming: true,
     };
     frames.send(Frame::Opened { message: opened }).ok();
@@ -384,59 +366,6 @@ fn woke(app: &AppHandle, conversation: &str, logs: &std::path::Path) -> Woken {
     }
 }
 
-impl Woken {
-    fn heard(&mut self, part: Part) {
-        self.parts.push(part.clone());
-        self.frames
-            .send(Frame::Part {
-                message_id: self.answer_id.clone(),
-                part,
-            })
-            .ok();
-    }
-
-    fn finish(self, transcript: &std::path::Path, head: &std::path::Path, said: Said) {
-        let answered = Message {
-            id: self.answer_id,
-            turn_id: Some(self.turn_id.clone()),
-            role: Role::Assistant,
-            parts: self.parts,
-            created_at: now(),
-            streaming: false,
-        };
-        let _ = append(transcript, &answered);
-        if let Some(opening) = read_head(head) {
-            let after = crate::chat_turn::after(
-                opening,
-                &self.turn_id,
-                &said.end,
-                said.session_id,
-                said.anchor,
-            );
-            let _ = write_head(head, &after);
-        }
-        let end = devpit_rpc::TurnEnd {
-            turn_id: self.turn_id,
-            ..said.end
-        };
-        self.frames.send(Frame::Ended { end }).ok();
-    }
-}
-
-fn now() -> f64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|since| since.as_secs_f64())
-        .unwrap_or_default()
-}
-
-fn gone() -> devpit_rpc::TurnEnd {
-    devpit_rpc::TurnEnd {
-        turn_id: String::new(),
-        cost_usd: None,
-        duration_ms: None,
-        stop_reason: Some("interrupted".to_owned()),
-        is_error: true,
-        context: None,
-    }
-}
+#[cfg(test)]
+#[path = "chat_resident_tests.rs"]
+mod tests;

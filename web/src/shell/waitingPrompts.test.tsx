@@ -64,6 +64,20 @@ describe('the questions sessions are stopped on', () => {
     ;(live as { ask: unknown }).ask = was
   })
 
+  it('drops what the last pick was told once the session asks something else', async () => {
+    const live = await import('./live')
+    const was = live.ask
+    ;(live as { ask: unknown }).ask = () => Promise.resolve({ data: null, error: 'the screen moved on' })
+    const { rerender } = render(<WaitingPrompts profileId="claude" sessions={[asking]} onAnswered={() => {}} />)
+    fireEvent.click(screen.getByText('All at once'))
+    await waitFor(() => expect(screen.getByText('the screen moved on')).toBeTruthy())
+    ;(live as { ask: unknown }).ask = was
+
+    const next = session('api-worker', { question: 'Which branch?', options: [{ label: 'main', hint: null }], cursor: 0 })
+    rerender(<WaitingPrompts profileId="claude" sessions={[next]} onAnswered={() => {}} />)
+    expect(screen.queryByText('the screen moved on')).toBeNull()
+  })
+
   it('dismisses with Esc', async () => {
     render(<WaitingPrompts profileId="claude" sessions={[asking]} onAnswered={() => {}} />)
     fireEvent.click(screen.getByText('Esc'))

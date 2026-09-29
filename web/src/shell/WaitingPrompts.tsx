@@ -15,6 +15,11 @@ import { ask, commands } from './live'
 
 type Waiting = LiveSession & { waiting: PendingPrompt }
 
+/* Which question a session is on: what the last pick was told belongs to it,
+   not to the one the session asks next. */
+export const asked = (waiting: PendingPrompt): string =>
+  [waiting.question, ...waiting.options.map((option) => option.label)].join('\n')
+
 export function WaitingPrompts({
   profileId,
   sessions,
@@ -31,14 +36,14 @@ export function WaitingPrompts({
   // Per session: the pick in flight, so a second click cannot land on the
   // question after this one, and what the last pick was told.
   const [sending, setSending] = useState<ReadonlySet<string>>(new Set())
-  const [said, setSaid] = useState<Readonly<Record<string, string>>>({})
+  const [said, setSaid] = useState<Readonly<Record<string, { to: string; text: string }>>>({})
   const waiting = sessions.filter((one): one is Waiting => one.waiting !== null)
   if (waiting.length === 0) return null
 
   const answer = (one: Waiting, choice: number | null): void => {
     setSending((was) => new Set(was).add(one.name))
     void ask(() => commands.orchestratorAnswer(profileId, one.name, one.waiting, choice)).then((sent) => {
-      setSaid((was) => ({ ...was, [one.name]: sent.error ?? '' }))
+      setSaid((was) => ({ ...was, [one.name]: { to: asked(one.waiting), text: sent.error ?? '' } }))
       setSending((was) => {
         const now = new Set(was)
         now.delete(one.name)
@@ -53,6 +58,8 @@ export function WaitingPrompts({
       <p className="wprompt__t">Waiting on you</p>
       {waiting.map((one) => {
         const busy = sending.has(one.name)
+        const told = said[one.name]?.to === asked(one.waiting) ? said[one.name]!.text : ''
+
         return (
           <div className="wprompt__i" key={one.name}>
             <p className="wprompt__who">
@@ -76,7 +83,7 @@ export function WaitingPrompts({
                 </button>
               )}
             </div>
-            {said[one.name] && <p className="osess__said">{said[one.name]}</p>}
+            {told && <p className="osess__said">{told}</p>}
           </div>
         )
       })}

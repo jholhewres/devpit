@@ -11,7 +11,7 @@ use devpit_agentcli::driver::driver;
 use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head};
 use devpit_agentcli::store::{append, conversation_path, read};
 use devpit_agentcli::talk::{Said, Say};
-use devpit_rpc::{Ask, Conversation, ErrorCode, Frame, Message, Part, Role, RpcError, TurnEnd};
+use devpit_rpc::{Ask, Conversation, ErrorCode, Frame, Message, RpcError, TurnEnd};
 use tauri::ipc::Channel;
 
 use crate::card_activity::Doing;
@@ -126,8 +126,6 @@ pub async fn chat_send(
         permission,
         effort,
     } = ask;
-    // Every frame goes through the relay, so a chat reopened mid-turn can join.
-    let (on_frame, _relaying) = relay.open(&conversation_id, on_frame);
     let home = home();
     let sessions = crate::projects::project_home(&project_id)?.sessions();
     let head_file = head_path(&sessions, &conversation_id);
@@ -182,30 +180,26 @@ pub async fn chat_send(
     let mode = opening.permission.clone();
     let thinking = opening.effort.clone();
     let left = remaining(Some(&opening));
-
-    let asked = Message {
-        id: id("msg"),
-        turn_id: Some(turn_id.clone()),
-        role: Role::User,
-        parts: vec![Part::Text {
-            text: prompt.clone(),
-            parent: None,
-        }],
-        created_at: now(),
-        streaming: false,
+    let staying = crate::chat_resident::staying(
+        &app,
+        &project_id,
+        &conversation_id,
+        &sessions,
+        &profile.driver,
+        mode.as_deref(),
+    );
+    // Every frame goes through the relay, so a chat reopened mid-turn can join.
+    // A turn on a resident process may wait for a woken one: it is heard after it.
+    let (on_frame, relaying) = match staying {
+        Some(_) => relay.waiting(&conversation_id, on_frame),
+        None => relay.open(&conversation_id, on_frame),
     };
-    let _ = append(&file, &asked);
-    let _ = on_frame.send(Frame::Opened { message: asked });
 
-    let answer_id = id("msg");
-    let opened = Message {
-        id: answer_id.clone(),
-        turn_id: Some(turn_id.clone()),
-        role: Role::Assistant,
-        parts: Vec::new(),
-        created_at: now(),
-        streaming: true,
-    };
+    let (asked, opened) = crate::chat_turn::messages(&turn_id, &prompt, now());
+    let answer_id = opened.id.clone();
+    let _ = on_frame.send(Frame::Opened {
+        message: asked.clone(),
+    });
     let _ = on_frame.send(Frame::Opened {
         message: opened.clone(),
     });
@@ -217,14 +211,10 @@ pub async fn chat_send(
     let sink = on_frame.clone();
     let answer = answer_id.clone();
     let hold = crate::asking::holding(mode.as_deref(), &app, on_frame.clone());
-    let staying = crate::chat_resident::staying(
-        &app,
-        &project_id,
-        &conversation_id,
-        &sessions,
-        &profile.driver,
-        mode.as_deref(),
-    );
+    let begin = relaying.beginning();
+    let began = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let beginning = began.clone();
+    let transcript = file.clone();
 
     // Claimed before anything is spawned, and released by the guard however
     // this returns.
@@ -241,7 +231,7 @@ pub async fn chat_send(
     let said = tauri::async_runtime::spawn_blocking(move || {
         let hooks = crate::steps::hook_settings();
         let checkout = std::path::Path::new(&cwd);
-        let before = crate::turn_changes::before(checkout);
+        let mut before = None;
         let said = crate::chat_resident::or_say(
             staying,
             driver.as_ref(),
@@ -263,6 +253,14 @@ pub async fn chat_send(
                 control: Some(&control),
                 on_session: Some(&hold),
                 add_dirs: &reach,
+            },
+            // Only once the turn has the process: a woken turn it waited for
+            // is written first, and its changes are not this turn's.
+            || {
+                before = crate::turn_changes::before(checkout);
+                let _ = append(&transcript, &asked);
+                begin();
+                beginning.store(true, std::sync::atomic::Ordering::SeqCst);
             },
             |part| {
                 collected
@@ -294,6 +292,16 @@ pub async fn chat_send(
     // The guard does both when it goes, including on the `?` above.
     drop(guard);
 
+    // Stopped while it waited for a woken turn: nothing was said, or written.
+    if !began.load(std::sync::atomic::Ordering::SeqCst) {
+        let end = TurnEnd {
+            turn_id,
+            ..said.end
+        };
+        let _ = on_frame.send(Frame::Ended { end: end.clone() });
+        return Ok(end);
+    }
+
     let answered = Message {
         parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
         streaming: false,
@@ -308,8 +316,14 @@ pub async fn chat_send(
         anchor,
     } = said;
     crate::slash::remember(&home, &profile_id, init.as_ref());
-    let head = crate::chat_turn::after(opening, &turn_id, &end, session_id, anchor);
-    let _ = write_head(&head_file, &head);
+    crate::chat_turn::settle(
+        &head_file,
+        Some(opening),
+        &turn_id,
+        &end,
+        session_id,
+        anchor,
+    );
 
     let end = TurnEnd { turn_id, ..end };
     let _ = on_frame.send(Frame::Ended { end: end.clone() });

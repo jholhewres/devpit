@@ -63,10 +63,14 @@ export function SessionTerminal({ session, onGo, onClose }: { session: LiveSessi
   /* Closing the terminal itself — not just this view of it — asks once. */
   const [ending, setEnding] = useState(false)
   const [refused, setRefused] = useState<string | null>(null)
+  /* A pane that was closed is not handed back: its tab would attach again to
+     a pane that is gone. */
+  const closed = useRef<string | null>(null)
   const end = (): void => {
     if (!pane) return
     void ask(() => commands.terminalClose(pane.projectId, pane.paneId)).then((done) => {
       if (done.error) return setRefused(done.error)
+      closed.current = pane.paneId
       onClose()
     })
   }
@@ -76,7 +80,7 @@ export function SessionTerminal({ session, onGo, onClose }: { session: LiveSessi
   useEffect(() => {
     if (!pane) return
     return () => {
-      window.dispatchEvent(new CustomEvent(PANE_FREED, { detail: pane.paneId }))
+      if (closed.current !== pane.paneId) window.dispatchEvent(new CustomEvent(PANE_FREED, { detail: pane.paneId }))
     }
   }, [pane])
 

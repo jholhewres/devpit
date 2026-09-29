@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
-import { applied, ASKS, batched, fixedTo, MODES, rejoin, send, withFiles } from './chat'
+import { applied, ASKS, batched, fixedTo, MODES, opening, rejoin, send, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
@@ -90,7 +90,8 @@ export function useChat(conversationId: string): Chat {
   const [card, setCard] = useState<ChatCard | null>(null)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const live = useRef(true)
+  /* This opening of the conversation; the one before it closed with it. */
+  const opened = useRef<Opening>(opening())
   /* What the conversation's own head said it last ran with; the profile's
      last pick only fills what that leaves empty. */
   const stored = useRef<Modes>({})
@@ -99,22 +100,26 @@ export function useChat(conversationId: string): Chat {
      reloaded — is joined where it is, instead of being said to have died. */
   const rejoined = useCallback(
     (projectId: string, woken = false): void => {
+      const now = opened.current
       const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
-      const running = rejoin(conversationId, (frame) => {
-        if (!live.current) return
-        setSending(true)
-        if (frame.type === 'session') setSession(frame.session_id)
-        else push(frame)
-      })
-      void running?.then((was) => {
+      const joined = now.join(
+        rejoin(conversationId, (frame) => {
+          if (!now.open()) return
+          setSending(true)
+          if (frame.type === 'session') setSession(frame.session_id)
+          else push(frame)
+        }),
+      )
+      void joined?.running.then((was) => {
+        if (!now.open()) return
         flush()
         /* A woken turn can be over before this asks to join it — a short
            answer to a message. It was written down; read it from there. */
-        if ((!was && !woken) || !live.current) return
+        if (!was && !woken) return
         setSending(false)
         // The transcript holds the answer as it was saved, costs and all.
         void ask(() => commands.chatHistory(projectId, conversationId)).then((past) => {
-          if (!live.current || !past.data) return
+          if (!now.open() || !past.data) return
           setMessages(past.data.messages)
           setCost(past.data.costUsd ?? 0)
           setContext(past.data.context ?? null)
@@ -126,14 +131,15 @@ export function useChat(conversationId: string): Chat {
   )
 
   useEffect(() => {
-    live.current = true
-    if (!project) return
+    const now = opening()
+    opened.current = now
+    if (!project) return now.close
     void (async () => {
       const [past, found] = await Promise.all([
         ask(() => commands.chatHistory(project.id, conversationId)),
         ask(() => commands.agentProfiles()),
       ])
-      if (!live.current) return
+      if (!now.open()) return
       const belongs = past.data ? fixedTo(past.data) : null
       if (past.data) {
         setMessages(past.data.messages)
@@ -160,9 +166,7 @@ export function useChat(conversationId: string): Chat {
       setProfileId((was) => was ?? project.orchestrator ?? (installed.length === 1 ? installed[0].id : null))
       setError(past.error ?? found.error)
     })()
-    return () => {
-      live.current = false
-    }
+    return now.close
   }, [project, conversationId, rejoined])
 
   /* Reopened, a conversation goes back to the mode it ran in; a new one to the
@@ -181,7 +185,11 @@ export function useChat(conversationId: string): Chat {
   useEffect(() => {
     if (!project) return
     return onChatWoke((woken) => {
-      if (woken === conversationId) rejoined(project.id, true)
+      if (woken !== conversationId) return
+      /* Joined now, this chat's own turn would reach it twice — through its
+         own channel and the rejoin — so a woken one is joined after it. */
+      if (opened.current.sending) opened.current.woke = true
+      else rejoined(project.id, true)
     })
   }, [project, conversationId, rejoined])
 
@@ -189,7 +197,7 @@ export function useChat(conversationId: string): Chat {
   useEffect(() => {
     const again = (): void =>
       void ask(() => commands.agentProfiles()).then((found) => {
-        if (live.current && found.data) setProfiles(pickable(found.data, fixed))
+        if (opened.current.open() && found.data) setProfiles(pickable(found.data, fixed))
       })
     return onProfilesChanged(again)
   }, [fixed])
@@ -242,9 +250,15 @@ export function useChat(conversationId: string): Chat {
         permission,
         effort,
       }
+      const now = opened.current
       const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
-      const started = send(turn, (frame) => (frame.type === 'session' ? setSession(frame.session_id) : push(frame)))
+      const started = send(turn, (frame) => {
+        if (!now.open()) return
+        if (frame.type === 'session') setSession(frame.session_id)
+        else push(frame)
+      })
       if (!started) return setError('not running in the app')
+      now.sending = true
       setSending(true)
       setError(null)
       setFiles([])
@@ -257,13 +271,14 @@ export function useChat(conversationId: string): Chat {
       setSkills([])
       void started.end
         .then((end) => {
+          if (!now.open()) return
           flush()
           setCost((was) => was + (end.costUsd ?? 0))
           if (end.context) setContext(end.context)
           /* A turn's place in the CLI's transcript is known once it has run. */
           void ask(() => commands.chatHistory(project.id, conversationId)).then(
             (past) => {
-              if (!live.current || !past.data) return
+              if (!now.open() || !past.data) return
               setRewindable(past.data.rewindable ?? [])
               /* A new conversation learns its session from its first turn; until
                  then nothing could tell it to stop and ask. */
@@ -271,20 +286,25 @@ export function useChat(conversationId: string): Chat {
             },
           )
         })
-        .catch((thrown: { message?: string }) => setError(thrown.message ?? 'the turn failed'))
+        .catch((thrown: { message?: string }) => now.open() && setError(thrown.message ?? 'the turn failed'))
         .finally(() => {
+          now.sending = false
+          if (!now.open()) return
           /* Whatever is still waiting for a frame is in before the turn is
              said to be over. */
           flush()
-          if (!live.current) return
           setSending(false)
           /* A question the turn left behind has nobody waiting on it now. */
           setAsked([])
           /* The first turn settles the account for good. */
           setFixed(profileId)
+          if (now.woke) {
+            now.woke = false
+            rejoined(project.id, true)
+          }
         })
     },
-    [project, conversationId, profileId, model, permission, effort, files, skills],
+    [project, conversationId, profileId, model, permission, effort, files, skills, rejoined],
   )
 
   /* A dropped file is resolved against the project root before it is shown:
