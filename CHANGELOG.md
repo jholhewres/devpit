@@ -3,6 +3,62 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.25 — 2026-09-29
+
+### Git
+
+- **Fetch, pull, push and sync** from the Changes panel, with how far ahead
+  and behind the branch is. Pull only fast-forwards: a branch that went two
+  ways is left for a terminal, never half-merged by a button.
+- **The panels follow a commit made anywhere** — in a terminal, by an agent —
+  instead of waiting for the window to lose and regain focus.
+- **The branch menu scrolls**, and filters once there are more than a few.
+- **A deleted file shows its diff** again.
+
+### Terminals
+
+- **A link in a terminal opens in the browser.**
+- **A split stays where its pane was** — in a card's worktree, with its branch
+  shown at once.
+- **Stopping a terminal ends everything it started**, background jobs
+  included; removing a project ends its terminals.
+- **Drop files** on a terminal to type their paths, on the file tree to copy
+  them in, or on Artifacts to keep them.
+- **A new project offers its agents** on the empty screen.
+
+### Orchestrator
+
+- **A stopped session stays stopped.** A background session is stopped by its
+  own CLI, which would otherwise start it again, and every session of that
+  name goes with it.
+- **The chat keeps its turns apart**: a turn another session woke and the
+  person's own no longer mix, land out of order or stop each other, and a chat
+  with Remote Control on is no longer closed by another.
+- **Orchestrators stay where they are** in the rail when you pick one.
+
+### The window
+
+- **The right panel reads as one**: the tab in front says its name, Sessions
+  counts what is waiting on you, and every view has the same heading and the
+  same empty state. Artifacts can be added by hand.
+- **A notice goes to the terminal** the agent is waiting in.
+- **The status strip shows the MCP servers** — how many answer, and why the
+  others do not.
+- **A group of projects can show only the active ones.**
+- **A new worktree can be set up for you**: files copied or linked from the
+  main checkout, commands run, variables set — in Edit project.
+- **An update shows as soon as it is found**, and devpit asks every hour.
+- Less redrawing: the window no longer re-renders itself for every agent
+  report.
+
+### Fixes
+
+- "database is locked" with many terminals open.
+- The board's Add card no longer sits under a long lane.
+- A card's branch keeps its accented letters (`producao`, not `produ-o`).
+- Sessions under a path with `_` are found, and a profile switched off leaves
+  every menu that offers one (thanks, @aronpc).
+
 ## 0.1.24 — 2026-09-26
 
 ### Orchestrator
