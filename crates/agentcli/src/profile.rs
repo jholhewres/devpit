@@ -148,6 +148,7 @@ pub fn profiles(
                 own_models: one.models.clone(),
                 efforts,
                 effort_default,
+                enabled: true,
             }
         })
         .collect();
@@ -190,6 +191,7 @@ pub fn profiles(
             own_models: Vec::new(),
             efforts,
             effort_default,
+            enabled: true,
         });
     }
     all

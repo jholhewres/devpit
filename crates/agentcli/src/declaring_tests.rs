@@ -248,3 +248,13 @@ fn a_home_at_the_front_of_a_value_is_made_absolute() {
         ]
     );
 }
+
+#[test]
+fn one_value_is_made_absolute_the_way_a_saved_profile_is() {
+    assert_eq!(
+        at_home_value("~/.claude-x", "/home/me/"),
+        "/home/me/.claude-x"
+    );
+    assert_eq!(at_home_value("${HOME}", "/home/me"), "/home/me");
+    assert_eq!(at_home_value("/elsewhere/~", "/home/me"), "/elsewhere/~");
+}

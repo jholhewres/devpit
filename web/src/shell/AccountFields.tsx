@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import type { Credentials } from '../gen/bindings'
+import { ask, commands } from './live'
 import type { Draft } from './profiles'
 import { ACCOUNT, hasAccountFields, valueOf, withValue } from './profiles'
 import { modelsOf, modelsText } from './models'
@@ -12,6 +14,29 @@ import { modelsOf, modelsText } from './models'
  * plain editor shows; they are here because a person declaring `claude2`
  * should not need to know the name `CLAUDE_CONFIG_DIR`.
  */
+
+/* What the directory says about signing in, asked for what is typed rather
+   than what was saved. Unknown says nothing: on macOS the Keychain holds it. */
+const SAID: Record<Credentials, string> = {
+  saved: ' Signed in.',
+  missing: ' No sign-in here yet — open a terminal with this profile and run /login.',
+  unknown: '',
+}
+
+function useCredentials(dir: string, asking: boolean): Credentials {
+  const [state, setState] = useState<Credentials>('unknown')
+  useEffect(() => {
+    if (!asking) return
+    let current = true
+    void ask(() => commands.agentSignedIn(dir)).then((answer) => {
+      if (current) setState(answer.data?.state ?? 'unknown')
+    })
+    return () => {
+      current = false
+    }
+  }, [dir, asking])
+  return state
+}
 
 export function AccountFields({
   draft,
@@ -26,6 +51,7 @@ export function AccountFields({
   const [reveal, setReveal] = useState(false)
   const value = (name: string): string => valueOf(draft.env, name)
   const put = (name: string, next: string): void => set({ env: withValue(draft.env, name, next) })
+  const credentials = useCredentials(value(ACCOUNT.config), hasAccountFields(draft.base))
 
   return (
     <>
@@ -43,6 +69,7 @@ export function AccountFields({
             />
             <span className="fld__h">
               Its own sign-in, history, settings, skills and MCP servers. Empty uses ~/.claude.
+              {SAID[credentials]}
             </span>
           </label>
 

@@ -140,16 +140,24 @@ pub fn allowed(declared: &Declared, knows_base: impl Fn(&str) -> bool) -> Result
 /// `.zshrc` would otherwise name a folder called `~`.
 pub fn at_home(mut declared: Declared, home: &str) -> Declared {
     for var in &mut declared.env {
-        let rest = ["~/", "$HOME/", "${HOME}/"]
-            .iter()
-            .find_map(|lead| var.value.strip_prefix(lead));
-        if let Some(rest) = rest {
-            var.value = format!("{}/{rest}", home.trim_end_matches('/'));
-        } else if ["~", "$HOME", "${HOME}"].contains(&var.value.as_str()) {
-            var.value = home.to_owned();
-        }
+        var.value = at_home_value(&var.value, home);
     }
     declared
+}
+
+/// One value, made absolute the way a saved profile's are — for a field that
+/// asks about a value before it is saved.
+pub fn at_home_value(value: &str, home: &str) -> String {
+    let rest = ["~/", "$HOME/", "${HOME}/"]
+        .iter()
+        .find_map(|lead| value.strip_prefix(lead));
+    if let Some(rest) = rest {
+        format!("{}/{rest}", home.trim_end_matches('/'))
+    } else if ["~", "$HOME", "${HOME}"].contains(&value) {
+        home.to_owned()
+    } else {
+        value.to_owned()
+    }
 }
 
 /// A value as one shell word.

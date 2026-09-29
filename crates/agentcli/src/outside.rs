@@ -26,9 +26,13 @@ pub struct Outside {
     pub last_at: f64,
 }
 
-/// The folder name the CLI gives a project root.
+/// The folder name the CLI gives a project root: every character that is not
+/// an ASCII letter or digit becomes `-`, so `_`, spaces and `@` go too.
 pub fn folder_name(root: &Path) -> String {
-    root.to_string_lossy().replace(['/', '.'], "-")
+    root.to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
 }
 
 /// Reads one line into `into`, keeping at most the ceiling. Answers the line's

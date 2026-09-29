@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import type { Card, CardDetail, DeleteRefusal } from '../gen/bindings'
 import type { Tab } from './strip'
 import { ask, commands } from './live'
+import { offers } from './profiles'
 import type { UseBoard } from './useBoard'
 import { liveWork, stopLiveWork, type LiveWork } from './liveWork'
 import { useShell } from './useShell'
@@ -92,7 +93,7 @@ export async function openCardChat(
     ask(() => commands.agentProfiles()),
   ])
   if (!detail.data) return detail.error ?? 'the card could not be read'
-  const installed = (profiles.data ?? []).filter((profile) => profile.path !== null)
+  const installed = (profiles.data ?? []).filter((profile) => profile.path !== null).filter(offers(null))
   const only = installed.length === 1 ? installed[0]!.id : null
   const answer = await ask(() => commands.cardChat(projectId, cardId, only))
   if (!answer.data) return answer.error ?? 'the chat did not open'

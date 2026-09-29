@@ -368,3 +368,45 @@ fn a_step_naming_a_shell_function_is_refused_rather_than_spawned() {
     let why = runner_for(&store, &mine.id).expect_err("it resolved something");
     assert!(why.contains("outside a terminal"), "{why}");
 }
+
+#[test]
+fn a_profile_switched_off_says_so_in_the_list() {
+    // The composer and the step editor read this list, not `agents.known`, so
+    // a switch that only reached the other list switched nothing off for them.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = open(dir.path());
+    let off = written(&store, glm());
+    let on = written(&store, glm_with_secret());
+    store
+        .set_preference(
+            devpit_core::store::preference::AGENTS_DISABLED,
+            &serde_json::to_string(&[&off.id]).expect("json"),
+        )
+        .expect("write");
+
+    let found = all(&store).expect("list");
+    let enabled = |id: &str| found.iter().find(|one| one.id == id).map(|one| one.enabled);
+    assert_eq!(enabled(&off.id), Some(false));
+    assert_eq!(enabled(&on.id), Some(true));
+}
+
+#[test]
+fn a_home_written_before_it_was_made_absolute_is_made_absolute_on_the_way_out() {
+    // Profiles saved before `at_home` ran on save still hold a literal `~`,
+    // which no shell ever expands and which names a folder called `~`.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = open(dir.path());
+    let mut old = glm();
+    old.env[1].value = "~/.claude-glm".to_owned();
+    written(&store, old);
+
+    let home = crate::installations::home().expect("home");
+    let back = stored(&store).expect("read");
+    assert_eq!(
+        back[0].env[1].value,
+        format!(
+            "{}/.claude-glm",
+            home.to_string_lossy().trim_end_matches('/')
+        )
+    );
+}

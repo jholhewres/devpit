@@ -157,3 +157,10 @@ describe('what is here and what could be', () => {
     expect(installed(mixed).length + elsewhere(mixed).length).toBe(mixed.length)
   })
 })
+
+describe('what is switched off', () => {
+  it('shows a profile of their own as off too', () => {
+    const made = catalogue([], [profile('01JGLM')], { defaultId: '', disabled: ['01JGLM'] })
+    expect(made[0]?.enabled).toBe(false)
+  })
+})

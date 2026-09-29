@@ -10,6 +10,7 @@ import {
   blank,
   declaredFrom,
   draftOf,
+  offers,
   hasAccountFields,
   masked,
   ordered,
@@ -224,5 +225,19 @@ describe('the account fields over the variable list', () => {
   it('only offers the fields to the agent that reads them', () => {
     expect(hasAccountFields('claude')).toBe(true)
     expect(hasAccountFields('codex')).toBe(false)
+  })
+})
+
+describe('offers', () => {
+  it('leaves out a profile switched off', () => {
+    expect(offers(null)(profile({ id: 'a', enabled: false }))).toBe(false)
+  })
+
+  it('reads a missing switch as on, like an older answer', () => {
+    expect(offers(null)(profile({ id: 'a', enabled: undefined }))).toBe(true)
+  })
+
+  it('keeps the one already chosen, so what it runs is still shown', () => {
+    expect(offers('a')(profile({ id: 'a', enabled: false }))).toBe(true)
   })
 })
