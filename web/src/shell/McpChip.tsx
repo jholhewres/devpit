@@ -23,6 +23,14 @@ export function summed(servers: readonly McpServerHealth[]): { up: number; all: 
   return { up, all: servers.length, bad: up < servers.length }
 }
 
+/** Active first — the ones answering — then the ones that are not. */
+export function parted(servers: readonly McpServerHealth[]): { title: string; servers: McpServerHealth[] }[] {
+  return [
+    { title: 'Active', servers: servers.filter((one) => one.state === 'connected') },
+    { title: 'Inactive', servers: servers.filter((one) => one.state !== 'connected') },
+  ]
+}
+
 const WORDS: Record<McpServerHealth['state'], string> = {
   connected: 'connected',
   failed: 'failed',
@@ -74,21 +82,33 @@ export function McpChip({ projectId }: { projectId: string | null }): React.JSX.
         <div className="mcpchip__pop" role="dialog" aria-label="MCP servers">
           <div className="mcpchip__h">
             <span>MCP servers{health ? ` · ${health.profileId}` : ''}</span>
-            <button className="mcpchip__again" disabled={asking} onClick={() => check(true)}>
-              {asking ? 'Checking…' : 'Check again'}
+            <button className="mcpchip__again" disabled={asking} onClick={() => check(true)} aria-label="Check the servers again">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" /></svg>
+              {asking ? 'Checking…' : 'Refresh'}
             </button>
           </div>
           {error && <p className="mcpchip__why">{error}</p>}
-          <ul className="mcpchip__list">
-            {(health?.servers ?? []).map((one) => (
-              <li key={one.name} data-state={one.state} title={one.detail ?? one.target}>
-                <i className="mcpchip__dot" />
-                <span className="mcpchip__n">{one.name}</span>
-                <span className="mcpchip__s">{WORDS[one.state]}</span>
-                {one.detail && <span className="mcpchip__why">{one.detail}</span>}
-              </li>
-            ))}
-          </ul>
+          <div className="mcpchip__list">
+            {parted(health?.servers ?? []).map(({ title, servers }) =>
+              servers.length === 0 ? null : (
+                <section key={title}>
+                  <h4 className="mcpchip__g">
+                    {title} <span>{servers.length}</span>
+                  </h4>
+                  <ul>
+                    {servers.map((one) => (
+                      <li key={one.name} data-state={one.state} title={one.detail ?? one.target}>
+                        <i className="mcpchip__dot" />
+                        <span className="mcpchip__n">{one.name}</span>
+                        <span className="mcpchip__s">{WORDS[one.state]}</span>
+                        {one.detail && <span className="mcpchip__why">{one.detail}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ),
+            )}
+          </div>
         </div>
       )}
     </div>

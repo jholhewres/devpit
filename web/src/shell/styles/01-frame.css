@@ -138,9 +138,12 @@
 .strip__go[data-state='bad'] .strip__n { color: var(--warning); }
 .mcpchip__pop { position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 300; width: 340px; max-height: min(420px, 70vh); display: flex; flex-direction: column; padding: 8px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--raised); box-shadow: 0 16px 36px var(--shade); }
 .mcpchip__h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; font-size: 12px; font-weight: 550; color: var(--text-2); }
-.mcpchip__again { font-size: 11.5px; font-weight: 400; color: var(--text-3); padding: 2px 6px; border-radius: 5px; }
+.mcpchip__again { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 400; color: var(--text-3); padding: 2px 6px; border-radius: 5px; }
 .mcpchip__again:hover { color: var(--text); background: var(--overlay); }
-.mcpchip__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; scrollbar-width: thin; }
+.mcpchip__list { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.mcpchip__list ul { list-style: none; margin: 0 0 6px; padding: 0; }
+.mcpchip__g { margin: 4px 4px 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.mcpchip__g span { font-weight: 400; color: var(--ghost); }
 .mcpchip__list li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; padding: 4px; border-radius: 6px; font-size: 12px; }
 .mcpchip__list li:hover { background: var(--overlay); }
 .mcpchip__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
