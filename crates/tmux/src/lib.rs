@@ -19,6 +19,7 @@ mod running;
 mod scratch;
 mod scroll;
 mod shell;
+mod windows;
 pub use pane::Key;
 pub use scratch::Scratch;
 pub use shell::{parse_running, Running, Shell};
@@ -98,7 +99,7 @@ impl Server {
     /// reports back to the pane a person is looking at: a hook fires in a
     /// process three levels below the shell, and the environment is what
     /// reaches down there.
-    fn shell_args(&self, window: &str) -> Vec<String> {
+    pub(crate) fn shell_args(&self, window: &str) -> Vec<String> {
         shell::window_args(self.shell.as_ref(), window)
     }
 
@@ -134,22 +135,14 @@ impl Server {
         Ok(())
     }
 
-    pub fn new_window(&self, session: &str, window: &str, cwd: &Path) -> Result<(), TmuxError> {
-        let cwd = cwd.to_string_lossy().into_owned();
-        let mut argv: Vec<String> = ["new-window", "-t", session, "-n", window, "-c", &cwd]
-            .iter()
-            .map(|part| (*part).to_owned())
-            .collect();
-        argv.extend(self.shell_args(window));
-        self.require(&argv.iter().map(String::as_str).collect::<Vec<_>>())?;
-        self.ensure_client_session(session, window)?;
-        Ok(())
-    }
-
     /// Each visible leaf attaches to a grouped session with its own selected
     /// window. Grouped sessions share the processes but not the current-window
     /// pointer, so two xterms can display two project windows at once.
-    fn ensure_client_session(&self, session: &str, window: &str) -> Result<(), TmuxError> {
+    pub(crate) fn ensure_client_session(
+        &self,
+        session: &str,
+        window: &str,
+    ) -> Result<(), TmuxError> {
         let client = naming::client_session(session, window);
         if !self.has_session(&client)? {
             self.require(&["new-session", "-d", "-t", session, "-s", &client])?;

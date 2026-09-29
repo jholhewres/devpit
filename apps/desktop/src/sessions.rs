@@ -159,24 +159,31 @@ pub(crate) fn persist(store: &Store, tab_id: &str, layout: &SessionLayout) -> Re
     Ok(())
 }
 
-fn load_or_create(project_id: &str, tab_id: &str, cwd: &Path) -> Result<SessionLayout, RpcError> {
+/// `had` is the session's windows before this; `was_in` is where a leaf's
+/// shell last stood, for a window made again.
+fn load_or_create(
+    project_id: &str,
+    tab_id: &str,
+    cwd: &Path,
+    had: &[String],
+    was_in: impl Fn(&str) -> Option<PathBuf>,
+) -> Result<SessionLayout, RpcError> {
     let store = store()?;
     let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(project_id);
 
     if let Some((tree, focused)) = store.pane_layout(project_id, tab_id)? {
         let layout = decode(project_id, &tree, &focused)?;
-        // A window missing before this is one tmux lost with its server, not
-        // one closed on purpose — closing forgets the pane's layout too.
-        let had = match server.has_session(&session).map_err(tmux_err)? {
-            true => server.list_windows(&session).map_err(tmux_err)?,
-            false => Vec::new(),
-        };
         for (leaf_id, _) in layout.tree.leaves() {
+            // A window missing before this is one tmux lost with its server,
+            // not one closed on purpose — closing forgets the pane's layout
+            // too. It comes back where its shell last was, not at the tab's.
+            let lost = !had.iter().any(|name| name == leaf_id);
+            let at = lost.then(|| was_in(leaf_id)).flatten();
             server
-                .ensure_session(&session, leaf_id, cwd)
+                .ensure_session(&session, leaf_id, at.as_deref().unwrap_or(cwd))
                 .map_err(tmux_err)?;
-            if !had.iter().any(|name| name == leaf_id) {
+            if lost {
                 crate::restoring::start_again(&store, &session, leaf_id);
             }
         }
@@ -268,7 +275,17 @@ pub(crate) fn ensure_at(
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let layout = load_or_create(project_id, tab_id, cwd)?;
+    let server = tmux_server()?;
+    let session = devpit_tmux::Server::session_name(project_id);
+    let had = match server.has_session(&session).map_err(tmux_err)? {
+        true => server.list_windows(&session).map_err(tmux_err)?,
+        false => Vec::new(),
+    };
+    // Before anything is made: a tap left by a window that went has to go
+    // first, or the window made again under its leaf is never tapped.
+    crate::leftovers::tidy(state, project_id, &had);
+    let was_in = |leaf: &str| crate::blocks::last_cwd(state.app(), project_id, leaf);
+    let layout = load_or_create(project_id, tab_id, cwd, &had, was_in)?;
     listen(state, project_id, &layout);
     Ok(layout)
 }

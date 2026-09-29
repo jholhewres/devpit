@@ -25,3 +25,16 @@ fn unsaved_work_asks_first_and_force_goes_ahead() {
 fn a_card_with_nothing_going_on_goes() {
     assert_eq!(delete_refusal(0, None, 0, false), None);
 }
+
+#[test]
+fn archiving_asks_first_when_an_agent_works_in_the_cards_terminal() {
+    let asked = archive_refusal(Some("Claude Code"), 0, "/w").expect("asked");
+    assert!(asked.contains("Claude Code") && asked.ends_with("archive anyway?"));
+}
+
+#[test]
+fn archiving_asks_first_about_unsaved_work_and_goes_when_there_is_none() {
+    let asked = archive_refusal(None, 3, "/w").expect("asked");
+    assert!(asked.starts_with("3 changes in /w"));
+    assert_eq!(archive_refusal(None, 0, "/w"), None);
+}

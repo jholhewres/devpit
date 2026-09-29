@@ -178,10 +178,19 @@ pub(crate) fn project_open_now(project_id: String) -> Result<ProjectList, RpcErr
 #[tauri::command]
 #[specta::specta]
 pub async fn project_forget(
+    app: tauri::AppHandle,
     project_id: String,
     wipe_workspace: bool,
 ) -> Result<ProjectList, RpcError> {
-    crate::off_main::blocking(move || project_forget_now(project_id, wipe_workspace)).await
+    crate::off_main::blocking(move || {
+        // Its terminals first, while the rows still say which tabs are its:
+        // a forgotten project's shells are ones nothing can reach again.
+        if let Err(err) = crate::leftovers::end_project(&app, &project_id) {
+            eprintln!("devpit: the terminals of {project_id} were not all ended: {err}");
+        }
+        project_forget_now(project_id, wipe_workspace)
+    })
+    .await
 }
 
 /// [`project_forget`], on the calling thread.

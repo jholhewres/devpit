@@ -98,10 +98,13 @@ pub fn session_resize(
 /// This is what makes reopening a window show a terminal rather than an empty
 /// one. It comes from the ring the reader fills, so it survives the webview
 /// going away and dying with it — the pty never stopped.
+///
+/// Off the main thread: copying and decoding a full ring is megabytes, and a
+/// project switch asks it of every terminal at once.
 #[tauri::command]
 #[specta::specta]
-pub fn pane_scrollback(
-    state: State<SessionState>,
+pub async fn pane_scrollback(
+    state: State<'_, SessionState>,
     pane_id: String,
 ) -> Result<PaneScrollback, RpcError> {
     // A pane nobody has attached yet has no history — which is an answer, not
@@ -114,6 +117,11 @@ pub fn pane_scrollback(
             truncated: false,
         });
     };
+    crate::off_main::blocking(move || scrollback_of(&live)).await
+}
+
+/// [`pane_scrollback`], on the calling thread.
+fn scrollback_of(live: &crate::live::Live) -> Result<PaneScrollback, RpcError> {
     let ring = live
         .ring
         .lock()

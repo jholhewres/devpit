@@ -218,13 +218,13 @@ fn told_if_long(app: &tauri::AppHandle, blocks: &Blocks, pane_id: &str, head: &H
         .lock()
         .ok()
         .and_then(|projects| projects.get(pane_id).cloned());
-    crate::notices::ring(
+    crate::notices::ring_at(
         app,
         project.as_deref(),
         crate::notices::kind::COMMAND,
         &title,
         head.cwd.as_deref(),
-        None,
+        pane_id,
     );
 }
 
@@ -251,12 +251,46 @@ pub(crate) fn pane_blocks_now(
     if let Some(running) = pane.segmenter.running() {
         blocks.push(view(&running.head));
     }
+    let heard = pane.segmenter.cwd().map(str::to_owned);
+    let (integrated, at_prompt) = (pane.segmenter.integrated(), pane.segmenter.at_prompt());
+    drop(pane);
     Ok(PaneBlocks {
         blocks,
-        integrated: pane.segmenter.integrated(),
-        at_prompt: pane.segmenter.at_prompt(),
-        cwd: pane.segmenter.cwd().map(str::to_owned),
+        integrated,
+        at_prompt,
+        cwd: heard.or_else(|| standing_in(&state, &pane_id)),
     })
+}
+
+/// Where tmux says a pane's shell stands, until the shell has said so itself:
+/// a pane that has not reached its first prompt would show no folder, and so
+/// no branch.
+fn standing_in(state: &Blocks, pane_id: &str) -> Option<String> {
+    let project = state.projects.lock().ok()?.get(pane_id).cloned()?;
+    let session = devpit_tmux::Server::session_name(&project);
+    let path = crate::sessions::tmux_server()
+        .ok()?
+        .pane_path(&session, pane_id)?;
+    Some(path.to_string_lossy().into_owned())
+}
+
+/// The folder a pane's shell last said it was in — heard this run, or kept
+/// in its journal — for a window tmux lost and is made again.
+pub(crate) fn last_cwd(
+    app: &tauri::AppHandle,
+    project_id: &str,
+    pane_id: &str,
+) -> Option<std::path::PathBuf> {
+    let blocks = tauri::Manager::try_state::<Blocks>(app)?;
+    blocks.belongs(pane_id, project_id);
+    let pane = blocks.restored(pane_id);
+    let pane = pane.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let said = match pane.segmenter.cwd() {
+        Some(cwd) => Some(cwd.to_owned()),
+        None => pane.history.heads().pop().and_then(|head| head.cwd),
+    };
+    said.map(std::path::PathBuf::from)
+        .filter(|path| path.is_dir())
 }
 
 /// `block.output` — what a block printed, as the terminal received it.

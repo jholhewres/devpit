@@ -6,15 +6,43 @@ use crate::{Server, TmuxError};
 ///
 /// The point is that it does not need a client: tmux keeps piping with
 /// nobody attached, which is what lets a build be watched in a tab you are
-/// not looking at. `-o` makes it a toggle, so arming a pane that is
-/// already piped is not a second pipe.
+/// not looking at. Without `-o`, which is a toggle: arming a pane still piped
+/// from the app's last run closed its pipe instead. Plain, any old pipe is
+/// replaced.
 ///
 /// Measured before relying on it: a reader that dies leaves the pane
 /// running, and a reader that stalls does not stall the pane — 200,000
 /// lines with nobody draining, and the pane still answered.
 pub(crate) fn pipe_pane(server: &Server, target: &str, command: &str) -> Result<(), TmuxError> {
-    server.require(&["pipe-pane", "-o", "-t", target, command])?;
+    server.require(&["pipe-pane", "-t", target, command])?;
     Ok(())
+}
+
+/// One of a pane's own formats, asked of the window's pane in the project's
+/// session — which exists as long as the window does, unlike its client.
+fn pane_format(server: &Server, session: &str, window: &str, format: &str) -> Option<String> {
+    let target = format!("{session}:{window}");
+    let out = server
+        .require(&["display-message", "-p", "-t", &target, format])
+        .ok()?;
+    let said = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+    (!said.is_empty()).then_some(said)
+}
+
+impl Server {
+    /// The folder a pane's shell stands in, as the kernel says — known before
+    /// the shell has said anything about itself.
+    pub fn pane_path(&self, session: &str, window: &str) -> Option<std::path::PathBuf> {
+        pane_format(self, session, window, "#{pane_current_path}").map(Into::into)
+    }
+
+    /// The pid of the shell a window was started with: the leader of the
+    /// session everything typed into it runs in.
+    pub fn pane_pid(&self, session: &str, window: &str) -> Option<u32> {
+        pane_format(self, session, window, "#{pane_pid}")?
+            .parse()
+            .ok()
+    }
 }
 
 /// Stops the pipe. A pane that has none is not an error.

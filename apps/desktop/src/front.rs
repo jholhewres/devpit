@@ -55,48 +55,118 @@ pub(crate) fn card_diff_now(card_id: String) -> Result<Front, RpcError> {
     })
 }
 
-/// `card.archive` — and it refuses while the front holds unsaved work.
+/// `card.archive` — and it refuses while the front holds unsaved work, or an
+/// agent works in the card's terminal.
 ///
 /// `force` is the person saying they know. Nothing here decides on its own
 /// that work nobody committed was not worth keeping.
 #[tauri::command]
 #[specta::specta]
 pub async fn card_archive(
+    app: tauri::AppHandle,
     project_id: String,
     card_id: String,
     force: bool,
 ) -> Result<Board, RpcError> {
-    crate::off_main::blocking(move || card_archive_now(project_id, card_id, force)).await
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        card_archive_now(&state, project_id, card_id, force)
+    })
+    .await
 }
 
 /// [`card_archive`], on the calling thread.
 pub(crate) fn card_archive_now(
+    state: &SessionState,
     project_id: String,
     card_id: String,
     force: bool,
 ) -> Result<Board, RpcError> {
     let store = store()?;
+    let leaves = card_tab_leaves(&project_id, &card_id);
 
     if !force {
-        if let Some(path) = store.card(&card_id)?.and_then(|card| card.worktree_path) {
-            let unsaved = devpit_git::unsaved_in(std::path::Path::new(&path))
-                .map_err(|err| RpcError::internal(err.to_string()))?;
-            if !unsaved.is_empty() {
-                return Err(RpcError::new(
-                    ErrorCode::Conflict,
-                    format!(
-                        "{} change{} in {path} that nothing has saved — archive anyway?",
-                        unsaved.len(),
-                        if unsaved.len() == 1 { "" } else { "s" }
-                    ),
-                ));
-            }
+        let agent = live_agent_in(&project_id, &leaves)?;
+        let path = store.card(&card_id)?.and_then(|card| card.worktree_path);
+        let unsaved = match &path {
+            Some(path) => devpit_git::unsaved_in(std::path::Path::new(path))
+                .map_err(|err| RpcError::internal(err.to_string()))?
+                .len(),
+            None => 0,
+        };
+        let path = path.unwrap_or_default();
+        if let Some(refused) = archive_refusal(agent.as_deref(), unsaved, &path) {
+            return Err(RpcError::new(ErrorCode::Conflict, refused));
         }
     }
 
+    // Archived is put away: a terminal left open on it is one nothing lists.
+    if !leaves.is_empty() {
+        close_card_tab(state, &project_id, &card_id)?;
+    }
     store.archive_card(&card_id)?;
     crate::card_activity::card_ended(&card_id);
     board_get_now(project_id)
+}
+
+/// Why `card.archive` asks first, or nothing. Every answer can be forced:
+/// archiving is the person's call, once they know what it stops.
+pub(crate) fn archive_refusal(
+    live_agent: Option<&str>,
+    unsaved: usize,
+    path: &str,
+) -> Option<String> {
+    if let Some(agent) = live_agent {
+        return Some(format!(
+            "{agent} is running in this card's terminal, and archiving stops it — archive anyway?"
+        ));
+    }
+    (unsaved > 0).then(|| {
+        format!(
+            "{unsaved} change{} in {path} that nothing has saved — archive anyway?",
+            if unsaved == 1 { "" } else { "s" }
+        )
+    })
+}
+
+/// The panes of a card's terminal tab, none when it has no tab.
+fn card_tab_leaves(project_id: &str, card_id: &str) -> Vec<String> {
+    layout_of(project_id, &tab_for_card(card_id))
+        .map(|layout| {
+            layout
+                .tree
+                .leaves()
+                .into_iter()
+                .map(|(leaf, _)| leaf.to_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The agent open in one of these panes, by the name a person knows it by.
+fn live_agent_in(project_id: &str, leaves: &[String]) -> Result<Option<String>, RpcError> {
+    // Only asked when the card has a terminal: it spawns tmux and ps.
+    if leaves.is_empty() {
+        return Ok(None);
+    }
+    Ok(crate::shell_launch::running_in(project_id)?
+        .into_iter()
+        .find(|pane| pane.agent.is_some() && leaves.contains(&pane.pane_id))
+        .map(|pane| pane.label))
+}
+
+/// Closes a card's terminal tab, and tells the window, which lets a tab
+/// closed from here go the way it does one an orchestrator stopped.
+fn close_card_tab(state: &SessionState, project_id: &str, card_id: &str) -> Result<(), RpcError> {
+    let tab_id = tab_for_card(card_id);
+    let closed = crate::arranging::close_tab(state, project_id, &tab_id)?;
+    crate::card_activity::panes_closed(state.app(), &closed);
+    let _ = tauri::Emitter::emit(
+        state.app(),
+        crate::stopping::TAB_CLOSED,
+        serde_json::json!({ "projectId": project_id, "tabId": tab_id }),
+    );
+    Ok(())
 }
 
 /// Why `card.delete` will not go ahead, or nothing.
@@ -167,26 +237,8 @@ pub(crate) fn card_delete_now(
         .filter(|run| run.state == "running")
         .count();
 
-    let tab = tab_for_card(&card_id);
-    let leaves: Vec<String> = layout_of(&project_id, &tab)
-        .map(|layout| {
-            layout
-                .tree
-                .leaves()
-                .into_iter()
-                .map(|(leaf, _)| leaf.to_owned())
-                .collect()
-        })
-        .unwrap_or_default();
-    // Only asked when the card has a terminal: it spawns tmux and ps.
-    let agent = if leaves.is_empty() {
-        None
-    } else {
-        crate::shell_launch::running_in(&project_id)?
-            .into_iter()
-            .find(|pane| pane.agent.is_some() && leaves.contains(&pane.pane_id))
-            .map(|pane| pane.label)
-    };
+    let leaves = card_tab_leaves(&project_id, &card_id);
+    let agent = live_agent_in(&project_id, &leaves)?;
 
     let unsaved = match card.worktree_path.as_deref().map(std::path::Path::new) {
         Some(path) if path.is_dir() => devpit_git::unsaved_in(path)
@@ -202,7 +254,7 @@ pub(crate) fn card_delete_now(
         });
     }
     if !leaves.is_empty() {
-        crate::arranging::close_tab(&state, &project_id, &tab)?;
+        close_card_tab(&state, &project_id, &card_id)?;
     }
     let deleted = store.delete_card(&card_id)?;
     if deleted {

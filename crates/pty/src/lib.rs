@@ -31,6 +31,7 @@ pub mod journal;
 mod osc;
 mod reader;
 mod ring;
+mod session;
 pub mod shell;
 mod stopping;
 pub mod usage;
@@ -39,6 +40,7 @@ pub use foreground::{all_on as fronts_on, at_a_prompt, looking, on as front_on, 
 pub use osc::{Scanner, Span, Told, MOST_CARRIED};
 pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;
+pub use session::{members as session_members, stop_members, AGENT_GRACE};
 pub use stopping::{stop, stop_group, Stopped, GRACE};
 
 use std::io::Write;

@@ -45,7 +45,6 @@ pub(crate) fn session_split_now(
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
     let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(&project_id);
 
@@ -56,11 +55,31 @@ pub(crate) fn session_split_now(
             "that pane is not in this project's layout",
         ));
     }
+    // Where the pane it splits from stands: a card's tab is in its worktree,
+    // and the project root would put the new pane on another branch.
+    let cwd = match server
+        .pane_path(&session, &leaf_id)
+        .filter(|path| path.is_dir())
+    {
+        Some(path) => path,
+        None => locate_cwd(&project_id, worktree_id.as_deref())?,
+    };
 
     let new_id = format!("leaf_{}", Ulid::generate());
-    server
-        .new_window(&session, &new_id, &cwd)
-        .map_err(tmux_err)?;
+    // Tapped as it is made, like every other leaf, or it has no blocks and
+    // never says its folder.
+    let made = match state.taps.ahead_of(state.app(), &project_id, &new_id) {
+        Some(pipe) => server.new_window_piped(&session, &new_id, &cwd, &pipe),
+        None => server.new_window(&session, &new_id, &cwd),
+    };
+    if let Err(err) = made {
+        let target = devpit_tmux::Server::target(&session, &new_id);
+        state.taps.forget(&server, &new_id, &target);
+        return Err(tmux_err(err));
+    }
+    if let Some(blocks) = tauri::Manager::try_state::<crate::blocks::Blocks>(state.app()) {
+        blocks.belongs(&new_id, &project_id);
+    }
     let new_leaf = LayoutNode::leaf(
         new_id.clone(),
         devpit_tmux::Server::target(&session, &new_id),
@@ -141,7 +160,7 @@ pub(crate) fn session_close_leaf_now(
         &leaf_id,
         &devpit_tmux::Server::target(&session, &leaf_id),
     );
-    crate::tap::stop_whatever_runs(&server, &session, &leaf_id);
+    crate::tap::stop_whatever_runs(&server, &session, &[leaf_id.as_str()]);
     server.kill_window(&session, &leaf_id).map_err(tmux_err)?;
     crate::blocks::closed(&app, &project_id, &leaf_id);
     // A pane closed on purpose is not one to start an agent in again.
@@ -269,10 +288,13 @@ pub(crate) fn close_tab(
         .collect();
     let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(project_id);
-    for (leaf_id, _) in layout.tree.leaves() {
+    let leaves: Vec<&str> = closed.iter().map(String::as_str).collect();
+    for leaf_id in &leaves {
         let target = devpit_tmux::Server::target(&session, leaf_id);
         state.taps.forget(&server, leaf_id, &target);
-        crate::tap::stop_whatever_runs(&server, &session, leaf_id);
+    }
+    crate::tap::stop_whatever_runs(&server, &session, &leaves);
+    for leaf_id in leaves {
         let _ = server.kill_window(&session, leaf_id);
         crate::blocks::closed(state.app(), project_id, leaf_id);
         let _ = store()?.forget_pane_agent(leaf_id);

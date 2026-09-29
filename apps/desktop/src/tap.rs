@@ -23,7 +23,7 @@
 
 use std::collections::HashMap;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -39,6 +39,9 @@ use tauri::State;
 struct Tap {
     /// Cleared to stop the reader; it checks between reads.
     listening: Arc<AtomicBool>,
+    /// Whose session the window is in, so tidying one project never ends
+    /// another's taps.
+    project: String,
 }
 
 /// Every pane this app is listening to, across projects.
@@ -60,6 +63,7 @@ impl Taps {
         &self,
         app: &tauri::AppHandle,
         server: &devpit_tmux::Server,
+        project_id: &str,
         leaf_id: &str,
         target: &str,
     ) {
@@ -69,29 +73,26 @@ impl Taps {
         if open.contains_key(leaf_id) {
             return;
         }
-        let Some(path) = fifo_for(leaf_id) else {
+        let Some(pipe) = start(&mut open, app, project_id, leaf_id) else {
             return;
         };
-        if make_fifo(&path).is_err() {
-            return;
+        if server.pipe_pane(target, &pipe).is_err() {
+            if let Some(tap) = open.remove(leaf_id) {
+                end(&tap, leaf_id);
+            }
         }
-        // Quoted: a path with a space in it would otherwise become two
-        // arguments to the shell tmux runs this through.
-        if server
-            .pipe_pane(target, &format!("cat > '{}'", path.display()))
-            .is_err()
-        {
-            return;
-        }
+    }
 
-        let listening = Arc::new(AtomicBool::new(true));
-        open.insert(
-            leaf_id.to_owned(),
-            Tap {
-                listening: Arc::clone(&listening),
-            },
-        );
-        spawn_reader(app.clone(), leaf_id.to_owned(), path, listening);
+    /// Starts reading for a window about to be made, and answers the pipe to
+    /// make it with, so nothing it prints first is missed.
+    pub(crate) fn ahead_of(
+        &self,
+        app: &tauri::AppHandle,
+        project_id: &str,
+        leaf_id: &str,
+    ) -> Option<String> {
+        let mut open = self.open.lock().ok()?;
+        start(&mut open, app, project_id, leaf_id)
     }
 
     /// Stops listening. The pane keeps running; only the copy ends.
@@ -99,24 +100,132 @@ impl Taps {
         let Ok(mut open) = self.open.lock() else {
             return;
         };
-        let Some(tap) = open.remove(leaf_id) else {
-            let _ = server.unpipe(target);
-            return;
-        };
-        tap.listening.store(false, Ordering::Relaxed);
+        let tap = open.remove(leaf_id);
         let _ = server.unpipe(target);
-
-        // The reader is blocked inside `read` and only looks at the flag
-        // between reads, so a quiet pane would leave a thread waiting on a
-        // fifo forever. One byte wakes it; it sees the flag and leaves.
-        if let Some(path) = fifo_for(leaf_id) {
-            if let Ok(mut waking) = std::fs::OpenOptions::new().write(true).open(&path) {
-                use std::io::Write;
-                let _ = waking.write_all(b"\0");
-            }
-            let _ = std::fs::remove_file(path);
+        if let Some(tap) = tap {
+            end(&tap, leaf_id);
         }
     }
+
+    /// Ends the taps of a project whose window has gone, and the fifos
+    /// nothing reads.
+    ///
+    /// A shell that exits by itself takes its window with it and tells nobody,
+    /// so its tap stayed — thread, fifo and entry — and the entry kept a
+    /// window made again under the same leaf from ever being tapped.
+    pub(crate) fn sweep(&self, server: &devpit_tmux::Server, project_id: &str, windows: &[String]) {
+        let Ok(mut open) = self.open.lock() else {
+            return;
+        };
+        let listed = open
+            .iter()
+            .map(|(leaf, tap)| (leaf.as_str(), tap.project.as_str()));
+        for leaf in gone(listed, project_id, windows) {
+            if let Some(tap) = open.remove(&leaf) {
+                end(&tap, &leaf);
+            }
+        }
+        let Some(root) = taps_root() else {
+            return;
+        };
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            return;
+        };
+        let unread: Vec<(String, PathBuf)> = entries
+            .flatten()
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                let leaf = name.strip_suffix(".fifo")?.to_owned();
+                (!open.contains_key(&leaf)).then(|| (leaf, entry.path()))
+            })
+            .collect();
+        if unread.is_empty() {
+            return;
+        }
+        // Every session's windows: a fifo of a project not opened since the
+        // app started is still that window's, and is armed again when it is.
+        let anywhere = server.all_windows().unwrap_or_default();
+        for (leaf, path) in unread {
+            if !anywhere.contains(&leaf) {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+}
+
+/// The leaves of `project_id` among `taps` whose window is not in `windows`.
+pub(crate) fn gone<'a>(
+    taps: impl Iterator<Item = (&'a str, &'a str)>,
+    project_id: &str,
+    windows: &[String],
+) -> Vec<String> {
+    taps.filter(|(leaf, project)| {
+        *project == project_id && !windows.iter().any(|window| window == leaf)
+    })
+    .map(|(leaf, _)| leaf.to_owned())
+    .collect()
+}
+
+/// Makes the fifo, starts its reader and answers what tmux pipes into it.
+fn start(
+    open: &mut HashMap<String, Tap>,
+    app: &tauri::AppHandle,
+    project_id: &str,
+    leaf_id: &str,
+) -> Option<String> {
+    let path = fifo_for(leaf_id)?;
+    make_fifo(&path).ok()?;
+    let listening = Arc::new(AtomicBool::new(true));
+    open.insert(
+        leaf_id.to_owned(),
+        Tap {
+            listening: Arc::clone(&listening),
+            project: project_id.to_owned(),
+        },
+    );
+    let pipe = pipe_command(&path);
+    spawn_reader(app.clone(), leaf_id.to_owned(), path, listening);
+    Some(pipe)
+}
+
+/// What tmux runs to copy a pane into its fifo.
+///
+/// `exec`, so the shell tmux runs this through becomes `cat` rather than
+/// waiting on it: one process per pane, not two. Quoted whole, with any
+/// quote in the path closed and reopened, because tmux hands it to `sh -c`.
+pub(crate) fn pipe_command(path: &Path) -> String {
+    let path = path.to_string_lossy().replace('\'', "'\\''");
+    format!("exec cat > '{path}'")
+}
+
+/// Ends a tap's reader and removes its fifo.
+fn end(tap: &Tap, leaf_id: &str) {
+    tap.listening.store(false, Ordering::Relaxed);
+    // The reader is blocked inside `read` and only looks at the flag between
+    // reads, so a quiet pane would leave a thread waiting on a fifo forever.
+    // One byte wakes it; it sees the flag and leaves. Non-blocking, so a
+    // reader that never opened the fifo cannot hang this instead.
+    if let Some(path) = fifo_for(leaf_id) {
+        if let Ok(mut waking) = waking(&path) {
+            use std::io::Write;
+            let _ = waking.write_all(b"\0");
+        }
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+#[cfg(unix)]
+fn waking(path: &Path) -> std::io::Result<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)
+}
+
+#[cfg(not(unix))]
+fn waking(path: &Path) -> std::io::Result<std::fs::File> {
+    std::fs::OpenOptions::new().write(true).open(path)
 }
 
 /// Where a pane's copy arrives.
@@ -131,13 +240,17 @@ fn fifo_for(leaf_id: &str) -> Option<PathBuf> {
     {
         return None;
     }
+    Some(taps_root()?.join(format!("{leaf_id}.fifo")))
+}
+
+fn taps_root() -> Option<PathBuf> {
     let root = devpit_core::Store::root().ok()?.join("taps");
     std::fs::create_dir_all(&root).ok()?;
-    Some(root.join(format!("{leaf_id}.fifo")))
+    Some(root)
 }
 
 #[cfg(unix)]
-fn make_fifo(path: &std::path::Path) -> std::io::Result<()> {
+fn make_fifo(path: &Path) -> std::io::Result<()> {
     use std::os::unix::ffi::OsStrExt;
     if path.exists() {
         return Ok(());
@@ -220,7 +333,9 @@ pub(crate) fn listen(state: &State<SessionState>, project_id: &str, layout: &Ses
             blocks.belongs(leaf_id, project_id);
         }
         let target = devpit_tmux::Server::target(&session, leaf_id);
-        state.taps.watch(state.app(), &server, leaf_id, &target);
+        state
+            .taps
+            .watch(state.app(), &server, project_id, leaf_id, &target);
     }
 }
 
@@ -232,9 +347,29 @@ pub(crate) fn listen(state: &State<SessionState>, project_id: &str, layout: &Ses
 /// init, still working, with nothing left able to reach it. The close prompt
 /// says "this will stop the agent's current work", and it has to be true.
 ///
-/// A pane sitting at its prompt is left alone. Killing an idle shell's group
-/// is violence for nothing; the window going is enough.
-pub(crate) fn stop_whatever_runs(server: &devpit_tmux::Server, session: &str, leaf_id: &str) {
+/// Everything the pane's shell started, not only what is in front: a job in
+/// the background and an agent's `setsid` children outlived the foreground
+/// group. Every leaf at once, so a tab of several pays one grace, not one
+/// each. A shell with nothing under it is left to the window going.
+pub(crate) fn stop_whatever_runs(server: &devpit_tmux::Server, session: &str, leaves: &[&str]) {
+    let shells: Vec<u32> = leaves
+        .iter()
+        .filter_map(|leaf| server.pane_pid(session, leaf))
+        .collect();
+    match devpit_pty::session_members(&shells) {
+        Some(members) => {
+            devpit_pty::stop_members(&members, devpit_pty::AGENT_GRACE);
+        }
+        None => {
+            for leaf in leaves {
+                stop_the_front(server, session, leaf);
+            }
+        }
+    }
+}
+
+/// Where the process table cannot be read: the foreground group only.
+fn stop_the_front(server: &devpit_tmux::Server, session: &str, leaf_id: &str) {
     let Ok(panes) = server.running(session) else {
         return;
     };
@@ -251,3 +386,7 @@ pub(crate) fn stop_whatever_runs(server: &devpit_tmux::Server, session: &str, le
     }
     devpit_pty::stop_group(front.pgid, devpit_pty::GRACE);
 }
+
+#[cfg(test)]
+#[path = "tap_tests.rs"]
+mod tests;
