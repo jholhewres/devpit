@@ -26,6 +26,7 @@ jobs:
       - name: Probe
         continue-on-error: true
         run: |
+          set +e
           T="$(mktemp -d)"
           probe() { echo "\$ tmux $*"; tmux "$@"; echo "  -> exit $?"; }
           for NS in "-S $T/s.sock" "-L devpitprobe"; do
