@@ -12,6 +12,7 @@ import { abandoned, committed } from './typing'
 
 export function RailGroup({
   name,
+  hidden,
   folded,
   renaming,
   over,
@@ -23,6 +24,8 @@ export function RailGroup({
   clicked,
 }: {
   name: string
+  /** Projects a filter to the active ones is keeping out of sight. */
+  hidden: number
   folded: boolean
   renaming: boolean
   /** Where a drag over it would land: before, after, or into the group. */
@@ -73,6 +76,11 @@ export function RailGroup({
       }}
     >
       <span className="rail__gname">{name}</span>
+      {hidden > 0 && (
+        <span className="rail__ghid" title={`${hidden} not active — right-click to show all`}>
+          +{hidden}
+        </span>
+      )}
       <span className="rail__gchev" data-open={!folded}>
         <ChevronDown size={12} />
       </span>

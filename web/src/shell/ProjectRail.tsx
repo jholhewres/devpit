@@ -8,7 +8,7 @@ import { ProjectMark } from './ProjectMark'
 import { RailGroup } from './RailGroup'
 import { RailOrchestrators } from './RailOrchestrators'
 import { RailMenu, type RailItem } from './RailMenu'
-import { ordered, placed, saveGroups, savedGroups, saveOrder, savedOrder, saveShut, savedShut, sections, shown } from './rail'
+import { ordered, placed, saveActiveOnly, savedActiveOnly, saveGroups, savedGroups, saveOrder, savedOrder, saveShut, savedShut, sections, shown } from './rail'
 import { remembered } from './tabs'
 import { useRailDrag, type Grab, type Spot } from './useRailDrag'
 import { useShell } from './useShell'
@@ -35,6 +35,7 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
   const { projects, project, setProject, open, reloadProjects } = useShell()
   const [order, setOrder] = useState<readonly string[]>(savedOrder)
   const [shut, setShut] = useState<ReadonlySet<string>>(savedShut)
+  const [activeOnly, setActiveOnly] = useState<ReadonlySet<string>>(savedActiveOnly)
   const [groupOrder, setGroupOrder] = useState<readonly string[]>(savedGroups)
   const scroller = useRef<HTMLDivElement>(null)
   const [editing, setEditing] = useState<Project | null>(null)
@@ -139,7 +140,19 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
     { label: 'Remove…', glyph: <Trash />, act: () => onRemove(one.id), bad: true },
   ]
 
+  const filter = (group: string): void =>
+    setActiveOnly((was) => {
+      const next = new Set(was)
+      if (!next.delete(group)) next.add(group)
+      saveActiveOnly(next)
+      return next
+    })
+
   const groupMenu = (group: string): readonly RailItem[] => [
+    activeOnly.has(group)
+      ? { label: 'Show all projects', glyph: <Folder />, act: () => filter(group) }
+      : { label: 'Show only active', glyph: <Folder />, act: () => filter(group) },
+    'rule',
     { label: 'Rename group…', glyph: <Pencil />, act: () => setRenaming(group) },
     { label: 'Ungroup', glyph: <Close />, act: () => renameGroup(group, '') },
   ]
@@ -154,11 +167,17 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
         <div className="rail__list" ref={scroller}>
           {all.map((section) => {
             const folded = section.group !== null && shut.has(section.group)
+            const only =
+              section.group !== null && activeOnly.has(section.group)
+                ? { active: (id: string) => tabsOf(id) > 0, current: project?.id ?? null }
+                : undefined
+            const listed = shown(section, folded, only)
             return (
               <div className="rail__sect" key={section.group ?? ''} data-folded={folded ? 'true' : undefined}>
                 {section.group && (
                   <RailGroup
                     name={section.group}
+                    hidden={folded ? 0 : section.projects.length - listed.length}
                     folded={folded}
                     renaming={renaming === section.group}
                     onToggle={() => fold(section.group!)}
@@ -174,7 +193,7 @@ export function ProjectRail({ onAddProject, onRemove }: { onAddProject: () => vo
                     clicked={drag.clicked}
                   />
                 )}
-                {shown(section, folded).map((one) => {
+                {listed.map((one) => {
                   const tabs = tabsOf(one.id)
                   const branch = (one.worktrees.find((tree) => tree.current) ?? one.worktrees[0])?.branch
                   return (

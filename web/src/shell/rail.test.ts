@@ -65,6 +65,13 @@ describe('the order of groups', () => {
     expect(sections(list, []).map((one) => one.group)).toEqual([null, 'Work', 'Home'])
   })
 
+  it('shows only the active of a filtered group, and always the one in front', () => {
+    const [work] = sections([project('a', 'a', 'Work'), project('b', 'b', 'Work'), project('c', 'c', 'Work')])
+    const only = { active: (id: string) => id === 'a', current: 'c' }
+    expect(shown(work!, false, only).map((one) => one.id)).toEqual(['a', 'c'])
+    expect(shown(work!, true, only)).toEqual([])
+  })
+
   it('shows nothing of a folded group', () => {
     const [work] = sections([project('a', 'a', 'Work')])
     expect(shown(work!, true)).toEqual([])

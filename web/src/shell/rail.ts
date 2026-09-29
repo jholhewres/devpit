@@ -145,7 +145,34 @@ export function saveShut(shut: ReadonlySet<string>): void {
   }
 }
 
-/** What a group shows: all of it when open, nothing when folded. */
-export function shown(section: Section, folded: boolean): readonly Project[] {
-  return folded ? [] : section.projects
+/* The groups showing only their active projects, remembered per window. */
+const ACTIVE_KEY = 'devpit.rail.activeOnly'
+
+export function savedActiveOnly(): ReadonlySet<string> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? '[]')
+    return new Set(Array.isArray(raw) ? raw.filter((one): one is string => typeof one === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+export function saveActiveOnly(groups: ReadonlySet<string>): void {
+  try {
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify([...groups]))
+  } catch {
+    /* The filter still applies for as long as the window is open. */
+  }
+}
+
+/** What a group shows: nothing when folded; when it shows only the active,
+ *  those — and the project in front, which is never hidden from under you. */
+export function shown(
+  section: Section,
+  folded: boolean,
+  only?: { active: (id: string) => boolean; current: string | null },
+): readonly Project[] {
+  if (folded) return []
+  if (!only) return section.projects
+  return section.projects.filter((one) => one.id === only.current || only.active(one.id))
 }
