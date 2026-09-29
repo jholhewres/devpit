@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import type { PrefsPane } from './shape'
 
@@ -27,15 +27,13 @@ export function useOverlays(): Overlays {
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
   const [managing, setManaging] = useState(false)
 
+  // Stable, so a component picking one of them re-renders for nothing else.
+  const openPrefs = useCallback((pane: PrefsPane = 'account') => setPrefs(pane), [])
+  const closePrefs = useCallback(() => setPrefs(null), [])
+  const openManager = useCallback(() => setManaging(true), [])
+  const closeManager = useCallback(() => setManaging(false), [])
   return useMemo(
-    () => ({
-      prefs,
-      openPrefs: (pane: PrefsPane = 'account') => setPrefs(pane),
-      closePrefs: () => setPrefs(null),
-      managing,
-      openManager: () => setManaging(true),
-      closeManager: () => setManaging(false),
-    }),
-    [prefs, managing],
+    () => ({ prefs, openPrefs, closePrefs, managing, openManager, closeManager }),
+    [prefs, managing, openPrefs, closePrefs, openManager, closeManager],
   )
 }

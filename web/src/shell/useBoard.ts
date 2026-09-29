@@ -129,19 +129,18 @@ export function useBoard(projectId: string | null): UseBoard {
   /* What a card's sessions are doing arrives many times a turn, for one card.
      Only that card's tile changes with it; the board is not read again. */
   const [sessions, setSessions] = useState<Readonly<Record<string, readonly CardSession[]>>>({})
+  const onBoard = useRef<ReadonlySet<string>>(new Set())
+  useEffect(() => {
+    onBoard.current = new Set(board?.cards.map((card) => card.id))
+  }, [board])
   useEffect(
     () =>
       onCarried<CardHappening>('card:happening', (happening) => {
-        setBoard(
-          (was) =>
-            was && {
-              ...was,
-              cards: was.cards.map((card) =>
-                card.id === happening.cardId ? { ...card, activity: happening.activity } : card,
-              ),
-            },
+        if (!onBoard.current.has(happening.cardId)) return
+        setBoard((was) => withActivity(was, happening))
+        setSessions((was) =>
+          same(was[happening.cardId], happening.sessions) ? was : { ...was, [happening.cardId]: happening.sessions },
         )
-        setSessions((was) => ({ ...was, [happening.cardId]: happening.sessions }))
       }),
     [],
   )
@@ -344,5 +343,21 @@ export function useBoard(projectId: string | null): UseBoard {
     setFlow,
     steps: board?.steps ?? [],
     reload,
+  }
+}
+
+/* The same answer twice is not a change: every project's cards arrive here,
+   and a new board object for each re-drew every tile of this one. */
+const same = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a) === JSON.stringify(b)
+
+/** The board with one card's activity replaced — the same board when the card
+ *  is not on it or its activity did not change. */
+export function withActivity(board: Board | null, happening: CardHappening): Board | null {
+  if (!board) return board
+  const card = board.cards.find((one) => one.id === happening.cardId)
+  if (!card || same(card.activity, happening.activity)) return board
+  return {
+    ...board,
+    cards: board.cards.map((one) => (one.id === happening.cardId ? { ...one, activity: happening.activity } : one)),
   }
 }

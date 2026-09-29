@@ -72,3 +72,23 @@ function usePicked<T>(store: ShellStore, pick: (shell: Shell) => T): T {
   }, [store])
   return useSyncExternalStore(store.subscribe, snapshot, snapshot)
 }
+
+/* What the window's frame reads: a slice, not the whole shell — it draws
+   every other component, and re-rendering it for each agent report re-drew
+   the whole window. */
+export function useWindowShell() {
+  return useShellPick((all) => ({
+    side: all.side,
+    files: all.files,
+    widths: all.widths,
+    signedIn: all.signedIn,
+    palette: all.palette,
+    openPalette: all.openPalette,
+    closePalette: all.closePalette,
+    show: all.show,
+    theme: all.theme,
+    openPrefs: all.openPrefs,
+    closePrefs: all.closePrefs,
+    closeManager: all.closeManager,
+  }))
+}

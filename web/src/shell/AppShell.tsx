@@ -12,7 +12,8 @@ import { Sidebar } from './Sidebar'
 import { StatusStrip } from './StatusStrip'
 import { TopBar } from './TopBar'
 import { PluginsProvider } from './usePlugins'
-import { ShellProvider, useShell } from './useShell'
+import { ShellProvider } from './useShell'
+import { useWindowShell } from './shellStore'
 import { shortcutFor } from './shortcuts'
 import { isMaximized, onResized } from './window'
 import { abandoned } from './typing'
@@ -36,7 +37,7 @@ export function AppShell(): React.JSX.Element {
  * time the tree is hidden.
  */
 function Window(): React.JSX.Element {
-  const shell = useShell()
+  const shell = useWindowShell()
   const { side, files, widths, signedIn, palette, openPalette, closePalette } = shell
   const [signIn, setSignIn] = useState(false)
   const [adding, setAdding] = useState(false)

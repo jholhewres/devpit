@@ -17,6 +17,7 @@ import { useProjects } from './useProjects'
 import { useRunning } from './useRunning'
 import { useTheme } from './useTheme'
 import { createShellStore, ShellStoreContext } from './shellStore'
+import { useShellActions } from './shellActions'
 
 export type { Closing } from './useClosing'
 export type { PrefsPane, Theme } from './shape'
@@ -67,6 +68,16 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
 
   const { theme, setTheme } = useTheme(setConfirmStop)
 
+  const actions = useShellActions({
+    setSide,
+    setFiles,
+    setPalette,
+    pickProject: projects.setProject,
+    closePrefs: overlays.closePrefs,
+    startSignIn: membership.signIn,
+    endSignOut: membership.signOut,
+  })
+
   const value = useMemo<Shell>(
     () => ({
       ...tabs,
@@ -82,31 +93,17 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       side,
       files,
       ...sizing,
-      toggleSide: () => setSide((was) => !was),
-      toggleFiles: () => setFiles((was) => !was),
       theme,
       setTheme,
       ...projects,
-      setProject: (id: string) => {
-        projects.setProject(id)
-        overlays.closePrefs()
-      },
+      ...actions,
       membership,
       signedIn: membership.account !== null,
       account: who(membership.account),
-      signIn: () => void membership.signIn(),
-      signOut: () => {
-        void membership.signOut()
-        /* Signing out from inside Settings leaves a screen about an account
-           that is gone. */
-        overlays.closePrefs()
-      },
       ...overlays,
       wantedCard,
       openCard: setWantedCard,
       palette,
-      openPalette: () => setPalette(true),
-      closePalette: () => setPalette(false),
     }),
     [
       tabs,
@@ -128,6 +125,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       overlays,
       palette,
       wantedCard,
+      actions,
     ],
   )
 
