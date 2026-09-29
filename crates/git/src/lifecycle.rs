@@ -33,6 +33,16 @@ impl Loss {
     }
 }
 
+/// `title` with its accents taken off, so `produção` names a branch
+/// `producao` rather than `produ-o`: decomposed, and the marks dropped.
+pub fn unaccented(title: &str) -> String {
+    icu_normalizer::DecomposingNormalizerBorrowed::new_nfd()
+        .normalize(title)
+        .chars()
+        .filter(|ch| !('\u{0300}'..='\u{036f}').contains(ch))
+        .collect()
+}
+
 /// The branch a card's worktree gets.
 ///
 /// The `devpit/` prefix does two jobs: it shows whose branch this is in a bare
@@ -44,7 +54,7 @@ pub fn branch_for(title: &str, card_id: &str) -> String {
 
 fn slug(title: &str) -> String {
     let mut out = String::new();
-    for ch in title.chars() {
+    for ch in unaccented(title).chars() {
         if ch.is_ascii_alphanumeric() {
             out.extend(ch.to_lowercase());
         } else if !out.ends_with('-') {

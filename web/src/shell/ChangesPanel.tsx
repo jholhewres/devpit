@@ -8,10 +8,11 @@ import { counted, primary } from './primary'
 import { DiscardConfirm } from './DiscardConfirm'
 import { List, Minus, Plus, Search, Trash, Tree, Undo } from './GitIcons'
 import { ask, commands } from './live'
+import { RemoteRow } from './RemoteRow'
 import { Skeleton } from './Skeleton'
 import { abandoned, committed } from './typing'
 import { useShell } from './useShell'
-import type { UseTree } from './useTree'
+import { changed, type UseTree } from './useTree'
 
 /*
  * What has changed, and what a commit would take.
@@ -24,7 +25,7 @@ import type { UseTree } from './useTree'
 type Group = 'staged' | 'changed' | 'untracked'
 
 export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
-  const { project, show, active } = useShell()
+  const { project, show, active, reloadProjects } = useShell()
   /* The row of the file on screen is marked, so the list and the pane agree
      about where you are. */
   const onScreen = active?.kind === 'diff' ? (active.path ?? null) : null
@@ -69,7 +70,9 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
         } else {
           setSaid(answer.error)
         }
-        tree.reload()
+        // History, the branch's ahead count and the file index moved too.
+        changed()
+        reloadProjects()
       })
       .finally(() => setBusy(false))
   }
@@ -121,8 +124,6 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
         <div className="git__row">
           <span className="git__branch">{here?.branch ?? 'Changes'}</span>
           <span className="git__up">
-            {here && here.ahead > 0 && <span>&uarr;{here.ahead}</span>}
-            {here && here.behind > 0 && <span>&darr;{here.behind}</span>}
             <span className="add">+{counted(tree.totals.added)}</span>
             <span className="del">&minus;{counted(tree.totals.removed)}</span>
           </span>
@@ -133,6 +134,7 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
             {view === 'tree' ? <List /> : <Tree />}
           </button>
         </div>
+        {project && <RemoteRow projectId={project.id} here={here} onDone={reloadProjects} />}
         {finding !== null && (
           <input className="git__find" autoFocus placeholder="Filter files" value={finding} onChange={(event) => setFinding(event.target.value)} onKeyDown={(event) => abandoned(event) && setFinding(null)} aria-label="Filter files by path" />
         )}
@@ -168,7 +170,7 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
             {said && <span className="exempty__d">{said}</span>}
           </div>
         )}
-        {wanted && shown.length === 0 && <div className="exempty__t">No changed file matches.</div>}
+        {wanted && shown.length === 0 && <div className="pempty"><span className="pempty__d">No changed file matches.</span></div>}
         {section('staged', 'Staged', groups.staged)}
         {section('changed', 'Changed', groups.changed)}
         {section('untracked', 'Untracked', groups.untracked)}

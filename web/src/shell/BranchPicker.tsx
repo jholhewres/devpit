@@ -12,15 +12,30 @@ import { useShell } from './useShell'
  * shown as it came: it names the files, and a summary here would name fewer.
  */
 
+/** Past this many, the menu leads with a filter. */
+const FILTER_FROM = 8
+
+/** The branches whose name or last subject holds every word typed. */
+export function matching(branches: readonly Branch[], filter: string): readonly Branch[] {
+  const words = filter.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return branches
+  return branches.filter((one) => {
+    const text = `${one.name} ${one.subject}`.toLowerCase()
+    return words.every((word) => text.includes(word))
+  })
+}
+
 export function BranchPicker({ branch, ahead }: { branch: string; ahead: number }): React.JSX.Element {
   const { project, reloadProjects } = useShell()
   const [open, setOpen] = useState(false)
   const [branches, setBranches] = useState<readonly Branch[]>([])
   const [refused, setRefused] = useState<string | null>(null)
+  const [filter, setFilter] = useState('')
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open || !project) return
+    setFilter('')
     void ask(() => commands.branchList(project.id, null)).then((answer) => {
       setBranches(answer.data?.branches ?? [])
       setRefused(answer.error)
@@ -58,7 +73,18 @@ export function BranchPicker({ branch, ahead }: { branch: string; ahead: number 
 
       {open && (
         <div className="branchmenu" role="menu">
-          {branches.map((one) => (
+          {branches.length > FILTER_FROM && (
+            <input
+              className="branchmenu__f"
+              autoFocus
+              placeholder="Filter branches"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              onKeyDown={(event) => event.key === 'Escape' && setOpen(false)}
+            />
+          )}
+          <div className="branchmenu__list">
+          {matching(branches, filter).map((one) => (
             <button
               className="branchmenu__i"
               role="menuitem"
@@ -70,6 +96,7 @@ export function BranchPicker({ branch, ahead }: { branch: string; ahead: number 
               <span className="branchmenu__s">{one.subject}</span>
             </button>
           ))}
+          </div>
           {refused && <div className="branchmenu__no">{refused}</div>}
         </div>
       )}

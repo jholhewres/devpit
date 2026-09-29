@@ -21,8 +21,10 @@
 /* The list takes only the height its cards need; the filler below it is
    what keeps the lane a drop target all the way down. Letting the list
    grow instead pushed Add card to the bottom of the window, a screen
-   away from the card it would sit after. */
-.blane__list { flex: 0 1 auto; min-height: 24px; display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
+   away from the card it would sit after. Past the lane's height it scrolls,
+   or the cards ran on over Add card. The side padding keeps a hovered
+   tile's lift and shadow inside the clip. */
+.blane__list { flex: 0 1 auto; min-height: 24px; display: flex; flex-direction: column; gap: 6px; padding: 2px 4px 6px; margin: 0 -4px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 .blane__fill { flex: 1; min-height: 8px; }
 
 .tile {

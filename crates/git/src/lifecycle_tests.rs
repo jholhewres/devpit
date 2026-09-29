@@ -19,6 +19,14 @@ fn a_branch_is_named_after_the_card_and_prefixed() {
 }
 
 #[test]
+fn an_accented_title_keeps_its_letters() {
+    assert_eq!(
+        branch_for("Telemetria e logs de produção", "card_01M38MRZ"),
+        "devpit/telemetria-e-logs-de-producao-01m38mrz"
+    );
+}
+
+#[test]
 fn a_title_with_nothing_nameable_in_it_still_gets_a_branch() {
     assert_eq!(
         branch_for("!!! ???", "card_abcdefgh"),

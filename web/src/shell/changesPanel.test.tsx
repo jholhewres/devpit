@@ -24,7 +24,7 @@ vi.mock('./live', () => ({
 }))
 
 const project = { id: 'p', name: 'devpit', worktrees: [] } as unknown as Project
-vi.mock('./useShell', () => ({ useShell: () => ({ project, show: vi.fn() }) }))
+vi.mock('./useShell', () => ({ useShell: () => ({ project, show: vi.fn(), reloadProjects: vi.fn() }) }))
 
 const change = (path: string, over: Partial<Change> = {}): Change => ({
   path,

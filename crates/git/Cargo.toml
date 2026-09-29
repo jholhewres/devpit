@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 devpit-pty = { path = "../pty" }
 devpit-rpc = { path = "../rpc" }
+icu_normalizer = "2.3"
 sha2 = "0.10"
 thiserror = "2.0.20"
 

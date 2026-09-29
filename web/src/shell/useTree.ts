@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Change, FileNode } from '../gen/bindings'
 import { ask, commands } from './live'
+import { watchDisk } from './diskMoves'
+import { CHANGED } from './treeChanged'
 
 export interface UseTree {
   readonly nodes: readonly FileNode[]
@@ -21,15 +23,7 @@ export interface UseTree {
   reload: () => void
 }
 
-/* What a mutation outside this hook announces when it has changed the tree.
-   An event, not a callback threaded through four components: the panel that
-   owns the tree and the menu that creates a file are siblings, and the menu
-   has no business holding a reference to the panel's reload. */
-export const CHANGED = 'devpit:tree-changed'
-
-export const changed = (): void => {
-  window.dispatchEvent(new Event(CHANGED))
-}
+export { CHANGED, changed } from './treeChanged'
 
 /* A fetch's response belongs to the generation that asked for it. Two fetches
    can be in flight at once — a manual Refresh while a focus-triggered reload
@@ -112,6 +106,8 @@ export function useTree(projectId: string | null): UseTree {
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [reload])
+
+  useEffect(watchDisk, [])
 
   return { nodes, changes, totals, error, version, loading, reload }
 }

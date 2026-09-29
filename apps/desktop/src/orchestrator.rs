@@ -192,7 +192,10 @@ pub(crate) fn free_folder(root: &Path, name: &str) -> Option<std::path::PathBuf>
 /// name they gave is what the rail shows.
 pub(crate) fn slug(name: &str) -> String {
     let mut out = String::new();
-    for ch in name.chars().flat_map(char::to_lowercase) {
+    for ch in devpit_git::lifecycle::unaccented(name)
+        .chars()
+        .flat_map(char::to_lowercase)
+    {
         if ch.is_ascii_alphanumeric() {
             out.push(ch);
         } else if !out.ends_with('-') {

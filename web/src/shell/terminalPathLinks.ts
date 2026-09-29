@@ -34,7 +34,7 @@ export function linkPaths(
                 range: { start: { x: at.from.x + 1, y: at.from.y + 1 }, end: { x: at.to.x + at.to.width, y: at.to.y + 1 } },
                 text: one.url,
                 decorations: { underline: true, pointerCursor: true },
-                activate: () => void ask(() => commands.pathOpen(one.url)),
+                activate: () => void ask(() => commands.urlOpen(one.url)),
               },
             ]
           : []

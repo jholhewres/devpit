@@ -3,7 +3,7 @@
 //! Nothing here happens on its own. Staging is a click, committing is a
 //! click, and the message is written by the person or by an agent they asked.
 
-use devpit_rpc::{Commit, ErrorCode, ProjectChanges, RpcError};
+use devpit_rpc::{Commit, ErrorCode, ProjectChanges, RemoteAct, RpcError};
 
 use crate::projects::project_changes_now;
 use crate::roots::root_of;
@@ -93,6 +93,27 @@ pub(crate) fn changes_commit_now(
 ) -> Result<Commit, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_git::commit(&root, &message).map_err(git_error)
+}
+
+/// `changes.remote` — fetch, pull, push or sync this checkout's branch.
+#[tauri::command]
+#[specta::specta]
+pub async fn changes_remote(
+    project_id: String,
+    worktree_id: Option<String>,
+    act: RemoteAct,
+) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let root = root_of(&project_id, worktree_id.as_deref())?;
+        match act {
+            RemoteAct::Fetch => devpit_git::remote::fetch(&root),
+            RemoteAct::Pull => devpit_git::remote::pull(&root),
+            RemoteAct::Push => devpit_git::remote::push(&root),
+            RemoteAct::Sync => devpit_git::remote::sync(&root),
+        }
+        .map_err(git_error)
+    })
+    .await
 }
 
 /// `changes.discard` — throws away uncommitted work in these paths.

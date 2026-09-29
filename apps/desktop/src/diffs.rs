@@ -28,9 +28,25 @@ pub(crate) fn file_at_head_now(
     path: String,
 ) -> Result<Option<String>, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
-    devpit_core::tree::resolve(&root, &path)
-        .map_err(|err| RpcError::new(ErrorCode::Forbidden, err.to_string()))?;
+    if !names_inside(&path) {
+        return Err(RpcError::new(
+            ErrorCode::Forbidden,
+            format!("{path} is not a path inside the checkout"),
+        ));
+    }
     devpit_git::at_head(&root, &path).map_err(|err| RpcError::internal(err.to_string()))
+}
+
+/// Whether `path` names something under the checkout, judged by its words.
+///
+/// Not resolved on disk: a deleted file is exactly the one whose `HEAD` side is
+/// asked for, and git reads it from the commit, never through a symlink.
+fn names_inside(path: &str) -> bool {
+    use std::path::Component;
+    !path.is_empty()
+        && std::path::Path::new(path)
+            .components()
+            .all(|part| matches!(part, Component::Normal(_)))
 }
 
 /// `commit.diff` — the patch one commit introduced.
@@ -52,4 +68,18 @@ pub(crate) fn commit_diff_now(
 ) -> Result<String, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_git::show(&root, &sha).map_err(|err| RpcError::new(ErrorCode::Conflict, err.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::names_inside;
+
+    #[test]
+    fn a_deleted_file_is_asked_for_by_name_and_nothing_climbs_out() {
+        assert!(names_inside("src/gone.rs"));
+        assert!(!names_inside("../outside.rs"));
+        assert!(!names_inside("src/../../outside.rs"));
+        assert!(!names_inside("/etc/passwd"));
+        assert!(!names_inside(""));
+    }
 }

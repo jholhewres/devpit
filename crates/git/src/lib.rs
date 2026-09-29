@@ -33,6 +33,7 @@ pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
 mod log;
+pub mod remote;
 mod search;
 mod snapshot;
 mod sourcing;

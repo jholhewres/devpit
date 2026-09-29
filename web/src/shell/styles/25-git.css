@@ -83,3 +83,15 @@
 /* A folded stretch of unchanged lines: a quiet bar that opens on a click. */
 .mdiff .cm-collapsedLines { padding: 3px 12px; background: var(--overlay); color: var(--text-3); font-family: var(--ui); font-size: 11.5px; cursor: pointer; }
 .mdiff .cm-collapsedLines:hover { background: var(--overlay-strong); color: var(--text-2); }
+
+/* The branch against its remote. The act that would bring the two sides
+   together is the one drawn forward. */
+.gremote { display: flex; align-items: center; gap: 2px; min-height: 26px; }
+.gremote__b[data-lead='true'] { color: var(--accent); }
+.gremote__n { font: 11px var(--mono); font-variant-numeric: tabular-nums; }
+.gremote__sync { height: 24px; margin-left: 4px; padding: 0 10px; font-size: 12px; }
+.gremote__sync[data-lead='true'] { background: var(--inverse); color: var(--on-inverse); font-weight: 550; }
+.gremote__b:disabled, .gremote__sync:disabled { opacity: 0.55; }
+.gremote__said { min-width: 0; margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-3); }
+.gremote__spin { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--border-strong); border-top-color: var(--accent); animation: gremote-spin 700ms linear infinite; }
+@keyframes gremote-spin { to { transform: rotate(360deg); } }
