@@ -11,6 +11,8 @@ vi.mock('./live', () => ({
       edited(...args)
       return { data: { projects: [] }, error: null }
     },
+    projectWorktreeSetup: () => ({ data: { copy: [], link: [], run: [], share: [] }, error: null }),
+    projectWorktreeSetupSet: () => ({ data: null, error: null }),
   },
 }))
 

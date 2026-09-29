@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::prime_paths::{copied, plain};
+
 /// What a project needs done to a fresh checkout.
 ///
 /// Lives in the devpit workspace rather than in the repository: it is one
@@ -17,6 +19,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Prime {
+    /// Files to copy from the main checkout: `.env*`, `config/*.local.json`.
+    /// A `*` matches within one name; the folder part is written out.
+    pub copy: Vec<String>,
     /// Files to link back to the main checkout instead of copying: one `.env`,
     /// read by every worktree.
     pub link: Vec<String>,
@@ -50,8 +55,25 @@ pub fn read(path: &Path) -> Prime {
 }
 
 /// The marker that says this worktree has already been prepared.
+///
+/// Inside the worktree's own git folder, not beside its files: there it was
+/// an untracked file, counted as unsaved work that refused an archive.
 fn done_marker(at: &Path) -> PathBuf {
-    at.join(".devpit-primed")
+    let dot_git = at.join(".git");
+    let git_dir = std::fs::read_to_string(&dot_git)
+        .ok()
+        .and_then(|text| {
+            text.trim()
+                .strip_prefix("gitdir:")
+                .map(|dir| PathBuf::from(dir.trim()))
+        })
+        .map(|dir| if dir.is_absolute() { dir } else { at.join(dir) })
+        .unwrap_or(dot_git);
+    if git_dir.is_dir() {
+        git_dir.join("devpit-primed")
+    } else {
+        at.join(".devpit-primed")
+    }
 }
 
 /// Runs the preparation in a fresh worktree, once.
@@ -64,14 +86,30 @@ pub fn run(
     at: &Path,
     mut on_line: impl FnMut(&str),
 ) -> std::io::Result<Primed> {
-    if done_marker(at).exists() {
+    if done_marker(at).exists() || at.join(".devpit-primed").exists() {
         return Ok(Primed::Nothing);
     }
-    if prime.link.is_empty() && prime.run.is_empty() && prime.share.is_empty() {
+    if prime.copy.is_empty()
+        && prime.link.is_empty()
+        && prime.run.is_empty()
+        && prime.share.is_empty()
+    {
         return Ok(Primed::Nothing);
     }
 
-    for relative in &prime.link {
+    for relative in prime.copy.iter().flat_map(|pattern| copied(main, pattern)) {
+        let to = at.join(&relative);
+        if to.symlink_metadata().is_ok() {
+            continue;
+        }
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(main.join(&relative), &to)?;
+        on_line(&format!("copied {relative}"));
+    }
+
+    for relative in prime.link.iter().filter(|one| plain(one)) {
         let from = main.join(relative);
         let to = at.join(relative);
         if !from.exists() || to.exists() {

@@ -93,3 +93,41 @@ fn a_preparation_runs_once_and_not_again() {
         "the preparation ran twice"
     );
 }
+
+#[test]
+fn copied_env_files_arrive_and_the_marker_stays_out_of_the_tree() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let main = dir.path().join("main");
+    let side = dir.path().join("side");
+    std::fs::create_dir_all(main.join("config")).expect("create");
+    std::fs::create_dir_all(side.join(".git")).expect("create");
+    std::fs::write(main.join(".env"), "A=1\n").expect("write");
+    std::fs::write(main.join(".env.local"), "B=2\n").expect("write");
+    std::fs::write(main.join("config/app.local.json"), "{}").expect("write");
+    std::fs::write(main.join("README.md"), "no").expect("write");
+
+    let prime = Prime {
+        copy: vec![
+            ".env*".to_owned(),
+            "config/*.local.json".to_owned(),
+            "../outside*".to_owned(),
+        ],
+        ..Prime::default()
+    };
+    assert_eq!(
+        run(&prime, &main, &side, nothing()).expect("prime"),
+        Primed::Done
+    );
+    assert_eq!(
+        std::fs::read_to_string(side.join(".env")).expect("copied"),
+        "A=1\n"
+    );
+    assert!(side.join(".env.local").is_file());
+    assert!(side.join("config/app.local.json").is_file());
+    assert!(!side.join("README.md").exists());
+    assert!(
+        !side.join(".devpit-primed").exists(),
+        "the marker is an untracked file in the checkout"
+    );
+    assert!(side.join(".git/devpit-primed").exists());
+}

@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import type { Project } from '../gen/bindings'
+import type { Project, WorktreeSetup } from '../gen/bindings'
 import { GroupPicker } from './GroupPicker'
 import { ask, commands } from './live'
 import { COLOURS, ICONS, iconName, ProjectMark } from './ProjectMark'
 import { abandoned, committed } from './typing'
 import { useShell } from './useShell'
+import { WorktreeSetupFields } from './WorktreeSetupFields'
 
 /*
  * A project's name, group and mark, set in one place.
@@ -26,6 +27,13 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
   const [emoji, setEmoji] = useState(project.icon && !iconName(project.icon) ? project.icon : '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /* A worktree is a git project's; an orchestrator's folder never gets one. */
+  const [setup, setSetup] = useState<WorktreeSetup | null>(null)
+  const [setupChanged, setSetupChanged] = useState(false)
+  useEffect(() => {
+    if (project.orchestrator) return
+    void ask(() => commands.projectWorktreeSetup(project.id)).then((answer) => setSetup(answer.data))
+  }, [project])
 
   const groups = [...new Set(projects.map((one) => one.group).filter((one): one is string => Boolean(one)))].sort()
   const preview = { id: project.id, name: name || project.name, icon, color }
@@ -33,8 +41,12 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
   const save = (): void => {
     setBusy(true)
     void ask(() => commands.projectEdit(project.id, name, group || null, icon, color))
-      .then((answer) => {
+      .then(async (answer) => {
         if (answer.error) return setError(answer.error)
+        if (setup && setupChanged) {
+          const kept = await ask(() => commands.projectWorktreeSetupSet(project.id, setup))
+          if (kept.error) return setError(kept.error)
+        }
         reloadProjects()
         onClose()
       })
@@ -106,6 +118,16 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
             <input type="color" className="pdlg__pick" value={color ?? '#5b9be2'} onChange={(event) => setColor(event.target.value)} title="Any colour" />
           </div>
         </div>
+
+        {setup && (
+          <WorktreeSetupFields
+            setup={setup}
+            onChange={(next) => {
+              setSetup(next)
+              setSetupChanged(true)
+            }}
+          />
+        )}
 
         {error && <p className="acc__note">{error}</p>}
         <div className="pdlg__acts">
