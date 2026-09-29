@@ -114,6 +114,9 @@ test-rust: node_modules ## Guards and the Rust tests, without the frontend
 	@touch $(TEST_HOME)/.zshenv $(TEST_HOME)/.zshrc $(TEST_HOME)/.bashrc $(TEST_HOME)/.profile
 	$(TEST_ENV) cargo test --workspace
 
+check-windows: ## Compiles for Windows, which is built nowhere yet
+	cargo check --workspace
+
 e2e: node_modules ## The built app, driven through a WebDriver (minutes, not seconds)
 	./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.conf.json
 	node e2e/run.mjs

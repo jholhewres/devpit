@@ -46,7 +46,8 @@ nothing of devpit's**. Keep it that way:
   a home somewhere else entirely, and pointing it at the installed one undoes
   the whole separation.
 
-`help setup dev build test fmt clean`, and `e2e` for the WebDriver suite. The
+`help setup dev build test fmt clean`, `e2e` for the WebDriver suite, and
+`check-windows`, which only compiles for a platform nobody ships yet. The
 list is short because the Makefile is the interface everyone reads: a target
 earns its place by being something a person runs by hand, and a one-off belongs
 in the shell. The other half of the same rule is that **CI never invents a

@@ -65,9 +65,6 @@ jobs:
   # `make test-rust` and not a bespoke `cargo check`: the guards and the Rust
   # tests are the bar, and CI does not invent commands nobody can run by hand.
   # The frontend is left to the Linux job, which already builds it once.
-  #
-  # Windows is absent on purpose. `release.yml` ships Linux and macOS, and a
-  # platform nobody releases is a platform nobody should be blocked by.
   macos:
     runs-on: macos-14
     steps:
@@ -86,3 +83,22 @@ jobs:
 
       - run: make setup
       - run: make test-rust
+
+  # Windows is not released yet, and this keeps the door from rusting shut: a
+  # `libc::` or a `std::os::unix` without its gate fails here, not the day a
+  # Windows build is tried. It compiles; it does not run the suite, which
+  # needs tmux.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # The image's bash has no make of its own.
+      - run: command -v make || choco install make -y --no-progress
+      - run: make check-windows
