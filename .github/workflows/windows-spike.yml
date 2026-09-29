@@ -1,0 +1,25 @@
+name: Windows spike
+
+# Whether psmux — a tmux of Windows' own — can stand in for tmux: the tmux
+# crate's tests, run against it. A question asked by hand, never on a push:
+# its answer goes into a written decision, not into the build.
+on:
+  workflow_dispatch:
+
+jobs:
+  psmux:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # It installs `psmux`, `pmux` and a `tmux` beside them.
+      - run: cargo install psmux --locked
+      - run: tmux -V || true
+
+      - run: command -v make || choco install make -y --no-progress
+      - run: make test-tmux

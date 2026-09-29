@@ -117,6 +117,9 @@ test-rust: node_modules ## Guards and the Rust tests, without the frontend
 check-windows: ## Compiles for Windows, which is built nowhere yet
 	cargo check --workspace
 
+test-tmux: ## The tmux crate's own tests, against whatever `tmux` is on PATH
+	cargo test -p devpit-tmux -- --test-threads=1
+
 e2e: node_modules ## The built app, driven through a WebDriver (minutes, not seconds)
 	./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.conf.json
 	node e2e/run.mjs
