@@ -12,9 +12,10 @@
 //! signalled together. The group exists because this module created it — this
 //! never signals a group it did not make, which is also why the tmux server,
 //! living in its own session, is out of reach here by construction.
+//!
+//! Windows has no sessions or signals: the shell gets a process group of its
+//! own, and the tree under it is ended by `taskkill /T` — the same promise.
 
-use std::io;
-use std::os::unix::process::CommandExt;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
@@ -28,7 +29,10 @@ const LOOK: Duration = Duration::from_millis(20);
 
 /// Puts the command in a session of its own, so its descendants share one
 /// process group and can be ended together.
+#[cfg(unix)]
 pub fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
+    use std::io;
+    use std::os::unix::process::CommandExt;
     // SAFETY: `setsid` is async-signal-safe and touches nothing shared with
     // this process after the fork — which is the whole contract of `pre_exec`.
     unsafe {
@@ -39,12 +43,21 @@ pub fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
     }
 }
 
+/// A process group of its own, which is what `taskkill /T` ends as one tree.
+#[cfg(windows)]
+pub fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    command.creation_flags(CREATE_NEW_PROCESS_GROUP)
+}
+
 /// Ends the run and everything under it, and does not return until the group
 /// is gone.
 ///
 /// Terminate first, so a runner that cleans up after itself gets to; then kill
 /// what is left. Reporting an end before observing one is the bug this module
 /// exists to remove, so the wait is not optional.
+#[cfg(unix)]
 pub fn end_it_all(child: &mut Child) {
     let group = child.id() as i32;
     signal(group, libc::SIGTERM);
@@ -58,10 +71,20 @@ pub fn end_it_all(child: &mut Child) {
     gone(child, GRACE);
 }
 
+/// The Windows half: the whole tree, forced, then waited for.
+#[cfg(windows)]
+pub fn end_it_all(child: &mut Child) {
+    let _ = devpit_pty::host_env::command("taskkill")
+        .args(["/T", "/F", "/PID", &child.id().to_string()])
+        .output();
+    gone(child, GRACE);
+}
+
 /// Signals the whole group, by the negative pid `kill` reads as one.
 ///
 /// Only a group this module made: `group` is the pid of a shell spawned
 /// through [`in_a_session_of_its_own`], which `setsid` made the leader.
+#[cfg(unix)]
 fn signal(group: i32, signal: i32) {
     // SAFETY: a signal to a pid this process owns; the worst answer is ESRCH,
     // which is the group already being gone.

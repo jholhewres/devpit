@@ -280,11 +280,7 @@ fn listed_clients(sessions: &Path) -> Vec<(String, String)> {
 
 /// Whether a process is still there. A listing outlives a CLI that crashed.
 pub(crate) fn alive(pid: i32) -> bool {
-    // Signal 0 checks without sending anything. EPERM is a process that
-    // exists and belongs to someone else, which is still alive.
-    pid > 0
-        && (unsafe { libc::kill(pid, 0) } == 0
-            || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM))
+    devpit_pty::process::alive(pid)
 }
 
 /// How long the project list is reused between listings. Drawing it asks git

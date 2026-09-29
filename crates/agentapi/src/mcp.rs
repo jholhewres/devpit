@@ -168,6 +168,7 @@ fn beside_the_flag(root: &Path) -> bool {
 }
 
 /// The command line of the process that started this one — the agent.
+#[cfg(unix)]
 fn parent_argv() -> Option<String> {
     let parent = std::os::unix::process::parent_id();
     if let Ok(raw) = std::fs::read(format!("/proc/{parent}/cmdline")) {
@@ -178,6 +179,13 @@ fn parent_argv() -> Option<String> {
         .output()
         .ok()?;
     Some(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// Not read on Windows: no `/proc` and no `ps`. The tools are then offered,
+/// which is what an agent without devpit's own server needs anyway.
+#[cfg(not(unix))]
+fn parent_argv() -> Option<String> {
+    None
 }
 
 /// One JSON-RPC message in, at most one out. `ask` is the app.

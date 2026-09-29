@@ -30,16 +30,19 @@ const GRACE: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// Whether the process is still there and still this one: a zombie or a pid
 /// already handed to someone else is not signalled.
+///
+/// `/proc` only exists on Linux; elsewhere it used to read as gone, and a
+/// resident chat that hung was never ended on macOS.
 fn still_running(pid: u32) -> bool {
-    std::fs::read_to_string(format!("/proc/{pid}/stat"))
-        .ok()
-        .and_then(|stat| {
-            stat.rsplit(')')
-                .next()
-                .map(|rest| rest.trim_start().chars().next())
-        })
-        .flatten()
-        .is_some_and(|state| state != 'Z')
+    match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
+        Ok(stat) => stat
+            .rsplit(')')
+            .next()
+            .and_then(|rest| rest.trim_start().chars().next())
+            .is_some_and(|state| state != 'Z'),
+        Err(_) if cfg!(target_os = "linux") => false,
+        Err(_) => devpit_pty::process::alive(pid as i32),
+    }
 }
 
 /// What the process says, a turn at a time.

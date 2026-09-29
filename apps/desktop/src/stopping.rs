@@ -99,7 +99,7 @@ pub(crate) fn stop(app: &AppHandle, profile_id: &str, name: &str) -> Result<Valu
                 .map_err(|why| RpcError::new(ErrorCode::Conflict, format!("{name}: {why}")))?,
             (None, None) => {
                 // Outside devpit's terminals and not a job: only the process.
-                if one.pid <= 0 || unsafe { libc::kill(one.pid, libc::SIGTERM) } != 0 {
+                if !devpit_pty::process::terminate(one.pid) {
                     return Err(RpcError::new(
                         ErrorCode::Conflict,
                         format!("{name} could not be stopped"),
