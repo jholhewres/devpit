@@ -42,6 +42,10 @@ pub fn changes() -> &'static [Change] {
 pub fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut command = Command::new(program);
     scrub(&mut command);
+    // Found where the person's own shell finds it — see `login_path`.
+    if let Some(path) = crate::login_path::login_path() {
+        command.env("PATH", path);
+    }
     command
 }
 

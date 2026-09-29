@@ -28,6 +28,7 @@ mod coalesce;
 mod foreground;
 pub mod host_env;
 pub mod journal;
+pub mod login_path;
 mod osc;
 mod reader;
 mod ring;
