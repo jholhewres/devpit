@@ -270,3 +270,25 @@ fn a_debug_build_keeps_a_home_apart_from_the_installed_one() {
     taken with it by anything that clears that folder. */
     assert!(!DEV_ROOT.starts_with(&format!("{RELEASE_ROOT}/")));
 }
+
+#[test]
+fn an_up_to_date_store_opens_while_another_connection_writes() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("state.db");
+    drop(Store::open(&path).expect("first open migrates"));
+
+    // Another writer holds the lock, as a terminal's hook does mid-write.
+    let writer = rusqlite::Connection::open(&path).expect("writer");
+    writer
+        .execute_batch("BEGIN IMMEDIATE")
+        .expect("take the write lock");
+
+    let started = std::time::Instant::now();
+    Store::open(&path).expect("opens without waiting for the writer");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(1),
+        "open queued behind the writer for {:?}",
+        started.elapsed()
+    );
+    writer.execute_batch("ROLLBACK").expect("release");
+}

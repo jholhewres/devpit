@@ -40,9 +40,7 @@ fn apply(conn: &Connection, root: &Path, migration: &Migration) -> Result<(), St
 /// to be edited whenever a migration is added is a constant that will one day
 /// disagree with the list it describes.
 ///
-/// Only the test asks, like `run_up_to`: the app applies everything and never
-/// needs to name the number it reached.
-#[cfg(test)]
+/// `run` asks it to skip the write lock when there is nothing to apply.
 pub fn latest() -> i64 {
     MIGRATIONS.iter().map(|one| one.version).max().unwrap_or(0)
 }
@@ -69,6 +67,12 @@ pub fn latest() -> i64 {
 /// what was here before and keeps the reason it was written: a partial failure
 /// must not leave half the tables standing with the version already bumped.
 pub fn run(conn: &Connection, root: &Path) -> Result<(), StoreError> {
+    // Every command opens a store, so the common case must not take the write
+    // lock: with many terminals reporting at once it queued behind their writes
+    // and came back "database is locked". A version only ever goes up.
+    if up_to_date(conn)? {
+        return Ok(());
+    }
     conn.execute_batch("BEGIN IMMEDIATE")?;
     let applied = match conn.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0)) {
         Ok(applied) => applied,
@@ -87,6 +91,12 @@ pub fn run(conn: &Connection, root: &Path) -> Result<(), StoreError> {
 
     conn.execute_batch("COMMIT")?;
     Ok(())
+}
+
+/// Whether this file already holds every migration, read without a lock.
+fn up_to_date(conn: &Connection) -> Result<bool, StoreError> {
+    let applied: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    Ok(applied >= latest())
 }
 
 /// Applies only up to `version`, to build a database of an older shape.
