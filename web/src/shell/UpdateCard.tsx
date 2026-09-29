@@ -127,18 +127,26 @@ export function UpdateCard(): React.JSX.Element | null {
      update waits. */
   const focused = useFocusIsOn()
 
-  useEffect(
-    () =>
-      onCarried<UpdateStatus>('update:status', (heard) => {
-        setStatus(heard)
-        if (heard.type === 'available') setTestFeed(heard.testFeed)
-        else if (heard.type !== 'failed') setTestFeed(false)
-        // A new state is news again: the close dismissed the state it was on.
-        setLater(false)
-        setNotes(false)
-      }),
-    [],
-  )
+  useEffect(() => {
+    const hear = (heard: UpdateStatus): void => {
+      setStatus(heard)
+      if (heard.type === 'available') setTestFeed(heard.testFeed)
+      else if (heard.type !== 'failed') setTestFeed(false)
+      // A new state is news again: the close dismissed the state it was on.
+      setLater(false)
+      setNotes(false)
+    }
+    /* The check at startup can finish before this listens, so what it found
+       is asked for once — and an event heard meanwhile is newer and wins. */
+    let heard = false
+    const stop = onCarried<UpdateStatus>('update:status', (said) => {
+      heard = true
+      hear(said)
+    })
+    const asked = commands.updateStatus()
+    void asked.then((now) => !heard && now.type !== 'idle' && hear(now)).catch(() => undefined)
+    return stop
+  }, [])
 
   useEffect(() => {
     if (!counting(status)) return

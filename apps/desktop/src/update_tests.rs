@@ -4,11 +4,11 @@ use super::*;
 use devpit_rpc::UpdateStatus as S;
 
 #[test]
-fn checking_happens_at_start_then_daily() {
-    let day = 24.0 * 60.0 * 60.0;
+fn checking_happens_at_start_then_every_hour() {
+    let hour = 60.0 * 60.0;
     assert!(due(None, 1000.0, 0, true), "the first start never checked");
-    assert!(!due(Some(1000.0), 1000.0 + day - 1.0, 0, true));
-    assert!(due(Some(1000.0), 1000.0 + day, 0, true));
+    assert!(!due(Some(1000.0), 1000.0 + hour - 1.0, 0, true));
+    assert!(due(Some(1000.0), 1000.0 + hour, 0, true));
 }
 
 #[test]

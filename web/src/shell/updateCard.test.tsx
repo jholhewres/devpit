@@ -21,6 +21,9 @@ const installedPackage = vi.fn(async () => ({ status: 'ok', data: true }))
 const installed = vi.fn(async () => ({ status: 'ok', data: null }))
 const checked = vi.fn(async () => ({ status: 'ok', data: { type: 'checking' } }))
 const chose = vi.fn(async (_choice: string) => ({ status: 'ok', data: null }))
+/* Where the update stands when the card mounts: idle, unless a test says the
+   check at startup already found one. */
+const standing = vi.fn(async (): Promise<UpdateStatus> => ({ type: 'idle' }))
 type Blocking = { id: string; title: string }
 let busy: { runs: Blocking[]; turns: Blocking[]; keeps: Blocking[] } = { runs: [], turns: [], keeps: [] }
 vi.mock('./live', () => ({
@@ -36,6 +39,7 @@ vi.mock('./live', () => ({
     updateCheck: () => checked(),
     updateRunning: async () => ({ status: 'ok', data: busy }),
     updateChoose: (choice: string) => chose(choice),
+    updateStatus: () => standing(),
   },
 }))
 
@@ -52,6 +56,12 @@ afterEach(() => {
 })
 
 describe('the update card', () => {
+  it('shows an update the check at startup found before the window listened', async () => {
+    standing.mockResolvedValueOnce({ type: 'available', version: '0.2.0', notes: '', kind: 'appImage', testFeed: false })
+    render(<UpdateCard />)
+    expect(await screen.findByText('devpit 0.2.0 is ready.')).toBeTruthy()
+  })
+
   it('says nothing until there is something to say', () => {
     render(<UpdateCard />)
     expect(screen.queryByRole('status')).toBeNull()

@@ -137,7 +137,9 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
 }
 
 /// How long to wait before looking again.
-const A_DAY: f64 = 24.0 * 60.0 * 60.0;
+/// A release goes out and the person is told within the hour, without going
+/// to Settings to ask.
+pub(crate) const BETWEEN_CHECKS: f64 = 60.0 * 60.0;
 const AFTER_A_FAILURE: f64 = 60.0 * 60.0;
 const AT_MOST: f64 = 6.0 * 60.0 * 60.0;
 
@@ -148,7 +150,7 @@ const WHILE_WAITING: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Whether to check now.
 ///
-/// At startup, then once a day; after a failure an hour, doubling to six, so a
+/// At startup, then every hour; after a failure an hour, doubling to six, so a
 /// machine that is offline for a morning does not ask sixty times.
 pub(crate) fn due(last: Option<f64>, now: f64, failures: u32, enabled: bool) -> bool {
     if !enabled {
@@ -158,7 +160,7 @@ pub(crate) fn due(last: Option<f64>, now: f64, failures: u32, enabled: bool) -> 
         return true;
     };
     let wait = if failures == 0 {
-        A_DAY
+        BETWEEN_CHECKS
     } else {
         // Clamped before the cast: past a few doublings the cap has already
         // won, and a count near `u32::MAX` would wrap to a negative exponent.
@@ -445,6 +447,18 @@ fn now() -> f64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|since| since.as_secs_f64())
         .unwrap_or_default()
+}
+
+/// `update.status` — where the update stands now.
+///
+/// The check at startup runs before the window listens, and its event went
+/// nowhere: the card only showed once somebody asked again from Settings.
+#[tauri::command]
+#[specta::specta]
+pub async fn update_status(app: tauri::AppHandle) -> UpdateStatus {
+    app.try_state::<Updating>()
+        .map(|updating| updating.state())
+        .unwrap_or(UpdateStatus::Idle)
 }
 
 /// `update.check` — ask the feed whether there is a newer devpit.
