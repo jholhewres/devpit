@@ -62,6 +62,56 @@ pub async fn artifact_remove(project_id: String, name: String) -> Result<(), Rpc
     .await
 }
 
+/// A file the person adds is copied whole; past this it is not an artifact.
+const MOST_BYTES: u64 = 512 * 1024 * 1024;
+
+/// `artifacts.add` — files the person picked or dropped, copied in under
+/// their own names. A name already there is refused, never written over.
+#[tauri::command]
+#[specta::specta]
+pub async fn artifacts_add(
+    project_id: String,
+    sources: Vec<String>,
+) -> Result<Artifacts, RpcError> {
+    crate::off_main::blocking(move || {
+        let folder = folder_of(&project_id)?;
+        let refused: Vec<String> = sources
+            .iter()
+            .filter_map(|one| add(&folder, Path::new(one)).err())
+            .collect();
+        if !refused.is_empty() {
+            return Err(RpcError::new(ErrorCode::Conflict, refused.join("\n")));
+        }
+        Ok(Artifacts {
+            items: listed(&folder),
+            folder: folder.display().to_string(),
+        })
+    })
+    .await
+}
+
+/// One file into the folder under its own name.
+pub(crate) fn add(folder: &Path, from: &Path) -> Result<(), String> {
+    let real = from
+        .canonicalize()
+        .map_err(|_| format!("there is no file at {}", from.display()))?;
+    let meta = real.metadata().map_err(|err| err.to_string())?;
+    if !meta.is_file() {
+        return Err(format!("{} is not a file", from.display()));
+    }
+    if meta.len() > MOST_BYTES {
+        return Err(format!(
+            "{} is larger than an artifact may be",
+            from.display()
+        ));
+    }
+    let name = real
+        .file_name()
+        .and_then(|one| one.to_str())
+        .ok_or_else(|| format!("{} has no name to keep it by", from.display()))?;
+    carry(&real, &folder.join(plain(name)?), false, false)
+}
+
 /// An agent's call: `artifacts`, `artifact_save`, `artifact_restore` or
 /// `artifact_remove`, for `project`, from an agent standing in `cwd`.
 pub(crate) fn respond(

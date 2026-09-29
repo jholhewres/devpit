@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ask, commands } from './live'
 
+import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { ProjectMark } from './ProjectMark'
 import { useProjectBoards } from './useProjectBoards'
 import { useShell } from './useShell'
@@ -53,18 +54,17 @@ export function OrchestratorBoards({ shown }: { shown: boolean }): React.JSX.Ele
 
   return (
     <div className="oboards">
-      <div className="oboards__top">
-        <span className="oboards__t">Boards</span>
-        <button className="oboards__all" onClick={() => setLinking(linking ? null : new Set(linked ?? []))} aria-expanded={linking !== null}>
-          {linking ? 'Cancel' : 'Link projects'}
-        </button>
-        <button className="oboards__all" onClick={openManager} title="Every board in one view">
-          Manager
-        </button>
-      </div>
+      <PanelHead title="Boards" meta={linked && linked.length > 0 ? `${linked.length} linked` : null}>
+        <PanelAct label={linking ? 'Stop linking' : 'Link projects'} active={linking !== null} onClick={() => setLinking(linking ? null : new Set(linked ?? []))}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
+        </PanelAct>
+        <PanelAct label="Every board in one view" onClick={openManager}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+        </PanelAct>
+      </PanelHead>
       {linking && (
         <div className="oboards__link" role="group" aria-label="Projects this orchestrator works with">
-          <p className="oboards__note">The projects this orchestrator works with: their boards show here, and its chat and tools reach only these.</p>
+          <p className="pempty__d">The projects this orchestrator works with: their boards show here, and its chat and tools reach only these.</p>
           {candidates.map((one) => (
             <label className="oboards__pick" key={one.id}>
               <input
@@ -83,19 +83,26 @@ export function OrchestratorBoards({ shown }: { shown: boolean }): React.JSX.Ele
               <span>{one.name}</span>
             </label>
           ))}
-          {said && <p className="oboards__note">{said}</p>}
-          <button className="btn btn--go" onClick={saveLinks}>
-            Save
-          </button>
+          {said && <p className="pempty__d">{said}</p>}
+          <div className="oboards__save">
+            <button className="btn" onClick={() => setLinking(null)}>
+              Cancel
+            </button>
+            <button className="btn btn--go" onClick={saveLinks}>
+              Save
+            </button>
+          </div>
         </div>
       )}
       {linked?.length === 0 && !linking && (
-        <p className="oboards__note">
-          No project linked yet. Link the projects this orchestrator works with: their boards show here, and it reaches only those.
-        </p>
+        <PanelEmpty title="No project linked" hint="Link the projects this orchestrator works with: their boards show here, and it reaches only those.">
+          <button className="btn" onClick={() => setLinking(new Set())}>
+            Link projects
+          </button>
+        </PanelEmpty>
       )}
-      {failed && <p className="oboards__note">{failed}</p>}
-      {boards === null && <p className="oboards__note">Reading the boards…</p>}
+      {failed && <p className="pempty__d">{failed}</p>}
+      {linked !== null && linked.length > 0 && boards === null && <p className="pempty__d">Reading the boards…</p>}
       {boards?.map(({ project, board }) => (
         <section className="oboards__p" key={project.id}>
           <button className="oboards__name" onClick={() => go(project.id)} title={`Open ${project.name}'s board`}>
@@ -103,6 +110,7 @@ export function OrchestratorBoards({ shown }: { shown: boolean }): React.JSX.Ele
             <span>{project.name}</span>
             <span className="oboards__n">{board.cards.length}</span>
           </button>
+          {board.cards.length === 0 && <p className="oboards__lempty">No cards on this board.</p>}
           {board.columns.map((column) => {
             const cards = board.cards.filter((card) => card.columnId === column.id).sort((a, b) => a.position - b.position)
             if (cards.length === 0) return null

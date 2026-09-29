@@ -132,7 +132,7 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
   const pane = usePaneActions({ tab, tree, focused, onLayout: layoutTo, onNotice: setNotice })
 
   if (error) return <div className="exempty__t">{error}</div>
-  if (!tree) return <div className="termhost" />
+  if (!tree) return <div className="termhost termhost--starting">Starting the terminal…</div>
 
   return (
     <>

@@ -39,14 +39,15 @@ vi.mock('./live', () => ({
 }))
 
 /*
- * Three words plus two counts took the whole width of a panel somebody has
- * just been given a handle to make narrower. The panel is the content, not its
- * own table of contents.
+ * Every name at once took the whole width of a panel somebody has just been
+ * given a handle to make narrower; no name at all left them guessing where
+ * they were. The one in front says its name, the rest are icons.
  */
 describe('the panel picker', () => {
-  it('says which panel each icon opens without spending the width on it', () => {
+  it('names the panel in front, and only that one', () => {
     render(<RightPanel onOpenFile={vi.fn()} />)
-    for (const name of ['Explorer', 'Changes', 'History']) {
+    expect(screen.getByLabelText('Explorer').textContent).toBe('Explorer')
+    for (const name of ['Changes', 'History']) {
       const button = screen.getByLabelText(name)
       expect(button.getAttribute('title')).toBe(name)
       expect(button.textContent).not.toContain(name)
@@ -57,7 +58,6 @@ describe('the panel picker', () => {
     // A zero says the opposite of what the count is there for, and takes the
     // room to say it.
     render(<RightPanel onOpenFile={vi.fn()} />)
-    expect(screen.getByLabelText('Explorer').textContent).toBe('2')
     expect(screen.getByLabelText('Changes').textContent).toBe('')
   })
 })

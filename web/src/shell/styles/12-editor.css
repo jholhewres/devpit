@@ -21,6 +21,8 @@
    `overflow: hidden`. That is the line cut in half at the bottom of a
    terminal with Claude Code open. */
 .termhost { flex: 1; min-height: 0; }
+.termhost[data-drop] { outline: 1px dashed var(--accent); outline-offset: -3px; border-radius: 6px; }
+.termhost--starting { display: grid; place-items: center; font-size: 12px; color: var(--text-3); }
 .termhost .xterm { height: 100%; padding: 8px 4px 8px 12px; }
 /* xterm.css paints the viewport `#000`, and the viewport is positioned
    absolutely against the *padding* box — so the padding above is a black

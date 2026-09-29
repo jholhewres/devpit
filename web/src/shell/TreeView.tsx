@@ -1,4 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+
+import { folderUnder, useFileDrop } from './fileDrop'
+import { ask, commands } from './live'
+import { changed } from './treeChanged'
 
 import { Row } from './Row'
 import { matching, ordered } from './tree'
@@ -28,8 +32,17 @@ export function Tree({
   // One tab stop for the whole tree, not one per row — see `rove`.
   useEffect(() => (ref.current ? rove(ref.current) : undefined), [])
 
+  /* Files dropped from outside are copied in: onto a folder, into it; onto
+     a file, beside it; onto the empty space, at the root. */
+  const dropped = useCallback(
+    (paths: readonly string[], under: Element | null) =>
+      void ask(() => commands.pathImport(projectId, null, folderUnder(under), [...paths])).then(() => changed()),
+    [projectId],
+  )
+  const hovering = useFileDrop(ref, dropped)
+
   return (
-    <div className="tree" ref={ref} onKeyDown={onTreeKeyDown}>
+    <div className="tree" ref={ref} onKeyDown={onTreeKeyDown} data-drop={hovering ? 'true' : undefined}>
       {ordered(nodes).map((node) => (
         <Row
           key={node.path}

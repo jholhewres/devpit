@@ -103,3 +103,98 @@ pub(crate) fn path_delete_now(
     devpit_core::paths::remove(&root, &path).map_err(refused)?;
     project_tree_now(project_id, worktree_id, String::new())
 }
+
+/// A file dropped from outside is copied whole; past this it is not one to
+/// carry into a checkout by dragging.
+const MOST_IMPORTED: u64 = 512 * 1024 * 1024;
+
+/// `path.import` — files dropped from outside, copied into `folder` under
+/// their own names. A name already there is refused, never written over.
+#[tauri::command]
+#[specta::specta]
+pub async fn path_import(
+    project_id: String,
+    worktree_id: Option<String>,
+    folder: String,
+    sources: Vec<String>,
+) -> Result<ProjectTree, RpcError> {
+    crate::off_main::blocking(move || {
+        let root = root_of(&project_id, worktree_id.as_deref())?;
+        for source in &sources {
+            import(&root, &folder, std::path::Path::new(source))?;
+        }
+        project_tree_now(project_id, worktree_id, String::new())
+    })
+    .await
+}
+
+/// One file into `folder` of `root`, held to the project like every write.
+pub(crate) fn import(
+    root: &std::path::Path,
+    folder: &str,
+    from: &std::path::Path,
+) -> Result<(), RpcError> {
+    let meta = from
+        .metadata()
+        .map_err(|err| RpcError::new(ErrorCode::NotFound, format!("{}: {err}", from.display())))?;
+    if !meta.is_file() {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            format!("{} is not a file", from.display()),
+        ));
+    }
+    if meta.len() > MOST_IMPORTED {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            format!("{} is too large to drop in", from.display()),
+        ));
+    }
+    let name = from
+        .file_name()
+        .and_then(|one| one.to_str())
+        .ok_or_else(|| RpcError::new(ErrorCode::Invalid, "a file with no name"))?;
+    let relative = if folder.trim_matches('/').is_empty() {
+        name.to_owned()
+    } else {
+        format!("{}/{name}", folder.trim_matches('/'))
+    };
+    let target = devpit_core::paths::resolve_new(root, &relative).map_err(refused)?;
+    if target.symlink_metadata().is_ok() {
+        return Err(RpcError::new(
+            ErrorCode::Conflict,
+            format!("{relative} is already there"),
+        ));
+    }
+    std::fs::copy(from, &target).map_err(|err| RpcError::internal(err.to_string()))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::import;
+
+    #[test]
+    fn a_dropped_file_lands_in_the_folder_and_nowhere_else() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().join("repo");
+        std::fs::create_dir_all(root.join("docs")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".git")).expect("mkdir");
+        let picked = dir.path().join("shot.png");
+        std::fs::write(&picked, "png").expect("write");
+
+        import(&root, "docs", &picked).expect("imported");
+        assert!(root.join("docs/shot.png").is_file());
+        assert!(
+            import(&root, "docs", &picked).is_err(),
+            "wrote over a file already there"
+        );
+        assert!(
+            import(&root, "..", &picked).is_err(),
+            "climbed out of the project"
+        );
+        assert!(
+            import(&root, ".git/hooks", &picked).is_err(),
+            "wrote into .git"
+        );
+    }
+}

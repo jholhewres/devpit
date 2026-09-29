@@ -8,8 +8,9 @@ import { OrchestratorBoards } from './OrchestratorBoards'
 import { SessionsView } from './SessionsView'
 import { useExplorerState } from './useExplorerState'
 import { useFileIndex } from './useFileIndex'
-import { useShell } from './useShell'
+import { useShellPick } from './shellStore'
 import { useTree } from './useTree'
+import { useLiveSessions } from './liveStatus'
 
 const Icon = ({ d, size = 15 }: { d: string; size?: number }): React.JSX.Element => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -32,7 +33,12 @@ const CLOCK = 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'
 export const SHOW_PANEL = 'devpit:show-panel'
 
 export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void }): React.JSX.Element {
-  const { project, files, active, toggleFiles } = useShell()
+  const { project, files, active, toggleFiles } = useShellPick((all) => ({
+    project: all.project,
+    files: all.files,
+    active: all.active,
+    toggleFiles: all.toggleFiles,
+  }))
   const tree = useTree(project?.id ?? null)
   const index = useFileIndex(project?.id ?? null)
   const { view: chosen, setView, mode, setMode, query, setQuery } = useExplorerState(project?.id ?? null)
@@ -49,6 +55,15 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
     setArts(false)
     next()
   }
+
+  /* Which tab is on belongs to the project it was picked in: carried over,
+     an orchestrator's Artifacts opened on the next project's too. */
+  const here = project?.id ?? null
+  useEffect(() => {
+    setArts(false)
+    setOrch('sessions')
+  }, [here])
+  const waiting = useLiveSessions(project?.orchestrator ?? null).filter((one) => one.waiting).length
 
   /* Asked for from elsewhere — the chat's session count — opened if hidden. */
   useEffect(() => {
@@ -79,10 +94,9 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
 
   return (
     <aside className="rp">
-      {/* Icons, with the name in the tooltip and on the label. Three words
-          plus two counts took the whole width of a panel somebody has just
-          been given a handle to make narrower — and the panel is the content,
-          not its own table of contents. */}
+      {/* Icons, and the name of the one in front. Every name at once took
+          the whole width of a panel somebody has just been given a handle to
+          make narrower; no name at all left them guessing where they were. */}
       <div className="rp__bar">
         <button
           className="rtab"
@@ -92,16 +106,23 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
           onClick={() => pick(() => (setOrch('tree'), setView('tree')))}
         >
           <Icon d={FOLDER} size={15} />
-          {tree.nodes.length > 0 && <span className="rtab__n">{tree.nodes.length}</span>}
+          {view === 'tree' && <span className="rtab__l">Explorer</span>}
         </button>
         {!git && (
           <button className="rtab rtab--lead" aria-selected={view === 'sessions'} title="Sessions" aria-label="Sessions" onClick={() => pick(() => setOrch('sessions'))}>
             <Icon d={PEOPLE} size={15} />
+            {view === 'sessions' && <span className="rtab__l">Sessions</span>}
+            {waiting > 0 && (
+              <span className="rtab__n" data-tone="warn" title={`${waiting} waiting on you`}>
+                {waiting}
+              </span>
+            )}
           </button>
         )}
         {!git && (
           <button className="rtab rtab--lead" aria-selected={view === 'boards'} title="Boards" aria-label="Boards" onClick={() => pick(() => setOrch('boards'))}>
             <Icon d={BOARDS} size={15} />
+            {view === 'boards' && <span className="rtab__l">Boards</span>}
           </button>
         )}
         {git && (
@@ -114,6 +135,7 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
             onClick={() => pick(() => setView('changes'))}
           >
             <Icon d={UPLOAD} size={15} />
+            {view === 'changes' && <span className="rtab__l">Changes</span>}
             {/* A zero is not news. The count is here to say there is something
                 to look at, and `0` says the opposite while taking the room. */}
             {tree.changes.length > 0 && <span className="rtab__n">{tree.changes.length}</span>}
@@ -126,11 +148,13 @@ export function RightPanel({ onOpenFile }: { onOpenFile: (path: string) => void 
             onClick={() => pick(() => setView('history'))}
           >
             <Icon d={CLOCK} size={15} />
+            {view === 'history' && <span className="rtab__l">History</span>}
           </button>
           </>
         )}
         <button className="rtab" aria-selected={view === 'artifacts'} title="Artifacts" aria-label="Artifacts" onClick={() => setArts(true)}>
           <Icon d={ARCHIVE} size={15} />
+          {view === 'artifacts' && <span className="rtab__l">Artifacts</span>}
         </button>
       </div>
 

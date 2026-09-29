@@ -50,6 +50,7 @@
 .row:hover { background: var(--sidebar-item); }
 .row[aria-current='true'] { background: var(--sidebar-item); color: var(--text); }
 /* The folder under the pointer mid-drag — see `useRowDrag.ts`. */
+.tree[data-drop] { box-shadow: inset 0 0 0 1px var(--accent); }
 .row[data-drag-over='true'] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .row__chev { width: 12px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--ghost); }
 .row__ico { color: var(--text-3); }
@@ -60,12 +61,8 @@
 
 
 /* Every project's board, beside an orchestrator's chat. */
-.oboards { display: flex; flex-direction: column; gap: 10px; height: 100%; overflow-y: auto; padding: 10px 10px 16px; scrollbar-width: thin; }
-.oboards__top { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
-.oboards__t { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-.oboards__all { font-size: 11.5px; color: var(--text-3); padding: 2px 6px; border-radius: 5px; }
-.oboards__all:hover { color: var(--text); background: var(--overlay); }
-.oboards__note { padding: 0 4px; font-size: 12px; color: var(--text-3); }
+.oboards { display: flex; flex-direction: column; gap: 10px; height: 100%; overflow-y: auto; padding: 0 8px 16px; scrollbar-width: thin; }
+.oboards__lempty { padding: 2px 6px 4px 32px; font-size: 11.5px; color: var(--text-3); }
 .oboards__p { display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .oboards__p:last-child { border-bottom: 0; }
 .oboards__name { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--text); text-align: left; }
@@ -79,13 +76,11 @@
 .oboards__card { display: block; width: 100%; padding: 3px 6px; border-radius: 5px; font-size: 12px; color: var(--text-2); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* A project's artifacts: kept outside its repository. */
-.arts { display: flex; flex-direction: column; gap: 8px; height: 100%; overflow-y: auto; padding: 10px 10px 16px; scrollbar-width: thin; }
-.arts__top { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
-.arts__t { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-.arts__act { font-size: 11.5px; color: var(--text-3); padding: 2px 6px; border-radius: 5px; }
-.arts__act:hover { color: var(--text); background: var(--overlay); }
-.arts__act--bad { color: var(--danger); }
-.arts__note { padding: 0 4px; font-size: 12px; line-height: 1.5; color: var(--text-3); }
+.arts { display: flex; flex-direction: column; gap: 8px; height: 100%; overflow-y: auto; padding: 0 8px 16px; scrollbar-width: thin; }
+.arts__bad { flex: none; font-size: 11.5px; color: var(--danger); padding: 2px 6px; border-radius: 5px; }
+.arts__bad:hover { color: #fff; background: var(--danger); }
+.arts[data-drop] { box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.arts__ico { flex: none; color: var(--text-3); }
 .arts__list { list-style: none; margin: 0; padding: 0; }
 .arts__i { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 5px; }
 .arts__i:hover { background: var(--overlay); }
@@ -96,23 +91,18 @@
 .arts__i:hover .arts__x, .arts__x:focus-visible { opacity: 1; }
 .arts__x:hover { color: var(--text); background: var(--overlay-strong); }
 .oboards__link { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--raised); }
-.oboards__link > .btn { align-self: flex-end; margin-top: 4px; }
+.oboards__save { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
 .oboards__pick { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 5px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
 .oboards__pick:hover { background: var(--overlay); }
 .oboards__pick .pmark { width: 18px; height: 18px; border-radius: 5px; font-size: 9px; }
-.oboards__top { gap: 4px; }
-.oboards__t { flex: 1; }
 
 /* An orchestrator's sessions: how each stands, what to do with it, what passed. */
 .rtab--lead { order: -1; }
-.sess { display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto; padding: 10px 8px 16px; scrollbar-width: thin; }
-.sess__top { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
-.sess__t { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-.sess__sum { flex: 1; display: flex; justify-content: flex-end; gap: 8px; font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
+.sess { display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto; padding: 0 8px 16px; scrollbar-width: thin; }
+.sess__sum { display: flex; gap: 8px; }
 .sess__wait { color: var(--warning); font-weight: 600; }
 .sess__icon { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--text-3); }
 .sess__icon:hover { color: var(--text); background: var(--overlay-strong); }
-.sess__note { margin: 0; padding: 0 4px; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 .sess__group { display: flex; flex-direction: column; gap: 2px; }
 .sess__g { margin: 0 0 2px; padding: 0 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
 .sess__one { border-radius: 8px; }
@@ -150,4 +140,33 @@
 .sess__gh .sess__g { flex: 1; margin: 0; }
 .sess__gh .sess__icon { width: 22px; height: 22px; opacity: .7; }
 .sess__gh:hover .sess__icon { opacity: 1; }
-.sess__none { margin: 0; padding: 2px 8px 4px; font-size: 11.5px; color: var(--text-3); }
+.sess__none { margin: 0; padding: 0 8px 4px; font-size: 11.5px; color: var(--ghost); }
+
+/* ── A view's title row and its empty state ─────────────────────────
+   The same metrics as the Explorer's and Changes' heads, so switching tabs
+   moves nothing but the content. Sticky: a long list scrolls under it. */
+.phead { position: sticky; top: 0; z-index: 2; height: 34px; flex: none; display: flex; align-items: center; gap: 6px; margin: 0 -8px; padding: 0 6px 0 12px; background: var(--sidebar); }
+.phead__t { font-size: 12.5px; font-weight: 550; color: var(--text); white-space: nowrap; }
+.phead__m { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.phead__acts { flex: none; display: flex; gap: 1px; margin-left: auto; }
+.phead__act { position: relative; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: var(--text-3); }
+.phead__act:hover, .phead__act[aria-pressed='true'] { color: var(--text); background: var(--overlay-strong); }
+/* Right-anchored: these sit against the window's edge. */
+.phead__act::after {
+  content: attr(data-tip); position: absolute; z-index: 80; top: calc(100% + 6px); right: 0;
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+  background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 8px 20px var(--shade);
+  font-size: 11.5px; font-weight: 400; color: var(--text-2);
+  opacity: 0; pointer-events: none; transform: translateY(-3px);
+  transition: opacity 120ms ease 220ms, transform 120ms ease 220ms;
+}
+.phead__act:hover::after { opacity: 1; transform: none; }
+.pempty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 16px; text-align: center; }
+.pempty__t { font-size: 12.5px; color: var(--text-2); }
+.pempty__d { max-width: 240px; font-size: 11.5px; line-height: 1.5; color: var(--text-3); }
+.pempty .btn { margin-top: 6px; }
+
+/* The tab bar: icons, and the one in front says its name — the panel's
+   width goes to the content, and the person still knows where they are. */
+.rtab__l { font-size: 12px; font-weight: 550; white-space: nowrap; }
+.rtab .rtab__n[data-tone='warn'] { color: var(--warning); font-weight: 600; }

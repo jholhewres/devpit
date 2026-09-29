@@ -17,6 +17,7 @@ import { useMarks } from './useMarks'
 import { menuPoint } from './menuRules'
 import { useShellPick } from './shellStore'
 import { linkPaths } from './terminalPathLinks'
+import { shellWord, useFileDrop } from './fileDrop'
 
 /*
  * One terminal, attached to one pane.
@@ -283,12 +284,16 @@ export function Leaf({
 
   useMarks(term, paneId)
   const closeMenu = useCallback(() => setMenuAt(null), [])
+  /* Files dropped on a terminal are typed at its prompt as their paths —
+     quoted, and left for the person to run. */
+  const dropped = useCallback((paths: readonly string[]) => term?.paste(`${paths.map(shellWord).join(' ')} `), [term])
+  const hovering = useFileDrop(host, term ? dropped : null)
 
   return (
     <>
       {error && <div className="exempty__t">{error}</div>}
       {pasteFailed && <div className="exempty__t">{pasteFailed}</div>}
-      <div className="termhost" ref={host} />
+      <div className="termhost" ref={host} data-drop={hovering ? 'true' : undefined} />
       {menuAt && term && (
         <TerminalMenu at={menuAt} terminal={term} projectId={projectId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} onBlocks={onBlocks} onSeparate={onSeparate} />
       )}

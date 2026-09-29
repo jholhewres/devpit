@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use super::{carry, inside, inside_new, listed, plain, remove};
+use super::{add, carry, inside, inside_new, listed, plain, remove};
 
 fn roots(dir: &std::path::Path) -> Vec<PathBuf> {
     vec![dir.join("repo").canonicalize().expect("repo")]
@@ -78,4 +78,30 @@ fn the_list_is_every_file_by_name_and_removing_tidies_up() {
     );
     assert!(folder.exists());
     assert!(remove(&folder, "../notes.md").is_err());
+}
+
+#[test]
+fn a_file_the_person_adds_keeps_its_name_and_never_overwrites() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let folder = dir.path().join("artifacts");
+    std::fs::create_dir_all(&folder).expect("mkdir");
+    let picked = dir.path().join("report.pdf");
+    std::fs::write(&picked, "one").expect("write");
+
+    add(&folder, &picked).expect("added");
+    assert_eq!(
+        std::fs::read_to_string(folder.join("report.pdf")).expect("kept"),
+        "one"
+    );
+
+    std::fs::write(&picked, "two").expect("rewrite");
+    assert!(
+        add(&folder, &picked).is_err(),
+        "a second file of that name wrote over the first"
+    );
+    assert_eq!(
+        std::fs::read_to_string(folder.join("report.pdf")).expect("kept"),
+        "one"
+    );
+    assert!(add(&folder, dir.path()).is_err(), "a folder is not a file");
 }

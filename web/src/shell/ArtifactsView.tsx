@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { open as pickFiles } from '@tauri-apps/plugin-dialog'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Artifacts } from '../gen/bindings'
 import { bytes } from './disk'
+import { useFileDrop } from './fileDrop'
 import { ask, commands } from './live'
+import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { useShell } from './useShell'
 
 /*
  * The project's artifacts: files kept for it outside its repository, in its
  * own folder in the devpit workspace. Sessions keep and take them back with
- * devpit's tools; here they are read, revealed and removed.
+ * devpit's tools; here they are added, opened, revealed and removed.
  */
 export function ArtifactsView({ shown }: { shown: boolean }): React.JSX.Element {
   const { project, show } = useShell()
@@ -16,6 +19,7 @@ export function ArtifactsView({ shown }: { shown: boolean }): React.JSX.Element 
   const [error, setError] = useState<string | null>(null)
   /* Removing asks once, in place: the window has no dialog for one file. */
   const [removing, setRemoving] = useState<string | null>(null)
+  const box = useRef<HTMLDivElement>(null)
 
   const load = useCallback(() => {
     if (!project) return
@@ -30,6 +34,23 @@ export function ArtifactsView({ shown }: { shown: boolean }): React.JSX.Element 
     if (shown) load()
   }, [shown, load])
 
+  const add = useCallback(
+    (paths: readonly string[]) => {
+      if (!project || paths.length === 0) return
+      void ask(() => commands.artifactsAdd(project.id, [...paths])).then((answer) => {
+        setError(answer.error)
+        if (answer.data) setFound(answer.data)
+        else load()
+      })
+    },
+    [project, load],
+  )
+  const hovering = useFileDrop(box, shown ? add : null)
+  const choose = (): void =>
+    void pickFiles({ multiple: true, directory: false }).then((picked) => {
+      if (picked) add(Array.isArray(picked) ? picked : [picked])
+    })
+
   const remove = (name: string): void => {
     if (!project) return
     void ask(() => commands.artifactRemove(project.id, name)).then((answer) => {
@@ -39,25 +60,33 @@ export function ArtifactsView({ shown }: { shown: boolean }): React.JSX.Element 
     })
   }
 
+  const items = found?.items ?? []
   return (
-    <div className="arts">
-      <div className="arts__top">
-        <span className="arts__t">Artifacts</span>
+    <div className="arts" ref={box} data-drop={hovering ? 'true' : undefined}>
+      <PanelHead title="Artifacts" meta={items.length > 0 ? items.length : null}>
+        <PanelAct label="Add files" onClick={choose}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        </PanelAct>
         {found && (
-          <button className="arts__act" onClick={() => void ask(() => commands.pathReveal(found.folder))} title={found.folder}>
-            Reveal folder
-          </button>
+          <PanelAct label="Reveal folder" onClick={() => void ask(() => commands.pathReveal(found.folder))}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+          </PanelAct>
         )}
-      </div>
-      {error && <p className="arts__note">{error}</p>}
-      {found?.items.length === 0 && (
-        <p className="arts__note">
-          Files kept for this project outside its repository. Ask a session to keep one here — it has devpit&rsquo;s artifact tools.
-        </p>
+      </PanelHead>
+      {error && <p className="pempty__d">{error}</p>}
+      {found && items.length === 0 && (
+        <PanelEmpty
+          title="No artifacts yet"
+          hint="Files this project keeps outside its repository. Drop files here, add them, or ask a session — it has devpit's artifact tools."
+        >
+          <button className="btn" onClick={choose}>
+            Add files
+          </button>
+        </PanelEmpty>
       )}
       <ul className="arts__list">
-        {found?.items.map((one) => {
-          const path = `${found.folder}/${one.name}`
+        {items.map((one) => {
+          const path = `${found!.folder}/${one.name}`
           return (
             <li className="arts__i" key={one.name}>
               <button className="arts__name" title={path} onClick={() => show('file', { id: `file:${path}`, path, title: one.name.split('/').pop() })}>
@@ -65,13 +94,18 @@ export function ArtifactsView({ shown }: { shown: boolean }): React.JSX.Element 
               </button>
               <span className="arts__size">{bytes(one.bytes)}</span>
               {removing === one.name ? (
-                <button className="arts__act arts__act--bad" onClick={() => remove(one.name)} onBlur={() => setRemoving(null)} autoFocus>
+                <button className="arts__bad" onClick={() => remove(one.name)} onBlur={() => setRemoving(null)} autoFocus>
                   Remove?
                 </button>
               ) : (
-                <button className="arts__x" aria-label={`Remove ${one.name}`} title="Remove" onClick={() => setRemoving(one.name)}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-                </button>
+                <>
+                  <button className="arts__x" aria-label={`Open ${one.name} in its app`} title="Open in its app" onClick={() => void ask(() => commands.pathOpen(path))}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M8 7h9v9" /></svg>
+                  </button>
+                  <button className="arts__x" aria-label={`Remove ${one.name}`} title="Remove" onClick={() => setRemoving(one.name)}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
+                </>
               )}
             </li>
           )
