@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Project, Thread } from '../gen/bindings'
 import { ChevronDown, Folder, Pencil, Plus, Trash } from './GitIcons'
@@ -44,6 +44,9 @@ function savedFolded(): boolean {
 
 type Menu = (at: { x: number; y: number }, items: readonly RailItem[]) => void
 
+/** Oldest first, whatever order the list arrived in. */
+export const byAge = (all: readonly Project[]): readonly Project[] => [...all].sort((a, b) => a.id.localeCompare(b.id))
+
 export function RailOrchestrators({
   onMenu,
   onRemove,
@@ -59,7 +62,9 @@ export function RailOrchestrators({
   const [account, setAccount] = useState<Project | null>(null)
   const [folded, setFolded] = useState(savedFolded)
   const arriving = useRef<string | null>(null)
-  const mine = projects.filter((one) => one.orchestrator)
+  /* In the order they were made — ids sort by time. The list comes back
+     last-opened first, and opening one moved it to the top under the pointer. */
+  const mine = useMemo(() => byAge(projects.filter((one) => one.orchestrator)), [projects])
 
   /* Arriving with nothing open picks up where it was left: its last
      conversation, or a new one. Tabs it still had are left as they were. */

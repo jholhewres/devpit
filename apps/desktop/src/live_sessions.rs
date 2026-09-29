@@ -23,6 +23,8 @@ struct Listed {
     cwd: Option<String>,
     status_updated_at: Option<f64>,
     tmux: Option<String>,
+    /// The short id a background session is stopped by.
+    job_id: Option<String>,
 }
 
 /// Every live session listed in `sessions`, placed on its project and card.
@@ -62,6 +64,7 @@ pub(crate) fn read(
                 .and_then(|shown| crate::live_prompt::pending(&shown));
             Some(LiveSession {
                 name,
+                pid: listed.pid.unwrap_or_default(),
                 status: listed.status.unwrap_or_default(),
                 kind: listed.kind.unwrap_or_default(),
                 card_id: card_of(worktrees, Path::new(&cwd)),
@@ -211,34 +214,48 @@ fn client_named(profile_id: &str, name: &str) -> Result<String, RpcError> {
         })
 }
 
-/// This account's live session called `name`: its process and, when it runs
-/// in one of devpit's terminals, that terminal's project and pane.
-pub(crate) fn running_named(
-    profile_id: &str,
-    name: &str,
-) -> Result<(i32, Option<devpit_rpc::LivePane>), RpcError> {
+/// One live session of an account, as stopping it needs it.
+pub(crate) struct Running {
+    pub pid: i32,
+    /// When it runs in one of devpit's terminals, that terminal.
+    pub pane: Option<devpit_rpc::LivePane>,
+    /// When it is a background session, the id its CLI stops it by.
+    pub job: Option<String>,
+}
+
+/// Every live session of this account called `name`. More than one is
+/// ordinary: a background job started twice keeps the name it was given.
+pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>, RpcError> {
     let sessions = config_of(profile_id)?.join("sessions");
-    let found = std::fs::read_dir(&sessions)
+    let found: Vec<Running> = std::fs::read_dir(&sessions)
         .into_iter()
         .flatten()
         .flatten()
         .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+        .filter(|entry| entry.metadata().is_ok_and(|meta| meta.len() <= MOST_BYTES))
         .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
         .filter_map(|text| serde_json::from_str::<Listed>(&text).ok())
-        .find(|listed| listed.name.as_deref() == Some(name) && listed.pid.is_some_and(alive));
-    let listed = found.ok_or_else(|| {
-        RpcError::new(
+        .filter(|listed| listed.name.as_deref() == Some(name) && listed.pid.is_some_and(alive))
+        .map(|listed| Running {
+            pid: listed.pid.unwrap_or_default(),
+            pane: listed
+                .tmux
+                .as_deref()
+                .and_then(pane_target)
+                .as_deref()
+                .and_then(pane_of),
+            job: listed
+                .job_id
+                .filter(|_| listed.kind.as_deref() == Some("bg")),
+        })
+        .collect();
+    if found.is_empty() {
+        return Err(RpcError::new(
             ErrorCode::NotFound,
             format!("no session called {name} is running"),
-        )
-    })?;
-    let pane = listed
-        .tmux
-        .as_deref()
-        .and_then(pane_target)
-        .as_deref()
-        .and_then(pane_of);
-    Ok((listed.pid.unwrap_or_default(), pane))
+        ));
+    }
+    Ok(found)
 }
 
 /// Each live listing's name and tmux client, for the one reply that needs it.

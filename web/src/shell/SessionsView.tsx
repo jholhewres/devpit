@@ -6,6 +6,7 @@ import { inOrder, refreshSessions, STATE_WORDS, stateOf, useLiveSessions } from 
 import { SessionTerminal } from './SessionTerminal'
 import { opened } from './strip'
 import { remember, remembered } from './tabs'
+import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { useShell } from './useShell'
 
 /*
@@ -37,6 +38,22 @@ export function since(ms: number | null, now: number): string | null {
   return hours < 24 ? `${hours} h` : `${Math.round(hours / 24)} d`
 }
 
+/** A row's own key: a name started twice is two sessions, and keyed by name
+ *  they opened and closed as one. */
+export const rowOf = (one: LiveSession): string => `${one.name}:${one.pid}`
+
+/* "3 min" has to move while the panel is on screen, and only then. */
+function useNow(shown: boolean): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!shown) return
+    setNow(Date.now())
+    const every = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(every)
+  }, [shown])
+  return now
+}
+
 export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
   const { project, projects, setProject, show, openCard, openPane } = useShell()
   const [linked, setLinked] = useState<readonly string[]>([])
@@ -45,7 +62,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
   const [threads, setThreads] = useState<readonly AgentThread[]>([])
   const [open, setOpen] = useState<string | null>(null)
   const [terminal, setTerminal] = useState<LiveSession | null>(null)
-  const now = Date.now()
+  const now = useNow(shown)
 
   const readHistory = useCallback(() => {
     if (!project?.orchestrator) return
@@ -67,6 +84,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
       remember(one.id, { ...opened(was, { id: tabId, kind: 'term', panes: [made.data.focusedId] }), active: was.active ?? tabId })
       setTerminal({
         name: 'Terminal',
+        pid: 0,
         status: 'idle',
         kind: 'interactive',
         cwd: one.rootPath,
@@ -118,20 +136,32 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
 
   return (
     <div className="sess">
-      <div className="sess__top">
-        <span className="sess__t">Sessions</span>
-        <span className="sess__sum">
-          {waiting > 0 && <b className="sess__wait">{waiting} waiting</b>}
-          {busy > 0 && <span>{busy} working</span>}
-          {sessions.length === 0 ? 'none running' : <span>{sessions.length} running</span>}
-        </span>
-        <button className="sess__icon" onClick={() => (profileId && refreshSessions(profileId), readHistory())} title="Read again" aria-label="Refresh sessions">
+      <PanelHead
+        title="Sessions"
+        meta={
+          sessions.length > 0 && (
+            <span className="sess__sum">
+              {waiting > 0 && <b className="sess__wait">{waiting} waiting</b>}
+              {busy > 0 && <span>{busy} working</span>}
+              <span>{sessions.length} running</span>
+            </span>
+          )
+        }
+      >
+        <PanelAct label="Read again" onClick={() => (profileId && refreshSessions(profileId), readHistory())}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" /></svg>
-        </button>
-      </div>
+        </PanelAct>
+      </PanelHead>
 
       {sessions.length === 0 && (
-        <p className="sess__note">No session of this account is running. Ask the orchestrator to start one on a card, or open Claude Code in a project&rsquo;s terminal.</p>
+        <PanelEmpty
+          title="No session running"
+          hint={
+            groups.length > 0
+              ? 'Start one from a project below — a terminal or a chat — or ask the orchestrator to start one on a card.'
+              : 'Ask the orchestrator to start one on a card, or open Claude Code in a project’s terminal.'
+          }
+        />
       )}
 
       {groups.map(({ project: where, members }) => (
@@ -149,16 +179,16 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
               </>
             )}
           </div>
-          {members.length === 0 && <p className="sess__none">No session running here.</p>}
+          {members.length === 0 && sessions.length > 0 && <p className="sess__none">No session running here.</p>}
           {members.map((one) => {
             const state = stateOf(sessions, one.name)
             const history = historyOf(one.name)
             const last = history?.events[history.events.length - 1]
-            const expanded = open === one.name
+            const expanded = open === rowOf(one)
             return (
-              <div className="sess__one" key={one.name} data-state={state} data-open={expanded ? 'true' : undefined}>
+              <div className="sess__one" key={rowOf(one)} data-state={state} data-open={expanded ? 'true' : undefined}>
                 <div className="sess__row">
-                  <button className="sess__main" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : one.name)} title={one.cwd}>
+                  <button className="sess__main" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : rowOf(one))} title={one.cwd}>
                     <i className="deleg__dot" data-state={state} />
                     <span className="sess__name">{one.name}</span>
                     <span className="sess__state">{STATE_WORDS[state]}</span>

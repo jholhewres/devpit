@@ -84,22 +84,41 @@ pub(crate) fn close_pane(
     Ok(tab_id)
 }
 
-/// Stops the session called `name` of this account, and closes its terminal.
+/// Stops the sessions called `name` of this account — every one, since a
+/// name started twice is one name to the person — and closes their terminals.
 pub(crate) fn stop(app: &AppHandle, profile_id: &str, name: &str) -> Result<Value, RpcError> {
-    let (pid, pane) = crate::live_sessions::running_named(profile_id, name)?;
-    let Some(pane) = pane else {
-        // Outside devpit's terminals there is only the process.
-        if pid <= 0 || unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
-            return Err(RpcError::new(
-                ErrorCode::Conflict,
-                format!("{name} could not be stopped"),
-            ));
+    let found = crate::live_sessions::running_named(profile_id, name)?;
+    let mut terminal = Value::Null;
+    for one in &found {
+        match (&one.pane, &one.job) {
+            (Some(pane), _) => {
+                let tab_id = close_pane(app, &pane.project_id, &pane.pane_id)?;
+                terminal = json!({ "projectId": pane.project_id, "tabId": tab_id });
+            }
+            (None, Some(job)) => stop_job(profile_id, job)
+                .map_err(|why| RpcError::new(ErrorCode::Conflict, format!("{name}: {why}")))?,
+            (None, None) => {
+                // Outside devpit's terminals and not a job: only the process.
+                if one.pid <= 0 || unsafe { libc::kill(one.pid, libc::SIGTERM) } != 0 {
+                    return Err(RpcError::new(
+                        ErrorCode::Conflict,
+                        format!("{name} could not be stopped"),
+                    ));
+                }
+            }
         }
-        return Ok(json!({ "stopped": format!("{name} was stopped"), "terminal": null }));
+    }
+    let said = match (found.len(), terminal.is_null()) {
+        (1, true) => format!("{name} was stopped"),
+        (1, false) => format!("{name} was stopped, and its terminal closed"),
+        (many, _) => format!("{many} sessions called {name} were stopped"),
     };
-    let tab_id = close_pane(app, &pane.project_id, &pane.pane_id)?;
-    Ok(json!({
-        "stopped": format!("{name} was stopped, and its terminal closed"),
-        "terminal": { "projectId": pane.project_id, "tabId": tab_id },
-    }))
+    Ok(json!({ "stopped": said, "terminal": terminal }))
+}
+
+/// A background job, stopped by its own CLI under the account that runs it.
+fn stop_job(profile_id: &str, job: &str) -> Result<(), String> {
+    let store = crate::projects::store().map_err(|err| err.to_string())?;
+    let runner = crate::agent_profiles::runner_for(&store, profile_id)?;
+    devpit_agentcli::stop_background(Some(&runner), job).map_err(|err| err.to_string())
 }

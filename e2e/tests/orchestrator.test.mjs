@@ -79,7 +79,8 @@ describe('the orchestrator', () => {
       .split('\n')
       .filter(Boolean)
       .map((line) => JSON.parse(line))
-      .find((call) => call.control?.enabled)
+      // The last one: the log is the run's, and the chat suite asked first.
+      .findLast((call) => call.control?.enabled)
     assert.equal(asked?.control?.name, 'devpit-client-work')
   })
 

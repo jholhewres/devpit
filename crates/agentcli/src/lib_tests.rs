@@ -157,3 +157,17 @@ fn a_handed_session_is_named_and_asked_as_arguments() {
     assert_eq!(argv[at + 1], "api-fix");
     assert_eq!(&argv[argv.len() - 2..], ["--", "fix it; rm -rf /"]);
 }
+
+#[test]
+fn a_background_session_is_stopped_by_the_profile_that_started_it() {
+    assert_eq!(stop_argv(None, "a1b2"), ["claude", "stop", "a1b2"]);
+    let named = crate::running::Runner {
+        program: "/opt/claw/bin/claw".to_owned(),
+        args: vec!["--profile".to_owned(), "work".to_owned()],
+        env: Vec::new(),
+    };
+    assert_eq!(
+        stop_argv(Some(&named), "a1b2"),
+        ["/opt/claw/bin/claw", "--profile", "work", "stop", "a1b2"]
+    );
+}

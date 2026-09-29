@@ -9,6 +9,8 @@ use specta::Type;
 pub struct LiveSession {
     /// The name another session messages it by.
     pub name: String,
+    /// Its process: what tells apart two sessions that share a name.
+    pub pid: i32,
     /// The CLI's own word: `busy` or `idle`.
     pub status: String,
     /// `interactive` or `background`.
