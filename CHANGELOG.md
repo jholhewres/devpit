@@ -3,6 +3,27 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.26 — 2026-09-29
+
+### Sessions
+
+- **Every session devpit starts runs in a terminal you can watch.** A card's
+  work handed on by an orchestrator, and a lane's `session` step, open in the
+  card's terminal tab with your profile's own command — the same mode your own
+  sessions run in. They used to start in the background, where nothing showed
+  them and a permission they asked for waited on a question nobody could see.
+- **A background session can be watched.** In the Sessions panel, "Watch it in
+  a terminal" attaches it in a tab of its project.
+
+### Fixes
+
+- A program devpit starts — an agent, a chat, the MCP check — finds what your
+  own shell finds, even when devpit was opened from the desktop's menu. MCP
+  servers installed in a folder your shell adds to `PATH` no longer read as
+  failed.
+- The MCP list shows the servers that answer apart from the ones that do not,
+  and refreshes from its header.
+
 ## 0.1.25 — 2026-09-29
 
 ### Git
