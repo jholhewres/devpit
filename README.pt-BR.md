@@ -155,7 +155,8 @@ trabalho, não uma cancela.
 ## Requisitos
 
 - **Linux**, X11 ou Wayland, é o build. macOS tem um build universal sem
-  assinatura nem notarização; Windows ainda não é construído.
+  assinatura nem notarização. No Windows, roda como o build de Linux dentro do
+  WSL — veja [Windows](#windows).
 - **`tmux`**. Os terminais são painéis do tmux, e é por isso que eles
   sobrevivem à janela.
 - **[Claude Code](https://claude.com/claude-code)** (`claude` no PATH). Chat,
@@ -208,8 +209,27 @@ xattr -dr com.apple.quarantine /Applications/devpit.app
 
 Se for fazer isso, confira antes o `SHA256SUMS` — logo abaixo.
 
-**Windows** ainda não é compilado. O terminal é tmux e tmux não existe lá, então
-é um port e não um build; não está nesta release.
+### Windows
+
+O devpit roda no Windows como o build de Linux dentro do WSL 2, com a janela
+desenhada pelo WSLg na área de trabalho do Windows. Nada se perde: os
+terminais são sessões tmux dentro do WSL e sobrevivem à janela como em
+qualquer lugar.
+
+1. Windows 11, ou Windows 10 21H2 em diante, com WSL 2 e uma distribuição
+   Linux: `wsl --install` no PowerShell, depois reinicie.
+2. No shell da distribuição: `sudo apt install tmux wslu`, e o Claude Code
+   como diz a página de instalação dele.
+3. A mesma linha do Linux, dentro do WSL:
+   `curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | sh`
+4. Mantenha os projetos no sistema de arquivos do Linux (`~/…`), não em
+   `/mnt/c`: git e os observadores de arquivo ficam muitas vezes mais lentos
+   nessa fronteira.
+
+O `wslu` é o que abre um link no navegador do Windows. Duas coisas não
+atravessam: sessões logadas trazidas de um navegador do Windows, e arquivos
+arrastados do Explorer. Um build nativo de Windows está em andamento; tmux não
+existe lá, então é um port e não um build.
 
 Toda release traz um `SHA256SUMS`, e conferir é uma linha:
 
