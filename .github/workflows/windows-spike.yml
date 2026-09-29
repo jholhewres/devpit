@@ -21,5 +21,33 @@ jobs:
       - run: cargo install psmux --locked
       - run: tmux -V || true
 
+      # What the tmux crate leans on, asked of psmux one verb at a time — the
+      # tests stop at the first thing that fails, and this is the rest.
+      - name: Probe
+        continue-on-error: true
+        run: |
+          T="$(mktemp -d)"
+          probe() { echo "\$ tmux $*"; tmux "$@"; echo "  -> exit $?"; }
+          for NS in "-S $T/s.sock" "-L devpitprobe"; do
+            echo "===== server: $NS"
+            probe $NS new-session -d -s base -n w1 -c "$T"
+            probe $NS new-window -t base -n w2 -c "$T"
+            probe $NS list-windows -t base -F '#{window_name}'
+            probe $NS new-session -d -t base -s base__w1
+            probe $NS list-sessions -F '#{session_name} #{session_group}'
+            probe $NS select-window -t base__w1:w1
+            probe $NS select-window -t base:w1
+            probe $NS display-message -p -t base:w2 '#{pane_current_path} #{pane_pid}'
+            probe $NS pipe-pane -t base:w1 "cat > '$T/out.txt'"
+            probe $NS send-keys -t base:w1 'echo devpit-probe' Enter
+            sleep 3
+            echo "--- piped:"; cat "$T/out.txt" 2>&1 | tail -5
+            probe $NS capture-pane -p -t base:w1
+            probe $NS list-panes -s -t base -F '#{window_name} #{pane_pid} #{pane_current_command}'
+            probe $NS kill-window -t base:w2
+            probe $NS kill-session -t base
+            rm -f "$T/out.txt"
+          done
+
       - run: command -v make || choco install make -y --no-progress
       - run: make test-tmux
