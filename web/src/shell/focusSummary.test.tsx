@@ -32,6 +32,7 @@ const notice = (over: Partial<Notice>): Notice => ({
   cardId: 'card_1',
   createdAt: 1000,
   readAt: null,
+  paneId: null,
   ...over,
 })
 

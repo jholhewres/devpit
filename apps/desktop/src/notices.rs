@@ -45,6 +45,7 @@ pub(crate) fn drawn(row: devpit_core::NoticeRow) -> Notice {
         card_id: row.card_id,
         created_at: row.created_at as f64,
         read_at: row.read_at.map(|at| at as f64),
+        pane_id: row.pane_id,
     }
 }
 
@@ -70,21 +71,47 @@ pub fn ring(
     let Ok(store) = Store::open_default() else {
         return;
     };
-    ring_in(&store, app, project_id, kind, title, detail, card_id);
+    if store
+        .add_notice(project_id, kind, title, detail, card_id)
+        .is_ok()
+    {
+        let _ = app.emit(RANG, ());
+    }
 }
 
-/// `ring`, with a Store the caller already opened for the same event.
+/// `ring`, about something that happened in terminal `pane`.
+pub fn ring_at(
+    app: &tauri::AppHandle,
+    project_id: Option<&str>,
+    kind: &str,
+    title: &str,
+    detail: Option<&str>,
+    pane: &str,
+) {
+    let Ok(store) = Store::open_default() else {
+        return;
+    };
+    if store
+        .add_pane_notice(project_id, kind, title, detail, None, pane)
+        .is_ok()
+    {
+        let _ = app.emit(RANG, ());
+    }
+}
+
+/// `ring`, with a Store the caller already opened for the same event, about
+/// something that happened in terminal `pane`.
 pub(crate) fn ring_in(
     store: &Store,
     app: &tauri::AppHandle,
     project_id: Option<&str>,
     kind: &str,
     title: &str,
-    detail: Option<&str>,
     card_id: Option<&str>,
+    pane: &str,
 ) {
     if store
-        .add_notice(project_id, kind, title, detail, card_id)
+        .add_pane_notice(project_id, kind, title, None, card_id, pane)
         .is_err()
     {
         return;

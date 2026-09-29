@@ -40,6 +40,8 @@ pub struct NoticeRow {
     pub card_id: Option<String>,
     pub created_at: i64,
     pub read_at: Option<i64>,
+    /// The terminal it happened in, for a click to go to.
+    pub pane_id: Option<String>,
 }
 
 /// A ceiling on what one read can allocate.
@@ -225,7 +227,7 @@ impl Store {
 
     pub fn notices(&self, limit: i64) -> Result<Vec<NoticeRow>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, project_id, kind, title, detail, card_id, created_at, read_at \
+            "SELECT id, project_id, kind, title, detail, card_id, created_at, read_at, pane_id \
              FROM notice ORDER BY created_at DESC, rowid DESC LIMIT ?1",
         )?;
         let rows = stmt
@@ -239,6 +241,7 @@ impl Store {
                     card_id: row.get(5)?,
                     created_at: row.get(6)?,
                     read_at: row.get(7)?,
+                    pane_id: row.get(8)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -273,7 +276,7 @@ impl Store {
             "project_id = ?1"
         };
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT id, project_id, kind, title, detail, card_id, created_at, read_at \
+            "SELECT id, project_id, kind, title, detail, card_id, created_at, read_at, pane_id \
              FROM notice \
              WHERE {whose} AND created_at >= ?2 AND (?3 IS NULL OR id > ?3) \
              ORDER BY created_at ASC, id ASC LIMIT ?4",
@@ -289,6 +292,7 @@ impl Store {
                     card_id: row.get(5)?,
                     created_at: row.get(6)?,
                     read_at: row.get(7)?,
+                    pane_id: row.get(8)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -303,7 +307,28 @@ impl Store {
         detail: Option<&str>,
         card_id: Option<&str>,
     ) -> Result<String, StoreError> {
-        Self::add_notice_on(&self.conn, project_id, kind, title, detail, card_id)
+        Self::add_notice_on(&self.conn, project_id, kind, title, detail, card_id, None)
+    }
+
+    /// `add_notice`, about something that happened in terminal `pane_id`.
+    pub fn add_pane_notice(
+        &self,
+        project_id: Option<&str>,
+        kind: &str,
+        title: &str,
+        detail: Option<&str>,
+        card_id: Option<&str>,
+        pane_id: &str,
+    ) -> Result<String, StoreError> {
+        Self::add_notice_on(
+            &self.conn,
+            project_id,
+            kind,
+            title,
+            detail,
+            card_id,
+            Some(pane_id),
+        )
     }
 
     /// `add_notice` for work holding a connection but no store: a migration,
@@ -315,6 +340,7 @@ impl Store {
         title: &str,
         detail: Option<&str>,
         card_id: Option<&str>,
+        pane_id: Option<&str>,
     ) -> Result<String, StoreError> {
         let id = format!("ntc_{}", ulid::Ulid::generate());
         conn.execute(
@@ -322,6 +348,13 @@ impl Store {
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![id, project_id, kind, title, detail, card_id, now()],
         )?;
+        // Apart, because a migration older than the column rings here too.
+        if let Some(pane_id) = pane_id {
+            conn.execute(
+                "UPDATE notice SET pane_id = ?2 WHERE id = ?1",
+                rusqlite::params![id, pane_id],
+            )?;
+        }
 
         // Trimmed on write, not on read: the read is what a person waits for.
         // Same tiebreak as the read, or the trim would keep a different 200.

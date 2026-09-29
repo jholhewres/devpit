@@ -218,6 +218,10 @@ fn a_row_written_before_a_migration_survives_it() {
         .expect("undo 021");
     store
         .conn()
+        .execute_batch("ALTER TABLE notice DROP COLUMN pane_id;")
+        .expect("undo 022");
+    store
+        .conn()
         .execute_batch("PRAGMA user_version = 16;")
         .expect("back to 16");
     drop(store);

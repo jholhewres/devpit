@@ -37,11 +37,14 @@ export function Notices({
   open,
   setOpen,
   onOpenCard,
+  onOpenPane,
 }: {
   bell: Bell
   open: boolean
   setOpen: React.Dispatch<React.SetStateAction<boolean>>
   onOpenCard?: (cardId: string) => void
+  /** Goes to the terminal a notice happened in, in its project. */
+  onOpenPane?: (projectId: string | null, paneId: string) => void
 }): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   useAway(box, () => setOpen(false), open)
@@ -62,9 +65,14 @@ export function Notices({
     return () => window.removeEventListener('keydown', key)
   })
 
+  /* The terminal it happened in first: an agent waiting is answered there,
+     and the card only says which piece of work it was. */
   const act = (one: Notice): void => {
     bell.markRead(one.id)
-    if (one.cardId && onOpenCard) {
+    if (one.paneId && onOpenPane) {
+      setOpen(false)
+      onOpenPane(one.projectId, one.paneId)
+    } else if (one.cardId && onOpenCard) {
       setOpen(false)
       onOpenCard(one.cardId)
     }

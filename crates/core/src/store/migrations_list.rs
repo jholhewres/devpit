@@ -621,4 +621,14 @@ UPDATE run
 CREATE UNIQUE INDEX run_one_running ON run(card_id) WHERE state = 'running';
 "#,
     },
+    // Migration 022 — the terminal a notice is about.
+    Migration {
+        version: 22,
+        sql: r#"
+-- An agent waiting, a command that finished: clicking the notice goes to the
+-- terminal it happened in. Kept apart from `detail`, which is text to read —
+-- the pane id used to be put there and drawn as `leaf_…`.
+ALTER TABLE notice ADD COLUMN pane_id TEXT;
+"#,
+    },
 ];

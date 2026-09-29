@@ -161,8 +161,8 @@ describe('manual item 7 — claude typed by hand', () => {
   })
 })
 
-describe('manual item 8 — a waiting agent rings the bell and opens its card', () => {
-  test('the notice arrives, and clicking it opens that card', async () => {
+describe('manual item 8 — a waiting agent rings the bell and goes to its terminal', () => {
+  test('the notice arrives, and clicking it goes to the terminal the agent waits in', async () => {
     await openCard('Needs you')
     const known = panes(home)
     await press(window, 'Claude Code')
@@ -195,7 +195,12 @@ describe('manual item 8 — a waiting agent rings the bell and opens its card', 
       }) ?? notices[0]
       hit.click()
     })
-    await window.wait(async () => (await openCardTitle()) === 'Needs you', 10000)
+    // The terminal it is waiting in, where it is answered — not its card.
+    const front = await window.wait(
+      () => window.executeScript("return document.querySelector('[data-show=\"true\"][data-pane]')?.getAttribute('data-pane') ?? null"),
+      10000,
+    )
+    assert.equal(front, 'term')
     type(home, pane, '/exit')
   })
 })

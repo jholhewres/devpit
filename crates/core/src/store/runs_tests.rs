@@ -160,6 +160,7 @@ fn rows_the_old_sweep_wrote_become_lost_and_nothing_else_moves() {
              DROP TABLE pane_agent; DROP INDEX project_folder; ALTER TABLE project DROP COLUMN folder; \
              DROP TABLE project_plugin; ALTER TABLE card_attachment DROP COLUMN plugin_id; \
              ALTER TABLE project DROP COLUMN icon; ALTER TABLE project DROP COLUMN color; \
+             ALTER TABLE notice DROP COLUMN pane_id; \
              CREATE TABLE drawing (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, \
              scene TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);",
         )

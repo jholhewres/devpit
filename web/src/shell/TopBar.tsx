@@ -26,7 +26,7 @@ import { close, minimize, toggleMaximize } from './window'
  * the buttons still take their own clicks.
  */
 export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
-  const { side, files, toggleSide, toggleFiles, project, show, openCard, managing, openManager } =
+  const { side, files, toggleSide, toggleFiles, project, show, openCard, managing, openManager, setProject, openPane } =
     useShell()
   /* One reader for the whole top bar: the panel and the pill draw from the
      same list, so a count on one cannot disagree with the other. */
@@ -96,6 +96,10 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
         onOpenCard={(cardId) => {
           show('board')
           openCard(cardId)
+        }}
+        onOpenPane={(projectId, paneId) => {
+          if (projectId && projectId !== project?.id) setProject(projectId)
+          openPane(paneId)
         }}
       />
 

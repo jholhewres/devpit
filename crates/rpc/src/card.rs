@@ -106,6 +106,8 @@ pub struct Notice {
     pub card_id: Option<String>,
     pub created_at: f64,
     pub read_at: Option<f64>,
+    /// The terminal it happened in: a click goes there, to its tab.
+    pub pane_id: Option<String>,
 }
 
 /// Response of every notice command.

@@ -371,8 +371,8 @@ impl HookSink for AppHandle {
             ring.project_id,
             crate::notices::kind::AGENT,
             "An agent is waiting on you",
-            Some(pane),
             ring.card_id,
+            pane,
         );
     }
 

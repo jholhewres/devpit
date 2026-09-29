@@ -223,6 +223,7 @@ describe('the bell', () => {
     cardId: 'card_1',
     createdAt: Date.now() / 1000 - 30,
     readAt: null,
+    paneId: null,
     ...over,
   })
 
@@ -234,7 +235,13 @@ describe('the bell', () => {
 
   /* The top bar owns the bell's state now, so one reader serves the panel and
      the focus pill. The tests supply it the same way the top bar does. */
-  function Bell({ onOpenCard }: { onOpenCard?: (cardId: string) => void }): React.JSX.Element {
+  function Bell({
+    onOpenCard,
+    onOpenPane,
+  }: {
+    onOpenCard?: (cardId: string) => void
+    onOpenPane?: (projectId: string | null, paneId: string) => void
+  }): React.JSX.Element {
     const [open, setOpen] = useState(false)
     return (
       <Notices
@@ -242,9 +249,22 @@ describe('the bell', () => {
         open={open}
         setOpen={setOpen}
         onOpenCard={onOpenCard}
+        onOpenPane={onOpenPane}
       />
     )
   }
+
+  it('goes to the terminal an agent is waiting in, before its card', async () => {
+    const onOpenCard = vi.fn()
+    const onOpenPane = vi.fn()
+    bell = { notices: [notice({ id: 'ntc_agent', kind: 'agent', projectId: 'prj_1', cardId: 'card_agent', paneId: 'leaf_1' })], unread: 1 }
+    render(<Bell onOpenCard={onOpenCard} onOpenPane={onOpenPane} />)
+    await waitFor(() => expect(screen.getByLabelText('1 unread')).toBeTruthy())
+
+    fireEvent.keyDown(window, { key: 'N', shiftKey: true, metaKey: true })
+    await waitFor(() => expect(onOpenPane).toHaveBeenCalledWith('prj_1', 'leaf_1'))
+    expect(onOpenCard).not.toHaveBeenCalled()
+  })
 
   /* One key to whatever has been waiting longest, in the order somebody
      between five agents wants. It opens the card the notice points at, which

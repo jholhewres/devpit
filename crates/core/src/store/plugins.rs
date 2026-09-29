@@ -148,6 +148,7 @@ pub(super) fn export_drawings(conn: &Connection, root: &Path) -> Result<(), Stor
             title,
             Some(&detail),
             None,
+            None,
         )?;
     }
     Ok(())
