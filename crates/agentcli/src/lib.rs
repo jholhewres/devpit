@@ -309,6 +309,7 @@ mod head_tests;
 pub mod history;
 #[cfg(test)]
 mod history_tests;
+mod mcp_health;
 pub mod outside;
 pub mod peers;
 pub mod profile;
@@ -316,6 +317,9 @@ pub mod profile;
 mod profile_tests;
 pub mod resident;
 pub mod running;
+mod stopping;
+pub use mcp_health::mcp_health;
+pub use stopping::{stop_argv, stop_background};
 pub mod skills;
 mod sources;
 pub mod spend_prices;

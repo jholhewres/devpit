@@ -102,6 +102,13 @@ export const commands = {
 	 */
 	updateCheck: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_check")),
 	/**
+	 *  `update.status` — where the update stands now.
+	 * 
+	 *  The check at startup runs before the window listens, and its event went
+	 *  nowhere: the card only showed once somebody asked again from Settings.
+	 */
+	updateStatus: () => __TAURI_INVOKE<UpdateStatus>("update_status"),
+	/**
 	 *  `update.download` — fetch the update, with the plugin verifying it.
 	 * 
 	 *  Refused from any state where a download makes no sense, and refused
@@ -266,6 +273,11 @@ export const commands = {
 	artifactsList: (projectId: string) => typedError<Artifacts, RpcError>(__TAURI_INVOKE("artifacts_list", { projectId })),
 	/**  `artifacts.remove` — one of them, gone. */
 	artifactRemove: (projectId: string, name: string) => typedError<null, RpcError>(__TAURI_INVOKE("artifact_remove", { projectId, name })),
+	/**
+	 *  `artifacts.add` — files the person picked or dropped, copied in under
+	 *  their own names. A name already there is refused, never written over.
+	 */
+	artifactsAdd: (projectId: string, sources: string[]) => typedError<Artifacts, RpcError>(__TAURI_INVOKE("artifacts_add", { projectId, sources })),
 	/**
 	 *  `orchestrator.agents` — every session an orchestrator has written to or
 	 *  heard from, with what passed, most recent first.
@@ -933,6 +945,16 @@ export const commands = {
 	 */
 	pathDelete: (projectId: string, worktreeId: string | null, path: string) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_delete", { projectId, worktreeId, path })),
 	/**
+	 *  `path.import` — files dropped from outside, copied into `folder` under
+	 *  their own names. A name already there is refused, never written over.
+	 */
+	pathImport: (projectId: string, worktreeId: string | null, folder: string, sources: string[]) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_import", { projectId, worktreeId, folder, sources })),
+	mcpHealth: (projectId: string | null) => typedError<McpHealth, RpcError>(__TAURI_INVOKE("mcp_health", { projectId })),
+	/**  `project.worktree_setup` — what a new worktree of this project gets. */
+	projectWorktreeSetup: (projectId: string) => typedError<WorktreeSetup, RpcError>(__TAURI_INVOKE("project_worktree_setup", { projectId })),
+	/**  `project.worktree_setup_set` — the same, written. */
+	projectWorktreeSetupSet: (projectId: string, setup: WorktreeSetup) => typedError<WorktreeSetup, RpcError>(__TAURI_INVOKE("project_worktree_setup_set", { projectId, setup })),
+	/**
 	 *  `changes.stage` — puts these paths in the index, and answers with the list
 	 *  as it now stands.
 	 * 
@@ -944,6 +966,8 @@ export const commands = {
 	changesUnstage: (projectId: string, worktreeId: string | null, paths: string[]) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("changes_unstage", { projectId, worktreeId, paths })),
 	/**  `changes.commit` — commits what is staged. */
 	changesCommit: (projectId: string, worktreeId: string | null, message: string) => typedError<Commit, RpcError>(__TAURI_INVOKE("changes_commit", { projectId, worktreeId, message })),
+	/**  `changes.remote` — fetch, pull, push or sync this checkout's branch. */
+	changesRemote: (projectId: string, worktreeId: string | null, act: RemoteAct) => typedError<null, RpcError>(__TAURI_INVOKE("changes_remote", { projectId, worktreeId, act })),
 	/**
 	 *  `changes.discard` — throws away uncommitted work in these paths.
 	 * 
@@ -977,7 +1001,8 @@ export const commands = {
 	 */
 	runCancel: (cardId: string, runId: string) => typedError<null, RpcError>(__TAURI_INVOKE("run_cancel", { cardId, runId })),
 	/**
-	 *  `card.archive` — and it refuses while the front holds unsaved work.
+	 *  `card.archive` — and it refuses while the front holds unsaved work, or an
+	 *  agent works in the card's terminal.
 	 * 
 	 *  `force` is the person saying they know. Nothing here decides on its own
 	 *  that work nobody committed was not worth keeping.
@@ -1172,6 +1197,9 @@ export const commands = {
 	 *  This is what makes reopening a window show a terminal rather than an empty
 	 *  one. It comes from the ring the reader fills, so it survives the webview
 	 *  going away and dying with it — the pty never stopped.
+	 * 
+	 *  Off the main thread: copying and decoding a full ring is megabytes, and a
+	 *  project switch asks it of every terminal at once.
 	 */
 	paneScrollback: (paneId: string) => typedError<PaneScrollback, RpcError>(__TAURI_INVOKE("pane_scrollback", { paneId })),
 	/**  `session.detach` — closes only this app's client; tmux keeps the shell. */
@@ -2371,6 +2399,8 @@ export type LivePane = {
 export type LiveSession = {
 	/**  The name another session messages it by. */
 	name: string,
+	/**  Its process: what tells apart two sessions that share a name. */
+	pid: number,
 	/**  The CLI's own word: `busy` or `idle`. */
 	status: string,
 	/**  `interactive` or `background`. */
@@ -2417,6 +2447,27 @@ export type McpAppTool = {
 	server: string,
 	bordered: boolean,
 };
+
+/**  `mcp.health`'s answer. */
+export type McpHealth = {
+	/**  The account it was measured as. */
+	profileId: string,
+	servers: McpServerHealth[],
+};
+
+/**  One server, as `mcp list` reported it. */
+export type McpServerHealth = {
+	name: string,
+	/**  The command it runs, or the address it is reached at. */
+	target: string,
+	state: McpState,
+	/**  The CLI's reason, when it gave one. */
+	detail: string | null,
+};
+
+export type McpState = "connected" | "failed" | 
+/**  Reachable, and waiting on the person to sign in to it. */
+"needs_auth";
 
 /**
  *  What the account pane draws.
@@ -2487,6 +2538,8 @@ export type Notice = {
 	cardId: string | null,
 	createdAt: number | null,
 	readAt: number | null,
+	/**  The terminal it happened in: a click goes there, to its tab. */
+	paneId: string | null,
 };
 
 /**
@@ -3053,6 +3106,11 @@ export type RejectedAgent = {
 	file: string,
 	reason: string,
 };
+
+/**  What the Changes panel asks of a branch's remote. */
+export type RemoteAct = "fetch" | "pull" | "push" | 
+/**  Pull, then push. */
+"sync";
 
 /**
  *  Whether an orchestrator's conversation can be reached by Remote Control,
@@ -3854,6 +3912,17 @@ export type WorktreeOrigin =
 "claude" | 
 /**  Everything else, which is mostly `git worktree add` by hand. */
 "other";
+
+export type WorktreeSetup = {
+	/**  Files copied from the main checkout, `*` within a name: `.env*`. */
+	copy: string[],
+	/**  Files linked back to the main checkout rather than copied. */
+	link: string[],
+	/**  Commands run once in the new worktree, in order. */
+	run: string[],
+	/**  What every setup command is given, as variables. */
+	share: EnvVar[],
+};
 
 export type Worktrees = {
 	worktrees: CardWorktree[],

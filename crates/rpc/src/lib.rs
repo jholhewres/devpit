@@ -21,10 +21,13 @@ pub mod focus;
 mod frame;
 pub mod front;
 pub mod live;
+pub mod mcp_health;
 pub mod plugin_data;
 pub mod plugins;
+pub mod prime;
 pub mod profile;
 pub mod project;
+pub mod remote;
 pub mod review;
 pub mod runs;
 pub mod search;
@@ -57,6 +60,7 @@ pub use focus::{HeadsDown, Waiting};
 pub use frame::{Context, Frame};
 pub use front::Front;
 pub use live::{LivePane, LiveSession, LiveSessions, PendingPrompt, PromptOption, RemoteState};
+pub use mcp_health::{McpHealth, McpServerHealth, McpState};
 pub use plugin_data::{
     PluginFile, PluginFileRemoved, PluginFileSaved, PluginFileText, PluginFiles,
 };
@@ -64,11 +68,13 @@ pub use plugins::{
     catalogue, validate, validate_catalogue, DataSpec, Permission, PluginError, PluginList,
     PluginManifest, PluginState, PluginUninstalled, Surface,
 };
+pub use prime::WorktreeSetup;
 pub use profile::{Credentials, Declared, EnvVar, Profile, Reach, ReadCommand, SignedIn};
 pub use project::{
     Change, Commit, FileNode, GitStatus, Project, ProjectChanges, ProjectHistory, ProjectList,
     ProjectTree, Worktree, WorktreeOrigin,
 };
+pub use remote::RemoteAct;
 pub use review::{
     blocking, reviewed, standing, Finding, Found, Review, Severity, Standing, REVIEW_EVIDENCE,
 };
