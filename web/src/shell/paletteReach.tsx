@@ -11,6 +11,7 @@ import { usePlugins } from './usePlugins'
 import { useShell } from './useShell'
 import { capabilityName, openerOf } from './capabilities'
 import { SHORTCUTS } from './shortcuts'
+import { launchShown } from './launchLine'
 
 /*
  * What the field can reach, gathered.
@@ -102,7 +103,7 @@ export function useReachable(): Reachable {
       agents.map((agent) => ({
         key: `agent:${agent.id}`,
         name: agent.label,
-        meta: agent.installed ? agent.launch : 'not installed',
+        meta: agent.installed ? launchShown(agent.launch) : 'not installed',
         icon: <AgentMark agent={agent.id} />,
         go: () => {
           if (!agent.installed) return
