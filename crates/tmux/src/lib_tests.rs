@@ -41,10 +41,12 @@ fn a_program_that_exits_zero() -> std::path::PathBuf {
 fn a_pane_attaches_to_the_project_session_at_its_window() {
     let server = Server::new(PathBuf::from(r"C:\devpit\tmux.sock"));
     let argv = server.attach_argv("devpit_prj", "leaf_a");
+    // The tmux found on PATH, named whole: a pty is started with Windows'
+    // own environment for the user, where devpit's bundled one is not.
+    assert_eq!(argv[0], crate::naming::program());
     assert_eq!(
-        argv,
+        argv[1..],
         [
-            "tmux",
             "-S",
             r"C:\devpit\tmux.sock",
             "attach-session",
