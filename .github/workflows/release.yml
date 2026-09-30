@@ -365,17 +365,21 @@ jobs:
       # Each artifact is verified against the public key the app carries before
       # a single manifest is written. `createUpdaterArtifacts` already signed
       # both bundles on the runner that built them; nothing is signed here.
+      # The changelog's section for this version is what the release says:
+      # on its page, and in the update card's notes. A tag with no section
+      # stops here — a release that says nothing is one somebody forgot.
       - name: Manifests, from artifacts that verify
         run: |
+          cargo xtask release-notes "${GITHUB_REF_NAME#v}" > target/release/notes.md
           cargo xtask release-manifest "${GITHUB_REF_NAME#v}" \
-            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${GITHUB_REF_NAME}"
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(cat target/release/notes.md)"
 
       - name: Publish the artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag \
-            --title "$GITHUB_REF_NAME" --generate-notes \
+            --title "$GITHUB_REF_NAME" --notes-file target/release/notes.md --generate-notes \
             $(find target/release/collected -type f \
               \( -name '*.AppImage' -o -name '*.AppImage.sig' \
               -o -name '*.deb' -o -name '*.deb.sig' \

@@ -21,6 +21,7 @@ mod platform_window;
 mod ratchet;
 mod reachable;
 mod release_manifest;
+mod release_notes;
 mod release_workflow;
 mod reseed;
 mod shell_boundary;
@@ -38,6 +39,7 @@ fn main() -> ExitCode {
         "ceilings" => ceilings(),
         "controls" => controls(),
         "release-manifest" => release_manifest_command(),
+        "release-notes" => release_notes_command(),
         other => {
             eprintln!("unknown command: {other}\n\nusage: cargo xtask check | ceilings | controls");
             ExitCode::FAILURE
@@ -71,6 +73,25 @@ fn controls() -> ExitCode {
         }
         Err(error) => {
             eprintln!("could not write the budgets: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `cargo xtask release-notes <version>` — the changelog's section for it,
+/// printed, for the release page and the update card.
+fn release_notes_command() -> ExitCode {
+    let Some(version) = std::env::args().nth(2) else {
+        eprintln!("usage: cargo xtask release-notes <version>");
+        return ExitCode::FAILURE;
+    };
+    match release_notes::run(&workspace_root(), &version) {
+        Ok(notes) => {
+            println!("{notes}");
+            ExitCode::SUCCESS
+        }
+        Err(why) => {
+            eprintln!("{why}");
             ExitCode::FAILURE
         }
     }
