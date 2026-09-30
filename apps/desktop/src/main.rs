@@ -240,6 +240,12 @@ fn main() {
                 browser_gtk::settle(&main);
                 frame_gtk::repaint_on_state_change(&main);
             }
+            // Windows opens a window where it last put one, which for a new
+            // install is low enough to run under the taskbar.
+            #[cfg(windows)]
+            if let Some(main) = tauri::Manager::get_webview_window(app, "main") {
+                let _ = main.center();
+            }
             // A development build says so where the window is listed —
             // the taskbar, alt-tab — because the window draws its own frame
             // and the title is otherwise seen nowhere. The top bar's badge is

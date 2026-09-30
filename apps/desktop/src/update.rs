@@ -356,6 +356,11 @@ pub(crate) fn watch(app: tauri::AppHandle) {
     if cfg!(debug_assertions) && fixture_feed().is_none() {
         return;
     }
+    // The Windows preview is in no feed yet: every check would fail, and say
+    // "offline" to a machine that is not.
+    if cfg!(windows) && fixture_feed().is_none() {
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         let mut last: Option<f64> = None;
         let mut failures: u32 = 0;
@@ -468,6 +473,12 @@ pub async fn update_status(app: tauri::AppHandle) -> UpdateStatus {
 #[tauri::command]
 #[specta::specta]
 pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcError> {
+    if cfg!(windows) && fixture_feed().is_none() {
+        return Err(RpcError::new(
+            devpit_rpc::ErrorCode::Conflict,
+            "The Windows preview is updated by installing a newer one from devpit's releases page.",
+        ));
+    }
     let kind = kind_here();
     // From where things are, not from Idle: a check in the middle of a
     // download replaced the update being downloaded and dropped its bytes.

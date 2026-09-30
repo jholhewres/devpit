@@ -37,7 +37,7 @@ export function Onboarding({
   const steps = ['Account', 'Theme', 'Project'] as const
 
   return (
-    <div className="onb">
+    <div className="onb" data-tauri-drag-region>
       <div className="onb__box">
         <span className="onb__mark">
           <img className="mark" alt="" src={mark} />
