@@ -50,3 +50,47 @@ mod tests {
         assert!(!alive(-1));
     }
 }
+
+/// Where a program is found on Windows: this process's `PATH`, then the one
+/// Windows keeps for the user now — a tool installed after devpit started is
+/// on that one only — under each extension Windows runs.
+#[cfg(windows)]
+pub fn found_on_path(name: &str) -> Option<std::path::PathBuf> {
+    let mut dirs: Vec<std::path::PathBuf> = std::env::var_os("PATH")
+        .map(|path| std::env::split_paths(&path).collect())
+        .unwrap_or_default();
+    dirs.extend(user_path());
+    let has_extension = std::path::Path::new(name).extension().is_some();
+    dirs.iter().find_map(|dir| {
+        if has_extension {
+            let whole = dir.join(name);
+            return whole.is_file().then_some(whole);
+        }
+        ["exe", "cmd", "bat"]
+            .iter()
+            .map(|ext| dir.join(format!("{name}.{ext}")))
+            .find(|candidate| candidate.is_file())
+    })
+}
+
+/// The `Path` Windows keeps for this user, asked once.
+#[cfg(windows)]
+fn user_path() -> Vec<std::path::PathBuf> {
+    static ASKED: std::sync::OnceLock<Vec<std::path::PathBuf>> = std::sync::OnceLock::new();
+    ASKED
+        .get_or_init(|| {
+            crate::host_env::command("powershell.exe")
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    "[Environment]::GetEnvironmentVariable('Path','User')",
+                ])
+                .output()
+                .map(|out| {
+                    std::env::split_paths(String::from_utf8_lossy(&out.stdout).trim()).collect()
+                })
+                .unwrap_or_default()
+        })
+        .clone()
+}

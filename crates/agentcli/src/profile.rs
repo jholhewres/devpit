@@ -19,7 +19,15 @@ pub struct Base {
     pub driver: String,
 }
 
+/// Where a command resolves to, if anywhere. On Windows `claude` is
+/// `claude.exe` or `claude.cmd`, and the name alone is no file.
+#[cfg(windows)]
+pub fn found(command: &str) -> Option<String> {
+    devpit_pty::process::found_on_path(command).map(|found| found.to_string_lossy().into_owned())
+}
+
 /// Where a command resolves to, if anywhere.
+#[cfg(not(windows))]
 pub fn found(command: &str) -> Option<String> {
     std::env::var_os("PATH").and_then(|path| {
         std::env::split_paths(&path)
@@ -35,11 +43,6 @@ fn is_runnable(path: &PathBuf) -> bool {
     std::fs::metadata(path)
         .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
         .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_runnable(path: &PathBuf) -> bool {
-    path.is_file()
 }
 
 /// How far this machine gets with a command.

@@ -338,44 +338,15 @@ fn ask_the_shell(names: &[String]) -> std::collections::HashSet<String> {
 }
 
 /// Windows has no `-ic` to ask: a name is there when a program of it is on
-/// `PATH` — the user's as Windows keeps it now, and this process's — under
-/// any of the extensions Windows runs.
+/// the `PATH` Windows keeps for this user, or this process's.
 #[cfg(not(unix))]
 fn ask_the_shell(names: &[String]) -> std::collections::HashSet<String> {
-    let mut dirs: Vec<std::path::PathBuf> = std::env::var_os("PATH")
-        .map(|path| std::env::split_paths(&path).collect())
-        .unwrap_or_default();
-    dirs.extend(user_path_dirs());
     names
         .iter()
         .filter(|name| is_a_bare_name(name))
-        .filter(|name| {
-            dirs.iter().any(|dir| {
-                ["exe", "cmd", "bat", "ps1"]
-                    .iter()
-                    .any(|ext| dir.join(format!("{name}.{ext}")).is_file())
-            })
-        })
+        .filter(|name| devpit_pty::process::found_on_path(name).is_some())
         .cloned()
         .collect()
-}
-
-/// The `Path` Windows keeps for this user, which a tool installed since this
-/// process started is on and this process's own `PATH` is not.
-#[cfg(not(unix))]
-fn user_path_dirs() -> Vec<std::path::PathBuf> {
-    let Ok(out) = devpit_pty::host_env::command("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "[Environment]::GetEnvironmentVariable('Path','User')",
-        ])
-        .output()
-    else {
-        return Vec::new();
-    };
-    std::env::split_paths(String::from_utf8_lossy(&out.stdout).trim()).collect()
 }
 
 /// Whether a name can be pasted into a shell script as itself.
