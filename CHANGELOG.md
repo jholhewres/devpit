@@ -3,6 +3,29 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.29 — 2026-09-30
+
+### Windows
+
+- **Commands typed in a terminal run.** The line was cleared with keys
+  PowerShell does not bind, and they reached the command as invisible
+  characters — `ls` and `claude` read as not found.
+- **A new terminal opens in its project's folder**, not your home — so an agent
+  started there no longer asks to trust your home folder.
+- **The chat finds your Claude Code profiles.** Programs are found under their
+  `.exe` or `.cmd`, on the PATH Windows keeps for you now.
+
+### Board
+
+- **An agent moves its card with the work**: into the column for work in
+  progress when it starts, and on to the one for checking when it finishes —
+  by your board's own column names, never into a column that runs a step.
+
+### Releases
+
+- **Each release says what changed**, from this changelog: on the releases
+  page and in the update card's notes.
+
 ## 0.1.28 — 2026-09-30
 
 ### Windows
