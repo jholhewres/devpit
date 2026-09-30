@@ -17,14 +17,14 @@ use sha2::{Digest, Sha256};
 
 /// One built artifact: what the updater downloads, and the signature beside it.
 pub(crate) struct Artifact {
-    /// `appimage`, `deb` or `app` — the installer the plugin detects and
-    /// substitutes into the endpoint as `{{bundle_type}}`.
+    /// `appimage`, `deb`, `app` or `nsis` — the installer the plugin detects
+    /// and substitutes into the endpoint as `{{bundle_type}}`.
     pub kind: String,
     pub file: PathBuf,
     /// The `.sig` beside it, as published: base64 of the minisign file.
     pub signature: String,
     /// The key the updater looks itself up by: `linux-x86_64`,
-    /// `darwin-aarch64`, `darwin-x86_64`.
+    /// `darwin-aarch64`, `darwin-x86_64`, `windows-x86_64`.
     pub target: String,
 }
 
@@ -140,16 +140,19 @@ pub(crate) fn pubkey_of(root: &Path) -> Option<String> {
 
 /// The bundles a release build left, each with the signature beside it.
 ///
-/// Three kinds, because three is what the updater can install in place: an
-/// AppImage and a `.deb` on Linux, and on macOS the `.app.tar.gz` the plugin
-/// unpacks over the installed app. The `.dmg` is a download for a person, not
-/// an update, so it is published and never named in a manifest.
+/// Four kinds, because four is what the updater can install in place: an
+/// AppImage and a `.deb` on Linux, on macOS the `.app.tar.gz` the plugin
+/// unpacks over the installed app, and on Windows the NSIS `-setup.exe` it
+/// runs over the installed one. The `.dmg` is a download for a person, not an
+/// update, so it is published and never named in a manifest. The setup is
+/// both: the first download and the update are the same file.
 pub(crate) fn artifacts_in(bundle: &Path, target: &str) -> Vec<Artifact> {
     let mut found = Vec::new();
     for (kind, extension) in [
         ("appimage", ".AppImage"),
         ("deb", ".deb"),
         ("macos", ".app.tar.gz"),
+        ("nsis", "-setup.exe"),
     ] {
         let dir = bundle.join(kind);
         let Ok(entries) = std::fs::read_dir(&dir) else {

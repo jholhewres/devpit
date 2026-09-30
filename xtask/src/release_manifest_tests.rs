@@ -213,3 +213,65 @@ fn the_dmgs_are_found_where_the_bundler_leaves_them() {
     /* A Linux runner has no dmg folder at all, and that is nothing, not an error. */
     assert!(dmgs_in(&bundle.path().join("nowhere")).is_empty());
 }
+
+/// The Windows installer is collected from where the bundler leaves it, under
+/// the bundle type the app asks for — `nsis` — and only with its signature.
+#[test]
+fn the_windows_installer_is_found_where_the_bundler_leaves_it() {
+    let bundle = tempfile::tempdir().expect("a bundle");
+    let nsis = bundle.path().join("nsis");
+    std::fs::create_dir_all(&nsis).expect("the nsis folder");
+    std::fs::write(nsis.join("devpit_0.2.0_x64-setup.exe"), PAYLOAD).expect("an installer");
+    std::fs::write(nsis.join("devpit_0.2.0_x64-setup.exe.sig"), SIGNATURE).expect("its sig");
+    /* Unsigned, so not an update: nothing may name it in a manifest. */
+    std::fs::write(nsis.join("devpit_0.1.0_x64-setup.exe"), b"old").expect("an unsigned one");
+
+    let found = artifacts_in(bundle.path(), "windows-x86_64");
+    assert_eq!(
+        found.len(),
+        1,
+        "{:?}",
+        found.iter().map(|a| &a.file).collect::<Vec<_>>()
+    );
+    assert_eq!(found[0].kind, "nsis", "the app asks for latest-nsis.json");
+    assert_eq!(found[0].target, "windows-x86_64");
+    assert!(found[0].file.ends_with("devpit_0.2.0_x64-setup.exe"));
+    assert_eq!(found[0].signature, SIGNATURE);
+}
+
+/// A Windows leg, collected as the release collects it: the manifest the app
+/// polls names it under its own target, and `SHA256SUMS` lists the installer a
+/// person downloads first.
+#[test]
+fn a_windows_leg_writes_latest_nsis_and_is_checksummed() {
+    let root = tempfile::tempdir().expect("a root");
+    let conf = root.path().join("apps/desktop");
+    std::fs::create_dir_all(&conf).expect("the app's folder");
+    std::fs::write(
+        conf.join("tauri.conf.json"),
+        serde_json::json!({ "plugins": { "updater": { "pubkey": PUBKEY } } }).to_string(),
+    )
+    .expect("a config carrying the key");
+    let leg = root.path().join("target/release/collected/windows-latest");
+    let nsis = leg.join("bundle/nsis");
+    std::fs::create_dir_all(&nsis).expect("the nsis folder");
+    std::fs::write(leg.join("target.txt"), "windows-x86_64\n").expect("the target");
+    std::fs::write(nsis.join("devpit_0.2.0_x64-setup.exe"), PAYLOAD).expect("an installer");
+    std::fs::write(nsis.join("devpit_0.2.0_x64-setup.exe.sig"), SIGNATURE).expect("its sig");
+
+    run(root.path(), "0.2.0", "", "2026-09-30T00:00:00Z").expect("the manifests");
+
+    let out = root.path().join("target/release/manifests");
+    let manifest: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(out.join("latest-nsis.json")).expect("latest-nsis.json"),
+    )
+    .expect("json");
+    let platform = &manifest["platforms"]["windows-x86_64"];
+    assert_eq!(
+        platform["url"],
+        "https://github.com/jholhewres/devpit/releases/download/v0.2.0/devpit_0.2.0_x64-setup.exe"
+    );
+    assert_eq!(platform["signature"], SIGNATURE);
+    let sums = std::fs::read_to_string(out.join("SHA256SUMS")).expect("SHA256SUMS");
+    assert!(sums.contains("  devpit_0.2.0_x64-setup.exe\n"), "{sums}");
+}

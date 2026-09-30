@@ -19,6 +19,9 @@
 //!   window whatever the `webviews` list says. The moment this window holds a
 //!   second webview showing somebody else's page, `windows: ["main"]` hands
 //!   devpit's whole command surface to it;
+//! - the **Windows config** builds the NSIS installer alone, per-user, with
+//!   psmux in `bin\` where the installer hooks look for it, and leaves the
+//!   signing to the release overlay like the base does;
 //! - the **image the Linux binary is built on** decides who can run it. A
 //!   binary links against the glibc of the machine that made it and runs on
 //!   that version or newer, never older, so the oldest image that can build
@@ -33,6 +36,7 @@ use crate::Finding;
 const IDENTIFIER: &str = "dev.devpit.app";
 const BASE: &str = "apps/desktop/tauri.conf.json";
 const OVERLAY: &str = "apps/desktop/tauri.release.conf.json";
+const WINDOWS: &str = "apps/desktop/tauri.windows.conf.json";
 const CAPABILITIES: &str = "apps/desktop/capabilities";
 const RELEASE: &str = ".github/workflows/release.yml";
 
@@ -86,10 +90,14 @@ pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
     naming them builds whatever the base config says, which is a `.deb` and
     no updater artifact at all — a release nobody can update from. */
     let workflow = std::fs::read_to_string(root.join(RELEASE)).unwrap_or_default();
-    for wanted in ["appimage,deb", "app,dmg"] {
+    for wanted in ["appimage,deb", "app,dmg", "nsis"] {
         if !workflow.contains(&format!("bundles: {wanted}")) {
             refuse(RELEASE, format!("no runner is told to build {wanted}"));
         }
+    }
+
+    for what in windows_findings(&json(root, WINDOWS)) {
+        refuse(WINDOWS, what);
     }
 
     for image in above_the_floor(&workflow) {
@@ -201,6 +209,42 @@ fn capability_findings(capability: &serde_json::Value) -> Vec<String> {
         ));
     }
 
+    findings
+}
+
+/// What is wrong with the Windows config, if anything.
+///
+/// Its own function so a test can hand it a config. Every PR can build the
+/// installer without the key (`make bundle-windows`), so the updater artifacts
+/// stay in the release overlay; the rest is what the README and the installer
+/// hooks promise.
+fn windows_findings(conf: &serde_json::Value) -> Vec<String> {
+    let mut findings = Vec::new();
+    let targets = conf.pointer("/bundle/targets").and_then(|t| t.as_array());
+    if targets.map(Vec::len) != Some(1) || targets.and_then(|t| t[0].as_str()) != Some("nsis") {
+        findings.push("bundle.targets is not exactly [nsis]".to_owned());
+    }
+    if conf.pointer("/bundle/createUpdaterArtifacts").is_some() {
+        findings.push("createUpdaterArtifacts belongs to the release overlay".to_owned());
+    }
+    /* Per-user is what lets the updater run the installer over the install
+    without asking anybody for rights. */
+    if conf
+        .pointer("/bundle/windows/nsis/installMode")
+        .and_then(|m| m.as_str())
+        != Some("currentUser")
+    {
+        findings.push("the installer is not per-user (installMode currentUser)".to_owned());
+    }
+    /* `hooks.nsh` ends the psmux under `$INSTDIR\bin` before replacing it. */
+    if conf
+        .pointer("/bundle/resources/windows-bin~1")
+        .and_then(|to| to.as_str())
+        != Some("bin/")
+    {
+        findings
+            .push("psmux is not installed to bin/, where the installer hooks end it".to_owned());
+    }
     findings
 }
 

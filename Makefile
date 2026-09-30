@@ -118,15 +118,20 @@ test-rust: node_modules ## Guards and the Rust tests, without the frontend
 # on there — carried inside it, so installing devpit is the whole install.
 # Pinned: its tests are the contract `test-tmux` keeps.
 PSMUX_VERSION := 3.3.8
-bundle-windows: node_modules ## The Windows installer, psmux inside it
+bundle-windows: node_modules windows-bin ## The Windows installer, psmux inside it
+	@# Through pnpm: `./node_modules/.bin/…` is a path `cmd` cannot run.
+	pnpm exec tauri build --bundles nsis
+
+# Its own target because the release builds the installer with its own flags
+# and tests against this same psmux first: `target/psmux/bin` has the `tmux`.
+.PHONY: windows-bin
+windows-bin: ## The pinned psmux, where the Windows installer picks it up
 	cargo install psmux --version $(PSMUX_VERSION) --locked --root target/psmux
 	mkdir -p apps/desktop/windows-bin
 	cp target/psmux/bin/*.exe apps/desktop/windows-bin/
 	curl -fsSL https://raw.githubusercontent.com/psmux/psmux/master/LICENSE -o apps/desktop/windows-bin/psmux-LICENSE.txt
-	@# Through pnpm: `./node_modules/.bin/…` is a path `cmd` cannot run.
-	pnpm exec tauri build --bundles nsis
 
-check-windows: ## Compiles for Windows, which is built nowhere yet
+check-windows: ## Compiles for Windows, without building the installer
 	@# The installer's resources are named in the Windows config and must exist.
 	mkdir -p apps/desktop/windows-bin
 	cargo check --workspace

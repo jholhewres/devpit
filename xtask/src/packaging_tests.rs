@@ -149,3 +149,34 @@ fn a_webview_pattern_is_refused_however_harmless_it_looks() {
         "a browser pane was granted devpit's commands"
     );
 }
+
+/// The Windows config as it stands, and each promise it could stop keeping.
+#[test]
+fn the_windows_config_builds_the_installer_it_promises() {
+    let ours = json(&crate::workspace_root(), WINDOWS);
+    assert!(
+        windows_findings(&ours).is_empty(),
+        "{:?}",
+        windows_findings(&ours)
+    );
+
+    let broken = |pointer: &str, value: serde_json::Value| {
+        let mut conf = ours.clone();
+        *conf.pointer_mut(pointer).expect(pointer) = value;
+        windows_findings(&conf)
+    };
+    assert!(!broken("/bundle/targets", serde_json::json!(["nsis", "msi"])).is_empty());
+    assert!(!broken(
+        "/bundle/windows/nsis/installMode",
+        serde_json::json!("perMachine")
+    )
+    .is_empty());
+    assert!(!broken("/bundle/resources", serde_json::json!({})).is_empty());
+
+    /* Signing in the platform config would make every PR's build need the key. */
+    let mut signed = ours.clone();
+    signed["bundle"]["createUpdaterArtifacts"] = serde_json::json!(true);
+    assert!(windows_findings(&signed)
+        .iter()
+        .any(|what| what.contains("release overlay")));
+}

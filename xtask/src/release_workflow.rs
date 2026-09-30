@@ -122,6 +122,8 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
         ));
     }
 
+    said.extend(windows_refusals(text));
+
     match (at("gh release create"), at("gh release upload")) {
         (Some(created), Some(uploaded)) if uploaded < created => said.push((
             uploaded,
@@ -131,6 +133,42 @@ fn refusals(text: &str) -> Vec<(usize, String)> {
         _ => {}
     }
 
+    said
+}
+
+/// What a Windows leg owes, if the matrix has one.
+///
+/// Its tests, because `make test` is Linux's gate and `make test-rust` is not
+/// run there; and bash for every step that calls `./node_modules/.bin/`,
+/// because PowerShell is Windows' default shell and cannot run that path.
+fn windows_refusals(text: &str) -> Vec<(usize, String)> {
+    let mut said = Vec::new();
+    let leg = text
+        .lines()
+        .position(|line| line.trim().starts_with("- os: windows"));
+    let Some(leg) = leg else {
+        return said;
+    };
+    for gate in ["make check-windows", "make test-tmux"] {
+        if !text.lines().any(|line| line.trim().ends_with(gate)) {
+            said.push((
+                leg + 1,
+                format!("the Windows leg publishes without `{gate}`"),
+            ));
+        }
+    }
+    for step in text.split("\n      - ") {
+        if step.contains("./node_modules/.bin/") && !step.contains("shell: bash") {
+            let first = step.lines().next().unwrap_or_default().trim();
+            said.push((
+                text.lines()
+                    .position(|line| line.contains(first))
+                    .map_or(1, |n| n + 1),
+                "calls ./node_modules/.bin/ in the Windows leg's PowerShell; say `shell: bash`"
+                    .to_owned(),
+            ));
+        }
+    }
     said
 }
 

@@ -148,3 +148,44 @@ fn the_installer_parses_in_the_shell_it_is_piped_into() {
         );
     }
 }
+
+/// Linux's gate is `make test` and the Mac's `make test-rust`; the Windows leg
+/// answers to what CI's Windows job runs, or it publishes untested.
+#[test]
+fn a_windows_leg_without_its_tests_is_refused() {
+    for gate in ["make check-windows", "make test-tmux"] {
+        let untested: String = ours()
+            .lines()
+            .filter(|line| !line.trim_end().ends_with(gate))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        assert!(
+            refusals(&untested)
+                .iter()
+                .any(|(_, what)| what.contains(gate)),
+            "a Windows leg without {gate} was accepted"
+        );
+    }
+}
+
+/// PowerShell is Windows' shell unless a step names another, and it cannot
+/// run `./node_modules/.bin/tauri`: the leg would fail at the bundle, keyed.
+#[test]
+fn the_tauri_path_outside_bash_is_refused_with_a_windows_leg() {
+    let keyed =
+        "        shell: bash\n        run: |\n          ./node_modules/.bin/tauri build --bundles";
+    assert!(ours().contains(keyed), "the bundle step moved");
+    let in_powershell = ours().replace(
+        keyed,
+        "        run: |\n          ./node_modules/.bin/tauri build --bundles",
+    );
+    assert!(refusals(&in_powershell)
+        .iter()
+        .any(|(_, what)| what.contains("shell: bash")));
+
+    /* Without a Windows leg there is no PowerShell to worry about. */
+    let no_windows = in_powershell.replace("- os: windows-latest", "- os: ubuntu-22.04");
+    assert!(!refusals(&no_windows)
+        .iter()
+        .any(|(_, what)| what.contains("shell: bash")));
+}

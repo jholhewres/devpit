@@ -83,7 +83,16 @@ jobs:
             bundles: app,dmg
             rust-target: universal-apple-darwin
             out: target/universal-apple-darwin/release
+          # The NSIS installer, per-user, psmux inside it. The same file is a
+          # person's first download and what the updater runs over an install.
+          - os: windows-latest
+            target: windows-x86_64
+            bundles: nsis
+            out: target/release
     runs-on: ${{ matrix.os }}
+    # Windows is new: while it is, a leg of it that fails leaves that release
+    # without a Windows installer rather than taking Linux and macOS with it.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     # Reading the code, and whether CI already passed on it.
     permissions:
       contents: read
@@ -152,12 +161,24 @@ jobs:
         if: matrix.rust-target == 'universal-apple-darwin'
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
+      # Windows runs its steps in PowerShell unless told otherwise, and these
+      # are bash. On Linux and macOS `shell: bash` only adds `-o pipefail`,
+      # and no step it is on has a pipe that could trip it.
+      #
+      # The image's bash has no make of its own.
+      - name: Make, on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: command -v make || choco install make -y --no-progress
+
       - run: make setup
+        shell: bash
 
       # The tag says what the app says about itself, or nothing is published:
       # an update names a version, and a version nobody built is a download
       # that verifies and then refuses to install.
       - name: The tag is the version
+        shell: bash
         run: |
           version=$(sed -n '/\[workspace.package\]/,/^\[/p' Cargo.toml \
             | sed -n 's/^version = "\(.*\)"/\1/p')
@@ -179,7 +200,21 @@ jobs:
       - run: make test
         if: runner.os == 'Linux' && steps.ci.outputs.passed != 'true'
       - run: make test-rust
-        if: runner.os != 'Linux' || steps.ci.outputs.passed == 'true'
+        if: (runner.os != 'Linux' || steps.ci.outputs.passed == 'true') && runner.os != 'Windows'
+
+      # Windows answers to what CI's Windows job answers to: the tree compiles
+      # there, and the tmux crate's tests pass against the very psmux the
+      # installer is about to carry — pinned, and put in place for the bundle.
+      - name: psmux, pinned, for the tests and the installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: make windows-bin
+      - run: make check-windows
+        if: runner.os == 'Windows'
+        shell: bash
+      - run: PATH="$PWD/target/psmux/bin:$PATH" make test-tmux
+        if: runner.os == 'Windows'
+        shell: bash
 
       # Everything that runs somebody else's code happens here, without the
       # key: the frontend build runs every npm dependency, and cargo runs every
@@ -196,6 +231,7 @@ jobs:
           # Thin LTO on the Mac, which builds two targets one after the other
           # and sets how long a release takes; fat LTO elsewhere.
           CARGO_PROFILE_RELEASE_LTO: ${{ runner.os == 'macOS' && 'thin' || 'true' }}
+        shell: bash
         run: |
           ./node_modules/.bin/tauri build --no-bundle \
             ${{ matrix.rust-target && format('--target {0}', matrix.rust-target) || '' }} \
@@ -240,12 +276,14 @@ jobs:
       #
       # Nothing here is signed for the platform, only for the updater: there is
       # no Developer ID and no code-signing certificate, so a Mac asks before
-      # it opens this the first time. The README says so.
+      # it opens this the first time, and SmartScreen before the Windows
+      # installer runs. The README says so.
       - name: Bundle and sign
         env:
           CARGO_PROFILE_RELEASE_LTO: ${{ runner.os == 'macOS' && 'thin' || 'true' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: bash
         run: |
           ./node_modules/.bin/tauri build --bundles ${{ matrix.bundles }} \
             ${{ matrix.rust-target && format('--target {0}', matrix.rust-target) || '' }} \
@@ -279,6 +317,7 @@ jobs:
           done
 
       - name: Say which targets these bundles answer for
+        shell: bash
         run: echo "${{ matrix.target }}" > ${{ matrix.out }}/target.txt
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -297,6 +336,8 @@ jobs:
             ${{ matrix.out }}/bundle/macos/*.app.tar.gz
             ${{ matrix.out }}/bundle/macos/*.app.tar.gz.sig
             ${{ matrix.out }}/bundle/dmg/*.dmg
+            ${{ matrix.out }}/bundle/nsis/*-setup.exe
+            ${{ matrix.out }}/bundle/nsis/*-setup.exe.sig
           if-no-files-found: error
           retention-days: 7
 
@@ -339,7 +380,8 @@ jobs:
               \( -name '*.AppImage' -o -name '*.AppImage.sig' \
               -o -name '*.deb' -o -name '*.deb.sig' \
               -o -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \
-              -o -name '*.dmg' \) | sort) \
+              -o -name '*.dmg' \
+              -o -name '*-setup.exe' -o -name '*-setup.exe.sig' \) | sort) \
             target/release/manifests/SHA256SUMS
 
       # Last, and alone: an installed app polls these. Published before the

@@ -47,7 +47,8 @@ nothing of devpit's**. Keep it that way:
   the whole separation.
 
 `help setup dev build test fmt clean`, `e2e` for the WebDriver suite, and
-`check-windows`, which only compiles for a platform nobody ships yet. The
+for Windows `check-windows`, `test-tmux`, `windows-bin` (the pinned psmux) and
+`bundle-windows` (the installer) — what the release's Windows leg runs. The
 list is short because the Makefile is the interface everyone reads: a target
 earns its place by being something a person runs by hand, and a one-off belongs
 in the shell. The other half of the same rule is that **CI never invents a
