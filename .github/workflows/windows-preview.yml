@@ -1,0 +1,47 @@
+name: Windows preview
+
+# The Windows installer, as a pre-release of its own: outside the release, and
+# outside every `latest-*.json`, so no installed devpit is ever offered it.
+# Run by hand while Windows is a preview.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v4.2.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: command -v make || choco install make -y --no-progress
+      - run: make setup
+      - run: make bundle-windows
+
+      - name: Publish the pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./web/package.json').version")"
+          tag="v${version}-windows-preview"
+          installer="$(ls target/release/bundle/nsis/*-setup.exe)"
+          notes="A preview of devpit on Windows, built from ${GITHUB_SHA::7}. Not offered by the updater.
+
+          Install: run the installer; it asks for no administrator rights and installs for this user, with psmux — the tmux devpit's terminals run on — inside it. It adds devpit to the Start menu, and removes cleanly from Settings → Apps.
+
+          Needs Claude Code on PATH (\`claude\`), and WebView2, which the installer fetches if Windows lacks it."
+          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" "$installer" --prerelease --target "$GITHUB_SHA" --title "devpit ${version} — Windows preview" --notes "$notes"

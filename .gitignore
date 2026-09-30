@@ -51,3 +51,5 @@ Thumbs.db
 # --- Python bytecode (the brand render script) ---
 __pycache__/
 *.pyc
+# psmux, copied in by `make bundle-windows`.
+apps/desktop/windows-bin/

@@ -114,6 +114,17 @@ test-rust: node_modules ## Guards and the Rust tests, without the frontend
 	@touch $(TEST_HOME)/.zshenv $(TEST_HOME)/.zshrc $(TEST_HOME)/.bashrc $(TEST_HOME)/.profile
 	$(TEST_ENV) cargo test --workspace
 
+# The Windows installer: NSIS, with psmux — the tmux devpit's terminals run
+# on there — carried inside it, so installing devpit is the whole install.
+# Pinned: its tests are the contract `test-tmux` keeps.
+PSMUX_VERSION := 3.3.8
+bundle-windows: node_modules ## The Windows installer, psmux inside it
+	cargo install psmux --version $(PSMUX_VERSION) --locked --root target/psmux
+	mkdir -p apps/desktop/windows-bin
+	cp target/psmux/bin/*.exe apps/desktop/windows-bin/
+	curl -fsSL https://raw.githubusercontent.com/psmux/psmux/master/LICENSE -o apps/desktop/windows-bin/psmux-LICENSE.txt
+	$(TAURI) build --bundles nsis
+
 check-windows: ## Compiles for Windows, which is built nowhere yet
 	cargo check --workspace
 
