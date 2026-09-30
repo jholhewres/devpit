@@ -155,10 +155,11 @@ trabalho, não uma cancela.
 ## Requisitos
 
 - **Linux**, X11 ou Wayland, é o build. macOS tem um build universal sem
-  assinatura nem notarização. No Windows, roda como o build de Linux dentro do
-  WSL — veja [Windows](#windows).
+  assinatura nem notarização. Windows tem um instalador sem assinatura de
+  código, e o build de Linux também roda dentro do WSL — veja
+  [Windows](#windows).
 - **`tmux`**. Os terminais são painéis do tmux, e é por isso que eles
-  sobrevivem à janela.
+  sobrevivem à janela. No Windows é o psmux, e o instalador já o traz.
 - **[Claude Code](https://claude.com/claude-code)** (`claude` no PATH). Chat,
   etapas de agente e de sessão passam por ele; é a única CLI que o devpit sabe
   conduzir hoje.
@@ -211,10 +212,29 @@ Se for fazer isso, confira antes o `SHA256SUMS` — logo abaixo.
 
 ### Windows
 
-O devpit roda no Windows como o build de Linux dentro do WSL 2, com a janela
-desenhada pelo WSLg na área de trabalho do Windows. Nada se perde: os
-terminais são sessões tmux dentro do WSL e sobrevivem à janela como em
-qualquer lugar.
+Baixe o `devpit_<versão>_x64-setup.exe` da [última release][releases] e
+execute. É um instalador NSIS que instala só para o seu usuário — sem direitos
+de administrador — com o psmux, o tmux em que os terminais do devpit rodam lá,
+dentro dele. Ele põe o devpit no menu Iniciar e sai limpo por Configurações →
+Aplicativos. Precisa do Claude Code no PATH (`claude`) e do WebView2, que o
+instalador baixa se o Windows não tiver.
+
+O instalador **não é assinado com um certificado de assinatura de código**,
+então o SmartScreen o barra na primeira vez com "O Windows protegeu o
+computador". Isso é o certificado que falta falando, não o arquivo: confira
+antes com o `SHA256SUMS` — no PowerShell,
+`(Get-FileHash .\devpit_<versão>_x64-setup.exe).Hash.ToLower()` é a primeira
+metade da linha — e então Mais informações → Executar assim mesmo.
+
+Depois de instalado, o devpit se atualiza sozinho: baixa o instalador novo,
+confere a assinatura, executa e reabre. Diferente do Linux e do macOS, **uma
+atualização fecha seus terminais**: o Windows não troca um programa em
+execução, então o instalador encerra antes o psmux de dentro do devpit. O card
+avisa antes de reiniciar.
+
+**Ou dentro do WSL.** O build de Linux roda no WSL 2, com a janela desenhada
+pelo WSLg na área de trabalho do Windows. Os terminais são sessões tmux dentro
+do WSL e sobrevivem à janela lá, atualizações incluídas.
 
 1. Windows 11, ou Windows 10 21H2 em diante, com WSL 2 e uma distribuição
    Linux: `wsl --install` no PowerShell, depois reinicie.
@@ -228,8 +248,7 @@ qualquer lugar.
 
 O `wslu` é o que abre um link no navegador do Windows. Duas coisas não
 atravessam: sessões logadas trazidas de um navegador do Windows, e arquivos
-arrastados do Explorer. Um build nativo de Windows está em andamento; tmux não
-existe lá, então é um port e não um build.
+arrastados do Explorer.
 
 Toda release traz um `SHA256SUMS`, e conferir é uma linha:
 
