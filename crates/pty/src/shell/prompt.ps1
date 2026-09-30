@@ -82,13 +82,15 @@ function global:prompt {
 
 # The line being run and where its output begins, as PSReadLine hands it over.
 # Without PSReadLine there is no moment to say it, and only the prompts are
-# marked. The terminator bytes are taken out, and the length is capped.
+# marked. Control characters are taken out, and the length is capped.
 if (Test-Path Function:\PSConsoleHostReadLine) {
     $global:__devpit_their_readline = $function:PSConsoleHostReadLine
     function global:PSConsoleHostReadLine {
         $line = & $global:__devpit_their_readline
         if ($line -and $line.Trim()) {
-            $shown = $line -replace "[$([char]7)$([char]27)]", ''
+            # Every control character, not only the terminator bytes: a key
+            # sent to clear the line arrives in it, and draws as a box.
+            $shown = $line -replace '[\x00-\x08\x0B-\x1F\x7F]', ''
             if ($shown.Length -gt 2000) { $shown = $shown.Substring(0, 2000) }
             [Console]::Write((__devpit_osc "777;devpit-cmd;$shown"))
             [Console]::Write((__devpit_osc '133;C'))
