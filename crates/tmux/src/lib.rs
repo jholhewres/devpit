@@ -197,25 +197,6 @@ impl Server {
         naming::attach_argv(&self.socket, session, window)
     }
 
-    /// Kills a window and the client session that was pointed at it.
-    ///
-    /// Both, because `ensure_client_session` makes one grouped session per
-    /// window: killing only the window leaves a session with nothing selected,
-    /// and tmux keeps those around forever on a socket nobody else uses.
-    ///
-    /// A window that is already gone is not an error. Closing a pane whose
-    /// shell exited a moment earlier is an ordinary thing to do, and a refusal
-    /// would leave the leaf in the tree with no way to remove it.
-    pub fn kill_window(&self, session: &str, window: &str) -> Result<(), TmuxError> {
-        let client = naming::client_session(session, window);
-        // Ungrouped, the client is the project's own session: never killed here.
-        if naming::GROUPED && self.has_session(&client)? {
-            let _ = self.run(&["kill-session", "-t", &client])?;
-        }
-        let _ = self.run(&["kill-window", "-t", &format!("{session}:{window}")])?;
-        Ok(())
-    }
-
     /// A copy of everything a pane prints, to `command`'s stdin, with no
     /// client attached. See [`crate::pane`].
     pub fn pipe_pane(&self, target: &str, command: &str) -> Result<(), TmuxError> {

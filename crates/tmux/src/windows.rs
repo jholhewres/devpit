@@ -2,9 +2,49 @@
 
 use std::path::Path;
 
-use crate::{Server, TmuxError};
+use crate::{naming, Server, TmuxError};
 
 impl Server {
+    /// Kills a window and the client session that was pointed at it.
+    ///
+    /// Both, because `ensure_client_session` makes one grouped session per
+    /// window: killing only the window leaves a session with nothing selected,
+    /// and tmux keeps those around forever on a socket nobody else uses.
+    ///
+    /// A window that is already gone is not an error. Closing a pane whose
+    /// shell exited a moment earlier is an ordinary thing to do, and a refusal
+    /// would leave the leaf in the tree with no way to remove it.
+    pub fn kill_window(&self, session: &str, window: &str) -> Result<(), TmuxError> {
+        let client = naming::client_session(session, window);
+        // Ungrouped, the client is the project's own session: never killed here.
+        if naming::GROUPED && self.has_session(&client)? {
+            let _ = self.run(&["kill-session", "-t", &client])?;
+        }
+        let _ = self.run(&["kill-window", "-t", &format!("{session}:{window}")])?;
+        if !naming::GROUPED {
+            self.end_when_empty(session);
+        }
+        Ok(())
+    }
+
+    /// psmux keeps its server, and the files under it, running with nothing
+    /// in it — tmux leaves once its last session goes. With no terminal left
+    /// there is nothing to come back to, so an empty server is ended here, and
+    /// installing over devpit is not refused by a `tmux.exe` still running.
+    fn end_when_empty(&self, session: &str) {
+        let windows = self.list_windows(session).unwrap_or_default();
+        if windows.is_empty() {
+            let _ = self.run(&["kill-session", "-t", session]);
+        }
+        let left = self
+            .run(&["list-sessions", "-F", "#{session_name}"])
+            .map(|out| String::from_utf8_lossy(&out.stdout).trim().is_empty())
+            .unwrap_or(true);
+        if left {
+            let _ = self.run(&["kill-server"]);
+        }
+    }
+
     pub fn new_window(&self, session: &str, window: &str, cwd: &Path) -> Result<(), TmuxError> {
         self.open_window(session, window, cwd, None)
     }

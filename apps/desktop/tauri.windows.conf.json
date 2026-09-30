@@ -14,7 +14,8 @@
         "installMode": "currentUser",
         "installerIcon": "icons/icon.ico",
         "startMenuFolder": "devpit",
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "installerHooks": "windows/hooks.nsh"
       }
     }
   }
