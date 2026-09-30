@@ -6,6 +6,12 @@
 
 TAURI := ./node_modules/.bin/tauri
 
+# GNU make on Windows runs recipes through `cmd` unless told otherwise, and
+# every recipe here is written for a POSIX shell. Git for Windows has one.
+ifeq ($(OS),Windows_NT)
+SHELL := bash
+endif
+
 # Nothing of an installed AppImage reaches a recipe.
 #
 # A terminal inside the AppImage devpit inherits the AppImage's environment:
@@ -126,6 +132,8 @@ bundle-windows: node_modules ## The Windows installer, psmux inside it
 	$(TAURI) build --bundles nsis
 
 check-windows: ## Compiles for Windows, which is built nowhere yet
+	@# The installer's resources are named in the Windows config and must exist.
+	mkdir -p apps/desktop/windows-bin
 	cargo check --workspace
 
 test-tmux: ## The tmux crate's own tests, against whatever `tmux` is on PATH
