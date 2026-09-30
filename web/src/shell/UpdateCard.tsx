@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { UpdateStatus, UpdateWork } from '../gen/bindings'
+import type { InstallKind, UpdateStatus, UpdateWork } from '../gen/bindings'
 import { ask, commands } from './live'
 import { useFocusIsOn } from './useHeadsDown'
 import { onCarried } from './window'
@@ -48,10 +48,19 @@ export const counting = (status: UpdateStatus | null): boolean => status?.type =
  *  would re-render for a sentence that did not change. */
 const A_TICK = 30_000
 
+/** What an update does to the terminals, for the install it goes into.
+ *
+ * Kept everywhere but Windows, where the installer ends the psmux inside the
+ * install to replace it (`update::terminals_survive`). */
+export function terminalsAfter(kind: InstallKind | null): string {
+  return kind === 'nsis' ? 'Your terminals close: the installer ends them.' : 'Your terminals keep running.'
+}
+
 /** What the card says about each state, and what its one button does. */
 function offer(
   status: UpdateStatus,
   now: number,
+  kind: InstallKind | null,
 ): {
   title: string
   said: string
@@ -63,7 +72,7 @@ function offer(
       return {
         title: 'Update available',
         said: `devpit ${status.version} is ready.`,
-        calm: 'Your terminals keep running.',
+        calm: terminalsAfter(status.kind),
         action: 'Update',
       }
     case 'downloading':
@@ -72,14 +81,14 @@ function offer(
       return {
         title: 'Update ready',
         said: `devpit ${status.version} is ready to install.`,
-        calm: 'Your terminals keep running.',
+        calm: terminalsAfter(kind),
         action: 'Restart now',
       }
     case 'waiting':
       return {
         title: 'Update waiting',
         said: `It goes in once ${inFlight(status.runs, status.turns)} are done. Waiting ${waitingFor(status.since, now)}.`,
-        calm: 'Nothing new starts meanwhile. Your terminals keep running.',
+        calm: `Nothing new starts meanwhile. ${terminalsAfter(kind)}`,
         action: 'Cancel',
       }
     case 'manualInstall':
@@ -115,6 +124,9 @@ export function UpdateCard(): React.JSX.Element | null {
   /* Kept apart from the status: a refused download turns the card into a
      failure, and the failure still came from a test feed. */
   const [testFeed, setTestFeed] = useState(false)
+  /* Only `available` names the install, and the states after it still have to
+     say what the update does to the terminals. */
+  const [kind, setKind] = useState<InstallKind | null>(null)
   /* What is running, once the person has asked to restart and it turns out
      something is. Null is "nothing in the way, or nobody has asked yet". */
   const [work, setWork] = useState<UpdateWork | null>(null)
@@ -130,8 +142,10 @@ export function UpdateCard(): React.JSX.Element | null {
   useEffect(() => {
     const hear = (heard: UpdateStatus): void => {
       setStatus(heard)
-      if (heard.type === 'available') setTestFeed(heard.testFeed)
-      else if (heard.type !== 'failed') setTestFeed(false)
+      if (heard.type === 'available') {
+        setKind(heard.kind)
+        setTestFeed(heard.testFeed)
+      } else if (heard.type !== 'failed') setTestFeed(false)
       // A new state is news again: the close dismissed the state it was on.
       setLater(false)
       setNotes(false)
@@ -212,7 +226,7 @@ export function UpdateCard(): React.JSX.Element | null {
   }
 
   if (!status || later || focused) return null
-  const said = offer(status, now)
+  const said = offer(status, now, kind)
   if (!said) return null
 
   const fromATestFeed = testFeed && (status.type === 'available' || status.type === 'failed')

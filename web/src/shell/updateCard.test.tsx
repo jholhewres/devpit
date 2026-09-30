@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { UpdateStatus } from '../gen/bindings'
-import { counting, RELEASE_PAGE, UpdateCard, waitingFor } from './UpdateCard'
+import { counting, RELEASE_PAGE, terminalsAfter, UpdateCard, waitingFor } from './UpdateCard'
 
 const heard: Record<string, (payload: UpdateStatus) => void> = {}
 vi.mock('./window', () => ({
@@ -403,6 +403,29 @@ describe('one card, three ways of being installed', () => {
     /* The one the plan was written around: an AppImage being told about apt. */
     for (const word of ['apt', 'dpkg', 'sudo', 'password', '.deb']) {
       expect(appImage.toLowerCase()).not.toContain(word)
+    }
+  })
+})
+
+/* The Windows installer ends the psmux inside the install to replace it, so an
+   update there closes the terminals — and the card has to say so from the
+   offer through the restart, not only on the first screen. */
+describe('an update to the Windows installer', () => {
+  it('says the terminals close, on the offer and once it is ready', () => {
+    render(<UpdateCard />)
+    say({ type: 'available', version: '0.2.0', notes: '', kind: 'nsis', testFeed: false })
+    expect(screen.getByText(terminalsAfter('nsis'))).toBeTruthy()
+    expect(screen.queryByText('Your terminals keep running.')).toBeNull()
+
+    say({ type: 'ready', version: '0.2.0' })
+    expect(screen.getByText(terminalsAfter('nsis'))).toBeTruthy()
+    expect(screen.queryByText('Your terminals keep running.')).toBeNull()
+  })
+
+  it('is the only install whose terminals do not survive', () => {
+    expect(terminalsAfter('nsis')).toContain('close')
+    for (const kind of ['appImage', 'deb', 'externallyManaged', 'unmanaged', null] as const) {
+      expect(terminalsAfter(kind)).toBe('Your terminals keep running.')
     }
   })
 })

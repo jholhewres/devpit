@@ -136,9 +136,9 @@ export const commands = {
 	/**
 	 *  `update.install` — put it in and come back.
 	 * 
-	 *  Only an AppImage is installed from here: a `.deb` is shown as a command for
-	 *  the person to run (US-017), because installing it means asking for root and
-	 *  devpit never does that on anyone's behalf.
+	 *  Only an AppImage or the Windows installer is installed from here: a `.deb`
+	 *  is shown as a command for the person to run (US-017), because installing it
+	 *  means asking for root and devpit never does that on anyone's behalf.
 	 */
 	updateInstall: () => typedError<UpdateStatus, RpcError>(__TAURI_INVOKE("update_install")),
 	/**  `update.restart_ready` — the window has saved what it had. */
@@ -2302,7 +2302,12 @@ export type InstallKind =
  *  `make dev`, a `cargo run`, or anything else with no bundle around it.
  *  Nothing is installed from here.
  */
-"unmanaged";
+"unmanaged" | 
+/**
+ *  The Windows installer. The app runs the new one over itself, and that
+ *  installer ends the psmux inside the install — so the terminals close.
+ */
+"nsis";
 
 /**  One installation, as the panels offer it. */
 export type Installation = {
@@ -3715,6 +3720,7 @@ export type UpdateWork = {
 	 *  Terminal agents and background sessions. Not in the way: they live in
 	 *  tmux or in the CLI's own daemon, and they keep running through the
 	 *  restart. Listed so the person does not have to take that on trust.
+	 *  Empty where an update ends them (`update::terminals_survive`).
 	 */
 	keeps: UpdateBlocking[],
 };

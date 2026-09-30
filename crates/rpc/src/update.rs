@@ -24,6 +24,9 @@ pub enum InstallKind {
     /// `make dev`, a `cargo run`, or anything else with no bundle around it.
     /// Nothing is installed from here.
     Unmanaged,
+    /// The Windows installer. The app runs the new one over itself, and that
+    /// installer ends the psmux inside the install — so the terminals close.
+    Nsis,
 }
 
 /// Where the update is, and what may be done about it.
@@ -95,5 +98,6 @@ pub struct UpdateWork {
     /// Terminal agents and background sessions. Not in the way: they live in
     /// tmux or in the CLI's own daemon, and they keep running through the
     /// restart. Listed so the person does not have to take that on trust.
+    /// Empty where an update ends them (`update::terminals_survive`).
     pub keeps: Vec<UpdateBlocking>,
 }

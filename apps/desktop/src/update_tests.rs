@@ -826,3 +826,45 @@ fn a_failure_with_no_better_words_keeps_its_own() {
         "{odd}"
     );
 }
+
+/// The Windows installer is updated in place, like an AppImage: the stamp is
+/// all it takes, because the install is per-user and nothing asks for rights.
+#[test]
+fn the_windows_installer_is_updated_in_place() {
+    assert_eq!(install_kind(None, Some("nsis"), &[]), InstallKind::Nsis);
+    /* An inherited APPIMAGE does not make a Windows build one. */
+    assert_eq!(
+        install_kind(Some("/opt/devpit.AppImage"), Some("nsis"), &[]),
+        InstallKind::Nsis
+    );
+
+    let offered = S::Available {
+        version: "0.2.0".to_owned(),
+        notes: String::new(),
+        kind: InstallKind::Nsis,
+        test_feed: false,
+    };
+    assert_eq!(may_download(&offered), Ok(()));
+    assert_eq!(why_not_here(InstallKind::Nsis), None);
+    for package_in in [false, true] {
+        assert_eq!(
+            quit_steps(InstallKind::Nsis, package_in),
+            vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart]
+        );
+    }
+}
+
+/// Only the Windows installer ends the terminals: it has to stop the psmux
+/// inside the install to replace it. Everywhere else they are kept.
+#[test]
+fn only_the_windows_installer_closes_the_terminals() {
+    assert!(!terminals_survive(InstallKind::Nsis));
+    for kind in [
+        InstallKind::AppImage,
+        InstallKind::Deb,
+        InstallKind::ExternallyManaged,
+        InstallKind::Unmanaged,
+    ] {
+        assert!(terminals_survive(kind), "{kind:?}");
+    }
+}

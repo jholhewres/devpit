@@ -237,6 +237,9 @@ pub(crate) fn install_kind(
                 InstallKind::Deb
             }
         }
+        // Per-user, in a folder this user owns: the installer needs no one's
+        // permission to run over it.
+        Some("nsis") => InstallKind::Nsis,
         _ => InstallKind::Unmanaged,
     }
 }
@@ -270,6 +273,7 @@ pub(crate) fn kind_here() -> InstallKind {
         BundleType::AppImage => "appimage",
         BundleType::Deb => "deb",
         BundleType::Rpm => "rpm",
+        BundleType::Nsis => "nsis",
         _ => "other",
     });
     install_kind(appimage.as_deref(), stamped, &tools_found())
@@ -354,11 +358,6 @@ impl Updating {
 /// still works.
 pub(crate) fn watch(app: tauri::AppHandle) {
     if cfg!(debug_assertions) && fixture_feed().is_none() {
-        return;
-    }
-    // The Windows preview is in no feed yet: every check would fail, and say
-    // "offline" to a machine that is not.
-    if cfg!(windows) && fixture_feed().is_none() {
         return;
     }
     tauri::async_runtime::spawn(async move {
@@ -473,12 +472,6 @@ pub async fn update_status(app: tauri::AppHandle) -> UpdateStatus {
 #[tauri::command]
 #[specta::specta]
 pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcError> {
-    if cfg!(windows) && fixture_feed().is_none() {
-        return Err(RpcError::new(
-            devpit_rpc::ErrorCode::Conflict,
-            "The Windows preview is updated by installing a newer one from devpit's releases page.",
-        ));
-    }
     let kind = kind_here();
     // From where things are, not from Idle: a check in the middle of a
     // download replaced the update being downloaded and dropped its bytes.
@@ -852,8 +845,21 @@ pub(crate) fn blocking_now(talking: &crate::chat::Talking) -> Result<UpdateWork,
     })
 }
 
+/// Whether the terminals outlive an update of this kind of install.
+///
+/// Not on Windows: the installer ends the psmux inside the install, because
+/// Windows will not replace a file a process is running from.
+pub(crate) fn terminals_survive(kind: InstallKind) -> bool {
+    kind != InstallKind::Nsis
+}
+
 /// The terminal agents and background sessions a restart leaves running.
 fn keeps_running() -> Vec<UpdateBlocking> {
+    // Listing what the installer is about to end, as kept, would be a promise
+    // broken on the next screen.
+    if !terminals_survive(kind_here()) {
+        return Vec::new();
+    }
     let keys = crate::card_activity::registry()
         .lock()
         .map(|activities| activities.surviving())
@@ -1009,7 +1015,7 @@ pub(crate) enum QuitStep {
 /// installing since 0.1.3.
 pub(crate) fn why_not_here(kind: InstallKind) -> Option<&'static str> {
     match kind {
-        InstallKind::AppImage => None,
+        InstallKind::AppImage | InstallKind::Nsis => None,
         InstallKind::Deb => {
             Some("a package is installed from the update card, not by quitting devpit")
         }
@@ -1029,7 +1035,11 @@ pub(crate) fn why_not_here(kind: InstallKind) -> Option<&'static str> {
 /// installed never ran.
 pub(crate) fn quit_steps(kind: InstallKind, package_in: bool) -> Vec<QuitStep> {
     match kind {
-        InstallKind::AppImage => vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart],
+        // The NSIS installer is started with `/R`, which restarts into the new
+        // version; the plugin ends this process as it starts it.
+        InstallKind::AppImage | InstallKind::Nsis => {
+            vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart]
+        }
         InstallKind::Deb if package_in => vec![QuitStep::AskTheWindow, QuitStep::Restart],
         InstallKind::Deb => vec![QuitStep::ItsOwnInstaller],
         // Nothing to do to a build nobody installs from here.
@@ -1203,9 +1213,9 @@ pub async fn update_install_package(
 
 /// `update.install` — put it in and come back.
 ///
-/// Only an AppImage is installed from here: a `.deb` is shown as a command for
-/// the person to run (US-017), because installing it means asking for root and
-/// devpit never does that on anyone's behalf.
+/// Only an AppImage or the Windows installer is installed from here: a `.deb`
+/// is shown as a command for the person to run (US-017), because installing it
+/// means asking for root and devpit never does that on anyone's behalf.
 #[tauri::command]
 #[specta::specta]
 pub async fn update_install(
@@ -1477,7 +1487,7 @@ pub(crate) fn may_download(state: &UpdateStatus) -> Result<(), String> {
                 );
             }
             match kind {
-                InstallKind::AppImage | InstallKind::Deb => Ok(()),
+                InstallKind::AppImage | InstallKind::Deb | InstallKind::Nsis => Ok(()),
                 InstallKind::Unmanaged => Err(
                     "this build was not installed from a devpit release; the release page has the files"
                         .to_owned(),
