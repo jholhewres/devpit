@@ -50,5 +50,23 @@ jobs:
             rm -f "$T/out.txt"
           done
 
+      # How a window is given its shell and its environment: which of tmux's
+      # spellings psmux takes, and whether `-e` reaches the program.
+      - name: Probe the shell of a window
+        continue-on-error: true
+        run: |
+          set +e
+          T="$(mktemp -d)"
+          S="-S $T/shell.sock"
+          tmux $S new-session -d -s a -n w -e FOO=from-e -- pwsh.exe -NoLogo -NoExit -Command 'Write-Output ("A-dashdash-" + $env:FOO)'; echo "A exit $?"
+          tmux $S new-session -d -s b -n w -e FOO=from-e 'pwsh.exe -NoLogo -NoExit -Command Write-Output ("B-string-" + $env:FOO)'; echo "B exit $?"
+          tmux $S new-session -d -s c -n w -e FOO=from-e pwsh.exe -NoLogo -NoExit -Command 'Write-Output ("C-args-" + $env:FOO)'; echo "C exit $?"
+          sleep 8
+          for x in a b c; do
+            echo "===== $x: $(tmux $S display-message -p -t $x:w '#{pane_current_command}')"
+            tmux $S capture-pane -p -t $x:w | grep -v '^\s*$' | head -8
+          done
+          tmux $S kill-server
+
       - run: command -v make || choco install make -y --no-progress
       - run: make test-tmux
