@@ -31,6 +31,13 @@ jobs:
       - run: make setup
       - run: make bundle-windows
 
+      # Kept with the run first: a publish that fails does not lose twenty
+      # minutes of build with it.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: devpit-windows-installer
+          path: target/release/bundle/nsis/*-setup.exe
+
       - name: Publish the pre-release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -43,5 +50,10 @@ jobs:
           Install: run the installer; it asks for no administrator rights and installs for this user, with psmux — the tmux devpit's terminals run on — inside it. It adds devpit to the Start menu, and removes cleanly from Settings → Apps.
 
           Needs Claude Code on PATH (\`claude\`), and WebView2, which the installer fetches if Windows lacks it."
-          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$tag" "$installer" --prerelease --target "$GITHUB_SHA" --title "devpit ${version} — Windows preview" --notes "$notes"
+          # The releases API answers 500 now and then; asked again, it does not.
+          for attempt in 1 2 3; do
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+            gh release create "$tag" "$installer" --prerelease --target "$GITHUB_SHA" --title "devpit ${version} — Windows preview" --notes "$notes" && exit 0
+            sleep $((attempt * 15))
+          done
+          exit 1
