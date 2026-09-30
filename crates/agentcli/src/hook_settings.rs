@@ -42,10 +42,14 @@ pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
 /// runs inside a devpit terminal, and that the session was not also launched
 /// with the flags: two copies of a hook would report every event twice.
 pub fn plugin_hooks_json(endpoint_file: &Path, auth_file: &Path) -> String {
+    #[cfg(not(windows))]
     let guard = format!(
         "[ -n \"${pane}\" ] && [ -z \"${HOOKED}\" ] || exit 0; ",
         pane = devpit_tmux_pane_env()
     );
+    // `devpit hook` makes the same check itself: there is no shell to ask.
+    #[cfg(windows)]
+    let guard = " --plugin".to_owned();
     format!("{{\"hooks\":{}}}", hooks(endpoint_file, auth_file, &guard))
 }
 
@@ -67,13 +71,13 @@ fn hooks(endpoint_file: &Path, auth_file: &Path, guard: &str) -> String {
 
     // Told and forgotten. The reply is discarded and the budget is short,
     // because these only report what happened and the agent is waiting.
-    let tell = format!("{guard}{}", post(&file, &auth, "1.5", false));
+    let tell = guarded(guard, &post(&file, &auth, "1.5", false));
 
     // `PreToolUse` is the one that can be answered, so its reply is printed:
     // the app either sends back a decision or sends back nothing, and nothing
     // leaves the CLI's own permission mode in charge. The budget is long
     // because on this one the answer is a person.
-    let consult = format!("{guard}{}", post(&file, &auth, "125", true));
+    let consult = guarded(guard, &post(&file, &auth, "125", true));
 
     let hooks: Vec<String> = [
         ("PreToolUse", &consult),
@@ -104,6 +108,18 @@ fn hooks(endpoint_file: &Path, auth_file: &Path, guard: &str) -> String {
     format!("{{{}}}", hooks.join(","))
 }
 
+/// A hook's line with its guard: a shell test before it, or on Windows a
+/// flag after it.
+#[cfg(not(windows))]
+fn guarded(guard: &str, post: &str) -> String {
+    format!("{guard}{post}")
+}
+
+#[cfg(windows)]
+fn guarded(guard: &str, post: &str) -> String {
+    format!("{post}{guard}")
+}
+
 /// The shell one hook runs.
 ///
 /// The endpoint is read from disk on every invocation, so a session that
@@ -117,6 +133,7 @@ fn hooks(endpoint_file: &Path, auth_file: &Path, guard: &str) -> String {
 /// what reaches that far. `${VAR:+?pane=$VAR}` is POSIX and expands to
 /// nothing at all when the agent was not started in one of our terminals, so
 /// a headless turn posts exactly the URL it always did.
+#[cfg(not(windows))]
 fn post(endpoint_file: &str, auth_file: &str, seconds: &str, echo: bool) -> String {
     let sink = if echo { "" } else { " >/dev/null" };
     format!(
@@ -128,11 +145,38 @@ fn post(endpoint_file: &str, auth_file: &str, seconds: &str, echo: bool) -> Stri
     )
 }
 
+/// On Windows the hook is devpit itself, `devpit hook`: there is no `cat`,
+/// `curl` or POSIX shell to count on, and the binary is already installed. It
+/// reads the endpoint and the secret from the same files, and adds the pane.
+#[cfg(windows)]
+fn post(_endpoint_file: &str, _auth_file: &str, seconds: &str, echo: bool) -> String {
+    // This process is devpit: the one binary that knows where its state is.
+    let exe = std::env::current_exe()
+        .map(|exe| exe.display().to_string())
+        .unwrap_or_else(|_| "devpit".to_owned());
+    hook_line(&exe, seconds, echo)
+}
+
+/// `<exe> hook --wait <seconds> [--echo]`, read alike by cmd, Git Bash and
+/// PowerShell: forward slashes, and quotes only when a space needs them.
+#[cfg(windows)]
+pub(crate) fn hook_line(exe: &str, seconds: &str, echo: bool) -> String {
+    let exe = exe.replace('\\', "/");
+    let exe = if exe.contains(' ') {
+        format!("\"{exe}\"")
+    } else {
+        exe
+    };
+    let echo = if echo { " --echo" } else { "" };
+    format!("{exe} hook --wait {seconds}{echo}")
+}
+
 /// The variable a devpit terminal puts the pane's name in.
 ///
 /// Named here rather than imported: this crate is the boundary around the
 /// agent CLI and does not depend on the terminal one. The name is checked
 /// against it by `the_pane_name_matches_what_the_terminal_sets`.
+#[cfg(not(windows))]
 fn devpit_tmux_pane_env() -> &'static str {
     "DEVPIT_PANE"
 }

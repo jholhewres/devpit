@@ -193,3 +193,31 @@ fn the_plugin_hooks_stay_quiet_outside_a_pane_and_beside_the_settings() {
     assert_eq!(run(&[("DEVPIT_PANE", "leaf_1")]), "posted");
     assert_eq!(run(&[("DEVPIT_PANE", "leaf_1"), (HOOKED, "1")]), "");
 }
+
+/// On Windows there is no `curl`, `cat` or POSIX shell to count on: the hook
+/// is devpit itself, spelled so cmd, Git Bash and PowerShell all run it.
+#[cfg(windows)]
+#[test]
+fn on_windows_a_hook_is_devpit_itself() {
+    use crate::hook_settings::hook_line;
+
+    assert_eq!(
+        hook_line(r"C:\Users\jo\AppData\Local\devpit\devpit.exe", "1.5", false),
+        "C:/Users/jo/AppData/Local/devpit/devpit.exe hook --wait 1.5"
+    );
+    assert_eq!(
+        hook_line(r"C:\Program Files\devpit\devpit.exe", "125", true),
+        "\"C:/Program Files/devpit/devpit.exe\" hook --wait 125 --echo"
+    );
+
+    let written = plugin_hooks_json(Path::new("endpoint"), Path::new("hook-auth"));
+    let parsed: serde_json::Value = serde_json::from_str(&written).expect("valid json");
+    for (event, entries) in parsed["hooks"].as_object().expect("hooks") {
+        let command = entries[0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(command.contains(" hook --wait "), "{event}: {command}");
+        assert!(command.ends_with(" --plugin"), "{event}: {command}");
+        assert!(!command.contains("curl"), "{event}: {command}");
+    }
+}

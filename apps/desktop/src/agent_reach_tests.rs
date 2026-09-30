@@ -70,3 +70,39 @@ fn the_shim_runs_this_binary_as_the_agent_cli() {
     let script = std::fs::read_to_string(bin.join("devpit-agent")).expect("read");
     assert_eq!(script, "#!/bin/sh\nexec '/opt/devpit' agent \"$@\"\n");
 }
+
+/// `devpit hook` stays quiet beside the settings by the variable the settings
+/// set; two spellings of one name would report every event twice.
+#[test]
+fn the_hook_door_reads_the_variable_the_settings_set() {
+    assert_eq!(devpit_agentapi::hook::HOOKED_ENV, devpit_agentcli::HOOKED);
+}
+
+/// On Windows the shim is a batch file PATHEXT finds as `devpit-agent`.
+#[cfg(windows)]
+#[test]
+fn on_windows_the_shim_is_a_batch_file_that_passes_everything_on() {
+    let (name, said) = shim(r"C:\Users\jo\AppData\Local\devpit\devpit.exe").expect("shim");
+    assert_eq!(name, "devpit-agent.cmd");
+    assert_eq!(
+        said,
+        "@echo off\r\n\"C:\\Users\\jo\\AppData\\Local\\devpit\\devpit.exe\" agent %*\r\n"
+    );
+    assert!(shim(r"C:\100%\devpit.exe").is_none());
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = cli_shim(dir.path(), Path::new(r"C:\devpit\devpit.exe")).expect("written");
+    assert!(bin.join("devpit-agent.cmd").is_file());
+}
+
+/// A Windows path is carried with forward slashes, which TOML does not read
+/// as escapes and Windows reads as a path.
+#[cfg(windows)]
+#[test]
+fn on_windows_the_tools_are_reached_through_forward_slashes() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config = dir.path().join("mcp.json");
+    let flags = mcp_flags("codex", Path::new(r"C:\devpit\devpit.exe"), &config).expect("flags");
+    assert!(flags.contains(r#"mcp_servers.devpit.command="C:/devpit/devpit.exe""#));
+    assert!(mcp_flags("claude", Path::new(r"C:\devpit\devpit.exe"), &config).is_some());
+}

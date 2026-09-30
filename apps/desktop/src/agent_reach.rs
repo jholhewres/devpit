@@ -35,6 +35,10 @@ pub(crate) fn chat_mcp(driver: &str) -> Option<String> {
 /// when it differs.
 pub(crate) fn mcp_flags(agent: &str, exe: &Path, config: &Path) -> Option<String> {
     let exe = exe.to_str()?;
+    // Windows reads forward slashes as well, and TOML reads a backslash as
+    // an escape.
+    #[cfg(windows)]
+    let exe: &str = &exe.replace('\\', "/");
     // Quoted into a shell line and, for Codex, into TOML inside it: a path
     // with either quote in it is not one this can carry safely.
     if exe.contains(['\'', '"', '\\']) {
@@ -80,13 +84,9 @@ pub(crate) fn claude_config(exe: &str, agent: &str) -> String {
 /// Not `devpit`: that name is the installed app itself, on the person's own
 /// PATH, and a terminal where `devpit` meant something else would be a trap.
 pub(crate) fn cli_shim(root: &Path, exe: &Path) -> Option<PathBuf> {
-    let exe = exe.to_str()?;
-    if exe.contains('\'') {
-        return None;
-    }
+    let (name, wanted) = shim(exe.to_str()?)?;
     let dir = root.join("bin");
-    let path = dir.join("devpit-agent");
-    let wanted = format!("#!/bin/sh\nexec '{exe}' agent \"$@\"\n");
+    let path = dir.join(name);
     if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
         std::fs::create_dir_all(&dir).ok()?;
         std::fs::write(&path, &wanted).ok()?;
@@ -97,6 +97,30 @@ pub(crate) fn cli_shim(root: &Path, exe: &Path) -> Option<PathBuf> {
         }
     }
     Some(dir)
+}
+
+/// The shim's file name and what it says.
+#[cfg(not(windows))]
+fn shim(exe: &str) -> Option<(&'static str, String)> {
+    if exe.contains('\'') {
+        return None;
+    }
+    let wanted = format!("#!/bin/sh\nexec '{exe}' agent \"$@\"\n");
+    Some(("devpit-agent", wanted))
+}
+
+/// A batch file on Windows, which PATHEXT finds as `devpit-agent` from cmd
+/// and PowerShell alike. A `%` in the path would be expanded, a `"` would end
+/// the quoting: neither can be carried.
+#[cfg(windows)]
+fn shim(exe: &str) -> Option<(&'static str, String)> {
+    if exe.contains(['"', '%']) {
+        return None;
+    }
+    Some((
+        "devpit-agent.cmd",
+        format!("@echo off\r\n\"{exe}\" agent %*\r\n"),
+    ))
 }
 
 #[cfg(test)]

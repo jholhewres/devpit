@@ -14,6 +14,7 @@ pub mod apps;
 pub mod cli;
 pub mod client;
 pub mod guide;
+pub mod hook;
 pub mod mcp;
 
 pub use client::ask;
