@@ -6,12 +6,6 @@
 
 TAURI := ./node_modules/.bin/tauri
 
-# GNU make on Windows runs recipes through `cmd` unless told otherwise, and
-# every recipe here is written for a POSIX shell. Git for Windows has one.
-ifeq ($(OS),Windows_NT)
-SHELL := bash
-endif
-
 # Nothing of an installed AppImage reaches a recipe.
 #
 # A terminal inside the AppImage devpit inherits the AppImage's environment:
@@ -129,7 +123,8 @@ bundle-windows: node_modules ## The Windows installer, psmux inside it
 	mkdir -p apps/desktop/windows-bin
 	cp target/psmux/bin/*.exe apps/desktop/windows-bin/
 	curl -fsSL https://raw.githubusercontent.com/psmux/psmux/master/LICENSE -o apps/desktop/windows-bin/psmux-LICENSE.txt
-	$(TAURI) build --bundles nsis
+	@# Through pnpm: `./node_modules/.bin/…` is a path `cmd` cannot run.
+	pnpm exec tauri build --bundles nsis
 
 check-windows: ## Compiles for Windows, which is built nowhere yet
 	@# The installer's resources are named in the Windows config and must exist.
