@@ -3,6 +3,23 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.27 — 2026-09-29
+
+### Windows
+
+- **devpit runs on Windows inside WSL.** The README says how: WSL 2 with
+  WSLg, and the same install line as on Linux.
+- **On the way to a native build.** The code now builds for Windows, and its
+  terminals' layer is tested on every push against psmux, a tmux of Windows'
+  own. Nothing is shipped for Windows yet.
+
+### Fixes
+
+- The search lists an agent by its command, without the variables in front of
+  it — no more account directories or paths in the list.
+- On macOS, a chat that hangs is ended after its grace period, instead of
+  being taken for already gone.
+
 ## 0.1.26 — 2026-09-29
 
 ### Sessions
