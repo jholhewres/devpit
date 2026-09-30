@@ -5,6 +5,17 @@
 # puts the marks around it. Written for Windows PowerShell 5.1 as well as 7,
 # which has neither the backtick escape for ESC nor ??: [char]27, if/else.
 
+# The PATH Windows keeps for this user now, as a new Windows Terminal tab gets
+# it: the server this shell runs under may have been started before a tool was
+# installed, and `claude` would be missing here while found everywhere else.
+$__devpit_fresh = @(
+    [Environment]::GetEnvironmentVariable('Path', 'Machine'),
+    [Environment]::GetEnvironmentVariable('Path', 'User'),
+    $env:PATH
+) -join ';' -split ';' | Where-Object { $_ } | Select-Object -Unique
+$env:PATH = $__devpit_fresh -join ';'
+Remove-Variable __devpit_fresh
+
 # Where `devpit-agent` lives, after their profile, which may set PATH outright.
 if ($env:DEVPIT_BIN -and -not (($env:PATH -split ';') -contains $env:DEVPIT_BIN)) {
     $env:PATH = "$env:DEVPIT_BIN;$env:PATH"
@@ -52,7 +63,10 @@ function global:prompt {
     }
     $here = $executionContext.SessionState.Path.CurrentLocation
     if ($here.Provider.Name -eq 'FileSystem') {
-        $path = $here.ProviderPath.Replace('\', '/').Replace('%', '%25').Replace(' ', '%20')
+        $path = $here.ProviderPath
+        # A long-path prefix is not part of the folder's name.
+        if ($path.StartsWith('\\?\')) { $path = $path.Substring(4) }
+        $path = $path.Replace('\', '/').Replace('%', '%25').Replace(' ', '%20')
         $out += __devpit_osc "7;file://$env:COMPUTERNAME/$($path.TrimStart('/'))"
     }
     $out += __devpit_osc '133;A'

@@ -18,6 +18,11 @@ pub(crate) fn native(path: String) -> String {
 #[cfg(any(windows, test))]
 pub(crate) fn drive_path(path: &str) -> Option<String> {
     let rest = path.strip_prefix('/')?;
+    // `\\?\C:\x` written as a URI: the long-path prefix is not the folder's.
+    let rest = rest
+        .strip_prefix("/?/")
+        .or_else(|| rest.strip_prefix("?/"))
+        .unwrap_or(rest);
     let mut chars = rest.chars();
     let drive = chars.next().filter(char::is_ascii_alphabetic)?;
     if chars.next() != Some(':') {
@@ -43,6 +48,15 @@ mod tests {
         );
         assert_eq!(drive_path("/d:").as_deref(), Some(r"d:\"));
         assert_eq!(drive_path("/C:/").as_deref(), Some(r"C:\"));
+    }
+
+    #[test]
+    fn a_long_path_prefix_is_not_part_of_the_folder() {
+        assert_eq!(
+            drive_path("/?/C:/Workspace/app").as_deref(),
+            Some(r"C:\Workspace\app")
+        );
+        assert_eq!(drive_path("//?/C:/x").as_deref(), Some(r"C:\x"));
     }
 
     #[test]
