@@ -30,7 +30,7 @@ fn a_window_made_piped_is_heard_from_its_first_byte() {
         .ensure_session(session, "leaf_one", dir.path())
         .expect("ensure");
     let copy = dir.path().join("copy");
-    let pipe = format!("exec cat >> '{}'", copy.display());
+    let pipe = devpit_tmux::copy_to(&copy, true);
 
     server
         .new_window_piped(session, "leaf_two", dir.path(), &pipe)

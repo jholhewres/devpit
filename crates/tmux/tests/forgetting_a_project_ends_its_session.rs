@@ -39,6 +39,8 @@ fn a_projects_session_goes_with_every_client_and_no_other() {
         server.has_session(&format!("={staying}")).expect("asked"),
         "a project whose name starts the same went too"
     );
+    // Its client session too, where panes attach through one (not psmux).
+    #[cfg(unix)]
     assert!(server
         .has_session(&format!("={staying}__leaf_a"))
         .expect("asked"));

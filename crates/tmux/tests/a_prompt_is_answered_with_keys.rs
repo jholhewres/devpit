@@ -4,6 +4,8 @@
 
 use devpit_tmux::{Key, Server};
 
+// `cat -v` is what shows the bytes; Windows has no such program.
+#[cfg(unix)]
 #[test]
 fn a_prompt_is_answered_with_named_keys_only() {
     if !Server::available() {

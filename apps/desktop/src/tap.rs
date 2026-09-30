@@ -188,14 +188,9 @@ fn start(
     Some(pipe)
 }
 
-/// What tmux runs to copy a pane into its fifo.
-///
-/// `exec`, so the shell tmux runs this through becomes `cat` rather than
-/// waiting on it: one process per pane, not two. Quoted whole, with any
-/// quote in the path closed and reopened, because tmux hands it to `sh -c`.
+/// What tmux runs to copy a pane into its fifo: see `devpit_tmux::copy_to`.
 pub(crate) fn pipe_command(path: &Path) -> String {
-    let path = path.to_string_lossy().replace('\'', "'\\''");
-    format!("exec cat > '{path}'")
+    devpit_tmux::copy_to(path, false)
 }
 
 /// Ends a tap's reader and removes its fifo.

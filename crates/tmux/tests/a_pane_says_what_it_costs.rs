@@ -9,6 +9,8 @@
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+// The process table is read from the kernel, which Windows does not offer.
+#[cfg(unix)]
 #[test]
 fn a_pane_running_something_reports_memory_for_its_whole_tree() {
     if !devpit_tmux::Server::available() {

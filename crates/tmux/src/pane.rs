@@ -13,6 +13,19 @@ use crate::{Server, TmuxError};
 /// Measured before relying on it: a reader that dies leaves the pane
 /// running, and a reader that stalls does not stall the pane — 200,000
 /// lines with nobody draining, and the pane still answered.
+/// The `pipe-pane` command that copies a pane's output to `path`, appended
+/// when `append`. `exec` spares a shell per pane where there is one; psmux
+/// reads the redirection itself and opens the file, so it gets it bare.
+pub fn copy_to(path: &std::path::Path, append: bool) -> String {
+    let path = path.display().to_string().replace('\'', r"'\''");
+    let into = if append { ">>" } else { ">" };
+    if crate::naming::GROUPED {
+        format!("exec cat {into} '{path}'")
+    } else {
+        format!("cat {into} '{path}'")
+    }
+}
+
 pub(crate) fn pipe_pane(server: &Server, target: &str, command: &str) -> Result<(), TmuxError> {
     server.require(&["pipe-pane", "-t", target, command])?;
     Ok(())

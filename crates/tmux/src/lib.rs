@@ -20,7 +20,7 @@ mod scratch;
 mod scroll;
 mod shell;
 mod windows;
-pub use pane::Key;
+pub use pane::{copy_to, Key};
 pub use scratch::Scratch;
 pub use shell::{parse_running, Running, Shell};
 
@@ -153,7 +153,14 @@ impl Server {
 
     /// Everything tmux draws that this app draws better itself.
     fn quiet_chrome(&self) -> Result<(), TmuxError> {
-        let _ = self.require(&chrome::one_line());
+        if naming::GROUPED {
+            let _ = self.require(&chrome::one_line());
+            return Ok(());
+        }
+        // psmux is not held to tmux's `;` between commands: one at a time.
+        for line in chrome::one_line().split(|word| *word == ";") {
+            let _ = self.require(line);
+        }
         Ok(())
     }
 

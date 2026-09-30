@@ -22,7 +22,7 @@ fn a_pane_piped_twice_is_still_piped() {
         .expect("ensure");
     let target = Server::target(session, window);
     let copy = dir.path().join("copy");
-    let pipe = format!("exec cat >> '{}'", copy.display());
+    let pipe = devpit_tmux::copy_to(&copy, true);
 
     server.pipe_pane(&target, &pipe).expect("first arming");
     server.pipe_pane(&target, &pipe).expect("second arming");

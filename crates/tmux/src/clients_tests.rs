@@ -7,6 +7,8 @@ devpit_prj_A__leaf_2 1\n\
 devpit_prj_A__leaf_gone 0\n\
 devpit_prj_B__leaf_9 0\n";
 
+// Client sessions are the grouped model's; psmux has none to be orphaned.
+#[cfg(unix)]
 #[test]
 fn a_detached_client_whose_window_is_gone_is_an_orphan() {
     let windows = vec!["leaf_1".to_owned(), "leaf_2".to_owned()];

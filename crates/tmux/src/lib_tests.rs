@@ -73,10 +73,16 @@ fn a_session_survives_and_echoes_through_send_keys() {
         .send_keys(&target, "echo devpit-tmux-ok")
         .expect("send");
 
-    // The shell needs a beat to print. A tight loop would flake on a
-    // loaded machine; 200ms is well above a local echo and still a unit.
-    std::thread::sleep(std::time::Duration::from_millis(200));
-    let shot = server.capture_pane(&target).expect("capture");
+    // Asked until it is there: a shell that starts slowly — PowerShell takes
+    // seconds — is not a shell that did not echo.
+    let mut shot = String::new();
+    for _ in 0..100 {
+        shot = server.capture_pane(&target).expect("capture");
+        if shot.contains("devpit-tmux-ok") {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
     assert!(
         shot.contains("devpit-tmux-ok"),
         "capture missed the echo: {shot:?}"
