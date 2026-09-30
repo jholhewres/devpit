@@ -17,17 +17,26 @@ fn session_names_are_safe_for_tmux() {
 /// `/bin/true` is Linux's; macOS ships it as `/usr/bin/true` and has no
 /// `/bin/true` at all, which is how this test failed a release on a Mac while
 /// saying nothing about tmux.
-fn a_program_that_exits_zero() -> &'static Path {
+#[cfg(unix)]
+fn a_program_that_exits_zero() -> std::path::PathBuf {
     ["/bin/true", "/usr/bin/true"]
         .iter()
-        .map(Path::new)
+        .map(std::path::PathBuf::from)
         .find(|path| path.exists())
         .expect("no `true` on this system")
 }
 
+/// Windows has no `true`: a script that exits zero stands in.
+#[cfg(windows)]
+fn a_program_that_exits_zero() -> std::path::PathBuf {
+    let path = std::env::temp_dir().join("devpit-exits-zero.cmd");
+    std::fs::write(&path, "@exit /b 0\r\n").expect("write the stand-in");
+    path
+}
+
 #[test]
 fn availability_follows_the_program_exit() {
-    assert!(Server::available_at(a_program_that_exits_zero()));
+    assert!(Server::available_at(&a_program_that_exits_zero()));
     assert!(!Server::available_at(Path::new(
         "/path/that/does/not/contain/tmux"
     )));

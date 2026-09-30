@@ -144,7 +144,7 @@ impl Server {
         window: &str,
     ) -> Result<(), TmuxError> {
         let client = naming::client_session(session, window);
-        if !self.has_session(&client)? {
+        if naming::GROUPED && !self.has_session(&client)? {
             self.require(&["new-session", "-d", "-t", session, "-s", &client])?;
         }
         self.require(&["select-window", "-t", &format!("{client}:{window}")])?;
@@ -201,7 +201,8 @@ impl Server {
     /// would leave the leaf in the tree with no way to remove it.
     pub fn kill_window(&self, session: &str, window: &str) -> Result<(), TmuxError> {
         let client = naming::client_session(session, window);
-        if self.has_session(&client)? {
+        // Ungrouped, the client is the project's own session: never killed here.
+        if naming::GROUPED && self.has_session(&client)? {
             let _ = self.run(&["kill-session", "-t", &client])?;
         }
         let _ = self.run(&["kill-window", "-t", &format!("{session}:{window}")])?;

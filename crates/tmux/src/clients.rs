@@ -18,6 +18,10 @@ use crate::{naming, Server};
 /// Removes the orphaned client sessions of `session`, given its windows.
 /// Best effort: a tidy-up that fails leaves things as they were.
 pub(crate) fn prune(server: &Server, session: &str, windows: &[String]) {
+    // Without groups there are no client sessions to leave behind.
+    if !naming::GROUPED {
+        return;
+    }
     let Ok(listed) = server.run(&["list-sessions", "-F", "#{session_name} #{session_attached}"])
     else {
         return;

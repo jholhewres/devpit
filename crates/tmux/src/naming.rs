@@ -23,7 +23,16 @@ pub(crate) fn target(session: &str, window: &str) -> String {
     format!("{}:{window}", client_session(session, window))
 }
 
+/// Whether a pane attaches through a session grouped with the project's.
+///
+/// psmux, the tmux of Windows, has no grouped sessions: a pane is attached
+/// to the project's own session there, at its window.
+pub(crate) const GROUPED: bool = !cfg!(windows);
+
 pub(crate) fn client_session(session: &str, window: &str) -> String {
+    if !GROUPED {
+        return session.to_owned();
+    }
     let mut name = format!("{session}__{window}");
     name.truncate(160);
     name
