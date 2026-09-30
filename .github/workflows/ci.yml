@@ -86,8 +86,8 @@ jobs:
 
   # Windows is not released yet, and this keeps the door from rusting shut: a
   # `libc::` or a `std::os::unix` without its gate fails here, not the day a
-  # Windows build is tried. It compiles; it does not run the suite, which
-  # needs tmux.
+  # Windows build is tried. And the tmux crate's tests run against psmux, the
+  # tmux devpit uses there — they are the contract it has to keep.
   windows:
     runs-on: windows-latest
     defaults:
@@ -102,3 +102,6 @@ jobs:
       # The image's bash has no make of its own.
       - run: command -v make || choco install make -y --no-progress
       - run: make check-windows
+      # It installs `psmux`, `pmux` and a `tmux` beside them.
+      - run: cargo install psmux --locked
+      - run: make test-tmux
