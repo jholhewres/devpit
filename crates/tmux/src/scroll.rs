@@ -172,7 +172,14 @@ impl Server {
     /// screen cleared, the text — pasted, bracketed, when it is several lines
     /// — then Enter. Literal throughout, so no word of it is read as a key.
     pub fn submit(&self, target: &str, line: &str) -> Result<(), TmuxError> {
-        self.require(&["send-keys", "-t", target, "C-e", "C-u", "C-l"])?;
+        self.require(&[
+            "send-keys",
+            "-t",
+            target,
+            CLEAR_LINE,
+            CLEAR_LINE_AGAIN,
+            "C-l",
+        ])?;
         if line.contains('\n') {
             self.require(&["set-buffer", "-b", "devpit-submit", "--", line])?;
             self.require(&[
@@ -229,6 +236,19 @@ impl Server {
         Ok(())
     }
 }
+
+/// The keys that empty a shell's line before a line is typed into it: end,
+/// then kill to the start, in readline and zle. PowerShell binds neither and
+/// typed them into the command as characters nobody could see; Escape is its
+/// own "revert the line".
+#[cfg(not(windows))]
+const CLEAR_LINE: &str = "C-e";
+#[cfg(not(windows))]
+const CLEAR_LINE_AGAIN: &str = "C-u";
+#[cfg(windows)]
+const CLEAR_LINE: &str = "Escape";
+#[cfg(windows)]
+const CLEAR_LINE_AGAIN: &str = "Escape";
 
 #[cfg(test)]
 mod tests {

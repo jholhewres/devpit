@@ -76,6 +76,7 @@ impl Server {
             .iter()
             .map(|part| (*part).to_owned())
             .collect();
+        argv.extend(cwd_env(&cwd));
         argv.extend(self.shell_args(window));
         let target = format!("{session}:{window}");
         let chained = crate::naming::GROUPED;
@@ -118,4 +119,14 @@ impl Server {
         }
         Ok(())
     }
+}
+
+/// The folder a Windows shell is to stand in, handed over as a variable too:
+/// a window made after the first came up in the person's home, and PowerShell
+/// profiles often `cd` there themselves. Its startup file goes back to it.
+pub(crate) fn cwd_env(cwd: &str) -> Vec<String> {
+    if crate::naming::GROUPED {
+        return Vec::new();
+    }
+    vec!["-e".to_owned(), format!("DEVPIT_CWD={cwd}")]
 }

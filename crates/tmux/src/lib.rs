@@ -128,6 +128,7 @@ impl Server {
             .iter()
             .map(|part| (*part).to_owned())
             .collect();
+        argv.extend(windows::cwd_env(&cwd));
         argv.extend(self.shell_args(window));
         self.require(&argv.iter().map(String::as_str).collect::<Vec<_>>())?;
         self.quiet_chrome()?;

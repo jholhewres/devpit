@@ -99,3 +99,11 @@ if (Test-Path Function:\PSConsoleHostReadLine) {
         $line
     }
 }
+
+# The folder devpit opened this terminal in: a profile that `cd`s home, or a
+# window the terminal server started elsewhere, would leave it standing in the
+# wrong one — and an agent started there asks to trust the person's home.
+if ($env:DEVPIT_CWD -and (Test-Path -LiteralPath $env:DEVPIT_CWD)) {
+    Set-Location -LiteralPath $env:DEVPIT_CWD
+}
+Remove-Item Env:DEVPIT_CWD -ErrorAction SilentlyContinue
