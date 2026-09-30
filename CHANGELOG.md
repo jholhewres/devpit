@@ -3,6 +3,27 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.28 — 2026-09-30
+
+### Windows
+
+- **devpit installs on Windows.** A per-user installer on the releases page,
+  with psmux — the tmux devpit's terminals run on there — inside it. It adds
+  devpit to the Start menu and removes cleanly from Settings → Apps. It is not
+  signed with a code-signing certificate, so SmartScreen asks the first time.
+- **It updates itself** like the Linux and macOS builds. On Windows an update
+  closes the open terminals; the card says so before you choose.
+- Terminals run PowerShell with devpit's prompt marks, find what a new Windows
+  Terminal tab finds, and nothing devpit starts flashes a console window.
+- Closing the last terminal ends the terminal server, and installing over
+  devpit or removing it ends it first.
+- The agents offered are the ones actually installed.
+
+### Sessions
+
+- A background session can be watched in a terminal, and every session devpit
+  starts runs in one you can see (0.1.26).
+
 ## 0.1.27 — 2026-09-29
 
 ### Windows
