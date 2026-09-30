@@ -200,6 +200,8 @@ pub async fn session_attach(
         builder.arg(arg);
     }
     devpit_pty::host_env::scrub_pty(&mut builder);
+    // ConPTY speaks for itself on Windows; a `TERM` there is a Unix answer.
+    #[cfg(not(windows))]
     builder.env("TERM", "xterm-256color");
 
     let claimed = state.claims.take_for(&pane_id, &client_id)?;

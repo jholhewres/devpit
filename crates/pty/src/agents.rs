@@ -270,7 +270,21 @@ pub const SHELLS: &[&str] = &["bash", "zsh", "fish", "sh", "dash", "ksh", "csh",
 
 /// Whether the pane is merely sitting at a prompt.
 pub fn idle_shell(program: &str) -> bool {
-    SHELLS.contains(&program)
+    SHELLS.contains(&program) || windows_shell(program)
+}
+
+/// PowerShell and `cmd`, the shells a Windows pane sits at, however psmux
+/// spells them.
+#[cfg(windows)]
+fn windows_shell(program: &str) -> bool {
+    crate::pwsh::is_powershell(program)
+        || program.eq_ignore_ascii_case("cmd")
+        || program.eq_ignore_ascii_case("cmd.exe")
+}
+
+#[cfg(not(windows))]
+fn windows_shell(_program: &str) -> bool {
+    false
 }
 
 #[cfg(test)]

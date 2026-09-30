@@ -111,6 +111,21 @@ pub(crate) fn argv(target: &str, lines: i32, state: Held) -> Option<Vec<String>>
 /// nothing and draws the prompt again.
 const SHELLS: [&str; 5] = ["bash", "zsh", "fish", "sh", "dash"];
 
+/// PowerShell, the shell a Windows pane starts, by the name psmux gives it.
+#[cfg(windows)]
+fn powershell(front: &str) -> bool {
+    let name = front.to_ascii_lowercase();
+    matches!(
+        name.strip_suffix(".exe").unwrap_or(&name),
+        "pwsh" | "powershell"
+    )
+}
+
+#[cfg(not(windows))]
+fn powershell(_front: &str) -> bool {
+    false
+}
+
 impl Server {
     /// Presses Enter in a pane whose shell is in front, so it draws its prompt
     /// — and its hooks mark it. A pane started before the app was can be drawn
@@ -128,7 +143,7 @@ impl Server {
             .trim()
             .trim_start_matches('-')
             .to_owned();
-        if !SHELLS.contains(&front.as_str()) {
+        if !SHELLS.contains(&front.as_str()) && !powershell(&front) {
             return Ok(false);
         }
         self.require(&["send-keys", "-t", target, "Enter"])?;

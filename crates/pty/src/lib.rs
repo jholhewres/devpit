@@ -31,11 +31,14 @@ pub mod journal;
 pub mod login_path;
 mod osc;
 pub mod process;
+#[cfg(any(windows, test))]
+mod pwsh;
 mod reader;
 mod ring;
 mod session;
 pub mod shell;
 mod stopping;
+mod uri_path;
 pub mod usage;
 
 pub use foreground::{all_on as fronts_on, at_a_prompt, looking, on as front_on, Front, Settling};

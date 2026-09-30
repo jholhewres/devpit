@@ -176,7 +176,7 @@ fn read(body: &[u8]) -> Option<Told> {
         // The title. Both codes set it; 0 also sets the icon name, which is
         // not a thing this product draws.
         "0" | "2" => Some(Told::Title(rest.to_owned())),
-        "7" => path_of(rest).map(Told::Cwd),
+        "7" => path_of(rest).map(crate::uri_path::native).map(Told::Cwd),
         "52" => {
             // `52 ; <selection> ; <base64>`. The selection is which clipboard,
             // and this product has one.

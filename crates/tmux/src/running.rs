@@ -18,16 +18,20 @@ pub(crate) fn require(server: &Server, args: &[&str]) -> Result<std::process::Ou
 }
 
 pub(crate) fn run(server: &Server, args: &[&str]) -> Result<std::process::Output, TmuxError> {
-    devpit_pty::host_env::command("tmux")
-        .arg("-S")
-        .arg(&server.socket)
-        .args(args)
-        .output()
-        .map_err(|err| match err.kind() {
-            std::io::ErrorKind::NotFound => TmuxError::Missing,
-            _ => TmuxError::Failed {
-                command: args.join(" "),
-                stderr: err.to_string(),
-            },
-        })
+    let mut command = devpit_pty::host_env::command("tmux");
+    command.arg("-S").arg(&server.socket).args(args);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // A console program started from a windowed app is given a console
+        // window of its own, flashed on screen at every call. CREATE_NO_WINDOW.
+        command.creation_flags(0x0800_0000);
+    }
+    command.output().map_err(|err| match err.kind() {
+        std::io::ErrorKind::NotFound => TmuxError::Missing,
+        _ => TmuxError::Failed {
+            command: args.join(" "),
+            stderr: err.to_string(),
+        },
+    })
 }

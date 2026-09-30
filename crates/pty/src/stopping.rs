@@ -9,6 +9,7 @@
 //! (`waku-core/src/terminal.rs:180-190`), which met the same problem from the
 //! other side.
 
+#[cfg(not(windows))]
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -76,6 +77,7 @@ pub fn stop(pid: Option<u32>, grace: Duration, ask: impl FnOnce()) -> Stopped {
 /// Through the system's own `kill` rather than a crate:
 /// `apps/desktop/src/in_flight.rs` made the same call for the same reason, and
 /// a dependency taken for one signal is a dependency to keep in step forever.
+#[cfg(not(windows))]
 fn alive(pid: u32) -> bool {
     match Command::new("kill").args(["-0", &pid.to_string()]).output() {
         Ok(out) => out.status.success(),
@@ -89,10 +91,25 @@ fn alive(pid: u32) -> bool {
     }
 }
 
+#[cfg(not(windows))]
 fn insist(pid: u32) {
     let _ = Command::new("kill")
         .args(["-KILL", &pid.to_string()])
         .output();
+}
+
+/// Windows has no `kill`: a spawn that fails reads as "still there", and
+/// every close would sit out the whole grace.
+#[cfg(windows)]
+fn alive(pid: u32) -> bool {
+    i32::try_from(pid).is_ok_and(crate::process::alive)
+}
+
+#[cfg(windows)]
+fn insist(pid: u32) {
+    if let Ok(pid) = i32::try_from(pid) {
+        crate::process::terminate(pid);
+    }
 }
 
 /// Ends everything in a terminal's foreground process group.

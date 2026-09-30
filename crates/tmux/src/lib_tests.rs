@@ -34,6 +34,26 @@ fn a_program_that_exits_zero() -> std::path::PathBuf {
     path
 }
 
+/// psmux has no grouped sessions: a pane attaches to the project's own
+/// session, at its window, on the same server every other verb talks to.
+#[cfg(windows)]
+#[test]
+fn a_pane_attaches_to_the_project_session_at_its_window() {
+    let server = Server::new(PathBuf::from(r"C:\devpit\tmux.sock"));
+    let argv = server.attach_argv("devpit_prj", "leaf_a");
+    assert_eq!(
+        argv,
+        [
+            "tmux",
+            "-S",
+            r"C:\devpit\tmux.sock",
+            "attach-session",
+            "-t",
+            "devpit_prj:leaf_a"
+        ]
+    );
+}
+
 #[test]
 fn availability_follows_the_program_exit() {
     assert!(Server::available_at(&a_program_that_exits_zero()));

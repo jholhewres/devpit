@@ -1,6 +1,7 @@
 //! Ending a child, tested against children that really behave that way.
 
 use super::*;
+use std::process::Command;
 
 /// A process that does what it is told, and one that will not.
 ///

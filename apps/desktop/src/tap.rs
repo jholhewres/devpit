@@ -17,11 +17,12 @@
 //! reader that stalls does not stall the pane — two hundred thousand lines
 //! with nobody draining, and the pane still answered.
 //!
-//! This is the Unix half of a seam. When Windows arrives, a daemon owning the
-//! pty replaces the source and everything below it — the scanner, the events,
-//! the screen — stays exactly as it is.
+//! On Windows psmux copies into a regular file rather than a fifo, and
+//! `tap_file` follows it; everything below the source — the scanner,
+//! the events, the screen — stays exactly as it is.
 
 use std::collections::HashMap;
+#[cfg(unix)]
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -135,7 +136,7 @@ impl Taps {
             .flatten()
             .filter_map(|entry| {
                 let name = entry.file_name().to_string_lossy().into_owned();
-                let leaf = name.strip_suffix(".fifo")?.to_owned();
+                let leaf = name.strip_suffix(COPY_SUFFIX)?.to_owned();
                 (!open.contains_key(&leaf)).then(|| (leaf, entry.path()))
             })
             .collect();
@@ -174,7 +175,10 @@ fn start(
     leaf_id: &str,
 ) -> Option<String> {
     let path = fifo_for(leaf_id)?;
+    #[cfg(unix)]
     make_fifo(&path).ok()?;
+    #[cfg(windows)]
+    let from = crate::tap_file::emptied(&path)?;
     let listening = Arc::new(AtomicBool::new(true));
     open.insert(
         leaf_id.to_owned(),
@@ -184,7 +188,17 @@ fn start(
         },
     );
     let pipe = pipe_command(&path);
+    #[cfg(unix)]
     spawn_reader(app.clone(), leaf_id.to_owned(), path, listening);
+    #[cfg(windows)]
+    spawn_follower(
+        app.clone(),
+        project_id,
+        leaf_id.to_owned(),
+        path,
+        from,
+        listening,
+    );
     Some(pipe)
 }
 
@@ -199,8 +213,10 @@ fn end(tap: &Tap, leaf_id: &str) {
     // The reader is blocked inside `read` and only looks at the flag between
     // reads, so a quiet pane would leave a thread waiting on a fifo forever.
     // One byte wakes it; it sees the flag and leaves. Non-blocking, so a
-    // reader that never opened the fifo cannot hang this instead.
+    // reader that never opened the fifo cannot hang this instead. A file's
+    // follower looks on its own, and a byte would be written into the copy.
     if let Some(path) = fifo_for(leaf_id) {
+        #[cfg(unix)]
         if let Ok(mut waking) = waking(&path) {
             use std::io::Write;
             let _ = waking.write_all(b"\0");
@@ -218,11 +234,6 @@ fn waking(path: &Path) -> std::io::Result<std::fs::File> {
         .open(path)
 }
 
-#[cfg(not(unix))]
-fn waking(path: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::OpenOptions::new().write(true).open(path)
-}
-
 /// Where a pane's copy arrives.
 fn fifo_for(leaf_id: &str) -> Option<PathBuf> {
     // The leaf id is ours and is alphanumeric, so it needs no escaping — but
@@ -235,8 +246,11 @@ fn fifo_for(leaf_id: &str) -> Option<PathBuf> {
     {
         return None;
     }
-    Some(taps_root()?.join(format!("{leaf_id}.fifo")))
+    Some(taps_root()?.join(format!("{leaf_id}{COPY_SUFFIX}")))
 }
+
+/// A fifo's name, or on Windows a regular file's: psmux writes a file.
+const COPY_SUFFIX: &str = if cfg!(windows) { ".log" } else { ".fifo" };
 
 fn taps_root() -> Option<PathBuf> {
     let root = devpit_core::Store::root().ok()?.join("taps");
@@ -261,14 +275,8 @@ fn make_fifo(path: &Path) -> std::io::Result<()> {
     }
 }
 
-#[cfg(not(unix))]
-fn make_fifo(_path: &std::path::Path) -> std::io::Result<()> {
-    // Windows has no fifo, and no tmux to write to one. The daemon is what
-    // fills this seam there; refusing here is what keeps the seam honest.
-    Err(std::io::Error::other("no fifo on this platform"))
-}
-
 /// Reads a pane's copy for as long as it is being listened to.
+#[cfg(unix)]
 fn spawn_reader(app: tauri::AppHandle, leaf_id: String, path: PathBuf, listening: Arc<AtomicBool>) {
     std::thread::spawn(move || {
         // Opened read *and* write: a fifo opened read-only ends the moment the
@@ -293,6 +301,43 @@ fn spawn_reader(app: tauri::AppHandle, leaf_id: String, path: PathBuf, listening
             // from there — one scan of the stream, not two.
             crate::blocks::heard(&app, &leaf_id, &buffer[..read]);
         }
+    });
+}
+
+/// How big a Windows copy grows before its pipe is armed again, which empties
+/// it: psmux holds the file, so nothing here can cut it.
+#[cfg(windows)]
+const COPY_CEILING: u64 = 8 * 1024 * 1024;
+
+/// Follows a pane's copy in a file, from `from`, for as long as it is being
+/// listened to — the Windows reader. See `tap_file`.
+#[cfg(windows)]
+fn spawn_follower(
+    app: tauri::AppHandle,
+    project_id: &str,
+    leaf_id: String,
+    path: PathBuf,
+    from: u64,
+    listening: Arc<AtomicBool>,
+) {
+    let session = devpit_tmux::Server::session_name(project_id);
+    let target = devpit_tmux::Server::target(&session, &leaf_id);
+    std::thread::spawn(move || {
+        let Ok(tail) = crate::tap_file::Tail::open(&path, from) else {
+            return;
+        };
+        let rotate = || {
+            if let Ok(server) = crate::sessions::tmux_server() {
+                let _ = server.pipe_pane(&target, &pipe_command(&path));
+            }
+        };
+        crate::tap_file::follow(
+            tail,
+            &listening,
+            COPY_CEILING,
+            |bytes| crate::blocks::heard(&app, &leaf_id, bytes),
+            rotate,
+        );
     });
 }
 

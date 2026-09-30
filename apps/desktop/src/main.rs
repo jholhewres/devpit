@@ -139,11 +139,15 @@ mod still_holds;
 mod stopping;
 mod stopping_a_run;
 mod tap;
+// Only Windows copies a pane into a file; tested everywhere.
+#[cfg(any(windows, test))]
+mod tap_file;
 mod threads;
 mod turn_changes;
 mod update;
 mod update_deb;
 mod watching;
+mod windows_bin;
 mod working;
 mod workspace;
 mod worktree_base;
@@ -152,6 +156,9 @@ mod worktrees;
 mod wsfiles;
 
 fn main() {
+    // Before any thread, and before anything asks for tmux.
+    windows_bin::use_the_bundled_tmux();
+
     // `devpit agent …` and `devpit mcp` are an agent reaching the running
     // app, not a second window: answered here, before anything starts GTK.
     if let Some(code) = agent_door() {
@@ -309,11 +316,16 @@ fn main() {
 fn agent_door() -> Option<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let first = args.first()?.as_str();
-    if first != "agent" && first != "mcp" {
+    // `devpit hook` is how an agent's hooks reach the app on Windows, where
+    // the `curl` line the settings carry elsewhere has nothing to run on.
+    let hook = cfg!(windows) && first == "hook";
+    if first != "agent" && first != "mcp" && !hook {
         return None;
     }
     let root = match devpit_core::Store::root() {
         Ok(root) => root,
+        // A hook that fails must not fail the turn it reports on.
+        Err(_) if hook => return Some(0),
         Err(err) => {
             eprintln!("devpit: cannot find where devpit keeps its state: {err}");
             return Some(1);
@@ -321,6 +333,7 @@ fn agent_door() -> Option<i32> {
     };
     Some(match first {
         "mcp" => devpit_agentapi::mcp::serve(&root),
+        "hook" => devpit_agentapi::hook::run(&root, &args[1..]),
         _ => devpit_agentapi::cli::run(&root, &args[1..]),
     })
 }

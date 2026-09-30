@@ -111,11 +111,19 @@ pub fn kind_of(shell: &str) -> Kind {
 }
 
 /// The shell to start: what the person has chosen, or a sane one.
+#[cfg(not(windows))]
 pub fn preferred(env_shell: Option<&str>) -> String {
     match env_shell {
         Some(shell) if !shell.trim().is_empty() => shell.to_owned(),
         _ => "/bin/bash".to_owned(),
     }
+}
+
+/// PowerShell. `SHELL` on Windows, when set at all, is Git Bash's: an MSYS
+/// path no native program can start.
+#[cfg(windows)]
+pub fn preferred(_env_shell: Option<&str>) -> String {
+    crate::pwsh::preferred()
 }
 
 /// How to launch a shell with the startup file in place.
@@ -140,6 +148,10 @@ pub fn launch(shell: &str, root: &Path, features: &[Feature], env_zdotdir: Optio
     };
     if features.is_empty() {
         return plain;
+    }
+    #[cfg(windows)]
+    if let Some(launch) = crate::pwsh::launch(shell, features) {
+        return launch;
     }
 
     match kind_of(shell) {
