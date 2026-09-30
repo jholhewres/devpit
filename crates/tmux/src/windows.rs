@@ -37,11 +37,17 @@ impl Server {
             .map(|part| (*part).to_owned())
             .collect();
         argv.extend(self.shell_args(window));
-        if let Some(pipe) = pipe {
-            let target = format!("{session}:{window}");
+        let target = format!("{session}:{window}");
+        let chained = crate::naming::GROUPED;
+        if let (Some(pipe), true) = (pipe, chained) {
             argv.extend([";", "pipe-pane", "-t", &target, pipe].map(str::to_owned));
         }
         self.require(&argv.iter().map(String::as_str).collect::<Vec<_>>())?;
+        // psmux takes one command per invocation; its shell is slow enough to
+        // start that the pipe, armed right after, still hears the first prompt.
+        if let (Some(pipe), false) = (pipe, chained) {
+            self.require(&["pipe-pane", "-t", &target, pipe])?;
+        }
         self.ensure_client_session(session, window)?;
         Ok(())
     }
