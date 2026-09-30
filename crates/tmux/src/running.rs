@@ -18,7 +18,7 @@ pub(crate) fn require(server: &Server, args: &[&str]) -> Result<std::process::Ou
 }
 
 pub(crate) fn run(server: &Server, args: &[&str]) -> Result<std::process::Output, TmuxError> {
-    let mut command = devpit_pty::host_env::command("tmux");
+    let mut command = devpit_pty::host_env::command(crate::naming::program());
     command.arg("-S").arg(&server.socket).args(args);
     #[cfg(windows)]
     {

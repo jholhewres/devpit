@@ -169,7 +169,14 @@ pub fn spawn(command: CommandBuilder, size: PtySize) -> Result<Session, PtyError
         .openpty(size)
         .map_err(|e| PtyError::Open(e.to_string()))?;
 
-    let label = format!("{command:?}");
+    // Its argv, and not the builder's Debug: that carries every environment
+    // variable, and an error is drawn on screen.
+    let label = command
+        .get_argv()
+        .iter()
+        .map(|arg| arg.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ");
     let child = pty
         .slave
         .spawn_command(command)

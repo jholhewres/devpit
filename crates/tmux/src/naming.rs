@@ -45,11 +45,31 @@ pub(crate) fn client_session(session: &str, window: &str) -> String {
 /// them.
 pub(crate) fn attach_argv(socket: &std::path::Path, session: &str, window: &str) -> Vec<String> {
     vec![
-        "tmux".to_owned(),
+        program(),
         "-S".to_owned(),
         socket.display().to_string(),
         "attach-session".to_owned(),
         "-t".to_owned(),
         target(session, window),
     ]
+}
+
+/// The tmux to run, as a path where the name alone is not enough.
+///
+/// On Windows a pty is started with the environment Windows keeps for the
+/// user, not this process's: the psmux devpit puts first on its own `PATH`
+/// is not on that one. So it is found here, on this process's `PATH`, and
+/// named whole.
+pub fn program() -> String {
+    #[cfg(windows)]
+    {
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        if let Some(found) = std::env::split_paths(&path)
+            .map(|dir| dir.join("tmux.exe"))
+            .find(|candidate| candidate.is_file())
+        {
+            return found.display().to_string();
+        }
+    }
+    "tmux".to_owned()
 }
