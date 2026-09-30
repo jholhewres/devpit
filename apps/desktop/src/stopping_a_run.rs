@@ -77,7 +77,7 @@ fn signal(target: i32, signal: i32) -> bool {
 
 #[cfg(not(unix))]
 fn signal(target: i32, _signal: i32) -> bool {
-    std::process::Command::new("taskkill")
+    devpit_pty::host_env::command("taskkill")
         .args(["/PID", &target.abs().to_string(), "/T"])
         .output()
         .map(|out| out.status.success())

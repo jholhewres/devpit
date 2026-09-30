@@ -48,7 +48,9 @@ pub fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
 pub fn in_a_session_of_its_own(command: &mut Command) -> &mut Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    command.creation_flags(CREATE_NEW_PROCESS_GROUP)
+    // Both: flags are set, not added, and this would drop the one that keeps
+    // a console window from opening.
+    command.creation_flags(CREATE_NEW_PROCESS_GROUP | devpit_pty::host_env::NO_WINDOW)
 }
 
 /// Ends the run and everything under it, and does not return until the group

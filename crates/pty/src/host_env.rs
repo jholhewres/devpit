@@ -42,12 +42,24 @@ pub fn changes() -> &'static [Change] {
 pub fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut command = Command::new(program);
     scrub(&mut command);
+    // A console program started by a windowed one gets a console window of
+    // its own: git, the agent CLI, tasklist — each flashed on screen at
+    // every poll. None of what devpit runs this way is read in a window.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(NO_WINDOW);
+    }
     // Found where the person's own shell finds it — see `login_path`.
     if let Some(path) = crate::login_path::login_path() {
         command.env("PATH", path);
     }
     command
 }
+
+/// `CREATE_NO_WINDOW`, for a child that must not open a console window.
+#[cfg(windows)]
+pub const NO_WINDOW: u32 = 0x0800_0000;
 
 /// Applies [`changes`] to a command about to be spawned.
 pub fn scrub(command: &mut Command) -> &mut Command {

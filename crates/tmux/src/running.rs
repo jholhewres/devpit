@@ -25,7 +25,7 @@ pub(crate) fn run(server: &Server, args: &[&str]) -> Result<std::process::Output
         use std::os::windows::process::CommandExt;
         // A console program started from a windowed app is given a console
         // window of its own, flashed on screen at every call. CREATE_NO_WINDOW.
-        command.creation_flags(0x0800_0000);
+        command.creation_flags(devpit_pty::host_env::NO_WINDOW);
     }
     command.output().map_err(|err| match err.kind() {
         std::io::ErrorKind::NotFound => TmuxError::Missing,
