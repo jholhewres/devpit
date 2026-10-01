@@ -216,7 +216,12 @@ pub async fn orchestrator_reply(
 /// The devpit terminal a session of this account runs in, by its name: the
 /// only place the window types or presses anything for the person.
 pub(crate) fn terminal_of(profile_id: &str, name: &str) -> Result<String, RpcError> {
-    let client = client_named(profile_id, name)?;
+    let client = match client_named(profile_id, name) {
+        Ok(client) => client,
+        // One started here that the CLI does not list yet: its terminal is
+        // the one devpit typed it into.
+        Err(err) => return crate::starting::target_of(profile_id, name).ok_or(err),
+    };
     pane_target(&client).ok_or_else(|| {
         RpcError::new(
             ErrorCode::Invalid,
@@ -349,6 +354,10 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
         &worktrees,
         screen,
     );
+    // Started here and stopped before the CLI lists it — on the folder's
+    // trust question, most often.
+    let early = crate::starting::unlisted(profile_id, &sessions, screen);
+    sessions.extend(early);
     for one in &mut sessions {
         one.draft = crate::reply_drafts::drafted(profile_id, &one.name);
     }

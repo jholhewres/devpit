@@ -105,7 +105,8 @@ them.
     checkout (or the project's folder). Without one, it opens in a new tab in
     the project's folder — no card, no worktree needed. It answers with the
     name to message it by. If Claude Code asks to trust the folder, that
-    question is on the person's screen: say so, and let them answer it.
+    question shows in "Waiting on you" beside this chat before the session is
+    up: say so, and let the person answer it.
   - `devpit_board`, `devpit_card`, `devpit_comment`, `devpit_create_card`,
     `devpit_update_card`, `devpit_move_card` — pass `project` to work on
     another project's board.

@@ -61,6 +61,22 @@ pub(crate) fn hand(
     let line = crate::opening::launched(profile_id, &name, prompt).map_err(|err| err.message)?;
     let pane_id = crate::opening::typed_in(app, &board.project_id, &tab_id, &cwd, &line)
         .map_err(|err| err.message)?;
+    // Looked for from now: before the CLI lists it, it may already be stopped
+    // on a question only the person can answer.
+    crate::starting::began(crate::starting::Starting {
+        profile: profile_id.to_owned(),
+        name: name.clone(),
+        project_id: board.project_id.clone(),
+        project_name: crate::projects::project_list_now().ok().and_then(|list| {
+            list.projects
+                .into_iter()
+                .find(|one| one.id == board.project_id)
+                .map(|one| one.name)
+        }),
+        cwd: cwd.display().to_string(),
+        pane_id: pane_id.clone(),
+        at: std::time::Instant::now(),
+    });
     let _ = tauri::Emitter::emit(
         app,
         crate::opening::TAB_OPENED,
