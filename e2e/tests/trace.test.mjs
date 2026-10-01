@@ -91,7 +91,7 @@ test('every hook that reached a card reached the window within two seconds', () 
 export function lostInRun(run) {
   const settled = new Set()
   for (const line of run) {
-    const ended = /^post seq=(\d+) (?:refused|bad request|emitted|unchanged|ignored|no card|no state|no store)$/.exec(line.what)
+    const ended = /^post seq=(\d+) (?:refused|bad request|agent|permission|emitted|unchanged|ignored|no card|no state|no store)$/.exec(line.what)
     if (ended) settled.add(ended[1])
   }
   const closing = run[run.length - 1].at - CLOSING_MOMENT
@@ -112,7 +112,7 @@ test('every hook let in was settled, and none was lost on the way to its card', 
     const settled = new Map()
     const emitted = new Set()
     for (const line of run) {
-      const ended = /^post seq=(\d+) (refused|bad request|emitted|unchanged|ignored|no card|no state|no store)$/.exec(line.what)
+      const ended = /^post seq=(\d+) (refused|bad request|agent|permission|emitted|unchanged|ignored|no card|no state|no store)$/.exec(line.what)
       if (ended) settled.set(ended[1], ended[2])
       const emit = /^emit card:happening seq=(\d+)$/.exec(line.what)
       if (emit) emitted.add(emit[1])
