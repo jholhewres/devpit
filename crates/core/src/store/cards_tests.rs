@@ -539,3 +539,17 @@ fn a_long_focus_reads_every_held_notice_across_pages() {
     unique.dedup();
     assert_eq!(unique.len(), 150);
 }
+
+/// A checkout removed keeps where its work began: its branch is still there,
+/// and the next checkout on it diffs against the same point.
+#[test]
+fn forgetting_a_checkout_keeps_where_the_work_began() {
+    let (_dir, store, card) = seeded();
+    store
+        .set_card_front(&card, Some("/w/wt"), Some("abc123"))
+        .expect("front");
+    store.forget_card_checkout(&card).expect("forget");
+    let row = store.card(&card).expect("read").expect("card");
+    assert_eq!(row.worktree_path, None);
+    assert_eq!(row.base_ref.as_deref(), Some("abc123"));
+}

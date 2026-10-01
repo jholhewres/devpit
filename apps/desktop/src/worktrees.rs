@@ -147,7 +147,7 @@ pub(crate) fn worktree_remove_now(
 
     // The card keeps its base_ref: the branch still exists, and forgetting
     // where it started would make the next diff meaningless.
-    let _ = store.set_card_front(&card_id, None, None);
+    let _ = store.forget_card_checkout(&card_id);
 
     Ok(Removed {
         uncommitted_files: loss.files as u32,

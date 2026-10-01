@@ -72,6 +72,17 @@ fn now() -> i64 {
 }
 
 impl Store {
+    /// The checkout is gone and its branch stays: where the work began is
+    /// kept, so a checkout made again on that branch diffs against the same
+    /// point.
+    pub fn forget_card_checkout(&self, card_id: &str) -> Result<(), StoreError> {
+        self.conn.execute(
+            "UPDATE card SET worktree_path = NULL, updated_at = ?2 WHERE id = ?1",
+            rusqlite::params![card_id, now()],
+        )?;
+        Ok(())
+    }
+
     /// When this card is due, or `None` to clear it.
     pub fn set_card_due(&self, card_id: &str, due_at: Option<i64>) -> Result<bool, StoreError> {
         let changed = self.conn.execute(

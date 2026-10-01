@@ -146,3 +146,29 @@ fn disk_usage_counts_what_is_in_the_folder() {
     std::fs::write(dir.path().join("deep/b"), "123").expect("write");
     assert_eq!(disk_usage(dir.path()), 8);
 }
+
+/// Removing a worktree keeps its branch, so the next checkout of the same
+/// card has to find that branch rather than fail making it again.
+#[test]
+fn a_card_checked_out_again_goes_back_on_its_own_branch() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join("main");
+    std::fs::create_dir_all(&root).expect("mkdir");
+    repo(&root);
+    let at = dir.path().join("wt");
+    let branch = branch_for("Fix it", "card_01HZXY9K");
+    let first = create(&root, &at, &branch, "HEAD").expect("create");
+    remove(&root, &at, false).expect("remove");
+
+    let left = branch_left(&root, "card_01HZXY9K").expect("the branch is still there");
+    assert_eq!(left, branch);
+    assert_eq!(branch_left(&root, "card_99999999"), None);
+
+    let again = reattach(&root, &at, &left, Some(&first.base_ref)).expect("reattach");
+    assert_eq!(again.branch, branch);
+    assert_eq!(
+        again.base_ref, first.base_ref,
+        "the diff keeps its starting point"
+    );
+    assert!(at.join("a.txt").exists());
+}

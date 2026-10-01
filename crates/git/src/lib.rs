@@ -56,7 +56,8 @@ pub use front::{at_head, changed_since, diff_since, head_of, remove_front, unsav
 pub use glance::{glance, Glance};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
-    assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,
+    assignable, branch_for, branch_left, create, disk_usage, reattach, remove, uncommitted,
+    worktree_home, Loss, Made,
 };
 pub use log::{history, show};
 pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};

@@ -110,7 +110,13 @@ pub fn checkout_of(
     let at = devpit_git::worktree_at(&base, &home, &main, &project_id, card_id);
     let branch = devpit_git::branch_for(&card.title, card_id);
 
-    let made = devpit_git::create(&main, &at, &branch, "HEAD").map_err(|err| err.to_string())?;
+    // A worktree removed before left its branch: back onto it, from where it
+    // began, rather than failing to make the branch a second time.
+    let made = match devpit_git::branch_left(&main, card_id) {
+        Some(left) => devpit_git::reattach(&main, &at, &left, card.base_ref.as_deref()),
+        None => devpit_git::create(&main, &at, &branch, "HEAD"),
+    }
+    .map_err(|err| err.to_string())?;
     store
         .set_card_front(card_id, made.path.to_str(), Some(made.base_ref.as_str()))
         .map_err(|err| err.to_string())?;
