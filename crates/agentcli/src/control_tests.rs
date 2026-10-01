@@ -51,3 +51,14 @@ fn a_control_with_no_turn_behind_it_refuses_quietly() {
     let control = Control::new();
     assert!(!control.stop_task("a"));
 }
+
+/// The resident is listening again at its `result`; only a process that ends
+/// with the turn has to wait out its background tasks.
+#[test]
+fn a_staying_turn_is_over_at_its_result_even_with_a_task_running() {
+    let mut running = Running::default();
+    running.saw(&task("a", "started"));
+    assert!(turn_over(true, true, &running));
+    assert!(!turn_over(false, true, &running));
+    assert!(!turn_over(true, false, &running));
+}

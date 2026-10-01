@@ -6,7 +6,7 @@
 
 use devpit_rpc::{Part, SessionInit};
 
-use crate::control::{may_close, Control, Running};
+use crate::control::{turn_over, Control, Running};
 use crate::driver::{Driver, Read};
 
 /// What a turn's stream said, apart from its parts.
@@ -99,7 +99,7 @@ fn one_turn(
             Read::Init(said) => heard.init = Some(said),
             Read::Nothing => {}
         }
-        if may_close(result_seen, &running) {
+        if turn_over(stays, result_seen, &running) {
             if stays {
                 return (heard, true);
             }

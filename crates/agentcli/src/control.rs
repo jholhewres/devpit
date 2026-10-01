@@ -117,6 +117,17 @@ pub fn may_close(result_seen: bool, running: &Running) -> bool {
     result_seen && running.idle()
 }
 
+/// Whether a turn is over for whoever is waiting on it.
+///
+/// A process that ends with the turn holds it until its background tasks are
+/// done: closing stdin earlier could cut them off. One that stays has no such
+/// reason — the agent is idle at its `result`, and what a task says later
+/// comes back as a turn of its own. Held for those tasks, a message queued
+/// behind the turn waited minutes for an agent that was already listening.
+pub fn turn_over(stays: bool, result_seen: bool, running: &Running) -> bool {
+    result_seen && (stays || running.idle())
+}
+
 #[cfg(test)]
 #[path = "control_tests.rs"]
 mod tests;

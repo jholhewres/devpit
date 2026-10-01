@@ -24,3 +24,29 @@ fn a_session_is_told_as_soon_as_the_stream_names_it() {
     assert_eq!(*told.lock().unwrap(), ["s1", "s2"]);
     assert_eq!(heard.session_id.as_deref(), Some("s2"));
 }
+
+/// A message queued behind a turn goes in as soon as the agent is listening,
+/// not once the background tasks it started have finished.
+#[test]
+fn a_resident_turn_returns_at_its_result_while_a_task_still_runs() {
+    let driver = crate::driver::driver("claude").expect("claude");
+    let lines = [
+        r#"{"type":"system","subtype":"task_started","task_id":"t1","description":"watch"}"#,
+        r#"{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01}"#,
+        r#"{"type":"system","subtype":"task_notification","task_id":"t1","status":"completed"}"#,
+    ];
+    let mut read = 0;
+    let (heard, open) = next_turn(
+        driver.as_ref(),
+        lines
+            .iter()
+            .map(|line| line.to_string())
+            .inspect(|_| read += 1),
+        &Control::default(),
+        None,
+        |_| {},
+    );
+    assert!(open);
+    assert!(heard.ended.is_some());
+    assert_eq!(read, 2, "the task's later line is the next turn's to read");
+}
