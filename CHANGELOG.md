@@ -3,6 +3,56 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.31 — 2026-10-01
+
+### Reminders
+
+- **Ask to be reminded, and be told at that time.** A card's date can carry
+  a time now; a day alone reminds that morning at nine. When it comes, a
+  banner under the top bar says so — it has no close, only *Later* (15
+  minutes, an hour, tomorrow morning) and *Done* — with a system
+  notification when devpit is behind, and a line in the bell. A focus does
+  not hold it back: the time was your own choice.
+- **The orchestrator, or any session, can set one** when you ask —
+  *"remind me tomorrow at three to review the PR"* — on a card with that
+  date and time. devpit sets it off, not the agent, and a reminder only
+  tells: it never starts anything.
+- One thread waits for the next date and wakes only when a date changes.
+  Switch it off in Settings → General → Reminders.
+
+### Orchestrator
+
+- **It drafts what you would say to a session, and you send it as yours.**
+  A "go on" or a change of plan said in its chat waits, editable, above the
+  composer and in the Sessions panel; *Send as you* types it into that
+  session's terminal as your own words. Nothing is sent without your click.
+- **A session it starts in a new folder shows the trust question** in
+  *Waiting on you* before the session is even up, and is answered there.
+- **Remote Control from the Sessions panel**, for a session in one of
+  devpit's terminals.
+- **What a session is on** — *Edit invoice.ts*, *Run npm test* — shows in
+  the Sessions panel and on a card's sessions, not only on the island.
+- **Every orchestrator reads the brief of the build that runs it**, however
+  it is opened, and the brief says which build wrote it.
+
+### Updates
+
+- **The Mac updates itself.** The app in Applications was taken for a build
+  nobody installs over, and was never offered an install.
+- **Update in Settings shows the update it starts**: it follows the download
+  and brings the update card forward, where it used to say "Working…" and
+  then nothing.
+- **Which devpit this is**, at the left of the status strip — with a dot when
+  a newer one is on its way. A click copies it for a bug report.
+
+### Fixes
+
+- The island shows what is open in devpit: closing a tab takes its session
+  off at once, a session idle in an open tab stays, and a terminal shows one
+  session rather than every one it ever ran.
+- A picture between 2 and 8 MB — a full-screen screenshot — opens in its tab
+  rather than being refused as a file too long to read.
+
 ## 0.1.30 — 2026-10-01
 
 ### The island
