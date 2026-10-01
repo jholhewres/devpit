@@ -101,35 +101,28 @@ pub(crate) fn contents(root: &Path, path: String) -> Result<FileContents, RpcErr
     let head = &raw[..raw.len().min(512)];
     let kind = kind_of(&path, head);
 
-    let mut not_shown = past_the_ceiling(&path, bytes);
     let mut text = None;
     let mut data_url = None;
 
-    match kind {
-        FileKind::Image | FileKind::Pdf if not_shown.is_none() => {
-            not_shown = too_big_to_draw(&path, bytes);
-            if not_shown.is_none() {
-                data_url = Some(format!(
-                    "data:{};base64,{}",
-                    media_type(&path, kind, head),
-                    BASE64.encode(&raw)
-                ));
-            }
-        }
+    let not_shown = match kind {
+        // Its own ceiling, not the text one: a screenshot is past 2 MB more
+        // often than not, and was refused as text before this was asked.
+        FileKind::Image | FileKind::Pdf => too_big_to_draw(&path, bytes).or_else(|| {
+            let media = media_type(&path, kind, head);
+            data_url = Some(format!("data:{media};base64,{}", BASE64.encode(&raw)));
+            None
+        }),
         FileKind::Binary => {
-            not_shown = not_shown.or_else(|| Some(format!("{path} is not text")));
+            past_the_ceiling(&path, bytes).or_else(|| Some(format!("{path} is not text")))
         }
-        _ if not_shown.is_none() => {
-            // Refused rather than rendered: a megabyte of bytes drawn as
-            // replacement characters is worse than a sentence saying it is not
-            // text, and saving it back would corrupt the file.
+        // Refused rather than rendered: a megabyte of bytes drawn as
+        // replacement characters is worse than a sentence saying it is not
+        // text, and saving it back would corrupt the file.
+        _ => past_the_ceiling(&path, bytes).or_else(|| {
             text = String::from_utf8(raw).ok();
-            if text.is_none() {
-                not_shown = Some(format!("{path} is not text"));
-            }
-        }
-        _ => {}
-    }
+            text.is_none().then(|| format!("{path} is not text"))
+        }),
+    };
 
     Ok(FileContents {
         full_path: resolved.display().to_string(),

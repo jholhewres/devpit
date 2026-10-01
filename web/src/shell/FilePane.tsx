@@ -5,6 +5,7 @@ import { Code } from './Code'
 import { ofPath } from './languages'
 import { ask, commands } from './live'
 import { Markdown } from './MarkdownView'
+import { Picture } from './Picture'
 import type { Tab } from './strip'
 import { useFile } from './useFile'
 import { useShell } from './useShell'
@@ -111,10 +112,7 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
         )}
 
         {kind === 'image' && edit.file?.dataUrl && (
-          <div className="media">
-            <img className="media__img" src={edit.file.dataUrl} alt={name} />
-            <div className="media__what">{bytes(edit.file.bytes)}</div>
-          </div>
+          <Picture key={`${path}:${edit.file.readAt}`} src={edit.file.dataUrl} name={name} size={edit.file.bytes} />
         )}
 
         {kind === 'pdf' && edit.file?.dataUrl && (

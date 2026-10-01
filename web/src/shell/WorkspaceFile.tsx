@@ -5,6 +5,7 @@ import { Code } from './Code'
 import { ofPath } from './languages'
 import { ask, commands } from './live'
 import { Markdown } from './MarkdownView'
+import { Picture } from './Picture'
 import { useWorkspaceFile } from './useWorkspace'
 
 /*
@@ -69,10 +70,7 @@ export function WorkspaceFile({
         )}
 
         {kind === 'image' && file?.dataUrl && (
-          <div className="media">
-            <img className="media__img" src={file.dataUrl} alt={name} />
-            <div className="media__what">{bytes(file.bytes)}</div>
-          </div>
+          <Picture key={`${path}:${file.readAt}`} src={file.dataUrl} name={name} size={file.bytes} />
         )}
 
         {kind === 'pdf' && file?.dataUrl && (

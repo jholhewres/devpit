@@ -124,3 +124,74 @@ fn a_file_that_grew_past_the_ceiling_is_refused() {
     assert!(raw.is_empty());
     assert!(past_the_ceiling("grew.log", bytes).is_some());
 }
+
+/// A picture between the text ceiling and its own is drawn: a full-screen
+/// screenshot is past 2 MB, and was being refused as text that was too long.
+#[test]
+fn a_picture_past_the_text_ceiling_is_still_drawn() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+    png.resize(3 * 1024 * 1024, 7);
+    std::fs::write(dir.path().join("shot.png"), &png).expect("write");
+
+    let read = contents(dir.path(), "shot.png".to_owned()).expect("read");
+    assert_eq!(read.kind, FileKind::Image);
+    assert_eq!(read.not_shown, None);
+    let url = read.data_url.expect("a picture to draw");
+    assert!(url.starts_with("data:image/png;base64,"), "{}", &url[..40]);
+}
+
+/// Past its own ceiling a picture says so, rather than leaving the tab blank.
+#[test]
+fn a_picture_past_its_own_ceiling_says_why() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+    png.resize(9 * 1024 * 1024, 7);
+    std::fs::write(dir.path().join("huge.png"), &png).expect("write");
+
+    let read = contents(dir.path(), "huge.png".to_owned()).expect("read");
+    assert_eq!(read.kind, FileKind::Image);
+    assert!(read.data_url.is_none());
+    let why = read.not_shown.expect("a reason");
+    assert!(why.contains("this draws"), "{why}");
+}
+
+/// Every format the pane draws comes back as a picture with its own type.
+#[test]
+fn each_picture_format_comes_back_drawable() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut webp = b"RIFF\0\0\0\0WEBPVP8 ".to_vec();
+    webp.extend_from_slice(&[0; 8]);
+    let cases: [(&str, Vec<u8>, &str); 5] = [
+        ("a.png", b"\x89PNG\r\n\x1a\n....".to_vec(), "image/png"),
+        ("a.jpg", b"\xff\xd8\xff\xe0....".to_vec(), "image/jpeg"),
+        ("a.gif", b"GIF89a....".to_vec(), "image/gif"),
+        ("a.webp", webp, "image/webp"),
+        (
+            "a.svg",
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>".to_vec(),
+            "image/svg+xml",
+        ),
+    ];
+    for (name, bytes, media) in cases {
+        std::fs::write(dir.path().join(name), &bytes).expect("write");
+        let read = contents(dir.path(), name.to_owned()).expect("read");
+        assert_eq!(read.kind, FileKind::Image, "{name}");
+        let url = read.data_url.unwrap_or_default();
+        assert!(
+            url.starts_with(&format!("data:{media};base64,")),
+            "{name}: {url}"
+        );
+    }
+}
+
+/// Text keeps its own ceiling: the picture's does not stretch to it.
+#[test]
+fn text_past_its_ceiling_is_still_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("big.log"), vec![b'a'; 3 * 1024 * 1024]).expect("write");
+
+    let read = contents(dir.path(), "big.log".to_owned()).expect("read");
+    assert!(read.text.is_none());
+    assert!(read.not_shown.expect("a reason").contains("this opens"));
+}
