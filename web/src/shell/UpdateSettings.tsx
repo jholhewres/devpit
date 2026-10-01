@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { UpdateStatus } from '../gen/bindings'
 import { ask, commands } from './live'
+import { SHOW_THE_UPDATE } from './UpdateCard'
+import { useShell } from './useShell'
+import { onCarried } from './window'
 
 /*
  * Whether there is a newer devpit, and which one this is.
@@ -12,6 +15,12 @@ import { ask, commands } from './live'
  * The version is asked of the app rather than read from a bundled constant:
  * the app is what the updater compares against, so the number on screen has to
  * be the number it uses.
+ *
+ * It follows the same status the card does. It used to know only what its own
+ * button had answered, so an update the hourly check had found read "devpit
+ * checks for a newer version", and a download it started showed "Working…"
+ * for minutes and then nothing — while the card that was drawing the progress
+ * sat under this screen, out of sight.
  */
 
 function said(status: UpdateStatus | null): string {
@@ -22,7 +31,17 @@ function said(status: UpdateStatus | null): string {
     case 'checking':
       return 'Checking…'
     case 'available':
-      return `devpit ${status.version} is out. Update starts the download; the card takes it from there.`
+      return `devpit ${status.version} is out. Update downloads it, and the update card takes it from there.`
+    case 'downloading':
+      return `Downloading the update · ${status.percent}%`
+    case 'ready':
+      return `devpit ${status.version} is downloaded and installs when devpit restarts.`
+    case 'waiting':
+      return 'The update installs once the work in flight is done.'
+    case 'installing':
+      return 'Installing…'
+    case 'manualInstall':
+      return 'The package is downloaded. The update card has the command that installs it.'
     case 'externallyManaged':
       return 'This copy is looked after by your system, so update it there.'
     case 'failed':
@@ -38,13 +57,33 @@ function fromATestFeed(status: UpdateStatus | null): boolean {
   return status?.type === 'available' && status.testFeed
 }
 
+/* Past the offer, the card is where an update is carried on — restart, the
+   work in flight, the package command — so the button here takes you to it. */
+const ON_THE_CARD = new Set<UpdateStatus['type']>(['downloading', 'ready', 'waiting', 'manualInstall'])
+
 export function UpdateSettings(): React.JSX.Element {
+  const { closePrefs } = useShell()
   const [status, setStatus] = useState<UpdateStatus | null>(null)
   const [version, setVersion] = useState('')
   const [asking, setAsking] = useState(false)
 
   useEffect(() => {
     void ask(() => commands.appInfo()).then((answer) => setVersion(answer.data?.version ?? ''))
+  }, [])
+
+  /* What the app holds now, and every move after. An event heard before the
+     first answer is newer, and wins. */
+  useEffect(() => {
+    let heard = false
+    const stop = onCarried<UpdateStatus>('update:status', (now) => {
+      heard = true
+      setStatus(now)
+    })
+    void commands
+      .updateStatus()
+      .then((now) => !heard && now.type !== 'idle' && setStatus(now))
+      .catch(() => undefined)
+    return stop
   }, [])
 
   const answered = (answer: { data: UpdateStatus | null; error: string | null }): void => {
@@ -63,16 +102,37 @@ export function UpdateSettings(): React.JSX.Element {
     void ask(() => commands.updateCheck()).then(answered)
   }
 
+  const toTheCard = (): void => {
+    window.dispatchEvent(new Event(SHOW_THE_UPDATE))
+    closePrefs()
+  }
+
   /* The download is where the card comes in: it is the one place that draws
-     progress, asks about work in flight, and installs. Settings starting it
-     is the row saying how, rather than announcing a version and stopping. */
+     progress, asks about work in flight, and installs. So once the download
+     has started, this steps out of the way; a refusal before it starts stays
+     here, where it was asked. */
+  const handing = useRef(false)
+  useEffect(() => {
+    if (!handing.current || status?.type !== 'downloading') return
+    handing.current = false
+    window.dispatchEvent(new Event(SHOW_THE_UPDATE))
+    closePrefs()
+  }, [status, closePrefs])
+
   const update = (): void => {
+    handing.current = true
     setAsking(true)
-    void ask(() => commands.updateDownload()).then(answered)
+    void ask(() => commands.updateDownload()).then((answer) => {
+      handing.current = false
+      setAsking(false)
+      if (answer.error) answered(answer)
+    })
   }
 
   /* Nothing to offer on a test feed: what it names cannot be installed. */
   const offered = status?.type === 'available' && !fromATestFeed(status)
+  const onTheCard = status !== null && ON_THE_CARD.has(status.type)
+  const busy = asking || status?.type === 'checking' || status?.type === 'installing'
 
   return (
     <div className="prefs__hrow">
@@ -83,8 +143,8 @@ export function UpdateSettings(): React.JSX.Element {
         </span>
         <span className="pref__d">{said(status)}</span>
       </div>
-      <button className="btn" disabled={asking} onClick={offered ? update : check}>
-        {asking ? 'Working…' : offered ? 'Update' : 'Check now'}
+      <button className="btn" disabled={busy} onClick={onTheCard ? toTheCard : offered ? update : check}>
+        {busy ? 'Working…' : onTheCard ? 'Show the update' : offered ? 'Update' : 'Check now'}
       </button>
     </div>
   )

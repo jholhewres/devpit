@@ -42,6 +42,10 @@ export function waitingFor(since: number | null, now: number): string {
  * nothing while it waits: no event arrives between the choice and the work
  * ending, so without a tick of its own the card said "for less than a minute"
  * for as long as it was open. */
+/** Asked for by Settings, which sits over the card: whatever was closed on
+ *  the card is shown again, because the person went looking for it. */
+export const SHOW_THE_UPDATE = 'devpit:show-the-update'
+
 export const counting = (status: UpdateStatus | null): boolean => status?.type === 'waiting'
 
 /** How often that clock moves. Minutes are what the card says, so a finer tick
@@ -160,6 +164,12 @@ export function UpdateCard(): React.JSX.Element | null {
     const asked = commands.updateStatus()
     void asked.then((now) => !heard && now.type !== 'idle' && hear(now)).catch(() => undefined)
     return stop
+  }, [])
+
+  useEffect(() => {
+    const show = (): void => setLater(false)
+    window.addEventListener(SHOW_THE_UPDATE, show)
+    return () => window.removeEventListener(SHOW_THE_UPDATE, show)
   }, [])
 
   useEffect(() => {
