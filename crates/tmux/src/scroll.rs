@@ -132,6 +132,16 @@ impl Server {
     /// as blocks only once it has been heard at a prompt. Anything else in
     /// front is left alone: an Enter there would be a keystroke nobody typed.
     pub fn nudge(&self, target: &str) -> Result<bool, TmuxError> {
+        if !self.shell_in_front(target)? {
+            return Ok(false);
+        }
+        self.require(&["send-keys", "-t", target, "Enter"])?;
+        Ok(true)
+    }
+
+    /// Whether a pane's shell is what is in front, rather than a program it
+    /// runs: text typed for an agent into a shell is a command nobody meant.
+    pub fn shell_in_front(&self, target: &str) -> Result<bool, TmuxError> {
         let front = self.require(&[
             "display-message",
             "-p",
@@ -143,11 +153,7 @@ impl Server {
             .trim()
             .trim_start_matches('-')
             .to_owned();
-        if !SHELLS.contains(&front.as_str()) && !powershell(&front) {
-            return Ok(false);
-        }
-        self.require(&["send-keys", "-t", target, "Enter"])?;
-        Ok(true)
+        Ok(SHELLS.contains(&front.as_str()) || powershell(&front))
     }
 
     /// Hands `text` to whatever runs in a pane as one bracketed paste, then

@@ -73,8 +73,10 @@ them.
 
 - **devpit** (MCP):
   - `devpit_projects` — every project, its group and its board at a glance.
-  - `devpit_sessions` — the sessions of this account running now: name,
-    status, project and card, and the question one is stopped on.
+  - `devpit_sessions` — the sessions of this account running now in the
+    projects linked to you: name, status, project and card, and the question
+    one is stopped on. A session in a project not linked is not yours to see,
+    read or stop.
   - `devpit_session_screen` — the last lines a session in one of devpit's
     terminals shows, and the choices of the question it waits on.
   - `devpit_stop_session` — stop a session of this account and close the

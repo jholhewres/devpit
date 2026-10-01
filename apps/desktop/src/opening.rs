@@ -27,23 +27,26 @@ pub(crate) fn open(
             format!("a session is started with between 1 and {LONGEST} characters of brief"),
         ));
     }
-    let name = named
-        .map(str::trim)
-        .filter(|one| !one.is_empty())
-        .map(str::to_owned)
-        .unwrap_or_else(|| {
-            let short: String = ulid::Ulid::generate()
-                .to_string()
-                .chars()
-                .rev()
-                .take(4)
-                .collect();
-            format!(
-                "{}-{}",
-                crate::chat_remote::remote_name(&project.name).trim_start_matches("devpit-"),
-                short.to_lowercase()
-            )
-        });
+    let name = crate::handing::unused(
+        named
+            .map(str::trim)
+            .filter(|one| !one.is_empty())
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                let short: String = ulid::Ulid::generate()
+                    .to_string()
+                    .chars()
+                    .rev()
+                    .take(4)
+                    .collect();
+                format!(
+                    "{}-{}",
+                    crate::chat_remote::remote_name(&project.name).trim_start_matches("devpit-"),
+                    short.to_lowercase()
+                )
+            }),
+        &crate::handing::live_names(profile_id),
+    );
     let tab_id = fresh_tab();
     let pane_id = typed_in(
         app,
@@ -69,8 +72,31 @@ pub(crate) fn fresh_tab() -> String {
     format!("tab_{}", ulid::Ulid::generate().to_string().to_lowercase())
 }
 
+/// Whether text can be typed at a shell inside quotes and stay text.
+///
+/// A control character is a key: Ctrl-C or Ctrl-U in a brief would end the
+/// quoted argument at the terminal and run what follows it as a command.
+/// Lines and tabs stay inside the quotes, so they are kept.
+pub(crate) fn typeable(text: &str) -> Result<(), RpcError> {
+    match text
+        .chars()
+        .find(|ch| ch.is_control() && *ch != '\n' && *ch != '\t')
+    {
+        Some(ch) => Err(RpcError::new(
+            ErrorCode::Invalid,
+            format!(
+                "a brief cannot hold control characters (found U+{:04X})",
+                u32::from(ch)
+            ),
+        )),
+        None => Ok(()),
+    }
+}
+
 /// The account's Claude Code, named and briefed, as one line to type.
 pub(crate) fn launched(profile_id: &str, name: &str, prompt: &str) -> Result<String, RpcError> {
+    typeable(name)?;
+    typeable(prompt)?;
     Ok(format!(
         "{} --name {} {}",
         crate::shell_launch::to_start(profile_id)?,
@@ -135,4 +161,18 @@ pub async fn session_watch(
         Ok(pane_id)
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::typeable;
+
+    /// Ctrl-C and Ctrl-U are keys at a terminal: inside a typed brief they end
+    /// the quoted argument and run the rest as a command.
+    #[test]
+    fn a_brief_with_a_control_character_is_refused() {
+        assert!(typeable("fix it\x03; rm -rf ~").is_err());
+        assert!(typeable("line one\x15rm -rf ~").is_err());
+        assert!(typeable("two lines\nand a\ttab").is_ok());
+    }
 }

@@ -10,6 +10,19 @@ use serde_json::{json, Value};
 /// How long a question may take. Short, because an agent is waiting on the
 /// answer; a devpit that has gone away should cost it a moment, not a hang.
 const WAIT: Duration = Duration::from_secs(5);
+/// Starting a session waits for its terminal to settle and may make the
+/// card's checkout first. Given up on at five seconds, it was told "devpit is
+/// not open" while the session started anyway — and asked again.
+const STARTING: Duration = Duration::from_secs(90);
+
+/// How long devpit has to answer one question.
+pub(crate) fn wait_for(method: &str) -> Duration {
+    if method == "start" {
+        STARTING
+    } else {
+        WAIT
+    }
+}
 
 /// Asks the devpit keeping its state in `root`, from `cwd`, and answers with
 /// what it said or why it could not.
@@ -20,14 +33,22 @@ pub fn ask(root: &Path, method: &str, params: Value, cwd: &Path) -> Result<Value
     let author = std::env::var("DEVPIT_AGENT_ID").unwrap_or_default();
     let body = json!({ "method": method, "params": params, "cwd": cwd.display().to_string(), "author": author }).to_string();
     let mut stream = TcpStream::connect(&address).map_err(|_| closed())?;
-    let _ = stream.set_read_timeout(Some(WAIT));
+    let _ = stream.set_read_timeout(Some(wait_for(method)));
     let _ = stream.set_write_timeout(Some(WAIT));
     let request = format!(
         "POST /agent HTTP/1.1\r\nhost: {address}\r\ncontent-type: application/json\r\n{secret}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
         body.len()
     );
     stream.write_all(request.as_bytes()).map_err(|_| closed())?;
-    let reply = read_reply(stream)?;
+    // Connected and then silent is not closed: devpit took the question and
+    // is still on it, and asking again would do it twice.
+    let reply = read_reply(stream).map_err(|why| {
+        if why == closed() {
+            format!("devpit took the question but did not answer in time — check before asking `{method}` again")
+        } else {
+            why
+        }
+    })?;
     let parsed: Value = serde_json::from_str(&reply)
         .map_err(|_| "devpit answered something that is not JSON".to_owned())?;
     match (parsed.get("ok"), parsed.get("error")) {

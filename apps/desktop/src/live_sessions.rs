@@ -185,8 +185,19 @@ pub async fn orchestrator_reply(
             ));
         }
         let target = terminal_of(&profile_id, &name)?;
-        crate::sessions::tmux_server()?
-            .paste_and_send(&target, text)
+        let tmux = crate::sessions::tmux_server()?;
+        // A session suspended or exited leaves its shell in front, and the
+        // reply would run there as a command.
+        if tmux
+            .shell_in_front(&target)
+            .map_err(|err| RpcError::internal(err.to_string()))?
+        {
+            return Err(RpcError::new(
+                ErrorCode::Conflict,
+                "the agent is not in front in that terminal — open it to see why",
+            ));
+        }
+        tmux.paste_and_send(&target, text)
             .map_err(|err| RpcError::internal(err.to_string()))
     })
     .await

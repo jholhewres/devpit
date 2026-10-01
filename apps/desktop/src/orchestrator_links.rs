@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use devpit_rpc::{ErrorCode, Project, RpcError};
+use devpit_rpc::{ErrorCode, LiveSession, Project, RpcError};
 use serde_json::{json, Value};
 
 /// The settings as they are, or an empty object.
@@ -41,6 +41,29 @@ pub(crate) fn linked(folder: &Path) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// The sessions an orchestrator may see and touch: those running in itself or
+/// in a project linked to it. A session elsewhere in the account is someone
+/// else's work, and reading its screen or stopping it is not this one's to do.
+pub(crate) fn within(
+    here_id: &str,
+    linked: &[String],
+    sessions: Vec<LiveSession>,
+) -> Vec<LiveSession> {
+    sessions
+        .into_iter()
+        .filter(|one| {
+            one.project_id
+                .as_deref()
+                .is_some_and(|id| id == here_id || linked.iter().any(|link| link == id))
+        })
+        .collect()
+}
+
+/// [`within`], for the orchestrator asking.
+pub(crate) fn reachable(here: &Project, sessions: Vec<LiveSession>) -> Vec<LiveSession> {
+    within(&here.id, &linked(Path::new(&here.root_path)), sessions)
 }
 
 /// Whether `here`, an orchestrator, may reach `project`: itself, or one the

@@ -58,3 +58,11 @@ fn a_question_carries_the_secret_and_gets_the_answer() {
     assert!(request.contains("x-devpit-hook: s3cret"), "{request}");
     assert!(request.contains(r#""cwd":"/work""#), "{request}");
 }
+
+/// Starting a session settles a terminal and may make a checkout first; given
+/// the budget of a lookup, it was reported as devpit being closed and retried.
+#[test]
+fn starting_a_session_is_given_longer_than_a_lookup() {
+    assert!(wait_for("start") > wait_for("board"));
+    assert!(wait_for("start") >= std::time::Duration::from_secs(60));
+}

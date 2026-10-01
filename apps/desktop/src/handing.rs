@@ -37,7 +37,10 @@ pub(crate) fn hand(
         .iter()
         .find(|card| card.id == card_id)
         .ok_or("that card is not on this project's board")?;
-    let name = session_name(named.unwrap_or(&card.title), card_id);
+    let name = unused(
+        session_name(named.unwrap_or(&card.title), card_id),
+        &live_names(profile_id),
+    );
 
     let store = crate::projects::store().map_err(|err| err.message)?;
     // The card's own checkout: two sessions at work in one project do not
@@ -70,6 +73,26 @@ pub(crate) fn hand(
         "cwd": cwd.display().to_string(),
         "next": "It runs in a terminal tab of the project, where the person can watch it. Message it by this name with SendMessage once it is up, and pass notify_when_idle to hear when it is done.",
     }))
+}
+
+/// A name no session alive goes by: the same card handed twice is two
+/// sessions, and one name for both sends a reply, a screen or a stop to
+/// whichever the CLI lists first.
+pub(crate) fn unused(name: String, taken: &[String]) -> String {
+    if !taken.contains(&name) {
+        return name;
+    }
+    (2..)
+        .map(|n| format!("{name}-{n}"))
+        .find(|candidate| !taken.contains(candidate))
+        .unwrap_or(name)
+}
+
+/// The names the account's live sessions go by.
+pub(crate) fn live_names(profile_id: &str) -> Vec<String> {
+    crate::live_sessions::orchestrator_sessions_now(profile_id)
+        .map(|live| live.sessions.into_iter().map(|one| one.name).collect())
+        .unwrap_or_default()
 }
 
 /// The card's own tab, unless something already has it open.
@@ -112,7 +135,14 @@ pub(crate) fn session_name(title: &str, card_id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{session_name, tab_to_open};
+    use super::{session_name, tab_to_open, unused};
+
+    #[test]
+    fn a_name_already_alive_is_numbered_until_it_is_free() {
+        let taken = ["fix-9xyz".to_owned(), "fix-9xyz-2".to_owned()];
+        assert_eq!(unused("fix-9xyz".to_owned(), &taken), "fix-9xyz-3");
+        assert_eq!(unused("other".to_owned(), &taken), "other");
+    }
 
     #[test]
     fn a_handed_session_takes_the_card_tab_and_never_types_over_one_open() {

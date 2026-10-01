@@ -72,7 +72,7 @@ const TOOLS: [Tool; 16] = [
     Tool {
         name: "devpit_sessions",
         method: "sessions",
-        description: "Orchestrator only: this account's Claude Code sessions running now — the name to message each by, busy or idle, the project and card it works in, and the question it is stopped on.",
+        description: "Orchestrator only: this account's Claude Code sessions running now in this orchestrator's folder or a project linked to it — the name to message each by, busy or idle, the project and card it works in, and the question it is stopped on.",
         input: || json!({ "type": "object", "properties": {} }),
     },
     Tool {
@@ -84,7 +84,7 @@ const TOOLS: [Tool; 16] = [
     Tool {
         name: "devpit_stop_session",
         method: "stop",
-        description: "Orchestrator only: stop a session of this account — the agent ends and the devpit terminal it ran in is closed (its tab too, when it was the last pane). Work in flight is lost: only when the person asked for it, never on your own initiative.",
+        description: "Orchestrator only: stop a session of this account running in a linked project — the agent ends and the devpit terminal it ran in is closed (its tab too, when it was the last pane). Work in flight is lost: only when the person asked for it, never on your own initiative.",
         input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." } }, "required": ["name"] }),
     },
     Tool {

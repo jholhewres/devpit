@@ -121,17 +121,22 @@ fn respond_in(
         "sessions" => {
             let profile = orchestrating(here)?;
             let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
-            return Ok(json!(live.sessions));
+            return Ok(json!(crate::orchestrator_links::reachable(
+                here,
+                live.sessions
+            )));
         }
         "stop" => {
             let profile = orchestrating(here)?;
             let app = app.ok_or("devpit's window is not running")?;
             let name = text("name").ok_or("which session? pass its name")?;
+            in_reach(here, profile, &name)?;
             return crate::stopping::stop(app, profile, &name).map_err(said);
         }
         "screen" => {
             let profile = orchestrating(here)?;
             let name = text("name").ok_or("which session? pass its name")?;
+            in_reach(here, profile, &name)?;
             return Ok(
                 match crate::live_sessions::screen_for(profile, &name).map_err(said)? {
                     Some((screen, waiting)) => json!({ "screen": screen, "waiting": waiting }),
@@ -315,6 +320,16 @@ pub(crate) fn gate(column: &Column) -> Result<(), String> {
         )),
         None => Ok(()),
     }
+}
+
+/// Refuses a session outside the orchestrator's linked projects, by name.
+fn in_reach(here: &Project, profile: &str, name: &str) -> Result<(), String> {
+    let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
+    crate::orchestrator_links::reachable(here, live.sessions)
+        .iter()
+        .any(|one| one.name == name)
+        .then_some(())
+        .ok_or_else(|| format!("{name} is not running in a project linked to this orchestrator"))
 }
 
 fn said(err: RpcError) -> String {
