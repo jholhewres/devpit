@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 20] = [
+const TOOLS: [Tool; 23] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -98,6 +98,24 @@ const TOOLS: [Tool; 20] = [
         method: "repo",
         description: "Where a project's repository — or a card's checkout — stands: its branch, files changed and not committed, ahead and behind its upstream, the latest commits, the latest tag and how far past it, and for each branch named whether it exists here and on origin and is already merged. Use it rather than running git by hand in another project.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string", "description": "A card whose own checkout to read instead of the project's folder." }, "branches": { "type": "array", "items": { "type": "string" }, "description": "Branches to say whether they exist and are merged, e.g. a session's feature branch." }, "fetch": { "type": "boolean", "description": "Ask origin first. Defaults to false: only what is known here." } } }),
+    },
+    Tool {
+        name: "devpit_remind",
+        method: "remind",
+        description: "Remind the person at a time they asked for — \"remind me tomorrow at 3pm to review the PR\". devpit sets it off, never you: a banner in its window and a system notification, on a card with that date and time. With a cardId the time goes on that card; without one a new card holds it, in this project or the one named. Pass the moment with its offset, and say it back to the person in words, with the day and the zone. Only when they asked; a reminder only tells, it never starts anything.",
+        input: || json!({ "type": "object", "properties": { "at": { "type": "string", "description": "ISO 8601 with its offset, e.g. 2026-10-02T15:00:00-03:00. One without an offset is refused." }, "title": { "type": "string", "description": "What to be reminded of, as the card's title. Needed unless cardId is given." }, "note": { "type": "string", "description": "More to keep on the new card." }, "cardId": { "type": "string", "description": "An existing card to put the time on instead of making one." }, "project": { "type": "string", "description": "Orchestrator only: another project, by id or name. Leave out for your own board." } }, "required": ["at"] }),
+    },
+    Tool {
+        name: "devpit_reminders",
+        method: "reminders",
+        description: "The reminders not yet dealt with, soonest first: those still to come and those that went off and wait on the person. An orchestrator sees its own and its linked projects'; a project's session, its project's. Says whether reminders are switched on.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: one project, by id or name." } } }),
+    },
+    Tool {
+        name: "devpit_resolve_reminder",
+        method: "resolve_reminder",
+        description: "Deal with a reminder the person told you about: done (it leaves the banner, the card keeps its date), snooze (it goes off again later: `for` 15m, 2h, 1d, or `until` a moment with its offset) or cancel (the card loses the time).",
+        input: || json!({ "type": "object", "properties": { "cardId": { "type": "string" }, "action": { "type": "string", "enum": ["done", "snooze", "cancel"] }, "for": { "type": "string", "description": "snooze: how long, as 15m, 2h or 1d." }, "until": { "type": "string", "description": "snooze: until when, ISO 8601 with its offset." }, "project": { "type": "string", "description": "Orchestrator only: the card's project, by id or name." } }, "required": ["cardId", "action"] }),
     },
     Tool {
         name: "devpit_draft_reply",

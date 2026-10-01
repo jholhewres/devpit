@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 21] = [
+pub(crate) const METHODS: [&str; 24] = [
     "context",
     "board",
     "card",
@@ -64,6 +64,9 @@ pub(crate) const METHODS: [&str; 21] = [
     "log",
     "repo",
     "draft",
+    "remind",
+    "reminders",
+    "resolve_reminder",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -190,6 +193,16 @@ fn respond_in(
     }
     let project = reached(projects, here, text("project").as_deref())?;
     crate::orchestrator_links::reaches(here, project)?;
+    if crate::agent_reminders::METHODS.contains(&asked.method.as_str()) {
+        return crate::agent_reminders::respond(
+            app,
+            &asked.method,
+            here,
+            project,
+            projects,
+            &asked.params,
+        );
+    }
     if asked.method.starts_with("artifact") {
         return crate::artifacts::respond(
             &asked.method,
