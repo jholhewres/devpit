@@ -19,6 +19,7 @@ vi.mock('../shell/live', () => ({
     islandDecide: (id: string, verdict: string) => (called('decide', id, verdict), null),
     islandOpenPane: (projectId: string | null, paneId: string) => (called('open', projectId, paneId), null),
     islandPeek: () => ({ text: 'one\ntwo', notShown: null }),
+    islandDrop: (sessionId: string, text: string) => (called('drop', sessionId, text), null),
     permissionAnswer: (id: string, answer: string) => (called('answer', id, answer), null),
     permissionAlways: (id: string, sessionId: string, tool: string) => (called('always', id, sessionId, tool), null),
   },
@@ -158,5 +159,18 @@ describe('the island window', () => {
     expect(screen.getByText('api')).toBeTruthy()
     say('island:session', { was: 'gone', sessionId: 's1' })
     expect(screen.getByText('Sessions you start in devpit show up here.')).toBeTruthy()
+  })
+
+  it('pastes the paths of files dropped on a session into that session', async () => {
+    render(<IslandWindow />)
+    await act(async () => {})
+    say('island:session', changed(session()))
+    say('island:session', changed(session({ sessionId: 's2', project: 'web', paneId: 'leaf_2' })))
+    fireEvent.click(shape())
+    const row = document.querySelector('[data-session="s2"]') as HTMLElement
+    const files = { types: ['Files'], getData: () => 'file:///w/my%20notes.md\nfile:///w/a.png' }
+    fireEvent.dragOver(row, { dataTransfer: files })
+    fireEvent.drop(row, { dataTransfer: files })
+    expect(called).toHaveBeenCalledWith('drop', 's2', "'/w/my notes.md' /w/a.png ")
   })
 })

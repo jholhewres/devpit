@@ -66,6 +66,19 @@
     opacity 0.26s ease 0.08s;
 }
 .isl-shape[data-mode='compact'] { cursor: pointer; }
+/* A file held over it: the edge says where it will land. */
+.isl-shape[data-drop='true'] { border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.isl-dropnote {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--isl-rise);
+  font-size: 11.5px;
+  color: var(--isl-ink);
+}
 
 @keyframes isl-in {
   from { opacity: 0; transform: translateY(-4px); }

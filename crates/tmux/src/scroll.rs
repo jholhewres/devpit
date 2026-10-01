@@ -160,6 +160,14 @@ impl Server {
     /// Enter: what an agent's TUI takes as one message, however many lines.
     /// Nothing is cleared first — the program's own input is its business.
     pub fn paste_and_send(&self, target: &str, text: &str) -> Result<(), TmuxError> {
+        self.paste(target, text)?;
+        self.require(&["send-keys", "-t", target, "Enter"])?;
+        Ok(())
+    }
+
+    /// Hands `text` to whatever runs in a pane as one bracketed paste, and
+    /// leaves it there for the person to finish and send.
+    pub fn paste(&self, target: &str, text: &str) -> Result<(), TmuxError> {
         self.require(&["set-buffer", "-b", "devpit-compose", "--", text])?;
         self.require(&[
             "paste-buffer",
@@ -170,7 +178,6 @@ impl Server {
             "-t",
             target,
         ])?;
-        self.require(&["send-keys", "-t", target, "Enter"])?;
         Ok(())
     }
 

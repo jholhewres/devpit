@@ -108,6 +108,9 @@ fn made(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, RpcError> {
             .focusable(false)
             // On every desktop and Space, the way the top bar is.
             .visible_on_all_workspaces(true)
+            // Files dropped on a session reach the page, as on devpit's own
+            // window, rather than the native handler.
+            .disable_drag_drop_handler()
             .visible(false)
             .inner_size(WIDE, TALL)
             .title("devpit island")
@@ -465,6 +468,49 @@ fn peek_now(session_id: &str, path: String) -> Result<FileContents, RpcError> {
         }
     }
     Err(refused)
+}
+
+/// `island.drop` — files dropped on a session in the island, their paths
+/// pasted into its agent's prompt for the person to finish.
+///
+/// Only into an agent: with the shell in front, the paths would run as a
+/// command.
+#[tauri::command]
+#[specta::specta]
+pub async fn island_drop(session_id: String, text: String) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        if text.trim().is_empty() || text.chars().count() > 8000 {
+            return Err(RpcError::new(ErrorCode::Invalid, "nothing to paste"));
+        }
+        crate::opening::typeable(&text)?;
+        let session = crate::island_feed::now()
+            .into_iter()
+            .find(|one| one.session_id == session_id)
+            .ok_or_else(|| {
+                RpcError::new(ErrorCode::NotFound, "that session has left the island")
+            })?;
+        let (Some(project_id), Some(pane_id)) = (session.project_id, session.pane_id) else {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "that session is not in one of devpit's terminals",
+            ));
+        };
+        let tmux = crate::sessions::tmux_server()?;
+        let target =
+            devpit_tmux::Server::target(&devpit_tmux::Server::session_name(&project_id), &pane_id);
+        if tmux
+            .shell_in_front(&target)
+            .map_err(|err| RpcError::internal(err.to_string()))?
+        {
+            return Err(RpcError::new(
+                ErrorCode::Conflict,
+                "the agent is not in front in that terminal",
+            ));
+        }
+        tmux.paste(&target, &text)
+            .map_err(|err| RpcError::internal(err.to_string()))
+    })
+    .await
 }
 
 /// `island.cursors` — the shape `island:cursor` carries, for the contract.

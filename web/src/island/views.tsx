@@ -93,6 +93,7 @@ export function Rows({
         <button
           className="isl-row"
           key={session.sessionId}
+          data-session={session.sessionId}
           style={{ '--tint': session.color ?? 'var(--accent)' } as React.CSSProperties}
           onClick={() => onChoose(session)}
         >
@@ -115,7 +116,7 @@ export function Detail({ session, now }: { session: IslandSession; now: number }
   const steps = session.steps.slice(-6)
   const shown: IslandStep | null = [...session.steps].reverse().find((one) => one.touch) ?? session.steps.at(-1) ?? null
   return (
-    <div className="isl-detail">
+    <div className="isl-detail" data-session={session.sessionId}>
       <div className="isl-detail__side">
         <ol className="isl-line">
           {steps.length === 0 && (

@@ -131,6 +131,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         island::island_shape,
         island::island_open_pane,
         island::island_peek,
+        island::island_drop,
         island::island_cursors,
         pane_asking::island_seen,
         pane_asking::island_decide,

@@ -642,6 +642,14 @@ export const commands = {
 	 *  size capped. A path anywhere else is refused, not shown.
 	 */
 	islandPeek: (sessionId: string, path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("island_peek", { sessionId, path })),
+	/**
+	 *  `island.drop` — files dropped on a session in the island, their paths
+	 *  pasted into its agent's prompt for the person to finish.
+	 * 
+	 *  Only into an agent: with the shell in front, the paths would run as a
+	 *  command.
+	 */
+	islandDrop: (sessionId: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_drop", { sessionId, text })),
 	/**  `island.cursors` — the shape `island:cursor` carries, for the contract. */
 	islandCursors: () => __TAURI_INVOKE<[Cursor, IslandChange[]]>("island_cursors"),
 	/**  `island.seen` — the island is showing a held question. */

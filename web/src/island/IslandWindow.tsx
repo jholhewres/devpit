@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { shellWord, useFileDrop } from '../shell/fileDrop'
 
 import { ask, commands } from '../shell/live'
 import { headline, labelled, moodOf, moodOfAll, nameOf } from './sessions'
@@ -24,6 +26,32 @@ export function IslandWindow(): React.JSX.Element {
   const mood = moodOfAll(sessions, questions, now)
   const was = useRef<Rect>(WAKE)
   const drag = useDrag()
+  const shape = useRef<HTMLDivElement>(null)
+  const [dropNote, setDropNote] = useState<string | null>(null)
+
+  /* Files dropped on a session go to its agent's prompt; dropped anywhere
+     else, to the one session open in the detail, or the only one there is. */
+  const onDrop = useCallback(
+    (paths: readonly string[], under: Element | null) => {
+      const named = under?.closest<HTMLElement>('[data-session]')?.dataset.session
+      const sessionId = named ?? chosen?.sessionId ?? (sessions.length === 1 ? sessions[0].sessionId : null)
+      if (!sessionId) {
+        setDropNote('Drop the file on a session')
+        return
+      }
+      void ask(() => commands.islandDrop(sessionId, `${paths.map(shellWord).join(' ')} `)).then((answer) =>
+        setDropNote(answer.error ?? 'In its prompt — finish the message there'),
+      )
+    },
+    [chosen, sessions],
+  )
+  const dropping = useFileDrop(shape, onDrop)
+
+  useEffect(() => {
+    if (!dropNote) return
+    const gone = window.setTimeout(() => setDropNote(null), 3000)
+    return () => window.clearTimeout(gone)
+  }, [dropNote])
 
   /* While one size turns into the other, both take the mouse; once it has
      settled, only the new one does. Keyed on the numbers, not the object,
@@ -58,8 +86,10 @@ export function IslandWindow(): React.JSX.Element {
 
   return (
     <div className="isl" data-mode={island.mode}>
-      <div className="isl-wake" onMouseEnter={() => nudge({ kind: 'enter' })} />
+      <div className="isl-wake" onMouseEnter={() => nudge({ kind: 'enter' })} onDragEnter={() => nudge({ kind: 'open' })} />
       <div
+        ref={shape}
+        data-drop={dropping ? 'true' : undefined}
         className="isl-shape"
         data-mode={island.mode}
         data-mood={mood}
@@ -71,6 +101,7 @@ export function IslandWindow(): React.JSX.Element {
         onPointerUp={drag.onPointerUp}
         onClick={() => !drag.wasDrag() && island.mode === 'compact' && nudge({ kind: 'open' })}
       >
+        {dropNote && <div className="isl-dropnote">{dropNote}</div>}
         {island.mode === 'compact' && <Capsule sessions={sessions} questions={questions} mood={mood} now={now} />}
         {island.mode === 'expanded' && (
           <div className="isl-open" data-view={view}>
