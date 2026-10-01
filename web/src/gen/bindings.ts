@@ -320,6 +320,8 @@ export const commands = {
 	 *  must stay only theirs to send.
 	 */
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
+	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
+	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
 	/**
 	 *  `orchestrator.answer` — the person's pick on the question a session is
 	 *  stopped on: arrows to the choice and Enter, or Escape when `choice` is
@@ -2614,6 +2616,11 @@ export type LiveSession = {
 	sessionId: string | null,
 	/**  What it is on while it works — `Edit invoice.ts` — as its hooks said. */
 	step: string | null,
+	/**
+	 *  A reply the orchestrator drafted for the person to send it as theirs.
+	 *  Never sent by the orchestrator: only the person's click types it.
+	 */
+	draft: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */

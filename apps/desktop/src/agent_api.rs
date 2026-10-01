@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 20] = [
+pub(crate) const METHODS: [&str; 21] = [
     "context",
     "board",
     "card",
@@ -63,6 +63,7 @@ pub(crate) const METHODS: [&str; 20] = [
     "transcript",
     "log",
     "repo",
+    "draft",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -151,6 +152,16 @@ fn respond_in(
                 .and_then(Value::as_u64)
                 .unwrap_or(3) as usize;
             return crate::session_told::told_by(profile, &name, last);
+        }
+        "draft" => {
+            let profile = orchestrating(here)?;
+            let name = text("name").ok_or("which session? pass its name")?;
+            in_reach(here, profile, &name)?;
+            crate::reply_drafts::draft(profile, &name, &text("text").unwrap_or_default())?;
+            return Ok(json!({
+                "drafted": name,
+                "note": "Nothing was sent. The person sees the draft beside the session — in the Sessions panel and above this chat's composer — and sends it as their own words, edits it, or drops it.",
+            }));
         }
         "log" => {
             orchestrating(here)?;

@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 19] = [
+const TOOLS: [Tool; 20] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -98,6 +98,12 @@ const TOOLS: [Tool; 19] = [
         method: "repo",
         description: "Where a project's repository — or a card's checkout — stands: its branch, files changed and not committed, ahead and behind its upstream, the latest commits, the latest tag and how far past it, and for each branch named whether it exists here and on origin and is already merged. Use it rather than running git by hand in another project.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string", "description": "A card whose own checkout to read instead of the project's folder." }, "branches": { "type": "array", "items": { "type": "string" }, "description": "Branches to say whether they exist and are merged, e.g. a session's feature branch." }, "fetch": { "type": "boolean", "description": "Ask origin first. Defaults to false: only what is known here." } } }),
+    },
+    Tool {
+        name: "devpit_draft_reply",
+        method: "draft",
+        description: "Orchestrator only: draft what the person would say to a session of a linked project — when they told you in this chat to let it go on, widen what its brief allowed, or answer what it asked them. Nothing is sent: the draft waits beside the session in devpit, and only the person's click types it into the session's terminal, as their own words. One draft per session; a new one replaces it.",
+        input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." }, "text": { "type": "string", "description": "The words, as the person would type them to that session. At most 4000 characters." } }, "required": ["name", "text"] }),
     },
     Tool {
         name: "devpit_log",

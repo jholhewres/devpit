@@ -15,10 +15,10 @@ use crate::{
     history, in_flight, index, installations, island, island_checks, live_answer, live_sessions,
     mcp, mcp_apps, mcp_health, moving, notices, openers, opening, orchestrator, orchestrator_links,
     outside_sessions, pane_asking, pane_screen, panels, panes, pasting, paths, plan_limits,
-    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reveal,
-    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
-    slash, sources, spend_history, staging, steering, steps, stopping, threads, update, watching,
-    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
+    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping,
+    reply_drafts, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
+    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, stopping,
+    threads, update, watching, workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -74,6 +74,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         mcp_apps::mcp_app_call,
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
+        reply_drafts::orchestrator_draft_drop,
         live_answer::orchestrator_answer,
         chat_remote::chat_remote,
         chat_remote::chat_remote_state,

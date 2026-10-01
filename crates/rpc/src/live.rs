@@ -38,6 +38,9 @@ pub struct LiveSession {
     pub session_id: Option<String>,
     /// What it is on while it works — `Edit invoice.ts` — as its hooks said.
     pub step: Option<String>,
+    /// A reply the orchestrator drafted for the person to send it as theirs.
+    /// Never sent by the orchestrator: only the person's click types it.
+    pub draft: Option<String>,
 }
 
 /// A devpit terminal, as a tab attaches to it.

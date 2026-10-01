@@ -70,6 +70,7 @@ fn live(name: &str, project: Option<&str>) -> devpit_rpc::LiveSession {
         pane: None,
         session_id: None,
         step: None,
+        draft: None,
     }
 }
 

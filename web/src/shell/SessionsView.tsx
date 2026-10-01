@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AgentThread, LiveSession, Project } from '../gen/bindings'
 import { ask, commands } from './live'
 import { inOrder, refreshSessions, STATE_WORDS, stateOf, useLiveSessions } from './liveStatus'
+import { ReplyDrafts } from './ReplyDrafts'
 import { SessionTerminal } from './SessionTerminal'
 import { opened } from './strip'
 import { remember, remembered } from './tabs'
@@ -98,6 +99,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
         pane: { projectId: one.id, paneId: made.data.focusedId },
         sessionId: null,
         step: null,
+        draft: null,
       })
     })
   }
@@ -165,6 +167,8 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" /></svg>
         </PanelAct>
       </PanelHead>
+
+      {profileId && <ReplyDrafts profileId={profileId} sessions={sessions} onDone={() => refreshSessions(profileId)} />}
 
       {sessions.length === 0 && (
         <PanelEmpty

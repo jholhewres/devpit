@@ -14,6 +14,8 @@ fn a_new_orchestrator_starts_with_its_brief_and_folders() {
     assert!(brief.contains("Never move a card into a lane that runs a step"));
     // The person answers a waiting session; the orchestrator never relays it.
     assert!(brief.contains("do\n  not relay \"go on\" as a message"));
+    // It drafts the person's words instead, and only their click sends them.
+    assert!(brief.contains("Draft their words with `devpit_draft_reply`"));
     // Its folder is notes, organised, and never a repository.
     assert!(brief.contains("`context/projects/<project>.md`"));
     assert!(brief.contains("never initialise one or commit"));

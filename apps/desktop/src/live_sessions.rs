@@ -80,6 +80,7 @@ pub(crate) fn read(
                 waiting,
                 pane,
                 cwd,
+                draft: None,
                 step: listed
                     .session_id
                     .as_deref()
@@ -204,7 +205,10 @@ pub async fn orchestrator_reply(
             ));
         }
         tmux.paste_and_send(&target, text)
-            .map_err(|err| RpcError::internal(err.to_string()))
+            .map_err(|err| RpcError::internal(err.to_string()))?;
+        // Sent as the person: whatever was drafted for it has been said.
+        crate::reply_drafts::forget(&profile_id, &name);
+        Ok(())
     })
     .await
 }
@@ -338,15 +342,17 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // One tmux server for every screen read in this listing.
     let server = crate::sessions::tmux_server().ok();
     let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
-    Ok(LiveSessions {
-        sessions: read(
-            &config_of(profile_id)?.join("sessions"),
-            alive,
-            &projects,
-            &worktrees,
-            screen,
-        ),
-    })
+    let mut sessions = read(
+        &config_of(profile_id)?.join("sessions"),
+        alive,
+        &projects,
+        &worktrees,
+        screen,
+    );
+    for one in &mut sessions {
+        one.draft = crate::reply_drafts::drafted(profile_id, &one.name);
+    }
+    Ok(LiveSessions { sessions })
 }
 
 /// This profile's account's config folder — where its sessions are listed.

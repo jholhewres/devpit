@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import type { LiveSession } from '../gen/bindings'
 import { refreshSessions, useLiveSessions } from './liveStatus'
+import { ReplyDrafts } from './ReplyDrafts'
 import { SHOW_PANEL } from './RightPanel'
 import { SessionTerminal } from './SessionTerminal'
 import { useShell } from './useShell'
@@ -11,7 +12,8 @@ import { WaitingPrompts } from './WaitingPrompts'
  * What an orchestrator's chat adds for the sessions it works with: their
  * count in its corner, which opens the Sessions panel, and — above the
  * composer — every question one of them is stopped on, answered from here or
- * in its own terminal opened over the chat.
+ * in its own terminal opened over the chat, and every reply the orchestrator
+ * drafted for the person to send as theirs.
  */
 
 export function SessionsChip({ profileId }: { profileId: string }): React.JSX.Element {
@@ -32,6 +34,7 @@ export function SessionsWaiting({ profileId }: { profileId: string }): React.JSX
   return (
     <>
       <WaitingPrompts profileId={profileId} sessions={live} onAnswered={() => refreshSessions(profileId)} onOpen={setTerminal} />
+      <ReplyDrafts profileId={profileId} sessions={live} onDone={() => refreshSessions(profileId)} />
       {terminal && (
         <SessionTerminal
           session={terminal}

@@ -220,6 +220,7 @@ fn listed(session_id: Option<&str>, status: &str, in_pane: bool) -> devpit_rpc::
         }),
         session_id: session_id.map(str::to_owned),
         step: None,
+        draft: None,
     }
 }
 
