@@ -49,6 +49,28 @@ TEST_ENV := HOME=$(TEST_HOME) \
 	CARGO_HOME=$(CARGO_HOME) \
 	RUSTUP_HOME=$(RUSTUP_HOME)
 
+# A version bump leaves the old build behind.
+#
+# Every crate here takes the workspace version, and cargo folds a crate's
+# version into the hash its artifacts are named by. After a bump nothing of
+# the previous build of these crates is ever read again — the incremental
+# caches, the test binaries, all of it — and cargo never collects them: two
+# weeks of releases put 80 GB in `target/debug` and filled the disk. So the
+# first recipe after the version moves drops them. The third-party crates keep
+# their artifacts; the bump did not touch theirs.
+WORKSPACE_VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml)
+VERSION_STAMP := target/.version-$(WORKSPACE_VERSION)
+
+$(VERSION_STAMP):
+	@if ls target/.version-* >/dev/null 2>&1; then \
+		cargo clean $$(cargo metadata --no-deps --format-version 1 \
+			| grep -o '"name":"[^"]*","version":"$(WORKSPACE_VERSION)"' \
+			| sed 's/^"name":"\([^"]*\)".*/-p \1/'); \
+	fi
+	@rm -f target/.version-*
+	@mkdir -p target
+	@touch $@
+
 .DEFAULT_GOAL := help
 .PHONY: help setup dev build test test-rust fmt clean e2e
 
@@ -75,10 +97,10 @@ setup: ## Install dependencies
 #
 # HOME is left alone on purpose: agent credentials, git and gh are the same
 # ones the installed devpit uses, so agents run here the way they run there.
-dev: node_modules ## Run the app with hot reload, on a home of its own
+dev: node_modules $(VERSION_STAMP) ## Run the app with hot reload, on a home of its own
 	$(TAURI) dev --config apps/desktop/tauri.dev.conf.json
 
-build: node_modules ## Bundle a release binary, frontend included
+build: node_modules $(VERSION_STAMP) ## Bundle a release binary, frontend included
 	$(TAURI) build
 
 # A .deb only, and no updater artifacts. The AppImage bundler downloads
@@ -105,7 +127,7 @@ test: node_modules test-rust ## Everything CI runs: guards, Rust, frontend
 # The frontend half is not here on purpose. It runs in jsdom, which is the same
 # jsdom everywhere, and running it three times has so far cost a release rather
 # than found a bug in one.
-test-rust: node_modules ## Guards and the Rust tests, without the frontend
+test-rust: node_modules $(VERSION_STAMP) ## Guards and the Rust tests, without the frontend
 	cargo fmt --all --check
 	cargo xtask check
 	cargo clippy --workspace --all-targets -- -D warnings
@@ -139,7 +161,7 @@ check-windows: ## Compiles for Windows, without building the installer
 test-tmux: ## The tmux crate's own tests, against whatever `tmux` is on PATH
 	cargo test -p devpit-tmux --no-fail-fast -- --test-threads=1
 
-e2e: node_modules ## The built app, driven through a WebDriver (minutes, not seconds)
+e2e: node_modules $(VERSION_STAMP) ## The built app, driven through a WebDriver (minutes, not seconds)
 	./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.conf.json
 	node e2e/run.mjs
 
