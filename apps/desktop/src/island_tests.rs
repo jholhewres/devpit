@@ -45,3 +45,24 @@ fn the_wake_strip_takes_no_margin() {
     assert!(!lands(taken, 300.0, 5.0));
     assert!(!lands(taken, 259.0, 2.0));
 }
+
+#[test]
+fn a_chat_is_found_by_the_cli_session_it_keeps() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        dir.path().join("conv_A.json"),
+        r#"{"sessionId":"s-1","title":"a"}"#,
+    )
+    .expect("a");
+    std::fs::write(
+        dir.path().join("conv_B.json"),
+        r#"{"sessionId":"s-2","title":"b"}"#,
+    )
+    .expect("b");
+    std::fs::write(dir.path().join("conv_B.jsonl"), "not the meta").expect("transcript");
+    assert_eq!(
+        conversation_of(dir.path(), "s-2").as_deref(),
+        Some("conv_B")
+    );
+    assert_eq!(conversation_of(dir.path(), "s-9"), None);
+}

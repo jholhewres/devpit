@@ -635,6 +635,13 @@ export const commands = {
 	/**  `island.open_pane` — brings devpit forward on the terminal a session runs in. */
 	islandOpenPane: (projectId: string | null, paneId: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_open_pane", { projectId, paneId })),
 	/**
+	 *  `island.open_chat` — brings devpit forward on the chat a session is.
+	 * 
+	 *  Answers with the conversation it found, or none for an orchestrator, whose
+	 *  project is its chat.
+	 */
+	islandOpenChat: (sessionId: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_open_chat", { sessionId })),
+	/**
 	 *  `island.peek` — a file a session's step touches, for the preview.
 	 * 
 	 *  Read only inside the session's own checkout or its project, through the

@@ -441,6 +441,18 @@ pub async fn island_open_pane(
     project_id: Option<String>,
     pane_id: String,
 ) -> Result<(), RpcError> {
+    raised(&app)?;
+    // To `main` by name: a page in a browser pane must not hear it.
+    app.emit_to(
+        tauri::EventTarget::webview("main"),
+        "island:open-pane",
+        (project_id, pane_id),
+    )
+    .map_err(|err| RpcError::internal(format!("devpit would not be told: {err}")))
+}
+
+/// Brings devpit's window to the front from a click on the island.
+fn raised(app: &tauri::AppHandle) -> Result<(), RpcError> {
     let main = app
         .get_webview_window("main")
         .ok_or_else(|| RpcError::internal("there is no main window".to_owned()))?;
@@ -453,11 +465,57 @@ pub async fn island_open_pane(
     let _ = main.set_always_on_top(true);
     let _ = main.set_focus();
     let _ = main.set_always_on_top(false);
-    // To `main` by name: a page in a browser pane must not hear it.
+    Ok(())
+}
+
+/// The conversation of a project's whose CLI session is `session_id`, read
+/// from the conversations devpit keeps.
+pub(crate) fn conversation_of(sessions: &std::path::Path, session_id: &str) -> Option<String> {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Kept {
+        session_id: Option<String>,
+    }
+    std::fs::read_dir(sessions)
+        .ok()?
+        .flatten()
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+        .filter(|entry| entry.metadata().is_ok_and(|meta| meta.len() <= 64 * 1024))
+        .find_map(|entry| {
+            let kept: Kept =
+                serde_json::from_str(&std::fs::read_to_string(entry.path()).ok()?).ok()?;
+            (kept.session_id.as_deref() == Some(session_id))
+                .then(|| entry.path().file_stem()?.to_str().map(str::to_owned))
+                .flatten()
+        })
+}
+
+/// `island.open_chat` — brings devpit forward on the chat a session is.
+///
+/// Answers with the conversation it found, or none for an orchestrator, whose
+/// project is its chat.
+#[tauri::command]
+#[specta::specta]
+pub async fn island_open_chat(app: tauri::AppHandle, session_id: String) -> Result<(), RpcError> {
+    let (project_id, conversation) = crate::off_main::blocking(move || {
+        let session = crate::island_feed::now()
+            .into_iter()
+            .find(|one| one.session_id == session_id)
+            .ok_or_else(|| {
+                RpcError::new(ErrorCode::NotFound, "that session has left the island")
+            })?;
+        let project_id = session
+            .project_id
+            .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that session is in no project"))?;
+        let sessions = crate::projects::project_home(&project_id)?.sessions();
+        Ok::<_, RpcError>((project_id, conversation_of(&sessions, &session_id)))
+    })
+    .await?;
+    raised(&app)?;
     app.emit_to(
         tauri::EventTarget::webview("main"),
-        "island:open-pane",
-        (project_id, pane_id),
+        "island:open-chat",
+        (project_id, conversation),
     )
     .map_err(|err| RpcError::internal(format!("devpit would not be told: {err}")))
 }

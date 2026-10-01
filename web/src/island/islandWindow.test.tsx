@@ -27,6 +27,7 @@ vi.mock('../shell/live', () => ({
     islandSeen: (id: string) => (called('seen', id), null),
     islandDecide: (id: string, verdict: string) => (called('decide', id, verdict), null),
     islandOpenPane: (projectId: string | null, paneId: string) => (called('open', projectId, paneId), null),
+    islandOpenChat: (sessionId: string) => (called('chat', sessionId), null),
     islandPeek: () => ({ text: 'one\ntwo', notShown: null }),
     islandDrop: (sessionId: string, text: string) => (called('drop', sessionId, text), null),
     islandChecks: () => ({ branch: 'fix/x', pull: { number: 7, state: 'OPEN', title: 'Fix', url: 'https://example.invalid/7' }, checks: 'passing' }),
@@ -186,5 +187,16 @@ describe('the island window', () => {
     fireEvent.dragOver(row, { dataTransfer: files })
     fireEvent.drop(row, { dataTransfer: files })
     expect(called).toHaveBeenCalledWith('drop', 's2', "'/w/my notes.md' /w/a.png ")
+  })
+
+  it('opens a chat session in its chat, having no terminal to open', async () => {
+    render(<IslandWindow />)
+    await act(async () => {})
+    say('island:session', changed(session({ paneId: null })))
+    fireEvent.click(shape())
+    fireEvent.click(screen.getByText('api'))
+    fireEvent.click(screen.getByText('Open chat'))
+    expect(called).toHaveBeenCalledWith('chat', 's1')
+    expect(screen.queryByText('Open terminal')).toBeNull()
   })
 })

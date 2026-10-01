@@ -126,6 +126,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         island::island_now,
         island::island_shape,
         island::island_open_pane,
+        island::island_open_chat,
         island::island_peek,
         island::island_drop,
         island_checks::island_checks,

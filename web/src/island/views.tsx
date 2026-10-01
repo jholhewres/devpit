@@ -14,9 +14,12 @@ import { askedWords, headline, labelled, nameOf, nowWords, stepWords, type Ask, 
  * animated around them, and a view that grew past it would be cut.
  */
 
-/** Brings devpit forward on the terminal a session runs in. */
+/** Brings devpit forward on the terminal a session runs in, or on its chat. */
 export const openPane = (session: IslandSession): void => {
-  if (!session.paneId) return
+  if (!session.paneId) {
+    void ask(() => commands.islandOpenChat(session.sessionId))
+    return
+  }
   void ask(() => commands.islandOpenPane(session.projectId, session.paneId!))
 }
 
@@ -134,11 +137,9 @@ export function Detail({ session, now }: { session: IslandSession; now: number }
           ))}
         </ol>
         <Checks sessionId={session.sessionId} />
-        {session.paneId && (
-          <button className="isl-btn isl-btn--quiet" onClick={() => openPane(session)}>
-            Open terminal
-          </button>
-        )}
+        <button className="isl-btn isl-btn--quiet" onClick={() => openPane(session)}>
+          {session.paneId ? 'Open terminal' : 'Open chat'}
+        </button>
       </div>
       <Preview session={session} step={shown} />
     </div>
