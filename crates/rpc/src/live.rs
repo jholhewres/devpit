@@ -36,6 +36,8 @@ pub struct LiveSession {
     pub pane: Option<LivePane>,
     /// The CLI's own id for the conversation, which its hooks carry too.
     pub session_id: Option<String>,
+    /// What it is on while it works — `Edit invoice.ts` — as its hooks said.
+    pub step: Option<String>,
 }
 
 /// A devpit terminal, as a tab attaches to it.

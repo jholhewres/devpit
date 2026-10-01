@@ -32,6 +32,7 @@ pub(crate) fn card_sessions(
         tab_id: None,
         leaf_id: None,
         run_id: None,
+        step: None,
     };
     let mut sessions = Vec::new();
 
@@ -94,6 +95,14 @@ pub(crate) fn card_sessions(
                 ..one.clone()
             });
         }
+    }
+    // What each is on, from what its hooks said: a terminal by its pane,
+    // everything else by the id its agent goes by.
+    for one in &mut sessions {
+        one.step = match one.kind {
+            SessionKind::Pane => crate::island_feed::step_in_pane(&one.reference),
+            _ => crate::island_feed::step_of(&one.reference),
+        };
     }
     sessions
 }

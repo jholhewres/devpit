@@ -219,6 +219,7 @@ fn listed(session_id: Option<&str>, status: &str, in_pane: bool) -> devpit_rpc::
             pane_id: "leaf_1".to_owned(),
         }),
         session_id: session_id.map(str::to_owned),
+        step: None,
     }
 }
 
@@ -262,4 +263,39 @@ fn what_a_hook_said_is_not_overwritten_by_the_listing() {
         &HashMap::new(),
     );
     assert_eq!(sessions["s1"].state, Doing::Waiting);
+}
+
+/// A row says what a working session is on, the newest step first, and says
+/// nothing once the turn is over.
+#[test]
+fn a_working_session_says_its_newest_step() {
+    let mut session = folded(vec![
+        Event::Prompted,
+        using("Read", "a.rs"),
+        using("Edit", "invoice.ts"),
+        Event::Used {
+            tool: "Edit".to_owned(),
+        },
+    ])
+    .expect("a session");
+    assert_eq!(stepping(&session).as_deref(), Some("Edit invoice.ts"));
+
+    session.steps.push(IslandStep {
+        tool: "TodoWrite".to_owned(),
+        target: None,
+        done: false,
+        failed: false,
+        touch: None,
+    });
+    assert_eq!(stepping(&session).as_deref(), Some("TodoWrite"));
+
+    let stopped = folded(vec![
+        Event::Prompted,
+        using("Edit", "invoice.ts"),
+        Event::Stopped { said: None },
+    ])
+    .expect("a session");
+    assert_eq!(stepping(&stopped), None);
+    let thinking = folded(vec![Event::Prompted]).expect("a session");
+    assert_eq!(stepping(&thinking), None, "a turn that touched nothing yet");
 }

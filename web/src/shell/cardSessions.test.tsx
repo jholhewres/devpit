@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CardSession } from '../gen/bindings'
-import { CardSessions, READ_AFTER_MS } from './CardSessions'
+import { CardSessions, READ_AFTER_MS, STEP_EVERY_MS } from './CardSessions'
 
 afterEach(cleanup)
 
@@ -49,6 +49,7 @@ const session = (over: Partial<CardSession>): CardSession => ({
   tabId: null,
   leafId: null,
   runId: null,
+  step: null,
   ...over,
 })
 
@@ -115,5 +116,34 @@ describe("a card's Sessions", () => {
     vi.advanceTimersByTime(1)
     expect(onChanged).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
+  })
+})
+
+describe('what a session is on', () => {
+  it('says the step a working session is on', () => {
+    rows([session({ state: 'working', step: 'Edit invoice.ts' })])
+    expect(row('Terminal').getByText('working · Edit invoice.ts')).toBeTruthy()
+  })
+
+  it('says no step once the session stopped working', () => {
+    rows([session({ state: 'done', step: 'Edit invoice.ts' })])
+    expect(row('Terminal').getByText('done')).toBeTruthy()
+  })
+
+  it('reads again on a beat while something works, and stops after', () => {
+    vi.useFakeTimers()
+    try {
+      const onChanged = vi.fn()
+      const { rerender } = render(
+        <CardSessions cardId="card_1" title="t" sessions={[session({ state: 'working' })]} onChanged={onChanged} />,
+      )
+      vi.advanceTimersByTime(STEP_EVERY_MS * 2)
+      expect(onChanged).toHaveBeenCalledTimes(2)
+      rerender(<CardSessions cardId="card_1" title="t" sessions={[session({ state: 'done' })]} onChanged={onChanged} />)
+      vi.advanceTimersByTime(STEP_EVERY_MS * 2)
+      expect(onChanged).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

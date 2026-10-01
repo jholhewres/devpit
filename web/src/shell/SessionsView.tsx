@@ -97,6 +97,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
         waiting: null,
         pane: { projectId: one.id, paneId: made.data.focusedId },
         sessionId: null,
+        step: null,
       })
     })
   }
@@ -206,7 +207,11 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                     <span className="sess__state">{STATE_WORDS[state]}</span>
                     <span className="sess__meta">
                       {[one.cardId ? 'card' : null, since(one.since, now)].filter(Boolean).join(' · ')}
-                      {last && ` · ${ARROW[last.kind as keyof typeof ARROW] ?? ''} ${last.summary ?? last.text}`}
+                      {/* What it is on right now beats what it last said: a
+                          working session's last reply is from the turn before. */}
+                      {one.step && state === 'busy'
+                        ? ` · ${one.step}`
+                        : last && ` · ${ARROW[last.kind as keyof typeof ARROW] ?? ''} ${last.summary ?? last.text}`}
                     </span>
                   </button>
                   {one.pane && (

@@ -69,6 +69,7 @@ fn live(name: &str, project: Option<&str>) -> devpit_rpc::LiveSession {
         waiting: None,
         pane: None,
         session_id: None,
+        step: None,
     }
 }
 

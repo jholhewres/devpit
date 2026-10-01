@@ -1734,6 +1734,11 @@ export type CardSession = {
 	leafId: string | null,
 	/**  The run a `run` session belongs to, so the card can stop it. */
 	runId: string | null,
+	/**
+	 *  What it is on while it works — `Edit invoice.ts` — joined when read
+	 *  from what its hooks said, never stored.
+	 */
+	step: string | null,
 };
 
 /**
@@ -2607,6 +2612,8 @@ export type LiveSession = {
 	pane: LivePane | null,
 	/**  The CLI's own id for the conversation, which its hooks carry too. */
 	sessionId: string | null,
+	/**  What it is on while it works — `Edit invoice.ts` — as its hooks said. */
+	step: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */

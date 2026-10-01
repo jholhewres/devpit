@@ -19,6 +19,7 @@ const session = (over: Partial<CardSession>): CardSession => ({
   tabId: null,
   leafId: null,
   runId: null,
+  step: null,
   ...over,
 })
 

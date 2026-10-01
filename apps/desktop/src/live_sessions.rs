@@ -80,6 +80,10 @@ pub(crate) fn read(
                 waiting,
                 pane,
                 cwd,
+                step: listed
+                    .session_id
+                    .as_deref()
+                    .and_then(crate::island_feed::step_of),
                 session_id: listed.session_id.filter(|id| crate::adopting::plain(id)),
             })
         })

@@ -146,6 +146,7 @@ impl Activities {
                 tab_id: heard.place.tab_id.clone(),
                 leaf_id: heard.place.leaf_id.clone(),
                 run_id: None,
+                step: None,
             })
             .collect();
         sessions.extend(
@@ -159,6 +160,7 @@ impl Activities {
                     tab_id: None,
                     leaf_id: None,
                     run_id: None,
+                    step: None,
                 }),
         );
         sessions.sort_by(|a, b| (a.kind, &a.reference).cmp(&(b.kind, &b.reference)));

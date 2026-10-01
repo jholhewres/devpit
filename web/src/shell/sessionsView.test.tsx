@@ -14,7 +14,7 @@ vi.mock('./live', () => ({
     orchestratorSessions: () => ({
       sessions: [
         live('api-b', 'api'),
-        live('web-a', 'web', { status: 'busy', projectId: 'w' }),
+        live('web-a', 'web', { status: 'busy', projectId: 'w', step: 'Edit invoice.ts' }),
         live('api-a', 'api', { waiting: { question: 'Deploy now?', options: [], cursor: 0 }, pane: { projectId: 'p', paneId: 'leaf_1' } }),
       ],
     }),
@@ -53,6 +53,11 @@ describe("an orchestrator's sessions", () => {
     fireEvent.change(input, { target: { value: 'yes, go' } })
     fireEvent.submit(input.closest('form')!)
     expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, go')
+  })
+
+  it('says what a busy session is on right now', async () => {
+    render(<SessionsView shown />)
+    expect(await screen.findByText(/· Edit invoice\.ts/)).toBeTruthy()
   })
 
   it('keeps the ones no longer running below, with their history', async () => {

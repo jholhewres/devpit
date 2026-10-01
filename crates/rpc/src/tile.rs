@@ -78,6 +78,9 @@ pub struct CardSession {
     pub leaf_id: Option<String>,
     /// The run a `run` session belongs to, so the card can stop it.
     pub run_id: Option<String>,
+    /// What it is on while it works — `Edit invoice.ts` — joined when read
+    /// from what its hooks said, never stored.
+    pub step: Option<String>,
 }
 
 /// What `card:happening` carries: a card's sessions, and what they add up to.

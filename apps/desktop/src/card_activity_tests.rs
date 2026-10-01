@@ -249,6 +249,7 @@ fn a_card_adds_up_to_the_state_most_worth_looking_at() {
         tab_id: None,
         leaf_id: None,
         run_id: None,
+        step: None,
     };
     let order = [
         Doing::Gone,
@@ -371,6 +372,7 @@ fn a_session_nobody_has_heard_from_does_not_count_on_the_tile() {
         tab_id: None,
         leaf_id: None,
         run_id: None,
+        step: None,
     };
     assert_eq!(
         activity(&[session(None), session(Some(Doing::Done))]),
@@ -545,6 +547,7 @@ fn a_background_session_the_cli_listed_still_counts_when_another_session_of_the_
         tab_id: None,
         leaf_id: None,
         run_id: None,
+        step: None,
     };
     note_background(&mut activities, "card_1", std::slice::from_ref(&listed));
 

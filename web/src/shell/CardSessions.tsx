@@ -8,6 +8,8 @@ import { onCarried } from './window'
 
 /** How long a card's sessions have to be quiet before the card is read again. */
 export const READ_AFTER_MS = 250
+/** How often a card with a session working reads again, for the step it is on. */
+export const STEP_EVERY_MS = 4000
 
 const KIND: Readonly<Record<CardSession['kind'], string>> = {
   pane: 'Terminal',
@@ -56,6 +58,15 @@ export function CardSessions({
       stop()
     }
   }, [cardId, onChanged])
+
+  /* A state change is what the card hears; a tool after a tool is not one,
+     so while something works the step it is on is read again on a beat. */
+  const working = sessions.some((one) => one.state === 'working')
+  useEffect(() => {
+    if (!working) return
+    const beat = window.setInterval(onChanged, STEP_EVERY_MS)
+    return () => window.clearInterval(beat)
+  }, [working, onChanged])
 
   if (sessions.length === 0) return null
   const projectId = project?.id ?? null
@@ -115,7 +126,10 @@ export function CardSessions({
             <span className="crun__b">
               <span className="crun__t">{KIND[session.kind]}</span>
             </span>
-            <span className="crun__s">{session.state ?? 'not heard from yet'}</span>
+            <span className="crun__s" title={session.step ?? undefined}>
+              {session.state ?? 'not heard from yet'}
+              {session.step && session.state === 'working' && ` · ${session.step}`}
+            </span>
             {tabId && leafId && (
               <button className="btn" disabled={busy} onClick={() => void goTo(tabId, leafId)}>
                 Go to terminal

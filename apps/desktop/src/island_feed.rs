@@ -97,6 +97,35 @@ pub(crate) fn now() -> Vec<IslandSession> {
     all
 }
 
+/// What a working session is on, in the words a row shows — `Edit
+/// invoice.ts` — or `None` once its turn is over. The newest step, done or
+/// not: between two tools it is still what the turn last touched.
+pub(crate) fn stepping(session: &IslandSession) -> Option<String> {
+    if session.state != Doing::Working {
+        return None;
+    }
+    let step = session.steps.last()?;
+    Some(match &step.target {
+        Some(target) => format!("{} {target}", step.tool),
+        None => step.tool.clone(),
+    })
+}
+
+/// [`stepping`] for the session the CLI calls `session_id`.
+pub(crate) fn step_of(session_id: &str) -> Option<String> {
+    stepping(registry().lock().ok()?.get(session_id)?)
+}
+
+/// [`stepping`] for the session in devpit's terminal `pane_id`.
+pub(crate) fn step_in_pane(pane_id: &str) -> Option<String> {
+    let sessions = registry().lock().ok()?;
+    sessions
+        .values()
+        .filter(|one| one.pane_id.as_deref() == Some(pane_id))
+        .max_by(|one, other| one.at.total_cmp(&other.at))
+        .and_then(stepping)
+}
+
 /// Folds one hook into its session and tells the island what changed.
 pub(crate) fn heard(sink: &impl HookSink, pane: Option<&str>, happening: &Happening, at: f64) {
     let Ok(mut sessions) = registry().lock() else {

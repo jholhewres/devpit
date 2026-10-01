@@ -53,6 +53,7 @@ fn a_cards_panes_are_listed_before_their_agents_say_anything() {
             tab_id: Some(tab.clone()),
             leaf_id: Some("leaf_a".to_owned()),
             run_id: None,
+            step: None,
         }],
     };
 
@@ -98,6 +99,7 @@ fn a_run_heard_under_its_own_id_is_listed_without_a_link() {
             tab_id: None,
             leaf_id: None,
             run_id: None,
+            step: None,
         }],
     };
     let listed = card_sessions(&store, &project, &card, &[], &heard);
