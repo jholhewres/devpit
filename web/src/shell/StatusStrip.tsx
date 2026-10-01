@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { McpChip } from './McpChip'
 import { Monitor } from './Monitor'
+import { Version } from './Version'
 import { tabOfPane } from './strip'
 import { useShell } from './useShell'
 import { useUsage } from './useUsage'
@@ -32,6 +33,7 @@ export function StatusStrip(): React.JSX.Element | null {
 
   return (
     <div className="strip">
+      <Version />
       <McpChip projectId={project.orchestrator ? null : project.id} />
       {open && (
         <Monitor

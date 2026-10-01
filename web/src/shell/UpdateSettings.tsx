@@ -4,7 +4,7 @@ import type { UpdateStatus } from '../gen/bindings'
 import { ask, commands } from './live'
 import { SHOW_THE_UPDATE } from './UpdateCard'
 import { useShell } from './useShell'
-import { onCarried } from './window'
+import { useUpdateStatus } from './useUpdateStatus'
 
 /*
  * Whether there is a newer devpit, and which one this is.
@@ -63,27 +63,12 @@ const ON_THE_CARD = new Set<UpdateStatus['type']>(['downloading', 'ready', 'wait
 
 export function UpdateSettings(): React.JSX.Element {
   const { closePrefs } = useShell()
-  const [status, setStatus] = useState<UpdateStatus | null>(null)
+  const [status, setStatus] = useUpdateStatus()
   const [version, setVersion] = useState('')
   const [asking, setAsking] = useState(false)
 
   useEffect(() => {
     void ask(() => commands.appInfo()).then((answer) => setVersion(answer.data?.version ?? ''))
-  }, [])
-
-  /* What the app holds now, and every move after. An event heard before the
-     first answer is newer, and wins. */
-  useEffect(() => {
-    let heard = false
-    const stop = onCarried<UpdateStatus>('update:status', (now) => {
-      heard = true
-      setStatus(now)
-    })
-    void commands
-      .updateStatus()
-      .then((now) => !heard && now.type !== 'idle' && setStatus(now))
-      .catch(() => undefined)
-    return stop
   }, [])
 
   const answered = (answer: { data: UpdateStatus | null; error: string | null }): void => {
