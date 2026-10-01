@@ -173,6 +173,17 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
         return;
     }
 
+    // A terminal session about to ask: held for the island while nobody is at
+    // the window, and answered with nothing otherwise, so the terminal asks.
+    if let Some(pane) = posted.pane.as_deref() {
+        if crate::pane_asking::is_permission_request(body) {
+            trace(&format!("post seq={seq} permission"));
+            let said = crate::pane_asking::hold(&app, body, pane);
+            reply(&mut stream, &said);
+            return;
+        }
+    }
+
     // A tool this session wants to be asked about holds the connection until
     // a person answers. Everything else is answered at once and empty, which
     // leaves the CLI's own permission mode in charge — a board step running
@@ -191,8 +202,12 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
         let asking = app.state::<Asking>();
         let hear = asking.opened(&question.id);
         let _ = app.emit("permission:asked", &question);
+        crate::island_notify::asked(&app, &question.tool, &question.input);
         let said = decision(asking.wait(&question.id, hear));
         reply(&mut stream, &said);
+        // Answered here or anywhere else, or timed out: every window that
+        // drew the question puts it away.
+        let _ = app.emit("permission:settled", &question.id);
         return;
     }
 
@@ -215,6 +230,7 @@ fn hear_post(sink: &impl HookSink, posted: &Posted, seq: u64) -> &'static str {
         None => "ignored",
         Some(happening) => {
             sink.to_window("agent:happening", describe(&happening));
+            crate::island_feed::heard(sink, posted.pane.as_deref(), &happening, now_ms());
             heard(sink, posted.pane.as_deref(), &happening, seq)
         }
     }
@@ -357,6 +373,10 @@ pub(crate) trait HookSink {
     fn store(&self) -> Option<Store>;
     /// What has been heard about cards so far.
     fn activities(&self) -> &Mutex<Activities>;
+    /// A session changed on the island. Nothing, where there is no island.
+    fn to_island(&self, _change: devpit_rpc::IslandChange) {}
+    /// A session's state changed from `was`: the person may want to know.
+    fn tell_person(&self, _session: &devpit_rpc::IslandSession, _was: Option<devpit_rpc::Doing>) {}
 }
 
 impl HookSink for AppHandle {
@@ -383,6 +403,21 @@ impl HookSink for AppHandle {
     fn activities(&self) -> &Mutex<Activities> {
         crate::card_activity::registry()
     }
+
+    fn to_island(&self, change: devpit_rpc::IslandChange) {
+        crate::island::tell(self, change);
+    }
+
+    fn tell_person(&self, session: &devpit_rpc::IslandSession, was: Option<devpit_rpc::Doing>) {
+        crate::island_notify::changed(self, session, was);
+    }
+}
+
+fn now_ms() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_millis() as f64)
+        .unwrap_or_default()
 }
 
 fn reply(stream: &mut TcpStream, body: &str) {

@@ -36,5 +36,9 @@ pub const FILES_WIDTH: &str = "layout.files_width";
 pub const HEADS_DOWN: &str = "focus.heads_down";
 /// Whether the focus mode is offered. Off unless it is turned on.
 pub const FOCUS_MODE: &str = "focus.enabled";
+/// Whether the island opens above the other windows. On unless turned off.
+pub const ISLAND: &str = "island.enabled";
+/// The screen the island was last dragged to, by the name the system gives it.
+pub const ISLAND_SCREEN: &str = "island.screen";
 /// Whether devpit keeps its own errors for a report. Off unless turned on.
 pub const ERROR_REPORTS: &str = "telemetry.error_reports";

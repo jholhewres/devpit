@@ -7,7 +7,7 @@ import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
 import { withSkills } from './pills'
 import { offers, onProfilesChanged } from './profiles'
-import { onChatWoke, onPermissionAsked } from './window'
+import { onChatWoke, onPermissionAsked, onPermissionSettled } from './window'
 import { useShellPick } from './shellStore'
 
 /** The card a conversation is filed under. */
@@ -216,6 +216,9 @@ export function useChat(conversationId: string): Chat {
       if (question.sessionId === session) setAsked((was) => [...was, question])
     })
   }, [session])
+
+  /* Answered from the island, or timed out: the card goes either way. */
+  useEffect(() => onPermissionSettled((id) => setAsked((was) => was.filter((one) => one.id !== id))), [])
 
   const answer = useCallback(
     (id: string, allow: boolean) => {

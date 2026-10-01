@@ -8,6 +8,7 @@ import { Notices } from './Notices'
 import { ProjectPicker } from './ProjectPicker'
 import { TabStrip } from './TabStrip'
 import { useNotices } from './useNotices'
+import { useIslandOpens } from './useIslandOpens'
 import { useShell } from './useShell'
 import { useTree } from './useTree'
 import { close, minimize, toggleMaximize } from './window'
@@ -28,6 +29,7 @@ import { close, minimize, toggleMaximize } from './window'
 export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
   const { side, files, toggleSide, toggleFiles, project, show, openCard, managing, openManager, setProject, openPane } =
     useShell()
+  useIslandOpens(project?.id ?? null, setProject, openPane)
   /* One reader for the whole top bar: the panel and the pill draw from the
      same list, so a count on one cannot disagree with the other. */
   const bell = useNotices()

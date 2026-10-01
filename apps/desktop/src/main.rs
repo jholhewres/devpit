@@ -84,6 +84,9 @@ mod index;
 #[cfg(target_os = "linux")]
 mod input_method;
 mod installations;
+mod island;
+mod island_feed;
+mod island_notify;
 mod kept_out;
 mod kinds;
 mod leftovers;
@@ -97,6 +100,7 @@ mod notices;
 mod off_main;
 mod openers;
 mod outside_sessions;
+mod pane_asking;
 mod pane_screen;
 mod panels;
 mod panes;
@@ -195,6 +199,8 @@ fn main() {
         // Checking and downloading are the app's; installing is not — see
         // `update` for why only an AppImage is ever installed from here.
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Telling the person an agent needs them while devpit is behind.
+        .plugin(tauri_plugin_notification::init())
         .manage(chat::Talking::default())
         .manage(chat_relay::Relay::default())
         .manage(chat_resident::Residents::default())
@@ -294,6 +300,8 @@ fn main() {
             if let Ok(root) = devpit_core::Store::root() {
                 listener::start(app.handle().clone(), &root);
             }
+            // The island, when the person wants it and the screen can hold it.
+            island::apply(app.handle());
             // Which agent CLIs this machine has, asked of the login shell —
             // which costs an interactive shell startup. Started now so the
             // first time somebody opens the menu the answer is already there.

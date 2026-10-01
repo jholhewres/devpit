@@ -73,6 +73,9 @@ pub struct Settings {
     ///
     /// Opt-in: `null` is off. Turning it off deletes what was kept.
     pub error_reports: Option<bool>,
+    /// Whether the island opens above the other windows. `null` is on: it
+    /// stays out of sight until an agent does something.
+    pub island: Option<bool>,
 }
 
 /// What the next error report would send, for the person to read first.

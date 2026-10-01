@@ -45,6 +45,7 @@ vi.mock('./window', () => ({
   inTauri: () => true,
   onChatWoke: (then: (conversationId: string) => void) => ((woke.handler = then), () => {}),
   onPermissionAsked: () => () => {},
+  onPermissionSettled: () => () => {},
 }))
 const shell = { project: { id: 'p', rootPath: '/w', orchestrator: null }, show: () => {} }
 vi.mock('./shellStore', () => ({ useShellPick: (pick: (from: typeof shell) => unknown) => pick(shell) }))

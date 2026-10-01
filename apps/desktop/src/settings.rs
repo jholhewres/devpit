@@ -27,6 +27,7 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
             .filter(|value| CONTRAST.contains(value)),
         focus_mode: store.preference_flag(preference::FOCUS_MODE)?,
         error_reports: store.preference_flag(preference::ERROR_REPORTS)?,
+        island: store.preference_flag(preference::ISLAND)?,
     })
 }
 
@@ -55,6 +56,7 @@ pub async fn settings_write(
     terminal_contrast: Option<f64>,
     focus_mode: Option<bool>,
     error_reports: Option<bool>,
+    island: Option<bool>,
 ) -> Result<Settings, RpcError> {
     crate::off_main::blocking(move || {
         settings_write_now(
@@ -64,6 +66,7 @@ pub async fn settings_write(
             terminal_contrast,
             focus_mode,
             error_reports,
+            island,
         )
     })
     .await
@@ -77,6 +80,7 @@ pub(crate) fn settings_write_now(
     terminal_contrast: Option<f64>,
     focus_mode: Option<bool>,
     error_reports: Option<bool>,
+    island: Option<bool>,
 ) -> Result<Settings, RpcError> {
     let store = store()?;
     if let Some(chosen) = theme {
@@ -90,6 +94,9 @@ pub(crate) fn settings_write_now(
     }
     if let Some(offered) = focus_mode {
         store.set_preference_flag(preference::FOCUS_MODE, offered)?;
+    }
+    if let Some(shown) = island {
+        store.set_preference_flag(preference::ISLAND, shown)?;
     }
     if let Some(kept) = error_reports {
         // Now, not at the next start: off means nothing kept from this moment.

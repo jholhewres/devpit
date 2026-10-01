@@ -47,9 +47,13 @@ export function Settings({
           null,
           field === 'focusMode' ? next : null,
           field === 'errorReports' ? next : null,
+          field === 'island' ? next : null,
         ),
       ),
-    ).then((answer) => setFlags(answer.data ?? flags))
+    ).then((answer) => {
+      setFlags(answer.data ?? flags)
+      if (field === 'island' && answer.data) void ask(() => commands.islandApply())
+    })
   }
 
   const on = (field: Flag): boolean => flagOn(flags, field)
@@ -108,6 +112,10 @@ export function Settings({
             </div>
             <button className="pref" role="switch" aria-checked={on('automaticUpdates')} onClick={() => set('automaticUpdates', !on('automaticUpdates'))}>
               <span className="pref__body"><span className="pref__t">Automatic updates</span><span className="pref__d">Check in the background and offer to install.</span></span>
+              <span className="sw"></span>
+            </button>
+            <button className="pref" role="switch" aria-checked={on('island')} onClick={() => set('island', !on('island'))}>
+              <span className="pref__body"><span className="pref__t">Island</span><span className="pref__d">A small window at the top of the screen, above everything, showing what every agent is doing and who is waiting on you.</span></span>
               <span className="sw"></span>
             </button>
             <button className="pref" role="switch" aria-checked={on('focusMode')} onClick={() => set('focusMode', !on('focusMode'))}>
@@ -170,7 +178,7 @@ export function Settings({
             <TerminalContrast
               value={flags?.terminalContrast ?? null}
               onPick={(value) =>
-                void inOrder('settings', () => ask(() => commands.settingsWrite(null, null, null, value, null, null))).then((answer) =>
+                void inOrder('settings', () => ask(() => commands.settingsWrite(null, null, null, value, null, null, null))).then((answer) =>
                   setFlags(answer.data ?? flags),
                 )
               }

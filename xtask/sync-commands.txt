@@ -24,6 +24,8 @@ session_resize resizes an open pty
 permission_answer answers a question held in memory
 update_restart_ready wakes a thread that is already waiting
 browser_menus exists for its types
+island_cursors exists for its types
+island_questions exists for its types
 pane_scrollback reads the ring an attached pane already holds in memory
 permission_ask_from_now sets a flag on a session held in memory
 chat_stop_task signals a task the running turn already holds

@@ -36,3 +36,5 @@ browser_where the e2e asks the window where a page really is; the driver cannot 
 # cannot see from a command: `MenuFor` goes out on `browser:menu-for` and `Did`
 # comes back as an argument the window has to be able to name.
 browser_menus carries MenuFor and Did, the payloads the menu window is told and answers with
+island_cursors carries Cursor and IslandChange, the payloads island:cursor and island:session carry
+island_questions carries IslandQuestion, the payload island:asked carries

@@ -619,6 +619,33 @@ export const commands = {
 	 */
 	browserMenus: () => __TAURI_INVOKE<[MenuFor, Did]>("browser_menus"),
 	/**
+	 *  `island.apply` — opens or closes the island to match the setting, right
+	 *  after it was switched.
+	 */
+	islandApply: () => typedError<null, RpcError>(__TAURI_INVOKE("island_apply")),
+	/**  `island.now` — every session the island would draw, asked as it mounts. */
+	islandNow: () => typedError<IslandNow, RpcError>(__TAURI_INVOKE("island_now")),
+	/**  `island.shape` — what the island draws, so only that takes the mouse. */
+	islandShape: (rect: IslandRect, shown: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("island_shape", { rect, shown })),
+	/**  `island.open_pane` — brings devpit forward on the terminal a session runs in. */
+	islandOpenPane: (projectId: string | null, paneId: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_open_pane", { projectId, paneId })),
+	/**
+	 *  `island.peek` — a file a session's step touches, for the preview.
+	 * 
+	 *  Read only inside the session's own checkout or its project, through the
+	 *  same reader the file pane uses: symlinks followed, containment checked,
+	 *  size capped. A path anywhere else is refused, not shown.
+	 */
+	islandPeek: (sessionId: string, path: string) => typedError<FileContents, RpcError>(__TAURI_INVOKE("island_peek", { sessionId, path })),
+	/**  `island.cursors` — the shape `island:cursor` carries, for the contract. */
+	islandCursors: () => __TAURI_INVOKE<[Cursor, IslandChange[]]>("island_cursors"),
+	/**  `island.seen` — the island is showing a held question. */
+	islandSeen: (id: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_seen", { id })),
+	/**  `island.decide` — what the person said to a held question. */
+	islandDecide: (id: string, verdict: IslandVerdict) => typedError<null, RpcError>(__TAURI_INVOKE("island_decide", { id, verdict })),
+	/**  `island.questions` — the shape `island:asked` carries, for the contract. */
+	islandQuestions: () => __TAURI_INVOKE<IslandQuestion[]>("island_questions"),
+	/**
 	 *  Every cookie store on this machine, with what stands in the way of each.
 	 * 
 	 *  Listing is not importing. This is what a person chooses from.
@@ -1311,7 +1338,7 @@ export const commands = {
 	 *  Answering with the whole object rather than nothing means the screen never
 	 *  has to predict what a write did to the rest of it.
 	 */
-	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null, focusMode: boolean | null, errorReports: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast, focusMode, errorReports })),
+	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null, focusMode: boolean | null, errorReports: boolean | null, island: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast, focusMode, errorReports, island })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 
@@ -1961,6 +1988,12 @@ export type Conversations = {
  */
 export type Credentials = "saved" | "missing" | "unknown";
 
+/**  Where the cursor is, in the island window's pixels, for the eyes. */
+export type Cursor = {
+	x: number | null,
+	y: number | null,
+};
+
 /**  What a plugin's data folder is allowed to hold. */
 export type DataSpec = {
 	/**  Each with its leading dot, e.g. `.excalidraw`. Enforced by [`validate`]. */
@@ -2322,6 +2355,91 @@ export type Installation = {
 	/**  Whether the default profile runs against it — where the panels start. */
 	default: boolean,
 };
+
+/**
+ *  One change, as `island:session` carries it: the session as it now is, or
+ *  its id when it has gone.
+ */
+export type IslandChange = { was: "changed"; session: IslandSession } | { was: "gone"; sessionId: string };
+
+/**
+ *  Every session the island knows of. An object, so tomorrow's field has
+ *  somewhere to go.
+ */
+export type IslandNow = {
+	sessions: IslandSession[],
+};
+
+/**
+ *  A terminal session about to ask for permission, held for the island to
+ *  answer while nobody is at devpit's window.
+ */
+export type IslandQuestion = {
+	id: string,
+	sessionId: string,
+	paneId: string,
+	/**  The project it runs in, by name, when devpit knows it. */
+	project: string | null,
+	tool: string,
+	/**  The tool's input, as the JSON the CLI sent. */
+	input: string,
+	/**  Whether the CLI offered a rule to keep, so "always" means something. */
+	keepable: boolean,
+};
+
+/**
+ *  The visible island, in the window's logical pixels: the only part of the
+ *  window that takes the mouse.
+ */
+export type IslandRect = {
+	x: number | null,
+	y: number | null,
+	width: number | null,
+	height: number | null,
+};
+
+/**  An agent session, as the island draws it. */
+export type IslandSession = {
+	sessionId: string,
+	/**  The devpit terminal it runs in, when it runs in one. */
+	paneId: string | null,
+	projectId: string | null,
+	project: string | null,
+	/**  The project's colour, as `#rrggbb`, when one was chosen. */
+	color: string | null,
+	cardId: string | null,
+	card: string | null,
+	/**
+	 *  The folder it works in — its card's checkout, else its project — so
+	 *  a path can be shown from there rather than from `/`.
+	 */
+	root: string | null,
+	state: Doing,
+	/**  The latest steps, oldest first. */
+	steps: IslandStep[],
+	/**  The last thing the agent said, cut short. */
+	said: string | null,
+	/**  Milliseconds since the epoch, when it last changed. */
+	at: number | null,
+};
+
+/**  One step of a session's turn: a tool, and what it was run on. */
+export type IslandStep = {
+	tool: string,
+	/**  `invoice.ts`, `npm test`: what the step reads as, after the tool. */
+	target: string | null,
+	done: boolean,
+	/**  It ran and the tool reported an error. */
+	failed: boolean,
+	touch: Touch | null,
+};
+
+/**  What the person said to a held question. */
+export type IslandVerdict = "allow" | 
+/**  Allow, and keep the rule the CLI suggested. */
+"always" | "deny" | 
+/**  Let the terminal ask, the way it would have without devpit. */
+"in_terminal";
 
 /**
  *  What a session is keeping, so emptying it can say so before it happens.
@@ -3326,6 +3444,11 @@ export type Settings = {
 	 *  Opt-in: `null` is off. Turning it off deletes what was kept.
 	 */
 	errorReports: boolean | null,
+	/**
+	 *  Whether the island opens above the other windows. `null` is on: it
+	 *  stays out of sight until an agent does something.
+	 */
+	island: boolean | null,
 };
 
 /**
@@ -3663,6 +3786,22 @@ export type TokenCounts = {
 	cacheRead: number | null,
 	cacheWrite: number | null,
 };
+
+/**
+ *  What a tool is about to touch, read from its input, for the preview.
+ * 
+ *  A closed set: a tool whose input is none of these is shown by name alone,
+ *  rather than guessed at.
+ */
+export type Touch = 
+/**  A replacement in a file: what was there, and what goes in its place. */
+{ kind: "edit"; path: string; before: string; after: string } | 
+/**  A whole file written. */
+{ kind: "write"; path: string; after: string } | 
+/**  A file read, from a line, for so many lines, when the tool said. */
+{ kind: "read"; path: string; offset: number | null; limit: number | null } | 
+/**  A shell command. */
+{ kind: "run"; command: string };
 
 /**  What a turn cost and why it stopped. */
 export type TurnEnd = {

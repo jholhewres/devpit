@@ -119,6 +119,14 @@ export function onPermissionAsked(then: (question: Question) => void): () => voi
 }
 
 /**
+ * Calls back when a question stops waiting — answered in any window, or timed
+ * out — with its id, so every window drawing it can put it away.
+ */
+export function onPermissionSettled(then: (id: string) => void): () => void {
+  return shared<string>('permission:settled', then)
+}
+
+/**
  * Calls back whenever a pane says something about itself.
  *
  * One event for all of it — a prompt, a command starting, an exit code, a
