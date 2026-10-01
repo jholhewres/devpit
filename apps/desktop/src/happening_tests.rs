@@ -48,6 +48,8 @@ fn what_names_no_subagent_is_not_a_subagent() {
         Event::Waiting,
         Event::Using {
             tool: "Agent".to_owned(),
+            target: None,
+            touch: None,
         },
     ] {
         assert!(subagent_said("leaf_1", &event).is_none(), "{event:?}");

@@ -21,7 +21,11 @@ fn a_tool_about_to_run_is_named() {
     assert_eq!(
         happening.event,
         Event::Using {
-            tool: "Bash".to_owned()
+            tool: "Bash".to_owned(),
+            target: Some("echo hi".to_owned()),
+            touch: Some(Touch::Run {
+                command: "echo hi".to_owned()
+            }),
         }
     );
 }
@@ -238,4 +242,17 @@ fn a_compaction_is_not_a_session_starting() {
     for source in ["startup", "resume", "clear"] {
         assert_eq!(started(source).expect(source).event, Event::SessionStarted);
     }
+}
+
+/// A tool that failed sends this and no `PostToolUse`; read as nothing, the
+/// step would stay running until the turn ended.
+#[test]
+fn a_tool_that_failed_is_heard() {
+    let payload = r#"{"session_id":"abc","hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"exit 1"}"#;
+    assert_eq!(
+        read(payload).expect("read").event,
+        Event::UseFailed {
+            tool: "Bash".to_owned()
+        }
+    );
 }

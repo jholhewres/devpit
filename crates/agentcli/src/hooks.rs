@@ -25,7 +25,10 @@
 
 use std::path::{Path, PathBuf};
 
+use devpit_rpc::Touch;
 use serde::Deserialize;
+
+use crate::touch::{target_of, touch_of};
 
 /// What a hook told us.
 #[derive(Debug, Clone, PartialEq)]
@@ -44,10 +47,16 @@ pub struct Happening {
 /// event nobody asked for, and every one of these changes what a card shows.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    /// About to run a tool, named.
-    Using { tool: String },
+    /// About to run a tool, named, with what it is run on when its input says.
+    Using {
+        tool: String,
+        target: Option<String>,
+        touch: Option<Touch>,
+    },
     /// Finished a tool.
     Used { tool: String },
+    /// A tool that failed, which sends no `Used`.
+    UseFailed { tool: String },
     /// A person sent a prompt, so a turn has begun — the only word a turn that
     /// answers in text alone ever sends before its `Stop`.
     Prompted,
@@ -90,6 +99,8 @@ struct Raw {
     cwd: String,
     #[serde(default)]
     tool_name: Option<String>,
+    #[serde(default)]
+    tool_input: Option<serde_json::Value>,
     #[serde(default)]
     last_assistant_message: Option<String>,
     #[serde(default)]
@@ -139,9 +150,15 @@ pub fn read(payload: &str) -> Option<Happening> {
     }
 
     let event = match raw.hook_event_name.as_str() {
-        "PreToolUse" => Event::Using {
-            tool: raw.tool_name?,
-        },
+        "PreToolUse" => {
+            let tool = raw.tool_name?;
+            let input = raw.tool_input.unwrap_or_default();
+            Event::Using {
+                target: target_of(&input),
+                touch: touch_of(&tool, &input),
+                tool,
+            }
+        }
         "PostToolUse" => {
             let tool = raw.tool_name?;
             // Parsed a second time only for `Agent`, not for every tool's output.
@@ -156,6 +173,9 @@ pub fn read(payload: &str) -> Option<Happening> {
                 None => Event::Used { tool },
             }
         }
+        "PostToolUseFailure" => Event::UseFailed {
+            tool: raw.tool_name?,
+        },
         "UserPromptSubmit" => Event::Prompted,
         "Stop" => Event::Stopped {
             said: raw.last_assistant_message,

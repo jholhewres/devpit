@@ -81,7 +81,13 @@ fn hooks(endpoint_file: &Path, auth_file: &Path, guard: &str) -> String {
 
     let hooks: Vec<String> = [
         ("PreToolUse", &consult),
+        // Fired only when the CLI is about to ask, so it is the one to answer
+        // from somewhere else; held by the app only while a person can see the
+        // question there, and answered with nothing otherwise.
+        ("PermissionRequest", &consult),
         ("PostToolUse", &tell),
+        // A tool that failed, which sends no `PostToolUse`.
+        ("PostToolUseFailure", &tell),
         // A turn begins here, and a turn that only answers in text says
         // nothing else before its `Stop`.
         ("UserPromptSubmit", &tell),

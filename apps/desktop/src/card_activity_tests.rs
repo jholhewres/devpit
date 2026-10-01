@@ -13,6 +13,8 @@ fn each_hook_means_what_the_table_says() {
         (
             Event::Using {
                 tool: "Edit".to_owned(),
+                target: None,
+                touch: None,
             },
             Some(Doing::Working),
         ),

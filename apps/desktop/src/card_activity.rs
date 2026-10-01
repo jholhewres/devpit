@@ -23,6 +23,7 @@ pub(crate) fn state_of_event(event: &Event) -> Option<Doing> {
         Event::Prompted
         | Event::Using { .. }
         | Event::Used { .. }
+        | Event::UseFailed { .. }
         | Event::SubagentStarted { .. }
         | Event::Delegated { .. }
         | Event::SubagentDone { .. } => Some(Doing::Working),

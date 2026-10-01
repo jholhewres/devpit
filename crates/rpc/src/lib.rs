@@ -20,6 +20,7 @@ pub mod file;
 pub mod focus;
 mod frame;
 pub mod front;
+pub mod island;
 pub mod live;
 pub mod mcp_health;
 pub mod plugin_data;
@@ -59,6 +60,10 @@ pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};
 pub use frame::{Context, Frame};
 pub use front::Front;
+pub use island::{
+    IslandChange, IslandNow, IslandQuestion, IslandRect, IslandSession, IslandStep, IslandVerdict,
+    Touch,
+};
 pub use live::{LivePane, LiveSession, LiveSessions, PendingPrompt, PromptOption, RemoteState};
 pub use mcp_health::{McpHealth, McpServerHealth, McpState};
 pub use plugin_data::{

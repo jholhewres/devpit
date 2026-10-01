@@ -21,6 +21,7 @@ mod hook_settings;
 mod hooks;
 mod schema;
 mod session;
+mod touch;
 mod transcript;
 
 pub use catalogue::{
@@ -32,6 +33,7 @@ pub use hook_settings::{plugin_hooks_json, settings_json, ALLOWED_TOOLS, HOOKED}
 pub use hooks::{auth_file, endpoint_file, read as read_hook, Event, Happening, HOOK_HEADER};
 pub use schema::validates;
 pub use sources::seed_sources;
+pub use touch::target_of;
 // `start_background` and the argv builders live in this module.
 pub use session::{AgentSession, Kind, Status};
 pub use transcript::transcript_path;

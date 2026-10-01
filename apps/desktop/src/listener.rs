@@ -400,8 +400,14 @@ fn reply(stream: &mut TcpStream, body: &str) {
 fn describe(happening: &Happening) -> (String, String) {
     let said = match &happening.event {
         Event::Prompted => "took a prompt".to_owned(),
-        Event::Using { tool } => format!("running {tool}"),
+        Event::Using {
+            tool,
+            target: Some(target),
+            ..
+        } => format!("running {tool} {target}"),
+        Event::Using { tool, .. } => format!("running {tool}"),
         Event::Used { tool } => format!("finished {tool}"),
+        Event::UseFailed { tool } => format!("{tool} failed"),
         Event::Stopped { said } => said
             .clone()
             .unwrap_or_else(|| "finished the turn".to_owned()),

@@ -18,12 +18,15 @@ fn only_the_hook_that_can_be_answered_prints_what_came_back() {
 
     // The stdout sink, not the stderr one: both hooks silence stderr, and
     // only one of them silences the answer.
-    assert!(
-        !command("PreToolUse").contains(" >/dev/null"),
-        "the decision was thrown away"
-    );
+    for asking in ["PreToolUse", "PermissionRequest"] {
+        assert!(
+            !command(asking).contains(" >/dev/null"),
+            "the decision on {asking} was thrown away"
+        );
+    }
     for reporting in [
         "PostToolUse",
+        "PostToolUseFailure",
         "UserPromptSubmit",
         "Stop",
         "StopFailure",
@@ -54,6 +57,7 @@ fn the_hook_that_waits_on_a_person_gets_a_longer_budget() {
     };
 
     assert!(command("PreToolUse").contains("--max-time 125"));
+    assert!(command("PermissionRequest").contains("--max-time 125"));
     assert!(command("Stop").contains("--max-time 1.5"));
 }
 
