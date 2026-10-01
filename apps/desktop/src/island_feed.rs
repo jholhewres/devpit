@@ -3,7 +3,7 @@
 //! Heard, never stored, like `card_activity`: the island draws what agents
 //! are doing right now, and a row that outlived the app would still say it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 
 use devpit_agentcli::{Event, Happening};
@@ -32,9 +32,13 @@ pub(crate) fn registry() -> &'static Mutex<Sessions> {
 /// no hook has spoken for since this app started: a session left idle before
 /// a restart says nothing until it is used, and the island would call that
 /// nothing running.
-pub(crate) fn seed(live: Vec<devpit_rpc::LiveSession>, colors: &HashMap<String, Option<String>>) {
+pub(crate) fn seed(
+    live: Vec<devpit_rpc::LiveSession>,
+    colors: &HashMap<String, Option<String>>,
+    panes: &HashSet<String>,
+) {
     if let Ok(mut sessions) = registry().lock() {
-        seed_into(&mut sessions, live, colors);
+        seed_into(&mut sessions, live, colors, panes);
     }
 }
 
@@ -43,10 +47,12 @@ pub(crate) fn seed_into(
     sessions: &mut Sessions,
     live: Vec<devpit_rpc::LiveSession>,
     colors: &HashMap<String, Option<String>>,
+    panes: &HashSet<String>,
 ) {
     for one in live {
-        // A project this devpit knows: the CLI lists the account's sessions,
-        // and another devpit's terminals are not this one's to open.
+        // In one of this devpit's terminals, open now: the CLI lists the
+        // account's sessions, and a pane named like devpit's on another
+        // devpit's server — a development build's — is not this one's.
         let (Some(session_id), Some(pane), Some(_)) = (
             one.session_id.clone(),
             one.pane.as_ref(),
@@ -54,6 +60,9 @@ pub(crate) fn seed_into(
         ) else {
             continue;
         };
+        if !panes.contains(&pane.pane_id) {
+            continue;
+        }
         if sessions.contains_key(&session_id) {
             continue;
         }
@@ -84,6 +93,66 @@ pub(crate) fn seed_into(
                 at: one.since.unwrap_or_default(),
             },
         );
+    }
+}
+
+/// What is no longer open in devpit: a session whose terminal closed or went
+/// back to its shell, and — one agent to a terminal — every session of a pane
+/// but the latest, left behind by a `/clear` or a restart in it. Answers what
+/// went. Chats have no pane and are not this rule's.
+pub(crate) fn reconcile(sessions: &mut Sessions, panes: &HashSet<String>) -> Vec<String> {
+    let mut latest: HashMap<&str, (&str, f64)> = HashMap::new();
+    for one in sessions.values() {
+        let Some(pane) = one.pane_id.as_deref() else {
+            continue;
+        };
+        let newer = latest.get(pane).is_none_or(|(_, at)| one.at > *at);
+        if newer {
+            latest.insert(pane, (one.session_id.as_str(), one.at));
+        }
+    }
+    let gone: Vec<String> = sessions
+        .values()
+        .filter(|one| match one.pane_id.as_deref() {
+            Some(pane) => {
+                !panes.contains(pane)
+                    || latest
+                        .get(pane)
+                        .is_some_and(|(id, _)| *id != one.session_id)
+            }
+            None => false,
+        })
+        .map(|one| one.session_id.clone())
+        .collect();
+    for id in &gone {
+        sessions.remove(id);
+    }
+    gone
+}
+
+/// Terminals devpit just closed: their sessions leave the island now, not at
+/// the next look.
+pub(crate) fn panes_closed(app: &tauri::AppHandle, leaves: &[String]) {
+    let gone: Vec<String> = match registry().lock() {
+        Ok(mut sessions) => {
+            let gone: Vec<String> = sessions
+                .values()
+                .filter(|one| {
+                    one.pane_id
+                        .as_ref()
+                        .is_some_and(|pane| leaves.contains(pane))
+                })
+                .map(|one| one.session_id.clone())
+                .collect();
+            for id in &gone {
+                sessions.remove(id);
+            }
+            gone
+        }
+        Err(_) => return,
+    };
+    for session_id in gone {
+        crate::island::tell(app, IslandChange::Gone { session_id });
     }
 }
 
@@ -338,6 +407,9 @@ pub(crate) fn fold(
 fn resting(sessions: &Sessions, at: f64) -> Vec<String> {
     sessions
         .values()
+        // A terminal's session stays while its terminal is open, however long
+        // it has been idle: that is what `reconcile` is for, against the panes.
+        .filter(|one| one.pane_id.is_none())
         .filter(|one| !matches!(one.state, Doing::Working | Doing::Waiting))
         .filter(|one| at - one.at > RESTING)
         .map(|one| one.session_id.clone())

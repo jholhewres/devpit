@@ -1,5 +1,5 @@
 use devpit_agentcli::{Event, Happening};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use devpit_rpc::{Doing, Touch};
 
@@ -238,6 +238,7 @@ fn a_live_session_no_hook_spoke_for_is_brought_in() {
             listed(Some("s3"), "busy", false),
         ],
         &colors,
+        &open(&["leaf_1"]),
     );
     assert_eq!(sessions["s1"].state, Doing::Open);
     assert_eq!(sessions["s2"].state, Doing::Working);
@@ -246,7 +247,7 @@ fn a_live_session_no_hook_spoke_for_is_brought_in() {
 
     let mut elsewhere = listed(Some("s4"), "busy", true);
     elsewhere.project_id = None;
-    seed_into(&mut sessions, vec![elsewhere], &colors);
+    seed_into(&mut sessions, vec![elsewhere], &colors, &open(&["leaf_1"]));
     assert!(
         !sessions.contains_key("s4"),
         "a project this devpit does not know"
@@ -262,8 +263,76 @@ fn what_a_hook_said_is_not_overwritten_by_the_listing() {
         &mut sessions,
         vec![listed(Some("s1"), "idle", true)],
         &HashMap::new(),
+        &open(&["leaf_1"]),
     );
     assert_eq!(sessions["s1"].state, Doing::Waiting);
+}
+
+fn open(panes: &[&str]) -> HashSet<String> {
+    panes.iter().map(|one| (*one).to_owned()).collect()
+}
+
+/// The case that was reported: the CLI listed a session in a pane named like
+/// devpit's — a development build's, on its own tmux server — in a folder this
+/// devpit knows, and the island showed a terminal nobody had open here.
+#[test]
+fn a_session_in_a_terminal_not_open_here_is_not_brought_in() {
+    let mut sessions = Sessions::new();
+    seed_into(
+        &mut sessions,
+        vec![listed(Some("s1"), "idle", true)],
+        &HashMap::new(),
+        &open(&["leaf_other"]),
+    );
+    assert!(sessions.is_empty());
+}
+
+fn in_pane(id: &str, pane: Option<&str>, state: Doing, at: f64) -> IslandSession {
+    let mut session = folded(vec![Event::Prompted]).expect("a session");
+    session.session_id = id.to_owned();
+    session.pane_id = pane.map(str::to_owned);
+    session.state = state;
+    session.at = at;
+    session
+}
+
+/// What is open in devpit decides, not what a hook last said: a terminal
+/// closed or back at its shell takes its session with it, and a terminal
+/// holds one agent — an older session left there by a `/clear` goes.
+#[test]
+fn the_island_keeps_what_is_open_in_devpit() {
+    let mut sessions: Sessions = [
+        in_pane("open", Some("leaf_1"), Doing::Open, 1.0),
+        in_pane("closed", Some("leaf_2"), Doing::Working, 2.0),
+        in_pane("before-clear", Some("leaf_3"), Doing::Open, 1.0),
+        in_pane("after-clear", Some("leaf_3"), Doing::Working, 5.0),
+        in_pane("chat", None, Doing::Open, 1.0),
+    ]
+    .into_iter()
+    .map(|one| (one.session_id.clone(), one))
+    .collect();
+
+    let mut gone = reconcile(&mut sessions, &open(&["leaf_1", "leaf_3"]));
+    gone.sort();
+    assert_eq!(gone, ["before-clear", "closed"]);
+    let mut kept: Vec<&str> = sessions.keys().map(String::as_str).collect();
+    kept.sort();
+    assert_eq!(kept, ["after-clear", "chat", "open"]);
+}
+
+/// An idle session in an open terminal stays, however long it has been idle;
+/// one with no terminal — a chat — still rests after two hours.
+#[test]
+fn an_idle_terminal_session_is_not_rested_away() {
+    let sessions: Sessions = [
+        in_pane("terminal", Some("leaf_1"), Doing::Open, 0.0),
+        in_pane("chat", None, Doing::Open, 0.0),
+    ]
+    .into_iter()
+    .map(|one| (one.session_id.clone(), one))
+    .collect();
+    let ten_hours = 10.0 * 3600.0 * 1000.0;
+    assert_eq!(resting(&sessions, ten_hours), ["chat"]);
 }
 
 /// A row says what a working session is on, the newest step first, and says

@@ -222,6 +222,8 @@ pub(crate) fn panes_closed(app: &tauri::AppHandle, leaves: &[String]) {
             let _ = tauri::Emitter::emit(app, "card:happening", happening);
         }
     }
+    drop(activities);
+    crate::island_feed::panes_closed(app, leaves);
 }
 
 /// What a card's sessions add up to on its tile: the one most worth looking at.

@@ -178,6 +178,17 @@ impl Server {
         Ok(shell::parse_running(&String::from_utf8_lossy(&out.stdout)))
     }
 
+    /// What is running in every pane on this server, one row per pane: a
+    /// window shows up once per session grouped on it, and is told once.
+    pub fn running_everywhere(&self) -> Result<Vec<Running>, TmuxError> {
+        let out = self.require(&["list-panes", "-a", "-F", shell::RUNNING_FORMAT])?;
+        let mut seen = std::collections::HashSet::new();
+        Ok(shell::parse_running(&String::from_utf8_lossy(&out.stdout))
+            .into_iter()
+            .filter(|one| seen.insert(one.leaf_id.clone()))
+            .collect())
+    }
+
     /// Records which profile devpit started in a pane.
     pub fn name_pane(&self, target: &str, profile: &str) -> Result<(), TmuxError> {
         pane::name_pane(self, target, profile)

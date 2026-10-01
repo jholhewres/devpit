@@ -401,12 +401,35 @@ fn seeded() {
                 .collect()
         })
         .unwrap_or_default();
+    // The terminals open in this devpit with something other than a shell in
+    // front: what the island may show. Unknown — tmux not answering — is not
+    // "none", and leaves the island as it was.
+    let Some(panes) = open_panes() else {
+        return;
+    };
     let profiles = crate::agent_profiles::all(&store).unwrap_or_default();
     for profile in profiles.iter().filter(|one| one.driver == "claude") {
         if let Ok(live) = crate::live_sessions::orchestrator_sessions_now(&profile.id) {
-            crate::island_feed::seed(live.sessions, &colors);
+            crate::island_feed::seed(live.sessions, &colors, &panes);
         }
     }
+    if let Ok(mut sessions) = crate::island_feed::registry().lock() {
+        crate::island_feed::reconcile(&mut sessions, &panes);
+    }
+}
+
+/// This devpit's terminals with an agent — anything but a shell — in front.
+fn open_panes() -> Option<std::collections::HashSet<String>> {
+    let server = crate::sessions::tmux_server().ok()?;
+    Some(
+        server
+            .running_everywhere()
+            .ok()?
+            .into_iter()
+            .filter(|one| !devpit_pty::agents::idle_shell(&one.command))
+            .map(|one| one.leaf_id)
+            .collect(),
+    )
 }
 
 /// `island.shape` — what the island draws, so only that takes the mouse.
