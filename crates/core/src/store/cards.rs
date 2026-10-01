@@ -83,11 +83,18 @@ impl Store {
         Ok(())
     }
 
-    /// When this card is due, or `None` to clear it.
-    pub fn set_card_due(&self, card_id: &str, due_at: Option<i64>) -> Result<bool, StoreError> {
+    /// When this card is due, or `None` to clear it; `timed` when the date
+    /// carries a time somebody chose. A new date reminds again.
+    pub fn set_card_due(
+        &self,
+        card_id: &str,
+        due_at: Option<i64>,
+        timed: bool,
+    ) -> Result<bool, StoreError> {
         let changed = self.conn.execute(
-            "UPDATE card SET due_at = ?2, updated_at = ?3 WHERE id = ?1 AND archived_at IS NULL",
-            rusqlite::params![card_id, due_at, now()],
+            "UPDATE card SET due_at = ?2, due_time = ?3, reminded_at = NULL, handled_at = NULL, \
+             updated_at = ?4 WHERE id = ?1 AND archived_at IS NULL",
+            rusqlite::params![card_id, due_at, timed && due_at.is_some(), now()],
         )?;
         Ok(changed > 0)
     }

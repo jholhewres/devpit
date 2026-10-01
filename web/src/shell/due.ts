@@ -32,19 +32,22 @@ export function nearness(due: number | null, now = Date.now() / 1000): Nearness 
   return 'later'
 }
 
-/** The date, in the reader's locale — the year only when it is not this one. */
-export function dueLabel(due: number | null, now = Date.now() / 1000): string {
+/** The date, in the reader's locale — the year only when it is not this one,
+ *  and the time when one was chosen. */
+export function dueLabel(due: number | null, now = Date.now() / 1000, timed = false): string {
   if (!due) return ''
   const at = new Date(due * 1000)
   const near = nearness(due, now)
-  if (near === 'today') return 'today'
+  const time = timed ? at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''
+  if (near === 'today') return time ? `today ${time}` : 'today'
 
   const thisYear = at.getFullYear() === new Date(now * 1000).getFullYear()
-  return at.toLocaleDateString(undefined, {
+  const day = at.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     ...(thisYear ? {} : { year: 'numeric' }),
   })
+  return time ? `${day} · ${time}` : day
 }
 
 /*
@@ -62,11 +65,25 @@ export function toField(due: number | null): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`
 }
 
-export function fromField(value: string): number | null {
+export function fromField(value: string, time = ''): number | null {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
   if (!parts) return null
   const [, year, month, day] = parts
-  /* Noon, not midnight: a date stored at 00:00 local and read back through a
-     daylight-saving boundary can land on the previous day. */
-  return new Date(Number(year), Number(month) - 1, Number(day), 12).getTime() / 1000
+  const clock = /^(\d{2}):(\d{2})$/.exec(time.trim())
+  /* A day alone is kept at nine in the morning: the hour its reminder goes
+     off, and well away from midnight — a date stored at 00:00 local and read
+     back through a daylight-saving boundary can land on the previous day. */
+  const [hour, minute] = clock ? [Number(clock[1]), Number(clock[2])] : [DAY_REMINDS_AT, 0]
+  return new Date(Number(year), Number(month) - 1, Number(day), hour, minute).getTime() / 1000
+}
+
+/** The hour a date without a time of its own reminds at, local. */
+export const DAY_REMINDS_AT = 9
+
+/** What a time field holds for a date: `HH:MM` when it carries one. */
+export function toTimeField(due: number | null, timed: boolean): string {
+  if (!due || !timed) return ''
+  const at = new Date(due * 1000)
+  const pad = (part: number): string => String(part).padStart(2, '0')
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}`
 }

@@ -123,6 +123,7 @@ mod receipts;
 mod reconcile;
 mod refusing;
 mod regrouping;
+mod reminders;
 mod reply_drafts;
 mod restoring;
 mod reveal;
@@ -304,6 +305,8 @@ fn main() {
                     eprintln!("project folders were not settled: {err}");
                 }
             }
+            // A card's date goes off at its time, whatever project it is in.
+            reminders::watch(app.handle().clone());
             // devpit's half of each orchestrator's brief, as this build has it.
             orchestrator::seed_all_on_start();
             // Hooks are how the board hears about work as it happens rather

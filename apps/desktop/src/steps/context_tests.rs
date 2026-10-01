@@ -70,6 +70,7 @@ fn card() -> devpit_core::CardRow {
         worktree_path: Some("/home/me/.devpit/worktrees/p/card_1".to_owned()),
         base_ref: Some("9f1c2b7e4a".to_owned()),
         due_at: None,
+        due_time: false,
     }
 }
 

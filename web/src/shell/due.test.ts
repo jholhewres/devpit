@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { dueLabel, fromField, nearness, toField } from './due'
+import { DAY_REMINDS_AT, dueLabel, fromField, nearness, toField, toTimeField } from './due'
 
 /* A fixed clock at noon, so nothing here depends on when it runs. */
 const NOON = new Date(2026, 4, 20, 12, 0, 0).getTime() / 1000
@@ -61,10 +61,27 @@ describe('the date field', () => {
     }
   })
 
-  /* Stored at noon rather than midnight: a date at 00:00 local read back
-     across a daylight-saving boundary lands on the day before. */
-  it('stores the date away from midnight', () => {
+  /* Stored at nine rather than midnight: the hour a day's reminder goes off,
+     and a date at 00:00 local read back across a daylight-saving boundary
+     lands on the day before. */
+  it('stores a day alone at the hour it reminds, away from midnight', () => {
     const chosen = fromField('2026-05-20')!
-    expect(new Date(chosen * 1000).getHours()).toBe(12)
+    expect(new Date(chosen * 1000).getHours()).toBe(DAY_REMINDS_AT)
+  })
+
+  it('keeps a time when one is chosen, and gives it back', () => {
+    const chosen = fromField('2026-05-20', '15:30')!
+    const at = new Date(chosen * 1000)
+    expect([at.getDate(), at.getHours(), at.getMinutes()]).toEqual([20, 15, 30])
+    expect(toTimeField(chosen, true)).toBe('15:30')
+    expect(toTimeField(chosen, false)).toBe('')
+    expect(fromField('2026-05-20', 'soon')).toBe(fromField('2026-05-20'))
+  })
+
+  it('says the time beside the day when there is one', () => {
+    const today = fromField('2026-05-20', '15:30')!
+    expect(dueLabel(today, NOON, true)).toMatch(/^today \d/)
+    expect(dueLabel(today, NOON)).toBe('today')
+    expect(dueLabel(at(2026, 5, 23, 15), NOON, true)).toMatch(/ · /)
   })
 })

@@ -62,6 +62,7 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
         position: row.position as i32,
         worktree_path: row.worktree_path,
         due_at: row.due_at.map(|at| at as f64),
+        due_time: row.due_time,
         cost_usd: store.card_cost(&row.id)?,
         // Counted rather than carried. A board of thirty cards would otherwise
         // read thirty conversations to draw thirty badges.

@@ -24,6 +24,7 @@ session_resize resizes an open pty
 permission_answer answers a question held in memory
 permission_always keeps a rule in memory and answers a question held there
 orchestrator_draft_drop drops a draft held in memory
+reminders_rearm wakes a thread that is already waiting
 update_restart_ready wakes a thread that is already waiting
 browser_menus exists for its types
 island_cursors exists for its types

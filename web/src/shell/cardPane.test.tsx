@@ -16,6 +16,7 @@ const detail: CardDetail = {
     position: 0,
     worktreePath: null,
     dueAt: null,
+    dueTime: false,
     costUsd: null,
     comments: 0,
     pinned: 0,

@@ -155,14 +155,23 @@ pub(crate) fn detail_of(project_id: String, card_id: String) -> Result<CardDetai
 ///
 /// Seconds since the epoch, from the screen's own clock: a date is chosen in
 /// the reader's timezone and this process has no business reinterpreting it.
+/// `timed` when it carries a time somebody chose; a day alone is stored as
+/// its last minute, when it is over.
 #[tauri::command]
 #[specta::specta]
 pub async fn card_set_due(
+    app: tauri::AppHandle,
     project_id: String,
     card_id: String,
     due_at: Option<f64>,
+    timed: Option<bool>,
 ) -> Result<CardDetail, RpcError> {
-    crate::off_main::blocking(move || card_set_due_now(project_id, card_id, due_at)).await
+    crate::off_main::blocking(move || {
+        let detail = card_set_due_now(project_id, card_id, due_at, timed.unwrap_or(false))?;
+        crate::reminders::changed(&app);
+        Ok(detail)
+    })
+    .await
 }
 
 /// [`card_set_due`], on the calling thread.
@@ -170,6 +179,7 @@ pub(crate) fn card_set_due_now(
     project_id: String,
     card_id: String,
     due_at: Option<f64>,
+    timed: bool,
 ) -> Result<CardDetail, RpcError> {
     let store = store()?;
     let at = match due_at {
@@ -177,7 +187,7 @@ pub(crate) fn card_set_due_now(
         Some(_) => return Err(RpcError::new(ErrorCode::Invalid, "that is not a date")),
         None => None,
     };
-    if !store.set_card_due(&card_id, at)? {
+    if !store.set_card_due(&card_id, at, timed)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such card"));
     }
     detail_of(project_id, card_id)

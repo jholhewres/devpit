@@ -28,6 +28,7 @@ fn read(store: &Store) -> Result<Settings, RpcError> {
         focus_mode: store.preference_flag(preference::FOCUS_MODE)?,
         error_reports: store.preference_flag(preference::ERROR_REPORTS)?,
         island: store.preference_flag(preference::ISLAND)?,
+        reminders: store.preference_flag(preference::REMINDERS)?,
     })
 }
 

@@ -211,6 +211,11 @@ pub(crate) fn notices_sweep_due_now(app: tauri::AppHandle) -> Result<Notices, Rp
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let store = store()?;
+    // With reminders on, a date going off is theirs to tell, at its time; this
+    // would tell it a second time, as a date gone by.
+    if crate::reminders::enabled(&store) {
+        return answer(&store);
+    }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|since| since.as_secs() as i64)

@@ -25,7 +25,9 @@ fn a_card_starts_with_no_deadline_and_can_be_given_one() {
         None
     );
 
-    assert!(store.set_card_due(&card, Some(1_800_000_000)).expect("set"));
+    assert!(store
+        .set_card_due(&card, Some(1_800_000_000), false)
+        .expect("set"));
     assert_eq!(
         store.card(&card).expect("read").expect("there").due_at,
         Some(1_800_000_000)
@@ -37,8 +39,10 @@ fn a_deadline_can_be_taken_away_again() {
     // Clearing has to be possible, or the only way out of a date typed by
     // mistake is to delete the card.
     let (_dir, store, card) = seeded();
-    store.set_card_due(&card, Some(1_800_000_000)).expect("set");
-    assert!(store.set_card_due(&card, None).expect("clear"));
+    store
+        .set_card_due(&card, Some(1_800_000_000), false)
+        .expect("set");
+    assert!(store.set_card_due(&card, None, false).expect("clear"));
     assert_eq!(
         store.card(&card).expect("read").expect("there").due_at,
         None
@@ -269,8 +273,10 @@ fn only_cards_past_their_date_are_overdue() {
         .create_card(&project, &column, "later", "")
         .expect("card");
 
-    store.set_card_due(&card, Some(1_000)).expect("past");
-    store.set_card_due(&later, Some(9_000)).expect("future");
+    store.set_card_due(&card, Some(1_000), false).expect("past");
+    store
+        .set_card_due(&later, Some(9_000), false)
+        .expect("future");
 
     let past = store.overdue_cards(5_000).expect("overdue");
     assert_eq!(past.len(), 1);

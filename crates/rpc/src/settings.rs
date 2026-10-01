@@ -76,6 +76,9 @@ pub struct Settings {
     /// Whether the island opens above the other windows. `null` is on: it
     /// stays out of sight until an agent does something.
     pub island: Option<bool>,
+    /// Whether a card's date goes off as a reminder at its time. Null is
+    /// never asked, which is on.
+    pub reminders: Option<bool>,
 }
 
 /// What the next error report would send, for the person to read first.

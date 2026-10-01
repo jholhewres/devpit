@@ -322,6 +322,23 @@ export const commands = {
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
+	/**  `reminders.pending` — what went off and nobody has dealt with. */
+	remindersPending: () => typedError<Reminders, RpcError>(__TAURI_INVOKE("reminders_pending")),
+	/**  `reminder.snooze` — the reminder goes off again at `until`. */
+	reminderSnooze: (cardId: string, until: number | null) => typedError<Reminders, RpcError>(__TAURI_INVOKE("reminder_snooze", { cardId, until })),
+	/**  `reminder.done` — the person dealt with it. The card keeps its date. */
+	reminderDone: (cardId: string) => typedError<Reminders, RpcError>(__TAURI_INVOKE("reminder_done", { cardId })),
+	/**
+	 *  `reminders.set` — reminders on or off. Off, the thread waits on the next
+	 *  change and nothing goes off; on again, what came due meanwhile goes off at
+	 *  once.
+	 */
+	remindersSet: (on: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("reminders_set", { on })),
+	/**
+	 *  `reminders.rearm` — the window came back to the front: a machine that
+	 *  slept may have passed a reminder, and the thread's clock slept with it.
+	 */
+	remindersRearm: () => __TAURI_INVOKE<void>("reminders_rearm"),
 	/**
 	 *  `orchestrator.answer` — the person's pick on the question a session is
 	 *  stopped on: arrows to the choice and Enter, or Escape when `choice` is
@@ -902,8 +919,10 @@ export const commands = {
 	 * 
 	 *  Seconds since the epoch, from the screen's own clock: a date is chosen in
 	 *  the reader's timezone and this process has no business reinterpreting it.
+	 *  `timed` when it carries a time somebody chose; a day alone is stored as
+	 *  its last minute, when it is over.
 	 */
-	cardSetDue: (projectId: string, cardId: string, dueAt: number | null) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_set_due", { projectId, cardId, dueAt })),
+	cardSetDue: (projectId: string, cardId: string, dueAt: number | null, timed: boolean | null) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_set_due", { projectId, cardId, dueAt, timed })),
 	/**  `card.comment` — says something on the card. */
 	cardComment: (projectId: string, cardId: string, body: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_comment", { projectId, cardId, body })),
 	/**  `card.comment_edit` — changes one, and says that it changed. */
@@ -1652,6 +1671,8 @@ export type Card = {
 	 *  cards, which is why it is an option and not a date nobody chose.
 	 */
 	dueAt: number | null,
+	/**  Whether `due_at` carries a time somebody chose, rather than a day. */
+	dueTime: boolean,
 	/**  What every run of this card has cost, added up. */
 	costUsd: number | null,
 	/**
@@ -3300,6 +3321,24 @@ export type RejectedAgent = {
 	reason: string,
 };
 
+/**  One card whose date went off, or is still to. */
+export type Reminder = {
+	cardId: string,
+	projectId: string,
+	/**  The project's name, so a reminder from another project says where. */
+	project: string | null,
+	title: string,
+	/**  Seconds since the epoch. */
+	dueAt: number | null,
+	/**  Whether the date carries a time somebody chose, rather than a day. */
+	timed: boolean,
+};
+
+/**  A list, so tomorrow's field has somewhere to go. */
+export type Reminders = {
+	reminders: Reminder[],
+};
+
 /**  What the Changes panel asks of a branch's remote. */
 export type RemoteAct = "fetch" | "pull" | "push" | 
 /**  Pull, then push. */
@@ -3511,6 +3550,11 @@ export type Settings = {
 	 *  stays out of sight until an agent does something.
 	 */
 	island: boolean | null,
+	/**
+	 *  Whether a card's date goes off as a reminder at its time. Null is
+	 *  never asked, which is on.
+	 */
+	reminders: boolean | null,
 };
 
 /**

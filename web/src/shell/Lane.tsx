@@ -134,7 +134,7 @@ export function Tile({
         {near && (
           <span className="tile__due" data-near={near}>
             <Clock />
-            {dueLabel(card.dueAt)}
+            {dueLabel(card.dueAt, undefined, card.dueTime)}
           </span>
         )}
         {card.comments > 0 && (

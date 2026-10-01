@@ -6,15 +6,16 @@ import { Grips } from './Grips'
 import { Overlays } from './Overlays'
 import { ProjectRail } from './ProjectRail'
 import { Panes } from './Panes'
+import { RemindersBanner } from './RemindersBanner'
 import { ResizeEdges } from './ResizeEdges'
 import { RightPanel } from './RightPanel'
 import { Sidebar } from './Sidebar'
 import { StatusStrip } from './StatusStrip'
 import { TopBar } from './TopBar'
 import { PluginsProvider } from './usePlugins'
-import { ShellProvider, useShell } from './useShell'
+import { ShellProvider } from './useShell'
 import { useWindowShell } from './shellStore'
-import { useBriefRefresh } from './useBriefRefresh'
+import { BriefRefresh } from './useBriefRefresh'
 import { shortcutFor } from './shortcuts'
 import { isMaximized, onResized } from './window'
 import { abandoned } from './typing'
@@ -27,13 +28,6 @@ export function AppShell(): React.JSX.Element {
       </PluginsProvider>
     </ShellProvider>
   )
-}
-
-/* Its own component, so the project changing re-renders this and not the
-   window: the window reads the shell through a picked, stable slice. */
-function BriefRefresh(): null {
-  useBriefRefresh(useShell().project)
-  return null
 }
 
 /*
@@ -123,6 +117,7 @@ function Window(): React.JSX.Element {
       <ResizeEdges />
       <ContextMenu />
       <TopBar onAddProject={() => setAdding(true)} />
+      <RemindersBanner />
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
         <ProjectRail onAddProject={() => setAdding(true)} onRemove={setRemoving} />

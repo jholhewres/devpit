@@ -631,4 +631,27 @@ CREATE UNIQUE INDEX run_one_running ON run(card_id) WHERE state = 'running';
 ALTER TABLE notice ADD COLUMN pane_id TEXT;
 "#,
     },
+    // Migration 023 — a card's date can carry a time, and reminds at it.
+    Migration {
+        version: 23,
+        sql: r#"
+-- `due_time`: whether `due_at` is a moment somebody chose, or a day. A day
+-- reminds when it is over; a moment, at the moment.
+ALTER TABLE card ADD COLUMN due_time INTEGER NOT NULL DEFAULT 0;
+-- When the reminder for the date as it stands went off, and when the person
+-- dealt with it. Both are cleared whenever the date changes, so a date moved
+-- reminds again — the bell's own record dedupes per card, forever.
+ALTER TABLE card ADD COLUMN reminded_at INTEGER;
+ALTER TABLE card ADD COLUMN handled_at INTEGER;
+-- Dates already past were told by the bell. Reminding about each of them the
+-- first time this runs would be weeks of dates nobody asked about again.
+UPDATE card
+   SET reminded_at = CAST(strftime('%s', 'now') AS INTEGER),
+       handled_at = CAST(strftime('%s', 'now') AS INTEGER)
+ WHERE due_at IS NOT NULL AND due_at <= CAST(strftime('%s', 'now') AS INTEGER);
+-- What the reminders wait on: the next date nobody has been reminded of.
+CREATE INDEX card_reminder ON card(due_at)
+ WHERE due_at IS NOT NULL AND archived_at IS NULL AND reminded_at IS NULL;
+"#,
+    },
 ];

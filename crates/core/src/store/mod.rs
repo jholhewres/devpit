@@ -15,6 +15,7 @@ pub mod pane_agents;
 mod plugins;
 pub mod project_runs;
 mod projects;
+mod reminders;
 mod runs;
 pub mod search_index;
 mod session_links;
@@ -66,6 +67,7 @@ pub mod limits {
 }
 pub use plugins::{DRAWINGS_PLUGIN, DRAWING_EXTENSION};
 pub use projects::ProjectRow;
+pub use reminders::ReminderRow;
 pub use settings::key as preference;
 
 /// The folder an installed devpit keeps everything in, under the home.

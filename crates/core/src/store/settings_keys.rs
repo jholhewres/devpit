@@ -36,6 +36,9 @@ pub const FILES_WIDTH: &str = "layout.files_width";
 pub const HEADS_DOWN: &str = "focus.heads_down";
 /// Whether the focus mode is offered. Off unless it is turned on.
 pub const FOCUS_MODE: &str = "focus.enabled";
+/// Whether a card's date goes off as a reminder at its time. On unless
+/// turned off.
+pub const REMINDERS: &str = "general.reminders";
 /// Whether the island opens above the other windows. On unless turned off.
 pub const ISLAND: &str = "island.enabled";
 /// The screen the island was last dragged to, by the name the system gives it.

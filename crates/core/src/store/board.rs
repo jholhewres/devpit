@@ -31,6 +31,23 @@ pub struct CardRow {
     /// Seconds since the epoch. Absent for most cards, which is why it is an
     /// option and not a date somebody never chose.
     pub due_at: Option<i64>,
+    /// Whether `due_at` carries a time somebody chose, rather than a day.
+    pub due_time: bool,
+}
+
+/// A card as both of its queries select it.
+fn card_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CardRow> {
+    Ok(CardRow {
+        id: row.get(0)?,
+        column_id: row.get(1)?,
+        title: row.get(2)?,
+        body: row.get(3)?,
+        position: row.get(4)?,
+        worktree_path: row.get(5)?,
+        base_ref: row.get(6)?,
+        due_at: row.get(7)?,
+        due_time: row.get(8)?,
+    })
 }
 
 pub struct StepRow {
@@ -161,23 +178,12 @@ impl Store {
     /// Every card of a project, by column and then by position.
     pub fn cards(&self, project_id: &str) -> Result<Vec<CardRow>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, column_id, title, body, position, worktree_path, base_ref, due_at \
+            "SELECT id, column_id, title, body, position, worktree_path, base_ref, due_at, due_time \
              FROM card WHERE project_id = ?1 AND archived_at IS NULL \
              ORDER BY column_id, position",
         )?;
         let rows = stmt
-            .query_map([project_id], |row| {
-                Ok(CardRow {
-                    id: row.get(0)?,
-                    column_id: row.get(1)?,
-                    title: row.get(2)?,
-                    body: row.get(3)?,
-                    position: row.get(4)?,
-                    worktree_path: row.get(5)?,
-                    base_ref: row.get(6)?,
-                    due_at: row.get(7)?,
-                })
-            })?
+            .query_map([project_id], card_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
@@ -186,21 +192,10 @@ impl Store {
         Ok(self
             .conn
             .query_row(
-                "SELECT id, column_id, title, body, position, worktree_path, base_ref, due_at \
+                "SELECT id, column_id, title, body, position, worktree_path, base_ref, due_at, due_time \
                  FROM card WHERE id = ?1",
                 [card_id],
-                |row| {
-                    Ok(CardRow {
-                        id: row.get(0)?,
-                        column_id: row.get(1)?,
-                        title: row.get(2)?,
-                        body: row.get(3)?,
-                        position: row.get(4)?,
-                        worktree_path: row.get(5)?,
-                        base_ref: row.get(6)?,
-                        due_at: row.get(7)?,
-                    })
-                },
+                card_row,
             )
             .optional()?)
     }

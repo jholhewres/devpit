@@ -165,3 +165,18 @@ button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font:
 .fnd__s[data-severity='worth'] { color: var(--warning); }
 .fnd__w { font-family: var(--mono); font-size: 11px; color: var(--text); overflow-wrap: anywhere; }
 .fnd__y { grid-column: 2; color: var(--text-3); }
+
+/* Reminders that went off, under the top bar until each is dealt with. Its
+   own colour, not the bell's: the person asked for this interruption. */
+.remind { flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 7px 14px; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--text); }
+.remind__icon { flex: none; margin-top: 5px; color: var(--accent); }
+.remind__list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.remind__one { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.remind__what { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.remind__what b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.remind__when { flex: none; font-size: 11.5px; color: var(--text-3); }
+.remind__acts { flex: none; display: flex; gap: 4px; }
+.remind__btn { height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 11.5px; cursor: pointer; }
+.remind__btn:hover { color: var(--text); border-color: var(--accent); }
+.remind__btn--done { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.remind__more { flex: none; margin-top: 2px; padding: 0 6px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 11.5px; cursor: pointer; }

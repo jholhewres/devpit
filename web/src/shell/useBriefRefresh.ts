@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 
 import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
+import { useShell } from './useShell'
 
 /**
  * devpit's half of an orchestrator's brief, brought up to this build whenever
@@ -17,4 +18,11 @@ export function useBriefRefresh(project: Pick<Project, 'id' | 'orchestrator'> | 
   useEffect(() => {
     if (front) void ask(() => commands.orchestratorRefresh(front))
   }, [front])
+}
+
+/* A component of its own, so the project changing re-renders this and not
+   the window, which reads the shell through a picked, stable slice. */
+export function BriefRefresh(): null {
+  useBriefRefresh(useShell().project)
+  return null
 }

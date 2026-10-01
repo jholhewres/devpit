@@ -161,6 +161,8 @@ fn rows_the_old_sweep_wrote_become_lost_and_nothing_else_moves() {
              DROP TABLE project_plugin; ALTER TABLE card_attachment DROP COLUMN plugin_id; \
              ALTER TABLE project DROP COLUMN icon; ALTER TABLE project DROP COLUMN color; \
              ALTER TABLE notice DROP COLUMN pane_id; \
+             DROP INDEX card_reminder; ALTER TABLE card DROP COLUMN due_time; \
+             ALTER TABLE card DROP COLUMN reminded_at; ALTER TABLE card DROP COLUMN handled_at; \
              CREATE TABLE drawing (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, \
              scene TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);",
         )

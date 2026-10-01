@@ -61,13 +61,13 @@ pub(crate) fn words(session: &IslandSession, tell: Tell) -> (String, String) {
 
 /// Whether devpit's own window is the one somebody is looking at, in which
 /// case the bell is enough.
-fn in_front(app: &tauri::AppHandle) -> bool {
+pub(crate) fn in_front(app: &tauri::AppHandle) -> bool {
     app.get_webview_window("main")
         .and_then(|main| main.is_focused().ok())
         .unwrap_or(false)
 }
 
-fn show(app: &tauri::AppHandle, title: &str, body: &str, urgent: bool) {
+pub(crate) fn show(app: &tauri::AppHandle, title: &str, body: &str, urgent: bool) {
     let _ = app.notification().builder().title(title).body(body).show();
     if urgent {
         if let Some(main) = app.get_webview_window("main") {

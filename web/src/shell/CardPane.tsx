@@ -11,7 +11,7 @@ import { liveWork, stopLiveWork } from './liveWork'
 import { CardWork } from './CardWork'
 import { Comments } from './Comments'
 import { CardEnding, CardHeader, type Ending } from './CardHeader'
-import { dueLabel, fromField, nearness, toField } from './due'
+import { dueLabel, fromField, nearness, toField, toTimeField } from './due'
 import { useCard } from './useCard'
 import { useShell } from './useShell'
 import { abandoned, committed } from './typing'
@@ -226,9 +226,24 @@ export function CardPane({
                     type="date"
                     className="cardp__date"
                     value={toField(detail.card.dueAt)}
-                    onChange={(event) => card.setDue(fromField(event.target.value))}
+                    onChange={(event) => {
+                      const time = toTimeField(detail.card.dueAt, detail.card.dueTime)
+                      card.setDue(fromField(event.target.value, time), time !== '')
+                    }}
                   />
-                  {near && <span className="cardp__near">{dueLabel(detail.card.dueAt)}</span>}
+                  {/* A time is optional: a day alone reminds that morning. */}
+                  {detail.card.dueAt !== null && (
+                    <input
+                      type="time"
+                      className="cardp__date"
+                      aria-label="Due at"
+                      value={toTimeField(detail.card.dueAt, detail.card.dueTime)}
+                      onChange={(event) =>
+                        card.setDue(fromField(toField(detail.card.dueAt), event.target.value), event.target.value !== '')
+                      }
+                    />
+                  )}
+                  {near && <span className="cardp__near">{dueLabel(detail.card.dueAt, undefined, detail.card.dueTime)}</span>}
                 </label>
                 {detail.card.dueAt !== null && (
                   <button className="conv__act" onClick={() => card.setDue(null)}>

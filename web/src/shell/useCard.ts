@@ -22,7 +22,7 @@ export interface Card {
   readonly busy: boolean
   /** Answers why the title and body were not kept, or null once they are. */
   save: (title: string, body: string) => Promise<string | null>
-  setDue: (seconds: number | null) => void
+  setDue: (seconds: number | null, timed?: boolean) => void
   comment: (body: string) => Promise<string | null>
   editComment: (commentId: string, body: string) => Promise<string | null>
   deleteComment: (commentId: string) => void
@@ -106,7 +106,7 @@ export function useCard(
       onChanged?.()
       return null
     },
-    setDue: (seconds) => void here((p, c) => commands.cardSetDue(p, c, seconds)),
+    setDue: (seconds, timed = false) => void here((p, c) => commands.cardSetDue(p, c, seconds, timed)),
     comment: (body) => here((p, c) => commands.cardComment(p, c, body)),
     editComment: (id, body) => here((p, c) => commands.cardCommentEdit(p, c, id, body)),
     deleteComment: (id) => void here((p, c) => commands.cardCommentDelete(p, c, id)),

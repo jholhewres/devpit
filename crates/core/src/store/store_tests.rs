@@ -222,6 +222,13 @@ fn a_row_written_before_a_migration_survives_it() {
         .expect("undo 022");
     store
         .conn()
+        .execute_batch(
+            "DROP INDEX card_reminder; ALTER TABLE card DROP COLUMN due_time; \
+             ALTER TABLE card DROP COLUMN reminded_at; ALTER TABLE card DROP COLUMN handled_at;",
+        )
+        .expect("undo 023");
+    store
+        .conn()
         .execute_batch("PRAGMA user_version = 16;")
         .expect("back to 16");
     drop(store);

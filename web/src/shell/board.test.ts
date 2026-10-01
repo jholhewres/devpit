@@ -7,6 +7,7 @@ const column = (id: string, position: number): Column => ({ id, name: id, positi
 const card = (id: string, columnId: string, position: number): Card =>
   ({ id, columnId, title: id, body: '', position, worktreePath: null,
   dueAt: null,
+  dueTime: false,
   comments: 0,
   pinned: 0, costUsd: null, runs: [], activity: null })
 

@@ -14,6 +14,7 @@ const card = (id: string, title: string): Card => ({
   position: 0,
   worktreePath: null,
   dueAt: null,
+  dueTime: false,
   costUsd: null,
   comments: 0,
   pinned: 0,

@@ -28,6 +28,7 @@ pub mod plugins;
 pub mod prime;
 pub mod profile;
 pub mod project;
+pub mod reminder;
 pub mod remote;
 pub mod review;
 pub mod runs;
@@ -79,6 +80,7 @@ pub use project::{
     Change, Commit, FileNode, GitStatus, Project, ProjectChanges, ProjectHistory, ProjectList,
     ProjectTree, Worktree, WorktreeOrigin,
 };
+pub use reminder::{Reminder, Reminders};
 pub use remote::RemoteAct;
 pub use review::{
     blocking, reviewed, standing, Finding, Found, Review, Severity, Standing, REVIEW_EVIDENCE,

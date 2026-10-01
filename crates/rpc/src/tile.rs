@@ -20,6 +20,8 @@ pub struct Card {
     /// Seconds since the epoch; `f64` for the usual reason. Absent for most
     /// cards, which is why it is an option and not a date nobody chose.
     pub due_at: Option<f64>,
+    /// Whether `due_at` carries a time somebody chose, rather than a day.
+    pub due_time: bool,
     /// What every run of this card has cost, added up.
     pub cost_usd: f64,
     /// Counted, not carried: the tile shows that there is a conversation, and
