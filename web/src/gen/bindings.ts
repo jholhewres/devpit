@@ -650,6 +650,8 @@ export const commands = {
 	 *  command.
 	 */
 	islandDrop: (sessionId: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_drop", { sessionId, text })),
+	/**  `island.checks` — the pull request and checks of a session's branch. */
+	islandChecks: (sessionId: string) => typedError<IslandChecks, RpcError>(__TAURI_INVOKE("island_checks", { sessionId })),
 	/**  `island.cursors` — the shape `island:cursor` carries, for the contract. */
 	islandCursors: () => __TAURI_INVOKE<[Cursor, IslandChange[]]>("island_cursors"),
 	/**  `island.seen` — the island is showing a held question. */
@@ -2376,11 +2378,30 @@ export type Installation = {
 export type IslandChange = { was: "changed"; session: IslandSession } | { was: "gone"; sessionId: string };
 
 /**
+ *  A session's branch as its code host sees it: its pull request, and how
+ *  the checks on it are doing.
+ */
+export type IslandChecks = {
+	branch: string,
+	pull: IslandPull | null,
+	/**  `passing` | `failing` | `running`, or nothing when nothing has run. */
+	checks: string | null,
+};
+
+/**
  *  Every session the island knows of. An object, so tomorrow's field has
  *  somewhere to go.
  */
 export type IslandNow = {
 	sessions: IslandSession[],
+};
+
+export type IslandPull = {
+	number: number,
+	/**  `OPEN` | `MERGED` | `CLOSED`, as the host says it. */
+	state: string,
+	title: string,
+	url: string,
 };
 
 /**

@@ -1,5 +1,6 @@
 import type { IslandSession, IslandStep, IslandVerdict } from '../gen/bindings'
 import { ask, commands } from '../shell/live'
+import { Checks } from './Checks'
 import { Mascot } from './Mascot'
 import { Preview } from './Preview'
 import { ROWS } from './shape'
@@ -132,6 +133,7 @@ export function Detail({ session, now }: { session: IslandSession; now: number }
             </li>
           ))}
         </ol>
+        <Checks sessionId={session.sessionId} />
         {session.paneId && (
           <button className="isl-btn isl-btn--quiet" onClick={() => openPane(session)}>
             Open terminal

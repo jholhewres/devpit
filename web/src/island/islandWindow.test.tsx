@@ -6,20 +6,31 @@ import { IslandWindow } from './IslandWindow'
 
 /* What the window would hear, by event name, so a test can say it. */
 const heard = new Map<string, (payload: unknown) => void>()
-const say = (name: string, payload: unknown): void => act(() => heard.get(name)?.(payload))
+/* What Rust holds, as the island asks for it again: the sessions said. */
+const alive = new Map<string, IslandSession>()
+const say = (name: string, payload: unknown): void => {
+  if (name === 'island:session') {
+    const change = payload as IslandChange
+    if (change.was === 'changed') alive.set(change.session.sessionId, change.session)
+    else alive.delete(change.sessionId)
+  }
+  act(() => heard.get(name)?.(payload))
+}
 let askedChat: ((question: Question) => void) | undefined
 
 const called = vi.fn()
 vi.mock('../shell/live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
-    islandNow: () => ({ sessions: [] }),
+    islandNow: () => ({ sessions: [...alive.values()] }),
     islandShape: () => null,
     islandSeen: (id: string) => (called('seen', id), null),
     islandDecide: (id: string, verdict: string) => (called('decide', id, verdict), null),
     islandOpenPane: (projectId: string | null, paneId: string) => (called('open', projectId, paneId), null),
     islandPeek: () => ({ text: 'one\ntwo', notShown: null }),
     islandDrop: (sessionId: string, text: string) => (called('drop', sessionId, text), null),
+    islandChecks: () => ({ branch: 'fix/x', pull: { number: 7, state: 'OPEN', title: 'Fix', url: 'https://example.invalid/7' }, checks: 'passing' }),
+    urlOpen: (url: string) => (called('url', url), null),
     permissionAnswer: (id: string, answer: string) => (called('answer', id, answer), null),
     permissionAlways: (id: string, sessionId: string, tool: string) => (called('always', id, sessionId, tool), null),
   },
@@ -50,6 +61,7 @@ const shape = (): HTMLElement => document.querySelector('.isl-shape') as HTMLEle
 
 beforeEach(() => {
   heard.clear()
+  alive.clear()
   called.mockClear()
 })
 afterEach(cleanup)
@@ -75,6 +87,8 @@ describe('the island window', () => {
     expect(document.querySelector('.isl-open')?.getAttribute('data-view')).toBe('session')
     expect(screen.getByText('src/invoice.ts', { exact: false })).toBeTruthy()
     expect(document.querySelectorAll('.isl-peek__ln[data-mark="+"]').length).toBe(1)
+    fireEvent.click(await screen.findByText('PR #7 open · checks passing'))
+    expect(called).toHaveBeenCalledWith('url', 'https://example.invalid/7')
     fireEvent.click(screen.getByText('Open terminal'))
     expect(called).toHaveBeenCalledWith('open', 'p1', 'leaf_1')
     fireEvent.click(screen.getByLabelText('Every session'))

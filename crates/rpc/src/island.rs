@@ -125,3 +125,24 @@ pub enum IslandVerdict {
     /// Let the terminal ask, the way it would have without devpit.
     InTerminal,
 }
+
+/// A session's branch as its code host sees it: its pull request, and how
+/// the checks on it are doing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandChecks {
+    pub branch: String,
+    pub pull: Option<IslandPull>,
+    /// `passing` | `failing` | `running`, or nothing when nothing has run.
+    pub checks: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandPull {
+    pub number: u32,
+    /// `OPEN` | `MERGED` | `CLOSED`, as the host says it.
+    pub state: String,
+    pub title: String,
+    pub url: String,
+}

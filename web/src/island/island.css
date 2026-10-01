@@ -279,7 +279,31 @@
   animation: isl-glow 1.1s ease-in-out infinite;
 }
 .isl-line__words { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.isl-detail__side .isl-btn--quiet { margin-top: auto; height: 28px; font-size: 12px; }
+.isl-detail__side .isl-btn--quiet { height: 28px; font-size: 12px; }
+.isl-checks {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: auto 0 8px;
+  padding: 4px 9px;
+  max-width: 100%;
+  border: 1px solid var(--isl-hair);
+  border-radius: 999px;
+  background: var(--isl-flat);
+  color: var(--isl-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.isl-checks:hover { color: var(--isl-ink); }
+.isl-checks__words { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.isl-checks__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--isl-dim); }
+.isl-checks[data-checks='passing'] .isl-checks__dot { background: var(--success); }
+.isl-checks[data-checks='failing'] .isl-checks__dot { background: var(--danger); }
+.isl-checks[data-checks='running'] .isl-checks__dot { background: var(--accent); animation: isl-glow 1.2s ease-in-out infinite; }
+/* With no badge, the terminal button sits at the bottom on its own. */
+.isl-detail__side .isl-checks + .isl-btn--quiet { margin-top: 0; }
+.isl-detail__side > .isl-btn--quiet:first-of-type { margin-top: auto; }
 
 .isl-peek {
   display: flex;

@@ -14,13 +14,13 @@ use crate::{
     browser_menu, card_chat, card_work, cards, chat, chat_remote, checkpoint, checkpoint_findings,
     checkpoint_preview, claude_plugin, cloning, columns, commands, delegations, diffs,
     error_reports, error_sender, files, filetree, front, happening, heads_down, history, in_flight,
-    index, installations, island, live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving,
-    notices, openers, opening, orchestrator, orchestrator_links, outside_sessions, pane_asking,
-    pane_screen, panels, panes, pasting, paths, plan_limits, plugin_data, plugins, project_naming,
-    projects, reading_path, receipts, regrouping, reveal, rewinding, runs_list, saves, search,
-    session_search, sessions, settings, shell_launch, skills, slash, sources, spend_history,
-    staging, steering, steps, stopping, threads, update, watching, workspace, worktree_base,
-    worktree_setup, worktrees, wsfiles,
+    index, installations, island, island_checks, live_answer, live_sessions, mcp, mcp_apps,
+    mcp_health, moving, notices, openers, opening, orchestrator, orchestrator_links,
+    outside_sessions, pane_asking, pane_screen, panels, panes, pasting, paths, plan_limits,
+    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reveal,
+    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
+    slash, sources, spend_history, staging, steering, steps, stopping, threads, update, watching,
+    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -128,6 +128,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         island::island_open_pane,
         island::island_peek,
         island::island_drop,
+        island_checks::island_checks,
         island::island_cursors,
         pane_asking::island_seen,
         pane_asking::island_decide,
