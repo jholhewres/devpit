@@ -28,6 +28,65 @@ pub(crate) fn registry() -> &'static Mutex<Sessions> {
     SESSIONS.get_or_init(Mutex::default)
 }
 
+/// Brings in the sessions the CLI lists as alive in devpit's terminals that
+/// no hook has spoken for since this app started: a session left idle before
+/// a restart says nothing until it is used, and the island would call that
+/// nothing running.
+pub(crate) fn seed(live: Vec<devpit_rpc::LiveSession>, colors: &HashMap<String, Option<String>>) {
+    if let Ok(mut sessions) = registry().lock() {
+        seed_into(&mut sessions, live, colors);
+    }
+}
+
+/// [`seed`], into a given set: what a hook already said is never overwritten.
+pub(crate) fn seed_into(
+    sessions: &mut Sessions,
+    live: Vec<devpit_rpc::LiveSession>,
+    colors: &HashMap<String, Option<String>>,
+) {
+    for one in live {
+        // A project this devpit knows: the CLI lists the account's sessions,
+        // and another devpit's terminals are not this one's to open.
+        let (Some(session_id), Some(pane), Some(_)) = (
+            one.session_id.clone(),
+            one.pane.as_ref(),
+            one.project_id.as_ref(),
+        ) else {
+            continue;
+        };
+        if sessions.contains_key(&session_id) {
+            continue;
+        }
+        let state = if one.waiting.is_some() {
+            Doing::Waiting
+        } else if one.status == "busy" {
+            Doing::Working
+        } else {
+            Doing::Open
+        };
+        sessions.insert(
+            session_id.clone(),
+            IslandSession {
+                session_id,
+                pane_id: Some(pane.pane_id.clone()),
+                color: one
+                    .project_id
+                    .as_ref()
+                    .and_then(|id| colors.get(id).cloned().flatten()),
+                project_id: one.project_id,
+                project: one.project_name,
+                card_id: one.card_id,
+                card: None,
+                root: Some(one.cwd),
+                state,
+                steps: Vec::new(),
+                said: None,
+                at: one.since.unwrap_or_default(),
+            },
+        );
+    }
+}
+
 /// Every session the island would draw, the most recent first.
 pub(crate) fn now() -> Vec<IslandSession> {
     let Ok(sessions) = registry().lock() else {

@@ -34,6 +34,8 @@ pub struct LiveSession {
     /// The devpit terminal it runs in, to open right here: present exactly
     /// when `in_devpit` is.
     pub pane: Option<LivePane>,
+    /// The CLI's own id for the conversation, which its hooks carry too.
+    pub session_id: Option<String>,
 }
 
 /// A devpit terminal, as a tab attaches to it.

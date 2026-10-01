@@ -378,9 +378,35 @@ pub async fn island_apply(app: tauri::AppHandle) -> Result<(), RpcError> {
 #[tauri::command]
 #[specta::specta]
 pub async fn island_now() -> Result<IslandNow, RpcError> {
-    Ok(IslandNow {
-        sessions: crate::island_feed::now(),
+    crate::off_main::blocking(|| {
+        seeded();
+        Ok(IslandNow {
+            sessions: crate::island_feed::now(),
+        })
     })
+    .await
+}
+
+/// What every Claude Code account lists alive, brought into the feed.
+fn seeded() {
+    let Ok(store) = crate::projects::store() else {
+        return;
+    };
+    let colors = crate::projects::project_list_now()
+        .map(|listed| {
+            listed
+                .projects
+                .into_iter()
+                .map(|one| (one.id, one.color))
+                .collect()
+        })
+        .unwrap_or_default();
+    let profiles = crate::agent_profiles::all(&store).unwrap_or_default();
+    for profile in profiles.iter().filter(|one| one.driver == "claude") {
+        if let Ok(live) = crate::live_sessions::orchestrator_sessions_now(&profile.id) {
+            crate::island_feed::seed(live.sessions, &colors);
+        }
+    }
 }
 
 /// `island.shape` — what the island draws, so only that takes the mouse.

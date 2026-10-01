@@ -1,4 +1,6 @@
 use devpit_agentcli::{Event, Happening};
+use std::collections::HashMap;
+
 use devpit_rpc::{Doing, Touch};
 
 use super::*;
@@ -196,4 +198,68 @@ fn a_step_whose_tool_failed_says_so() {
     .expect("a session");
     assert!(session.steps[0].done);
     assert!(session.steps[0].failed);
+}
+
+fn listed(session_id: Option<&str>, status: &str, in_pane: bool) -> devpit_rpc::LiveSession {
+    devpit_rpc::LiveSession {
+        name: "anchored-1a".to_owned(),
+        pid: 1,
+        job: None,
+        status: status.to_owned(),
+        kind: "interactive".to_owned(),
+        cwd: "/w/anchored".to_owned(),
+        project_id: Some("prj_a".to_owned()),
+        project_name: Some("anchored".to_owned()),
+        card_id: None,
+        since: Some(5.0),
+        in_devpit: in_pane,
+        waiting: None,
+        pane: in_pane.then(|| devpit_rpc::LivePane {
+            project_id: "prj_a".to_owned(),
+            pane_id: "leaf_1".to_owned(),
+        }),
+        session_id: session_id.map(str::to_owned),
+    }
+}
+
+/// An idle session left from before a restart says nothing until it is used;
+/// the CLI still lists it, and so does the island.
+#[test]
+fn a_live_session_no_hook_spoke_for_is_brought_in() {
+    let mut sessions = Sessions::new();
+    let colors = HashMap::from([("prj_a".to_owned(), Some("#62c987".to_owned()))]);
+    seed_into(
+        &mut sessions,
+        vec![
+            listed(Some("s1"), "idle", true),
+            listed(Some("s2"), "busy", true),
+            listed(Some("s3"), "busy", false),
+        ],
+        &colors,
+    );
+    assert_eq!(sessions["s1"].state, Doing::Open);
+    assert_eq!(sessions["s2"].state, Doing::Working);
+    assert_eq!(sessions["s1"].color.as_deref(), Some("#62c987"));
+    assert!(!sessions.contains_key("s3"), "not in a devpit terminal");
+
+    let mut elsewhere = listed(Some("s4"), "busy", true);
+    elsewhere.project_id = None;
+    seed_into(&mut sessions, vec![elsewhere], &colors);
+    assert!(
+        !sessions.contains_key("s4"),
+        "a project this devpit does not know"
+    );
+}
+
+#[test]
+fn what_a_hook_said_is_not_overwritten_by_the_listing() {
+    let mut sessions = Sessions::new();
+    let heard = fold(None, Some("leaf_1"), &heard(Event::Waiting), None, 9.0).expect("a session");
+    sessions.insert("s1".to_owned(), heard);
+    seed_into(
+        &mut sessions,
+        vec![listed(Some("s1"), "idle", true)],
+        &HashMap::new(),
+    );
+    assert_eq!(sessions["s1"].state, Doing::Waiting);
 }

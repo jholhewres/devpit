@@ -146,7 +146,7 @@ export function nowWords(session: IslandSession, now: number): string {
   if (mood === 'working' && last) return stepWords(last)
   if (session.state === 'failed') return session.said ?? 'Stopped on an error'
   if (session.state === 'done') return session.said ?? 'Done'
-  return 'Open'
+  return 'Idle'
 }
 
 /** The pill's count: who waits, else who works. */

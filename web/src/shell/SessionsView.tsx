@@ -96,6 +96,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
         inDevpit: true,
         waiting: null,
         pane: { projectId: one.id, paneId: made.data.focusedId },
+        sessionId: null,
       })
     })
   }

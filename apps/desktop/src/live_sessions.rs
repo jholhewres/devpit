@@ -25,6 +25,7 @@ struct Listed {
     tmux: Option<String>,
     /// The short id a background session is stopped by.
     job_id: Option<String>,
+    session_id: Option<String>,
 }
 
 /// Every live session listed in `sessions`, placed on its project and card.
@@ -79,6 +80,7 @@ pub(crate) fn read(
                 waiting,
                 pane,
                 cwd,
+                session_id: listed.session_id.filter(|id| crate::adopting::plain(id)),
             })
         })
         .collect();

@@ -2593,6 +2593,8 @@ export type LiveSession = {
 	 *  when `in_devpit` is.
 	 */
 	pane: LivePane | null,
+	/**  The CLI's own id for the conversation, which its hooks carry too. */
+	sessionId: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */
