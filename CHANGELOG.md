@@ -3,6 +3,56 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.30 — 2026-10-01
+
+### The island
+
+- **Every agent at a glance, above your other windows.** A small capsule at
+  the top of the screen shows what each session in devpit's terminals and
+  chats is doing — the step it is on, like *Edit invoice.ts* or *Run npm
+  test* — and opens all the way when one waits on you. Hover or click it for
+  every session; open one for its steps and a preview of the change, the
+  file or the command. It folds itself away when you move on.
+- **Answer from it.** A terminal session's permission question can be
+  allowed, denied, allowed always (the rule the agent suggested) or handed
+  back to the terminal; unanswered, the terminal asks as it always did, and
+  coming back to devpit hands it back too. A chat's question is answered
+  there as well.
+- **Get to the session.** *Open terminal* and *Open chat* bring devpit to the
+  front on it. Drop a file on a session and its path goes into the agent's
+  prompt. A session's pull request and the state of its checks show beside
+  it.
+- **devpit's own face**, in a picture per mood, a few sounds of its own you
+  can switch off, and a system notification when a session waits, fails or
+  finishes while devpit is behind — held, like the bell, by a focus.
+- **Drag it** to the screen you work on; it stays there.
+- On by default; switch it off in Settings → General. It sees only what runs
+  inside devpit. On Linux it needs X11 or XWayland, which the AppImage uses;
+  on a Wayland session without it you get the notifications alone.
+
+### Orchestrator
+
+- **It reads a session's replies**, a project's repository state and keeps
+  its own log through devpit, rather than through scripts of its own.
+- **Its links and account are kept by devpit**, out of reach of its own chat.
+- **Its session tools reach only the projects linked to it**, never type
+  control characters into a terminal, give every session a name of its own,
+  and wait long enough for a session to start — so a slow start no longer
+  ends in two of the same session.
+- A message queued while it works goes in as soon as it has answered, not
+  once every background task it started has finished.
+
+### Chat
+
+- **Allow always, for the rest of the conversation**: every file edit, the
+  exact command, or the same tool — kept for that chat only.
+
+### Fixes
+
+- A card checked out again after its worktree was removed goes back on its
+  branch, diffing from where its work began.
+- A reply to a session is never typed into a terminal whose shell is in front.
+
 ## 0.1.29 — 2026-09-30
 
 ### Windows
