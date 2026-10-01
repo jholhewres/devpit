@@ -172,8 +172,13 @@ describe('the orchestrator', () => {
     assert.ok(closed, 'the terminal did not close')
     tmux(home, 'send-keys', '-t', target, 'Escape')
 
-    // Stopped by the orchestrator: the agent ends and its terminal closes.
+    // Stopped by the orchestrator: the agent ends and its terminal closes —
+    // once its project is linked. Before, the session is someone else's.
     const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
+    const outOfReach = await ask('stop', { name: 'termed-stub' }, orchestrator)
+    assert.match(outOfReach.error ?? '', /not running in a project linked/, `an unlinked project's session was stopped: ${JSON.stringify(outOfReach)}`)
+    const orchestratorId = (await invoke(window, 'project_list')).projects.find((one) => one.orchestrator)?.id
+    await invoke(window, 'orchestrator_link', { projectId: orchestratorId, linked: [project.id] })
     const stopped = await ask('stop', { name: 'termed-stub' }, orchestrator)
     assert.ok(stopped.ok, `the session could not be stopped: ${JSON.stringify(stopped)}`)
     const windows = () => {
