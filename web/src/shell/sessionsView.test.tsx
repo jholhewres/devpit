@@ -14,7 +14,7 @@ vi.mock('./live', () => ({
     orchestratorSessions: () => ({
       sessions: [
         live('api-b', 'api'),
-        live('web-a', 'web', { status: 'busy', projectId: 'w', step: 'Edit invoice.ts' }),
+        live('web-a', 'web', { status: 'busy', projectId: 'w', step: 'Edit invoice.ts', pane: { projectId: 'w', paneId: 'leaf_2' } }),
         live('api-a', 'api', { waiting: { question: 'Deploy now?', options: [], cursor: 0 }, pane: { projectId: 'p', paneId: 'leaf_1' } }),
       ],
     }),
@@ -53,6 +53,17 @@ describe("an orchestrator's sessions", () => {
     fireEvent.change(input, { target: { value: 'yes, go' } })
     fireEvent.submit(input.closest('form')!)
     expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, go')
+  })
+
+  it('asks a session in a devpit terminal for Remote Control, typed as the person', async () => {
+    render(<SessionsView shown />)
+    fireEvent.click(await screen.findByText('api-b'))
+    expect(screen.queryByRole('button', { name: 'Remote Control' })).toBeNull()
+    cleanup()
+    render(<SessionsView shown />)
+    fireEvent.click(await screen.findByText('web-a'))
+    fireEvent.click(screen.getByRole('button', { name: 'Remote Control' }))
+    expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/remote-control')
   })
 
   it('says what a busy session is on right now', async () => {

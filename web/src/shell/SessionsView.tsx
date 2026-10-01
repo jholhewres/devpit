@@ -230,7 +230,13 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                   )}
                 </div>
                 {expanded && (
-                  <Details session={one} history={history} profileId={profileId} onWatch={one.job && one.projectId && !one.pane ? () => watch(one) : undefined} />
+                  <Details
+                    session={one}
+                    history={history}
+                    profileId={profileId}
+                    onWatch={one.job && one.projectId && !one.pane ? () => watch(one) : undefined}
+                    onTerminal={one.pane ? () => setTerminal(one) : undefined}
+                  />
                 )}
               </div>
             )
@@ -270,17 +276,24 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
   )
 }
 
+/** Claude Code's command that makes a session reachable from claude.ai, or
+ *  stops it when it already is (2.1.287). */
+export const REMOTE_CONTROL = '/remote-control'
+
 function Details({
   session,
   history,
   profileId,
   onWatch,
+  onTerminal,
 }: {
   session: LiveSession
   history: AgentThread | undefined
   profileId: string | null
   /** A background session, opened in a terminal to be watched and typed into. */
   onWatch?: () => void
+  /** Its own terminal, opened over the panel. */
+  onTerminal?: () => void
 }): React.JSX.Element {
   const [reply, setReply] = useState('')
   const [said, setSaid] = useState<string | null>(null)
@@ -306,6 +319,17 @@ function Details({
       if (sent.error) return
       setReply('')
       refreshSessions(profileId)
+    })
+  }
+
+  /* Remote Control is the session's own command, so it is typed there as the
+     person; its page and code appear in that terminal, which opens to show
+     them. The orchestrator cannot do this: it types into nobody's terminal. */
+  const remote = (): void => {
+    if (!profileId) return
+    void ask(() => commands.orchestratorReply(profileId, session.name, REMOTE_CONTROL)).then((sent) => {
+      setSaid(sent.error ?? `Typed ${REMOTE_CONTROL} — its terminal shows the link, or that it disconnected.`)
+      if (!sent.error) onTerminal?.()
     })
   }
 
@@ -339,9 +363,16 @@ function Details({
             <button className="sess__btn sess__btn--bad" onClick={stop}>Stop</button>
           </>
         ) : (
-          <button className="sess__btn" onClick={() => setStopping(true)} aria-label={`Stop ${session.name}`}>
-            Stop session…
-          </button>
+          <>
+            {session.pane && !session.waiting && (
+              <button className="sess__btn" onClick={remote} title={`Types ${REMOTE_CONTROL} in its terminal, as you: on, or off when it already is`}>
+                Remote Control
+              </button>
+            )}
+            <button className="sess__btn" onClick={() => setStopping(true)} aria-label={`Stop ${session.name}`}>
+              Stop session…
+            </button>
+          </>
         )}
       </div>
       {history ? <History thread={history} /> : <p className="sess__note">Nothing has passed between this chat and it yet.</p>}
