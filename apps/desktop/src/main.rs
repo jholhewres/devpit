@@ -229,6 +229,9 @@ fn main() {
         // nobody is.
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Focused(focused) = event {
+                if window.label() == "main" && *focused {
+                    pane_asking::release_all();
+                }
                 if window.label() == "main" {
                     if let Some(presence) =
                         tauri::Manager::try_state::<error_sender::Presence>(window)

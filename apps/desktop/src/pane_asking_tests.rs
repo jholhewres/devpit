@@ -73,3 +73,22 @@ fn an_answer_counts_only_once_the_question_was_seen() {
     seen.send(()).expect("send");
     assert_eq!(answered(&seen_rx, &said_rx), Some(IslandVerdict::Allow));
 }
+
+/// Back at devpit, the person is at the terminal: what the island held goes
+/// back there, answered by nobody.
+#[test]
+fn a_held_question_goes_back_to_its_terminal_when_devpit_is_in_front() {
+    let (seen, seen_rx) = std::sync::mpsc::channel();
+    let (said, said_rx) = std::sync::mpsc::channel();
+    held()
+        .lock()
+        .expect("held")
+        .insert("ask_released".to_owned(), Held { seen, said });
+    release_all();
+    held().lock().expect("held").remove("ask_released");
+    assert_eq!(
+        answered(&seen_rx, &said_rx),
+        Some(IslandVerdict::InTerminal)
+    );
+    assert_eq!(reply_for(Some(IslandVerdict::InTerminal), None), "");
+}

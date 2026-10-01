@@ -158,6 +158,18 @@ fn project_of(pane: &str, cwd: &str) -> Option<String> {
         .map(|project| project.name)
 }
 
+/// devpit came to the front: every question held for the island goes back
+/// to its terminal, where the person now is — and where the orchestrator's
+/// panel reads it — rather than waiting out its hold on the island alone.
+pub(crate) fn release_all() {
+    if let Ok(all) = held().lock() {
+        for one in all.values() {
+            let _ = one.seen.send(());
+            let _ = one.said.send(IslandVerdict::InTerminal);
+        }
+    }
+}
+
 fn answered(seen: &Receiver<()>, said: &Receiver<IslandVerdict>) -> Option<IslandVerdict> {
     seen.recv_timeout(SEEN_WITHIN).ok()?;
     said.recv_timeout(ANSWER_WITHIN).ok()
