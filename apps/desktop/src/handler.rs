@@ -7,18 +7,18 @@
 //! is what is typed.
 
 use crate::{
-    account, adopting, agent_choice, agent_profiles, arranging, artifacts, asking, attaching_chat,
-    blocks, board, branches, browser, browser_cookies, browser_driving, browser_menu, card_chat,
-    card_work, cards, chat, chat_relay, chat_remote, checkpoint, checkpoint_findings,
-    checkpoint_preview, claude_plugin, cloning, columns, commands, delegations, diffs,
-    error_reports, error_sender, files, filetree, front, happening, heads_down, history, in_flight,
-    index, installations, island, live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving,
-    notices, openers, opening, orchestrator, orchestrator_links, outside_sessions, pane_asking,
-    pane_screen, panels, panes, pasting, paths, plan_limits, plugin_data, plugins, project_naming,
-    projects, reading_path, receipts, regrouping, reveal, rewinding, runs_list, saves, search,
-    session_search, sessions, settings, shell_launch, skills, slash, sources, spend_history,
-    staging, steering, steps, stopping, threads, update, watching, workspace, worktree_base,
-    worktree_setup, worktrees, wsfiles,
+    account, adopting, agent_choice, agent_profiles, arranging, artifacts, asking, asking_kept,
+    attaching_chat, blocks, board, branches, browser, browser_cookies, browser_driving,
+    browser_menu, card_chat, card_work, cards, chat, chat_relay, chat_remote, checkpoint,
+    checkpoint_findings, checkpoint_preview, claude_plugin, cloning, columns, commands,
+    delegations, diffs, error_reports, error_sender, files, filetree, front, happening, heads_down,
+    history, in_flight, index, installations, island, live_answer, live_sessions, mcp, mcp_apps,
+    mcp_health, moving, notices, openers, opening, orchestrator, orchestrator_links,
+    outside_sessions, pane_asking, pane_screen, panels, panes, pasting, paths, plan_limits,
+    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reveal,
+    rewinding, runs_list, saves, search, session_search, sessions, settings, shell_launch, skills,
+    slash, sources, spend_history, staging, steering, steps, stopping, threads, update, watching,
+    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -98,6 +98,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         receipts::chat_receipt,
         slash::chat_slash_commands,
         asking::permission_answer,
+        asking_kept::permission_always,
         asking::permission_ask_from_now,
         asking::permission_questions,
         mcp::mcp_list,

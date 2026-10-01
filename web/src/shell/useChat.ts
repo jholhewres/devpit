@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
+import type { Said } from './Asked'
 import { applied, ASKS, batched, fixedTo, MODES, opening, rejoin, send, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
@@ -57,7 +58,7 @@ export interface Chat {
   readonly rewindable: readonly string[]
   rewind: (turnId: string) => void
   detach: (path: string) => void
-  answer: (id: string, allow: boolean) => void
+  answer: (id: string, said: Said) => void
   say: (prompt: string) => void
   stop: () => void
 }
@@ -221,12 +222,17 @@ export function useChat(conversationId: string): Chat {
   useEffect(() => onPermissionSettled((id) => setAsked((was) => was.filter((one) => one.id !== id))), [])
 
   const answer = useCallback(
-    (id: string, allow: boolean) => {
+    (id: string, said: Said) => {
       const question = asked.find((one) => one.id === id)
+      const allow = said !== 'deny'
       /* Taken off the list first: the question is answered either way, and a
          row that lingers invites a second click that has nothing to answer. */
       setAsked((was) => was.filter((one) => one.id !== id))
-      void ask(() => commands.permissionAnswer(id, allow ? 'allow' : 'deny')).then((answered) => {
+      const call =
+        said === 'always' && question
+          ? () => commands.permissionAlways(id, question.sessionId, question.tool, question.input)
+          : () => commands.permissionAnswer(id, allow ? 'allow' : 'deny')
+      void ask(call).then((answered) => {
         /* Kept in the thread only when the answer reached the agent: a receipt
            for a question that had already timed out would record a decision
            nobody's turn ever heard. */

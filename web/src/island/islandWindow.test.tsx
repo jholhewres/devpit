@@ -20,6 +20,7 @@ vi.mock('../shell/live', () => ({
     islandOpenPane: (projectId: string | null, paneId: string) => (called('open', projectId, paneId), null),
     islandPeek: () => ({ text: 'one\ntwo', notShown: null }),
     permissionAnswer: (id: string, answer: string) => (called('answer', id, answer), null),
+    permissionAlways: (id: string, sessionId: string, tool: string) => (called('always', id, sessionId, tool), null),
   },
 }))
 vi.mock('../shell/window', () => ({
@@ -131,6 +132,10 @@ describe('the island window', () => {
     expect(screen.getByText('Edit /w/b.rs')).toBeTruthy()
     say('permission:settled', 'q2')
     expect(screen.queryByText('Edit /w/b.rs')).toBeNull()
+
+    act(() => askedChat?.({ id: 'q3', sessionId: 's9', tool: 'Edit', input: '{"file_path":"/w/c.rs"}', cwd: '/w' }))
+    fireEvent.click(screen.getByText('Always'))
+    expect(called).toHaveBeenCalledWith('always', 'q3', 's9', 'Edit')
   })
 
   it('switches its sounds off and on from the head', async () => {

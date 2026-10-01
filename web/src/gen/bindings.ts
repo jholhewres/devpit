@@ -421,6 +421,11 @@ export const commands = {
 	/**  `permission.answer` — what the person said. */
 	permissionAnswer: (id: string, answer: Answer) => typedError<null, RpcError>(__TAURI_INVOKE("permission_answer", { id, answer })),
 	/**
+	 *  `permission.always` — allows this question, and the ones like it for the
+	 *  rest of the conversation.
+	 */
+	permissionAlways: (id: string, sessionId: string, tool: string, input: string) => typedError<null, RpcError>(__TAURI_INVOKE("permission_always", { id, sessionId, tool, input })),
+	/**
 	 *  `permission.ask_from_now` — whether this conversation stops to ask.
 	 * 
 	 *  Per session rather than global: a board step running unattended must not

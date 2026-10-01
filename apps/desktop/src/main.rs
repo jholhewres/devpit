@@ -11,6 +11,7 @@ mod agent_reach;
 mod arranging;
 mod artifacts;
 mod asking;
+mod asking_kept;
 mod attaching;
 mod attaching_chat;
 mod blocks;
@@ -214,6 +215,7 @@ fn main() {
         })
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())
+        .manage(asking_kept::Kept::default())
         .manage(blocks::Blocks::default())
         .manage(update::Updating::default())
         /* Empty, and filled only by somebody granting a pane. */

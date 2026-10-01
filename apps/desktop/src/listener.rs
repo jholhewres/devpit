@@ -195,6 +195,19 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
                 .map(|asking| asking.asks(&question.session_id))
                 .unwrap_or(false)
     });
+    // Already allowed for the rest of this conversation: answered as the
+    // person answered it then, without asking again.
+    if let Some(question) = &held {
+        let kept = app
+            .try_state::<crate::asking_kept::Kept>()
+            .is_some_and(|kept| kept.covers(&question.session_id, &question.tool, &question.input));
+        if kept {
+            reply(&mut stream, &decision(crate::asking::Answer::Allow));
+            let settled = hear_post(&app, &posted, seq);
+            trace(&format!("post seq={seq} {settled}"));
+            return;
+        }
+    }
 
     if let Some(question) = held {
         let settled = hear_post(&app, &posted, seq);

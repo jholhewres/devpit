@@ -139,8 +139,12 @@ export function useIsland(): IslandState {
       void ask(() => commands.islandDecide(question.id, verdict))
       return
     }
-    /* A chat has no terminal to hand back to and keeps no rule: what is not
-       a denial is an allow. */
+    /* A chat has no terminal to hand back to: what is not a denial is an
+       allow, and "always" keeps the rule for the rest of that chat. */
+    if (verdict === 'always') {
+      void ask(() => commands.permissionAlways(question.id, question.sessionId, question.tool, question.input))
+      return
+    }
     void ask(() => commands.permissionAnswer(question.id, verdict === 'deny' ? 'deny' : 'allow'))
   }, [])
 

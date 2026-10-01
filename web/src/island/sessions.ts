@@ -26,7 +26,7 @@ export interface Ask {
   readonly keepable: boolean
 }
 
-export const fromChat = (question: Question): Ask => ({ ...question, from: 'chat', keepable: false, project: null })
+export const fromChat = (question: Question): Ask => ({ ...question, from: 'chat', keepable: true, project: null })
 export const fromTerminal = (question: IslandQuestion): Ask => ({ ...question, from: 'terminal' })
 
 /** The sessions after one change. */
