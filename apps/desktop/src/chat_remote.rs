@@ -189,7 +189,7 @@ fn remote_of(project_id: &str) -> Result<(String, bool), RpcError> {
         .ok()
         .and_then(|home| home.canonicalize().ok())
         .unwrap_or_default();
-    let orchestrating = devpit_core::home::orchestrator_of(&home, &root).is_some();
+    let orchestrating = devpit_core::home::orchestrator_of(&store, &home, &root).is_some();
     let name = store
         .projects()?
         .into_iter()

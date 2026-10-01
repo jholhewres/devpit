@@ -74,14 +74,15 @@ fn an_orchestrator_says_its_account_where_the_folder_is_read() {
     let dir = tempfile::tempdir().expect("tempdir");
     let folder = dir.path().join("orchestrator").join("work");
     seed(&folder).expect("seeded");
-    speaks_as(&folder, "01M39W5J").expect("said");
+    let store = devpit_core::Store::open(&dir.path().join("state.db")).expect("store");
+    speaks_as(&store, &folder, "01M39W5J").expect("said");
     assert_eq!(
-        devpit_core::home::orchestrator_profile(&folder).as_deref(),
+        devpit_core::home::orchestrator_profile(&store, &folder).as_deref(),
         Some("01M39W5J")
     );
-    speaks_as(&folder, "claude").expect("changed");
+    speaks_as(&store, &folder, "claude").expect("changed");
     assert_eq!(
-        devpit_core::home::orchestrator_profile(&folder).as_deref(),
+        devpit_core::home::orchestrator_profile(&store, &folder).as_deref(),
         Some("claude")
     );
     // Notes, not a repository: nothing to push them to.

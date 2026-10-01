@@ -57,7 +57,7 @@ pub(crate) fn orchestrator_create_now(
     let folder = free_folder(&root, name)
         .ok_or_else(|| RpcError::new(ErrorCode::Invalid, "that name cannot name a folder"))?;
     seed(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
-    speaks_as(&folder, &profile.id).map_err(|err| RpcError::internal(err.to_string()))?;
+    speaks_as(&store, &folder, &profile.id)?;
     let here = folder
         .canonicalize()
         .map_err(|err| RpcError::internal(err.to_string()))?;
@@ -145,9 +145,9 @@ fn orchestrable(
     Ok(profile)
 }
 
-/// Which account an orchestrator speaks as, said in its own folder.
-pub(crate) fn speaks_as(folder: &Path, profile_id: &str) -> std::io::Result<()> {
-    crate::orchestrator_links::set(folder, "profile", serde_json::json!(profile_id))
+/// Which account an orchestrator speaks as, kept by its folder.
+pub(crate) fn speaks_as(store: &Store, folder: &Path, profile_id: &str) -> Result<(), RpcError> {
+    crate::orchestrator_links::set_in(store, folder, "profile", serde_json::json!(profile_id))
 }
 
 /// `orchestrator.account` — the account an orchestrator speaks as, changed.
@@ -164,13 +164,13 @@ pub async fn orchestrator_account(project_id: String, profile_id: String) -> Res
             .ok()
             .and_then(|home| home.canonicalize().ok())
             .unwrap_or_default();
-        if devpit_core::home::orchestrator_of(&home, &root).is_none() {
+        if devpit_core::home::orchestrator_of(&store, &home, &root).is_none() {
             return Err(RpcError::new(
                 ErrorCode::Invalid,
                 "that project is not an orchestrator",
             ));
         }
-        speaks_as(&root, &profile.id).map_err(|err| RpcError::internal(err.to_string()))
+        speaks_as(&store, &root, &profile.id)
     })
     .await
 }

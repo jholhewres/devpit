@@ -46,7 +46,8 @@ describe('the orchestrator', () => {
     assert.ok(existsSync(join(folder, 'CLAUDE.md')), 'the brief was not written')
     assert.ok(existsSync(join(folder, '.devpit', 'orchestrator.md')), "devpit's half of the brief was not written")
     assert.ok(!existsSync(join(folder, '.git')), 'the folder was made a repository with nowhere to push')
-    assert.match(readFileSync(join(folder, '.devpit', 'orchestrator.json'), 'utf8'), /"profile":"claude"/)
+    // The account and the links are devpit's to keep, not a file in the folder the orchestrator's own chat edits.
+    assert.ok(!existsSync(join(folder, '.devpit', 'orchestrator.json')), 'the account was kept where the orchestrator can change it')
 
     await fill(window, 'textarea.composer__ph', 'pwd')
     const answered = await window

@@ -89,7 +89,7 @@ fn stays(app: &AppHandle, project_id: &str, conversation_id: &str, mode: Option<
     devpit_core::Store::root()
         .ok()
         .and_then(|home| home.canonicalize().ok())
-        .and_then(|home| devpit_core::home::orchestrator_of(&home, &root))
+        .and_then(|home| devpit_core::home::orchestrator_of(&store, &home, &root))
         .is_some()
 }
 

@@ -50,7 +50,7 @@ pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
     let orchestrator = devpit_core::Store::root()
         .ok()
         .and_then(|home| home.canonicalize().ok())
-        .and_then(|home| devpit_core::home::orchestrator_of(&home, &root));
+        .and_then(|home| devpit_core::home::orchestrator_of(store, &home, &root));
     // An orchestrator's folder is notes, not a repository: no checkouts to
     // list, and no git to be unreadable for want of.
     let (worktrees, unreadable) = if orchestrator.is_some() {

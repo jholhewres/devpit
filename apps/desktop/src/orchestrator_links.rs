@@ -2,37 +2,38 @@
 //! one. Only those are on its Boards panel, readable by its chat, and within
 //! reach of its tools; every other project stays where it is.
 //!
-//! Kept in the orchestrator's own settings file, beside its account, so the
-//! link lives and goes with the orchestrator.
+//! Kept in devpit's store beside its account, by the orchestrator's folder —
+//! not in a file inside it, where the orchestrator's own chat could edit the
+//! links that bound it.
 
 use std::path::Path;
 
+use devpit_core::Store;
 use devpit_rpc::{ErrorCode, LiveSession, Project, RpcError};
 use serde_json::{json, Value};
 
-/// The settings as they are, or an empty object.
-fn settings(folder: &Path) -> Value {
-    std::fs::read_to_string(folder.join(devpit_core::home::ORCHESTRATOR_SETTINGS))
-        .ok()
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .filter(Value::is_object)
-        .unwrap_or_else(|| json!({}))
-}
-
-/// One key of the settings changed, the rest kept.
-pub(crate) fn set(folder: &Path, key: &str, value: Value) -> std::io::Result<()> {
-    let file = folder.join(devpit_core::home::ORCHESTRATOR_SETTINGS);
-    if let Some(parent) = file.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let mut all = settings(folder);
-    all[key] = value;
-    std::fs::write(file, all.to_string())
+/// One setting changed, the rest kept.
+pub(crate) fn set_in(
+    store: &Store,
+    folder: &Path,
+    key: &str,
+    value: Value,
+) -> Result<(), RpcError> {
+    Ok(store.set_orchestrator_setting(folder, key, value)?)
 }
 
 /// The ids of the projects this orchestrator's folder is linked to.
 pub(crate) fn linked(folder: &Path) -> Vec<String> {
-    settings(folder)["projects"]
+    crate::projects::store()
+        .map(|store| linked_in(&store, folder))
+        .unwrap_or_default()
+}
+
+/// [`linked`], in a given store.
+pub(crate) fn linked_in(store: &Store, folder: &Path) -> Vec<String> {
+    store
+        .orchestrator_settings(folder)
+        .unwrap_or_else(|_| json!({}))["projects"]
         .as_array()
         .map(|all| {
             all.iter()
@@ -69,10 +70,16 @@ pub(crate) fn reachable(here: &Project, sessions: Vec<LiveSession>) -> Vec<LiveS
 /// Whether `here`, an orchestrator, may reach `project`: itself, or one the
 /// person linked. A project reaches only itself, and is not asked here.
 pub(crate) fn reaches(here: &Project, project: &Project) -> Result<(), String> {
+    let store = crate::projects::store().map_err(|err| err.message)?;
+    reaches_in(&store, here, project)
+}
+
+/// [`reaches`], in a given store.
+pub(crate) fn reaches_in(store: &Store, here: &Project, project: &Project) -> Result<(), String> {
     if here.orchestrator.is_none() || project.id == here.id {
         return Ok(());
     }
-    linked(Path::new(&here.root_path))
+    linked_in(store, Path::new(&here.root_path))
         .contains(&project.id)
         .then_some(())
         .ok_or_else(|| {
@@ -114,7 +121,7 @@ pub async fn orchestrator_link(project_id: String, linked: Vec<String>) -> Resul
                 format!("{stray} is not a project that can be linked"),
             ));
         }
-        set(&root, "projects", json!(linked)).map_err(|err| RpcError::internal(err.to_string()))
+        set_in(&store, &root, "projects", json!(linked))
     })
     .await
 }

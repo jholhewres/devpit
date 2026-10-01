@@ -10,6 +10,7 @@ mod folders;
 mod lanes;
 mod layouts;
 mod migrations;
+mod orchestrators;
 pub mod pane_agents;
 mod plugins;
 pub mod project_runs;

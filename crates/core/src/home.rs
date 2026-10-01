@@ -42,15 +42,15 @@ pub fn orchestrator_dir(root: &Path, name: &str) -> Option<PathBuf> {
     plain_id(name).then(|| root.join(ORCHESTRATOR).join(name))
 }
 
-/// Where an orchestrator says which account it speaks as: a file in its own
-/// folder, so changing it is an edit and not a move.
+/// Where an older devpit kept an orchestrator's settings, in its own folder —
+/// within reach of the orchestrator's chat. Read once, into the store.
 pub const ORCHESTRATOR_SETTINGS: &str = ".devpit/orchestrator.json";
 
 /// The profile whose orchestrator `folder` is, if it is one: known by being
 /// devpit's own folder, so a project needs no column to say so. An older one
 /// at `orchestrator/<profile>/<name>` said its profile with the path, and
 /// still does until its settings say otherwise.
-pub fn orchestrator_of(root: &Path, folder: &Path) -> Option<String> {
+pub fn orchestrator_of(store: &crate::Store, root: &Path, folder: &Path) -> Option<String> {
     let rest = folder.strip_prefix(root.join(ORCHESTRATOR)).ok()?;
     let parts: Vec<&str> = rest
         .components()
@@ -61,19 +61,15 @@ pub fn orchestrator_of(root: &Path, folder: &Path) -> Option<String> {
         [profile, name] if plain_id(profile) && plain_id(name) => Some((*profile).to_owned()),
         _ => return None,
     };
-    orchestrator_profile(folder).or(from_path)
+    orchestrator_profile(store, folder).or(from_path)
 }
 
 /// The profile an orchestrator's settings name, when they name a plain one.
-pub fn orchestrator_profile(folder: &Path) -> Option<String> {
-    let file = folder.join(ORCHESTRATOR_SETTINGS);
-    // A settings file is a line of JSON; past this it is not one.
-    if std::fs::metadata(&file).ok()?.len() > 4096 {
-        return None;
-    }
-    let said: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
-    said.get("profile")?
+pub fn orchestrator_profile(store: &crate::Store, folder: &Path) -> Option<String> {
+    store
+        .orchestrator_settings(folder)
+        .ok()?
+        .get("profile")?
         .as_str()
         .filter(|id| plain_id(id))
         .map(str::to_owned)
