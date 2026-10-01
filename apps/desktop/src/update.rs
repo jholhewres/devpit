@@ -240,8 +240,23 @@ pub(crate) fn install_kind(
         // Per-user, in a folder this user owns: the installer needs no one's
         // permission to run over it.
         Some("nsis") => InstallKind::Nsis,
+        Some("app") => InstallKind::MacApp,
         _ => InstallKind::Unmanaged,
     }
+}
+
+/// Whether a Mac binary sits inside an app bundle the updater can swap.
+///
+/// The stamp cannot say: Tauri calls every Mac binary an app, `cargo run`
+/// included. A bundle opened from its disk image, or one macOS moved to a
+/// read-only place because it was opened from Downloads, is a bundle nothing
+/// can be written over — the person moves it to Applications first.
+pub(crate) fn swappable_bundle(exe: &std::path::Path) -> bool {
+    let exe = exe.to_string_lossy();
+    let in_a_bundle = exe
+        .rsplit_once("/Contents/MacOS/")
+        .is_some_and(|(bundle, _)| bundle.ends_with(".app"));
+    in_a_bundle && !exe.starts_with("/Volumes/") && !exe.contains("/AppTranslocation/")
 }
 
 /// The package tools this machine has, looked up where only root can write.
@@ -274,6 +289,7 @@ pub(crate) fn kind_here() -> InstallKind {
         BundleType::Deb => "deb",
         BundleType::Rpm => "rpm",
         BundleType::Nsis => "nsis",
+        BundleType::App if std::env::current_exe().is_ok_and(|exe| swappable_bundle(&exe)) => "app",
         _ => "other",
     });
     install_kind(appimage.as_deref(), stamped, &tools_found())
@@ -1015,7 +1031,7 @@ pub(crate) enum QuitStep {
 /// installing since 0.1.3.
 pub(crate) fn why_not_here(kind: InstallKind) -> Option<&'static str> {
     match kind {
-        InstallKind::AppImage | InstallKind::Nsis => None,
+        InstallKind::AppImage | InstallKind::Nsis | InstallKind::MacApp => None,
         InstallKind::Deb => {
             Some("a package is installed from the update card, not by quitting devpit")
         }
@@ -1037,7 +1053,7 @@ pub(crate) fn quit_steps(kind: InstallKind, package_in: bool) -> Vec<QuitStep> {
     match kind {
         // The NSIS installer is started with `/R`, which restarts into the new
         // version; the plugin ends this process as it starts it.
-        InstallKind::AppImage | InstallKind::Nsis => {
+        InstallKind::AppImage | InstallKind::Nsis | InstallKind::MacApp => {
             vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart]
         }
         InstallKind::Deb if package_in => vec![QuitStep::AskTheWindow, QuitStep::Restart],
@@ -1487,7 +1503,10 @@ pub(crate) fn may_download(state: &UpdateStatus) -> Result<(), String> {
                 );
             }
             match kind {
-                InstallKind::AppImage | InstallKind::Deb | InstallKind::Nsis => Ok(()),
+                InstallKind::AppImage
+                | InstallKind::Deb
+                | InstallKind::Nsis
+                | InstallKind::MacApp => Ok(()),
                 InstallKind::Unmanaged => Err(
                     "this build was not installed from a devpit release; the release page has the files"
                         .to_owned(),

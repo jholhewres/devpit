@@ -854,6 +854,46 @@ fn the_windows_installer_is_updated_in_place() {
     }
 }
 
+/// A Mac bundle is swapped in place, like an AppImage. The stamp says "app"
+/// for any Mac binary, so where the binary sits is what decides.
+#[test]
+fn a_mac_bundle_where_it_was_put_is_updated_in_place() {
+    use std::path::Path;
+    assert_eq!(install_kind(None, Some("app"), &[]), InstallKind::MacApp);
+    assert!(swappable_bundle(Path::new(
+        "/Applications/devpit.app/Contents/MacOS/devpit"
+    )));
+    assert!(swappable_bundle(Path::new(
+        "/Users/ana/Applications/devpit.app/Contents/MacOS/devpit"
+    )));
+    for nowhere in [
+        // `cargo run` and `make dev`: no bundle around the binary.
+        "/Users/ana/devpit/target/debug/devpit",
+        // Opened from the disk image, which is read-only.
+        "/Volumes/devpit/devpit.app/Contents/MacOS/devpit",
+        // Opened from Downloads: macOS runs a read-only copy elsewhere.
+        "/private/var/folders/x/T/AppTranslocation/1A2B/d/devpit.app/Contents/MacOS/devpit",
+        "/Users/ana/Contents/MacOS/devpit",
+    ] {
+        assert!(!swappable_bundle(Path::new(nowhere)), "{nowhere}");
+    }
+
+    let offered = S::Available {
+        version: "0.2.0".to_owned(),
+        notes: String::new(),
+        kind: InstallKind::MacApp,
+        test_feed: false,
+    };
+    assert_eq!(may_download(&offered), Ok(()));
+    assert_eq!(why_not_here(InstallKind::MacApp), None);
+    for package_in in [false, true] {
+        assert_eq!(
+            quit_steps(InstallKind::MacApp, package_in),
+            vec![QuitStep::AskTheWindow, QuitStep::Install, QuitStep::Restart]
+        );
+    }
+}
+
 /// Only the Windows installer ends the terminals: it has to stop the psmux
 /// inside the install to replace it. Everywhere else they are kept.
 #[test]
@@ -864,6 +904,7 @@ fn only_the_windows_installer_closes_the_terminals() {
         InstallKind::Deb,
         InstallKind::ExternallyManaged,
         InstallKind::Unmanaged,
+        InstallKind::MacApp,
     ] {
         assert!(terminals_survive(kind), "{kind:?}");
     }

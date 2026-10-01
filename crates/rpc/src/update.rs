@@ -27,6 +27,9 @@ pub enum InstallKind {
     /// The Windows installer. The app runs the new one over itself, and that
     /// installer ends the psmux inside the install — so the terminals close.
     Nsis,
+    /// The macOS app bundle, where it was put. The updater swaps the bundle
+    /// for the new one, like an AppImage, and the terminals keep running.
+    MacApp,
 }
 
 /// Where the update is, and what may be done about it.

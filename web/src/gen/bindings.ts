@@ -2362,7 +2362,12 @@ export type InstallKind =
  *  The Windows installer. The app runs the new one over itself, and that
  *  installer ends the psmux inside the install — so the terminals close.
  */
-"nsis";
+"nsis" | 
+/**
+ *  The macOS app bundle, where it was put. The updater swaps the bundle
+ *  for the new one, like an AppImage, and the terminals keep running.
+ */
+"macApp";
 
 /**  One installation, as the panels offer it. */
 export type Installation = {
