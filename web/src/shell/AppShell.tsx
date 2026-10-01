@@ -12,8 +12,9 @@ import { Sidebar } from './Sidebar'
 import { StatusStrip } from './StatusStrip'
 import { TopBar } from './TopBar'
 import { PluginsProvider } from './usePlugins'
-import { ShellProvider } from './useShell'
+import { ShellProvider, useShell } from './useShell'
 import { useWindowShell } from './shellStore'
+import { useBriefRefresh } from './useBriefRefresh'
 import { shortcutFor } from './shortcuts'
 import { isMaximized, onResized } from './window'
 import { abandoned } from './typing'
@@ -26,6 +27,13 @@ export function AppShell(): React.JSX.Element {
       </PluginsProvider>
     </ShellProvider>
   )
+}
+
+/* Its own component, so the project changing re-renders this and not the
+   window: the window reads the shell through a picked, stable slice. */
+function BriefRefresh(): null {
+  useBriefRefresh(useShell().project)
+  return null
 }
 
 /*
@@ -125,6 +133,7 @@ function Window(): React.JSX.Element {
       </div>
 
       <StatusStrip />
+      <BriefRefresh />
 
       <Overlays
         signIn={signIn}

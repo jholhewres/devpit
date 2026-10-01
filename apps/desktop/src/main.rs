@@ -302,6 +302,8 @@ fn main() {
                     eprintln!("project folders were not settled: {err}");
                 }
             }
+            // devpit's half of each orchestrator's brief, as this build has it.
+            orchestrator::seed_all_on_start();
             // Hooks are how the board hears about work as it happens rather
             // than a poll later. Started here so the endpoint is on disk before
             // the first turn goes out.

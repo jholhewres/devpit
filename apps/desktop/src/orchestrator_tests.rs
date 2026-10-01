@@ -1,4 +1,4 @@
-use super::{free_folder, seed, slug, speaks_as};
+use super::{brief, free_folder, seed, seed_all, slug, speaks_as};
 
 #[test]
 fn a_new_orchestrator_starts_with_its_brief_and_folders() {
@@ -87,4 +87,60 @@ fn an_orchestrator_says_its_account_where_the_folder_is_read() {
     );
     // Notes, not a repository: nothing to push them to.
     assert!(!folder.join(".git").exists());
+}
+
+/// The brief names the build that wrote it, so which one an orchestrator is
+/// reading is one look at the file.
+#[test]
+fn the_brief_says_which_build_wrote_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let folder = dir.path().join("claude2");
+    seed(&folder).expect("seeded");
+    let written = std::fs::read_to_string(folder.join(".devpit/orchestrator.md")).expect("brief");
+    assert_eq!(written, brief());
+    assert!(written.starts_with(&format!(
+        "<!-- written by devpit {} -->\n# Orchestrator",
+        env!("CARGO_PKG_VERSION")
+    )));
+}
+
+/// Starting the app brings every orchestrator's brief up to this build, the
+/// ones nobody opens included, and leaves the person's half and every other
+/// project alone.
+#[test]
+fn starting_brings_every_orchestrator_brief_up_to_this_build() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let store = devpit_core::Store::open(&root.join("state.db")).expect("store");
+
+    let mut folders = Vec::new();
+    for name in ["work", "home"] {
+        let folder = root.join("orchestrator").join(name);
+        seed(&folder).expect("seeded");
+        speaks_as(&store, &folder, "claude").expect("account");
+        store.add_project(&folder, None).expect("project");
+        std::fs::write(folder.join(".devpit/orchestrator.md"), "an older build's").expect("age it");
+        std::fs::write(folder.join("CLAUDE.md"), "mine").expect("edit");
+        folders.push(folder);
+    }
+    let project = root.join("notes").join("api");
+    std::fs::create_dir_all(project.join(".devpit")).expect("project");
+    std::fs::write(project.join(".devpit/orchestrator.md"), "not ours").expect("write");
+    store.add_project(&project, None).expect("project");
+
+    assert!(seed_all(&store, root).is_empty());
+    for folder in &folders {
+        let written =
+            std::fs::read_to_string(folder.join(".devpit/orchestrator.md")).expect("brief");
+        assert_eq!(written, brief(), "{}", folder.display());
+        assert_eq!(
+            std::fs::read_to_string(folder.join("CLAUDE.md")).expect("mine"),
+            "mine"
+        );
+    }
+    assert_eq!(
+        std::fs::read_to_string(project.join(".devpit/orchestrator.md")).expect("theirs"),
+        "not ours",
+        "a project that is not an orchestrator was written into"
+    );
 }

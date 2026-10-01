@@ -77,9 +77,9 @@ export function RailOrchestrators({
     })
   }, [project, open.length, show])
 
-  /* devpit's half of the brief is brought up to this build on the way in. */
+  /* devpit's half of the brief is brought up to this build by the shell,
+     whichever way an orchestrator comes in front (`useBriefRefresh`). */
   const enter = (one: Project): void => {
-    void ask(() => commands.orchestratorRefresh(one.id))
     arriving.current = one.id
     if (one.id !== project?.id) setProject(one.id)
   }

@@ -211,12 +211,23 @@ pub(crate) fn slug(name: &str) -> String {
     }
 }
 
+/// devpit's brief as this build writes it: the text, under a line naming the
+/// build — so "which brief is this orchestrator reading" is answered by
+/// opening the file rather than by diffing it against a release.
+pub(crate) fn brief() -> String {
+    format!(
+        "<!-- written by devpit {} -->\n{}",
+        env!("CARGO_PKG_VERSION"),
+        DEVPIT_BRIEF.1
+    )
+}
+
 /// Writes devpit's brief as this build has it, and what a new orchestrator
 /// starts with, leaving the rest alone.
 pub(crate) fn seed(folder: &Path) -> std::io::Result<()> {
-    let (name, text) = DEVPIT_BRIEF;
-    let brief = folder.join(name);
-    if std::fs::read_to_string(&brief).ok().as_deref() != Some(text) {
+    let text = brief();
+    let brief = folder.join(DEVPIT_BRIEF.0);
+    if std::fs::read_to_string(&brief).ok() != Some(text.clone()) {
         std::fs::create_dir_all(brief.parent().unwrap_or(folder))?;
         std::fs::write(&brief, text)?;
     }
@@ -231,6 +242,38 @@ pub(crate) fn seed(folder: &Path) -> std::io::Result<()> {
         std::fs::write(path, text)?;
     }
     Ok(())
+}
+
+/// Every orchestrator's brief brought up to this build, and what could not
+/// be. Opening one refreshes it too, but one nobody opens was left with an
+/// older build's brief for anything else that reads its folder.
+pub(crate) fn seed_all(store: &Store, root: &Path) -> Vec<(String, std::io::Error)> {
+    let Ok(rows) = store.projects() else {
+        return Vec::new();
+    };
+    rows.into_iter()
+        .map(|row| std::path::PathBuf::from(row.root_path))
+        .filter(|folder| devpit_core::home::orchestrator_of(store, root, folder).is_some())
+        .filter_map(|folder| {
+            seed(&folder)
+                .err()
+                .map(|err| (folder.display().to_string(), err))
+        })
+        .collect()
+}
+
+/// [`seed_all`] as the app starts, on its own thread. An update is always a
+/// new build starting, so this is the moment that covers every orchestrator
+/// before any of its chats does.
+pub(crate) fn seed_all_on_start() {
+    std::thread::spawn(|| {
+        let (Ok(root), Ok(store)) = (Store::root(), Store::open_default()) else {
+            return;
+        };
+        for (folder, err) in seed_all(&store, &root) {
+            eprintln!("the orchestrator brief in {folder} was left as it was: {err}");
+        }
+    });
 }
 
 #[cfg(test)]
