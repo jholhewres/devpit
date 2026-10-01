@@ -446,7 +446,13 @@ pub async fn island_open_pane(
         .ok_or_else(|| RpcError::internal("there is no main window".to_owned()))?;
     let _ = main.unminimize();
     let _ = main.show();
+    // The click was on the island, which never takes focus, so the window
+    // manager reads a focus asked for from here as one window stealing it
+    // from another and leaves devpit behind. Lifted above everything for a
+    // moment, it comes to the front all the same.
+    let _ = main.set_always_on_top(true);
     let _ = main.set_focus();
+    let _ = main.set_always_on_top(false);
     // To `main` by name: a page in a browser pane must not hear it.
     app.emit_to(
         tauri::EventTarget::webview("main"),
