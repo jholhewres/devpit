@@ -17,6 +17,7 @@
 //! single-digit milliseconds on a warm repository, and none of them sits in a
 //! frame budget.
 
+mod again;
 mod basing;
 pub mod branches;
 #[cfg(test)]
@@ -48,6 +49,7 @@ use std::path::PathBuf;
 pub(crate) use invoke::fixture;
 pub(crate) use invoke::{identify, run, run_diffing};
 
+pub use again::{branch_left, reattach};
 pub use basing::{allowed as base_allowed, chosen as base_chosen, worktree_at, Refused};
 pub use branches::{branch_at, branches, switch, Branch};
 pub use clone::{clone, first_commit, folder_for, init, unborn};
@@ -56,8 +58,7 @@ pub use front::{at_head, changed_since, diff_since, head_of, remove_front, unsav
 pub use glance::{glance, Glance};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
-    assignable, branch_for, branch_left, create, disk_usage, reattach, remove, uncommitted,
-    worktree_home, Loss, Made,
+    assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,
 };
 pub use log::{history, show};
 pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};

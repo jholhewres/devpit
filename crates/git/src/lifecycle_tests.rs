@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::fixture;
 use crate::lifecycle::*;
+use crate::{branch_left, reattach};
 use crate::{worktrees, GitError};
 
 fn repo(at: &Path) {
