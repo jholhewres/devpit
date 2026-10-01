@@ -22,7 +22,7 @@ pub async fn orchestrator_stop(
     name: String,
 ) -> Result<String, RpcError> {
     crate::off_main::blocking(move || {
-        stop(&app, &profile_id, &name)
+        stop(&app, &profile_id, &name, None)
             .map(|said| said["stopped"].as_str().unwrap_or_default().to_owned())
     })
     .await
@@ -86,8 +86,24 @@ pub(crate) fn close_pane(
 
 /// Stops the sessions called `name` of this account — every one, since a
 /// name started twice is one name to the person — and closes their terminals.
-pub(crate) fn stop(app: &AppHandle, profile_id: &str, name: &str) -> Result<Value, RpcError> {
-    let found = crate::live_sessions::running_named(profile_id, name)?;
+/// With `only`, the one process of that name; without, every one — a name
+/// handed twice before names were unique is one piece of work.
+pub(crate) fn stop(
+    app: &AppHandle,
+    profile_id: &str,
+    name: &str,
+    only: Option<i32>,
+) -> Result<Value, RpcError> {
+    let found: Vec<_> = crate::live_sessions::running_named(profile_id, name)?
+        .into_iter()
+        .filter(|one| only.is_none_or(|pid| one.pid == pid))
+        .collect();
+    if found.is_empty() {
+        return Err(RpcError::new(
+            ErrorCode::NotFound,
+            format!("no session called {name} is running with that process"),
+        ));
+    }
     let mut terminal = Value::Null;
     for one in &found {
         match (&one.pane, &one.job) {

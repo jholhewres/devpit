@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 17] = [
+pub(crate) const METHODS: [&str; 20] = [
     "context",
     "board",
     "card",
@@ -60,6 +60,9 @@ pub(crate) const METHODS: [&str; 17] = [
     "artifact_save",
     "artifact_restore",
     "artifact_remove",
+    "transcript",
+    "log",
+    "repo",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -131,7 +134,33 @@ fn respond_in(
             let app = app.ok_or("devpit's window is not running")?;
             let name = text("name").ok_or("which session? pass its name")?;
             in_reach(here, profile, &name)?;
-            return crate::stopping::stop(app, profile, &name).map_err(said);
+            let pid = asked
+                .params
+                .get("pid")
+                .and_then(Value::as_i64)
+                .map(|pid| pid as i32);
+            return crate::stopping::stop(app, profile, &name, pid).map_err(said);
+        }
+        "transcript" => {
+            let profile = orchestrating(here)?;
+            let name = text("name").ok_or("which session? pass its name")?;
+            in_reach(here, profile, &name)?;
+            let last = asked
+                .params
+                .get("last")
+                .and_then(Value::as_u64)
+                .unwrap_or(3) as usize;
+            return crate::session_told::told_by(profile, &name, last);
+        }
+        "log" => {
+            orchestrating(here)?;
+            let log = text("log").unwrap_or_else(|| "sessions".to_owned());
+            let wrote = crate::orchestrator_notes::note(
+                Path::new(&here.root_path),
+                &log,
+                &text("text").unwrap_or_default(),
+            )?;
+            return Ok(json!({ "wrote": wrote }));
         }
         "screen" => {
             let profile = orchestrating(here)?;
@@ -158,8 +187,11 @@ fn respond_in(
             &asked.params,
         );
     }
-    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
     let card_id = text("cardId").unwrap_or_default();
+    if asked.method == "repo" {
+        return repo(project, &card_id, &asked.params);
+    }
+    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
     let answer = match asked.method.as_str() {
         "context" => context(project, &board),
         "board" => board_view(&board),
@@ -320,6 +352,51 @@ pub(crate) fn gate(column: &Column) -> Result<(), String> {
         )),
         None => Ok(()),
     }
+}
+
+/// Where a project's repository, or a card's checkout, stands.
+fn repo(project: &Project, card_id: &str, params: &Value) -> Result<Value, String> {
+    let checkout = (!card_id.is_empty())
+        .then(|| {
+            crate::projects::store()
+                .ok()?
+                .card(card_id)
+                .ok()
+                .flatten()?
+                .worktree_path
+        })
+        .flatten();
+    let root = checkout.unwrap_or_else(|| project.root_path.clone());
+    let branches: Vec<String> = params
+        .get("branches")
+        .and_then(Value::as_array)
+        .map(|all| {
+            all.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .take(20)
+                .collect()
+        })
+        .unwrap_or_default();
+    let fetch = params
+        .get("fetch")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let state = devpit_git::repo_state(Path::new(&root), &branches, fetch)
+        .map_err(|err| err.to_string())?;
+    Ok(json!({
+        "folder": root,
+        "branch": state.branch,
+        "dirty": state.dirty,
+        "upstream": state.upstream,
+        "ahead": state.ahead,
+        "behind": state.behind,
+        "commits": state.commits.iter().map(|(sha, subject)| json!({ "sha": sha, "subject": subject })).collect::<Vec<_>>(),
+        "defaultBranch": state.default_branch,
+        "branches": state.branches.iter().map(|one| json!({ "name": one.name, "local": one.local, "remote": one.remote, "merged": one.merged })).collect::<Vec<_>>(),
+        "tag": state.tag,
+        "sinceTag": state.since_tag,
+    }))
 }
 
 /// Refuses a session outside the orchestrator's linked projects, by name.

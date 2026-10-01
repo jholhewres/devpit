@@ -39,6 +39,7 @@ mod mcp_apps;
 mod opening;
 mod orchestrator;
 mod orchestrator_links;
+mod orchestrator_notes;
 mod rewinding;
 mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the
@@ -128,6 +129,7 @@ mod runs;
 mod saves;
 mod search;
 mod session_search;
+mod session_told;
 mod sessions;
 mod settings;
 mod shell_launch;
