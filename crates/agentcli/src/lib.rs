@@ -300,6 +300,7 @@ mod live_tests;
 pub mod apps_host;
 pub mod claude_lines;
 pub mod cli_config;
+pub mod config_edit;
 pub mod control;
 pub mod declaring;
 pub mod driver;
