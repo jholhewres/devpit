@@ -3,6 +3,7 @@ import { ask, commands } from '../shell/live'
 import { Checks } from './Checks'
 import { Mascot } from './Mascot'
 import { Preview } from './Preview'
+import { Reply } from './Reply'
 import { ROWS } from './shape'
 import { askedWords, headline, labelled, nameOf, nowWords, stepWords, type Ask, type Mood } from './sessions'
 
@@ -148,6 +149,7 @@ export function Detail({ session, now }: { session: IslandSession; now: number }
         <button className="isl-btn isl-btn--quiet" onClick={() => openPane(session)}>
           {session.paneId ? 'Open terminal' : 'Open chat'}
         </button>
+        <Reply session={session} />
       </div>
       <Preview session={session} step={shown} />
     </div>

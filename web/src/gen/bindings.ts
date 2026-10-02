@@ -354,6 +354,20 @@ export const commands = {
 	 *  `choice` is absent.
 	 */
 	islandAnswer: (sessionId: string, seen: PendingPrompt, choice: number | null) => typedError<null, RpcError>(__TAURI_INVOKE("island_answer", { sessionId, seen, choice })),
+	/**
+	 *  `island.reply` — the person's words, typed into a session's terminal as
+	 *  theirs: a follow-up, a "go on", what the session asked for in its own
+	 *  words. Never into a terminal whose shell is in front, where it would run as
+	 *  a command.
+	 */
+	islandReply: (sessionId: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_reply", { sessionId, text })),
+	/**
+	 *  `island.typing` — the island takes the keyboard while a field of it is
+	 *  being typed in, and gives it back after. Otherwise it never takes focus:
+	 *  a window above everything that took the keyboard on every hover would be
+	 *  a trap for whatever the person was typing elsewhere.
+	 */
+	islandTyping: (on: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("island_typing", { on })),
 	/**  `reminders.pending` — what went off and nobody has dealt with. */
 	remindersPending: () => typedError<Reminders, RpcError>(__TAURI_INVOKE("reminders_pending")),
 	/**  `reminder.snooze` — the reminder goes off again at `until`. */

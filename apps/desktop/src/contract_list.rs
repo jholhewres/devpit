@@ -84,6 +84,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         columns::column_set_role,
         island_answer::island_prompt,
         island_answer::island_answer,
+        island_answer::island_reply,
+        island_answer::island_typing,
         reminders::reminders_pending,
         reminders::reminder_snooze,
         reminders::reminder_done,

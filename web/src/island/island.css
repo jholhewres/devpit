@@ -578,18 +578,18 @@
 }
 
 /* A question put to the person: what is asked, and the choices to press. */
-.isl-ask { padding: 10px 14px; font-family: var(--ui); font-size: 12.5px; color: var(--isl-text, #e8e8e8); white-space: normal; }
-.isl-ask__q + .isl-ask__q { margin-top: 10px; }
-.isl-ask__h { display: inline-block; margin-bottom: 4px; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); color: var(--isl-dim); font-size: 10.5px; }
-.isl-ask__t { margin: 0 0 6px; line-height: 1.4; }
-.isl-ask__opts { margin: 0; padding-left: 18px; color: var(--isl-dim); line-height: 1.5; }
-.isl-ask__picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.isl-ask__pick { display: flex; align-items: baseline; gap: 6px; padding: 4px 9px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
-.isl-ask__pick:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.35); }
-.isl-ask__pick:disabled { opacity: 0.5; cursor: default; }
-.isl-ask__n { font-family: var(--mono); font-size: 10.5px; color: var(--isl-dim); }
-.isl-ask__esc { font-family: var(--mono); font-size: 11px; }
-.isl-ask__said { margin: 6px 0 0; color: var(--isl-dim); font-size: 11.5px; }
+.isl-q { padding: 10px 14px; font-family: var(--ui); font-size: 12.5px; color: var(--isl-text, #e8e8e8); white-space: normal; }
+.isl-q__q + .isl-q__q { margin-top: 10px; }
+.isl-q__h { display: inline-block; margin-bottom: 4px; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); color: var(--isl-dim); font-size: 10.5px; }
+.isl-q__t { margin: 0 0 6px; line-height: 1.4; }
+.isl-q__opts { margin: 0; padding-left: 18px; color: var(--isl-dim); line-height: 1.5; }
+.isl-q__picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.isl-q__pick { display: flex; align-items: baseline; gap: 6px; padding: 4px 9px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.isl-q__pick:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.35); }
+.isl-q__pick:disabled { opacity: 0.5; cursor: default; }
+.isl-q__n { font-family: var(--mono); font-size: 10.5px; color: var(--isl-dim); }
+.isl-q__esc { font-family: var(--mono); font-size: 11px; }
+.isl-q__said { margin: 6px 0 0; color: var(--isl-dim); font-size: 11.5px; }
 .isl-peek__plan { padding: 10px 14px; font-family: var(--ui); font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
 
 /* Another session asking while one is open: a badge, never the view. */
@@ -598,3 +598,9 @@
 /* The fold coming: a bar that runs out over the last seconds. */
 .isl-closing { position: absolute; left: 50%; bottom: 3px; height: 2px; width: var(--from, 100%); max-width: 160px; transform: translateX(-50%); border-radius: 2px; background: rgba(255, 255, 255, 0.35); animation-name: isl-closing; animation-timing-function: linear; animation-fill-mode: forwards; pointer-events: none; }
 @keyframes isl-closing { to { width: 0; } }
+
+/* Replying from the island: typed into the session's terminal as the person. */
+.isl-reply { display: flex; gap: 6px; margin-top: 8px; }
+.isl-reply__in { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; font-size: 12px; }
+.isl-reply__in:focus { outline: none; border-color: rgba(255, 255, 255, 0.35); }
+.isl-reply__said { margin: 4px 0 0; color: var(--isl-dim); font-size: 11px; }

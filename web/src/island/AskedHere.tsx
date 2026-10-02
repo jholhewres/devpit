@@ -55,14 +55,14 @@ export function AskedHere({
   }
 
   return (
-    <div className="isl-ask">
+    <div className="isl-q">
       {questions.map((one, at) => (
-        <div className="isl-ask__q" key={at}>
-          {one.header && <span className="isl-ask__h">{one.header}</span>}
-          <p className="isl-ask__t">{one.question}</p>
+        <div className="isl-q__q" key={at}>
+          {one.header && <span className="isl-q__h">{one.header}</span>}
+          <p className="isl-q__t">{one.question}</p>
           {/* The choices as asked, until the terminal's own can be pressed. */}
           {!prompt && (
-            <ol className="isl-ask__opts">
+            <ol className="isl-q__opts">
               {one.options.map((option, n) => (
                 <li key={n}>{option}</li>
               ))}
@@ -71,19 +71,19 @@ export function AskedHere({
         </div>
       ))}
       {prompt && (
-        <div className="isl-ask__picks" aria-label="Answer in its terminal">
+        <div className="isl-q__picks" aria-label="Answer in its terminal">
           {prompt.options.map((option, n) => (
-            <button key={n} className="isl-ask__pick" disabled={busy} title={option.hint ?? undefined} onClick={() => pick(prompt, n)}>
-              <span className="isl-ask__n">{n + 1}</span>
+            <button key={n} className="isl-q__pick" disabled={busy} title={option.hint ?? undefined} onClick={() => pick(prompt, n)}>
+              <span className="isl-q__n">{n + 1}</span>
               {option.label}
             </button>
           ))}
-          <button className="isl-ask__pick isl-ask__esc" disabled={busy} onClick={() => pick(prompt, null)}>
+          <button className="isl-q__pick isl-q__esc" disabled={busy} onClick={() => pick(prompt, null)}>
             Esc
           </button>
         </div>
       )}
-      {said && <p className="isl-ask__said">{said}</p>}
+      {said && <p className="isl-q__said">{said}</p>}
     </div>
   )
 }
