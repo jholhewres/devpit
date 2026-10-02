@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme Store</title>
+<style>
+  :root { --ink: #1d1b19; --muted: #6f6a64; --line: #ece7e1; --accent: #e8622c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #fbf9f6; }
+  header { display: flex; align-items: center; gap: 28px; padding: 18px 36px; border-bottom: 1px solid var(--line); background: #fff; }
+  .logo { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+  .logo b { color: var(--accent); }
+  nav { display: flex; gap: 20px; color: var(--muted); }
+  .cart { margin-left: auto; position: relative; padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; }
+  .cart span { position: absolute; top: -7px; right: -7px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 6px; }
+  .hero { margin: 28px 36px; padding: 36px 40px; border-radius: 18px; background: linear-gradient(120deg, #ffe3d3, #fff4e0 60%, #e9f3ff); }
+  .hero h1 { margin: 0 0 6px; font-size: 34px; letter-spacing: -0.03em; }
+  .hero p { margin: 0; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 20px; margin: 0 36px 36px; }
+  .item { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .shot { height: 130px; }
+  .item div.meta { padding: 12px 14px; }
+  .item b { display: block; }
+  .item small { color: var(--muted); }
+  .price { float: right; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">acme<b>.</b></div>
+  <nav><a>New</a><a>Home</a><a>Outdoor</a><a>Sale</a></nav>
+  <div class="cart">Cart <span>3</span></div>
+</header>
+<section class="hero">
+  <h1>Autumn essentials</h1>
+  <p>Free delivery on orders over $50 · estimated arrival Tuesday</p>
+</section>
+<section class="grid">
+  <div class="item"><div class="shot" style="background:linear-gradient(135deg,#f6c7a8,#e8622c)"></div><div class="meta"><span class="price">$48</span><b>Trail mug</b><small>Enamel, 12 oz</small></div></div>
+  <div class="item"><div class="shot" style="background:linear-gradient(135deg,#c9e4d6,#3f8f6b)"></div><div class="meta"><span class="price">$129</span><b>Day pack</b><small>Recycled nylon</small></div></div>
+  <div class="item"><div class="shot" style="background:linear-gradient(135deg,#d8dcf5,#5561c9)"></div><div class="meta"><span class="price">$34</span><b>Wool beanie</b><small>Three colours</small></div></div>
+  <div class="item"><div class="shot" style="background:linear-gradient(135deg,#f3e6b8,#c99a1e)"></div><div class="meta"><span class="price">$76</span><b>Camp lantern</b><small>USB-C, 300 lm</small></div></div>
+</section>
+</body>
+</html>
