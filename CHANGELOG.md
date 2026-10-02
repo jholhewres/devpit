@@ -3,6 +3,102 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.32 — 2026-10-02
+
+### Remote
+
+- **This machine, from your phone or another computer, over Tailscale.**
+  Settings → General → Remote: the machine serves its own viewer to your
+  tailnet. Terminals are watched, and typed into when you allow it. The
+  board's cards move. Agents' questions are answered. Chats are read.
+- **Nothing listens beyond the machine and your tailnet.** The viewer
+  answers on loopback, published by `tailscale serve` with HTTPS, or on the
+  machine's tailnet address when the tailnet has no HTTPS. Never on every
+  interface.
+- **Two things to get in.** You must be the machine's owner in the tailnet,
+  and the device must be paired with a code (or QR) shown on the machine's
+  screen. The code is good once, for two minutes.
+- **What each device may do is set on the machine.** Every device can watch.
+  Typing and answering are allowed device by device. A device that only
+  watches is attached read-only by tmux itself, and a phone never shrinks
+  the terminal on the desk.
+- The desk says *Watched by 1 device*, and a click drops it. A log keeps who
+  connected and what they did, never what was on screen.
+
+### Orchestrator
+
+- **A session's window says where it stands.** It shows the branch, how far
+  it is ahead or behind, and whether it runs in its own checkout. A folded
+  *Changes* panel holds the files, the commits and the diff. Its name is
+  renamed in place (click or F2), through the CLI's own `/rename`.
+- **It proposes projects, and you add them in one click.** *"Add
+  ~/Workspace/x to the ASC group"* becomes a card above the composer:
+  *Yes*, *Edit* or *Drop*. The Boards panel adds a folder, names it, groups
+  it and links it in one screen, and links a whole group at once.
+- **It hears what its sessions did since its last message** (one finished,
+  one is waiting, one ended) at the start of your next one. It is not woken
+  to say it.
+- **Standing rules for every session it starts.** Whatever its
+  `context/preferences.md` keeps under *Rules for sessions* goes with every
+  brief.
+
+### The card follows the work
+
+- **A card moves to the lane for work in progress when its work starts, and
+  to the one for checking when it is finished.** The agent no longer has to
+  remember. A lane says which role it plays from its menu.
+- **A card says what its sessions changed in other repositories:** *Also
+  changed 13 files in devpit-app*, with which are still uncommitted.
+
+### Chats
+
+- **Attach files with a button** (Ctrl/Cmd+Shift+A), from the system's picker.
+- **Voice messages.** Click or hold the microphone. The words land in the
+  composer to read and edit before sending. They come from a whisper on this
+  machine (whisper.cpp or `whisper`), or from a transcription service only if
+  you choose one and keep its key. Without an engine, the recording goes as
+  a file.
+
+### The island
+
+- **It shows the question a session asks, and answers it.** Its choices
+  become buttons, pressed in that terminal as you.
+- **Answer in words.** Reply to a session from the island without opening
+  its terminal.
+- **A question from another session waits as a badge**, rather than taking
+  the island from the one you are reading. A thin bar counts down the last
+  seconds before it folds.
+- **On Wayland too.** It is a layer at the top of the screen on KDE,
+  Hyprland and Sway (with gtk-layer-shell), and a window that never takes
+  focus on GNOME.
+- It costs nothing while hidden: no timer, no frame, no sound context.
+
+### Desktop
+
+- **One devpit at a time.** Opening it again brings the open one forward.
+- **In the tray**, with *Pause for an hour*.
+- **Open at login**, and **a shortcut that brings devpit forward** from
+  anywhere, both in Settings → General.
+- **Pause** notifications, the island and its questions, for a while or until
+  you resume. Everything is still heard, so it is right when you come back.
+
+### Other agents
+
+- **Any agent can report to devpit.** `devpit-agent hook --agent <name>`
+  says what it is doing, so it shows on the island and on its card like
+  Claude Code (see `docs/agents.md`).
+- **Gemini CLI reports from devpit's terminals with nothing to set up.**
+  Your own `~/.gemini/settings.json` is never written, and your own hooks
+  still run.
+- **A safe way to change an agent's own settings file**: a diff first, a
+  backup, and no write over a file that changed in between.
+
+### Fixes
+
+- A PDF opens in its tab, page by page, rather than as a file too long to read.
+- A big tool report, such as a Read of a large file, reaches devpit cut down
+  to what it reads, rather than being refused and leaving its step running.
+
 ## 0.1.31 — 2026-10-01
 
 ### Reminders
