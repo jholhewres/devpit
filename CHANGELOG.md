@@ -3,6 +3,35 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.33 — 2026-10-02
+
+### Settings
+
+- **General is grouped**: the island and being told, this desktop, chats,
+  other devices, updates and privacy. Searching Settings for *island*,
+  *pause*, *voice*, *remote*, *shortcut* and the rest finds it.
+- **Pause has a row**, with what it holds back and what it does not.
+- **The island says how it is drawn on this desktop**: above every window, a
+  layer at the top, or, on GNOME, a window wherever the desktop puts it.
+- **Ask before stopping a terminal** can be turned back on after *Don't ask
+  again*.
+- **Remote says how to get in**, step by step, what *type* and *answer*
+  allow, and where its log is kept.
+- **Voice messages say where the microphone is** and how to install a
+  whisper.
+- An orchestrator's first screen says where its rules for sessions live.
+
+### Fixes
+
+- **A session that finished no longer shows as working.** Claude Code's own
+  background forks report a subagent ending after the turn has ended, and that
+  put the session back to work on the island, its tab and its card.
+- **The microphone and the island's sound work in the AppImage.** It carries
+  the GStreamer plugins it records and plays with; the system's are newer than
+  its own GStreamer and were refused. The `.deb` recommends them.
+- **The tray offers a pause again when one ends on its own**, rather than
+  *Resume* for a pause long over.
+
 ## 0.1.32 — 2026-10-02
 
 ### Remote
@@ -90,8 +119,9 @@ release notes are taken from here when a version is tagged.
 - **Gemini CLI reports from devpit's terminals with nothing to set up.**
   Your own `~/.gemini/settings.json` is never written, and your own hooks
   still run.
-- **A safe way to change an agent's own settings file**: a diff first, a
-  backup, and no write over a file that changed in between.
+- **The groundwork for changing an agent's own settings file safely**: a
+  diff first, a backup, and no write over a file that changed in between.
+  Nothing uses it yet.
 
 ### Fixes
 
