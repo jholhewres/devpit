@@ -16,7 +16,9 @@ use devpit_rpc::{CardHappening, CardSession, SessionKind};
 /// What a hook says about the session it fired in; `None` when it says nothing.
 ///
 /// `/clear` ends one session and starts the next in the same agent, so it is
-/// not an end.
+/// not an end. A subagent starting or stopping says nothing of its parent: the
+/// CLI's own forks send `SubagentStop` after the parent's `Stop`, and read as
+/// working they put a finished session back to work.
 pub(crate) fn state_of_event(event: &Event) -> Option<Doing> {
     match event {
         Event::SessionStarted => Some(Doing::Open),
@@ -24,9 +26,8 @@ pub(crate) fn state_of_event(event: &Event) -> Option<Doing> {
         | Event::Using { .. }
         | Event::Used { .. }
         | Event::UseFailed { .. }
-        | Event::SubagentStarted { .. }
-        | Event::Delegated { .. }
-        | Event::SubagentDone { .. } => Some(Doing::Working),
+        | Event::Delegated { .. } => Some(Doing::Working),
+        Event::SubagentStarted { .. } | Event::SubagentDone { .. } => None,
         Event::Waiting => Some(Doing::Waiting),
         Event::Stopped { .. } => Some(Doing::Done),
         Event::Failed { .. } => Some(Doing::Failed),

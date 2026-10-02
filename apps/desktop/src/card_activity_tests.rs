@@ -29,7 +29,7 @@ fn each_hook_means_what_the_table_says() {
                 agent: "a1".to_owned(),
                 kind: None,
             },
-            Some(Doing::Working),
+            None,
         ),
         (
             Event::Delegated {
@@ -40,7 +40,7 @@ fn each_hook_means_what_the_table_says() {
             },
             Some(Doing::Working),
         ),
-        (Event::SubagentDone { agent: None }, Some(Doing::Working)),
+        (Event::SubagentDone { agent: None }, None),
         (Event::Waiting, Some(Doing::Waiting)),
         (Event::Stopped { said: None }, Some(Doing::Done)),
         (

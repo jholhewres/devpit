@@ -84,6 +84,25 @@ fn a_turn_that_stops_ends_its_steps_and_says_what_it_said() {
     assert_eq!(session.said.as_deref(), Some("All green."));
 }
 
+/// Claude Code's own forks (the away recap) send `SubagentStop` after the
+/// parent's `Stop`, with the parent's session id.
+#[test]
+fn a_subagent_stopping_after_the_turn_leaves_it_done() {
+    let session = folded(vec![
+        Event::Prompted,
+        using("Bash", "rm -v a.zip"),
+        Event::Stopped { said: None },
+        Event::SubagentDone { agent: None },
+        Event::SubagentStarted {
+            agent: "fork".to_owned(),
+            kind: None,
+        },
+    ])
+    .expect("a session");
+    assert_eq!(session.state, Doing::Done);
+    assert_eq!(stepping(&session), None);
+}
+
 #[test]
 fn only_the_latest_steps_are_kept() {
     let mut events = vec![Event::Prompted];
