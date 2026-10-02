@@ -50,18 +50,37 @@ fn said(until: i64) -> Paused {
     }
 }
 
-/// Reads the pause kept from before this start.
-pub(crate) fn restore(store: &Store) {
+/// Reads the pause kept from before this start, and ends it at its time.
+pub(crate) fn restore(app: &AppHandle, store: &Store) {
     let kept = store
         .preference(preference::PAUSED_UNTIL)
         .ok()
         .flatten()
         .and_then(|value| value.parse::<i64>().ok())
         .unwrap_or(OFF);
-    UNTIL.store(
-        if on_at(kept, now()) { kept } else { OFF },
-        Ordering::Relaxed,
-    );
+    let until = if on_at(kept, now()) { kept } else { OFF };
+    UNTIL.store(until, Ordering::Relaxed);
+    end_when_due(app, until);
+}
+
+/// Resumes at `until`, unless the pause was changed by then. Without it the
+/// pause ended only in what `paused()` answered, and the tray kept offering
+/// "Resume" for a pause long over.
+fn end_when_due(app: &AppHandle, until: i64) {
+    if until == OFF || until == UNTIL_RESUMED {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let left = until.saturating_sub(now()).max(0) as u64;
+        std::thread::sleep(std::time::Duration::from_secs(left));
+        if UNTIL
+            .compare_exchange(until, OFF, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            let _ = set(&app, OFF);
+        }
+    });
 }
 
 /// `pause.read` — whether devpit is paused, and until when.
@@ -104,6 +123,7 @@ pub(crate) fn set(app: &AppHandle, until: i64) -> Result<Paused, RpcError> {
     let now = said(until);
     let _ = app.emit(CHANGED, now);
     crate::desk::tray_refresh(app);
+    end_when_due(app, until);
     Ok(now)
 }
 

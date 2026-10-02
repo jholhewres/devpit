@@ -346,7 +346,7 @@ fn main() {
             }
             // A pause given before this start still holds, until its time.
             if let Ok(store) = devpit_core::Store::open_default() {
-                pausing::restore(&store);
+                pausing::restore(app.handle(), &store);
             }
             // In the tray, and the shortcut that brings it forward, if one was chosen.
             desk::tray(app.handle());
