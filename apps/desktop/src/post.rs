@@ -68,6 +68,7 @@ pub(crate) fn read_post(mut reader: impl BufRead, door: Option<&str>) -> Option<
     let mut pane = None;
     let mut secret = None;
     let mut agent = false;
+    let mut gemini = false;
     let mut first = true;
     let mut seen = 0usize;
 
@@ -99,6 +100,7 @@ pub(crate) fn read_post(mut reader: impl BufRead, door: Option<&str>) -> Option<
             // not a header, and the only place the pane could travel without
             // touching the JSON the agent itself wrote.
             pane = pane_in(line);
+            gemini = query_says(line, "from") == Some("gemini");
             agent = line
                 .split_whitespace()
                 .nth(1)
@@ -130,6 +132,12 @@ pub(crate) fn read_post(mut reader: impl BufRead, door: Option<&str>) -> Option<
     let mut body = vec![0u8; length];
     reader.read_exact(&mut body).ok()?;
     let mut body = String::from_utf8(body).ok()?;
+    // Gemini CLI's report, put into the words devpit reads — before it is
+    // cut, which would take the error a failed tool reports. One devpit does
+    // not listen to is left with nothing to say.
+    if gemini && !agent {
+        body = devpit_agentcli::gemini::claude_shaped(&body).unwrap_or_else(|| "{}".to_owned());
+    }
     if !agent && body.len() > devpit_agentapi::SLIM_ABOVE {
         // What is not JSON is not cut, and passes only under the small
         // ceiling, as it always did; the reader after this refuses it.
@@ -154,18 +162,22 @@ pub(crate) fn read_post(mut reader: impl BufRead, door: Option<&str>) -> Option<
 /// reach the screen — a value nobody checked is a value somebody else can
 /// choose.
 fn pane_in(request_line: &str) -> Option<String> {
-    let target = request_line.split_whitespace().nth(1)?;
-    let query = target.split_once('?')?.1;
-    let value = query
-        .split('&')
-        .find_map(|pair| pair.strip_prefix("pane="))?;
-    let named = value.trim();
+    let named = query_says(request_line, "pane")?.trim();
     let ours = !named.is_empty()
         && named.len() <= 64
         && named
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
     ours.then(|| named.to_owned())
+}
+
+/// What a request line's query gives `key`, if it gives it anything.
+fn query_says<'a>(request_line: &'a str, key: &str) -> Option<&'a str> {
+    let target = request_line.split_whitespace().nth(1)?;
+    let query = target.split_once('?')?.1;
+    query
+        .split('&')
+        .find_map(|pair| pair.strip_prefix(key)?.strip_prefix('='))
 }
 
 #[cfg(test)]

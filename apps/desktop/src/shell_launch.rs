@@ -66,6 +66,9 @@ fn typed_agents() -> Vec<(String, String)> {
             root.join("hooks.json").display().to_string(),
         ));
     }
+    if let Some(defaults) = gemini_settings(&root) {
+        env.push((devpit_agentcli::gemini::DEFAULTS_ENV.to_owned(), defaults));
+    }
     if let Some(exe) = crate::agent_reach::exe() {
         let config = root.join("mcp.json");
         if crate::agent_reach::mcp_flags("claude", &exe, &config).is_some() {
@@ -538,6 +541,34 @@ fn hook_settings() -> Option<String> {
     // Quoted, because a home directory with a space in it would otherwise
     // become two arguments to the shell this is typed into.
     Some(format!("'{}'", path.display()))
+}
+
+/// The defaults file Gemini CLI is pointed at in a devpit terminal, written if
+/// it differs: the system's own defaults with devpit's hooks added, so the
+/// person's settings file is never touched and the system's is never lost.
+fn gemini_settings(root: &std::path::Path) -> Option<String> {
+    let path = root.join("gemini-hooks.json");
+    let system = devpit_agentcli::gemini::defaults_path();
+    // Started from a devpit terminal, the variable already names ours.
+    let theirs = if system == path {
+        None
+    } else {
+        match std::fs::read_to_string(&system) {
+            Ok(text) => Some(text),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(_) => return None,
+        }
+    };
+    let wanted = devpit_agentcli::gemini::settings_json(
+        &devpit_agentcli::endpoint_file(root),
+        &devpit_agentcli::auth_file(root),
+        theirs.as_deref(),
+    )?;
+    if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
+        // Private, as the Claude Code hooks: these are commands an agent runs.
+        devpit_core::home::write_private(&path, wanted.as_bytes()).ok()?;
+    }
+    Some(path.display().to_string())
 }
 
 /// Whether a pane is ready to be typed into.

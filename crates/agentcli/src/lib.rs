@@ -306,6 +306,7 @@ pub mod declaring;
 pub mod driver;
 #[cfg(test)]
 mod driver_tests;
+pub mod gemini;
 pub mod head;
 #[cfg(test)]
 mod head_tests;

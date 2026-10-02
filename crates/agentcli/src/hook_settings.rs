@@ -71,13 +71,13 @@ fn hooks(endpoint_file: &Path, auth_file: &Path, guard: &str) -> String {
 
     // Told and forgotten. The reply is discarded and the budget is short,
     // because these only report what happened and the agent is waiting.
-    let tell = guarded(guard, &post(&file, &auth, "1.5", false));
+    let tell = guarded(guard, &post(&file, &auth, "1.5", false, None));
 
     // `PreToolUse` is the one that can be answered, so its reply is printed:
     // the app either sends back a decision or sends back nothing, and nothing
     // leaves the CLI's own permission mode in charge. The budget is long
     // because on this one the answer is a person.
-    let consult = guarded(guard, &post(&file, &auth, "125", true));
+    let consult = guarded(guard, &post(&file, &auth, "125", true, None));
 
     let hooks: Vec<String> = [
         ("PreToolUse", &consult),
@@ -139,15 +139,28 @@ fn guarded(guard: &str, post: &str) -> String {
 /// what reaches that far. `${VAR:+?pane=$VAR}` is POSIX and expands to
 /// nothing at all when the agent was not started in one of our terminals, so
 /// a headless turn posts exactly the URL it always did.
+///
+/// `from` names an agent other than Claude Code, whose reports the listener
+/// puts into Claude Code's words (`gemini`).
 #[cfg(not(windows))]
-fn post(endpoint_file: &str, auth_file: &str, seconds: &str, echo: bool) -> String {
+pub(crate) fn post(
+    endpoint_file: &str,
+    auth_file: &str,
+    seconds: &str,
+    echo: bool,
+    from: Option<&str>,
+) -> String {
     let sink = if echo { "" } else { " >/dev/null" };
+    let pane = devpit_tmux_pane_env();
+    let query = match from {
+        None => format!("${{{pane}:+?pane=${pane}}}"),
+        Some(agent) => format!("?from={agent}${{{pane}:+&pane=${pane}}}"),
+    };
     format!(
         "E=$(cat {endpoint_file} 2>/dev/null) && [ -n \"$E\" ] && \
          curl -sS -X POST --noproxy '*' --connect-timeout 0.5 --max-time {seconds} \
          -H 'content-type: application/json' -H @'{auth_file}' --data-binary @- \
-         \"$E${{{pane}:+?pane=${pane}}}\"{sink} 2>/dev/null || true",
-        pane = devpit_tmux_pane_env()
+         \"$E{query}\"{sink} 2>/dev/null || true"
     )
 }
 
@@ -155,12 +168,22 @@ fn post(endpoint_file: &str, auth_file: &str, seconds: &str, echo: bool) -> Stri
 /// `curl` or POSIX shell to count on, and the binary is already installed. It
 /// reads the endpoint and the secret from the same files, and adds the pane.
 #[cfg(windows)]
-fn post(_endpoint_file: &str, _auth_file: &str, seconds: &str, echo: bool) -> String {
+pub(crate) fn post(
+    _endpoint_file: &str,
+    _auth_file: &str,
+    seconds: &str,
+    echo: bool,
+    from: Option<&str>,
+) -> String {
     // This process is devpit: the one binary that knows where its state is.
     let exe = std::env::current_exe()
         .map(|exe| exe.display().to_string())
         .unwrap_or_else(|_| "devpit".to_owned());
-    hook_line(&exe, seconds, echo)
+    let line = hook_line(&exe, seconds, echo);
+    match from {
+        Some(agent) => format!("{line} --from {agent}"),
+        None => line,
+    }
 }
 
 /// `<exe> hook --wait <seconds> [--echo]`, read alike by cmd, Git Bash and

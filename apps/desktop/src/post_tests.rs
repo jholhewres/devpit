@@ -280,3 +280,42 @@ fn a_big_report_from_our_hook_is_read_and_cut_down() {
     assert_eq!(read_post(&wrong[..], Some("6f1c")), None);
     assert!(body.len() < MOST_HOOK_BYTES);
 }
+
+/// Gemini CLI says which agent it is in the query, and its report arrives in
+/// Claude Code's words; an event devpit does not listen to says nothing.
+#[test]
+fn a_gemini_report_is_read_in_claude_codes_words() {
+    let body =
+        r#"{"hook_event_name":"AfterAgent","session_id":"g1","cwd":"/w","prompt_response":"Done"}"#;
+    let raw = format!(
+        "POST /hook?from=gemini&pane=leaf_1 HTTP/1.1\r\ncontent-length: {}\r\n\r\n{body}",
+        body.len()
+    );
+    let posted = read_post(raw.as_bytes(), None).expect("read");
+    assert_eq!(posted.pane.as_deref(), Some("leaf_1"));
+    assert!(
+        posted.body.contains(r#""hook_event_name":"Stop""#),
+        "{}",
+        posted.body
+    );
+
+    let model = r#"{"hook_event_name":"AfterModel","session_id":"g1"}"#;
+    let raw = format!(
+        "POST /hook?from=gemini HTTP/1.1\r\ncontent-length: {}\r\n\r\n{model}",
+        model.len()
+    );
+    assert_eq!(
+        read_post(raw.as_bytes(), None).map(|posted| posted.body),
+        Some("{}".to_owned())
+    );
+
+    // Without the word, the same body is read as it came.
+    let raw = format!(
+        "POST /hook HTTP/1.1\r\ncontent-length: {}\r\n\r\n{body}",
+        body.len()
+    );
+    assert_eq!(
+        read_post(raw.as_bytes(), None).map(|posted| posted.body),
+        Some(body.to_owned())
+    );
+}

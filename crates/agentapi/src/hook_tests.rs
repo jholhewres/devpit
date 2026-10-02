@@ -38,6 +38,23 @@ fn a_hook_is_told_its_budget_and_whether_to_answer() {
 }
 
 #[test]
+fn a_hook_for_another_agent_says_which_in_the_query() {
+    assert_eq!(
+        parsed(&words("--from gemini")).from.as_deref(),
+        Some("gemini")
+    );
+    // Only a word reaches the URL.
+    assert_eq!(parsed(&words("--from a&pane=x")).from, None);
+    assert_eq!(
+        query_of("leaf_1", Some("gemini")),
+        "?from=gemini&pane=leaf_1"
+    );
+    assert_eq!(query_of("", Some("gemini")), "?from=gemini");
+    assert_eq!(query_of("leaf_1", None), "?pane=leaf_1");
+    assert_eq!(query_of("", None), "");
+}
+
+#[test]
 fn the_plugins_hook_speaks_only_inside_a_pane_and_not_beside_the_settings() {
     let plugin = parsed(&words("--plugin"));
     assert!(!speaks(&plugin, "", ""));
@@ -99,6 +116,7 @@ fn a_hook_posts_its_payload_with_the_secret_and_the_pane_and_hears_the_reply() {
         root.path(),
         br#"{"hook_event_name":"PreToolUse"}"#,
         "leaf_1",
+        None,
         Duration::from_secs(5),
     );
     let (head, body) = app.join().expect("app");
@@ -124,11 +142,11 @@ fn a_devpit_that_is_gone_costs_the_hook_a_moment_not_a_hang() {
     };
     let root = root_listening_at(&address);
     let started = std::time::Instant::now();
-    assert!(post(root.path(), b"{}", "", Duration::from_secs(5)).is_none());
+    assert!(post(root.path(), b"{}", "", None, Duration::from_secs(5)).is_none());
     assert!(started.elapsed() < Duration::from_secs(2));
 
     let nowhere = tempfile::tempdir().expect("tempdir");
-    assert!(post(nowhere.path(), b"{}", "", Duration::from_secs(5)).is_none());
+    assert!(post(nowhere.path(), b"{}", "", None, Duration::from_secs(5)).is_none());
 }
 
 /// What the Windows hook sends after a big Read: the report, not the file.

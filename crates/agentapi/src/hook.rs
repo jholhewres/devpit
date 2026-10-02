@@ -42,6 +42,9 @@ pub(crate) struct Asked {
     /// The plugin's copy, which speaks only inside a devpit pane and not
     /// beside the settings' own.
     pub plugin: bool,
+    /// The agent the report is from, when it is not Claude Code: the listener
+    /// puts it into Claude Code's words.
+    pub from: Option<String>,
 }
 
 /// Runs one hook and answers with its exit code, which is always 0.
@@ -61,7 +64,7 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
         return 0;
     }
     let body = slim(body);
-    if let Some(reply) = post(root, &body, &pane, asked.wait) {
+    if let Some(reply) = post(root, &body, &pane, asked.from.as_deref(), asked.wait) {
         if asked.echo {
             let _ = std::io::stdout().write_all(&reply);
         }
@@ -82,19 +85,29 @@ pub(crate) fn slim(body: Vec<u8>) -> Vec<u8> {
         .unwrap_or(body)
 }
 
-/// `--wait <seconds>`, `--echo`, `--plugin`; anything else is ignored, so a
+/// `--wait <seconds>`, `--echo`, `--plugin`, `--from <agent>`; anything else is ignored, so a
 /// newer settings file never makes an older binary fail a hook.
 pub(crate) fn parsed(args: &[String]) -> Asked {
     let mut asked = Asked {
         wait: Duration::from_millis(1500),
         echo: false,
         plugin: false,
+        from: None,
     };
     let mut words = args.iter();
     while let Some(word) = words.next() {
         match word.as_str() {
             "--echo" => asked.echo = true,
             "--plugin" => asked.plugin = true,
+            // A word, as the query takes it: nothing else rides into the URL.
+            "--from" => {
+                asked.from = words
+                    .next()
+                    .filter(|agent| {
+                        !agent.is_empty() && agent.chars().all(|c| c.is_ascii_alphanumeric())
+                    })
+                    .cloned();
+            }
             "--wait" => {
                 if let Some(seconds) = words.next().and_then(|one| one.parse::<f64>().ok()) {
                     asked.wait = Duration::from_secs_f64(seconds.clamp(0.1, 600.0));
@@ -115,15 +128,17 @@ pub(crate) fn speaks(asked: &Asked, pane: &str, hooked: &str) -> bool {
 /// Posts `body` to the app's hook route, naming `pane` when there is one, and
 /// answers with the reply's body — or nothing, when the app could not be
 /// reached in time.
-pub(crate) fn post(root: &Path, body: &[u8], pane: &str, wait: Duration) -> Option<Vec<u8>> {
+pub(crate) fn post(
+    root: &Path,
+    body: &[u8],
+    pane: &str,
+    from: Option<&str>,
+    wait: Duration,
+) -> Option<Vec<u8>> {
     let (address, secret) = client::door(root).ok()?;
     let endpoint = std::fs::read_to_string(root.join("hook-endpoint")).ok()?;
     let route = route_of(endpoint.trim())?;
-    let query = if pane.is_empty() {
-        String::new()
-    } else {
-        format!("?pane={pane}")
-    };
+    let query = query_of(pane, from);
     let to: SocketAddr = address.parse().ok()?;
     let mut stream = TcpStream::connect_timeout(&to, CONNECT).ok()?;
     stream.set_read_timeout(Some(wait)).ok()?;
@@ -138,6 +153,20 @@ pub(crate) fn post(root: &Path, body: &[u8], pane: &str, wait: Duration) -> Opti
     stream.take(MOST_REPLY).read_to_end(&mut reply).ok()?;
     let at = reply.windows(4).position(|four| four == b"\r\n\r\n")?;
     Some(reply.split_off(at + 4))
+}
+
+/// `?from=<agent>&pane=<pane>`, each when there is one.
+pub(crate) fn query_of(pane: &str, from: Option<&str>) -> String {
+    let pairs: Vec<String> = from
+        .map(|agent| format!("from={agent}"))
+        .into_iter()
+        .chain((!pane.is_empty()).then(|| format!("pane={pane}")))
+        .collect();
+    if pairs.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", pairs.join("&"))
+    }
 }
 
 /// `/hook` out of `http://host:port/hook`.

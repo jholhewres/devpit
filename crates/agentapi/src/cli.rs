@@ -22,6 +22,7 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
                 root,
                 body.as_bytes(),
                 &pane,
+                None,
                 std::time::Duration::from_millis(1500),
             );
             0

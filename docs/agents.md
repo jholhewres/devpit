@@ -49,3 +49,25 @@ that fails must not fail the agent sending it.
 
 There is no `PermissionRequest`. An approval asked this way could pass for
 one of Claude Code's, and approving is the person's, in the agent itself.
+
+## Gemini CLI, with nothing to set up
+
+In a devpit terminal Gemini CLI reports on its own. The terminal sets
+`GEMINI_CLI_SYSTEM_DEFAULTS_PATH` to `<home>/gemini-hooks.json`: the
+system's own defaults file, if there is one, with devpit's hooks added.
+Gemini merges that file under the person's settings, and it concatenates hook
+lists, so their own hooks still run and `~/.gemini/settings.json` is never
+written. If the system's file exists but cannot be read as JSON, devpit leaves
+the variable alone rather than hide it.
+
+The hooks post with `?from=gemini`. The listener puts each report into Claude
+Code's words: `BeforeTool` becomes `PreToolUse`, `AfterTool` becomes
+`PostToolUse`, or `PostToolUseFailure` when the tool returned an error.
+`BeforeAgent` becomes `UserPromptSubmit`, and `AfterAgent` becomes `Stop`
+with the reply. A `Notification` is a permission prompt, so the session shows
+as waiting. Gemini's tool names are mapped to devpit's too: `run_shell_command`
+to Bash, `replace` to Edit, and so on. Nothing is answered from devpit, and
+the reply is thrown away, as Gemini would show any text a hook prints.
+
+Antigravity is not covered. It is an editor whose agent settings are global,
+with no per-terminal file to point at, and devpit does not write a global file.
