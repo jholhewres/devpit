@@ -84,6 +84,9 @@ pub(crate) fn changed(app: &tauri::AppHandle, session: &IslandSession, was: Opti
     let Some(tell) = worth_telling(was, session.state) else {
         return;
     };
+    if crate::pausing::paused() {
+        return;
+    }
     let (title, body) = words(session, tell);
     let project = session.project_id.clone();
     let app = app.clone();
@@ -98,6 +101,9 @@ pub(crate) fn changed(app: &tauri::AppHandle, session: &IslandSession, was: Opti
 /// An agent asked to be allowed something: always worth telling, unless
 /// devpit is in front, where the question is already on screen.
 pub(crate) fn asked(app: &tauri::AppHandle, tool: &str, input: &str) {
+    if crate::pausing::paused() {
+        return;
+    }
     let input = serde_json::from_str(input).unwrap_or_default();
     let what = devpit_agentcli::target_of(&input)
         .map_or_else(|| tool.to_owned(), |target| format!("{tool} {target}"));

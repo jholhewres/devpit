@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import type { IslandChange, IslandQuestion, IslandSession, IslandVerdict } from '../gen/bindings'
 import { ask, commands } from '../shell/live'
 import { onCarried, onPermissionAsked, onPermissionSettled } from '../shell/window'
+import { usePause } from '../shell/usePause'
 import { cueOf, play, setSoundOn, soundOn } from './chime'
 import { due, next, resting, type Island, type Nudge } from './islandMachine'
 import { applied, fromChat, fromTerminal, holds, ordered, type Ask, type Sessions } from './sessions'
@@ -38,8 +39,13 @@ export function useIsland(): IslandState {
   const [chosenId, setChosenId] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [sound, setSoundState] = useState(soundOn)
+  /* Paused, the island stays down and silent; what happens is still heard,
+     so it is right the moment the pause ends. */
+  const { paused } = usePause()
+  const pausedRef = useRef(paused.on)
+  pausedRef.current = paused.on
   const soundRef = useRef(sound)
-  soundRef.current = sound
+  soundRef.current = sound && !paused.on
   const byIdRef = useRef(byId)
   byIdRef.current = byId
 
@@ -54,9 +60,13 @@ export function useIsland(): IslandState {
     () => resting(Date.now()),
   )
 
+  useEffect(() => {
+    if (paused.on) dispatch({ kind: 'rest' })
+  }, [paused.on])
+
   const asked = (question: Ask): void => {
     setQuestions((was) => [...was.filter((one) => one.id !== question.id), question])
-    dispatch({ kind: 'alert' })
+    if (!pausedRef.current) dispatch({ kind: 'alert' })
     if (soundRef.current) play('asking')
   }
 
@@ -84,7 +94,7 @@ export function useIsland(): IslandState {
           if (cue && soundRef.current) play(cue)
         }
         setById((was) => applied(was, change))
-        if (change.was === 'changed') {
+        if (change.was === 'changed' && !pausedRef.current) {
           dispatch({ kind: change.session.state === 'waiting' ? 'alert' : 'activity' })
         }
       }),

@@ -16,11 +16,12 @@ use crate::{
     error_reports, error_sender, files, filetree, front, happening, heads_down, history, in_flight,
     index, installations, island, island_answer, island_checks, live_answer, live_sessions, mcp,
     mcp_apps, mcp_health, moving, notices, openers, opening, orchestrator, orchestrator_links,
-    outside_sessions, pane_asking, pane_screen, panels, panes, pasting, paths, plan_limits,
-    plugin_data, plugins, project_naming, projects, reading_path, receipts, regrouping, reminders,
-    reply_drafts, reveal, rewinding, runs_list, saves, search, session_search, sessions, settings,
-    shell_launch, skills, slash, sources, spend_history, staging, steering, steps, stopping,
-    threads, update, watching, workspace, worktree_base, worktree_setup, worktrees, wsfiles,
+    outside_sessions, pane_asking, pane_screen, panels, panes, pasting, paths, pausing,
+    plan_limits, plugin_data, plugins, project_naming, projects, reading_path, receipts,
+    regrouping, reminders, reply_drafts, reveal, rewinding, runs_list, saves, search,
+    session_search, sessions, settings, shell_launch, skills, slash, sources, spend_history,
+    staging, steering, steps, stopping, threads, update, watching, workspace, worktree_base,
+    worktree_setup, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -74,6 +75,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
         reply_drafts::orchestrator_draft_drop,
+        pausing::pause_read,
+        pausing::pause_set,
         columns::column_set_role,
         island_answer::island_prompt,
         island_answer::island_answer,

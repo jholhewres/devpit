@@ -112,6 +112,7 @@ mod panels;
 mod panes;
 mod pasting;
 mod paths;
+mod pausing;
 mod plan_limits;
 mod plugin_data;
 mod plugins;
@@ -308,6 +309,10 @@ fn main() {
                 {
                     eprintln!("project folders were not settled: {err}");
                 }
+            }
+            // A pause given before this start still holds, until its time.
+            if let Ok(store) = devpit_core::Store::open_default() {
+                pausing::restore(&store);
             }
             // A card's date goes off at its time, whatever project it is in.
             reminders::watch(app.handle().clone());

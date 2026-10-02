@@ -17,12 +17,14 @@ const say = (name: string, payload: unknown): void => {
   act(() => heard.get(name)?.(payload))
 }
 let askedChat: ((question: Question) => void) | undefined
+let paused = { on: false, until: null as number | null }
 
 const called = vi.fn()
 vi.mock('../shell/live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
     islandNow: () => ({ sessions: [...alive.values()] }),
+    pauseRead: async () => paused,
     islandShape: () => null,
     islandSeen: (id: string) => (called('seen', id), null),
     islandDecide: (id: string, verdict: string) => (called('decide', id, verdict), null),
@@ -61,6 +63,7 @@ const changed = (one: IslandSession): IslandChange => ({ was: 'changed', session
 const shape = (): HTMLElement => document.querySelector('.isl-shape') as HTMLElement
 
 beforeEach(() => {
+  paused = { on: false, until: null }
   heard.clear()
   alive.clear()
   called.mockClear()
@@ -140,6 +143,17 @@ describe('the island window', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('stays down and asks nothing while devpit is paused', async () => {
+    paused = { on: true, until: null }
+    render(<IslandWindow />)
+    await act(async () => {})
+    say('island:session', changed(session({ state: 'waiting', steps: [] })))
+    expect(shape().dataset.mode).toBe('hidden')
+    say('pause:changed', { on: false, until: null })
+    say('island:session', changed(session({ state: 'waiting', steps: [] })))
+    expect(shape().dataset.mode).toBe('expanded')
   })
 
   it('folds back to the capsule from the fold button, and pins open', async () => {

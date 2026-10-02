@@ -23,6 +23,7 @@ pub mod front;
 pub mod island;
 pub mod live;
 pub mod mcp_health;
+pub mod pause;
 pub mod plugin_data;
 pub mod plugins;
 pub mod prime;
@@ -67,6 +68,7 @@ pub use island::{
 };
 pub use live::{LivePane, LiveSession, LiveSessions, PendingPrompt, PromptOption, RemoteState};
 pub use mcp_health::{McpHealth, McpServerHealth, McpState};
+pub use pause::Paused;
 pub use plugin_data::{
     PluginFile, PluginFileRemoved, PluginFileSaved, PluginFileText, PluginFiles,
 };

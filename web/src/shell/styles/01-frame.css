@@ -109,6 +109,12 @@
 .strip__v { margin-right: auto; height: 20px; padding: 0 7px; border-radius: 5px; display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--ghost); }
 .strip__v:hover { background: var(--overlay); color: var(--text-2); }
 .strip__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+/* Pausing devpit, and the way back. */
+.strip__pausebox { position: relative; }
+.strip__pause { height: 20px; padding: 0 7px; border-radius: 5px; display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ghost); }
+.strip__pause:hover { background: var(--overlay); color: var(--text-2); }
+.strip__pause[data-on='true'] { color: var(--warning); }
+.strip__pausemenu { position: absolute; bottom: 24px; right: 0; min-width: 190px; }
 /* The total might be an overcount, so it says so rather than hoping nobody
    asks. Resident memory overstates a process tree by half. */
 .strip__warn { color: var(--warning); }

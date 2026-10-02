@@ -322,6 +322,13 @@ export const commands = {
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
+	/**  `pause.read` — whether devpit is paused, and until when. */
+	pauseRead: () => __TAURI_INVOKE<Paused>("pause_read"),
+	/**
+	 *  `pause.set` — pauses until `until` (seconds since the epoch), until
+	 *  resumed when `forever`, or resumes when neither.
+	 */
+	pauseSet: (until: number | null, forever: boolean) => typedError<Paused, RpcError>(__TAURI_INVOKE("pause_set", { until, forever })),
 	/**
 	 *  `column.set_role` — what a column is for: `backlog`, `doing`, `check`,
 	 *  `done`, or `None` to read it from the name again.
@@ -2990,6 +2997,16 @@ input: string; allowed: boolean } |
  *  output is worse than showing it plain.
  */
 { kind: "unknown"; text: string };
+
+/**  Whether devpit is paused, and until when. */
+export type Paused = {
+	on: boolean,
+	/**
+	 *  Seconds since the epoch it ends at; `null` while on means "until
+	 *  resumed".
+	 */
+	until: number | null,
+};
 
 /**
  *  A question a session is stopped on, as its screen shows it: the words

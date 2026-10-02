@@ -32,6 +32,8 @@ export type Nudge =
   | { readonly kind: 'close' }
   | { readonly kind: 'pin'; readonly pinned: boolean }
   | { readonly kind: 'tick' }
+  /** devpit was paused: down, whatever it was doing. */
+  | { readonly kind: 'rest' }
 
 /** How long the open island waits for somebody when it opened on its own. */
 export const EXPANDED_FOR = 15_000
@@ -61,6 +63,8 @@ export function next(island: Island, nudge: Nudge, now: number, held: boolean): 
       return to('expanded')
     case 'close':
       return { ...to('compact'), pinned: false }
+    case 'rest':
+      return resting(now)
     case 'pin':
       return { ...island, pinned: nudge.pinned, since: now }
     case 'tick': {

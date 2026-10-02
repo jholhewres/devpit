@@ -96,7 +96,12 @@ pub(crate) fn hold(app: &tauri::AppHandle, body: &str, pane: &str) -> String {
         .get_webview_window("main")
         .and_then(|main| main.is_focused().ok())
         .unwrap_or(false);
-    if in_front || app.get_webview_window(ISLAND).is_none() || asked.session_id.is_empty() {
+    // Paused, nobody is looking at the island: the terminal asks at once.
+    if in_front
+        || crate::pausing::paused()
+        || app.get_webview_window(ISLAND).is_none()
+        || asked.session_id.is_empty()
+    {
         return String::new();
     }
 

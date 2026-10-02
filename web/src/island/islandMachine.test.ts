@@ -84,3 +84,11 @@ describe('the island', () => {
     expect(opened.mode).toBe('expanded')
   })
 })
+
+describe('a pause', () => {
+  it('puts the island down, whatever it was doing', () => {
+    const open = next(resting(0), { kind: 'alert' }, 0, true)
+    expect(open.mode).toBe('expanded')
+    expect(next({ ...open, pinned: true }, { kind: 'rest' }, 5, true).mode).toBe('hidden')
+  })
+})

@@ -39,7 +39,7 @@ describe('showing a terminal from the resource strip', () => {
   it('focuses the tab that holds the pane, not the pane id', () => {
     // Before, `focus('leaf_3')` was called — an id no tab has.
     render(<StatusStrip />)
-    fireEvent.click(screen.getByRole('button', { expanded: false }))
+    fireEvent.click(screen.getByText('1 terminal'))
     fireEvent.click(screen.getByText('Show leaf_3'))
     expect(focus).toHaveBeenCalledWith('term_2')
     expect(focus).not.toHaveBeenCalledWith('leaf_3')
