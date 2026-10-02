@@ -229,6 +229,10 @@ fn a_row_written_before_a_migration_survives_it() {
         .expect("undo 023");
     store
         .conn()
+        .execute_batch("ALTER TABLE board_column DROP COLUMN role;")
+        .expect("undo 024");
+    store
+        .conn()
         .execute_batch("PRAGMA user_version = 16;")
         .expect("back to 16");
     drop(store);

@@ -18,6 +18,8 @@ pub struct ColumnRow {
     pub on_pass: Option<String>,
     /// `manual` | `ask` | `auto`. See `advancing::Autonomy`.
     pub autonomy: String,
+    /// What the column is for, when the person chose it (`column_roles`).
+    pub role: Option<String>,
 }
 
 pub struct CardRow {
@@ -82,7 +84,7 @@ impl Store {
     /// The project's columns, left to right.
     pub fn columns(&self, project_id: &str) -> Result<Vec<ColumnRow>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, position, step_id, on_pass, autonomy FROM board_column \
+            "SELECT id, name, position, step_id, on_pass, autonomy, role FROM board_column \
              WHERE project_id = ?1 ORDER BY position",
         )?;
         let rows = stmt
@@ -94,6 +96,7 @@ impl Store {
                     step_id: row.get(3)?,
                     on_pass: row.get(4)?,
                     autonomy: row.get(5)?,
+                    role: row.get(6)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

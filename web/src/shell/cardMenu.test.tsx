@@ -43,6 +43,8 @@ const column = (over: Partial<Column> = {}): Column => ({
   step: null,
   onPass: null,
   autonomy: 'manual',
+  role: null,
+  roleChosen: false,
   ...over,
 })
 

@@ -654,4 +654,14 @@ CREATE INDEX card_reminder ON card(due_at)
  WHERE due_at IS NOT NULL AND archived_at IS NULL AND reminded_at IS NULL;
 "#,
     },
+    // Migration 024 — what a column is for, when the person says so.
+    Migration {
+        version: 24,
+        sql: r#"
+-- `backlog`, `doing`, `check` or `done`. Null is "read it from the name":
+-- every board names its columns its own way, and an agent moving its card
+-- needs to know which one holds work in progress.
+ALTER TABLE board_column ADD COLUMN role TEXT;
+"#,
+    },
 ];

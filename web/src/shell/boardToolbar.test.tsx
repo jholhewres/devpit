@@ -26,7 +26,7 @@ const card = (id: string, title: string, over: Partial<Card> = {}): Card => ({
 
 const board = (): Board => ({
   projectId: 'p1',
-  columns: [{ id: 'col_1', name: 'Todo', position: 0, step: null, onPass: null, autonomy: 'manual' }],
+  columns: [{ id: 'col_1', name: 'Todo', position: 0, step: null, onPass: null, autonomy: 'manual', role: null, roleChosen: false }],
   cards: [card('card_1', 'Wire the board'), card('card_2', 'Check the tests', { position: 1 })],
   steps: [],
 })

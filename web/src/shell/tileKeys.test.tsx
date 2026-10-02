@@ -83,7 +83,7 @@ describe('a focused tile', () => {
   })
 
   const board = (hands: CardBoardActs, onOpen = vi.fn(), over: { step?: Column['step']; onPlay?: () => Promise<null> } = {}) => {
-    const column: Column = { id: 'col_1', name: 'Todo', position: 0, step: over.step ?? null, onPass: null, autonomy: 'manual' }
+    const column: Column = { id: 'col_1', name: 'Todo', position: 0, step: over.step ?? null, onPass: null, autonomy: 'manual', role: null, roleChosen: false }
     const lane = { column, cards: [card] } as Lane
     const view = render(
       <LaneCards

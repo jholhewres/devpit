@@ -74,6 +74,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
         reply_drafts::orchestrator_draft_drop,
+        columns::column_set_role,
         island_answer::island_prompt,
         island_answer::island_answer,
         reminders::reminders_pending,

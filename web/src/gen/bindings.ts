@@ -322,6 +322,11 @@ export const commands = {
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
+	/**
+	 *  `column.set_role` — what a column is for: `backlog`, `doing`, `check`,
+	 *  `done`, or `None` to read it from the name again.
+	 */
+	columnSetRole: (projectId: string, columnId: string, role: string | null) => typedError<Board, RpcError>(__TAURI_INVOKE("column_set_role", { projectId, columnId, role })),
 	/**  `island.prompt` — the question a session's terminal shows, if it shows one. */
 	islandPrompt: (sessionId: string) => typedError<{
 	question: string,
@@ -1904,6 +1909,13 @@ export type Column = {
 	 *  happens without somebody moving a card.
 	 */
 	autonomy: string,
+	/**
+	 *  What the column is for — `backlog`, `doing`, `check` or `done` — as
+	 *  the person said, or as its name reads. `null` when neither says.
+	 */
+	role?: string | null,
+	/**  Whether the person chose the role, rather than it being read. */
+	roleChosen?: boolean,
 };
 
 /**

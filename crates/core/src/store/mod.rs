@@ -5,6 +5,7 @@
 mod board;
 mod card_links;
 mod cards;
+pub mod column_roles;
 mod evidence;
 mod folders;
 mod lanes;

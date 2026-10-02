@@ -98,7 +98,7 @@ fn dates_past_before_the_upgrade_do_not_remind() {
         .execute_batch(
             "DROP INDEX card_reminder; ALTER TABLE card DROP COLUMN due_time; \
              ALTER TABLE card DROP COLUMN reminded_at; ALTER TABLE card DROP COLUMN handled_at; \
-             PRAGMA user_version = 22;",
+             ALTER TABLE board_column DROP COLUMN role; PRAGMA user_version = 22;",
         )
         .expect("back to 22");
     drop(store);

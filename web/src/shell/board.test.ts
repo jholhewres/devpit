@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Board, Card, Column, Run } from '../gen/bindings'
 import { endOf, landed, lanes, moveQuestion, placed, playable } from './board'
 
-const column = (id: string, position: number): Column => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual' })
+const column = (id: string, position: number): Column => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual', role: null, roleChosen: false })
 const card = (id: string, columnId: string, position: number): Card =>
   ({ id, columnId, title: id, body: '', position, worktreePath: null,
   dueAt: null,

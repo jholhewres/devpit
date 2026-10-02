@@ -16,6 +16,8 @@ struct Recorded {
     store_path: PathBuf,
     activities: Mutex<Activities>,
     said: Mutex<Vec<(String, serde_json::Value)>>,
+    /// The cards a session took a prompt on.
+    prompted: Mutex<Vec<String>>,
 }
 
 impl HookSink for Recorded {
@@ -35,6 +37,13 @@ impl HookSink for Recorded {
 
     fn activities(&self) -> &Mutex<Activities> {
         &self.activities
+    }
+
+    fn card_prompted(&self, card_id: &str) {
+        self.prompted
+            .lock()
+            .expect("prompted")
+            .push(card_id.to_owned());
     }
 }
 
@@ -149,6 +158,7 @@ fn a_hook_reaches_the_card() {
         store_path,
         activities: Mutex::default(),
         said: Mutex::default(),
+        prompted: Mutex::default(),
     };
     let state_of = |kind: SessionKind, reference: &str| {
         sink.activities
@@ -260,6 +270,7 @@ fn a_background_session_waiting_reaches_its_card() {
         store_path,
         activities: Mutex::default(),
         said: Mutex::default(),
+        prompted: Mutex::default(),
     };
 
     let posted = Posted {
@@ -318,6 +329,7 @@ fn a_hook_from_an_archived_cards_pane_does_not_bring_it_back() {
         store_path,
         activities: Mutex::default(),
         said: Mutex::default(),
+        prompted: Mutex::default(),
     };
     let posted = Posted {
         body: PAYLOAD.to_owned(),
@@ -371,4 +383,38 @@ fn only_the_secret_this_run_made_is_heard() {
         !authorized(Some("6f1c00"), "6f1c"),
         "a longer guess was heard"
     );
+}
+
+/// A card's session taking a prompt asks for the card to move to work in
+/// progress; anything else it says does not.
+#[test]
+fn a_prompt_in_a_cards_session_moves_its_card_along() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store_path = dir.path().join("state.db");
+    let store = Store::open(&store_path).expect("store");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let column = store.columns(&project).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&project, &column, "a card", "")
+        .expect("card");
+    store
+        .link_session(&card, "a1b2", "s-bg", None, Some("/w/card"), None)
+        .expect("link");
+    let sink = Recorded {
+        store_path,
+        activities: Mutex::default(),
+        said: Mutex::default(),
+        prompted: Mutex::default(),
+    };
+    let said = |event: &str| Posted {
+        body: format!(r#"{{"hook_event_name":"{event}","session_id":"s-bg","cwd":"/w/card"}}"#),
+        pane: None,
+        secret: None,
+        agent: false,
+    };
+    hear_post(&sink, &said("Stop"), next_seq());
+    assert!(sink.prompted.lock().expect("prompted").is_empty());
+    hear_post(&sink, &said("UserPromptSubmit"), next_seq());
+    assert_eq!(*sink.prompted.lock().expect("prompted"), [card]);
 }

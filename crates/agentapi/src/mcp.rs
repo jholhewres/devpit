@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 23] = [
+const TOOLS: [Tool; 25] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -158,6 +158,18 @@ const TOOLS: [Tool; 23] = [
         method: "update",
         description: "Change a card's title or body. Whatever is not given stays as it is.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" } }, "required": ["cardId"] }),
+    },
+    Tool {
+        name: "devpit_start_card",
+        method: "start_card",
+        description: "You are starting work on a card: it moves to the column for work in progress, whatever the board calls it. No column id needed. Refused when that column runs a step — ask the person then.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" } }, "required": ["cardId"] }),
+    },
+    Tool {
+        name: "devpit_finish_card",
+        method: "finish_card",
+        description: "You finished the work on a card: says what you did on it, and moves it to the column where finished work waits to be checked, whatever the board calls it. No column id needed.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" }, "summary": { "type": "string", "description": "What you did and what is left, as a comment on the card." } }, "required": ["cardId", "summary"] }),
     },
     Tool {
         name: "devpit_move_card",

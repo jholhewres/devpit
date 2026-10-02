@@ -51,6 +51,7 @@ mod agent_choice;
 mod agent_profiles;
 mod card_activity;
 mod card_chat;
+mod card_follows;
 mod card_reconcile;
 mod card_route;
 mod card_sessions;

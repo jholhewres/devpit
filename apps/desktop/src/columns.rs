@@ -47,6 +47,27 @@ pub(crate) fn column_rename_now(
     board_get_now(project_id)
 }
 
+/// `column.set_role` — what a column is for: `backlog`, `doing`, `check`,
+/// `done`, or `None` to read it from the name again.
+#[tauri::command]
+#[specta::specta]
+pub async fn column_set_role(
+    project_id: String,
+    column_id: String,
+    role: Option<String>,
+) -> Result<Board, RpcError> {
+    crate::off_main::blocking(move || {
+        if !store()?.set_column_role(&column_id, role.as_deref())? {
+            return Err(RpcError::new(
+                devpit_rpc::ErrorCode::Invalid,
+                "a column is for waiting work, work in progress, work to check or done work",
+            ));
+        }
+        board_get_now(project_id)
+    })
+    .await
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn column_reorder(project_id: String, ids: Vec<String>) -> Result<Board, RpcError> {

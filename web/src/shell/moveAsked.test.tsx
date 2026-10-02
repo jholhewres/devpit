@@ -29,7 +29,7 @@ const card = (id: string, columnId: string, position: number): Card => ({
 
 const board = (): Board => ({
   projectId: 'p1',
-  columns: ['todo', 'done'].map((id, position) => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual' })),
+  columns: ['todo', 'done'].map((id, position) => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual', role: null, roleChosen: false })),
   cards: [card('a', 'todo', 0)],
   steps: [],
 })

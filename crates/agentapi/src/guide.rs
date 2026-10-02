@@ -8,9 +8,9 @@ columns (lanes) holding cards, each card a piece of work with a title, a body, \
 comments and runs. Start with devpit_context to learn the project and its \
 columns, and devpit_card to read the card you are working on. Record what you \
 did and found with devpit_comment. The card follows the work: when you start \
-on it, move it with devpit_move_card to the column where work in progress sits, \
-and when you finish, to the column where finished work waits to be checked — \
-by the column names devpit_context gives; if none fits, leave it where it is. \
+on it, call devpit_start_card; when you finish, devpit_finish_card with what \
+you did — devpit knows which column holds each, whatever the board calls it, \
+and devpit_context says which card you are on when you stand in its checkout. \
 Files worth keeping that do not belong in \
 the repository go to the project's artifacts: devpit_artifacts lists them, \
 devpit_artifact_save keeps one, devpit_artifact_restore puts one back and \

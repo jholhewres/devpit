@@ -22,8 +22,15 @@ export function LaneMenu({
   onAddCard,
   onShift,
   onDelete,
+  role = null,
+  roleChosen = false,
+  onRole,
 }: {
   name: string
+  /** What the lane is for, and whether the person said so. */
+  role?: string | null
+  roleChosen?: boolean
+  onRole?: (role: string | null) => void
   /** The lanes its cards can go to. */
   others: readonly { id: string; name: string }[]
   /** Held by the head, which also opens it on a right-click. */
@@ -39,12 +46,16 @@ export function LaneMenu({
   const [asking, setAsking] = useState<'confirm' | { readonly inTheWay: number } | null>(null)
   const [to, setTo] = useState('')
   const target = to || others[0]?.id || ''
-  const entries = laneMenu({
-    rename: onRename,
-    addCard: onAddCard,
-    shift: onShift,
-    remove: () => setAsking('confirm'),
-  })
+  const entries = laneMenu(
+    {
+      rename: onRename,
+      addCard: onAddCard,
+      shift: onShift,
+      remove: () => setAsking('confirm'),
+      role: onRole,
+    },
+    { role, chosen: roleChosen },
+  )
 
   return (
     <div className="ctl" ref={box} onPointerDown={stay}>

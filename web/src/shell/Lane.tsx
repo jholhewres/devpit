@@ -239,10 +239,12 @@ export function LaneHead({
   onAddCard,
   onShift,
   onDelete,
+  onRole,
 }: {
   lane: LaneData
   steps: readonly Step[]
   onRename: (name: string) => void
+  onRole?: (role: string | null) => void
   onAddCard: () => void
   onShift: (by: -1 | 1) => void
   onDelete: (moveTo: string | null) => Promise<ColumnDeleted | null>
@@ -333,6 +335,9 @@ export function LaneHead({
         onAddCard={onAddCard}
         onShift={onShift}
         onDelete={onDelete}
+        role={lane.column.role}
+        roleChosen={lane.column.roleChosen}
+        onRole={onRole}
       />
     </div>
   )

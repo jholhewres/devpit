@@ -57,6 +57,13 @@ pub struct Column {
     /// `manual` is the default and what every existing board has: nothing
     /// happens without somebody moving a card.
     pub autonomy: String,
+    /// What the column is for — `backlog`, `doing`, `check` or `done` — as
+    /// the person said, or as its name reads. `null` when neither says.
+    #[serde(default)]
+    pub role: Option<String>,
+    /// Whether the person chose the role, rather than it being read.
+    #[serde(default)]
+    pub role_chosen: bool,
 }
 
 /// How a run ended, or that it has not.

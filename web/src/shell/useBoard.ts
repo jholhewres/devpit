@@ -31,6 +31,8 @@ export interface UseBoard {
   renameCard: (cardId: string, title: string) => void
   addColumn: (name: string) => void
   renameColumn: (columnId: string, name: string) => void
+  /** What a lane is for, or null to read it from its name again. */
+  setRole: (columnId: string, role: string | null) => void
   reorderColumns: (ids: string[]) => void
   /** Moves a lane one place left or right; nothing at an edge. */
   shiftColumn: (columnId: string, by: -1 | 1) => void
@@ -262,6 +264,11 @@ export function useBoard(projectId: string | null): UseBoard {
       projectId && then(() => commands.columnRename(projectId, columnId, name)),
     [projectId, then],
   )
+  const setRole = useCallback(
+    (columnId: string, role: string | null) =>
+      projectId && then(() => commands.columnSetRole(projectId, columnId, role)),
+    [projectId, then],
+  )
   const reorderColumns = useCallback(
     (ids: string[]) => projectId && then(() => commands.columnReorder(projectId, ids)),
     [projectId, then],
@@ -333,6 +340,7 @@ export function useBoard(projectId: string | null): UseBoard {
     renameCard,
     addColumn,
     renameColumn,
+    setRole,
     reorderColumns,
     shiftColumn,
     deleteColumn,

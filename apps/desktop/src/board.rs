@@ -137,6 +137,9 @@ pub(crate) fn board_get_now(project_id: String) -> Result<Board, RpcError> {
         .columns(&project_id)?
         .into_iter()
         .map(|row| Column {
+            role: devpit_core::store::column_roles::role_of(row.role.as_deref(), &row.name)
+                .map(str::to_owned),
+            role_chosen: row.role.is_some(),
             id: row.id,
             name: row.name,
             position: row.position as i32,

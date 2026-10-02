@@ -82,6 +82,10 @@ pub(crate) fn hand(
         crate::opening::TAB_OPENED,
         json!({ "projectId": board.project_id, "tabId": tab_id, "paneId": pane_id }),
     );
+    // Work on it starts now: a waiting card goes to work in progress.
+    if let Some(to) = crate::card_follows::when_started(board, card_id) {
+        let _ = crate::agent_api::moved(Some(app), board, card_id, &to.id);
+    }
 
     Ok(json!({
         "name": name,

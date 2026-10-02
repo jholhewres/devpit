@@ -24,6 +24,8 @@ const board = (): Board => ({
     step: null,
     onPass: null,
     autonomy: 'manual',
+    role: null,
+    roleChosen: false,
   })),
   cards: [],
   steps: [],
@@ -148,5 +150,24 @@ describe('the lane head', () => {
     fireEvent.click(screen.getByRole('button', { name: 'doing actions' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
     expect(screen.getByRole('textbox', { name: 'doing name' }).getAttribute('contenteditable')).toBe('true')
+  })
+})
+
+describe('what a lane is for', () => {
+  const hands = { rename: vi.fn(), addCard: vi.fn(), shift: vi.fn(), remove: vi.fn(), role: vi.fn() }
+
+  it('marks the role in force, and says when it was read from the name', () => {
+    const labels = laneMenu(hands, { role: 'doing', chosen: false }).map((entry) => entry.label)
+    expect(labels).toContain('✓ Holds work in progress · by its name')
+    expect(labels).toContain('Holds work to check')
+  })
+
+  it('says a role, and picking the one chosen goes back to the name', () => {
+    const chosen = laneMenu(hands, { role: 'check', chosen: true })
+    chosen.find((entry) => entry.label === '✓ Holds work to check')?.run?.('')
+    expect(hands.role).toHaveBeenLastCalledWith(null)
+    chosen.find((entry) => entry.label === 'Holds done work')?.run?.('')
+    expect(hands.role).toHaveBeenLastCalledWith('done')
+    expect(wired(chosen)).toBe(true)
   })
 })

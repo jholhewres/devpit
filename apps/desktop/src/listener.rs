@@ -292,6 +292,9 @@ fn heard(
         (None, _) => "no card",
         (Some(_), Some(_)) => "unchanged",
     };
+    if let (Some(route), Event::Prompted) = (&route, &happening.event) {
+        sink.card_prompted(&route.card_id);
+    }
     if let (Some(route), Some(doing)) = (&route, doing) {
         let key = Key {
             card_id: route.card_id.clone(),
@@ -339,6 +342,10 @@ fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) -> 
     let Some((card_id, kind)) = card_of_session(&store, &happening.session_id) else {
         return "no card";
     };
+    // A run is a step's: its card already sits where the step put it.
+    if matches!(happening.event, Event::Prompted) && kind != SessionKind::Run {
+        sink.card_prompted(&card_id);
+    }
     let key = Key {
         card_id,
         kind,
@@ -390,6 +397,9 @@ pub(crate) trait HookSink {
     fn to_island(&self, _change: devpit_rpc::IslandChange) {}
     /// A session's state changed from `was`: the person may want to know.
     fn tell_person(&self, _session: &devpit_rpc::IslandSession, _was: Option<devpit_rpc::Doing>) {}
+    /// A session of this card took a prompt: the card may move to work in
+    /// progress. Nothing, where there is no board to move it on.
+    fn card_prompted(&self, _card_id: &str) {}
 }
 
 impl HookSink for AppHandle {
@@ -423,6 +433,10 @@ impl HookSink for AppHandle {
 
     fn tell_person(&self, session: &devpit_rpc::IslandSession, was: Option<devpit_rpc::Doing>) {
         crate::island_notify::changed(self, session, was);
+    }
+
+    fn card_prompted(&self, card_id: &str) {
+        crate::card_follows::prompted(self, card_id);
     }
 }
 

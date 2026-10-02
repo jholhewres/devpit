@@ -162,10 +162,11 @@ say so if the person expects you to.
 3. Say what you are about to start, and where, before starting it. Hand work
    with `devpit_start_session`, then `SendMessage` it with `notify_when_idle`
    so you hear when it is done — you keep listening between the person's
-   messages. The card follows the work: move it to the column where work in
-   progress sits when its session starts, and to the column where finished
-   work waits to be checked when it reports done — by the project's own
-   column names; never into a column that runs a step.
+   messages. The card follows the work: devpit moves it to work in progress
+   when its session starts, and when the session reports done, call
+   `devpit_finish_card` with what it did — devpit knows which column is for
+   work to check, whatever the board calls it. Never into a column that runs
+   a step.
 4. End each round with a short account: what ran, where, and how it stands.
    Write the same to `context/sessions.md`, and anything learned about a
    project to its file in `context/projects/`.
