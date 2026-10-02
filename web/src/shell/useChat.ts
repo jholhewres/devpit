@@ -50,6 +50,8 @@ export interface Chat {
   setSkills: (next: readonly string[]) => void
   /** Keeps a pasted picture and attaches it. */
   paste: (file: Blob) => void
+  /** Attaches a file devpit already kept — a voice message, recorded. */
+  keep: (file: Attachment) => void
   /** Data URLs for pasted pictures, by the path they were kept under. */
   readonly previews: Readonly<Record<string, string>>
   /** The CLI's id for this conversation, once it has one. */
@@ -361,6 +363,10 @@ export function useChat(conversationId: string): Chat {
     [project],
   )
 
+  const keep = useCallback((file: Attachment) => {
+    setFiles((was) => (was.some((had) => had.path === file.path) ? was : [...was, file]))
+  }, [])
+
   const detach = useCallback((path: string) => {
     setFiles((was) => was.filter((file) => file.path !== path))
     setPreviews((was) => {
@@ -424,6 +430,7 @@ export function useChat(conversationId: string): Chat {
     },
     attach,
     paste,
+    keep,
     previews,
     skills,
     setSkills,

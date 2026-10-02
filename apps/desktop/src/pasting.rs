@@ -13,13 +13,18 @@ use devpit_rpc::{Attachment, ErrorCode, RpcError};
 const MOST_BYTES: usize = 8 * 1024 * 1024;
 
 /// The extension a pasted type is saved under, or nothing for a type this
-/// does not take — only pictures, because that is all the composer offers.
+/// does not take — pictures, and the voice messages the composer records.
+/// A recording's type comes with its codec (`audio/webm;codecs=opus`).
 pub(crate) fn extension_for(media_type: &str) -> Option<&'static str> {
-    match media_type {
+    match media_type.split(';').next().unwrap_or_default().trim() {
         "image/png" => Some("png"),
         "image/jpeg" => Some("jpg"),
         "image/gif" => Some("gif"),
         "image/webp" => Some("webp"),
+        "audio/webm" => Some("webm"),
+        "audio/ogg" => Some("ogg"),
+        "audio/mp4" => Some("m4a"),
+        "audio/wav" => Some("wav"),
         _ => None,
     }
 }
@@ -62,13 +67,23 @@ pub(crate) fn chat_paste_now(
     if project_id.contains(['/', '\\']) || project_id.starts_with('.') {
         return Err(RpcError::new(ErrorCode::Forbidden, "that is not a project"));
     }
-    let ext = extension_for(&media_type)
-        .ok_or_else(|| RpcError::new(ErrorCode::Invalid, "only pictures can be pasted"))?;
+    let ext = extension_for(&media_type).ok_or_else(|| {
+        RpcError::new(
+            ErrorCode::Invalid,
+            "only pictures and recordings can be pasted",
+        )
+    })?;
     let bytes = decoded(&data)?;
     let dir = crate::projects::project_home(&project_id)?.pasted();
     std::fs::create_dir_all(&dir).map_err(|err| RpcError::internal(err.to_string()))?;
+    // A recording is named as one, which is what transcribing it asks for.
+    let what = if media_type.starts_with("audio/") {
+        "voice"
+    } else {
+        "pasted"
+    };
     let name = format!(
-        "pasted-{}.{ext}",
+        "{what}-{}.{ext}",
         ulid::Ulid::generate().to_string().to_lowercase()
     );
     let path = dir.join(&name);

@@ -6,6 +6,9 @@ fn only_pictures_are_taken() {
     assert_eq!(extension_for("image/jpeg"), Some("jpg"));
     assert_eq!(extension_for("text/html"), None);
     assert_eq!(extension_for("application/octet-stream"), None);
+    assert_eq!(extension_for("audio/webm;codecs=opus"), Some("webm"));
+    assert_eq!(extension_for("audio/mp4"), Some("m4a"));
+    assert_eq!(extension_for("audio/x-anything"), None);
 }
 
 #[test]

@@ -326,6 +326,23 @@ export const commands = {
 	 *  written anywhere else would be written over.
 	 */
 	orchestratorRename: (profileId: string, name: string, to: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_rename", { profileId, name, to })),
+	/**  `transcribe.read` — how voice messages become words here. */
+	transcribeRead: () => typedError<Transcribing, RpcError>(__TAURI_INVOKE("transcribe_read")),
+	/**  `transcribe.set` — the engine, its model, the language and the address. */
+	transcribeSet: (engine: string, model: string, language: string, url: string) => typedError<Transcribing, RpcError>(__TAURI_INVOKE("transcribe_set", { engine, model, language, url })),
+	/**
+	 *  `transcribe.key_set` — keeps the service's key in a private file, or
+	 *  forgets it. It is never read back to the window.
+	 */
+	transcribeKeySet: (key: string | null) => typedError<null, RpcError>(__TAURI_INVOKE("transcribe_key_set", { key })),
+	/**
+	 *  `chat.transcribe` — a recording kept by the composer, in words.
+	 * 
+	 *  `language` is the window's guess from the system when the settings name
+	 *  none. A recording that cannot be heard is not an error: it is sent as a
+	 *  file, and the note says why.
+	 */
+	chatTranscribe: (projectId: string, name: string, language: string | null) => typedError<Transcript, RpcError>(__TAURI_INVOKE("chat_transcribe", { projectId, name, language })),
 	/**  `orchestrator.proposals` — what this orchestrator proposed, oldest first. */
 	orchestratorProposals: (projectId: string) => __TAURI_INVOKE<ProjectProposal[]>("orchestrator_proposals", { projectId }),
 	/**  `orchestrator.proposal_drop` — done or dropped by the person, it goes. */
@@ -4061,6 +4078,28 @@ export type Touch =
 { kind: "ask"; questions: IslandAsked[] } | 
 /**  A plan put to the person to approve before the session goes on. */
 { kind: "plan"; plan: string };
+
+/**
+ *  How voice messages become words, as the settings show it. The key never
+ *  comes back: only whether one is kept.
+ */
+export type Transcribing = {
+	/**  `local`, `api` or `off`. */
+	engine: string,
+	model: string,
+	/**  A language code, or empty for the system's. */
+	language: string,
+	url: string,
+	keySet: boolean,
+	/**  The whisper found on this machine, by name, when there is one. */
+	local: string | null,
+};
+
+/**  A voice message, heard: its words, or why there are none. */
+export type Transcript = {
+	text: string | null,
+	note: string | null,
+};
 
 /**  What a turn cost and why it stopped. */
 export type TurnEnd = {

@@ -43,6 +43,7 @@ mod threads;
 pub mod tile;
 pub mod update;
 pub mod usage;
+pub mod voice;
 
 pub use account::{Account, Membership, SignIn, SignInState};
 pub use agents::{Agent, Agents, RejectedAgent};
@@ -104,6 +105,7 @@ pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
 pub use update::{InstallKind, UpdateBlocking, UpdateStatus, UpdateWork};
 pub use usage::{PaneCost, Usage};
+pub use voice::{Transcribing, Transcript};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;

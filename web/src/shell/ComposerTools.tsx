@@ -1,0 +1,161 @@
+import { open as pickFiles } from '@tauri-apps/plugin-dialog'
+import { useEffect, useRef, useState } from 'react'
+
+import { ask, commands } from './live'
+import { base64Of, formatHere, LONGEST_MS, record, refusal, systemLanguage, type Recording } from './recorder'
+import type { Chat } from './useChat'
+import { useShell } from './useShell'
+
+/*
+ * The composer's two ways in besides typing: files, chosen from the system's
+ * picker (Ctrl/Cmd+Shift+A), and a voice message — recorded, made into words
+ * the person reads and edits before sending, and sent as the recording when
+ * no engine could hear it.
+ */
+
+const clock = (ms: number): string => {
+  const seconds = Math.floor(ms / 1000)
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+/** A press held this long is a hold: let go, and the recording stops. */
+const HOLD_MS = 600
+
+export function ComposerTools({ chat, onHeard }: { chat: Chat; onHeard: (text: string) => void }): React.JSX.Element {
+  const { project } = useShell()
+  const box = useRef<HTMLSpanElement>(null)
+  const recording = useRef<Recording | null>(null)
+  const pressed = useRef(0)
+  const [since, setSince] = useState<number | null>(null)
+  const [now, setNow] = useState(0)
+  const [hearing, setHearing] = useState(false)
+  const [said, setSaid] = useState<string | null>(null)
+  const format = formatHere()
+
+  const pick = async (): Promise<void> => {
+    const picked = await pickFiles({ multiple: true })
+    const paths = Array.isArray(picked) ? picked : typeof picked === 'string' ? [picked] : []
+    if (paths.length > 0) chat.attach(paths)
+  }
+
+  /* Ctrl/Cmd+Shift+A, from anywhere in this composer. */
+  useEffect(() => {
+    const keyed = (event: KeyboardEvent): void => {
+      const inside = box.current?.closest('.composer')?.contains(document.activeElement)
+      if (inside && event.shiftKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+        event.preventDefault()
+        void pick()
+      }
+    }
+    document.addEventListener('keydown', keyed)
+    return () => document.removeEventListener('keydown', keyed)
+  })
+
+  useEffect(() => {
+    if (since === null) return
+    const beat = window.setInterval(() => {
+      setNow(Date.now())
+      if (Date.now() - since > LONGEST_MS) void finish()
+    }, 250)
+    return () => window.clearInterval(beat)
+  })
+
+  /* Gone with the composer, a recording does not keep the microphone. */
+  useEffect(() => () => recording.current?.cancel(), [])
+
+  const start = async (): Promise<void> => {
+    if (!format || recording.current) return
+    setSaid(null)
+    try {
+      recording.current = await record(format)
+      setSince(Date.now())
+      setNow(Date.now())
+    } catch (error) {
+      setSaid(refusal(error))
+    }
+  }
+
+  const cancel = (): void => {
+    recording.current?.cancel()
+    recording.current = null
+    setSince(null)
+  }
+
+  const finish = async (): Promise<void> => {
+    const held = recording.current
+    if (!held || !project) return
+    recording.current = null
+    setSince(null)
+    const blob = await held.stop()
+    if (!blob) return setSaid('Nothing was recorded.')
+    setHearing(true)
+    const kept = await ask(async () => commands.chatPaste(project.id, blob.type, await base64Of(blob)))
+    if (!kept.data) {
+      setHearing(false)
+      return setSaid(kept.error ?? 'The recording could not be kept.')
+    }
+    const recorded = kept.data
+    chat.keep(recorded)
+    const heard = await ask(() => commands.chatTranscribe(project.id, recorded.name, systemLanguage()))
+    setHearing(false)
+    const text = heard.data?.text
+    if (text) {
+      /* Heard, the words are the message; the recording goes unless kept by hand. */
+      chat.detach(recorded.path)
+      onHeard(text)
+      return
+    }
+    setSaid(`Sent as a recording: ${heard.data?.note ?? heard.error ?? 'it could not be heard'}.`)
+  }
+
+  const recordingNow = since !== null
+  return (
+    <span className="ctools" ref={box}>
+      {said && (
+        <span className="ctools__said" role="status">
+          {said}
+          <button className="ctools__x" onClick={() => setSaid(null)} aria-label="Dismiss">
+            ✕
+          </button>
+        </span>
+      )}
+      {recordingNow ? (
+        <span className="ctools__rec" role="status" aria-label="Recording">
+          <i className="ctools__dot" />
+          {clock(now - since)}
+          <button className="ctools__btn" onClick={cancel} title="Throw it away">
+            Cancel
+          </button>
+          <button className="ctools__btn ctools__btn--go" onClick={() => void finish()} title="Stop, and make it words">
+            Done
+          </button>
+        </span>
+      ) : (
+        <>
+          <button className="ctools__icon" onClick={() => void pick()} title="Attach files (Ctrl+Shift+A)" aria-label="Attach files">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.4 11.6-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5" /></svg>
+          </button>
+          <button
+            className="ctools__icon"
+            disabled={!format || hearing}
+            title={!format ? 'This window cannot record' : hearing ? 'Making it words…' : 'Record a voice message — click, or hold and let go'}
+            aria-label="Record a voice message"
+            onPointerDown={() => {
+              pressed.current = Date.now()
+              void start()
+            }}
+            onPointerUp={() => {
+              if (Date.now() - pressed.current > HOLD_MS) void finish()
+            }}
+          >
+            {hearing ? (
+              <span className="ctools__wait" />
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+            )}
+          </button>
+        </>
+      )}
+    </span>
+  )
+}

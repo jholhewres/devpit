@@ -350,3 +350,31 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .errprev { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 6px 0 12px; }
 .errprev__body { align-self: stretch; margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--inset); font-family: var(--mono); font-size: 11.5px; line-height: 1.55; max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
 .prefs__acts { display: flex; gap: 6px; flex: none; }
+
+/* Voice messages: the engine, and what it needs. */
+.pref--stack .pref__body { display: flex; flex-direction: column; gap: 8px; }
+.voice__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.voice__row .btn[data-on] { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.voice__l { width: 64px; font-size: 12.5px; color: var(--text-2); }
+.voice__in { flex: 1; min-width: 160px; height: 28px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12.5px; }
+.voice__in--short { flex: none; width: 90px; min-width: 0; }
+.voice__val { flex: 1; min-width: 0; font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.voice__bad { color: var(--danger); }
+
+/* The composer's files and voice, beside send. */
+.ctools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.ctools__icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: var(--text-3); }
+.ctools__icon:hover:not(:disabled) { color: var(--text); background: var(--overlay); }
+.ctools__icon:disabled { opacity: .45; }
+.ctools__rec { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px 0 10px; border-radius: 14px; font: 12px var(--mono); color: var(--text); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+.ctools__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: ctools-beat 1.2s ease-in-out infinite; }
+@keyframes ctools-beat { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .ctools__dot { animation: none; } }
+.ctools__btn { height: 22px; padding: 0 8px; border-radius: 11px; font-size: 12px; color: var(--text-2); }
+.ctools__btn:hover { color: var(--text); background: var(--overlay); }
+.ctools__btn--go { color: var(--text); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.ctools__wait { width: 12px; height: 12px; border: 2px solid var(--text-3); border-top-color: transparent; border-radius: 50%; animation: ctools-spin .8s linear infinite; }
+@keyframes ctools-spin { to { transform: rotate(1turn); } }
+.ctools__said { display: inline-flex; align-items: center; gap: 6px; max-width: 360px; margin-right: 6px; font-size: 12px; color: var(--text-2); }
+.ctools__x { color: var(--text-3); font-size: 11px; }
+.ctools + .send { margin-left: 4px; }

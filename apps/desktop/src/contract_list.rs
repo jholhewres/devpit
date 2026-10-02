@@ -20,8 +20,8 @@ use crate::{
     plan_limits, plugin_data, plugins, project_naming, project_proposals, projects, reading_path,
     receipts, regrouping, reminders, reply_drafts, reveal, rewinding, runs_list, saves, search,
     session_search, session_window, sessions, settings, shell_launch, skills, slash, sources,
-    spend_history, staging, steering, steps, stopping, threads, update, watching, workspace,
-    worktree_base, worktree_setup, worktrees, wsfiles,
+    spend_history, staging, steering, steps, stopping, threads, transcribe, update, watching,
+    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -75,6 +75,10 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
         session_window::orchestrator_rename,
+        transcribe::transcribe_read,
+        transcribe::transcribe_set,
+        transcribe::transcribe_key_set,
+        transcribe::chat_transcribe,
         project_proposals::orchestrator_proposals,
         project_proposals::orchestrator_proposal_drop,
         session_window::session_changes,

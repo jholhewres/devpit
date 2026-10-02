@@ -39,6 +39,8 @@ mod live_answer;
 mod live_prompt;
 mod live_sessions;
 mod mcp_apps;
+#[cfg(all(unix, not(target_os = "macos")))]
+mod microphone_gtk;
 mod opening;
 mod orchestrator;
 mod orchestrator_links;
@@ -159,6 +161,7 @@ mod still_holds;
 mod stopping;
 mod stopping_a_run;
 mod tap;
+mod transcribe;
 // Only Windows copies a pane into a file; tested everywhere.
 #[cfg(any(windows, test))]
 mod tap_file;
@@ -279,6 +282,7 @@ fn main() {
             if let Some(main) = tauri::Manager::get_webview_window(app, "main") {
                 browser_gtk::settle(&main);
                 frame_gtk::repaint_on_state_change(&main);
+                microphone_gtk::allow(&main);
             }
             // Windows opens a window where it last put one, which for a new
             // install is low enough to run under the taskbar.

@@ -6,6 +6,7 @@ import { inOrder } from './inOrder'
 import { PrefsSide } from './PrefsSide'
 import { PrefSwitch } from './PrefSwitch'
 import { DeskSettings } from './DeskSettings'
+import { VoiceSettings } from './VoiceSettings'
 import { ErrorReportsPreview } from './ErrorReportsPreview'
 import { OpenApps } from './OpenApps'
 import { ProjectRows } from './ProjectRows'
@@ -126,6 +127,7 @@ export function Settings({
             <PrefSwitch on={on('errorReports')} onFlip={() => set('errorReports', !on('errorReports'))} title="Error reports" said={<>Send devpit&rsquo;s own errors, without paths or your work, anonymously and only while devpit sits idle. Turning it off deletes what was kept.</>} />
             {on('errorReports') && <ErrorReportsPreview />}
             <DeskSettings />
+            <VoiceSettings />
             <OpenApps />
             <UpdateSettings />
           </section>

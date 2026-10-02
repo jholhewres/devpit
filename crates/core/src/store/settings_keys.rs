@@ -50,3 +50,13 @@ pub const ISLAND: &str = "island.enabled";
 pub const ISLAND_SCREEN: &str = "island.screen";
 /// Whether devpit keeps its own errors for a report. Off unless turned on.
 pub const ERROR_REPORTS: &str = "telemetry.error_reports";
+/// How a voice message becomes words: `local` (a whisper on this machine),
+/// `api` (a transcription service the person chose) or `off`. Local unless set.
+pub const TRANSCRIBE: &str = "chat.transcribe";
+/// The model: a whisper.cpp `.bin` file, a whisper model's name, or the
+/// service's model. Empty is the engine's default.
+pub const TRANSCRIBE_MODEL: &str = "chat.transcribe_model";
+/// The language a voice message is heard in, as a code; empty is the system's.
+pub const TRANSCRIBE_LANGUAGE: &str = "chat.transcribe_language";
+/// The transcription service's address, OpenAI's form of it. Empty is OpenAI.
+pub const TRANSCRIBE_URL: &str = "chat.transcribe_url";

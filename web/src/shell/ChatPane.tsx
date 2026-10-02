@@ -22,6 +22,7 @@ import { useFollow } from './useFollow'
 import { useDraft } from './useDraft'
 import { JumpToEnd } from './JumpToEnd'
 import { ComposerFiles } from './ComposerFiles'
+import { ComposerTools } from './ComposerTools'
 import { ChatBlank } from './ChatBlank'
 import { RemoteToggle } from './RemoteToggle'
 import { SessionsChip, SessionsWaiting } from './OrchestratorChat'
@@ -185,6 +186,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
                   is not the person's job. Cancelling the press instead would
                   be cheaper and would swallow the click that opens the menu. */}
               <Chips chat={chat} refocus={() => field.current?.focus()} />
+              <ComposerTools chat={chat} onHeard={(text) => (setPrompt((was) => (was.trim() ? `${was.trimEnd()} ${text}` : text)), field.current?.focus())} />
               <SendButton sending={chat.sending} showEsc={showEsc} can={ready(prompt, chat.sending, chat.profileId)} onSend={send} onStop={halt} />
             </div>
           </div>

@@ -79,3 +79,6 @@ libc = "0.2"
 # version tauri already resolves so this adds no tree of its own.
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
 gtk = "0.18"
+# The microphone for voice messages: WebKitGTK refuses capture unless told.
+# The version and features wry already resolves, so it adds no tree either.
+webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }

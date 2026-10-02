@@ -1027,6 +1027,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "ulid",
+ "webkit2gtk",
 ]
 
 [[package]]
