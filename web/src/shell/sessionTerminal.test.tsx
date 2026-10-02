@@ -7,8 +7,10 @@ import { SessionTerminal } from './SessionTerminal'
 
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
-  commands: { terminalClose: () => null },
+  commands: { terminalClose: () => null, sessionChanges: () => null },
 }))
+vi.mock('./useShell', () => ({ useShell: () => ({ show: vi.fn(), openCard: vi.fn() }) }))
+vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({ writeText: vi.fn(() => Promise.resolve()) }))
 // The terminal itself is not what is under test, and xterm wants a canvas.
 vi.mock('./Leaf', () => ({ PANE_FREED: 'devpit:pane-freed', Leaf: () => null }))
 

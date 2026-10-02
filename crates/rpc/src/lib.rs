@@ -61,7 +61,7 @@ pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};
 pub use frame::{Context, Frame};
-pub use front::Front;
+pub use front::{Front, SessionChanges};
 pub use island::{
     IslandAsked, IslandChange, IslandChecks, IslandNow, IslandPull, IslandQuestion, IslandRect,
     IslandSession, IslandStep, IslandVerdict, Touch,

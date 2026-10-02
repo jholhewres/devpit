@@ -1,9 +1,14 @@
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { LiveSession } from '../gen/bindings'
 import { Leaf, PANE_FREED } from './Leaf'
 import { ask, commands } from './live'
+import { branchWords, SessionChangesPanel } from './SessionChangesPanel'
+import { SessionName } from './SessionName'
+import { useSessionChanges } from './useSessionChanges'
+import { useShell } from './useShell'
 
 /*
  * A session's own terminal, opened over the orchestrator's chat: the same
@@ -18,6 +23,7 @@ import { ask, commands } from './live'
  */
 
 const KEPT = 'devpit.sessionTerminal.size'
+const SIDE = 'devpit.sessionTerminal.changes'
 const SMALLEST = { width: 560, height: 320 }
 /* Room left around it, so the window behind stays in view. */
 const MARGIN = 32
@@ -56,8 +62,57 @@ const EDGES: readonly Edge[] = [
   { x: -1, y: -1, name: 'nw' },
 ]
 
-export function SessionTerminal({ session, onGo, onClose }: { session: LiveSession; onGo: () => void; onClose: () => void }): React.JSX.Element | null {
+/** How long since, in the fewest characters that still say it. */
+const since = (at: number | null): string | null => {
+  if (!at) return null
+  const minutes = Math.round((Date.now() - at) / 60_000)
+  return minutes < 1 ? 'now' : minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`
+}
+
+const sideKept = (): boolean => {
+  try {
+    return localStorage.getItem(SIDE) === 'open'
+  } catch {
+    return false
+  }
+}
+
+export function SessionTerminal({
+  session,
+  profileId = null,
+  onGo,
+  onClose,
+}: {
+  session: LiveSession
+  /** The orchestrator's profile, which a rename is asked through. */
+  profileId?: string | null
+  onGo: () => void
+  onClose: () => void
+}): React.JSX.Element | null {
   const pane = session.pane
+  const { show, openCard } = useShell()
+  const [name, setName] = useState(session.name)
+  useEffect(() => setName(session.name), [session.name])
+  const { changes, problem, reload } = useSessionChanges(session)
+  /* Folded by default: the terminal is what the window is for. */
+  const [side, setSide] = useState(sideKept)
+  const toggleSide = (): void =>
+    setSide((was) => {
+      try {
+        localStorage.setItem(SIDE, was ? 'shut' : 'open')
+      } catch {
+        // Unsaved, it is still open now.
+      }
+      return !was
+    })
+  /* The window's own title says whose terminal is in front. */
+  useEffect(() => {
+    const was = document.title
+    document.title = `${name} — devpit`
+    return () => {
+      document.title = was
+    }
+  }, [name])
   const [size, setSize] = useState<Size>(keptSize)
   const [dragging, setDragging] = useState(false)
   /* Closing the terminal itself — not just this view of it — asks once. */
@@ -128,8 +183,11 @@ export function SessionTerminal({ session, onGo, onClose }: { session: LiveSessi
       <div className="sterm" role="dialog" aria-modal="true" aria-label={`${session.name}'s terminal`} data-dragging={dragging ? 'true' : undefined} style={{ width: size.width, height: size.height }}>
         <header className="sterm__bar">
           <i className="deleg__dot" data-state={session.waiting ? 'waiting' : session.status === 'busy' ? 'busy' : 'idle'} />
-          <span className="sterm__name">{session.name}</span>
-          <span className="sterm__where">{[session.projectName, session.cardId ? 'card' : null].filter(Boolean).join(' · ')}</span>
+          <SessionName profileId={profileId} name={name} onRenamed={setName} />
+          <span className="sterm__where" title={session.cwd}>
+            {[session.waiting ? 'waiting' : session.status, since(session.since), session.projectName].filter(Boolean).join(' · ')}
+            {changes && <span className="sterm__branch">{branchWords(changes)}</span>}
+          </span>
           <span className="sterm__size" aria-hidden="true">
             {dragging ? `${size.width} × ${size.height}` : ''}
           </span>
@@ -148,6 +206,17 @@ export function SessionTerminal({ session, onGo, onClose }: { session: LiveSessi
               Close terminal…
             </button>
           )}
+          {session.cardId && (
+            <button className="sterm__btn" onClick={() => (onClose(), show('board'), openCard(session.cardId!))} title="Open the card it works on">
+              Card
+            </button>
+          )}
+          <button className="sterm__btn" onClick={() => void writeText(name).catch(() => undefined)} title="Copy the name other sessions message it by">
+            Copy name
+          </button>
+          <button className="sterm__btn" data-on={side ? 'true' : undefined} onClick={toggleSide} title="What it has changed">
+            Changes{changes && changes.changes.length > 0 ? ` ${changes.changes.length}` : ''}
+          </button>
           <button className="sterm__btn" onClick={onGo} title="Open its project and tab">
             Go there
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M8 7h9v9" /></svg>
@@ -156,8 +225,11 @@ export function SessionTerminal({ session, onGo, onClose }: { session: LiveSessi
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </header>
-        <div className="sterm__body">
-          <Leaf paneId={pane.paneId} projectId={pane.projectId} cwd={session.cwd} />
+        <div className="sterm__main">
+          <div className="sterm__body">
+            <Leaf paneId={pane.paneId} projectId={pane.projectId} cwd={session.cwd} />
+          </div>
+          {side && <SessionChangesPanel changes={changes} problem={problem} onReload={reload} />}
         </div>
         {EDGES.map((edge) => (
           <span key={edge.name} className="sterm__grip" data-edge={edge.name} onPointerDown={grab(edge)} aria-hidden="true" />

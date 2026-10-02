@@ -140,6 +140,7 @@ mod saves;
 mod search;
 mod session_search;
 mod session_told;
+mod session_window;
 mod sessions;
 mod settings;
 mod shell_launch;

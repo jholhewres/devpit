@@ -61,7 +61,7 @@ pub use index::{commit, stage, unstage};
 pub use lifecycle::{
     assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,
 };
-pub use log::{history, show};
+pub use log::{commits_in, history, show, upstream_of};
 pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};
 pub use snapshot::{changed_between, snapshot, Changed};
 pub use sourcing::{hidden_as, hidden_in, origin_of, shown, word_of};

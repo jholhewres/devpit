@@ -17,9 +17,9 @@ use crate::{
     orchestrator, orchestrator_links, outside_sessions, pane_asking, pane_screen, panels, panes,
     pasting, paths, pausing, plan_limits, plugin_data, plugins, project_naming, projects,
     reading_path, receipts, regrouping, reminders, reply_drafts, reveal, rewinding, runs_list,
-    saves, search, session_search, sessions, settings, shell_launch, skills, slash, sources,
-    spend_history, staging, steering, steps, stopping, threads, update, watching, workspace,
-    worktree_base, worktree_setup, worktrees, wsfiles,
+    saves, search, session_search, session_window, sessions, settings, shell_launch, skills, slash,
+    sources, spend_history, staging, steering, steps, stopping, threads, update, watching,
+    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -75,6 +75,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         mcp_apps::mcp_app_call,
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
+        session_window::orchestrator_rename,
+        session_window::session_changes,
         reply_drafts::orchestrator_draft_drop,
         pausing::pause_read,
         desk::shortcut_read,

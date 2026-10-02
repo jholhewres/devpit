@@ -30,13 +30,13 @@ export function TurnDelegations({ parts }: { parts: readonly Part[] }): React.JS
   return (
     <div className="deleg">
       {sent.map((one) => (
-        <Delegation key={one.id} to={one.to} summary={one.summary} message={one.message} state={stateOf(sessions, one.to)} session={sessions.find((live) => live.name === one.to) ?? null} />
+        <Delegation key={one.id} to={one.to} summary={one.summary} message={one.message} state={stateOf(sessions, one.to)} session={sessions.find((live) => live.name === one.to) ?? null} profileId={scope?.profileId ?? null} />
       ))}
     </div>
   )
 }
 
-function Delegation({ to, summary, message, state, session }: { to: string; summary: string; message: string; state: keyof typeof STATE_WORDS; session: LiveSession | null }): React.JSX.Element {
+function Delegation({ to, summary, message, state, session, profileId }: { to: string; summary: string; message: string; state: keyof typeof STATE_WORDS; session: LiveSession | null; profileId: string | null }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [terminal, setTerminal] = useState(false)
   const { setProject, openPane } = useShell()
@@ -59,6 +59,7 @@ function Delegation({ to, summary, message, state, session }: { to: string; summ
       {terminal && session && (
         <SessionTerminal
           session={session}
+          profileId={profileId}
           onClose={() => setTerminal(false)}
           onGo={() => {
             setTerminal(false)

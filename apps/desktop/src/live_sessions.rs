@@ -317,7 +317,7 @@ const PROJECTS_FRESH: std::time::Duration = std::time::Duration::from_secs(15);
 static PROJECTS: std::sync::Mutex<Option<(std::time::Instant, Vec<Project>)>> =
     std::sync::Mutex::new(None);
 
-fn recent_projects() -> Result<Vec<Project>, RpcError> {
+pub(crate) fn recent_projects() -> Result<Vec<Project>, RpcError> {
     if let Some((at, kept)) = PROJECTS.lock().ok().and_then(|held| held.clone()) {
         if at.elapsed() < PROJECTS_FRESH {
             return Ok(kept);

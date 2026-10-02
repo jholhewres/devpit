@@ -38,6 +38,7 @@ export function SessionsWaiting({ profileId }: { profileId: string }): React.JSX
       {terminal && (
         <SessionTerminal
           session={terminal}
+          profileId={profileId}
           onClose={() => setTerminal(null)}
           onGo={() => {
             setTerminal(null)

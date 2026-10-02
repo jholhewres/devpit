@@ -320,6 +320,20 @@ export const commands = {
 	 *  must stay only theirs to send.
 	 */
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
+	/**
+	 *  `orchestrator.rename` — calls a session something else, by typing the
+	 *  CLI's own `/rename` into its terminal: the name lives in the CLI, and one
+	 *  written anywhere else would be written over.
+	 */
+	orchestratorRename: (profileId: string, name: string, to: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_rename", { profileId, name, to })),
+	/**
+	 *  `session.changes` — a session's folder, as git sees it.
+	 * 
+	 *  Only a folder inside one of devpit's projects or their checkouts: the
+	 *  window shows sessions devpit placed, and a path from anywhere else is not
+	 *  one of them.
+	 */
+	sessionChanges: (cwd: string, cardId: string | null) => typedError<SessionChanges, RpcError>(__TAURI_INVOKE("session_changes", { cwd, cardId })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
 	/**  `pause.read` — whether devpit is paused, and until when. */
@@ -3551,6 +3565,36 @@ export type Servers = {
 	manageWith: string,
 	/**  The CLI configuration directory these came from. */
 	directory: string,
+};
+
+/**
+ *  Response of `session.changes` — where a session's folder stands, read for
+ *  the window that opens it over the orchestrator's chat.
+ */
+export type SessionChanges = {
+	/**  The branch, or a short commit when `HEAD` is detached. */
+	branch: string,
+	/**  The folder, by its last segment. */
+	folder: string,
+	/**  In a checkout of its own rather than the project's folder. */
+	worktree: boolean,
+	ahead: number,
+	behind: number,
+	/**
+	 *  What its commits are counted from: the card's base, or the branch's
+	 *  upstream. Absent when there is neither, and then there are none.
+	 */
+	base: string | null,
+	changes: Change[],
+	/**  The commits on top of `base`, newest first. */
+	commits: Commit[],
+	/**
+	 *  The diff of what is not committed, or for a card of everything since
+	 *  its base: what the files below it show.
+	 */
+	diff: string,
+	/**  The diff was longer than a window reads, and was cut. */
+	cut: boolean,
 };
 
 export type SessionHit = {

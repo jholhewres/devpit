@@ -18,3 +18,29 @@ pub struct Front {
     /// it answers is "what would I lose".
     pub unsaved: Vec<String>,
 }
+
+/// Response of `session.changes` — where a session's folder stands, read for
+/// the window that opens it over the orchestrator's chat.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChanges {
+    /// The branch, or a short commit when `HEAD` is detached.
+    pub branch: String,
+    /// The folder, by its last segment.
+    pub folder: String,
+    /// In a checkout of its own rather than the project's folder.
+    pub worktree: bool,
+    pub ahead: u32,
+    pub behind: u32,
+    /// What its commits are counted from: the card's base, or the branch's
+    /// upstream. Absent when there is neither, and then there are none.
+    pub base: Option<String>,
+    pub changes: Vec<crate::Change>,
+    /// The commits on top of `base`, newest first.
+    pub commits: Vec<crate::Commit>,
+    /// The diff of what is not committed, or for a card of everything since
+    /// its base: what the files below it show.
+    pub diff: String,
+    /// The diff was longer than a window reads, and was cut.
+    pub cut: bool,
+}

@@ -265,6 +265,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
       {terminal && (
         <SessionTerminal
           session={terminal}
+          profileId={profileId}
           onClose={() => setTerminal(null)}
           onGo={() => {
             setTerminal(null)

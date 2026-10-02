@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { ask, commands } from './live'
-import { parse } from './diff'
+import { DiffFiles } from './DiffFiles'
 
 /*
  * What this card has changed, against where it started.
@@ -31,8 +31,6 @@ export function CardDiff({ cardId }: { cardId: string }): React.JSX.Element {
     setRaw(answer.data.diff)
   }
 
-  const parsed = raw ? parse(raw) : []
-
   return (
     <section className="cdiff">
       <div className="prefs__hrow">
@@ -48,32 +46,7 @@ export function CardDiff({ cardId }: { cardId: string }): React.JSX.Element {
         <p className="pref__d">Nothing has changed since this card started.</p>
       )}
 
-      {parsed.map((file) => (
-        <details className="cdiff__f" key={file.path}>
-          <summary className="cdiff__s">
-            <span className="cdiff__p">{file.path}</span>
-            <span className="cdiff__n">
-              {file.binary
-                ? 'binary'
-                : `${file.hunks.reduce((sum, hunk) => sum + hunk.rows.length, 0)} lines`}
-            </span>
-          </summary>
-          {/* Its own scroller: a diff is the one thing here wider than the
-              pane, and letting it widen the pane would move everything else. */}
-          <div className="cdiff__body">
-            {file.hunks.map((hunk, at) => (
-              <div className="cdiff__h" key={at}>
-                <div className="cdiff__hh">{hunk.header}</div>
-                {hunk.rows.map((row, line) => (
-                  <div className="cdiff__r" key={line} data-kind={row.kind}>
-                    {row.text}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </details>
-      ))}
+      {raw && <DiffFiles diff={raw} />}
     </section>
   )
 }

@@ -26,6 +26,32 @@ pub fn history(root: &Path, limit: u32, skip: u32) -> Result<Vec<Commit>, GitErr
     Ok(parse(&raw))
 }
 
+/// The commits in `range` (`base..HEAD`), newest first, at most `limit`.
+/// Nothing, when git cannot read the range: a base that has gone is no
+/// commits to show rather than an error to.
+pub fn commits_in(root: &Path, range: &str, limit: u32) -> Vec<Commit> {
+    let count = format!("-n{limit}");
+    run(root, &["log", &count, FORMAT, range, "--"])
+        .map(|raw| parse(&raw))
+        .unwrap_or_default()
+}
+
+/// The branch's upstream, as `origin/main`, when it has one.
+pub fn upstream_of(root: &Path) -> Option<String> {
+    let named = run(
+        root,
+        &[
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            "@{upstream}",
+        ],
+    )
+    .ok()?;
+    let named = named.trim();
+    (!named.is_empty()).then(|| named.to_owned())
+}
+
 fn parse(raw: &str) -> Vec<Commit> {
     raw.split('\x1e')
         .map(str::trim_start)
@@ -112,5 +138,33 @@ mod tests {
             next_page.iter().map(|c| &c.subject).collect::<Vec<_>>(),
             ["first"]
         );
+    }
+}
+
+#[cfg(test)]
+mod range_tests {
+    use super::{commits_in, upstream_of};
+    use crate::invoke::fixture::{commit, repo};
+
+    #[test]
+    fn the_commits_on_top_of_a_base_are_listed_newest_first() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        repo(dir.path());
+        std::fs::write(dir.path().join("a"), "1").expect("write");
+        commit(dir.path(), "first");
+        let base = crate::head_of(dir.path()).expect("head");
+        for (file, message) in [("b", "second"), ("c", "third")] {
+            std::fs::write(dir.path().join(file), "1").expect("write");
+            commit(dir.path(), message);
+        }
+        let subjects: Vec<String> = commits_in(dir.path(), &format!("{base}..HEAD"), 20)
+            .into_iter()
+            .map(|one| one.subject)
+            .collect();
+        assert_eq!(subjects, ["third", "second"]);
+        // A base that is not there is no commits, not an error.
+        assert!(commits_in(dir.path(), "nowhere..HEAD", 20).is_empty());
+        // A branch with no upstream has none to name.
+        assert_eq!(upstream_of(dir.path()), None);
     }
 }
