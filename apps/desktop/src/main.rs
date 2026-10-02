@@ -35,6 +35,8 @@ mod desk;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod frame_gtk;
 mod handing;
+#[cfg(target_os = "linux")]
+mod island_wayland;
 mod live_answer;
 mod live_prompt;
 mod live_sessions;

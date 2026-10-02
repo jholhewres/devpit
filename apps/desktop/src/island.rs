@@ -15,9 +15,10 @@
 //! - Elsewhere: the window ignores the mouse unless the cursor is over the
 //!   island, decided by a poll that only runs while the island is shown.
 //!
-//! **Linux needs X11.** A Wayland client may neither place itself nor stay on
-//! top, so on a Wayland display the island does not open at all — the
-//! AppImage runs through XWayland already, a `.deb` on Wayland does not.
+//! **Wayland** cannot place a window or keep it on top: there the island is a
+//! layer where the compositor has layer-shell, and an ordinary window that
+//! never takes focus where it does not (GNOME) — see `island_wayland`. The
+//! AppImage runs through XWayland, and is X11 here.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -117,11 +118,15 @@ pub fn apply(app: &tauri::AppHandle) {
     }
 }
 
-/// Whether a window can put itself at the top of this screen and stay there.
+/// Whether the island can open on this screen: X11, or Wayland as a layer or
+/// as the plain window GNOME allows.
 #[cfg(target_os = "linux")]
 fn placeable() -> bool {
     use gtk::prelude::*;
-    gtk::gdk::Display::default().is_some_and(|display| display.type_().name() == "GdkX11Display")
+    gtk::gdk::Display::default().is_some_and(|display| {
+        let kind = display.type_().name();
+        kind == "GdkX11Display" || kind == "GdkWaylandDisplay"
+    })
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -155,8 +160,22 @@ fn made(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, RpcError> {
             .title("devpit island")
             .build()
             .map_err(|err| RpcError::internal(format!("the island would not open: {err}")))?;
-    placed(&built);
+    // A layer on Wayland is made before it is shown, and placed by its anchor.
+    #[cfg(target_os = "linux")]
+    let layered = crate::island_wayland::wayland()
+        && built
+            .gtk_window()
+            .is_ok_and(|window| crate::island_wayland::layer(&window, remembered().as_deref()));
+    #[cfg(not(target_os = "linux"))]
+    let layered = false;
+    if !layered {
+        placed(&built);
+    }
     quiet(&built);
+    #[cfg(target_os = "linux")]
+    if crate::island_wayland::wayland() {
+        crate::island_wayland::settle(&built, layered, shaped);
+    }
     let moved = built.clone();
     built.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Moved(_)) {

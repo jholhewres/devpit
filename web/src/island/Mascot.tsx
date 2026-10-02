@@ -67,14 +67,23 @@ export function Mascot({
 
   useEffect(() => {
     if (!looks) return
-    return onCarried<Cursor>('island:cursor', (cursor) => {
+    const lean = (cursor: { x: number; y: number }): void => {
       const at = face.current
       if (!at) return
       const box = at.getBoundingClientRect()
-      const lean = leaning({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, cursor)
-      at.style.setProperty('--lx', lean.x.toFixed(3))
-      at.style.setProperty('--ly', lean.y.toFixed(3))
-    })
+      const leaned = leaning({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, cursor)
+      at.style.setProperty('--lx', leaned.x.toFixed(3))
+      at.style.setProperty('--ly', leaned.y.toFixed(3))
+    }
+    /* The page's own pointer as well: on Wayland nothing can say where the
+       cursor is outside the window, so only the moves over it are known. */
+    const moved = (event: PointerEvent): void => lean({ x: event.clientX, y: event.clientY })
+    window.addEventListener('pointermove', moved)
+    const stop = onCarried<Cursor>('island:cursor', lean)
+    return () => {
+      window.removeEventListener('pointermove', moved)
+      stop()
+    }
   }, [looks])
 
   useEffect(() => {
