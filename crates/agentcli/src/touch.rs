@@ -4,16 +4,24 @@
 //! them is shown by its name alone: guessing at a shape nobody recorded is how
 //! a label starts lying the day the shape changes.
 
-use devpit_rpc::Touch;
+use devpit_rpc::{IslandAsked, Touch};
 use serde_json::Value;
 
 /// How long a target may run before it is cut, in characters.
 const TARGET: usize = 60;
 /// How much of an edit or a command the preview keeps, in characters.
 const KEPT: usize = 4000;
+/// How many questions, and choices to one, a question step keeps.
+const QUESTIONS: usize = 4;
+const CHOICES: usize = 8;
+/// How long a question or a choice may run, in characters.
+const ASKED: usize = 400;
 
 /// What a step reads as after its tool's name: `invoice.ts`, `npm test`.
 pub fn target_of(input: &Value) -> Option<String> {
+    if let Some(first) = questions_in(input).first() {
+        return Some(cut(first.question.trim(), TARGET));
+    }
     if let Some(path) = path_in(input) {
         return Some(cut(base_name(path), TARGET));
     }
@@ -59,8 +67,45 @@ pub fn touch_of(tool: &str, input: &Value) -> Option<Touch> {
         "Bash" => Some(Touch::Run {
             command: cut(text(input, "command")?, KEPT),
         }),
+        "AskUserQuestion" => {
+            let questions = questions_in(input);
+            (!questions.is_empty()).then_some(Touch::Ask { questions })
+        }
+        "ExitPlanMode" => Some(Touch::Plan {
+            plan: cut(text(input, "plan")?, KEPT),
+        }),
         _ => None,
     }
+}
+
+/// The questions an `AskUserQuestion` input carries, each with its choices.
+fn questions_in(input: &Value) -> Vec<IslandAsked> {
+    let Some(asked) = input.get("questions").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    asked
+        .iter()
+        .take(QUESTIONS)
+        .filter_map(|one| {
+            Some(IslandAsked {
+                header: text(one, "header").map(|header| cut(header, TARGET)),
+                question: cut(text(one, "question")?, ASKED),
+                options: one
+                    .get("options")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .take(CHOICES)
+                    .filter_map(|option| text(option, "label").or_else(|| option.as_str()))
+                    .map(|label| cut(label, ASKED))
+                    .collect(),
+                multi: one
+                    .get("multiSelect")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            })
+        })
+        .collect()
 }
 
 fn path_in(input: &Value) -> Option<&str> {

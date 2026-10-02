@@ -93,6 +93,19 @@ impl Server {
         Ok(())
     }
 
+    /// The session a window belongs to on this server — the project's, not
+    /// a client's grouped on it — or nothing when no session holds it.
+    pub fn session_of_window(&self, window: &str) -> Result<Option<String>, TmuxError> {
+        let output =
+            self.require(&["list-windows", "-a", "-F", "#{session_name} #{window_name}"])?;
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find_map(|line| {
+                let (session, name) = line.trim().split_once(' ')?;
+                (name == window && !session.contains("__")).then(|| session.to_owned())
+            }))
+    }
+
     /// Every window of every session on this server, by name.
     pub fn all_windows(&self) -> Result<Vec<String>, TmuxError> {
         let output = self.require(&["list-windows", "-a", "-F", "#{window_name}"])?;

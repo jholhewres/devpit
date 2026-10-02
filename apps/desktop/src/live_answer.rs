@@ -69,34 +69,41 @@ pub async fn orchestrator_answer(
     seen: PendingPrompt,
     choice: Option<u32>,
 ) -> Result<(), RpcError> {
-    crate::off_main::blocking(move || {
-        let target = terminal_of(&profile_id, &name)?;
-        let server = crate::sessions::tmux_server()?;
-        let read = || screen_of(&target).and_then(|shown| crate::live_prompt::pending(&shown));
-        let press = |key: Key| {
-            server
-                .press(&target, &[key])
-                .map_err(|err| RpcError::internal(err.to_string()))
-        };
-        still_asked(read().as_ref(), &seen, choice)?;
-        let Some(at) = choice else {
-            return press(Key::Escape);
-        };
-        for key in keys_for(seen.cursor, at) {
-            press(key)?;
+    crate::off_main::blocking(move || answer_in(&terminal_of(&profile_id, &name)?, &seen, choice))
+        .await
+}
+
+/// The pick, pressed in the terminal `target`: for the Sessions panel and the
+/// island alike, under the same rule — only on the question the person saw.
+pub(crate) fn answer_in(
+    target: &str,
+    seen: &PendingPrompt,
+    choice: Option<u32>,
+) -> Result<(), RpcError> {
+    let server = crate::sessions::tmux_server()?;
+    let read = || screen_of(target).and_then(|shown| crate::live_prompt::pending(&shown));
+    let press = |key: Key| {
+        server
+            .press(target, &[key])
+            .map_err(|err| RpcError::internal(err.to_string()))
+    };
+    still_asked(read().as_ref(), seen, choice)?;
+    let Some(at) = choice else {
+        return press(Key::Escape);
+    };
+    for key in keys_for(seen.cursor, at) {
+        press(key)?;
+    }
+    for _ in 0..CURSOR_TRIES {
+        if on_choice(read().as_ref(), seen, at) {
+            return press(Key::Enter);
         }
-        for _ in 0..CURSOR_TRIES {
-            if on_choice(read().as_ref(), &seen, at) {
-                return press(Key::Enter);
-            }
-            std::thread::sleep(CURSOR_WAIT);
-        }
-        Err(RpcError::new(
-            ErrorCode::Conflict,
-            "the cursor did not reach that choice — nothing was taken",
-        ))
-    })
-    .await
+        std::thread::sleep(CURSOR_WAIT);
+    }
+    Err(RpcError::new(
+        ErrorCode::Conflict,
+        "the cursor did not reach that choice — nothing was taken",
+    ))
 }
 
 #[cfg(test)]

@@ -111,6 +111,8 @@ const VERBS: Readonly<Record<string, string>> = {
   Task: 'Delegate',
   TodoWrite: 'Plan',
   Skill: 'Use skill',
+  AskUserQuestion: 'Ask',
+  ExitPlanMode: 'Propose a plan',
 }
 
 /** One step, in words. */

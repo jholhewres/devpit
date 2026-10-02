@@ -84,3 +84,44 @@ fn a_tool_the_preview_cannot_draw_has_no_touch() {
     assert_eq!(touch_of("WebFetch", &json!({ "url": "https://x" })), None);
     assert_eq!(touch_of("Edit", &json!({ "new_string": "no path" })), None);
 }
+
+/// A question step carries the question and its choices: the session waits
+/// on the person, and "nothing to show" was the island saying nothing about
+/// what they were being asked.
+#[test]
+fn a_question_step_says_what_is_asked_and_the_choices() {
+    let input = serde_json::json!({
+        "questions": [{
+            "question": "Where does the viewer run?",
+            "header": "Viewer",
+            "multiSelect": false,
+            "options": [
+                { "label": "Web, PWA later", "description": "…" },
+                { "label": "Native app", "description": "…" }
+            ]
+        }]
+    });
+    assert_eq!(
+        target_of(&input).as_deref(),
+        Some("Where does the viewer run?")
+    );
+    let Some(Touch::Ask { questions }) = touch_of("AskUserQuestion", &input) else {
+        panic!("a question step");
+    };
+    assert_eq!(questions.len(), 1);
+    assert_eq!(questions[0].header.as_deref(), Some("Viewer"));
+    assert_eq!(questions[0].options, ["Web, PWA later", "Native app"]);
+    assert!(!questions[0].multi);
+    assert_eq!(touch_of("AskUserQuestion", &serde_json::json!({})), None);
+}
+
+#[test]
+fn a_plan_step_carries_the_plan() {
+    let input = serde_json::json!({ "plan": "1. Spike\n2. Ship" });
+    assert_eq!(
+        touch_of("ExitPlanMode", &input),
+        Some(Touch::Plan {
+            plan: "1. Spike\n2. Ship".to_owned()
+        })
+    );
+}

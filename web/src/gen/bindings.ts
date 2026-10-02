@@ -322,6 +322,18 @@ export const commands = {
 	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
+	/**  `island.prompt` — the question a session's terminal shows, if it shows one. */
+	islandPrompt: (sessionId: string) => typedError<{
+	question: string,
+	options: PromptOption[],
+	/**  Zero-based: the option the `❯` is on. */
+	cursor: number,
+} | null, RpcError>(__TAURI_INVOKE("island_prompt", { sessionId })),
+	/**
+	 *  `island.answer` — the person's pick on that question, or Escape when
+	 *  `choice` is absent.
+	 */
+	islandAnswer: (sessionId: string, seen: PendingPrompt, choice: number | null) => typedError<null, RpcError>(__TAURI_INVOKE("island_answer", { sessionId, seen, choice })),
 	/**  `reminders.pending` — what went off and nobody has dealt with. */
 	remindersPending: () => typedError<Reminders, RpcError>(__TAURI_INVOKE("reminders_pending")),
 	/**  `reminder.snooze` — the reminder goes off again at `until`. */
@@ -2411,6 +2423,16 @@ export type Installation = {
 	default: boolean,
 };
 
+/**  One question a session asks the person, as its tool put it. */
+export type IslandAsked = {
+	/**  The short label the CLI shows above it, when it has one. */
+	header: string | null,
+	question: string,
+	options: string[],
+	/**  Several of the choices may be picked. */
+	multi: boolean,
+};
+
 /**
  *  One change, as `island:session` carries it: the session as it now is, or
  *  its id when it has gone.
@@ -3907,7 +3929,14 @@ export type Touch =
 /**  A file read, from a line, for so many lines, when the tool said. */
 { kind: "read"; path: string; offset: number | null; limit: number | null } | 
 /**  A shell command. */
-{ kind: "run"; command: string };
+{ kind: "run"; command: string } | 
+/**
+ *  Questions put to the person, each with its choices: what the session
+ *  waits on until they pick.
+ */
+{ kind: "ask"; questions: IslandAsked[] } | 
+/**  A plan put to the person to approve before the session goes on. */
+{ kind: "plan"; plan: string };
 
 /**  What a turn cost and why it stopped. */
 export type TurnEnd = {

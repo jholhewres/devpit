@@ -29,6 +29,23 @@ pub enum Touch {
     },
     /// A shell command.
     Run { command: String },
+    /// Questions put to the person, each with its choices: what the session
+    /// waits on until they pick.
+    Ask { questions: Vec<IslandAsked> },
+    /// A plan put to the person to approve before the session goes on.
+    Plan { plan: String },
+}
+
+/// One question a session asks the person, as its tool put it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandAsked {
+    /// The short label the CLI shows above it, when it has one.
+    pub header: Option<String>,
+    pub question: String,
+    pub options: Vec<String>,
+    /// Several of the choices may be picked.
+    pub multi: bool,
 }
 
 /// One step of a session's turn: a tool, and what it was run on.

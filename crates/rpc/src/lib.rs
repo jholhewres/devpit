@@ -62,8 +62,8 @@ pub use focus::{HeadsDown, Waiting};
 pub use frame::{Context, Frame};
 pub use front::Front;
 pub use island::{
-    IslandChange, IslandChecks, IslandNow, IslandPull, IslandQuestion, IslandRect, IslandSession,
-    IslandStep, IslandVerdict, Touch,
+    IslandAsked, IslandChange, IslandChecks, IslandNow, IslandPull, IslandQuestion, IslandRect,
+    IslandSession, IslandStep, IslandVerdict, Touch,
 };
 pub use live::{LivePane, LiveSession, LiveSessions, PendingPrompt, PromptOption, RemoteState};
 pub use mcp_health::{McpHealth, McpServerHealth, McpState};

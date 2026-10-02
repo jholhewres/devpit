@@ -4,6 +4,7 @@ import type { IslandSession, IslandStep, Touch } from '../gen/bindings'
 import { ofPath } from '../shell/languages'
 import { ask, commands } from '../shell/live'
 import { Painted } from '../shell/Painted'
+import { AskedHere } from './AskedHere'
 import { verbOf } from './sessions'
 
 /*
@@ -35,7 +36,7 @@ export function linesFrom(text: string, offset: number | null): { line: number; 
     .map((one, at) => ({ line: from + at, text: one }))
 }
 
-const pathOf = (touch: Touch): string | null => (touch.kind === 'run' ? null : touch.path)
+const pathOf = (touch: Touch): string | null => ('path' in touch ? touch.path : null)
 const baseName = (path: string): string => path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
 
 /** A path from the session's own folder, the way the file tree shows it. */
@@ -89,6 +90,10 @@ export function Preview({ session, step }: { session: IslandSession; step: Islan
             <span className="isl-peek__tx">{touch.command}</span>
           </div>
         )}
+        {touch?.kind === 'ask' && (
+          <AskedHere session={session} questions={touch.questions} waiting={session.state === 'waiting' && !step?.done} />
+        )}
+        {touch?.kind === 'plan' && <div className="isl-peek__plan">{touch.plan}</div>}
       </div>
     </div>
   )

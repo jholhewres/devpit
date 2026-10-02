@@ -88,6 +88,7 @@ mod index;
 mod input_method;
 mod installations;
 mod island;
+mod island_answer;
 mod island_checks;
 mod island_feed;
 mod island_notify;
