@@ -65,8 +65,8 @@ pub use focus::{HeadsDown, Waiting};
 pub use frame::{Context, Frame};
 pub use front::{Elsewhere, ElsewhereFile, Front, SessionChanges};
 pub use island::{
-    IslandAsked, IslandChange, IslandChecks, IslandNow, IslandPull, IslandQuestion, IslandRect,
-    IslandSession, IslandStep, IslandVerdict, Touch,
+    IslandAsked, IslandChange, IslandChecks, IslandDrawn, IslandHow, IslandNow, IslandPull,
+    IslandQuestion, IslandRect, IslandSession, IslandStep, IslandVerdict, Touch,
 };
 pub use live::{
     LivePane, LiveSession, LiveSessions, PendingPrompt, ProjectProposal, PromptOption, RemoteState,

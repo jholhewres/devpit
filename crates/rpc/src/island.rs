@@ -6,6 +6,25 @@ use specta::Type;
 
 use crate::Doing;
 
+/// How the island is drawn on this desktop, for Settings to say.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum IslandDrawn {
+    /// A window placed at the top and kept above: X11, macOS, Windows.
+    Above,
+    /// A Wayland layer anchored to the top (KDE, Hyprland, Sway).
+    Layer,
+    /// A Wayland window that refuses focus, wherever the compositor puts it:
+    /// GNOME, or no `libgtk-layer-shell`.
+    Plain,
+}
+
+/// `island.drawn`'s answer.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct IslandHow {
+    pub drawn: IslandDrawn,
+}
+
 /// What a tool is about to touch, read from its input, for the preview.
 ///
 /// A closed set: a tool whose input is none of these is shown by name alone,

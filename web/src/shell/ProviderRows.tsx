@@ -180,9 +180,11 @@ export function ProviderRows(): React.JSX.Element {
         <span className="pref__body">
           <span className="pref__t">Agent status hooks</span>
           <span className="pref__d">
-            Shows working, waiting and done in the sidebar. The hooks travel on the command
-            line and reach only the agents devpit starts &mdash; nothing is written into your
-            own configuration, so turning this off is the whole of turning it off.
+            Shows working, waiting and done on the island, in the sidebar and on a card, for
+            Claude Code and the Gemini CLI run in devpit&rsquo;s terminals. The hooks travel
+            with the launch &mdash; nothing is written into your own configuration, so turning
+            this off is the whole of turning it off. Any other agent can report with{' '}
+            <code>devpit-agent hook --agent &lt;name&gt; &lt;event&gt;</code>, run in one of devpit&rsquo;s terminals.
           </span>
         </span>
         <span className="sw"></span>

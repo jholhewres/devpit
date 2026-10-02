@@ -348,6 +348,7 @@ fn main() {
             if let Ok(store) = devpit_core::Store::open_default() {
                 pausing::restore(app.handle(), &store);
             }
+            island::note_drawn();
             // In the tray, and the shortcut that brings it forward, if one was chosen.
             desk::tray(app.handle());
             // Reachable from the person's other devices, when it was left on.

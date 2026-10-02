@@ -51,7 +51,7 @@ export function VoiceSettings(): React.JSX.Element {
       <span className="pref__body">
         <span className="pref__t">Voice messages</span>
         <span className="pref__d">
-          Hold the microphone in a chat to speak; the words land in the composer to read before sending. Without an engine the recording goes as a file.
+          The microphone sits beside the paperclip in a chat&rsquo;s composer (Ctrl+Shift+A attaches files); a terminal has neither. Click or hold it to speak, and the words land in the composer to read before sending. Without an engine the recording goes as a file.
         </span>
         <span className="voice__row" role="radiogroup" aria-label="Engine">
           {ENGINES.map((one) => (
@@ -62,8 +62,14 @@ export function VoiceSettings(): React.JSX.Element {
         </span>
         {local && (
           <span className="pref__d">
-            {now.local ? `Found ${now.local}.` : 'No whisper found: install whisper.cpp (whisper-cli) or whisper, then reopen Settings.'}
+            {now.local ? `Found ${now.local}.` : 'No whisper found, then reopen Settings once one is installed:'}
           </span>
+        )}
+        {local && !now.local && (
+          <ul className="prefhow">
+            <li><b>whisper.cpp</b>: <code>whisper-cli</code> on the PATH, <code>ffmpeg</code> beside it, and a model file such as <code>ggml-base.bin</code> from the whisper.cpp releases, chosen here.</li>
+            <li><b>whisper</b>: <code>pip install openai-whisper</code> (or <code>whisper-ctranslate2</code>), which fetches its <code>base</code> model the first time.</li>
+          </ul>
         )}
         {local && needsFile && (
           <span className="voice__row">

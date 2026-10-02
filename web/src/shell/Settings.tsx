@@ -4,19 +4,13 @@ import type { Settings as Stored } from '../gen/bindings'
 import { ask, commands } from './live'
 import { inOrder } from './inOrder'
 import { PrefsSide } from './PrefsSide'
-import { PrefSwitch } from './PrefSwitch'
-import { DeskSettings } from './DeskSettings'
-import { RemoteSettings } from './RemoteSettings'
-import { VoiceSettings } from './VoiceSettings'
-import { ErrorReportsPreview } from './ErrorReportsPreview'
-import { OpenApps } from './OpenApps'
+import { GeneralSettings } from './GeneralSettings'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
 import { flagOn, type Flag } from './settingsFlags'
 import { SkillsPane } from './SkillsPane'
 import { TerminalContrast } from './TerminalContrast'
-import { UpdateSettings } from './UpdateSettings'
 import { Usage } from './Usage'
 import { Worktrees } from './Worktrees'
 
@@ -117,21 +111,7 @@ export function Settings({
           </section>
 
           <section className="prefs__in" hidden={pane !== 'general'}>
-            <h1 className="prefs__h">General</h1>
-            <div className="pref">
-              <span className="pref__body"><span className="pref__t">Local by default</span><span className="pref__d">Projects, conversations and settings are kept on this computer.</span></span>
-            </div>
-            <PrefSwitch on={on('automaticUpdates')} onFlip={() => set('automaticUpdates', !on('automaticUpdates'))} title="Automatic updates" said="Check in the background and offer to install." />
-            <PrefSwitch on={on('island')} onFlip={() => set('island', !on('island'))} title="Island" said="A small window at the top of the screen, above everything, showing what every agent is doing and who is waiting on you." />
-            <PrefSwitch on={on('reminders')} onFlip={() => set('reminders', !on('reminders'))} title="Reminders" said="A card's date goes off at its time — a banner here and a notification — and an agent can set one when you ask it to remind you." />
-            <PrefSwitch on={on('focusMode')} onFlip={() => set('focusMode', !on('focusMode'))} title="Focus mode" said="Unfinished. A door for one project: what arrives from another waits until you come out." />
-            <PrefSwitch on={on('errorReports')} onFlip={() => set('errorReports', !on('errorReports'))} title="Error reports" said={<>Send devpit&rsquo;s own errors, without paths or your work, anonymously and only while devpit sits idle. Turning it off deletes what was kept.</>} />
-            {on('errorReports') && <ErrorReportsPreview />}
-            <DeskSettings />
-            <VoiceSettings />
-            <RemoteSettings />
-            <OpenApps />
-            <UpdateSettings />
+            <GeneralSettings on={on} set={set} />
           </section>
 
           <section className="prefs__in" hidden={pane !== 'providers'}>

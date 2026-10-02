@@ -86,6 +86,10 @@ describe('the settings sidebar', () => {
     /* Nobody looking for the update switch types "General". */
     expect(matching('updates').flatMap((g) => g.items.map((i) => i.id))).toEqual(['general'])
     expect(matching('tokens').flatMap((g) => g.items.map((i) => i.id))).toEqual(['usage'])
+    /* General's rows, found by their own names rather than only by the pane's. */
+    for (const row of ['island', 'pause', 'microphone', 'tailscale', 'shortcut']) {
+      expect(matching(row).flatMap((g) => g.items.map((i) => i.id))).toEqual(['general'])
+    }
   })
 
   it('is the whole list again once the field is emptied', () => {

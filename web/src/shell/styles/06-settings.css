@@ -360,6 +360,8 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .voice__in--short { flex: none; width: 90px; min-width: 0; }
 .voice__val { flex: 1; min-width: 0; font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .voice__bad { color: var(--danger); }
+/* A how-to under a row: numbered steps, in the row's own small print. */
+.prefhow { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
 
 /* The composer's files and voice, beside send. */
 .ctools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }

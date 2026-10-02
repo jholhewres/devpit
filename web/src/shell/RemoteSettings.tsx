@@ -57,6 +57,12 @@ export function RemoteSettings(): React.JSX.Element {
       {view.enabled && (
         <div className="pref pref--stack">
           <span className="pref__body">
+            <ol className="prefhow">
+              <li>Install Tailscale on the phone or computer and sign in as the owner of this machine{tailscale.login && <> ({tailscale.login})</>}. Anyone else in the tailnet is refused.</li>
+              <li>Open the address below on that device.</li>
+              <li><b>Pair a device</b> here, then scan the code or type it there. It is good once, for two minutes.</li>
+              <li>Choose what the device may do. Watching is always allowed; <b>type</b> sends keys to terminals and moves cards; <b>answer</b> allows or denies a question an agent is waiting on. Chats are read there, not written.</li>
+            </ol>
             <span className="pref__d">
               {view.address ? <>Open <code>{view.address}</code> on a device in your tailnet, signed in as {tailscale.login}.</> : (view.problem ?? 'Not reachable yet.')}
             </span>
@@ -102,6 +108,9 @@ export function RemoteSettings(): React.JSX.Element {
                 </button>
               </span>
             ))}
+            <span className="pref__d">
+              The status strip says <i>Watched by 1 device</i> while one is connected, and a click drops it. Who connected and what they did, never what was on screen, is kept in <code>~/.devpit/remote-log.jsonl</code>.
+            </span>
           </span>
         </div>
       )}

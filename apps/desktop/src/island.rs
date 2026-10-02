@@ -453,6 +453,37 @@ pub async fn island_apply(app: tauri::AppHandle) -> Result<(), RpcError> {
         .map_err(|err| RpcError::internal(format!("the island would not change: {err}")))
 }
 
+static DRAWN: std::sync::OnceLock<devpit_rpc::IslandDrawn> = std::sync::OnceLock::new();
+
+/// Reads how this desktop draws the island. On GTK's thread, at setup: the
+/// display is only asked there.
+pub(crate) fn note_drawn() {
+    #[cfg(target_os = "linux")]
+    let drawn = match (
+        crate::island_wayland::wayland(),
+        crate::island_wayland::layered(),
+    ) {
+        (false, _) => devpit_rpc::IslandDrawn::Above,
+        (true, true) => devpit_rpc::IslandDrawn::Layer,
+        (true, false) => devpit_rpc::IslandDrawn::Plain,
+    };
+    #[cfg(not(target_os = "linux"))]
+    let drawn = devpit_rpc::IslandDrawn::Above;
+    let _ = DRAWN.set(drawn);
+}
+
+/// `island.drawn` — how the island is drawn on this desktop.
+#[tauri::command]
+#[specta::specta]
+pub fn island_drawn() -> devpit_rpc::IslandHow {
+    devpit_rpc::IslandHow {
+        drawn: DRAWN
+            .get()
+            .copied()
+            .unwrap_or(devpit_rpc::IslandDrawn::Above),
+    }
+}
+
 /// `island.now` — every session the island would draw, asked as it mounts.
 #[tauri::command]
 #[specta::specta]

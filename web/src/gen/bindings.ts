@@ -747,6 +747,8 @@ export const commands = {
 	 *  after it was switched.
 	 */
 	islandApply: () => typedError<null, RpcError>(__TAURI_INVOKE("island_apply")),
+	/**  `island.drawn` — how the island is drawn on this desktop. */
+	islandDrawn: () => __TAURI_INVOKE<IslandHow>("island_drawn"),
 	/**  `island.now` — every session the island would draw, asked as it mounts. */
 	islandNow: () => typedError<IslandNow, RpcError>(__TAURI_INVOKE("island_now")),
 	/**  `island.shape` — what the island draws, so only that takes the mouse. */
@@ -2565,6 +2567,23 @@ export type IslandChecks = {
 	pull: IslandPull | null,
 	/**  `passing` | `failing` | `running`, or nothing when nothing has run. */
 	checks: string | null,
+};
+
+/**  How the island is drawn on this desktop, for Settings to say. */
+export type IslandDrawn = 
+/**  A window placed at the top and kept above: X11, macOS, Windows. */
+"above" | 
+/**  A Wayland layer anchored to the top (KDE, Hyprland, Sway). */
+"layer" | 
+/**
+ *  A Wayland window that refuses focus, wherever the compositor puts it:
+ *  GNOME, or no `libgtk-layer-shell`.
+ */
+"plain";
+
+/**  `island.drawn`'s answer. */
+export type IslandHow = {
+	drawn: IslandDrawn,
 };
 
 /**
