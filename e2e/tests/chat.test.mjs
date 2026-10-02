@@ -29,7 +29,16 @@ const card = async (title) =>
 
 /** Until no answer is being written: typed during one, a message waits in the queue. */
 async function idle() {
-  await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 90000)
+  // A turn ending re-renders the pane under the query; WebKit's driver then
+  // throws stale rather than answer, which is only "ask again".
+  await window.wait(
+    async () =>
+      (await window.findElements(By.css('.working'))).length === 0,
+    90000,
+  ).catch(async (err) => {
+    if (err?.name !== 'StaleElementReferenceError') throw err
+    await idle()
+  })
 }
 
 async function backToTheBoard() {
@@ -183,7 +192,7 @@ describe('manual item 10 — a card chat moves the dot', () => {
 })
 
 describe('Remote Control in a project chat', () => {
-  test('a project chat is reachable too, connecting with its next message', async () => {
+  test('a project chat is reachable too, connecting with its next message', async (t) => {
     const toggles = await window.findElements(By.css('[aria-label="Remote Control"]'))
     assert.ok(toggles.length > 0, 'a project chat has no Remote Control')
     // Supervised asks in a process per turn, so there is none to reach there.
@@ -199,6 +208,14 @@ describe('Remote Control in a project chat', () => {
       await press(window, 'Supervised')
       await press(window, 'Full access')
     }
+    // The mode is remembered per profile and later chats start where this
+    // one leaves it, so it goes back even when this test fails.
+    t.after(async () => {
+      if (supervised) {
+        await press(window, 'Full access')
+        await press(window, 'Supervised')
+      }
+    })
     await window.executeScript(function () {
       document.querySelector('textarea[data-e2e="mine"]').closest('.pane').querySelector('[aria-label="Remote Control"]').click()
     })
@@ -221,11 +238,6 @@ describe('Remote Control in a project chat', () => {
       document.querySelector('textarea[data-e2e="mine"]').closest('.pane').querySelector('[aria-label="Remote Control"]').click()
     })
     await idle()
-    // The mode is remembered per profile; later chats start where they did.
-    if (supervised) {
-      await press(window, 'Full access')
-      await press(window, 'Supervised')
-    }
   })
 })
 
