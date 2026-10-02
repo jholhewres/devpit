@@ -71,7 +71,7 @@ fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) ->
             match listener.accept() {
                 Ok((mut stream, _)) => {
                     stream.set_nonblocking(false).expect("blocking");
-                    let posted = read_request(&mut stream);
+                    let posted = read_request(&mut stream, None);
                     reply(&mut stream, "");
                     return posted;
                 }

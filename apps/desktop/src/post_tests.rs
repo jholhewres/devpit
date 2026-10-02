@@ -4,7 +4,7 @@
 //! that decide how much memory a request gets to ask for, and those do not
 //! need a port to exercise.
 
-use crate::post::{read_post, MOST_BYTES, MOST_HEADERS, MOST_HEADER_BYTES};
+use crate::post::{read_post, MOST_BYTES, MOST_HEADERS, MOST_HEADER_BYTES, MOST_HOOK_BYTES};
 
 /// A request, assembled the way `curl --data-binary` sends one.
 fn post(body: &str) -> Vec<u8> {
@@ -40,7 +40,7 @@ fn the_secret_is_read_whatever_its_case_or_padding() {
     ] {
         let raw = post_with(&[header], "{}");
         assert_eq!(
-            read_post(&raw[..]).and_then(|posted| posted.secret),
+            read_post(&raw[..], None).and_then(|posted| posted.secret),
             Some("6f1c".to_owned()),
             "{header}"
         );
@@ -52,11 +52,14 @@ fn the_secret_is_read_whatever_its_case_or_padding() {
 #[test]
 fn a_post_with_no_secret_carries_none_and_an_empty_one_carries_empty() {
     let raw = post("{}");
-    assert_eq!(read_post(&raw[..]).and_then(|posted| posted.secret), None);
+    assert_eq!(
+        read_post(&raw[..], None).and_then(|posted| posted.secret),
+        None
+    );
 
     let raw = post_with(&["x-devpit-hook:"], "{}");
     assert_eq!(
-        read_post(&raw[..]).and_then(|posted| posted.secret),
+        read_post(&raw[..], None).and_then(|posted| posted.secret),
         Some(String::new())
     );
 }
@@ -68,12 +71,12 @@ fn a_post_with_no_secret_carries_none_and_an_empty_one_carries_empty() {
 fn a_header_line_has_a_ceiling() {
     let long = format!("x-devpit-hook: {}", "a".repeat(MOST_HEADER_BYTES + 1));
     let raw = post_with(&[&long], "{}");
-    assert_eq!(read_post(&raw[..]), None);
+    assert_eq!(read_post(&raw[..], None), None);
 
     // One byte under it still reads.
     let short = format!("x-devpit-hook: {}", "a".repeat(64));
     let raw = post_with(&[&short], "{}");
-    assert!(read_post(&raw[..]).is_some());
+    assert!(read_post(&raw[..], None).is_some());
 }
 
 /// And a request cannot arrive with ten thousand short headers either.
@@ -84,7 +87,7 @@ fn a_wall_of_headers_is_refused() {
         .collect();
     let borrowed: Vec<&str> = many.iter().map(String::as_str).collect();
     let raw = post_with(&borrowed, "{}");
-    assert_eq!(read_post(&raw[..]), None);
+    assert_eq!(read_post(&raw[..], None), None);
 }
 
 #[test]
@@ -92,7 +95,7 @@ fn a_well_formed_post_gives_up_its_body() {
     let body = r#"{"hook_event_name":"Stop","session_id":"s1"}"#;
     let raw = post(body);
     assert_eq!(
-        read_post(&raw[..]).map(|posted| posted.body),
+        read_post(&raw[..], None).map(|posted| posted.body),
         Some(body.to_owned())
     );
 }
@@ -103,7 +106,7 @@ fn a_well_formed_post_gives_up_its_body() {
 fn the_length_header_is_read_whatever_its_case() {
     let raw = b"POST /hook HTTP/1.1\r\nContent-Length: 2\r\n\r\nhi";
     assert_eq!(
-        read_post(&raw[..]).map(|posted| posted.body),
+        read_post(&raw[..], None).map(|posted| posted.body),
         Some("hi".to_owned())
     );
 }
@@ -126,7 +129,7 @@ fn a_length_past_the_ceiling_is_refused_before_anything_is_allocated() {
         "POST /hook HTTP/1.1\r\ncontent-length: {}\r\n\r\n{body}",
         MOST_BYTES + 1
     );
-    assert_eq!(read_post(raw.as_bytes()), None);
+    assert_eq!(read_post(raw.as_bytes(), None), None);
 }
 
 #[test]
@@ -134,7 +137,7 @@ fn a_length_at_the_ceiling_is_still_read() {
     let body = "x".repeat(MOST_BYTES);
     let raw = format!("POST /hook HTTP/1.1\r\ncontent-length: {MOST_BYTES}\r\n\r\n{body}");
     assert_eq!(
-        read_post(raw.as_bytes()).map(|posted| posted.body),
+        read_post(raw.as_bytes(), None).map(|posted| posted.body),
         Some(body)
     );
 }
@@ -142,7 +145,7 @@ fn a_length_at_the_ceiling_is_still_read() {
 #[test]
 fn a_request_with_no_body_is_nothing_to_read() {
     let raw = b"POST /hook HTTP/1.1\r\ncontent-length: 0\r\n\r\n";
-    assert_eq!(read_post(&raw[..]), None);
+    assert_eq!(read_post(&raw[..], None), None);
 }
 
 /// A length that is not a number ends the read rather than defaulting to one.
@@ -150,7 +153,7 @@ fn a_request_with_no_body_is_nothing_to_read() {
 #[test]
 fn a_length_that_is_not_a_number_is_refused() {
     let raw = b"POST /hook HTTP/1.1\r\ncontent-length: lots\r\n\r\nhi";
-    assert_eq!(read_post(&raw[..]), None);
+    assert_eq!(read_post(&raw[..], None), None);
 }
 
 /// Connection closed mid-headers. `read_line` returns zero and the loop has
@@ -158,7 +161,7 @@ fn a_length_that_is_not_a_number_is_refused() {
 #[test]
 fn a_truncated_request_ends_rather_than_spins() {
     let raw = b"POST /hook HTTP/1.1\r\ncontent-length: 5\r\n";
-    assert_eq!(read_post(&raw[..]), None);
+    assert_eq!(read_post(&raw[..], None), None);
 }
 
 /// The body arrives shorter than the header promised. Reading it as far as it
@@ -166,7 +169,7 @@ fn a_truncated_request_ends_rather_than_spins() {
 #[test]
 fn a_body_shorter_than_promised_is_refused() {
     let raw = b"POST /hook HTTP/1.1\r\ncontent-length: 40\r\n\r\nshort";
-    assert_eq!(read_post(&raw[..]), None);
+    assert_eq!(read_post(&raw[..], None), None);
 }
 
 /// The pane the hook fired in, which is the whole reason the query exists:
@@ -176,7 +179,7 @@ fn a_body_shorter_than_promised_is_refused() {
 fn the_pane_rides_in_the_query() {
     let raw = b"POST /hook?pane=leaf_01ABC HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi";
     assert_eq!(
-        read_post(&raw[..]).and_then(|posted| posted.pane),
+        read_post(&raw[..], None).and_then(|posted| posted.pane),
         Some("leaf_01ABC".to_owned())
     );
 }
@@ -186,7 +189,10 @@ fn the_pane_rides_in_the_query() {
 #[test]
 fn a_post_with_no_query_names_no_pane() {
     let raw = b"POST /hook HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi";
-    assert_eq!(read_post(&raw[..]).and_then(|posted| posted.pane), None);
+    assert_eq!(
+        read_post(&raw[..], None).and_then(|posted| posted.pane),
+        None
+    );
 }
 
 /// This value arrives from a shell we wrote, through a process we did not,
@@ -202,7 +208,7 @@ fn a_pane_that_is_not_shaped_like_ours_is_refused() {
     ] {
         let raw = format!("POST {target} HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi");
         assert_eq!(
-            read_post(raw.as_bytes()).and_then(|posted| posted.pane),
+            read_post(raw.as_bytes(), None).and_then(|posted| posted.pane),
             None,
             "{target} was accepted"
         );
@@ -215,7 +221,7 @@ fn a_pane_that_is_not_shaped_like_ours_is_refused() {
 fn the_pane_is_found_beside_other_parameters() {
     let raw = b"POST /hook?x=1&pane=leaf_two HTTP/1.1\r\ncontent-length: 2\r\n\r\nhi";
     assert_eq!(
-        read_post(&raw[..]).and_then(|posted| posted.pane),
+        read_post(&raw[..], None).and_then(|posted| posted.pane),
         Some("leaf_two".to_owned())
     );
 }
@@ -224,20 +230,53 @@ fn the_pane_is_found_beside_other_parameters() {
 /// told apart by the path, before anything reads the body.
 #[test]
 fn a_post_to_agent_is_a_question_and_to_hook_a_report() {
-    let asked = read_post(std::io::Cursor::new(
-        "POST /agent HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes(),
-    ))
+    let asked = read_post(
+        std::io::Cursor::new("POST /agent HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes()),
+        None,
+    )
     .expect("read");
     assert!(asked.agent);
-    let told = read_post(std::io::Cursor::new(
-        "POST /hook?pane=leaf_1 HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes(),
-    ))
+    let told = read_post(
+        std::io::Cursor::new(
+            "POST /hook?pane=leaf_1 HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes(),
+        ),
+        None,
+    )
     .expect("read");
     assert!(!told.agent);
     // A path that merely starts with the word is neither.
-    let neither = read_post(std::io::Cursor::new(
-        "POST /agents HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes(),
-    ))
+    let neither = read_post(
+        std::io::Cursor::new("POST /agents HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}".as_bytes()),
+        None,
+    )
     .expect("read");
     assert!(!neither.agent);
+}
+
+/// A Read of a big file reported back: past the small ceiling, but from a
+/// hook that showed the secret. It is read, and cut down to what devpit uses —
+/// refused, the report was lost and its step stayed running.
+#[test]
+fn a_big_report_from_our_hook_is_read_and_cut_down() {
+    let file = "x".repeat(MOST_BYTES * 4);
+    let body = serde_json::json!({
+        "hook_event_name": "PostToolUse",
+        "session_id": "s1",
+        "tool_name": "Read",
+        "tool_input": { "file_path": "/w/big.log" },
+        "tool_response": { "file": { "content": file } },
+    })
+    .to_string();
+    let raw = post_with(&["x-devpit-hook: 6f1c"], &body);
+
+    let posted = read_post(&raw[..], Some("6f1c")).expect("read");
+    assert!(posted.body.len() < 4 * 1024, "{} bytes", posted.body.len());
+    assert!(posted.body.contains("\"tool_name\":\"Read\""));
+    assert!(!posted.body.contains("tool_response"));
+
+    // Without the secret — or with the wrong one — the small ceiling holds.
+    assert_eq!(read_post(&raw[..], None), None);
+    let wrong = post_with(&["x-devpit-hook: 0000"], &body);
+    assert_eq!(read_post(&wrong[..], Some("6f1c")), None);
+    assert!(body.len() < MOST_HOOK_BYTES);
 }

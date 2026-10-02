@@ -148,7 +148,7 @@ fn fresh_secret() -> Option<String> {
 
 fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     trace(&format!("post seq={seq}"));
-    let Some(posted) = read_request(&mut stream) else {
+    let Some(posted) = read_request(&mut stream, SECRET.get().map(String::as_str)) else {
         trace(&format!("post seq={seq} bad request"));
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return;

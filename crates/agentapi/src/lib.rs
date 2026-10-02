@@ -16,8 +16,10 @@ pub mod client;
 pub mod guide;
 pub mod hook;
 pub mod mcp;
+mod slim;
 
 pub use client::ask;
+pub use slim::{slimmed, SLIM_ABOVE};
 
 /// Where the agent is standing.
 ///

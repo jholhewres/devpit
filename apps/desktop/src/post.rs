@@ -14,6 +14,12 @@ use std::net::TcpStream;
 /// socket and an unbounded read is a way to spend all the memory on the box.
 pub(crate) const MOST_BYTES: usize = 256 * 1024;
 
+/// What a post that showed the right secret may carry. A tool's report can be
+/// a whole file — a Read, a command's output — and refusing it lost the report
+/// with it: the step stayed running. It is read, cut down to what devpit uses
+/// (`devpit_agentapi::slimmed`), and the rest let go.
+pub(crate) const MOST_HOOK_BYTES: usize = 16 * 1024 * 1024;
+
 /// A header line longer than this is not one of ours either.
 ///
 /// `read_line` grows its buffer until it meets a newline, so a sender that
@@ -47,8 +53,8 @@ pub struct Posted {
 /// Written by hand rather than with an HTTP crate: one route, one method, one
 /// caller on loopback. A dependency here would be several thousand lines to
 /// parse a request this already refuses to over-read.
-pub fn read_request(stream: &mut TcpStream) -> Option<Posted> {
-    read_post(BufReader::new(stream.try_clone().ok()?))
+pub fn read_request(stream: &mut TcpStream, door: Option<&str>) -> Option<Posted> {
+    read_post(BufReader::new(stream.try_clone().ok()?), door)
 }
 
 /// The same, from anything that yields bytes.
@@ -57,7 +63,7 @@ pub fn read_request(stream: &mut TcpStream) -> Option<Posted> {
 /// port. The ceiling below is the only thing between a `content-length`
 /// somebody else wrote and an allocation of exactly that size, and a rule a
 /// test cannot call is a rule the test cannot guard.
-pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
+pub(crate) fn read_post(mut reader: impl BufRead, door: Option<&str>) -> Option<Posted> {
     let mut length = 0usize;
     let mut pane = None;
     let mut secret = None;
@@ -111,13 +117,30 @@ pub(crate) fn read_post(mut reader: impl BufRead) -> Option<Posted> {
         }
     }
 
-    if length == 0 || length > MOST_BYTES {
+    // The bigger ceiling only for a post that showed the door's secret, which
+    // is known before a byte of the body is read: anyone else gets the small
+    // one, and no say in how much this process allocates.
+    let ceiling = match door {
+        Some(door) if crate::listener::authorized(secret.as_deref(), door) => MOST_HOOK_BYTES,
+        _ => MOST_BYTES,
+    };
+    if length == 0 || length > ceiling {
         return None;
     }
     let mut body = vec![0u8; length];
     reader.read_exact(&mut body).ok()?;
+    let mut body = String::from_utf8(body).ok()?;
+    if !agent && body.len() > devpit_agentapi::SLIM_ABOVE {
+        // What is not JSON is not cut, and passes only under the small
+        // ceiling, as it always did; the reader after this refuses it.
+        match devpit_agentapi::slimmed(&body) {
+            Some(slim) => body = slim,
+            None if body.len() <= MOST_BYTES => {}
+            None => return None,
+        }
+    }
     Some(Posted {
-        body: String::from_utf8(body).ok()?,
+        body,
         pane,
         secret,
         agent,

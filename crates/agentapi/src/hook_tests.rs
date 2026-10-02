@@ -130,3 +130,19 @@ fn a_devpit_that_is_gone_costs_the_hook_a_moment_not_a_hang() {
     let nowhere = tempfile::tempdir().expect("tempdir");
     assert!(post(nowhere.path(), b"{}", "", Duration::from_secs(5)).is_none());
 }
+
+/// What the Windows hook sends after a big Read: the report, not the file.
+#[test]
+fn a_big_report_is_cut_down_before_it_is_sent() {
+    let body = serde_json::json!({
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "tool_response": { "file": { "content": "x".repeat(1024 * 1024) } },
+    })
+    .to_string()
+    .into_bytes();
+    let sent = slim(body);
+    assert!(sent.len() < 1024, "{} bytes", sent.len());
+    // A small one goes as it came.
+    assert_eq!(slim(b"{\"a\":1}".to_vec()), b"{\"a\":1}");
+}

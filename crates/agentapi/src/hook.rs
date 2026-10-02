@@ -21,8 +21,10 @@ pub const PANE_ENV: &str = "DEVPIT_PANE";
 /// (`devpit_agentcli::HOOKED`), where the plugin's copy stays quiet.
 pub const HOOKED_ENV: &str = "DEVPIT_HOOKED";
 
-/// The listener refuses a body bigger than this, so nothing bigger is read.
-const MOST_BYTES: usize = 256 * 1024;
+/// The most a hook's report is read up to: as the listener takes from a hook
+/// that shows its secret. It is cut down before it is sent (`slimmed`), so
+/// what crosses is what devpit reads.
+const MOST_BYTES: usize = 16 * 1024 * 1024;
 
 /// A reply is a decision or nothing; anything longer is not one of ours.
 const MOST_REPLY: u64 = 64 * 1024;
@@ -58,12 +60,26 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
     if read.is_err() || body.len() > MOST_BYTES {
         return 0;
     }
+    let body = slim(body);
     if let Some(reply) = post(root, &body, &pane, asked.wait) {
         if asked.echo {
             let _ = std::io::stdout().write_all(&reply);
         }
     }
     0
+}
+
+/// A report cut down to what devpit reads, when it is big enough to matter:
+/// a Read's whole file and a command's whole output stay on this side.
+pub(crate) fn slim(body: Vec<u8>) -> Vec<u8> {
+    if body.len() <= crate::SLIM_ABOVE {
+        return body;
+    }
+    std::str::from_utf8(&body)
+        .ok()
+        .and_then(crate::slimmed)
+        .map(String::into_bytes)
+        .unwrap_or(body)
 }
 
 /// `--wait <seconds>`, `--echo`, `--plugin`; anything else is ignored, so a
