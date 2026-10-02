@@ -207,6 +207,11 @@ impl ProjectHome {
         self.dir().join("pasted")
     }
 
+    /// What each card's sessions wrote outside its own checkout, by card.
+    pub fn elsewhere(&self) -> PathBuf {
+        self.dir().join("elsewhere")
+    }
+
     /// Files kept for the project outside its repository: saved from a
     /// checkout by a session or the person, and never committed.
     pub fn artifacts(&self) -> PathBuf {

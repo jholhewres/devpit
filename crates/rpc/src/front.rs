@@ -44,3 +44,25 @@ pub struct SessionChanges {
     /// The diff was longer than a window reads, and was cut.
     pub cut: bool,
 }
+
+/// Another repository a card's sessions wrote in: what `Changes` cannot see,
+/// because it reads only the card's own checkout.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Elsewhere {
+    /// The repository's folder, whole. Local only.
+    pub root: String,
+    /// The project's name when devpit has it, the folder's otherwise.
+    pub name: String,
+    pub project_id: Option<String>,
+    pub files: Vec<ElsewhereFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ElsewhereFile {
+    /// Relative to the repository.
+    pub path: String,
+    /// Still differs from its last commit there.
+    pub uncommitted: bool,
+}

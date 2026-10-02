@@ -9,8 +9,8 @@
 use crate::{
     account, adopting, agent_choice, agent_profiles, arranging, artifacts, asking, asking_kept,
     attaching_chat, blocks, board, branches, browser, browser_cookies, browser_driving,
-    browser_menu, card_chat, card_work, cards, chat, chat_relay, chat_remote, checkpoint,
-    checkpoint_findings, checkpoint_preview, claude_plugin, cloning, columns, commands,
+    browser_menu, card_chat, card_elsewhere, card_work, cards, chat, chat_relay, chat_remote,
+    checkpoint, checkpoint_findings, checkpoint_preview, claude_plugin, cloning, columns, commands,
     delegations, desk, diffs, error_reports, error_sender, files, filetree, front, happening,
     heads_down, history, in_flight, index, installations, island, island_answer, island_checks,
     live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving, notices, openers, opening,
@@ -243,6 +243,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         front::card_restore,
         front::board_archived,
         front::card_diff,
+        card_elsewhere::card_elsewhere,
         columns::step_create,
         columns::step_update,
         columns::step_delete,

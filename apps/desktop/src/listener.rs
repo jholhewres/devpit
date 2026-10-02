@@ -295,6 +295,9 @@ fn heard(
     if let (Some(route), Event::Prompted) = (&route, &happening.event) {
         sink.card_prompted(&route.card_id);
     }
+    if let (Some(route), Some(path)) = (&route, written(&happening.event)) {
+        sink.card_touched(&route.card_id, path);
+    }
     if let (Some(route), Some(doing)) = (&route, doing) {
         let key = Key {
             card_id: route.card_id.clone(),
@@ -327,6 +330,18 @@ fn heard(
     settled
 }
 
+/// The file an event says its tool is about to edit or write.
+fn written(event: &Event) -> Option<&str> {
+    match event {
+        Event::Using {
+            touch:
+                Some(devpit_rpc::Touch::Edit { path, .. } | devpit_rpc::Touch::Write { path, .. }),
+            ..
+        } => Some(path),
+        _ => None,
+    }
+}
+
 /// A hook from a session with no pane — a run's turn, or a session a step
 /// started in the background — reaching the card that holds its id.
 ///
@@ -345,6 +360,9 @@ fn heard_without_pane(sink: &impl HookSink, happening: &Happening, seq: u64) -> 
     // A run is a step's: its card already sits where the step put it.
     if matches!(happening.event, Event::Prompted) && kind != SessionKind::Run {
         sink.card_prompted(&card_id);
+    }
+    if let Some(path) = written(&happening.event) {
+        sink.card_touched(&card_id, path);
     }
     let key = Key {
         card_id,
@@ -400,6 +418,8 @@ pub(crate) trait HookSink {
     /// A session of this card took a prompt: the card may move to work in
     /// progress. Nothing, where there is no board to move it on.
     fn card_prompted(&self, _card_id: &str) {}
+    /// A session of a card edited or wrote a file, perhaps outside its checkout.
+    fn card_touched(&self, _card_id: &str, _path: &str) {}
 }
 
 impl HookSink for AppHandle {
@@ -433,6 +453,11 @@ impl HookSink for AppHandle {
 
     fn tell_person(&self, session: &devpit_rpc::IslandSession, was: Option<devpit_rpc::Doing>) {
         crate::island_notify::changed(self, session, was);
+    }
+
+    fn card_touched(&self, card_id: &str, path: &str) {
+        let (card_id, path) = (card_id.to_owned(), path.to_owned());
+        std::thread::spawn(move || crate::card_elsewhere::touched(&card_id, &path));
     }
 
     fn card_prompted(&self, card_id: &str) {

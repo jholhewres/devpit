@@ -4,6 +4,7 @@ import { Attachments } from './Attachments'
 import { savesBeforeRestart } from './beforeRestart'
 import { CardDescription } from './CardDescription'
 import { CardDiff } from './CardDiff'
+import { CardElsewhere } from './CardElsewhere'
 import { CardLane, type LaneChoice } from './CardLane'
 import { CardPlay } from './CardPlay'
 import { CardSessions } from './CardSessions'
@@ -195,6 +196,7 @@ export function CardPane({
               {/* Only once the card has a checkout: there is nothing to
                   compare against until it has started somewhere. */}
               {detail.worktree?.exists && <CardDiff cardId={cardId} />}
+              <CardElsewhere cardId={cardId} />
 
               <Comments
                 comments={detail.comments}

@@ -1178,6 +1178,8 @@ export const commands = {
 	 *  from this one with every commit anyone lands on the base branch.
 	 */
 	cardDiff: (cardId: string) => typedError<Front, RpcError>(__TAURI_INVOKE("card_diff", { cardId })),
+	/**  `card.elsewhere` — the other repositories this card's sessions wrote in. */
+	cardElsewhere: (cardId: string) => typedError<Elsewhere[], RpcError>(__TAURI_INVOKE("card_elsewhere", { cardId })),
 	stepCreate: (projectId: string, kind: string, name: string, config: string, irreversible: boolean) => typedError<Board, RpcError>(__TAURI_INVOKE("step_create", { projectId, kind, name, config, irreversible })),
 	/**
 	 *  `step.update` — what a step does, changed where it already runs.
@@ -2226,6 +2228,26 @@ export type Doing =
 export type Drove = {
 	pane: string,
 	said: string,
+};
+
+/**
+ *  Another repository a card's sessions wrote in: what `Changes` cannot see,
+ *  because it reads only the card's own checkout.
+ */
+export type Elsewhere = {
+	/**  The repository's folder, whole. Local only. */
+	root: string,
+	/**  The project's name when devpit has it, the folder's otherwise. */
+	name: string,
+	projectId: string | null,
+	files: ElsewhereFile[],
+};
+
+export type ElsewhereFile = {
+	/**  Relative to the repository. */
+	path: string,
+	/**  Still differs from its last commit there. */
+	uncommitted: boolean,
 };
 
 /**
