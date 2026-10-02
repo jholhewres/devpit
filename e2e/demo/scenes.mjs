@@ -175,7 +175,7 @@ async function busy(context) {
       await closeSessionTerminal(window)
 
       await openProject(window, 'acme-api')
-      await showBoard(window, size.name === 'hero' ? 'inbox' : 'doing')
+      await showBoard(window, size.name === 'hero' ? 'inbox' : 'review')
       shoot('board', area, mode)
       await islandOpen(context, area)
       shoot('island', area, mode)
