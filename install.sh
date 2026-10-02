@@ -1,13 +1,14 @@
 #!/bin/sh
 # Installs the latest devpit release, or updates an installed one.
 #
-#     curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | sh
+#     curl -fsSL https://devpit.app/install.sh | sh
 #
 # What it does, in order, and nothing else:
 #
 #   1. asks GitHub which release is the latest, or takes DEVPIT_VERSION;
 #   2. downloads the one file that fits this machine, and SHA256SUMS;
-#   3. refuses to go on unless the file matches its checksum;
+#   3. refuses to go on unless the file matches its checksum, and, where
+#      minisign is installed, its signature by devpit's release key;
 #   4. installs it — the .deb through apt on Debian and Ubuntu, the AppImage
 #      into ~/.local/bin elsewhere on Linux, the .app into Applications on
 #      macOS.
@@ -29,6 +30,9 @@
 set -eu
 
 REPO="jholhewres/devpit"
+# The key every release is signed with: the updater's own (`pubkey` in
+# apps/desktop/tauri.conf.json, which a guard keeps this equal to).
+PUBKEY="RWQkWKDUdIb0t1UL0cbl8d7MLNvFlyj6Sq+Fb3CzQlQ772LUDqOjQdi+"
 
 say() { printf 'devpit: %s\n' "$*"; }
 fail() {
@@ -39,6 +43,16 @@ fail() {
 fetch() {
   # HTTPS only, and never a downgrade to anything older than TLS 1.2.
   curl --proto '=https' --tlsv1.2 -fsSL "$@"
+}
+
+# The big download shows its progress where someone is watching: a hundred
+# megabytes in silence reads as a hang.
+fetch_big() {
+  if [ -t 2 ]; then
+    curl --proto '=https' --tlsv1.2 -fL --progress-bar "$@"
+  else
+    fetch "$@"
+  fi
 }
 
 latest_version() {
@@ -94,10 +108,31 @@ choose() {
       asset="devpit.app.tar.gz"
       how=macos
       ;;
+    MINGW* | MSYS* | CYGWIN*)
+      fail "on Windows, run the installer: https://github.com/$REPO/releases/download/v$version/devpit_${version}_x64-setup.exe — or run this script inside WSL"
+      ;;
     *)
-      fail "no build for $os — devpit is released for Linux and macOS"
+      fail "no build for $os — devpit is released for Linux, macOS and Windows"
       ;;
   esac
+}
+
+# The signature, where minisign can check it. SHA256SUMS sits in the same
+# release as the file, so it catches a broken download but not a replaced
+# release; the signature is what only devpit's key can make.
+verify_signature() {
+  file=$1
+  if ! command -v minisign >/dev/null 2>&1; then
+    say "signature not checked: install minisign to check it as well"
+    return 0
+  fi
+  fetch -o "$file.sig.b64" "$base/$asset.sig" || fail "could not download the signature of $asset"
+  # The release keeps each signature base64-encoded, as the updater reads it.
+  { base64 -d <"$file.sig.b64" || openssl base64 -d -A <"$file.sig.b64"; } >"$file.minisig" 2>/dev/null ||
+    fail "could not read the signature of $asset"
+  minisign -Vq -P "$PUBKEY" -m "$file" -x "$file.minisig" >/dev/null 2>&1 ||
+    fail "$asset is not signed by devpit's release key — refusing to install it"
+  say "signature matches"
 }
 
 install_deb() {
@@ -116,6 +151,8 @@ install_deb() {
   if [ "$(id -u)" -eq 0 ]; then
     apt-get install -y "$file"
   else
+    command -v sudo >/dev/null 2>&1 ||
+      fail "the .deb needs root, and sudo is not here: run this as root, or with DEVPIT_FORMAT=appimage"
     say "installing through apt, which asks for your password"
     sudo apt-get install -y "$file"
   fi
@@ -220,8 +257,15 @@ main() {
     version=$(latest_version) || fail "could not find the latest release on GitHub"
   fi
   version=${version#v}
+  # It goes into a URL: digits and dots, and nothing else.
+  case "$version" in
+    "" | *[!0-9.]* | .* | *.) fail "'$version' is not a version: DEVPIT_VERSION takes one like 0.1.33" ;;
+  esac
 
   choose "$version"
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    say "in WSL devpit opens through WSLg: Windows 11, or Windows 10 with WSLg"
+  fi
 
   work=$(mktemp -d)
   # The folder goes on the way out, however that is. INT and TERM exit rather
@@ -233,7 +277,7 @@ main() {
 
   base="https://github.com/$REPO/releases/download/v$version"
   say "downloading $asset ($version)"
-  fetch -o "$work/$asset" "$base/$asset" || fail "could not download $base/$asset"
+  fetch_big -o "$work/$asset" "$base/$asset" || fail "could not download $base/$asset"
   fetch -o "$work/SHA256SUMS" "$base/SHA256SUMS" || fail "could not download the checksums for $version"
 
   expected=$(awk -v name="$asset" '$2 == name { print $1; exit }' "$work/SHA256SUMS")
@@ -241,6 +285,7 @@ main() {
   actual=$(sha256_of "$work/$asset")
   [ "$actual" = "$expected" ] || fail "$asset does not match its checksum — refusing to install it"
   say "checksum matches"
+  verify_signature "$work/$asset"
 
   if [ -n "${DEVPIT_DRY_RUN:-}" ]; then
     say "dry run: would install $asset as $how, and stop here"

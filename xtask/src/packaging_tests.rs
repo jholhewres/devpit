@@ -180,3 +180,19 @@ fn the_windows_config_builds_the_installer_it_promises() {
         .iter()
         .any(|what| what.contains("release overlay")));
 }
+
+/// The updater's key as tauri.conf.json carries it: a minisign key file,
+/// base64-encoded.
+const UPDATER_KEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI3RjQ4Njc0RDRBMDU4MjQKUldRa1dLRFVkSWIwdDFVTDBjYmw4ZDdNTE52Rmx5ajZTcStGYjNDelFsUTc3MkxVRHFPalFkaSsK";
+
+#[test]
+fn the_installer_checks_signatures_with_the_updaters_key() {
+    let installer = "REPO=x\nPUBKEY=\"RWQkWKDUdIb0t1UL0cbl8d7MLNvFlyj6Sq+Fb3CzQlQ772LUDqOjQdi+\"\n";
+    assert_eq!(installer_key_findings(UPDATER_KEY, installer), None);
+}
+
+#[test]
+fn an_installer_with_another_key_is_named() {
+    let installer = "PUBKEY=\"RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3\"\n";
+    assert!(installer_key_findings(UPDATER_KEY, installer).is_some());
+}

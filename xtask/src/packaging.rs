@@ -39,6 +39,7 @@ const OVERLAY: &str = "apps/desktop/tauri.release.conf.json";
 const WINDOWS: &str = "apps/desktop/tauri.windows.conf.json";
 const CAPABILITIES: &str = "apps/desktop/capabilities";
 const RELEASE: &str = ".github/workflows/release.yml";
+const INSTALLER: &str = "install.sh";
 
 pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
     let mut findings = Vec::new();
@@ -67,8 +68,17 @@ pub fn the_bundle_says_what_it_ships(root: &Path) -> Vec<Finding> {
             "createUpdaterArtifacts belongs to the release overlay".to_owned(),
         );
     }
-    if base.pointer("/plugins/updater/pubkey").is_none() {
-        refuse(BASE, "plugins.updater has no public key".to_owned());
+    match base
+        .pointer("/plugins/updater/pubkey")
+        .and_then(|key| key.as_str())
+    {
+        None => refuse(BASE, "plugins.updater has no public key".to_owned()),
+        Some(pubkey) => {
+            let installer = std::fs::read_to_string(root.join(INSTALLER)).unwrap_or_default();
+            if let Some(what) = installer_key_findings(pubkey, &installer) {
+                refuse(INSTALLER, what);
+            }
+        }
     }
 
     let overlay = json(root, OVERLAY);
@@ -218,6 +228,24 @@ fn capability_findings(capability: &serde_json::Value) -> Vec<String> {
 /// installer without the key (`make bundle-windows`), so the updater artifacts
 /// stay in the release overlay; the rest is what the README and the installer
 /// hooks promise.
+/// Whether `install.sh` checks signatures with the key the updater trusts:
+/// two copies of one key, and the day they part an install refuses every
+/// release, or trusts one the updater would not.
+fn installer_key_findings(pubkey: &str, installer: &str) -> Option<String> {
+    use base64::Engine as _;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(pubkey.trim())
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok());
+    // A minisign key file: a comment line, then the key itself.
+    let Some(key) = decoded.as_deref().and_then(|file| file.lines().nth(1)) else {
+        return Some("the updater's public key is not a minisign key file".to_owned());
+    };
+    let wanted = format!("PUBKEY=\"{}\"", key.trim());
+    (!installer.lines().any(|line| line.trim() == wanted))
+        .then(|| format!("install.sh does not check signatures with the updater's key: {wanted}"))
+}
+
 fn windows_findings(conf: &serde_json::Value) -> Vec<String> {
     let mut findings = Vec::new();
     let targets = conf.pointer("/bundle/targets").and_then(|t| t.as_array());
