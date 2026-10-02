@@ -137,8 +137,13 @@ jobs:
           # ibus-gtk3 so linuxdeploy's gtk plugin finds im-ibus.so and bundles
           # it: without it the AppImage's module list has no IBus, and dead
           # keys typed through IBus arrive doubled (see `input_method.rs`).
+          # The GStreamer plugins are what `bundleMediaFramework` copies in,
+          # and its linuxdeploy plugin needs patchelf to do it: the AppImage's
+          # own GStreamer refuses the system's newer plugins, and without
+          # them nothing records or plays a sound.
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
-            libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev ibus-gtk3
+            libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev ibus-gtk3 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-pulseaudio patchelf
 
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
