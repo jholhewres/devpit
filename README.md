@@ -167,16 +167,17 @@ toll gate.
 One line, on Linux or macOS, and it always takes the latest release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | sh
+curl -fsSL https://devpit.app/install.sh | sh
 ```
 
 It picks the file that fits the machine, **refuses to install anything that
-does not match the release's `SHA256SUMS`**, and puts it in place: the `.deb`
+does not match the release's `SHA256SUMS`** — or, where `minisign` is
+installed, is not signed by devpit's release key — and puts it in place: the `.deb`
 through apt on Debian and Ubuntu, the AppImage into `~/.local/bin` — with an
 entry and an icon in the application menu — on other Linux, and `devpit.app`
 into Applications on macOS. Read
 [`install.sh`](install.sh) before piping it into a shell — it is short on
-purpose. Run it again at any time to catch up; it says so when there is
+purpose, and the site serves this same file. Run it again at any time to catch up; it says so when there is
 nothing to do. On Windows, run the installer instead — see [Windows](#windows).
 
 Three settings, all optional: `DEVPIT_VERSION=0.1.7` installs that version,
@@ -248,7 +249,7 @@ outlive the window there, updates included.
 2. In the distribution's shell: `sudo apt install tmux wslu`, and Claude Code
    as its own install page says.
 3. The same line as on Linux, inside WSL:
-   `curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | sh`
+   `curl -fsSL https://devpit.app/install.sh | sh`
 4. Keep projects in the Linux file system (`~/…`), not under `/mnt/c`: git and
    the file watchers are many times slower across that border.
 
@@ -289,7 +290,7 @@ given the `.deb` again:
 
 ```sh
 sudo apt remove devpit
-curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | DEVPIT_FORMAT=appimage sh
+curl -fsSL https://devpit.app/install.sh | DEVPIT_FORMAT=appimage sh
 ```
 
 [releases]: https://github.com/jholhewres/devpit/releases/latest

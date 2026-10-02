@@ -241,7 +241,7 @@ do WSL e sobrevivem à janela lá, atualizações incluídas.
 2. No shell da distribuição: `sudo apt install tmux wslu`, e o Claude Code
    como diz a página de instalação dele.
 3. A mesma linha do Linux, dentro do WSL:
-   `curl -fsSL https://raw.githubusercontent.com/jholhewres/devpit/main/install.sh | sh`
+   `curl -fsSL https://devpit.app/install.sh | sh`
 4. Mantenha os projetos no sistema de arquivos do Linux (`~/…`), não em
    `/mnt/c`: git e os observadores de arquivo ficam muitas vezes mais lentos
    nessa fronteira.
