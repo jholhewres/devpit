@@ -35,6 +35,8 @@ export async function startDriver({
   // screen, and every window it opened died with "Failed to initialize GTK"
   // while the file sat out its ten minutes.
   headless = needsXvfb(),
+  // The virtual screen's size, for a caller that photographs it whole.
+  size = '1280x1024',
 } = {}) {
   // The native WebKitWebDriver listens next door, on port + 1 by default. Two
   // drivers on neighbouring ports take each other's native port, and the
@@ -60,7 +62,7 @@ export async function startDriver({
   // process's, and the app's stderr — which is the only place the hook trace
   // is written — stopped reaching the pipe this keeps it in. The log came back
   // empty and the trace test had nothing to measure.
-  const screen = headless ? await startScreen() : null
+  const screen = headless ? await startScreen(size) : null
   const bus = startBus()
   const inherited = { ...(Object.keys(env).length > 0 ? env : process.env) }
   // On a Wayland desktop GTK prefers the compositor to DISPLAY, and the
@@ -107,10 +109,10 @@ export async function startDriver({
  * Numbered rather than `xvfb-run -a`: two suites on one machine must not take
  * each other's display, and the lock file is what says a number is free.
  */
-async function startScreen() {
+async function startScreen(size) {
   for (let number = 99; number < 140; number += 1) {
     if (existsSync(`/tmp/.X${number}-lock`)) continue
-    const xvfb = spawn('Xvfb', [`:${number}`, '-screen', '0', '1280x1024x24', '-nolisten', 'tcp'], {
+    const xvfb = spawn('Xvfb', [`:${number}`, '-screen', '0', `${size}x24`, '-nolisten', 'tcp'], {
       stdio: 'ignore',
     })
     // Given a moment to claim the number, then asked whether it did: a display
