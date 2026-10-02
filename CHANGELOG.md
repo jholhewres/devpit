@@ -21,6 +21,14 @@ release notes are taken from here when a version is tagged.
   whisper.
 - An orchestrator's first screen says where its rules for sessions live.
 
+### devpit.app
+
+- **devpit lives at devpit.app.** Sign-in and error reports go there, and the
+  install line is `curl -fsSL https://devpit.app/install.sh | sh`. Installed
+  copies that still ask the old address keep working.
+- **The installer checks each release's signature** by devpit's key, where
+  `minisign` is installed, besides its checksum.
+
 ### Fixes
 
 - **A session that finished no longer shows as working.** Claude Code's own
