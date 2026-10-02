@@ -62,6 +62,11 @@ export function setSoundOn(on: boolean): void {
 }
 
 let context: AudioContext | null = null
+let resting: ReturnType<typeof setTimeout> | undefined
+
+/** How long after a cue ends the audio is let go: a context left running
+ *  keeps an audio thread awake for nothing. */
+export const REST_AFTER_MS = 1_500
 
 /** Plays a cue. Silent, never throwing, wherever audio is not there. */
 export function play(cue: Cue): void {
@@ -70,6 +75,10 @@ export function play(cue: Cue): void {
     if (context.state === 'suspended') void context.resume()
     const start = context.currentTime + 0.02
     const { wave, notes } = TUNES[cue]
+    const ends = Math.max(...notes.map((note) => note.at + note.lasts)) + 0.05
+    clearTimeout(resting)
+    const going = context
+    resting = setTimeout(() => void going.suspend().catch(() => undefined), ends * 1000 + REST_AFTER_MS)
     for (const note of notes) {
       const tone = context.createOscillator()
       const level = context.createGain()

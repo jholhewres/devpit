@@ -57,6 +57,21 @@ static SHAPE: Mutex<Shape> = Mutex::new(Shape {
     shown: false,
 });
 static POLLING: AtomicBool = AtomicBool::new(false);
+/// Rung when the island comes out of hiding, for a watch that sleeps while
+/// there is nothing to watch.
+static SHOWN: std::sync::Condvar = std::sync::Condvar::new();
+
+/// How long the watch waits between looks: often while the island is up and
+/// its eyes follow the cursor; slower while hidden, where outside Linux it
+/// only has the strip that wakes it to watch for; and not at all, on Linux,
+/// where that strip is the window's input shape and no look is needed.
+pub(crate) fn between_looks(shown: bool, linux: bool) -> Option<Duration> {
+    match (shown, linux) {
+        (true, _) => Some(Duration::from_millis(33)),
+        (false, false) => Some(Duration::from_millis(250)),
+        (false, true) => None,
+    }
+}
 
 /// Opens the island if the person wants it and the screen allows it, or
 /// closes it when they do not.
@@ -347,7 +362,15 @@ fn watch(app: tauri::AppHandle) {
                     let _ = window.set_ignore_cursor_events(!takes);
                 }
             }
-            std::thread::sleep(Duration::from_millis(if shown { 33 } else { 120 }));
+            match between_looks(shown, cfg!(target_os = "linux")) {
+                Some(wait) => std::thread::sleep(wait),
+                // Asleep until the island is shown again: no look, no wakeup.
+                None => {
+                    if let Ok(shape) = SHAPE.lock() {
+                        drop(SHOWN.wait_while(shape, |shape| !shape.shown));
+                    }
+                }
+            }
         }
     });
 }
@@ -446,6 +469,9 @@ pub async fn island_shape(
         shape.shown = shown;
         appeared
     });
+    if appeared {
+        SHOWN.notify_all();
+    }
     if let Some(window) = app.get_webview_window(ISLAND) {
         // Coming out of hiding, it comes out where devpit is now.
         if appeared {

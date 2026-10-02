@@ -66,3 +66,23 @@ fn a_chat_is_found_by_the_cli_session_it_keeps() {
     );
     assert_eq!(conversation_of(dir.path(), "s-9"), None);
 }
+
+/// Hidden, the watch costs nothing on Linux, where the strip that wakes the
+/// island is its input shape; elsewhere it looks four times a second for it.
+#[test]
+fn the_watch_sleeps_while_the_island_is_hidden() {
+    use std::time::Duration;
+    assert_eq!(
+        super::between_looks(true, true),
+        Some(Duration::from_millis(33))
+    );
+    assert_eq!(
+        super::between_looks(true, false),
+        Some(Duration::from_millis(33))
+    );
+    assert_eq!(
+        super::between_looks(false, false),
+        Some(Duration::from_millis(250))
+    );
+    assert_eq!(super::between_looks(false, true), None);
+}
