@@ -5,6 +5,7 @@ import { Code } from './Code'
 import { ofPath } from './languages'
 import { ask, commands } from './live'
 import { Markdown } from './MarkdownView'
+import { PdfView } from './PdfView'
 import { Picture } from './Picture'
 import type { Tab } from './strip'
 import { useFile } from './useFile'
@@ -115,11 +116,7 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
           <Picture key={`${path}:${edit.file.readAt}`} src={edit.file.dataUrl} name={name} size={edit.file.bytes} />
         )}
 
-        {kind === 'pdf' && edit.file?.dataUrl && (
-          <object className="media__pdf" data={edit.file.dataUrl} type="application/pdf">
-            <div className="exempty__t">This window cannot draw the PDF.</div>
-          </object>
-        )}
+        {kind === 'pdf' && edit.file?.dataUrl && <PdfView dataUrl={edit.file.dataUrl} fullPath={edit.file.fullPath} name={name} />}
 
         {kind === 'markdown' && preview && <Markdown source={edit.text} />}
 

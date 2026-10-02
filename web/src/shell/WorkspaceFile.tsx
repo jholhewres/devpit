@@ -5,6 +5,7 @@ import { Code } from './Code'
 import { ofPath } from './languages'
 import { ask, commands } from './live'
 import { Markdown } from './MarkdownView'
+import { PdfView } from './PdfView'
 import { Picture } from './Picture'
 import { useWorkspaceFile } from './useWorkspace'
 
@@ -73,11 +74,7 @@ export function WorkspaceFile({
           <Picture key={`${path}:${file.readAt}`} src={file.dataUrl} name={name} size={file.bytes} />
         )}
 
-        {kind === 'pdf' && file?.dataUrl && (
-          <object className="media__pdf" data={file.dataUrl} type="application/pdf">
-            <div className="exempty__t">This window cannot draw the PDF.</div>
-          </object>
-        )}
+        {kind === 'pdf' && file?.dataUrl && <PdfView dataUrl={file.dataUrl} fullPath={full} name={name} />}
 
         {kind === 'markdown' && !source && <Markdown source={file?.text ?? ''} />}
 
