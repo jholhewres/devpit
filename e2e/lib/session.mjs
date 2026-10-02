@@ -62,11 +62,15 @@ export async function startDriver({
   // empty and the trace test had nothing to measure.
   const screen = headless ? await startScreen() : null
   const bus = startBus()
+  const inherited = { ...(Object.keys(env).length > 0 ? env : process.env) }
+  // On a Wayland desktop GTK prefers the compositor to DISPLAY, and the
+  // "headless" window opened on the person's own screen instead of Xvfb.
+  if (screen) delete inherited.WAYLAND_DISPLAY
   const driver = spawn(binary, argv, {
     stdio: ['ignore', 'inherit', log ? 'pipe' : 'inherit'],
     env: {
-      ...(Object.keys(env).length > 0 ? env : process.env),
-      ...(screen ? { DISPLAY: screen.display } : {}),
+      ...inherited,
+      ...(screen ? { DISPLAY: screen.display, GDK_BACKEND: 'x11' } : {}),
       DBUS_SESSION_BUS_ADDRESS: bus.address,
     },
   })
