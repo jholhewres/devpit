@@ -195,7 +195,7 @@ pub async fn chat_send(
         None => relay.open(&conversation_id, on_frame),
     };
 
-    let (asked, opened) = crate::chat_turn::messages(&turn_id, &prompt, now());
+    let (asked, opened) = crate::chat_turn::messages(&turn_id, &prompt, now() * 1000.0);
     let answer_id = opened.id.clone();
     let _ = on_frame.send(Frame::Opened {
         message: asked.clone(),
@@ -228,7 +228,10 @@ pub async fn chat_send(
     let guard = state.begin(&conversation_id, &steering)?;
     let control = steering.hold(&conversation_id);
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
+    let noticed = (project_id.clone(), profile_id.clone());
     let said = tauri::async_runtime::spawn_blocking(move || {
+        let prompt =
+            crate::session_notice::with_notice(&noticed.0, &noticed.1, &prompt, now() * 1000.0);
         let hooks = crate::steps::hook_settings();
         let checkout = std::path::Path::new(&cwd);
         let mut before = None;

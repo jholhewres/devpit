@@ -31,3 +31,26 @@ fn a_note_is_appended_and_what_was_there_stays() {
     assert_eq!(lines.len(), 2);
     assert!(lines[0].ends_with("— first") && lines[1].ends_with("— second"));
 }
+
+#[test]
+fn the_rules_for_sessions_go_with_every_brief() {
+    let text = "# Preferences\n\n- likes small commits\n\n## Rules for sessions\n\n- Never push to main.\n- Write commit messages in English.\n\n## Other\n- not this\n";
+    assert_eq!(
+        super::rules_in(text).as_deref(),
+        Some("- Never push to main.\n- Write commit messages in English.")
+    );
+    assert_eq!(super::rules_in("# Preferences\n- nothing here\n"), None);
+    assert_eq!(super::rules_in("## Rules for sessions\n\n"), None);
+
+    let dir = tempfile::tempdir().expect("dir");
+    std::fs::create_dir_all(dir.path().join("context")).expect("context");
+    std::fs::write(dir.path().join("context/preferences.md"), text).expect("prefs");
+    let brief = super::briefed(dir.path(), "Fix the invoice total.");
+    assert_eq!(
+        brief,
+        "Fix the invoice total.\n\n## Rules for sessions\n\n- Never push to main.\n- Write commit messages in English."
+    );
+    // Too long already, it goes as it is rather than being refused.
+    let long = "x".repeat(7990);
+    assert_eq!(super::briefed(dir.path(), &long), long);
+}

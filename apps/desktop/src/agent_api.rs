@@ -307,7 +307,10 @@ fn respond_in(
                 app,
                 project,
                 orchestrating(here)?,
-                &text("prompt").unwrap_or_default(),
+                &crate::orchestrator_notes::briefed(
+                    Path::new(&here.root_path),
+                    &text("prompt").unwrap_or_default(),
+                ),
                 text("name").as_deref(),
             )
             .map_err(said)?
@@ -317,7 +320,10 @@ fn respond_in(
             &board,
             orchestrating(here)?,
             &card_id,
-            &text("prompt").unwrap_or_default(),
+            &crate::orchestrator_notes::briefed(
+                Path::new(&here.root_path),
+                &text("prompt").unwrap_or_default(),
+            ),
             text("name").as_deref(),
             // Its own checkout unless told otherwise: the project's folder is
             // shared with whatever else runs there.

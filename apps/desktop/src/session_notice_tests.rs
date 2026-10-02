@@ -1,0 +1,50 @@
+use devpit_rpc::{LiveSession, PendingPrompt};
+use serde_json::json;
+
+use super::{notice, Seen};
+
+fn session(name: &str, status: &str, since: f64, waiting: bool) -> LiveSession {
+    let mut one: LiveSession = serde_json::from_value(json!({
+        "name": name, "pid": 1, "job": null, "status": status, "kind": "interactive", "cwd": "/w",
+        "projectId": "prj_a", "projectName": "a", "cardId": null, "since": since, "inDevpit": true,
+        "waiting": null, "pane": null, "sessionId": null, "step": null, "draft": null,
+    }))
+    .expect("a session");
+    if waiting {
+        one.waiting = Some(PendingPrompt {
+            question: "Allow?".into(),
+            options: Vec::new(),
+            cursor: 0,
+        });
+    }
+    one
+}
+
+#[test]
+fn the_first_turn_says_nothing_and_a_quiet_one_nothing_new() {
+    let now = [session("api", "busy", 10.0, false)];
+    assert_eq!(notice(None, &now), None);
+    assert_eq!(notice(Some(&Seen::of(&now, 20.0)), &now), None);
+}
+
+#[test]
+fn what_finished_asks_or_ended_since_the_last_turn_is_said() {
+    let before = Seen::of(
+        &[
+            session("api", "busy", 10.0, false),
+            session("web", "busy", 10.0, false),
+            session("old", "idle", 5.0, false),
+        ],
+        20.0,
+    );
+    let now = [
+        session("api", "idle", 30.0, false),
+        session("web", "busy", 10.0, true),
+        session("quick", "idle", 25.0, false),
+        session("stale", "idle", 15.0, false),
+    ];
+    assert_eq!(
+        notice(Some(&before), &now).as_deref(),
+        Some("[devpit, not the person] Since your last message: api finished its turn; web is waiting on a question; quick finished its turn; old ended.")
+    );
+}

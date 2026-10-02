@@ -54,6 +54,47 @@ pub(crate) fn note(folder: &Path, log: &str, text: &str) -> Result<String, Strin
     Ok(line)
 }
 
+/// The heading in `context/preferences.md` whose lines go with every brief.
+const RULES: &str = "## rules for sessions";
+
+/// The person's standing rules for every session the orchestrator starts:
+/// the section under `## Rules for sessions` in its preferences, up to the
+/// next heading of the same level. Nothing, when there is none.
+pub(crate) fn rules(folder: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(log_file(folder, "preferences")?).ok()?;
+    rules_in(&text)
+}
+
+pub(crate) fn rules_in(text: &str) -> Option<String> {
+    let mut lines = text
+        .lines()
+        .skip_while(|line| line.trim().to_lowercase() != RULES);
+    lines.next()?;
+    let body: Vec<&str> = lines
+        .take_while(|line| !line.starts_with("## ") && !line.starts_with("# "))
+        .collect();
+    let body = body.join("\n");
+    let body = body.trim();
+    (!body.is_empty()).then(|| body.chars().take(LONGEST).collect())
+}
+
+/// The longest brief a session is started with, rules included.
+const LONGEST_BRIEF: usize = 8000;
+
+/// A session's brief, with the person's standing rules after it — cut to
+/// what still fits, so the rules never make a brief too long to start.
+pub(crate) fn briefed(folder: &Path, prompt: &str) -> String {
+    let prompt_chars = prompt.trim_end().chars().count();
+    match rules(folder) {
+        Some(rules) if !prompt.trim().is_empty() && prompt_chars + 64 < LONGEST_BRIEF => {
+            let room = LONGEST_BRIEF - prompt_chars - 64;
+            let rules: String = rules.chars().take(room).collect();
+            format!("{}\n\n## Rules for sessions\n\n{rules}", prompt.trim_end())
+        }
+        _ => prompt.to_owned(),
+    }
+}
+
 #[cfg(test)]
 #[path = "orchestrator_notes_tests.rs"]
 mod tests;

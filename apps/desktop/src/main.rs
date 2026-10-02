@@ -139,6 +139,7 @@ mod run_from;
 mod runs;
 mod saves;
 mod search;
+mod session_notice;
 mod session_search;
 mod session_told;
 mod session_window;
