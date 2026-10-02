@@ -40,6 +40,11 @@ current directory. devpit must be open.
                                     a step starts work, and only a person moves
                                     cards there
   devpit agent methods              what this devpit answers
+  devpit agent hook --agent NAME EVENT [--session ID] [--tool T] [--target X] [--said TEXT]
+                                    an agent that is not Claude Code reporting
+                                    what it does: SessionStart, UserPromptSubmit,
+                                    PreToolUse, PostToolUse, Stop, SessionEnd…
+                                    (docs/agents.md). JSON piped in is the base.
 
 The project's artifacts are files kept for it outside its repository:
 devpit_artifacts, devpit_artifact_save, devpit_artifact_restore and

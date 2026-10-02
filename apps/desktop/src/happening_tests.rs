@@ -85,3 +85,42 @@ fn a_pane_learns_nothing_from_half_a_session() {
     assert!(session_said("leaf_1", &heard(None, "abc")).is_none());
     assert!(session_said("leaf_1", &heard(Some("/t.jsonl"), "")).is_none());
 }
+
+/// An agent that is not Claude Code reports through `devpit agent hook`, and
+/// what it sends reads as any hook does: a step with its target, a turn's end
+/// with what it said.
+#[test]
+fn another_agents_events_read_as_claude_codes() {
+    use devpit_agentapi::events::{parsed, payload};
+    use devpit_agentcli::{read_hook, Event};
+
+    let using = parsed(
+        &[
+            ("agent", "aider"),
+            ("session", "aider-7"),
+            ("tool", "Edit"),
+            ("target", "src/app.rs"),
+        ],
+        &["PreToolUse"],
+    )
+    .expect("call");
+    let heard = read_hook(&payload(&using, &serde_json::Value::Null, "/w/app")).expect("read");
+    assert_eq!(heard.session_id, "aider-7");
+    assert_eq!(heard.cwd, "/w/app");
+    assert!(
+        matches!(heard.event, Event::Using { ref tool, ref target, .. } if tool == "Edit" && target.as_deref() == Some("app.rs"))
+    );
+
+    let stop = parsed(
+        &[("agent", "aider"), ("session", "aider-7"), ("said", "Done")],
+        &["Stop"],
+    )
+    .expect("call");
+    let heard = read_hook(&payload(&stop, &serde_json::Value::Null, "/w/app")).expect("read");
+    assert_eq!(
+        heard.event,
+        Event::Stopped {
+            said: Some("Done".to_owned())
+        }
+    );
+}

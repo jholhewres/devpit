@@ -13,6 +13,7 @@
 pub mod apps;
 pub mod cli;
 pub mod client;
+pub mod events;
 pub mod guide;
 pub mod hook;
 pub mod mcp;

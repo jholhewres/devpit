@@ -14,6 +14,18 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
             print!("{}", guide::GUIDE);
             0
         }
+        // A report from any agent: never fails the agent that sent it.
+        Ok(Parsed::Hook(call)) => {
+            let body = crate::events::payload(&call, &stdin_json(), &cwd.display().to_string());
+            let pane = std::env::var(crate::hook::PANE_ENV).unwrap_or_default();
+            let _ = crate::hook::post(
+                root,
+                body.as_bytes(),
+                &pane,
+                std::time::Duration::from_millis(1500),
+            );
+            0
+        }
         Ok(Parsed::Ask(method, params)) => match client::ask(root, &method, params, &cwd) {
             Ok(answer) => {
                 println!(
@@ -38,6 +50,27 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
 pub(crate) enum Parsed {
     Guide,
     Ask(String, Value),
+    /// `devpit agent hook --agent NAME EVENT …`: an event from an agent that
+    /// is not Claude Code, in the shape devpit reads.
+    Hook(crate::events::Call),
+}
+
+/// The JSON an agent piped in, when it piped any: an object, or nothing.
+fn stdin_json() -> Value {
+    use std::io::{IsTerminal, Read};
+    let stdin = std::io::stdin();
+    if stdin.is_terminal() {
+        return Value::Null;
+    }
+    let mut text = String::new();
+    let _ = stdin
+        .lock()
+        .take(crate::events::MOST_BYTES)
+        .read_to_string(&mut text);
+    serde_json::from_str::<Value>(&text)
+        .ok()
+        .filter(Value::is_object)
+        .unwrap_or(Value::Null)
 }
 
 /// The method and its parameters, from the words after `devpit agent`.
@@ -83,6 +116,7 @@ pub(crate) fn parsed(args: &[String]) -> Result<Parsed, String> {
             );
             ask("update", Value::Object(params))
         }
+        Some("hook") => crate::events::parsed(&options, &plain).map(Parsed::Hook),
         Some("move") => {
             let id = one(&plain, "a card id")?;
             let column = plain.get(1).ok_or("move needs a column id")?;
