@@ -48,6 +48,8 @@ release notes are taken from here when a version is tagged.
   Settings → General → Remote: the machine serves its own viewer to your
   tailnet. Terminals are watched, and typed into when you allow it. The
   board's cards move. Agents' questions are answered. Chats are read.
+- **Terminals are not watched from Windows yet**: a remote viewer attaches
+  through a grouped session, which psmux does not have.
 - **Nothing listens beyond the machine and your tailnet.** The viewer
   answers on loopback, published by `tailscale serve` with HTTPS, or on the
   machine's tailnet address when the tailnet has no HTTPS. Never on every
@@ -143,8 +145,8 @@ release notes are taken from here when a version is tagged.
 
 - **Ask to be reminded, and be told at that time.** A card's date can carry
   a time now; a day alone reminds that morning at nine. When it comes, a
-  banner under the top bar says so — it has no close, only *Later* (15
-  minutes, an hour, tomorrow morning) and *Done* — with a system
+  banner under the top bar says so — it has no close, only *15 min*, *1 hour*,
+  *Tomorrow* (at nine) and *Done* — with a system
   notification when devpit is behind, and a line in the bell. A focus does
   not hold it back: the time was your own choice.
 - **The orchestrator, or any session, can set one** when you ask —
@@ -566,7 +568,8 @@ release notes are taken from here when a version is tagged.
   longer lists them.
 - **An orchestrator opens with its history begun**: its folder is committed when
   it is made, and devpit's own files are kept out of it, instead of opening on
-  a list of untracked files.
+  a list of untracked files. *(Since 0.1.19 the folder is not a git
+  repository.)*
 - The project picker says "1 worktree", not "1 worktrees".
 
 ## 0.1.15 — 2026-09-24
@@ -579,7 +582,9 @@ release notes are taken from here when a version is tagged.
   its own under `~/.devpit/orchestrator/<account>/<name>/` — a git repository
   with a brief, `docs/`, `artifacts/` and `context/` — and a chat that opens on
   its last conversation. Right-click reveals its folder or removes it; the
-  folder is kept. It is not listed among the projects.
+  folder is kept. It is not listed among the projects. *(Since 0.1.16 the
+  folder is `~/.devpit/orchestrator/<name>/`, and since 0.1.19 it is not a git
+  repository.)*
 - **An orchestrator keeps listening between your messages.** Its process
   stays, so a session's reply — or the notice it asked for when one went idle
   — wakes it, and what it says appears in its chat, marked as not in answer to
