@@ -39,8 +39,21 @@ fn read_kept(file: &Path) -> Kept {
         .unwrap_or_default()
 }
 
+/// `path` with its links resolved as far as it exists: a file not written
+/// yet still lands under the same real folder its checkout does (`/var` is
+/// `/private/var` on a Mac).
 fn resolved(path: &Path) -> PathBuf {
-    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    for there in path.ancestors() {
+        if let Ok(real) = std::fs::canonicalize(there) {
+            let rest = path.strip_prefix(there).unwrap_or(Path::new(""));
+            return if rest.as_os_str().is_empty() {
+                real
+            } else {
+                real.join(rest)
+            };
+        }
+    }
+    path.to_path_buf()
 }
 
 /// The repository a file is in: the nearest folder above it holding `.git`.
@@ -57,7 +70,7 @@ pub(crate) fn note(kept: &mut Kept, home: &Path, path: &Path) -> bool {
     if !path.is_absolute() {
         return false;
     }
-    let file = resolved(path.parent().unwrap_or(path)).join(path.file_name().unwrap_or_default());
+    let file = resolved(path);
     if file.starts_with(resolved(home)) {
         return false;
     }

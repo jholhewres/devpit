@@ -67,6 +67,7 @@ vi.mock('./live', async (actual) => ({
 answerBeforeRestart()
 /* The sections below the description have their own tests and their own commands. */
 vi.mock('./CardPlay', () => ({ CardPlay: () => null }))
+vi.mock('./CardElsewhere', () => ({ CardElsewhere: () => null }))
 vi.mock('./CardWork', () => ({ CardWork: () => null }))
 vi.mock('./CardSessions', () => ({ CardSessions: () => null }))
 vi.mock('./CardDiff', () => ({ CardDiff: () => null }))
