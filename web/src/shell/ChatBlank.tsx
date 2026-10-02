@@ -6,6 +6,7 @@ export const ORCHESTRATOR_TRIES = [
   'Where does every project stand?',
   'Which sessions are working, and on what?',
   'Plan this across projects:',
+  'Add a rule for every session you start:',
 ] as const
 
 /* An empty conversation: the question it is for. An orchestrator's is its own
@@ -25,6 +26,9 @@ export function ChatBlank({ project, account, onTry }: { project: Project | null
             <h2 className="chat__q">What should we orchestrate?</h2>
             <p className="chat__sub">
               Every project and every session of <code>{account ?? project?.orchestrator}</code> is in reach. Ask where things stand, plan across projects, or hand work to a session — you still approve what they do.
+            </p>
+            <p className="chat__sub">
+              Rules every session it starts must keep live under <i>Rules for sessions</i> in its <code>context/preferences.md</code>, and go with every brief. Ask it to add one.
             </p>
             <div className="chat__tries">
               {ORCHESTRATOR_TRIES.map((one) => (
