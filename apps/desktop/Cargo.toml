@@ -38,7 +38,7 @@ specta-typescript = "0.0.12"
 # refuses an app that touches private API — devpit ships its own dmg, deb and
 # AppImage, so there is nothing to lose. The main window already asked for
 # transparency in tauri.conf.json; this is what honours it.
-tauri = { version = "2", features = ["unstable", "macos-private-api"] }
+tauri = { version = "2", features = ["unstable", "macos-private-api", "tray-icon"] }
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
 ulid = "3.0.0"
@@ -55,6 +55,9 @@ tauri-plugin-dialog = "2.7.3"
 tauri-plugin-updater = "2.11.0"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2.3.4"
+tauri-plugin-autostart = "2.5.1"
+tauri-plugin-global-shortcut = "2.3.1"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

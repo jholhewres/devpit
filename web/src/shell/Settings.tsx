@@ -5,6 +5,7 @@ import { ask, commands } from './live'
 import { inOrder } from './inOrder'
 import { PrefsSide } from './PrefsSide'
 import { PrefSwitch } from './PrefSwitch'
+import { DeskSettings } from './DeskSettings'
 import { ErrorReportsPreview } from './ErrorReportsPreview'
 import { OpenApps } from './OpenApps'
 import { ProjectRows } from './ProjectRows'
@@ -124,6 +125,7 @@ export function Settings({
             <PrefSwitch on={on('focusMode')} onFlip={() => set('focusMode', !on('focusMode'))} title="Focus mode" said="Unfinished. A door for one project: what arrives from another waits until you come out." />
             <PrefSwitch on={on('errorReports')} onFlip={() => set('errorReports', !on('errorReports'))} title="Error reports" said={<>Send devpit&rsquo;s own errors, without paths or your work, anonymously and only while devpit sits idle. Turning it off deletes what was kept.</>} />
             {on('errorReports') && <ErrorReportsPreview />}
+            <DeskSettings />
             <OpenApps />
             <UpdateSettings />
           </section>

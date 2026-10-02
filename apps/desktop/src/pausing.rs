@@ -92,13 +92,29 @@ pub async fn pause_set(
             }
             (false, None) => OFF,
         };
-        UNTIL.store(until, Ordering::Relaxed);
-        Store::open_default()?.set_preference(preference::PAUSED_UNTIL, &until.to_string())?;
-        let now = said(until);
-        let _ = app.emit(CHANGED, now);
-        Ok(now)
+        set(&app, until)
     })
     .await
+}
+
+/// Pauses until `until`, or resumes at `0`, and tells every window.
+pub(crate) fn set(app: &AppHandle, until: i64) -> Result<Paused, RpcError> {
+    UNTIL.store(until, Ordering::Relaxed);
+    Store::open_default()?.set_preference(preference::PAUSED_UNTIL, &until.to_string())?;
+    let now = said(until);
+    let _ = app.emit(CHANGED, now);
+    crate::desk::tray_refresh(app);
+    Ok(now)
+}
+
+/// Paused for an hour from now: the tray's one choice.
+pub(crate) fn for_an_hour(app: &AppHandle) {
+    let _ = set(app, now() + 3600);
+}
+
+/// Resumed.
+pub(crate) fn resume(app: &AppHandle) {
+    let _ = set(app, OFF);
 }
 
 #[cfg(test)]

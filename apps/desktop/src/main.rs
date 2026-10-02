@@ -31,6 +31,7 @@ mod cloning;
 mod columns;
 mod commands;
 mod delegations;
+mod desk;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod frame_gtk;
 mod handing;
@@ -203,8 +204,22 @@ fn main() {
     // reach the webview as raw bytes rather than JSON. specta cannot describe
     // that enum, so its wrapper is hand-written. Everything else about a
     // session — ensure, split, write, resize — is in the generated contract.
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    // First of all, so a second launch hands over before it starts anything:
+    // its own listener and door would write over this one's endpoint and
+    // secret, and every session's hooks would post to a dead port.
+    if desk::one_copy() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            desk::forward(app);
+        }));
+    }
+    builder
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         // The terminal's copy and paste. The webview's own clipboard is not
         // reachable from a terminal on WebKitGTK, and it cannot read a picture.
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -314,6 +329,9 @@ fn main() {
             if let Ok(store) = devpit_core::Store::open_default() {
                 pausing::restore(&store);
             }
+            // In the tray, and the shortcut that brings it forward, if one was chosen.
+            desk::tray(app.handle());
+            desk::shortcut_restore(app.handle());
             // A card's date goes off at its time, whatever project it is in.
             reminders::watch(app.handle().clone());
             // devpit's half of each orchestrator's brief, as this build has it.

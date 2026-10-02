@@ -324,6 +324,14 @@ export const commands = {
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
 	/**  `pause.read` — whether devpit is paused, and until when. */
 	pauseRead: () => __TAURI_INVOKE<Paused>("pause_read"),
+	/**  `shortcut.read` — the keys that bring devpit forward, if any. */
+	shortcutRead: () => typedError<string | null, RpcError>(__TAURI_INVOKE("shortcut_read")),
+	/**  `shortcut.set` — the keys that bring devpit forward, or none. */
+	shortcutSet: (keys: string | null) => typedError<string | null, RpcError>(__TAURI_INVOKE("shortcut_set", { keys })),
+	/**  `at_login.read` — whether devpit opens when the person logs in. */
+	atLoginRead: () => typedError<boolean, RpcError>(__TAURI_INVOKE("at_login_read")),
+	/**  `at_login.set` — opens devpit at login, or stops. */
+	atLoginSet: (on: boolean) => typedError<boolean, RpcError>(__TAURI_INVOKE("at_login_set", { on })),
 	/**
 	 *  `pause.set` — pauses until `until` (seconds since the epoch), until
 	 *  resumed when `forever`, or resumes when neither.

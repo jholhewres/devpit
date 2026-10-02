@@ -57,6 +57,30 @@ static SHAPE: Mutex<Shape> = Mutex::new(Shape {
     shown: false,
 });
 static POLLING: AtomicBool = AtomicBool::new(false);
+/// How many looks apart the screens are compared: about two seconds.
+const SCREENS_EVERY: u32 = 60;
+
+/// The screens as they are now, in one line: names, places, sizes, scales.
+fn screens_of(window: &tauri::WebviewWindow) -> String {
+    window
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|one| {
+            format!(
+                "{}@{},{} {}x{} {}",
+                one.name().map(String::as_str).unwrap_or(""),
+                one.position().x,
+                one.position().y,
+                one.size().width,
+                one.size().height,
+                one.scale_factor()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 /// Rung when the island comes out of hiding, for a watch that sleeps while
 /// there is nothing to watch.
 static SHOWN: std::sync::Condvar = std::sync::Condvar::new();
@@ -332,11 +356,24 @@ fn watch(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         let mut last = (f64::NAN, f64::NAN);
         let mut took = false;
+        let mut screens = String::new();
+        let mut looks = 0u32;
         loop {
             let Some(window) = app.get_webview_window(ISLAND) else {
                 POLLING.store(false, Ordering::SeqCst);
                 return;
             };
+            // A screen plugged in, taken away or rescaled: the island goes
+            // back to where it belongs, rather than off the edge of one that
+            // left. Looked at every couple of seconds while it is up.
+            looks = looks.wrapping_add(1);
+            if looks.is_multiple_of(SCREENS_EVERY) && SHAPE.lock().is_ok_and(|shape| shape.shown) {
+                let now = screens_of(&window);
+                if !screens.is_empty() && now != screens {
+                    placed(&window);
+                }
+                screens = now;
+            }
             let (shown, rect) = SHAPE
                 .lock()
                 .map(|shape| (shape.shown, taking(shape.rect, shape.shown)))
@@ -501,7 +538,7 @@ pub async fn island_open_pane(
 }
 
 /// Brings devpit's window to the front from a click on the island.
-fn raised(app: &tauri::AppHandle) -> Result<(), RpcError> {
+pub(crate) fn raised(app: &tauri::AppHandle) -> Result<(), RpcError> {
     let main = app
         .get_webview_window("main")
         .ok_or_else(|| RpcError::internal("there is no main window".to_owned()))?;

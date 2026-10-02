@@ -36,6 +36,9 @@ pub const FILES_WIDTH: &str = "layout.files_width";
 pub const HEADS_DOWN: &str = "focus.heads_down";
 /// Whether the focus mode is offered. Off unless it is turned on.
 pub const FOCUS_MODE: &str = "focus.enabled";
+/// The keys that bring devpit forward from anywhere, as the shortcut
+/// plugin spells them (`CommandOrControl+Shift+D`). Absent is none.
+pub const SHORTCUT: &str = "general.shortcut";
 /// The moment a pause ends, in seconds since the epoch; `0` is none.
 pub const PAUSED_UNTIL: &str = "focus.paused_until";
 /// Whether a card's date goes off as a reminder at its time. On unless
