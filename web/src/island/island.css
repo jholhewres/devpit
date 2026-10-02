@@ -591,3 +591,10 @@
 .isl-ask__esc { font-family: var(--mono); font-size: 11px; }
 .isl-ask__said { margin: 6px 0 0; color: var(--isl-dim); font-size: 11.5px; }
 .isl-peek__plan { padding: 10px 14px; font-family: var(--ui); font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
+
+/* Another session asking while one is open: a badge, never the view. */
+.isl-head__calls { flex: none; padding: 2px 8px; border: 0; border-radius: 999px; background: var(--isl-calls); color: #111; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.isl-row__badge { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--isl-calls); color: #111; font-size: 11px; font-weight: 700; }
+/* The fold coming: a bar that runs out over the last seconds. */
+.isl-closing { position: absolute; left: 50%; bottom: 3px; height: 2px; width: var(--from, 100%); max-width: 160px; transform: translateX(-50%); border-radius: 2px; background: rgba(255, 255, 255, 0.35); animation-name: isl-closing; animation-timing-function: linear; animation-fill-mode: forwards; pointer-events: none; }
+@keyframes isl-closing { to { width: 0; } }

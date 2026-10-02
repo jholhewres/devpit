@@ -19,8 +19,14 @@ import './island.css'
  */
 
 export function IslandWindow(): React.JSX.Element {
-  const { island, sessions, questions, chosen, nudge, choose, answer, now, sound, setSound } = useIsland()
-  const question = questions[0] ?? null
+  const { island, sessions, questions, chosen, nudge, choose, answer, now, sound, setSound, closesAt } = useIsland()
+  /* While a session is open, only its own question takes the view: another
+     session asking waits as a badge, so the one being read is not pulled
+     away. With none open, the first question is the view. */
+  const reading = chosen?.sessionId ?? null
+  const question = (reading ? questions.find((one) => one.sessionId === reading) : questions[0]) ?? null
+  const elsewhere = reading ? questions.filter((one) => one.sessionId !== reading).length : 0
+  const askingIn = new Set(questions.map((one) => one.sessionId))
   const view: View = question ? 'asking' : chosen ? 'session' : 'overview'
   const size = sizeOf(island.mode, view, sessions.length)
   const mood = moodOfAll(sessions, questions, now)
@@ -102,6 +108,7 @@ export function IslandWindow(): React.JSX.Element {
         onClick={() => !drag.wasDrag() && island.mode === 'compact' && nudge({ kind: 'open' })}
       >
         {dropNote && <div className="isl-dropnote">{dropNote}</div>}
+        {island.mode === 'expanded' && <Closing at={closesAt} />}
         {island.mode === 'compact' && <Capsule sessions={sessions} questions={questions} mood={mood} now={now} />}
         {island.mode === 'expanded' && (
           <div className="isl-open" data-view={view}>
@@ -129,6 +136,7 @@ export function IslandWindow(): React.JSX.Element {
                   sub={whereOf(chosen, now)}
                   color={chosen.color}
                   onBack={() => choose(null)}
+                  waiting={elsewhere}
                   pinned={island.pinned}
                   onPin={pin}
                   onFold={fold}
@@ -141,12 +149,38 @@ export function IslandWindow(): React.JSX.Element {
             {view === 'overview' && (
               <>
                 <Head mood={mood} title={headline(sessions, questions)} sub={across} pinned={island.pinned} onPin={pin} onFold={fold} sound={sound} onSound={() => setSound(!sound)} />
-                <Rows sessions={sessions} now={now} onChoose={(session) => choose(session.sessionId)} />
+                <Rows sessions={sessions} now={now} asking={askingIn} onChoose={(session) => choose(session.sessionId)} />
               </>
             )}
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+/** How long before the island folds the bar shows it coming. */
+export const CLOSING_SHOWN_MS = 10_000
+
+/* A thin bar that runs out as the island is about to fold on its own, so the
+   fold is never a surprise. Gone while the cursor is on it or it is pinned —
+   there is no fold coming then. */
+function Closing({ at }: { at: number | null }): React.JSX.Element | null {
+  const [, again] = useState(0)
+  const left = at === null ? null : at - Date.now()
+  /* Asked to draw once more when the last stretch begins. */
+  useEffect(() => {
+    if (left === null || left <= CLOSING_SHOWN_MS) return
+    const wait = window.setTimeout(() => again((n) => n + 1), left - CLOSING_SHOWN_MS)
+    return () => window.clearTimeout(wait)
+  }, [left])
+  if (left === null || left <= 0 || left > CLOSING_SHOWN_MS) return null
+  return (
+    <div
+      key={at}
+      className="isl-closing"
+      aria-hidden
+      style={{ '--from': `${(left / CLOSING_SHOWN_MS) * 100}%`, animationDuration: `${left}ms` } as React.CSSProperties}
+    />
   )
 }

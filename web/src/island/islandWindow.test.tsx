@@ -96,6 +96,52 @@ describe('the island window', () => {
     expect(document.querySelector('.isl-open')?.getAttribute('data-view')).toBe('overview')
   })
 
+  it('keeps the session being read when another one asks, and badges that one', async () => {
+    render(<IslandWindow />)
+    await act(async () => {})
+    say('island:session', changed(session()))
+    say('island:session', changed(session({ sessionId: 's2', paneId: 'leaf_2', project: 'web', steps: [] })))
+    fireEvent.click(shape())
+    fireEvent.click(screen.getByText('api'))
+    expect(document.querySelector('.isl-open')?.getAttribute('data-view')).toBe('session')
+
+    say('island:asked', { id: 'ask_9', sessionId: 's2', paneId: 'leaf_2', project: 'web', tool: 'Bash', input: '{"command":"npm publish"}', keepable: false })
+    // Still on the session being read, with the other's question as a badge.
+    expect(document.querySelector('.isl-open')?.getAttribute('data-view')).toBe('session')
+    expect(screen.queryByText('Run npm publish')).toBeNull()
+    fireEvent.click(screen.getByText('1 waiting'))
+    expect(screen.getByText('Run npm publish')).toBeTruthy()
+  })
+
+  it('a question from the session being read does take the view', async () => {
+    render(<IslandWindow />)
+    await act(async () => {})
+    say('island:session', changed(session()))
+    fireEvent.click(shape())
+    fireEvent.click(screen.getByText('api'))
+    say('island:asked', { id: 'ask_8', sessionId: 's1', paneId: 'leaf_1', project: 'api', tool: 'Bash', input: '{"command":"ls"}', keepable: false })
+    expect(screen.getByText('Run ls')).toBeTruthy()
+  })
+
+  it('shows the fold coming in its last seconds, and not while pinned', async () => {
+    vi.useFakeTimers()
+    try {
+      render(<IslandWindow />)
+      await act(async () => {})
+      say('island:session', changed(session({ state: 'waiting', steps: [] })))
+      expect(shape().dataset.mode).toBe('expanded')
+      expect(document.querySelector('.isl-closing')).toBeNull()
+      await act(async () => {
+        vi.advanceTimersByTime(6_000)
+      })
+      expect(document.querySelector('.isl-closing')).not.toBeNull()
+      fireEvent.click(screen.getByLabelText('Keep it open'))
+      expect(document.querySelector('.isl-closing')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('folds back to the capsule from the fold button, and pins open', async () => {
     render(<IslandWindow />)
     await act(async () => {})

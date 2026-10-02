@@ -83,10 +83,13 @@ export function Capsule({
 export function Rows({
   sessions,
   now,
+  asking,
   onChoose,
 }: {
   sessions: readonly IslandSession[]
   now: number
+  /** The sessions with a question waiting on the person. */
+  asking?: ReadonlySet<string>
   onChoose: (session: IslandSession) => void
 }): React.JSX.Element {
   const labels = labelled(sessions)
@@ -106,6 +109,11 @@ export function Rows({
             <span className="isl-row__name">{labels.get(session.sessionId) ?? nameOf(session)}</span>
             <span className="isl-row__now">{nowWords(session, now)}</span>
           </span>
+          {asking?.has(session.sessionId) && (
+            <span className="isl-row__badge" title="Asks you something">
+              !
+            </span>
+          )}
           <span className="isl-row__state" data-state={session.state}>
             {STATE_WORD[session.state]}
           </span>
@@ -187,12 +195,15 @@ export function Head({
   onFold,
   sound,
   onSound,
+  waiting = 0,
 }: {
   mood: Mood
   title: string
   sub: string
   color?: string | null
   onBack?: () => void
+  /** Questions from other sessions, kept as a badge rather than the view. */
+  waiting?: number
   pinned: boolean
   onPin: () => void
   onFold: () => void
@@ -211,6 +222,11 @@ export function Head({
         <span className="isl-head__title">{title}</span>
         <span className="isl-head__sub">{sub}</span>
       </span>
+      {waiting > 0 && onBack && (
+        <button className="isl-head__calls" onClick={onBack} title="Another session asks you something">
+          {waiting} waiting
+        </button>
+      )}
       <button className="isl-icon" onClick={onSound} aria-label={sound ? 'Mute the island' : 'Let it make sounds'} title={sound ? 'Sounds on' : 'Sounds off'}>
         {sound ? (
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /></svg>

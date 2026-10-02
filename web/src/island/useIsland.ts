@@ -28,6 +28,8 @@ export interface IslandState {
   readonly now: number
   readonly sound: boolean
   readonly setSound: (on: boolean) => void
+  /** When the island would fold on its own, or null while it will not. */
+  readonly closesAt: number | null
 }
 
 export function useIsland(): IslandState {
@@ -155,5 +157,5 @@ export function useIsland(): IslandState {
   }, [])
 
   const chosen = (chosenId && byId[chosenId]) || null
-  return { island, sessions, questions, chosen, nudge: dispatch, choose: setChosenId, answer, now, sound, setSound }
+  return { island, sessions, questions, chosen, nudge: dispatch, choose: setChosenId, answer, now, sound, setSound, closesAt: due(island, held) }
 }
