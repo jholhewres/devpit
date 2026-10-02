@@ -15,7 +15,7 @@ vi.mock('./useShell', () => ({
     setTheme: vi.fn(),
     /* Nobody is halfway through signing in on a first run, which is the
        state this screen offers from. */
-    membership: { signingIn: null, failed: null, origin: 'https://devpit.jhol.dev', cancelSignIn: vi.fn() },
+    membership: { signingIn: null, failed: null, origin: 'https://devpit.app', cancelSignIn: vi.fn() },
   }),
 }))
 

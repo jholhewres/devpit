@@ -20,7 +20,7 @@ fn the_origin_can_be_pointed_somewhere_else() {
 
     // An empty value is not a choice, it is an unset variable spelled badly.
     std::env::set_var("DEVPIT_ACCOUNT_ORIGIN", "");
-    assert_eq!(origin(), "https://devpit.jhol.dev");
+    assert_eq!(origin(), "https://devpit.app");
 
     match restore {
         Some(value) => std::env::set_var("DEVPIT_ACCOUNT_ORIGIN", value),
@@ -68,7 +68,7 @@ fn a_poll_answer_is_read_the_way_the_server_writes_it() {
 fn a_grant_is_read_from_the_camel_case_the_server_sends() {
     let grant: Grant = serde_json::from_value(serde_json::json!({
         "userCode": "WXYZ-2345",
-        "verifyUrl": "https://devpit.jhol.dev/link?code=WXYZ-2345",
+        "verifyUrl": "https://devpit.app/link?code=WXYZ-2345",
         "pollToken": "a-poll-token",
         "expiresInSeconds": 900,
         "intervalSeconds": 2

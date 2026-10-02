@@ -18,7 +18,7 @@ pub(crate) fn origin() -> String {
     std::env::var("DEVPIT_ACCOUNT_ORIGIN")
         .ok()
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "https://devpit.jhol.dev".to_owned())
+        .unwrap_or_else(|| "https://devpit.app".to_owned())
 }
 
 /// The polling secret of a sign-in in progress.
