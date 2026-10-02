@@ -46,7 +46,8 @@ nothing of devpit's**. Keep it that way:
   a home somewhere else entirely, and pointing it at the installed one undoes
   the whole separation.
 
-`help setup dev build test fmt clean`, `e2e` for the WebDriver suite, and
+`help setup dev build test fmt clean`, `e2e` for the WebDriver suite, `shots`
+for the launch screenshots and clips (`e2e/demo/README.md`), and
 for Windows `check-windows`, `test-tmux`, `windows-bin` (the pinned psmux) and
 `bundle-windows` (the installer) — what the release's Windows leg runs. The
 list is short because the Makefile is the interface everyone reads: a target

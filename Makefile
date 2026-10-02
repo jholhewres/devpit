@@ -72,7 +72,7 @@ $(VERSION_STAMP):
 	@touch $@
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev build test test-rust fmt clean e2e
+.PHONY: help setup dev build test test-rust fmt clean e2e shots
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -164,6 +164,10 @@ test-tmux: ## The tmux crate's own tests, against whatever `tmux` is on PATH
 e2e: node_modules $(VERSION_STAMP) ## The built app, driven through a WebDriver (minutes, not seconds)
 	./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.conf.json
 	node e2e/run.mjs
+
+shots: node_modules $(VERSION_STAMP) ## Screenshots and clips of a made-up board, for the site and the launch
+	./node_modules/.bin/tauri build --no-bundle --config apps/desktop/tauri.conf.json
+	node e2e/demo/shots.mjs
 
 fmt: ## Format the tree
 	cargo fmt --all
