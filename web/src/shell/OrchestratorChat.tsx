@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import type { LiveSession } from '../gen/bindings'
 import { refreshSessions, useLiveSessions } from './liveStatus'
+import { ProjectProposals } from './ProjectProposals'
 import { ReplyDrafts } from './ReplyDrafts'
 import { SHOW_PANEL } from './RightPanel'
 import { SessionTerminal } from './SessionTerminal'
@@ -35,6 +36,7 @@ export function SessionsWaiting({ profileId }: { profileId: string }): React.JSX
     <>
       <WaitingPrompts profileId={profileId} sessions={live} onAnswered={() => refreshSessions(profileId)} onOpen={setTerminal} />
       <ReplyDrafts profileId={profileId} sessions={live} onDone={() => refreshSessions(profileId)} />
+      <ProjectProposals />
       {terminal && (
         <SessionTerminal
           session={terminal}

@@ -1,6 +1,10 @@
+import { open as pickFolder } from '@tauri-apps/plugin-dialog'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import type { ProjectProposal } from '../gen/bindings'
 import { ask, commands } from './live'
+import { LINKS_CHANGED } from './projectProposal'
+import { ProposalCard } from './ProposalCard'
 
 import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { ProjectMark } from './ProjectMark'
@@ -15,7 +19,9 @@ import { useShell } from './useShell'
  * own board. Read, never written — the orchestrator's tools are how it acts.
  */
 export function OrchestratorBoards({ shown }: { shown: boolean }): React.JSX.Element {
-  const { project: here, projects: every, setProject, show, openCard, openManager } = useShell()
+  const { project: here, projects: every, setProject, show, openCard, openManager, reloadProjects } = useShell()
+  /* A folder picked to add, shown as the proposal the chat would show. */
+  const [adding, setAdding] = useState<ProjectProposal | null>(null)
   const [linked, setLinked] = useState<readonly string[] | null>(null)
   const [linking, setLinking] = useState<Set<string> | null>(null)
   const [said, setSaid] = useState<string | null>(null)
@@ -28,6 +34,26 @@ export function OrchestratorBoards({ shown }: { shown: boolean }): React.JSX.Ele
     if (!here) return
     void ask(() => commands.orchestratorLinks(here.id)).then((answer) => setLinked(answer.data ?? []))
   }, [here])
+
+  /* Linked from a proposal in the chat, the panel reads its links again. */
+  useEffect(() => {
+    window.addEventListener(LINKS_CHANGED, readLinks)
+    return () => window.removeEventListener(LINKS_CHANGED, readLinks)
+  }, [readLinks])
+
+  const addFolder = async (): Promise<void> => {
+    const picked = await pickFolder({ directory: true, multiple: false })
+    if (typeof picked !== 'string') return
+    const known = candidates.find((one) => one.rootPath === picked)
+    setAdding({ id: 'local', projectId: known?.id ?? null, path: picked, name: known?.name ?? picked.split(/[\\/]/).filter(Boolean).pop() ?? picked, group: known?.group ?? null, link: true })
+  }
+
+  /* By group, with the group itself a box that takes all of it. */
+  const byGroup = useMemo(() => {
+    const groups = new Map<string, typeof candidates>()
+    for (const one of candidates) groups.set(one.group ?? '', [...(groups.get(one.group ?? '') ?? []), one])
+    return [...groups.entries()].sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
+  }, [candidates])
 
   /* The panel stays mounted; what is on the boards moves while it is away. */
   useEffect(() => {
@@ -58,30 +84,70 @@ export function OrchestratorBoards({ shown }: { shown: boolean }): React.JSX.Ele
         <PanelAct label={linking ? 'Stop linking' : 'Link projects'} active={linking !== null} onClick={() => setLinking(linking ? null : new Set(linked ?? []))}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
         </PanelAct>
+        <PanelAct label="Add a project, and link it here" onClick={() => void addFolder()}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        </PanelAct>
         <PanelAct label="Every board in one view" onClick={openManager}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
         </PanelAct>
       </PanelHead>
+      {adding && here && (
+        <ProposalCard
+          proposal={adding}
+          hereId={here.id}
+          projects={candidates}
+          editing
+          onDrop={() => setAdding(null)}
+          onDone={() => {
+            setAdding(null)
+            reloadProjects()
+            readLinks()
+          }}
+        />
+      )}
       {linking && (
         <div className="oboards__link" role="group" aria-label="Projects this orchestrator works with">
           <p className="pempty__d">The projects this orchestrator works with: their boards show here, and its chat and tools reach only these.</p>
-          {candidates.map((one) => (
-            <label className="oboards__pick" key={one.id}>
-              <input
-                type="checkbox"
-                checked={linking.has(one.id)}
-                onChange={(event) =>
-                  setLinking((was) => {
-                    const next = new Set(was)
-                    if (event.target.checked) next.add(one.id)
-                    else next.delete(one.id)
-                    return next
-                  })
-                }
-              />
-              <ProjectMark project={one} />
-              <span>{one.name}</span>
-            </label>
+          {byGroup.map(([group, members]) => (
+            <div className="oboards__group" key={group || 'none'}>
+              {group && (
+                <label className="oboards__pick oboards__pick--group">
+                  <input
+                    type="checkbox"
+                    checked={members.every((one) => linking.has(one.id))}
+                    onChange={(event) =>
+                      setLinking((was) => {
+                        const next = new Set(was)
+                        for (const one of members) {
+                          if (event.target.checked) next.add(one.id)
+                          else next.delete(one.id)
+                        }
+                        return next
+                      })
+                    }
+                  />
+                  <span>{group}</span>
+                </label>
+              )}
+              {members.map((one) => (
+                <label className="oboards__pick" key={one.id}>
+                  <input
+                    type="checkbox"
+                    checked={linking.has(one.id)}
+                    onChange={(event) =>
+                      setLinking((was) => {
+                        const next = new Set(was)
+                        if (event.target.checked) next.add(one.id)
+                        else next.delete(one.id)
+                        return next
+                      })
+                    }
+                  />
+                  <ProjectMark project={one} />
+                  <span>{one.name}</span>
+                </label>
+              ))}
+            </div>
           ))}
           {said && <p className="pempty__d">{said}</p>}
           <div className="oboards__save">

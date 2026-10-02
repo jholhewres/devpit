@@ -121,6 +121,7 @@ mod post;
 mod prime;
 mod prime_paths;
 mod project_naming;
+mod project_proposals;
 mod projects;
 mod question;
 mod reading_path;

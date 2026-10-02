@@ -15,11 +15,11 @@ use crate::{
     heads_down, history, in_flight, index, installations, island, island_answer, island_checks,
     live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving, notices, openers, opening,
     orchestrator, orchestrator_links, outside_sessions, pane_asking, pane_screen, panels, panes,
-    pasting, paths, pausing, plan_limits, plugin_data, plugins, project_naming, projects,
-    reading_path, receipts, regrouping, reminders, reply_drafts, reveal, rewinding, runs_list,
-    saves, search, session_search, session_window, sessions, settings, shell_launch, skills, slash,
-    sources, spend_history, staging, steering, steps, stopping, threads, update, watching,
-    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
+    pasting, paths, pausing, plan_limits, plugin_data, plugins, project_naming, project_proposals,
+    projects, reading_path, receipts, regrouping, reminders, reply_drafts, reveal, rewinding,
+    runs_list, saves, search, session_search, session_window, sessions, settings, shell_launch,
+    skills, slash, sources, spend_history, staging, steering, steps, stopping, threads, update,
+    watching, workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -76,6 +76,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         live_sessions::orchestrator_sessions,
         live_sessions::orchestrator_reply,
         session_window::orchestrator_rename,
+        project_proposals::orchestrator_proposals,
+        project_proposals::orchestrator_proposal_drop,
         session_window::session_changes,
         reply_drafts::orchestrator_draft_drop,
         pausing::pause_read,

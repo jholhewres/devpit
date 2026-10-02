@@ -66,7 +66,9 @@ pub use island::{
     IslandAsked, IslandChange, IslandChecks, IslandNow, IslandPull, IslandQuestion, IslandRect,
     IslandSession, IslandStep, IslandVerdict, Touch,
 };
-pub use live::{LivePane, LiveSession, LiveSessions, PendingPrompt, PromptOption, RemoteState};
+pub use live::{
+    LivePane, LiveSession, LiveSessions, PendingPrompt, ProjectProposal, PromptOption, RemoteState,
+};
 pub use mcp_health::{McpHealth, McpServerHealth, McpState};
 pub use pause::Paused;
 pub use plugin_data::{

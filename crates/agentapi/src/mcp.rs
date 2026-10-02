@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 25] = [
+const TOOLS: [Tool; 26] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -66,7 +66,7 @@ const TOOLS: [Tool; 25] = [
     Tool {
         name: "devpit_projects",
         method: "projects",
-        description: "Orchestrator only: every devpit project, its group, and its lanes with how many cards each holds.",
+        description: "Orchestrator only: every devpit project and its group, whether it is linked to you, and for those linked its lanes with how many cards each holds.",
         input: || json!({ "type": "object", "properties": {} }),
     },
     Tool {
@@ -116,6 +116,12 @@ const TOOLS: [Tool; 25] = [
         method: "resolve_reminder",
         description: "Deal with a reminder the person told you about: done (it leaves the banner, the card keeps its date), snooze (it goes off again later: `for` 15m, 2h, 1d, or `until` a moment with its offset) or cancel (the card loses the time).",
         input: || json!({ "type": "object", "properties": { "cardId": { "type": "string" }, "action": { "type": "string", "enum": ["done", "snooze", "cancel"] }, "for": { "type": "string", "description": "snooze: how long, as 15m, 2h or 1d." }, "until": { "type": "string", "description": "snooze: until when, ISO 8601 with its offset." }, "project": { "type": "string", "description": "Orchestrator only: the card's project, by id or name." } }, "required": ["cardId", "action"] }),
+    },
+    Tool {
+        name: "devpit_propose_project",
+        method: "propose_project",
+        description: "Orchestrator only: propose a change to your projects for the person to make — add a folder to devpit, link a project to you or unlink it, give it a name or a group. Nothing changes: the person sees a card in this chat and makes it with one click, edits it, or drops it. Use it when they ask for it, or when they ask for work in a project you are not linked to; find the folder yourself (often under ~/Workspace) and pass its path.",
+        input: || json!({ "type": "object", "properties": { "path": { "type": "string", "description": "The folder, whole or from ~/. A folder already in devpit is that project." }, "project": { "type": "string", "description": "A project devpit already has, by id or name, instead of a path." }, "name": { "type": "string", "description": "The name to give it." }, "group": { "type": "string", "description": "The group to put it in, existing or new." }, "link": { "type": "boolean", "description": "Link it to you (true) or unlink it (false). Defaults to linking a project you are not linked to." } } }),
     },
     Tool {
         name: "devpit_draft_reply",

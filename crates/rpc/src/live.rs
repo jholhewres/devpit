@@ -87,3 +87,24 @@ pub struct PromptOption {
     /// The quieter line under it, when it has one.
     pub hint: Option<String>,
 }
+
+/// A change to the projects an orchestrator proposed, waiting on the
+/// person: a folder to add, a project to link, a name or a group to give.
+/// Nothing in it has happened; the window does it when the person says yes.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectProposal {
+    pub id: String,
+    /// The project it is about, when it is already one of devpit's.
+    pub project_id: Option<String>,
+    /// The folder, whole. Local only.
+    pub path: String,
+    /// The name to give it, when one was proposed — for a new folder, its
+    /// last segment otherwise.
+    pub name: String,
+    /// The group to put it in, when one was proposed.
+    pub group: Option<String>,
+    /// Link it to this orchestrator (`true`), unlink it (`false`), or leave
+    /// its link as it is.
+    pub link: Option<bool>,
+}

@@ -326,6 +326,10 @@ export const commands = {
 	 *  written anywhere else would be written over.
 	 */
 	orchestratorRename: (profileId: string, name: string, to: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_rename", { profileId, name, to })),
+	/**  `orchestrator.proposals` — what this orchestrator proposed, oldest first. */
+	orchestratorProposals: (projectId: string) => __TAURI_INVOKE<ProjectProposal[]>("orchestrator_proposals", { projectId }),
+	/**  `orchestrator.proposal_drop` — done or dropped by the person, it goes. */
+	orchestratorProposalDrop: (projectId: string, id: string) => __TAURI_INVOKE<void>("orchestrator_proposal_drop", { projectId, id }),
 	/**
 	 *  `session.changes` — a session's folder, as git sees it.
 	 * 
@@ -3336,6 +3340,31 @@ export type ProjectHistory = {
 
 export type ProjectList = {
 	projects: Project[],
+};
+
+/**
+ *  A change to the projects an orchestrator proposed, waiting on the
+ *  person: a folder to add, a project to link, a name or a group to give.
+ *  Nothing in it has happened; the window does it when the person says yes.
+ */
+export type ProjectProposal = {
+	id: string,
+	/**  The project it is about, when it is already one of devpit's. */
+	projectId: string | null,
+	/**  The folder, whole. Local only. */
+	path: string,
+	/**
+	 *  The name to give it, when one was proposed — for a new folder, its
+	 *  last segment otherwise.
+	 */
+	name: string,
+	/**  The group to put it in, when one was proposed. */
+	group: string | null,
+	/**
+	 *  Link it to this orchestrator (`true`), unlink it (`false`), or leave
+	 *  its link as it is.
+	 */
+	link: boolean | null,
 };
 
 export type ProjectRun = {

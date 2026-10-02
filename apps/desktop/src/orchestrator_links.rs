@@ -84,7 +84,7 @@ pub(crate) fn reaches_in(store: &Store, here: &Project, project: &Project) -> Re
         .then_some(())
         .ok_or_else(|| {
             format!(
-                "{} is not linked to this orchestrator — ask the person to link it from the Boards panel",
+                "{} is not linked to this orchestrator — propose linking it with devpit_propose_project, and the person links it with one click",
                 project.name
             )
         })

@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 26] = [
+pub(crate) const METHODS: [&str; 27] = [
     "context",
     "board",
     "card",
@@ -69,6 +69,7 @@ pub(crate) const METHODS: [&str; 26] = [
     "resolve_reminder",
     "start_card",
     "finish_card",
+    "propose_project",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -128,12 +129,30 @@ fn respond_in(
         "projects" => {
             orchestrating(here)?;
             let linked = crate::orchestrator_links::linked(Path::new(&here.root_path));
-            let mine: Vec<Project> = projects
-                .iter()
-                .filter(|one| linked.contains(&one.id))
-                .cloned()
-                .collect();
-            return Ok(every_project(&mine));
+            return Ok(every_project(projects, &linked));
+        }
+        "propose_project" => {
+            orchestrating(here)?;
+            let linked = crate::orchestrator_links::linked(Path::new(&here.root_path));
+            // `HOME` on Unix, `USERPROFILE` on Windows, for a path from `~/`.
+            let home = std::env::var_os("HOME")
+                .or_else(|| std::env::var_os("USERPROFILE"))
+                .map(std::path::PathBuf::from);
+            let asked = crate::project_proposals::Asked {
+                path: asked.params.get("path").and_then(Value::as_str),
+                project: asked.params.get("project").and_then(Value::as_str),
+                name: asked.params.get("name").and_then(Value::as_str),
+                group: asked.params.get("group").and_then(Value::as_str),
+                link: asked.params.get("link").and_then(Value::as_bool),
+            };
+            return crate::project_proposals::propose(
+                app,
+                here,
+                projects,
+                &linked,
+                home.as_deref(),
+                &asked,
+            );
         }
         "sessions" => {
             let profile = orchestrating(here)?;
@@ -343,11 +362,16 @@ pub(crate) fn reached<'a>(
 
 /// Every project an orchestrator can work on, with its lanes and how many
 /// cards each holds: enough to choose where to look, not the boards whole.
-fn every_project(projects: &[Project]) -> Value {
+/// The linked projects with their lanes, and the rest by name only: what an
+/// orchestrator may propose to link, without reading boards it does not reach.
+fn every_project(projects: &[Project], linked: &[String]) -> Value {
     let listed: Vec<Value> = projects
         .iter()
         .filter(|one| one.orchestrator.is_none())
         .map(|one| {
+            if !linked.contains(&one.id) {
+                return json!({ "id": one.id, "name": one.name, "group": one.group, "root": one.root_path, "linked": false });
+            }
             let lanes = crate::board::board_get_now(one.id.clone())
                 .map(|board| {
                     board
@@ -360,7 +384,7 @@ fn every_project(projects: &[Project]) -> Value {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            json!({ "id": one.id, "name": one.name, "group": one.group, "root": one.root_path, "lanes": lanes })
+            json!({ "id": one.id, "name": one.name, "group": one.group, "root": one.root_path, "linked": true, "lanes": lanes })
         })
         .collect();
     json!(listed)

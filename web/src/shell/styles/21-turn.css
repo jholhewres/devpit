@@ -205,3 +205,18 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .sterm__warn { font-size: 12px; color: var(--text-2); white-space: nowrap; }
 .sterm__btn--bad { color: var(--danger); }
 .sterm__btn--bad:hover { color: #fff; background: var(--danger); }
+
+/* A change to the orchestrator's projects it proposed, waiting on a click. */
+.proposals { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.proposal { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); font-size: 12.5px; }
+.proposal__words { margin: 0; color: var(--text); line-height: 1.45; overflow-wrap: anywhere; }
+.proposal__fields { display: flex; flex-direction: column; gap: 6px; }
+.proposal__path { font: 11.5px var(--mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.proposal__row { display: grid; grid-template-columns: 56px 1fr; align-items: center; gap: 8px; color: var(--text-2); }
+.proposal__row--check { display: flex; }
+.proposal__input { height: 26px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12.5px; }
+.proposal__problem { margin: 0; color: var(--danger); }
+.proposal__acts { display: flex; justify-content: flex-end; gap: 6px; }
+.oboards .proposal { margin: 6px 8px; }
+.oboards__pick--group { font-weight: 600; color: var(--text); }
+.oboards__group + .oboards__group { margin-top: 6px; }
