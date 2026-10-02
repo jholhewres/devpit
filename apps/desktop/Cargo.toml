@@ -58,6 +58,8 @@ tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2.3.4"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-global-shortcut = "2.3.1"
+tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

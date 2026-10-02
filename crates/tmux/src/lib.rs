@@ -19,6 +19,7 @@ mod running;
 mod scratch;
 mod scroll;
 mod shell;
+mod viewers;
 mod windows;
 pub use pane::{copy_to, Key};
 pub use scratch::Scratch;

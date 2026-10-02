@@ -60,3 +60,9 @@ pub const TRANSCRIBE_MODEL: &str = "chat.transcribe_model";
 pub const TRANSCRIBE_LANGUAGE: &str = "chat.transcribe_language";
 /// The transcription service's address, OpenAI's form of it. Empty is OpenAI.
 pub const TRANSCRIBE_URL: &str = "chat.transcribe_url";
+/// Whether this machine can be reached from the person's other devices,
+/// over their tailnet. Off unless turned on.
+pub const REMOTE: &str = "remote.enabled";
+/// The loopback port the remote viewer is served from, kept so the tailnet
+/// address stays the same across restarts.
+pub const REMOTE_PORT: &str = "remote.port";

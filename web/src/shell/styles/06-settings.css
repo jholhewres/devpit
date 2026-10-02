@@ -378,3 +378,15 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .ctools__said { display: inline-flex; align-items: center; gap: 6px; max-width: 360px; margin-right: 6px; font-size: 12px; color: var(--text-2); }
 .ctools__x { color: var(--text-3); font-size: 11px; }
 .ctools + .send { margin-left: 4px; }
+
+/* Remote: pairing a device, and what each paired one may do. */
+.remote__pair { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.remote__qr { display: block; width: 168px; height: 168px; padding: 6px; border-radius: 8px; background: #fff; }
+.remote__qr svg { width: 100%; height: 100%; }
+.remote__code { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.remote__big { font: 600 22px var(--mono); letter-spacing: .12em; }
+.remote__dev { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--border); }
+.remote__name { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; color: var(--text); font-size: 13px; }
+.remote__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ghost, var(--text-3)); }
+.remote__dot[data-on] { background: var(--success); }
+.remote__cap { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-2); }

@@ -31,6 +31,7 @@ pub mod profile;
 pub mod project;
 pub mod reminder;
 pub mod remote;
+pub mod remote_view;
 pub mod review;
 pub mod runs;
 pub mod search;
@@ -87,6 +88,10 @@ pub use project::{
 };
 pub use reminder::{Reminder, Reminders};
 pub use remote::RemoteAct;
+pub use remote_view::{
+    RemoteDevice, RemoteIn, RemoteOut, RemotePairing, RemoteProject, RemoteQuestion, RemoteShapes,
+    RemoteTerminal, RemoteView, TailscaleState,
+};
 pub use review::{
     blocking, reviewed, standing, Finding, Found, Review, Severity, Standing, REVIEW_EVIDENCE,
 };

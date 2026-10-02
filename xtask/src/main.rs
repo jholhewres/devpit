@@ -13,6 +13,7 @@ mod agent_boundary;
 mod csp;
 mod dead_controls;
 mod home_paths;
+mod listening;
 mod naming;
 mod off_main;
 mod one_spelling;
@@ -147,6 +148,7 @@ fn check() -> ExitCode {
     findings.extend(uncalled::a_command_has_a_caller(&root));
     findings.extend(uncalled::the_app_answers_what_the_contract_offers(&root));
     findings.extend(off_main::no_command_holds_the_window(&root));
+    findings.extend(listening::nothing_listens_beyond_loopback(&root));
 
     if findings.is_empty() {
         println!("guards: ok");

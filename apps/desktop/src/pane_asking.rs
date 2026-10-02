@@ -198,16 +198,20 @@ pub async fn island_seen(id: String) -> Result<(), RpcError> {
 #[tauri::command]
 #[specta::specta]
 pub async fn island_decide(id: String, verdict: IslandVerdict) -> Result<(), RpcError> {
-    let said = held()
+    decide(&id, verdict).map_err(|why| RpcError::new(devpit_rpc::ErrorCode::NotFound, why))
+}
+
+/// What the person said to a held question, from the island or a remote
+/// device: it counts as seen, so the hold does not give up on it.
+pub(crate) fn decide(id: &str, verdict: IslandVerdict) -> Result<(), String> {
+    let (seen, said) = held()
         .lock()
         .ok()
-        .and_then(|all| all.get(&id).map(|one| one.said.clone()))
+        .and_then(|all| all.get(id).map(|one| (one.seen.clone(), one.said.clone())))
         .ok_or_else(|| {
-            RpcError::new(
-                devpit_rpc::ErrorCode::NotFound,
-                "that question is no longer waiting — the terminal is asking it now",
-            )
+            "that question is no longer waiting — the terminal is asking it now".to_owned()
         })?;
+    let _ = seen.send(());
     let _ = said.send(verdict);
     Ok(())
 }

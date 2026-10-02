@@ -6,6 +6,7 @@ import { inOrder } from './inOrder'
 import { PrefsSide } from './PrefsSide'
 import { PrefSwitch } from './PrefSwitch'
 import { DeskSettings } from './DeskSettings'
+import { RemoteSettings } from './RemoteSettings'
 import { VoiceSettings } from './VoiceSettings'
 import { ErrorReportsPreview } from './ErrorReportsPreview'
 import { OpenApps } from './OpenApps'
@@ -128,6 +129,7 @@ export function Settings({
             {on('errorReports') && <ErrorReportsPreview />}
             <DeskSettings />
             <VoiceSettings />
+            <RemoteSettings />
             <OpenApps />
             <UpdateSettings />
           </section>

@@ -163,3 +163,8 @@ li[data-state='needs_auth'] .mcpchip__dot { background: var(--warning); }
 .mcpchip__s { font-size: 11px; color: var(--text-3); }
 li[data-state='failed'] .mcpchip__s { color: var(--danger); }
 .mcpchip__why { grid-column: 2 / -1; margin: 0; font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Another device watching this machine: said, and dropped with a click. */
+.strip__remote { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; color: var(--text); background: color-mix(in srgb, var(--warning) 18%, transparent); }
+.strip__remote:hover { background: color-mix(in srgb, var(--warning) 28%, transparent); }
+.strip__remote-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }

@@ -133,6 +133,13 @@ export default defineConfig({
     // A stack trace out of the webview should be readable without shipping
     // the whole toolchain — or the maps: 'hidden' leaves no comment pointing
     // at a file the bundle no longer has.
-    sourcemap: 'hidden'
+    sourcemap: 'hidden',
+    // The app, and the remote viewer the machine serves to paired devices.
+    rollupOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'index.html'),
+        remote: resolve(import.meta.dirname, 'remote.html')
+      }
+    }
   }
 })

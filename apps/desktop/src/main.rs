@@ -136,6 +136,15 @@ mod refusing;
 mod regrouping;
 mod reminder_time;
 mod reminders;
+mod remote;
+mod remote_conn;
+mod remote_devices;
+mod remote_host;
+mod remote_http;
+mod remote_hub;
+mod remote_pairing;
+mod remote_panes;
+mod remote_tailscale;
 mod reply_drafts;
 mod restoring;
 mod reveal;
@@ -341,6 +350,8 @@ fn main() {
             }
             // In the tray, and the shortcut that brings it forward, if one was chosen.
             desk::tray(app.handle());
+            // Reachable from the person's other devices, when it was left on.
+            remote::restore(app.handle());
             desk::shortcut_restore(app.handle());
             // A card's date goes off at its time, whatever project it is in.
             reminders::watch(app.handle().clone());

@@ -326,6 +326,25 @@ export const commands = {
 	 *  written anywhere else would be written over.
 	 */
 	orchestratorRename: (profileId: string, name: string, to: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_rename", { profileId, name, to })),
+	/**  `remote.read` — Remote, as the settings show it. */
+	remoteRead: () => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_read")),
+	/**  `remote.set` — on or off. On says why, when it cannot be reached. */
+	remoteSet: (on: boolean) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_set", { on })),
+	/**  `remote.pair` — a code for one device, shown here, good once for two minutes. */
+	remotePair: () => typedError<RemotePairing, RpcError>(__TAURI_INVOKE("remote_pair")),
+	/**  `remote.pair_cancel` — the pairing code is put away. */
+	remotePairCancel: () => __TAURI_INVOKE<void>("remote_pair_cancel"),
+	/**
+	 *  `remote.allow` — what a device may do besides watching. Its connections
+	 *  end, and it connects again with what it has now.
+	 */
+	remoteAllow: (id: string, typing: boolean, answering: boolean) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_allow", { id, typing, answering })),
+	/**  `remote.forget` — the device is unpaired, and dropped at once. */
+	remoteForget: (id: string) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_forget", { id })),
+	/**  `remote.drop` — every device watching now is disconnected. */
+	remoteDrop: () => __TAURI_INVOKE<void>("remote_drop"),
+	/**  `remote.shapes` — the viewer's messages, for the generated contract. */
+	remoteShapes: () => __TAURI_INVOKE<RemoteShapes>("remote_shapes"),
 	/**  `transcribe.read` — how voice messages become words here. */
 	transcribeRead: () => typedError<Transcribing, RpcError>(__TAURI_INVOKE("transcribe_read")),
 	/**  `transcribe.set` — the engine, its model, the language and the address. */
@@ -3499,6 +3518,74 @@ export type RemoteAct = "fetch" | "pull" | "push" |
 /**  Pull, then push. */
 "sync";
 
+/**  A device paired with this machine. */
+export type RemoteDevice = {
+	id: string,
+	name: string,
+	typing: boolean,
+	answering: boolean,
+	/**  Seconds since the epoch. */
+	pairedAt: number | null,
+	lastSeen: number | null,
+	connected: boolean,
+};
+
+/**  What a viewer asks. */
+export type RemoteIn = 
+/**  The first message: the device's token, which only its pairing gave it. */
+{ t: "hello"; token: string } | { t: "projects" } | 
+/**
+ *  Watch a terminal, sized for the viewer's screen. The desk's own size
+ *  does not change.
+ */
+{ t: "paneOpen"; project: string; pane: string; cols: number; rows: number } | 
+/**  Keys, as bytes in base64. Only a device allowed to type. */
+{ t: "paneInput"; pane: string; b64: string } | 
+/**  A line written and sent, as if pasted and Enter pressed. */
+{ t: "panePaste"; pane: string; text: string } | { t: "paneClose"; pane: string } | { t: "board"; project: string } | 
+/**  Into a lane without a step. Only a device allowed to type. */
+{ t: "cardMove"; project: string; card: string; column: string } | { t: "waiting" } | 
+/**  A question an agent is waiting on. Only a device allowed to answer. */
+{ t: "answer"; id: string; allow: boolean } | { t: "chats"; project: string } | { t: "chat"; project: string; conversation: string } | { t: "ping" };
+
+/**  What the host says. */
+export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean } | 
+/**  Said once, then the connection ends. */
+{ t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | 
+/**  One request could not be done; the connection stays. */
+{ t: "failed"; why: string } | { t: "pong" };
+
+/**  A pairing, offered on the machine's screen and good once, briefly. */
+export type RemotePairing = {
+	code: string,
+	url: string,
+	qrSvg: string,
+	/**  Seconds since the epoch. */
+	expiresAt: number | null,
+};
+
+export type RemoteProject = {
+	id: string,
+	name: string,
+	group: string | null,
+	terminals: RemoteTerminal[],
+};
+
+export type RemoteQuestion = {
+	id: string,
+	/**  `terminal` or `chat`. */
+	from: string,
+	project: string | null,
+	tool: string,
+	input: string,
+};
+
+/**  Every message shape, for the generated contract the viewer is typed by. */
+export type RemoteShapes = {
+	incoming: RemoteIn[],
+	outgoing: RemoteOut[],
+};
+
 /**
  *  Whether an orchestrator's conversation can be reached by Remote Control,
  *  and where.
@@ -3510,6 +3597,23 @@ export type RemoteState = {
 	 *  on but not connected yet — its process starts with the next message.
 	 */
 	url: string | null,
+};
+
+export type RemoteTerminal = {
+	pane: string,
+	/**  What runs in front of it: `claude`, `zsh`. */
+	command: string,
+};
+
+/**  Remote, as the settings show it. */
+export type RemoteView = {
+	enabled: boolean,
+	tailscale: TailscaleState,
+	/**  Where a paired device opens the viewer, once it is reachable. */
+	address: string | null,
+	devices: RemoteDevice[],
+	/**  Why it is not reachable, when it is on and is not. */
+	problem: string | null,
 };
 
 /**  What removing a worktree would cost, when it refuses. */
@@ -4026,6 +4130,24 @@ export type Surface =
 { type: "pane"; many: boolean } | 
 /**  A pin shown on the card face. */
 { type: "cardPin" };
+
+/**  Where Tailscale stands on this machine. */
+export type TailscaleState = {
+	installed: boolean,
+	/**  Logged in and connected. */
+	running: boolean,
+	/**  The machine's MagicDNS name, without the trailing dot. */
+	name: string | null,
+	/**
+	 *  HTTPS certificates are on in the tailnet, so `tailscale serve` can
+	 *  publish the viewer with one.
+	 */
+	https: boolean,
+	/**  Who the machine belongs to in the tailnet: the only one let in. */
+	login: string | null,
+	/**  The machine's tailnet IPv4. */
+	ip: string | null,
+};
 
 /**  What an import actually did. */
 export type Taken = {

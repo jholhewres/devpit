@@ -41,3 +41,6 @@ presence_seen stores one number in an atomic
 chat_remote_state reads a map in memory and never waits
 orchestrator_proposals reads a few proposals held in memory
 orchestrator_proposal_drop drops one proposal held in memory
+remote_pair_cancel puts a code held in memory away
+remote_drop drops connections held in memory
+remote_shapes returns two empty lists, for the contract

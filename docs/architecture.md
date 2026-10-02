@@ -143,3 +143,26 @@ The limits are the point:
   the person. That path is the window's alone; no agent reaches it.
 - **Heard, not polling.** Its conversation keeps one process between turns, so a
   session's reply wakes it; nothing here runs it on a timer.
+
+## Remote
+
+devpit can be reached from the person's other devices over their Tailscale
+tailnet. It is off unless turned on in Settings. When on, the machine
+serves its own viewer (`web/remote.html`):
+
+- **Where it listens.** On loopback, published by `tailscale serve --https`.
+  When the tailnet has no HTTPS, it listens on the machine's tailnet IP
+  alone. It never listens on every interface; `cargo xtask check` enforces
+  this with `nothing_listens_beyond_loopback`.
+- **Who gets in.** A caller must be the machine's own owner in the tailnet
+  (the `Tailscale-User-Login` header, or `tailscale whois`). The caller must
+  also be a paired device, holding a token from a one-time code shown on
+  the machine.
+- **What a device may do.** Every device can watch. Typing and answering
+  are granted per device on the machine.
+- **Terminals.** Each watched terminal is a tmux client of its own,
+  `ignore-size`, and `read-only` for a device that may not type. The desk
+  never changes.
+
+The protocol is `RemoteIn`/`RemoteOut` in `devpit-rpc`, one JSON message per
+WebSocket frame.
