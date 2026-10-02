@@ -7,7 +7,7 @@
  * would inherit it.
  */
 
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
 import { setTimeout as wait } from 'node:timers/promises'
 
@@ -61,14 +61,17 @@ export async function startDriver({
   // is written — stopped reaching the pipe this keeps it in. The log came back
   // empty and the trace test had nothing to measure.
   const screen = headless ? await startScreen() : null
+  const bus = startBus()
   const driver = spawn(binary, argv, {
     stdio: ['ignore', 'inherit', log ? 'pipe' : 'inherit'],
     env: {
       ...(Object.keys(env).length > 0 ? env : process.env),
       ...(screen ? { DISPLAY: screen.display } : {}),
+      DBUS_SESSION_BUS_ADDRESS: bus.address,
     },
   })
   driver.screen = screen
+  driver.bus = bus
   // The app is the driver's child and writes to the driver's stderr, so this
   // file is the app's own log — what the trace test reads. Appended as each
   // chunk arrives, not through a stream: another process reads it while this
@@ -119,10 +122,33 @@ async function startScreen() {
   throw new Error('no free display for Xvfb between :99 and :139')
 }
 
-/** Ends the driver, and the screen it was given when there was one. */
+/**
+ * A session bus of the window's own.
+ *
+ * On the desktop's bus the release build finds the devpit installed on the
+ * machine, hands itself over as a second copy and quits — the suite then
+ * waits on a window that never opens. Its notifications would land on the
+ * desktop too.
+ */
+function startBus() {
+  const said = execFileSync('dbus-daemon', ['--session', '--fork', '--print-address=1', '--print-pid=1'], {
+    encoding: 'utf8',
+  })
+  const [address, pid] = said.trim().split('\n')
+  return { address, pid: Number(pid) }
+}
+
+/** Ends the driver, and the screen and the bus it was given. */
 export function stopDriver(driver) {
   driver.kill()
   driver.screen?.xvfb.kill()
+  if (driver.bus) {
+    try {
+      process.kill(driver.bus.pid)
+    } catch {
+      // Already gone.
+    }
+  }
 }
 
 /** A window on the built binary, from the driver at `port`. */

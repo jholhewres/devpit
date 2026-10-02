@@ -23,6 +23,11 @@ const TOOLS = [
     install: 'sudo apt install webkit2gtk-driver',
     why: 'it is the WebDriver that actually drives WebKitGTK',
   },
+  {
+    binary: 'dbus-daemon',
+    install: 'sudo apt install dbus',
+    why: 'the window gets a session bus of its own, away from an installed devpit',
+  },
 ]
 
 export function onPath(binary) {
