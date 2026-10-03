@@ -5,11 +5,37 @@ release notes are taken from here when a version is tagged.
 
 ## Unreleased
 
+### Orchestrator
+
+- **The Sessions panel lists what runs.** A linked project with nothing
+  running no longer takes a group unless you ask for it. A project the
+  orchestrator does not reach is linked from its group. A row names its card,
+  stops its session from a button, and a search finds a session by name,
+  project or card.
+
+### Settings
+
+- **Every row is a card, and only the switch switches**: clicking a row's
+  words no longer turns it on. The long half of each row folds under *How it
+  works*, and a search scrolls to the row it matched.
+- **Remote is one card**: its steps, the address with a Copy button, and
+  chips for what each device may do. A paired device is named after its
+  system rather than *A device*.
+- **Voice looks for a whisper again** from Settings, without reopening it.
+
 ### Fixes
 
 - **Closing the window ends devpit**, and *Quit devpit* in the tray always
   does. devpit used to stay running behind the island with no window, and the
   tray could no longer open or quit it. Terminals keep running in tmux.
+- **A session resumed after a restart is placed in its own terminal.** It
+  could be taken for another pane's: its screen could not be read, and
+  stopping it closed the other session's terminal.
+- **Error reports leave out what is not an error**: a project that is not a
+  git repository, a folder gone from the tree, a download the network cut off,
+  a chat whose agent process ended, a sound device that would not start. A
+  refused command is reported by its code and message, not as
+  `[object Object]`.
 
 ## 0.1.33 — 2026-10-02
 
