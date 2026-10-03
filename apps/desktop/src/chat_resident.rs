@@ -21,7 +21,7 @@ use devpit_agentcli::driver::Driver;
 use devpit_agentcli::resident::{Heard, Resident};
 use devpit_agentcli::talk::{say, Said, Say};
 use devpit_agentcli::AgentError;
-use devpit_rpc::{Frame, Message, Part, Role};
+use devpit_rpc::{ErrorCode, Frame, Message, Part, Role, RpcError};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -91,6 +91,18 @@ fn stays(app: &AppHandle, project_id: &str, conversation_id: &str, mode: Option<
         .and_then(|home| home.canonicalize().ok())
         .and_then(|home| devpit_core::home::orchestrator_of(&store, &home, &root))
         .is_some()
+}
+
+/// What a turn [`or_say`] could not finish answers with. Every one of these
+/// is the agent's process — missing, gone or failing — and not a devpit bug,
+/// so none of them reaches the error report.
+pub(crate) fn turn_refused(err: AgentError) -> RpcError {
+    let code = match err {
+        AgentError::NotInstalled => ErrorCode::NotFound,
+        // Sending again starts a process of its own.
+        AgentError::Failed { .. } | AgentError::Unreadable(_) => ErrorCode::Busy,
+    };
+    RpcError::new(code, err.to_string())
 }
 
 /// A turn, through the conversation's resident process when there is to be

@@ -290,7 +290,7 @@ pub async fn chat_send(
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Done);
     let said = said
         .map_err(|err| RpcError::internal(err.to_string()))?
-        .map_err(|err| RpcError::internal(err.to_string()))?;
+        .map_err(crate::chat_resident::turn_refused)?;
 
     // The guard does both when it goes, including on the `?` above.
     drop(guard);
