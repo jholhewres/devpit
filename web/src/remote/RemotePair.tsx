@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { deviceName } from './deviceName'
 import { pair } from './socket'
 
 /*
@@ -9,15 +10,7 @@ import { pair } from './socket'
 
 const fromLink = (): string => new URLSearchParams(location.hash.slice(1)).get('pair') ?? ''
 
-const guessName = (): string => {
-  const agent = navigator.userAgent
-  if (/iPhone/.test(agent)) return 'iPhone'
-  if (/iPad/.test(agent)) return 'iPad'
-  if (/Android/.test(agent)) return 'Android'
-  if (/Mac/.test(agent)) return 'Mac'
-  if (/Windows/.test(agent)) return 'Windows'
-  return 'A device'
-}
+const guessName = (): string => deviceName(navigator.userAgent, navigator.maxTouchPoints)
 
 export function RemotePair({ onPaired }: { onPaired: (token: string) => void }): React.JSX.Element {
   const [code, setCode] = useState(fromLink)
@@ -27,7 +20,7 @@ export function RemotePair({ onPaired }: { onPaired: (token: string) => void }):
 
   const go = async (): Promise<void> => {
     setBusy(true)
-    const answer = await pair(code, name)
+    const answer = await pair(code, name.trim() || guessName())
     setBusy(false)
     if ('token' in answer) {
       history.replaceState(null, '', location.pathname)
