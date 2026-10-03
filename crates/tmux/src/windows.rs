@@ -106,6 +106,21 @@ impl Server {
             }))
     }
 
+    /// The window each pane on this server is in, by the pane's id (`%3`).
+    ///
+    /// A pane's id is the server's own and names one pane; a session's name
+    /// does not, since every client session of a group shows every window.
+    pub fn pane_windows(&self) -> Result<std::collections::HashMap<String, String>, TmuxError> {
+        let output = self.require(&["list-panes", "-a", "-F", "#{pane_id} #{window_name}"])?;
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter_map(|line| {
+                let (pane, window) = line.trim().split_once(' ')?;
+                Some((pane.to_owned(), window.to_owned()))
+            })
+            .collect())
+    }
+
     /// Every window of every session on this server, by name.
     pub fn all_windows(&self) -> Result<Vec<String>, TmuxError> {
         let output = self.require(&["list-windows", "-a", "-F", "#{window_name}"])?;

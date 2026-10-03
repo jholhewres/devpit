@@ -1,9 +1,18 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{card_of, pane_of, pane_target, read};
+use super::{card_of, pane_of, pane_target, read, start_of};
+
+/// tmux's answer to which window each pane is in.
+fn windows(panes: &[(&str, &str)]) -> HashMap<String, String> {
+    panes
+        .iter()
+        .map(|(pane, window)| ((*pane).to_owned(), (*window).to_owned()))
+        .collect()
+}
 
 fn project(id: &str, root: &Path, orchestrator: Option<&str>) -> Project {
     serde_json::from_value(json!({
@@ -40,6 +49,7 @@ fn a_live_session_is_placed_on_its_project_and_card() {
         |_| true,
         &[project("prj_1", &app, None)],
         &worktrees,
+        &HashMap::new(),
         |_| None,
     );
     let names: Vec<_> = found
@@ -77,6 +87,7 @@ fn a_dead_session_and_the_orchestrators_own_are_left_out() {
         |pid| pid != 20,
         &[project("orch", &orch, Some("claude"))],
         dir.path(),
+        &HashMap::new(),
         |_| None,
     );
     assert!(
@@ -99,19 +110,43 @@ fn only_devpits_card_checkouts_name_a_card() {
 
 #[test]
 fn only_a_devpit_terminal_can_be_typed_into() {
+    let none = HashMap::new();
+    // An older CLI listed the client alone.
     assert_eq!(
-        pane_target("devpit_prj_1__leaf_9").as_deref(),
-        Some("devpit_prj_1__leaf_9:leaf_9")
+        pane_target("devpit_prj_1__leaf_9", &none).as_deref(),
+        Some("devpit_prj_1:leaf_9")
     );
-    // As the CLI lists it: the client, then tmux's window and pane ids.
+    // As the CLI lists it now: the client, then tmux's window and pane ids.
     assert_eq!(
-        pane_target("devpit_prj_1__leaf_9:@26.%26").as_deref(),
-        Some("devpit_prj_1__leaf_9:leaf_9")
+        pane_target(
+            "devpit_prj_1__leaf_9:@26.%26",
+            &windows(&[("%26", "leaf_9")])
+        )
+        .as_deref(),
+        Some("devpit_prj_1:leaf_9")
     );
-    assert_eq!(pane_target("devpit_prj_1__leaf_9:@2;rm"), None);
-    assert_eq!(pane_target("main"), None);
-    assert_eq!(pane_target("other_prj__leaf_9"), None);
-    assert_eq!(pane_target("devpit_prj;rm__leaf_9"), None);
+    assert_eq!(pane_target("devpit_prj_1__leaf_9:@2;rm", &none), None);
+    assert_eq!(pane_target("main", &none), None);
+    assert_eq!(pane_target("other_prj__leaf_9", &none), None);
+    assert_eq!(pane_target("devpit_prj;rm__leaf_9", &none), None);
+    assert_eq!(
+        pane_target("devpit_prj_1__leaf_9:@2.%2", &windows(&[("%2", "rm;x")])),
+        None
+    );
+}
+
+/// After a restart, the CLI can record another pane's client session: every
+/// client of a group shows every window, and tmux named an orphan one. The
+/// pane id is the CLI's own and right, and it decides.
+#[test]
+fn a_session_is_placed_in_its_own_pane_whatever_client_the_cli_recorded() {
+    let now = windows(&[("%2", "leaf_mine"), ("%5", "leaf_other")]);
+    assert_eq!(
+        pane_target("devpit_prj_1__leaf_other:@2.%2", &now).as_deref(),
+        Some("devpit_prj_1:leaf_mine")
+    );
+    // A pane tmux no longer has is no terminal at all, never a neighbour's.
+    assert_eq!(pane_target("devpit_prj_1__leaf_other:@9.%9", &now), None);
 }
 
 #[test]
@@ -129,7 +164,8 @@ fn a_session_in_a_devpit_terminal_says_the_question_it_is_stopped_on() {
         |_| true,
         &[],
         dir.path(),
-        |target| (target == "devpit_prj_1__leaf_1:leaf_1").then(|| screen.to_owned()),
+        &HashMap::new(),
+        |target| (target == "devpit_prj_1:leaf_1").then(|| screen.to_owned()),
     );
     let waiting = found[0].waiting.as_ref().expect("waiting on a question");
     assert_eq!(waiting.question, "Proceed?");
@@ -138,7 +174,11 @@ fn a_session_in_a_devpit_terminal_says_the_question_it_is_stopped_on() {
 
 #[test]
 fn a_devpit_terminal_is_opened_by_its_project_and_pane() {
-    let target = pane_target("devpit_prj_01AB__leaf_01CD:@3.%3").expect("a target");
+    let target = pane_target(
+        "devpit_prj_01AB__leaf_01CD:@3.%3",
+        &windows(&[("%3", "leaf_01CD")]),
+    )
+    .expect("a target");
     assert_eq!(
         pane_of(&target),
         Some(devpit_rpc::LivePane {
@@ -146,4 +186,13 @@ fn a_devpit_terminal_is_opened_by_its_project_and_pane() {
             pane_id: "leaf_01CD".into(),
         })
     );
+}
+
+/// A listing names a process by pid and start; a pid alone is reused after a
+/// restart.
+#[test]
+fn a_process_start_is_read_past_a_command_with_spaces() {
+    let stat = "12490 (claude (x) y) S 11194 12490 11194 34816 12490 4194560 1 2 3 4 5 6 7 8 20 0 12 0 5646 1 2";
+    assert_eq!(start_of(stat), Some("5646"));
+    assert_eq!(start_of("garbage"), None);
 }

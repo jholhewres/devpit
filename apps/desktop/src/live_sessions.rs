@@ -5,6 +5,7 @@
 //! folder it runs in. That is the list an orchestrator can reach, so it is the
 //! list it is shown — with the project and card each one works in.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use devpit_rpc::{ErrorCode, LiveSession, LiveSessions, Project, RpcError};
@@ -26,6 +27,18 @@ struct Listed {
     /// The short id a background session is stopped by.
     job_id: Option<String>,
     session_id: Option<String>,
+    /// When the process started, in the kernel's clock ticks since boot.
+    proc_start: Option<String>,
+}
+
+impl Listed {
+    /// Whether the listing's process is the one running now. A pid is reused
+    /// after a restart, and a listing the CLI never removed then names
+    /// whatever process took the number.
+    fn running(&self) -> bool {
+        self.pid
+            .is_some_and(|pid| alive(pid) && same_start(pid, self.proc_start.as_deref()))
+    }
 }
 
 /// Every live session listed in `sessions`, placed on its project and card.
@@ -37,6 +50,7 @@ pub(crate) fn read(
     alive: impl Fn(i32) -> bool,
     projects: &[Project],
     worktrees: &Path,
+    windows: &HashMap<String, String>,
     screen: impl Fn(&str) -> Option<String>,
 ) -> Vec<LiveSession> {
     let Ok(entries) = std::fs::read_dir(sessions) else {
@@ -114,29 +128,51 @@ pub(crate) fn pane_target(listed: &str) -> Option<String> {
     {
         return None;
     }
-    let (session, window) = client.split_once("__")?;
     let plain = |part: &str| {
         !part.is_empty()
             && part
                 .chars()
                 .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
     };
-    (session.starts_with("devpit_")
-        && window.starts_with("leaf_")
-        && plain(session)
-        && plain(window))
-    .then(|| format!("{client}:{window}"))
+    let (session, named) = match client.split_once("__") {
+        Some((session, window)) => (session, Some(window)),
+        None => (client, None),
+    };
+    if !session.starts_with("devpit_") || !plain(session) {
+        return None;
+    }
+    let window = match at.split_once('%') {
+        Some((_, pane)) if !pane.is_empty() => windows.get(&format!("%{pane}"))?.as_str(),
+        // An older CLI wrote the session alone, and the client's name is all
+        // there is to go on.
+        _ => named?,
+    };
+    // The project's own session holds every window of the group, so the
+    // target never depends on which client sessions happen to exist.
+    (window.starts_with("leaf_") && plain(window)).then(|| format!("{session}:{window}"))
 }
 
 /// The project and pane a devpit terminal's target names:
-/// `devpit_<project>__<leaf>:<leaf>`.
+/// `devpit_<project>:<leaf>`.
 pub(crate) fn pane_of(target: &str) -> Option<devpit_rpc::LivePane> {
-    let (client, _) = target.split_once(':')?;
-    let (session, window) = client.split_once("__")?;
+    let (session, window) = target.split_once(':')?;
+    // A client's target, `devpit_<project>__<leaf>:<leaf>`, names the same pane.
+    let session = session
+        .split_once("__")
+        .map_or(session, |(project, _)| project);
     Some(devpit_rpc::LivePane {
         project_id: session.strip_prefix("devpit_")?.to_owned(),
         pane_id: window.to_owned(),
     })
+}
+
+/// Which window each of devpit's panes is in now. Empty when tmux cannot say,
+/// and then no session is placed in a terminal rather than in a wrong one.
+pub(crate) fn windows_now() -> HashMap<String, String> {
+    crate::sessions::tmux_server()
+        .ok()
+        .and_then(|server| server.pane_windows().ok())
+        .unwrap_or_default()
 }
 
 /// A devpit terminal's screen as it is now, or nothing when tmux cannot say.
@@ -155,8 +191,14 @@ pub(crate) fn screen_for(
     name: &str,
 ) -> Result<Option<(String, Option<devpit_rpc::PendingPrompt>)>, RpcError> {
     let client = client_named(profile_id, name)?;
-    let Some(shown) = pane_target(&client).and_then(|target| screen_of(&target)) else {
+    let Some(target) = pane_target(&client, &windows_now()) else {
         return Ok(None);
+    };
+    let Some(shown) = screen_of(&target) else {
+        return Err(RpcError::new(
+            ErrorCode::NotFound,
+            format!("{name}'s terminal could not be read"),
+        ));
     };
     let lines: Vec<&str> = shown.lines().collect();
     // The bottom of the screen is where a session says what it is doing.
@@ -222,7 +264,7 @@ pub(crate) fn terminal_of(profile_id: &str, name: &str) -> Result<String, RpcErr
         // the one devpit typed it into.
         Err(err) => return crate::starting::target_of(profile_id, name).ok_or(err),
     };
-    pane_target(&client).ok_or_else(|| {
+    pane_target(&client, &windows_now()).ok_or_else(|| {
         RpcError::new(
             ErrorCode::Invalid,
             format!("{name} is not in a devpit terminal"),
@@ -257,6 +299,7 @@ pub(crate) struct Running {
 /// ordinary: a background job started twice keeps the name it was given.
 pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>, RpcError> {
     let sessions = config_of(profile_id)?.join("sessions");
+    let windows = windows_now();
     let found: Vec<Running> = std::fs::read_dir(&sessions)
         .into_iter()
         .flatten()
@@ -265,13 +308,13 @@ pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>
         .filter(|entry| entry.metadata().is_ok_and(|meta| meta.len() <= MOST_BYTES))
         .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
         .filter_map(|text| serde_json::from_str::<Listed>(&text).ok())
-        .filter(|listed| listed.name.as_deref() == Some(name) && listed.pid.is_some_and(alive))
+        .filter(|listed| listed.name.as_deref() == Some(name) && listed.running())
         .map(|listed| Running {
             pid: listed.pid.unwrap_or_default(),
             pane: listed
                 .tmux
                 .as_deref()
-                .and_then(pane_target)
+                .and_then(|tmux| pane_target(tmux, &windows))
                 .as_deref()
                 .and_then(pane_of),
             job: listed
@@ -299,7 +342,7 @@ fn listed_clients(sessions: &Path) -> Vec<(String, String)> {
         .filter(|entry| entry.metadata().is_ok_and(|meta| meta.len() <= MOST_BYTES))
         .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
         .filter_map(|text| serde_json::from_str::<Listed>(&text).ok())
-        .filter(|listed| listed.pid.is_some_and(alive))
+        .filter(Listed::running)
         .filter_map(|listed| Some((listed.name?, listed.tmux?)))
         .collect()
 }
@@ -307,6 +350,26 @@ fn listed_clients(sessions: &Path) -> Vec<(String, String)> {
 /// Whether a process is still there. A listing outlives a CLI that crashed.
 pub(crate) fn alive(pid: i32) -> bool {
     devpit_pty::process::alive(pid)
+}
+
+/// Whether `pid` started when the listing says. Only Linux keeps the start in
+/// `/proc`; elsewhere, and for a listing that does not say, it is taken as so.
+fn same_start(pid: i32, listed: Option<&str>) -> bool {
+    let Some(listed) = listed else {
+        return true;
+    };
+    match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
+        Ok(stat) => start_of(&stat).is_none_or(|now| now == listed),
+        Err(_) => true,
+    }
+}
+
+/// The start time in a `/proc/<pid>/stat` line: its 22nd field. The second is
+/// the command in parentheses, which may hold spaces, so counting starts after
+/// the last `)`.
+pub(crate) fn start_of(stat: &str) -> Option<&str> {
+    let (_, rest) = stat.rsplit_once(')')?;
+    rest.split_whitespace().nth(19)
 }
 
 /// How long the project list is reused between listings. Drawing it asks git
@@ -347,11 +410,16 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // One tmux server for every screen read in this listing.
     let server = crate::sessions::tmux_server().ok();
     let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
+    let windows = server
+        .as_ref()
+        .and_then(|server| server.pane_windows().ok())
+        .unwrap_or_default();
     let mut sessions = read(
         &config_of(profile_id)?.join("sessions"),
         alive,
         &projects,
         &worktrees,
+        &windows,
         screen,
     );
     // Started here and stopped before the CLI lists it — on the folder's
