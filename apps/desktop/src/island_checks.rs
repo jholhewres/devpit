@@ -132,6 +132,28 @@ fn asked(root: &Path, branch: &str) -> IslandChecks {
     }
 }
 
+/// The branch whose checks are asked for. A plain folder and a detached head
+/// have none, which is the person's checkout and not a fault of devpit's.
+fn branch_of(root: &Path) -> Result<String, RpcError> {
+    let branch = match devpit_git::repo_state(root, &[], false) {
+        Ok(state) => state.branch,
+        Err(devpit_git::GitError::NotARepository { .. }) => {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "that checkout is not a git repository",
+            ))
+        }
+        Err(err) => return Err(RpcError::internal(err.to_string())),
+    };
+    if !devpit_git::plain_branch(&branch) || branch == "HEAD" {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "that checkout is on no branch",
+        ));
+    }
+    Ok(branch)
+}
+
 type Kept = HashMap<(PathBuf, String), (Instant, IslandChecks)>;
 static KEPT: Mutex<Option<Kept>> = Mutex::new(None);
 
@@ -150,15 +172,7 @@ pub async fn island_checks(session_id: String) -> Result<IslandChecks, RpcError>
             PathBuf::from(session.root.ok_or_else(|| {
                 RpcError::new(ErrorCode::NotFound, "that session is in no project")
             })?);
-        let branch = devpit_git::repo_state(&root, &[], false)
-            .map_err(|err| RpcError::internal(err.to_string()))?
-            .branch;
-        if !devpit_git::plain_branch(&branch) || branch == "HEAD" {
-            return Err(RpcError::new(
-                ErrorCode::Invalid,
-                "that checkout is on no branch",
-            ));
-        }
+        let branch = branch_of(&root)?;
         let key = (root.clone(), branch.clone());
         if let Some((at, kept)) = KEPT
             .lock()

@@ -28,3 +28,12 @@ fn checks_still_going_are_running_and_all_done_are_passing() {
 fn nothing_run_is_nothing_to_say() {
     assert_eq!(rollup(std::iter::empty()), None);
 }
+
+#[test]
+fn a_folder_that_is_not_a_repository_is_refused_not_reported() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    let refused = branch_of(dir.path()).expect_err("a plain folder has no branch");
+
+    assert_eq!(refused.code, ErrorCode::Invalid);
+}
