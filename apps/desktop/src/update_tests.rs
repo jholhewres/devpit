@@ -768,6 +768,25 @@ fn a_failed_check_says_something_a_person_can_do_something_about() {
     assert!(!no_feed.contains("offline"), "{no_feed}");
 }
 
+/// A download the network dropped is the person's to retry, not a bug for the
+/// error report; a feed answering with an error status still is one.
+#[test]
+fn a_download_cut_off_is_retried_not_reported() {
+    use tauri_plugin_updater::Error;
+
+    let dropped = reqwest::Client::new()
+        .get("not a url")
+        .build()
+        .expect_err("no request is built from that");
+
+    let cut_off = why_the_download_failed(&Error::Reqwest(dropped));
+    assert_eq!(cut_off.code, devpit_rpc::ErrorCode::Busy);
+    assert!(cut_off.message.contains("try again"), "{}", cut_off.message);
+
+    let refused = why_the_download_failed(&Error::Network("status 404".to_owned()));
+    assert_eq!(refused.code, devpit_rpc::ErrorCode::Internal);
+}
+
 /// The sentence a person reads when the update does not happen, which was
 /// wrong for a `.deb` from 0.1.3 until this was written: devpit had started
 /// installing packages through polkit, and still said it never installs over

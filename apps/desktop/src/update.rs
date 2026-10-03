@@ -620,6 +620,19 @@ fn why_the_install_failed(err: &tauri_plugin_updater::Error) -> String {
     }
 }
 
+/// Why the download stopped. A connection that drops halfway is the network's
+/// and worth another try; a feed answering with an error status stays ours.
+fn why_the_download_failed(err: &tauri_plugin_updater::Error) -> RpcError {
+    use tauri_plugin_updater::Error;
+    match err {
+        Error::Reqwest(_) => RpcError::new(
+            devpit_rpc::ErrorCode::Busy,
+            "the download was cut off — try again",
+        ),
+        other => RpcError::internal(format!("the download failed: {other}")),
+    }
+}
+
 fn why_the_check_failed(err: &tauri_plugin_updater::Error) -> String {
     use tauri_plugin_updater::Error;
     match err {
@@ -1570,19 +1583,19 @@ pub async fn update_download(
         )
         .await
         .map_err(|err| {
-            let message = format!("the download failed: {err}");
+            let refused = why_the_download_failed(&err);
             if let Some(updating) = app.try_state::<Updating>() {
                 let now = updating.state();
                 if let Some(moved) = next(
                     &now,
                     Event::Failed {
-                        message: message.clone(),
+                        message: refused.message.clone(),
                     },
                 ) {
                     updating.moved_to(&app, moved);
                 }
             }
-            RpcError::internal(message)
+            refused
         })?;
 
     // A package is not installed from here: it is written where the package
