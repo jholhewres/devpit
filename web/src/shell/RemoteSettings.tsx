@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { RemotePairing, RemoteView } from '../gen/bindings'
+import type { RemoteDevice, RemotePairing, RemoteView } from '../gen/bindings'
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
 import { onCarried } from './window'
@@ -52,68 +52,108 @@ export function RemoteSettings(): React.JSX.Element {
         : null
 
   return (
-    <>
-      <PrefSwitch on={view.enabled} onFlip={busy ? () => undefined : flip} title="Remote" said={<>Reach this machine from your phone or another computer, over your Tailscale tailnet. {RISK}</>} />
+    <PrefSwitch
+      on={view.enabled}
+      disabled={busy}
+      onFlip={flip}
+      title="Remote"
+      said={<>Reach this machine from your phone or another computer, over your Tailscale tailnet. {RISK}</>}
+      moreLabel="How to set it up"
+      more={
+        <>
+          <ol className="prefhow">
+            <li>Install Tailscale on the phone or computer and sign in as the owner of this machine{tailscale.login && <> ({tailscale.login})</>}. Anyone else in the tailnet is refused.</li>
+            <li>Open this machine&rsquo;s address on that device.</li>
+            <li><b>Pair a device</b> here, then scan the code or type it there. It is good once, for two minutes.</li>
+            <li>Choose what the device may do. Watching is always allowed; <b>type</b> sends keys to terminals and moves cards; <b>answer</b> allows or denies a question an agent is waiting on. Chats are read there, not written.</li>
+          </ol>
+          <p>
+            The status strip says <i>Watched by 1 device</i> while one is connected, and a click drops it. Who connected and what they did, never what was on screen, is kept in <code>~/.devpit/remote-log.jsonl</code>.
+          </p>
+        </>
+      }
+    >
       {view.enabled && (
-        <div className="pref pref--stack">
-          <span className="pref__body">
-            <ol className="prefhow">
-              <li>Install Tailscale on the phone or computer and sign in as the owner of this machine{tailscale.login && <> ({tailscale.login})</>}. Anyone else in the tailnet is refused.</li>
-              <li>Open the address below on that device.</li>
-              <li><b>Pair a device</b> here, then scan the code or type it there. It is good once, for two minutes.</li>
-              <li>Choose what the device may do. Watching is always allowed; <b>type</b> sends keys to terminals and moves cards; <b>answer</b> allows or denies a question an agent is waiting on. Chats are read there, not written.</li>
-            </ol>
-            <span className="pref__d">
-              {view.address ? <>Open <code>{view.address}</code> on a device in your tailnet, signed in as {tailscale.login}.</> : (view.problem ?? 'Not reachable yet.')}
+        <>
+          {view.address ? <RemoteAddress address={view.address} login={tailscale.login} /> : <span className="pref__d">{view.problem ?? 'Not reachable yet.'}</span>}
+          {missing && <span className="pref__d">{missing}</span>}
+          {said && <span className="pref__d voice__bad">{said}</span>}
+          {view.address && !pairing && (
+            <span className="voice__row">
+              <button className="btn" onClick={pair}>
+                Pair a device
+              </button>
             </span>
-            {missing && <span className="pref__d">{missing}</span>}
-            {said && <span className="pref__d voice__bad">{said}</span>}
-            {view.address && !pairing && (
-              <span className="voice__row">
-                <button className="btn" onClick={pair}>
-                  Pair a device
+          )}
+          {pairing && (
+            <span className="remote__pair">
+              <span className="remote__qr" dangerouslySetInnerHTML={{ __html: pairing.qrSvg }} />
+              <span className="remote__code">
+                <span className="pref__d">Scan it, or open the address and type</span>
+                <code className="remote__big">{pairing.code}</code>
+                <span className="pref__d">Good once, for two minutes.</span>
+                <button className="btn" onClick={() => (commands.remotePairCancel(), setPairing(null))}>
+                  Done
                 </button>
               </span>
-            )}
-            {pairing && (
-              <span className="remote__pair">
-                <span className="remote__qr" dangerouslySetInnerHTML={{ __html: pairing.qrSvg }} />
-                <span className="remote__code">
-                  <span className="pref__d">Scan it, or open the address and type</span>
-                  <code className="remote__big">{pairing.code}</code>
-                  <span className="pref__d">Good once, for two minutes.</span>
-                  <button className="btn" onClick={() => (commands.remotePairCancel(), setPairing(null))}>
-                    Done
-                  </button>
-                </span>
-              </span>
-            )}
-            {view.devices.map((device) => (
-              <span className="remote__dev" key={device.id}>
-                <span className="remote__name">
-                  <i className="remote__dot" data-on={device.connected ? 'true' : undefined} />
-                  {device.name}
-                </span>
-                <label className="remote__cap">
-                  <input type="checkbox" checked readOnly disabled /> watch
-                </label>
-                <label className="remote__cap">
-                  <input type="checkbox" checked={device.typing} onChange={(event) => void ask(() => commands.remoteAllow(device.id, event.target.checked, device.answering)).then((answer) => answer.data && setView(answer.data))} /> type
-                </label>
-                <label className="remote__cap">
-                  <input type="checkbox" checked={device.answering} onChange={(event) => void ask(() => commands.remoteAllow(device.id, device.typing, event.target.checked)).then((answer) => answer.data && setView(answer.data))} /> answer
-                </label>
-                <button className="btn" onClick={() => void ask(() => commands.remoteForget(device.id)).then((answer) => answer.data && setView(answer.data))}>
-                  Forget
-                </button>
-              </span>
-            ))}
-            <span className="pref__d">
-              The status strip says <i>Watched by 1 device</i> while one is connected, and a click drops it. Who connected and what they did, never what was on screen, is kept in <code>~/.devpit/remote-log.jsonl</code>.
             </span>
-          </span>
-        </div>
+          )}
+          {view.devices.map((device) => (
+            <DeviceRow key={device.id} device={device} onView={setView} />
+          ))}
+        </>
       )}
+    </PrefSwitch>
+  )
+}
+
+/* The address to type on the other device, one click from the clipboard:
+   copied by hand off a settings pane, a tailnet name is easy to get wrong. */
+function RemoteAddress({ address, login }: { address: string; login: string | null }): React.JSX.Element {
+  const [copied, setCopied] = useState(false)
+  const copy = (): void =>
+    void navigator.clipboard?.writeText(address).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1400)
+    })
+  return (
+    <>
+      <span className="voice__row">
+        <code className="remote__addr">{address}</code>
+        <button className="btn" onClick={copy}>
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </span>
+      <span className="pref__d">Open it on a device in your tailnet{login && <>, signed in as {login}</>}.</span>
     </>
+  )
+}
+
+/* One paired device and what it may do. Watching is not a choice, so it is
+   drawn as a fact beside the two that are. */
+function DeviceRow({ device, onView }: { device: RemoteDevice; onView: (view: RemoteView) => void }): React.JSX.Element {
+  const allow = (typing: boolean, answering: boolean): void =>
+    void ask(() => commands.remoteAllow(device.id, typing, answering)).then((answer) => answer.data && onView(answer.data))
+  return (
+    <span className="remote__dev">
+      <span className="remote__name">
+        <i className="remote__dot" data-on={device.connected ? 'true' : undefined} />
+        {device.name}
+      </span>
+      <span className="remote__chips" role="group" aria-label={`What ${device.name} may do`}>
+        <span className="remote__chip" data-on="true" title="Watching is always allowed">
+          watch
+        </span>
+        <button className="remote__chip" aria-pressed={device.typing} title="Send keys to terminals and move cards" onClick={() => allow(!device.typing, device.answering)}>
+          type
+        </button>
+        <button className="remote__chip" aria-pressed={device.answering} title="Allow or deny a question an agent is waiting on" onClick={() => allow(device.typing, !device.answering)}>
+          answer
+        </button>
+      </span>
+      <button className="btn" onClick={() => void ask(() => commands.remoteForget(device.id)).then((answer) => answer.data && onView(answer.data))}>
+        Forget
+      </button>
+    </span>
   )
 }

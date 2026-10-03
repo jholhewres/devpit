@@ -423,8 +423,17 @@ ul.prefhow > li::before { content: ''; top: 8px; left: 3px; width: 4px; height: 
 .remote__qr svg { width: 100%; height: 100%; }
 .remote__code { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .remote__big { font: 600 22px var(--mono); letter-spacing: .12em; }
-.remote__dev { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--border); }
+.remote__dev { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0 0; border-top: 1px solid var(--border); }
+.remote__dev .btn { margin-left: auto; }
 .remote__name { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; color: var(--text); font-size: 13px; }
 .remote__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ghost, var(--text-3)); }
 .remote__dot[data-on] { background: var(--success); }
-.remote__cap { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-2); }
+.remote__addr { min-width: 0; padding: 5px 9px; border-radius: 7px; background: var(--inset); font: 12px var(--mono); color: var(--text); overflow-wrap: anywhere; user-select: all; }
+/* What a device may do, as chips that are lit or not — the switches' colour,
+   not a form's checkbox. Watch is lit and not a button: it cannot be refused. */
+.remote__chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.remote__chip { height: 24px; padding: 0 10px; border-radius: 12px; display: inline-flex; align-items: center; font-size: 12px; color: var(--text-3); background: var(--overlay); border: 1px solid transparent; transition: background-color 120ms ease, border-color 120ms ease; }
+button.remote__chip:hover { color: var(--text); background: var(--overlay-strong); }
+.remote__chip[data-on], .remote__chip[aria-pressed='true'] { color: var(--text); background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 38%, transparent); }
+.remote__chip[data-on] { cursor: default; opacity: 0.75; }
+.remote__chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
