@@ -113,22 +113,26 @@ export function useChat(conversationId: string): Chat {
           else push(frame)
         }),
       )
-      void joined?.running.then((was) => {
-        if (!now.open()) return
-        flush()
-        /* A woken turn can be over before this asks to join it — a short
-           answer to a message. It was written down; read it from there. */
-        if (!was && !woken) return
-        setSending(false)
-        // The transcript holds the answer as it was saved, costs and all.
-        void ask(() => commands.chatHistory(projectId, conversationId)).then((past) => {
-          if (!now.open() || !past.data) return
-          setMessages(past.data.messages)
-          setCost(past.data.costUsd ?? 0)
-          setContext(past.data.context ?? null)
-          setRewindable(past.data.rewindable ?? [])
+      void joined?.running
+        .then((was) => {
+          if (!now.open()) return
+          flush()
+          /* A woken turn can be over before this asks to join it — a short
+             answer to a message. It was written down; read it from there. */
+          if (!was && !woken) return
+          setSending(false)
+          // The transcript holds the answer as it was saved, costs and all.
+          void ask(() => commands.chatHistory(projectId, conversationId)).then((past) => {
+            if (!now.open() || !past.data) return
+            setMessages(past.data.messages)
+            setCost(past.data.costUsd ?? 0)
+            setContext(past.data.context ?? null)
+            setRewindable(past.data.rewindable ?? [])
+          })
         })
-      })
+        /* `chat_rejoin` never refuses; only the window going rejects it, and
+           then there is nobody left to tell. */
+        .catch(() => undefined)
     },
     [conversationId],
   )

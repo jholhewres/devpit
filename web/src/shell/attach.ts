@@ -58,7 +58,9 @@ export function attach(
     /* A pane is addressed by itself. These three carried a `projectId` the
        commands never declared, so Tauri dropped it — harmless, and a lie
        about what identifies a pane. */
-    write: (data) => void invoke('session_write', { paneId, data }),
+    /* Typing into a pane whose pty has ended is refused with `not_found`;
+       the end itself reaches `onEnd`, so the keystroke has nothing to add. */
+    write: (data) => void invoke('session_write', { paneId, data }).catch(() => undefined),
     /* The pty clamps. A pane that believes it has two hundred columns when it
        has eighty draws wrongly a long way from the line that caused it, so the
        applied size is what the caller gets back. */
@@ -67,7 +69,8 @@ export function attach(
         rows: number
         cols: number
       } | null,
-    detach: () => void invoke('session_detach', { paneId, clientId }),
+    // A pane already gone has nothing left to detach from.
+    detach: () => void invoke('session_detach', { paneId, clientId }).catch(() => undefined),
   }
 }
 

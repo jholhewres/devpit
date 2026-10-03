@@ -1,4 +1,5 @@
 import { commands } from '../gen/bindings'
+import { reason } from './reason'
 import { inTauri } from './window'
 
 /* Errors nothing else caught, handed to devpit's own report. The backend
@@ -44,5 +45,12 @@ export function sparing(now: () => number): (message: string) => boolean {
 
 export function describe(error: unknown): { message: string; stack: string | null } {
   if (error instanceof Error) return { message: `${error.name}: ${error.message}`, stack: error.stack ?? null }
+  /* A command rejects with a plain `RpcError`, which `String` reads as
+     `[object Object]` — a report that says nothing. */
+  if (error && typeof error === 'object') {
+    const { code } = error as { code?: unknown }
+    const said = reason(error, 'object')
+    return { message: typeof code === 'string' ? `${code}: ${said}` : said, stack: null }
+  }
   return { message: String(error), stack: null }
 }

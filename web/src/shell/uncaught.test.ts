@@ -32,6 +32,13 @@ group('uncaught errors', () => {
   it('says what a non-error was', () => {
     expect(describe(42)).toEqual({ message: '42', stack: null })
   })
+
+  /* What a rejected command hands back: a plain object, not an `Error`. */
+  it('says what a refused command said, not [object Object]', () => {
+    const refused = { code: 'not_found', message: 'that pane is not attached', retryAfterMs: null, details: null }
+    expect(describe(refused)).toEqual({ message: 'not_found: that pane is not attached', stack: null })
+    expect(describe({})).toEqual({ message: 'object', stack: null })
+  })
 })
 
 group('a storm of errors', () => {
