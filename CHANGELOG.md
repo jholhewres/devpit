@@ -3,7 +3,7 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
-## Unreleased
+## 0.1.34 — 2026-10-02
 
 ### Orchestrator
 
