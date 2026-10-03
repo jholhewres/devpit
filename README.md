@@ -53,9 +53,8 @@ work stands, and a number on every agent call.
 - **A browser pane**, for the page the project is serving. It opens
   `localhost` over http because that is what a dev server answers, keeps each
   pane's session apart, and can bring a signed-in session over from Chrome,
-  Firefox or Safari — per browser and per domain, never on its own. An agent
-  can drive a page you give it, and never reads what you type into a password
-  field.
+  Firefox or Safari — per browser and per domain, never on its own. Letting an
+  agent drive a page you give it is not built yet.
 - **File tree and diffs** beside the terminal, so reviewing what an agent did
   does not mean leaving.
 - **On your machine.** Projects, boards, conversations and terminal history
