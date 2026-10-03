@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import type { Transcribing } from '../gen/bindings'
 import { ask, commands } from './live'
+import { PrefMore } from './PrefRow'
 
 /*
  * How voice messages become words: a whisper on this machine, a service the
@@ -21,9 +22,22 @@ export function VoiceSettings(): React.JSX.Element {
   const [key, setKey] = useState('')
   const [said, setSaid] = useState<string | null>(null)
 
+  const [looked, setLooked] = useState<'not yet' | 'looking' | 'none'>('not yet')
+
   useEffect(() => {
     void ask(() => commands.transcribeRead()).then((answer) => setNow(answer.data))
   }, [])
+
+  /* The same read the pane opens with: it looks for a whisper every time, so
+     one installed a minute ago is found without leaving Settings. */
+  const lookAgain = (): void => {
+    setLooked('looking')
+    void ask(() => commands.transcribeRead()).then((answer) => {
+      setSaid(answer.error)
+      if (answer.data) setNow(answer.data)
+      setLooked(answer.data?.local ? 'not yet' : 'none')
+    })
+  }
 
   const save = (next: Transcribing): void => {
     setNow(next)
@@ -48,11 +62,12 @@ export function VoiceSettings(): React.JSX.Element {
   const needsFile = now.local === 'whisper-cli' || now.local === 'whisper-cpp'
   return (
     <div className="pref pref--stack">
-      <span className="pref__body">
+      <div className="pref__body">
         <span className="pref__t">Voice messages</span>
-        <span className="pref__d">
-          The microphone sits beside the paperclip in a chat&rsquo;s composer (Ctrl+Shift+A attaches files); a terminal has neither. Click or hold it to speak, and the words land in the composer to read before sending. Without an engine the recording goes as a file.
-        </span>
+        <span className="pref__d">Speak to a chat: the words land in its composer, to read before sending.</span>
+        <PrefMore>
+          The microphone sits beside the paperclip in a chat&rsquo;s composer (Ctrl+Shift+A attaches files); a terminal has neither. Click or hold it to speak. Without an engine the recording goes as a file. Nothing is sent anywhere unless <b>A service</b> is chosen here.
+        </PrefMore>
         <span className="voice__row" role="radiogroup" aria-label="Engine">
           {ENGINES.map((one) => (
             <button key={one.id} className="btn" data-on={now.engine === one.id ? 'true' : undefined} role="radio" aria-checked={now.engine === one.id} onClick={() => save({ ...now, engine: one.id })}>
@@ -60,16 +75,22 @@ export function VoiceSettings(): React.JSX.Element {
             </button>
           ))}
         </span>
-        {local && (
-          <span className="pref__d">
-            {now.local ? `Found ${now.local}.` : 'No whisper found, then reopen Settings once one is installed:'}
-          </span>
-        )}
+        {local && now.local && <span className="pref__d">Found {now.local}.</span>}
         {local && !now.local && (
-          <ul className="prefhow">
-            <li><b>whisper.cpp</b>: <code>whisper-cli</code> on the PATH, <code>ffmpeg</code> beside it, and a model file such as <code>ggml-base.bin</code> from the whisper.cpp releases, chosen here.</li>
-            <li><b>whisper</b>: <code>pip install openai-whisper</code> (or <code>whisper-ctranslate2</code>), which fetches its <code>base</code> model the first time.</li>
-          </ul>
+          <>
+            <span className="voice__row">
+              <span className="pref__d">{looked === 'none' ? 'Still no whisper on this machine.' : 'No whisper found on this machine.'}</span>
+              <button className="btn" disabled={looked === 'looking'} onClick={lookAgain}>
+                {looked === 'looking' ? 'Looking…' : 'Check again'}
+              </button>
+            </span>
+            <PrefMore label="How to install one">
+              <ul className="prefhow">
+                <li><b>whisper.cpp</b>: <code>whisper-cli</code> on the PATH, <code>ffmpeg</code> beside it, and a model file such as <code>ggml-base.bin</code> from the whisper.cpp releases, chosen here.</li>
+                <li><b>whisper</b>: <code>pip install openai-whisper</code> (or <code>whisper-ctranslate2</code>), which fetches its <code>base</code> model the first time.</li>
+              </ul>
+            </PrefMore>
+          </>
         )}
         {local && needsFile && (
           <span className="voice__row">
@@ -117,7 +138,7 @@ export function VoiceSettings(): React.JSX.Element {
           </label>
         )}
         {said && <span className="pref__d voice__bad">{said}</span>}
-      </span>
+      </div>
     </div>
   )
 }
