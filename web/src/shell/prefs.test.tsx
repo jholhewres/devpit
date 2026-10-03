@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OpenApp, Project } from '../gen/bindings'
-import { PrefsSide } from './PrefsSide'
+import { PrefsSide, rowFor } from './PrefsSide'
 import { matching, PREFS_NAV } from './prefsNav'
 import { OpenIn } from './OpenIn'
 import { ProjectRows } from './ProjectRows'
@@ -203,5 +203,29 @@ describe('removing a project', () => {
     fireEvent.click(screen.getByText(/Also delete/))
     fireEvent.click(screen.getByText('Remove and delete'))
     expect(onConfirm).toHaveBeenLastCalledWith(true)
+  })
+})
+
+describe('a search that lands on its row', () => {
+  const pane = (): HTMLElement => {
+    const root = document.createElement('div')
+    root.innerHTML = `
+      <section class="prefs__in">
+        <div class="pref"><span class="pref__t">Island</span><span class="pref__d">Quiet while you speak</span></div>
+        <div class="pref"><span class="pref__t">Voice messages</span><details><p>a whisper on this machine</p></details></div>
+      </section>
+      <section class="prefs__in" hidden><div class="pref"><span class="pref__t">Speak hidden</span></div></section>`
+    return root
+  }
+
+  it('prefers the row titled with the words over one that only mentions them', () => {
+    expect(rowFor('voice', pane())?.textContent).toContain('Voice messages')
+    expect(rowFor('speak', pane())?.textContent).toContain('Island')
+  })
+
+  it('finds words folded into a row, and nothing in a pane that is not shown', () => {
+    expect(rowFor('whisper', pane())?.textContent).toContain('Voice messages')
+    expect(rowFor('hidden', pane())).toBeNull()
+    expect(rowFor('  ', pane())).toBeNull()
   })
 })

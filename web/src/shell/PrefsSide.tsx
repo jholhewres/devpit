@@ -13,6 +13,16 @@ import type { PrefsPane } from './shape'
  * would look for instead of that name.
  */
 
+/** The row a search was after, in the pane on screen: one titled with the
+ *  words first, then one that says them anywhere, folded help included. */
+export function rowFor(query: string, root: ParentNode = document): HTMLElement | null {
+  const wanted = query.trim().toLowerCase()
+  if (!wanted) return null
+  const rows = Array.from(root.querySelectorAll<HTMLElement>('.prefs__in:not([hidden]) .pref'))
+  const said = (row: HTMLElement, part: string): boolean => (row.querySelector(part)?.textContent ?? '').toLowerCase().includes(wanted)
+  return rows.find((row) => said(row, '.pref__t')) ?? rows.find((row) => (row.textContent ?? '').toLowerCase().includes(wanted)) ?? null
+}
+
 export function PrefsSide({
   pane,
   onBack,
@@ -53,7 +63,11 @@ export function PrefsSide({
                 className="prefs__i"
                 key={item.id}
                 aria-selected={pane === item.id}
-                onClick={() => onSelect(item.id)}
+                onClick={() => {
+                  onSelect(item.id)
+                  /* General is long; a search for "whisper" should land on Voice, not on the pane's top. */
+                  if (query.trim()) requestAnimationFrame(() => rowFor(query)?.scrollIntoView({ block: 'center' }))
+                }}
               >
                 {item.icon}
                 {item.label}
