@@ -72,7 +72,7 @@ export const REST_AFTER_MS = 1_500
 export function play(cue: Cue): void {
   try {
     context ??= new AudioContext()
-    if (context.state === 'suspended') void context.resume()
+    if (context.state === 'suspended') void context.resume().catch(() => undefined)
     const start = context.currentTime + 0.02
     const { wave, notes } = TUNES[cue]
     const ends = Math.max(...notes.map((note) => note.at + note.lasts)) + 0.05

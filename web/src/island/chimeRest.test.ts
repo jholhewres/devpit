@@ -55,4 +55,23 @@ describe('the island audio', () => {
     expect(audio.suspended).toBe(2)
     expect(Context.made).toBe(made)
   })
+
+  /* WebKit refuses to resume audio before the person has touched the window;
+     that refusal is no error worth a report. */
+  it('lets a refused wake-up go without a loose rejection', async () => {
+    vi.stubGlobal('AudioContext', Context)
+    play('done')
+    const audio = Context.last!
+    audio.state = 'suspended'
+    audio.resume = () => Promise.reject(new Error('not allowed to start'))
+    const loose = vi.fn()
+    process.on('unhandledRejection', loose)
+    try {
+      play('done')
+      await new Promise((settled) => setTimeout(settled, 0))
+      expect(loose).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', loose)
+    }
+  })
 })
