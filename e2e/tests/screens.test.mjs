@@ -196,8 +196,10 @@ describe('the screens', () => {
     assert.doesNotMatch(said, /Keep transcripts/i)
     const checked = await window.executeScript(function () {
       const switches = Array.prototype.slice.call(document.querySelectorAll('[role="switch"]'))
+      // The switch is only the control; its name is the title it is labelled by.
       const it = switches.find(function (one) {
-        return one.innerText.indexOf('Automatic updates') >= 0
+        const title = document.getElementById(one.getAttribute('aria-labelledby') || '')
+        return (title?.textContent ?? one.innerText).indexOf('Automatic updates') >= 0
       })
       return it?.getAttribute('aria-checked') ?? null
     })

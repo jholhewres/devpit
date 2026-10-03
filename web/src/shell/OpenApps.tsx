@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KnownApp, OpenApp } from '../gen/bindings'
 import { useAway } from './away'
 import { ask, commands } from './live'
+import { PrefRow } from './PrefRow'
 
 /*
  * The apps a folder can be handed to.
@@ -54,13 +55,7 @@ export function OpenApps(): React.JSX.Element {
 
   return (
     <section className="apps">
-      <div className="prefs__hrow">
-        <div>
-          <span className="pref__t">Open in</span>
-          <span className="pref__d">
-            The apps offered when you open a project or a worktree somewhere else.
-          </span>
-        </div>
+      <PrefRow title="Open in" said="The apps offered when you open a project or a worktree somewhere else.">
         <div className="apps__add" ref={menu}>
           <button className="btn" onClick={() => setAdding((was) => !was)}>
             Add app
@@ -86,7 +81,7 @@ export function OpenApps(): React.JSX.Element {
             </div>
           )}
         </div>
-      </div>
+      </PrefRow>
 
       {custom && <Custom onCancel={() => setCustom(false)} onAdd={add} />}
 

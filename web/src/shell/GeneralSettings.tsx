@@ -47,10 +47,11 @@ export function GeneralSettings({ on, set }: { on: (field: Flag) => boolean; set
         on={on('island')}
         onFlip={flip('island')}
         title="Island"
-        said={<>A small window showing what every agent is doing and who is waiting on you. A session&rsquo;s question shows its choices as buttons, and <b>Reply</b> answers it in words without opening its terminal. Drag it to another screen to keep it there. {drawn && DRAWN[drawn]}</>}
+        said="A small window showing what every agent is doing and who is waiting on you."
+        more={<>A session&rsquo;s question shows its choices as buttons, and <b>Reply</b> answers it in words without opening its terminal. Drag it to another screen to keep it there. {drawn && DRAWN[drawn]}</>}
       />
       <PauseSettings />
-      <PrefSwitch on={on('reminders')} onFlip={flip('reminders')} title="Reminders" said="A card's date goes off at its time — a banner here and a notification — and a date with no time goes off at nine that morning. An agent can set one when you ask it to remind you." />
+      <PrefSwitch on={on('reminders')} onFlip={flip('reminders')} title="Reminders" said="A card's date goes off at its time, as a banner here and a notification." more="A date with no time goes off at nine that morning. An agent can set one when you ask it to remind you." />
       <PrefSwitch on={on('focusMode')} onFlip={flip('focusMode')} title="Focus mode" said="Unfinished. A door for one project: what arrives from another waits until you come out." />
 
       <div className="acc__sub">On this desktop</div>
@@ -67,8 +68,9 @@ export function GeneralSettings({ on, set }: { on: (field: Flag) => boolean; set
       <div className="acc__sub">Updates and privacy</div>
       <PrefSwitch on={on('automaticUpdates')} onFlip={flip('automaticUpdates')} title="Automatic updates" said="Check in the background and offer to install." />
       <UpdateSettings />
-      <PrefSwitch on={on('errorReports')} onFlip={flip('errorReports')} title="Error reports" said={<>Send devpit&rsquo;s own errors, without paths or your work, anonymously and only while devpit sits idle. Turning it off deletes what was kept.</>} />
-      {on('errorReports') && <ErrorReportsPreview />}
+      <PrefSwitch on={on('errorReports')} onFlip={flip('errorReports')} title="Error reports" said={<>Send devpit&rsquo;s own errors, without paths or your work, anonymously and only while devpit sits idle. Turning it off deletes what was kept.</>}>
+        {on('errorReports') && <ErrorReportsPreview />}
+      </PrefSwitch>
     </>
   )
 }

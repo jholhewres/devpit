@@ -12,8 +12,9 @@
 .wtb__ok { color: var(--accent); }
 .wtb__no { margin-top: 9px; font-size: 11.5px; color: var(--danger); }
 
-.apps { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
-.apps .prefs__hrow { align-items: flex-start; margin-bottom: 14px; }
+/* A row like the rest of General, with the apps under it as its own list. */
+.apps { display: flex; flex-direction: column; gap: 6px; }
+.apps > .oapp + .oapp { margin-top: 0; }
 .apps__add { position: relative; flex: none; }
 /* Over the list rather than pushing it down: a menu that reflows the rows
    behind it moves the row you were about to click. */

@@ -47,15 +47,40 @@
 .prefs__in > .prefs__h + * { margin-top: 0; }
 .prefs__in > * + .prefs__h { margin-top: 30px; }
 .prefs__h { font-size: 19px; font-weight: 550; letter-spacing: -0.01em; color: var(--text); margin: 0 0 18px; }
+/* A group heading inside a pane: the `* + *` above set its top to the 10px
+   between rows, so it sat as close to the group before as to its own. */
+.prefs__in > * + .acc__sub { margin-top: 28px; }
 
 .pref { display: flex; align-items: flex-start; gap: 16px; width: 100%; text-align: left; padding: 14px 16px; background: var(--raised); border-radius: 10px; }
 .pref__body { flex: 1; min-width: 0; }
 .pref__t { display: block; font-size: 13.5px; color: var(--text); }
 .pref__d { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
 .pref__d code { font-size: 11.5px; }
-.pref .sw { margin-top: 2px; }
-.pref[aria-checked='true'] .sw { background: color-mix(in srgb, var(--accent) 45%, transparent); }
-.pref[aria-checked='true'] .sw::after { transform: translateX(12px); background: var(--accent); }
+/* The switch is its own control, padded past the track so it is not a 30px
+   target; the words beside it no longer flip it. */
+.prefsw { flex: none; align-self: flex-start; padding: 4px; margin: -2px -4px 0 0; border-radius: 12px; }
+.prefsw .sw { display: block; margin-top: 0; }
+.prefsw:hover .sw { background: var(--border-strong); }
+.prefsw[aria-checked='true'] .sw { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.prefsw[aria-checked='true'] .sw::after { transform: translateX(12px); background: var(--accent); }
+.prefsw:disabled { opacity: 0.55; cursor: default; }
+.prefsw:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* A row's long half, folded under one line that says there is more. */
+.prefmore { margin-top: 6px; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
+.prefmore__s { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-size: 12px; color: var(--text-2); border-radius: 5px; }
+.prefmore__s::-webkit-details-marker { display: none; }
+.prefmore__s::before { content: ''; border-left: 4.5px solid currentColor; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; transition: transform 140ms ease; }
+.prefmore[open] > .prefmore__s::before { transform: rotate(90deg); }
+.prefmore__s:hover { color: var(--text); }
+.prefmore__s:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A block, not a flex column: the fold holds running text, and a column made
+   every <b> in it a line of its own. */
+.prefmore__b { margin-top: 8px; padding-left: 12px; border-left: 2px solid var(--border); }
+.prefmore__b p { margin: 0; }
+.prefmore__b > :not(:first-child) { margin-top: 8px; }
+.pref--stack .prefmore { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .prefmore__s::before { transition: none; } }
 
 /* Providers: agent CLIs on this machine. A row says whether it is there
    at all before it offers a switch — the same rule as a plugin. */
@@ -348,20 +373,31 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 
 /* The error report preview: the request body, read before it leaves. */
 .errprev { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 6px 0 12px; }
+.pref .errprev { margin: 0; }
 .errprev__body { align-self: stretch; margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--inset); font-family: var(--mono); font-size: 11.5px; line-height: 1.55; max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
 .prefs__acts { display: flex; gap: 6px; flex: none; }
 
 /* Voice messages: the engine, and what it needs. */
 .pref--stack .pref__body { display: flex; flex-direction: column; gap: 8px; }
+/* The same 4px under the title as a plain row, whatever the gap below it. */
+.pref--stack .pref__t + .pref__d { margin-top: -4px; }
 .voice__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.voice__row .pref__d { margin-top: 0; }
 .voice__row .btn[data-on] { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .voice__l { width: 64px; font-size: 12.5px; color: var(--text-2); }
 .voice__in { flex: 1; min-width: 160px; height: 28px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12.5px; }
 .voice__in--short { flex: none; width: 90px; min-width: 0; }
 .voice__val { flex: 1; min-width: 0; font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .voice__bad { color: var(--danger); }
-/* A how-to under a row: numbered steps, in the row's own small print. */
-.prefhow { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+/* A how-to under a row, in the row's own small print. The base resets list
+   markers, so the numbers are drawn here or there are none. */
+.prefhow { margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); counter-reset: prefhow; }
+.prefhow > li { position: relative; padding-left: 26px; }
+.prefhow > li::before { position: absolute; left: 0; top: 1px; width: 18px; height: 18px; border-radius: 50%; font-size: 10.5px; font-weight: 600; line-height: 18px; text-align: center; color: var(--text-2); background: var(--overlay-strong); }
+ol.prefhow > li { counter-increment: prefhow; }
+ol.prefhow > li::before { content: counter(prefhow); }
+ul.prefhow > li { padding-left: 14px; }
+ul.prefhow > li::before { content: ''; top: 8px; left: 3px; width: 4px; height: 4px; }
 
 /* The composer's files and voice, beside send. */
 .ctools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }

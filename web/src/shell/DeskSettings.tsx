@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
+import { PrefRow } from './PrefRow'
 import { PrefSwitch } from './PrefSwitch'
 import { abandoned } from './typing'
 
@@ -70,27 +71,27 @@ export function DeskSettings(): React.JSX.Element {
         on={atLogin}
         onFlip={() => void ask(() => commands.atLoginSet(!atLogin)).then((answer) => setAtLogin(answer.data ?? atLogin))}
         title="Open at login"
-        said={<>devpit starts with your desktop, so the island and the reminders are there from the first minute. One copy runs at a time: opening devpit again brings this one forward. Its tray icon opens it, pauses it for an hour and quits it.</>}
+        said="devpit starts with your desktop, so the island and the reminders are there from the first minute."
+        more="One copy runs at a time: opening devpit again brings this one forward. Its tray icon opens it, pauses it for an hour and quits it."
       />
-      <div className="prefs__hrow">
-        <div>
-          <span className="pref__t">Shortcut</span>
-          <span className="pref__d">
+      <PrefRow
+        title="Shortcut"
+        said={
+          <>
             {recording ? 'Press the keys — Escape to stop.' : shortcut ? `${shortcut} brings devpit forward from anywhere.` : 'Keys that bring devpit forward from anywhere. None yet.'}
             {refused && ` ${refused}`}
-          </span>
-        </div>
-        <span className="prefs__acts">
-          <button className="btn" onClick={() => setRecording((was) => !was)}>
-            {recording ? 'Stop' : shortcut ? 'Change' : 'Choose'}
+          </>
+        }
+      >
+        <button className="btn" onClick={() => setRecording((was) => !was)}>
+          {recording ? 'Stop' : shortcut ? 'Change' : 'Choose'}
+        </button>
+        {shortcut && !recording && (
+          <button className="btn" onClick={clear}>
+            Clear
           </button>
-          {shortcut && !recording && (
-            <button className="btn" onClick={clear}>
-              Clear
-            </button>
-          )}
-        </span>
-      </div>
+        )}
+      </PrefRow>
     </>
   )
 }

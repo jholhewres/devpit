@@ -1,3 +1,4 @@
+import { PrefMore } from './PrefRow'
 import { pauseOptions, usePause } from './usePause'
 
 /*
@@ -10,11 +11,12 @@ export function PauseSettings(): React.JSX.Element {
   const until = paused.until === null ? 'until you resume' : `until ${new Date(paused.until * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
   return (
     <div className="pref pref--stack">
-      <span className="pref__body">
+      <div className="pref__body">
         <span className="pref__t">Pause{paused.on && ` — paused ${until}`}</span>
-        <span className="pref__d">
-          Quiet for a meeting or a stretch of thought: no notifications, the island neither opens nor sounds, and a terminal&rsquo;s permission question goes straight to that terminal. Agents keep working, their news is still heard and reminders still go off. Also in the status strip and the tray.
-        </span>
+        <span className="pref__d">Quiet for a meeting or a stretch of thought. Agents keep working.</span>
+        <PrefMore>
+          No notifications, the island neither opens nor sounds, and a terminal&rsquo;s permission question goes straight to that terminal. Agents&rsquo; news is still heard and reminders still go off. Also in the status strip and the tray.
+        </PrefMore>
         <span className="voice__row">
           {paused.on ? (
             <button className="btn" onClick={resume}>
@@ -28,7 +30,7 @@ export function PauseSettings(): React.JSX.Element {
             ))
           )}
         </span>
-      </span>
+      </div>
     </div>
   )
 }

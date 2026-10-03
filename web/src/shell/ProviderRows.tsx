@@ -5,6 +5,7 @@ import { AgentRow } from './AgentRow'
 import { FieldSelect } from './FieldSelect'
 import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from './catalogue'
 import { ask, commands } from './live'
+import { PrefSwitch } from './PrefSwitch'
 import { ProfileEditor } from './ProfileEditor'
 import { blank, declaredFrom, draftOf, profilesChanged, type Draft } from './profiles'
 import { useKnownAgents } from './useKnownAgents'
@@ -170,25 +171,21 @@ export function ProviderRows(): React.JSX.Element {
         )}
       </div>
 
-      <button
-        className="pref"
-        role="switch"
-        aria-checked={choice.hooks}
+      <PrefSwitch
+        on={choice.hooks}
         disabled={busy}
-        onClick={() => setHooks(!choice.hooks)}
-      >
-        <span className="pref__body">
-          <span className="pref__t">Agent status hooks</span>
-          <span className="pref__d">
-            Shows working, waiting and done on the island, in the sidebar and on a card, for
-            Claude Code and the Gemini CLI run in devpit&rsquo;s terminals. The hooks travel
+        onFlip={() => setHooks(!choice.hooks)}
+        title="Agent status hooks"
+        said="Shows working, waiting and done on the island, in the sidebar and on a card."
+        more={
+          <>
+            For Claude Code and the Gemini CLI run in devpit&rsquo;s terminals. The hooks travel
             with the launch &mdash; nothing is written into your own configuration, so turning
             this off is the whole of turning it off. Any other agent can report with{' '}
             <code>devpit-agent hook --agent &lt;name&gt; &lt;event&gt;</code>, run in one of devpit&rsquo;s terminals.
-          </span>
-        </span>
-        <span className="sw"></span>
-      </button>
+          </>
+        }
+      />
 
       <div className="card2">
         <div className="card2__top">

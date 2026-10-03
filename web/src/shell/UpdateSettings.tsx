@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import type { UpdateStatus } from '../gen/bindings'
 import { ask, commands } from './live'
+import { PrefRow } from './PrefRow'
 import { SHOW_THE_UPDATE } from './UpdateCard'
 import { useShell } from './useShell'
 import { useUpdateStatus } from './useUpdateStatus'
@@ -120,17 +121,18 @@ export function UpdateSettings(): React.JSX.Element {
   const busy = asking || status?.type === 'checking' || status?.type === 'installing'
 
   return (
-    <div className="prefs__hrow">
-      <div>
-        <span className="pref__t">
+    <PrefRow
+      title={
+        <>
           Updates{version && ` · you have ${version}`}
           {fromATestFeed(status) && ' · test feed'}
-        </span>
-        <span className="pref__d">{said(status)}</span>
-      </div>
+        </>
+      }
+      said={said(status)}
+    >
       <button className="btn" disabled={busy} onClick={onTheCard ? toTheCard : offered ? update : check}>
         {busy ? 'Working…' : onTheCard ? 'Show the update' : offered ? 'Update' : 'Check now'}
       </button>
-    </div>
+    </PrefRow>
   )
 }
