@@ -158,10 +158,18 @@ pub async fn project_open(project_id: String) -> Result<ProjectList, RpcError> {
 
 /// [`project_open`], on the calling thread.
 pub(crate) fn project_open_now(project_id: String) -> Result<ProjectList, RpcError> {
-    let store = store()?;
-    locate(&store, &project_id)?;
-    store.touch_project(&project_id)?;
+    opened(&store()?, &project_id)?;
     project_list_now()
+}
+
+/// Whether the project can be opened. The touch only orders the list, so a
+/// store too busy to take it costs that order, not the project.
+pub(crate) fn opened(store: &Store, project_id: &str) -> Result<(), RpcError> {
+    locate(store, project_id)?;
+    if let Err(err) = store.touch_project(project_id) {
+        eprintln!("devpit: {project_id} opened without moving up the list: {err}");
+    }
+    Ok(())
 }
 
 /// `project.forget` — takes a project out of the list.

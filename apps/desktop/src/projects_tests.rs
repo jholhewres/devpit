@@ -50,3 +50,22 @@ fn a_folder_that_is_not_a_repository_has_no_changes() {
 
     assert!(changes.is_empty());
 }
+
+/// The touch only orders the list: a store that refuses it still opens the
+/// project it was asked about.
+#[test]
+fn a_project_opens_when_its_place_in_the_list_cannot_be_written() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("store");
+    let id = store.add_project(dir.path(), None).expect("project");
+    store
+        .conn()
+        .execute_batch(
+            "CREATE TRIGGER refused BEFORE UPDATE ON project
+             BEGIN SELECT RAISE(FAIL, 'database is locked'); END;",
+        )
+        .expect("a store that refuses the touch");
+    assert!(store.touch_project(&id).is_err(), "the touch went through");
+
+    opened(&store, &id).expect("opened all the same");
+}
