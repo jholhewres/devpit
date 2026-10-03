@@ -9,6 +9,7 @@ pub mod context;
 pub mod descendants;
 pub mod ended;
 pub mod manifest;
+pub mod report;
 pub mod runner;
 pub mod said;
 

@@ -1103,7 +1103,9 @@ name = "devpit-steps"
 version = "0.1.34"
 dependencies = [
  "devpit-pty",
+ "devpit-rpc",
  "libc",
+ "quick-xml",
  "serde",
  "serde_json",
  "tempfile",

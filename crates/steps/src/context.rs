@@ -18,6 +18,7 @@ pub const CONTEXT_KEYS: &[&str] = &[
     "baseRef",
     "card",
     "cardTitle",
+    "reportDir",
 ];
 
 /// The values behind those keys, for one run.
@@ -34,6 +35,8 @@ pub struct Context {
     pub base_ref: String,
     pub card: String,
     pub card_title: String,
+    /// This run's empty folder for test reports.
+    pub report_dir: String,
     /// The variables the project's worktree preparation shares with every
     /// command in a checkout (`CARGO_TARGET_DIR`, say). Never a `DEVPIT_` key:
     /// those are devpit's to say.
@@ -50,6 +53,7 @@ impl Context {
             "baseRef" => Some(&self.base_ref),
             "card" => Some(&self.card),
             "cardTitle" => Some(&self.card_title),
+            "reportDir" => Some(&self.report_dir),
             _ => None,
         }
     }

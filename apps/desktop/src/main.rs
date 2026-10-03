@@ -75,6 +75,7 @@ mod checkout;
 mod checkpoint;
 mod checkpoint_findings;
 mod checkpoint_preview;
+mod checkpoint_tested;
 mod claude_plugin;
 #[cfg(any(debug_assertions, test))]
 mod contract;

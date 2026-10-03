@@ -1511,6 +1511,7 @@ export const commands = {
 	checkpointRead: (runId: string) => typedError<Checked, RpcError>(__TAURI_INVOKE("checkpoint_read", { runId })),
 	checkpointFindings: (runId: string) => typedError<Found, RpcError>(__TAURI_INVOKE("checkpoint_findings", { runId })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
+	checkpointTested: (runId: string) => typedError<Tested, RpcError>(__TAURI_INVOKE("checkpoint_tested", { runId })),
 	/**  `plugin.list` — the catalogue, and what this project has on. */
 	pluginList: (projectId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_list", { projectId })),
 	/**
@@ -2297,6 +2298,15 @@ export type ErrorReportsPreview = {
 	waiting: number,
 	/**  The next request's body, exactly as it would go. */
 	next: string,
+};
+
+/**  One test that failed, as the report named it. */
+export type FailedTest = {
+	name: string,
+	/**  Relative to where the run worked when it was under it. */
+	file: string | null,
+	/**  The first line of what it said, cut short. */
+	message: string | null,
 };
 
 /**
@@ -4180,6 +4190,18 @@ export type Taken = {
 	count: number,
 	/**  Which domains they were for, in the order they were asked for. */
 	domains: string[],
+};
+
+/**  What every report a run left said, added up. */
+export type Tested = {
+	passed: number,
+	/**  Tests that failed, and files that failed before any test in them ran. */
+	failed: number,
+	skipped: number,
+	/**  At most [`MOST_FAILURES_KEPT`]; `failed` says how many there were. */
+	failures: FailedTest[],
+	/**  Formats read: `vitest`, `cargo test`, `JUnit`. */
+	readFrom: string[],
 };
 
 /**

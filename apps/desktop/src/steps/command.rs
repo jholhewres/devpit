@@ -50,6 +50,15 @@ pub fn run(
         }
     }
 
+    // Reports written here become the run's result.
+    let reports = devpit_core::Store::root()
+        .ok()
+        .and_then(|root| super::tested::fresh_folder(store, &root, card_id, run_id));
+    context.report_dir = reports
+        .as_deref()
+        .map(|folder| folder.display().to_string())
+        .unwrap_or_default();
+
     // Before the command, never after: a step that commits moves HEAD, and a
     // revision read at the end would name the code this run produced rather
     // than the code it ran against.
@@ -83,6 +92,14 @@ pub fn run(
         },
     )
     .map_err(|err| err.to_string())?;
+
+    super::tested::kept(
+        store,
+        run_id,
+        reports.as_deref(),
+        (!ended.output_cut).then_some(output.as_str()),
+        &cwd,
+    );
 
     if ended.timed_out {
         return Ok(Finished {

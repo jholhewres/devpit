@@ -218,6 +218,11 @@ impl ProjectHome {
         self.dir().join("artifacts")
     }
 
+    /// Per-run folders for command steps' test reports.
+    pub fn reports(&self) -> PathBuf {
+        self.dir().join("reports")
+    }
+
     /// Each terminal's finished commands, kept across restarts.
     pub fn blocks(&self) -> PathBuf {
         self.dir().join("blocks")

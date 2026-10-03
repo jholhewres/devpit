@@ -4,6 +4,7 @@ import type { Checked } from '../gen/bindings'
 import { ask, commands } from './live'
 import { CURRENT_MEANS, saidNothing, validityWords, verdictWords, whoseWords } from './checked'
 import { FoundPane } from './FoundPane'
+import { TestedPane } from './TestedPane'
 import { WouldRunCard } from './WouldRunCard'
 
 /*
@@ -74,6 +75,7 @@ export function Checked({
       </p>
 
       <FoundPane runId={runId} />
+      <TestedPane runId={runId} />
 
       {/* Two sentences, because they are two facts: one thing can ask for a
           run that another carries out. */}

@@ -83,6 +83,13 @@ exits zero and checked nothing. So a run carries three answers rather than one
 the code in front of you — and a run that left nothing devpit can read reports
 no result rather than a green tick.
 
+What devpit reads: every file a command step writes into `$DEVPIT_REPORT_DIR`
+— vitest or jest JSON (`--reporter=json --outputFile=…`), JUnit XML from pytest,
+Node's runner, go-junit-report, Maven or Gradle — and the `test result:` lines
+`cargo test` prints, or its JSON lines on nightly. The folder is the run's own
+and empty when it starts, so a report left by an earlier run is never read as
+this one's. Zero tests passed is still no result.
+
 **Secrets devpit handed out are taken out of a run's output before it is
 stored**: a profile's environment, the account token, the hook secret. This is
 not detection. A secret the command read from a file or fetched itself is one

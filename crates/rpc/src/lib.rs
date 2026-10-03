@@ -40,6 +40,7 @@ pub mod session_regroup;
 pub mod session_tree;
 pub mod settings;
 pub mod spend;
+pub mod tested;
 mod threads;
 pub mod tile;
 pub mod update;
@@ -106,6 +107,7 @@ pub use spend::{
     PlanLimits, PlanWindow, SpendCard, SpendDay, SpendHistory, SpendInstallation, SpendRow,
     SpendSession, SpendShare, TokenCounts,
 };
+pub use tested::{FailedTest, Tested, MOST_FAILURES_KEPT, TESTS_EVIDENCE};
 pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
 pub use update::{InstallKind, UpdateBlocking, UpdateStatus, UpdateWork};

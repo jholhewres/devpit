@@ -12,6 +12,7 @@
  */
 
 import { strict as assert } from 'node:assert'
+import { fileURLToPath } from 'node:url'
 import { after, before, describe, test } from 'node:test'
 import { By, until } from 'selenium-webdriver'
 
@@ -193,5 +194,58 @@ describe('the Checks panel', () => {
     const words = await said()
     assert.match(words, /true/, 'the command is not on screen')
     assert.match(words, /Current|Stale|Unknown/, 'nothing said whether it still holds')
+  })
+
+  /* A recorded vitest report in $DEVPIT_REPORT_DIR reads as Passed. */
+  test('a run whose vitest report passed is drawn as a pass', async () => {
+    const report = fileURLToPath(
+      new URL('../../crates/steps/fixtures/reports/vitest-passed.json', import.meta.url),
+    )
+    const made = await invoke(window, 'step_create', {
+      projectId: seeded.project.id,
+      kind: 'command',
+      name: 'vitest',
+      config: JSON.stringify({
+        command: `cp '${report}' "$DEVPIT_REPORT_DIR/vitest.json"`,
+        needsWorktree: false,
+      }),
+      irreversible: false,
+    })
+    const mine = (made.steps ?? []).find((one) => one.name === 'vitest')
+    await invoke(window, 'column_set_step', {
+      projectId: seeded.project.id,
+      columnId: borrowed.columnId,
+      stepId: mine.id,
+    })
+    await invoke(window, 'card_play', {
+      projectId: seeded.project.id,
+      cardId: seeded.card.id,
+      confirmed: false,
+    })
+    await window.wait(async () => {
+      const runs = await invoke(window, 'runs_list', {
+        query: {
+          projectId: seeded.project.id,
+          stepId: mine.id,
+          state: null,
+          since: null,
+          until: null,
+          after: null,
+        },
+      })
+      return runs.runs.some((one) => one.run.state === 'ok')
+    }, 30000)
+
+    await shut()
+    await settle(300)
+    await openRuns()
+    await settle(1500)
+    // The newest run is the first row.
+    await clickSaying('ok')
+    await settle(1500)
+
+    const words = await said()
+    assert.match(words, /\bPassed\b/, `the pass is not on screen: ${words.slice(0, 400)}`)
+    assert.match(words, /2 passed, 0 failed — read from vitest/)
   })
 })

@@ -82,6 +82,8 @@ impl Context {
             base_ref: self.base_ref.clone().unwrap_or_default(),
             card: self.card.clone(),
             card_title: self.card_title.clone(),
+            // Set by the run, which creates the folder.
+            report_dir: String::new(),
             shared: Vec::new(),
         }
     }

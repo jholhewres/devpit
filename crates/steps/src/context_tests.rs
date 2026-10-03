@@ -11,6 +11,7 @@ fn sample() -> Context {
         base_ref: "9f1c2b7".to_owned(),
         card: "card_1".to_owned(),
         card_title: "Ship it".to_owned(),
+        report_dir: "/home/x/.devpit/reports/run_1".to_owned(),
         shared: Vec::new(),
     }
 }

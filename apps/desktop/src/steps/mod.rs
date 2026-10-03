@@ -12,6 +12,7 @@ pub mod context;
 pub mod recipe;
 pub mod review;
 pub mod session;
+pub mod tested;
 pub mod verdict;
 pub mod what_ran;
 

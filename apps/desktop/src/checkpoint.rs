@@ -13,22 +13,25 @@ use devpit_core::store::Evidence;
 use devpit_core::store::{Asked, Carried, Ran, WhoseRun};
 use devpit_core::Store;
 use devpit_rpc::{
-    verdict, Checked, ErrorCode, Report, Review, RpcError, WhatRan, Whose, REVIEW_EVIDENCE,
+    verdict, Checked, ErrorCode, Report, Review, RpcError, Tested, WhatRan, Whose, REVIEW_EVIDENCE,
+    TESTS_EVIDENCE,
 };
 
 use crate::still_holds::still_holds;
 
 /// What a run reported, read back out of its evidence.
 ///
-/// A review is the one shape devpit writes itself, so it is the one shape this
-/// reads: blocking findings are failures, and a review that found none passed
-/// what it was asked to look for. Nothing else is read yet — a command step's
-/// test report has no parser, which is why [`devpit_rpc::verdict`] answers
-/// `Inconclusive` for a green command. `.omc/evidence/20/relatorios.md`
-/// measured what this project actually produces; the first of those is the
-/// vitest JSON.
+/// Reads a review (blocking findings fail) or a test report. Neither means
+/// no report, which [`devpit_rpc::verdict`] never calls a pass.
 fn reported(evidence: Option<&Evidence>) -> Option<Report> {
     let evidence = evidence?;
+    if evidence.version == TESTS_EVIDENCE {
+        let tested: Tested = serde_json::from_str(&evidence.payload).ok()?;
+        return Some(Report {
+            passed: tested.passed,
+            failed: tested.failed,
+        });
+    }
     if evidence.version != REVIEW_EVIDENCE {
         // A shape this build does not know is not a shape to read as though it
         // were the one it does.
