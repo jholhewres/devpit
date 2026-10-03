@@ -3,6 +3,14 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## Unreleased
+
+### Fixes
+
+- **Closing the window ends devpit**, and *Quit devpit* in the tray always
+  does. devpit used to stay running behind the island with no window, and the
+  tray could no longer open or quit it. Terminals keep running in tmux.
+
 ## 0.1.33 — 2026-10-02
 
 ### Settings
