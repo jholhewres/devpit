@@ -30,6 +30,43 @@ pub(crate) fn forward(app: &AppHandle) {
     let _ = crate::island::raised(app);
 }
 
+/// The window whose going ends devpit. The terminals live in tmux and outlive
+/// it; a process kept for the island and the tray has nothing left to raise.
+pub(crate) fn ends_devpit(label: &str) -> bool {
+    label == "main"
+}
+
+/// What Quit in the tray does.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Quit {
+    /// As the window's own close button: whatever closing asks, it asks here
+    /// too, and the window going is what ends devpit.
+    CloseTheWindow,
+    /// No window left to ask through, so nothing stands in the way.
+    Exit,
+}
+
+pub(crate) fn quitting(has_window: bool) -> Quit {
+    if has_window {
+        Quit::CloseTheWindow
+    } else {
+        Quit::Exit
+    }
+}
+
+fn quit(app: &AppHandle) {
+    let main = app.get_webview_window("main");
+    match (quitting(main.is_some()), main) {
+        (Quit::CloseTheWindow, Some(main)) => {
+            // A window that will not close must not leave Quit doing nothing.
+            if main.close().is_err() {
+                app.exit(0);
+            }
+        }
+        _ => app.exit(0),
+    }
+}
+
 fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let open = MenuItem::with_id(app, "open", "Open devpit", true, None::<&str>)?;
     let pause = if crate::pausing::paused() {
@@ -99,13 +136,7 @@ fn build_tray(app: &AppHandle) {
             "open" => forward(app),
             "pause" => crate::pausing::for_an_hour(app),
             "resume" => crate::pausing::resume(app),
-            // As the window's own close button: whatever closing asks, it
-            // asks here too.
-            "quit" => {
-                if let Some(main) = app.get_webview_window("main") {
-                    let _ = main.close();
-                }
-            }
+            "quit" => quit(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

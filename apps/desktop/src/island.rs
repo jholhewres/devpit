@@ -589,9 +589,10 @@ pub async fn island_open_pane(
 
 /// Brings devpit's window to the front from a click on the island.
 pub(crate) fn raised(app: &tauri::AppHandle) -> Result<(), RpcError> {
+    // Only while devpit is on its way out: the window going ends the process.
     let main = app
         .get_webview_window("main")
-        .ok_or_else(|| RpcError::internal("there is no main window".to_owned()))?;
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "devpit's window is closing"))?;
     let _ = main.unminimize();
     let _ = main.show();
     // The click was on the island, which never takes focus, so the window

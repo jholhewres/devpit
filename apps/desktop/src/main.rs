@@ -281,6 +281,11 @@ fn main() {
                     }
                 }
             }
+            // The hidden island would otherwise keep the process alive with
+            // no window, on every platform alike.
+            if matches!(event, tauri::WindowEvent::Destroyed) && desk::ends_devpit(window.label()) {
+                tauri::Manager::app_handle(window).exit(0);
+            }
         })
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle
