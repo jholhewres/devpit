@@ -66,6 +66,12 @@ pub(crate) fn session_split_now(
     };
 
     let new_id = format!("leaf_{}", Ulid::generate());
+    let server = match devpit_core::Store::open_default() {
+        Ok(store) => {
+            server.with_window_env(crate::checkout::shared_env_at(&store, &project_id, &cwd))
+        }
+        Err(_) => server,
+    };
     // Tapped as it is made, like every other leaf, or it has no blocks and
     // never says its folder.
     let made = match state.taps.ahead_of(state.app(), &project_id, &new_id) {

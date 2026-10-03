@@ -11,6 +11,7 @@ fn context() -> Context {
         base_ref: "2f0bee9".to_owned(),
         card: "card_1".to_owned(),
         card_title: "a card".to_owned(),
+        shared: Vec::new(),
     }
 }
 

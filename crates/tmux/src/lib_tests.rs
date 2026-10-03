@@ -204,3 +204,13 @@ fn the_format_asks_tmux_for_the_option() {
     // The parser and the format have to agree, and they are written apart.
     assert!(crate::shell::RUNNING_FORMAT.contains("@devpit_profile"));
 }
+
+/// A window is started with the variables it was given, one `-e` each, and
+/// with none when it was given none.
+#[test]
+fn a_window_is_given_its_variables() {
+    let plain = Server::new(std::path::PathBuf::from("/nowhere.sock"));
+    assert!(plain.window_env_args().is_empty());
+    let given = plain.with_window_env(vec![("CARGO_TARGET_DIR".to_owned(), "/cache/t".to_owned())]);
+    assert_eq!(given.window_env_args(), ["-e", "CARGO_TARGET_DIR=/cache/t"]);
+}

@@ -169,7 +169,10 @@ fn load_or_create(
     was_in: impl Fn(&str) -> Option<PathBuf>,
 ) -> Result<SessionLayout, RpcError> {
     let store = store()?;
-    let server = tmux_server()?;
+    // A terminal opened in a card's checkout gets what the project's
+    // preparation shares with every command there.
+    let server =
+        tmux_server()?.with_window_env(crate::checkout::shared_env_at(&store, project_id, cwd));
     let session = devpit_tmux::Server::session_name(project_id);
 
     if let Some((tree, focused)) = store.pane_layout(project_id, tab_id)? {

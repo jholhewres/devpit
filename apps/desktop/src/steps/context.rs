@@ -82,6 +82,7 @@ impl Context {
             base_ref: self.base_ref.clone().unwrap_or_default(),
             card: self.card.clone(),
             card_title: self.card_title.clone(),
+            shared: Vec::new(),
         }
     }
 }

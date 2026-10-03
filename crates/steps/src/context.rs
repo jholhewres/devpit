@@ -34,6 +34,10 @@ pub struct Context {
     pub base_ref: String,
     pub card: String,
     pub card_title: String,
+    /// The variables the project's worktree preparation shares with every
+    /// command in a checkout (`CARGO_TARGET_DIR`, say). Never a `DEVPIT_` key:
+    /// those are devpit's to say.
+    pub shared: Vec<(String, String)>,
 }
 
 impl Context {
@@ -55,14 +59,18 @@ impl Context {
     /// `DEVPIT_` prefixed so a command can tell them from its own, and
     /// upper-snake because that is what a shell script expects to read.
     pub fn environment(&self) -> Vec<(String, String)> {
-        CONTEXT_KEYS
+        // Shared first: a later variable of the same name wins, and the
+        // context's own are the ones that must.
+        self.shared
             .iter()
-            .map(|key| {
+            .filter(|(name, _)| !name.starts_with("DEVPIT_"))
+            .cloned()
+            .chain(CONTEXT_KEYS.iter().map(|key| {
                 (
                     format!("DEVPIT_{}", screaming_snake(key)),
                     self.get(key).unwrap_or_default().to_owned(),
                 )
-            })
+            }))
             .collect()
     }
 }
@@ -79,56 +87,5 @@ fn screaming_snake(key: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample() -> Context {
-        Context {
-            project: "devpit".to_owned(),
-            project_path: "/home/x/devpit".to_owned(),
-            worktree_path: "/home/x/devpit".to_owned(),
-            branch: "devpit/ship-it-01hzxy9k".to_owned(),
-            base_ref: "9f1c2b7".to_owned(),
-            card: "card_1".to_owned(),
-            card_title: "Ship it".to_owned(),
-        }
-    }
-
-    #[test]
-    fn every_key_has_a_value_behind_it() {
-        let context = sample();
-        for key in CONTEXT_KEYS {
-            assert!(context.get(key).is_some(), "no value for {key}");
-        }
-    }
-
-    #[test]
-    fn a_key_that_does_not_exist_has_no_value() {
-        assert_eq!(sample().get("secrets"), None);
-    }
-
-    #[test]
-    fn the_environment_names_are_what_a_shell_script_expects() {
-        let environment = sample().environment();
-        let names: Vec<&str> = environment.iter().map(|(k, _)| k.as_str()).collect();
-        assert!(names.contains(&"DEVPIT_PROJECT_PATH"));
-        assert!(names.contains(&"DEVPIT_CARD_TITLE"));
-        assert!(names.contains(&"DEVPIT_BRANCH"));
-        assert_eq!(names.len(), CONTEXT_KEYS.len());
-    }
-
-    /// The whole reason the context travels this way.
-    #[test]
-    fn a_branch_name_full_of_shell_syntax_is_only_ever_a_value() {
-        let context = Context {
-            branch: "x; rm -rf /tmp/proof".to_owned(),
-            ..sample()
-        };
-        let environment = context.environment();
-        let (_, branch) = environment
-            .iter()
-            .find(|(k, _)| k == "DEVPIT_BRANCH")
-            .expect("no branch in the environment");
-        assert_eq!(branch, "x; rm -rf /tmp/proof");
-    }
-}
+#[path = "context_tests.rs"]
+mod tests;

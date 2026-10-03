@@ -34,7 +34,7 @@ pub fn run(
     let cwd = crate::checkout::cwd_for(store, card_id, step, |_| {})?;
 
     let branch = crate::checkout::branch_of(step, &cwd);
-    let context = super::context::context_of(
+    let mut context = super::context::context_of(
         &card,
         branch
             .as_deref()
@@ -42,6 +42,13 @@ pub fn run(
         Some(&project),
     )
     .for_a_command();
+    // In a card's checkout, what the preparation shares reaches the command
+    // too: it said "every command in the worktree", and only its own got it.
+    if branch.is_some() {
+        if let Ok(Some(project_id)) = store.project_id_of_card(card_id) {
+            context.shared = crate::checkout::shared_env(store, &project_id);
+        }
+    }
 
     // Before the command, never after: a step that commits moves HEAD, and a
     // revision read at the end would name the code this run produced rather

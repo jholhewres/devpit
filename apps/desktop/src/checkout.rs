@@ -3,7 +3,7 @@
 //! Not every step wants a checkout: refining and reviewing read the card's
 //! text, and handing them a worktree costs minutes and gigabytes for nothing.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use devpit_core::Store;
 use devpit_rpc::{Step, StepKind};
@@ -137,6 +137,41 @@ pub fn checkout_of(
         }
         _ => Ok(made.path),
     }
+}
+
+/// [`shared_env`] for a terminal opened at `cwd`: only inside one of the
+/// project's card checkouts, never in the project's own folder.
+pub(crate) fn shared_env_at(store: &Store, project_id: &str, cwd: &Path) -> Vec<(String, String)> {
+    let checkouts: Vec<String> = store
+        .cards(project_id)
+        .map(|cards| {
+            cards
+                .into_iter()
+                .filter_map(|card| card.worktree_path)
+                .collect()
+        })
+        .unwrap_or_default();
+    if in_a_checkout(&checkouts, cwd) {
+        shared_env(store, project_id)
+    } else {
+        Vec::new()
+    }
+}
+
+/// Whether `cwd` is one of these checkouts or a folder inside one.
+pub(crate) fn in_a_checkout(checkouts: &[String], cwd: &Path) -> bool {
+    checkouts.iter().any(|checkout| cwd.starts_with(checkout))
+}
+
+/// The variables a project's worktree preparation shares with every command
+/// in its checkouts. Empty when it declares none or cannot be read.
+pub(crate) fn shared_env(store: &Store, project_id: &str) -> Vec<(String, String)> {
+    let Ok(home) = Store::root() else {
+        return Vec::new();
+    };
+    devpit_core::home::ProjectHome::of(store, &home, project_id)
+        .map(|project| prime::read(&project.prime()).share.into_iter().collect())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

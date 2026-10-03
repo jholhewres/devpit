@@ -5,6 +5,22 @@ use std::path::Path;
 use crate::{naming, Server, TmuxError};
 
 impl Server {
+    /// Windows made from here on start with these variables: a card's
+    /// checkout gets what the project's preparation shares with it.
+    pub fn with_window_env(mut self, env: Vec<(String, String)>) -> Self {
+        self.window_env = env;
+        self
+    }
+
+    /// `-e NAME=value` for each window variable, as `new-window` and
+    /// `new-session` take them.
+    pub(crate) fn window_env_args(&self) -> Vec<String> {
+        self.window_env
+            .iter()
+            .flat_map(|(name, value)| ["-e".to_owned(), format!("{name}={value}")])
+            .collect()
+    }
+
     /// Kills a window and the client session that was pointed at it.
     ///
     /// Both, because `ensure_client_session` makes one grouped session per
@@ -77,6 +93,7 @@ impl Server {
             .map(|part| (*part).to_owned())
             .collect();
         argv.extend(cwd_env(&cwd));
+        argv.extend(self.window_env_args());
         argv.extend(self.shell_args(window));
         let target = format!("{session}:{window}");
         let chained = crate::naming::GROUPED;

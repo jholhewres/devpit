@@ -38,6 +38,8 @@ pub enum TmuxError {
 pub struct Server {
     pub(crate) socket: PathBuf,
     shell: Option<Shell>,
+    /// Variables every window this server makes is started with.
+    pub(crate) window_env: Vec<(String, String)>,
 }
 
 impl Server {
@@ -55,6 +57,7 @@ impl Server {
         Self {
             socket,
             shell: None,
+            window_env: Vec::new(),
         }
     }
 
@@ -130,6 +133,7 @@ impl Server {
             .map(|part| (*part).to_owned())
             .collect();
         argv.extend(windows::cwd_env(&cwd));
+        argv.extend(self.window_env_args());
         argv.extend(self.shell_args(window));
         self.require(&argv.iter().map(String::as_str).collect::<Vec<_>>())?;
         self.quiet_chrome()?;

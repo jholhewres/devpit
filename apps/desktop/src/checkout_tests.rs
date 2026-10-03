@@ -47,3 +47,23 @@ fn renaming_the_column_changes_nothing() {
         needs_worktree(renamed.kind, &renamed.config)
     );
 }
+
+/// The shared variables are for a card's checkout, not the project's folder:
+/// `/w/app` holds the checkouts' parent, and only what is under one counts.
+#[test]
+fn only_a_card_checkout_is_given_the_shared_variables() {
+    let checkouts = vec!["/w/worktrees/prj/card_1".to_owned()];
+    assert!(in_a_checkout(
+        &checkouts,
+        std::path::Path::new("/w/worktrees/prj/card_1")
+    ));
+    assert!(in_a_checkout(
+        &checkouts,
+        std::path::Path::new("/w/worktrees/prj/card_1/src")
+    ));
+    assert!(!in_a_checkout(
+        &checkouts,
+        std::path::Path::new("/w/worktrees/prj/card_10")
+    ));
+    assert!(!in_a_checkout(&checkouts, std::path::Path::new("/w/app")));
+}
