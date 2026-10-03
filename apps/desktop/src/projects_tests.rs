@@ -39,3 +39,14 @@ fn a_project_whose_stored_folder_is_refused_is_erased_and_deletes_nothing() {
         "nobody was told the folder was left"
     );
 }
+
+/// A plain folder is a project devpit opens, so its changes are an empty
+/// list, not an error the report hears about on every turn.
+#[test]
+fn a_folder_that_is_not_a_repository_has_no_changes() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    let changes = changes_in(dir.path()).expect("a plain folder is not an error");
+
+    assert!(changes.is_empty());
+}

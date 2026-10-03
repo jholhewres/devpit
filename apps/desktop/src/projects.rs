@@ -291,7 +291,7 @@ pub(crate) fn project_changes_now(
     let (_, root) = locate(&store, &project_id)?;
     let root = checkout(&root, worktree_id.as_deref());
 
-    let changes = devpit_git::changes(&root).map_err(|err| RpcError::internal(err.to_string()))?;
+    let changes = changes_in(&root)?;
 
     // Summed here rather than on the screen, so the totals stay right if this
     // list is ever paged.
@@ -303,6 +303,15 @@ pub(crate) fn project_changes_now(
         added,
         removed,
     })
+}
+
+/// What has changed in `root`, and nothing for a folder that is not a
+/// repository: devpit opens plain folders too, and the tree asks every turn.
+pub(crate) fn changes_in(root: &Path) -> Result<Vec<devpit_rpc::Change>, RpcError> {
+    match devpit_git::changes(root) {
+        Err(devpit_git::GitError::NotARepository { .. }) => Ok(Vec::new()),
+        changes => changes.map_err(|err| RpcError::internal(err.to_string())),
+    }
 }
 
 /// Resolves which checkout a command is about.
