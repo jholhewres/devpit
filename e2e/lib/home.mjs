@@ -149,6 +149,9 @@ export function seedEnv({ home, feed }) {
     // PATH: a real `claude` in ~/.local/bin is exactly what must not answer.
     PATH: `${join(home, '.local/bin')}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
     GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
+    // Same root as HOME gives; set so the app never hands its window to an
+    // installed devpit over D-Bus.
+    DEVPIT_HOME: join(home, '.devpit'),
     DEVPIT_ACCOUNT_ORIGIN: CLOSED_PORT,
     DEVPIT_ACCOUNT_NO_BROWSER: '1',
     DEVPIT_UPDATE_FEED_FILE: feed,
