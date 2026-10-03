@@ -5,8 +5,10 @@
 //! checkout — including the rule that a folder shows the loudest change under
 //! it, which is the only real decision in here.
 
+use std::io::ErrorKind;
+
 use devpit_core::tree;
-use devpit_rpc::{FileNode, GitStatus, ProjectTree, RpcError};
+use devpit_rpc::{ErrorCode, FileNode, GitStatus, ProjectTree, RpcError};
 
 use crate::projects::{checkout, locate, store};
 
@@ -16,7 +18,16 @@ pub(crate) fn tree_error(err: devpit_core::TreeError) -> RpcError {
         // for a path that escaped than for a folder it could not read, and
         // this process runs terminals — reaching it is reaching the machine.
         devpit_core::TreeError::Outside { .. } => RpcError::forbidden(err.to_string()),
-        other => RpcError::internal(other.to_string()),
+        // A folder deleted under the tree, or one the person cannot read, is
+        // the disk's state and not a bug, so it stays out of the error report.
+        devpit_core::TreeError::Unreadable { ref source, .. } => match source.kind() {
+            ErrorKind::NotFound => RpcError::new(ErrorCode::NotFound, err.to_string()),
+            ErrorKind::PermissionDenied => RpcError::forbidden(err.to_string()),
+            _ => RpcError::internal(err.to_string()),
+        },
+        devpit_core::TreeError::AlreadyExists { .. } => {
+            RpcError::new(ErrorCode::Conflict, err.to_string())
+        }
     }
 }
 
@@ -191,6 +202,22 @@ mod tests {
             is_dir: false,
             ..dir(path)
         }
+    }
+
+    #[test]
+    fn a_folder_gone_or_closed_to_us_is_not_an_internal_error() {
+        let unreadable = |kind: ErrorKind| devpit_core::TreeError::Unreadable {
+            path: "src".into(),
+            source: kind.into(),
+        };
+
+        let gone = tree_error(unreadable(ErrorKind::NotFound));
+        let closed = tree_error(unreadable(ErrorKind::PermissionDenied));
+        let broken = tree_error(unreadable(ErrorKind::Other));
+
+        assert_eq!(gone.code, ErrorCode::NotFound);
+        assert_eq!(closed.code, ErrorCode::Forbidden);
+        assert_eq!(broken.code, ErrorCode::Internal);
     }
 
     #[test]

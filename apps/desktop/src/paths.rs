@@ -23,7 +23,7 @@ fn refused(err: TreeError) -> RpcError {
     match err {
         TreeError::AlreadyExists { .. } => RpcError::new(ErrorCode::Conflict, err.to_string()),
         TreeError::Outside { .. } => RpcError::new(ErrorCode::Forbidden, err.to_string()),
-        other => RpcError::internal(other.to_string()),
+        other => crate::filetree::tree_error(other),
     }
 }
 
