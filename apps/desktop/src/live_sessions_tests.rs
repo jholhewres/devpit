@@ -66,7 +66,8 @@ fn a_live_session_is_placed_on_its_project_and_card() {
         names,
         [
             ("api-worker", Some("prj_1"), None),
-            ("card-worker", None, Some("card_7"))
+            // A card's checkout belongs to the card's project.
+            ("card-worker", Some("prj_1"), Some("card_7"))
         ]
     );
 }

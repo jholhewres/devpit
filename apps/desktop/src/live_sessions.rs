@@ -62,16 +62,27 @@ pub(crate) fn read(
         .filter(|entry| entry.metadata().is_ok_and(|meta| meta.len() <= MOST_BYTES))
         .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
         .filter_map(|text| serde_json::from_str::<Listed>(&text).ok())
-        .filter(|listed| listed.pid.is_some_and(&alive))
+        .filter(|listed| {
+            listed
+                .pid
+                .is_some_and(|pid| alive(pid) && same_start(pid, listed.proc_start.as_deref()))
+        })
         .filter_map(|listed| {
             let cwd = listed.cwd?;
             let name = listed.name?;
-            let project = crate::agent_api::project_at(projects, Path::new(&cwd));
+            // A card's checkout is under devpit's own folder, not its project's.
+            let project = crate::agent_api::project_at(projects, Path::new(&cwd)).or_else(|| {
+                let id = project_of_checkout(worktrees, Path::new(&cwd))?;
+                projects.iter().find(|one| one.id == id)
+            });
             if project.is_some_and(|one| one.orchestrator.is_some()) {
                 return None;
             }
             // The screen only of a session that is listed, and read once.
-            let target = listed.tmux.as_deref().and_then(pane_target);
+            let target = listed
+                .tmux
+                .as_deref()
+                .and_then(|tmux| pane_target(tmux, windows));
             let in_devpit = target.is_some();
             let pane = target.as_deref().and_then(pane_of);
             let waiting = target
@@ -115,12 +126,23 @@ pub(crate) fn card_of(worktrees: &Path, cwd: &Path) -> Option<String> {
     card.starts_with("card_").then(|| card.to_owned())
 }
 
-/// Where to type into a session that runs in a devpit terminal: the CLI
-/// records the tmux client it runs under, `devpit_<project>__<leaf>`, and the
-/// leaf is the window. `None` for anything devpit did not name.
-pub(crate) fn pane_target(listed: &str) -> Option<String> {
-    // The CLI writes where it runs as `session:@window.%pane`; the session is
-    // devpit's client, and the rest — tmux's own ids — says nothing more.
+/// The project whose card checkout `cwd` is in: `worktrees/<project>/<card>`.
+pub(crate) fn project_of_checkout(worktrees: &Path, cwd: &Path) -> Option<String> {
+    card_of(worktrees, cwd)?;
+    let rest = cwd.strip_prefix(worktrees).ok()?;
+    Some(rest.components().next()?.as_os_str().to_str()?.to_owned())
+}
+
+/// Where to type into a session that runs in a devpit terminal, as
+/// `devpit_<project>:<leaf>`. `None` for anything devpit did not name, and for
+/// a pane tmux no longer has.
+///
+/// The CLI writes where it runs once, as `session:@window.%pane`. The session
+/// is the name tmux resolved for the pane at that moment, and with grouped
+/// client sessions that can be another pane's client: every one of them shows
+/// every window. So the pane id decides, looked up in `windows` (pane id →
+/// window, as tmux has it now); the session's name only says the project.
+pub(crate) fn pane_target(listed: &str, windows: &HashMap<String, String>) -> Option<String> {
     let (client, at) = listed.split_once(':').unwrap_or((listed, ""));
     if !at
         .chars()

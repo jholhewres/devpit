@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { AgentThread, LiveSession, Project } from '../gen/bindings'
 import { ask, commands } from './live'
-import { inOrder, refreshSessions, STATE_WORDS, stateOf, useLiveSessions } from './liveStatus'
+import { refreshSessions, STATE_WORDS, useLiveSessions } from './liveStatus'
+import { LINKS_CHANGED } from './projectProposal'
+import { panelGroups, stateOfOne, useCardTitles } from './sessionsPanel'
 import { ReplyDrafts } from './ReplyDrafts'
 import { SessionTerminal } from './SessionTerminal'
 import { opened } from './strip'
@@ -43,6 +45,24 @@ export function since(ms: number | null, now: number): string | null {
  *  they opened and closed as one. */
 export const rowOf = (one: LiveSession): string => `${one.name}:${one.pid}`
 
+/* Whether linked projects with nothing running get a group: a choice kept
+   per window, and off until asked for. */
+const EMPTY_KEY = 'devpit.sessions.showEmpty'
+const keptEmpty = (): boolean => {
+  try {
+    return localStorage.getItem(EMPTY_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+const keepEmpty = (on: boolean): void => {
+  try {
+    localStorage.setItem(EMPTY_KEY, on ? '1' : '0')
+  } catch {
+    /* Not kept: the panel still works, it forgets on reload. */
+  }
+}
+
 /* "3 min" has to move while the panel is on screen, and only then. */
 function useNow(shown: boolean): number {
   const [now, setNow] = useState(() => Date.now())
@@ -63,17 +83,51 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
   const [threads, setThreads] = useState<readonly AgentThread[]>([])
   const [open, setOpen] = useState<string | null>(null)
   const [terminal, setTerminal] = useState<LiveSession | null>(null)
+  const [query, setQuery] = useState('')
+  const [showEmpty, setShowEmpty] = useState(keptEmpty)
+  /* The row whose Stop is being confirmed, in place. */
+  const [stopping, setStopping] = useState<string | null>(null)
+  const [said, setSaid] = useState<string | null>(null)
   const now = useNow(shown)
+  const cardTitles = useCardTitles(sessions, shown)
 
   const readHistory = useCallback(() => {
     if (!project?.orchestrator) return
     void ask(() => commands.orchestratorAgents(project.id)).then((answer) => setThreads(answer.data ?? []))
   }, [project])
+  const readLinks = useCallback(() => {
+    if (project) void ask(() => commands.orchestratorLinks(project.id)).then((answer) => setLinked(answer.data ?? []))
+  }, [project])
   useEffect(() => {
     if (!shown) return
     readHistory()
-    if (project) void ask(() => commands.orchestratorLinks(project.id)).then((answer) => setLinked(answer.data ?? []))
-  }, [shown, readHistory, project])
+    readLinks()
+  }, [shown, readHistory, readLinks])
+  /* Linked from the Boards panel or a proposal: this panel's groups move too. */
+  useEffect(() => {
+    window.addEventListener(LINKS_CHANGED, readLinks)
+    return () => window.removeEventListener(LINKS_CHANGED, readLinks)
+  }, [readLinks])
+
+  /* A project with a session the orchestrator cannot reach yet, linked in
+     one click: its tools act only on linked projects. */
+  const link = (id: string): void => {
+    if (!project) return
+    void ask(() => commands.orchestratorLink(project.id, [...new Set([...linked, id])])).then((answer) => {
+      setSaid(answer.error)
+      if (answer.error) return
+      window.dispatchEvent(new CustomEvent(LINKS_CHANGED))
+    })
+  }
+
+  const stop = (one: LiveSession): void => {
+    if (!profileId) return
+    void ask(() => commands.orchestratorStop(profileId, one.name)).then((done) => {
+      setSaid(done.error ?? done.data ?? null)
+      setStopping(null)
+      refreshSessions(profileId)
+    })
+  }
 
   /* A new terminal in a project: a tab of its own there, kept in its strip,
      opened here over the chat. */
@@ -129,21 +183,10 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
     }
   }
 
-  /* Every project with a session, and every linked one even without: where
-     a new terminal or chat can be started. */
-  const groups = useMemo(() => {
-    const by = new Map<string, { project: Project | null; members: LiveSession[] }>()
-    for (const one of inOrder(sessions)) {
-      const key = one.projectId ?? 'outside'
-      const found = projects.find((candidate) => candidate.id === one.projectId) ?? null
-      by.set(key, { project: found, members: [...(by.get(key)?.members ?? []), one] })
-    }
-    for (const id of linked) {
-      const found = projects.find((candidate) => candidate.id === id)
-      if (found && !by.has(id)) by.set(id, { project: found, members: [] })
-    }
-    return [...by.values()]
-  }, [sessions, linked, projects])
+  const groups = useMemo(
+    () => panelGroups(sessions, linked, projects, query, showEmpty, cardTitles),
+    [sessions, linked, projects, query, showEmpty, cardTitles],
+  )
   const earlier = threads.filter((thread) => !sessions.some((one) => one.name === thread.name))
   const waiting = sessions.filter((one) => one.waiting).length
   const busy = sessions.filter((one) => one.status === 'busy' && !one.waiting).length
@@ -163,12 +206,24 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
           )
         }
       >
+        <PanelAct
+          label={showEmpty ? 'Hide projects with nothing running' : 'Show linked projects with nothing running'}
+          active={showEmpty}
+          onClick={() => setShowEmpty((was) => (keepEmpty(!was), !was))}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h18M3 12h18M3 17h10" /></svg>
+        </PanelAct>
         <PanelAct label="Read again" onClick={() => (profileId && refreshSessions(profileId), readHistory())}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" /></svg>
         </PanelAct>
       </PanelHead>
 
       {profileId && <ReplyDrafts profileId={profileId} sessions={sessions} onDone={() => refreshSessions(profileId)} />}
+
+      {sessions.length > 3 && (
+        <input className="sess__find" type="search" value={query} placeholder="Find a session, project or card" aria-label="Find a session" onChange={(event) => setQuery(event.target.value)} />
+      )}
+      {said && <p className="sess__note sess__said">{said}</p>}
 
       {sessions.length === 0 && (
         <PanelEmpty
@@ -181,10 +236,17 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
         />
       )}
 
-      {groups.map(({ project: where, members }) => (
+      {sessions.length > 0 && groups.length === 0 && <p className="sess__note">No session matches “{query}”.</p>}
+
+      {groups.map(({ project: where, members, linked: reached }) => (
         <section className="sess__group" key={where?.id ?? 'outside'}>
           <div className="sess__gh">
             <h3 className="sess__g">{where?.name ?? members[0]?.projectName ?? 'Outside devpit'}</h3>
+            {where && !reached && (
+              <button className="sess__link" onClick={() => link(where.id)} title={`Link ${where.name} to this orchestrator: its tools reach only linked projects`}>
+                Link
+              </button>
+            )}
             {where && (
               <>
                 <button className="sess__icon" onClick={() => newTerminal(where)} title={`New terminal in ${where.name}, opened here`} aria-label={`New terminal in ${where.name}`}>
@@ -196,9 +258,10 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
               </>
             )}
           </div>
-          {members.length === 0 && sessions.length > 0 && <p className="sess__none">No session running here.</p>}
+          {members.length === 0 && <p className="sess__none">Nothing running here.</p>}
           {members.map((one) => {
-            const state = stateOf(sessions, one.name)
+            const state = stateOfOne(one)
+            const card = one.cardId ? cardTitles.get(one.cardId) ?? 'a card' : null
             const history = historyOf(one.name)
             const last = history?.events[history.events.length - 1]
             const expanded = open === rowOf(one)
@@ -210,7 +273,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                     <span className="sess__name">{one.name}</span>
                     <span className="sess__state">{STATE_WORDS[state]}</span>
                     <span className="sess__meta">
-                      {[one.cardId ? 'card' : null, since(one.since, now)].filter(Boolean).join(' · ')}
+                      {[card, since(one.since, now)].filter(Boolean).join(' · ')}
                       {/* What it is on right now beats what it last said: a
                           working session's last reply is from the turn before. */}
                       {one.step && state === 'busy'
@@ -228,7 +291,17 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M8 7h9v9" /></svg>
                     </button>
                   )}
+                  <button className="sess__icon sess__icon--stop" onClick={() => setStopping(rowOf(one))} title="Stop it" aria-label={`Stop ${one.name}`}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                  </button>
                 </div>
+                {stopping === rowOf(one) && (
+                  <div className="sess__acts sess__stopask">
+                    <span className="sess__warn">Stop {one.name} and close its terminal? Work in flight is lost.</span>
+                    <button className="sess__btn" onClick={() => setStopping(null)}>Keep it</button>
+                    <button className="sess__btn sess__btn--bad" onClick={() => stop(one)}>Stop</button>
+                  </div>
+                )}
                 {expanded && (
                   <Details
                     session={one}
