@@ -10,7 +10,9 @@
 //! line numbers are not re-pointed at whatever is on those lines now.
 
 use devpit_core::Store;
-use devpit_rpc::{standing, ErrorCode, Found, Review, RpcError, REVIEW_EVIDENCE};
+use devpit_rpc::{
+    standing, CardFindings, CardReview, ErrorCode, Found, Review, RpcError, REVIEW_EVIDENCE,
+};
 
 pub(crate) fn findings(store: &Store, run_id: &str) -> Result<Found, RpcError> {
     if store.run_state(run_id)?.is_none() {
@@ -54,6 +56,46 @@ pub async fn checkpoint_findings(run_id: String) -> Result<Found, RpcError> {
 /// [`checkpoint_findings`], on the calling thread.
 pub(crate) fn checkpoint_findings_now(run_id: String) -> Result<Found, RpcError> {
     findings(&crate::board::store()?, &run_id)
+}
+
+/// The reviews a card's runs left that found something, newest first, with
+/// what the person set aside in each.
+pub(crate) fn of_card(store: &Store, card_id: &str) -> Result<CardFindings, RpcError> {
+    let mut reviews = Vec::new();
+    for run in store.runs(card_id)? {
+        let found = findings(store, &run.id)?;
+        if found.findings.is_empty() {
+            continue;
+        }
+        let dismissed = store.dismissed_findings(&run.id)?;
+        reviews.push(CardReview {
+            run_id: run.id,
+            found,
+            dismissed,
+        });
+    }
+    Ok(CardFindings { reviews })
+}
+
+/// `card.findings` — what every review on this card found, for its diff.
+#[tauri::command]
+#[specta::specta]
+pub async fn card_findings(card_id: String) -> Result<CardFindings, RpcError> {
+    crate::off_main::blocking(move || of_card(&crate::board::store()?, &card_id)).await
+}
+
+/// `finding.dismiss` — sets one finding aside, or brings it back.
+#[tauri::command]
+#[specta::specta]
+pub async fn finding_dismiss(run_id: String, at: u32, dismissed: bool) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        let store = crate::board::store()?;
+        if store.run_state(&run_id)?.is_none() {
+            return Err(RpcError::new(ErrorCode::NotFound, "no such run"));
+        }
+        Ok(store.dismiss_finding(&run_id, at, dismissed)?)
+    })
+    .await
 }
 
 #[cfg(test)]

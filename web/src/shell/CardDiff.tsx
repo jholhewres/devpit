@@ -2,6 +2,9 @@ import { useState } from 'react'
 
 import { ask, commands } from './live'
 import { DiffFiles } from './DiffFiles'
+import { notesOf, SHAPE, tally, type Note } from './diffNotes'
+import { severityWord } from './found'
+import { went } from './problems'
 
 /*
  * What this card has changed, against where it started.
@@ -20,15 +23,26 @@ export function CardDiff({ cardId }: { cardId: string }): React.JSX.Element {
   const [files, setFiles] = useState<readonly string[]>([])
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [notes, setNotes] = useState<readonly Note[]>([])
 
   const look = async (): Promise<void> => {
     setBusy(true)
-    const answer = await ask(() => commands.cardDiff(cardId))
+    const [answer, found] = await Promise.all([
+      ask(() => commands.cardDiff(cardId)),
+      ask(() => commands.cardFindings(cardId)),
+    ])
     setBusy(false)
+    setNotes(found.data ? notesOf(found.data) : [])
     setProblem(answer.error)
     if (!answer.data) return
     setFiles(answer.data.files)
     setRaw(answer.data.diff)
+  }
+
+  const dismiss = async (note: Note, dismissed: boolean): Promise<void> => {
+    const answer = await ask(() => commands.findingDismiss(note.runId, note.at, dismissed))
+    if (!went(answer)) return
+    setNotes((was) => was.map((one) => (one === note ? { ...one, dismissed } : one)))
   }
 
   return (
@@ -46,7 +60,28 @@ export function CardDiff({ cardId }: { cardId: string }): React.JSX.Element {
         <p className="pref__d">Nothing has changed since this card started.</p>
       )}
 
-      {raw && <DiffFiles diff={raw} />}
+      {raw && notes.length > 0 && <Tally notes={notes} />}
+      {raw && <DiffFiles diff={raw} notes={notes} onDismiss={(note, dismissed) => void dismiss(note, dismissed)} />}
     </section>
+  )
+}
+
+/* What the reviews still say, by severity; a click goes to the first one. */
+function Tally({ notes }: { notes: readonly Note[] }): React.JSX.Element {
+  const counts = tally(notes)
+  const first = (): void => {
+    const marker = document.querySelector<HTMLElement>('.cdiff__fd:not([data-dismissed])')
+    marker?.closest<HTMLDetailsElement>('.cdiff__f')?.setAttribute('open', '')
+    marker?.setAttribute('open', '')
+    marker?.scrollIntoView({ block: 'center' })
+  }
+  return (
+    <button className="cdiff__tally" onClick={first}>
+      {(['blocking', 'worth', 'noted'] as const).map((severity) => (
+        <span key={severity} className="fnd__s" data-severity={severity}>
+          {SHAPE[severity]} {counts[severity]} {severityWord(severity)}
+        </span>
+      ))}
+    </button>
   )
 }

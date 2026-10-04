@@ -1518,6 +1518,10 @@ export const commands = {
 	presenceSeen: () => typedError<null, RpcError>(__TAURI_INVOKE("presence_seen")),
 	checkpointRead: (runId: string) => typedError<Checked, RpcError>(__TAURI_INVOKE("checkpoint_read", { runId })),
 	checkpointFindings: (runId: string) => typedError<Found, RpcError>(__TAURI_INVOKE("checkpoint_findings", { runId })),
+	/**  `card.findings` — what every review on this card found, for its diff. */
+	cardFindings: (cardId: string) => typedError<CardFindings, RpcError>(__TAURI_INVOKE("card_findings", { cardId })),
+	/**  `finding.dismiss` — sets one finding aside, or brings it back. */
+	findingDismiss: (runId: string, at: number, dismissed: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("finding_dismiss", { runId, at, dismissed })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
 	checkpointTested: (runId: string) => typedError<Tested, RpcError>(__TAURI_INVOKE("checkpoint_tested", { runId })),
 	diagnosticsEnvironment: () => typedError<EnvironmentReport, RpcError>(__TAURI_INVOKE("diagnostics_environment")),
@@ -1845,12 +1849,25 @@ export type CardDetail = {
 	sessions: CardSession[],
 };
 
+/**  Every review a card's runs left, newest first. */
+export type CardFindings = {
+	reviews: CardReview[],
+};
+
 /**  What `card:happening` carries: a card's sessions, and what they add up to. */
 export type CardHappening = {
 	cardId: string,
 	/**  The one the tile shows. `None` once nothing is left. */
 	activity: Doing | null,
 	sessions: CardSession[],
+};
+
+/**  One run's review, as a card's diff draws it. */
+export type CardReview = {
+	runId: string,
+	found: Found,
+	/**  The places, in `found.findings`, the person set aside. */
+	dismissed: number[],
 };
 
 /**  One session working on a card. */

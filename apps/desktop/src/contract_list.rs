@@ -298,6 +298,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         error_sender::presence_seen,
         checkpoint::checkpoint_read,
         checkpoint_findings::checkpoint_findings,
+        checkpoint_findings::card_findings,
+        checkpoint_findings::finding_dismiss,
         checkpoint_preview::checkpoint_preview,
         checkpoint_tested::checkpoint_tested,
         diagnostics::diagnostics_environment,

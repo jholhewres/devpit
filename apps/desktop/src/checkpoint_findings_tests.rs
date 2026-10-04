@@ -166,3 +166,21 @@ fn a_run_nobody_knows_is_not_found() {
         ErrorCode::NotFound
     );
 }
+
+/// A card's diff hears every review that found something, with what was set
+/// aside; a run that left no review is not one.
+#[test]
+fn a_card_hears_its_reviews_and_what_was_set_aside() {
+    let (_dir, store, run) = a_run();
+    store
+        .record_evidence(&run, &a_review_at(Some("abc")))
+        .expect("evidence");
+    let card = store.run_card(&run).expect("card").expect("a card");
+    store.dismiss_finding(&run, 0, true).expect("dismiss");
+
+    let heard = of_card(&store, &card).expect("findings");
+    assert_eq!(heard.reviews.len(), 1);
+    assert_eq!(heard.reviews[0].run_id, run);
+    assert_eq!(heard.reviews[0].found.findings[0].line, Some(12));
+    assert_eq!(heard.reviews[0].dismissed, vec![0]);
+}

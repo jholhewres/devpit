@@ -174,6 +174,23 @@ impl Found {
     }
 }
 
+/// One run's review, as a card's diff draws it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardReview {
+    pub run_id: String,
+    pub found: Found,
+    /// The places, in `found.findings`, the person set aside.
+    pub dismissed: Vec<u32>,
+}
+
+/// Every review a card's runs left, newest first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardFindings {
+    pub reviews: Vec<CardReview>,
+}
+
 #[cfg(test)]
 #[path = "review_tests.rs"]
 mod tests;

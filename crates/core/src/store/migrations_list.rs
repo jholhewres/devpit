@@ -664,4 +664,18 @@ CREATE INDEX card_reminder ON card(due_at)
 ALTER TABLE board_column ADD COLUMN role TEXT;
 "#,
     },
+    // Migration 025 — a review finding the person set aside.
+    Migration {
+        version: 25,
+        sql: r#"
+-- By the run and the finding's place in its review: a review is written once
+-- and never changes, so the place is the finding's identity.
+CREATE TABLE finding_dismissal (
+    run_id       TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE,
+    at           INTEGER NOT NULL,
+    dismissed_at INTEGER NOT NULL,
+    PRIMARY KEY (run_id, at)
+);
+"#,
+    },
 ];

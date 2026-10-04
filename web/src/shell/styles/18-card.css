@@ -122,6 +122,15 @@
 .cdiff__r { padding: 0 16px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; white-space: pre; color: var(--text-2); }
 .cdiff__r[data-kind='add'] { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--text); }
 .cdiff__r[data-kind='del'] { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--text); }
+/* A review's finding, on the line it names. */
+.cdiff__fd { margin: 2px 16px 4px; padding: 4px 10px; border-left: 2px solid var(--border); background: var(--inset); border-radius: 6px; font-size: 11.5px; }
+.cdiff__fd > summary { display: flex; gap: 10px; align-items: baseline; cursor: default; list-style: none; }
+.cdiff__fd > summary::-webkit-details-marker { display: none; }
+.cdiff__fd .fnd__y { margin: 6px 0; white-space: normal; }
+.cdiff__fd[data-standing='outdated'], .cdiff__fd[data-dismissed] { opacity: .6; }
+.cdiff__fd[data-standing='outdated'] .fnd__s { color: var(--text-3); }
+.cdiff__fl { font-size: 11px; color: var(--text-3); }
+.cdiff__tally { display: flex; gap: 14px; margin: 8px 0; padding: 6px 10px; background: var(--inset); border: 0; border-radius: 8px; font: inherit; font-size: 12px; cursor: pointer; }
 
 /* What a run proves, under the row that ran it. Every state carries a word as
    well as a colour: the point of this panel is that "green" is not an answer,

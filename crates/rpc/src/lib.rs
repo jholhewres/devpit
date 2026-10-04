@@ -94,7 +94,8 @@ pub use remote_view::{
     RemoteTerminal, RemoteView, TailscaleState,
 };
 pub use review::{
-    blocking, reviewed, standing, Finding, Found, Review, Severity, Standing, REVIEW_EVIDENCE,
+    blocking, reviewed, standing, CardFindings, CardReview, Finding, Found, Review, Severity,
+    Standing, REVIEW_EVIDENCE,
 };
 pub use runs::{ProjectRun, RunCursor, RunsPage, RunsQuery};
 pub use search::{SearchFile, SearchHits, SearchLine};

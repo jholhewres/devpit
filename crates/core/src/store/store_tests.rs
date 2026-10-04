@@ -233,6 +233,10 @@ fn a_row_written_before_a_migration_survives_it() {
         .expect("undo 024");
     store
         .conn()
+        .execute_batch("DROP TABLE finding_dismissal;")
+        .expect("undo 025");
+    store
+        .conn()
         .execute_batch("PRAGMA user_version = 16;")
         .expect("back to 16");
     drop(store);
