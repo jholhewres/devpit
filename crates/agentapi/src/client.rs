@@ -16,7 +16,7 @@ const WAIT: Duration = Duration::from_secs(5);
 const STARTING: Duration = Duration::from_secs(90);
 
 /// How long devpit has to answer one question.
-pub(crate) fn wait_for(method: &str) -> Duration {
+pub fn wait_for(method: &str) -> Duration {
     if method == "start" {
         STARTING
     } else {

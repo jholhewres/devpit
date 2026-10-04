@@ -13,6 +13,17 @@ use crate::{identify, run, status::status, GitError};
 /// repository disagree about both, and that disagreement is the reason the
 /// list exists.
 pub fn worktrees(root: &Path, mine: &[PathBuf]) -> Result<Vec<Worktree>, GitError> {
+    listed(root, mine, true)
+}
+
+/// The same checkouts without asking each for its status: one `git` call
+/// rather than one per checkout, for a caller that only needs where they are.
+/// Dirt reads as unknown.
+pub fn worktrees_unread(root: &Path, mine: &[PathBuf]) -> Result<Vec<Worktree>, GitError> {
+    listed(root, mine, false)
+}
+
+fn listed(root: &Path, mine: &[PathBuf], with_status: bool) -> Result<Vec<Worktree>, GitError> {
     let raw = run(root, &["worktree", "list", "--porcelain"])?;
     let current = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
 
@@ -30,11 +41,11 @@ pub fn worktrees(root: &Path, mine: &[PathBuf]) -> Result<Vec<Worktree>, GitErro
         }
 
         let here = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
-        let read = status(&path);
+        let read = with_status.then(|| status(&path).ok()).flatten();
 
         found.push(Worktree {
             id: identify(&here),
-            branch: branch_of(block, &read),
+            branch: branch_of(block, read.as_ref()),
             path: here.display().to_string(),
             folder: here
                 .file_name()
@@ -44,7 +55,7 @@ pub fn worktrees(root: &Path, mine: &[PathBuf]) -> Result<Vec<Worktree>, GitErro
             behind: read.as_ref().map(|s| s.behind).unwrap_or(0),
             // Null, not zero: a checkout whose git could not be read has an
             // unknown amount of work in it, and zero would claim otherwise.
-            dirty_files: read.as_ref().ok().map(|s| s.dirty_files()),
+            dirty_files: read.as_ref().map(|s| s.dirty_files()),
             origin: crate::origin_of(&here, mine),
             current: here == current,
         });
@@ -57,7 +68,7 @@ pub fn worktrees(root: &Path, mine: &[PathBuf]) -> Result<Vec<Worktree>, GitErro
 }
 
 /// The branch, or something a person can act on when there is not one.
-fn branch_of(block: &str, read: &Result<crate::Status, GitError>) -> String {
+fn branch_of(block: &str, read: Option<&crate::Status>) -> String {
     if let Some(reference) = field(block, "branch ") {
         return reference
             .strip_prefix("refs/heads/")
@@ -70,9 +81,7 @@ fn branch_of(block: &str, read: &Result<crate::Status, GitError>) -> String {
     if let Some(head) = field(block, "HEAD ") {
         return head.chars().take(7).collect();
     }
-    read.as_ref()
-        .map(|status| status.branch.clone())
-        .unwrap_or_else(|_| "unknown".to_owned())
+    read.map_or_else(|| "unknown".to_owned(), |status| status.branch.clone())
 }
 
 /// The folder a worktree id names.
@@ -172,5 +181,12 @@ mod tests {
         let other = found.iter().find(|w| w.branch == "side").expect("side");
         assert_eq!(other.dirty_files, Some(1), "dirt read from the wrong tree");
         assert!(!other.current);
+
+        // Unread: the same checkouts and branches, and dirt left unknown.
+        let unread = worktrees_unread(&main, &[]).expect("unread");
+        let paths = |list: &[Worktree]| list.iter().map(|w| w.path.clone()).collect::<Vec<_>>();
+        assert_eq!(paths(&unread), paths(&found));
+        assert!(unread.iter().any(|w| w.branch == "side"));
+        assert!(unread.iter().all(|w| w.dirty_files.is_none()));
     }
 }

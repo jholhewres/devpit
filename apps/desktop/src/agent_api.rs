@@ -98,6 +98,38 @@ pub(crate) fn answer(app: Option<&AppHandle>, body: &str) -> String {
     }
 }
 
+/// [`answer`] on a thread of its own, or an error just before the agent would
+/// stop waiting: a question stuck behind something slow is still answered.
+pub(crate) fn answer_in_time(app: &AppHandle, body: String) -> String {
+    let method = serde_json::from_str::<Asked>(&body)
+        .map(|asked| asked.method)
+        .unwrap_or_default();
+    let app = app.clone();
+    within(patience(&method), &method, move || {
+        answer(Some(&app), &body)
+    })
+}
+
+/// What the agent waits, less a second for the reply to travel.
+fn patience(method: &str) -> std::time::Duration {
+    devpit_agentapi::client::wait_for(method).saturating_sub(std::time::Duration::from_secs(1))
+}
+
+fn within(
+    wait: std::time::Duration,
+    method: &str,
+    work: impl FnOnce() -> String + Send + 'static,
+) -> String {
+    let (said, heard) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = said.send(work());
+    });
+    heard.recv_timeout(wait).unwrap_or_else(|_| {
+        json!({ "error": format!("devpit is still working on `{method}` and may yet finish it — check before asking again") })
+            .to_string()
+    })
+}
+
 fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     if asked.method == "methods" {
         return Ok(json!(METHODS));
@@ -105,7 +137,9 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     if !METHODS.contains(&asked.method.as_str()) {
         return Err(format!("devpit does not answer `{}`", asked.method));
     }
-    let projects = crate::projects::project_list_now().map_err(said)?.projects;
+    let projects = crate::projects::project_list_unread_now()
+        .map_err(said)?
+        .projects;
     let here = project_at(&projects, Path::new(&asked.cwd))
         .ok_or_else(|| format!("no devpit project contains {}", asked.cwd))?;
     respond_in(app, &projects, here, asked)

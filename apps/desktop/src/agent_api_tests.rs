@@ -161,3 +161,36 @@ fn a_project_agent_reads_no_session_and_nothing_answers_a_prompt() {
         .iter()
         .any(|method| method.contains("answer") || method.contains("press")));
 }
+
+/// A question stuck behind something slow is answered before the agent gives
+/// up, and the answer says it may still be applied.
+#[test]
+fn a_slow_answer_is_cut_short_with_an_error() {
+    let started = std::time::Instant::now();
+    let said = super::within(std::time::Duration::from_millis(50), "board", || {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        "late".to_owned()
+    });
+    assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    let said: serde_json::Value = serde_json::from_str(&said).expect("json");
+    assert!(said["error"]
+        .as_str()
+        .is_some_and(|why| why.contains("`board`")));
+}
+
+/// Inside the deadline the answer is the work's own.
+#[test]
+fn a_quick_answer_passes_through() {
+    let said = super::within(std::time::Duration::from_secs(2), "board", || {
+        "{\"ok\":1}".to_owned()
+    });
+    assert_eq!(said, "{\"ok\":1}");
+}
+
+/// The app gives up before the client does, so its error is the one read.
+#[test]
+fn the_app_stops_waiting_before_the_agent_does() {
+    for method in ["board", "start"] {
+        assert!(super::patience(method) < devpit_agentapi::client::wait_for(method));
+    }
+}

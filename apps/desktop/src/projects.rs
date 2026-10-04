@@ -45,6 +45,12 @@ pub(crate) fn locate(
 /// had they been optional, which is how a list ends up disagreeing with the
 /// row that was just added to it.
 pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
+    drawn_with(store, row, devpit_git::worktrees)
+}
+
+type Listing = fn(&Path, &[PathBuf]) -> Result<Vec<devpit_rpc::Worktree>, devpit_git::GitError>;
+
+fn drawn_with(store: &Store, row: devpit_core::ProjectRow, listing: Listing) -> Project {
     let root = PathBuf::from(&row.root_path);
     let hidden = crate::sources::hidden(store);
     let orchestrator = devpit_core::Store::root()
@@ -56,7 +62,7 @@ pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
     let (worktrees, unreadable) = if orchestrator.is_some() {
         (Vec::new(), None)
     } else {
-        match devpit_git::worktrees(&root, &crate::sources::ours(store, &root)) {
+        match listing(&root, &crate::sources::ours(store, &root)) {
             // Filtered here rather than on the screen: the count on the row
             // and the list behind it are the same question, and two places
             // applying the same rule is two places to get it wrong.
@@ -100,12 +106,23 @@ pub async fn project_list() -> Result<ProjectList, RpcError> {
 
 /// [`project_list`], on the calling thread.
 pub(crate) fn project_list_now() -> Result<ProjectList, RpcError> {
+    listed(devpit_git::worktrees)
+}
+
+/// Every project with where its checkouts are, but not their status: one git
+/// call per project instead of one per checkout. What an agent's question
+/// needs, answered inside the few seconds the agent waits.
+pub(crate) fn project_list_unread_now() -> Result<ProjectList, RpcError> {
+    listed(devpit_git::worktrees_unread)
+}
+
+fn listed(listing: Listing) -> Result<ProjectList, RpcError> {
     let store = store()?;
 
     let projects = store
         .projects()?
         .into_iter()
-        .map(|row| drawn(&store, row))
+        .map(|row| drawn_with(&store, row, listing))
         .collect();
 
     Ok(ProjectList { projects })

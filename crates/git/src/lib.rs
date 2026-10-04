@@ -69,7 +69,7 @@ pub use standing::standing_at;
 pub use state::{plain_branch, repo_state, BranchState, RepoState};
 pub use status::{changes, status, Status};
 pub use weblink::{commit_link, web_url, CommitLink};
-pub use worktrees::{worktree_path, worktrees};
+pub use worktrees::{worktree_path, worktrees, worktrees_unread};
 
 #[derive(Debug, thiserror::Error)]
 pub enum GitError {

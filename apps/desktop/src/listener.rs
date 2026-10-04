@@ -169,7 +169,10 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     // asked for, and nothing about it reaches the hook path below.
     if posted.agent {
         trace(&format!("post seq={seq} agent"));
-        reply(&mut stream, &crate::agent_api::answer(Some(&app), body));
+        reply(
+            &mut stream,
+            &crate::agent_api::answer_in_time(&app, body.clone()),
+        );
         return;
     }
 

@@ -67,12 +67,14 @@ pub(crate) fn hand(
         profile: profile_id.to_owned(),
         name: name.clone(),
         project_id: board.project_id.clone(),
-        project_name: crate::projects::project_list_now().ok().and_then(|list| {
-            list.projects
-                .into_iter()
-                .find(|one| one.id == board.project_id)
-                .map(|one| one.name)
-        }),
+        project_name: crate::projects::project_list_unread_now()
+            .ok()
+            .and_then(|list| {
+                list.projects
+                    .into_iter()
+                    .find(|one| one.id == board.project_id)
+                    .map(|one| one.name)
+            }),
         cwd: cwd.display().to_string(),
         pane_id: pane_id.clone(),
         at: std::time::Instant::now(),
