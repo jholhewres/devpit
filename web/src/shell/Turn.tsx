@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 
 import { Acts } from './ActsRows'
+import { doing } from './acts'
 import type { Message } from '../gen/bindings'
 import { inFolder } from './markdown'
 import { Markdown } from './MarkdownView'
@@ -70,7 +71,7 @@ export const Turn = memo(function Turn({
         <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} folder={folder ?? null} onOpen={onOpen} />
       ))}
       {!message.streaming && <TurnChanges files={changed} parts={message.parts} />}
-      {message.streaming && <Working />}
+      {message.streaming && <Working parts={message.parts} />}
       {!message.streaming && <Foot message={message} rewind={rewind} />}
     </article>
   )
@@ -115,7 +116,7 @@ function Reply({
 
 /* How long it has been at it. The dots say it is alive; the seconds say
    whether to keep waiting. */
-function Working(): React.JSX.Element {
+function Working({ parts }: { parts: Message['parts'] }): React.JSX.Element {
   const [since] = useState(() => Date.now())
   const [now, setNow] = useState(since)
 
@@ -142,7 +143,8 @@ function Working(): React.JSX.Element {
         <i />
         <i />
       </span>
-      Working for {said}
+      <span className="working__what">{doing(parts)}</span>
+      <span>· {said}</span>
     </div>
   )
 }

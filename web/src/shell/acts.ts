@@ -297,6 +297,17 @@ export function headline(rows: readonly Act[], live: boolean): string {
   return last.target ? `${actionLabel(last.kind)} ${last.target}` : actionLabel(last.kind)
 }
 
+/* What a live turn is at, for the line under it: the call still open, or
+   thinking, or writing the answer. */
+export function doing(parts: readonly Part[]): string {
+  const last = parts.filter((part) => !('parent' in part) || !part.parent).at(-1)
+  const open = acts(parts).filter((row) => !row.done).at(-1)
+  if (open) return open.target ? `${actionLabel(open.kind)} ${open.target}` : actionLabel(open.kind)
+  if (last?.kind === 'thinking') return 'Thinking'
+  if (last?.kind === 'text') return 'Writing'
+  return 'Working'
+}
+
 /* The agent CLIs, by the name their process wears.
 
    A terminal sitting at its prompt shows the shell; a terminal with one of

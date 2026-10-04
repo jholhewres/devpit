@@ -4,6 +4,7 @@ import type { Part } from '../gen/bindings'
 import {
   actionLabel,
   acts,
+  doing,
   headline,
   isAgent,
   kindOf,
@@ -211,5 +212,16 @@ describe('a run of the same act reads as one row', () => {
     const grep = (id: string): Act => ({ ...read(id), kind: 'find', name: 'Grep' })
     const glob = (id: string): Act => ({ ...read(id), kind: 'find', name: 'Glob' })
     expect(grouped([grep('a'), glob('b'), grep('c')]).some(isGroup)).toBe(false)
+  })
+})
+
+describe('what a live turn is at', () => {
+  const text = (said: string): Part => ({ kind: 'text', text: said, parent: null })
+  const thought: Part = { kind: 'thinking', text: 'hmm', parent: null }
+  it('names the call still open, then thinking, then the answer being written', () => {
+    expect(doing([])).toBe('Working')
+    expect(doing([call('c1', 'Bash', '{"command":"cargo test"}', 'running')])).toBe('Run cargo test')
+    expect(doing([call('c1', 'Bash', '{"command":"cargo test"}', 'running'), result('c1', 'ok'), thought])).toBe('Thinking')
+    expect(doing([thought, text('Here')])).toBe('Writing')
   })
 })
