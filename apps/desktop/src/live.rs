@@ -13,6 +13,8 @@ use portable_pty::{ChildKiller, MasterPty};
 
 pub(crate) struct Live {
     pub(crate) client_id: String,
+    /// The webview whose page attached it: a reload of that page ends it.
+    pub(crate) webview: String,
     pub(crate) writer: Mutex<Box<dyn Write + Send>>,
     pub(crate) master: Mutex<Box<dyn MasterPty + Send>>,
     pub(crate) killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,

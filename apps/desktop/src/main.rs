@@ -289,6 +289,16 @@ fn main() {
                 tauri::Manager::app_handle(window).exit(0);
             }
         })
+        // A reloaded page never detached its terminals: end them here.
+        .on_page_load(|webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                if let Some(state) = tauri::Manager::try_state::<sessions::SessionState>(webview) {
+                    for live in state.claims.take_all_from(webview.label()) {
+                        let _ = live.stop();
+                    }
+                }
+            }
+        })
         .setup(|app| {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.

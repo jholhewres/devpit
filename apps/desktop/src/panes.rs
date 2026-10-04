@@ -183,7 +183,7 @@ pub(crate) fn session_detach_now(
 /// specta, so its wrapper is hand-written, next to the xterm host.
 #[tauri::command]
 pub async fn session_attach(
-    state: State<'_, SessionState>,
+    webview: tauri::Webview,
     project_id: String,
     pane_id: String,
     client_id: String,
@@ -191,6 +191,8 @@ pub async fn session_attach(
     cols: u16,
     on_frame: Channel<InvokeResponseBody>,
 ) -> Result<(), RpcError> {
+    // Kept by webview label: a reload of that page ends this attach.
+    let state = tauri::Manager::state::<SessionState>(&webview);
     // Which tab draws it does not matter here; that it is this project's does.
     crate::sessions::holding(&project_id, &pane_id)?;
 
@@ -255,6 +257,7 @@ pub async fn session_attach(
     };
     let live = Arc::new(Live {
         client_id: client_id.clone(),
+        webview: webview.label().to_owned(),
         writer: Mutex::new(io.writer),
         master: Mutex::new(io.master),
         killer: Mutex::new(io.killer),

@@ -103,11 +103,40 @@ fn a_pane_with_no_client_says_so() {
     ));
 }
 
+/// A reload takes back everything that page attached, and nothing another
+/// webview did.
+#[test]
+fn a_reloaded_page_gives_back_everything_it_attached() {
+    let claims = Claims::new();
+    for (pane, client, webview) in [("a", "1", "main"), ("b", "2", "main"), ("c", "3", "island")] {
+        let claimed = claims.take_for(pane, client).expect("claim");
+        assert!(claims
+            .install(pane, claimed.generation, live_of(client, webview))
+            .expect("install"));
+    }
+
+    let taken = claims.take_all_from("main");
+    assert_eq!(taken.len(), 2);
+    assert!(claims.live("a").is_err() && claims.live("b").is_err());
+    assert!(
+        claims.live("c").is_ok(),
+        "another webview's client was taken"
+    );
+    // Freed: the old client's late detach finds nothing of its own to release.
+    assert!(!claims.release("a", "1").expect("release"));
+    assert!(claims.release("c", "3").expect("release"));
+}
+
 /// A `Live` with ends that go nowhere. The ownership rule never touches them;
 /// it only ever compares the id and the generation beside them.
 fn live(client_id: &str) -> Arc<Live> {
+    live_of(client_id, "main")
+}
+
+fn live_of(client_id: &str, webview: &str) -> Arc<Live> {
     Arc::new(Live {
         client_id: client_id.to_owned(),
+        webview: webview.to_owned(),
         writer: Mutex::new(Box::new(std::io::sink())),
         master: Mutex::new(Box::new(Nowhere)),
         killer: Mutex::new(Box::new(Nowhere)),

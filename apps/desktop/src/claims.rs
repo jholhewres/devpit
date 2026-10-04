@@ -156,6 +156,22 @@ impl Claims {
         })
     }
 
+    /// Takes every client a webview attached, for a page loading again: the
+    /// old page never detached, and its frames flooded the new page's IPC.
+    pub(crate) fn take_all_from(&self, webview: &str) -> Vec<Arc<Live>> {
+        // `held` before `lives`, the order `install` takes them in.
+        let (Ok(mut held), Ok(mut lives)) = (self.held.lock(), self.lives.lock()) else {
+            return Vec::new();
+        };
+        let panes: Vec<String> = (lives.iter())
+            .filter(|(_, live)| live.webview == webview)
+            .map(|(pane, _)| pane.clone())
+            .collect();
+        let taken: Vec<Arc<Live>> = panes.iter().filter_map(|pane| lives.remove(pane)).collect();
+        held.retain(|_, holder| !taken.iter().any(|live| live.client_id == holder.client_id));
+        taken
+    }
+
     /// Forgets a pane's client, if it is still this exact one.
     ///
     /// By identity and not by id: a drain ending has to clear its own entry
