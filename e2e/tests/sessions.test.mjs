@@ -196,10 +196,14 @@ describe('manual item 8 — a waiting agent rings the bell and goes to its termi
       hit.click()
     })
     // The terminal it is waiting in, where it is answered — not its card.
-    const front = await window.wait(
-      () => window.executeScript("return document.querySelector('[data-show=\"true\"][data-pane]')?.getAttribute('data-pane') ?? null"),
-      10000,
-    )
+    // Waited for, not read once: the board is in front until the click lands.
+    let front = null
+    await window
+      .wait(async () => {
+        front = await window.executeScript("return document.querySelector('[data-show=\"true\"][data-pane]')?.getAttribute('data-pane') ?? null")
+        return front === 'term'
+      }, 10000)
+      .catch(() => null)
     assert.equal(front, 'term')
     type(home, pane, '/exit')
   })
