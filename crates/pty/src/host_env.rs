@@ -51,9 +51,7 @@ pub fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
         command.creation_flags(NO_WINDOW);
     }
     // Found where the person's own shell finds it — see `login_path`.
-    if let Some(path) = crate::login_path::login_path() {
-        command.env("PATH", path);
-    }
+    command.env("PATH", crate::login_path::search_path());
     command
 }
 
@@ -74,6 +72,7 @@ pub fn scrub(command: &mut Command) -> &mut Command {
 
 /// The same, for a command that runs on a pty.
 pub fn scrub_pty(command: &mut portable_pty::CommandBuilder) {
+    command.env("PATH", crate::login_path::search_path());
     for (name, value) in changes() {
         match value {
             Some(value) => command.env(name, value),

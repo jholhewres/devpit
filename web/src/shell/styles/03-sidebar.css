@@ -377,3 +377,4 @@ body[data-account='out'] .acct { display: none; }
 .hdown__box { height: 22px; padding: 0 4px; border: 0; border-radius: 6px;
   background: transparent; color: var(--text-3); font: inherit; font-size: 11px; cursor: pointer; }
 .hdown__box:hover { background: var(--overlay); color: var(--text); }
+.envcopy__said { display: block; margin-top: 6px; white-space: pre-wrap; }

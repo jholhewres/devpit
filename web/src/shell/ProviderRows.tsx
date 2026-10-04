@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { AgentChoice, Profile } from '../gen/bindings'
 import { AgentRow } from './AgentRow'
+import { EnvironmentCopy } from './EnvironmentCopy'
 import { FieldSelect } from './FieldSelect'
 import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from './catalogue'
 import { ask, commands } from './live'
@@ -230,8 +231,12 @@ export function ProviderRows(): React.JSX.Element {
 
         {error && <p className="acc__note">{error}</p>}
         {!error && entries.length === 0 && (
-          <p className="acc__note">No agent CLI found on this computer.</p>
+          <p className="acc__note">
+            No agent CLI found. devpit looked on your login shell’s PATH and the usual install
+            folders; set a profile’s Command to the full path.
+          </p>
         )}
+        <EnvironmentCopy />
 
         {here(entries).map((entry) => (
           <AgentRow

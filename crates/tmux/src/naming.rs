@@ -44,14 +44,19 @@ pub(crate) fn client_session(session: &str, window: &str) -> String {
 /// path and a `session:window` target, written out in the order tmux reads
 /// them.
 pub(crate) fn attach_argv(socket: &std::path::Path, session: &str, window: &str) -> Vec<String> {
-    vec![
-        program(),
+    let mut argv = vec![program()];
+    // UTF-8 whatever the locale says: an app opened from Finder has none.
+    if cfg!(unix) {
+        argv.push("-u".to_owned());
+    }
+    argv.extend([
         "-S".to_owned(),
         socket.display().to_string(),
         "attach-session".to_owned(),
         "-t".to_owned(),
         target(session, window),
-    ]
+    ]);
+    argv
 }
 
 /// The tmux to run, as a path where the name alone is not enough.

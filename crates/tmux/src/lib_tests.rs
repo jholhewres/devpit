@@ -44,8 +44,15 @@ fn a_pane_attaches_to_the_project_session_at_its_window() {
     // The tmux found on PATH, named whole: a pty is started with Windows'
     // own environment for the user, where devpit's bundled one is not.
     assert_eq!(argv[0], crate::naming::program());
+    // `-u` on Unix: UTF-8 even when the app was opened with no locale.
+    let rest = if cfg!(unix) {
+        assert_eq!(argv[1], "-u");
+        &argv[2..]
+    } else {
+        &argv[1..]
+    };
     assert_eq!(
-        argv[1..],
+        rest,
         [
             "-S",
             r"C:\devpit\tmux.sock",

@@ -1512,6 +1512,7 @@ export const commands = {
 	checkpointFindings: (runId: string) => typedError<Found, RpcError>(__TAURI_INVOKE("checkpoint_findings", { runId })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
 	checkpointTested: (runId: string) => typedError<Tested, RpcError>(__TAURI_INVOKE("checkpoint_tested", { runId })),
+	diagnosticsEnvironment: () => typedError<EnvironmentReport, RpcError>(__TAURI_INVOKE("diagnostics_environment")),
 	/**  `plugin.list` — the catalogue, and what this project has on. */
 	pluginList: (projectId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_list", { projectId })),
 	/**
@@ -2282,6 +2283,11 @@ export type EnvVar = {
 	name: string,
 	/**  Often a secret. Never logged, never put in an error message. */
 	value: string,
+};
+
+/**  The report, as text to paste. */
+export type EnvironmentReport = {
+	text: string,
 };
 
 export type ErrorCode = "unauthenticated" | 

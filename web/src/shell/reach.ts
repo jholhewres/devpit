@@ -39,7 +39,7 @@ export function told(profile: Profile): Told {
         off: false,
       }
     case 'missing':
-      return { dot: 'var(--ghost)', sub: 'not found', off: true }
+      return { dot: 'var(--ghost)', sub: 'not found — set its full path in Command', off: true }
   }
 }
 

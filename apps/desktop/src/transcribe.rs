@@ -38,9 +38,7 @@ fn local_whisper() -> Option<(&'static str, bool, PathBuf)> {
 }
 
 fn on_path(name: &str) -> Option<PathBuf> {
-    let path = devpit_pty::login_path::login_path()
-        .cloned()
-        .or_else(|| std::env::var_os("PATH"))?;
+    let path = devpit_pty::login_path::search_path();
     let names: Vec<String> = if cfg!(windows) {
         vec![format!("{name}.exe"), format!("{name}.cmd")]
     } else {

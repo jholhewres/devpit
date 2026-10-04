@@ -56,6 +56,7 @@ impl Watching {
             .map_err(|err| err.to_string())?;
         let mut command = CommandBuilder::new(&argv[0]);
         command.args(&argv[1..]);
+        devpit_pty::host_env::scrub_pty(&mut command);
         command.env("TERM", "xterm-256color");
         let size = PtySize {
             cols: size.0.clamp(20, 400),

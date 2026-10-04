@@ -26,15 +26,23 @@ pub fn found(command: &str) -> Option<String> {
     devpit_pty::process::found_on_path(command).map(|found| found.to_string_lossy().into_owned())
 }
 
-/// Where a command resolves to, if anywhere.
+/// Where a command resolves to, if anywhere: on the path devpit's children
+/// get, not the desktop's. `~/` names the home folder.
 #[cfg(not(windows))]
 pub fn found(command: &str) -> Option<String> {
-    std::env::var_os("PATH").and_then(|path| {
-        std::env::split_paths(&path)
-            .map(|dir| dir.join(command))
-            .find(is_runnable)
-            .map(|found| found.to_string_lossy().into_owned())
-    })
+    let command = expanded(command, std::env::var_os("HOME").as_deref());
+    std::env::split_paths(devpit_pty::login_path::search_path())
+        .map(|dir| dir.join(&command))
+        .find(is_runnable)
+        .map(|found| found.to_string_lossy().into_owned())
+}
+
+/// `~/x` under `home`; anything else as written.
+pub(crate) fn expanded(command: &str, home: Option<&std::ffi::OsStr>) -> PathBuf {
+    match (command.strip_prefix("~/"), home) {
+        (Some(rest), Some(home)) => PathBuf::from(home).join(rest),
+        _ => PathBuf::from(command),
+    }
 }
 
 #[cfg(unix)]

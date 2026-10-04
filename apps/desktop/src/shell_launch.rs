@@ -309,6 +309,10 @@ pub(crate) fn warm_installed() {
     });
 }
 
+/// How long the shell is given to say which names it knows.
+#[cfg(unix)]
+const SHELL_WAITS: std::time::Duration = std::time::Duration::from_secs(12);
+
 #[cfg(unix)]
 fn ask_the_shell(names: &[String]) -> std::collections::HashSet<String> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_owned());
@@ -321,14 +325,27 @@ fn ask_the_shell(names: &[String]) -> std::collections::HashSet<String> {
         .collect::<Vec<_>>()
         .join("; ");
 
-    let Ok(output) = devpit_pty::host_env::command(&shell)
+    let mut command = devpit_pty::host_env::command(&shell);
+    command
         .args(["-ic", &script])
-        // Nothing to read. An interactive shell that inherits a terminal can
-        // sit waiting on it forever, and this runs at startup — a hang here
-        // would be an app that never finishes opening.
+        // Nothing to read: an interactive shell can wait on a terminal forever.
         .stdin(std::process::Stdio::null())
-        .output()
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    let Ok(mut child) = devpit_steps::descendants::in_a_session_of_its_own(&mut command).spawn()
     else {
+        return std::collections::HashSet::new();
+    };
+    // A config that never returns would leave every agent menu waiting.
+    let started = std::time::Instant::now();
+    while matches!(child.try_wait(), Ok(None)) {
+        if started.elapsed() > SHELL_WAITS {
+            devpit_steps::descendants::end_it_all(&mut child);
+            return std::collections::HashSet::new();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let Ok(output) = child.wait_with_output() else {
         return std::collections::HashSet::new();
     };
     // The exit status is the last test's, so it says nothing about the rest.

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::profile::{found, offered, profiles, reach, Base, Declared, Reach};
+use crate::profile::{expanded, found, offered, profiles, reach, Base, Declared, Reach};
 
 fn declared(id: &str, command: &str) -> Declared {
     Declared {
@@ -186,4 +186,22 @@ fn an_override_saved_under_a_built_ins_id_takes_its_place() {
         .iter()
         .find(|one| one.id == "claude")
         .is_some_and(|one| one.mine));
+}
+
+/// A path typed in Settings as `~/…` is the home folder's.
+#[test]
+fn a_command_under_home_is_expanded() {
+    let home = Some(std::ffi::OsStr::new("/Users/me"));
+    assert_eq!(
+        expanded("~/.local/bin/claude", home),
+        std::path::PathBuf::from("/Users/me/.local/bin/claude")
+    );
+    assert_eq!(expanded("claude", home), std::path::PathBuf::from("claude"));
+}
+
+/// An absolute path is found whatever `PATH` holds.
+#[cfg(unix)]
+#[test]
+fn an_absolute_command_is_found_where_it_is() {
+    assert_eq!(found("/bin/sh").as_deref(), Some("/bin/sh"));
 }

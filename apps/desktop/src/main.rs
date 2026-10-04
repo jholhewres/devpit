@@ -80,6 +80,7 @@ mod claude_plugin;
 #[cfg(any(debug_assertions, test))]
 mod contract;
 mod cycles;
+mod diagnostics;
 mod diffs;
 mod error_reports;
 mod error_sender;
