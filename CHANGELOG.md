@@ -3,6 +3,50 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.35 — 2026-10-04
+
+### Chat
+
+- **Answers stream as they are written.** Text arrives word by word instead
+  of all at once when the turn ends, and the line under a live turn says what
+  it is at: the command or file it is on, *Thinking* or *Writing*.
+- **A queued message can go now.** *Send now* on a message waiting in the
+  queue hands it to the turn that is running, without waiting for it to end.
+- **Links in an answer open in your browser**, `http://localhost` included.
+  A link that cannot be opened says why instead of doing nothing.
+
+### Board
+
+- **A lane's step can start from a recipe**: *Tests* runs the command your
+  project's own files name and reads its report; *Review* has an agent file
+  findings on the card's change and sends a blocker back; *Prove-It* runs a
+  bug's test on the card's base and on its checkout, and is not proven unless
+  it failed first.
+- **A review's findings sit on their lines in the card's diff**, with how bad
+  each one is, why, and whether it was made against older code. A count over
+  the diff goes to the first one, and a finding can be dismissed.
+- **Command steps read their test reports**: a green run with passing tests
+  is *Passed*, not *Inconclusive*.
+- **Worktree preparation's shared variables** reach steps and terminals in a
+  card's checkout.
+
+### macOS
+
+- **Agents are found when devpit is opened from Finder.** devpit reads your
+  login shell's `PATH` and the usual install folders (the native installer,
+  npm, bun, nvm, asdf, mise, Homebrew), a command in Settings may be `~/…` or
+  absolute, and terminals keep UTF-8 without a locale.
+- **Copy environment info**, under the agents in Settings, gives what devpit
+  sees of your machine for a bug report; when no agent is found, devpit says
+  where it looked.
+
+### Fixes
+
+- **devpit's MCP tools no longer time out after hours open.** Every question
+  an agent asked listed the status of every checkout of every project; it now
+  answers in a fraction of the time, and says so in time when it is slow.
+- **A reloaded window ends the terminal connections its previous page left.**
+
 ## 0.1.34 — 2026-10-02
 
 ### Orchestrator
