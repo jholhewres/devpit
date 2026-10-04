@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 
 import type { Agent, Profile, Step } from '../gen/bindings'
 import { ask, commands } from './live'
 import { offers, onProfilesChanged } from './profiles'
+import { filled, RECIPES, type Recipe } from './recipes'
+import { ShellStoreContext } from './shellStore'
 import { CONTEXT_KEYS, stepConfig, stepFields, type Fields } from './stepConfig'
 
 /*
@@ -70,6 +72,11 @@ export function StepNew({
   const [profiles, setProfiles] = useState<readonly Profile[]>([])
   const [agents, setAgents] = useState<readonly Agent[]>([])
   const [irreversible, setIrreversible] = useState(step?.irreversible ?? false)
+  // A recipe's config the form does not show, kept by the save.
+  const [base, setBase] = useState<string | undefined>(undefined)
+  const [recipe, setRecipe] = useState<Recipe | null>(null)
+  // Read when a recipe is picked; a form drawn outside a shell has no project.
+  const shell = useContext(ShellStoreContext)
   const chosen = KINDS.find((one) => one.id === kind)
   const asked = FIELDS[kind] ?? []
 
@@ -91,6 +98,17 @@ export function StepNew({
     void ask(() => commands.agentsList()).then((answer) => setAgents(answer.data?.agents ?? []))
   }, [kind])
 
+  const start = async (picked: Recipe): Promise<void> => {
+    const project = shell?.get().project
+    const test = picked.id === 'tests' && project ? (await ask(() => commands.projectTestCommand(project.id))).data : null
+    const made = filled(picked.id, test?.command ?? null)
+    setRecipe(picked)
+    setKind(made.kind)
+    setName(made.name)
+    setFields(made.fields)
+    setBase(made.base)
+  }
+
   const typed = (key: string, value: string): void =>
     setFields((was) => ({ ...was, [key]: value }))
   const missing = asked.some((one) => one.needed && !(fields[one.key] ?? '').trim())
@@ -108,13 +126,27 @@ export function StepNew({
       <p className="lstep__t">{step ? 'This step' : 'A new step'}</p>
 
       {!step && (
+        <>
+          <span className="fld__l">Start from</span>
+          <div className="src__sw">
+            {RECIPES.map((one) => (
+              <button className="src__o" key={one.id} aria-checked={recipe?.id === one.id} onClick={() => void start(one)}>
+                {one.label}
+              </button>
+            ))}
+          </div>
+          {recipe && <p className="pref__d">{recipe.hint} What it runs is below, yours to change.</p>}
+        </>
+      )}
+
+      {!step && (
         <div className="src__sw">
           {KINDS.map((one) => (
             <button
               className="src__o"
               key={one.id}
               aria-checked={kind === one.id}
-              onClick={() => setKind(one.id)}
+              onClick={() => (setKind(one.id), setBase(undefined), setRecipe(null))}
             >
               {one.label}
             </button>
@@ -247,7 +279,7 @@ export function StepNew({
         <button
           className="btn btn--go"
           disabled={!name.trim() || missing}
-          onClick={() => onDone(kind, name.trim(), stepConfig(kind, fields, step?.config), irreversible)}
+          onClick={() => onDone(kind, name.trim(), stepConfig(kind, fields, step?.config ?? base), irreversible)}
         >
           {step ? 'Save' : 'Create'}
         </button>

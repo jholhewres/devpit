@@ -1522,6 +1522,7 @@ export const commands = {
 	cardFindings: (cardId: string) => typedError<CardFindings, RpcError>(__TAURI_INVOKE("card_findings", { cardId })),
 	/**  `finding.dismiss` — sets one finding aside, or brings it back. */
 	findingDismiss: (runId: string, at: number, dismissed: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("finding_dismiss", { runId, at, dismissed })),
+	projectTestCommand: (projectId: string) => typedError<TestCommand, RpcError>(__TAURI_INVOKE("project_test_command", { projectId })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
 	checkpointTested: (runId: string) => typedError<Tested, RpcError>(__TAURI_INVOKE("checkpoint_tested", { runId })),
 	diagnosticsEnvironment: () => typedError<EnvironmentReport, RpcError>(__TAURI_INVOKE("diagnostics_environment")),
@@ -4221,6 +4222,12 @@ export type Taken = {
 	count: number,
 	/**  Which domains they were for, in the order they were asked for. */
 	domains: string[],
+};
+
+/**  The command, and the file it was read from. Both `None` when nothing says. */
+export type TestCommand = {
+	command: string | null,
+	from: string | null,
 };
 
 /**  What every report a run left said, added up. */

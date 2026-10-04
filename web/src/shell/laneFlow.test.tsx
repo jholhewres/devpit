@@ -175,6 +175,17 @@ describe('the form that makes a step', () => {
     expect(await screen.findByText('glm')).toBeTruthy()
   })
 
+  it('starts from the Review recipe and saves a review that sends a blocker back', async () => {
+    const onCreate = vi.fn()
+    open({ onCreate })
+    fireEvent.click(screen.getByText('Review'))
+    await waitFor(() => expect(screen.getByDisplayValue('review')).toBeTruthy())
+    fireEvent.click(screen.getByText('Create'))
+    const [kind, name, config] = onCreate.mock.calls[0]!
+    expect([kind, name]).toEqual(['agent', 'review'])
+    expect(JSON.parse(config)).toMatchObject({ verdictField: 'verdict', sendsBackWhen: 'blocker', capUsd: 2 })
+  })
+
   it('keeps Create out of reach until the kind has what it needs', () => {
     open()
     fireEvent.change(screen.getByPlaceholderText('tests'), { target: { value: 'suite' } })

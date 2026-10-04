@@ -133,6 +133,7 @@ mod projects;
 mod question;
 mod reading_path;
 mod receipts;
+mod recipes;
 mod reconcile;
 mod refusing;
 mod regrouping;
