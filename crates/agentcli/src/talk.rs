@@ -98,11 +98,7 @@ pub fn say(
     let stdin = child.stdin.take().ok_or(AgentError::NotInstalled)?;
     let control = turn.control.cloned().unwrap_or_default();
     control.attach(stdin);
-    let message = serde_json::json!({
-        "type": "user",
-        "message": { "role": "user", "content": [{ "type": "text", "text": turn.prompt }] }
-    });
-    if !control.write(&message.to_string()) {
+    if !control.say(turn.prompt) {
         return Err(AgentError::Unreadable(
             "could not send the prompt".to_owned(),
         ));

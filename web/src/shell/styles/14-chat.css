@@ -229,6 +229,8 @@
 .queued__t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .queued__x { flex: none; background: none; border: 0; color: var(--text-3); cursor: pointer; padding: 0 2px; }
 .queued__x:hover { color: var(--text); }
+.queued__go { flex: none; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0 4px; font: inherit; font-size: 11px; }
+.queued__go:hover { text-decoration: underline; }
 
 /* `@file`: the name first, where the eye looks, and its folder after it. */
 .mention__i { display: flex; align-items: baseline; gap: 8px; min-width: 0; }

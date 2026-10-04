@@ -143,6 +143,13 @@ export function applied(messages: readonly Message[], frame: Frame): readonly Me
   }
 }
 
+/* A message sent into the turn in flight sits before the answer still being
+   written, where the transcript keeps it. */
+export function steered(messages: readonly Message[], said: Message): readonly Message[] {
+  const at = messages.findLastIndex((one) => one.streaming)
+  return at < 0 ? [...messages, said] : [...messages.slice(0, at), said, ...messages.slice(at)]
+}
+
 /* Consecutive text is one paragraph, not one part per chunk — unless the two
    came from different speakers: a subagent's words are not the agent's. */
 function merged(parts: readonly Part[], next: Part): Part[] {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
-import { applied, ASKS, batched, fixedTo, MODES, opening, rejoin, send, withFiles, type Opening } from './chat'
+import { applied, ASKS, batched, fixedTo, MODES, opening, rejoin, send, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
@@ -62,6 +62,8 @@ export interface Chat {
   detach: (path: string) => void
   answer: (id: string, said: Said) => void
   say: (prompt: string) => void
+  /** Into the turn in flight; whether it took it. */
+  steer: (prompt: string) => Promise<boolean>
   stop: () => void
 }
 
@@ -398,6 +400,16 @@ export function useChat(conversationId: string): Chat {
     void ask(() => commands.chatCancel(conversationId))
   }, [conversationId])
 
+  const steer = useCallback(
+    async (prompt: string): Promise<boolean> => {
+      if (!project) return false
+      const said = await ask(() => commands.chatSteer(project.id, conversationId, prompt))
+      if (said.data) setMessages((was) => steered(was, said.data!))
+      return said.data !== null
+    },
+    [project, conversationId],
+  )
+
   return {
     messages,
     card,
@@ -444,6 +456,7 @@ export function useChat(conversationId: string): Chat {
     detach,
     answer,
     say,
+    steer,
     stop,
   }
 }

@@ -7,6 +7,8 @@
  */
 
 import { strict as assert } from 'node:assert'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { By, until } from 'selenium-webdriver'
 
@@ -58,6 +60,29 @@ describe('an answer as it is written', () => {
     await settle(1500)
     const shown = (await text(window)).split('streamed first, then the rest').length - 1
     assert.equal(shown, 1, 'the streamed text and the whole block were both drawn')
+  })
+})
+
+describe('a message queued while a turn runs', () => {
+  test('goes into that turn on "Send now", without waiting for it to end', async () => {
+    await fill(window, COMPOSER, 'slow')
+    assert.ok(await onScreen('first half of a slow answer', 15000), 'the slow answer never started')
+    await fill(window, COMPOSER, 'what is the pwd')
+    const now = await window.wait(until.elementLocated(By.css('.queued__go')), 5000).catch(() => null)
+    assert.ok(now, 'the queued message offers no "Send now"')
+    await now.click()
+    const gone = await window
+      .wait(async () => (await window.findElements(By.css('.queued__o'))).length === 0, 5000)
+      .catch(() => false)
+    assert.ok(gone, 'the message stayed in the queue')
+    const calls = () => readFileSync(join(home, '.claude', 'stub-calls.log'), 'utf8')
+    const steered = await window.wait(async () => calls().includes('"prompt":"what is the pwd"'), 20000).catch(() => false)
+    assert.ok(steered, 'the running turn never heard it')
+    // Both answers, in one turn: no second turn was started for it.
+    assert.ok(await onScreen('second half of a slow answer', 20000), 'the slow answer never finished')
+    const turns = calls().split('\n').filter((line) => line.includes('"argv"')).length
+    await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 30000)
+    assert.equal(calls().split('\n').filter((line) => line.includes('"argv"')).length, turns, 'it went as a turn of its own')
   })
 })
 

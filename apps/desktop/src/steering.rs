@@ -62,6 +62,72 @@ pub fn chat_stop_task(
         .is_some_and(|control| control.stop_task(&task_id)))
 }
 
+/// `chat.steer` — hands the turn in flight one more message, without waiting
+/// for it to end: the CLI takes it in at its next step.
+///
+/// Answers with the message as the transcript keeps it. Refused when no turn
+/// runs, or the turn has already let go of its input: then it waits its turn.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_steer(
+    app: tauri::AppHandle,
+    talking: State<'_, crate::chat::Talking>,
+    steering: State<'_, Steering>,
+    project_id: String,
+    conversation_id: String,
+    prompt: String,
+) -> Result<devpit_rpc::Message, RpcError> {
+    let running = talking
+        .running
+        .lock()
+        .is_ok_and(|held| held.contains_key(&conversation_id));
+    let steering = steering.inner().clone();
+    crate::off_main::blocking(move || {
+        steer_now(
+            &app,
+            &steering,
+            running,
+            &project_id,
+            &conversation_id,
+            &prompt,
+        )
+    })
+    .await
+}
+
+fn steer_now(
+    app: &tauri::AppHandle,
+    steering: &Steering,
+    running: bool,
+    project_id: &str,
+    conversation_id: &str,
+    prompt: &str,
+) -> Result<devpit_rpc::Message, RpcError> {
+    let busy = |why: &str| RpcError::new(devpit_rpc::ErrorCode::Conflict, why.to_owned());
+    if !running || prompt.trim().is_empty() {
+        return Err(busy("no turn is running to take it"));
+    }
+    let taken = crate::chat_resident::steer(app, conversation_id, prompt)
+        .or_else(|| {
+            steering
+                .get(conversation_id)
+                .map(|control| control.say(prompt))
+        })
+        .unwrap_or(false);
+    if !taken {
+        return Err(busy("the turn is ending; it goes next"));
+    }
+    // No turn of its own: it is part of the one running.
+    let said = devpit_rpc::Message {
+        turn_id: None,
+        ..crate::chat_turn::messages("", prompt, crate::chat::now() * 1000.0).0
+    };
+    let sessions = crate::projects::project_home(project_id)?.sessions();
+    let file = devpit_agentcli::store::conversation_path(&sessions, conversation_id);
+    let _ = devpit_agentcli::store::append(&file, &said);
+    Ok(said)
+}
+
 /// `chat.cancel` — stops the turn in flight, keeping what already arrived.
 ///
 /// Answers with the ending it caused, or nothing when no turn was running.

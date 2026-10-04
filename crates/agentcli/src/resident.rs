@@ -150,11 +150,7 @@ impl Resident {
 
     /// Hands it the person's next message. False when it no longer listens.
     pub fn say(&self, prompt: &str) -> bool {
-        let message = serde_json::json!({
-            "type": "user",
-            "message": { "role": "user", "content": [{ "type": "text", "text": prompt }] }
-        });
-        self.control.write(&message.to_string())
+        self.control.say(prompt)
     }
 
     /// Sends a control request under `id`; its answer comes back as

@@ -244,6 +244,15 @@ pub(crate) fn control(
         .unwrap_or(false)
 }
 
+/// Hands this conversation's process a message for the turn it is on. `None`
+/// when it has no process, so the caller reaches the turn the other way.
+pub(crate) fn steer(app: &AppHandle, conversation_id: &str, prompt: &str) -> Option<bool> {
+    let residents = app.try_state::<Residents>()?;
+    let all = residents.0.lock().ok()?;
+    all.get(conversation_id)
+        .map(|live| live.resident.say(prompt))
+}
+
 /// Ends this conversation's process, if it has one: a chat no longer
 /// reachable goes back to a process per turn.
 pub(crate) fn close(app: &AppHandle, conversation_id: &str) {

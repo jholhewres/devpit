@@ -47,6 +47,11 @@ impl Control {
             .is_ok()
     }
 
+    /// Hands the running turn one more message from the person.
+    pub fn say(&self, prompt: &str) -> bool {
+        self.write(&user_line(prompt))
+    }
+
     /// Asks the CLI to stop one background task, by the id it gave it.
     pub fn stop_task(&self, task_id: &str) -> bool {
         self.write(&stop_task_request(task_id))
@@ -64,6 +69,16 @@ impl Control {
             held.take();
         }
     }
+}
+
+/// One message from the person, as stream-json input carries it. Written into
+/// a turn that is still running, the CLI takes it into that turn.
+pub fn user_line(prompt: &str) -> String {
+    serde_json::json!({
+        "type": "user",
+        "message": { "role": "user", "content": [{ "type": "text", "text": prompt }] }
+    })
+    .to_string()
 }
 
 /// The control request that stops the turn in flight: `{subtype: "interrupt"}`.

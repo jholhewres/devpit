@@ -29,7 +29,7 @@ pub(crate) fn home() -> PathBuf {
     devpit_core::Store::root().unwrap_or_default()
 }
 
-fn now() -> f64 {
+pub(crate) fn now() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|since| since.as_secs() as f64)

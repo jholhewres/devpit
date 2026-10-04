@@ -58,6 +58,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         session_search::sessions_search,
         steering::chat_cancel,
         steering::chat_stop_task,
+        steering::chat_steer,
         chat::chat_frames,
         orchestrator::orchestrator_create,
         orchestrator::orchestrator_refresh,

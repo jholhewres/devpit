@@ -227,6 +227,14 @@ export const commands = {
 	 */
 	chatStopTask: (conversationId: string, taskId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("chat_stop_task", { conversationId, taskId })),
 	/**
+	 *  `chat.steer` — hands the turn in flight one more message, without waiting
+	 *  for it to end: the CLI takes it in at its next step.
+	 * 
+	 *  Answers with the message as the transcript keeps it. Refused when no turn
+	 *  runs, or the turn has already let go of its input: then it waits its turn.
+	 */
+	chatSteer: (projectId: string, conversationId: string, prompt: string) => typedError<Message, RpcError>(__TAURI_INVOKE("chat_steer", { projectId, conversationId, prompt })),
+	/**
 	 *  `chat.frames` — the shapes `chat.send` uses, on both sides.
 	 * 
 	 *  It exists so the generated contract carries `Ask` and `Frame`: `chat.send`

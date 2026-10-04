@@ -87,7 +87,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   }, [rename, said, tab.id, tab.title])
 
   /* Typed while a turn runs, a message waits for it rather than being refused. */
-  const queue = useQueue(chat.sending, chat.say)
+  const queue = useQueue(chat.sending, chat.say, chat.steer)
   const send = (): void => {
     if (!ready(prompt, false, chat.profileId)) return
     if (chat.sending) queue.add(prompt)

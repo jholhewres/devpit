@@ -114,6 +114,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         chat_remote::chat_remote_state,
         steering::chat_cancel,
         steering::chat_stop_task,
+        steering::chat_steer,
         chat::chat_frames,
         panels::panel_widths,
         panels::panel_widths_write,

@@ -5,6 +5,7 @@ import {
   applied,
   ASKS,
   batched,
+  steered,
   choices,
   fixedTo,
   effortName,
@@ -253,5 +254,14 @@ describe('frames between paints', () => {
     expect(got).toEqual([[text('a', 'one'), text('a', 'two')]])
     vi.unstubAllGlobals()
     vi.useRealTimers()
+  })
+})
+
+describe('a message sent into the turn in flight', () => {
+  it('sits before the answer still being written', () => {
+    const asked = { ...message('u1', false), role: 'user' as const }
+    const said = { ...message('u2', false), role: 'user' as const }
+    expect(steered([asked, message('a1')], said).map((one) => one.id)).toEqual(['u1', 'u2', 'a1'])
+    expect(steered([message('a0', false)], said).map((one) => one.id)).toEqual(['a0', 'u2'])
   })
 })
