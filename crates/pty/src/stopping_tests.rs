@@ -1,6 +1,7 @@
 //! Ending a child, tested against children that really behave that way.
 
 use super::*;
+use std::io::BufRead;
 use std::process::Command;
 
 /// A process that does what it is told, and one that will not.
@@ -12,10 +13,21 @@ fn spawn(script: &str) -> std::process::Child {
     std::process::Command::new("sh")
         .arg("-c")
         .arg(script)
-        .stdout(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
         .expect("spawn")
+}
+
+/// Blocks until the script prints its first line: a signal sent before its
+/// `trap` is installed meets the default handler instead.
+fn ready(child: &mut std::process::Child) {
+    let out = child.stdout.take().expect("piped stdout");
+    let mut line = String::new();
+    std::io::BufReader::new(out)
+        .read_line(&mut line)
+        .expect("ready line");
+    assert_eq!(line.trim(), "ready");
 }
 
 /// Reaps in the background, the way the real arrangement does.
@@ -52,7 +64,8 @@ fn a_child_that_goes_when_asked_is_not_forced() {
 /// a destructor that waits without a deadline hang the window.
 #[test]
 fn a_child_that_ignores_the_request_is_made_to_stop() {
-    let child = spawn("trap '' HUP; sleep 30");
+    let mut child = spawn("trap '' HUP; echo ready; sleep 30");
+    ready(&mut child);
     let pid = child.id();
     let reaper = reaped(child);
 
