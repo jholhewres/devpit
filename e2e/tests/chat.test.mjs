@@ -8,7 +8,7 @@
  */
 
 import { strict as assert } from 'node:assert'
-import { readFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 import { after, before, describe, test } from 'node:test'
@@ -241,8 +241,34 @@ describe('Remote Control in a project chat', () => {
   })
 })
 
+describe('a link in an answer', () => {
+  test('opens in the browser the desktop uses', async () => {
+    // The desktop's opener, replaced by one that writes down what it was handed.
+    const opened = join(home, 'opened.log')
+    const opener = join(home, '.local/bin', process.platform === 'darwin' ? 'open' : 'xdg-open')
+    writeFileSync(opener, `#!/bin/sh\nprintf '%s\\n' "$@" >> "${opened}"\n`)
+    chmodSync(opener, 0o755)
+
+    // Out of any page a test before this one left the driver in.
+    await window.switchTo().defaultContent()
+    await idle()
+    await fill(window, 'textarea[data-e2e="mine"]', 'give me a link')
+    const link = await window
+      .wait(until.elementLocated(By.xpath('//button[contains(@class,"md__a") and normalize-space()="the docs"]')), 60000)
+      .catch(() => null)
+    assert.ok(link, `the link never showed. On screen: ${(await text(window)).slice(-400)}`)
+    await link.click()
+    const handed = await window
+      .wait(async () => existsSync(opened) && readFileSync(opened, 'utf8').includes('https://example.org/docs'), 10000)
+      .catch(() => false)
+    assert.ok(handed, 'clicking the link handed nothing to the opener')
+  })
+})
+
 describe('MCP Apps in a chat', () => {
-  test('a tool that comes with a page shows it, hands it the call, and runs its calls only when let', async () => {
+  test('a tool that comes with a page shows it, hands it the call, and runs its calls only when let', async (t) => {
+    // Out of the page whatever happens, or every test after this one looks inside it.
+    t.after(() => window.switchTo().defaultContent())
     await idle()
     await fill(window, 'textarea[data-e2e="mine"]', 'show me the app')
     const frame = await window.wait(until.elementLocated(By.css('.mcpapp__frame')), 60000).catch(() => null)

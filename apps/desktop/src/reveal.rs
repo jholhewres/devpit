@@ -102,7 +102,7 @@ fn hand_over(
 
 /// The web address this process will hand to the desktop, or why it will not.
 ///
-/// `https` and nothing else: `file:` would open anything on the disk, and a
+/// `https`, or `http` to this machine: `file:` would open anything on the disk, and a
 /// string starting with `-` is read by the opener as a flag rather than as an
 /// address. There is no list of allowed hosts on purpose — an agent's homepage
 /// comes from the person's own files in `~/.devpit/agents/`, so a fixed list

@@ -290,6 +290,14 @@ async function answer(prompt) {
     console.log(JSON.stringify(said))
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'here is the page', session_id: session }))
+  } else if (/\ba link\b/.test(prompt)) {
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.id = `link-${Date.now()}`
+    said.message.content = [{ type: 'text', text: 'see [the docs](https://example.org/docs)' }]
+    console.log(JSON.stringify(said))
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'see [the docs](https://example.org/docs)', session_id: session }))
   } else if (/\bpwd\b/.test(prompt)) {
     const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
     said.session_id = session
