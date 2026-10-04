@@ -2,6 +2,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { useContext, useEffect, useRef, useState } from 'react'
 
 import { ask, commands } from './live'
+import { went } from './problems'
 import { answer, toolInput, toolResult, type Bridge, type Rpc } from './mcpAppBridge'
 import { AppsScopeContext } from './mcpApps'
 
@@ -89,7 +90,7 @@ export function McpApp({ called, input, output, isError }: { called: string; inp
                 },
               }),
             ),
-      openLink: (url) => void ask(() => commands.pathOpen(url)),
+      openLink: (url) => void ask(() => commands.urlOpen(url)).then(went),
       resize: (next) => setHeight(Math.min(1600, Math.max(60, Math.ceil(next)))),
       ready: () => {
         ready.current = true

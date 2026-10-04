@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { blocks, external, resolved, spans } from './markdown'
+import { blocks, external, linkTarget, resolved, spans } from './markdown'
 
 describe('markdown blocks', () => {
   it('reads a heading with its level', () => {
@@ -68,6 +68,16 @@ describe('where a link goes', () => {
     expect(external('https://example.com')).toBe(true)
     expect(external('mailto:a@b.c')).toBe(true)
     expect(external('./notes.md')).toBe(false)
+  })
+
+  it('opens web addresses in the browser, paths here, and draws the rest as text', () => {
+    expect(linkTarget('https://example.com')).toBe('web')
+    expect(linkTarget('http://example.com')).toBe('web')
+    expect(linkTarget('http://localhost:5173')).toBe('web')
+    expect(linkTarget('mailto:a@b.c')).toBe('text')
+    expect(linkTarget('file:///etc/passwd')).toBe('text')
+    expect(linkTarget('./notes.md')).toBe('file')
+    expect(linkTarget('/abs/path.md')).toBe('file')
   })
 })
 

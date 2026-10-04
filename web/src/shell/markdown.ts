@@ -212,6 +212,12 @@ function linked(text: string): Span[] {
    relative one is a link inside the project and stays here. */
 export const external = (href: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(href)
 
+/* What a click on a link does: a web address opens in the browser, a path opens
+   here, and any other scheme (`mailto:`, `file:`) is drawn as text, since
+   nothing here opens it. */
+export const linkTarget = (href: string): 'web' | 'file' | 'text' =>
+  /^https?:\/\//i.test(href) ? 'web' : external(href) ? 'text' : 'file'
+
 /* A path an answer names, as the file to open: against the folder the
    conversation runs in when it has one, which for a card is its checkout. */
 export function inFolder(folder: string | null, here: string): string {

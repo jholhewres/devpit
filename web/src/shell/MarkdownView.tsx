@@ -4,9 +4,10 @@ import { Diagram } from './Diagram'
 import { ofName } from './languages'
 import { MdTable } from './MdTable'
 import { Painted } from './Painted'
-import { blocks, external, resolved, spans, type Block, type Span } from './markdown'
+import { blocks, external, linkTarget, resolved, spans, type Block, type Span } from './markdown'
 import { Tick } from './MdTick'
 import { ask, commands } from './live'
+import { went } from './problems'
 import { cut, locate, styleOf, type Chunk } from './veil'
 import { useShellPick } from './shellStore'
 
@@ -179,21 +180,14 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
       ) : (
         <span className="md__tick">{resolved(path, span.src)}</span>
       )
-    case 'link':
-      return (
-        <button
-          className="md__a"
-          onClick={() => {
-            /* A link that leaves the machine opens in the system browser; the
-               window is not a browser and must not become one. */
-            if (external(span.href)) return void ask(() => commands.pathOpen(span.href))
-            const here = resolved(path, span.href)
-            opens?.(here)
-          }}
-        >
-          {span.text}
-        </button>
-      )
+    case 'link': {
+      const target = linkTarget(span.href)
+      if (target === 'text') return <span title={span.href}>{span.text}</span>
+      /* The web opens in the system browser: the window is not a browser and must not become one. */
+      const open = (): void =>
+        target === 'web' ? void ask(() => commands.urlOpen(span.href)).then(went) : opens?.(resolved(path, span.href))
+      return <button className="md__a" title={target === 'web' ? span.href : undefined} onClick={open}>{span.text}</button>
+    }
     default:
       return <Text text={span.text} />
   }

@@ -116,10 +116,18 @@ pub(crate) fn web_address(url: &str) -> Result<&str, RpcError> {
             format!("that address is not one devpit opens: {why}"),
         ))
     };
-    let Some(rest) = url.strip_prefix("https://") else {
-        return refuse("only https");
+    let host_of = |rest: &str| {
+        rest.split(['/', '?', '#'])
+            .next()
+            .unwrap_or_default()
+            .to_owned()
     };
-    let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = match (url.strip_prefix("https://"), url.strip_prefix("http://")) {
+        (Some(rest), _) => host_of(rest),
+        // A server started on this machine, typically by the agent itself.
+        (None, Some(rest)) if on_this_machine(&host_of(rest)) => host_of(rest),
+        _ => return refuse("only https, or http on this machine"),
+    };
     if host.is_empty() {
         return refuse("no host");
     }
@@ -130,6 +138,18 @@ pub(crate) fn web_address(url: &str) -> Result<&str, RpcError> {
         return refuse("an address has no spaces or line breaks in it");
     }
     Ok(url)
+}
+
+/// `localhost`, `127.0.0.1` or `[::1]`, with or without a port.
+fn on_this_machine(host: &str) -> bool {
+    let name = match host.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or_default(),
+        None => host.split(':').next().unwrap_or_default(),
+    };
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "localhost" | "127.0.0.1" | "::1"
+    )
 }
 
 /// `url.open` — opens a web address in the browser the person uses.

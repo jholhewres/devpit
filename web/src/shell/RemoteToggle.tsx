@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { RemoteState } from '../gen/bindings'
 import { ask, commands } from './live'
+import { went } from './problems'
 import { onRemoteConnected } from './window'
 
 /*
@@ -61,7 +62,7 @@ export function RemoteToggle({
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>
       </button>
       {state.on && state.url && (
-        <button className="sq26" title={`Open ${state.url}`} aria-label="Open on claude.ai" onClick={() => void ask(() => commands.pathOpen(state.url!))}>
+        <button className="sq26" title={`Open ${state.url}`} aria-label="Open on claude.ai" onClick={() => void ask(() => commands.urlOpen(state.url!)).then(went)}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" /></svg>
         </button>
       )}

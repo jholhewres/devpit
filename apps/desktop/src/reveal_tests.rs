@@ -158,6 +158,14 @@ fn only_a_web_address_is_handed_to_the_browser() {
 
     // A scheme that does something other than open a page.
     assert!(web_address("http://example.org").is_err(), "plain http");
+    assert!(
+        web_address("http://localhost:5173/").is_ok(),
+        "a local server"
+    );
+    assert!(web_address("http://127.0.0.1:8080").is_ok());
+    assert!(web_address("http://[::1]:3000/x").is_ok());
+    assert!(web_address("http://localhost.example.org").is_err());
+    assert!(web_address("http://localhost@example.org").is_err());
     assert!(web_address("file:///etc/passwd").is_err(), "a local file");
     assert!(
         web_address("javascript:alert(1)").is_err(),
