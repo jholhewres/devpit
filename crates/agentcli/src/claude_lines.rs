@@ -5,6 +5,9 @@
 //! that changes when the vendor does. Shapes were read off a recorded turn of
 //! 2.1.270 (`tests/fixtures/`), not off documentation.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use devpit_rpc::{CallState, Part, SessionInit};
 
 use crate::driver::Read;
@@ -90,12 +93,66 @@ pub(crate) fn system(value: &serde_json::Value) -> Read {
     }
 }
 
-pub(crate) fn assistant_parts(value: &serde_json::Value) -> Vec<Part> {
+/// Which message each speaker is streaming, and whether its text has come in
+/// deltas: the whole block its `assistant` line repeats is then not drawn twice.
+#[derive(Default)]
+pub struct Streamed(Mutex<HashMap<Option<String>, (String, bool)>>);
+
+impl Streamed {
+    /// A `stream_event`: text deltas become text; the rest is the whole line's.
+    pub(crate) fn event(&self, value: &serde_json::Value) -> Read {
+        let parent = parent_of(value);
+        let Some(event) = value.get("event") else {
+            return Read::Nothing;
+        };
+        let Ok(mut open) = self.0.lock() else {
+            return Read::Nothing;
+        };
+        match event.get("type").and_then(|kind| kind.as_str()) {
+            Some("message_start") => {
+                let id = event.get("message").map(|message| string_at(message, "id"));
+                open.insert(parent, (id.unwrap_or_default(), false));
+                Read::Nothing
+            }
+            Some("content_block_delta") => {
+                let delta = event.get("delta");
+                let text = delta
+                    .filter(|delta| {
+                        delta.get("type").and_then(|kind| kind.as_str()) == Some("text_delta")
+                    })
+                    .and_then(|delta| delta.get("text")?.as_str());
+                let Some(text) = text.filter(|text| !text.is_empty()) else {
+                    return Read::Nothing;
+                };
+                if let Some(streaming) = open.get_mut(&parent) {
+                    streaming.1 = true;
+                }
+                Read::Parts(vec![Part::Text {
+                    text: text.to_owned(),
+                    parent,
+                }])
+            }
+            _ => Read::Nothing,
+        }
+    }
+
+    /// Whether this `assistant` line's text already arrived as deltas.
+    pub(crate) fn already(&self, value: &serde_json::Value) -> bool {
+        let id = value.get("message").map(|message| string_at(message, "id"));
+        self.0.lock().is_ok_and(|open| {
+            open.get(&parent_of(value))
+                .is_some_and(|(streaming, any)| *any && Some(streaming) == id.as_ref())
+        })
+    }
+}
+
+pub(crate) fn assistant_parts(value: &serde_json::Value, streamed: bool) -> Vec<Part> {
     let parent = parent_of(value);
     content_of(value)
         .iter()
         .filter_map(
             |block| match block.get("type").and_then(|kind| kind.as_str()) {
+                Some("text") if streamed => None,
                 Some("text") => block
                     .get("text")
                     .and_then(|text| text.as_str())

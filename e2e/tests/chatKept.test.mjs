@@ -49,6 +49,18 @@ after(async () => {
   await window?.quit()
 })
 
+describe('an answer as it is written', () => {
+  test('shows its first words before the turn ends, and its text once', async () => {
+    await fill(window, COMPOSER, 'stream it')
+    assert.ok(await onScreen('streamed first,', 15000), 'the first words never showed while the turn ran')
+    assert.ok(!(await text(window)).includes('then the rest'), 'the whole answer came at once')
+    assert.ok(await onScreen('streamed first, then the rest', 15000), 'the rest never came')
+    await settle(1500)
+    const shown = (await text(window)).split('streamed first, then the rest').length - 1
+    assert.equal(shown, 1, 'the streamed text and the whole block were both drawn')
+  })
+})
+
 describe('a chat left mid-turn', () => {
   test('picks the answer up where it is, and hears the rest', async () => {
     await fill(window, COMPOSER, 'slow')

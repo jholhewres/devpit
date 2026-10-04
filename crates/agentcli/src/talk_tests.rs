@@ -88,15 +88,15 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
     // spawn as NotInstalled. The script is there and executable, so that is
     // the only reason left: try again, a few times.
     let said = (0..5)
-        .find_map(
-            |_| match crate::talk::say(&crate::driver::Claude, &turn, |_| {}, |_| {}) {
+        .find_map(|_| {
+            match crate::talk::say(&crate::driver::Claude::default(), &turn, |_| {}, |_| {}) {
                 Err(crate::AgentError::NotInstalled) => {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     None
                 }
                 other => Some(other),
-            },
-        )
+            }
+        })
         .expect("the stand-in never started")
         .expect("a turn");
     assert_eq!(said.session_id.as_deref(), Some("new"));
@@ -170,15 +170,15 @@ fn a_chat_turn_runs_under_its_profile_env() {
     // Same retry as the test above, for the same reason: a script written a
     // moment ago can be "text file busy" while another test forks.
     let said = (0..5)
-        .find_map(
-            |_| match crate::talk::say(&crate::driver::Claude, &turn, |_| {}, |_| {}) {
+        .find_map(|_| {
+            match crate::talk::say(&crate::driver::Claude::default(), &turn, |_| {}, |_| {}) {
                 Err(crate::AgentError::NotInstalled) => {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     None
                 }
                 other => Some(other),
-            },
-        )
+            }
+        })
         .expect("the stand-in never started")
         .expect("a turn");
     assert_eq!(

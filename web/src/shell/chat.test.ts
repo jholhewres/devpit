@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { Attachment, Conversation, Frame, Message, Profile } from '../gen/bindings'
 import {
   applied,
   ASKS,
+  batched,
   choices,
   fixedTo,
   effortName,
@@ -234,5 +235,23 @@ describe('a rejoined turn', () => {
     const held = applied([], opened('msg_1'))
     expect(applied(held, opened('msg_1'))).toHaveLength(1)
     expect(applied(held, opened('msg_2'))).toHaveLength(2)
+  })
+})
+
+describe('frames between paints', () => {
+  it('are applied even when no animation frame ever comes', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('document', { hidden: false })
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    vi.stubGlobal('cancelAnimationFrame', () => undefined)
+    const got: Frame[][] = []
+    const { push } = batched((frames) => got.push([...frames]))
+    push(text('a', 'one'))
+    push(text('a', 'two'))
+    expect(got).toEqual([])
+    vi.advanceTimersByTime(100)
+    expect(got).toEqual([[text('a', 'one'), text('a', 'two')]])
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 })

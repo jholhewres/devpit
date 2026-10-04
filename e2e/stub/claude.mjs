@@ -290,6 +290,24 @@ async function answer(prompt) {
     console.log(JSON.stringify(said))
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'here is the page', session_id: session }))
+  } else if (/\bstream\b/.test(prompt)) {
+    // Text in deltas, as `--include-partial-messages` writes it, then the whole block.
+    const event = (body) => console.log(JSON.stringify({ type: 'stream_event', event: body, parent_tool_use_id: null, session_id: session }))
+    const id = `stream-${Date.now()}`
+    event({ type: 'message_start', message: { id, role: 'assistant', content: [] } })
+    event({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+    event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'streamed first, ' } })
+    await new Promise((done) => setTimeout(done, 4000))
+    event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'then the rest' } })
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.id = id
+    said.message.content = [{ type: 'text', text: 'streamed first, then the rest' }]
+    console.log(JSON.stringify(said))
+    event({ type: 'content_block_stop', index: 0 })
+    event({ type: 'message_stop' })
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'streamed first, then the rest', session_id: session }))
   } else if (/\ba link\b/.test(prompt)) {
     const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
     said.session_id = session

@@ -80,8 +80,9 @@ export function opening(): Opening {
 }
 
 /* Frames arrive many to a paint while an answer streams; they are applied
-   together, once per frame drawn, rather than one render each. A hidden
-   window gets no animation frames in WebKitGTK, so a timer stands in there. */
+   together, once per frame drawn, rather than one render each. A timer
+   stands in when no frame comes: WebKitGTK gives none to a hidden window,
+   nor to some visible ones, and the whole answer then waited for the end. */
 export function batched(apply: (frames: readonly Frame[]) => void): { push: (frame: Frame) => void; flush: () => void } {
   let pending: Frame[] = []
   let scheduled: { cancel: () => void } | null = null
@@ -96,12 +97,13 @@ export function batched(apply: (frames: readonly Frame[]) => void): { push: (fra
   const push = (frame: Frame): void => {
     pending.push(frame)
     if (scheduled) return
-    if (document.hidden) {
-      const timer = setTimeout(flush, 100)
-      scheduled = { cancel: () => clearTimeout(timer) }
-    } else {
-      const frame = requestAnimationFrame(flush)
-      scheduled = { cancel: () => cancelAnimationFrame(frame) }
+    const timer = setTimeout(flush, 100)
+    const painted = document.hidden ? null : requestAnimationFrame(flush)
+    scheduled = {
+      cancel: () => {
+        clearTimeout(timer)
+        if (painted !== null) cancelAnimationFrame(painted)
+      },
     }
   }
   return { push, flush }

@@ -102,3 +102,48 @@ fn a_chat_that_left_is_sent_nothing_more() {
         Err(tokio::sync::oneshot::error::TryRecvError::Closed)
     ));
 }
+
+fn text(said: &str, parent: Option<&str>) -> devpit_rpc::Part {
+    devpit_rpc::Part::Text {
+        text: said.to_owned(),
+        parent: parent.map(str::to_owned),
+    }
+}
+
+/// A streamed answer is kept as one part, and a subagent's words stay apart.
+#[test]
+fn streamed_text_is_kept_whole_per_speaker() {
+    let mut parts = Vec::new();
+    for piece in ["FIRST ", "DONE ", "banana"] {
+        super::kept(&mut parts, text(piece, None));
+    }
+    super::kept(&mut parts, text("inner", Some("toolu_1")));
+    assert_eq!(
+        parts,
+        vec![
+            text("FIRST DONE banana", None),
+            text("inner", Some("toolu_1"))
+        ]
+    );
+}
+
+/// A late joiner is handed the pieces so far as one frame, not hundreds.
+#[test]
+fn a_streamed_answer_is_relayed_whole_to_a_late_joiner() {
+    let mut frames = Vec::new();
+    for piece in ["a", "b", "c"] {
+        let part = text(piece, None);
+        super::kept_frame(
+            &mut frames,
+            Frame::Part {
+                message_id: "m".to_owned(),
+                part,
+            },
+        );
+    }
+    assert_eq!(frames.len(), 1);
+    let Frame::Part { part, .. } = &frames[0] else {
+        panic!("not a part")
+    };
+    assert_eq!(part, &text("abc", None));
+}

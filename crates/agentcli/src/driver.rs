@@ -6,7 +6,7 @@
 
 use devpit_rpc::{Context, Part, SessionInit};
 
-use crate::claude_lines::{assistant_parts, system, tool_results};
+use crate::claude_lines::{assistant_parts, system, tool_results, Streamed};
 
 /// What one line of a CLI's output turned into.
 #[derive(Debug, Clone, PartialEq)]
@@ -63,7 +63,10 @@ pub trait Driver: Send + Sync {
 }
 
 /// The Claude Code CLI, which prints one JSON object per line.
-pub struct Claude;
+#[derive(Default)]
+pub struct Claude {
+    streamed: Streamed,
+}
 
 impl Driver for Claude {
     fn name(&self) -> &'static str {
@@ -114,7 +117,10 @@ impl Driver for Claude {
                     .unwrap_or(false),
                 context: context_of(&value),
             },
-            Some("assistant") => Read::Parts(assistant_parts(&value)),
+            Some("assistant") => {
+                Read::Parts(assistant_parts(&value, self.streamed.already(&value)))
+            }
+            Some("stream_event") => self.streamed.event(&value),
             Some("user") => Read::Parts(tool_results(&value)),
             Some("system") => system(&value),
             _ => Read::Nothing,
@@ -169,7 +175,7 @@ fn context_of(result: &serde_json::Value) -> Option<Context> {
 /// The driver a conversation named, or nothing when it is not installed.
 pub fn driver(name: &str) -> Option<Box<dyn Driver>> {
     match name {
-        "claude" => Some(Box::new(Claude)),
+        "claude" => Some(Box::<Claude>::default()),
         _ => None,
     }
 }

@@ -268,7 +268,7 @@ pub async fn chat_send(
             |part| {
                 collected
                     .lock()
-                    .map(|mut held| held.push(part.clone()))
+                    .map(|mut held| crate::chat_relay::kept(&mut held, part.clone()))
                     .ok();
                 let _ = sink.send(Frame::Part {
                     message_id: answer.clone(),

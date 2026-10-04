@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use devpit_rpc::{Frame, RpcError};
+use devpit_rpc::{Frame, Part, RpcError};
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::State;
 use tokio::sync::oneshot;
@@ -21,6 +21,52 @@ use tokio::sync::oneshot;
 /// Frames kept for one turn. Past it they still stream to whoever listens;
 /// only a late joiner misses the middle, and the transcript fills it at the end.
 const KEPT_FRAMES: usize = 20_000;
+
+/// Adds a part, joining text onto the same speaker's text just before it: a
+/// streamed answer arrives in many small pieces and is kept as one.
+pub(crate) fn kept(parts: &mut Vec<Part>, part: Part) {
+    if let (
+        Some(Part::Text { text, parent }),
+        Part::Text {
+            text: more,
+            parent: theirs,
+        },
+    ) = (parts.last_mut(), &part)
+    {
+        if parent == theirs {
+            text.push_str(more);
+            return;
+        }
+    }
+    parts.push(part);
+}
+
+/// The same for a turn's frames, within one message.
+fn kept_frame(frames: &mut Vec<Frame>, frame: Frame) {
+    if let (
+        Some(Frame::Part {
+            message_id: last,
+            part: Part::Text { text, parent },
+        }),
+        Frame::Part {
+            message_id,
+            part:
+                Part::Text {
+                    text: more,
+                    parent: theirs,
+                },
+        },
+    ) = (frames.last_mut(), &frame)
+    {
+        if last == message_id && parent == theirs {
+            text.push_str(more);
+            return;
+        }
+    }
+    if frames.len() < KEPT_FRAMES {
+        frames.push(frame);
+    }
+}
 
 struct Turn {
     id: u64,
@@ -166,9 +212,7 @@ impl Relay {
         let Some(turn) = all.turn(conversation, id) else {
             return;
         };
-        if turn.frames.len() < KEPT_FRAMES {
-            turn.frames.push(frame.clone());
-        }
+        kept_frame(&mut turn.frames, frame.clone());
         let _ = turn.first.send(frame.clone());
         for one in &turn.joined {
             let _ = one.channel.send(frame.clone());
