@@ -65,6 +65,22 @@ describe('the orchestrator', () => {
       .catch(() => false)
     assert.ok(woken, `a turn woken by another session never reached the chat. On screen: ${(await text(window)).slice(-400)}`)
     assert.ok((await text(window)).includes('Not from this chat'), 'the woken turn reads as an answer to the person')
+    // One paragraph, however many deltas it came in: while it runs and once read back.
+    const paragraphs = () =>
+      window.executeScript(function () {
+        return Array.prototype.slice
+          .call(document.querySelectorAll('.reply'))
+          .filter(function (one) { return one.textContent.indexOf('says it is done') >= 0 || one.textContent.indexOf('the other') >= 0 })
+          .map(function (one) {
+            return Array.prototype.slice.call(one.querySelectorAll('p')).map(function (p) { return p.textContent })
+          })
+      })
+    // The note it opens with, then the answer whole.
+    const whole = [[(await paragraphs())[0]?.[0], 'the other session says it is done']]
+    assert.deepEqual(await paragraphs(), whole, 'the answer was drawn in pieces')
+    await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 30000)
+    await new Promise((done) => setTimeout(done, 1500))
+    assert.deepEqual(await paragraphs(), whole, 'the answer read back in pieces')
   })
 
   test('is reached by Remote Control through its own chat', async () => {

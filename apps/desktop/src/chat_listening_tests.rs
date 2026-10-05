@@ -139,12 +139,15 @@ fn a_woken_turn_that_dies_keeps_what_it_said_and_names_itself() {
     let (turn, frames) = woken(&relay);
     let ear = ear_on(turn);
     let head = dir.path().join("conv.json");
-    ear.hear(
-        Heard::Part(text("half an ")),
-        || unreachable!(),
-        &transcript,
-        &head,
-    );
+    // Two deltas of one sentence are one part, not two paragraphs.
+    for piece in ["half ", "an "] {
+        ear.hear(
+            Heard::Part(text(piece)),
+            || unreachable!(),
+            &transcript,
+            &head,
+        );
+    }
     ear.hear(Heard::Gone, || unreachable!(), &transcript, &head);
 
     let (kept, _) = devpit_agentcli::store::read(&transcript);

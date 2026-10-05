@@ -229,6 +229,13 @@ async function headless() {
       const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
       said.session_id = session
       said.message.id = `woken-${Date.now()}`
+      // In deltas that end mid-sentence, as the CLI streams it.
+      const event = (body) => console.log(JSON.stringify({ type: 'stream_event', event: body, parent_tool_use_id: null, session_id: session }))
+      event({ type: 'message_start', message: { id: said.message.id, role: 'assistant', content: [] } })
+      for (const piece of ['the other ', 'session says', ' it is done']) {
+        event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: piece } })
+        await new Promise((done) => setTimeout(done, 800))
+      }
       said.message.content = [{ type: 'text', text: 'the other session says it is done' }]
       console.log(JSON.stringify(said))
       const result = JSON.parse(recorded[recorded.length - 1])

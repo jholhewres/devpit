@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 
 import { Acts } from './ActsRows'
 import { doing } from './acts'
+import { joined } from './chat'
 import type { Message } from '../gen/bindings'
 import { inFolder } from './markdown'
 import { Markdown } from './MarkdownView'
@@ -52,7 +53,7 @@ export const Turn = memo(function Turn({
   }
 
   /* A subagent's report is not the answer: it is folded under its call. */
-  const answers = message.parts.filter((part) => part.kind === 'text' && !part.parent)
+  const answers = joined(message.parts).filter((part) => part.kind === 'text' && !part.parent)
   const said = message.parts.flatMap((part) => (part.kind === 'command' ? [part.content] : []))
   const doing = message.parts.filter((part) => part.kind !== 'text')
   const changed = message.parts.flatMap((part) => (part.kind === 'changes' ? part.files : []))

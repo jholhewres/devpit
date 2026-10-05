@@ -154,7 +154,9 @@ impl Ear {
 
 impl Woken {
     fn heard(&mut self, part: Part) {
-        self.parts.push(part.clone());
+        // Joined as the person's own turn joins them: a delta kept as a part
+        // of its own was read back as a paragraph of its own.
+        crate::chat_relay::kept(&mut self.parts, part.clone());
         self.frames
             .send(Frame::Part {
                 message_id: self.answer_id.clone(),

@@ -150,6 +150,10 @@ export function steered(messages: readonly Message[], said: Message): readonly M
   return at < 0 ? [...messages, said] : [...messages.slice(0, at), said, ...messages.slice(at)]
 }
 
+/* The parts as they are drawn: text that runs on is one text, however many
+   pieces it was kept in. */
+export const joined = (parts: readonly Part[]): Part[] => parts.reduce<Part[]>(merged, [])
+
 /* Consecutive text is one paragraph, not one part per chunk — unless the two
    came from different speakers: a subagent's words are not the agent's. */
 function merged(parts: readonly Part[], next: Part): Part[] {
