@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { ask, commands } from './live'
 import { went } from './problems'
@@ -59,7 +59,9 @@ export function McpApp({ called, input, output, isError }: { called: string; inp
     if (ready.current && output !== null) post(frame, toolResult(output, isError))
   }, [output, isError])
 
-  useEffect(() => {
+  /* Listening before the page can speak: it asks to initialize once, as it
+     loads, and a passive effect could run after that and miss it. */
+  useLayoutEffect(() => {
     if (!scope || !page) return
     let parsed: unknown = {}
     try {
