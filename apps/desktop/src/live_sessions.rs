@@ -403,8 +403,17 @@ static PROJECTS: std::sync::Mutex<Option<(std::time::Instant, Vec<Project>)>> =
     std::sync::Mutex::new(None);
 
 pub(crate) fn recent_projects() -> Result<Vec<Project>, RpcError> {
+    // Reused only while it lists the projects there are: one added a moment
+    // ago left its sessions with no project, so out of an orchestrator's reach.
+    let mut there: Vec<String> = crate::projects::store()?
+        .projects()?
+        .into_iter()
+        .map(|row| row.id)
+        .collect();
+    there.sort();
     if let Some((at, kept)) = PROJECTS.lock().ok().and_then(|held| held.clone()) {
-        if at.elapsed() < PROJECTS_FRESH {
+        if at.elapsed() < PROJECTS_FRESH && same_ids(kept.iter().map(|one| one.id.as_str()), &there)
+        {
             return Ok(kept);
         }
     }
@@ -413,6 +422,13 @@ pub(crate) fn recent_projects() -> Result<Vec<Project>, RpcError> {
         *held = Some((std::time::Instant::now(), fresh.clone()));
     }
     Ok(fresh)
+}
+
+/// Whether a kept list is of the projects `there` names, in any order.
+pub(crate) fn same_ids<'a>(kept: impl Iterator<Item = &'a str>, there: &[String]) -> bool {
+    let mut kept: Vec<&str> = kept.collect();
+    kept.sort_unstable();
+    kept.len() == there.len() && kept.iter().zip(there).all(|(one, other)| *one == other)
 }
 
 /// `orchestrator.sessions` — what this profile's account has running now.

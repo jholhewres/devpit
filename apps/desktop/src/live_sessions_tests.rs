@@ -197,3 +197,13 @@ fn a_process_start_is_read_past_a_command_with_spaces() {
     assert_eq!(start_of(stat), Some("5646"));
     assert_eq!(start_of("garbage"), None);
 }
+
+/// The kept project list is reused only while it names the projects there
+/// are: one added since is a reason to read them again.
+#[test]
+fn a_project_added_since_the_list_was_kept_is_a_reason_to_read_it_again() {
+    let there = vec!["prj_a".to_owned(), "prj_b".to_owned()];
+    assert!(super::same_ids(["prj_b", "prj_a"].into_iter(), &there));
+    assert!(!super::same_ids(["prj_a"].into_iter(), &there));
+    assert!(!super::same_ids(["prj_a", "prj_c"].into_iter(), &there));
+}
