@@ -317,3 +317,22 @@ fn a_tool_input_delta_is_not_text() {
     let line = r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"comma"}},"parent_tool_use_id":null}"#;
     assert_eq!(claude.read(line), Read::Nothing);
 }
+
+/// Thinking is said when it begins, and the empty block repeated at its end
+/// is not a second one.
+#[test]
+fn thinking_is_heard_when_it_begins_and_once() {
+    let claude = Claude::default();
+    let start = r#"{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_t","content":[]}},"parent_tool_use_id":null}"#;
+    let begins = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}},"parent_tool_use_id":null}"#;
+    let ends = r#"{"type":"assistant","message":{"id":"msg_t","content":[{"type":"thinking","thinking":""}]},"parent_tool_use_id":null}"#;
+    assert_eq!(claude.read(start), Read::Nothing);
+    assert_eq!(
+        claude.read(begins),
+        Read::Parts(vec![Part::Thinking {
+            text: String::new(),
+            parent: None
+        }])
+    );
+    assert_eq!(claude.read(ends), Read::Parts(vec![]));
+}

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo } from 'react'
+import { createContext, memo, useCallback, useContext, useMemo } from 'react'
 
 import { Diagram } from './Diagram'
 import { ofName } from './languages'
@@ -8,7 +8,6 @@ import { blocks, external, linkTarget, resolved, spans, type Block, type Span } 
 import { Tick } from './MdTick'
 import { ask, commands } from './live'
 import { went } from './problems'
-import { cut, locate, styleOf, type Chunk } from './veil'
 import { useShellPick } from './shellStore'
 
 /*
@@ -20,34 +19,17 @@ import { useShellPick } from './shellStore'
  * keep ahead of.
  */
 
-/* Where the fade is up to. One cursor for the whole pass, walked forward in
-   document order, so a word that appears twice fades on the right one. It is
-   context rather than a prop because every node would otherwise have to carry
-   it down to the one that draws text. */
-interface Fading {
-  readonly source: string
-  readonly chunks: readonly Chunk[]
-  readonly now: number
-  cursor: number
-}
-
-const Veil = createContext<Fading | null>(null)
-
-/* Context and not a prop for the same reason as the fade: every node between
-   the document and the one link would otherwise have to carry it down. */
+/* Context and not a prop: every node between the document and the one link
+   would otherwise have to carry it down. */
 const Opening = createContext<((path: string) => void) | null>(null)
 
 export function Markdown({
   source,
   path,
-  chunks,
-  now,
   opens,
 }: {
   source: string
   path?: string
-  chunks?: readonly Chunk[]
-  now?: number
   /* What a link to a file beside this document means. Absent, it is a file in
      the project, which is what every caller but one wants. The exception is a
      `SKILL.md`, which lives outside every project — its neighbours cannot be
@@ -55,7 +37,6 @@ export function Markdown({
      reader cannot act on. */
   opens?: (path: string) => void
 }): React.JSX.Element {
-  const fading = chunks?.length ? { source, chunks, now: now ?? Date.now(), cursor: 0 } : null
   /* Once here, not in every link: a long answer has hundreds of them. */
   const show = useShellPick((shell) => shell.show)
   const opener = useCallback(
@@ -65,42 +46,22 @@ export function Markdown({
   const parsed = useMemo(() => blocks(source), [source])
 
   return (
-    <Veil.Provider value={fading}>
-      <div className="md">
-        <Opening.Provider value={opener}>
-          {parsed.map((block, at) => (
-            <Piece key={at} block={block} path={path ?? ''} />
-          ))}
-        </Opening.Provider>
-      </div>
-    </Veil.Provider>
+    <div className="md">
+      <Opening.Provider value={opener}>
+        {parsed.map((block, at) => (
+          <Kept key={at} block={block} path={path ?? ''} />
+        ))}
+      </Opening.Provider>
+    </div>
   )
 }
 
-/* A run of text, cut where the fading ranges begin and end. Off the fading
-   path this is one string and one node, exactly as before. */
-function Text({ text }: { text: string }): React.JSX.Element {
-  const fading = useContext(Veil)
-  if (!fading) return <>{text}</>
-
-  const at = locate(fading.source, text, fading.cursor)
-  if (at < 0) return <>{text}</>
-  fading.cursor = at + text.length
-
-  return (
-    <>
-      {cut(text, at, fading.chunks).map((slice, index) =>
-        slice.chunk ? (
-          <span className="veil" key={index} style={styleOf(slice.chunk, fading.now, fading.chunks.length)}>
-            {slice.text}
-          </span>
-        ) : (
-          <span key={index}>{slice.text}</span>
-        ),
-      )}
-    </>
-  )
-}
+/* A block drawn again only when it changed: an answer being written changes
+   its last block, and the ones above it hold still. */
+const Kept = memo(
+  (props: { block: Block; path: string }) => <Piece {...props} />,
+  (was, now) => was.path === now.path && JSON.stringify(was.block) === JSON.stringify(now.block),
+)
 
 function Piece({ block, path }: { block: Block; path: string }): React.JSX.Element | null {
   switch (block.kind) {
@@ -189,6 +150,6 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
       return <button className="md__a" title={target === 'web' ? span.href : undefined} onClick={open}>{span.text}</button>
     }
     default:
-      return <Text text={span.text} />
+      return <>{span.text}</>
   }
 }

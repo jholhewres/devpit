@@ -10,7 +10,7 @@ import { Rewound } from './Rewound'
 import { TurnApps } from './TurnApps'
 import { TurnDelegations } from './TurnDelegations'
 import { TurnChanges } from './TurnChangesView'
-import { advanced, opened } from './veil'
+import { typed } from './writing'
 
 /*
  * One message, drawn part by part.
@@ -77,11 +77,7 @@ export const Turn = memo(function Turn({
   )
 })
 
-/* The answer, under the fade while it is still arriving.
-
-   The veil's state is a ref rather than state: it is bookkeeping about what
-   has already been drawn, and putting it in `useState` would ask React to
-   re-render in order to record that a render happened. */
+/* The answer, written out at a steady pace while it is still arriving. */
 function Reply({
   source,
   live,
@@ -94,24 +90,45 @@ function Reply({
   onOpen?: (path: string) => void
 }): React.JSX.Element {
   const show = useShellPick((shell) => shell.show)
-  const veil = useRef(opened(source))
-  const now = Date.now()
-  const chunks = advanced(veil.current, source, live, now)
+  const shown = useTyping(source, live)
 
   return (
-    <div className="reply">
+    <div className="reply" data-live={live || undefined}>
       <Markdown
-        source={source}
-        chunks={chunks}
-        now={now}
+        source={source.slice(0, shown)}
         opens={(here) => {
           const path = inFolder(folder, here)
           if (onOpen) onOpen(path)
           else show('file', { id: `file:${path}`, path })
         }}
       />
+      {live && <span className="reply__caret" aria-hidden="true" />}
     </div>
   )
+}
+
+const reducedMotion = (): boolean =>
+  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/* How much of the answer is on screen. A timer, not animation frames: WebKitGTK
+   gives none to some visible windows. Text there when it mounts is not replayed. */
+function useTyping(source: string, live: boolean): number {
+  const [shown, setShown] = useState(source.length)
+  const at = useRef({ source, live, last: 0 })
+  at.current.source = source
+  at.current.live = live
+  useEffect(() => {
+    if (shown >= source.length && live) return
+    if (!live || reducedMotion()) return setShown(source.length)
+    const timer = window.setTimeout(() => {
+      const now = performance.now()
+      const elapsed = at.current.last ? Math.min(now - at.current.last, 200) : 33
+      at.current.last = now
+      setShown((was) => typed(at.current.source, was, elapsed, { live: at.current.live, reduced: false }))
+    }, 33)
+    return () => window.clearTimeout(timer)
+  }, [shown, source, live])
+  return Math.min(shown, source.length)
 }
 
 /* How long it has been at it. The dots say it is alive; the seconds say

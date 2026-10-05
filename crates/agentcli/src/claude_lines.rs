@@ -93,10 +93,19 @@ pub(crate) fn system(value: &serde_json::Value) -> Read {
     }
 }
 
-/// Which message each speaker is streaming, and whether its text has come in
-/// deltas: the whole block its `assistant` line repeats is then not drawn twice.
+/// Which message each speaker is streaming, and what of it came as events: the
+/// whole block its `assistant` line repeats is then not drawn twice.
 #[derive(Default)]
-pub struct Streamed(Mutex<HashMap<Option<String>, (String, bool)>>);
+pub struct Streamed(Mutex<HashMap<Option<String>, (String, Seen)>>);
+
+/// What a message's stream already drew.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Seen {
+    pub text: bool,
+    /// A thinking block began. Its text is withheld from the stream, so the
+    /// empty block the `assistant` line repeats adds nothing.
+    pub thought: bool,
+}
 
 impl Streamed {
     /// A `stream_event`: text deltas become text; the rest is the whole line's.
@@ -111,8 +120,23 @@ impl Streamed {
         match event.get("type").and_then(|kind| kind.as_str()) {
             Some("message_start") => {
                 let id = event.get("message").map(|message| string_at(message, "id"));
-                open.insert(parent, (id.unwrap_or_default(), false));
+                open.insert(parent, (id.unwrap_or_default(), Seen::default()));
                 Read::Nothing
+            }
+            // Said when it begins, not when it ends: seconds can pass in it.
+            Some("content_block_start")
+                if event
+                    .pointer("/content_block/type")
+                    .and_then(|kind| kind.as_str())
+                    == Some("thinking") =>
+            {
+                if let Some(streaming) = open.get_mut(&parent) {
+                    streaming.1.thought = true;
+                }
+                Read::Parts(vec![Part::Thinking {
+                    text: String::new(),
+                    parent,
+                }])
             }
             Some("content_block_delta") => {
                 let delta = event.get("delta");
@@ -125,7 +149,7 @@ impl Streamed {
                     return Read::Nothing;
                 };
                 if let Some(streaming) = open.get_mut(&parent) {
-                    streaming.1 = true;
+                    streaming.1.text = true;
                 }
                 Read::Parts(vec![Part::Text {
                     text: text.to_owned(),
@@ -136,23 +160,28 @@ impl Streamed {
         }
     }
 
-    /// Whether this `assistant` line's text already arrived as deltas.
-    pub(crate) fn already(&self, value: &serde_json::Value) -> bool {
+    /// What of this `assistant` line's message already arrived as events.
+    pub(crate) fn already(&self, value: &serde_json::Value) -> Seen {
         let id = value.get("message").map(|message| string_at(message, "id"));
-        self.0.lock().is_ok_and(|open| {
-            open.get(&parent_of(value))
-                .is_some_and(|(streaming, any)| *any && Some(streaming) == id.as_ref())
-        })
+        self.0
+            .lock()
+            .ok()
+            .and_then(|open| {
+                open.get(&parent_of(value))
+                    .filter(|(streaming, _)| Some(streaming) == id.as_ref())
+                    .map(|(_, seen)| *seen)
+            })
+            .unwrap_or_default()
     }
 }
 
-pub(crate) fn assistant_parts(value: &serde_json::Value, streamed: bool) -> Vec<Part> {
+pub(crate) fn assistant_parts(value: &serde_json::Value, streamed: Seen) -> Vec<Part> {
     let parent = parent_of(value);
     content_of(value)
         .iter()
         .filter_map(
             |block| match block.get("type").and_then(|kind| kind.as_str()) {
-                Some("text") if streamed => None,
+                Some("text") if streamed.text => None,
                 Some("text") => block
                     .get("text")
                     .and_then(|text| text.as_str())
@@ -160,15 +189,14 @@ pub(crate) fn assistant_parts(value: &serde_json::Value, streamed: bool) -> Vec<
                         text: text.to_owned(),
                         parent: parent.clone(),
                     }),
-                Some("thinking") => {
-                    block
-                        .get("thinking")
-                        .and_then(|text| text.as_str())
-                        .map(|text| Part::Thinking {
-                            text: text.to_owned(),
-                            parent: parent.clone(),
-                        })
-                }
+                Some("thinking") => block
+                    .get("thinking")
+                    .and_then(|text| text.as_str())
+                    .filter(|text| !(streamed.thought && text.is_empty()))
+                    .map(|text| Part::Thinking {
+                        text: text.to_owned(),
+                        parent: parent.clone(),
+                    }),
                 Some("tool_use") => Some(Part::ToolCall {
                     id: string_at(block, "id"),
                     name: string_at(block, "name"),
