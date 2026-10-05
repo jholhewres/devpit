@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { SessionCost as Cost } from '../gen/bindings'
 import { ask, commands } from './live'
-import { costDetail, costWords, keepUnit, unitNow, type CostUnit } from './sessionCost'
+import { costDetail, costWords, keepUnit, unitNow, type CostUnit } from './spentWords'
 
 const EVERY_MS = 3000
 

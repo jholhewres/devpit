@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { SessionCost as Cost } from '../gen/bindings'
 import { SessionCost } from './SessionCost'
-import { costDetail, costWords, tokens } from './sessionCost'
+import { costDetail, costWords, tokens } from './spentWords'
 
 const COST: Cost = {
   costUsd: 1.234,
