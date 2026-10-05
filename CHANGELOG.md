@@ -3,6 +3,14 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.37 — 2026-10-05
+
+### Chat
+
+- **A document opened from an answer is resized by its edge**, and the chat
+  narrows beside it instead of running on underneath. The chat's buttons
+  stay over the chat, and the document's own over the document.
+
 ## 0.1.36 — 2026-10-05
 
 ### Chat
@@ -26,10 +34,6 @@ release notes are taken from here when a version is tagged.
   tooltip has the last turn, what was spent since devpit first saw it, the
   tokens and the model. Dollars are API list prices; a click shows tokens
   instead.
-
-- **A document opened from an answer is resized by its edge**, and the chat
-  narrows beside it instead of running on underneath. The chat's buttons
-  stay over the chat, and the document's own over the document.
 
 ### Fixes
 
