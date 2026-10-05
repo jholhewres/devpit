@@ -242,3 +242,12 @@
 /* What a session has spent: dollars or tokens, the rest in its tooltip. */
 .scost { flex: none; background: none; border: 0; padding: 0 4px; font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-3); cursor: pointer; }
 .scost:hover { color: var(--text); }
+
+/* A reply the orchestrator drafted, where it drafted it, for the person to send. */
+.tdraft { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.tdraft__card { padding: 8px 10px; border-radius: 8px; background: var(--raised); border-left: 2px solid var(--accent); }
+.tdraft__card[data-standing='sent'], .tdraft__card[data-standing='dropped'], .tdraft__card[data-standing='gone'] { border-left-color: var(--border); opacity: .75; }
+.tdraft__h { display: flex; gap: 10px; align-items: baseline; margin: 0 0 4px; font-size: 12px; }
+.tdraft__to { font-weight: 550; color: var(--text); }
+.tdraft__state { color: var(--text-3); font-size: 11px; }
+.tdraft__text { margin: 0 0 6px; white-space: pre-wrap; font-size: 12.5px; color: var(--text-2); }

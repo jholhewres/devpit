@@ -195,6 +195,7 @@ describe('the orchestrator', () => {
     assert.match(outOfReach.error ?? '', /not running in a project linked/, `an unlinked project's session was stopped: ${JSON.stringify(outOfReach)}`)
     const orchestratorId = (await invoke(window, 'project_list')).projects.find((one) => one.orchestrator)?.id
     await invoke(window, 'orchestrator_link', { projectId: orchestratorId, linked: [project.id] })
+
     const stopped = await ask('stop', { name: 'termed-stub' }, orchestrator)
     assert.ok(stopped.ok, `the session could not be stopped: ${JSON.stringify(stopped)}`)
     const windows = () => {
@@ -206,6 +207,41 @@ describe('the orchestrator', () => {
     }
     const gone = await window.wait(async () => !windows().includes(layout.focusedId), 10000).catch(() => false)
     assert.ok(gone, `its terminal is still there: ${windows()}`)
+  })
+
+  test('shows a reply it drafted as a card in its chat, sent into the session by the person', async () => {
+    // A session of its own in the project the test before linked, on no question.
+    const project = (await invoke(window, 'project_list')).projects.find((one) => one.name === 'termed')
+    const layout = await invoke(window, 'session_ensure', { projectId: project.id, tabId: 'tab_e2e_drafted', worktreeId: null })
+    const target = `devpit_${project.id}:${layout.focusedId}`
+    const stub = join(process.env.E2E_ROOT, 'e2e', 'stub', 'claude.mjs')
+    tmux(home, 'send-keys', '-t', target, '-l', `${process.execPath} ${stub} --name drafted-stub`)
+    tmux(home, 'send-keys', '-t', target, 'Enter')
+    const screen = () => tmux(home, 'capture-pane', '-p', '-t', target)
+    const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
+    const drafted = await window
+      .wait(async () => ((await ask('draft', { name: 'drafted-stub', text: 'please carry on' }, orchestrator)).ok ? true : false), 20000)
+      .catch(() => false)
+    assert.ok(drafted, 'the draft was refused')
+
+    await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 30000)
+    await fill(window, 'textarea.composer__ph', 'draft a reply for drafted-stub')
+    const card = await window.wait(until.elementLocated(By.css('.tdraft__card[data-standing="pending"]')), 20000).catch(() => null)
+    assert.ok(card, `the draft never showed as a card in the chat. On screen: ${(await text(window)).slice(-400)}`)
+    const sent = await window
+      .wait(async () => window.executeScript(function () {
+        const send = Array.prototype.slice.call(document.querySelectorAll('.tdraft__card button')).find(function (one) { return one.textContent === 'Send' })
+        if (!send || send.disabled) return false
+        send.click()
+        return true
+      }), 15000)
+      .catch(() => false)
+    assert.ok(sent, 'the card never let the draft be sent')
+    const reached = await window.wait(async () => String(screen()).includes('please carry on'), 15000).catch(() => false)
+    assert.ok(reached, `the reply never reached the session. It shows: ${String(screen()).slice(-300)}`)
+    assert.ok(await window.wait(until.elementLocated(By.css('.tdraft__card[data-standing="sent"]')), 5000).catch(() => null), 'the card does not say it was sent')
+    tmux(home, 'send-keys', '-t', target, '-l', '/exit')
+    tmux(home, 'send-keys', '-t', target, 'Enter')
   })
 
   test('hands a card to a session of its account, linked to the card — and nothing else may', async () => {

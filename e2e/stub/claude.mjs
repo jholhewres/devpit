@@ -284,6 +284,19 @@ async function answer(prompt) {
     console.log(JSON.stringify(said))
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'handed to worker-1', session_id: session }))
+  } else if (/\bdraft a reply\b/.test(prompt)) {
+    // What an orchestrator does when told to let a session go on: drafts it.
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.id = `draft-${Date.now()}`
+    said.message.content = [{ type: 'tool_use', id: 'toolu_draft1', name: 'mcp__devpit__devpit_draft_reply', input: { name: 'drafted-stub', text: 'please carry on' } }]
+    console.log(JSON.stringify(said))
+    console.log(JSON.stringify({ type: 'user', session_id: session, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_draft1', content: '{"drafted":"termed-stub"}' }] } }))
+    said.message.id = `draft-said-${Date.now()}`
+    said.message.content = [{ type: 'text', text: 'drafted it for you to send' }]
+    console.log(JSON.stringify(said))
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'drafted it for you to send', session_id: session }))
   } else if (/\bthe app\b/.test(prompt)) {
     // A call of the tool that comes with a page, and its result.
     const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
