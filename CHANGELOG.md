@@ -27,10 +27,16 @@ release notes are taken from here when a version is tagged.
   tokens and the model. Dollars are API list prices; a click shows tokens
   instead.
 
+- **A document opened from an answer is resized by its edge**, and the chat
+  narrows beside it instead of running on underneath. The chat's buttons
+  stay over the chat, and the document's own over the document.
+
 ### Fixes
 
 - **A session in a project added a moment ago is in an orchestrator's
   reach** right after it is linked; it used to be refused for a few seconds.
+- **A page an MCP tool comes with always gets its call and result.** It
+  could load before the window listened, and wait for them forever.
 
 ## 0.1.35 — 2026-10-04
 
