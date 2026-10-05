@@ -604,3 +604,6 @@
 .isl-reply__in { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; font-size: 12px; }
 .isl-reply__in:focus { outline: none; border-color: rgba(255, 255, 255, 0.35); }
 .isl-reply__said { margin: 4px 0 0; color: var(--isl-dim); font-size: 11px; }
+
+/* What the session has spent, under its checks. */
+.isl-cost { align-self: flex-start; background: none; border: 0; padding: 0; font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; color: inherit; opacity: .7; cursor: pointer; }

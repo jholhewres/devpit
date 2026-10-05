@@ -105,8 +105,8 @@ pub use session::{
 };
 pub use settings::{ErrorReportsPreview, Settings, Theme};
 pub use spend::{
-    PlanLimits, PlanWindow, SpendCard, SpendDay, SpendHistory, SpendInstallation, SpendRow,
-    SpendSession, SpendShare, TokenCounts,
+    PlanLimits, PlanWindow, SessionCost, SpendCard, SpendDay, SpendHistory, SpendInstallation,
+    SpendRow, SpendSession, SpendShare, TokenCounts,
 };
 pub use tested::{FailedTest, Tested, MOST_FAILURES_KEPT, TESTS_EVIDENCE};
 pub use threads::{Conversations, Thread};

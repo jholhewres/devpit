@@ -238,3 +238,7 @@
 .reply__caret { display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: var(--text-3); border-radius: 1px; animation: caret 1s steps(2, start) infinite; }
 @keyframes caret { to { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .reply__caret { animation: none; } }
+
+/* What a session has spent: dollars or tokens, the rest in its tooltip. */
+.scost { flex: none; background: none; border: 0; padding: 0 4px; font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-3); cursor: pointer; }
+.scost:hover { color: var(--text); }

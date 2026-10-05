@@ -29,6 +29,7 @@ import { SessionsChip, SessionsWaiting } from './OrchestratorChat'
 import { Queued } from './Queued'
 import { SendButton } from './SendButton'
 import { useQueue } from './useQueue'
+import { SessionCost } from './SessionCost'
 import { SlashMenu } from './SlashMenu'
 import { MentionMenu } from './MentionMenu'
 import { useMention } from './useMention'
@@ -112,7 +113,6 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     halt,
   )
 
-  const spent = money(chat.cost)
   const empty = chat.messages.length === 0 && !chat.error
 
   return (
@@ -120,7 +120,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
       <PaneCorner tabId={tab.id} what="chat">
         <ChatCardChip card={chat.card} />
         <ContextMeter context={chat.context} />
-        {spent && <span className="pcorner__cost" title="What this conversation has cost">{spent}</span>}
+        {chat.session ? <SessionCost sessionId={chat.session} className="pcorner__cost scost" /> : money(chat.cost) && <span className="pcorner__cost">{money(chat.cost)}</span>}
         {chat.session && <CopySession id={chat.session} />}
         {project?.orchestrator && <SessionsChip profileId={project.orchestrator} />}
         {project && <RemoteToggle projectId={project.id} conversationId={tab.id} sending={chat.sending} supervised={ASKS(chat.permission)} />}

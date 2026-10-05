@@ -9,6 +9,8 @@ apps/desktop/src/adopted_history.rs 1
 apps/desktop/src/reading_path_tests.rs 1
 apps/desktop/src/session_search.rs 1
 apps/desktop/src/session_search_tests.rs 1
+apps/desktop/src/session_cost.rs 1   # a session's transcript, by its id, under the CLI's config
+apps/desktop/src/session_cost_tests.rs 1
 crates/agentcli/src/outside.rs 1
 crates/agentcli/src/outside_tests.rs 1
 crates/agentcli/src/transcript.rs 1

@@ -1523,6 +1523,17 @@ export const commands = {
 	/**  `finding.dismiss` — sets one finding aside, or brings it back. */
 	findingDismiss: (runId: string, at: number, dismissed: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("finding_dismiss", { runId, at, dismissed })),
 	projectTestCommand: (projectId: string) => typedError<TestCommand, RpcError>(__TAURI_INVOKE("project_test_command", { projectId })),
+	sessionCost: (sessionId: string) => typedError<{
+	/**  At API list prices: on a subscription it is what the tokens would cost. */
+	costUsd: number | null,
+	lastTurnUsd: number | null,
+	/**  Spent since devpit first read it; less than the whole for a resumed one. */
+	sinceSeenUsd: number | null,
+	tokens: TokenCounts,
+	model: string | null,
+	/**  Tokens of a model there is no price for. */
+	unpricedTokens: number | null,
+} | null, RpcError>(__TAURI_INVOKE("session_cost", { sessionId })),
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
 	checkpointTested: (runId: string) => typedError<Tested, RpcError>(__TAURI_INVOKE("checkpoint_tested", { runId })),
 	diagnosticsEnvironment: () => typedError<EnvironmentReport, RpcError>(__TAURI_INVOKE("diagnostics_environment")),
@@ -3828,6 +3839,19 @@ export type SessionChanges = {
 	diff: string,
 	/**  The diff was longer than a window reads, and was cut. */
 	cut: boolean,
+};
+
+/**  What one session has spent so far, read off its transcript. */
+export type SessionCost = {
+	/**  At API list prices: on a subscription it is what the tokens would cost. */
+	costUsd: number | null,
+	lastTurnUsd: number | null,
+	/**  Spent since devpit first read it; less than the whole for a resumed one. */
+	sinceSeenUsd: number | null,
+	tokens: TokenCounts,
+	model: string | null,
+	/**  Tokens of a model there is no price for. */
+	unpricedTokens: number | null,
 };
 
 export type SessionHit = {

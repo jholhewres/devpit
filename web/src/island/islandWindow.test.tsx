@@ -26,6 +26,7 @@ vi.mock('../shell/live', () => ({
     islandNow: () => ({ sessions: [...alive.values()] }),
     pauseRead: async () => paused,
     islandShape: () => null,
+    sessionCost: () => null,
     islandSeen: (id: string) => (called('seen', id), null),
     islandDecide: (id: string, verdict: string) => (called('decide', id, verdict), null),
     islandOpenPane: (projectId: string | null, paneId: string) => (called('open', projectId, paneId), null),

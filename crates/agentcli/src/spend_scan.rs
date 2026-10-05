@@ -42,7 +42,7 @@ pub fn records_in(text: &str) -> Vec<Record> {
         .collect()
 }
 
-fn record_of(line: &str) -> Option<Record> {
+pub(crate) fn record_of(line: &str) -> Option<Record> {
     let value: Value = serde_json::from_str(line).ok()?;
     if value.get("type")?.as_str()? != "assistant" {
         return None;

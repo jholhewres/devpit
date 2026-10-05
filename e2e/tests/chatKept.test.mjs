@@ -7,7 +7,7 @@
  */
 
 import { strict as assert } from 'node:assert'
-import { readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { By, until } from 'selenium-webdriver'
@@ -101,6 +101,25 @@ describe('a chat left mid-turn', () => {
     )
     assert.ok(!(await text(window)).includes('the app closed while the turn was running'), 'a running turn was said to have died')
     assert.ok(await onScreen('second half of a slow answer', 20000), 'the rest of the answer never reached the reopened chat')
+  })
+})
+
+describe('what a session has spent', () => {
+  test("is in the chat's corner, and grows with its transcript", async () => {
+    const id = await window.executeScript("return document.querySelector('.pcorner [aria-label=\"Copy session ID\"]')?.title ?? null")
+    assert.ok(id, 'the chat has no session to read')
+    // A transcript of the CLI's own shape, written as a session would write it.
+    const folder = join(home, '.claude', 'projects', '-e2e-cost')
+    mkdirSync(folder, { recursive: true })
+    const said = (message, output) =>
+      `${JSON.stringify({ type: 'assistant', requestId: `r-${message}`, sessionId: id, cwd: '/w', timestamp: '2026-10-05T10:00:00Z', message: { id: message, model: 'claude-sonnet-4-5', usage: { input_tokens: 1000, output_tokens: output } } })}\n`
+    writeFileSync(join(folder, `${id}.jsonl`), said('m1', 100000))
+    const shown = () => window.executeScript("return document.querySelector('.pcorner .scost')?.textContent ?? null")
+    const first = await window.wait(async () => ((await shown())?.startsWith('$') ? shown() : false), 15000).catch(() => null)
+    assert.ok(first, 'the chat never said what its session has spent')
+    appendFileSync(join(folder, `${id}.jsonl`), said('m2', 200000))
+    const grew = await window.wait(async () => (await shown()) !== first, 15000).catch(() => false)
+    assert.ok(grew, `what it spent stayed at ${first} as its transcript grew`)
   })
 })
 

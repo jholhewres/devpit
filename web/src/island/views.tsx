@@ -1,5 +1,6 @@
 import type { IslandSession, IslandStep, IslandVerdict } from '../gen/bindings'
 import { ask, commands } from '../shell/live'
+import { SessionCost } from '../shell/SessionCost'
 import { Checks } from './Checks'
 import { Mascot } from './Mascot'
 import { Preview } from './Preview'
@@ -146,6 +147,7 @@ export function Detail({ session, now }: { session: IslandSession; now: number }
           ))}
         </ol>
         <Checks sessionId={session.sessionId} />
+        <SessionCost sessionId={session.sessionId} className="isl-cost" />
         <button className="isl-btn isl-btn--quiet" onClick={() => openPane(session)}>
           {session.paneId ? 'Open terminal' : 'Open chat'}
         </button>

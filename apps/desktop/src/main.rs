@@ -156,6 +156,7 @@ mod run_from;
 mod runs;
 mod saves;
 mod search;
+mod session_cost;
 mod session_notice;
 mod session_search;
 mod session_told;

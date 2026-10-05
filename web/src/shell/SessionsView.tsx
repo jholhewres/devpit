@@ -11,6 +11,7 @@ import { opened } from './strip'
 import { remember, remembered } from './tabs'
 import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { useShell } from './useShell'
+import { SessionCost } from './SessionCost'
 
 /*
  * The sessions an orchestrator works with, in one place: how each stands,
@@ -281,6 +282,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                         : last && ` · ${ARROW[last.kind as keyof typeof ARROW] ?? ''} ${last.summary ?? last.text}`}
                     </span>
                   </button>
+                  <SessionCost sessionId={one.sessionId} />
                   {one.pane && (
                     <button className="sess__icon" onClick={() => setTerminal(one)} title="Open its terminal here" aria-label={`Open ${one.name}'s terminal here`}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 10 3 2-3 2M13 14h4" /></svg>

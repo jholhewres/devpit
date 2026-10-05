@@ -132,3 +132,18 @@ pub struct PlanLimits {
     /// Why there are no windows, said rather than drawn as zero.
     pub problem: Option<String>,
 }
+
+/// What one session has spent so far, read off its transcript.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCost {
+    /// At API list prices: on a subscription it is what the tokens would cost.
+    pub cost_usd: f64,
+    pub last_turn_usd: f64,
+    /// Spent since devpit first read it; less than the whole for a resumed one.
+    pub since_seen_usd: f64,
+    pub tokens: TokenCounts,
+    pub model: Option<String>,
+    /// Tokens of a model there is no price for.
+    pub unpriced_tokens: f64,
+}

@@ -324,6 +324,7 @@ pub mod running;
 mod stopping;
 pub use mcp_health::mcp_health;
 pub use stopping::{stop_argv, stop_background};
+pub mod session_cost;
 pub mod skills;
 mod sources;
 pub mod spend_prices;
