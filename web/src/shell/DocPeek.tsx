@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
+
 import { Markdown } from './MarkdownView'
+import { keepWidth, keptWidth, PEEK_DEFAULT, peekWidth } from './peekWidth'
 import { useFile } from './useFile'
 import { useShellPick } from './shellStore'
 
@@ -13,9 +16,47 @@ export function DocPeek({ path, onOpen, onClose }: { path: string; onOpen: (path
   const name = path.split('/').pop() ?? path
   const text = file.file?.text ?? null
   const markdown = /\.(md|markdown|mdx)$/i.test(path)
+  const side = useRef<HTMLElement>(null)
+  const [width, setWidth] = useState(keptWidth)
+
+  /* The pane makes room for it: the chat narrows beside it instead of
+     running on underneath, and its corner moves with it. */
+  useEffect(() => {
+    const pane = side.current?.parentElement
+    if (!pane) return
+    const fitted = peekWidth(width, pane.clientWidth)
+    pane.style.setProperty('--peek-w', `${fitted}px`)
+    return () => {
+      pane.style.removeProperty('--peek-w')
+    }
+  }, [width])
+
+  const drag = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const pane = side.current?.parentElement
+    if (!pane) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const right = pane.getBoundingClientRect().right
+    const move = (to: PointerEvent): void => setWidth(peekWidth(right - to.clientX, pane.clientWidth))
+    const up = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      setWidth((was) => (keepWidth(was), was))
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
 
   return (
-    <aside className="peek" aria-label={`Preview of ${name}`}>
+    <aside className="peek" ref={side} aria-label={`Preview of ${name}`}>
+      <div
+        className="peek__grip"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the preview"
+        title="Drag to resize · double-click for the default"
+        onPointerDown={drag}
+        onDoubleClick={() => (setWidth(PEEK_DEFAULT), keepWidth(PEEK_DEFAULT))}
+      />
       <header className="peek__bar">
         <span className="peek__name" title={path}>
           {name}

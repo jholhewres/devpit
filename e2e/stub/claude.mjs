@@ -330,6 +330,14 @@ async function answer(prompt) {
     event({ type: 'message_stop' })
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'streamed first, then more, then the rest', session_id: session }))
+  } else if (/\ba file\b/.test(prompt)) {
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.id = `file-${Date.now()}`
+    said.message.content = [{ type: 'text', text: 'read [the readme](README.md)' }]
+    console.log(JSON.stringify(said))
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'read [the readme](README.md)', session_id: session }))
   } else if (/\ba link\b/.test(prompt)) {
     const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
     said.session_id = session

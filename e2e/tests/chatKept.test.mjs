@@ -123,6 +123,45 @@ describe('what a session has spent', () => {
   })
 })
 
+describe('a document an answer points at', () => {
+  test('opens beside the chat, which narrows for it, and is resized by its edge', async () => {
+    await fill(window, COMPOSER, 'point me to a file')
+    const link = await window
+      .wait(until.elementLocated(By.xpath('//button[contains(@class,"md__a") and normalize-space()="the readme"]')), 30000)
+      .catch(() => null)
+    assert.ok(link, 'the answer never pointed at the file')
+    await link.click()
+    await window.wait(until.elementLocated(By.css('.peek')), 10000)
+    const box = (selector) =>
+      window.executeScript(function (one) {
+        const at = document.querySelector(one).getBoundingClientRect()
+        return { left: at.left, right: at.right }
+      }, selector)
+    const peek = await box('.peek')
+    // The chat and its corner stay left of the document, not under it.
+    assert.ok((await box('.pane:has(> .peek) > .scroll')).right <= peek.left + 1, 'the chat runs on under the document')
+    assert.ok((await box('.pane:has(> .peek) > .pcorner')).right <= peek.left, "the chat's corner sits over the document")
+
+    // Pulled right by its edge, it narrows: pointer events, as a mouse sends them.
+    await window.executeScript(function (by) {
+      const grip = document.querySelector('.peek__grip')
+      const at = grip.getBoundingClientRect()
+      const x = at.left + at.width / 2
+      const y = at.top + 40
+      const send = (target, type, clientX) => target.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, clientX, clientY: y }))
+      send(grip, 'pointerdown', x)
+      send(window, 'pointermove', x + by)
+      send(window, 'pointerup', x + by)
+    }, 120)
+    await settle(300)
+    const narrower = await box('.peek')
+    // As far as it was pulled, down to the least it keeps (320px).
+    const room = Math.min(120, peek.right - peek.left - 320)
+    assert.ok(room > 0 && Math.abs(narrower.left - peek.left - room) <= 2, `dragging its edge did not resize it (${peek.left} → ${narrower.left}, expected +${room})`)
+    await window.executeScript("document.querySelector('[aria-label=\"Close preview\"]').click()")
+  })
+})
+
 describe('what was picked and typed', () => {
   test('is still there after a reload', async () => {
     await press(window, 'Supervised')
