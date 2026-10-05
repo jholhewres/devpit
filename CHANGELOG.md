@@ -3,6 +3,35 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.36 — 2026-10-05
+
+### Chat
+
+- **Answers are written out as they arrive.** Text appears word by word at
+  a steady pace from the first token, with a caret while the turn runs, and
+  says *Thinking* as soon as the agent starts to think. With reduced motion
+  it still arrives as it is written, without the animation.
+- **An answer to a message from another session is one paragraph again**,
+  not one line per piece it was streamed in — answers already saved that
+  way read whole too.
+- **A reply the orchestrator drafts is a card in its chat**, with *Send*,
+  *Edit* and *Drop*: you send it to the session's terminal as yours without
+  leaving the chat. A session stopped on a question shows it in the same
+  card. The orchestrator still sends nothing itself.
+
+### Sessions
+
+- **What a session has spent is shown where you use it**: in a terminal's
+  corner, a chat's, each row of the Sessions panel and the island. Its
+  tooltip has the last turn, what was spent since devpit first saw it, the
+  tokens and the model. Dollars are API list prices; a click shows tokens
+  instead.
+
+### Fixes
+
+- **A session in a project added a moment ago is in an orchestrator's
+  reach** right after it is linked; it used to be refused for a few seconds.
+
 ## 0.1.35 — 2026-10-04
 
 ### Chat
