@@ -156,6 +156,19 @@ fn hello(ws: &mut WebSocket<TcpStream>, root: &std::path::Path) -> Option<Device
     None
 }
 
+fn drafts_now() -> RemoteOut {
+    RemoteOut::Drafts {
+        drafts: crate::reply_drafts::all()
+            .into_iter()
+            .map(|(profile, name, text)| devpit_rpc::RemoteDraft {
+                profile,
+                name,
+                text,
+            })
+            .collect(),
+    }
+}
+
 fn failed(why: impl Into<String>) -> Option<RemoteOut> {
     Some(RemoteOut::Failed { why: why.into() })
 }
@@ -294,6 +307,33 @@ fn answer(
                 Err(err) => RemoteOut::Failed { why: err.message },
             },
         ),
+        RemoteIn::Drafts => Some(drafts_now()),
+        RemoteIn::DraftSend { profile, name } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            let Some(text) = crate::reply_drafts::drafted(&profile, &name) else {
+                return failed("that draft is no longer waiting");
+            };
+            if let Err(err) = crate::live_sessions::reply_now(&profile, &name, &text) {
+                return failed(err.message);
+            }
+            crate::remote::note(root, device, &format!("sent a draft to {name}"));
+            Some(drafts_now())
+        }
+        RemoteIn::AgentHealth => Some(RemoteOut::AgentHealth {
+            health: crate::agent_door::health_now(app),
+        }),
+        RemoteIn::AgentRestart => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            crate::remote::note(root, device, "restarted devpit's MCP");
+            Some(match crate::agent_door::restart_by_hand(app) {
+                Ok(health) => RemoteOut::AgentHealth { health },
+                Err(why) => RemoteOut::Failed { why },
+            })
+        }
     }
 }
 

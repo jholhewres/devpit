@@ -244,6 +244,64 @@ describe('the orchestrator', () => {
     tmux(home, 'send-keys', '-t', target, 'Enter')
   })
 
+  test('sends a command to a session from the sessions panel, once the person confirms it', async () => {
+    const project = (await invoke(window, 'project_list')).projects.find((one) => one.name === 'termed')
+    const layout = await invoke(window, 'session_ensure', { projectId: project.id, tabId: 'tab_e2e_commanded', worktreeId: null })
+    const target = `devpit_${project.id}:${layout.focusedId}`
+    const stub = join(process.env.E2E_ROOT, 'e2e', 'stub', 'claude.mjs')
+    tmux(home, 'send-keys', '-t', target, '-l', `${process.execPath} ${stub} --name commanded-stub`)
+    tmux(home, 'send-keys', '-t', target, 'Enter')
+    const screen = () => String(tmux(home, 'capture-pane', '-p', '-t', target))
+    const click = (label) =>
+      window.executeScript(function (label) {
+        const one = Array.prototype.slice.call(document.querySelectorAll('.sess button')).find(function (button) {
+          return button.textContent === label && button.offsetParent !== null
+        })
+        if (one) one.click()
+        return Boolean(one)
+      }, label)
+
+    const opened = await window
+      .wait(
+        () =>
+          window.executeScript(function () {
+            const row = Array.prototype.slice.call(document.querySelectorAll('.sess__main')).find(function (one) {
+              return one.querySelector('.sess__name')?.textContent === 'commanded-stub' && one.offsetParent !== null
+            })
+            if (row && row.getAttribute('aria-expanded') !== 'true') row.click()
+            return Boolean(row)
+          }),
+        20000,
+      )
+      .catch(() => false)
+    assert.ok(opened, 'the session never showed in the panel')
+    assert.ok(await window.wait(() => click('Send command…'), 10000).catch(() => false), 'the session has no way to send it a command')
+    assert.ok(await click('/compact'), 'the command list has no /compact')
+    await settle(500)
+    assert.ok(!screen().includes('/compact'), 'the command went before it was confirmed')
+    assert.ok(await click('Send'), 'there was nothing to confirm the command with')
+    const reached = await window.wait(async () => screen().includes('/compact'), 15000).catch(() => false)
+    assert.ok(reached, `the command never reached the session. It shows: ${screen().slice(-300)}`)
+    tmux(home, 'send-keys', '-t', target, '-l', '/exit')
+    tmux(home, 'send-keys', '-t', target, 'Enter')
+  })
+
+  test("restarts devpit's own MCP without restarting the app", async () => {
+    const endpoint = () => readFileSync(join(home, '.devpit', 'hook-endpoint'), 'utf8').trim()
+    const before = endpoint()
+    const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
+    const health = await ask('health', {}, orchestrator)
+    assert.equal(health.ok?.answering, true, `its MCP did not say it answers: ${JSON.stringify(health)}`)
+
+    const restarted = await invoke(window, 'agent_restart')
+    assert.equal(restarted.restarts, 1)
+    assert.notEqual(endpoint(), before, 'the MCP still listens where it did')
+    // The old door is shut, the new one answers, and the window never went.
+    await assert.rejects(fetch(before.replace(/\/hook$/, '/agent'), { method: 'POST', body: '{}' }))
+    assert.ok((await ask('sessions', {}, orchestrator)).ok, 'the MCP does not answer after its restart')
+    assert.ok(await window.findElement(By.css('textarea.composer__ph')), "the orchestrator's chat went with the restart")
+  })
+
   test('hands a card to a session of its account, linked to the card — and nothing else may', async () => {
     const repo = seedRepo(home, 'handed')
     const project = await invoke(window, 'project_add', { rootPath: repo })

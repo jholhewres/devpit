@@ -247,34 +247,36 @@ pub async fn orchestrator_reply(
     name: String,
     text: String,
 ) -> Result<(), RpcError> {
-    crate::off_main::blocking(move || {
-        let text = text.trim();
-        if text.is_empty() || text.chars().count() > LONGEST_REPLY {
-            return Err(RpcError::new(
-                ErrorCode::Invalid,
-                "a reply is between 1 and 4000 characters",
-            ));
-        }
-        let target = terminal_of(&profile_id, &name)?;
-        let tmux = crate::sessions::tmux_server()?;
-        // A session suspended or exited leaves its shell in front, and the
-        // reply would run there as a command.
-        if tmux
-            .shell_in_front(&target)
-            .map_err(|err| RpcError::internal(err.to_string()))?
-        {
-            return Err(RpcError::new(
-                ErrorCode::Conflict,
-                "the agent is not in front in that terminal — open it to see why",
-            ));
-        }
-        tmux.paste_and_send(&target, text)
-            .map_err(|err| RpcError::internal(err.to_string()))?;
-        // Sent as the person: whatever was drafted for it has been said.
-        crate::reply_drafts::forget(&profile_id, &name);
-        Ok(())
-    })
-    .await
+    crate::off_main::blocking(move || reply_now(&profile_id, &name, &text)).await
+}
+
+/// [`orchestrator_reply`], on the calling thread: the Remote sends a draft through it too.
+pub(crate) fn reply_now(profile_id: &str, name: &str, text: &str) -> Result<(), RpcError> {
+    let text = text.trim();
+    if text.is_empty() || text.chars().count() > LONGEST_REPLY {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "a reply is between 1 and 4000 characters",
+        ));
+    }
+    let target = terminal_of(profile_id, name)?;
+    let tmux = crate::sessions::tmux_server()?;
+    // A session suspended or exited leaves its shell in front, and the
+    // reply would run there as a command.
+    if tmux
+        .shell_in_front(&target)
+        .map_err(|err| RpcError::internal(err.to_string()))?
+    {
+        return Err(RpcError::new(
+            ErrorCode::Conflict,
+            "the agent is not in front in that terminal — open it to see why",
+        ));
+    }
+    tmux.paste_and_send(&target, text)
+        .map_err(|err| RpcError::internal(err.to_string()))?;
+    // Sent as the person: whatever was drafted for it has been said.
+    crate::reply_drafts::forget(profile_id, name);
+    Ok(())
 }
 
 /// The devpit terminal a session of this account runs in, by its name: the

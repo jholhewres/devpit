@@ -63,6 +63,16 @@ pub enum RemoteIn {
         project: String,
         conversation: String,
     },
+    /// The replies orchestrators drafted for the person to send.
+    Drafts,
+    /// Types a draft into its session's terminal. Only a device allowed to type.
+    DraftSend {
+        profile: String,
+        name: String,
+    },
+    AgentHealth,
+    /// Opens devpit's own MCP again. Only a device allowed to type.
+    AgentRestart,
     Ping,
 }
 
@@ -108,11 +118,28 @@ pub enum RemoteOut {
         project: String,
         conversation: Box<Conversation>,
     },
+    Drafts {
+        drafts: Vec<RemoteDraft>,
+    },
+    AgentHealth {
+        health: crate::AgentHealth,
+    },
     /// One request could not be done; the connection stays.
     Failed {
         why: String,
     },
     Pong,
+}
+
+/// A reply an orchestrator drafted, waiting on the person.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteDraft {
+    /// The orchestrator's account.
+    pub profile: String,
+    /// The session it is for.
+    pub name: String,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]

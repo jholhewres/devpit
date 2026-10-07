@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
-import type { Happening, Question } from '../gen/bindings'
+import type { AgentHealth, Happening, Question } from '../gen/bindings'
 
 /*
  * The window, for a window that draws its own frame.
@@ -282,6 +282,21 @@ export function onChatWoke(then: (conversationId: string) => void): () => void {
   let dropped = false
   let drop: (() => void) | undefined
   void listen<string>('chat:woke', (event) => then(event.payload)).then((unlisten) => {
+    if (dropped) unlisten()
+    else drop = unlisten
+  })
+  return () => {
+    dropped = true
+    drop?.()
+  }
+}
+
+/** Calls back with every check of devpit's own MCP, and every restart of it. */
+export function onAgentHealth(then: (health: AgentHealth) => void): () => void {
+  if (!inTauri()) return () => {}
+  let dropped = false
+  let drop: (() => void) | undefined
+  void listen<AgentHealth>('agent:health', (event) => then(event.payload)).then((unlisten) => {
     if (dropped) unlisten()
     else drop = unlisten
   })

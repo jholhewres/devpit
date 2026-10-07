@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 27] = [
+pub(crate) const METHODS: [&str; 28] = [
     "context",
     "board",
     "card",
@@ -70,6 +70,7 @@ pub(crate) const METHODS: [&str; 27] = [
     "start_card",
     "finish_card",
     "propose_project",
+    "health",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -133,6 +134,11 @@ fn within(
 fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     if asked.method == "methods" {
         return Ok(json!(METHODS));
+    }
+    // Asked of no project: it is about devpit itself.
+    if asked.method == "health" {
+        let app = app.ok_or("no window to check from")?;
+        return Ok(json!(crate::agent_door::health_now(app)));
     }
     if !METHODS.contains(&asked.method.as_str()) {
         return Err(format!("devpit does not answer `{}`", asked.method));

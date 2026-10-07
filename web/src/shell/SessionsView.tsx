@@ -11,6 +11,8 @@ import { opened } from './strip'
 import { remember, remembered } from './tabs'
 import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { useShell } from './useShell'
+import { SessionCommand } from './SessionCommand'
+import { REMOTE_CONTROL } from './sessionCommands'
 import { SessionCost } from './SessionCost'
 
 /*
@@ -352,9 +354,6 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
   )
 }
 
-/** Claude Code's command that makes a session reachable from claude.ai, or
- *  stops it when it already is (2.1.287). */
-export const REMOTE_CONTROL = '/remote-control'
 
 function Details({
   session,
@@ -398,14 +397,13 @@ function Details({
     })
   }
 
-  /* Remote Control is the session's own command, so it is typed there as the
-     person; its page and code appear in that terminal, which opens to show
-     them. The orchestrator cannot do this: it types into nobody's terminal. */
-  const remote = (): void => {
+  /* Typed in the session's own terminal as the person: the orchestrator types
+     into nobody's. Remote Control's page and code show there, so it opens. */
+  const command = (line: string): void => {
     if (!profileId) return
-    void ask(() => commands.orchestratorReply(profileId, session.name, REMOTE_CONTROL)).then((sent) => {
-      setSaid(sent.error ?? `Typed ${REMOTE_CONTROL} — its terminal shows the link, or that it disconnected.`)
-      if (!sent.error) onTerminal?.()
+    void ask(() => commands.orchestratorReply(profileId, session.name, line)).then((sent) => {
+      setSaid(sent.error ?? (line === REMOTE_CONTROL ? `Typed ${REMOTE_CONTROL} — its terminal shows the link, or that it disconnected.` : `Typed ${line}, as you.`))
+      if (!sent.error && line === REMOTE_CONTROL) onTerminal?.()
     })
   }
 
@@ -440,11 +438,7 @@ function Details({
           </>
         ) : (
           <>
-            {session.pane && !session.waiting && (
-              <button className="sess__btn" onClick={remote} title={`Types ${REMOTE_CONTROL} in its terminal, as you: on, or off when it already is`}>
-                Remote Control
-              </button>
-            )}
+            {session.pane && !session.waiting && <SessionCommand name={session.name} onSend={command} />}
             <button className="sess__btn" onClick={() => setStopping(true)} aria-label={`Stop ${session.name}`}>
               Stop session…
             </button>

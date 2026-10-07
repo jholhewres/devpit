@@ -32,3 +32,22 @@ pub struct McpHealth {
     pub profile_id: String,
     pub servers: Vec<McpServerHealth>,
 }
+
+/// How devpit's own MCP answers: the loopback door its tools post to.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentHealth {
+    /// Whether the last check was answered.
+    pub answering: bool,
+    /// How long the last answer took.
+    pub latency_ms: Option<f64>,
+    /// When it was last checked, in ms since the epoch.
+    pub checked_at: Option<f64>,
+    /// Checks in a row that went unanswered.
+    pub failures: u32,
+    /// Restarts since the app started, by hand or by itself.
+    pub restarts: u32,
+    pub last_restart_at: Option<f64>,
+    /// Why the last check failed, or why the last restart happened.
+    pub detail: Option<String>,
+}

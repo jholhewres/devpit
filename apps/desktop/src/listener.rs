@@ -10,8 +10,10 @@
 //! to a process that runs terminals.
 
 use std::io::Write;
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use devpit_agentcli::{read_hook, Event, Happening};
 use devpit_core::Store;
@@ -32,23 +34,46 @@ use crate::question::question_in;
 /// happens, and without them it still polls. A window that refuses to open
 /// because a port was busy would be worse than one that is a little less live.
 pub fn start(app: AppHandle, root: &Path) {
-    let listener = match TcpListener::bind((Ipv4Addr::LOCALHOST, 0)) {
-        Ok(listener) => listener,
-        Err(err) => {
-            devpit_core::reports::background(
-                "hook listener",
-                &format!("none, the board will poll instead: {err}"),
-            );
-            return;
-        }
-    };
-
-    let Ok(address) = listener.local_addr() else {
-        return;
-    };
     // Where one run of the app begins in the trace: sequence numbers start
     // again with every process, and a reader pairing them has to know that.
     trace("listening");
+    if let Err(why) = open(app, root) {
+        devpit_core::reports::background("hook listener", &why);
+    }
+}
+
+/// Which listener is the current one: a restart opens another, and the old
+/// accept loop ends at its next connection.
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+/// The current listener's address, for a restart to wake the old loop with.
+static LISTENING: Mutex<Option<SocketAddr>> = Mutex::new(None);
+
+/// Opens a listener and publishes it, retiring the one before if there was.
+///
+/// The secret stays for the life of the process: a hook already carrying it
+/// must still get in after a restart.
+pub(crate) fn open(app: AppHandle, root: &Path) -> Result<SocketAddr, String> {
+    open_with(root, move |stream| {
+        // Stamped here, in the order posts arrived: each is served on its
+        // own thread, and threads finish in any order.
+        let seq = next_seq();
+        let app = app.clone();
+        // One thread per post, and they are short: a hook that has to wait
+        // for the one before it is a hook holding up the agent that sent it.
+        std::thread::spawn(move || serve(app, stream, seq));
+    })
+}
+
+/// [`open`], with what each connection is handed to.
+pub(crate) fn open_with(
+    root: &Path,
+    take: impl Fn(TcpStream) + Send + 'static,
+) -> Result<SocketAddr, String> {
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+        .map_err(|err| format!("none, the board will poll instead: {err}"))?;
+    let address = listener
+        .local_addr()
+        .map_err(|err| format!("no address: {err}"))?;
     let endpoint = devpit_agentcli::endpoint_file(root);
     if let Some(parent) = endpoint.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -56,47 +81,44 @@ pub fn start(app: AppHandle, root: &Path) {
     // The secret before the address, and for the same reason the address is
     // written at all: a hook that found a port to post to but no secret to
     // carry would post and, from the next story on, be refused.
-    let Some(secret) = fresh_secret() else {
-        devpit_core::reports::background(
-            "hook listener",
-            &"none: the system gave out no randomness",
-        );
-        return;
+    let secret = match SECRET.get() {
+        Some(secret) => secret.clone(),
+        None => fresh_secret().ok_or("none: the system gave out no randomness")?,
     };
-    if let Err(err) = devpit_core::home::write_private(
+    devpit_core::home::write_private(
         &devpit_agentcli::auth_file(root),
         format!("{}: {secret}\n", devpit_agentcli::HOOK_HEADER).as_bytes(),
-    ) {
-        devpit_core::reports::background(
-            "hook listener",
-            &format!("could not write the hook secret: {err}"),
-        );
-        return;
-    }
+    )
+    .map_err(|err| format!("could not write the hook secret: {err}"))?;
     let _ = SECRET.set(secret);
     // Private: the port is what a post has to know, so a file anyone can read
     // is an invitation to post as the agent.
-    if let Err(err) =
-        devpit_core::home::write_private(&endpoint, format!("http://{address}/hook").as_bytes())
-    {
-        devpit_core::reports::background(
-            "hook listener",
-            &format!("could not publish the hook endpoint: {err}"),
-        );
-        return;
-    }
+    devpit_core::home::write_private(&endpoint, format!("http://{address}/hook").as_bytes())
+        .map_err(|err| format!("could not publish the hook endpoint: {err}"))?;
 
-    std::thread::spawn(move || {
-        for stream in listener.incoming().flatten() {
-            let app = app.clone();
-            // Stamped here, in the order posts arrived: each is served on its
-            // own thread, and threads finish in any order.
-            let seq = next_seq();
-            // One thread per post, and they are short: a hook that has to wait
-            // for the one before it is a hook holding up the agent that sent it.
-            std::thread::spawn(move || serve(app, stream, seq));
+    let mine = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    let before = LISTENING
+        .lock()
+        .ok()
+        .and_then(|mut listening| listening.replace(address));
+    std::thread::spawn(move || accept(listener, mine, take));
+    if let Some(before) = before {
+        let _ = TcpStream::connect_timeout(&before, Duration::from_millis(200));
+    }
+    Ok(address)
+}
+
+fn accept(listener: TcpListener, mine: u64, take: impl Fn(TcpStream)) {
+    for stream in listener.incoming() {
+        if GENERATION.load(Ordering::SeqCst) != mine {
+            return;
         }
-    });
+        match stream {
+            Ok(stream) => take(stream),
+            // Out of descriptors, most often: spinning on it starves the rest.
+            Err(_) => std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
 }
 
 /// This run's secret, kept for the door to compare against.

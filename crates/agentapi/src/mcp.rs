@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 26] = [
+const TOOLS: [Tool; 27] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -126,8 +126,14 @@ const TOOLS: [Tool; 26] = [
     Tool {
         name: "devpit_draft_reply",
         method: "draft",
-        description: "Orchestrator only: draft what the person would say to a session of a linked project — when they told you in this chat to let it go on, widen what its brief allowed, or answer what it asked them. Nothing is sent: the draft waits beside the session in devpit, and only the person's click types it into the session's terminal, as their own words. One draft per session; a new one replaces it.",
+        description: "Orchestrator only: draft what the person would say to a session of a linked project — when they told you in this chat to let it go on, widen what its brief allowed, or answer what it asked them — or a command for its terminal, such as /remote-control or /compact, when they asked for one. Nothing is sent: the draft waits beside the session in devpit, and only the person's click types it into the session's terminal, as their own words. One draft per session; a new one replaces it.",
         input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." }, "text": { "type": "string", "description": "The words, as the person would type them to that session. At most 4000 characters." } }, "required": ["name", "text"] }),
+    },
+    Tool {
+        name: "devpit_mcp_health",
+        method: "health",
+        description: "Whether devpit's own MCP answers, checked now: how long it took, checks failed in a row, and how often it was restarted. devpit restarts it by itself after three failed checks; otherwise the person restarts it from the footer.",
+        input: || json!({ "type": "object", "properties": {} }),
     },
     Tool {
         name: "devpit_log",

@@ -31,7 +31,10 @@ vi.mock('./useShell', () => ({
   useShell: () => ({ project: { id: 'orch', orchestrator: 'claude' }, projects: [{ id: 'p', name: 'api', rootPath: '/w/api' }], setProject: () => {}, show: () => {}, openCard: () => {}, openPane: () => {} }),
 }))
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  replied.mockClear()
+})
 
 describe("an orchestrator's sessions", () => {
   it('group by project, the one waiting on the person first, with what was last asked of it', async () => {
@@ -55,15 +58,30 @@ describe("an orchestrator's sessions", () => {
     expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, go')
   })
 
-  it('asks a session in a devpit terminal for Remote Control, typed as the person', async () => {
+  it('sends a command to a session in a devpit terminal only once it is confirmed, typed as the person', async () => {
     render(<SessionsView shown />)
     fireEvent.click(await screen.findByText('api-b'))
-    expect(screen.queryByRole('button', { name: 'Remote Control' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Send command…' })).toBeNull()
     cleanup()
     render(<SessionsView shown />)
     fireEvent.click(await screen.findByText('web-a'))
-    fireEvent.click(screen.getByRole('button', { name: 'Remote Control' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send command…' }))
+    fireEvent.click(screen.getByRole('button', { name: '/remote-control' }))
+    expect(replied).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/remote-control')
+  })
+
+  it('sends a command written by hand, after the same question', async () => {
+    render(<SessionsView shown />)
+    fireEvent.click(await screen.findByText('web-a'))
+    fireEvent.click(screen.getByRole('button', { name: 'Send command…' }))
+    const input = screen.getByLabelText('A command for web-a')
+    fireEvent.change(input, { target: { value: '  /model   opus ' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(replied).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/model opus')
   })
 
   it('says what a busy session is on right now', async () => {

@@ -7,6 +7,7 @@ mod adopted_history;
 mod adopting;
 mod advancing;
 mod agent_api;
+mod agent_door;
 mod agent_reach;
 mod agent_reminders;
 mod arranging;
@@ -383,6 +384,8 @@ fn main() {
             if let Ok(root) = devpit_core::Store::root() {
                 listener::start(app.handle().clone(), &root);
             }
+            // Knocks on that listener's `/agent` and opens it again when it stops answering.
+            agent_door::watch(app.handle().clone());
             // The island, when the person wants it and the screen can hold it.
             island::apply(app.handle());
             // Which agent CLIs this machine has, asked of the login shell —

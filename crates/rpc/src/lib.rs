@@ -72,7 +72,7 @@ pub use island::{
 pub use live::{
     LivePane, LiveSession, LiveSessions, PendingPrompt, ProjectProposal, PromptOption, RemoteState,
 };
-pub use mcp_health::{McpHealth, McpServerHealth, McpState};
+pub use mcp_health::{AgentHealth, McpHealth, McpServerHealth, McpState};
 pub use pause::Paused;
 pub use plugin_data::{
     PluginFile, PluginFileRemoved, PluginFileSaved, PluginFileText, PluginFiles,
@@ -90,8 +90,8 @@ pub use project::{
 pub use reminder::{Reminder, Reminders};
 pub use remote::RemoteAct;
 pub use remote_view::{
-    RemoteDevice, RemoteIn, RemoteOut, RemotePairing, RemoteProject, RemoteQuestion, RemoteShapes,
-    RemoteTerminal, RemoteView, TailscaleState,
+    RemoteDevice, RemoteDraft, RemoteIn, RemoteOut, RemotePairing, RemoteProject, RemoteQuestion,
+    RemoteShapes, RemoteTerminal, RemoteView, TailscaleState,
 };
 pub use review::{
     blocking, reviewed, standing, CardFindings, CardReview, Finding, Found, Review, Severity,

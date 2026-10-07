@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { AgentChip } from './AgentChip'
 import { McpChip } from './McpChip'
 import { Monitor } from './Monitor'
 import { PauseControl } from './PauseControl'
@@ -39,6 +40,7 @@ export function StatusStrip(): React.JSX.Element | null {
       <PauseControl />
       <RemoteBadge />
       <McpChip projectId={project.orchestrator ? null : project.id} />
+      <AgentChip />
       {open && (
         <Monitor
           usage={usage}

@@ -7,20 +7,20 @@
 //! is what is typed.
 
 use crate::{
-    account, adopting, agent_choice, agent_profiles, arranging, artifacts, asking, asking_kept,
-    attaching_chat, blocks, board, branches, browser, browser_cookies, browser_driving,
-    browser_menu, card_chat, card_elsewhere, card_work, cards, chat, chat_relay, chat_remote,
-    checkpoint, checkpoint_findings, checkpoint_preview, checkpoint_tested, claude_plugin, cloning,
-    columns, commands, delegations, desk, diagnostics, diffs, error_reports, error_sender, files,
-    filetree, front, happening, heads_down, history, in_flight, index, installations, island,
-    island_answer, island_checks, live_answer, live_sessions, mcp, mcp_apps, mcp_health, moving,
-    notices, openers, opening, orchestrator, orchestrator_links, outside_sessions, pane_asking,
-    pane_screen, panels, panes, pasting, paths, pausing, plan_limits, plugin_data, plugins,
-    project_naming, project_proposals, projects, reading_path, receipts, recipes, regrouping,
-    reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves, search, session_cost,
-    session_search, session_window, sessions, settings, shell_launch, skills, slash, sources,
-    spend_history, staging, steering, steps, stopping, threads, transcribe, update, watching,
-    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
+    account, adopting, agent_choice, agent_door, agent_profiles, arranging, artifacts, asking,
+    asking_kept, attaching_chat, blocks, board, branches, browser, browser_cookies,
+    browser_driving, browser_menu, card_chat, card_elsewhere, card_work, cards, chat, chat_relay,
+    chat_remote, checkpoint, checkpoint_findings, checkpoint_preview, checkpoint_tested,
+    claude_plugin, cloning, columns, commands, delegations, desk, diagnostics, diffs,
+    error_reports, error_sender, files, filetree, front, happening, heads_down, history, in_flight,
+    index, installations, island, island_answer, island_checks, live_answer, live_sessions, mcp,
+    mcp_apps, mcp_health, moving, notices, openers, opening, orchestrator, orchestrator_links,
+    outside_sessions, pane_asking, pane_screen, panels, panes, pasting, paths, pausing,
+    plan_limits, plugin_data, plugins, project_naming, project_proposals, projects, reading_path,
+    receipts, recipes, regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list,
+    saves, search, session_cost, session_search, session_window, sessions, settings, shell_launch,
+    skills, slash, sources, spend_history, staging, steering, steps, stopping, threads, transcribe,
+    update, watching, workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -227,6 +227,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         paths::path_delete,
         paths::path_import,
         mcp_health::mcp_health,
+        agent_door::agent_health,
+        agent_door::agent_restart,
         opening::session_watch,
         worktree_setup::project_worktree_setup,
         worktree_setup::project_worktree_setup_set,

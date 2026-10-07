@@ -46,6 +46,19 @@ pub(crate) fn drafted(profile: &str, name: &str) -> Option<String> {
         .cloned()
 }
 
+/// Every draft waiting, as (profile, session, text), in a steady order.
+pub(crate) fn all() -> Vec<(String, String, String)> {
+    let Ok(held) = drafts().lock() else {
+        return Vec::new();
+    };
+    let mut every: Vec<_> = held
+        .iter()
+        .map(|((profile, name), text)| (profile.clone(), name.clone(), text.clone()))
+        .collect();
+    every.sort();
+    every
+}
+
 /// Lets go of a session's draft: sent, or dropped by the person.
 pub(crate) fn forget(profile: &str, name: &str) {
     if let Ok(mut held) = drafts().lock() {

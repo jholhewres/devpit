@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { Board, Conversation, Conversations, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion } from '../gen/bindings'
+import type { AgentHealth, Board, Conversation, Conversations, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion } from '../gen/bindings'
 import { RemoteBoard } from './RemoteBoard'
 import { RemoteChats } from './RemoteChats'
 import { RemotePair } from './RemotePair'
@@ -35,6 +35,8 @@ export function RemoteApp(): React.JSX.Element {
   const [pane, setPane] = useState<string | null>(null)
   const [board, setBoard] = useState<Board | null>(null)
   const [questions, setQuestions] = useState<readonly RemoteQuestion[]>([])
+  const [drafts, setDrafts] = useState<readonly RemoteDraft[]>([])
+  const [health, setHealth] = useState<AgentHealth | null>(null)
   const [chats, setChats] = useState<Conversations | null>(null)
   const [chat, setChat] = useState<Conversation | null>(null)
   const link = useRef<Link | null>(null)
@@ -53,6 +55,7 @@ export function RemoteApp(): React.JSX.Element {
           setRefused(null)
           link.current?.send({ t: 'projects' })
           link.current?.send({ t: 'waiting' })
+          link.current?.send({ t: 'drafts' })
           return
         case 'refused':
           setRefused(message.why)
@@ -75,6 +78,12 @@ export function RemoteApp(): React.JSX.Element {
           return
         case 'waiting':
           setQuestions(message.questions)
+          return
+        case 'drafts':
+          setDrafts(message.drafts)
+          return
+        case 'agentHealth':
+          setHealth(message.health)
           return
         case 'chats':
           if (message.project === projectRef.current) setChats(message.conversations)
@@ -100,6 +109,11 @@ export function RemoteApp(): React.JSX.Element {
     if (view === 'board') send({ t: 'board', project: projectId })
     if (view === 'chats') send({ t: 'chats', project: projectId })
     if (view === 'terminals') send({ t: 'projects' })
+    if (view === 'waiting') {
+      send({ t: 'waiting' })
+      send({ t: 'drafts' })
+      send({ t: 'agentHealth' })
+    }
   }, [view, projectId, up, send])
 
   if (!token) return <RemotePair onPaired={(fresh) => (keepToken(fresh), setToken(fresh))} />
@@ -133,7 +147,7 @@ export function RemoteApp(): React.JSX.Element {
       <nav className="rm__tabs">
         {(['terminals', 'board', 'waiting', 'chats'] as const).map((one) => (
           <button key={one} className="rm__tab" data-on={view === one ? 'true' : undefined} onClick={() => setView(one)}>
-            {one === 'waiting' && questions.length > 0 ? `waiting ${questions.length}` : one}
+            {one === 'waiting' && questions.length + drafts.length > 0 ? `waiting ${questions.length + drafts.length}` : one}
           </button>
         ))}
       </nav>
@@ -153,7 +167,7 @@ export function RemoteApp(): React.JSX.Element {
           </>
         )}
         {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} send={send} />}
-        {view === 'waiting' && <RemoteWaiting questions={questions} answering={welcome?.answering ?? false} send={send} />}
+        {view === 'waiting' && <RemoteWaiting questions={questions} drafts={drafts} health={health} answering={welcome?.answering ?? false} typing={welcome?.typing ?? false} send={send} />}
         {view === 'chats' && projectId && <RemoteChats project={projectId} chats={chats} chat={chat} onClose={() => setChat(null)} send={send} />}
       </section>
     </main>

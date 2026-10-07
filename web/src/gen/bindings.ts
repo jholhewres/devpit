@@ -1130,6 +1130,10 @@ export const commands = {
 	 */
 	pathImport: (projectId: string, worktreeId: string | null, folder: string, sources: string[]) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_import", { projectId, worktreeId, folder, sources })),
 	mcpHealth: (projectId: string | null) => typedError<McpHealth, RpcError>(__TAURI_INVOKE("mcp_health", { projectId })),
+	/**  `agent.health` — whether devpit's own MCP answers, checked now. */
+	agentHealth: () => typedError<AgentHealth, RpcError>(__TAURI_INVOKE("agent_health")),
+	/**  `agent.restart` — opens devpit's own MCP again, without restarting the app. */
+	agentRestart: () => typedError<AgentHealth, RpcError>(__TAURI_INVOKE("agent_restart")),
 	/**
 	 *  `session.watch` — a background session, attached in a new terminal tab of
 	 *  its project: it ran under the CLI's own supervisor, where nobody could see
@@ -1631,6 +1635,23 @@ export type AgentEvent = {
 	/**  The request's summary, for one that was sent. */
 	summary: string | null,
 	text: string,
+};
+
+/**  How devpit's own MCP answers: the loopback door its tools post to. */
+export type AgentHealth = {
+	/**  Whether the last check was answered. */
+	answering: boolean,
+	/**  How long the last answer took. */
+	latencyMs: number | null,
+	/**  When it was last checked, in ms since the epoch. */
+	checkedAt: number | null,
+	/**  Checks in a row that went unanswered. */
+	failures: number,
+	/**  Restarts since the app started, by hand or by itself. */
+	restarts: number,
+	lastRestartAt: number | null,
+	/**  Why the last check failed, or why the last restart happened. */
+	detail: string | null,
 };
 
 /**  Who is running in the leaf. `none` is a plain shell. */
@@ -3602,6 +3623,15 @@ export type RemoteDevice = {
 	connected: boolean,
 };
 
+/**  A reply an orchestrator drafted, waiting on the person. */
+export type RemoteDraft = {
+	/**  The orchestrator's account. */
+	profile: string,
+	/**  The session it is for. */
+	name: string,
+	text: string,
+};
+
 /**  What a viewer asks. */
 export type RemoteIn = 
 /**  The first message: the device's token, which only its pairing gave it. */
@@ -3618,12 +3648,18 @@ export type RemoteIn =
 /**  Into a lane without a step. Only a device allowed to type. */
 { t: "cardMove"; project: string; card: string; column: string } | { t: "waiting" } | 
 /**  A question an agent is waiting on. Only a device allowed to answer. */
-{ t: "answer"; id: string; allow: boolean } | { t: "chats"; project: string } | { t: "chat"; project: string; conversation: string } | { t: "ping" };
+{ t: "answer"; id: string; allow: boolean } | { t: "chats"; project: string } | { t: "chat"; project: string; conversation: string } | 
+/**  The replies orchestrators drafted for the person to send. */
+{ t: "drafts" } | 
+/**  Types a draft into its session's terminal. Only a device allowed to type. */
+{ t: "draftSend"; profile: string; name: string } | { t: "agentHealth" } | 
+/**  Opens devpit's own MCP again. Only a device allowed to type. */
+{ t: "agentRestart" } | { t: "ping" };
 
 /**  What the host says. */
 export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean } | 
 /**  Said once, then the connection ends. */
-{ t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | 
+{ t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | { t: "drafts"; drafts: RemoteDraft[] } | { t: "agentHealth"; health: AgentHealth } | 
 /**  One request could not be done; the connection stays. */
 { t: "failed"; why: string } | { t: "pong" };
 

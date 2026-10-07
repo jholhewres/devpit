@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { useEffect, useRef, useState } from 'react'
 
 import type { RemoteIn } from '../gen/bindings'
+import { SESSION_COMMANDS } from '../shell/sessionCommands'
 import { base64Of, bytesOf } from './socket'
 
 /*
@@ -72,6 +73,13 @@ export function RemoteTerminal({
             {KEYS.map((key) => (
               <button key={key.label} className="rm__key" onClick={() => send({ t: 'paneInput', pane, b64: base64Of(key.bytes) })}>
                 {key.label}
+              </button>
+            ))}
+          </div>
+          <div className="rm__keys" aria-label="Commands">
+            {SESSION_COMMANDS.map((one) => (
+              <button key={one.command} className="rm__key" title={one.what} onClick={() => confirm(`Type ${one.command} in this terminal?`) && send({ t: 'panePaste', pane, text: one.command })}>
+                {one.command}
               </button>
             ))}
           </div>
