@@ -42,6 +42,7 @@ button, input, select { font: inherit; color: inherit; }
 .rm__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-3); }
 .rm__dot[data-up] { background: var(--good); }
 .rm__host { font-weight: 600; }
+.rm__add { font-size: 12px; text-decoration: underline; }
 .rm__pick { margin-left: auto; max-width: 55%; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .rm__tabs { display: flex; gap: 4px; padding: 8px 12px; overflow-x: auto; }
 .rm__tab { flex: none; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent; color: var(--text-2); text-transform: capitalize; cursor: pointer; }

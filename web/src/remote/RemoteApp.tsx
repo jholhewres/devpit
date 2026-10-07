@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AgentHealth, Board, Conversation, Conversations, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion } from '../gen/bindings'
+import { launcherLink } from '../shell/remoteLauncher'
 import { RemoteBoard } from './RemoteBoard'
 import { RemoteChats } from './RemoteChats'
 import { RemotePair } from './RemotePair'
@@ -130,11 +131,17 @@ export function RemoteApp(): React.JSX.Element {
     )
 
   const project = projects.find((one) => one.id === projectId) ?? null
+  const launcher = launcherLink(window.location.origin, welcome?.host)
   return (
     <main className="rm">
       <header className="rm__head">
         <span className="rm__dot" data-up={up ? 'true' : undefined} />
         <span className="rm__host">{welcome?.host ?? 'devpit'}</span>
+        {launcher && (
+          <a className="rm__dim rm__add" href={launcher} target="_blank" rel="noreferrer" title="Adds this machine's address to devpit.app/remote; nothing else is sent">
+            Add to devpit.app
+          </a>
+        )}
         <select className="rm__pick" aria-label="Project" value={projectId ?? ''} onChange={(event) => (setProjectId(event.target.value), setPane(null), setBoard(null), setChats(null), setChat(null))}>
           {projects.map((one) => (
             <option key={one.id} value={one.id}>

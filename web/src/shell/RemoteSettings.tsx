@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { RemoteDevice, RemotePairing, RemoteView } from '../gen/bindings'
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
+import { launcherLink } from './remoteLauncher'
 import { onCarried } from './window'
 
 /*
@@ -125,7 +126,22 @@ function RemoteAddress({ address, login }: { address: string; login: string | nu
         </button>
       </span>
       <span className="pref__d">Open it on a device in your tailnet{login && <>, signed in as {login}</>}.</span>
+      <LauncherRow address={address} />
     </>
+  )
+}
+
+/* devpit.app/remote opens this machine's own address; it is handed only that,
+   in the fragment, and needs the tailnet's HTTPS one. */
+function LauncherRow({ address }: { address: string }): React.JSX.Element {
+  const link = launcherLink(address)
+  if (!link) return <span className="pref__d">Adding it to devpit.app/remote needs the tailnet&rsquo;s HTTPS address.</span>
+  return (
+    <span className="voice__row">
+      <button className="btn" onClick={() => void ask(() => commands.urlOpen(link))} title="Opens devpit.app/remote with this machine's address; nothing else is sent">
+        Add to devpit.app
+      </button>
+    </span>
   )
 }
 
