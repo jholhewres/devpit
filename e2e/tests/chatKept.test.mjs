@@ -130,7 +130,12 @@ describe('a document an answer points at', () => {
       .wait(until.elementLocated(By.xpath('//button[contains(@class,"md__a") and normalize-space()="the readme"]')), 30000)
       .catch(() => null)
     assert.ok(link, 'the answer never pointed at the file')
-    await link.click()
+    // Clicked once the turn has ended: a live turn is drawn again when it is saved.
+    const ended = await window
+      .wait(async () => (await window.executeScript("return document.querySelector('.reply[data-live]') === null")), 30000)
+      .catch(() => false)
+    assert.ok(ended, 'the turn that pointed at the file never ended')
+    await window.findElement(By.xpath('//button[contains(@class,"md__a") and normalize-space()="the readme"]')).click()
     await window.wait(until.elementLocated(By.css('.peek')), 10000)
     const box = (selector) =>
       window.executeScript(function (one) {
