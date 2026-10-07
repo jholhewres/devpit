@@ -152,7 +152,10 @@ fn a_picture_past_the_inline_ceiling_is_left_to_the_stream() {
     let read = contents(dir.path(), "huge.png".to_owned()).expect("read");
     assert_eq!(read.kind, FileKind::Image);
     assert!(read.data_url.is_none(), "a 9 MB picture went inline");
-    assert!(read.not_shown.is_none(), "a picture that streams was refused");
+    assert!(
+        read.not_shown.is_none(),
+        "a picture that streams was refused"
+    );
 }
 
 /// Every format the pane draws comes back as a picture with its own type.
