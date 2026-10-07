@@ -58,7 +58,7 @@ describe('the orchestrator', () => {
 
   test('hears another session between the person\'s messages, and says so in its chat', async () => {
     // After the last answer is whole: typed during it, this waits in the queue.
-    await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 30000)
+    await window.wait(() => window.executeScript("return document.querySelectorAll('.working').length === 0"), 30000)
     await fill(window, 'textarea.composer__ph', 'wake me when the other session is done')
     const woken = await window
       .wait(async () => (await text(window)).includes('the other session says it is done'), 20000)
@@ -78,7 +78,7 @@ describe('the orchestrator', () => {
     // The note it opens with, then the answer whole.
     const whole = [[(await paragraphs())[0]?.[0], 'the other session says it is done']]
     assert.deepEqual(await paragraphs(), whole, 'the answer was drawn in pieces')
-    await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 30000)
+    await window.wait(() => window.executeScript("return document.querySelectorAll('.working').length === 0"), 30000)
     await new Promise((done) => setTimeout(done, 1500))
     assert.deepEqual(await paragraphs(), whole, 'the answer read back in pieces')
   })
@@ -224,7 +224,7 @@ describe('the orchestrator', () => {
       .catch(() => false)
     assert.ok(drafted, 'the draft was refused')
 
-    await window.wait(async () => (await window.findElements(By.css('.working'))).length === 0, 30000)
+    await window.wait(() => window.executeScript("return document.querySelectorAll('.working').length === 0"), 30000)
     await fill(window, 'textarea.composer__ph', 'draft a reply for drafted-stub')
     const card = await window.wait(until.elementLocated(By.css('.tdraft__card[data-standing="pending"]')), 20000).catch(() => null)
     assert.ok(card, `the draft never showed as a card in the chat. On screen: ${(await text(window)).slice(-400)}`)
