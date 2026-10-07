@@ -23,6 +23,7 @@ const called = vi.fn()
 vi.mock('../shell/live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
+    islandDraft: async () => null,
     islandNow: () => ({ sessions: [...alive.values()] }),
     pauseRead: async () => paused,
     islandShape: () => null,
