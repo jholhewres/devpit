@@ -7,24 +7,10 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 
-import { invoke as once } from '../lib/seed.mjs'
+import { invoke } from '../lib/seed.mjs'
 import { ORCHESTRATOR, PROJECTS } from './world.mjs'
 
-/**
- * A command, tried again while SQLite is busy: the review runs write their
- * results while the seed is still moving cards, and a move that meets one of
- * those writes is refused rather than queued.
- */
-export async function invoke(window, command, args = {}) {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await once(window, command, args)
-    } catch (error) {
-      if (attempt >= 8 || !/database is locked/.test(error.message)) throw error
-      await wait(250 * (attempt + 1))
-    }
-  }
-}
+export { invoke }
 
 const REVIEW = {
   prompt: 'Review the change on this card and say whether it is safe to ship.',

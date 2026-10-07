@@ -94,7 +94,7 @@ impl Store {
         writes: &[PaneLayoutWrite<'_>],
         forget: &[&str],
     ) -> Result<(), StoreError> {
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = self.writing()?;
         for write in writes {
             self.set_pane_layout(project_id, write.tab_id, write.tree, write.focused_id)?;
         }

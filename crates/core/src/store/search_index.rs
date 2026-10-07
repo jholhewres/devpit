@@ -50,7 +50,7 @@ pub fn replace_file(
     // (role, text) pairs, as the transcript reader found them.
     lines: &[(&str, &str)],
 ) -> Result<(), StoreError> {
-    let tx = conn.unchecked_transaction()?;
+    let tx = super::writing(conn)?;
     tx.execute(
         "DELETE FROM session_text WHERE path = ?1",
         params![file.path],
@@ -106,7 +106,7 @@ pub fn forget_missing(
     if gone.is_empty() {
         return Ok(0);
     }
-    let tx = conn.unchecked_transaction()?;
+    let tx = super::writing(conn)?;
     for path in &gone {
         tx.execute("DELETE FROM session_text WHERE path = ?1", params![path])?;
         tx.execute("DELETE FROM session_file WHERE path = ?1", params![path])?;

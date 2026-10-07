@@ -27,7 +27,7 @@ mod whose_run;
 
 use std::path::{Path, PathBuf};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction, TransactionBehavior};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -226,6 +226,23 @@ impl Store {
     pub fn conn(&self) -> &Connection {
         &self.conn
     }
+
+    /// A transaction that writes: see [`writing`].
+    pub(crate) fn writing(&self) -> Result<Transaction<'_>, StoreError> {
+        writing(&self.conn)
+    }
+}
+
+/// A transaction that holds the write lock from its `BEGIN`.
+///
+/// A deferred one that reads first finds its snapshot stale once another
+/// connection commits, and SQLite refuses its write without waiting. Taken up
+/// front, `busy_timeout` waits for the other writer instead.
+pub(crate) fn writing(conn: &Connection) -> Result<Transaction<'_>, StoreError> {
+    Ok(Transaction::new_unchecked(
+        conn,
+        TransactionBehavior::Immediate,
+    )?)
 }
 
 #[cfg(test)]

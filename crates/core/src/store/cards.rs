@@ -519,7 +519,7 @@ impl Store {
     /// them — to the end of another in their order, then deletes the lane. One
     /// transaction: a lane half emptied is worse than either answer.
     pub fn delete_column_moving_cards(&self, column_id: &str, to: &str) -> Result<(), StoreError> {
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = self.writing()?;
         let start: i64 = tx.query_row(
             "SELECT COALESCE(MAX(position) + 1, 0) FROM card WHERE column_id = ?1",
             [to],

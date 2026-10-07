@@ -143,7 +143,7 @@ impl Store {
     /// (project_id, position) halfway through a reorder, so the positions go
     /// negative first and come back in the order given.
     pub fn reorder_columns(&self, project_id: &str, ids: &[String]) -> Result<(), StoreError> {
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = self.writing()?;
         tx.execute(
             "UPDATE board_column SET position = -position - 1 WHERE project_id = ?1",
             [project_id],
@@ -247,7 +247,7 @@ impl Store {
         column_id: &str,
         position: i64,
     ) -> Result<(), StoreError> {
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = self.writing()?;
         let mut order: Vec<String> = {
             let mut stmt = tx.prepare(
                 "SELECT id FROM card WHERE column_id = ?1 AND id != ?2 AND archived_at IS NULL \
@@ -434,7 +434,7 @@ impl Store {
     /// two halves cannot come apart: a board that lost a step but kept
     /// pointing at it would draw a lane with no name for what it runs.
     pub fn delete_step(&self, step_id: &str) -> Result<bool, StoreError> {
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = self.writing()?;
         tx.execute(
             "UPDATE board_column SET step_id = NULL WHERE step_id = ?1",
             [step_id],
@@ -543,3 +543,7 @@ mod tests;
 #[cfg(test)]
 #[path = "board_steps_tests.rs"]
 mod step_tests;
+
+#[cfg(test)]
+#[path = "board_writing_tests.rs"]
+mod writing_tests;
