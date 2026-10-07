@@ -74,9 +74,14 @@ pub(crate) fn resume_flag_of(launch: &str) -> Option<&'static str> {
         .ok()
         .and_then(|store| crate::agent_profiles::all(&store).ok())
         .and_then(|profiles| profiles.into_iter().find(|one| one.id == launch))
-        .map(|profile| profile.base)
-        .unwrap_or_else(|| launch.to_owned());
-    devpit_pty::agents::known(&base).and_then(|agent| agent.resume_flag)
+        .map(|profile| profile.base);
+    devpit_pty::agents::known(base_or(base.as_deref(), launch)).and_then(|agent| agent.resume_flag)
+}
+
+/// The agent a profile behaves like: its base, or — for a discovered one,
+/// whose base is empty — the profile itself, as `claude` is.
+pub(crate) fn base_or<'a>(base: Option<&'a str>, launch: &'a str) -> &'a str {
+    base.filter(|base| !base.is_empty()).unwrap_or(launch)
 }
 
 /// The launch line, continuing `session` when the agent can.
@@ -95,7 +100,15 @@ pub(crate) fn with_resume(start: &str, flag: Option<&str>, session: Option<&str>
 
 #[cfg(test)]
 mod tests {
-    use super::with_resume;
+    use super::{base_or, with_resume};
+
+    /// The account discovered as `claude` has no base of its own, and resumed nothing.
+    #[test]
+    fn a_discovered_profile_behaves_like_the_agent_it_is_named_for() {
+        assert_eq!(base_or(Some(""), "claude"), "claude");
+        assert_eq!(base_or(Some("claude"), "work"), "claude");
+        assert_eq!(base_or(None, "claude"), "claude");
+    }
 
     const START: &str = "claude --settings /s.json";
 
