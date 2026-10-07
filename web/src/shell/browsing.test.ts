@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { aim, boxOf, grouped, inset, moved, shown, VIEWPORTS } from './browsing'
+import { aim, boxOf, covered, grouped, inset, moved, shown, VIEWPORTS } from './browsing'
 
 const at = (typed: string): string => {
   const aimed = aim(typed)
@@ -160,5 +160,17 @@ describe('holding the page at a width', () => {
       expect(at.x).toBeGreaterThanOrEqual(hole.x)
       expect(at.x + at.width).toBeLessThanOrEqual(hole.x + hole.width)
     }
+  })
+})
+
+describe('a screen over the panes', () => {
+  /* The Manager drew under a page left open in a browser pane, because the
+     page is a native webview above the whole window. */
+  it('takes the page away while the Manager, Settings or the palette is open', () => {
+    const none = { managing: false, prefs: null, palette: false }
+    expect(covered(none)).toBe(false)
+    expect(covered({ ...none, managing: true })).toBe(true)
+    expect(covered({ ...none, prefs: 'account' })).toBe(true)
+    expect(covered({ ...none, palette: true })).toBe(true)
   })
 })

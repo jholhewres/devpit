@@ -128,6 +128,24 @@ export function boxOf(rect: DOMRect): Where {
   }
 }
 
+/** What can open over every pane at once. */
+export interface Over {
+  readonly managing: boolean
+  readonly prefs: unknown
+  readonly palette: boolean
+}
+
+/**
+ * Whether a screen is open over the panes.
+ *
+ * A native page floats above the whole window, so a screen drawn by this
+ * document cannot cover it: the page has to leave, as it does for a tab that
+ * is not the visible one.
+ */
+export function covered(over: Over): boolean {
+  return over.managing || over.prefs !== null || over.palette
+}
+
 /** Whether two boxes differ enough to be worth telling the window about. */
 export function moved(before: Where | null, now: Where): boolean {
   if (!before) return true

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { BrowserFind } from './BrowserFind'
-import { aim, boxOf, inset, moved, shown, type Viewport, VIEWPORTS, type Where } from './browsing'
+import { aim, boxOf, covered, inset, moved, shown, type Viewport, VIEWPORTS, type Where } from './browsing'
 import type { Did, Drove, Showing } from '../gen/bindings'
 import { ask, commands } from './live'
 import type { Tab } from './strip'
@@ -29,7 +29,8 @@ import { onCarried } from './window'
  */
 
 export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { rename } = useShell()
+  const { rename, managing, prefs, palette } = useShell()
+  const over = covered({ managing, prefs, palette })
   const box = useRef<HTMLDivElement | null>(null)
   const placed = useRef<Where | null>(null)
   const open = useRef(false)
@@ -67,7 +68,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (!node) return
     const hole = boxOf(node.getBoundingClientRect())
     const now = inset(hole, viewport)
-    const shown = hole.width > 0 && hole.height > 0
+    const shown = hole.width > 0 && hole.height > 0 && !over
 
     if (!shown) {
       if (open.current) {
@@ -89,7 +90,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (!moved(placed.current, now)) return
     placed.current = now
     void ask(() => commands.browserPlace(tab.id, now))
-  }, [at, session, tab.id, viewport])
+  }, [at, over, session, tab.id, viewport])
 
   const go = useCallback(
     (where: string, into: string = session): void => {
