@@ -14,11 +14,16 @@ const WAIT: Duration = Duration::from_secs(5);
 /// card's checkout first. Given up on at five seconds, it was told "devpit is
 /// not open" while the session started anyway — and asked again.
 const STARTING: Duration = Duration::from_secs(90);
+/// A decision waits on a model over the network, which is given five seconds;
+/// the rest is room for the app to say why it gave up.
+const DECIDING: Duration = Duration::from_secs(15);
 
 /// How long devpit has to answer one question.
 pub fn wait_for(method: &str) -> Duration {
     if method == "start" || method == "resume" {
         STARTING
+    } else if method == "decide" || method == "rubric_run" {
+        DECIDING
     } else {
         WAIT
     }

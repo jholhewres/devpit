@@ -26,7 +26,7 @@ struct Tool {
     input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 28] = [
+const TOOLS: [Tool; 30] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -194,6 +194,32 @@ const TOOLS: [Tool; 28] = [
         method: "move",
         description: "Move a card to another column. Refused for a column that runs a step, because entering it starts work: ask the person to move it there.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" }, "columnId": { "type": "string" } }, "required": ["cardId", "columnId"] }),
+    },
+    Tool {
+        name: "devpit_decide",
+        method: "decide",
+        description: "Ask Decisions — a model that answers typed questions instead of writing text — about a state: each question gets a calibrated probability (noul, yes/no), a distribution over options (choice) or a value on a scale (score). For classifying, filtering, ranking or a yes/no verdict whose evidence is in the state; not for maths, counting, dates, writing text or security calls. Costs money and is logged; off unless the person set it up in Settings → Decisions. `devpit agent guide` says how to write the questions.",
+        input: || json!({ "type": "object", "properties": {
+            "state": { "anyOf": [{ "type": "string" }, { "type": "object" }], "description": "The evidence the questions are about: text, or an object. Cut past 100,000 characters, with a warning." },
+            "questions": { "type": "object", "maxProperties": 20, "description": "Question id to question; at most 20.", "additionalProperties": { "type": "object", "properties": {
+                "type": { "type": "string", "enum": ["noul", "choice", "score"] },
+                "instructions": { "type": "string", "description": "The question, precise and answerable from the state alone." },
+                "criteria": { "type": "object", "description": "What each answer means, e.g. { \"true\": \"…\", \"false\": \"…\" }." },
+                "options": { "type": "array", "items": { "type": "string" }, "description": "choice: the options, up to 255." },
+                "scale": { "type": "object", "description": "score: the ordered scale, e.g. { \"min\": 1, \"max\": 5 }." }
+            }, "required": ["type", "instructions"] } },
+            "cardId": { "type": "string", "description": "The card this is about, for the log." }
+        }, "required": ["state", "questions"] }),
+    },
+    Tool {
+        name: "devpit_rubric_run",
+        method: "rubric_run",
+        description: "Run a rubric through Decisions: its questions asked about the state, and each answer judged pass, grey (for a person) or fail by the rubric's thresholds, with the worst as the outcome. A rubric is .devpit/rubrics/<name>.json in the project, or built in: `done` asks whether a card's acceptance criteria are met, verified and in scope. Off unless the person set Decisions up.",
+        input: || json!({ "type": "object", "properties": {
+            "rubric": { "type": "string", "description": "Its name: letters, digits, - and _." },
+            "state": { "anyOf": [{ "type": "string" }, { "type": "object" }], "description": "The evidence: the card, the diff, the test output." },
+            "cardId": { "type": "string", "description": "The card this is about, for the log." }
+        }, "required": ["rubric", "state"] }),
     },
 ];
 

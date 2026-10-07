@@ -146,3 +146,34 @@ fn the_board_card_and_sessions_come_with_pages_a_host_can_read() {
     .expect("answer");
     assert!(missing.contains("-32002"));
 }
+
+#[test]
+fn decisions_come_as_two_tools_with_their_questions_bounded() {
+    let decide = TOOLS
+        .iter()
+        .find(|tool| tool.name == "devpit_decide")
+        .expect("devpit_decide");
+    assert_eq!(decide.method, "decide");
+    let schema = (decide.input)();
+    assert_eq!(schema["required"], json!(["state", "questions"]));
+    assert_eq!(schema["properties"]["questions"]["maxProperties"], 20);
+    assert_eq!(
+        schema["properties"]["questions"]["additionalProperties"]["properties"]["type"]["enum"],
+        json!(["noul", "choice", "score"])
+    );
+    let rubric = TOOLS
+        .iter()
+        .find(|tool| tool.name == "devpit_rubric_run")
+        .expect("devpit_rubric_run");
+    assert_eq!(rubric.method, "rubric_run");
+    assert_eq!((rubric.input)()["required"], json!(["rubric", "state"]));
+}
+
+/// A model over the network takes longer than a board read; the agent must
+/// not give up on it first.
+#[test]
+fn a_decision_is_waited_for_longer_than_a_read() {
+    for method in ["decide", "rubric_run"] {
+        assert!(client::wait_for(method) > client::wait_for("board"));
+    }
+}

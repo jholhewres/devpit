@@ -194,3 +194,12 @@ fn the_app_stops_waiting_before_the_agent_does() {
         assert!(super::patience(method) < devpit_agentapi::client::wait_for(method));
     }
 }
+
+/// Decisions reads the state it is handed and changes nothing on the board.
+#[test]
+fn decisions_are_answered_and_write_nothing() {
+    for method in crate::agent_decide::METHODS {
+        assert!(METHODS.contains(&method), "{method}");
+        assert!(!WRITES.contains(&method), "{method}");
+    }
+}

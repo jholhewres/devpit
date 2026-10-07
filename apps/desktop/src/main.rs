@@ -54,6 +54,7 @@ mod runs_list;
 // frontend's types — in a release build nothing calls it, and a module dead in
 // release should say so rather than warn about it on every build.
 mod agent_choice;
+mod agent_decide;
 mod agent_profiles;
 mod card_activity;
 mod card_chat;
