@@ -112,6 +112,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
           <svg {...stroke}><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1" /><rect x="7" y="12" width="10" height="9" rx="2" /></svg>
         ),
       },
+      {
+        id: 'decisions',
+        label: 'Decisions',
+        about: 'jev typesafe openrouter vercel gateway rubric gate judge classify verdict probability key cap',
+        icon: (
+          <svg {...stroke}><path d="M12 3v18M5 7h14" /><path d="m5 7-3 6a3 3 0 0 0 6 0Z" /><path d="m19 7-3 6a3 3 0 0 0 6 0Z" /></svg>
+        ),
+      },
     ],
   },
   {

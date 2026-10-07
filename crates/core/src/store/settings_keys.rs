@@ -66,3 +66,15 @@ pub const REMOTE: &str = "remote.enabled";
 /// The loopback port the remote viewer is served from, kept so the tailnet
 /// address stays the same across restarts.
 pub const REMOTE_PORT: &str = "remote.port";
+/// Who answers Decisions: `openrouter` or `vercel`. OpenRouter unless set.
+pub const DECISIONS_PROVIDER: &str = "decisions.provider";
+/// The Decisions model; empty is the provider's default.
+pub const DECISIONS_MODEL: &str = "decisions.model";
+/// The provider's address; empty is its default.
+pub const DECISIONS_URL: &str = "decisions.url";
+/// The most Decisions may spend in a day, in US dollars.
+pub const DECISIONS_DAILY_CAP: &str = "decisions.daily_cap_usd";
+/// The projects whose state is never sent to Decisions, as a JSON array.
+pub const DECISIONS_OPTED_OUT: &str = "decisions.opted_out";
+/// The gates that enforce, as a JSON object of gate to mode. Shadow unless named.
+pub const DECISIONS_MODES: &str = "decisions.modes";

@@ -6,10 +6,10 @@
 //! all of them can put a token into a log that then sits in SQLite forever.
 //!
 //! **This is not detection.** It knows exactly the values this app handed out:
-//! the account token, the hook secret, and what a profile declared. A secret
-//! that reached the command another way — read from a file, fetched at
-//! runtime, typed by somebody — passes straight through, and the public
-//! documentation must never say otherwise.
+//! the account token, the hook secret, the Decisions key, and what a profile
+//! declared. A secret that reached the command another way — read from a file,
+//! fetched at runtime, typed by somebody — passes straight through, and the
+//! public documentation must never say otherwise.
 //!
 //! Applied on the way to disk rather than on the way to the window. A line
 //! that already reached the screen cannot be unseen, and putting this in the
@@ -67,6 +67,7 @@ pub(crate) fn what_devpit_gave(store: &devpit_core::Store) -> Vec<String> {
         .collect();
     known.extend(crate::account::token::read());
     known.extend(crate::listener::secret_now());
+    known.extend(crate::decisions::key());
     worth_hiding(known)
 }
 

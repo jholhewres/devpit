@@ -30,6 +30,7 @@ export type PrefsPane =
   | 'storage'
   | 'worktrees'
   | 'usage'
+  | 'decisions'
 
 /*
  * Three facts about the panes, because they came apart the moment tabs

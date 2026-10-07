@@ -15,6 +15,7 @@ pub mod card;
 pub mod chat;
 pub mod checkpoint;
 pub mod conversation;
+pub mod decisions;
 pub mod error;
 pub mod file;
 pub mod focus;
@@ -60,6 +61,7 @@ pub use checkpoint::{
     validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, Whose, WouldRun,
 };
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
+pub use decisions::{Deciding, DecisionTried};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};

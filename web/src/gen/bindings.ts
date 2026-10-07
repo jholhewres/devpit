@@ -384,6 +384,22 @@ export const commands = {
 	 *  file hunted down by hand.
 	 */
 	transcribeModelDownload: () => typedError<Transcribing, RpcError>(__TAURI_INVOKE("transcribe_model_download")),
+	/**  `decisions.read` — how Decisions is set up, and what it spent today. */
+	decisionsRead: () => typedError<Deciding, RpcError>(__TAURI_INVOKE("decisions_read")),
+	/**  `decisions.set` — the provider, the model, the address and the day's cap. */
+	decisionsSet: (provider: string, model: string, url: string, dailyCapUsd: number | null) => typedError<Deciding, RpcError>(__TAURI_INVOKE("decisions_set", { provider, model, url, dailyCapUsd })),
+	/**
+	 *  `decisions.key_set` — keeps the provider's key in a private file, or
+	 *  forgets it, which turns Decisions off.
+	 */
+	decisionsKeySet: (key: string | null) => typedError<null, RpcError>(__TAURI_INVOKE("decisions_key_set", { key })),
+	/**  `decisions.project_set` — whether a project's state may be sent at all. */
+	decisionsProjectSet: (projectId: string, send: boolean) => typedError<Deciding, RpcError>(__TAURI_INVOKE("decisions_project_set", { projectId, send })),
+	/**
+	 *  `decisions.test` — one trivial question, through the same path every
+	 *  decision takes: its latency and cost, or why it did not answer.
+	 */
+	decisionsTest: () => typedError<DecisionTried, RpcError>(__TAURI_INVOKE("decisions_test")),
 	/**  `orchestrator.proposals` — what this orchestrator proposed, oldest first. */
 	orchestratorProposals: (projectId: string) => __TAURI_INVOKE<ProjectProposal[]>("orchestrator_proposals", { projectId }),
 	/**  `orchestrator.proposal_drop` — done or dropped by the person, it goes. */
@@ -2254,6 +2270,39 @@ export type DataSpec = {
 	 *  for why `f64`.
 	 */
 	maxBytes: number | null,
+};
+
+/**
+ *  How Decisions is set up, as the settings show it. The key never comes
+ *  back: only whether one is kept.
+ */
+export type Deciding = {
+	/**  `openrouter` or `vercel`. */
+	provider: string,
+	/**  Empty is the provider's default. */
+	model: string,
+	/**  Empty is the provider's default. */
+	url: string,
+	dailyCapUsd: number | null,
+	keySet: boolean,
+	/**  Since midnight UTC, read off the decision log. */
+	spentTodayUsd: number | null,
+	decidedToday: number,
+	/**  The projects whose state is never sent. */
+	optedOut: string[],
+};
+
+/**
+ *  One trivial question asked from Settings, to see the key, the address
+ *  and the model work.
+ */
+export type DecisionTried = {
+	/**  The probability it answered, when it answered. */
+	probability: number | null,
+	latencyMs: number | null,
+	costUsd: number | null,
+	/**  Why it did not answer. */
+	note: string | null,
 };
 
 /**

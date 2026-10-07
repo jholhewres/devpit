@@ -1,11 +1,11 @@
-//! Where state lives: a SQLite file at `~/.devpit/state.db`, in WAL.
-//!
-//! WAL because the access pattern is a window drawing while a watcher writes.
+//! Where state lives: a SQLite file at `~/.devpit/state.db`, in WAL — because
+//! the access pattern is a window drawing while a watcher writes.
 
 mod board;
 mod card_links;
 mod cards;
 pub mod column_roles;
+pub mod decisions;
 mod dismissals;
 mod evidence;
 mod folders;

@@ -701,4 +701,32 @@ CREATE TABLE seen_session (
 CREATE INDEX seen_session_ended ON seen_session(profile_id, ended_at);
 "#,
     },
+    // Migration 027 — what Decisions was asked, what it answered and cost.
+    Migration {
+        version: 27,
+        sql: r#"
+-- The state is never kept, only its digest: it is the project's own text, and
+-- the log outlives it. Rows older than ninety days are pruned on write.
+CREATE TABLE decision (
+    id             TEXT PRIMARY KEY,
+    at             INTEGER NOT NULL,
+    project_id     TEXT,
+    card_id        TEXT,
+    gate           TEXT NOT NULL,
+    mode           TEXT NOT NULL,
+    rubric         TEXT,
+    rubric_version TEXT,
+    questions      TEXT NOT NULL,
+    answers        TEXT,
+    thresholds     TEXT,
+    outcome        TEXT NOT NULL,
+    action_taken   TEXT,
+    cost_usd       REAL NOT NULL DEFAULT 0,
+    latency_ms     INTEGER NOT NULL DEFAULT 0,
+    state_digest   TEXT NOT NULL,
+    person_verdict TEXT
+);
+CREATE INDEX decision_at ON decision(at);
+"#,
+    },
 ];

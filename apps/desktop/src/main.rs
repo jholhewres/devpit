@@ -81,6 +81,8 @@ mod claude_plugin;
 #[cfg(any(debug_assertions, test))]
 mod contract;
 mod cycles;
+mod deciding;
+mod decisions;
 mod diagnostics;
 mod diffs;
 mod ended_sessions;
@@ -155,6 +157,7 @@ mod reply_drafts;
 mod restoring;
 mod reveal;
 mod roots;
+mod rubric;
 mod run_from;
 mod runs;
 mod saves;
