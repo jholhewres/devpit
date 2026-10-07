@@ -35,6 +35,43 @@ pub(crate) fn note(root: &Path, device: &Device, what: &str) {
     }
 }
 
+/// The latest `most` entries of the Remote's log, the latest first.
+pub(crate) fn activity_in(text: &str, most: usize) -> Vec<devpit_rpc::RemoteActivity> {
+    text.lines()
+        .rev()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter_map(|one| {
+            Some(devpit_rpc::RemoteActivity {
+                at: one.get("at")?.as_f64()?,
+                device: one.get("device")?.as_str()?.to_owned(),
+                what: one.get("what")?.as_str()?.to_owned(),
+            })
+        })
+        .take(most)
+        .collect()
+}
+
+/// `remote.activity` — what paired devices did lately, never what they saw.
+#[tauri::command]
+#[specta::specta]
+pub async fn remote_activity() -> Result<devpit_rpc::RemoteActivities, devpit_rpc::RpcError> {
+    crate::off_main::blocking(|| {
+        let path = devpit_core::Store::root()?.join("remote-log.jsonl");
+        // The tail only: the log grows for as long as the Remote is used.
+        let mut tail = Vec::new();
+        if let Ok(mut file) = std::fs::File::open(&path) {
+            use std::io::{Read, Seek, SeekFrom};
+            let size = file.metadata().map(|meta| meta.len()).unwrap_or(0);
+            let _ = file.seek(SeekFrom::Start(size.saturating_sub(256 * 1024)));
+            let _ = file.take(256 * 1024).read_to_end(&mut tail);
+        }
+        Ok(devpit_rpc::RemoteActivities {
+            entries: activity_in(&String::from_utf8_lossy(&tail), 30),
+        })
+    })
+    .await
+}
+
 /// The settings read again: a device paired, or one connected.
 pub(crate) fn changed(app: &tauri::AppHandle) {
     let _ = app.emit("remote:changed", ());
@@ -225,3 +262,7 @@ pub fn remote_shapes() -> RemoteShapes {
         outgoing: Vec::new(),
     }
 }
+
+#[cfg(test)]
+#[path = "remote_tests.rs"]
+mod tests;

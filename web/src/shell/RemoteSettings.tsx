@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { RemoteDevice, RemotePairing, RemoteView } from '../gen/bindings'
+import type { RemoteActivity, RemoteDevice, RemotePairing, RemoteView } from '../gen/bindings'
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
 import { launcherLink } from './remoteLauncher'
@@ -102,6 +102,7 @@ export function RemoteSettings(): React.JSX.Element {
           {view.devices.map((device) => (
             <DeviceRow key={device.id} device={device} onView={setView} />
           ))}
+          {view.devices.length > 0 && <Activity />}
         </>
       )}
     </PrefSwitch>
@@ -128,6 +129,33 @@ function RemoteAddress({ address, login }: { address: string; login: string | nu
       <span className="pref__d">Open it on a device in your tailnet{login && <>, signed in as {login}</>}.</span>
       <LauncherRow address={address} />
     </>
+  )
+}
+
+/* What paired devices did lately, from the Remote's log — never what they saw. */
+function Activity(): React.JSX.Element {
+  const [entries, setEntries] = useState<readonly RemoteActivity[] | null>(null)
+  const show = (): void => void ask(() => commands.remoteActivity()).then((answer) => setEntries(answer.data?.entries ?? []))
+  if (!entries)
+    return (
+      <span className="voice__row">
+        <button className="btn" onClick={show}>
+          Show activity
+        </button>
+      </span>
+    )
+  return (
+    <span className="remote__log">
+      {entries.length === 0 && <span className="pref__d">Nothing done from a device yet.</span>}
+      {entries.map((one, at) => (
+        <span className="pref__d" key={at}>
+          {new Date((one.at ?? 0) * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })} · {one.device} · {one.what}
+        </span>
+      ))}
+      <button className="btn" onClick={() => setEntries(null)}>
+        Hide activity
+      </button>
+    </span>
   )
 }
 

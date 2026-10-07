@@ -89,20 +89,24 @@ export function OpenApps(): React.JSX.Element {
         <p className="acc__note">No apps yet. Add one and it appears in every project&rsquo;s menu.</p>
       )}
 
-      {apps.map((app) => (
-        <div className="oapp" key={app.id}>
-          <span className="oapp__b">
-            <span className="oapp__t">{app.label}</span>
-            <span className="oapp__c">{app.command}</span>
-          </span>
-          {/* Measured, not assumed: the row says so rather than failing when
-              it is clicked, which is the moment it would be most confusing. */}
-          {!app.installed && <span className="oapp__no">not on this machine</span>}
-          <button className="btn" data-danger onClick={() => remove(app.id)}>
-            Remove
-          </button>
+      {apps.length > 0 && (
+        <div className="apps__list">
+          {apps.map((app) => (
+            <div className="oapp" key={app.id}>
+              <span className="oapp__b">
+                <span className="oapp__t">{app.label}</span>
+                <span className="oapp__c">{app.command}</span>
+              </span>
+              {/* Measured, not assumed: the row says so rather than failing when
+                  it is clicked, which is the moment it would be most confusing. */}
+              {!app.installed && <span className="oapp__no">not on this machine</span>}
+              <button className="btn" data-danger onClick={() => remove(app.id)}>
+                Remove
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
 
       {problem && <p className="wtb__no">{problem}</p>}
     </section>

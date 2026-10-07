@@ -186,6 +186,15 @@ pub async fn chat_transcribe(
     let audio = crate::projects::project_home(&project_id)?
         .pasted()
         .join(&name);
+    heard_in(&audio, language).await
+}
+
+/// What the engine chosen in Settings hears in `audio`, as a transcript.
+async fn heard_in(
+    audio: &std::path::Path,
+    language: Option<String>,
+) -> Result<Transcript, RpcError> {
+    let audio = audio.to_path_buf();
     let settings = crate::off_main::blocking(|| read_settings(&Store::open_default()?)).await?;
     let language = Some(settings.language.clone())
         .filter(|code| !code.is_empty())
@@ -214,6 +223,27 @@ pub async fn chat_transcribe(
             note: Some(why),
         },
     })
+}
+
+/// `transcribe.test` — a few seconds recorded in Settings, heard by the engine
+/// chosen there and thrown away: the microphone, its permission and the engine,
+/// diagnosed at once.
+#[tauri::command]
+#[specta::specta]
+pub async fn transcribe_test(
+    media_type: String,
+    data: String,
+    language: Option<String>,
+) -> Result<Transcript, RpcError> {
+    let ext = crate::pasting::extension_for(&media_type)
+        .filter(|_| media_type.starts_with("audio/"))
+        .ok_or_else(|| RpcError::new(ErrorCode::Invalid, "that is not a recording"))?;
+    let bytes = crate::pasting::decoded(&data)?;
+    let audio = Store::root()?.join(format!("voice-test.{ext}"));
+    std::fs::write(&audio, bytes).map_err(|err| RpcError::internal(err.to_string()))?;
+    let heard = heard_in(&audio, language).await;
+    let _ = std::fs::remove_file(&audio);
+    heard
 }
 
 /// Heard by a whisper on this machine, working in a folder beside the
@@ -402,6 +432,73 @@ pub(crate) fn multipart(
     body.extend_from_slice(bytes);
     body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
     (boundary, body)
+}
+
+/// whisper.cpp's base model, from its own release on Hugging Face.
+const BASE_MODEL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
+/// The most a model download may be: the base one is about 150 MB.
+const MOST_MODEL_BYTES: u64 = 400 * 1_048_576;
+
+/// `transcribe.model_download` — fetches whisper.cpp's base model into
+/// devpit's own folder and chooses it, so the local engine works without a
+/// file hunted down by hand.
+#[tauri::command]
+#[specta::specta]
+pub async fn transcribe_model_download() -> Result<Transcribing, RpcError> {
+    let folder = Store::root()?.join("models");
+    std::fs::create_dir_all(&folder).map_err(|err| RpcError::internal(err.to_string()))?;
+    let path = folder.join("ggml-base.bin");
+    let part = folder.join("ggml-base.bin.part");
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(20))
+        .read_timeout(std::time::Duration::from_secs(60))
+        .user_agent(concat!("devpit/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|err| RpcError::internal(err.to_string()))?;
+    let unreachable = |err: reqwest::Error| {
+        RpcError::new(
+            ErrorCode::Conflict,
+            format!("the model could not be downloaded: {err}"),
+        )
+    };
+    let mut response = client
+        .get(BASE_MODEL)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(unreachable)?;
+    if response
+        .content_length()
+        .is_some_and(|size| size > MOST_MODEL_BYTES)
+    {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "that model is larger than any whisper base model",
+        ));
+    }
+    let mut file =
+        std::fs::File::create(&part).map_err(|err| RpcError::internal(err.to_string()))?;
+    let mut written: u64 = 0;
+    while let Some(chunk) = response.chunk().await.map_err(unreachable)? {
+        written += chunk.len() as u64;
+        if written > MOST_MODEL_BYTES {
+            let _ = std::fs::remove_file(&part);
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "that model is larger than any whisper base model",
+            ));
+        }
+        std::io::Write::write_all(&mut file, &chunk)
+            .map_err(|err| RpcError::internal(err.to_string()))?;
+    }
+    drop(file);
+    std::fs::rename(&part, &path).map_err(|err| RpcError::internal(err.to_string()))?;
+    crate::off_main::blocking(move || {
+        let store = Store::open_default()?;
+        store.set_preference(preference::TRANSCRIBE_MODEL, &path.display().to_string())?;
+        read_settings(&store)
+    })
+    .await
 }
 
 #[cfg(test)]

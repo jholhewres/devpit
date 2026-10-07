@@ -91,8 +91,9 @@ pub use project::{
 pub use reminder::{Reminder, Reminders};
 pub use remote::RemoteAct;
 pub use remote_view::{
-    RemoteDevice, RemoteDraft, RemoteIn, RemoteOut, RemotePairing, RemoteProject, RemoteQuestion,
-    RemoteShapes, RemoteTerminal, RemoteView, TailscaleState,
+    RemoteActivities, RemoteActivity, RemoteDevice, RemoteDraft, RemoteIn, RemoteOut,
+    RemotePairing, RemoteProject, RemoteQuestion, RemoteShapes, RemoteTerminal, RemoteView,
+    TailscaleState,
 };
 pub use review::{
     blocking, reviewed, standing, CardFindings, CardReview, Finding, Found, Review, Severity,

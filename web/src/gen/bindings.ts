@@ -336,6 +336,8 @@ export const commands = {
 	orchestratorRename: (profileId: string, name: string, to: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_rename", { profileId, name, to })),
 	/**  `remote.read` — Remote, as the settings show it. */
 	remoteRead: () => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_read")),
+	/**  `remote.activity` — what paired devices did lately, never what they saw. */
+	remoteActivity: () => typedError<RemoteActivities, RpcError>(__TAURI_INVOKE("remote_activity")),
 	/**  `remote.set` — on or off. On says why, when it cannot be reached. */
 	remoteSet: (on: boolean) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_set", { on })),
 	/**  `remote.pair` — a code for one device, shown here, good once for two minutes. */
@@ -370,6 +372,18 @@ export const commands = {
 	 *  file, and the note says why.
 	 */
 	chatTranscribe: (projectId: string, name: string, language: string | null) => typedError<Transcript, RpcError>(__TAURI_INVOKE("chat_transcribe", { projectId, name, language })),
+	/**
+	 *  `transcribe.test` — a few seconds recorded in Settings, heard by the engine
+	 *  chosen there and thrown away: the microphone, its permission and the engine,
+	 *  diagnosed at once.
+	 */
+	transcribeTest: (mediaType: string, data: string, language: string | null) => typedError<Transcript, RpcError>(__TAURI_INVOKE("transcribe_test", { mediaType, data, language })),
+	/**
+	 *  `transcribe.model_download` — fetches whisper.cpp's base model into
+	 *  devpit's own folder and chooses it, so the local engine works without a
+	 *  file hunted down by hand.
+	 */
+	transcribeModelDownload: () => typedError<Transcribing, RpcError>(__TAURI_INVOKE("transcribe_model_download")),
 	/**  `orchestrator.proposals` — what this orchestrator proposed, oldest first. */
 	orchestratorProposals: (projectId: string) => __TAURI_INVOKE<ProjectProposal[]>("orchestrator_proposals", { projectId }),
 	/**  `orchestrator.proposal_drop` — done or dropped by the person, it goes. */
@@ -3646,6 +3660,19 @@ export type Reminders = {
 export type RemoteAct = "fetch" | "pull" | "push" | 
 /**  Pull, then push. */
 "sync";
+
+export type RemoteActivities = {
+	/**  The latest first. */
+	entries: RemoteActivity[],
+};
+
+/**  One thing a paired device did, from the Remote's own log. */
+export type RemoteActivity = {
+	/**  Seconds since the epoch. */
+	at: number | null,
+	device: string,
+	what: string,
+};
 
 /**  A device paired with this machine. */
 export type RemoteDevice = {

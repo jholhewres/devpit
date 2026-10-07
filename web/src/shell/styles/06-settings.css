@@ -437,3 +437,4 @@ button.remote__chip:hover { color: var(--text); background: var(--overlay-strong
 .remote__chip[data-on], .remote__chip[aria-pressed='true'] { color: var(--text); background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 38%, transparent); }
 .remote__chip[data-on] { cursor: default; opacity: 0.75; }
 .remote__chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.remote__log { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-height: 180px; overflow-y: auto; }

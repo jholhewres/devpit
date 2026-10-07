@@ -16,6 +16,10 @@
 .apps { display: flex; flex-direction: column; gap: 6px; }
 .apps > .oapp + .oapp { margin-top: 0; }
 .apps__add { position: relative; flex: none; }
+/* One card, a row per app: a stack of cards read as so many separate settings. */
+.apps__list { background: var(--raised); border-radius: 10px; }
+.apps__list > .oapp { background: none; border-radius: 0; padding: 10px 18px; }
+.apps__list > .oapp + .oapp { margin-top: 0; border-top: 1px solid var(--border); }
 /* Over the list rather than pushing it down: a menu that reflows the rows
    behind it moves the row you were about to click. */
 .apps__menu { position: absolute; right: 0; top: calc(100% + 5px); z-index: 20; min-width: 190px; padding: 5px; border-radius: 9px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 18px 44px var(--shade); animation: pop-in 130ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }

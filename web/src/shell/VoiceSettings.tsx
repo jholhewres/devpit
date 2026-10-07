@@ -4,12 +4,16 @@ import { useEffect, useState } from 'react'
 import type { Transcribing } from '../gen/bindings'
 import { ask, commands } from './live'
 import { PrefMore } from './PrefRow'
+import { base64Of, formatHere, record, refusal, systemLanguage } from './recorder'
 
 /*
  * How voice messages become words: a whisper on this machine, a service the
  * person chose with their own key, or not at all. Nothing is sent anywhere
  * unless the service is chosen here.
  */
+
+/** How long the microphone test records. */
+const TEST_MS = 3000
 
 const ENGINES: readonly { id: string; label: string }[] = [
   { id: 'local', label: 'This machine' },
@@ -23,6 +27,39 @@ export function VoiceSettings(): React.JSX.Element {
   const [said, setSaid] = useState<string | null>(null)
 
   const [looked, setLooked] = useState<'not yet' | 'looking' | 'none'>('not yet')
+  const [testing, setTesting] = useState<'no' | 'listening' | 'hearing'>('no')
+  const [heard, setHeard] = useState<string | null>(null)
+  const [fetching, setFetching] = useState(false)
+
+  /* Three seconds through the same microphone and engine a chat uses, thrown away after. */
+  const test = async (): Promise<void> => {
+    const format = formatHere()
+    if (!format) return setHeard('This window cannot record: GStreamer’s plugins for the microphone are missing.')
+    setHeard(null)
+    try {
+      const recording = await record(format)
+      setTesting('listening')
+      await new Promise((done) => window.setTimeout(done, TEST_MS))
+      const blob = await recording.stop()
+      if (!blob) return setHeard('The microphone gave nothing: check it is the one selected in the system.')
+      setTesting('hearing')
+      const answer = await ask(async () => commands.transcribeTest(blob.type, await base64Of(blob), systemLanguage()))
+      setHeard(answer.data?.text ? `Heard: “${answer.data.text}”` : `Recorded, not heard: ${answer.data?.note ?? answer.error ?? 'no answer'}.`)
+    } catch (error) {
+      setHeard(refusal(error))
+    } finally {
+      setTesting('no')
+    }
+  }
+
+  const fetchModel = (): void => {
+    setFetching(true)
+    void ask(() => commands.transcribeModelDownload()).then((answer) => {
+      setFetching(false)
+      setSaid(answer.error)
+      if (answer.data) setNow(answer.data)
+    })
+  }
 
   useEffect(() => {
     void ask(() => commands.transcribeRead()).then((answer) => setNow(answer.data))
@@ -105,6 +142,11 @@ export function VoiceSettings(): React.JSX.Element {
             >
               Choose model
             </button>
+            {!now.model && (
+              <button className="btn" disabled={fetching} onClick={fetchModel} title="ggml-base.bin from whisper.cpp's releases, about 150 MB, into ~/.devpit/models">
+                {fetching ? 'Downloading…' : 'Download base model'}
+              </button>
+            )}
           </span>
         )}
         {api && (
@@ -137,6 +179,12 @@ export function VoiceSettings(): React.JSX.Element {
             <input className="voice__in voice__in--short" placeholder="system" defaultValue={now.language} onBlur={(event) => event.target.value !== now.language && save({ ...now, language: event.target.value })} />
           </label>
         )}
+        <span className="voice__row">
+          <button className="btn" disabled={testing !== 'no'} onClick={() => void test()}>
+            {testing === 'listening' ? 'Listening… say something' : testing === 'hearing' ? 'Hearing…' : 'Test the microphone'}
+          </button>
+          {heard && <span className="pref__d">{heard}</span>}
+        </span>
         {said && <span className="pref__d voice__bad">{said}</span>}
       </div>
     </div>

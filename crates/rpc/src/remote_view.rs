@@ -223,6 +223,23 @@ pub struct RemoteView {
     pub problem: Option<String>,
 }
 
+/// One thing a paired device did, from the Remote's own log.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteActivity {
+    /// Seconds since the epoch.
+    pub at: f64,
+    pub device: String,
+    pub what: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteActivities {
+    /// The latest first.
+    pub entries: Vec<RemoteActivity>,
+}
+
 /// A pairing, offered on the machine's screen and good once, briefly.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq)]
 #[serde(rename_all = "camelCase")]
