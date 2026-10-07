@@ -6,17 +6,22 @@ import { Reply } from './Reply'
 
 const replied = vi.fn(async (..._args: unknown[]) => null)
 const typing = vi.fn(async (_on: boolean) => null)
+const draftSent = vi.fn(async (..._args: unknown[]) => null)
+let drafted: string | null = null
 vi.mock('../shell/live', () => ({
   ask: async (call: () => Promise<unknown>) => ({ data: await call(), error: null, loading: false }),
   commands: {
     islandReply: (...args: unknown[]) => replied(...args),
     islandTyping: (on: boolean) => typing(on),
+    islandDraft: async () => drafted,
+    islandDraftSend: (...args: unknown[]) => draftSent(...args),
   },
 }))
 
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  drafted = null
 })
 
 const inPane = { sessionId: 's1', paneId: 'leaf_1' } as IslandSession
@@ -38,5 +43,14 @@ describe('replying from the island', () => {
   it('has nothing to type into for a session in no terminal', () => {
     const { container } = render(<Reply session={{ sessionId: 'c1', paneId: null } as IslandSession} />)
     expect(container.innerHTML).toBe('')
+  })
+
+  it("shows the orchestrator's draft for the session, and sends it on a click", async () => {
+    drafted = 'please carry on'
+    render(<Reply session={inPane} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(draftSent).toHaveBeenCalledWith('s1'))
+    await waitFor(() => screen.getByText('Draft sent, as you.'))
+    expect(screen.queryByText(/Drafted for you/)).toBeNull()
   })
 })

@@ -11,6 +11,7 @@ import { ContextMeter } from './ContextMeter'
 import { ComposerStatus } from './ComposerStatus'
 import { CopySession } from './CopySession'
 import { DocPeek } from './DocPeek'
+import { useDraftShortcut } from './draftShortcut'
 import { AppsScopeContext } from './mcpApps'
 import { DropTarget } from './DropTarget'
 import { PaneCorner } from './PaneCorner'
@@ -58,8 +59,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   /* A chat opened from a card starts with the card in the composer, unsent. */
   const [prompt, setPrompt] = useDraft(tab.id, tab.draft)
   const slash = useSlash(chat.profileId, prompt, setPrompt)
-  /* New output belongs at the bottom, where the eye already is — unless the
-     eye went up to read. */
+  /* New output belongs at the bottom, where the eye already is — unless it went up to read. */
   const follow = useFollow<HTMLDivElement>(chat.messages)
   const field = useRef<HTMLTextAreaElement>(null)
   const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
@@ -67,8 +67,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const mine = active?.id === tab.id
   /* A file an answer names opens beside the conversation, not over it. */
   const [peek, setPeek] = useState<string | null>(null)
-  /* Where a page an MCP tool came with is asked for: this conversation's
-     account, in its folder. */
+  /* Where a page an MCP tool came with is asked for: this conversation's account, in its folder. */
   const scope = useMemo(
     () => (chat.profileId && chat.folder ? { profileId: chat.profileId, cwd: chat.folder } : null),
     [chat.profileId, chat.folder],
@@ -78,8 +77,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (tab.draft !== undefined) drafted(tab.id)
   }, [tab.draft, tab.id, drafted])
 
-  /* A conversation is called the first thing you said in it. Only once, and
-     only while it is unnamed: a tab you renamed keeps the name you gave it. */
+  /* Named once after the first thing you said in it; a tab you renamed keeps your name. */
   const said = chat.messages.find((one) => one.role === 'user')
   useEffect(() => {
     if (tab.title !== undefined || !said) return
@@ -89,8 +87,10 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
 
   /* Typed while a turn runs, a message waits for it rather than being refused. */
   const queue = useQueue(chat.sending, chat.say, chat.steer)
+  const sendDraft = useDraftShortcut(project?.orchestrator ?? null, setPrompt)
   const send = (): void => {
     if (!ready(prompt, false, chat.profileId)) return
+    if (sendDraft(prompt)) return setPrompt('')
     if (chat.sending) queue.add(prompt)
     else chat.say(prompt)
     setPrompt('')

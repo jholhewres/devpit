@@ -75,7 +75,7 @@ function DraftCard({ draft, session, profileId }: { draft: Drafted; session: Liv
 
   const send = (): void => {
     setBusy(true)
-    void ask(() => commands.orchestratorReply(profileId, draft.to, text)).then((sent) => {
+    void ask(() => commands.orchestratorReply(profileId, draft.to, text, 'the chat')).then((sent) => {
       setBusy(false)
       setWhy(sent.error)
       if (sent.error) return

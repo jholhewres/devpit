@@ -315,7 +315,9 @@ fn answer(
             let Some(text) = crate::reply_drafts::drafted(&profile, &name) else {
                 return failed("that draft is no longer waiting");
             };
-            if let Err(err) = crate::live_sessions::reply_now(&profile, &name, &text) {
+            if let Err(err) =
+                crate::live_sessions::reply_now(&profile, &name, &text, Some("the Remote"))
+            {
                 return failed(err.message);
             }
             crate::remote::note(root, device, &format!("sent a draft to {name}"));

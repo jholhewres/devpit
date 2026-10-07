@@ -55,7 +55,7 @@ describe('a reply the orchestrator drafted', () => {
     expect(replied).not.toHaveBeenCalled()
     fireEvent.change(text, { target: { value: 'yes, delete it, keep the rollback' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send as you' }))
-    await waitFor(() => expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, delete it, keep the rollback'))
+    await waitFor(() => expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, delete it, keep the rollback', 'the chat'))
     await waitFor(() => expect(onDone).toHaveBeenCalled())
   })
 

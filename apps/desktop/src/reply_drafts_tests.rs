@@ -53,3 +53,15 @@ fn every_draft_waiting_is_listed_for_the_remote() {
     forget("all-a", "api");
     forget("all-b", "web");
 }
+
+#[test]
+fn a_sent_draft_is_recorded_with_where_it_went_from_and_whether_it_was_edited() {
+    assert_eq!(
+        super::sent_entry("api-a", "go on", " go on ", "the Remote"),
+        "The person sent the draft for api-a from the Remote, as drafted: go on"
+    );
+    assert_eq!(
+        super::sent_entry("api-a", "go on", "go on, but skip F2", "the window"),
+        "The person sent the draft for api-a from the window, edited: go on, but skip F2"
+    );
+}

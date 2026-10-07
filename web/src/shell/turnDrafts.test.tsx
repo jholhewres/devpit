@@ -54,7 +54,7 @@ describe('a draft in the orchestrator chat', () => {
     fireEvent.click(screen.getByText('Edit'))
     fireEvent.change(screen.getByLabelText('Reply to api-a, as you'), { target: { value: 'yes, but skip the migration' } })
     fireEvent.click(screen.getByText('Send'))
-    await waitFor(() => expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, but skip the migration'))
+    await waitFor(() => expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, but skip the migration', 'the chat'))
     expect(await screen.findByText(/Sent as you at/)).toBeTruthy()
   })
 

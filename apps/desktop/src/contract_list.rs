@@ -93,6 +93,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         project_proposals::orchestrator_proposal_drop,
         session_window::session_changes,
         reply_drafts::orchestrator_draft_drop,
+        reply_drafts::island_draft,
+        reply_drafts::island_draft_send,
         pausing::pause_read,
         desk::shortcut_read,
         desk::shortcut_set,

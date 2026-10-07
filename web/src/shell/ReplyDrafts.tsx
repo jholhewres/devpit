@@ -41,7 +41,7 @@ export function ReplyDrafts({
   const send = (one: Drafted): void => {
     setSending(one.name)
     const text = edited[one.name] ?? one.draft
-    void ask(() => commands.orchestratorReply(profileId, one.name, text)).then((sent) => settle(one.name, sent.error))
+    void ask(() => commands.orchestratorReply(profileId, one.name, text, 'the chat')).then((sent) => settle(one.name, sent.error))
   }
 
   const drop = (one: Drafted): void => {

@@ -56,7 +56,7 @@ describe("an orchestrator's sessions", () => {
     const input = screen.getByLabelText('Reply to api-a')
     fireEvent.change(input, { target: { value: 'yes, go' } })
     fireEvent.submit(input.closest('form')!)
-    expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, go')
+    expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'yes, go', 'the Sessions panel')
   })
 
   it('sends a command to a session in a devpit terminal only once it is confirmed, typed as the person', async () => {
@@ -70,7 +70,7 @@ describe("an orchestrator's sessions", () => {
     fireEvent.click(screen.getByRole('button', { name: '/remote-control' }))
     expect(replied).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/remote-control')
+    expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/remote-control', 'the Sessions panel')
   })
 
   it('sends a command written by hand, after the same question', async () => {
@@ -82,7 +82,7 @@ describe("an orchestrator's sessions", () => {
     fireEvent.submit(input.closest('form')!)
     expect(replied).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/model opus')
+    expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/model opus', 'the Sessions panel')
   })
 
   it('says what a busy session is on right now', async () => {

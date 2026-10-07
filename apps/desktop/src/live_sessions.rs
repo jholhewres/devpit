@@ -246,12 +246,19 @@ pub async fn orchestrator_reply(
     profile_id: String,
     name: String,
     text: String,
+    from: Option<String>,
 ) -> Result<(), RpcError> {
-    crate::off_main::blocking(move || reply_now(&profile_id, &name, &text)).await
+    crate::off_main::blocking(move || reply_now(&profile_id, &name, &text, from.as_deref())).await
 }
 
-/// [`orchestrator_reply`], on the calling thread: the Remote sends a draft through it too.
-pub(crate) fn reply_now(profile_id: &str, name: &str, text: &str) -> Result<(), RpcError> {
+/// [`orchestrator_reply`], on the calling thread: the Remote and the island
+/// send a draft through it too. `from` says where, for the draft's record.
+pub(crate) fn reply_now(
+    profile_id: &str,
+    name: &str,
+    text: &str,
+    from: Option<&str>,
+) -> Result<(), RpcError> {
     let text = text.trim();
     if text.is_empty() || text.chars().count() > LONGEST_REPLY {
         return Err(RpcError::new(
@@ -275,6 +282,15 @@ pub(crate) fn reply_now(profile_id: &str, name: &str, text: &str) -> Result<(), 
     tmux.paste_and_send(&target, text)
         .map_err(|err| RpcError::internal(err.to_string()))?;
     // Sent as the person: whatever was drafted for it has been said.
+    if let Some(drafted) = crate::reply_drafts::drafted(profile_id, name) {
+        crate::reply_drafts::kept_sent(
+            profile_id,
+            name,
+            &drafted,
+            text,
+            from.unwrap_or("the window"),
+        );
+    }
     crate::reply_drafts::forget(profile_id, name);
     Ok(())
 }

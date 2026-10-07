@@ -409,7 +409,7 @@ function Details({
   const send = (): void => {
     const text = reply.trim()
     if (!text || !profileId) return
-    void ask(() => commands.orchestratorReply(profileId, session.name, text)).then((sent) => {
+    void ask(() => commands.orchestratorReply(profileId, session.name, text, 'the Sessions panel')).then((sent) => {
       setSaid(sent.error ?? 'Sent, as you.')
       if (sent.error) return
       setReply('')
@@ -421,7 +421,7 @@ function Details({
      into nobody's. Remote Control's page and code show there, so it opens. */
   const command = (line: string): void => {
     if (!profileId) return
-    void ask(() => commands.orchestratorReply(profileId, session.name, line)).then((sent) => {
+    void ask(() => commands.orchestratorReply(profileId, session.name, line, 'the Sessions panel')).then((sent) => {
       setSaid(sent.error ?? (line === REMOTE_CONTROL ? `Typed ${REMOTE_CONTROL} — its terminal shows the link, or that it disconnected.` : `Typed ${line}, as you.`))
       if (!sent.error && line === REMOTE_CONTROL) onTerminal?.()
     })

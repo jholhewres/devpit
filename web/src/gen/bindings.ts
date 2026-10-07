@@ -327,7 +327,7 @@ export const commands = {
 	 *  approves nothing, by the CLI's rule; this is the person answering, and it
 	 *  must stay only theirs to send.
 	 */
-	orchestratorReply: (profileId: string, name: string, text: string) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text })),
+	orchestratorReply: (profileId: string, name: string, text: string, from: string | null) => typedError<null, RpcError>(__TAURI_INVOKE("orchestrator_reply", { profileId, name, text, from })),
 	/**
 	 *  `orchestrator.rename` — calls a session something else, by typing the
 	 *  CLI's own `/rename` into its terminal: the name lives in the CLI, and one
@@ -384,6 +384,10 @@ export const commands = {
 	sessionChanges: (cwd: string, cardId: string | null) => typedError<SessionChanges, RpcError>(__TAURI_INVOKE("session_changes", { cwd, cardId })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
+	/**  `island.draft` — the reply drafted for a session the island shows, if any. */
+	islandDraft: (sessionId: string) => typedError<string | null, RpcError>(__TAURI_INVOKE("island_draft", { sessionId })),
+	/**  `island.draft_send` — sends that draft into the session's terminal, as the person. */
+	islandDraftSend: (sessionId: string) => typedError<null, RpcError>(__TAURI_INVOKE("island_draft_send", { sessionId })),
 	/**  `pause.read` — whether devpit is paused, and until when. */
 	pauseRead: () => __TAURI_INVOKE<Paused>("pause_read"),
 	/**  `shortcut.read` — the keys that bring devpit forward, if any. */

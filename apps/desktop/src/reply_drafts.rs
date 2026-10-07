@@ -59,6 +59,75 @@ pub(crate) fn all() -> Vec<(String, String, String)> {
     every
 }
 
+/// The line a sent draft leaves in its orchestrator's `sessions` log: who it
+/// went to, from where, and the words that went — edited or as drafted.
+pub(crate) fn sent_entry(name: &str, drafted: &str, sent: &str, from: &str) -> String {
+    let how = if drafted.trim() == sent.trim() {
+        "as drafted"
+    } else {
+        "edited"
+    };
+    format!(
+        "The person sent the draft for {name} from {from}, {how}: {}",
+        sent.trim()
+    )
+}
+
+/// Writes [`sent_entry`] into the log of the orchestrator speaking as `profile`.
+pub(crate) fn kept_sent(profile: &str, name: &str, drafted: &str, sent: &str, from: &str) {
+    let Ok(projects) = crate::live_sessions::recent_projects() else {
+        return;
+    };
+    let Some(folder) = projects
+        .iter()
+        .find(|one| one.orchestrator.as_deref() == Some(profile))
+        .map(|one| std::path::PathBuf::from(&one.root_path))
+    else {
+        return;
+    };
+    let entry = sent_entry(name, drafted, sent, from);
+    if let Err(why) = crate::orchestrator_notes::note(&folder, "sessions", &entry) {
+        devpit_core::reports::background("draft record", &why);
+    }
+}
+
+/// The draft waiting for the live session whose id is `session_id`, as
+/// (profile, name, text): the island knows a session only by its id.
+pub(crate) fn for_session(session_id: &str) -> Option<(String, String, String)> {
+    all().into_iter().find(|(profile, name, _)| {
+        crate::live_sessions::orchestrator_sessions_now(profile)
+            .map(|live| {
+                live.sessions
+                    .iter()
+                    .any(|one| &one.name == name && one.session_id.as_deref() == Some(session_id))
+            })
+            .unwrap_or(false)
+    })
+}
+
+/// `island.draft` — the reply drafted for a session the island shows, if any.
+#[tauri::command]
+#[specta::specta]
+pub async fn island_draft(session_id: String) -> Result<Option<String>, devpit_rpc::RpcError> {
+    crate::off_main::blocking(move || Ok(for_session(&session_id).map(|(_, _, text)| text))).await
+}
+
+/// `island.draft_send` — sends that draft into the session's terminal, as the person.
+#[tauri::command]
+#[specta::specta]
+pub async fn island_draft_send(session_id: String) -> Result<(), devpit_rpc::RpcError> {
+    crate::off_main::blocking(move || {
+        let (profile, name, text) = for_session(&session_id).ok_or_else(|| {
+            devpit_rpc::RpcError::new(
+                devpit_rpc::ErrorCode::NotFound,
+                "that draft is no longer waiting",
+            )
+        })?;
+        crate::live_sessions::reply_now(&profile, &name, &text, Some("the island"))
+    })
+    .await
+}
+
 /// Lets go of a session's draft: sent, or dropped by the person.
 pub(crate) fn forget(profile: &str, name: &str) {
     if let Ok(mut held) = drafts().lock() {

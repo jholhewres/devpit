@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { IslandSession } from '../gen/bindings'
 import { ask, commands } from '../shell/live'
@@ -17,7 +17,21 @@ export function Reply({ session }: { session: IslandSession }): React.JSX.Elemen
   const [text, setText] = useState('')
   const [said, setSaid] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  /* What the orchestrator drafted for it, waiting on the person's click. */
+  const [draft, setDraft] = useState<string | null>(null)
+  useEffect(() => {
+    void ask(() => commands.islandDraft(session.sessionId)).then((answer) => setDraft(answer.data))
+  }, [session.sessionId, session.at])
   if (!session.paneId) return null
+
+  const sendDraft = (): void => {
+    setSending(true)
+    void ask(() => commands.islandDraftSend(session.sessionId)).then((answer) => {
+      setSending(false)
+      setSaid(answer.error ?? 'Draft sent, as you.')
+      if (!answer.error) setDraft(null)
+    })
+  }
 
   const send = (): void => {
     const words = text.trim()
@@ -32,6 +46,14 @@ export function Reply({ session }: { session: IslandSession }): React.JSX.Elemen
 
   return (
     <>
+      {draft && (
+        <div className="isl-draft">
+          <span className="isl-draft__t">Drafted for you: {draft}</span>
+          <button className="isl-draft__go" disabled={sending} onClick={sendDraft}>
+            Send
+          </button>
+        </div>
+      )}
       <form className="isl-reply" onSubmit={(event) => (event.preventDefault(), send())}>
         <input
           className="isl-reply__in"
