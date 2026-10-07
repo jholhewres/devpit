@@ -141,9 +141,9 @@ fn a_picture_past_the_text_ceiling_is_still_drawn() {
     assert!(url.starts_with("data:image/png;base64,"), "{}", &url[..40]);
 }
 
-/// Past its own ceiling a picture says so, rather than leaving the tab blank.
+/// Past the inline ceiling a picture is streamed (`media.rs`), not refused.
 #[test]
-fn a_picture_past_its_own_ceiling_says_why() {
+fn a_picture_past_the_inline_ceiling_is_left_to_the_stream() {
     let dir = tempfile::tempdir().expect("tempdir");
     let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
     png.resize(9 * 1024 * 1024, 7);
@@ -151,9 +151,8 @@ fn a_picture_past_its_own_ceiling_says_why() {
 
     let read = contents(dir.path(), "huge.png".to_owned()).expect("read");
     assert_eq!(read.kind, FileKind::Image);
-    assert!(read.data_url.is_none());
-    let why = read.not_shown.expect("a reason");
-    assert!(why.contains("this draws"), "{why}");
+    assert!(read.data_url.is_none(), "a 9 MB picture went inline");
+    assert!(read.not_shown.is_none(), "a picture that streams was refused");
 }
 
 /// Every format the pane draws comes back as a picture with its own type.

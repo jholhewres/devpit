@@ -7,6 +7,7 @@ import { ask, commands } from './live'
 import { Markdown } from './MarkdownView'
 import { PdfView } from './PdfView'
 import { Picture } from './Picture'
+import { Streamed } from './Streamed'
 import { useWorkspaceFile } from './useWorkspace'
 
 /*
@@ -75,6 +76,10 @@ export function WorkspaceFile({
         )}
 
         {kind === 'pdf' && file?.dataUrl && <PdfView dataUrl={file.dataUrl} fullPath={full} name={name} />}
+
+        {file && !file.notShown && ((kind === 'image' && !file.dataUrl) || kind === 'video' || kind === 'audio') && (
+          <Streamed key={`${full}:${file.readAt}`} kind={kind} projectId={null} path={full} name={name} size={file.bytes} />
+        )}
 
         {kind === 'markdown' && !source && <Markdown source={file?.text ?? ''} />}
 

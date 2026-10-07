@@ -107,11 +107,14 @@ pub(crate) fn contents(root: &Path, path: String) -> Result<FileContents, RpcErr
     let not_shown = match kind {
         // Its own ceiling, not the text one: a screenshot is past 2 MB more
         // often than not, and was refused as text before this was asked.
+        // Past the inline ceiling, a picture is streamed instead (`media.rs`).
+        FileKind::Image if too_big_to_draw(&path, bytes).is_some() => None,
         FileKind::Image | FileKind::Pdf => too_big_to_draw(&path, bytes).or_else(|| {
             let media = media_type(&path, kind, head);
             data_url = Some(format!("data:{media};base64,{}", BASE64.encode(&raw)));
             None
         }),
+        FileKind::Video | FileKind::Audio => None,
         FileKind::Binary => {
             past_the_ceiling(&path, bytes).or_else(|| Some(format!("{path} is not text")))
         }

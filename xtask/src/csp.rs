@@ -34,6 +34,11 @@ const MUST_BE_NONE: [&str; 1] = ["object-src"];
 /// network is framed.
 const FRAMES: [&str; 2] = ["mcpapp:", "http://mcpapp.localhost"];
 
+/// Pictures and media may also come from the scheme the viewer streams files
+/// on (`media.rs`), spelt both ways — and only pictures and media.
+const MEDIA: [&str; 1] = ["http://devpitmedia.localhost"];
+const MEDIA_DIRECTIVES: [&str; 2] = ["img-src", "media-src"];
+
 pub fn the_csp_forbids_what_the_app_never_needs(root: &Path) -> Vec<Finding> {
     let path = root.join("apps/desktop/tauri.conf.json");
     let Ok(text) = std::fs::read_to_string(&path) else {
@@ -133,7 +138,8 @@ fn refusals(policy: &str, allowed: &[&str]) -> Vec<String> {
                 || source.starts_with("https://")
                 || source.starts_with("ws://")
                 || source.starts_with("wss://");
-            if remote && !allowed.contains(&source) {
+            let media = MEDIA_DIRECTIVES.contains(&name) && MEDIA.contains(&source);
+            if remote && !allowed.contains(&source) && !media {
                 said.push(format!("{name} reaches {source}"));
             }
             if source == "https:" || source == "http:" {

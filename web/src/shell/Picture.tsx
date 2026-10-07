@@ -13,6 +13,9 @@ import { bytes } from './disk'
 
 export function Picture({ src, name, size }: { src: string; name: string; size: number | null }): React.JSX.Element {
   const [broken, setBroken] = useState(false)
+  /* Fitted to the pane, or at its own size: a click switches. */
+  const [actual, setActual] = useState(false)
+  const [drawn, setDrawn] = useState<{ width: number; height: number } | null>(null)
 
   if (broken) {
     return (
@@ -24,8 +27,17 @@ export function Picture({ src, name, size }: { src: string; name: string; size: 
   }
   return (
     <div className="media">
-      <img className="media__img" src={src} alt={name} onError={() => setBroken(true)} />
-      <div className="media__what">{bytes(size)}</div>
+      <img
+        className="media__img"
+        data-actual={actual || undefined}
+        src={src}
+        alt={name}
+        title={actual ? 'Click to fit the pane' : 'Click for its own size'}
+        onClick={() => setActual((was) => !was)}
+        onLoad={(event) => setDrawn({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
+        onError={() => setBroken(true)}
+      />
+      <div className="media__what">{[drawn && `${drawn.width} × ${drawn.height}`, bytes(size)].filter(Boolean).join(' · ')}</div>
     </div>
   )
 }

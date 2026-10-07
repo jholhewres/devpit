@@ -111,6 +111,7 @@ mod live;
 mod mcp;
 mod mcp_health;
 mod mcp_reading;
+mod media;
 mod moving;
 mod notices;
 mod off_main;
@@ -260,6 +261,17 @@ fn main() {
         // A page that came with an MCP tool, on an origin of its own.
         .register_uri_scheme_protocol("mcpapp", |ctx, request| {
             mcp_apps::serve(ctx.app_handle(), request.uri().path())
+        })
+        // Video, audio and big pictures, in the ranges a player asks for; off
+        // the main thread, which a file read must never hold.
+        .register_asynchronous_uri_scheme_protocol(media::SCHEME, |_ctx, request, responder| {
+            let path = request.uri().path().to_owned();
+            let range = request
+                .headers()
+                .get("range")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned);
+            std::thread::spawn(move || responder.respond(media::serve(&path, range.as_deref())));
         })
         .manage(steering::Steering::default())
         .manage(asking::Asking::default())

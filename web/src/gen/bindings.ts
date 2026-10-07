@@ -1148,6 +1148,11 @@ export const commands = {
 	 */
 	pathImport: (projectId: string, worktreeId: string | null, folder: string, sources: string[]) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_import", { projectId, worktreeId, folder, sources })),
 	mcpHealth: (projectId: string | null) => typedError<McpHealth, RpcError>(__TAURI_INVOKE("mcp_health", { projectId })),
+	/**
+	 *  `media.open` — a token the window streams a file by: a project's file by
+	 *  its relative path, or an absolute one the viewer may read.
+	 */
+	mediaOpen: (projectId: string | null, path: string) => typedError<string, RpcError>(__TAURI_INVOKE("media_open", { projectId, path })),
 	/**  `agent.health` — whether devpit's own MCP answers, checked now. */
 	agentHealth: () => typedError<AgentHealth, RpcError>(__TAURI_INVOKE("agent_health")),
 	/**  `agent.restart` — opens devpit's own MCP again, without restarting the app. */
@@ -2464,6 +2469,8 @@ export type FileIndex = {
 
 /**  What a file is, so the screen knows what to draw rather than guessing. */
 export type FileKind = "text" | "markdown" | "image" | "pdf" | 
+/**  Streamed through `devpitmedia:`, never sent inline. */
+"video" | "audio" | 
 /**  Nothing this window can draw. The screen says which type and how big. */
 "binary";
 

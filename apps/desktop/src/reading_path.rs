@@ -21,7 +21,20 @@ pub async fn path_read(path: String) -> Result<FileContents, RpcError> {
 
 /// [`path_read`], on the calling thread.
 pub(crate) fn path_read_now(path: String) -> Result<FileContents, RpcError> {
-    let target = crate::reveal::allowed(&path)?;
+    let target = viewable(&path)?;
+    let (Some(folder), Some(name)) = (target.parent(), target.file_name()) else {
+        return Err(RpcError::new(ErrorCode::Invalid, "that is not a file"));
+    };
+    let mut read = crate::files::contents(folder, name.to_string_lossy().into_owned())?;
+    // Named as it was asked for, which is what the tab and its title show.
+    read.path = path;
+    Ok(read)
+}
+
+/// An absolute path the viewer may read, resolved: the rule `path.read` and
+/// the media it streams share.
+pub(crate) fn viewable(path: &str) -> Result<PathBuf, RpcError> {
+    let target = crate::reveal::allowed(path)?;
     let store = Store::open_default()?;
     let projects: Vec<PathBuf> = store
         .projects()?
@@ -40,13 +53,7 @@ pub(crate) fn path_read_now(path: String) -> Result<FileContents, RpcError> {
             "that file is not one the viewer opens: it may hold a secret",
         ));
     }
-    let (Some(folder), Some(name)) = (target.parent(), target.file_name()) else {
-        return Err(RpcError::new(ErrorCode::Invalid, "that is not a file"));
-    };
-    let mut read = crate::files::contents(folder, name.to_string_lossy().into_owned())?;
-    // Named as it was asked for, which is what the tab and its title show.
-    read.path = path;
-    Ok(read)
+    Ok(target)
 }
 
 /// A name that says it holds a credential, wherever it is.

@@ -7,6 +7,8 @@ import { ask, commands } from './live'
 import { Markdown } from './MarkdownView'
 import { PdfView } from './PdfView'
 import { Picture } from './Picture'
+import { went } from './problems'
+import { Streamed } from './Streamed'
 import type { Tab } from './strip'
 import { useFile } from './useFile'
 import { useShell } from './useShell'
@@ -21,7 +23,7 @@ import { useWantedLine } from './revealLine'
  */
 
 export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { close, active, markUnsaved } = useShell()
+  const { close, active, markUnsaved, project } = useShell()
   const path = tab.path ?? null
   const edit = useFile(path)
   const line = useWantedLine(path, edit.file !== null)
@@ -103,17 +105,26 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
           <div className="exempty">
             <span className="exempty__t">{edit.file.notShown}</span>
             <span className="exempty__d">{bytes(edit.file.bytes) ?? 'empty'}</span>
-            <button
-              className="btn"
-              onClick={() => void ask(() => commands.pathReveal(edit.file!.fullPath))}
-            >
-              Show in the finder
-            </button>
+            <span className="voice__row">
+              <button className="btn" onClick={() => void ask(() => commands.pathOpen(edit.file!.fullPath)).then(went)}>
+                Open in the system app
+              </button>
+              <button
+                className="btn"
+                onClick={() => void ask(() => commands.pathReveal(edit.file!.fullPath))}
+              >
+                Show in the finder
+              </button>
+            </span>
           </div>
         )}
 
         {kind === 'image' && edit.file?.dataUrl && (
           <Picture key={`${path}:${edit.file.readAt}`} src={edit.file.dataUrl} name={name} size={edit.file.bytes} />
+        )}
+
+        {path && edit.file && !edit.file.notShown && ((kind === 'image' && !edit.file.dataUrl) || kind === 'video' || kind === 'audio') && (
+          <Streamed key={`${path}:${edit.file.readAt}`} kind={kind} projectId={project?.id ?? null} path={path} name={name} size={edit.file.bytes} />
         )}
 
         {kind === 'pdf' && edit.file?.dataUrl && <PdfView dataUrl={edit.file.dataUrl} fullPath={edit.file.fullPath} name={name} />}

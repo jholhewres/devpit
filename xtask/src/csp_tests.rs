@@ -111,3 +111,16 @@ fn scripts_have_to_come_from_the_app_itself() {
         "default-src 'self' alone is a fine answer for scripts"
     );
 }
+
+/// The viewer's stream may feed pictures and media, and nothing else.
+#[test]
+fn the_media_scheme_reaches_pictures_and_media_only() {
+    let base = "default-src 'self'; frame-src 'none'; object-src 'none'";
+    let media = format!("{base}; img-src 'self' http://devpitmedia.localhost; media-src http://devpitmedia.localhost");
+    assert!(refusals(&media, &[]).is_empty(), "{:?}", refusals(&media, &[]));
+    let elsewhere = format!("{base}; connect-src http://devpitmedia.localhost");
+    assert!(
+        refusals(&elsewhere, &[]).iter().any(|why| why.contains("connect-src reaches")),
+        "the media scheme was let into connect-src"
+    );
+}

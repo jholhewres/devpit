@@ -11,6 +11,9 @@ pub enum FileKind {
     Markdown,
     Image,
     Pdf,
+    /// Streamed through `devpitmedia:`, never sent inline.
+    Video,
+    Audio,
     /// Nothing this window can draw. The screen says which type and how big.
     Binary,
 }
