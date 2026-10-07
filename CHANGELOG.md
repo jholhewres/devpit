@@ -3,6 +3,71 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.38 — 2026-10-07
+
+### Sessions
+
+- **A command can be sent to a session.** *Send command…* in the Sessions
+  panel offers `/remote-control`, `/compact`, `/clear`, `/model`, `/status`
+  and `/cost`, or one written by hand, and types it in the session's terminal
+  as you once you confirm it.
+- **Sessions that ended stay in reach.** The Sessions panel lists them under
+  *Ended*: when, whether you or the orchestrator stopped them, what each said
+  last and files left uncommitted in its folder. *Resume* opens the same
+  conversation in a new terminal of its project, in the folder it ran in.
+- **Stopping a session that is working, or has work not committed, asks
+  again** and says why, with *Stop anyway*.
+
+### Orchestrator
+
+- **"Send it" sends the draft.** Said alone in the orchestrator's chat (also
+  *envie* or *manda*), it sends the one draft waiting. The island shows a
+  session's draft with *Send* too, and every draft sent is recorded in the
+  orchestrator's sessions log: to whom, from where, and whether it was edited.
+- **It reads and resumes sessions that ended**, and a stop it asks for is
+  refused while a session is working or has work not committed, unless the
+  person said so.
+
+### devpit's own MCP
+
+- **It is checked every 30 seconds and restarts by itself** when it stops
+  answering, without restarting the app or dropping the orchestrator's chat;
+  the bell says so. A *devpit* chip in the footer shows how fast it answers,
+  with *Restart MCP*.
+
+### Remote
+
+- **A terminal's key bar has Claude Code's commands**, each confirmed first;
+  the orchestrator's drafts are sent from the *waiting* tab; devpit's MCP is
+  restarted from there too.
+- **Add to devpit.app** puts this machine on devpit.app/remote. Only its
+  address goes, in the link's fragment — no token.
+
+### Files
+
+- **Video and audio play in a tab**, with seeking: MP4, MOV, WebM, MP3, WAV,
+  Ogg and FLAC. They are streamed from devpit, never sent whole.
+- **Pictures past 8 MB open** instead of being refused. A click switches
+  between fitting the pane and the picture's own size, with its dimensions
+  under it. A file devpit cannot show offers the system's app.
+
+### Settings
+
+- **Voice tests the microphone in place**: three seconds through the same
+  microphone and engine a chat uses, and what was heard. With whisper.cpp,
+  *Download base model* fetches one and chooses it.
+- **Remote shows what paired devices did lately**, never what they saw.
+- **Decisions** (new, off by default): typed decisions by Jev, with your own
+  key, model, a daily cap and a switch per project. Agents ask through
+  `devpit_decide` and `devpit_rubric_run`. Nothing is sent without a key.
+
+### Fixes
+
+- **Moving a card into a lane that runs a step no longer fails with
+  "database is locked"** or takes over 30 seconds while agents are working.
+- **A session restored after a restart continues its conversation** on the
+  default Claude account; it used to start afresh.
+
 ## 0.1.37 — 2026-10-07
 
 ### Chat
