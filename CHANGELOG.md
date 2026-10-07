@@ -3,13 +3,19 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
-## 0.1.37 — 2026-10-05
+## 0.1.37 — 2026-10-07
 
 ### Chat
 
 - **A document opened from an answer is resized by its edge**, and the chat
   narrows beside it instead of running on underneath. The chat's buttons
   stay over the chat, and the document's own over the document.
+
+### Fixes
+
+- **A page in a browser pane no longer draws over the Manager, Settings or
+  the command palette.** It steps aside while one is open and comes back
+  when it closes, as it does when its tab is not the one showing.
 
 ## 0.1.36 — 2026-10-05
 
