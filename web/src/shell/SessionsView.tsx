@@ -11,6 +11,7 @@ import { opened } from './strip'
 import { remember, remembered } from './tabs'
 import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { useShell } from './useShell'
+import { EndedSessions } from './EndedSessions'
 import { SessionCommand } from './SessionCommand'
 import { REMOTE_CONTROL } from './sessionCommands'
 import { SessionCost } from './SessionCost'
@@ -43,6 +44,9 @@ export function since(ms: number | null, now: number): string | null {
   const hours = Math.round(minutes / 60)
   return hours < 24 ? `${hours} h` : `${Math.round(hours / 24)} d`
 }
+
+/** Whether a stop was refused because it would lose work, and asks again. */
+export const wouldLose = (error: string | null): boolean => Boolean(error?.endsWith('stop it anyway?'))
 
 /** A row's own key: a name started twice is two sessions, and keyed by name
  *  they opened and closed as one. */
@@ -123,11 +127,15 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
     })
   }
 
-  const stop = (one: LiveSession): void => {
+  /* Asked again when it would lose work: working, or files not committed. */
+  const [losing, setLosing] = useState<{ row: string; why: string } | null>(null)
+  const stop = (one: LiveSession, force = false): void => {
     if (!profileId) return
-    void ask(() => commands.orchestratorStop(profileId, one.name)).then((done) => {
-      setSaid(done.error ?? done.data ?? null)
+    void ask(() => commands.orchestratorStop(profileId, one.name, force)).then((done) => {
       setStopping(null)
+      if (wouldLose(done.error)) return setLosing({ row: rowOf(one), why: done.error! })
+      setLosing(null)
+      setSaid(done.error ?? done.data ?? null)
       refreshSessions(profileId)
     })
   }
@@ -306,6 +314,13 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                     <button className="sess__btn sess__btn--bad" onClick={() => stop(one)}>Stop</button>
                   </div>
                 )}
+                {losing?.row === rowOf(one) && (
+                  <div className="sess__acts sess__stopask">
+                    <span className="sess__warn">{losing.why}</span>
+                    <button className="sess__btn" onClick={() => setLosing(null)}>Keep it</button>
+                    <button className="sess__btn sess__btn--bad" onClick={() => stop(one, true)}>Stop anyway</button>
+                  </div>
+                )}
                 {expanded && (
                   <Details
                     session={one}
@@ -320,6 +335,8 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
           })}
         </section>
       ))}
+
+      {profileId && <EndedSessions profileId={profileId} running={sessions.length} />}
 
       {earlier.length > 0 && (
         <section className="sess__group">
@@ -375,11 +392,14 @@ function Details({
   /* Stopping asks once, in place: work in flight is lost. */
   const [stopping, setStopping] = useState(false)
 
-  const stop = (): void => {
+  const [losing, setLosing] = useState<string | null>(null)
+  const stop = (force = false): void => {
     if (!profileId) return
-    void ask(() => commands.orchestratorStop(profileId, session.name)).then((done) => {
-      setSaid(done.error ?? done.data ?? null)
+    void ask(() => commands.orchestratorStop(profileId, session.name, force)).then((done) => {
       setStopping(false)
+      if (wouldLose(done.error)) return setLosing(done.error)
+      setLosing(null)
+      setSaid(done.error ?? done.data ?? null)
       refreshSessions(profileId)
     })
   }
@@ -434,7 +454,13 @@ function Details({
           <>
             <span className="sess__warn">Stop it and close its terminal? Work in flight is lost.</span>
             <button className="sess__btn" onClick={() => setStopping(false)}>Keep it</button>
-            <button className="sess__btn sess__btn--bad" onClick={stop}>Stop</button>
+            <button className="sess__btn sess__btn--bad" onClick={() => stop()}>Stop</button>
+          </>
+        ) : losing ? (
+          <>
+            <span className="sess__warn">{losing}</span>
+            <button className="sess__btn" onClick={() => setLosing(null)}>Keep it</button>
+            <button className="sess__btn sess__btn--bad" onClick={() => stop(true)}>Stop anyway</button>
           </>
         ) : (
           <>

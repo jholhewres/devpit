@@ -317,6 +317,10 @@ pub(crate) struct Running {
     pub pane: Option<devpit_rpc::LivePane>,
     /// When it is a background session, the id its CLI stops it by.
     pub job: Option<String>,
+    /// `busy` or `idle`, the CLI's word.
+    pub status: String,
+    pub cwd: String,
+    pub session_id: Option<String>,
 }
 
 /// Every live session of this account called `name`. More than one is
@@ -344,6 +348,9 @@ pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>
             job: listed
                 .job_id
                 .filter(|_| listed.kind.as_deref() == Some("bg")),
+            status: listed.status.unwrap_or_default(),
+            cwd: listed.cwd.unwrap_or_default(),
+            session_id: listed.session_id,
         })
         .collect();
     if found.is_empty() {
@@ -466,6 +473,7 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // trust question, most often.
     let early = crate::starting::unlisted(profile_id, &sessions, screen);
     sessions.extend(early);
+    crate::ended_sessions::remember(profile_id, &sessions);
     for one in &mut sessions {
         one.draft = crate::reply_drafts::drafted(profile_id, &one.name);
     }

@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 28] = [
+pub(crate) const METHODS: [&str; 29] = [
     "context",
     "board",
     "card",
@@ -71,6 +71,7 @@ pub(crate) const METHODS: [&str; 28] = [
     "finish_card",
     "propose_project",
     "health",
+    "resume",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -197,10 +198,30 @@ fn respond_in(
         "sessions" => {
             let profile = orchestrating(here)?;
             let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
-            return Ok(json!(crate::orchestrator_links::reachable(
-                here,
-                live.sessions
-            )));
+            let running = json!(crate::orchestrator_links::reachable(here, live.sessions));
+            if asked.params.get("include_ended").and_then(Value::as_bool) != Some(true) {
+                return Ok(running);
+            }
+            let linked = crate::orchestrator_links::linked(Path::new(&here.root_path));
+            let ended: Vec<_> = crate::ended_sessions::ended_now(profile)
+                .map_err(said)?
+                .sessions
+                .into_iter()
+                .filter(|one| {
+                    one.project_id
+                        .as_deref()
+                        .is_some_and(|id| id == here.id || linked.iter().any(|link| link == id))
+                })
+                .collect();
+            return Ok(json!({ "running": running, "ended": ended }));
+        }
+        "resume" => {
+            let profile = orchestrating(here)?;
+            let app = app.ok_or("devpit's window is not running")?;
+            let session = text("session").ok_or("which session? pass its name or sessionId")?;
+            ended_in_reach(here, profile, &session)?;
+            return crate::ended_sessions::resume(app, profile, &session, text("name").as_deref())
+                .map_err(said);
         }
         "stop" => {
             let profile = orchestrating(here)?;
@@ -212,12 +233,14 @@ fn respond_in(
                 .get("pid")
                 .and_then(Value::as_i64)
                 .map(|pid| pid as i32);
-            return crate::stopping::stop(app, profile, &name, pid).map_err(said);
+            let force = asked.params.get("force").and_then(Value::as_bool) == Some(true);
+            return crate::stopping::stop(app, profile, &name, pid, "orchestrator", force)
+                .map_err(said);
         }
         "transcript" => {
             let profile = orchestrating(here)?;
             let name = text("name").ok_or("which session? pass its name")?;
-            in_reach(here, profile, &name)?;
+            in_reach(here, profile, &name).or_else(|_| ended_in_reach(here, profile, &name))?;
             let last = asked
                 .params
                 .get("last")
@@ -530,6 +553,17 @@ fn in_reach(here: &Project, profile: &str, name: &str) -> Result<(), String> {
         .any(|one| one.name == name)
         .then_some(())
         .ok_or_else(|| format!("{name} is not running in a project linked to this orchestrator"))
+}
+
+/// Whether an ended session of `profile` ran in `here` or a project linked to it.
+fn ended_in_reach(here: &Project, profile: &str, id_or_name: &str) -> Result<(), String> {
+    let row = crate::ended_sessions::ended_one(profile, id_or_name).map_err(said)?;
+    let linked = crate::orchestrator_links::linked(Path::new(&here.root_path));
+    row.project_id
+        .as_deref()
+        .is_some_and(|id| id == here.id || linked.iter().any(|one| one == id))
+        .then_some(())
+        .ok_or_else(|| format!("{id_or_name} did not run in a project linked to this orchestrator"))
 }
 
 fn said(err: RpcError) -> String {

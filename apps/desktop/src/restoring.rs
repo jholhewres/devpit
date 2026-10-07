@@ -69,7 +69,7 @@ fn resume_line(agent: &PaneAgent) -> Result<String, devpit_rpc::RpcError> {
     ))
 }
 
-fn resume_flag_of(launch: &str) -> Option<&'static str> {
+pub(crate) fn resume_flag_of(launch: &str) -> Option<&'static str> {
     let base = crate::projects::store()
         .ok()
         .and_then(|store| crate::agent_profiles::all(&store).ok())
@@ -83,7 +83,7 @@ fn resume_flag_of(launch: &str) -> Option<&'static str> {
 ///
 /// The id is typed into a shell, so anything but a session id's own
 /// characters is refused rather than quoted.
-fn with_resume(start: &str, flag: Option<&str>, session: Option<&str>) -> String {
+pub(crate) fn with_resume(start: &str, flag: Option<&str>, session: Option<&str>) -> String {
     let plain = |id: &&str| {
         !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
     };

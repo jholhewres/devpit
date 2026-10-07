@@ -20,9 +20,10 @@ pub async fn orchestrator_stop(
     app: AppHandle,
     profile_id: String,
     name: String,
+    force: bool,
 ) -> Result<String, RpcError> {
     crate::off_main::blocking(move || {
-        stop(&app, &profile_id, &name, None)
+        stop(&app, &profile_id, &name, None, "person", force)
             .map(|said| said["stopped"].as_str().unwrap_or_default().to_owned())
     })
     .await
@@ -84,15 +85,33 @@ pub(crate) fn close_pane(
     Ok(tab_id)
 }
 
+/// Why stopping a session would lose work, if it would: it is working, or
+/// its folder holds changes not committed.
+pub(crate) fn would_lose(name: &str, busy: bool, dirty: Option<u32>) -> Option<String> {
+    let dirty = dirty.filter(|files| *files > 0);
+    let why = match (busy, dirty) {
+        (false, None) => return None,
+        (true, None) => "it is working right now".to_owned(),
+        (false, Some(files)) => format!("its folder has {files} file(s) not committed"),
+        (true, Some(files)) => {
+            format!("it is working right now and its folder has {files} file(s) not committed")
+        }
+    };
+    Some(format!("{name}: {why} — stop it anyway?"))
+}
+
 /// Stops the sessions called `name` of this account — every one, since a
 /// name started twice is one name to the person — and closes their terminals.
 /// With `only`, the one process of that name; without, every one — a name
-/// handed twice before names were unique is one piece of work.
+/// handed twice before names were unique is one piece of work. One working,
+/// or with work not committed, is stopped only with `force`.
 pub(crate) fn stop(
     app: &AppHandle,
     profile_id: &str,
     name: &str,
     only: Option<i32>,
+    by: &str,
+    force: bool,
 ) -> Result<Value, RpcError> {
     let found: Vec<_> = crate::live_sessions::running_named(profile_id, name)?
         .into_iter()
@@ -103,6 +122,21 @@ pub(crate) fn stop(
             ErrorCode::NotFound,
             format!("no session called {name} is running with that process"),
         ));
+    }
+    if !force {
+        let busy = found.iter().any(|one| one.status == "busy");
+        let dirty = found
+            .iter()
+            .filter_map(|one| crate::ended_sessions::dirty_in(&one.cwd))
+            .max();
+        if let Some(why) = would_lose(name, busy, dirty) {
+            return Err(RpcError::new(ErrorCode::Conflict, why));
+        }
+    }
+    if let Ok(store) = crate::projects::store() {
+        for id in found.iter().filter_map(|one| one.session_id.as_deref()) {
+            let _ = store.session_stopped(id, by, crate::ended_sessions::now_secs());
+        }
     }
     let mut terminal = Value::Null;
     for one in &found {

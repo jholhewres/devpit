@@ -158,7 +158,13 @@ function register() {
   const dir = join(home, '.claude', 'sessions')
   mkdirSync(dir, { recursive: true })
   const file = join(dir, `${process.pid}.json`)
-  writeFileSync(file, JSON.stringify({ pid: process.pid, name: valueOf('--name') ?? `stub-${process.pid}`, status: 'idle', kind: 'interactive', cwd: process.cwd(), tmux: client }))
+  // Resumed, it keeps the conversation's id, and its transcript is where the CLI keeps one.
+  const sessionId = valueOf('--resume') ?? `00000000-0000-4000-8000-${String(process.pid).padStart(12, '0')}`
+  const folder = join(home, '.claude', 'projects', process.cwd().replace(/[^A-Za-z0-9]/g, '-'))
+  mkdirSync(folder, { recursive: true })
+  const said = { type: 'assistant', sessionId, cwd: process.cwd(), timestamp: new Date().toISOString(), message: { id: `m-${sessionId}`, role: 'assistant', content: [{ type: 'text', text: 'Phase 1 is half done.' }] } }
+  appendFileSync(join(folder, `${sessionId}.jsonl`), `${JSON.stringify(said)}\n`)
+  writeFileSync(file, JSON.stringify({ pid: process.pid, name: valueOf('--name') ?? `stub-${process.pid}`, status: 'idle', kind: 'interactive', cwd: process.cwd(), tmux: client, sessionId }))
   return file
 }
 

@@ -678,4 +678,27 @@ CREATE TABLE finding_dismissal (
 );
 "#,
     },
+    // Migration 026 — the sessions an orchestrator's account was seen running.
+    Migration {
+        version: 26,
+        sql: r#"
+-- The CLI lists only sessions alive now; this keeps the ones that ended, so
+-- they can be read and resumed. No foreign keys: a project removed since does
+-- not take a session's record with it.
+CREATE TABLE seen_session (
+    session_id    TEXT PRIMARY KEY,
+    profile_id    TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    cwd           TEXT NOT NULL,
+    project_id    TEXT,
+    card_id       TEXT,
+    first_seen_at INTEGER NOT NULL,
+    last_seen_at  INTEGER NOT NULL,
+    last_status   TEXT,
+    ended_at      INTEGER,
+    ended_by      TEXT
+);
+CREATE INDEX seen_session_ended ON seen_session(profile_id, ended_at);
+"#,
+    },
 ];

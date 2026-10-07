@@ -25,6 +25,7 @@ vi.mock('./live', () => ({
     orchestratorReply: (...args: unknown[]) => (replied(...args), null),
     orchestratorLinks: () => ['p'],
     orchestratorStop: () => 'stopped',
+    orchestratorEnded: () => ({ sessions: [] }),
   },
 }))
 vi.mock('./useShell', () => ({

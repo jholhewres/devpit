@@ -20,6 +20,7 @@ mod projects;
 mod reminders;
 mod runs;
 pub mod search_index;
+mod seen_sessions;
 mod session_links;
 pub mod settings;
 mod spend;
@@ -61,6 +62,7 @@ pub use cards::{AttachmentRow, CommentRow, NoticeRow};
 pub use evidence::{Evidence, EvidenceError, Ran, MOST_EVIDENCE};
 pub use layouts::{CardTabLayout, PaneLayoutWrite};
 pub use runs::RunRow;
+pub use seen_sessions::{SeenSessionRow, SessionSeen};
 pub use session_links::SessionLink;
 pub use whose_run::{Asked, Carried, WhoseRun};
 /// The ceilings on anything read from outside, in one place.
@@ -233,11 +235,8 @@ impl Store {
     }
 }
 
-/// A transaction that holds the write lock from its `BEGIN`.
-///
-/// A deferred one that reads first finds its snapshot stale once another
-/// connection commits, and SQLite refuses its write without waiting. Taken up
-/// front, `busy_timeout` waits for the other writer instead.
+/// A transaction holding the write lock from `BEGIN`: a deferred one that read
+/// first is refused, without waiting, once another connection commits.
 pub(crate) fn writing(conn: &Connection) -> Result<Transaction<'_>, StoreError> {
     Ok(Transaction::new_unchecked(
         conn,

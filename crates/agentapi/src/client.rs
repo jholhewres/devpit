@@ -17,7 +17,7 @@ const STARTING: Duration = Duration::from_secs(90);
 
 /// How long devpit has to answer one question.
 pub fn wait_for(method: &str) -> Duration {
-    if method == "start" {
+    if method == "start" || method == "resume" {
         STARTING
     } else {
         WAIT

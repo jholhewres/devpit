@@ -284,6 +284,27 @@ describe('the orchestrator', () => {
     assert.ok(reached, `the command never reached the session. It shows: ${screen().slice(-300)}`)
     tmux(home, 'send-keys', '-t', target, '-l', '/exit')
     tmux(home, 'send-keys', '-t', target, 'Enter')
+
+    // Ended, it is still listed, read and resumed as the same conversation.
+    const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
+    const ended = await window
+      .wait(async () => {
+        const said = await ask('sessions', { include_ended: true }, orchestrator)
+        return said.ok?.ended?.find((one) => one.name === 'commanded-stub') ?? false
+      }, 20000)
+      .catch(() => null)
+    assert.ok(ended, 'the session that ended is not listed')
+    const read = await ask('transcript', { name: 'commanded-stub' }, orchestrator)
+    assert.deepEqual(read.ok?.replies, ['Phase 1 is half done.'], `its transcript was not read: ${JSON.stringify(read)}`)
+    const resumed = await ask('resume', { session: ended.sessionId }, orchestrator)
+    assert.equal(resumed.ok?.name, 'commanded-stub', `it was not resumed: ${JSON.stringify(resumed)}`)
+    const log = join(home, '.claude', 'stub-calls.log')
+    const again = await window
+      .wait(() => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)).find((call) => call.argv?.includes('--resume') && call.argv.includes(ended.sessionId)), 20000)
+      .catch(() => null)
+    assert.ok(again, 'the conversation was not resumed by its id')
+    assert.equal(again.cwd, ended.cwd, 'it was resumed in another folder')
+    assert.ok((await ask('stop', { name: 'commanded-stub', force: true }, orchestrator)).ok, 'the resumed session could not be stopped')
   })
 
   test("restarts devpit's own MCP without restarting the app", async () => {

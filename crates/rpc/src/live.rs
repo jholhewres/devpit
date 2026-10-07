@@ -58,6 +58,44 @@ pub struct LiveSessions {
     pub sessions: Vec<LiveSession>,
 }
 
+/// A session of the account that ran and ended, as devpit saw it.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EndedSession {
+    pub session_id: String,
+    pub name: String,
+    pub cwd: String,
+    pub project_id: Option<String>,
+    pub project_name: Option<String>,
+    pub card_id: Option<String>,
+    /// When it was first and last seen running, in ms since the epoch.
+    pub started_at: f64,
+    pub ended_at: f64,
+    /// `orchestrator` or `person` when one of them stopped it; otherwise it
+    /// ended by itself, or with the machine.
+    pub ended_by: Option<String>,
+    /// `busy` or `idle`, as it was last seen.
+    pub last_status: Option<String>,
+    /// Files changed and not committed in its folder now, when it is a repository.
+    pub dirty: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EndedSessions {
+    pub sessions: Vec<EndedSession>,
+}
+
+/// What a session said last, read from its transcript.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTold {
+    /// Its latest replies, oldest first.
+    pub replies: Vec<String>,
+    /// The latest prompts it was given, oldest first.
+    pub prompts: Vec<String>,
+}
+
 /// Whether an orchestrator's conversation can be reached by Remote Control,
 /// and where.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

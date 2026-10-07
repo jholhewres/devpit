@@ -70,7 +70,8 @@ pub use island::{
     IslandQuestion, IslandRect, IslandSession, IslandStep, IslandVerdict, Touch,
 };
 pub use live::{
-    LivePane, LiveSession, LiveSessions, PendingPrompt, ProjectProposal, PromptOption, RemoteState,
+    EndedSession, EndedSessions, LivePane, LiveSession, LiveSessions, PendingPrompt,
+    ProjectProposal, PromptOption, RemoteState, SessionTold,
 };
 pub use mcp_health::{AgentHealth, McpHealth, McpServerHealth, McpState};
 pub use pause::Paused;

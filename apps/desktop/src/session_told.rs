@@ -26,7 +26,8 @@ struct Listed {
     cwd: Option<String>,
 }
 
-/// The transcript of the live session called `name`, under this profile.
+/// The transcript of the session called `name` under this profile: the live
+/// one, or the latest that ran here and ended.
 pub(crate) fn transcript_of(profile_id: &str, name: &str) -> Result<Option<PathBuf>, RpcError> {
     let config = crate::live_sessions::config_of(profile_id)?;
     let found = std::fs::read_dir(config.join("sessions"))
@@ -40,13 +41,18 @@ pub(crate) fn transcript_of(profile_id: &str, name: &str) -> Result<Option<PathB
         .find(|one| {
             one.name.as_deref() == Some(name) && one.pid.is_some_and(crate::live_sessions::alive)
         });
-    Ok(found.and_then(|one| {
-        let id = one.session_id.filter(|id| crate::adopting::plain(id))?;
-        Some(devpit_agentcli::transcript_path(
-            &config,
-            Path::new(&one.cwd?),
-            &id,
-        ))
+    let live = found.and_then(|one| Some((one.session_id?, one.cwd?)));
+    let ended = || {
+        crate::projects::store()
+            .ok()?
+            .seen_session(profile_id, name)
+            .ok()
+            .flatten()
+            .map(|row| (row.session_id, row.cwd))
+    };
+    Ok(live.or_else(ended).and_then(|(id, cwd)| {
+        crate::adopting::plain(&id)
+            .then(|| devpit_agentcli::transcript_path(&config, Path::new(&cwd), &id))
     }))
 }
 
@@ -95,7 +101,7 @@ pub(crate) fn told(messages: &[Message], last: usize) -> Value {
 pub(crate) fn told_by(profile_id: &str, name: &str, last: usize) -> Result<Value, String> {
     let path = transcript_of(profile_id, name)
         .map_err(|err| err.message)?
-        .ok_or_else(|| format!("no session called {name} is running"))?;
+        .ok_or_else(|| format!("no session called {name} is running or has run here"))?;
     if !path.is_file() {
         return Ok(
             json!({ "replies": [], "prompts": [], "messages": 0, "note": "it has written no transcript yet" }),

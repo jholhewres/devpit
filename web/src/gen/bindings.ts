@@ -292,7 +292,7 @@ export const commands = {
 	 */
 	orchestratorAgents: (projectId: string) => typedError<AgentThread[], RpcError>(__TAURI_INVOKE("orchestrator_agents", { projectId })),
 	/**  `orchestrator.stop` — the window's own way to stop a session. */
-	orchestratorStop: (profileId: string, name: string) => typedError<string, RpcError>(__TAURI_INVOKE("orchestrator_stop", { profileId, name })),
+	orchestratorStop: (profileId: string, name: string, force: boolean) => typedError<string, RpcError>(__TAURI_INVOKE("orchestrator_stop", { profileId, name, force })),
 	/**
 	 *  `terminal.close` — a devpit terminal closed from outside its tab: the
 	 *  pane, or its tab when it is the last one, and whatever runs in it.
@@ -1134,6 +1134,12 @@ export const commands = {
 	agentHealth: () => typedError<AgentHealth, RpcError>(__TAURI_INVOKE("agent_health")),
 	/**  `agent.restart` — opens devpit's own MCP again, without restarting the app. */
 	agentRestart: () => typedError<AgentHealth, RpcError>(__TAURI_INVOKE("agent_restart")),
+	/**  `orchestrator.ended` — what this account ran that has ended. */
+	orchestratorEnded: (profileId: string) => typedError<EndedSessions, RpcError>(__TAURI_INVOKE("orchestrator_ended", { profileId })),
+	/**  `orchestrator.resume` — the person resumes an ended session. */
+	orchestratorResume: (profileId: string, sessionId: string) => typedError<string, RpcError>(__TAURI_INVOKE("orchestrator_resume", { profileId, sessionId })),
+	/**  `orchestrator.told` — what a session said last, running or ended. */
+	orchestratorTold: (profileId: string, session: string) => typedError<SessionTold, RpcError>(__TAURI_INVOKE("orchestrator_told", { profileId, session })),
 	/**
 	 *  `session.watch` — a background session, attached in a new terminal tab of
 	 *  its project: it ran under the CLI's own supervisor, where nobody could see
@@ -2329,6 +2335,32 @@ export type ElsewhereFile = {
 	path: string,
 	/**  Still differs from its last commit there. */
 	uncommitted: boolean,
+};
+
+/**  A session of the account that ran and ended, as devpit saw it. */
+export type EndedSession = {
+	sessionId: string,
+	name: string,
+	cwd: string,
+	projectId: string | null,
+	projectName: string | null,
+	cardId: string | null,
+	/**  When it was first and last seen running, in ms since the epoch. */
+	startedAt: number | null,
+	endedAt: number | null,
+	/**
+	 *  `orchestrator` or `person` when one of them stopped it; otherwise it
+	 *  ended by itself, or with the machine.
+	 */
+	endedBy: string | null,
+	/**  `busy` or `idle`, as it was last seen. */
+	lastStatus: string | null,
+	/**  Files changed and not committed in its folder now, when it is a repository. */
+	dirty: number | null,
+};
+
+export type EndedSessions = {
+	sessions: EndedSession[],
 };
 
 /**
@@ -3913,6 +3945,14 @@ export type SessionLayout = {
 	projectId: string,
 	focusedId: string,
 	tree: LayoutNode,
+};
+
+/**  What a session said last, read from its transcript. */
+export type SessionTold = {
+	/**  Its latest replies, oldest first. */
+	replies: string[],
+	/**  The latest prompts it was given, oldest first. */
+	prompts: string[],
 };
 
 export type Settings = {

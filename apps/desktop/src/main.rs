@@ -83,6 +83,7 @@ mod contract;
 mod cycles;
 mod diagnostics;
 mod diffs;
+mod ended_sessions;
 mod error_reports;
 mod error_sender;
 mod files;
