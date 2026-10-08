@@ -81,3 +81,5 @@ pub const DECISIONS_DAILY_CAP: &str = "decisions.daily_cap_usd";
 pub const DECISIONS_OPTED_OUT: &str = "decisions.opted_out";
 /// The gates that enforce, as a JSON object of gate to mode. Shadow unless named.
 pub const DECISIONS_MODES: &str = "decisions.modes";
+/// Which events reach which channels, quiet hours and grouping, as JSON.
+pub const CHANNEL_RULES: &str = "channels.rules";

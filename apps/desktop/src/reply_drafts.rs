@@ -34,6 +34,15 @@ pub(crate) fn draft(profile: &str, name: &str, text: &str) -> Result<(), String>
         .lock()
         .map_err(|_| "the drafts could not be read".to_owned())?
         .insert((profile.to_owned(), name.to_owned()), text.to_owned());
+    crate::channels::emit(crate::channels::Told {
+        event: devpit_rpc::ChannelEvent::DraftReady,
+        line: format!("A draft for {name}: «{text}»"),
+        bare: "A draft waits to be sent.".to_owned(),
+        actions: vec![crate::channels::Action::SendDraft {
+            profile: profile.to_owned(),
+            session: name.to_owned(),
+        }],
+    });
     Ok(())
 }
 

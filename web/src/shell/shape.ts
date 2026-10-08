@@ -31,6 +31,7 @@ export type PrefsPane =
   | 'worktrees'
   | 'usage'
   | 'decisions'
+  | 'channels'
 
 /*
  * Three facts about the panes, because they came apart the moment tabs

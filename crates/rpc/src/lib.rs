@@ -12,6 +12,7 @@ pub mod agents;
 pub mod blocks;
 pub mod board;
 pub mod card;
+pub mod channels;
 pub mod chat;
 pub mod checkpoint;
 pub mod conversation;
@@ -56,6 +57,9 @@ pub use board::{Board, CardChanged, Column, ColumnDeleted, Run, RunState, Step, 
 pub use card::{
     ArchivedCard, ArchivedCards, CardDeleted, CardDetail, CardTerminal, Checkout, Comment,
     DeleteRefusal, Notice, Notices, Pinned, Played,
+};
+pub use channels::{
+    ChannelEvent, ChannelInfo, ChannelRoute, ChannelRules, Channels, QuietHours, TelegramStatus,
 };
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
 pub use checkpoint::{

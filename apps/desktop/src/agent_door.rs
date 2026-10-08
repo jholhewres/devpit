@@ -91,6 +91,12 @@ fn check(app: &AppHandle) -> AgentHealth {
         let why = format!("it stopped answering for {FAILURES_BEFORE_RESTART} checks in a row");
         if restart(app, &why).is_ok() {
             devpit_core::reports::background("devpit MCP", &format!("restarted by itself: {why}"));
+            crate::channels::emit(crate::channels::Told {
+                event: devpit_rpc::ChannelEvent::McpRestarted,
+                line: "devpit's MCP stopped answering and was restarted.".to_owned(),
+                bare: "devpit's MCP was restarted.".to_owned(),
+                actions: Vec::new(),
+            });
             crate::notices::ring(
                 app,
                 None,

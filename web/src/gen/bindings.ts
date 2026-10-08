@@ -521,6 +521,21 @@ export const commands = {
 	projectSecrets: (projectId: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secrets", { projectId })),
 	/**  `project.secret_set` — puts one in the project's `.env`. */
 	projectSecretSet: (projectId: string, name: string, value: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secret_set", { projectId, name, value })),
+	/**  `channels.read` — what is connected, and the rules. */
+	channelsRead: () => typedError<Channels, RpcError>(__TAURI_INVOKE("channels_read")),
+	/**  `channels.rules_set` — which events go where, quiet hours, grouping. */
+	channelsRulesSet: (rules: ChannelRules) => typedError<Channels, RpcError>(__TAURI_INVOKE("channels_rules_set", { rules })),
+	/**  `telegram.status` */
+	telegramStatus: () => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_status")),
+	/**
+	 *  `telegram.link` — takes the person's bot token, checks it, and offers a code
+	 *  to send to the bot from the chat devpit should use.
+	 */
+	telegramLink: (token: string) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_link", { token })),
+	/**  `telegram.titles_set` — whether messages name what they are about. */
+	telegramTitlesSet: (titles: boolean) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_titles_set", { titles })),
+	/**  `telegram.unlink` — forgets the bot and the chat. */
+	telegramUnlink: () => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_unlink")),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -2029,6 +2044,47 @@ export type ChangedFile = {
 	path: string,
 	added: number,
 	removed: number,
+};
+
+/**  What can be told on a channel. */
+export type ChannelEvent = 
+/**  A session stopped on a question or a permission. */
+"session_waiting" | 
+/**  A session finished a turn it was working on. */
+"session_done" | 
+/**  A session stopped on an error. */
+"session_failed" | 
+/**  The orchestrator drafted words for a session. */
+"draft_ready" | 
+/**  A card's date went off. */
+"reminder" | 
+/**  A lane's step failed. */
+"step_failed" | 
+/**  devpit's own MCP stopped answering and was restarted. */
+"mcp_restarted";
+
+/**  A channel this machine can send on. */
+export type ChannelInfo = {
+	id: string,
+	label: string,
+};
+
+/**  Which channels one event goes to, by channel id. */
+export type ChannelRoute = {
+	event: ChannelEvent,
+	channels: string[],
+};
+
+export type ChannelRules = {
+	routes: ChannelRoute[],
+	quiet: QuietHours | null,
+	/**  Seconds events are gathered into one message per channel. */
+	groupSeconds: number,
+};
+
+export type Channels = {
+	connected: ChannelInfo[],
+	rules: ChannelRules,
 };
 
 /**
@@ -3666,6 +3722,20 @@ export type Question = {
 	cwd: string,
 };
 
+/**  Hours nothing is sent, but a reminder. */
+export type QuietHours = {
+	/**  Minutes since midnight, local time. `from` after `to` runs overnight. */
+	from: number,
+	to: number,
+	/**  Days it holds, 0 = Sunday. Empty is every day. */
+	days: number[],
+	/**
+	 *  The person's offset from UTC in minutes, as the window last saw it:
+	 *  the process has no time zone database, the window does.
+	 */
+	offsetMinutes: number,
+};
+
 /**
  *  How far this machine can get with a command.
  * 
@@ -4433,6 +4503,19 @@ export type Taken = {
 	count: number,
 	/**  Which domains they were for, in the order they were asked for. */
 	domains: string[],
+};
+
+/**  The person's Telegram bot, as the screen shows it: never its token. */
+export type TelegramStatus = {
+	/**  A chat is linked and gets the notices. */
+	linked: boolean,
+	bot: string | null,
+	/**  The code to send the bot from the chat to link, while one is waiting. */
+	code: string | null,
+	/**  `t.me/<bot>?start=<code>`, which sends it in one tap. */
+	link: string | null,
+	/**  Whether messages name the session, card or project. */
+	titles: boolean,
 };
 
 /**  The command, and the file it was read from. Both `None` when nothing says. */

@@ -136,6 +136,14 @@ pub fn run_ended(app: &tauri::AppHandle, store: &Store, card_id: &str, step: &st
     } else {
         format!("{step} failed on “{title}”")
     };
+    if !ok {
+        crate::channels::emit(crate::channels::Told {
+            event: devpit_rpc::ChannelEvent::StepFailed,
+            line: said.clone(),
+            bare: "A step failed.".to_owned(),
+            actions: Vec::new(),
+        });
+    }
     ring(
         app,
         project.as_deref(),

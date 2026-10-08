@@ -40,7 +40,7 @@ specta-typescript = "0.0.12"
 # transparency in tauri.conf.json; this is what honours it.
 tauri = { version = "2", features = ["unstable", "macos-private-api", "tray-icon"] }
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 ulid = "3.0.0"
 base64 = "0.22"
 # The hook secret, and nothing else. A ULID is a timestamp and a counter, so a

@@ -10,6 +10,7 @@ import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
 import { flagOn, type Flag } from './settingsFlags'
+import { ChannelsPane } from './ChannelsPane'
 import { DecisionsSettings } from './DecisionsSettings'
 import { SkillsPane } from './SkillsPane'
 import { TerminalContrast } from './TerminalContrast'
@@ -173,6 +174,9 @@ export function Settings({
             />
           </section>
 
+          <section className="prefs__in" hidden={pane !== 'channels'}>
+            <ChannelsPane />
+          </section>
           <section className="prefs__in" hidden={pane !== 'decisions'}>
             <h1 className="prefs__h">Decisions</h1>
             <DecisionsSettings />

@@ -147,6 +147,21 @@ pub(crate) fn fire(store: &Store, at: i64) -> Vec<ReminderRow> {
 fn tell(app: &AppHandle, store: &Store, fired: &[ReminderRow]) {
     let _ = app.emit(crate::notices::RANG, ());
     let _ = app.emit(FIRED, drawn(store, fired.to_vec()));
+    for one in fired {
+        crate::channels::emit(crate::channels::Told {
+            event: devpit_rpc::ChannelEvent::Reminder,
+            line: format!("Reminder: {}", one.title),
+            bare: "A reminder went off.".to_owned(),
+            actions: vec![
+                crate::channels::Action::ReminderDone {
+                    card_id: one.card_id.clone(),
+                },
+                crate::channels::Action::Snooze {
+                    card_id: one.card_id.clone(),
+                },
+            ],
+        });
+    }
     if crate::island_notify::in_front(app) {
         return;
     }

@@ -88,6 +88,21 @@ pub(crate) fn changed(app: &tauri::AppHandle, session: &IslandSession, was: Opti
         return;
     }
     let (title, body) = words(session, tell);
+    crate::channels::emit(crate::channels::Told {
+        event: match tell {
+            Tell::Waiting => devpit_rpc::ChannelEvent::SessionWaiting,
+            Tell::Failed => devpit_rpc::ChannelEvent::SessionFailed,
+            Tell::Done => devpit_rpc::ChannelEvent::SessionDone,
+        },
+        line: format!("{title}: {body}"),
+        bare: match tell {
+            Tell::Waiting => "A session is waiting on you.",
+            Tell::Failed => "A session stopped on an error.",
+            Tell::Done => "A session finished its turn.",
+        }
+        .to_owned(),
+        actions: Vec::new(),
+    });
     let project = session.project_id.clone();
     let app = app.clone();
     std::thread::spawn(move || {
@@ -107,6 +122,12 @@ pub(crate) fn asked(app: &tauri::AppHandle, tool: &str, input: &str) {
     let input = serde_json::from_str(input).unwrap_or_default();
     let what = devpit_agentcli::target_of(&input)
         .map_or_else(|| tool.to_owned(), |target| format!("{tool} {target}"));
+    crate::channels::emit(crate::channels::Told {
+        event: devpit_rpc::ChannelEvent::SessionWaiting,
+        line: format!("An agent asks to {what}"),
+        bare: "An agent is asking for a permission.".to_owned(),
+        actions: Vec::new(),
+    });
     let app = app.clone();
     std::thread::spawn(move || {
         if !in_front(&app) {

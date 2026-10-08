@@ -113,6 +113,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
         ),
       },
       {
+        id: 'channels',
+        label: 'Channels',
+        about: 'telegram bot notify notification phone away quiet hours silent message',
+        icon: (
+          <svg {...stroke}><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+        ),
+      },
+      {
         id: 'decisions',
         label: 'Decisions',
         about: 'jev typesafe openrouter vercel gateway rubric gate judge classify verdict probability key cap',

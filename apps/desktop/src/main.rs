@@ -66,6 +66,8 @@ mod card_sessions;
 mod card_work;
 mod cards;
 mod chaining;
+mod channel_rules;
+mod channels;
 mod chat;
 mod chat_listening;
 mod chat_relay;
@@ -195,6 +197,7 @@ mod transcribe;
 // Only Windows copies a pane into a file; tested everywhere.
 #[cfg(any(windows, test))]
 mod tap_file;
+mod telegram;
 mod threads;
 mod trust_answer;
 mod turn_changes;
@@ -332,6 +335,8 @@ fn main() {
             // Managed here and not in the builder because it holds the handle
             // it relays through, and the handle does not exist until now.
             tauri::Manager::manage(app, sessions::SessionState::new(app.handle().clone()));
+            // The person's Telegram bot, listened to from here when one is set up.
+            telegram::listen(app.handle());
             // The window rebuilt around a container that can hold a page
             // *beside* the app rather than under it. Done now, while the
             // window has exactly one webview in it, so the swap has nothing to
