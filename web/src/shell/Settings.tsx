@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Settings as Stored } from '../gen/bindings'
 import { ask, commands } from './live'
 import { inOrder } from './inOrder'
+import { PlusLink } from './PlusLink'
 import { PrefsSide } from './PrefsSide'
 import { GeneralSettings } from './GeneralSettings'
 import { ProjectRows } from './ProjectRows'
@@ -89,6 +90,9 @@ export function Settings({
             </p>
             <p className="acc__note">
               Projects, boards, conversations, terminal history and files are on this computer.
+            </p>
+            <p className="acc__note">
+              <PlusLink from="app-account" said="Reaching this computer from anywhere, push on your phone and sync between machines will be devpit Plus." />
             </p>
 
             <div className="acc__sub">Leaving</div>
