@@ -25,6 +25,9 @@ const WRITE_WITHIN: Duration = Duration::from_secs(15);
 pub enum RelayError {
     /// The account's session was refused: signed out, or ended elsewhere.
     SignedOut,
+    /// devpit.app's relay is part of devpit Plus there, and this account
+    /// does not have it.
+    NeedsPlus,
     /// Past a ceiling of the relay's.
     TooMany,
     /// The relay answered, and not with a WebSocket.
@@ -41,6 +44,9 @@ impl std::fmt::Display for RelayError {
             RelayError::SignedOut => {
                 f.write_str("devpit.app refused this machine's session — sign in again")
             }
+            RelayError::NeedsPlus => f.write_str(
+                "devpit.app's relay is part of devpit Plus, which this account does not have",
+            ),
             RelayError::TooMany => {
                 f.write_str("devpit.app has too many connections of this account")
             }
@@ -168,6 +174,7 @@ impl Relay {
             Err(HandshakeError::Failure(tungstenite::Error::Http(answer))) => {
                 Err(match answer.status().as_u16() {
                     401 => RelayError::SignedOut,
+                    402 => RelayError::NeedsPlus,
                     429 => RelayError::TooMany,
                     status => RelayError::Refused(status),
                 })
@@ -237,6 +244,7 @@ impl Control {
             }
             Ok(Message::Close(frame)) => Err(match frame.map(|frame| u16::from(frame.code)) {
                 Some(4401) => RelayError::SignedOut,
+                Some(4402) => RelayError::NeedsPlus,
                 _ => RelayError::Unreachable("closed by devpit.app".to_owned()),
             }),
             Ok(_) => Ok(None),

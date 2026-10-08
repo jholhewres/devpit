@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Settings as Stored } from '../gen/bindings'
 import { ask, commands } from './live'
 import { inOrder } from './inOrder'
+import { PlusLine } from './PlusLine'
 import { PrefsSide } from './PrefsSide'
 import { GeneralSettings } from './GeneralSettings'
 import { KeyboardSettings } from './KeyboardSettings'
@@ -91,6 +92,7 @@ export function Settings({
             <p className="acc__note">
               Projects, boards, conversations, terminal history and files stay on this computer.
             </p>
+            <PlusLine />
 
             <div className="acc__sub">Leaving</div>
             <div className="acc__row">

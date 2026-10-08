@@ -291,6 +291,7 @@ fn reach(
 fn why(err: &LinkError, name: &str) -> String {
     match err {
         LinkError::Closed(4401) => "devpit.app asked this machine to sign in again — sign in, then ask again".to_owned(),
+        LinkError::Closed(4402) => "reaching another machine through devpit.app is part of devpit Plus, which this account does not have".to_owned(),
         LinkError::Closed(4404) => format!("{name} is not connected to devpit.app: devpit must be open there with Remote on through devpit.app, and this machine signed in to the same account"),
         LinkError::Closed(4429) => "devpit.app has too many connections of this account open".to_owned(),
         LinkError::Closed(4504) => format!("{name} did not answer through devpit.app in time"),

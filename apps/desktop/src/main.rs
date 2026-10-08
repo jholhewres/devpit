@@ -150,6 +150,7 @@ mod pausing;
 mod plan_limits;
 mod plugin_data;
 mod plugins;
+mod plus;
 mod post;
 mod prime;
 mod prime_command;

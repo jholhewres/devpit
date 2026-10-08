@@ -166,6 +166,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         crate::sync_pairing::sync_offer,
         crate::sync_pairing::sync_offer_withdraw,
         crate::sync_pairing::sync_join,
+        crate::plus::plus_status,
+        crate::plus::plus_refresh,
         agent_profiles::agent_profiles,
         agent_profiles::agent_profile_save,
         agent_profiles::agent_profile_read,

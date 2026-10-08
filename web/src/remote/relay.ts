@@ -29,7 +29,7 @@ export interface RelayPairing {
 }
 
 /** What the relay closes with, when a page can do something about it. */
-export const CLOSED = { signIn: 4401, offline: 4404, tooMany: 4429, late: 4504 } as const
+export const CLOSED = { signIn: 4401, needsPlus: 4402, offline: 4404, tooMany: 4429, late: 4504 } as const
 
 /** The most a message from the machine may be: a big board, a long chat. */
 const MOST_MESSAGE = 8 * 1024 * 1024
@@ -126,6 +126,8 @@ export function closedBecause(code: number): string | null {
   switch (code) {
     case CLOSED.signIn:
       return 'Sign in to devpit.app on this device, with the account the machine is signed in to.'
+    case CLOSED.needsPlus:
+      return 'Reaching your machine through devpit.app is part of devpit Plus, which this account does not have.'
     case CLOSED.offline:
       return 'The machine is not connected to devpit.app: it is off, asleep, or Remote is off there.'
     case CLOSED.tooMany:
@@ -226,7 +228,8 @@ export function connectRelay(
       if (closed) return
       const why = closedBecause(event.code)
       state(false, why ?? undefined, event.code)
-      if (event.code === CLOSED.signIn) return
+      // Asking again would be refused again: these wait for the person.
+      if (event.code === CLOSED.signIn || event.code === CLOSED.needsPlus) return
       again = setTimeout(connectOnce, backoff(tries++))
     }
   }

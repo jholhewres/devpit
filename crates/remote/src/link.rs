@@ -20,8 +20,9 @@ pub enum LinkError {
     NotAFrame,
     /// The connection ended.
     Gone,
-    /// The relay closed it with a code that says why: 4401 sign in, 4404 the
-    /// machine is not connected, 4408 the other end left.
+    /// The relay closed it with a code that says why: 4401 sign in, 4402
+    /// devpit Plus is needed, 4404 the machine is not connected, 4408 the
+    /// other end left.
     Closed(u16),
 }
 

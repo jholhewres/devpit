@@ -29,6 +29,7 @@ pub mod mcp_health;
 pub mod pause;
 pub mod plugin_data;
 pub mod plugins;
+pub mod plus;
 pub mod prime;
 pub mod profile;
 pub mod project;
@@ -97,6 +98,7 @@ pub use plugins::{
     catalogue, validate, validate_catalogue, DataSpec, Permission, PluginError, PluginList,
     PluginManifest, PluginState, PluginUninstalled, Surface,
 };
+pub use plus::PlusStatus;
 pub use prime::WorktreeSetup;
 pub use profile::{Credentials, Declared, EnvVar, Profile, Reach, ReadCommand, SignedIn};
 pub use project::{

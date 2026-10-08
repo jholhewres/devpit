@@ -133,6 +133,15 @@ describe('the viewer through the relay', () => {
     expect(sockets).toHaveLength(1)
   })
 
+  it('says devpit Plus is needed, and does not ask again', () => {
+    vi.useFakeTimers()
+    const { sockets, states } = setUp()
+    sockets[0]!.shut(CLOSED.needsPlus)
+    expect(states.at(-1)).toEqual([false, expect.stringMatching(/devpit Plus/), CLOSED.needsPlus])
+    vi.advanceTimersByTime(60_000)
+    expect(sockets).toHaveLength(1)
+  })
+
   it('connects again, later, when the machine is away', () => {
     vi.useFakeTimers()
     const { sockets, states } = setUp()

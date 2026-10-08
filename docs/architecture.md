@@ -314,3 +314,21 @@ turned on in Settings → Account → Sync. The design is `docs/sync.md`.
   same project on two machines when it clones the same repository.
 - **The board** is the next namespace, and stays on each machine until it is
   safe to sync.
+
+## devpit Plus
+
+Plus pays for what devpit.app carries for the person away from the machine:
+the relay (the Remote, and MCP from another machine), sync and notices
+through the hub. Nothing that runs on this machine is ever part of it.
+
+- **Checked offline.** devpit.app signs an entitlement (ed25519);
+  `plus.refresh` fetches it with the account's token and keeps it, and
+  `plus.status` checks it against a public key built in. It holds until three
+  days after the paid period, and past that only what needs devpit.app stops.
+- **Off until billing is.** With no key built in (`PUBLIC_KEY` in
+  `plus.rs`), Plus is neither checked nor drawn, and devpit.app gates
+  nothing until its own billing is switched on. Then an account without Plus
+  is refused with `needs_plus` — a 402, or close code 4402 on the relay — and
+  the Remote's viewer, the remote MCP client and the machine's relay
+  connection say so in words rather than as a status; the viewer stops
+  asking until the person acts.

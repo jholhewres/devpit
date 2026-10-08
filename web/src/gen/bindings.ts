@@ -650,6 +650,10 @@ export const commands = {
 	 *  machine's offer or from the recovery code, and syncs with it.
 	 */
 	syncJoin: (given: string) => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_join", { given })),
+	/**  `plus.status` — whether Plus holds on this install. */
+	plusStatus: () => typedError<PlusStatus, RpcError>(__TAURI_INVOKE("plus_status")),
+	/**  `plus.refresh` — asks devpit.app for the account's entitlement and keeps it. */
+	plusRefresh: () => typedError<PlusStatus, RpcError>(__TAURI_INVOKE("plus_refresh")),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -3835,6 +3839,19 @@ export type PluginUninstalled = {
 	plugins: PluginState[],
 	/**  0 when the files were kept. */
 	removedFiles: number,
+};
+
+export type PlusStatus = {
+	/**
+	 *  Whether this build checks Plus at all. Off until billing is switched
+	 *  on, and then nothing about Plus is drawn.
+	 */
+	enabled: boolean,
+	/**  Whether a valid, unexpired entitlement is kept here. */
+	active: boolean,
+	plan: string | null,
+	/**  Seconds since the epoch. */
+	expiresAt: number | null,
 };
 
 /**  How much of what devpit says leaves on a channel. */

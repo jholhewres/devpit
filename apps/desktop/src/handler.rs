@@ -171,6 +171,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         crate::sync_pairing::sync_offer,
         crate::sync_pairing::sync_offer_withdraw,
         crate::sync_pairing::sync_join,
+        crate::plus::plus_status,
+        crate::plus::plus_refresh,
         agent_profiles::agent_profiles,
         agent_profiles::agent_profile_save,
         agent_profiles::agent_profile_read,
