@@ -26,6 +26,7 @@ mod clone;
 mod discard;
 mod front;
 mod glance;
+mod ignoring;
 pub mod index;
 #[cfg(test)]
 mod index_tests;
@@ -57,6 +58,7 @@ pub use clone::{clone, first_commit, folder_for, init, unborn};
 pub use discard::discard;
 pub use front::{at_head, changed_since, diff_since, head_of, remove_front, unsaved_in};
 pub use glance::{glance, Glance};
+pub use ignoring::{exclude, ignored};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
     assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,

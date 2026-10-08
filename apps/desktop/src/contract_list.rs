@@ -130,6 +130,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         agent_choice::agent_enabled_set,
         agent_choice::agent_hooks_set,
         agent_choice::agent_trust_set,
+        crate::vault::project_secrets,
+        crate::vault::project_secret_set,
         agent_profiles::agent_profiles,
         agent_profiles::agent_profile_save,
         agent_profiles::agent_profile_read,

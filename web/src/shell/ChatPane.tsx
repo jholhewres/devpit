@@ -28,6 +28,7 @@ import { ChatBlank } from './ChatBlank'
 import { RemoteToggle } from './RemoteToggle'
 import { SessionsChip, SessionsWaiting } from './OrchestratorChat'
 import { Queued } from './Queued'
+import { SecretWarning } from './SecretWarning'
 import { SendButton } from './SendButton'
 import { useQueue } from './useQueue'
 import { SessionCost } from './SessionCost'
@@ -153,6 +154,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           {project?.orchestrator && <SessionsWaiting profileId={project.orchestrator} />}
           <Asked questions={chat.asked} onAnswer={chat.answer} />
           <ComposerStatus conversationId={tab.id} messages={chat.messages} />
+          <SecretWarning text={prompt} />
           <Queued queue={queue} />
 
           <div className="composer__in">
@@ -170,8 +172,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               onChange={(event) => setPrompt(event.target.value)}
               onPaste={pasted}
               onKeyDown={(event) => {
-                /* Enter sends, Shift+Enter is a new line — and `committed`
-                   keeps the Enter that finishes an accented letter out. */
+                /* Enter sends, Shift+Enter a new line; `committed` keeps an accent's Enter out. */
                 if (slash.keyDown(event) || mention.keyDown(event)) return
                 if (committed(event) && !event.shiftKey) {
                   event.preventDefault()
@@ -181,10 +182,8 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
             />
 
             <div className="composer__row">
-              {/* A control takes focus to be operated, and gives it back when
-                  it is done: the cursor was mid-sentence, and putting it back
-                  is not the person's job. Cancelling the press instead would
-                  be cheaper and would swallow the click that opens the menu. */}
+              {/* A control takes focus and gives it back: the cursor was mid-sentence. Cancelling
+                  the press instead would be cheaper and swallow the click that opens the menu. */}
               <Chips chat={chat} refocus={() => field.current?.focus()} />
               <ComposerTools chat={chat} onHeard={(text) => (setPrompt((was) => (was.trim() ? `${was.trimEnd()} ${text}` : text)), field.current?.focus())} />
               <SendButton sending={chat.sending} showEsc={showEsc} can={ready(prompt, chat.sending, chat.profileId)} onSend={send} onStop={halt} />

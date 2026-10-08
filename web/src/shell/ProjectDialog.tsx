@@ -6,6 +6,7 @@ import { GroupPicker } from './GroupPicker'
 import { ask, commands } from './live'
 import { COLOURS, ICONS, iconName, ProjectMark } from './ProjectMark'
 import { abandoned, committed } from './typing'
+import { SecretFields } from './SecretFields'
 import { useShell } from './useShell'
 import { WorktreeSetupFields } from './WorktreeSetupFields'
 
@@ -128,6 +129,8 @@ export function ProjectDialog({ project, onClose }: { project: Project; onClose:
             }}
           />
         )}
+
+        {!project.orchestrator && <SecretFields projectId={project.id} />}
 
         {error && <p className="acc__note">{error}</p>}
         <div className="pdlg__acts">

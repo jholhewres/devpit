@@ -202,6 +202,12 @@ impl ProjectHome {
         self.dir().join("prime.json")
     }
 
+    /// The names of the secrets kept for this project, with when each was
+    /// set. Never their values.
+    pub fn secrets(&self) -> PathBuf {
+        self.dir().join("secrets.json")
+    }
+
     /// The sign-ins this project's sessions need, checked before one starts.
     pub fn needs(&self) -> PathBuf {
         self.dir().join("needs.txt")

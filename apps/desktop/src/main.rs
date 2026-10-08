@@ -200,6 +200,7 @@ mod trust_answer;
 mod turn_changes;
 mod update;
 mod update_deb;
+mod vault;
 mod watching;
 mod windows_bin;
 mod working;

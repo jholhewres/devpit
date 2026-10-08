@@ -46,6 +46,7 @@ mod threads;
 pub mod tile;
 pub mod update;
 pub mod usage;
+pub mod vault;
 pub mod voice;
 
 pub use account::{Account, Membership, SignIn, SignInState};
@@ -117,6 +118,7 @@ pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
 pub use update::{InstallKind, UpdateBlocking, UpdateStatus, UpdateWork};
 pub use usage::{PaneCost, Usage};
+pub use vault::{Secret, SecretList};
 pub use voice::{Transcribing, Transcript};
 
 use serde::{Deserialize, Serialize};

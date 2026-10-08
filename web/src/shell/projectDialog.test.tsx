@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Project } from '../gen/bindings'
 
 const edited = vi.fn()
+const kept = vi.fn()
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve(call()),
   commands: {
@@ -13,6 +14,11 @@ vi.mock('./live', () => ({
     },
     projectWorktreeSetup: () => ({ data: { copy: [], link: [], run: [], share: [] }, error: null }),
     projectWorktreeSetupSet: () => ({ data: null, error: null }),
+    projectSecrets: () => ({ data: { secrets: [], file: '/p/.env' }, error: null }),
+    projectSecretSet: (...args: unknown[]) => {
+      kept(...args)
+      return { data: { secrets: [{ name: 'JEV_API_KEY', setAt: 1 }], file: '/p/.env' }, error: null }
+    },
   },
 }))
 
@@ -76,5 +82,16 @@ describe('the project dialog', () => {
     fireEvent.change(typed, { target: { value: 'Side' } })
     fireEvent.keyDown(typed, { key: 'Enter' })
     expect(screen.getByText('Side')).toBeTruthy()
+  })
+
+  it('keeps a secret from a password field, by its name in capitals', async () => {
+    render(<ProjectDialog project={project()} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('JEV_API_KEY'), { target: { value: 'jev_api_key' } })
+    const value = screen.getByLabelText('Value') as HTMLInputElement
+    expect(value.type).toBe('password')
+    fireEvent.change(value, { target: { value: 'sk-abc' } })
+    fireEvent.click(screen.getByText('Keep it'))
+    await waitFor(() => expect(kept).toHaveBeenCalledWith('p1', 'JEV_API_KEY', 'sk-abc'))
+    await waitFor(() => expect(value.value).toBe(''))
   })
 })

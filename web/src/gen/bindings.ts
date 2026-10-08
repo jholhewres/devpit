@@ -517,6 +517,10 @@ export const commands = {
 	agentHooksSet: (on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_hooks_set", { on })),
 	/**  `agent.trust_set` — whether added projects' folders are marked trusted. */
 	agentTrustSet: (on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_trust_set", { on })),
+	/**  `project.secrets` — the names kept for a project, and where. */
+	projectSecrets: (projectId: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secrets", { projectId })),
+	/**  `project.secret_set` — puts one in the project's `.env`. */
+	projectSecretSet: (projectId: string, name: string, value: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secret_set", { projectId, name, value })),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -3945,6 +3949,19 @@ export type SearchHits = {
 export type SearchLine = {
 	line: number,
 	text: string,
+};
+
+export type Secret = {
+	/**  The variable's name, which is all an agent ever sees of it. */
+	name: string,
+	/**  When it was last set, in seconds since the epoch. */
+	setAt: number | null,
+};
+
+export type SecretList = {
+	secrets: Secret[],
+	/**  The file the values are kept in. */
+	file: string,
 };
 
 export type Server = {
