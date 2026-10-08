@@ -136,6 +136,7 @@ mod plugin_data;
 mod plugins;
 mod post;
 mod prime;
+mod prime_command;
 mod prime_paths;
 mod project_naming;
 mod project_proposals;

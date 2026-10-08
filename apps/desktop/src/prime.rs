@@ -31,6 +31,9 @@ pub struct Prime {
     pub share: std::collections::BTreeMap<String, String>,
     /// Commands to run once, in the worktree.
     pub run: Vec<String>,
+    /// Seconds each command may take before it is stopped and the preparation
+    /// fails. Ten minutes unless said.
+    pub timeout: Option<u64>,
 }
 
 /// How a preparation ended.
@@ -124,19 +127,13 @@ pub fn run(
     }
 
     for line in &prime.run {
-        on_line(&format!("$ {line}"));
-        let output = devpit_pty::host_env::command("sh")
-            .arg("-c")
-            .arg(line)
-            .current_dir(at)
-            .envs(&prime.share)
-            .output()?;
-        on_line(&String::from_utf8_lossy(&output.stdout));
-        if !output.status.success() {
-            on_line(&String::from_utf8_lossy(&output.stderr));
+        let log = done_marker(at).with_file_name("devpit-prime.log");
+        if let Some(code) =
+            crate::prime_command::ran(line, at, &prime.share, prime.timeout, &log, &mut on_line)?
+        {
             return Ok(Primed::Failed {
                 command: line.clone(),
-                code: output.status.code().unwrap_or(-1),
+                code,
             });
         }
     }

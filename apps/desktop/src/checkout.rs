@@ -123,13 +123,23 @@ pub fn checkout_of(
     // A worktree is a git root of its own: the main checkout's trust stops short of it.
     crate::folder_trust::trust(&[&made.path]);
 
-    let declared = prime::read(
+    let declared = crate::worktree_setup::declared_or_env(
         &devpit_core::home::ProjectHome::of(store, &home, &project_id)
             .map_err(|err| err.to_string())?
             .prime(),
     );
     on_line("preparing the worktree");
-    match prime::run(&declared, &main, &made.path, &mut on_line).map_err(|err| err.to_string())? {
+    let mut said = Vec::new();
+    let primed = prime::run(&declared, &main, &made.path, |line| {
+        said.push(line.to_owned());
+        on_line(line);
+    })
+    .map_err(|err| err.to_string())?;
+    // On the card, so a session that starts broken is not the first to say so.
+    if let Some(note) = prepared_note(&primed, &said) {
+        let _ = store.add_comment(card_id, "agent", &note);
+    }
+    match primed {
         prime::Primed::Failed { command, code } => {
             // Named as the preparation's failure. Read as the work's, it sends
             // someone looking at the agent for a problem in `pnpm install`.
@@ -138,6 +148,28 @@ pub fn checkout_of(
             ))
         }
         _ => Ok(made.path),
+    }
+}
+
+/// What a preparation leaves on the card: what it did, or where it failed
+/// with the end of the output. Nothing when there was nothing to do.
+pub(crate) fn prepared_note(primed: &prime::Primed, said: &[String]) -> Option<String> {
+    match primed {
+        prime::Primed::Nothing => None,
+        prime::Primed::Done => {
+            let done: Vec<&str> = said
+                .iter()
+                .map(String::as_str)
+                .filter(|line| {
+                    line.starts_with("copied ") || line.starts_with("linked ") || line.starts_with("$ ")
+                })
+                .collect();
+            Some(format!("Worktree prepared: {}.", done.join("; ")))
+        }
+        prime::Primed::Failed { command, code } => Some(format!(
+            "Preparing the worktree failed: `{command}` exited {code}. The end of its output:\n\n```\n{}\n```",
+            crate::prime_command::tail(&said.join("\n"))
+        )),
     }
 }
 

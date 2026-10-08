@@ -67,3 +67,29 @@ fn only_a_card_checkout_is_given_the_shared_variables() {
     ));
     assert!(!in_a_checkout(&checkouts, std::path::Path::new("/w/app")));
 }
+
+#[test]
+fn the_card_hears_what_the_preparation_did_or_where_it_failed() {
+    use crate::prime::Primed;
+    let said = vec![
+        "preparing the worktree".to_owned(),
+        "copied .env".to_owned(),
+        "$ pnpm i".to_owned(),
+        "added 412 packages".to_owned(),
+    ];
+    assert_eq!(super::prepared_note(&Primed::Nothing, &said), None);
+    assert_eq!(
+        super::prepared_note(&Primed::Done, &said).as_deref(),
+        Some("Worktree prepared: copied .env; $ pnpm i.")
+    );
+    let failed = super::prepared_note(
+        &Primed::Failed {
+            command: "pnpm i".to_owned(),
+            code: 1,
+        },
+        &said,
+    )
+    .expect("note");
+    assert!(failed.starts_with("Preparing the worktree failed: `pnpm i` exited 1."));
+    assert!(failed.contains("added 412 packages"));
+}
