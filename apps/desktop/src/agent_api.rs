@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 31] = [
+pub(crate) const METHODS: [&str; 32] = [
     "context",
     "board",
     "card",
@@ -64,6 +64,7 @@ pub(crate) const METHODS: [&str; 31] = [
     "log",
     "repo",
     "draft",
+    "send_draft",
     "remind",
     "reminders",
     "resolve_reminder",
@@ -259,6 +260,12 @@ fn respond_in(
                 "drafted": name,
                 "note": "Nothing was sent. The person sees the draft beside the session — in the Sessions panel and above this chat's composer — and sends it as their own words, edits it, or drops it.",
             }));
+        }
+        "send_draft" => {
+            let profile = orchestrating(here)?;
+            let name = text("name").ok_or("which session? pass its name")?;
+            in_reach(here, profile, &name)?;
+            return crate::draft_sending::send(profile, Path::new(&here.root_path), &name);
         }
         "log" => {
             orchestrating(here)?;

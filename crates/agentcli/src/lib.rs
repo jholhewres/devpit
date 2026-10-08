@@ -316,6 +316,7 @@ mod history_tests;
 mod mcp_health;
 pub mod outside;
 pub mod peers;
+pub mod person;
 pub mod profile;
 #[cfg(test)]
 mod profile_tests;

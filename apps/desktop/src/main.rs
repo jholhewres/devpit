@@ -86,6 +86,7 @@ mod deciding;
 mod decisions;
 mod diagnostics;
 mod diffs;
+mod draft_sending;
 mod ended_sessions;
 mod error_reports;
 mod error_sender;
