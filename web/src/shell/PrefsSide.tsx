@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { CommunityFoot } from './Community'
 import { matching } from './prefsNav'
 import type { PrefsPane } from './shape'
 
@@ -79,6 +80,8 @@ export function PrefsSide({
           <p className="prefs__none">Nothing here matches &ldquo;{query.trim()}&rdquo;.</p>
         )}
       </nav>
+
+      <CommunityFoot />
     </aside>
   )
 }

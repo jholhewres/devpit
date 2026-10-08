@@ -30,6 +30,10 @@
 .prefs__i[aria-selected='true'] { background: var(--sidebar-item); color: var(--text); }
 .prefs__i[aria-selected='true'] svg { color: var(--accent); }
 .prefs__i svg { flex: none; color: var(--text-3); }
+/* Quiet on purpose: a way out to the community, not a pane. */
+.prefs__comm { height: 30px; flex: none; display: flex; align-items: center; gap: 9px; margin: auto 12px 0; padding: 0 10px; border-radius: 8px; font-size: 12px; color: var(--text-3); }
+.prefs__comm:hover { background: var(--sidebar-item); color: var(--text-2); }
+.prefs__comm svg { flex: none; }
 
 .prefs__main { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 /* Wider than prose: these panes are rows of controls, and a 780px column
