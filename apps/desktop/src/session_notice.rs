@@ -94,6 +94,8 @@ pub(crate) fn with_notice(project_id: &str, profile_id: &str, prompt: &str, now_
         &crate::orchestrator_links::linked(Path::new(&here.root_path)),
         live.sessions,
     );
+    // The person speaks: the round the orchestrator reads after a compaction.
+    crate::round_state::keep(Path::new(&here.root_path), &here.id, profile_id, &sessions);
     let Ok(mut held) = seen().lock() else {
         return prompt.to_owned();
     };

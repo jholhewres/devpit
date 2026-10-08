@@ -201,7 +201,9 @@ fn respond_in(
         "sessions" => {
             let profile = orchestrating(here)?;
             let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
-            let running = json!(crate::orchestrator_links::reachable(here, live.sessions));
+            let reachable = crate::orchestrator_links::reachable(here, live.sessions);
+            crate::round_state::keep(Path::new(&here.root_path), &here.id, profile, &reachable);
+            let running = json!(reachable);
             if asked.params.get("include_ended").and_then(Value::as_bool) != Some(true) {
                 return Ok(running);
             }

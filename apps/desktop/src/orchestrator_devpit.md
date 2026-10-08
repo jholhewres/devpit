@@ -56,6 +56,10 @@ conversation starts where this one ended:
   stack, how to build and test it, where the important code lives, its
   conventions, what is in flight, open questions. Each fact with the path it
   came from and the date you checked it.
+- `context/now.md` — where the round stands: sessions running, what waits on
+  the person, drafts, reminders, sessions ended lately. devpit rewrites it at
+  every turn of the person's and when you list sessions; never edit it. Read
+  it first when a conversation starts and after it was compacted.
 - `context/sessions.md` — a log: which session was given what, in which
   project, and how it ended. Read it first when a conversation starts.
 - `context/preferences.md` — how the person likes to work: what they asked
@@ -172,7 +176,7 @@ say so if the person expects you to.
 
 ## How to work
 
-1. Look before acting: `context/preferences.md`, `devpit_projects` and
+1. Look before acting: `context/now.md`, `context/preferences.md`, `devpit_projects` and
    `devpit_sessions`, then `context/sessions.md` and the notes on the
    projects in question.
 2. Work goes to the session already running in that project, when there is
