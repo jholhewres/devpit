@@ -160,6 +160,7 @@ mod remote_http;
 mod remote_hub;
 mod remote_pairing;
 mod remote_panes;
+mod remote_start;
 mod remote_tailscale;
 mod reply_drafts;
 mod restoring;

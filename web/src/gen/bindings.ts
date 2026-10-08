@@ -3853,6 +3853,14 @@ export type RemoteIn =
 { t: "drafts" } | 
 /**  Types a draft into its session's terminal. Only a device allowed to type. */
 { t: "draftSend"; profile: string; name: string } | { t: "agentHealth" } | 
+/**  A card in the project's first lane. Only a device allowed to type. */
+{ t: "cardCreate"; project: string; title: string } | 
+/**
+ *  A new session of the default Claude account in the project, on a card
+ *  or not. Only a device allowed to type. Refused, with the command, when
+ *  a sign-in the project needs is missing, unless `anyway`.
+ */
+{ t: "sessionStart"; project: string; card: string | null; prompt: string; anyway: boolean } | 
 /**  Opens devpit's own MCP again. Only a device allowed to type. */
 { t: "agentRestart" } | { t: "ping" };
 
@@ -3860,6 +3868,8 @@ export type RemoteIn =
 export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean } | 
 /**  Said once, then the connection ends. */
 { t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | { t: "drafts"; drafts: RemoteDraft[] } | { t: "agentHealth"; health: AgentHealth } | 
+/**  A session started from here, by the name to find it under. */
+{ t: "started"; name: string } | 
 /**  One request could not be done; the connection stays. */
 { t: "failed"; why: string } | { t: "pong" };
 

@@ -323,6 +323,35 @@ fn answer(
             crate::remote::note(root, device, &format!("sent a draft to {name}"));
             Some(drafts_now())
         }
+        RemoteIn::CardCreate { project, title } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            crate::remote::note(root, device, "created a card");
+            crate::remote_start::card(app, &project, &title)
+                .err()
+                .and_then(failed)
+        }
+        RemoteIn::SessionStart {
+            project,
+            card,
+            prompt,
+            anyway,
+        } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            Some(
+                match crate::remote_start::session(app, &project, card.as_deref(), &prompt, anyway)
+                {
+                    Ok(name) => {
+                        crate::remote::note(root, device, &format!("started {name}"));
+                        RemoteOut::Started { name }
+                    }
+                    Err(why) => RemoteOut::Failed { why },
+                },
+            )
+        }
         RemoteIn::AgentHealth => Some(RemoteOut::AgentHealth {
             health: crate::agent_door::health_now(app),
         }),

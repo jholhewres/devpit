@@ -71,6 +71,20 @@ pub enum RemoteIn {
         name: String,
     },
     AgentHealth,
+    /// A card in the project's first lane. Only a device allowed to type.
+    CardCreate {
+        project: String,
+        title: String,
+    },
+    /// A new session of the default Claude account in the project, on a card
+    /// or not. Only a device allowed to type. Refused, with the command, when
+    /// a sign-in the project needs is missing, unless `anyway`.
+    SessionStart {
+        project: String,
+        card: Option<String>,
+        prompt: String,
+        anyway: bool,
+    },
     /// Opens devpit's own MCP again. Only a device allowed to type.
     AgentRestart,
     Ping,
@@ -123,6 +137,10 @@ pub enum RemoteOut {
     },
     AgentHealth {
         health: crate::AgentHealth,
+    },
+    /// A session started from here, by the name to find it under.
+    Started {
+        name: String,
     },
     /// One request could not be done; the connection stays.
     Failed {

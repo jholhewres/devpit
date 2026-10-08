@@ -77,3 +77,8 @@ button, input, select { font: inherit; color: inherit; }
   .rm__lanes { flex-direction: row; align-items: flex-start; overflow-x: auto; }
   .rm__lane { width: 260px; flex: none; }
 }
+
+/* Making a card or starting a session from the board. */
+.rm__new { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 10px; }
+.rm__new input, .rm__new textarea { flex: 1; min-width: 0; font: inherit; }
+.rm__waitbar { width: 100%; margin: 0 0 10px; font-weight: 600; }

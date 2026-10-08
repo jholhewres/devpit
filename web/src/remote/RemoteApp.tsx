@@ -40,6 +40,7 @@ export function RemoteApp(): React.JSX.Element {
   const [health, setHealth] = useState<AgentHealth | null>(null)
   const [chats, setChats] = useState<Conversations | null>(null)
   const [chat, setChat] = useState<Conversation | null>(null)
+  const [started, setStarted] = useState<string | null>(null)
   const link = useRef<Link | null>(null)
   const bytes = useRef<(pane: string, b64: string) => void>(() => {})
   const projectRef = useRef(projectId)
@@ -91,6 +92,10 @@ export function RemoteApp(): React.JSX.Element {
           return
         case 'chat':
           setChat(message.conversation)
+          return
+        case 'started':
+          setStarted(message.name)
+          window.setTimeout(() => setStarted(null), 6000)
           return
         case 'failed':
           setFailed(message.why)
@@ -151,6 +156,7 @@ export function RemoteApp(): React.JSX.Element {
         </select>
       </header>
       {failed && <p className="rm__failed" role="alert">{failed}</p>}
+      {started && <p className="rm__said" role="status">Started {started}: it runs in a terminal tab of the project.</p>}
       <nav className="rm__tabs">
         {(['terminals', 'board', 'waiting', 'chats'] as const).map((one) => (
           <button key={one} className="rm__tab" data-on={view === one ? 'true' : undefined} onClick={() => setView(one)}>
@@ -173,7 +179,7 @@ export function RemoteApp(): React.JSX.Element {
             {pane && <RemoteTerminal key={pane} project={project.id} pane={pane} typing={welcome?.typing ?? false} send={send} bytes={bytes} />}
           </>
         )}
-        {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} send={send} />}
+        {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} waiting={questions.length + drafts.length} onWaiting={() => setView('waiting')} send={send} />}
         {view === 'waiting' && <RemoteWaiting questions={questions} drafts={drafts} health={health} answering={welcome?.answering ?? false} typing={welcome?.typing ?? false} send={send} />}
         {view === 'chats' && projectId && <RemoteChats project={projectId} chats={chats} chat={chat} onClose={() => setChat(null)} send={send} />}
       </section>
