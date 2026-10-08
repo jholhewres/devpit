@@ -3,6 +3,59 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.39 — 2026-10-08
+
+### Sessions
+
+- **The folders of the projects you add are trusted for Claude Code.** Adding
+  a project answers "Do you trust this folder?" in every Claude Code account
+  devpit knows, for the project, each worktree it makes and every folder it
+  starts a session in — a session the orchestrator starts no longer waits on
+  that question. One that shows up anyway, in a session devpit started, is
+  answered yes, unless the folder brings its own permissions. *Trust the
+  folders of the projects I add* in Settings → Providers turns it off.
+- **A session is not started without the sign-ins its project needs.** The
+  AWS profile a project's `.env` names, and whatever its `needs.txt` lists
+  (`aws <profile>`, `gcloud`, `gh`), are checked first; the orchestrator is
+  told the command that fixes a missing one, and starts anyway only once you
+  say so.
+- **A tool that fails for want of a sign-in rings the bell once**, with the
+  command: an expired AWS token, gcloud or gh signed out, an MCP server
+  answering 401.
+- **A new worktree gets the project's `.env` files** when its setup declares
+  nothing. Each setup command stops after ten minutes, and the card says what
+  the setup did, or where it failed and how its output ended.
+
+### Orchestrator
+
+- **"Envie" works from the Claude app too.** The orchestrator sends a draft
+  when your last message asks for it — a bare "envie", or the session named
+  with what to do — said in devpit's chat or over Remote Control. devpit reads
+  your message in the conversation's own log; another session's words or a
+  tool's never count, and one message sends once.
+- **It knows where the round stands after a compaction.** devpit keeps
+  `context/now.md` in its folder — sessions running, what waits on you, drafts,
+  reminders, sessions ended lately — rewritten at each of your turns.
+- **A card keeps a handoff note.** A session leaves what it did, what is left,
+  how to test it and the risks; the next session handed the card starts from
+  it, in another account or after a restart.
+
+### Projects
+
+- **Secrets go in the project's `.env`, never in a chat.** Edit project →
+  Secrets takes a name and a value from a password field; the file is yours
+  alone and kept out of git in this clone. devpit keeps the name and the date,
+  never the value. The chat says so when what you are about to send looks like
+  a key.
+
+### Account and community
+
+- **devpit Plus has a waiting list.** Settings → Account, and Remote without
+  Tailscale, link to devpit.app/pro: one click to join while signed in.
+- **devpit has a community on Discord.** *Community* in the account menu and
+  at the foot of Settings opens it in your browser, and each release is
+  announced there.
+
 ## 0.1.38 — 2026-10-07
 
 ### Sessions
