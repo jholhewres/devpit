@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 32] = [
+pub(crate) const METHODS: [&str; 33] = [
     "context",
     "board",
     "card",
@@ -70,6 +70,7 @@ pub(crate) const METHODS: [&str; 32] = [
     "resolve_reminder",
     "start_card",
     "finish_card",
+    "handoff",
     "propose_project",
     "health",
     "resume",
@@ -78,7 +79,7 @@ pub(crate) const METHODS: [&str; 32] = [
 ];
 
 /// The methods that change the board, and so tell the window.
-const WRITES: [&str; 7] = [
+const WRITES: [&str; 8] = [
     "comment",
     "create",
     "update",
@@ -86,6 +87,7 @@ const WRITES: [&str; 7] = [
     "start",
     "start_card",
     "finish_card",
+    "handoff",
 ];
 
 /// Answers one posted question with a JSON body: `{"ok": …}` or `{"error": …}`.
@@ -137,7 +139,7 @@ fn within(
 
 fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     if asked.method == "methods" {
-        return Ok(json!(METHODS));
+        return Ok(json!(METHODS.as_slice()));
     }
     // Asked of no project: it is about devpit itself.
     if asked.method == "health" {
@@ -341,6 +343,21 @@ fn respond_in(
         "context" => context(project, &board, Path::new(&asked.cwd)),
         "board" => board_view(&board),
         "card" => card_view(&board, &card_id)?,
+        "handoff" => {
+            on_board(&board, &card_id)?;
+            let said = crate::handoff::note(
+                &text("done").unwrap_or_default(),
+                &text("left").unwrap_or_default(),
+                &text("test").unwrap_or_default(),
+                &text("risks").unwrap_or_default(),
+            )?;
+            let sayable = crate::cards::sayable(&said).map_err(said_of)?;
+            crate::projects::store()
+                .map_err(said_of)?
+                .add_comment(&card_id, signed(&asked.author), sayable)
+                .map_err(|err| err.to_string())?;
+            card_view(&board, &card_id)?
+        }
         "comment" => {
             on_board(&board, &card_id)?;
             let body = text("body").unwrap_or_default();
@@ -602,6 +619,10 @@ fn ended_in_reach(here: &Project, profile: &str, id_or_name: &str) -> Result<(),
         .is_some_and(|id| id == here.id || linked.iter().any(|one| one == id))
         .then_some(())
         .ok_or_else(|| format!("{id_or_name} did not run in a project linked to this orchestrator"))
+}
+
+fn said_of(err: RpcError) -> String {
+    said(err)
 }
 
 fn said(err: RpcError) -> String {

@@ -58,7 +58,10 @@ pub(crate) fn hand(
         .map_err(|err| err.to_string())?
         .is_some();
     let tab_id = tab_to_open(card_tab, taken);
-    let line = crate::opening::launched(profile_id, &name, prompt).map_err(|err| err.message)?;
+    // The last handoff on the card, so a new session starts where one stopped.
+    let comments = store.comments(card_id).map_err(|err| err.to_string())?;
+    let prompt = crate::handoff::briefed(prompt, crate::handoff::latest(&comments));
+    let line = crate::opening::launched(profile_id, &name, &prompt).map_err(|err| err.message)?;
     let pane_id = crate::opening::typed_in(app, &board.project_id, &tab_id, &cwd, &line)
         .map_err(|err| err.message)?;
     // Looked for from now: before the CLI lists it, it may already be stopped

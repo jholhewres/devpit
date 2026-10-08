@@ -75,7 +75,7 @@ fn a_question_it_cannot_read_or_answer_says_so() {
 #[test]
 fn it_says_what_it_answers() {
     let said: Value = serde_json::from_str(&answer(None, r#"{"method":"methods"}"#)).expect("json");
-    assert_eq!(said["ok"], json!(METHODS));
+    assert_eq!(said["ok"], json!(METHODS.as_slice()));
 }
 
 #[test]

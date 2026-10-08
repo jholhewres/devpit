@@ -10,6 +10,8 @@ columns, and devpit_card to read the card you are working on. Record what you \
 did and found with devpit_comment. The card follows the work: when you start \
 on it, call devpit_start_card; when you finish, devpit_finish_card with what \
 you did — devpit knows which column holds each, whatever the board calls it, \
+and when you finish or pause, devpit_handoff leaves where the work stands for \
+the next session — \
 and devpit_context says which card you are on when you stand in its checkout. \
 Files worth keeping that do not belong in \
 the repository go to the project's artifacts: devpit_artifacts lists them, \
