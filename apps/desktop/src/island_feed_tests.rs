@@ -212,6 +212,7 @@ fn a_step_whose_tool_failed_says_so() {
         using("Bash", "npm test"),
         Event::UseFailed {
             tool: "Bash".to_owned(),
+            error: None,
         },
     ])
     .expect("a session");

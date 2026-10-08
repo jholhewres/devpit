@@ -326,6 +326,16 @@ fn respond_in(
     if asked.method == "repo" {
         return repo(project, &card_id, &asked.params);
     }
+    if asked.method == "start" && asked.params.get("anyway").and_then(Value::as_bool) != Some(true)
+    {
+        let missing = crate::credentials::before_start(
+            Path::new(&project.root_path),
+            needs_file(&project.id).as_deref(),
+        );
+        if !missing.is_empty() {
+            return Err(crate::credentials::refused(&missing));
+        }
+    }
     let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
     let answer = match asked.method.as_str() {
         "context" => context(project, &board, Path::new(&asked.cwd)),
@@ -420,6 +430,15 @@ fn respond_in(
         }
     }
     Ok(answer)
+}
+
+/// The project's `needs.txt` in devpit's folder for it.
+fn needs_file(project_id: &str) -> Option<PathBuf> {
+    let store = crate::projects::store().ok()?;
+    let root = devpit_core::Store::root().ok()?;
+    devpit_core::home::ProjectHome::of(&store, &root, project_id)
+        .ok()
+        .map(|home| home.needs())
 }
 
 /// The profile whose orchestrator the agent stands in, or why it is refused:

@@ -252,7 +252,8 @@ fn a_tool_that_failed_is_heard() {
     assert_eq!(
         read(payload).expect("read").event,
         Event::UseFailed {
-            tool: "Bash".to_owned()
+            tool: "Bash".to_owned(),
+            error: Some("exit 1".to_owned()),
         }
     );
 }

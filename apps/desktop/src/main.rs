@@ -81,6 +81,7 @@ mod checkpoint_tested;
 mod claude_plugin;
 #[cfg(any(debug_assertions, test))]
 mod contract;
+mod credentials;
 mod cycles;
 mod deciding;
 mod decisions;

@@ -39,7 +39,8 @@ fn a_tool_that_failed_and_a_turn_that_ended_read_as_such() {
     assert_eq!(
         failed.event,
         Event::UseFailed {
-            tool: "Read".to_owned()
+            tool: "Read".to_owned(),
+            error: None,
         }
     );
 

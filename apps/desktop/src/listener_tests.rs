@@ -18,6 +18,8 @@ struct Recorded {
     said: Mutex<Vec<(String, serde_json::Value)>>,
     /// The cards a session took a prompt on.
     prompted: Mutex<Vec<String>>,
+    /// The commands a missing sign-in was told with.
+    lacked: Mutex<Vec<String>>,
 }
 
 impl HookSink for Recorded {
@@ -37,6 +39,13 @@ impl HookSink for Recorded {
 
     fn activities(&self) -> &Mutex<Activities> {
         &self.activities
+    }
+
+    fn lacks(&self, _happening: &Happening, missing: &crate::credentials::Missing) {
+        self.lacked
+            .lock()
+            .expect("lacked")
+            .push(missing.command.clone());
     }
 
     fn card_prompted(&self, card_id: &str) {
@@ -159,6 +168,7 @@ fn a_hook_reaches_the_card() {
         activities: Mutex::default(),
         said: Mutex::default(),
         prompted: Mutex::default(),
+        lacked: Mutex::default(),
     };
     let state_of = |kind: SessionKind, reference: &str| {
         sink.activities
@@ -271,6 +281,7 @@ fn a_background_session_waiting_reaches_its_card() {
         activities: Mutex::default(),
         said: Mutex::default(),
         prompted: Mutex::default(),
+        lacked: Mutex::default(),
     };
 
     let posted = Posted {
@@ -330,6 +341,7 @@ fn a_hook_from_an_archived_cards_pane_does_not_bring_it_back() {
         activities: Mutex::default(),
         said: Mutex::default(),
         prompted: Mutex::default(),
+        lacked: Mutex::default(),
     };
     let posted = Posted {
         body: PAYLOAD.to_owned(),
@@ -406,6 +418,7 @@ fn a_prompt_in_a_cards_session_moves_its_card_along() {
         activities: Mutex::default(),
         said: Mutex::default(),
         prompted: Mutex::default(),
+        lacked: Mutex::default(),
     };
     let said = |event: &str| Posted {
         body: format!(r#"{{"hook_event_name":"{event}","session_id":"s-bg","cwd":"/w/card"}}"#),
@@ -417,4 +430,41 @@ fn a_prompt_in_a_cards_session_moves_its_card_along() {
     assert!(sink.prompted.lock().expect("prompted").is_empty());
     hear_post(&sink, &said("UserPromptSubmit"), next_seq());
     assert_eq!(*sink.prompted.lock().expect("prompted"), [card]);
+}
+
+/// A tool that failed for want of a sign-in tells the person the command; any
+/// other failure tells nothing.
+#[test]
+fn a_tool_that_fails_for_a_sign_in_says_what_fixes_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sink = Recorded {
+        store_path: dir.path().join("state.db"),
+        activities: Mutex::default(),
+        said: Mutex::default(),
+        prompted: Mutex::default(),
+        lacked: Mutex::default(),
+    };
+    let posted = |error: &str| Posted {
+        body: serde_json::json!({
+            "hook_event_name": "PostToolUseFailure",
+            "session_id": "s-cred",
+            "cwd": "/w",
+            "tool_name": "Bash",
+            "error": error,
+        })
+        .to_string(),
+        pane: None,
+        secret: None,
+        agent: false,
+    };
+    hear_post(&sink, &posted("error[E0425]: cannot find value"), 1);
+    hear_post(
+        &sink,
+        &posted("An error occurred (ExpiredToken) ... --profile asc"),
+        2,
+    );
+    assert_eq!(
+        *sink.lacked.lock().expect("lacked"),
+        ["aws sso login --profile asc"]
+    );
 }

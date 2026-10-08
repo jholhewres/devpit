@@ -381,7 +381,7 @@ pub(crate) fn fold(
             let over = session.steps.len().saturating_sub(STEPS);
             session.steps.drain(..over);
         }
-        Event::Used { tool } | Event::UseFailed { tool } => {
+        Event::Used { tool } | Event::UseFailed { tool, .. } => {
             if let Some(step) = session
                 .steps
                 .iter_mut()

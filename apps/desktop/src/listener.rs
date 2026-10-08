@@ -267,6 +267,15 @@ fn hear_post(sink: &impl HookSink, posted: &Posted, seq: u64) -> &'static str {
         // An event this app does not read: settled, by being left alone.
         None => "ignored",
         Some(happening) => {
+            if let Event::UseFailed {
+                tool,
+                error: Some(error),
+            } = &happening.event
+            {
+                if let Some(missing) = crate::credentials::missing_in(tool, error) {
+                    sink.lacks(&happening, &missing);
+                }
+            }
             sink.to_window("agent:happening", describe(&happening));
             crate::island_feed::heard(sink, posted.pane.as_deref(), &happening, now_ms());
             heard(sink, posted.pane.as_deref(), &happening, seq)
@@ -445,6 +454,8 @@ pub(crate) trait HookSink {
     fn card_prompted(&self, _card_id: &str) {}
     /// A session of a card edited or wrote a file, perhaps outside its checkout.
     fn card_touched(&self, _card_id: &str, _path: &str) {}
+    /// A tool failed for want of a sign-in: the person is told what fixes it.
+    fn lacks(&self, _happening: &Happening, _missing: &crate::credentials::Missing) {}
 }
 
 impl HookSink for AppHandle {
@@ -466,6 +477,29 @@ impl HookSink for AppHandle {
 
     fn store(&self) -> Option<Store> {
         Store::open_default().ok()
+    }
+
+    fn lacks(&self, happening: &Happening, missing: &crate::credentials::Missing) {
+        if !crate::credentials::first_time(&happening.session_id, &missing.command) {
+            return;
+        }
+        let project = crate::projects::project_list_unread_now()
+            .ok()
+            .and_then(|listed| {
+                crate::agent_api::project_at(&listed.projects, Path::new(&happening.cwd))
+                    .map(|one| one.id.clone())
+            });
+        crate::notices::ring(
+            self,
+            project.as_deref(),
+            crate::notices::kind::AGENT,
+            &format!("A session is missing a sign-in: {}", missing.what),
+            Some(&format!(
+                "Run `{}`, then tell the session to go on.",
+                missing.command
+            )),
+            None,
+        );
     }
 
     fn activities(&self) -> &Mutex<Activities> {
@@ -519,7 +553,7 @@ fn describe(happening: &Happening) -> (String, String) {
         } => format!("running {tool} {target}"),
         Event::Using { tool, .. } => format!("running {tool}"),
         Event::Used { tool } => format!("finished {tool}"),
-        Event::UseFailed { tool } => format!("{tool} failed"),
+        Event::UseFailed { tool, .. } => format!("{tool} failed"),
         Event::Stopped { said } => said
             .clone()
             .unwrap_or_else(|| "finished the turn".to_owned()),

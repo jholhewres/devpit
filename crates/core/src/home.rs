@@ -202,6 +202,11 @@ impl ProjectHome {
         self.dir().join("prime.json")
     }
 
+    /// The sign-ins this project's sessions need, checked before one starts.
+    pub fn needs(&self) -> PathBuf {
+        self.dir().join("needs.txt")
+    }
+
     /// Pictures pasted into the composer.
     pub fn pasted(&self) -> PathBuf {
         self.dir().join("pasted")

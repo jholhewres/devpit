@@ -55,8 +55,8 @@ pub enum Event {
     },
     /// Finished a tool.
     Used { tool: String },
-    /// A tool that failed, which sends no `Used`.
-    UseFailed { tool: String },
+    /// A tool that failed, which sends no `Used`, with what it said.
+    UseFailed { tool: String, error: Option<String> },
     /// A person sent a prompt, so a turn has begun — the only word a turn that
     /// answers in text alone ever sends before its `Stop`.
     Prompted,
@@ -175,6 +175,7 @@ pub fn read(payload: &str) -> Option<Happening> {
         }
         "PostToolUseFailure" => Event::UseFailed {
             tool: raw.tool_name?,
+            error: raw.error,
         },
         "UserPromptSubmit" => Event::Prompted,
         "Stop" => Event::Stopped {
