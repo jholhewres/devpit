@@ -91,6 +91,7 @@ mod error_reports;
 mod error_sender;
 mod files;
 mod filetree;
+mod folder_trust;
 mod front;
 mod handler;
 mod happening;
@@ -189,6 +190,7 @@ mod transcribe;
 #[cfg(any(windows, test))]
 mod tap_file;
 mod threads;
+mod trust_answer;
 mod turn_changes;
 mod update;
 mod update_deb;

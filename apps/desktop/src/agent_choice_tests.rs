@@ -79,3 +79,15 @@ fn switching_the_hooks_off_survives_closing_the_database() {
     drop(store);
     assert!(!read(&open(dir.path())).hooks);
 }
+
+#[test]
+fn folders_are_trusted_until_somebody_says_otherwise() {
+    // Adding the project is the consent; turning it off is a choice.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = open(dir.path());
+    assert!(read(&store).trust);
+    store
+        .set_preference_flag(preference::AGENT_TRUST, false)
+        .expect("write");
+    assert!(!read(&store).trust);
+}

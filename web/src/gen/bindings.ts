@@ -515,6 +515,8 @@ export const commands = {
 	agentEnabledSet: (id: string, on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_enabled_set", { id, on })),
 	/**  `agent.hooks_set` — whether devpit asks for progress at all. */
 	agentHooksSet: (on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_hooks_set", { on })),
+	/**  `agent.trust_set` — whether added projects' folders are marked trusted. */
+	agentTrustSet: (on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_trust_set", { on })),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -1670,6 +1672,11 @@ export type AgentChoice = {
 	 *  turning this off is the whole of turning it off.
 	 */
 	hooks: boolean,
+	/**
+	 *  Whether the folders of the projects the person adds, and their
+	 *  worktrees, are marked trusted for Claude Code before a session opens.
+	 */
+	trust: boolean,
 };
 
 export type AgentEvent = {

@@ -423,9 +423,16 @@ pub async fn session_launch_agent(
     // that long would stall every other thing the project wants to do.
     let waiting = session.clone();
     let waited = pane_id.clone();
-    let ready = tauri::async_runtime::spawn_blocking(move || settled(&waiting, &waited))
-        .await
-        .map_err(|err| RpcError::internal(err.to_string()))?;
+    let trusting = layout.project_id.clone();
+    let ready = tauri::async_runtime::spawn_blocking(move || {
+        // A project added before devpit trusted folders gets it at its first agent.
+        if let Ok(root) = crate::roots::root_of(&trusting, None) {
+            crate::folder_trust::trust(&[&root]);
+        }
+        settled(&waiting, &waited)
+    })
+    .await
+    .map_err(|err| RpcError::internal(err.to_string()))?;
 
     if let Ready::Busy(command) = ready {
         return Err(RpcError::new(

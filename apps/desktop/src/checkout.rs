@@ -120,6 +120,8 @@ pub fn checkout_of(
     store
         .set_card_front(card_id, made.path.to_str(), Some(made.base_ref.as_str()))
         .map_err(|err| err.to_string())?;
+    // A worktree is a git root of its own: the main checkout's trust stops short of it.
+    crate::folder_trust::trust(&[&made.path]);
 
     let declared = prime::read(
         &devpit_core::home::ProjectHome::of(store, &home, &project_id)

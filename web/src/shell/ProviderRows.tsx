@@ -30,7 +30,7 @@ const NEW = '+new'
 
 export function ProviderRows(): React.JSX.Element {
   const [profiles, setProfiles] = useState<readonly Profile[]>([])
-  const [choice, setChoice] = useState<AgentChoice>({ defaultId: NO_AGENT, disabled: [], hooks: true })
+  const [choice, setChoice] = useState<AgentChoice>({ defaultId: NO_AGENT, disabled: [], hooks: true, trust: true })
   const [checked, setChecked] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
@@ -78,6 +78,14 @@ export function ProviderRows(): React.JSX.Element {
   const setHooks = (on: boolean): void =>
     act(() =>
       ask(() => commands.agentHooksSet(on)).then((answer) => {
+        if (answer.data) setChoice(answer.data)
+        return answer
+      }),
+    )
+
+  const setTrust = (on: boolean): void =>
+    act(() =>
+      ask(() => commands.agentTrustSet(on)).then((answer) => {
         if (answer.data) setChoice(answer.data)
         return answer
       }),
@@ -184,6 +192,22 @@ export function ProviderRows(): React.JSX.Element {
             with the launch &mdash; nothing is written into your own configuration, so turning
             this off is the whole of turning it off. Any other agent can report with{' '}
             <code>devpit-agent hook --agent &lt;name&gt; &lt;event&gt;</code>, run in one of devpit&rsquo;s terminals.
+          </>
+        }
+      />
+
+      <PrefSwitch
+        on={choice.trust}
+        disabled={busy}
+        onFlip={() => setTrust(!choice.trust)}
+        title="Trust the folders of the projects I add"
+        said="Claude Code stops asking whether to trust a project's folder or its worktrees."
+        more={
+          <>
+            Adding a project is the answer: devpit writes it into each Claude Code account it knows,
+            when the project is added and when a worktree is made. A trusted folder&rsquo;s own{' '}
+            <code>.claude</code> settings &mdash; hooks, permissions &mdash; apply without asking, so
+            add only what you would trust by hand. Off, the question comes back for new folders.
           </>
         }
       />

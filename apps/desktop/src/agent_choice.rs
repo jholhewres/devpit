@@ -28,6 +28,9 @@ pub struct AgentChoice {
     /// starts — nothing is written into anybody's own configuration, so
     /// turning this off is the whole of turning it off.
     pub hooks: bool,
+    /// Whether the folders of the projects the person adds, and their
+    /// worktrees, are marked trusted for Claude Code before a session opens.
+    pub trust: bool,
 }
 
 fn read(store: &devpit_core::Store) -> AgentChoice {
@@ -52,12 +55,23 @@ fn read(store: &devpit_core::Store) -> AgentChoice {
             .ok()
             .flatten()
             .unwrap_or(true),
+        // On unless turned off: adding the project is the consent.
+        trust: store
+            .preference_flag(preference::AGENT_TRUST)
+            .ok()
+            .flatten()
+            .unwrap_or(true),
     }
 }
 
 /// Whether an agent devpit starts is told to report what it is doing.
 pub(crate) fn hooks_on(store: &devpit_core::Store) -> bool {
     read(store).hooks
+}
+
+/// Whether devpit marks the folders of added projects trusted.
+pub(crate) fn trust_on(store: &devpit_core::Store) -> bool {
+    read(store).trust
 }
 
 /// What a new terminal opens, for whoever needs to start where it starts.
@@ -140,6 +154,18 @@ pub(crate) fn agent_hooks_set_now(on: bool) -> Result<AgentChoice, RpcError> {
     let store = crate::projects::store()?;
     store.set_preference_flag(preference::AGENT_HOOKS, on)?;
     Ok(read(&store))
+}
+
+/// `agent.trust_set` — whether added projects' folders are marked trusted.
+#[tauri::command]
+#[specta::specta]
+pub async fn agent_trust_set(on: bool) -> Result<AgentChoice, RpcError> {
+    crate::off_main::blocking(move || {
+        let store = crate::projects::store()?;
+        store.set_preference_flag(preference::AGENT_TRUST, on)?;
+        Ok(read(&store))
+    })
+    .await
 }
 
 #[cfg(test)]

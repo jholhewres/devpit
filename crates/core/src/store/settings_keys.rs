@@ -27,6 +27,9 @@ pub const AGENT_DEFAULT: &str = "agents.default";
 pub const AGENTS_DISABLED: &str = "agents.disabled";
 /// Whether devpit tells the agents it starts to report what they are doing.
 pub const AGENT_HOOKS: &str = "agents.hooks";
+/// Whether devpit tells Claude Code that the folders of the projects it adds,
+/// and their worktrees, are trusted. On unless turned off.
+pub const AGENT_TRUST: &str = "agents.trust_folders";
 /// How wide the two side panels were left, in pixels.
 pub const SIDEBAR_WIDTH: &str = "layout.sidebar_width";
 pub const FILES_WIDTH: &str = "layout.files_width";

@@ -119,9 +119,12 @@ pub(crate) fn typed_in(
     let session = devpit_tmux::Server::session_name(project_id);
     let target = devpit_tmux::Server::target(&session, &layout.focused_id);
     let _ = crate::shell_launch::settled(&session, &layout.focused_id);
+    // Before the CLI looks: a session stopped on the trust question is not up.
+    crate::folder_trust::trust(&[cwd]);
     crate::sessions::tmux_server()?
         .send_keys(&target, line)
         .map_err(|err| RpcError::internal(err.to_string()))?;
+    crate::trust_answer::watch(target);
     Ok(layout.focused_id)
 }
 

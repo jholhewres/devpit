@@ -155,6 +155,8 @@ pub(crate) fn project_add_now(root_path: String) -> Result<Project, RpcError> {
     let store = store()?;
     let origin = origin_url(&root);
     let id = store.add_project(&root, origin.as_deref())?;
+    // Adding the folder is the consent the CLI's trust question asks for.
+    crate::folder_trust::trust(&[&root]);
 
     let row = store
         .project(&id)?

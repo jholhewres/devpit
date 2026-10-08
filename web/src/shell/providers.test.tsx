@@ -8,7 +8,7 @@ afterEach(cleanup)
 
 let listed: Profile[] = []
 let known: KnownAgent[] = []
-let choice: AgentChoice = { defaultId: '', disabled: [], hooks: true }
+let choice: AgentChoice = { defaultId: '', disabled: [], hooks: true, trust: true }
 let refusal: string | null = null
 const saved = vi.fn()
 const removed = vi.fn()
@@ -17,6 +17,7 @@ const switched = vi.fn()
 let signIn: 'saved' | 'missing' | 'unknown' = 'saved'
 const asked: string[] = []
 const hooked = vi.fn()
+const trusting = vi.fn()
 
 const opened: string[] = []
 
@@ -37,6 +38,7 @@ vi.mock('./live', () => ({
     agentDefaultSet: (id: string) => (defaulted(id), { ...choice, defaultId: id }),
     agentEnabledSet: (id: string, on: boolean) => (switched(id, on), choice),
     agentHooksSet: (on: boolean) => (hooked(on), { ...choice, hooks: on }),
+    agentTrustSet: (on: boolean) => (trusting(on), { ...choice, trust: on }),
     agentProfileSave: (declared: Declared) => (saved(declared), listed),
     agentProfileRemove: (id: string) => (removed(id), listed),
     agentProfileRead: (command: string) => readBack(command),
@@ -73,7 +75,7 @@ const profile = (id: string, over: Partial<Profile> = {}): Profile => ({
 beforeEach(() => {
   listed = []
   known = [agent('claude', { label: 'Claude Code' })]
-  choice = { defaultId: '', disabled: [], hooks: true }
+  choice = { defaultId: '', disabled: [], hooks: true, trust: true }
   signIn = 'saved'
   asked.length = 0
   refusal = null
@@ -112,7 +114,7 @@ describe('what opens when I start a terminal', () => {
   })
 
   it('says which one is chosen', async () => {
-    choice = { defaultId: 'claude', disabled: [], hooks: true }
+    choice = { defaultId: 'claude', disabled: [], hooks: true, trust: true }
     await shown()
     const menu = picker()
     expect(within(menu).getByText('Claude Code').closest('[role="option"]')?.getAttribute('aria-selected')).toBe('true')
@@ -129,7 +131,7 @@ describe('what opens when I start a terminal', () => {
     // A default pointing at something absent opens nothing. Said here rather
     // than discovered at the next launch.
     known = [agent('gone', { installed: false })]
-    choice = { defaultId: 'gone', disabled: [], hooks: true }
+    choice = { defaultId: 'gone', disabled: [], hooks: true, trust: true }
     await shown()
     expect(screen.getByText(/not on this machine any more/)).toBeTruthy()
   })
@@ -341,7 +343,7 @@ describe('a switch you can switch back', () => {
     // Filtering the list the pane itself reads is how an agent turned off
     // becomes an agent nobody can turn back on.
     known = [agent('codex', { label: 'Codex', enabled: false })]
-    choice = { defaultId: '', disabled: ['codex'], hooks: true }
+    choice = { defaultId: '', disabled: ['codex'], hooks: true, trust: true }
     await shown()
     expect(screen.getByText('Codex')).toBeTruthy()
     expect(screen.getByText('Enabled')).toBeTruthy()
@@ -349,7 +351,7 @@ describe('a switch you can switch back', () => {
 
   it('turns it back on', async () => {
     known = [agent('codex', { label: 'Codex', enabled: false })]
-    choice = { defaultId: '', disabled: ['codex'], hooks: true }
+    choice = { defaultId: '', disabled: ['codex'], hooks: true, trust: true }
     await shown()
     fireEvent.click(screen.getByText('Enabled'))
     await waitFor(() => expect(switched).toHaveBeenCalledWith('codex', true))
@@ -357,7 +359,7 @@ describe('a switch you can switch back', () => {
 
   it('keeps it out of the default picker while it is off', async () => {
     known = [agent('codex', { label: 'Codex', enabled: false })]
-    choice = { defaultId: '', disabled: ['codex'], hooks: true }
+    choice = { defaultId: '', disabled: ['codex'], hooks: true, trust: true }
     await shown()
     expect(picker().textContent).not.toContain('Codex')
   })
@@ -391,7 +393,7 @@ describe('a switch that shows what it did', () => {
   it('reads as switched the moment it is, not after the pane is opened again', async () => {
     // The catalogue's own flag is read once; the choice is what the switch changes.
     known = [agent('codex', { label: 'Codex', enabled: false })]
-    choice = { defaultId: '', disabled: [], hooks: true }
+    choice = { defaultId: '', disabled: [], hooks: true, trust: true }
     await shown()
     expect(picker().textContent).toContain('Codex')
   })
@@ -466,6 +468,14 @@ describe('the shape of the pane', () => {
     await waitFor(() => expect(hooked).toHaveBeenCalledWith(false))
   })
 
+  it('lets trusting the added folders be switched off', async () => {
+    await shown()
+    const row = screen.getByRole('switch', { name: /Trust the folders/ })
+    expect(row.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(row)
+    await waitFor(() => expect(trusting).toHaveBeenCalledWith(false))
+  })
+
   it('says in the picker what each one runs', async () => {
     known = [agent('claude', { label: 'Claude Code' })]
     await shown()
@@ -473,7 +483,7 @@ describe('the shape of the pane', () => {
   })
 
   it('names the one that is chosen on the menu itself', async () => {
-    choice = { defaultId: 'claude', disabled: [], hooks: true }
+    choice = { defaultId: 'claude', disabled: [], hooks: true, trust: true }
     await shown()
     expect(screen.getByRole('button', { name: 'Default agent' }).textContent).toContain('Claude Code')
   })
