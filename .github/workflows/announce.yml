@@ -1,0 +1,42 @@
+name: Announce
+
+# The release's Discord post, by hand: to read what a version would say, or to
+# post one again. It publishes no release and touches no tag.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, as in CHANGELOG.md (e.g. 0.1.38)'
+        required: true
+      post:
+        description: 'Post it to #releases (off prints it only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+
+      - name: What would be posted
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          cargo xtask release-announcement "$VERSION" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION" > announcement.json
+          cat announcement.json
+
+      - name: Post it
+        if: ${{ inputs.post }}
+        env:
+          DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+        run: |
+          curl -fsS -H 'Content-Type: application/json' \
+            --data @announcement.json "$DISCORD_RELEASES_WEBHOOK" > /dev/null

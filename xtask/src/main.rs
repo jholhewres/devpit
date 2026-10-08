@@ -21,6 +21,7 @@ mod packaging;
 mod platform_window;
 mod ratchet;
 mod reachable;
+mod release_announcement;
 mod release_manifest;
 mod release_notes;
 mod release_workflow;
@@ -41,6 +42,7 @@ fn main() -> ExitCode {
         "controls" => controls(),
         "release-manifest" => release_manifest_command(),
         "release-notes" => release_notes_command(),
+        "release-announcement" => release_announcement_command(),
         other => {
             eprintln!("unknown command: {other}\n\nusage: cargo xtask check | ceilings | controls");
             ExitCode::FAILURE
@@ -89,6 +91,26 @@ fn release_notes_command() -> ExitCode {
     match release_notes::run(&workspace_root(), &version) {
         Ok(notes) => {
             println!("{notes}");
+            ExitCode::SUCCESS
+        }
+        Err(why) => {
+            eprintln!("{why}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `cargo xtask release-announcement <version> <url>` — the `#releases`
+/// post for it, as a Discord webhook body. Posting is the caller's.
+fn release_announcement_command() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(2).collect();
+    let [version, url] = args.as_slice() else {
+        eprintln!("usage: cargo xtask release-announcement <version> <url>");
+        return ExitCode::FAILURE;
+    };
+    match release_announcement::run(&workspace_root(), version, url) {
+        Ok(body) => {
+            println!("{body}");
             ExitCode::SUCCESS
         }
         Err(why) => {
