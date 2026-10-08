@@ -62,4 +62,5 @@ Windows, manual downloads, updates and uninstalling:
 - [Building and running](docs/building.md)
 - [The model](docs/the-model.md) · [Architecture](docs/architecture.md)
 - [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
+- [Community on Discord](https://discord.gg/yW8VUyY63b)
 - [Licence: Apache 2.0](LICENSE)

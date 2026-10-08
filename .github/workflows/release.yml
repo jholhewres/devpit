@@ -400,3 +400,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$GITHUB_REF_NAME" target/release/manifests/latest-*.json
+
+      # Told last, and allowed to fail: the release is out either way, and a
+      # Discord outage is no reason to mark it red. Without the secret it says
+      # so and posts nothing.
+      - name: Announce in the community's releases channel
+        continue-on-error: true
+        env:
+          DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_RELEASES_WEBHOOK" ]; then
+            echo "No DISCORD_RELEASES_WEBHOOK; nothing announced."
+            exit 0
+          fi
+          cargo xtask release-announcement "${GITHUB_REF_NAME#v}" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" \
+            > target/release/announcement.json
+          curl -fsS -H 'Content-Type: application/json' \
+            --data @target/release/announcement.json "$DISCORD_RELEASES_WEBHOOK" > /dev/null

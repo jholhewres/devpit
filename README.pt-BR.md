@@ -62,4 +62,5 @@ download manual, atualização e desinstalação:
 - [Compilando e rodando](docs/pt-BR/building.md)
 - [O modelo](docs/the-model.md) · [Arquitetura](docs/architecture.md) (em inglês)
 - [Changelog](CHANGELOG.md) · [Como contribuir](CONTRIBUTING.md)
+- [Comunidade no Discord](https://discord.gg/yW8VUyY63b)
 - [Licença: Apache 2.0](LICENSE)

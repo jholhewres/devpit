@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import { useAway } from './away'
 import { CapabilityRows } from './CapabilityRows'
+import { CommunityMenuItem } from './Community'
 import type { PaneName } from './paneList'
 import { SessionRows } from './SessionRowsView'
 import { Threads } from './Threads'
@@ -185,6 +186,7 @@ export function Sidebar({
               {/* One item, because Profile, What's saved and Devices were
                    three names for the same preferences pane. */}
               <button className="newmenu__item" role="menuitem" onClick={() => openPrefs('account')}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg></span><span className="newmenu__label">Account</span></button>
+              <CommunityMenuItem onPick={() => setMenu(null)} />
               <div className="acct__sep"></div>
             <button className="newmenu__item" role="menuitem" data-danger onClick={signOut}><span className="newmenu__ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></svg></span><span className="newmenu__label">Sign out</span></button>
             </div>
