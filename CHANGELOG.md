@@ -3,6 +3,43 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.40 — 2026-10-08
+
+### Channels
+
+- **devpit tells you what waits on you while you are away from it.**
+  Settings → Channels sends a session waiting on a question, failing or
+  finishing, a draft ready, a reminder, a step failing or devpit's MCP
+  restarting to the channels you connect — never while devpit's window is
+  in front or devpit is paused.
+- **Telegram, through your own bot.** Paste its token from @BotFather and
+  send it the code devpit shows: messages go straight from this computer,
+  with no server of ours in between. The token is kept on this computer,
+  readable by you alone, and never shown again.
+- **E-mail and push on your phone, through devpit.app.** Switch on
+  *Send notices through devpit.app* and choose at devpit.app/account: e-mail
+  (after you confirm the address, with a one-click way out) and push on any
+  device that installs devpit.app. Only that something waits leaves this
+  computer, unless you switch titles on; devpit.app keeps nothing of it.
+- **Buttons that act on this computer.** *Send the draft*, *Done* and *In 15
+  minutes* for a reminder, and the first two choices of a session stopped on
+  a question — picked only while it is still the question on its screen. A
+  button works once, for half an hour, and this computer does it as you.
+- **Which event goes where, quiet hours and one message for many.** A
+  matrix of events and channels, quiet hours by day that a reminder you set
+  still breaks, and a short wait that turns five sessions finishing at once
+  into one message.
+
+### Remote
+
+- **Start work from your phone.** A device allowed to type makes a card and
+  starts a session, on a card or in the project, checked for the sign-ins
+  the project needs like any other start. The board opens with what waits
+  on you.
+- **Your card dates as a calendar.** Settings → General → Remote gives an
+  address a calendar app on one of your tailnet's devices subscribes to;
+  *New address* retires the old one.
+
 ## 0.1.39 — 2026-10-08
 
 ### Sessions
