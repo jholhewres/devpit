@@ -176,6 +176,15 @@ fn serve(
     match (request.method.as_str(), request.path.as_str()) {
         ("GET", "/api/ws") => upgrade(app, stream, &request, root),
         ("POST", "/api/pair") => pair(&app, &mut stream, &request, &root),
+        ("GET", path) if path.starts_with("/cal/") => match crate::calendar::served(path) {
+            Some(calendar) => reply(
+                &mut stream,
+                "200 OK",
+                "text/calendar; charset=utf-8",
+                calendar.as_bytes(),
+            ),
+            None => reply(&mut stream, "404 Not Found", "text/plain", b""),
+        },
         ("GET", path) => file(&app, &mut stream, path),
         _ => reply(&mut stream, "404 Not Found", "text/plain", b""),
     }

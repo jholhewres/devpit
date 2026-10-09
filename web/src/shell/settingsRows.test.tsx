@@ -39,6 +39,8 @@ vi.mock('./live', () => ({
     remoteAllow: async (id: string, typing: boolean, answering: boolean) => (allowed(id, typing, answering), view()),
     remoteForget: async () => view(),
     transcribeRead: async () => voice(),
+    calendarLink: async () => ({ path: '/cal/secret.ics' }),
+    calendarRenew: async () => ({ path: '/cal/fresh.ics' }),
   },
 }))
 
@@ -114,5 +116,14 @@ describe('Voice in Settings', () => {
     render(<VoiceSettings />)
     fireEvent.click(await screen.findByRole('button', { name: 'Check again' }))
     await screen.findByText('Still no whisper on this machine.')
+  })
+})
+
+describe('the Remote calendar', () => {
+  it('offers the calendar at the machine’s own address, and a new one', async () => {
+    render(<RemoteSettings />)
+    expect(await screen.findByText('Copy its address')).toBeTruthy()
+    fireEvent.click(screen.getByText('New address'))
+    expect(await screen.findByText('Copy its address')).toBeTruthy()
   })
 })

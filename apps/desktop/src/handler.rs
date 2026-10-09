@@ -144,6 +144,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         crate::telegram::telegram_unlink,
         crate::hub::hub_status,
         crate::hub::hub_set,
+        crate::calendar::calendar_link,
+        crate::calendar::calendar_renew,
         agent_profiles::agent_profiles,
         agent_profiles::agent_profile_save,
         agent_profiles::agent_profile_read,

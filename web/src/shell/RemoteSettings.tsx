@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { RemoteActivity, RemoteDevice, RemotePairing, RemoteView } from '../gen/bindings'
 import { ask, commands } from './live'
+import { CalendarRow } from './CalendarRow'
 import { PlusLink } from './PlusLink'
 import { PrefSwitch } from './PrefSwitch'
 import { launcherLink } from './remoteLauncher'
@@ -78,6 +79,7 @@ export function RemoteSettings(): React.JSX.Element {
       {view.enabled && (
         <>
           {view.address ? <RemoteAddress address={view.address} login={tailscale.login} /> : <span className="pref__d">{view.problem ?? 'Not reachable yet.'}</span>}
+          {view.address && <CalendarRow address={view.address} />}
           {missing && <span className="pref__d">{missing}</span>}
           {!tailscale.installed && <PlusLink from="app-remote" said="Without Tailscale, a relay encrypted end to end is planned for devpit Plus." />}
           {said && <span className="pref__d voice__bad">{said}</span>}

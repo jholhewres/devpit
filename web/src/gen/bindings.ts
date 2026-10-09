@@ -540,6 +540,10 @@ export const commands = {
 	hubStatus: () => typedError<HubStatus, RpcError>(__TAURI_INVOKE("hub_status")),
 	/**  `hub.set` — whether notices go through devpit.app, and whether they name things. */
 	hubSet: (on: boolean, titles: boolean) => typedError<HubStatus, RpcError>(__TAURI_INVOKE("hub_set", { on, titles })),
+	/**  `calendar.link` — the calendar's path on the Remote, made the first time. */
+	calendarLink: () => typedError<CalendarLink, RpcError>(__TAURI_INVOKE("calendar_link")),
+	/**  `calendar.renew` — a new address; the old one stops answering. */
+	calendarRenew: () => typedError<CalendarLink, RpcError>(__TAURI_INVOKE("calendar_renew")),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -1880,6 +1884,11 @@ export type Branch = {
 
 export type Branches = {
 	branches: Branch[],
+};
+
+/**  The calendar's path on the Remote, with its secret. */
+export type CalendarLink = {
+	path: string,
 };
 
 /**  How a tool call ended, or that it has not. */

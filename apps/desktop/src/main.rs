@@ -56,6 +56,7 @@ mod runs_list;
 mod agent_choice;
 mod agent_decide;
 mod agent_profiles;
+mod calendar;
 mod card_activity;
 mod card_chat;
 mod card_elsewhere;

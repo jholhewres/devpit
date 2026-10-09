@@ -96,3 +96,10 @@ pub struct HubStatus {
     /// Signed in to devpit.app on this machine, which the hub needs.
     pub signed_in: bool,
 }
+
+/// The calendar's path on the Remote, with its secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarLink {
+    pub path: String,
+}
