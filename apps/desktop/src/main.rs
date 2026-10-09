@@ -66,6 +66,7 @@ mod card_sessions;
 mod card_work;
 mod cards;
 mod chaining;
+mod channel_actions;
 mod channel_rules;
 mod channels;
 mod chat;
@@ -102,6 +103,7 @@ mod handoff;
 mod happening;
 mod heads_down;
 mod history;
+mod hub;
 mod in_flight;
 mod index;
 #[cfg(target_os = "linux")]
@@ -338,6 +340,8 @@ fn main() {
             tauri::Manager::manage(app, sessions::SessionState::new(app.handle().clone()));
             // The person's Telegram bot, listened to from here when one is set up.
             telegram::listen(app.handle());
+            // Buttons pressed on devpit.app's channels, done here.
+            hub::listen();
             // The window rebuilt around a container that can hold a page
             // *beside* the app rather than under it. Done now, while the
             // window has exactly one webview in it, so the swap has nothing to

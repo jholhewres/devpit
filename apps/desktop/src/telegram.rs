@@ -8,8 +8,7 @@
 //! bot, and that chat is the one devpit talks to and listens to; any other
 //! chat is ignored.
 
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use devpit_rpc::{ChannelInfo, RpcError, TelegramStatus};
@@ -17,14 +16,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
-use crate::channels::Action;
-
 pub(crate) const ID: &str = "telegram";
 const API: &str = "https://api.telegram.org";
 /// How long a linking code holds.
 const CODE_SECS: i64 = 10 * 60;
-/// Buttons kept answerable; older ones say they have expired.
-const KEPT_ACTIONS: usize = 200;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -96,34 +91,17 @@ async fn call(token: &str, method: &str, body: Value) -> Result<Value, String> {
     Ok(said["result"].clone())
 }
 
-fn actions() -> &'static Mutex<HashMap<String, Action>> {
-    static ACTIONS: OnceLock<Mutex<HashMap<String, Action>>> = OnceLock::new();
-    ACTIONS.get_or_init(Mutex::default)
-}
-
-fn label(action: &Action) -> &'static str {
-    match action {
-        Action::SendDraft { .. } => "Send the draft",
-        Action::ReminderDone { .. } => "Done",
-        Action::Snooze { .. } => "In 15 minutes",
-    }
-}
-
 /// Sends `text` to the linked chat, with a button per action.
-pub(crate) fn send(text: &str, offered: &[Action]) {
+pub(crate) fn send(text: &str, offered: &[crate::channels::Action]) {
     let Some(kept) = read() else { return };
     let Some(chat) = kept.chat_id else { return };
-    let mut row = Vec::new();
-    if let Ok(mut held) = actions().lock() {
-        if held.len() > KEPT_ACTIONS {
-            held.clear();
-        }
-        for action in offered {
-            let key = ulid::Ulid::generate().to_string();
-            row.push(json!({ "text": label(action), "callback_data": format!("a:{key}") }));
-            held.insert(key, action.clone());
-        }
-    }
+    let row: Vec<Value> = offered
+        .iter()
+        .map(|action| {
+            let key = crate::channel_actions::remember(action);
+            json!({ "text": crate::channel_actions::label(action), "callback_data": format!("a:{key}") })
+        })
+        .collect();
     let mut body = json!({ "chat_id": chat, "text": text });
     if !row.is_empty() {
         body["reply_markup"] = json!({ "inline_keyboard": [row] });
@@ -144,44 +122,6 @@ pub(crate) fn links(kept: &Kept, said: &str, now: i64) -> bool {
     let said = said.trim();
     let said = said.strip_prefix("/start").map(str::trim).unwrap_or(said);
     now < kept.code_until && said.eq_ignore_ascii_case(code)
-}
-
-/// Does what a button asks, here, and answers what happened.
-fn act(action: &Action) -> String {
-    let now = devpit_core::reports::now() as i64;
-    let done = match action {
-        Action::SendDraft { profile, session } => {
-            match crate::reply_drafts::drafted(profile, session) {
-                Some(draft) => {
-                    crate::live_sessions::reply_now(profile, session, &draft, Some("Telegram"))
-                        .map(|_| format!("Sent to {session}."))
-                        .map_err(|err| err.message)
-                }
-                None => Err("That draft is no longer waiting.".to_owned()),
-            }
-        }
-        Action::ReminderDone { card_id } => crate::projects::store()
-            .map_err(|err| err.message)
-            .and_then(|store| {
-                store
-                    .handle_reminder(card_id, now)
-                    .map_err(|err| err.to_string())
-            })
-            .map(|_| "Marked done.".to_owned()),
-        Action::Snooze { card_id } => crate::projects::store()
-            .map_err(|err| err.message)
-            .and_then(|store| {
-                crate::reminders::snooze(&store, card_id, (now + 15 * 60) as f64, now)
-                    .map_err(|err| err.message)
-            })
-            .map(|_| "Again in 15 minutes.".to_owned()),
-    };
-    if matches!(action, Action::ReminderDone { .. } | Action::Snooze { .. }) {
-        if let Some(app) = app().get() {
-            crate::reminders::changed(app);
-        }
-    }
-    done.unwrap_or_else(|why| why)
 }
 
 /// One update from the bot: a linking code, or a button pressed in the linked chat.
@@ -211,11 +151,12 @@ async fn heard(update: &Value) {
         .and_then(|data| data.strip_prefix("a:"))
         .unwrap_or_default();
     let action = from_linked
-        .then(|| actions().lock().ok().and_then(|mut held| held.remove(key)))
+        .then(|| crate::channel_actions::take(key))
         .flatten();
-    let said = action
-        .as_ref()
-        .map_or_else(|| "That button has expired.".to_owned(), act);
+    let said = action.as_ref().map_or_else(
+        || "That button has expired.".to_owned(),
+        |action| crate::channel_actions::act(action, "Telegram"),
+    );
     let _ = call(
         &kept.token,
         "answerCallbackQuery",

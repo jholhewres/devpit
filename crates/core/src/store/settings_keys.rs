@@ -83,3 +83,7 @@ pub const DECISIONS_OPTED_OUT: &str = "decisions.opted_out";
 pub const DECISIONS_MODES: &str = "decisions.modes";
 /// Which events reach which channels, quiet hours and grouping, as JSON.
 pub const CHANNEL_RULES: &str = "channels.rules";
+/// Whether notices also go through devpit.app's hub (e-mail, push). Off unless turned on.
+pub const CHANNEL_HUB: &str = "channels.hub";
+/// Whether those notices name what they are about. Off unless turned on.
+pub const CHANNEL_HUB_TITLES: &str = "channels.hub_titles";

@@ -49,7 +49,10 @@ static GATHERING: AtomicBool = AtomicBool::new(false);
 
 /// The channels this machine can send on now.
 fn connected() -> Vec<ChannelInfo> {
-    crate::telegram::connected().into_iter().collect()
+    crate::telegram::connected()
+        .into_iter()
+        .chain(crate::hub::connected())
+        .collect()
 }
 
 fn ids(connected: &[ChannelInfo]) -> Vec<String> {
@@ -112,7 +115,11 @@ fn deliver(batch: &[Told]) {
                     .contains(&channel.id)
             })
             .collect();
-        let titles = crate::telegram::titles();
+        let titles = if channel.id == crate::hub::ID {
+            crate::hub::titles()
+        } else {
+            crate::telegram::titles()
+        };
         let lines: Vec<String> = mine
             .iter()
             .map(|one| {
@@ -130,8 +137,10 @@ fn deliver(batch: &[Told]) {
             [one] => one.actions.clone(),
             _ => Vec::new(),
         };
-        if channel.id == crate::telegram::ID {
-            crate::telegram::send(&text, &actions);
+        match channel.id.as_str() {
+            crate::telegram::ID => crate::telegram::send(&text, &actions),
+            crate::hub::ID => crate::hub::send(&text, &actions),
+            _ => {}
         }
     }
 }

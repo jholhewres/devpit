@@ -4,6 +4,7 @@ import type { ChannelRules, Channels } from '../gen/bindings'
 import { clock, EVENTS, flipped, minutes, offsetNow } from './channelRules'
 import { ask, commands } from './live'
 import { PlusLink } from './PlusLink'
+import { HubSetup } from './HubSetup'
 import { TelegramSetup } from './TelegramSetup'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -28,8 +29,9 @@ export function ChannelsPane(): React.JSX.Element {
     <>
       <h1 className="prefs__h">Channels</h1>
       <TelegramSetup onLinked={load} />
+      <HubSetup onChanged={load} />
       <p className="acc__note">
-        <PlusLink from="app-channels" said="Push on your phone, e-mail and a devpit bot that works with this computer off come with devpit Plus." />
+        <PlusLink from="app-channels" said="A devpit bot that works with this computer off, and more, come with devpit Plus." />
       </p>
 
       {rules && connected.length > 0 && (

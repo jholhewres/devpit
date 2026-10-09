@@ -138,6 +138,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         crate::telegram::telegram_link,
         crate::telegram::telegram_titles_set,
         crate::telegram::telegram_unlink,
+        crate::hub::hub_status,
+        crate::hub::hub_set,
         agent_profiles::agent_profiles,
         agent_profiles::agent_profile_save,
         agent_profiles::agent_profile_read,

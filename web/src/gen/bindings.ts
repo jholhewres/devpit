@@ -536,6 +536,10 @@ export const commands = {
 	telegramTitlesSet: (titles: boolean) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_titles_set", { titles })),
 	/**  `telegram.unlink` — forgets the bot and the chat. */
 	telegramUnlink: () => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_unlink")),
+	/**  `hub.status` */
+	hubStatus: () => typedError<HubStatus, RpcError>(__TAURI_INVOKE("hub_status")),
+	/**  `hub.set` — whether notices go through devpit.app, and whether they name things. */
+	hubSet: (on: boolean, titles: boolean) => typedError<HubStatus, RpcError>(__TAURI_INVOKE("hub_set", { on, titles })),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -2740,6 +2744,14 @@ export type Held = {
 	 *  yet" is honest; a row that says 0 B is not.
 	 */
 	exists: boolean,
+};
+
+/**  devpit.app as a channel: e-mail and push, set up at devpit.app/account. */
+export type HubStatus = {
+	on: boolean,
+	titles: boolean,
+	/**  Signed in to devpit.app on this machine, which the hub needs. */
+	signedIn: boolean,
 };
 
 /**

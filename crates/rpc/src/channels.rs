@@ -86,3 +86,13 @@ pub struct TelegramStatus {
     /// Whether messages name the session, card or project.
     pub titles: bool,
 }
+
+/// devpit.app as a channel: e-mail and push, set up at devpit.app/account.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct HubStatus {
+    pub on: bool,
+    pub titles: bool,
+    /// Signed in to devpit.app on this machine, which the hub needs.
+    pub signed_in: bool,
+}
