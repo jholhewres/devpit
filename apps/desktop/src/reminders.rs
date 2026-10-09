@@ -160,6 +160,7 @@ fn tell(app: &AppHandle, store: &Store, fired: &[ReminderRow]) {
                     card_id: one.card_id.clone(),
                 },
             ],
+            asking: None,
         });
     }
     if crate::island_notify::in_front(app) {

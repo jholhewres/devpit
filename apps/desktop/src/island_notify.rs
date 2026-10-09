@@ -102,6 +102,13 @@ pub(crate) fn changed(app: &tauri::AppHandle, session: &IslandSession, was: Opti
         }
         .to_owned(),
         actions: Vec::new(),
+        asking: match (tell, &session.project_id, &session.pane_id) {
+            (Tell::Waiting, Some(project), Some(pane)) => Some(devpit_tmux::Server::target(
+                &devpit_tmux::Server::session_name(project),
+                pane,
+            )),
+            _ => None,
+        },
     });
     let project = session.project_id.clone();
     let app = app.clone();
@@ -127,6 +134,7 @@ pub(crate) fn asked(app: &tauri::AppHandle, tool: &str, input: &str) {
         line: format!("An agent asks to {what}"),
         bare: "An agent is asking for a permission.".to_owned(),
         actions: Vec::new(),
+        asking: None,
     });
     let app = app.clone();
     std::thread::spawn(move || {

@@ -27,6 +27,13 @@ pub(crate) enum Action {
     Snooze {
         card_id: String,
     },
+    /// Picks a choice on the question a session is stopped on — only while
+    /// it is still the question that was offered.
+    Answer {
+        target: String,
+        seen: devpit_rpc::PendingPrompt,
+        choice: u32,
+    },
 }
 
 /// One thing to tell: what it is, a line saying it, and what it offers.
@@ -38,6 +45,9 @@ pub(crate) struct Told {
     /// Without names, for a channel that says only that something happened.
     pub bare: String,
     pub actions: Vec<Action>,
+    /// The terminal of a session waiting on a question: its choices become
+    /// buttons when the notice goes, by then drawn on its screen.
+    pub asking: Option<String>,
 }
 
 fn queue() -> &'static Mutex<Vec<Told>> {
@@ -134,7 +144,12 @@ fn deliver(batch: &[Told]) {
             continue;
         };
         let actions = match mine.as_slice() {
-            [one] => one.actions.clone(),
+            [one] => one
+                .actions
+                .iter()
+                .cloned()
+                .chain(choices(one.asking.as_deref()))
+                .collect(),
             _ => Vec::new(),
         };
         match channel.id.as_str() {
@@ -143,6 +158,26 @@ fn deliver(batch: &[Told]) {
             _ => {}
         }
     }
+}
+
+/// The first two choices of the question on terminal `target`, as buttons.
+fn choices(target: Option<&str>) -> Vec<Action> {
+    let Some(target) = target else {
+        return Vec::new();
+    };
+    let Some(seen) = crate::live_sessions::screen_of(target)
+        .as_deref()
+        .and_then(crate::live_prompt::pending)
+    else {
+        return Vec::new();
+    };
+    (0..seen.options.len().min(2) as u32)
+        .map(|choice| Action::Answer {
+            target: target.to_owned(),
+            seen: seen.clone(),
+            choice,
+        })
+        .collect()
 }
 
 /// `channels.read` — what is connected, and the rules.

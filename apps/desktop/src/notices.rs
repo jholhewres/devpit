@@ -142,6 +142,7 @@ pub fn run_ended(app: &tauri::AppHandle, store: &Store, card_id: &str, step: &st
             line: said.clone(),
             bare: "A step failed.".to_owned(),
             actions: Vec::new(),
+            asking: None,
         });
     }
     ring(

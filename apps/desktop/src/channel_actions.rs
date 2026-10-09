@@ -31,11 +31,28 @@ pub(crate) fn take(key: &str) -> Option<Action> {
     held().lock().ok()?.remove(key)
 }
 
-pub(crate) fn label(action: &Action) -> &'static str {
+pub(crate) fn label(action: &Action) -> String {
     match action {
-        Action::SendDraft { .. } => "Send the draft",
-        Action::ReminderDone { .. } => "Done",
-        Action::Snooze { .. } => "In 15 minutes",
+        Action::SendDraft { .. } => "Send the draft".to_owned(),
+        Action::ReminderDone { .. } => "Done".to_owned(),
+        Action::Snooze { .. } => "In 15 minutes".to_owned(),
+        Action::Answer { seen, choice, .. } => {
+            let said = seen
+                .options
+                .get(*choice as usize)
+                .map_or("", |one| one.label.as_str());
+            // A button's label is short: cut at a word, and say it was cut.
+            let short = if said.chars().count() <= 26 {
+                said.to_owned()
+            } else {
+                let cut: String = said.chars().take(26).collect();
+                format!(
+                    "{}…",
+                    cut.rsplit_once(' ').map_or(cut.as_str(), |(head, _)| head)
+                )
+            };
+            format!("{}. {short}", choice + 1)
+        }
     }
 }
 
@@ -68,6 +85,13 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
                     .map_err(|err| err.message)
             })
             .map(|_| "Again in 15 minutes.".to_owned()),
+        Action::Answer {
+            target,
+            seen,
+            choice,
+        } => crate::live_answer::answer_in(target, seen, Some(*choice))
+            .map(|_| format!("Answered: {}.", label(action)))
+            .map_err(|err| err.message),
     };
     if matches!(action, Action::ReminderDone { .. } | Action::Snooze { .. }) {
         if let Some(app) = crate::telegram::app().get() {
@@ -81,6 +105,24 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
 mod tests {
     use super::{remember, take};
     use crate::channels::Action;
+
+    #[test]
+    fn an_answer_button_says_its_number_and_the_choice() {
+        let seen = devpit_rpc::PendingPrompt {
+            question: "Run the migration?".to_owned(),
+            options: vec![devpit_rpc::PromptOption {
+                label: "Yes, and don't ask again for this command".to_owned(),
+                hint: None,
+            }],
+            cursor: 0,
+        };
+        let said = super::label(&Action::Answer {
+            target: "t".to_owned(),
+            seen,
+            choice: 0,
+        });
+        assert_eq!(said, "1. Yes, and don't ask again…");
+    }
 
     #[test]
     fn a_key_stands_for_its_action_once() {

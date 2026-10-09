@@ -42,6 +42,7 @@ pub(crate) fn draft(profile: &str, name: &str, text: &str) -> Result<(), String>
             profile: profile.to_owned(),
             session: name.to_owned(),
         }],
+        asking: None,
     });
     Ok(())
 }
