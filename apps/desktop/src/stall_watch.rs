@@ -2,10 +2,11 @@
 //!
 //! A reload has been seen to leave the page with every call unanswered and no
 //! thread inside any command, and it never happened again while anybody was
-//! looking. So three clocks are kept: the window's thread, the async runtime
-//! commands start on, and the page, which calls in while it is shown. A thread
-//! of its own, which needs none of them, says on stderr and in the error log
-//! when one stands still, with how long ago the other two last ran.
+//! looking. So four clocks are kept: the window's thread, the async runtime
+//! commands start on, the blocking pool their work runs on, and the page, which
+//! calls in while it is shown. A thread of its own, which needs none of them,
+//! says on stderr and in the error log when one stands still, with how long ago
+//! the others last ran.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
@@ -19,7 +20,15 @@ const LOOK_EVERY: Duration = Duration::from_secs(2);
 
 static MAIN: AtomicU64 = AtomicU64::new(0);
 static RUNTIME: AtomicU64 = AtomicU64::new(0);
+static BLOCKING: AtomicU64 = AtomicU64::new(0);
 static PAGE: AtomicU64 = AtomicU64::new(0);
+/// Each clock with what it stands for, as a stall is told.
+static CLOCKS: [(&str, &AtomicU64); 4] = [
+    ("the window's thread", &MAIN),
+    ("the async runtime", &RUNTIME),
+    ("the blocking pool", &BLOCKING),
+    ("the page, while shown,", &PAGE),
+];
 /// What the page last said about itself; a hidden page owes no beat.
 static SHOWN: AtomicBool = AtomicBool::new(false);
 
@@ -75,15 +84,11 @@ pub fn window_beat(webview: tauri::Webview, shown: bool) {
 
 /// The watcher. Started once, in `setup`.
 pub(crate) fn watch(app: tauri::AppHandle) {
-    let now = reports::now();
-    for clock in [&MAIN, &RUNTIME, &PAGE] {
-        clock.store(now, Ordering::Relaxed);
-    }
+    restart_clocks(reports::now());
     let _ = std::thread::Builder::new()
         .name("stall-watch".to_owned())
         .spawn(move || {
-            let (mut main, mut runtime, mut page) =
-                (Clock::default(), Clock::default(), Clock::default());
+            let mut clocks: [Clock; 4] = Default::default();
             let mut looked = reports::now();
             loop {
                 // Stamped by the thing being watched, so a stuck one never stamps.
@@ -91,43 +96,47 @@ pub(crate) fn watch(app: tauri::AppHandle) {
                 tauri::async_runtime::spawn(async {
                     RUNTIME.store(reports::now(), Ordering::Relaxed)
                 });
+                tauri::async_runtime::spawn_blocking(|| {
+                    BLOCKING.store(reports::now(), Ordering::Relaxed)
+                });
                 std::thread::sleep(LOOK_EVERY);
                 let now = reports::now();
                 if overslept(now, looked) {
-                    for clock in [&MAIN, &RUNTIME, &PAGE] {
-                        clock.store(now, Ordering::Relaxed);
-                    }
+                    restart_clocks(now);
                 }
                 looked = now;
                 let ages = ages(now);
                 let shown = SHOWN.load(Ordering::Relaxed);
-                tell(
-                    main.look(now, MAIN.load(Ordering::Relaxed), true),
-                    "the window's thread",
-                    &ages,
-                );
-                tell(
-                    runtime.look(now, RUNTIME.load(Ordering::Relaxed), true),
-                    "the async runtime",
-                    &ages,
-                );
-                tell(
-                    page.look(now, PAGE.load(Ordering::Relaxed), shown),
-                    "the page, while shown,",
-                    &ages,
-                );
+                for ((who, last), clock) in CLOCKS.iter().zip(&mut clocks) {
+                    let owed = shown || !std::ptr::eq(*last, &PAGE);
+                    tell(
+                        clock.look(now, last.load(Ordering::Relaxed), owed),
+                        who,
+                        &ages,
+                    );
+                }
             }
         });
 }
 
+fn restart_clocks(now: u64) {
+    for (_, clock) in &CLOCKS {
+        clock.store(now, Ordering::Relaxed);
+    }
+}
+
 fn ages(now: u64) -> String {
-    let age = |clock: &AtomicU64| now.saturating_sub(clock.load(Ordering::Relaxed));
-    format!(
-        "window thread {}s ago, async runtime {}s ago, page {}s ago",
-        age(&MAIN),
-        age(&RUNTIME),
-        age(&PAGE)
-    )
+    CLOCKS
+        .iter()
+        .map(|(who, last)| {
+            let age = now.saturating_sub(last.load(Ordering::Relaxed));
+            format!(
+                "{} {age}s ago",
+                who.trim_start_matches("the ").trim_end_matches(',')
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn tell(said: Option<Said>, who: &str, ages: &str) {
