@@ -34,6 +34,7 @@ pub(crate) fn draft(profile: &str, name: &str, text: &str) -> Result<(), String>
         .lock()
         .map_err(|_| "the drafts could not be read".to_owned())?
         .insert((profile.to_owned(), name.to_owned()), text.to_owned());
+    crate::tray::refresh_soon();
     crate::channels::emit(crate::channels::Told {
         event: devpit_rpc::ChannelEvent::DraftReady,
         line: format!("A draft for {name}: «{text}»"),
@@ -143,6 +144,7 @@ pub(crate) fn forget(profile: &str, name: &str) {
     if let Ok(mut held) = drafts().lock() {
         held.remove(&(profile.to_owned(), name.to_owned()));
     }
+    crate::tray::refresh_soon();
 }
 
 /// `orchestrator.draft_drop` — the person drops a draft without sending it.

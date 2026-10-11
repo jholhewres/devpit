@@ -49,10 +49,12 @@ pub(crate) fn rearm() {
     }
 }
 
-/// A date changed: the thread looks again and the window reads them again.
+/// A date changed: the thread looks again, and the window and the tray read
+/// them again.
 pub(crate) fn changed(app: &AppHandle) {
     rearm();
     let _ = app.emit(CHANGED, ());
+    crate::tray::refresh_soon();
 }
 
 /// Whether reminders go off. On unless the person turned them off.
@@ -147,6 +149,7 @@ pub(crate) fn fire(store: &Store, at: i64) -> Vec<ReminderRow> {
 fn tell(app: &AppHandle, store: &Store, fired: &[ReminderRow]) {
     let _ = app.emit(crate::notices::RANG, ());
     let _ = app.emit(FIRED, drawn(store, fired.to_vec()));
+    crate::tray::refresh_soon();
     for one in fired {
         crate::channels::emit(crate::channels::Told {
             event: devpit_rpc::ChannelEvent::Reminder,

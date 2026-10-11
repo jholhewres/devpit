@@ -10,6 +10,7 @@ import { TabStrip } from './TabStrip'
 import { useNotices } from './useNotices'
 import { useIslandOpens } from './useIslandOpens'
 import { useShell } from './useShell'
+import { useTrayOpens } from './useTrayOpens'
 import { useTree } from './useTree'
 import { WindowControls } from './WindowControls'
 
@@ -28,9 +29,10 @@ import { WindowControls } from './WindowControls'
  * restores through Tauri's own drag script: a handler here would toggle twice.
  */
 export function TopBar({ onAddProject, maximized }: { onAddProject: () => void; maximized: boolean }): React.JSX.Element {
-  const { side, files, toggleSide, toggleFiles, project, show, openCard, managing, openManager, setProject, openPane } =
+  const { side, files, toggleSide, toggleFiles, project, show, openCard, managing, openManager, setProject, openPane, openPrefs } =
     useShell()
   useIslandOpens(project?.id ?? null, setProject, openPane, show)
+  useTrayOpens(project?.id ?? null, setProject, show, openCard, openPrefs)
   /* One reader for the whole top bar: the panel and the pill draw from the
      same list, so a count on one cannot disagree with the other. */
   const bell = useNotices()

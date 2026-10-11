@@ -5,6 +5,8 @@ import { DeskSettings, keysOf } from './DeskSettings'
 
 const set = vi.fn(async (keys: string | null) => keys)
 let atLogin = false
+let tray = { shown: true, keep: true }
+const keep = vi.fn(async (on: boolean) => (tray = { ...tray, keep: on }))
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<unknown>) => ({ data: await call(), error: null, loading: false }),
   commands: {
@@ -12,6 +14,8 @@ vi.mock('./live', () => ({
     atLoginSet: async (on: boolean) => ((atLogin = on), on),
     shortcutRead: async () => null,
     shortcutSet: (keys: string | null) => set(keys),
+    trayRead: async () => tray,
+    trayKeepSet: (on: boolean) => keep(on),
   },
 }))
 
@@ -19,6 +23,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   atLogin = false
+  tray = { shown: true, keep: true }
 })
 
 const press = (over: Partial<KeyboardEvent>) =>
@@ -51,5 +56,21 @@ describe('devpit as a desktop app', () => {
     const login = await screen.findByRole('switch', { name: /Open at login/ })
     fireEvent.click(login)
     await waitFor(() => expect(atLogin).toBe(true))
+  })
+
+  it('keeps devpit in the tray until the switch is turned off', async () => {
+    render(<DeskSettings />)
+    const kept = await screen.findByRole('switch', { name: /Keep devpit in the tray/ })
+    await waitFor(() => expect(kept.getAttribute('aria-checked')).toBe('true'))
+    fireEvent.click(kept)
+    await waitFor(() => expect(keep).toHaveBeenCalledWith(false))
+    await waitFor(() => expect(kept.getAttribute('aria-checked')).toBe('false'))
+  })
+
+  it('offers no switch where no tray shows, and says closing quits', async () => {
+    tray = { shown: false, keep: true }
+    render(<DeskSettings />)
+    await screen.findByText(/shows no tray icon, so closing the window quits devpit/)
+    expect(screen.queryByRole('switch', { name: /Keep devpit in the tray/ })).toBeNull()
   })
 })

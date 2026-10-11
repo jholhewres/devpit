@@ -1,6 +1,6 @@
 //! What a desktop app is expected to have: one copy running, a place in the
-//! tray, opening at login, and a shortcut that brings it forward from
-//! anywhere.
+//! tray (`tray`), opening at login, and a shortcut that brings it forward
+//! from anywhere.
 //!
 //! One copy, because a second one is not harmless: it opens its own hook
 //! listener and its own agent door, writes their endpoint and secret over the
@@ -11,13 +11,9 @@
 
 use devpit_core::{preference, Store};
 use devpit_rpc::RpcError;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt as _, Shortcut, ShortcutState};
-
-const TRAY: &str = "devpit";
 
 /// Whether this launch keeps to one copy: a devpit in its own home is
 /// another devpit, and two of those may well be running on purpose.
@@ -28,6 +24,17 @@ pub(crate) fn one_copy() -> bool {
 /// devpit to the front, wherever it was.
 pub(crate) fn forward(app: &AppHandle) {
     let _ = crate::island::raised(app);
+}
+
+/// The Dock icon clicked while the window is in the tray brings it back, as
+/// every other way of opening devpit does.
+pub(crate) fn reopened(app: &AppHandle, event: &tauri::RunEvent) {
+    #[cfg(target_os = "macos")]
+    if let tauri::RunEvent::Reopen { .. } = event {
+        forward(app);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, event);
 }
 
 /// The window whose going ends devpit. The terminals live in tmux and outlive
@@ -54,111 +61,23 @@ pub(crate) fn quitting(has_window: bool) -> Quit {
     }
 }
 
-fn quit(app: &AppHandle) {
-    let main = app.get_webview_window("main");
-    match (quitting(main.is_some()), main) {
-        (Quit::CloseTheWindow, Some(main)) => {
-            // A window that will not close must not leave Quit doing nothing.
-            if main.close().is_err() {
-                app.exit(0);
-            }
-        }
-        _ => app.exit(0),
-    }
+/// What closing the window does.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Close {
+    /// Into the tray: hooks, notices, the agent door and the Remote go on.
+    Hide,
+    /// devpit ends; the terminals stay in tmux.
+    Quit,
 }
 
-fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let open = MenuItem::with_id(app, "open", "Open devpit", true, None::<&str>)?;
-    let pause = if crate::pausing::paused() {
-        MenuItem::with_id(app, "resume", "Resume", true, None::<&str>)?
+/// Hidden only when the person wants it, into a tray they can see, and never
+/// on the way out: a window hidden with no icon to bring it back is a devpit
+/// that looks gone and is not.
+pub(crate) fn closing(keep: bool, tray_shown: bool, quitting: bool) -> Close {
+    if keep && tray_shown && !quitting {
+        Close::Hide
     } else {
-        MenuItem::with_id(app, "pause", "Pause for an hour", true, None::<&str>)?
-    };
-    let quit = MenuItem::with_id(app, "quit", "Quit devpit", true, None::<&str>)?;
-    Menu::with_items(
-        app,
-        &[&open, &pause, &PredefinedMenuItem::separator(app)?, &quit],
-    )
-}
-
-/// Whether this desktop can show a tray icon. On Linux the icon goes through
-/// the appindicator library, loaded when first used — and its loader panics
-/// when the library is not there, which would take the whole app with it.
-#[cfg(target_os = "linux")]
-fn can_tray() -> bool {
-    const NAMES: [&str; 2] = ["libayatana-appindicator3.so.1", "libappindicator3.so.1"];
-    let mut dirs: Vec<std::path::PathBuf> = [
-        "/usr/lib",
-        "/usr/lib64",
-        "/usr/lib/x86_64-linux-gnu",
-        "/usr/lib/aarch64-linux-gnu",
-        "/lib/x86_64-linux-gnu",
-        "/lib/aarch64-linux-gnu",
-    ]
-    .iter()
-    .map(std::path::PathBuf::from)
-    .collect();
-    // An AppImage carries its own.
-    if let Some(appdir) = std::env::var_os("APPDIR") {
-        let appdir = std::path::PathBuf::from(appdir);
-        dirs.push(appdir.join("usr/lib"));
-        dirs.push(appdir.join("usr/lib/x86_64-linux-gnu"));
-        dirs.push(appdir.join("usr/lib/aarch64-linux-gnu"));
-    }
-    dirs.iter()
-        .any(|dir| NAMES.iter().any(|name| dir.join(name).exists()))
-}
-
-#[cfg(not(target_os = "linux"))]
-fn can_tray() -> bool {
-    true
-}
-
-/// The tray icon and its menu. A desktop without a tray just has none.
-pub(crate) fn tray(app: &AppHandle) {
-    if !can_tray() {
-        return;
-    }
-    // A last guard: the library found, and its loader panicking all the same.
-    let app = app.clone();
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || build_tray(&app)));
-}
-
-fn build_tray(app: &AppHandle) {
-    let Ok(menu) = menu(app) else {
-        return;
-    };
-    let mut built = TrayIconBuilder::with_id(TRAY)
-        .tooltip("devpit")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            "open" => forward(app),
-            "pause" => crate::pausing::for_an_hour(app),
-            "resume" => crate::pausing::resume(app),
-            "quit" => quit(app),
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                forward(tray.app_handle());
-            }
-        });
-    if let Some(icon) = app.default_window_icon().cloned() {
-        built = built.icon(icon);
-    }
-    let _ = built.build(app);
-}
-
-/// The tray's menu again, after the pause changed.
-pub(crate) fn tray_refresh(app: &AppHandle) {
-    if let (Some(tray), Ok(menu)) = (app.tray_by_id(TRAY), menu(app)) {
-        let _ = tray.set_menu(Some(menu));
+        Close::Quit
     }
 }
 

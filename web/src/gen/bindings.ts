@@ -429,6 +429,13 @@ export const commands = {
 	/**  `at_login.set` — opens devpit at login, or stops. */
 	atLoginSet: (on: boolean) => typedError<boolean, RpcError>(__TAURI_INVOKE("at_login_set", { on })),
 	/**
+	 *  `tray.read` — whether devpit's icon is in the tray, and whether closing
+	 *  the window leaves devpit there.
+	 */
+	trayRead: () => typedError<Tray, RpcError>(__TAURI_INVOKE("tray_read")),
+	/**  `tray.keep_set` — closing the window leaves devpit in the tray, or quits. */
+	trayKeepSet: (on: boolean) => typedError<Tray, RpcError>(__TAURI_INVOKE("tray_keep_set", { on })),
+	/**
 	 *  `pause.set` — pauses until `until` (seconds since the epoch), until
 	 *  resumed when `forever`, or resumes when neither.
 	 */
@@ -4647,6 +4654,17 @@ export type Transcribing = {
 export type Transcript = {
 	text: string | null,
 	note: string | null,
+};
+
+/**  What closing the window does, and why. */
+export type Tray = {
+	/**
+	 *  Whether devpit's icon is in this desktop's tray. Without one, closing
+	 *  the window quits: a hidden window with no icon has no way back.
+	 */
+	shown: boolean,
+	/**  Whether closing the window leaves devpit running in the tray. */
+	keep: boolean,
 };
 
 /**  What a turn cost and why it stopped. */

@@ -20,8 +20,8 @@ use crate::{
     projects, reading_path, receipts, recipes, regrouping, reminders, remote, reply_drafts, reveal,
     rewinding, runs_list, saves, search, session_cost, session_search, session_window, sessions,
     settings, shell_launch, skills, slash, sources, spend_history, staging, steering, steps,
-    stopping, threads, transcribe, update, watching, workspace, worktree_base, worktree_setup,
-    worktrees, wsfiles,
+    stopping, threads, transcribe, tray, update, watching, workspace, worktree_base,
+    worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -109,6 +109,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         desk::shortcut_set,
         desk::at_login_read,
         desk::at_login_set,
+        tray::tray_read,
+        tray::tray_keep_set,
         pausing::pause_set,
         columns::column_set_role,
         island_answer::island_prompt,

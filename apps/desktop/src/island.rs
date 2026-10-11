@@ -431,8 +431,10 @@ fn watch(app: tauri::AppHandle) {
     });
 }
 
-/// Tells the island what changed. Only the island hears it.
+/// Tells the island what changed. Only the island hears it — and the tray,
+/// which counts the sessions waiting.
 pub(crate) fn tell(app: &tauri::AppHandle, change: IslandChange) {
+    crate::tray::refresh_soon();
     if app.get_webview_window(ISLAND).is_some() {
         let _ = app.emit_to(
             tauri::EventTarget::webview(ISLAND),
@@ -490,6 +492,7 @@ pub fn island_drawn() -> devpit_rpc::IslandHow {
 pub async fn island_now() -> Result<IslandNow, RpcError> {
     crate::off_main::blocking(|| {
         seeded();
+        crate::tray::refresh_soon();
         Ok(IslandNow {
             sessions: crate::island_feed::now(),
         })
@@ -577,7 +580,16 @@ pub async fn island_open_pane(
     project_id: Option<String>,
     pane_id: String,
 ) -> Result<(), RpcError> {
-    raised(&app)?;
+    open_pane(&app, project_id, pane_id)
+}
+
+/// devpit forward on the terminal `pane_id`: the island's click, and the tray's.
+pub(crate) fn open_pane(
+    app: &tauri::AppHandle,
+    project_id: Option<String>,
+    pane_id: String,
+) -> Result<(), RpcError> {
+    raised(app)?;
     // To `main` by name: a page in a browser pane must not hear it.
     app.emit_to(
         tauri::EventTarget::webview("main"),
@@ -593,6 +605,9 @@ pub(crate) fn raised(app: &tauri::AppHandle) -> Result<(), RpcError> {
     let main = app
         .get_webview_window("main")
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "devpit's window is closing"))?;
+    // Hidden with its window on the way to the tray: see `tray::tuck_away`.
+    #[cfg(windows)]
+    let _ = AsRef::<tauri::Webview>::as_ref(&main).show();
     let _ = main.unminimize();
     let _ = main.show();
     // The click was on the island, which never takes focus, so the window
@@ -634,21 +649,33 @@ pub(crate) fn conversation_of(sessions: &std::path::Path, session_id: &str) -> O
 #[tauri::command]
 #[specta::specta]
 pub async fn island_open_chat(app: tauri::AppHandle, session_id: String) -> Result<(), RpcError> {
-    let (project_id, conversation) = crate::off_main::blocking(move || {
-        let session = crate::island_feed::now()
-            .into_iter()
-            .find(|one| one.session_id == session_id)
-            .ok_or_else(|| {
-                RpcError::new(ErrorCode::NotFound, "that session has left the island")
-            })?;
-        let project_id = session
-            .project_id
-            .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that session is in no project"))?;
-        let sessions = crate::projects::project_home(&project_id)?.sessions();
-        Ok::<_, RpcError>((project_id, conversation_of(&sessions, &session_id)))
-    })
-    .await?;
-    raised(&app)?;
+    let (project_id, conversation) =
+        crate::off_main::blocking(move || chat_of(&session_id)).await?;
+    open_chat(&app, project_id, conversation)
+}
+
+/// The project and the conversation of the chat whose session is
+/// `session_id`. Reads the conversations on disk: never on the window's thread.
+pub(crate) fn chat_of(session_id: &str) -> Result<(String, Option<String>), RpcError> {
+    let session = crate::island_feed::now()
+        .into_iter()
+        .find(|one| one.session_id == session_id)
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that session has left the island"))?;
+    let project_id = session
+        .project_id
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that session is in no project"))?;
+    let sessions = crate::projects::project_home(&project_id)?.sessions();
+    Ok((project_id, conversation_of(&sessions, session_id)))
+}
+
+/// devpit forward on a project's chat, or on the project alone when there is
+/// no conversation — an orchestrator's, whose project is its chat.
+pub(crate) fn open_chat(
+    app: &tauri::AppHandle,
+    project_id: String,
+    conversation: Option<String>,
+) -> Result<(), RpcError> {
+    raised(app)?;
     app.emit_to(
         tauri::EventTarget::webview("main"),
         "island:open-chat",

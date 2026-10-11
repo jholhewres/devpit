@@ -45,6 +45,7 @@ pub mod spend;
 pub mod tested;
 mod threads;
 pub mod tile;
+pub mod tray;
 pub mod update;
 pub mod usage;
 pub mod vault;
@@ -121,6 +122,7 @@ pub use spend::{
 pub use tested::{FailedTest, Tested, MOST_FAILURES_KEPT, TESTS_EVIDENCE};
 pub use threads::{Conversations, Thread};
 pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
+pub use tray::Tray;
 pub use update::{InstallKind, UpdateBlocking, UpdateStatus, UpdateWork};
 pub use usage::{PaneCost, Usage};
 pub use vault::{Secret, SecretList};

@@ -188,6 +188,8 @@ pub(crate) fn opened(store: &Store, project_id: &str) -> Result<(), RpcError> {
     if let Err(err) = store.touch_project(project_id) {
         eprintln!("devpit: {project_id} opened without moving up the list: {err}");
     }
+    // The tray's recent projects are this list's head.
+    crate::tray::refresh_soon();
     Ok(())
 }
 
@@ -215,7 +217,9 @@ pub async fn project_forget(
         if let Err(err) = crate::leftovers::end_project(&app, &project_id) {
             eprintln!("devpit: the terminals of {project_id} were not all ended: {err}");
         }
-        project_forget_now(project_id, wipe_workspace)
+        let left = project_forget_now(project_id, wipe_workspace);
+        crate::tray::refresh_soon();
+        left
     })
     .await
 }

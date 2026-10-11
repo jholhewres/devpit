@@ -122,7 +122,7 @@ pub(crate) fn set(app: &AppHandle, until: i64) -> Result<Paused, RpcError> {
     Store::open_default()?.set_preference(preference::PAUSED_UNTIL, &until.to_string())?;
     let now = said(until);
     let _ = app.emit(CHANGED, now);
-    crate::desk::tray_refresh(app);
+    crate::tray::refresh_soon();
     end_when_due(app, until);
     Ok(now)
 }

@@ -1,4 +1,4 @@
-use super::{ends_devpit, quitting, readable, Quit};
+use super::{closing, ends_devpit, quitting, readable, Close, Quit};
 
 /// Quit goes through the window while there is one, so it asks what closing
 /// asks; with none it must still end the process, not do nothing.
@@ -6,6 +6,21 @@ use super::{ends_devpit, quitting, readable, Quit};
 fn quit_closes_the_window_or_ends_devpit_without_one() {
     assert_eq!(quitting(true), Quit::CloseTheWindow);
     assert_eq!(quitting(false), Quit::Exit);
+}
+
+/// Closing hides only when the person wants it and a tray shows the icon to
+/// come back by; Quit's own close always ends devpit.
+#[test]
+fn closing_hides_only_into_a_tray_that_shows() {
+    assert_eq!(closing(true, true, false), Close::Hide);
+    // Kept off: closing quits, as before there was a tray to keep it in.
+    assert_eq!(closing(false, true, false), Close::Quit);
+    // No icon to bring it back (GNOME without AppIndicator, a tray that
+    // failed to build): a hidden window would be a devpit nobody can reach.
+    assert_eq!(closing(true, false, false), Close::Quit);
+    assert_eq!(closing(false, false, false), Close::Quit);
+    // Quit closes the window too, and that close must not hide it.
+    assert_eq!(closing(true, true, true), Close::Quit);
 }
 
 /// The main window going ends devpit; the island or a menu closing does not.

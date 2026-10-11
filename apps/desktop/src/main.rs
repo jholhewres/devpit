@@ -203,6 +203,9 @@ mod transcribe;
 mod tap_file;
 mod telegram;
 mod threads;
+mod tray;
+mod tray_look;
+mod tray_menu;
 mod trust_answer;
 mod turn_changes;
 mod update;
@@ -319,6 +322,14 @@ fn main() {
                     }
                 }
             }
+            // Into the tray, when there is one to come back from; otherwise
+            // the close goes on and ends devpit, below.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if desk::ends_devpit(window.label()) && tray::hides_on_close() {
+                    api.prevent_close();
+                    tray::tuck_away(tauri::Manager::app_handle(window));
+                }
+            }
             // The hidden island would otherwise keep the process alive with
             // no window, on every platform alike.
             if matches!(event, tauri::WindowEvent::Destroyed) && desk::ends_devpit(window.label()) {
@@ -404,10 +415,11 @@ fn main() {
             // A pause given before this start still holds, until its time.
             if let Ok(store) = devpit_core::Store::open_default() {
                 pausing::restore(app.handle(), &store);
+                tray::restore(&store);
             }
             island::note_drawn();
             // In the tray, and the shortcut that brings it forward, if one was chosen.
-            desk::tray(app.handle());
+            tray::start(app.handle());
             // Reachable from the person's other devices, when it was left on.
             remote::restore(app.handle());
             desk::shortcut_restore(app.handle());
@@ -445,8 +457,9 @@ fn main() {
         })
         .manage(std::sync::Arc::new(in_flight::InFlight::new()))
         .invoke_handler(handler::handler())
-        .run(tauri::generate_context!())
-        .expect("the window did not open");
+        .build(tauri::generate_context!())
+        .expect("the window did not open")
+        .run(|app, event| desk::reopened(app, &event));
 }
 
 /// The exit code of an agent's command, when the arguments are one.
