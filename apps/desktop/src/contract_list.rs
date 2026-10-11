@@ -21,8 +21,8 @@ use crate::{
     pausing, plan_limits, plugin_data, plugins, project_naming, project_proposals, projects,
     reading_path, receipts, recipes, regrouping, reminders, remote, reply_drafts, reveal,
     rewinding, runs_list, saves, search, session_cost, session_search, session_window, sessions,
-    settings, shell_launch, skills, slash, sources, spend_history, staging, steering, steps,
-    stopping, threads, transcribe, tray, update, watching, workspace, worktree_base,
+    settings, shell_launch, sign_ins, skills, slash, sources, spend_history, staging, steering,
+    steps, stopping, threads, transcribe, tray, update, watching, workspace, worktree_base,
     worktree_setup, worktrees, wsfiles,
 };
 
@@ -316,6 +316,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         watching::session_usage,
         shell_launch::agents_known,
         shell_launch::session_launch_agent,
+        sign_ins::sign_ins,
         happening::terminal_happenings,
         happening::card_happenings,
         account::account_read,

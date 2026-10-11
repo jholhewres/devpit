@@ -1,7 +1,7 @@
 //! The shell a terminal window starts, and the startup file behind it.
 
 use devpit_core::Store;
-use devpit_rpc::{KnownAgent, PaneRunning, RpcError};
+use devpit_rpc::{AgentLaunch, KnownAgent, MissingSignIn, PaneRunning, RpcError};
 
 /// The shell a new window starts, with the startup file that makes it speak.
 ///
@@ -400,6 +400,11 @@ fn is_a_bare_name(name: &str) -> bool {
 /// Measured on the machine this was written on: a fresh tmux window took 1.3
 /// seconds to print its first prompt, and a line sent at half a second simply
 /// vanished. So this waits, which is why it is async.
+///
+/// The sign-ins it runs on are checked while it waits, and a missing one holds
+/// the start — the terminal stays, ready for the command that fixes it —
+/// unless the person said `anyway`. The MCP servers the project needs are read
+/// from the last check and said, never waited on.
 #[tauri::command]
 #[specta::specta]
 pub async fn session_launch_agent(
@@ -407,7 +412,8 @@ pub async fn session_launch_agent(
     project_id: String,
     pane_id: String,
     agent_id: String,
-) -> Result<String, RpcError> {
+    anyway: bool,
+) -> Result<AgentLaunch, RpcError> {
     // A profile first, then a built-in agent. The same menu offers both, and
     // a profile is the more specific answer when an id is both — which it is
     // for a discovered command, whose id *is* the command.
@@ -424,12 +430,24 @@ pub async fn session_launch_agent(
     let waiting = session.clone();
     let waited = pane_id.clone();
     let trusting = layout.project_id.clone();
-    let ready = tauri::async_runtime::spawn_blocking(move || {
+    let agent = agent_id.clone();
+    let (ready, missing, failing) = tauri::async_runtime::spawn_blocking(move || {
+        let root = crate::roots::root_of(&trusting, None).ok();
+        // Beside the wait for the prompt, so the check adds nothing to it.
+        let check = root.clone().filter(|_| !anyway).map(|root| {
+            let (agent, project) = (agent.clone(), trusting.clone());
+            std::thread::spawn(move || crate::sign_ins::before_start(Some(&agent), &project, &root))
+        });
         // A project added before devpit trusted folders gets it at its first agent.
-        if let Ok(root) = crate::roots::root_of(&trusting, None) {
-            crate::folder_trust::trust(&[&root]);
+        if let Some(root) = &root {
+            crate::folder_trust::trust(&[root]);
         }
-        settled(&waiting, &waited)
+        let ready = settled(&waiting, &waited);
+        let missing = check.and_then(|one| one.join().ok()).unwrap_or_default();
+        let failing = root
+            .map(|root| crate::sign_ins::failing_at_start(&agent, &trusting, &root))
+            .unwrap_or_default();
+        (ready, missing, failing)
     })
     .await
     .map_err(|err| RpcError::internal(err.to_string()))?;
@@ -439,6 +457,9 @@ pub async fn session_launch_agent(
             devpit_rpc::ErrorCode::Conflict,
             format!("this terminal is running {command}"),
         ));
+    }
+    if let Some(held) = held(missing) {
+        return Ok(held);
     }
 
     let line = start;
@@ -458,7 +479,20 @@ pub async fn session_launch_agent(
     if let Ok(store) = crate::sessions::store() {
         let _ = store.remember_pane_launch(&project_id, &pane_id, &agent_id);
     }
-    Ok(line)
+    Ok(AgentLaunch {
+        line: Some(line),
+        missing: Vec::new(),
+        failing,
+    })
+}
+
+/// A start held for the sign-ins it would go without; none when it goes ahead.
+pub(crate) fn held(missing: Vec<MissingSignIn>) -> Option<AgentLaunch> {
+    (!missing.is_empty()).then(|| AgentLaunch {
+        line: None,
+        missing,
+        failing: Vec::new(),
+    })
 }
 
 /// The profile id to record on a pane, empty for a built-in agent.

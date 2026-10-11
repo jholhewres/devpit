@@ -330,9 +330,10 @@ fn respond_in(
     }
     if asked.method == "start" && asked.params.get("anyway").and_then(Value::as_bool) != Some(true)
     {
-        let missing = crate::credentials::before_start(
+        let missing = crate::sign_ins::before_start(
+            orchestrating(here).ok(),
+            &project.id,
             Path::new(&project.root_path),
-            needs_file(&project.id).as_deref(),
         );
         if !missing.is_empty() {
             return Err(crate::credentials::refused(&missing));
@@ -447,15 +448,6 @@ fn respond_in(
         }
     }
     Ok(answer)
-}
-
-/// The project's `needs.txt` in devpit's folder for it.
-fn needs_file(project_id: &str) -> Option<PathBuf> {
-    let store = crate::projects::store().ok()?;
-    let root = devpit_core::Store::root().ok()?;
-    devpit_core::home::ProjectHome::of(&store, &root, project_id)
-        .ok()
-        .map(|home| home.needs())
 }
 
 /// The profile whose orchestrator the agent stands in, or why it is refused:

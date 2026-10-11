@@ -1199,7 +1199,11 @@ export const commands = {
 	 *  their own names. A name already there is refused, never written over.
 	 */
 	pathImport: (projectId: string, worktreeId: string | null, folder: string, sources: string[]) => typedError<ProjectTree, RpcError>(__TAURI_INVOKE("path_import", { projectId, worktreeId, folder, sources })),
-	mcpHealth: (projectId: string | null) => typedError<McpHealth, RpcError>(__TAURI_INVOKE("mcp_health", { projectId })),
+	/**
+	 *  The default account's servers. `again` asks the CLI even when the last
+	 *  answer is recent: the footer's Refresh.
+	 */
+	mcpHealth: (projectId: string | null, again: boolean) => typedError<McpHealth, RpcError>(__TAURI_INVOKE("mcp_health", { projectId, again })),
 	/**
 	 *  `media.open` — a token the window streams a file by: a project's file by
 	 *  its relative path, or an absolute one the viewer may read.
@@ -1539,8 +1543,18 @@ export const commands = {
 	 *  Measured on the machine this was written on: a fresh tmux window took 1.3
 	 *  seconds to print its first prompt, and a line sent at half a second simply
 	 *  vanished. So this waits, which is why it is async.
+	 * 
+	 *  The sign-ins it runs on are checked while it waits, and a missing one holds
+	 *  the start — the terminal stays, ready for the command that fixes it —
+	 *  unless the person said `anyway`. The MCP servers the project needs are read
+	 *  from the last check and said, never waited on.
 	 */
-	sessionLaunchAgent: (projectId: string, paneId: string, agentId: string) => typedError<string, RpcError>(__TAURI_INVOKE("session_launch_agent", { projectId, paneId, agentId })),
+	sessionLaunchAgent: (projectId: string, paneId: string, agentId: string, anyway: boolean) => typedError<AgentLaunch, RpcError>(__TAURI_INVOKE("session_launch_agent", { projectId, paneId, agentId, anyway })),
+	/**
+	 *  `sign_ins` — every account's sign-in, and what the open project needs,
+	 *  checked now.
+	 */
+	signIns: (projectId: string | null) => typedError<SignIns, RpcError>(__TAURI_INVOKE("sign_ins", { projectId })),
 	/**
 	 *  `terminal.happenings` — the shape `terminal:happening` carries.
 	 * 
@@ -1668,6 +1682,18 @@ export type Account = {
 	createdAt: string,
 };
 
+/**  One account of the agent CLI: a configuration directory and its sign-in. */
+export type AccountSignIn = {
+	/**  The profiles that run against it; `Claude Code` for the one none names. */
+	label: string,
+	directory: string,
+	state: Credentials,
+	/**  When the saved sign-in stops renewing itself, in ms since the epoch. */
+	until: number | null,
+	/**  The command that signs it in again. */
+	fix: string,
+};
+
 /**  What an agent asked a page to do. */
 export type Act = 
 /**  Put text into the element a selector names. */
@@ -1738,6 +1764,19 @@ export type AgentHealth = {
 	lastRestartAt: number | null,
 	/**  Why the last check failed, or why the last restart happened. */
 	detail: string | null,
+};
+
+/**  `session.launch_agent`'s answer. */
+export type AgentLaunch = {
+	/**  The line typed, or none when the start was held for a sign-in. */
+	line: string | null,
+	/**  What the start was held for. */
+	missing: MissingSignIn[],
+	/**
+	 *  Servers the project needs that the last check found not answering:
+	 *  said, and the start went ahead.
+	 */
+	failing: McpServerHealth[],
 };
 
 /**  Who is running in the leaf. `none` is a plain shell. */
@@ -2336,10 +2375,12 @@ export type Conversations = {
 /**
  *  Whether a CLI configuration directory holds a sign-in.
  * 
- *  Three answers, because on macOS the sign-in lives in the Keychain and the
+ *  `Unknown` because on macOS the sign-in lives in the Keychain and the
  *  directory cannot say either way.
  */
-export type Credentials = "saved" | "missing" | "unknown";
+export type Credentials = "saved" | "missing" | "unknown" | 
+/**  Saved, but past renewing itself: the CLI asks for /login. */
+"expired";
 
 /**  Where the cursor is, in the island window's pixels, for the eyes. */
 export type Cursor = {
@@ -3167,6 +3208,19 @@ export type Message = {
 	createdAt: number | null,
 	/**  True while more of it is still arriving. */
 	streaming: boolean,
+};
+
+/**  A sign-in a start would go without, and the command that fixes it. */
+export type MissingSignIn = {
+	what: string,
+	command: string,
+};
+
+/**  A sign-in a project's sessions need — an AWS profile, gcloud, gh. */
+export type NeededSignIn = {
+	what: string,
+	holds: boolean,
+	fix: string,
 };
 
 /**  Something worth telling somebody about. */
@@ -4286,6 +4340,13 @@ export type SignInState =
 { state: "signed"; account: Account } | 
 /**  The code ran out, or was already used. Start again. */
 { state: "expired" };
+
+/**  `sign_ins`'s answer. */
+export type SignIns = {
+	accounts: AccountSignIn[],
+	/**  What the open project declares, checked now. */
+	needed: NeededSignIn[],
+};
 
 /**  `agent.signed_in`'s answer. An object, so the next field has somewhere to go. */
 export type SignedIn = {

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { LayoutNode } from '../gen/bindings'
+import type { LayoutNode, MissingSignIn } from '../gen/bindings'
 import { ask, commands } from './live'
 import { BlockTerm } from './BlockTerm'
+import { LaunchHeld } from './LaunchHeld'
 import { usePaneActions } from './paneActions'
 import { PaneCorner } from './PaneCorner'
 import { Split } from './Split'
@@ -11,6 +12,7 @@ import { leaves } from './splits'
 import type { Tab } from './strip'
 import { SessionCost } from './SessionCost'
 import { useShellPick } from './shellStore'
+import { failingWords } from './startChecks'
 
 /*
  * One tab's terminals, arranged as its tree says.
@@ -105,19 +107,29 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
      before that state has landed. Two sends is two `claude` lines typed, the
      second one into the first one. */
   const sent = useRef(false)
+  /* A start held for a sign-in: the pane it was for, and what it lacks. */
+  const [held, setHeld] = useState<{ paneId: string; agent: string; missing: MissingSignIn[] } | null>(null)
+  const start = useCallback(
+    (paneId: string, agent: string, anyway: boolean) => {
+      setHeld(null)
+      void ask(() => commands.sessionLaunchAgent(projectId, paneId, agent, anyway)).then((answer) => {
+        /* A notice, not the fatal error. The terminal is open and working
+           whether or not the agent was started for you, and replacing a working
+           terminal with a sentence takes away the one thing that still lets you
+           type the command yourself. */
+        if (!answer.data) return setNotice(answer.error)
+        if (answer.data.line === null) return setHeld({ paneId, agent, missing: answer.data.missing })
+        setNotice(failingWords(answer.data.failing))
+      })
+    },
+    [projectId],
+  )
   useEffect(() => {
     if (!projectId || !focused || !tab.launch || sent.current) return
     sent.current = true
-    const agent = tab.launch
     launched(tab.id)
-    void ask(() => commands.sessionLaunchAgent(projectId, focused, agent)).then((answer) => {
-      /* A notice, not the fatal error. The terminal is open and working
-         whether or not the agent was started for you, and replacing a working
-         terminal with a sentence takes away the one thing that still lets you
-         type the command yourself. */
-      if (answer.error) setNotice(answer.error)
-    })
-  }, [projectId, focused, tab.launch, tab.id, launched])
+    start(focused, tab.launch, false)
+  }, [projectId, focused, tab.launch, tab.id, launched, start])
 
   const layoutTo = useCallback((next: LayoutNode, focusedId: string) => {
     setTree(next)
@@ -145,6 +157,14 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
         <button className="tnote" onClick={() => setNotice(null)} title="Dismiss">
           {notice}
         </button>
+      )}
+      {held && (
+        <LaunchHeld
+          missing={held.missing}
+          onAgain={() => start(held.paneId, held.agent, false)}
+          onAnyway={() => start(held.paneId, held.agent, true)}
+          onDismiss={() => setHeld(null)}
+        />
       )}
       <Split
         node={tree}

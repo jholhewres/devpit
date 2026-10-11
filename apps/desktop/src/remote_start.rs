@@ -54,16 +54,10 @@ pub(crate) fn session(
         .find(|one| one.id == project)
         .ok_or("no such project")?;
     if !anyway {
-        let needs = devpit_core::home::ProjectHome::of(
-            &store,
-            &devpit_core::Store::root().map_err(|err| err.to_string())?,
+        let missing = crate::sign_ins::before_start(
+            Some(&profile),
             project,
-        )
-        .ok()
-        .map(|home| home.needs());
-        let missing = crate::credentials::before_start(
             std::path::Path::new(&here.root_path),
-            needs.as_deref(),
         );
         if !missing.is_empty() {
             return Err(

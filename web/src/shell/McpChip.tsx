@@ -7,15 +7,13 @@ import { ask, commands } from './live'
 /*
  * The MCP servers the default account has, as its CLI finds them when it
  * connects: a count in the strip, and the list — with what each said — a
- * click away. Asked when a project opens and every ten minutes while the
- * window is in view; each ask starts the CLI, so no more often than that.
+ * click away. Asked when a project opens and on a beat while the window is in
+ * view; the backend keeps the answer for ten minutes, so the beat only starts
+ * the CLI when that has run out, and a session's start reads it without
+ * waiting.
  */
 
-const EVERY_MS = 10 * 60 * 1000
-
-/* What each project's last ask found: switching projects shows it rather
-   than starting every server again. */
-const kept = new Map<string, { at: number; health: McpHealth }>()
+const EVERY_MS = 5 * 60 * 1000
 
 /** Connected out of all, and whether anything needs looking at. */
 export function summed(servers: readonly McpServerHealth[]): { up: number; all: number; bad: boolean } {
@@ -47,16 +45,10 @@ export function McpChip({ projectId }: { projectId: string | null }): React.JSX.
 
   const check = useCallback(
     (again: boolean) => {
-      const key = projectId ?? ''
-      const was = kept.get(key)
-      if (!again && was && Date.now() - was.at < EVERY_MS) return setHealth(was.health)
       setAsking(true)
-      void ask(() => commands.mcpHealth(projectId))
+      void ask(() => commands.mcpHealth(projectId, again))
         .then((answer) => {
-          if (answer.data) {
-            kept.set(key, { at: Date.now(), health: answer.data })
-            setHealth(answer.data)
-          }
+          if (answer.data) setHealth(answer.data)
           setError(answer.error)
         })
         .finally(() => setAsking(false))
@@ -66,7 +58,7 @@ export function McpChip({ projectId }: { projectId: string | null }): React.JSX.
 
   useEffect(() => {
     check(false)
-    const every = window.setInterval(() => document.visibilityState === 'visible' && check(true), EVERY_MS)
+    const every = window.setInterval(() => document.visibilityState === 'visible' && check(false), EVERY_MS)
     return () => window.clearInterval(every)
   }, [check])
 

@@ -40,16 +40,87 @@ pub fn config_dir_of(home: &Path, env: &[(String, String)], inherited: Option<&s
     config_dir_from(home, own.or(inherited))
 }
 
+/// The most of a `.credentials.json` read: it also keeps every MCP server's
+/// tokens, so it grows, but not past this.
+const CREDENTIALS_CEILING: u64 = 1024 * 1024;
+
+/// A sign-in as its file reads, and when it stops renewing itself.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SignInRead {
+    pub state: Credentials,
+    /// In ms since the epoch.
+    pub until: Option<f64>,
+}
+
 /// Whether `dir` holds a sign-in: `.credentials.json`, which is where the CLI
-/// keeps it everywhere but macOS. Only asks that the file exists.
+/// keeps it everywhere but macOS.
 pub fn sign_in_at(dir: &Path) -> Credentials {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_millis() as f64)
+        .unwrap_or_default();
+    read_sign_in(dir, now).state
+}
+
+/// [`sign_in_at`], with when it lapses, as of `now_ms`.
+pub fn read_sign_in(dir: &Path, now_ms: f64) -> SignInRead {
+    let unknown = SignInRead {
+        state: Credentials::Unknown,
+        until: None,
+    };
     if cfg!(target_os = "macos") {
-        return Credentials::Unknown;
+        return unknown;
     }
-    if dir.join(".credentials.json").is_file() {
-        Credentials::Saved
+    let Ok(file) = std::fs::File::open(dir.join(".credentials.json")) else {
+        return SignInRead {
+            state: Credentials::Missing,
+            until: None,
+        };
+    };
+    let mut text = String::new();
+    let mut bounded = std::io::Read::take(file, CREDENTIALS_CEILING);
+    if std::io::Read::read_to_string(&mut bounded, &mut text).is_err() {
+        return unknown;
+    }
+    sign_in_in(&text, now_ms)
+}
+
+/// What a `.credentials.json` says of the Claude sign-in at `now_ms`.
+///
+/// The access token lapses every few hours and the CLI renews it, so only a
+/// lapsed refresh token — or an access token with none — needs /login again.
+pub fn sign_in_in(text: &str, now_ms: f64) -> SignInRead {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(text.trim()) else {
+        return SignInRead {
+            state: Credentials::Unknown,
+            until: None,
+        };
+    };
+    let oauth = value.get("claudeAiOauth");
+    let field = |name: &str| oauth.and_then(|one| one.get(name));
+    let token = |name: &str| {
+        field(name)
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|text| !text.is_empty())
+    };
+    if !token("accessToken") {
+        return SignInRead {
+            state: Credentials::Missing,
+            until: None,
+        };
+    }
+    let until = if token("refreshToken") {
+        field("refreshTokenExpiresAt")
     } else {
-        Credentials::Missing
+        field("expiresAt")
+    }
+    .and_then(serde_json::Value::as_f64);
+    SignInRead {
+        state: match until {
+            Some(at) if at <= now_ms => Credentials::Expired,
+            _ => Credentials::Saved,
+        },
+        until,
     }
 }
 
@@ -150,8 +221,31 @@ mod tests {
             return;
         }
         assert_eq!(sign_in_at(dir.path()), Credentials::Missing);
-        std::fs::write(dir.path().join(".credentials.json"), "{}").expect("write");
+        // Only an MCP server's tokens: no Claude sign-in.
+        let file = dir.path().join(".credentials.json");
+        std::fs::write(&file, r#"{"mcpOAuth":{}}"#).expect("write");
+        assert_eq!(sign_in_at(dir.path()), Credentials::Missing);
+        let saved = r#"{"claudeAiOauth":{"accessToken":"a","refreshToken":"r"}}"#;
+        std::fs::write(&file, saved).expect("write");
         assert_eq!(sign_in_at(dir.path()), Credentials::Saved);
+    }
+
+    #[test]
+    fn a_sign_in_expires_when_nothing_can_renew_it() {
+        let at = |text: &str| sign_in_in(text, 2_000.0);
+        // A lapsed access token is renewed by the CLI: still signed in.
+        let renewing = at(r#"{"claudeAiOauth":{"accessToken":"a","refreshToken":"r",
+            "expiresAt":1000,"refreshTokenExpiresAt":3000}}"#);
+        assert_eq!(renewing.state, Credentials::Saved);
+        assert_eq!(renewing.until, Some(3000.0));
+        let lapsed = at(r#"{"claudeAiOauth":{"accessToken":"a","refreshToken":"r",
+            "expiresAt":1000,"refreshTokenExpiresAt":1500}}"#);
+        assert_eq!(lapsed.state, Credentials::Expired);
+        let unrenewable = at(r#"{"claudeAiOauth":{"accessToken":"a","expiresAt":1000}}"#);
+        assert_eq!(unrenewable.state, Credentials::Expired);
+        let empty = at(r#"{"claudeAiOauth":{"accessToken":""}}"#);
+        assert_eq!(empty.state, Credentials::Missing);
+        assert_eq!(at("half a file").state, Credentials::Unknown);
     }
 
     #[test]

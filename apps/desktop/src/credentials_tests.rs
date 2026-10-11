@@ -1,4 +1,37 @@
-use super::{aws_profile_in, declared, missing_in, refused, Missing, Need};
+use super::{
+    aws_profile_in, declared, declared_servers, failing_needed, missing_in, refused, Missing, Need,
+};
+
+#[test]
+fn needs_txt_names_the_mcp_servers_sessions_need() {
+    let text = "mcp github\nmcp plugin:figma:figma # designs\naws asc\nmcp\nmcp a b\n";
+    assert_eq!(declared_servers(text), ["github", "plugin:figma:figma"]);
+    // And a server is not taken for a sign-in to probe.
+    assert_eq!(declared(text), [Need::Aws("asc".to_owned())]);
+}
+
+#[test]
+fn only_a_needed_server_that_is_not_answering_is_said() {
+    use devpit_rpc::{McpServerHealth, McpState};
+    let server = |name: &str, state| McpServerHealth {
+        name: name.to_owned(),
+        target: "x".to_owned(),
+        state,
+        detail: None,
+    };
+    let listed = [
+        server("plugin:github:github", McpState::Failed),
+        server("plugin:figma:figma", McpState::NeedsAuth),
+        server("datadog", McpState::Connected),
+        server("jira", McpState::Failed),
+    ];
+    let needed = ["github", "plugin:figma:figma", "datadog"].map(str::to_owned);
+    let failing: Vec<_> = failing_needed(&listed, &needed)
+        .into_iter()
+        .map(|one| one.name)
+        .collect();
+    assert_eq!(failing, ["plugin:github:github", "plugin:figma:figma"]);
+}
 
 #[test]
 fn needs_txt_names_what_it_needs_and_nothing_else_runs() {

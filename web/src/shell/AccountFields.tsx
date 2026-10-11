@@ -20,6 +20,7 @@ import { modelsOf, modelsText } from './models'
 const SAID: Record<Credentials, string> = {
   saved: ' Signed in.',
   missing: ' No sign-in here yet — open a terminal with this profile and run /login.',
+  expired: ' Its sign-in has expired — open a terminal with this profile and run /login.',
   unknown: '',
 }
 

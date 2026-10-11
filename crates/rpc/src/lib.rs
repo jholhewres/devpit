@@ -41,6 +41,7 @@ pub mod session;
 pub mod session_regroup;
 pub mod session_tree;
 pub mod settings;
+pub mod sign_ins;
 pub mod spend;
 pub mod tested;
 mod threads;
@@ -115,6 +116,7 @@ pub use session::{
     SplitDirection,
 };
 pub use settings::{ErrorReportsPreview, Settings, Theme};
+pub use sign_ins::{AccountSignIn, AgentLaunch, MissingSignIn, NeededSignIn, SignIns};
 pub use spend::{
     PlanLimits, PlanWindow, SessionCost, SpendCard, SpendDay, SpendHistory, SpendInstallation,
     SpendRow, SpendSession, SpendShare, TokenCounts,

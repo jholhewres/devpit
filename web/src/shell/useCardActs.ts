@@ -4,6 +4,7 @@ import type { Card, CardDetail, DeleteRefusal } from '../gen/bindings'
 import type { Tab } from './strip'
 import { ask, commands } from './live'
 import { offers } from './profiles'
+import { launchWords } from './startChecks'
 import type { UseBoard } from './useBoard'
 import { liveWork, stopLiveWork, type LiveWork } from './liveWork'
 import { useShell } from './useShell'
@@ -47,7 +48,8 @@ export async function openCardTerminal(
      asked for is dropped on the way — so it is sent to the pane the tab has. */
   if (launch && open.some((tab) => tab.id === tabId)) {
     show('term', { id: tabId, title, cardId: answer.data.cardId })
-    return (await ask(() => commands.sessionLaunchAgent(projectId, layout.focusedId, launch))).error
+    const started = await ask(() => commands.sessionLaunchAgent(projectId, layout.focusedId, launch, false))
+    return started.data ? launchWords(started.data) : started.error
   }
   show('term', { id: tabId, title, cardId: answer.data.cardId, ...(launch ? { launch } : {}) })
   return null

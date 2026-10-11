@@ -26,14 +26,19 @@ pub(crate) enum Need {
 }
 
 /// What is missing, and what fixes it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Missing {
-    pub what: String,
-    pub command: String,
-}
+pub(crate) use devpit_rpc::MissingSignIn as Missing;
 
 impl Need {
-    fn missing(&self) -> Missing {
+    /// What the footer calls it.
+    pub(crate) fn label(&self) -> String {
+        match self {
+            Need::Aws(profile) => format!("AWS profile {profile}"),
+            Need::Gcloud => "gcloud".to_owned(),
+            Need::Gh => "GitHub CLI".to_owned(),
+        }
+    }
+
+    pub(crate) fn missing(&self) -> Missing {
         match self {
             Need::Aws(profile) => Missing {
                 what: format!("the AWS profile {profile} is signed out or expired"),
@@ -80,7 +85,8 @@ fn plain(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
-/// The needs `needs.txt` declares: `aws <profile>`, `gcloud`, `gh`, one a line.
+/// The sign-ins `needs.txt` declares: `aws <profile>`, `gcloud`, `gh`, one a
+/// line. Its `mcp <server>` lines are [`declared_servers`].
 pub(crate) fn declared(text: &str) -> Vec<Need> {
     text.lines()
         .map(|line| line.split('#').next().unwrap_or_default().trim())
@@ -158,17 +164,88 @@ fn holds(need: &Need) -> bool {
     }
 }
 
-/// What a project's sessions would start without, checked side by side.
-pub(crate) fn before_start(root: &Path, declared_file: Option<&Path>) -> Vec<Missing> {
-    let needs = needs_of(root, declared_file);
+/// Each need with whether it holds, checked side by side.
+pub(crate) fn checked(needs: Vec<Need>) -> Vec<(Need, bool)> {
     let checks: Vec<_> = needs
         .into_iter()
-        .map(|need| std::thread::spawn(move || (!holds(&need)).then(|| need.missing())))
+        .map(|need| std::thread::spawn(move || (holds(&need), need)))
         .collect();
     checks
         .into_iter()
-        .filter_map(|check| check.join().ok().flatten())
+        .filter_map(|check| check.join().ok())
+        .map(|(holds, need)| (need, holds))
         .collect()
+}
+
+/// What a project's sessions would start without.
+pub(crate) fn before_start(root: &Path, declared_file: Option<&Path>) -> Vec<Missing> {
+    checked(needs_of(root, declared_file))
+        .into_iter()
+        .filter(|(_, holds)| !holds)
+        .map(|(need, _)| need.missing())
+        .collect()
+}
+
+/// The MCP servers `needs.txt` declares: `mcp <name>`, one a line, named as
+/// `claude mcp list` names them.
+pub(crate) fn declared_servers(text: &str) -> Vec<String> {
+    text.lines()
+        .map(|line| line.split('#').next().unwrap_or_default().trim())
+        .filter_map(
+            |line| match line.split_whitespace().collect::<Vec<_>>()[..] {
+                ["mcp", name] => Some(name.to_owned()),
+                _ => None,
+            },
+        )
+        .collect()
+}
+
+/// The servers among `needed` that the last check found not answering. A
+/// plugin's server is listed as `plugin:<plugin>:<name>` and needed by its name.
+pub(crate) fn failing_needed(
+    servers: &[devpit_rpc::McpServerHealth],
+    needed: &[String],
+) -> Vec<devpit_rpc::McpServerHealth> {
+    servers
+        .iter()
+        .filter(|one| one.state != devpit_rpc::McpState::Connected)
+        .filter(|one| {
+            let short = one.name.rsplit(':').next().unwrap_or(&one.name);
+            needed.iter().any(|name| name == &one.name || name == short)
+        })
+        .cloned()
+        .collect()
+}
+
+/// What an account's own sign-in lacks, as a start would meet it.
+pub(crate) fn account_lacks(
+    label: &str,
+    state: devpit_rpc::Credentials,
+    fix: &str,
+) -> Option<Missing> {
+    use devpit_rpc::Credentials;
+    let what = match state {
+        Credentials::Missing => format!("the Claude account {label} is signed out"),
+        Credentials::Expired => format!("the Claude account {label}'s sign-in has expired"),
+        // The Keychain holds it on macOS: no word either way is not a refusal.
+        Credentials::Saved | Credentials::Unknown => return None,
+    };
+    Some(Missing {
+        what,
+        command: fix.to_owned(),
+    })
+}
+
+/// The command that signs an account in again: the CLI's own, pointed at the
+/// account's directory when it is not the default one.
+pub(crate) fn login_command(directory: Option<&str>) -> String {
+    match directory {
+        Some(dir) => format!(
+            "CLAUDE_CONFIG_DIR={} claude auth login",
+            devpit_agentcli::declaring::quoted(dir)
+        ),
+        None => "claude auth login".to_owned(),
+    }
 }
 
 /// The sign-in a failed tool's error says is missing, if it says.
