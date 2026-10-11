@@ -12,27 +12,50 @@ with this distribution in LICENSE, and is available at:
 --------------------------------------------------------------------------------
 Devflow skills
 
-The skills under flow/skills/ are devpit's own text, adapted from the sources
-below. Their evals follow the pattern of anthropics/skills' skill-creator.
+The skills under flow/skills/, the reviewer personas under flow/personas/ and
+the findings schema in flow/schemas/devflow-findings.schema.json are devpit's
+own text, adapted from the sources below. Their evals follow the pattern of
+anthropics/skills' skill-creator.
+
+  flow/skills/devflow-briefing      grilling, grill-me; interview-me
+  flow/skills/devflow-contexto      to-spec, domain-modeling; spec-driven-development
+  flow/skills/devflow-plano         to-tickets; planning-and-task-breakdown
+  flow/skills/devflow-execucao      tdd, diagnosing-bugs; test-driven-development,
+                                    incremental-implementation
+  flow/skills/devflow-review        code-review; code-review-and-quality,
+                                    security-and-hardening; requesting-code-review
+  flow/skills/devflow-conclusao     handoff; verification-before-completion
+  flow/skills/devflow-setup         devpit's own
+  flow/personas/devflow-spec        agents/code-reviewer; code-review
+  flow/personas/devflow-padroes     agents/code-reviewer; code-review
+  flow/personas/devflow-seguranca   agents/security-auditor; security-and-hardening
 
 mattpocock/skills
   https://github.com/mattpocock/skills, commit 49dd158
   MIT License, Copyright (c) 2026 Matt Pocock
   Adapted from: skills/productivity/grilling, skills/productivity/grill-me,
   skills/engineering/to-spec, skills/engineering/domain-modeling,
-  skills/engineering/to-tickets, skills/productivity/writing-for-agents
+  skills/engineering/to-tickets, skills/productivity/writing-for-agents,
+  skills/engineering/tdd, skills/engineering/diagnosing-bugs,
+  skills/engineering/code-review (the Spec and Standards axes, and its
+  baseline of Martin Fowler's code smells from "Refactoring"),
+  skills/productivity/handoff
 
 addyosmani/agent-skills
   https://github.com/addyosmani/agent-skills, commit 1be8e34
   MIT License, Copyright (c) 2025 Addy Osmani
   Adapted from: skills/interview-me, skills/spec-driven-development,
-  skills/planning-and-task-breakdown
+  skills/planning-and-task-breakdown, skills/test-driven-development (the
+  Prove-It pattern), skills/incremental-implementation,
+  skills/code-review-and-quality, skills/security-and-hardening,
+  agents/code-reviewer.md, agents/security-auditor.md
 
 obra/superpowers
   https://github.com/obra/superpowers, commit bb92a77
   MIT License, Copyright (c) 2025 Jesse Vincent
   Adapted from: skills/writing-skills (a description that names the trigger
-  and never summarizes the steps)
+  and never summarizes the steps; the rationalization table and red flags),
+  skills/requesting-code-review, skills/verification-before-completion
 
 anthropics/skills
   https://github.com/anthropics/skills, commit dbd4588

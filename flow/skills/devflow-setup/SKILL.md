@@ -1,0 +1,127 @@
+---
+name: devflow-setup
+description: Use when a person wants Devflow set up, switched on, changed or fixed in a devpit project (devflow.yaml and its stages, checks, reviewers, gate or Decisions mode), or asks what Devflow would do here before it is on.
+license: Apache-2.0
+---
+
+# Devflow: setup
+
+Set Devflow up for a project through devpit's MCP. devpit detects what it can
+(test commands, E2E tooling, the agent CLIs signed in, a Decisions key, the
+glossary and ADRs) and recommends a setup; you show the preview, ask only what
+detection left open, and write the file once the person says yes. Switching
+Devflow **on** is the person's click in the devpit app, never yours.
+
+## Ground rules
+
+- **Preview before write.** `devpit_devflow_setup` and `devpit_devflow_set`
+  preview by default and write only with `"apply": true`, which follows an
+  explicit yes to the latest preview.
+- **Facts are devpit's, decisions are the person's.** Detection answers what is
+  in the repo; the person answers what detection could not settle.
+- **One decision per turn,** each with your recommendation.
+- **devpit does not commit.** The files it writes are the person's to commit.
+- **Activation is a click.** Writing the file leaves Devflow off; turning it on,
+  and moving Decisions from `shadow` to `enforce`, wait for the person's click
+  on the confirmation devpit shows in the app.
+
+## Steps
+
+### 1. Read the state
+
+Call `devpit_devflow_status`. It answers with the state (`no file`, `disabled`,
+`active`, `invalid`), what devpit detected with the file each fact came from,
+and the current `devflow.yaml`.
+
+| State | Go to |
+|---|---|
+| `no file` | step 2 |
+| `invalid` | show the error with its line and field, then step 5 to fix that field |
+| `disabled` | show the file; on "switch it on", step 4's last paragraph |
+| `active` | step 5 for the change the person asked for |
+
+Done when you can say the state and list each detected fact with its source.
+
+### 2. Preview the recommended setup
+
+Call `devpit_devflow_setup` with `{"preset": "recommended"}` and no `apply`.
+The recommended setup is: briefing and plan approved by the person; the
+detected checks, each as a script under `.devpit/devflow/scripts/`; one
+reviewer, with the security persona; the `devflow-done` gate; Decisions in
+`shadow` when a key exists.
+
+Show the preview as a short list (stages, each check with its command and the
+file it came from, reviewers, gate, Decisions), then the open decisions from
+step 3, if any.
+
+Done when the preview is shown and nothing was written.
+
+### 3. Ask what detection left open
+
+An open decision is one the preview could not settle from the repo:
+
+- no test command found, or more than one candidate;
+- an E2E tool configured (Playwright, Cypress) with no command that runs it;
+- a reviewer CLI installed but not signed in;
+- a Decisions key with the project opted out.
+
+Ask the first open decision, alone:
+
+```
+**<short title>**: <the question, with the options>
+→ Recommended: <answer>, because <reason>.
+```
+
+End the turn and wait. Fold the answer into the setup as a `set` entry (step 4)
+and ask the next one in the next turn. Never ask what the preview already
+settled.
+
+Done when every open decision has an answer, or there was none.
+
+### 4. Apply, then say what is left to the person
+
+When every decision is answered, restate the setup in one short list (or point
+at the preview when nothing was asked), ending with:
+
+```
+Reply **yes** to write these files, or change any line.
+```
+
+End the turn. On an explicit, unconditional yes to that restate, call:
+
+```json
+{
+  "preset": "recommended",
+  "set": { "stages.execucao.checks": [{ "name": "unit", "run": "make test", "report": "junit" }] },
+  "apply": true
+}
+```
+
+`set` holds the answers as dotted paths over the preset; leave it out when
+nothing was asked. Use `"preset": "custom"` only when the person rejected the
+recommended setup as a whole.
+
+Reply with the files devpit wrote (`.devpit/devflow/devflow.yaml`, `scripts/`,
+`.gitignore` ignoring `runs/`), that they are theirs to commit, and that
+**Devflow is still off: it switches on when they click the confirmation devpit
+shows in the app**. End the turn.
+
+Done when the tool reported the files written and the reply says that
+activation waits for their click.
+
+### 5. Change one field
+
+Call `devpit_devflow_set` with the field as a dotted path and its new value,
+without `apply`:
+
+```json
+{ "path": "review.block_on", "value": ["critical"] }
+```
+
+Show the before and after, ask for a yes, then call it again with
+`"apply": true`. `enabled` and `decisions.mode: enforce` go through the
+person's click, like activation: tell them where to click instead of setting
+them.
+
+Done when the tool reported the change written, or the reply says which click
+the change waits for.
