@@ -76,6 +76,17 @@ async function runsTheStub(pane, seconds = 15) {
   return false
 }
 
+/**
+ * Starts the agent the window held. The seeded home has no Claude sign-in, so
+ * a start from the window waits above its terminal, saying so, until the
+ * person starts it anyway.
+ */
+async function startAnyway() {
+  const held = await window.wait(until.elementLocated(By.css('.theld')), 15000)
+  assert.match(await held.getText(), /signed out/)
+  await press(window, 'Start anyway')
+}
+
 /** The board in front, whatever tab the last test left there. */
 async function backToTheBoard() {
   await escape(window)
@@ -123,6 +134,7 @@ describe('manual items 5 and 6 — an agent launched on a card is open, then gon
     const known = panes(home)
     await press(window, 'Claude Code')
     const pane = await newPane(known)
+    await startAnyway()
 
     assert.ok(await runsTheStub(pane), `pane ${pane.id} is not running the stub: ${underPane(pane).join(' | ')}`)
     assert.equal(await until_doing('Launched', 'open'), 'open')
@@ -167,6 +179,7 @@ describe('manual item 8 — a waiting agent rings the bell and goes to its termi
     const known = panes(home)
     await press(window, 'Claude Code')
     const pane = await newPane(known)
+    await startAnyway()
     assert.ok(await runsTheStub(pane))
     assert.equal(await until_doing('Needs you', 'open'), 'open')
 

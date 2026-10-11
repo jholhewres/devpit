@@ -381,21 +381,26 @@ describe('the orchestrator', () => {
     assert.match(unlinked.error ?? '', /not linked/)
     await invoke(window, 'orchestrator_link', { projectId: orchestratorId, linked: [project.id] })
 
+    // The seeded home has no Claude sign-in: a start says so and waits for the
+    // person, who here says to go ahead.
+    const held = await ask('start', { project: project.id, prompt: 'Look around.', name: 'free-stub' }, orchestrator)
+    assert.match(held.error ?? '', /signed out/)
+
     // Without a card: a session of its own, in a new terminal of the project.
-    const free = await ask('start', { project: project.id, prompt: 'Look around.', name: 'free-stub' }, orchestrator)
+    const free = await ask('start', { project: project.id, prompt: 'Look around.', name: 'free-stub', anyway: true }, orchestrator)
     assert.equal(free.ok?.name, 'free-stub', `a session without a card was refused: ${JSON.stringify(free)}`)
     const started = await window
       .wait(() => readFileSync(join(home, '.claude', 'stub-calls.log'), 'utf8').split('\n').some((line) => line.includes('free-stub') && line.includes('"interactive":true')), 20000)
       .catch(() => false)
     assert.ok(started, 'the session without a card never started in its terminal')
 
-    const handed = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, orchestrator)
+    const handed = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.', anyway: true }, orchestrator)
     assert.ok(handed.ok, `the orchestrator could not hand the card: ${JSON.stringify(handed)}`)
     assert.match(handed.ok.name, /^fix-the-login-timeout-/)
     const detail = await invoke(window, 'card_detail', { projectId: project.id, cardId: card.id })
     assert.ok(detail.sessions.length > 0, 'the handed session is not on its card')
 
-    const refused = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.' }, repo)
+    const refused = await ask('start', { project: project.id, cardId: card.id, prompt: 'Take it from here.', anyway: true }, repo)
     assert.match(refused.error ?? '', /only an orchestrator/)
   })
 
