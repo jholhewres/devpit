@@ -63,13 +63,11 @@ export function opened(strip: Strip, tab: Tab): Strip {
     /* Appended, never moved: a tab keeps the place it was given. */
     if (already) return { ...strip, active: already.id }
   }
-  /* A terminal says which one it is from the moment it opens. A chat waits:
-     it is named after the first thing you say in it, and until then "Chat" is
-     the truest label available. */
-  const named =
-    tab.title === undefined && tab.kind === 'term'
-      ? { ...tab, title: nextName(strip.open, 'term', 'Terminal') }
-      : tab
+  /* A terminal says which one it is from the moment it opens, and a file is
+     its file. A chat waits: it is named after the first thing you say in it,
+     and until then "Chat" is the truest label available. */
+  const title = tab.kind === 'term' ? (tab.title ?? nextName(strip.open, 'term', 'Terminal')) : tabTitle(tab)
+  const named = title === tab.title ? tab : { ...tab, title }
   return { open: [...strip.open, named], active: named.id }
 }
 
@@ -160,6 +158,15 @@ export function titleOf(said: string, limit = 48): string {
   const short = [...first].slice(0, limit).join('').trimEnd()
   if (short === '') return ''
   return [...first].length > limit ? `${short}…` : short
+}
+
+/* A tab's own name: the one it was given, or for a file, the file's.
+
+   Here rather than in each opener, because three of them forgot it and the
+   tab fell back to the pane's label, which names no particular file. */
+export function tabTitle(tab: Tab): string | undefined {
+  if (tab.title !== undefined) return tab.title
+  return tab.kind === 'file' && tab.path ? tab.path.split('/').pop() : undefined
 }
 
 /* The next free number for a kind, so a second terminal is Terminal 2.

@@ -12,6 +12,7 @@ import {
   renamed,
   short,
   sweeping,
+  tabTitle,
   titleOf,
   twice,
   type Strip,
@@ -115,6 +116,30 @@ describe('a file is one tab', () => {
     const again = opened(one, file('a.rs'))
     expect(again.open).toHaveLength(2)
     expect(again.active).toBe('file:a.rs')
+  })
+})
+
+/* A markdown link opened a file tab with no title, and the strip showed the
+   pane's placeholder label `files.rs` over the right file. */
+describe('a file tab is named after its file', () => {
+  const doc = 'docs/devpit-flow-tools-2026-10.md'
+  const file: Tab = { id: `file:${doc}`, kind: 'file', path: doc }
+
+  it('is named after the file when the opener gave it no title', () => {
+    expect(opened(empty, file).open[0]!.title).toBe('devpit-flow-tools-2026-10.md')
+  })
+
+  it('is named after the file when it was saved before it had a title', () => {
+    /* Restored from storage, it never went through `opened`. */
+    expect(tabTitle(file)).toBe('devpit-flow-tools-2026-10.md')
+  })
+
+  it('keeps a name someone gave it', () => {
+    expect(tabTitle({ ...file, title: 'the flow doc' })).toBe('the flow doc')
+  })
+
+  it('leaves a tab that is not a file to its own fallback', () => {
+    expect(tabTitle({ id: 'c', kind: 'chat' })).toBeUndefined()
   })
 })
 

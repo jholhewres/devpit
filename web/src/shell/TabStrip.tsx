@@ -4,7 +4,7 @@ import { AgentMark } from './AgentMark'
 import { paneMeta } from './paneList'
 import { Rename } from './Rename'
 import { busyIn, doingIn } from './running'
-import { twice, type Clicked, type Tab } from './strip'
+import { tabTitle, twice, type Clicked, type Tab } from './strip'
 import { useShell } from './useShell'
 import { SHORTCUTS } from './shortcuts'
 
@@ -76,7 +76,7 @@ export function TabStrip(): React.JSX.Element {
   function named(tab: Tab): string {
     if (tab.title && !generated(tab)) return tab.title
     const here = busyIn(running, tab)
-    return here?.agent ? here.label : (tab.title ?? paneMeta(tab.kind).label)
+    return here?.agent ? here.label : (tabTitle(tab) ?? paneMeta(tab.kind).label)
   }
 
   /* A name this app wrote, rather than one a person chose. */
@@ -136,7 +136,7 @@ export function TabStrip(): React.JSX.Element {
           <div className="tab" data-tab={tab.id} data-ctx="tab" data-id={tab.id} data-toggle={tab.kind} data-active={String(active?.id === tab.id)} key={tab.id}>
             {icon(tab)}
             <Rename
-              value={tab.title ?? paneMeta(tab.kind).label}
+              value={tabTitle(tab) ?? paneMeta(tab.kind).label}
               editing
               onDone={(title) => {
                 if (title) rename(tab.id, title)

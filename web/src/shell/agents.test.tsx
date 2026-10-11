@@ -144,6 +144,13 @@ describe('a terminal running an agent, in the strip', () => {
     expect(screen.getByText('Terminal 1')).toBeTruthy()
   })
 
+  /* A tab saved without a title is drawn straight from storage. */
+  it('names a file tab after its file even without a title', () => {
+    shell.open = [{ id: 'file:docs/flow.md', kind: 'file', path: 'docs/flow.md' }]
+    render(<TabStrip />)
+    expect(screen.getByText('flow.md')).toBeTruthy()
+  })
+
   /* Orca's plus opens the field rather than a bare terminal, because most of
      the time what people came to start is an agent. */
   it('opens the field from the plus', () => {
