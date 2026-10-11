@@ -3,7 +3,8 @@ import { useState } from 'react'
 import type { Comment } from '../gen/bindings'
 import { Markdown } from './MarkdownView'
 import { since } from './projects'
-import { committed } from './typing'
+import { matches } from './shortcuts'
+import { composing } from './typing'
 
 /*
  * The card's conversation.
@@ -101,7 +102,7 @@ export function Comments({
           /* Enter is a newline here — this is prose, not a chat line, and
              half of what gets pasted in is a stack trace. */
           onKeyDown={(event) => {
-            if (committed(event) && (event.metaKey || event.ctrlKey)) {
+            if (matches('comment', event) && !composing(event)) {
               event.preventDefault()
               void say()
             }

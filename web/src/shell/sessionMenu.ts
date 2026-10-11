@@ -24,7 +24,7 @@ export interface SessionHands {
 export const sessionMenu = (hands: SessionHands): readonly SessionEntry[] => [
   { label: 'Open', key: '↵', run: hands.focus },
   { rule: true },
-  { label: 'Rename', key: 'F2', run: hands.rename },
+  { label: 'Rename', shortcut: 'rename', run: hands.rename },
   { rule: true },
   { label: 'Close session', bad: true, run: hands.close },
 ]

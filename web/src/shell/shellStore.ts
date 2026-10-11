@@ -89,6 +89,7 @@ export function useWindowShell() {
     theme: all.theme,
     openPrefs: all.openPrefs,
     closePrefs: all.closePrefs,
+    managing: all.managing,
     closeManager: all.closeManager,
   }))
 }

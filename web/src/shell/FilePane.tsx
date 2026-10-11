@@ -12,6 +12,7 @@ import { Streamed } from './Streamed'
 import type { Tab } from './strip'
 import { useFile } from './useFile'
 import { useShell } from './useShell'
+import { useShortcut } from './useShortcut'
 import { useWantedLine } from './revealLine'
 
 /*
@@ -41,17 +42,9 @@ export function FilePane({ tab }: { tab: Tab }): React.JSX.Element {
   }, [tab.id, edit.dirty, markUnsaved])
 
   /* ⌘S saves the tab in front, and only that one. */
-  useEffect(() => {
-    if (!mine) return
-    const onKey = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-        event.preventDefault()
-        if (edit.dirty) edit.save()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [mine, edit])
+  useShortcut('save', () => {
+    if (edit.dirty) edit.save()
+  }, mine)
 
   const name = path?.split('/').pop() ?? 'No file open'
   const editing = kind === 'text' || (kind === 'markdown' && !preview)

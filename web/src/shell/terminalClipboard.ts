@@ -1,9 +1,11 @@
 import { readImage, readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import type { Terminal } from '@xterm/xterm'
 
+import { onMacNow, type Press } from './keys'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
 import { reason } from './reason'
+import { matches } from './shortcuts'
 
 /*
  * Copy and paste in a terminal.
@@ -17,31 +19,11 @@ import { reason } from './reason'
 
 export type ClipboardAct = 'copy' | 'paste'
 
-const mac = (): boolean => typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
-
-/** The terminal's copy and paste keys: ⇧⌃C/⇧⌃V and ⌃/⇧Insert off a Mac, ⌘C/⌘V
- *  on one. Plain ⌃C and ⌃V stay the program's: interrupt, and Claude Code's
- *  own paste-an-image. */
-export function clipboardKey(
-  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'shiftKey' | 'metaKey' | 'altKey'>,
-  onMac = mac(),
-): ClipboardAct | null {
-  if (event.altKey) return null
-  const key = event.key.toLowerCase()
-  if (onMac) {
-    if (!event.metaKey || event.ctrlKey) return null
-    return key === 'c' ? 'copy' : key === 'v' ? 'paste' : null
-  }
-  if (key === 'insert') return event.shiftKey ? 'paste' : event.ctrlKey ? 'copy' : null
-  if (!event.ctrlKey || !event.shiftKey || event.metaKey) return null
-  return key === 'c' ? 'copy' : key === 'v' ? 'paste' : null
-}
-
-/** What the menu prints beside Copy and Paste — the keys `clipboardKey` takes.
- *  Kept beside the listener, as `tileKeys.ts` keeps its own, because these
- *  belong to the terminal and not to the window's shortcut map. */
-export function clipboardLabels(onMac = mac()): Record<ClipboardAct, string> {
-  return onMac ? { copy: '⌘C', paste: '⌘V' } : { copy: 'Ctrl+Shift+C', paste: 'Ctrl+Shift+V' }
+/** Copy or paste, by the keys the registry gives them. */
+export function clipboardKey(event: Press, onMac = onMacNow()): ClipboardAct | null {
+  if (matches('copy', event, onMac)) return 'copy'
+  if (matches('paste', event, onMac)) return 'paste'
+  return null
 }
 
 /** Copies the selection, and says whether there was one to copy. */

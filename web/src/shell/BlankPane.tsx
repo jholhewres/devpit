@@ -1,7 +1,7 @@
 import mark from '../assets/brand/mark.png'
 import { AgentMark } from './AgentMark'
 import type { Shell } from './shape'
-import { SHORTCUTS } from './shortcuts'
+import { useKeys } from './useShortcut'
 import { offered, useKnownAgents } from './useKnownAgents'
 
 /* A project with nothing open: the ways to start, the agents this machine
@@ -9,6 +9,7 @@ import { offered, useKnownAgents } from './useKnownAgents'
    most people open a project to do. */
 export function BlankPane({ name, show }: { name: string; show: Shell['show'] }): React.JSX.Element {
   const agents = offered(useKnownAgents()).filter((agent) => agent.installed)
+  const keys = useKeys()
   return (
     <div className="blank">
       <span className="blank__mark"><img className="mark" alt="" src={mark} /></span>
@@ -17,11 +18,11 @@ export function BlankPane({ name, show }: { name: string; show: Shell['show'] })
       <div className="blank__keys">
         <button className="blank__k" onClick={() => show('chat')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" /></svg>
-          <b>New chat</b><span>{SHORTCUTS.chat}</span>
+          <b>New chat</b><span>{keys('chat')}</span>
         </button>
         <button className="blank__k" onClick={() => show('term')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m4 17 6-6-6-6M12 19h8" /></svg>
-          <b>New terminal</b><span>{SHORTCUTS.terminal}</span>
+          <b>New terminal</b><span>{keys('terminal')}</span>
         </button>
         {agents.map((agent) => (
           <button key={agent.id} className="blank__k" onClick={() => show('term', { title: agent.label, launch: agent.id })}>

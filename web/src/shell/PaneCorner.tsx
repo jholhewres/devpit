@@ -1,5 +1,5 @@
 import { useShell } from './useShell'
-import { SHORTCUTS } from './shortcuts'
+import { useKeys } from './useShortcut'
 
 /*
  * What a pane can do, as a few icons in its corner rather than a title bar.
@@ -38,6 +38,7 @@ export function PaneCorner({
   children?: React.ReactNode
 }): React.JSX.Element {
   const { show, close, open, openCard } = useShell()
+  const keys = useKeys()
   const chatLabel = onChat ? 'Continue in chat' : 'New chat'
   /* The way back to the card a terminal was opened for. Only a tab the backend
      filed under a card has one. */
@@ -71,10 +72,10 @@ export function PaneCorner({
       </button>
       {onSplit && (
         <>
-          <button className="sq26" aria-label="Split right" title={`Split right (${SHORTCUTS.splitRight})`} onClick={() => onSplit('horizontal')}>
+          <button className="sq26" aria-label="Split right" title={`Split right (${keys('splitRight')})`} onClick={() => onSplit('horizontal')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M12 4v16" /></svg>
           </button>
-          <button className="sq26" aria-label="Split down" title={`Split down (${SHORTCUTS.splitDown})`} onClick={() => onSplit('vertical')}>
+          <button className="sq26" aria-label="Split down" title={`Split down (${keys('splitDown')})`} onClick={() => onSplit('vertical')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 12h18" /></svg>
           </button>
         </>

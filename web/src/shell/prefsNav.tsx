@@ -60,6 +60,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
           <svg {...stroke}><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /></svg>
         ),
       },
+      {
+        id: 'keyboard',
+        label: 'Keyboard',
+        about: 'shortcuts keys keybindings hotkeys record reset cheat sheet ctrl cmd',
+        icon: (
+          <svg {...stroke}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15h6" /></svg>
+        ),
+      },
     ],
   },
   {

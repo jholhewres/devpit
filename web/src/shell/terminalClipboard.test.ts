@@ -9,7 +9,8 @@ vi.mock('./live', () => ({
 }))
 
 import type { Terminal } from '@xterm/xterm'
-import { clipboardKey, clipboardLabels, copySelection, pasteClipboard } from './terminalClipboard'
+import { keysLabel } from './shortcuts'
+import { clipboardKey, copySelection, pasteClipboard } from './terminalClipboard'
 
 const key = (key: string, mods: Partial<KeyboardEvent> = {}) => ({
   key,
@@ -47,9 +48,9 @@ describe('the keys that copy and paste', () => {
 
 describe('what the menu prints', () => {
   it('is the keys that are listened for', () => {
-    expect(clipboardLabels(true)).toEqual({ copy: '⌘C', paste: '⌘V' })
+    expect([keysLabel('copy', true), keysLabel('paste', true)]).toEqual(['⌘C', '⌘V'])
     expect(clipboardKey(key('c', { metaKey: true }), true)).toBe('copy')
-    expect(clipboardLabels(false)).toEqual({ copy: 'Ctrl+Shift+C', paste: 'Ctrl+Shift+V' })
+    expect([keysLabel('copy', false), keysLabel('paste', false)]).toEqual(['Ctrl+Shift+C', 'Ctrl+Shift+V'])
     expect(clipboardKey(key('V', { ctrlKey: true, shiftKey: true }), false)).toBe('paste')
   })
 })

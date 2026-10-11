@@ -6,6 +6,7 @@ import { common, finished, wordAt } from './completing'
 import { shortPath } from './blockText'
 import { Folder } from './GitIcons'
 import { ask, commands } from './live'
+import { keysLabel, matches } from './shortcuts'
 import { abandoned, committed } from './typing'
 
 /*
@@ -136,18 +137,18 @@ export const CommandInput = forwardRef<CommandInputHandle, {
     }
     const atStart = box.selectionStart === 0 || !text.slice(0, box.selectionStart).includes('\n')
     const atEnd = !text.slice(box.selectionEnd).includes('\n')
-    if (event.ctrlKey && event.key.toLowerCase() === 'l') {
+    if (matches('clearBlocks', event)) {
       event.preventDefault()
       onClear()
       return
     }
-    if (event.ctrlKey && event.key.toLowerCase() === 'r') {
+    if (matches('searchHistory', event)) {
       event.preventDefault()
       setSearch('')
       setPick(0)
       return
     }
-    if (event.ctrlKey && event.key.toLowerCase() === 'c' && !box.value.slice(box.selectionStart, box.selectionEnd)) {
+    if (matches('clearLine', event) && !box.value.slice(box.selectionStart, box.selectionEnd)) {
       event.preventDefault()
       setText('')
       setWalk(null)
@@ -246,7 +247,7 @@ export const CommandInput = forwardRef<CommandInputHandle, {
             autoCapitalize="off"
             autoCorrect="off"
             value={text}
-            placeholder="Run a command — ↑ history, Ctrl+R search"
+            placeholder={`Run a command — ↑ history, ${keysLabel('searchHistory')} search`}
             aria-label="Command"
             onChange={(event) => {
               setText(event.target.value)

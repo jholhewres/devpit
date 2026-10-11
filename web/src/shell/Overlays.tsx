@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 
 import { AddProject } from './AddProject'
+import { CheatSheet } from './CheatSheet'
 import { ask, commands } from './live'
 import { Problem } from './Problem'
 import { RemoveProject } from './RemoveProject'
@@ -67,6 +68,7 @@ export function Overlays({
         </Suspense>
       )}
       <UpdateCard />
+      <CheatSheet />
       <Problem />
       {palette && (
         <Suspense fallback={null}>

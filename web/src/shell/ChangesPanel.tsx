@@ -9,8 +9,9 @@ import { DiscardConfirm } from './DiscardConfirm'
 import { List, Minus, Plus, Search, Trash, Tree, Undo } from './GitIcons'
 import { ask, commands } from './live'
 import { RemoteRow } from './RemoteRow'
+import { keysLabel, matches } from './shortcuts'
 import { Skeleton } from './Skeleton'
-import { abandoned, committed } from './typing'
+import { abandoned, composing } from './typing'
 import { useShell } from './useShell'
 import { changed, type UseTree } from './useTree'
 
@@ -143,11 +144,11 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
             and was off the screen by the time you had read what changed. */}
         <textarea
           className="git__msg"
-          placeholder="Message (⌘/Ctrl+Enter to commit)"
+          placeholder={`Message (${keysLabel('commit')} to commit)`}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           onKeyDown={(event) => {
-            if (committed(event) && (event.metaKey || event.ctrlKey) && !busy && !act1.disabled) {
+            if (matches('commit', event) && !composing(event) && !busy && !act1.disabled) {
               event.preventDefault()
               go()
             }

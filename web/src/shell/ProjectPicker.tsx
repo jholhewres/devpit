@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { SHORTCUTS, shortcutFor } from './shortcuts'
+import { useKeys, useShortcut } from './useShortcut'
 import { useShell } from './useShell'
 import { abandoned } from './typing'
 
@@ -38,14 +38,14 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
 
   /* ⌘P is heard open or shut, and here rather than in the shell, which would
      have to hold this menu's state. Escape only matters while it is open. */
+  useShortcut('project', () => {
+    setQuery('')
+    setOpen((was) => !was)
+  })
+  const keys = useKeys()('project')
   useEffect(() => {
     const shut = (): void => setOpen(false)
     const key = (event: KeyboardEvent): void => {
-      if (shortcutFor(event) === 'project') {
-        event.preventDefault()
-        setQuery('')
-        return setOpen((was) => !was)
-      }
       if (open && abandoned(event)) setOpen(false)
     }
     if (open) document.addEventListener('click', shut)
@@ -66,7 +66,7 @@ export function ProjectPicker({ onAdd }: { onAdd: () => void }): React.JSX.Eleme
         className="pick"
         aria-haspopup="true"
         aria-expanded={open}
-        title={`Switch project (${SHORTCUTS.project})`}
+        title={`Switch project (${keys})`}
         onClick={(event) => {
           event.stopPropagation()
           setQuery('')

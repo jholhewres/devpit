@@ -6,7 +6,7 @@ import { Rename } from './Rename'
 import { busyIn, doingIn } from './running'
 import { tabTitle, twice, type Clicked, type Tab } from './strip'
 import { useShell } from './useShell'
-import { SHORTCUTS } from './shortcuts'
+import { useKeys } from './useShortcut'
 
 /*
  * The strip is the order. A tab is appended when it opens and only moves when
@@ -18,6 +18,7 @@ import { SHORTCUTS } from './shortcuts'
 export function TabStrip(): React.JSX.Element {
   const { open, active, focus, close, move, rename, renaming, setRenaming } = useShell()
   const { running, doing, openPalette } = useShell()
+  const keys = useKeys()
     const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
   const moving = useRef<{ id: string; at: number; moved: boolean } | null>(null)
@@ -215,7 +216,7 @@ export function TabStrip(): React.JSX.Element {
           goes to start something, and most of the time the something is an
           agent. A plain terminal is the first row in it, and ⌘T still opens
           one without stopping to ask. */}
-      <button className="tab tab--new" title={`Open something new (${SHORTCUTS.palette})`} aria-label="Open something new" onClick={openPalette}>
+      <button className="tab tab--new" title={`Open something new (${keys('palette')})`} aria-label="Open something new" onClick={openPalette}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>

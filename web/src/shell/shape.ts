@@ -25,6 +25,7 @@ export type PrefsPane =
   | 'projects'
   | 'general'
   | 'appearance'
+  | 'keyboard'
   | 'providers'
   | 'skills'
   | 'storage'

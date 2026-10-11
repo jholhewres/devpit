@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { ask, commands } from './live'
+import { keysLabel, matches } from './shortcuts'
 import { abandoned, committed } from './typing'
 
 /*
@@ -39,9 +40,9 @@ export function SessionName({
     return (
       <button
         className="sterm__name sterm__name--edit"
-        title="Rename (F2)"
+        title={`Rename (${keysLabel('rename')})`}
         onClick={() => (setTyped(name), setEditing(true))}
-        onKeyDown={(event) => event.key === 'F2' && (setTyped(name), setEditing(true))}
+        onKeyDown={(event) => matches('rename', event) && (event.preventDefault(), setTyped(name), setEditing(true))}
       >
         {name}
       </button>

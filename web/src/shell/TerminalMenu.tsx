@@ -2,8 +2,8 @@ import type { Terminal } from '@xterm/xterm'
 
 import { Clipboard, Close, Columns, Copy, Plus, Rows, SelectAll } from './GitIcons'
 import { Menu, MenuItem, MenuRule } from './Menu'
-import { SHORTCUTS } from './shortcuts'
-import { clipboardLabels, copySelection, pasteClipboard } from './terminalClipboard'
+import { copySelection, pasteClipboard } from './terminalClipboard'
+import { useKeys } from './useShortcut'
 
 /*
  * A terminal's right-click, in Orca's order: what to do with text first, then
@@ -40,7 +40,7 @@ export function TerminalMenu({
   /** Absent for the only pane of a tab, which already has a tab of its own. */
   onSeparate?: () => void
 }): React.JSX.Element {
-  const keys = clipboardLabels()
+  const keys = useKeys()
 
   const run = (act: () => void | Promise<unknown>) => () => {
     onClose()
@@ -49,14 +49,14 @@ export function TerminalMenu({
 
   return (
     <Menu at={at} label="Terminal actions" onClose={onClose}>
-      <MenuItem label="Copy" glyph={<Copy />} keys={keys.copy} disabled={!terminal.hasSelection()} onPick={run(() => copySelection(terminal))} />
+      <MenuItem label="Copy" glyph={<Copy />} keys={keys('copy')} disabled={!terminal.hasSelection()} onPick={run(() => copySelection(terminal))} />
       <MenuItem label="Select all" glyph={<SelectAll />} onPick={run(() => terminal.selectAll())} />
-      <MenuItem label="Paste" glyph={<Clipboard />} keys={keys.paste} onPick={run(() => pasteClipboard(terminal, projectId).then(onFailed))} />
+      <MenuItem label="Paste" glyph={<Clipboard />} keys={keys('paste')} onPick={run(() => pasteClipboard(terminal, projectId).then(onFailed))} />
       {onSplit && (
         <>
           <MenuRule />
-          <MenuItem label="Split right" glyph={<Columns />} keys={SHORTCUTS.splitRight} onPick={run(() => onSplit('horizontal'))} />
-          <MenuItem label="Split down" glyph={<Rows />} keys={SHORTCUTS.splitDown} onPick={run(() => onSplit('vertical'))} />
+          <MenuItem label="Split right" glyph={<Columns />} keys={keys('splitRight')} onPick={run(() => onSplit('horizontal'))} />
+          <MenuItem label="Split down" glyph={<Rows />} keys={keys('splitDown')} onPick={run(() => onSplit('vertical'))} />
         </>
       )}
       {onBlocks && (

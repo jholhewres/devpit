@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 
 import type { Happening } from '../gen/bindings'
 import { jump, marked, noMarks, toneOf, type Marks, type Said } from './marks'
+import { matches } from './shortcuts'
 import { onHappening } from './window'
 
 /*
@@ -50,10 +51,11 @@ export function useMarks(term: Terminal | null, paneId: string | null): void {
        Returning false lets the key through to the shell, so a program that
        wants Alt+Up still gets it when there is nowhere to jump. */
     const disposeKeys = term.attachCustomKeyEventHandler((event) => {
-      if (event.type !== 'keydown' || !event.altKey || event.ctrlKey || event.metaKey) return true
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return true
+      if (event.type !== 'keydown') return true
+      const back = matches('previousCommand', event)
+      if (!back && !matches('nextCommand', event)) return true
       const here = term.buffer.active.viewportY
-      const to = jump(marks.current, here, event.key === 'ArrowUp' ? 'back' : 'forward')
+      const to = jump(marks.current, here, back ? 'back' : 'forward')
       if (to === null) return true
       term.scrollToLine(to)
       return false

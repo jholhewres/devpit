@@ -7,6 +7,7 @@ import { ask, commands } from './live'
 import { PluginChip } from './PluginChip'
 import { abandoned, committed } from './typing'
 import { useShellPick } from './shellStore'
+import { useKeys, useShortcut } from './useShortcut'
 
 /*
  * The strip under a terminal while an agent runs in it.
@@ -51,17 +52,14 @@ export function AgentBar({
     }
   }, [cwd])
 
-  /* Ctrl+G opens the editor from anywhere in this pane, as it does in Warp. */
-  useEffect(() => {
-    const key = (event: KeyboardEvent): void => {
-      if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'g' && document.activeElement?.closest(`[data-pane-id="${paneId}"]`)) {
-        event.preventDefault()
-        setComposing(true)
-      }
-    }
-    window.addEventListener('keydown', key, true)
-    return () => window.removeEventListener('keydown', key, true)
-  }, [paneId])
+  /* Opens the editor from anywhere in this pane, as Ctrl+G does in Warp. Taken
+     before xterm sees it: it used to reach the agent as well, and Claude Code's
+     own Ctrl+G opened a second editor inside the terminal. */
+  useShortcut('compose', () => {
+    if (!document.activeElement?.closest(`[data-pane-id="${paneId}"]`)) return false
+    setComposing(true)
+  })
+  const keys = useKeys()
 
   useEffect(() => {
     if (composing) field.current?.focus()
@@ -123,7 +121,7 @@ export function AgentBar({
         <button className="abar__b" onClick={toggleFiles} title="The project's files">
           <Folder size={14} /> Files
         </button>
-        <button className="abar__b" data-on={composing ? 'true' : undefined} onClick={() => setComposing(!composing)} title="Write the next message in an editor (Ctrl+G)">
+        <button className="abar__b" data-on={composing ? 'true' : undefined} onClick={() => setComposing(!composing)} title={`Write the next message in an editor (${keys('compose')})`}>
           <Pencil size={14} /> Compose
         </button>
       </div>

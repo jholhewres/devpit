@@ -6,6 +6,7 @@ import { inOrder } from './inOrder'
 import { PlusLink } from './PlusLink'
 import { PrefsSide } from './PrefsSide'
 import { GeneralSettings } from './GeneralSettings'
+import { KeyboardSettings } from './KeyboardSettings'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
@@ -174,6 +175,9 @@ export function Settings({
             />
           </section>
 
+          <section className="prefs__in" hidden={pane !== 'keyboard'}>
+            <KeyboardSettings onGeneral={() => openPrefs('general')} />
+          </section>
           <section className="prefs__in" hidden={pane !== 'channels'}>
             <ChannelsPane />
           </section>

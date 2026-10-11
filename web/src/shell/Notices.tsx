@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 
 import type { Notice } from '../gen/bindings'
 import { useAway } from './away'
 import { since } from './projects'
 import { nextThatNeedsYou } from './headsDown'
-import { shortcutFor } from './shortcuts'
+import { useShortcut } from './useShortcut'
 import type { Bell } from './useNotices'
 
 /*
@@ -49,22 +49,6 @@ export function Notices({
   const box = useRef<HTMLDivElement>(null)
   useAway(box, () => setOpen(false), open)
 
-  /* One key to the thing that has been waiting longest for you, in the order
-     somebody between five agents wants: an agent stopped for an answer, then a
-     step with no undo, then a run that ended. It walks what is ringing — what
-     a focus is holding is not something to be sent to. */
-  useEffect(() => {
-    const key = (event: KeyboardEvent): void => {
-      if (shortcutFor(event) !== 'next') return
-      const next = nextThatNeedsYou(bell.notices)
-      if (!next) return
-      event.preventDefault()
-      act(next)
-    }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
-  })
-
   /* The terminal it happened in first: an agent waiting is answered there,
      and the card only says which piece of work it was. */
   const act = (one: Notice): void => {
@@ -77,6 +61,16 @@ export function Notices({
       onOpenCard(one.cardId)
     }
   }
+
+  /* One key to the thing that has been waiting longest for you, in the order
+     somebody between five agents wants: an agent stopped for an answer, then a
+     step with no undo, then a run that ended. It walks what is ringing — what
+     a focus is holding is not something to be sent to. */
+  useShortcut('next', () => {
+    const next = nextThatNeedsYou(bell.notices)
+    if (!next) return false
+    act(next)
+  })
 
   return (
     <div className="bell" ref={box}>

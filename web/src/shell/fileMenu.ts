@@ -1,3 +1,5 @@
+import type { ShortcutId } from './shortcuts'
+
 /*
  * The file row's context menu, as data.
  *
@@ -24,6 +26,8 @@ export type ActionId =
 export interface Entry {
   readonly label?: string
   readonly key?: string
+  /** A key from the registry, printed as it is bound now. */
+  readonly shortcut?: ShortcutId
   readonly rule?: true
   /** Drawn as destructive. Only what cannot be undone from here earns it. */
   readonly bad?: true
@@ -39,7 +43,7 @@ export const FILE_MENU: readonly Entry[] = [
   { label: 'Copy path', act: 'copyPath' },
   { label: 'Reveal in the finder', act: 'reveal' },
   { rule: true },
-  { label: 'Rename…', key: 'F2', act: 'rename' },
+  { label: 'Rename…', shortcut: 'rename', act: 'rename' },
   { label: 'Delete', act: 'delete', bad: true },
 ]
 

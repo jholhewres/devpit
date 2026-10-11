@@ -6,6 +6,7 @@ import type { Did, Drove, Showing } from '../gen/bindings'
 import { ask, commands } from './live'
 import type { Tab } from './strip'
 import { useShell } from './useShell'
+import { listen } from './useShortcut'
 import { onCarried } from './window'
 
 /*
@@ -232,18 +233,15 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
        the page has focus — the key goes to the other webview and this document
        never sees it — which is why the bar has a button for the same thing and
        does not rely on the shortcut. */
-    const key = (event: KeyboardEvent): void => {
-      if (event.key !== 'f' || !(event.ctrlKey || event.metaKey)) return
-      if (node.getBoundingClientRect().width === 0) return
-      event.preventDefault()
+    const unfind = listen('find', () => {
+      if (node.getBoundingClientRect().width === 0) return false
       setFinding(true)
-    }
-    window.addEventListener('keydown', key)
+    })
 
     return () => {
       window.removeEventListener('resize', put)
       window.removeEventListener('scroll', put, true)
-      window.removeEventListener('keydown', key)
+      unfind()
       for (const watcher of watchers) watcher.disconnect()
       /* Unconditionally: a webview left behind floats over whatever the window
          shows next, and nothing else in the app knows it is there. */

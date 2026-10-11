@@ -21,3 +21,10 @@ export const CARD = (
     <path d="M9 3v18" />
   </svg>
 )
+
+export const KEYBOARD = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15h6" />
+  </svg>
+)

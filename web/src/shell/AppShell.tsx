@@ -16,8 +16,8 @@ import { PluginsProvider } from './usePlugins'
 import { ShellProvider } from './useShell'
 import { useWindowShell } from './shellStore'
 import { BriefRefresh } from './useBriefRefresh'
-import { shortcutFor } from './shortcuts'
 import { useMaximized } from './useMaximized'
+import { useShortcut } from './useShortcut'
 import { abandoned } from './typing'
 
 export function AppShell(): React.JSX.Element {
@@ -63,36 +63,28 @@ function Window(): React.JSX.Element {
     document.documentElement.dataset.theme = shell.theme
   }, [shell.theme])
 
+  // Only the window's own. A pane's keys are the pane's: splitting belongs
+  // to the terminal being split, ⌘P to the picker it opens.
+  useShortcut('palette', () => (palette ? closePalette() : openPalette()))
+  useShortcut('settings', () => shell.openPrefs('general'))
+  useShortcut('terminal', () => shell.show('term'))
+  useShortcut('chat', () => shell.show('chat'))
+
   useEffect(() => {
     const key = (event: KeyboardEvent): void => {
-      // Only the window's own. A pane's keys are the pane's: splitting
-      // belongs to the terminal being split, ⌘P to the picker it opens.
-      const press = shortcutFor(event)
-      if (press === 'palette') {
-        event.preventDefault()
-        if (palette) closePalette()
-        else openPalette()
-      }
-      if (press === 'settings') {
-        event.preventDefault()
-        shell.openPrefs('general')
-      }
-      if (press === 'terminal' || press === 'chat') {
-        event.preventDefault()
-        shell.show(press === 'terminal' ? 'term' : 'chat')
-      }
-      if (abandoned(event)) {
-        closePalette()
-        setSignIn(false)
-        setAdding(false)
-        setRemoving(null)
-        shell.closePrefs()
-        shell.closeManager()
-      }
+      if (!abandoned(event)) return
+      // One layer a press, the top one first: a question asked over Settings
+      // used to take Settings down with it.
+      if (removing) setRemoving(null)
+      else if (adding) setAdding(false)
+      else if (signIn) setSignIn(false)
+      else if (palette) closePalette()
+      else if (shell.managing) shell.closeManager()
+      else shell.closePrefs()
     }
     document.addEventListener('keydown', key)
     return () => document.removeEventListener('keydown', key)
-  }, [shell, palette, openPalette, closePalette])
+  }, [shell, palette, closePalette, removing, adding, signIn])
 
   return (
     <div

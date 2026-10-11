@@ -55,7 +55,7 @@ describe('the settings sidebar', () => {
        them; a pane in none is a pane that is unreachable. */
     const ids = PREFS_NAV.flatMap((group) => group.items.map((item) => item.id))
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids).toHaveLength(11)
+    expect(ids).toHaveLength(12)
   })
 
   it('draws the headings, and opens the pane you click', () => {
@@ -87,9 +87,11 @@ describe('the settings sidebar', () => {
     expect(matching('updates').flatMap((g) => g.items.map((i) => i.id))).toEqual(['general'])
     expect(matching('tokens').flatMap((g) => g.items.map((i) => i.id))).toEqual(['usage'])
     /* General's rows, found by their own names rather than only by the pane's. */
-    for (const row of ['island', 'pause', 'microphone', 'tailscale', 'shortcut']) {
+    for (const row of ['island', 'pause', 'microphone', 'tailscale']) {
       expect(matching(row).flatMap((g) => g.items.map((i) => i.id))).toEqual(['general'])
     }
+    /* The desktop-wide key is General's; the window's own are Keyboard's. */
+    expect(matching('shortcut').flatMap((g) => g.items.map((i) => i.id))).toEqual(['general', 'keyboard'])
   })
 
   it('is the whole list again once the field is emptied', () => {

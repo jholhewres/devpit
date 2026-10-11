@@ -5,6 +5,7 @@ import { ofPath } from './languages'
 import { ask, commands } from './live'
 import { mergeInto, toChange, type Merged, type Sides } from './mergeEditor'
 import { reason } from './reason'
+import { matches } from './shortcuts'
 
 /*
  * One file's change against HEAD, the whole file lined up.
@@ -138,7 +139,7 @@ export function FileDiff({
         className="mdiff"
         ref={host}
         onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+          if (matches('save', event)) {
             event.preventDefault()
             save()
           }

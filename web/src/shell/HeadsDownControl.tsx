@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { FocusSummary } from './FocusSummary'
 import { minutesIn } from './headsDown'
-import { shortcutFor, SHORTCUTS } from './shortcuts'
+import { useKeys, useShortcut } from './useShortcut'
 import { ask, commands } from './live'
 import { stamp, useHeadsDown } from './useHeadsDown'
 
@@ -96,18 +96,13 @@ export function HeadsDown({
      meanings, which this window already learned not to ship. What is held is
      in the bell beside it, under its own heading. */
 
-  useEffect(() => {
-    const key = (event: KeyboardEvent): void => {
-      if (shortcutFor(event) !== 'focus') return
-      // Off in Settings means off for the key too; a focus already on can
-      // still be left.
-      if (!offered && !focus) return
-      event.preventDefault()
-      toggle()
-    }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
+  useShortcut('focus', () => {
+    // Off in Settings means off for the key too; a focus already on can
+    // still be left.
+    if (!focus && (!offered || !projectId)) return false
+    toggle()
   })
+  const keys = useKeys()('focus')
 
   // Only with a project open: a focus is on one, and there is nothing to be in
   // the middle of before that. And only when it is turned on.
@@ -145,7 +140,7 @@ export function HeadsDown({
       className="hdown"
       data-on={String(on)}
       onClick={toggle}
-      title={`Focus (${SHORTCUTS.focus})`}
+      title={`Focus (${keys})`}
       aria-pressed={on}
     >
       {focus

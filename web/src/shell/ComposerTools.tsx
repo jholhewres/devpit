@@ -5,6 +5,7 @@ import { ask, commands } from './live'
 import { base64Of, formatHere, LONGEST_MS, record, refusal, systemLanguage, type Recording } from './recorder'
 import type { Chat } from './useChat'
 import { useShell } from './useShell'
+import { useKeys, useShortcut } from './useShortcut'
 
 /*
  * The composer's two ways in besides typing: files, chosen from the system's
@@ -31,6 +32,7 @@ export function ComposerTools({ chat, onHeard }: { chat: Chat; onHeard: (text: s
   const [hearing, setHearing] = useState(false)
   const [said, setSaid] = useState<string | null>(null)
   const format = formatHere()
+  const keys = useKeys()
 
   const pick = async (): Promise<void> => {
     const picked = await pickFiles({ multiple: true })
@@ -38,17 +40,10 @@ export function ComposerTools({ chat, onHeard }: { chat: Chat; onHeard: (text: s
     if (paths.length > 0) chat.attach(paths)
   }
 
-  /* Ctrl/Cmd+Shift+A, from anywhere in this composer. */
-  useEffect(() => {
-    const keyed = (event: KeyboardEvent): void => {
-      const inside = box.current?.closest('.composer')?.contains(document.activeElement)
-      if (inside && event.shiftKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
-        event.preventDefault()
-        void pick()
-      }
-    }
-    document.addEventListener('keydown', keyed)
-    return () => document.removeEventListener('keydown', keyed)
+  /* From anywhere in this composer, and only there: every open chat has one. */
+  useShortcut('attach', () => {
+    if (!box.current?.closest('.composer')?.contains(document.activeElement)) return false
+    void pick()
   })
 
   useEffect(() => {
@@ -132,7 +127,7 @@ export function ComposerTools({ chat, onHeard }: { chat: Chat; onHeard: (text: s
         </span>
       ) : (
         <>
-          <button className="ctools__icon" onClick={() => void pick()} title="Attach files (Ctrl+Shift+A)" aria-label="Attach files">
+          <button className="ctools__icon" onClick={() => void pick()} title={`Attach files (${keys('attach')})`} aria-label="Attach files">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.4 11.6-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5" /></svg>
           </button>
           <button

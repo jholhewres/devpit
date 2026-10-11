@@ -262,7 +262,7 @@ describe('the bell', () => {
     render(<Bell onOpenCard={onOpenCard} onOpenPane={onOpenPane} />)
     await waitFor(() => expect(screen.getByLabelText('1 unread')).toBeTruthy())
 
-    fireEvent.keyDown(window, { key: 'N', shiftKey: true, metaKey: true })
+    fireEvent.keyDown(window, { key: 'N', shiftKey: true, ctrlKey: true })
     await waitFor(() => expect(onOpenPane).toHaveBeenCalledWith('prj_1', 'leaf_1'))
     expect(onOpenCard).not.toHaveBeenCalled()
   })
@@ -282,7 +282,7 @@ describe('the bell', () => {
     render(<Bell onOpenCard={onOpenCard} />)
     await waitFor(() => expect(screen.getByLabelText('2 unread')).toBeTruthy())
 
-    fireEvent.keyDown(window, { key: 'N', shiftKey: true, metaKey: true })
+    fireEvent.keyDown(window, { key: 'N', shiftKey: true, ctrlKey: true })
     await waitFor(() => expect(onOpenCard).toHaveBeenCalledWith('card_agent'))
     expect(marked).toHaveBeenCalledWith('ntc_agent')
   })

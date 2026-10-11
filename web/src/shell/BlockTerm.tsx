@@ -12,6 +12,7 @@ import { finished, jumpTarget, modeOf } from './paneBlocks'
 import { useFollow } from './useFollow'
 import { usePaneBlocks } from './usePaneBlocks'
 import { useShellPick } from './shellStore'
+import { matches } from './shortcuts'
 
 /*
  * A terminal as blocks, the way Warp draws one.
@@ -134,12 +135,12 @@ export function BlockTerm({
      wherever the keyboard is except the live terminal, whose programs may
      want those keys themselves. Down past the last goes back to the editor. */
   const jump = (event: React.KeyboardEvent): void => {
-    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    const back = matches('previousCommand', event)
+    if (!back && !matches('nextCommand', event)) return
     if (event.target instanceof Element && event.target.closest('.bterm__live')) return
     event.preventDefault()
     event.stopPropagation()
-    const next = jumpTarget(done, jumped, event.key === 'ArrowUp' ? -1 : 1)
+    const next = jumpTarget(done, jumped, back ? -1 : 1)
     setJumped(next)
     const box = list.current
     if (next === null) {

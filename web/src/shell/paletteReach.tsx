@@ -6,11 +6,12 @@ import { ask, commands } from './live'
 import { offered } from './useKnownAgents'
 import { PANES, type PaneName } from './paneList'
 import type { Row } from './paletteGroups'
-import { GEAR } from './paletteIcons'
+import { GEAR, KEYBOARD } from './paletteIcons'
 import { usePlugins } from './usePlugins'
 import { useShell } from './useShell'
 import { capabilityName, openerOf } from './capabilities'
-import { SHORTCUTS } from './shortcuts'
+import { keysLabel, type ShortcutId } from './shortcuts'
+import { openKeysSheet } from './keysSheet'
 import { launchShown } from './launchLine'
 
 /*
@@ -24,7 +25,7 @@ import { launchShown } from './launchLine'
 
 /* No ⌘B for the board: off macOS it is Ctrl+B, the tmux prefix in every
    terminal pane, and a window that took it would break tmux for its users. */
-const SHORTCUT: Partial<Record<PaneName, string>> = { chat: SHORTCUTS.chat, term: SHORTCUTS.terminal }
+const SHORTCUT: Partial<Record<PaneName, ShortcutId>> = { chat: 'chat', term: 'terminal' }
 
 export interface Reachable {
   readonly panes: Row[]
@@ -75,7 +76,7 @@ export function useReachable(): Reachable {
         (pane) => ({
           key: `pane:${pane.name}`,
           name: capabilityName(pane.name, plugins) ?? pane.title,
-          meta: SHORTCUT[pane.name] ?? '',
+          meta: SHORTCUT[pane.name] ? keysLabel(SHORTCUT[pane.name]!) : '',
           icon: pane.icon,
           go: () => show(pane.name, openerOf(pane.name)?.tab),
         }),
@@ -83,10 +84,11 @@ export function useReachable(): Reachable {
       {
         key: 'prefs',
         name: 'Settings',
-        meta: SHORTCUTS.settings,
+        meta: keysLabel('settings'),
         icon: GEAR,
         go: () => openPrefs('general'),
       },
+      { key: 'keys', name: 'Keyboard shortcuts', meta: keysLabel('shortcuts'), icon: KEYBOARD, go: openKeysSheet },
     ],
     [show, openPrefs, offers, plugins],
   )

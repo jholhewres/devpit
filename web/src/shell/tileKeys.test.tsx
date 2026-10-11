@@ -39,7 +39,9 @@ describe('the keys a tile answers to', () => {
     expect(tileAction({ key: 'F2' })).toBe('rename')
     expect(tileAction({ key: 'Delete' })).toBe('archive')
     expect(tileAction({ key: 'm', ctrlKey: true })).toBe('moveTo')
-    expect(tileAction({ key: 'M', metaKey: true })).toBe('moveTo')
+    expect(tileAction({ key: 'M', ctrlKey: true })).toBe('moveTo')
+    // Off a Mac ⌘ is not Ctrl: the Super key is the desktop's.
+    expect(tileAction({ key: 'm', metaKey: true })).toBeNull()
     expect(tileAction({ key: 'm' })).toBeNull()
     expect(tileAction({ key: 'Enter', isComposing: true })).toBeNull()
   })

@@ -450,3 +450,27 @@ button.remote__chip:hover { color: var(--text); background: var(--overlay-strong
 .chmatrix th, .chmatrix td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
 .chmatrix td:not(:first-child), .chmatrix th:not(:first-child) { text-align: center; }
 .chday { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; color: var(--text-3); }
+
+/* Settings → Keyboard, and the cheat sheet that prints the same caps. One
+   card per group with hairlines between rows: thirty shortcuts as thirty cards
+   read as a wall. */
+.kmap__find { height: 30px; max-width: 360px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12px; color: var(--ghost); }
+.kmap__find:focus-within { border-color: var(--accent); }
+.kmap { background: var(--raised); border-radius: 10px; padding: 0 16px; }
+.kmap__row { display: flex; align-items: center; gap: 14px; padding: 10px 0; }
+.kmap__row + .kmap__row { border-top: 1px solid var(--border); }
+.kmap__row[data-recording='true'] .kmap__t { color: var(--accent); }
+.kmap__body { flex: 1; min-width: 0; }
+.kmap__t { display: block; font-size: 13px; color: var(--text); }
+.kmap__d { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--text-3); }
+.kmap__d[data-refused='true'] { color: var(--warning); }
+.kmap__keys { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; flex: none; }
+.kmap__key { min-width: 22px; height: 22px; padding: 0 7px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: var(--overlay-strong); border: 1px solid var(--border); font: 11.5px var(--mono); color: var(--text-2); white-space: nowrap; }
+.kmap__wait { flex: none; font-size: 12px; color: var(--accent); }
+
+.ksheet { width: min(900px, calc(100vw - 48px)); max-height: calc(100vh - 64px); overflow-y: auto; }
+.ksheet__cols { columns: 2 340px; column-gap: 28px; margin-top: 6px; }
+.ksheet__g { break-inside: avoid; padding-bottom: 14px; }
+.ksheet__gt { margin: 0 0 6px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-3); }
+.ksheet__r { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
+.ksheet__d { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-2); }

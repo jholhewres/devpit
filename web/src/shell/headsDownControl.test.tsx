@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SHORTCUTS } from './shortcuts'
+import { keysLabel } from './shortcuts'
 
 import type { HeadsDown as Stored } from '../gen/bindings'
 import { HeadsDown } from './HeadsDownControl'
@@ -83,7 +83,7 @@ describe('going into a focus', () => {
   it('hears the key it announces', async () => {
     render(<HeadsDown projectId="prj_1" />)
     expect((await screen.findByRole('button', { name: /Focus/ })).getAttribute('title')).toContain(
-      SHORTCUTS.focus,
+      keysLabel('focus'),
     )
 
     /* The button is drawn a moment before the effect that listens for the key
@@ -91,7 +91,7 @@ describe('going into a focus', () => {
        the render before, when focus was not yet offered. Pressed until heard —
        the first press that is heard ends the wait, so it enters only once. */
     await waitFor(() => {
-      fireEvent.keyDown(window, { key: 'F', shiftKey: true, metaKey: true })
+      fireEvent.keyDown(window, { key: 'F', shiftKey: true, ctrlKey: true })
       expect(written).toEqual(['prj_1'])
     })
   })
@@ -196,7 +196,7 @@ describe('before it is turned on', () => {
     // Let the settings answer land before the key is pressed.
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    fireEvent.keyDown(window, { key: 'F', shiftKey: true, metaKey: true })
+    fireEvent.keyDown(window, { key: 'F', shiftKey: true, ctrlKey: true })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(written).toEqual([])
   })

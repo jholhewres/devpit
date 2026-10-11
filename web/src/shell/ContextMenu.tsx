@@ -7,9 +7,10 @@ import { menuPoint } from './menuRules'
 import { sessionMenu, type SessionEntry } from './sessionMenu'
 import { joinable } from './strip'
 import { tabMenu, type TabEntry } from './tabMenu'
-import { composing } from './typing'
+import { keysLabel } from './shortcuts'
 import { useFileActions } from './useFileActions'
 import { useShell } from './useShell'
+import { useShortcut } from './useShortcut'
 
 /*
  * An item names an action or is not offered.
@@ -106,17 +107,11 @@ export function ContextMenu(): React.JSX.Element {
   /* The keys a menu prints beside an entry work on the row without it:
      F2 on a focused file or session renames it. Every render, since the
      entries act on this render's shell. */
-  useEffect(() => {
-    const key = (event: KeyboardEvent): void => {
-      if (event.key !== 'F2' || composing(event)) return
-      const row = rowOf(event.target)
-      const item = row && menus[row.dataset.ctx ?? '']?.find((one) => one.key === 'F2')
-      if (!row || !item) return
-      event.preventDefault()
-      pick(item, { id: row.dataset.id ?? '', path: row.dataset.path ?? null })
-    }
-    document.addEventListener('keydown', key)
-    return () => document.removeEventListener('keydown', key)
+  useShortcut('rename', (event) => {
+    const row = rowOf(event.target)
+    const item = row && menus[row.dataset.ctx ?? '']?.find((one) => one.shortcut === 'rename')
+    if (!row || !item) return false
+    pick(item, { id: row.dataset.id ?? '', path: row.dataset.path ?? null })
   })
 
   return (
@@ -127,7 +122,7 @@ export function ContextMenu(): React.JSX.Element {
             item.rule ? (
               <MenuRule key={index} />
             ) : (
-              <MenuItem key={index} label={item.label ?? ''} keys={item.key} bad={item.bad} onPick={() => pick(item, at)} />
+              <MenuItem key={index} label={item.label ?? ''} keys={item.shortcut ? keysLabel(item.shortcut) : item.key} bad={item.bad} onPick={() => pick(item, at)} />
             ),
           )}
         </Menu>

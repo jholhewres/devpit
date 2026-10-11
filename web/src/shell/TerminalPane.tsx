@@ -6,7 +6,7 @@ import { BlockTerm } from './BlockTerm'
 import { usePaneActions } from './paneActions'
 import { PaneCorner } from './PaneCorner'
 import { Split } from './Split'
-import { shortcutFor } from './shortcuts'
+import { useShortcut } from './useShortcut'
 import { leaves } from './splits'
 import type { Tab } from './strip'
 import { SessionCost } from './SessionCost'
@@ -60,18 +60,11 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
   )
 
   /* The shortcuts every terminal with splits uses. Only while this tab is the
-     one in front, or a hidden tab would split on a key meant for the visible
-     one. */
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      const press = shortcutFor(event)
-      if (press !== 'splitRight' && press !== 'splitDown') return
-      event.preventDefault()
-      split(press === 'splitRight' ? 'horizontal' : 'vertical')
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [split])
+     one in front: every tab stays mounted, and each used to split on a key
+     meant for the visible one. */
+  const shown = useShellPick((shell) => shell.active?.id === tab.id && shell.project?.id === projectId)
+  useShortcut('splitRight', () => split('horizontal'), shown)
+  useShortcut('splitDown', () => split('vertical'), shown)
 
   const settle = useCallback(
     (splitId: string, ratio: number) => {

@@ -1,3 +1,5 @@
+import { matches } from './shortcuts'
+
 /*
  * Escape, twice, stops the turn.
  *
@@ -40,14 +42,5 @@ export const same = (left: Armed | null, right: Armed | null): boolean =>
    while something that owns Escape is open — a menu closing is what the
    person meant, and stopping the turn behind it is not. */
 export function stops(event: KeyboardEvent, hasOverlay: boolean): boolean {
-  return (
-    event.key === 'Escape' &&
-    !event.repeat &&
-    !event.defaultPrevented &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey &&
-    !hasOverlay
-  )
+  return matches('stopTurn', event) && !event.repeat && !event.defaultPrevented && !hasOverlay
 }
