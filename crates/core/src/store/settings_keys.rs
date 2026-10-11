@@ -47,6 +47,10 @@ pub const PAUSED_UNTIL: &str = "focus.paused_until";
 /// Whether a card's date goes off as a reminder at its time. On unless
 /// turned off.
 pub const REMINDERS: &str = "general.reminders";
+/// Whether closing the window leaves devpit in the tray. On unless turned off.
+pub const KEEP_IN_TRAY: &str = "general.keep_in_tray";
+/// Whether the person was told, once, that a closed window left devpit running.
+pub const TRAY_TOLD: &str = "general.tray_told";
 /// Whether the island opens above the other windows. On unless turned off.
 pub const ISLAND: &str = "island.enabled";
 /// The screen the island was last dragged to, by the name the system gives it.

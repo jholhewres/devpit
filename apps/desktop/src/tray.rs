@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
+use devpit_core::store::preference;
 use devpit_core::Store;
 use devpit_rpc::{Doing, RpcError, Tray};
 use tauri::image::Image;
@@ -23,11 +24,6 @@ use crate::tray_menu::{said, Act, Entry, Go, Look, Recent, Said, Waiting};
 const TRAY: &str = "devpit";
 /// How long a change waits for the ones right behind it.
 const SETTLE: Duration = Duration::from_millis(400);
-/// Whether closing the window leaves devpit in the tray. On unless turned off.
-/// Read and written only here, so named here.
-const KEEP: &str = "general.keep_in_tray";
-/// Whether the person was told, once, that a closed window left devpit running.
-const TOLD: &str = "general.tray_told";
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
 /// Whether the icon was made. Not whether anybody sees it: see [`shown`].
@@ -417,7 +413,7 @@ fn told_once(app: &AppHandle) {
     let Ok(store) = Store::open_default() else {
         return;
     };
-    if store.preference_flag(TOLD).ok().flatten() == Some(true) {
+    if store.preference_flag(preference::TRAY_TOLD).ok().flatten() == Some(true) {
         return;
     }
     crate::island_notify::show(
@@ -426,11 +422,15 @@ fn told_once(app: &AppHandle) {
         "It went to the tray and goes on hearing your agents. Quit it from the tray's menu.",
         false,
     );
-    let _ = store.set_preference_flag(TOLD, true);
+    let _ = store.set_preference_flag(preference::TRAY_TOLD, true);
 }
 
 fn kept(store: &Store) -> bool {
-    store.preference_flag(KEEP).ok().flatten().unwrap_or(true)
+    store
+        .preference_flag(preference::KEEP_IN_TRAY)
+        .ok()
+        .flatten()
+        .unwrap_or(true)
 }
 
 /// Reads, as the app starts, whether closing keeps devpit in the tray.
@@ -458,7 +458,7 @@ pub async fn tray_read() -> Result<Tray, RpcError> {
 #[specta::specta]
 pub async fn tray_keep_set(on: bool) -> Result<Tray, RpcError> {
     crate::off_main::blocking(move || {
-        Store::open_default()?.set_preference_flag(KEEP, on)?;
+        Store::open_default()?.set_preference_flag(preference::KEEP_IN_TRAY, on)?;
         KEEP_ON.store(on, Ordering::Relaxed);
         Ok(now())
     })
