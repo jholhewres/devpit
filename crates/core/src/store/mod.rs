@@ -24,6 +24,7 @@ mod seen_sessions;
 mod session_links;
 pub mod settings;
 mod spend;
+mod wal;
 mod whose_run;
 
 use std::path::{Path, PathBuf};
@@ -96,44 +97,6 @@ pub struct Store {
     conn: Connection,
 }
 
-/// Puts the file in WAL, unless it is already there.
-///
-/// Retried rather than attempted once, and that is the whole of it: SQLite
-/// refuses a `journal_mode` change while another connection has the file
-/// open, and that refusal is **not** one `busy_timeout` waits out. Measured —
-/// a connection losing this race came back in 516µs, having waited for
-/// nothing at all.
-///
-/// Losing is not a failure here. The mode is a property of the file and the
-/// connection that won is setting it to the same value, so the only thing to
-/// do is look again in a moment. What must not happen is an app that fails to
-/// start because two of its own threads opened the store together, which is
-/// what startup does every time.
-fn set_wal(conn: &Connection) -> Result<(), StoreError> {
-    let mode = |conn: &Connection| -> Result<String, StoreError> {
-        Ok(conn.query_row("PRAGMA journal_mode", [], |row| row.get(0))?)
-    };
-
-    // Generous against a cold disk and short against a real fault: whoever
-    // holds the file is doing one pragma, not work.
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    loop {
-        if mode(conn)?.eq_ignore_ascii_case("wal") {
-            return Ok(());
-        }
-        let refusal = match conn.pragma_update(None, "journal_mode", "WAL") {
-            Ok(()) => return Ok(()),
-            Err(err) => err,
-        };
-        if std::time::Instant::now() >= deadline {
-            // The database's own word, not a timeout of ours: it is the one
-            // that says what is actually wrong when this is a real fault.
-            return Err(refusal.into());
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-}
-
 impl Store {
     pub fn open_default() -> Result<Self, StoreError> {
         Self::open(&Self::default_path()?)
@@ -166,7 +129,8 @@ impl Store {
         // one `busy_timeout` waits out. Two connections opening together is
         // ordinary here (startup alone does it), so a connection that finds
         // WAL already set must not ask for it again.
-        set_wal(&conn)?;
+        wal::set_wal(&conn)?;
+        wal::sync_outside_locks(&conn)?;
 
         // Per-connection, and so stated every time. foreign_keys defaults to
         // OFF in SQLite; leaving it there means discovering orphans months
