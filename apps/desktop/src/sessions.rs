@@ -221,22 +221,24 @@ pub(crate) fn tmux_err(err: devpit_tmux::TmuxError) -> RpcError {
 
 /// `session.ensure` — a layout and a tmux window, created if they were missing.
 ///
-/// Async so it does not run on the thread that draws the window.
-///
-/// It opens the store and spawns tmux several times — a handful of
-/// milliseconds each, and all of them on the main thread while somebody
-/// watches an empty pane. There is no `await` in the body, so the work still
-/// happens in one go; it just happens somewhere the window can paint through.
+/// It opens the store and spawns tmux several times, under the project's lock,
+/// so it goes to the blocking pool: run on the async runtime, a reload with a
+/// tmux server too busy to answer held one of the few threads every command
+/// starts on per terminal tab, and every command after them waited.
 #[tauri::command]
 #[specta::specta]
 pub async fn session_ensure(
-    state: State<'_, SessionState>,
+    app: tauri::AppHandle,
     project_id: String,
     tab_id: String,
     worktree_id: Option<String>,
 ) -> Result<SessionLayout, RpcError> {
-    let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
-    ensure_at(&state, &project_id, &tab_id, &cwd)
+    crate::off_main::blocking(move || {
+        let state = tauri::Manager::state::<SessionState>(&app);
+        let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
+        ensure_at(&state, &project_id, &tab_id, &cwd)
+    })
+    .await
 }
 
 /// The tab a card's terminal lives in.

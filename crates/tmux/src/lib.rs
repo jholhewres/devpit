@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 mod chrome;
 mod clients;
 mod environment;
+mod error;
 mod naming;
 mod pane;
 mod running;
@@ -21,18 +22,10 @@ mod scroll;
 mod shell;
 mod viewers;
 mod windows;
+pub use error::TmuxError;
 pub use pane::{copy_to, Key};
 pub use scratch::Scratch;
 pub use shell::{parse_running, Running, Shell};
-
-#[derive(Debug, thiserror::Error)]
-pub enum TmuxError {
-    #[error("tmux is not installed, or not on PATH")]
-    Missing,
-
-    #[error("tmux {command} failed: {stderr}")]
-    Failed { command: String, stderr: String },
-}
 
 /// One tmux server, addressed by a socket we own.
 pub struct Server {
@@ -40,6 +33,8 @@ pub struct Server {
     shell: Option<Shell>,
     /// Variables every window this server makes is started with.
     pub(crate) window_env: Vec<(String, String)>,
+    /// How long a command waits for the server before giving up on it.
+    pub(crate) patience: std::time::Duration,
 }
 
 impl Server {
@@ -58,6 +53,7 @@ impl Server {
             socket,
             shell: None,
             window_env: Vec::new(),
+            patience: running::PATIENCE,
         }
     }
 

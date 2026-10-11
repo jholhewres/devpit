@@ -60,6 +60,22 @@ describe('asking on a timer, while somebody is looking', () => {
     expect(look).toHaveBeenCalledTimes(2)
   })
 
+  /* A tmux buried under flooding panes answers nobody for minutes; asked
+     again on every tick, the questions held a thread each until none was left. */
+  it('does not ask again while the last answer is still awaited', async () => {
+    vi.useFakeTimers()
+    let answer = (): void => {}
+    const look = vi.fn(() => new Promise<void>((resolve) => (answer = resolve)))
+    renderHook(() => whileWatched(look, 2000, 'prj_1'))
+
+    act(() => void vi.advanceTimersByTime(10_000))
+    expect(look).toHaveBeenCalledTimes(1)
+
+    await act(async () => answer())
+    act(() => void vi.advanceTimersByTime(2000))
+    expect(look).toHaveBeenCalledTimes(2)
+  })
+
   it('stops when it is taken off the screen', () => {
     vi.useFakeTimers()
     const look = vi.fn()

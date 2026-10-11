@@ -27,7 +27,7 @@ export function useUsage(projectId: string | null, watching: boolean): Usage {
      is a render of the strip and what reads it. */
   const look = useCallback(() => {
     if (!projectId) return setUsage(NOTHING)
-    void ask(() => commands.sessionUsage(projectId)).then((asked) => {
+    return ask(() => commands.sessionUsage(projectId)).then((asked) => {
       const next = asked.data
       if (next) setUsage((was) => (JSON.stringify(was) === JSON.stringify(next) ? was : next))
     })

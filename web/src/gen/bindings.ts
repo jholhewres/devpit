@@ -1340,12 +1340,10 @@ export const commands = {
 	/**
 	 *  `session.ensure` — a layout and a tmux window, created if they were missing.
 	 * 
-	 *  Async so it does not run on the thread that draws the window.
-	 * 
-	 *  It opens the store and spawns tmux several times — a handful of
-	 *  milliseconds each, and all of them on the main thread while somebody
-	 *  watches an empty pane. There is no `await` in the body, so the work still
-	 *  happens in one go; it just happens somewhere the window can paint through.
+	 *  It opens the store and spawns tmux several times, under the project's lock,
+	 *  so it goes to the blocking pool: run on the async runtime, a reload with a
+	 *  tmux server too busy to answer held one of the few threads every command
+	 *  starts on per terminal tab, and every command after them waited.
 	 */
 	sessionEnsure: (projectId: string, tabId: string, worktreeId: string | null) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_ensure", { projectId, tabId, worktreeId })),
 	/**  `session.focus` — persists which leaf receives the next split or action. */

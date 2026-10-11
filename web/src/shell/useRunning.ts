@@ -32,7 +32,7 @@ export function useRunning(projectId: string | null): readonly PaneRunning[] {
       setRunning((was) => (was.length === 0 ? was : []))
       return
     }
-    void ask(() => commands.sessionRunning(projectId)).then((answer) => {
+    return ask(() => commands.sessionRunning(projectId)).then((answer) => {
       /* A project with no session yet answers with an empty list rather
          than an error, so there is nothing here to report. Every answer is
          a fresh array and the shell's context is rebuilt on a new one, so

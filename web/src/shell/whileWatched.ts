@@ -20,9 +20,14 @@ export const shouldPoll = (hidden: boolean, projectId: string | null, watching =
  * On coming back it asks at once rather than waiting out the interval: a
  * window restored to a screen showing what was true a minute ago is the same
  * staleness the timer exists to avoid.
+ *
+ * A tick is skipped while the last answer is still awaited. Both questions go
+ * through tmux, and a tmux server buried under flooding panes answers nobody
+ * for minutes: asked again every two seconds regardless, the questions piled
+ * up one waiting thread each until no command in the app had a thread left.
  */
 export function whileWatched(
-  look: () => void,
+  look: () => void | Promise<unknown>,
   every: number,
   projectId: string | null,
   watching = true,
@@ -30,6 +35,17 @@ export function whileWatched(
   useEffect(() => {
     const hidden = (): boolean => typeof document !== 'undefined' && document.hidden
     let timer: number | null = null
+    let asking = false
+    const free = (): void => {
+      asking = false
+    }
+    const ask = (): void => {
+      if (asking) return
+      const answer = look()
+      if (!answer) return
+      asking = true
+      void answer.then(free, free)
+    }
 
     const stop = (): void => {
       if (timer !== null) window.clearInterval(timer)
@@ -39,8 +55,8 @@ export function whileWatched(
     const start = (): void => {
       stop()
       if (!shouldPoll(hidden(), projectId, watching)) return
-      look()
-      timer = window.setInterval(look, every)
+      ask()
+      timer = window.setInterval(ask, every)
     }
 
     start()

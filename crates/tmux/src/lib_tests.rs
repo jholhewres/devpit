@@ -221,3 +221,27 @@ fn a_window_is_given_its_variables() {
     let given = plain.with_window_env(vec![("CARGO_TARGET_DIR".to_owned(), "/cache/t".to_owned())]);
     assert_eq!(given.window_env_args(), ["-e", "CARGO_TARGET_DIR=/cache/t"]);
 }
+
+/// A server that takes the connection and never answers, as one buried under
+/// panes that flood does: a command gives up on it rather than holding its
+/// thread for good.
+#[cfg(unix)]
+#[test]
+fn a_server_that_never_answers_is_given_up_on() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let socket = dir.path().join("tmux.sock");
+    let _deaf = std::os::unix::net::UnixListener::bind(&socket).expect("bind");
+    let mut server = Server::new(socket);
+    server.patience = std::time::Duration::from_millis(300);
+
+    // On a thread of its own, so a regression fails here instead of hanging.
+    let (said, heard) = std::sync::mpsc::channel();
+    std::thread::spawn(move || said.send(server.running("devpit_x")).ok());
+    let answer = heard
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("the command was still waiting on the server");
+    assert!(
+        matches!(answer, Err(TmuxError::Unanswered { .. })),
+        "{answer:?}"
+    );
+}
