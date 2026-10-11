@@ -21,9 +21,9 @@ use crate::{
     pausing, plan_limits, plugin_data, plugins, project_naming, project_proposals, projects,
     reading_path, rebound, receipts, recipes, regrouping, reminders, remote, reply_drafts, reveal,
     rewinding, runs_list, saves, search, session_cost, session_search, session_window, sessions,
-    settings, shell_launch, sign_ins, skills, slash, sources, spend_history, staging, steering,
-    steps, stopping, threads, transcribe, tray, update, watching, workspace, worktree_base,
-    worktree_setup, worktrees, wsfiles,
+    settings, shell_launch, sign_ins, skills, slash, sources, spend_history, staging, stall_watch,
+    steering, steps, stopping, threads, transcribe, tray, update, watching, workspace,
+    worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -129,6 +129,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         panels::panel_widths_write,
         rebound::rebound_read,
         rebound::rebound_set,
+        stall_watch::window_beat,
         agent_choice::agent_choice,
         agent_choice::agent_default_set,
         agent_choice::agent_enabled_set,

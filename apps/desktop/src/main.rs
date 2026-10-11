@@ -193,6 +193,7 @@ mod slash;
 mod sources;
 mod spend_history;
 mod staging;
+mod stall_watch;
 mod starting;
 mod steering;
 mod steps;
@@ -452,6 +453,8 @@ fn main() {
             update::watch(app.handle().clone());
             // Sends the error reports the person switched on, when idle.
             error_sender::watch(app.handle().clone());
+            // Says on stderr and in the error log when the window stops being answered.
+            stall_watch::watch(app.handle().clone());
             // A run still marked `running` after a restart is a run whose
             // thread died with the last process. Closed here, before anything
             // draws, or the card says it is working forever.

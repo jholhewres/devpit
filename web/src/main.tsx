@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { answerBeforeRestart } from './shell/beforeRestart'
+import { beat } from './shell/beat'
 import { IslandWindow } from './island/IslandWindow'
 import { BrowserMenuWindow } from './shell/BrowserMenuWindow'
 import { watchCsp } from './shell/csp'
@@ -40,6 +41,8 @@ if (!isAside) reportPresence()
 if (!isAside) answerBeforeRestart()
 // The keys a person recorded, from the settings; until then this window's own copy.
 if (!isAside) void loadRebound()
+// And that its calls still get through, which the app logs when they stop.
+if (!isAside) beat()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>{isIsland ? <IslandWindow /> : isMenu ? <BrowserMenuWindow /> : <App />}</StrictMode>
