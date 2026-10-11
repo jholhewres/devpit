@@ -58,7 +58,7 @@ export function PluginChip(): React.JSX.Element | null {
       {step.kind === 'done' && <span className="pchip__say">devpit plugin ready — run /reload-plugins in Claude Code</span>}
       {step.kind === 'failed' && <span className="pchip__say">The plugin could not be installed</span>}
       {step.kind !== 'working' && (
-        <button className="pchip__x" aria-label="Dismiss" onClick={close}>
+        <button className="pchip__x" aria-label="Dismiss" title="Dismiss" onClick={close}>
           ×
         </button>
       )}

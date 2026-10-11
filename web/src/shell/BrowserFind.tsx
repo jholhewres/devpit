@@ -65,13 +65,13 @@ export function BrowserFind({
           }
         }}
       />
-      <button className="browser__act" type="button" aria-label="Find previous" onClick={() => seek(true)}>
+      <button className="browser__act" type="button" aria-label="Find previous" title="Find previous" onClick={() => seek(true)}>
         ‹
       </button>
-      <button className="browser__act" type="submit" aria-label="Find next">
+      <button className="browser__act" type="submit" aria-label="Find next" title="Find next">
         ›
       </button>
-      <button className="browser__act" type="button" aria-label="Close find" onClick={onDone}>
+      <button className="browser__act" type="button" aria-label="Close find" title="Close find" onClick={onDone}>
         ✕
       </button>
     </form>

@@ -9,8 +9,10 @@
 
 .wctl { display: flex; align-items: center; margin-left: 2px; }
 .wbtn { width: 36px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-2); border-radius: 5px; }
-.wbtn:hover { background: var(--overlay-strong); }
+.wbtn:hover { background: var(--overlay); }
+.wbtn:active { background: var(--overlay-strong); }
 .wbtn--x:hover { background: #c42b1c; color: #fff; }
+.wbtn--x:active { background: #a52314; color: #fff; }
 
 .mid__body { flex: 1; min-height: 0; display: flex; }
 
@@ -40,10 +42,9 @@
    below it, so a drag edits that array and the DOM follows — nothing is
    positioned by hand, which is why the tab never lands somewhere the
    state disagrees with. */
-.tab { cursor: grab; }
-.tab[data-dragging='true'] { cursor: grabbing; opacity: 0.55; }
-.tabs[data-moving='true'] .tab { transition: none; }
-.tabs[data-moving='true'] .tab__x { pointer-events: none; }
+.tab[data-dragging='true'] { opacity: 0.55; }
+.tabs__rail[data-moving='true'], .tabs__rail[data-moving='true'] .tab { cursor: grabbing; transition: none; }
+.tabs__rail[data-moving='true'] .tab__x { pointer-events: none; }
 
 /* One pane at a time, chosen by its tab. An earlier build showed every
    open pane side by side *and* listed them as tabs, which made the tabs

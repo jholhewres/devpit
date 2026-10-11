@@ -137,6 +137,7 @@ export const BlockCard = memo(function BlockCard({
         <button
           className="blk__more"
           aria-label="Block actions"
+          title="Block actions"
           onClick={(event) => {
             event.stopPropagation()
             setMenu(menuPoint(event))

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { AgentMark } from './AgentMark'
 import { paneMeta } from './paneList'
@@ -21,6 +21,8 @@ export function TabStrip(): React.JSX.Element {
     const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
   const moving = useRef<{ id: string; at: number; moved: boolean } | null>(null)
+  // State as well as the ref: the strip only redraws as `grabbing` when this changes.
+  const [dragging, setDragging] = useState<string | null>(null)
   const clicked = useRef<Clicked | null>(null)
 
   /* FLIP: the tabs that did not move animate from where they were. */
@@ -50,6 +52,7 @@ export function TabStrip(): React.JSX.Element {
     const row = strip.current
     if (!drag || !row) return
     if (Math.abs(event.clientX - drag.at) <= 4) return
+    if (!drag.moved) setDragging(drag.id)
     drag.moved = true
     const tabs = Array.from(row.children) as HTMLElement[]
     const to = tabs.findIndex((el) => {
@@ -119,6 +122,7 @@ export function TabStrip(): React.JSX.Element {
         role="group"
         aria-label="Panes"
         ref={strip}
+        data-moving={dragging ? 'true' : undefined}
         onPointerMove={onMove}
         onWheel={(event) => {
           /* A wheel with no sideways travel is somebody scrolling a strip
@@ -154,6 +158,7 @@ export function TabStrip(): React.JSX.Element {
           data-id={tab.id}
           data-toggle={tab.kind}
           data-active={String(active?.id === tab.id)}
+          data-dragging={dragging === tab.id ? 'true' : undefined}
           aria-pressed={true}
           title={label(tab)}
           onPointerDown={(event) => {
@@ -166,6 +171,7 @@ export function TabStrip(): React.JSX.Element {
           }}
           onPointerUp={() => {
             moving.current = null
+            setDragging(null)
           }}
           onClick={(event) => {
             if (moving.current?.moved) return
@@ -187,6 +193,7 @@ export function TabStrip(): React.JSX.Element {
             className="tab__x"
             role="button"
             aria-label="Close"
+            title="Close"
             onClick={(event) => {
               event.stopPropagation()
               close(tab.id)

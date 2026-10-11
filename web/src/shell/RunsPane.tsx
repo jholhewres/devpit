@@ -77,7 +77,7 @@ export function RunsPane({
       <div className="cardp__box runsp" role="dialog" aria-modal="true" aria-label="Runs">
         <header className="runsp__top">
           <h2 className="runsp__t">Runs</h2>
-          <button className="sq26" onClick={onClose} aria-label="Close runs">
+          <button className="sq26" onClick={onClose} aria-label="Close runs" title="Close runs">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </header>

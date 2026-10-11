@@ -13,15 +13,16 @@ import { base64Of, bytesOf } from './socket'
  * line written and sent whole.
  */
 
-const KEYS: readonly { label: string; bytes: string }[] = [
-  { label: 'Esc', bytes: '\x1b' },
-  { label: 'Tab', bytes: '\t' },
-  { label: '^C', bytes: '\x03' },
-  { label: '↑', bytes: '\x1b[A' },
-  { label: '↓', bytes: '\x1b[B' },
-  { label: '←', bytes: '\x1b[D' },
-  { label: '→', bytes: '\x1b[C' },
-  { label: 'Enter', bytes: '\r' },
+// `name` because a glyph is not a name: a screen reader would say "upwards arrow".
+const KEYS: readonly { label: string; name: string; bytes: string }[] = [
+  { label: 'Esc', name: 'Escape', bytes: '\x1b' },
+  { label: 'Tab', name: 'Tab', bytes: '\t' },
+  { label: '^C', name: 'Interrupt (Ctrl+C)', bytes: '\x03' },
+  { label: '↑', name: 'Up', bytes: '\x1b[A' },
+  { label: '↓', name: 'Down', bytes: '\x1b[B' },
+  { label: '←', name: 'Left', bytes: '\x1b[D' },
+  { label: '→', name: 'Right', bytes: '\x1b[C' },
+  { label: 'Enter', name: 'Enter', bytes: '\r' },
 ]
 
 export function RemoteTerminal({
@@ -71,7 +72,7 @@ export function RemoteTerminal({
         <>
           <div className="rm__keys">
             {KEYS.map((key) => (
-              <button key={key.label} className="rm__key" onClick={() => send({ t: 'paneInput', pane, b64: base64Of(key.bytes) })}>
+              <button key={key.label} className="rm__key" aria-label={key.name} title={key.name} onClick={() => send({ t: 'paneInput', pane, b64: base64Of(key.bytes) })}>
                 {key.label}
               </button>
             ))}

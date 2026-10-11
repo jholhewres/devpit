@@ -86,13 +86,14 @@ export function FilesPane(): React.JSX.Element {
           onClick={() => void ask(() => commands.pathReveal(fullPath(root, here)))}
           disabled={!root}
           aria-label="Show this folder in the finder"
+          title="Show this folder in the finder"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
         </button>
-        <button className="sq26" onClick={folder.reload} aria-label="Refresh">
+        <button className="sq26" onClick={folder.reload} aria-label="Refresh" title="Refresh">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5" /></svg>
         </button>
-        <button className="sq26" onClick={() => close('files')} aria-label="Close Files">
+        <button className="sq26" onClick={() => close('files')} aria-label="Close Files" title="Close Files">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>
@@ -106,6 +107,7 @@ export function FilesPane(): React.JSX.Element {
                 onClick={() => up !== null && folder.go(up)}
                 disabled={up === null}
                 aria-label="Up one folder"
+                title="Up one folder"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
               </button>

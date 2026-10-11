@@ -282,7 +282,7 @@ export function UpdateCard(): React.JSX.Element | null {
           {said.title}
           {fromATestFeed && <span className="upd__tag">test feed</span>}
         </span>
-        <button className="upd__x" aria-label="Close" onClick={close}>
+        <button className="upd__x" aria-label="Close" title="Close" onClick={close}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>

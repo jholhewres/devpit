@@ -85,10 +85,10 @@ export function Drawing({ tab, name }: { tab: Tab; name: string }): React.JSX.El
             opens="down"
           />
         )}
-        <button className="sq26" onClick={() => setRenaming(true)} disabled={drawing.conflict} aria-label="Rename drawing">
+        <button className="sq26" onClick={() => setRenaming(true)} disabled={drawing.conflict} aria-label="Rename drawing" title="Rename drawing">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
         </button>
-        <button className="sq26" onClick={() => close(tab.id)} aria-label="Close drawing">
+        <button className="sq26" onClick={() => close(tab.id)} aria-label="Close drawing" title="Close drawing">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>

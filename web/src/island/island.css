@@ -65,7 +65,9 @@
     height 0.32s cubic-bezier(0.45, 0, 0.2, 1),
     opacity 0.26s ease 0.08s;
 }
+/* Compact it opens on a click; open, its bare surface carries the window. */
 .isl-shape[data-mode='compact'] { cursor: pointer; }
+.isl-shape[data-mode='expanded'] { cursor: grab; }
 /* A file held over it: the edge says where it will land. */
 .isl-shape[data-drop='true'] { border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
 .isl-dropnote {
@@ -173,7 +175,6 @@
   border-radius: 14px;
   background: transparent;
   color: var(--isl-dim);
-  cursor: pointer;
 }
 .isl-icon:hover { background: var(--isl-rise); color: var(--isl-ink); }
 .isl-icon[data-on='true'] { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
@@ -187,7 +188,6 @@
   color: var(--isl-ink);
   font: inherit;
   font-size: 12.5px;
-  cursor: pointer;
 }
 .isl-btn:hover { border-color: rgba(255, 255, 255, 0.18); }
 .isl-btn--go { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
@@ -210,7 +210,6 @@
   color: var(--isl-ink);
   font: inherit;
   text-align: left;
-  cursor: pointer;
   overflow: hidden;
 }
 .isl-row:hover { background: var(--isl-rise); border-color: rgba(255, 255, 255, 0.1); }
@@ -293,7 +292,6 @@
   color: var(--isl-dim);
   font: inherit;
   font-size: 11px;
-  cursor: pointer;
 }
 .isl-checks:hover { color: var(--isl-ink); }
 .isl-checks__words { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -584,16 +582,17 @@
 .isl-q__t { margin: 0 0 6px; line-height: 1.4; }
 .isl-q__opts { margin: 0; padding-left: 18px; color: var(--isl-dim); line-height: 1.5; }
 .isl-q__picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.isl-q__pick { display: flex; align-items: baseline; gap: 6px; padding: 4px 9px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.isl-q__pick { display: flex; align-items: baseline; gap: 6px; padding: 4px 9px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; font-size: 12px; text-align: left; }
 .isl-q__pick:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.35); }
-.isl-q__pick:disabled { opacity: 0.5; cursor: default; }
+.isl-q__pick:disabled { opacity: 0.5; }
 .isl-q__n { font-family: var(--mono); font-size: 10.5px; color: var(--isl-dim); }
 .isl-q__esc { font-family: var(--mono); font-size: 11px; }
 .isl-q__said { margin: 6px 0 0; color: var(--isl-dim); font-size: 11.5px; }
 .isl-peek__plan { padding: 10px 14px; font-family: var(--ui); font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
 
 /* Another session asking while one is open: a badge, never the view. */
-.isl-head__calls { flex: none; padding: 2px 8px; border: 0; border-radius: 999px; background: var(--isl-calls); color: #111; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.isl-head__calls { flex: none; padding: 2px 8px; border: 0; border-radius: 999px; background: var(--isl-calls); color: #111; font: inherit; font-size: 11px; font-weight: 600; }
+.isl-head__calls:hover { filter: brightness(1.1); }
 .isl-row__badge { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--isl-calls); color: #111; font-size: 11px; font-weight: 700; }
 /* The fold coming: a bar that runs out over the last seconds. */
 .isl-closing { position: absolute; left: 50%; bottom: 3px; height: 2px; width: var(--from, 100%); max-width: 160px; transform: translateX(-50%); border-radius: 2px; background: rgba(255, 255, 255, 0.35); animation-name: isl-closing; animation-timing-function: linear; animation-fill-mode: forwards; pointer-events: none; }
@@ -603,10 +602,12 @@
 .isl-draft { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; }
 .isl-draft__t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--isl-dim); }
 .isl-draft__go { height: 24px; padding: 0 10px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 7px; color: inherit; font-size: 12px; }
+.isl-draft__go:hover { border-color: rgba(255, 255, 255, 0.4); }
 .isl-reply { display: flex; gap: 6px; margin-top: 8px; }
 .isl-reply__in { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; font-size: 12px; }
 .isl-reply__in:focus { outline: none; border-color: rgba(255, 255, 255, 0.35); }
 .isl-reply__said { margin: 4px 0 0; color: var(--isl-dim); font-size: 11px; }
 
 /* What the session has spent, under its checks. */
-.isl-cost { align-self: flex-start; background: none; border: 0; padding: 0; font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; color: inherit; opacity: .7; cursor: pointer; }
+.isl-cost { align-self: flex-start; background: none; border: 0; padding: 0; font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; color: inherit; opacity: .7; }
+.isl-cost:hover { opacity: 1; }

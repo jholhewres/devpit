@@ -196,6 +196,7 @@ function Foot({ message, rewind }: { message: Message; rewind?: () => void }): R
       {said && <button
         className="tfbtn"
         aria-label={copied ? 'Copied' : 'Copy'}
+        title={copied ? 'Copied' : 'Copy'}
         onClick={() =>
           void navigator.clipboard?.writeText(said).then(() => {
             setCopied(true)

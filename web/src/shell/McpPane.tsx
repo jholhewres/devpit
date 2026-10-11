@@ -86,6 +86,7 @@ export function McpPane(): React.JSX.Element {
             load();
           }}
           aria-label="Refresh MCPs"
+          title="Refresh MCPs"
         >
           <svg
             width="12"
@@ -104,6 +105,7 @@ export function McpPane(): React.JSX.Element {
           className="sq26"
           onClick={() => close("mcps")}
           aria-label="Close MCPs"
+          title="Close MCPs"
         >
           <svg
             width="12"

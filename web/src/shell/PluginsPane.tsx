@@ -69,7 +69,7 @@ export function PluginsPane(): React.JSX.Element {
           {said ? ` · ${said}` : ''}
         </span>
         <span className="drag"></span>
-        <button className="sq26" onClick={() => close('plugins')} aria-label="Close Capabilities">
+        <button className="sq26" onClick={() => close('plugins')} aria-label="Close Capabilities" title="Close Capabilities">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>

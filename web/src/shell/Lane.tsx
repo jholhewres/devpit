@@ -84,6 +84,7 @@ export function Tile({
         <button
           className="tile__play"
           aria-label={`Run ${stepName ?? "this card's step"}`}
+          title={`Run ${stepName ?? "this card's step"}`}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation()

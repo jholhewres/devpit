@@ -260,6 +260,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
           type="button"
           className="browser__act"
           aria-label="Back"
+          title="Back"
           disabled={!at}
           onClick={() => void ask(() => commands.browserBack(tab.id))}
         >
@@ -269,6 +270,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
           type="button"
           className="browser__act"
           aria-label="Forward"
+          title="Forward"
           disabled={!at}
           onClick={() => void ask(() => commands.browserForward(tab.id))}
         >
@@ -278,6 +280,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
           type="button"
           className="browser__act"
           aria-label="Reload"
+          title="Reload"
           disabled={!at}
           onClick={() => at && go(at)}
         >
@@ -287,6 +290,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
           type="button"
           className="browser__act"
           aria-label="Stop"
+          title="Stop"
           disabled={!at}
           onClick={() => void ask(() => commands.browserStop(tab.id))}
         >
@@ -321,6 +325,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
           type="button"
           className="browser__act"
           aria-label="Find in page"
+          title="Find in page"
           aria-pressed={finding}
           disabled={!at}
           onClick={() => setFinding((was) => !was)}
@@ -339,6 +344,7 @@ export function BrowserPane({ tab }: { tab: Tab }): React.JSX.Element {
           type="button"
           className="browser__act"
           aria-label="Browser menu"
+          title="Browser menu"
           aria-haspopup="menu"
           ref={dots}
           onClick={() => {

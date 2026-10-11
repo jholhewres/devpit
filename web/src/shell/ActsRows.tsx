@@ -172,6 +172,7 @@ function Section({ label, body }: Piece): React.JSX.Element {
         <button
           className="asec__c"
           aria-label={copied ? 'Copied' : `Copy ${label.toLowerCase()}`}
+          title={copied ? 'Copied' : `Copy ${label.toLowerCase()}`}
           onClick={() => {
             void navigator.clipboard?.writeText(body)
             setCopied(true)

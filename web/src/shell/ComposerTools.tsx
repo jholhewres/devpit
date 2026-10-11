@@ -114,7 +114,7 @@ export function ComposerTools({ chat, onHeard }: { chat: Chat; onHeard: (text: s
       {said && (
         <span className="ctools__said" role="status">
           {said}
-          <button className="ctools__x" onClick={() => setSaid(null)} aria-label="Dismiss">
+          <button className="ctools__x" onClick={() => setSaid(null)} aria-label="Dismiss" title="Dismiss">
             ✕
           </button>
         </span>

@@ -48,6 +48,7 @@ export function CardHeader({
           <button
             className="sq26"
             aria-label="Card actions"
+            title="Card actions"
             aria-expanded={open}
             onClick={() => setOpen((was) => !was)}
           >
@@ -72,7 +73,7 @@ export function CardHeader({
             </div>
           )}
         </div>
-        <button className="sq26" aria-label="Close" onClick={onClose}>
+        <button className="sq26" aria-label="Close" title="Close" onClick={onClose}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>

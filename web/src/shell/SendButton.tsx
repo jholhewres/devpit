@@ -9,7 +9,7 @@ export function SendButton({ sending, showEsc, can, onSend, onStop }: {
 }): React.JSX.Element {
   if (sending)
     return (
-      <button className="send" onClick={onStop} aria-label={showEsc ? 'Press Escape again to stop' : 'Stop'}>
+      <button className="send" onClick={onStop} aria-label={showEsc ? 'Press Escape again to stop' : 'Stop'} title={showEsc ? 'Press Escape again to stop' : 'Stop'}>
         {showEsc ? (
           <span className="send__esc">Esc</span>
         ) : (
@@ -18,7 +18,7 @@ export function SendButton({ sending, showEsc, can, onSend, onStop }: {
       </button>
     )
   return (
-    <button className="send" onClick={onSend} disabled={!can} aria-label="Send">
+    <button className="send" onClick={onSend} disabled={!can} aria-label="Send" title="Send">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
     </button>
   )

@@ -32,7 +32,7 @@ export function SignIn({ onClose }: { onClose: () => void }): React.JSX.Element 
       onClick={(event) => event.target === event.currentTarget && close()}
     >
       <div className="auth__box" role="dialog" aria-label="Sign in to devpit">
-        <button className="auth__x" aria-label="Close" onClick={close}>
+        <button className="auth__x" aria-label="Close" title="Close" onClick={close}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
         <span className="auth__mark"><img className="mark" alt="" src={mark} /></span>

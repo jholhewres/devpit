@@ -62,7 +62,7 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
           </span>
           <span className="pane__t"><b>Board</b></span>
           <span className="drag"></span>
-          <button className="sq26" onClick={() => close('board')} aria-label="Close board">{closeIcon}</button>
+          <button className="sq26" onClick={() => close('board')} aria-label="Close board" title="Close board">{closeIcon}</button>
         </div>
         <BoardPane />
       </>
@@ -83,7 +83,7 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
           </span>
           <span className="pane__t"><b>Skills</b></span>
           <span className="drag"></span>
-          <button className="sq26" onClick={() => close('skills')} aria-label="Close Skills">{closeIcon}</button>
+          <button className="sq26" onClick={() => close('skills')} aria-label="Close Skills" title="Close Skills">{closeIcon}</button>
         </div>
         <SkillsPane />
       </>

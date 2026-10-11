@@ -48,7 +48,7 @@ export function AddProject({ onClose }: { onClose: () => void }): React.JSX.Elem
   return (
     <div className="ask" data-open="true" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="addpj__box" role="dialog" aria-modal="true" aria-labelledby="addpjT">
-        <button className="auth__x" aria-label="Close" onClick={onClose}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+        <button className="auth__x" aria-label="Close" title="Close" onClick={onClose}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
         <h2 className="addpj__t" id="addpjT">{cloning ? 'Clone a repository' : 'Add a project'}</h2>
         <p className="addpj__d">
           {cloning ? 'It lands where you say, and joins the list.' : 'Either way it joins your project list.'}

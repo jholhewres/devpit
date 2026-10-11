@@ -116,6 +116,7 @@ export function AgentRow({
           className="acc__act"
           aria-expanded={open}
           aria-label={`${open ? 'Hide' : 'Show'} how ${entry.label} is started`}
+          title={`${open ? 'Hide' : 'Show'} how ${entry.label} is started`}
           onClick={onOpen}
         >
           {open ? '⌃' : '⌄'}

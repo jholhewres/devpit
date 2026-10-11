@@ -82,10 +82,10 @@ export function PluginFileList({
           {files.length > 0 ? ` · ${files.length}` : ''}
         </span>
         <span className="drag"></span>
-        <button className="sq26" onClick={load} aria-label={`Refresh ${title}`}>
+        <button className="sq26" onClick={load} aria-label={`Refresh ${title}`} title={`Refresh ${title}`}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5" /></svg>
         </button>
-        <button className="sq26" onClick={() => close(tab.id)} aria-label={`Close ${title}`}>
+        <button className="sq26" onClick={() => close(tab.id)} aria-label={`Close ${title}`} title={`Close ${title}`}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>

@@ -59,7 +59,7 @@ export function LaneMenu({
 
   return (
     <div className="ctl" ref={box} onPointerDown={stay}>
-      <button className="sq26" aria-label={`${name} actions`} aria-expanded={open} onClick={() => onOpen(!open)}>
+      <button className="sq26" aria-label={`${name} actions`} title={`${name} actions`} aria-expanded={open} onClick={() => onOpen(!open)}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
           <circle cx="5" cy="12" r="1.8" />
           <circle cx="12" cy="12" r="1.8" />

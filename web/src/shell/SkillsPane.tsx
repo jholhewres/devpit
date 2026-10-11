@@ -73,6 +73,7 @@ export function SkillsPane(): React.JSX.Element {
               load()
             }}
             aria-label="Refresh skills"
+            title="Refresh skills"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M3 20v-5h5M21 4v5h-5" /></svg>
           </button>

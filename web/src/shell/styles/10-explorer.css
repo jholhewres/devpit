@@ -92,7 +92,7 @@
 .arts__x:hover { color: var(--text); background: var(--overlay-strong); }
 .oboards__link { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--raised); }
 .oboards__save { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
-.oboards__pick { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 5px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+.oboards__pick { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 5px; font-size: 12.5px; color: var(--text-2); }
 .oboards__pick:hover { background: var(--overlay); }
 .oboards__pick .pmark { width: 18px; height: 18px; border-radius: 5px; font-size: 9px; }
 
@@ -106,6 +106,7 @@
 .sess__icon:hover { color: var(--text); background: var(--overlay-strong); }
 .sess__group { display: flex; flex-direction: column; gap: 2px; }
 .sess__gbtn { display: block; width: 100%; text-align: left; }
+.sess__gbtn:hover { color: var(--text); }
 .sess__told { white-space: pre-wrap; max-height: 160px; overflow: auto; }
 .sess__g { margin: 0 0 2px; padding: 0 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
 .sess__one { border-radius: 8px; }

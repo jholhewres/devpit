@@ -127,7 +127,7 @@
 /* Read-only rows: no hover lift, because nothing here responds to a
    click. Pretending otherwise is how a person learns to distrust every
    row that does. */
-.cap--read { cursor: default; padding: 7px 10px; }
+.cap--read { padding: 7px 10px; }
 .cap--read:hover { background: none; border-color: transparent; }
 .cap__src { font-size: 10px; color: var(--text-3); background: var(--overlay-strong); padding: 1px 6px; border-radius: 4px; }
 

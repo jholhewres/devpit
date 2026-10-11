@@ -11,7 +11,7 @@ import { useNotices } from './useNotices'
 import { useIslandOpens } from './useIslandOpens'
 import { useShell } from './useShell'
 import { useTree } from './useTree'
-import { close, minimize, toggleMaximize } from './window'
+import { WindowControls } from './WindowControls'
 
 /*
  * The window is one project, so the project sits above the columns rather than
@@ -24,9 +24,10 @@ import { close, minimize, toggleMaximize } from './window'
  *
  * The bar carries `data-tauri-drag-region`, so it is the window's handle.
  * Everything interactive in it is a child without the attribute, which is why
- * the buttons still take their own clicks.
+ * the buttons still take their own clicks. A double click on it maximizes and
+ * restores through Tauri's own drag script: a handler here would toggle twice.
  */
-export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JSX.Element {
+export function TopBar({ onAddProject, maximized }: { onAddProject: () => void; maximized: boolean }): React.JSX.Element {
   const { side, files, toggleSide, toggleFiles, project, show, openCard, managing, openManager, setProject, openPane } =
     useShell()
   useIslandOpens(project?.id ?? null, setProject, openPane, show)
@@ -128,25 +129,7 @@ export function TopBar({ onAddProject }: { onAddProject: () => void }): React.JS
         </svg>
       </button>
 
-      {/* A frameless window still has to be minimised, maximised and closed;
-          these are ours to draw because the system's are not there. */}
-      <span className="wctl">
-        <button className="wbtn" aria-label="Minimize" onClick={minimize}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-            <path d="M5 12h14" />
-          </svg>
-        </button>
-        <button className="wbtn" aria-label="Maximize" onClick={toggleMaximize}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-            <rect x="5" y="5" width="14" height="14" rx="1.5" />
-          </svg>
-        </button>
-        <button className="wbtn wbtn--x" aria-label="Close" onClick={close}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
-      </span>
+      <WindowControls maximized={maximized} />
     </header>
   )
 }

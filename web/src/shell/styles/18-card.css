@@ -29,7 +29,7 @@
 }
 .cardp__lane { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
 .cardp__select { height: 28px; padding: 0 8px; border-radius: 7px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12px; color: var(--text); }
-.cardp__md { min-height: 64px; padding: 11px 13px; border-radius: 9px; background: var(--inset); border: 1px solid transparent; cursor: text; }
+.cardp__md { min-height: 64px; padding: 11px 13px; border-radius: 9px; background: var(--inset); border: 1px solid transparent; }
 .cardp__md:hover, .cardp__md:focus-visible { outline: none; border-color: var(--border); }
 .cardp__ph { font-size: 13px; color: var(--text-3); }
 .cardp__saved { margin: 6px 0 0; font-size: 11.5px; color: var(--text-3); }
@@ -110,7 +110,7 @@
 /* What a card changed, against where it started — never against HEAD. */
 .cdiff { margin-top: 22px; }
 .cdiff__f { margin-top: 6px; border-radius: 10px; background: var(--raised); overflow: hidden; }
-.cdiff__s { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: default; list-style: none; }
+.cdiff__s { display: flex; align-items: center; gap: 12px; padding: 10px 16px; list-style: none; }
 .cdiff__s::-webkit-details-marker { display: none; }
 .cdiff__s:hover { background: var(--overlay); }
 .cdiff__p { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -124,13 +124,14 @@
 .cdiff__r[data-kind='del'] { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--text); }
 /* A review's finding, on the line it names. */
 .cdiff__fd { margin: 2px 16px 4px; padding: 4px 10px; border-left: 2px solid var(--border); background: var(--inset); border-radius: 6px; font-size: 11.5px; }
-.cdiff__fd > summary { display: flex; gap: 10px; align-items: baseline; cursor: default; list-style: none; }
+.cdiff__fd > summary { display: flex; gap: 10px; align-items: baseline; list-style: none; }
 .cdiff__fd > summary::-webkit-details-marker { display: none; }
 .cdiff__fd .fnd__y { margin: 6px 0; white-space: normal; }
 .cdiff__fd[data-standing='outdated'], .cdiff__fd[data-dismissed] { opacity: .6; }
 .cdiff__fd[data-standing='outdated'] .fnd__s { color: var(--text-3); }
 .cdiff__fl { font-size: 11px; color: var(--text-3); }
-.cdiff__tally { display: flex; gap: 14px; margin: 8px 0; padding: 6px 10px; background: var(--inset); border: 0; border-radius: 8px; font: inherit; font-size: 12px; cursor: pointer; }
+.cdiff__tally { display: flex; gap: 14px; margin: 8px 0; padding: 6px 10px; background: var(--inset); border: 0; border-radius: 8px; font: inherit; font-size: 12px; }
+.cdiff__tally:hover { background: var(--overlay-strong); }
 
 /* What a run proves, under the row that ran it. Every state carries a word as
    well as a colour: the point of this panel is that "green" is not an answer,
@@ -149,7 +150,8 @@
 .chk__ran code { font-family: var(--mono); font-size: 11px; }
 /* The state is the control that opens the rest: the word a person is already
    looking at to ask "what happened", rather than a second thing beside it. */
-button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+button.crun__s { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+button.crun__s:hover, .chk__again:hover { text-decoration-style: solid; }
 
 /* Narrow: the row stops being a line and becomes a stack, so what a run
    proves is read at full width rather than squeezed into the column the cost
@@ -161,7 +163,7 @@ button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font:
   .chk__ran { grid-template-columns: 1fr; gap: 1px 0; }
   .chk__ran dt { margin-top: 5px; }
 }
-.chk__again { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text-2); cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.chk__again { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text-2); text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
 .chk__who { margin: 0 0 4px; font-size: 12px; color: var(--text-3); }
 
 /* What a review found. Severity carries a word as well as a colour, for the
@@ -181,11 +183,13 @@ button.crun__s { background: none; border: 0; padding: 0; cursor: pointer; font:
 .remind__icon { flex: none; margin-top: 5px; color: var(--accent); }
 .remind__list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .remind__one { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.remind__what { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.remind__what { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 12.5px; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.remind__what:hover b { text-decoration: underline; }
 .remind__what b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .remind__when { flex: none; font-size: 11.5px; color: var(--text-3); }
 .remind__acts { flex: none; display: flex; gap: 4px; }
-.remind__btn { height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 11.5px; cursor: pointer; }
+.remind__btn { height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 11.5px; }
 .remind__btn:hover { color: var(--text); border-color: var(--accent); }
 .remind__btn--done { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
-.remind__more { flex: none; margin-top: 2px; padding: 0 6px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 11.5px; cursor: pointer; }
+.remind__more { flex: none; margin-top: 2px; padding: 0 6px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 11.5px; }
+.remind__more:hover { text-decoration: underline; }

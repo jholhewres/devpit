@@ -17,7 +17,7 @@ import { ShellProvider } from './useShell'
 import { useWindowShell } from './shellStore'
 import { BriefRefresh } from './useBriefRefresh'
 import { shortcutFor } from './shortcuts'
-import { isMaximized, onResized } from './window'
+import { useMaximized } from './useMaximized'
 import { abandoned } from './typing'
 
 export function AppShell(): React.JSX.Element {
@@ -49,15 +49,9 @@ function Window(): React.JSX.Element {
      file twice lands on the tab you already have. */
   const openInTab = (path: string): void =>
     shell.show('file', { id: `file:${path}`, path, title: path.split('/').pop() })
-  const [maximized, setMaximized] = useState(false)
-
   /* Maximised, the rounded corners square off — a rounded rectangle floating
      in the middle of a screen it should fill reads as a bug. */
-  useEffect(() => {
-    const check = (): void => void isMaximized().then(setMaximized)
-    check()
-    return onResized(check)
-  }, [])
+  const maximized = useMaximized()
 
   /* The account state is read by CSS, which decides which half of the
      sidebar foot exists. */
@@ -116,7 +110,7 @@ function Window(): React.JSX.Element {
     >
       <ResizeEdges />
       <ContextMenu />
-      <TopBar onAddProject={() => setAdding(true)} />
+      <TopBar onAddProject={() => setAdding(true)} maximized={maximized} />
       <RemindersBanner />
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>

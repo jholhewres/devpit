@@ -2,6 +2,7 @@
 .ex__modes { display: flex; gap: 2px; margin: 8px 10px 6px; padding: 2px; border-radius: 8px; background: var(--inset); }
 .exmode__tab { flex: 1; height: 26px; border-radius: 6px; font-size: 12px; color: var(--text-3); }
 .exmode__tab[aria-selected='true'] { background: var(--raised); color: var(--text); }
+.exmode__tab:hover:not([aria-selected='true']) { color: var(--text-2); }
 .code__body { margin: 0; padding: 8px 12px; font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre; color: var(--text-2); }
 .row__g--modified { color: var(--warning); }
 .row__g--added, .row__g--untracked { color: var(--success); }

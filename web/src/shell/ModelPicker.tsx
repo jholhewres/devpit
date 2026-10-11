@@ -241,6 +241,7 @@ export function ModelPicker({
                       role="button"
                       tabIndex={0}
                       aria-label={starred ? 'Remove favourite' : 'Add favourite'}
+                      title={starred ? 'Remove favourite' : 'Add favourite'}
                       data-on={starred}
                       onClick={(event) => {
                         event.stopPropagation()

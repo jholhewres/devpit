@@ -32,7 +32,7 @@
   position: relative;
   background: var(--raised); border: 1px solid var(--border);
   border-radius: 9px; padding: 9px 10px; flex: none;
-  cursor: grab; touch-action: none;
+  touch-action: none;
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease, opacity 140ms ease;
 }
 .tile:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: 0 5px 16px var(--shade); }
@@ -139,7 +139,9 @@
 /* The same place says why something asked for did not happen (`Problem`). */
 .undo[role='alert'] { border-color: color-mix(in srgb, var(--danger) 45%, var(--border-strong)); }
 
-body[data-dragging='true'] { cursor: grabbing; }
+/* Every element, not just the body: each control's own hand would win over
+   an inherited cursor the moment the card passed over it. */
+body[data-dragging='true'], body[data-dragging='true'] * { cursor: grabbing; }
 body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -171,8 +173,10 @@ body[data-dragging='true'] .tile:hover { transform: none; box-shadow: none; }
 .mgr__no { margin: 0 0 16px; font-size: 12.5px; line-height: 1.55; color: var(--text-3); }
 .mgr__board { flex: 1; min-height: 0; display: flex; gap: 10px; overflow-x: auto; padding-bottom: 16px; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 .mgr__lane { min-height: 0; }
-/* A tile here is not dragged: it goes somewhere. */
-.mgr__tile { cursor: pointer; border-left: 2px solid var(--tile-accent, var(--border)); }
+/* Its lanes are not carried, so their heads are not handles. */
+.mgr__lane .blane__top { cursor: auto; }
+/* A tile here is not dragged: it goes somewhere, under its project's colour. */
+.mgr__tile { border-left: 2px solid var(--tile-accent, var(--border)); }
 .mgr__who { display: block; margin-bottom: 5px; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
 /* A refusal sits above the board's undo rather than on it: the undo has a
    timer, and a reason covering its button would spend it. */
