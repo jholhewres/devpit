@@ -508,6 +508,13 @@ export const commands = {
 	 *  until the next launch.
 	 */
 	panelWidthsWrite: (sidebar: number, files: number) => typedError<Widths, RpcError>(__TAURI_INVOKE("panel_widths_write", { sidebar, files })),
+	/**  `keys.rebound` — the keys recorded in place of the defaults. */
+	reboundRead: () => typedError<Rebound, RpcError>(__TAURI_INVOKE("rebound_read")),
+	/**
+	 *  `keys.rebound_set` — replaces them all. The window holds the whole map and
+	 *  changes it at once, so a write is the whole map and not one entry.
+	 */
+	reboundSet: (rebound: Rebound) => typedError<Rebound, RpcError>(__TAURI_INVOKE("rebound_set", { rebound })),
 	/**  `agent.choice` — the default and the ones switched off. */
 	agentChoice: () => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_choice")),
 	/**  `agent.default_set` — what a new terminal opens. */
@@ -3850,6 +3857,14 @@ export type ReadCommand = {
 	base: string,
 	args: string[],
 	env: EnvVar[],
+};
+
+export type Rebound = {
+	/**
+	 *  Shortcut id to the keys it answers to instead of its defaults, as the
+	 *  window spells them (`Mod+Shift+K`). Absent is the defaults.
+	 */
+	keys: { [key in string]: string[] },
 };
 
 export type RejectedAgent = {

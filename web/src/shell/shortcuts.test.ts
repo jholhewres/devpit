@@ -197,7 +197,6 @@ describe('recording a key', () => {
     expect(recordKeys('palette', press('j', { ctrlKey: true }), false)).toEqual({ kept: 'Mod+J' })
     expect(matches('palette', press('j', { ctrlKey: true }), false)).toBe(true)
     expect(matches('palette', press('k', { ctrlKey: true }), false)).toBe(false)
-    expect(JSON.parse(localStorage.getItem('devpit:shortcuts') ?? '{}')).toEqual({ palette: ['Mod+J'] })
   })
 
   it('waits while only a modifier is held', () => {

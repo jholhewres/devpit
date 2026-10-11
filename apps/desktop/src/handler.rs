@@ -17,11 +17,11 @@ use crate::{
     live_sessions, mcp, mcp_apps, mcp_health, media, moving, notices, openers, opening,
     orchestrator, orchestrator_links, outside_sessions, pane_asking, pane_screen, panels, panes,
     pasting, paths, pausing, plan_limits, plugin_data, plugins, project_naming, project_proposals,
-    projects, reading_path, receipts, recipes, regrouping, reminders, remote, reply_drafts, reveal,
-    rewinding, runs_list, saves, search, session_cost, session_search, session_window, sessions,
-    settings, shell_launch, sign_ins, skills, slash, sources, spend_history, staging, steering,
-    steps, stopping, threads, transcribe, tray, update, watching, workspace, worktree_base,
-    worktree_setup, worktrees, wsfiles,
+    projects, reading_path, rebound, receipts, recipes, regrouping, reminders, remote,
+    reply_drafts, reveal, rewinding, runs_list, saves, search, session_cost, session_search,
+    session_window, sessions, settings, shell_launch, sign_ins, skills, slash, sources,
+    spend_history, staging, steering, steps, stopping, threads, transcribe, tray, update, watching,
+    workspace, worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -131,6 +131,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         chat::chat_frames,
         panels::panel_widths,
         panels::panel_widths_write,
+        rebound::rebound_read,
+        rebound::rebound_set,
         agent_choice::agent_choice,
         agent_choice::agent_default_set,
         agent_choice::agent_enabled_set,

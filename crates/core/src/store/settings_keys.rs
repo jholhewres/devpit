@@ -42,6 +42,9 @@ pub const FOCUS_MODE: &str = "focus.enabled";
 /// The keys that bring devpit forward from anywhere, as the shortcut
 /// plugin spells them (`CommandOrControl+Shift+D`). Absent is none.
 pub const SHORTCUT: &str = "general.shortcut";
+/// The keys recorded in place of the window's shortcuts' defaults, as JSON.
+/// Absent is every default.
+pub const SHORTCUT_KEYS: &str = "keyboard.rebound";
 /// The moment a pause ends, in seconds since the epoch; `0` is none.
 pub const PAUSED_UNTIL: &str = "focus.paused_until";
 /// Whether a card's date goes off as a reminder at its time. On unless

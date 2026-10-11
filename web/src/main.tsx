@@ -6,6 +6,7 @@ import { IslandWindow } from './island/IslandWindow'
 import { BrowserMenuWindow } from './shell/BrowserMenuWindow'
 import { watchCsp } from './shell/csp'
 import { reportPresence } from './shell/presence'
+import { loadRebound } from './shell/rebound'
 import { reportUncaught } from './shell/uncaught'
 import './index.css'
 
@@ -37,6 +38,8 @@ if (!isAside) reportPresence()
 // And the window answers when an update is about to restart it. Not the menu:
 // it holds nothing anybody would lose, and it is closed by the restart anyway.
 if (!isAside) answerBeforeRestart()
+// The keys a person recorded, from the settings; until then this window's own copy.
+if (!isAside) void loadRebound()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>{isIsland ? <IslandWindow /> : isMenu ? <BrowserMenuWindow /> : <App />}</StrictMode>
