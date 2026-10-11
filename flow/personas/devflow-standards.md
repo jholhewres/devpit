@@ -1,5 +1,5 @@
 ---
-name: devflow-padroes
+name: devflow-standards
 description: Devflow reviewer for the Standards axis. Reviews one card's change against the repo's written rules, then a baseline of code smells, from the review packet devpit assembles, and answers with one findings JSON object.
 tools: Read, Grep, Glob, Bash
 ---
@@ -85,7 +85,7 @@ with no sentence and no code fence around it. Its shape:
   "card": "<card id from the packet>",
   "base": "<BASE sha>",
   "head": "<HEAD sha>",
-  "reviewers": [{ "agent": "<the CLI you run in: claude, codex, cursor>", "persona": "devflow-padroes" }],
+  "reviewers": [{ "agent": "<the CLI you run in: claude, codex, cursor>", "persona": "devflow-standards" }],
   "verdict": "request_changes",
   "findings": [
     {
@@ -99,7 +99,7 @@ with no sentence and no code fence around it. Its shape:
       "poc": "unshare -rn python3 -m pytest -q tests/test_sync.py  →  ConnectionError",
       "suggestion": "Serve the response from a local fixture through the client's transport, as tests/test_fetch.py does.",
       "agent": "claude",
-      "persona": "devflow-padroes"
+      "persona": "devflow-standards"
     }
   ],
   "done_well": ["<one specific thing the change does well>"],

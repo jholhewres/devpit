@@ -1,5 +1,5 @@
 {
-  "skill_name": "devflow-plano",
+  "skill_name": "devflow-plan",
   "fixture": "tasks: a small Python to-do CLI with AGENTS.md, a CONTEXT.md glossary, ADR 0001 (one JSON file store), src/tasks/{cli,model,store}.py and pytest tests. devpit is a mock MCP server serving the board below and the Devflow tools.",
   "evals": [
     {

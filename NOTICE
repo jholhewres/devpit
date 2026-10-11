@@ -18,17 +18,17 @@ own text, adapted from the sources below. Their evals follow the pattern of
 anthropics/skills' skill-creator.
 
   flow/skills/devflow-briefing      grilling, grill-me; interview-me
-  flow/skills/devflow-contexto      to-spec, domain-modeling; spec-driven-development
-  flow/skills/devflow-plano         to-tickets; planning-and-task-breakdown
-  flow/skills/devflow-execucao      tdd, diagnosing-bugs; test-driven-development,
+  flow/skills/devflow-context       to-spec, domain-modeling; spec-driven-development
+  flow/skills/devflow-plan          to-tickets; planning-and-task-breakdown
+  flow/skills/devflow-execution     tdd, diagnosing-bugs; test-driven-development,
                                     incremental-implementation
   flow/skills/devflow-review        code-review; code-review-and-quality,
                                     security-and-hardening; requesting-code-review
-  flow/skills/devflow-conclusao     handoff; verification-before-completion
+  flow/skills/devflow-completion    handoff; verification-before-completion
   flow/skills/devflow-setup         devpit's own
   flow/personas/devflow-spec        agents/code-reviewer; code-review
-  flow/personas/devflow-padroes     agents/code-reviewer; code-review
-  flow/personas/devflow-seguranca   agents/security-auditor; security-and-hardening
+  flow/personas/devflow-standards   agents/code-reviewer; code-review
+  flow/personas/devflow-security    agents/security-auditor; security-and-hardening
 
 mattpocock/skills
   https://github.com/mattpocock/skills, commit 49dd158

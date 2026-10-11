@@ -92,7 +92,7 @@ End the turn. On an explicit, unconditional yes to that restate, call:
 ```json
 {
   "preset": "recommended",
-  "set": { "stages.execucao.checks": [{ "name": "unit", "run": "make test", "report": "junit" }] },
+  "set": { "stages.execution.checks": [{ "name": "unit", "run": "make test", "report": "junit" }] },
   "apply": true
 }
 ```

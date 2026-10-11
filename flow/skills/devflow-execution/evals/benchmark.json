@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "skill_name": "devflow-execucao",
+    "skill_name": "devflow-execution",
     "executor_model": "claude-sonnet-5-5",
     "timestamp": "2026-10-11T17:21:15Z",
     "evals_run": [
@@ -60,7 +60,7 @@
           "evidence": "calls on card_01UND: []; undo in cli.py: False"
         },
         {
-          "text": "Does not finish the card; finishing belongs to the conclusion stage",
+          "text": "Does not finish the card; finishing belongs to the completion stage",
           "passed": true,
           "evidence": "devpit_finish_card called 0 times"
         }
@@ -114,7 +114,7 @@
           "evidence": "calls on card_01UND: []; undo in cli.py: False"
         },
         {
-          "text": "Does not finish the card; finishing belongs to the conclusion stage",
+          "text": "Does not finish the card; finishing belongs to the completion stage",
           "passed": false,
           "evidence": "devpit_finish_card called 1 times"
         }
@@ -394,7 +394,7 @@
         "query": "Implement card_01RNM.",
         "should_trigger": true,
         "fired": [
-          "devflow-execucao",
+          "devflow-execution",
           null
         ],
         "triggers": 1,
@@ -405,8 +405,8 @@
         "query": "Pick up the next card of the editing-tasks plan and build it.",
         "should_trigger": true,
         "fired": [
-          "devflow-execucao",
-          "devflow-execucao"
+          "devflow-execution",
+          "devflow-execution"
         ],
         "triggers": 2,
         "runs": 2,
@@ -417,7 +417,7 @@
         "should_trigger": true,
         "fired": [
           null,
-          "devflow-execucao"
+          "devflow-execution"
         ],
         "triggers": 1,
         "runs": 2,
@@ -460,8 +460,8 @@
         "query": "Autopilot: take the first unblocked [devflow] card and implement it.",
         "should_trigger": true,
         "fired": [
-          "devflow-execucao",
-          "devflow-execucao"
+          "devflow-execution",
+          "devflow-execution"
         ],
         "triggers": 2,
         "runs": 2,
@@ -471,7 +471,7 @@
         "query": "Work on card_01RNM, test first please.",
         "should_trigger": true,
         "fired": [
-          "devflow-execucao",
+          "devflow-execution",
           null
         ],
         "triggers": 1,
@@ -504,8 +504,8 @@
         "query": "Plan the approved epic card_01TAG into cards.",
         "should_trigger": false,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 0,
         "runs": 2,
@@ -526,8 +526,8 @@
         "query": "card_01RNM is done, close it out.",
         "should_trigger": false,
         "fired": [
-          "devflow-conclusao",
-          "devflow-conclusao"
+          "devflow-completion",
+          "devflow-completion"
         ],
         "triggers": 0,
         "runs": 2,
@@ -559,8 +559,8 @@
         "query": "Gather the context for the approved brief card_01DUE.",
         "should_trigger": false,
         "fired": [
-          "devflow-contexto",
-          "devflow-contexto"
+          "devflow-context",
+          "devflow-context"
         ],
         "triggers": 0,
         "runs": 2,

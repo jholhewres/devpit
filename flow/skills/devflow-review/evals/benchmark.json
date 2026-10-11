@@ -42,7 +42,7 @@
         {
           "text": "Reviews all three axes: spec, standards and security",
           "passed": true,
-          "evidence": "reviewers in findings.json: ['devflow-padroes', 'devflow-seguranca', 'devflow-spec']; per-persona files: ['devflow-padroes', 'devflow-seguranca', 'devflow-spec']"
+          "evidence": "reviewers in findings.json: ['devflow-standards', 'devflow-security', 'devflow-spec']; per-persona files: ['devflow-standards', 'devflow-security', 'devflow-spec']"
         },
         {
           "text": "Has a critical or high security finding on src/tasks/cli.py with a PoC",
@@ -145,7 +145,7 @@
         {
           "text": "Reviews all three axes: spec, standards and security",
           "passed": true,
-          "evidence": "reviewers in findings.json: ['devflow-padroes', 'devflow-seguranca', 'devflow-spec']; per-persona files: ['devflow-padroes', 'devflow-seguranca', 'devflow-spec']"
+          "evidence": "reviewers in findings.json: ['devflow-standards', 'devflow-security', 'devflow-spec']; per-persona files: ['devflow-standards', 'devflow-security', 'devflow-spec']"
         },
         {
           "text": "Has a spec finding (the footer is out of the card's scope, or criterion 3 has no test)",
@@ -253,7 +253,7 @@
         {
           "text": "Reviews all three axes: spec, standards and security",
           "passed": true,
-          "evidence": "reviewers in findings.json: ['devflow-padroes', 'devflow-seguranca', 'devflow-spec']; per-persona files: ['devflow-padroes', 'devflow-seguranca', 'devflow-spec']"
+          "evidence": "reviewers in findings.json: ['devflow-standards', 'devflow-security', 'devflow-spec']; per-persona files: ['devflow-standards', 'devflow-security', 'devflow-spec']"
         },
         {
           "text": "Reports the note to reviewers as a finding",
@@ -504,7 +504,7 @@
         "query": "Implement card_01OPN.",
         "should_trigger": false,
         "fired": [
-          "devflow-execucao",
+          "devflow-execution",
           null
         ],
         "triggers": 0,
@@ -515,8 +515,8 @@
         "query": "card_01RNM's review came back clean, wrap it up.",
         "should_trigger": false,
         "fired": [
-          "devflow-conclusao",
-          "devflow-conclusao"
+          "devflow-completion",
+          "devflow-completion"
         ],
         "triggers": 0,
         "runs": 2,
@@ -537,8 +537,8 @@
         "query": "Plan the reports epic into cards.",
         "should_trigger": false,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 0,
         "runs": 2,

@@ -434,8 +434,8 @@
         "query": "Implement card_01RNM.",
         "should_trigger": false,
         "fired": [
-          "devflow-execucao",
-          "devflow-execucao"
+          "devflow-execution",
+          "devflow-execution"
         ],
         "triggers": 0,
         "runs": 2,
@@ -456,8 +456,8 @@
         "query": "Finish card_01RNM.",
         "should_trigger": false,
         "fired": [
-          "devflow-conclusao",
-          "devflow-conclusao"
+          "devflow-completion",
+          "devflow-completion"
         ],
         "triggers": 0,
         "runs": 2,
@@ -511,8 +511,8 @@
         "query": "Plan card_01TAG.",
         "should_trigger": false,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 0,
         "runs": 2,

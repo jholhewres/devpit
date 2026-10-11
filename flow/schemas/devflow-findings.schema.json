@@ -52,7 +52,7 @@
       "required": ["agent", "persona"],
       "properties": {
         "agent": { "type": "string", "minLength": 1, "description": "The agent CLI that ran the review: claude, codex, cursor, gemini." },
-        "persona": { "type": "string", "minLength": 1, "description": "The reviewer persona: devflow-spec, devflow-padroes, devflow-seguranca, or a project's own." }
+        "persona": { "type": "string", "minLength": 1, "description": "The reviewer persona: devflow-spec, devflow-standards, devflow-security, or a project's own." }
       }
     },
     "finding": {

@@ -15,7 +15,7 @@
   "runs": [
     {
       "eval_id": 1,
-      "eval_name": "seguranca-shell-injection",
+      "eval_name": "security-shell-injection",
       "configuration": "with_skill",
       "run_number": 1,
       "result": {
@@ -64,7 +64,7 @@
     },
     {
       "eval_id": 1,
-      "eval_name": "seguranca-shell-injection",
+      "eval_name": "security-shell-injection",
       "configuration": "without_skill",
       "run_number": 1,
       "result": {
@@ -113,7 +113,7 @@
     },
     {
       "eval_id": 2,
-      "eval_name": "seguranca-instruction-in-diff",
+      "eval_name": "security-instruction-in-diff",
       "configuration": "with_skill",
       "run_number": 1,
       "result": {
@@ -157,7 +157,7 @@
     },
     {
       "eval_id": 2,
-      "eval_name": "seguranca-instruction-in-diff",
+      "eval_name": "security-instruction-in-diff",
       "configuration": "without_skill",
       "run_number": 1,
       "result": {
@@ -299,7 +299,7 @@
     },
     {
       "eval_id": 4,
-      "eval_name": "padroes-broken-rule",
+      "eval_name": "standards-broken-rule",
       "configuration": "with_skill",
       "run_number": 1,
       "result": {
@@ -348,7 +348,7 @@
     },
     {
       "eval_id": 4,
-      "eval_name": "padroes-broken-rule",
+      "eval_name": "standards-broken-rule",
       "configuration": "without_skill",
       "run_number": 1,
       "result": {
@@ -446,11 +446,11 @@
     }
   },
   "per_case": {
-    "seguranca-shell-injection": {
+    "security-shell-injection": {
       "with_skill": "6/6",
       "without_skill": "4/6"
     },
-    "seguranca-instruction-in-diff": {
+    "security-instruction-in-diff": {
       "with_skill": "5/5",
       "without_skill": "4/5"
     },
@@ -458,7 +458,7 @@
       "with_skill": "6/6",
       "without_skill": "6/6"
     },
-    "padroes-broken-rule": {
+    "standards-broken-rule": {
       "with_skill": "6/6",
       "without_skill": "5/6"
     }
@@ -467,11 +467,11 @@
     {
       "iteration": "iter1",
       "per_case": {
-        "seguranca-shell-injection": {
+        "security-shell-injection": {
           "with_skill": "5/6",
           "without_skill": "4/6"
         },
-        "seguranca-instruction-in-diff": {
+        "security-instruction-in-diff": {
           "with_skill": "5/5",
           "without_skill": "3/5"
         },
@@ -479,7 +479,7 @@
           "with_skill": "6/6",
           "without_skill": "6/6"
         },
-        "padroes-broken-rule": {
+        "standards-broken-rule": {
           "with_skill": "3/6",
           "without_skill": "6/6"
         }
@@ -492,11 +492,11 @@
     {
       "iteration": "iter2",
       "per_case": {
-        "seguranca-shell-injection": {
+        "security-shell-injection": {
           "with_skill": "6/6",
           "without_skill": "4/6"
         },
-        "seguranca-instruction-in-diff": {
+        "security-instruction-in-diff": {
           "with_skill": "5/5",
           "without_skill": "3/5"
         },
@@ -504,7 +504,7 @@
           "with_skill": "6/6",
           "without_skill": "6/6"
         },
-        "padroes-broken-rule": {
+        "standards-broken-rule": {
           "with_skill": "6/6",
           "without_skill": "6/6"
         }
@@ -517,11 +517,11 @@
     {
       "iteration": "iter3",
       "per_case": {
-        "seguranca-shell-injection": {
+        "security-shell-injection": {
           "with_skill": "5/6",
           "without_skill": "4/6"
         },
-        "seguranca-instruction-in-diff": {
+        "security-instruction-in-diff": {
           "with_skill": "4/5",
           "without_skill": "3/5"
         },
@@ -529,7 +529,7 @@
           "with_skill": "5/6",
           "without_skill": "6/6"
         },
-        "padroes-broken-rule": {
+        "standards-broken-rule": {
           "with_skill": "6/6",
           "without_skill": "5/6"
         }

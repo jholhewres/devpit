@@ -140,7 +140,7 @@ tool then writes the brief onto that card. The tool titles the epic
 `[devflow] Brief: <title>`.
 
 Reply with the epic's card id and one line saying the next stage is the context
-(`devflow-contexto`), started when the person asks. End the turn there.
+(`devflow-context`), started when the person asks. End the turn there.
 
 Done when the tool returned the card id, your reply names it, and no other
 card, file or stage was started in this turn.

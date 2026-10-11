@@ -14,8 +14,8 @@ rule and build the wrong thing, or build the right thing and break the rules.
 | Axis | Persona | Asks |
 |---|---|---|
 | `spec` | `devflow-spec` | Does it do what the card asked, and only that? Criteria met, partial or missing; scope creep; correctness at the edges; tests that prove each criterion. |
-| `standards` | `devflow-padroes` | Does it follow this repo's written rules? Then the code smells, as judgement calls; readability, architecture, performance. |
-| `security` | `devflow-seguranca` | Can it be abused? Trust boundaries and STRIDE first, then the OWASP Top 10, and the OWASP Top 10 for LLM applications where a model is involved. |
+| `standards` | `devflow-standards` | Does it follow this repo's written rules? Then the code smells, as judgement calls; readability, architecture, performance. |
+| `security` | `devflow-security` | Can it be abused? Trust boundaries and STRIDE first, then the OWASP Top 10, and the OWASP Top 10 for LLM applications where a model is involved. |
 
 ## Ground rules
 
@@ -153,8 +153,8 @@ the verdict follows `block_on`.
 ### 6. Hand back, then stop
 
 Reply with the verdict and the worst finding **within each axis**; never pick
-one winner across axes. On `approve`, the next stage is the conclusion
-(`devflow-conclusao`); on `request_changes`, execution again, with the blocking
+one winner across axes. On `approve`, the next stage is the completion
+(`devflow-completion`); on `request_changes`, execution again, with the blocking
 findings. End the turn.
 
 Done when the reply names the verdict and each axis's worst finding (or

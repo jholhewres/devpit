@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "skill_name": "devflow-plano",
+    "skill_name": "devflow-plan",
     "executor_model": "claude-sonnet-5-5",
     "timestamp": "2026-10-11T16:27:14Z",
     "evals_run": [
@@ -392,8 +392,8 @@
         "query": "Context for card_01DUE is in. Plan it.",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -403,8 +403,8 @@
         "query": "Break the tags epic (card_01TAG) into cards on the board, with dependencies.",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -414,8 +414,8 @@
         "query": "slice card_01REN into tracer bullets please",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -425,8 +425,8 @@
         "query": "The epic's brief and context are approved. Turn it into tasks on the devpit board.",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -436,8 +436,8 @@
         "query": "Plan the SQLite epic as child cards, each with acceptance criteria, files and how to verify it.",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -447,8 +447,8 @@
         "query": "How should we split card_01TAG into pieces of work? Put the plan on the board for me to approve.",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -458,8 +458,8 @@
         "query": "devflow plan stage for card_01DUE",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -469,8 +469,8 @@
         "query": "We need to rename list to project everywhere without breaking people's scripts. The epic card_01REN is approved; work out the cards and their order.",
         "should_trigger": true,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 2,
         "runs": 2,
@@ -481,7 +481,7 @@
         "should_trigger": true,
         "fired": [
           null,
-          "devflow-plano"
+          "devflow-plan"
         ],
         "triggers": 1,
         "runs": 2,

@@ -1,5 +1,5 @@
 ---
-name: devflow-execucao
+name: devflow-execution
 description: Use when a card on a devpit board with Devflow on is to be implemented, built, worked on or fixed (a card id such as card_01..., the next card of a plan, or a bug report), before writing any code for it.
 license: Apache-2.0
 ---
@@ -30,7 +30,7 @@ and keeping the evidence; review and the finish are the next stages.
 
 Read the card with `devpit_card`: criteria, likely files, verify command,
 blocked by. Read the epic's context section for the seam and the commands, and
-`.devpit/devflow/devflow.yaml` for the checks under `stages.execucao.checks`.
+`.devpit/devflow/devflow.yaml` for the checks under `stages.execution.checks`.
 When a card it depends on is not finished, name it and end the turn. Otherwise
 call `devpit_start_card`.
 
@@ -93,7 +93,7 @@ grep for `[DEBUG-` finds nothing, and the reply names the hypothesis that held.
 ### 5. Write the E2E spec, when the project has one
 
 When `devflow.yaml` has a check named `e2e`, write
-`.devpit/devflow/e2e/<card id>-<slug>.spec.ts` (`stages.execucao.e2e_dir` moves
+`.devpit/devflow/e2e/<card id>-<slug>.spec.ts` (`stages.execution.e2e_dir` moves
 the folder), the slug being the card's title in kebab case, in the framework
 that check runs. Give it one test per criterion a person can see, titled with
 the criterion; when the check keeps `screenshots` or `video`, each test ends in
@@ -137,7 +137,7 @@ Reply with:
 - `NOTICED BUT NOT TOUCHING`, or "nothing noticed";
 - the next stage: review (`devflow-review`).
 
-The card stays where it is; finishing belongs to the conclusion stage. End the
+The card stays where it is; finishing belongs to the completion stage. End the
 turn.
 
 Done when the reply has all four parts and no other card was started.

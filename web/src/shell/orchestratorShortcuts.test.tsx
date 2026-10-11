@@ -53,66 +53,67 @@ describe('what an orchestrator chat reads as a shortcut', () => {
   const mine = ownFor(true)
 
   it('is one of its four words, alone', () => {
-    expect(ownAsked('/status', mine)).toEqual({ name: 'status', arg: '' })
-    expect(ownAsked('  /esperando ', mine)).toEqual({ name: 'esperando', arg: '' })
-    expect(ownAsked('/encerradas', mine)).toEqual({ name: 'encerradas', arg: '' })
-    expect(ownAsked('/retomar', mine)).toEqual({ name: 'retomar', arg: '' })
+    expect(ownAsked('/sessions', mine)).toEqual({ name: 'sessions', arg: '' })
+    expect(ownAsked('  /waiting ', mine)).toEqual({ name: 'waiting', arg: '' })
+    expect(ownAsked('/ended', mine)).toEqual({ name: 'ended', arg: '' })
+    expect(ownAsked('/resume-session', mine)).toEqual({ name: 'resume-session', arg: '' })
   })
 
-  it('takes words after /retomar only: after another, the words are a message', () => {
-    expect(ownAsked('/retomar fix-login', mine)).toEqual({ name: 'retomar', arg: 'fix-login' })
-    expect(ownAsked('/status of the deploy?', mine)).toBeNull()
+  it('takes words after /resume-session only: after another, the words are a message', () => {
+    expect(ownAsked('/resume-session fix-login', mine)).toEqual({ name: 'resume-session', arg: 'fix-login' })
+    expect(ownAsked('/sessions of the deploy?', mine)).toBeNull()
   })
 
   it('is nothing in another chat, nor anything that is not one', () => {
-    expect(ownAsked('/status', ownFor(false))).toBeNull()
-    expect(ownAsked('status', mine)).toBeNull()
+    expect(ownAsked('/sessions', ownFor(false))).toBeNull()
+    expect(ownAsked('sessions', mine)).toBeNull()
     expect(ownAsked('/compact', mine)).toBeNull()
-    expect(ownFor(false)).not.toContain('retomar')
+    // Claude Code's own `/status` is left to the CLI.
+    expect(ownAsked('/status', mine)).toBeNull()
+    expect(ownFor(false)).not.toContain('resume-session')
     expect(mine).toEqual(expect.arrayContaining([...ORCHESTRATOR_OWN]))
   })
 })
 
 describe('an orchestrator chat’s composer', () => {
-  it('offers the shortcuts before the CLI’s commands, once each', async () => {
+  it('offers the shortcuts before the CLI’s commands, hiding none of them', async () => {
     const { result } = renderHook(() => useSlash('claude', '/', vi.fn(), true))
-    await waitFor(() => expect(result.current.items.slice(0, 5)).toEqual(['resume', 'status', 'esperando', 'encerradas', 'retomar']))
-    expect(result.current.items.filter((one) => one === 'status')).toHaveLength(1)
+    await waitFor(() => expect(result.current.items).toEqual(['resume', 'sessions', 'waiting', 'ended', 'resume-session', 'compact', 'status']))
   })
 
   it('opens a shortcut picked from the menu instead of typing it', async () => {
     const setPrompt = vi.fn()
-    const { result } = renderHook(() => useSlash('claude', '/esp', setPrompt, true))
-    await waitFor(() => expect(result.current.items).toEqual(['esperando']))
-    act(() => result.current.choose('esperando'))
+    const { result } = renderHook(() => useSlash('claude', '/wait', setPrompt, true))
+    await waitFor(() => expect(result.current.items).toEqual(['waiting']))
+    act(() => result.current.choose('waiting'))
     expect(setPrompt).toHaveBeenCalledWith('')
-    expect(result.current.own).toEqual({ name: 'esperando', arg: '' })
+    expect(result.current.own).toEqual({ name: 'waiting', arg: '' })
   })
 
   it('runs one sent as typed, with its words, and lets anything else through', () => {
     const { result } = renderHook(() => useSlash('claude', '', vi.fn(), true))
     let took = false
     act(() => {
-      took = result.current.ran('/retomar fix-login')
+      took = result.current.ran('/resume-session fix-login')
     })
     expect(took).toBe(true)
-    expect(result.current.own).toEqual({ name: 'retomar', arg: 'fix-login' })
+    expect(result.current.own).toEqual({ name: 'resume-session', arg: 'fix-login' })
     expect(result.current.ran('what is running?')).toBe(false)
   })
 
   it('leaves the words to the agent in a chat that is not an orchestrator’s', () => {
     const { result } = renderHook(() => useSlash('claude', '', vi.fn()))
-    expect(result.current.ran('/status')).toBe(false)
+    expect(result.current.ran('/sessions')).toBe(false)
   })
 })
 
 describe('what each shortcut selects', () => {
-  it('/esperando: a question or a draft waiting on the person, and nothing else', () => {
+  it('/waiting: a question or a draft waiting on the person, and nothing else', () => {
     const sessions = [live('idle-one'), live('asks', { waiting: asking }), live('drafted', { draft: 'go on' }), live('busy-one', { status: 'busy' })]
     expect(needingYou(sessions).map((one) => one.name)).toEqual(['asks', 'drafted'])
   })
 
-  it('/status: every running session once, by what it is doing, and the latest ended', () => {
+  it('/sessions: every running session once, by what it is doing, and the latest ended', () => {
     const sessions = [live('idle-one'), live('asks', { status: 'busy', waiting: asking }), live('busy-one', { status: 'busy' })]
     const endedOnes = [ended('old', { endedAt: 1 }), ended('a'), ended('b', { endedAt: 5 }), ended('c', { endedAt: 4 })]
     const round = roundOf(sessions, endedOnes)
@@ -122,11 +123,11 @@ describe('what each shortcut selects', () => {
     expect(round.ended.map((one) => one.name)).toEqual(['b', 'c', 'a'])
   })
 
-  it('/encerradas: the sessions that ended, the latest first', () => {
+  it('/ended: the sessions that ended, the latest first', () => {
     expect(endedLatestFirst([ended('a', { endedAt: 1 }), ended('b', { endedAt: 3 }), ended('c', { endedAt: null })]).map((one) => one.name)).toEqual(['b', 'a', 'c'])
   })
 
-  it('/retomar: an id, else the latest under a name, else every name containing the words', () => {
+  it('/resume-session: an id, else the latest under a name, else every name containing the words', () => {
     const list = [ended('fix-login', { sessionId: 'aaa', endedAt: 1 }), ended('fix-login', { sessionId: 'bbb', endedAt: 9 }), ended('fix-logout', { sessionId: 'ccc' }), ended('nowhere', { projectId: null })]
     expect(toResume(list, 'aaa').map((one) => one.sessionId)).toEqual(['aaa'])
     expect(toResume(list, 'FIX-LOGIN').map((one) => one.sessionId)).toEqual(['bbb'])
@@ -139,27 +140,27 @@ describe('what each shortcut selects', () => {
 })
 
 describe('a shortcut’s answer', () => {
-  it('/status draws the round from devpit’s own reading', async () => {
+  it('/sessions draws the round from devpit’s own reading', async () => {
     running.mockReturnValue([live('asks', { waiting: asking }), live('busy-one', { status: 'busy' })])
     gone.mockReturnValue([ended('done-one')])
-    render(<OrchestratorAnswer asked={{ name: 'status', arg: '' }} profileId="claude" onClose={vi.fn()} />)
+    render(<OrchestratorAnswer asked={{ name: 'sessions', arg: '' }} profileId="claude" onClose={vi.fn()} />)
     expect(await screen.findByText('Waiting on you · 1')).toBeTruthy()
     expect(screen.getByText('Run the migration?')).toBeTruthy()
     expect(screen.getByText('Working · 1')).toBeTruthy()
     expect(await screen.findByText('done-one')).toBeTruthy()
   })
 
-  it('/retomar naming one session resumes it, once', async () => {
+  it('/resume-session naming one session resumes it, once', async () => {
     gone.mockReturnValue([ended('fix-login'), ended('other')])
-    render(<OrchestratorAnswer asked={{ name: 'retomar', arg: 'fix-login' }} profileId="claude" onClose={vi.fn()} />)
+    render(<OrchestratorAnswer asked={{ name: 'resume-session', arg: 'fix-login' }} profileId="claude" onClose={vi.fn()} />)
     expect(await screen.findByText(/Resumed as fix-login/)).toBeTruthy()
     expect(resumed).toHaveBeenCalledTimes(1)
     expect(resumed).toHaveBeenCalledWith('claude', 'id-fix-login')
   })
 
-  it('/retomar naming several lets the person pick', async () => {
+  it('/resume-session naming several lets the person pick', async () => {
     gone.mockReturnValue([ended('fix-login'), ended('fix-logout')])
-    render(<OrchestratorAnswer asked={{ name: 'retomar', arg: 'fix' }} profileId="claude" onClose={vi.fn()} />)
+    render(<OrchestratorAnswer asked={{ name: 'resume-session', arg: 'fix' }} profileId="claude" onClose={vi.fn()} />)
     expect(await screen.findAllByRole('button', { name: 'Resume' })).toHaveLength(2)
     expect(resumed).not.toHaveBeenCalled()
   })

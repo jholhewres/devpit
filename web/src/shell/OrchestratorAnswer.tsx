@@ -19,12 +19,12 @@ export function OrchestratorAnswer({ asked, profileId, onClose }: { asked: OwnAs
   const live = useLiveSessions(profileId)
   const [ended, setEnded] = useState<readonly EndedSession[] | null>(null)
   const [said, setSaid] = useState<string | null>(null)
-  /* The `/retomar <sessão>` already resumed: once per asking, not per render. */
+  /* The `/resume-session <session>` already resumed: once per asking, not per render. */
   const [resumed, setResumed] = useState<OwnAsked | null>(null)
 
   /* Read again when one more or one fewer is running: a session ended or resumed. */
   useEffect(() => {
-    if (asked.name === 'esperando') return
+    if (asked.name === 'waiting') return
     void ask(() => commands.orchestratorEnded(profileId)).then((answer) => setEnded(answer.data?.sessions ?? []))
   }, [asked, profileId, live.length])
 
@@ -39,8 +39,8 @@ export function OrchestratorAnswer({ asked, profileId, onClose }: { asked: OwnAs
     })
   }
 
-  /* `/retomar <sessão>` naming exactly one resumes it; naming more, the person picks. */
-  const matches = asked.name === 'retomar' && ended ? toResume(ended, asked.arg) : null
+  /* `/resume-session <session>` naming exactly one resumes it; naming more, the person picks. */
+  const matches = asked.name === 'resume-session' && ended ? toResume(ended, asked.arg) : null
   const only = asked.arg && matches?.length === 1 ? matches[0]! : null
   useEffect(() => {
     if (!only || resumed === asked) return
@@ -57,10 +57,10 @@ export function OrchestratorAnswer({ asked, profileId, onClose }: { asked: OwnAs
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>
-      {asked.name === 'status' && <Status live={live} ended={ended} />}
-      {asked.name === 'esperando' && <Rows live={needingYou(live)} none="Nothing waits on you." />}
-      {asked.name === 'encerradas' && <Ended ended={ended === null ? null : endedLatestFirst(ended)} none="No session has ended." onResume={resume} />}
-      {asked.name === 'retomar' && resumed !== asked && !only && (
+      {asked.name === 'sessions' && <AllSessions live={live} ended={ended} />}
+      {asked.name === 'waiting' && <Rows live={needingYou(live)} none="Nothing waits on you." />}
+      {asked.name === 'ended' && <Ended ended={ended === null ? null : endedLatestFirst(ended)} none="No session has ended." onResume={resume} />}
+      {asked.name === 'resume-session' && resumed !== asked && !only && (
         <>
           {asked.arg && matches?.length === 0 && <p className="sess__note">No ended session is called “{asked.arg}”. These can be resumed:</p>}
           <Ended ended={matches === null ? null : matches.length > 0 ? matches : toResume(ended ?? [], '')} none="No ended session can be resumed." onResume={resume} />
@@ -71,7 +71,7 @@ export function OrchestratorAnswer({ asked, profileId, onClose }: { asked: OwnAs
   )
 }
 
-function Status({ live, ended }: { live: readonly LiveSession[]; ended: readonly EndedSession[] | null }): React.JSX.Element {
+function AllSessions({ live, ended }: { live: readonly LiveSession[]; ended: readonly EndedSession[] | null }): React.JSX.Element {
   const round = roundOf(live, ended ?? [])
   const groups: [string, readonly LiveSession[]][] = [
     ['Waiting on you', round.waiting],

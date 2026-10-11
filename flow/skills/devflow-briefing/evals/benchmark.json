@@ -442,8 +442,8 @@
         "query": "The brief on card_01DUE is approved. Gather the context for it.",
         "should_trigger": false,
         "fired": [
-          "devflow-contexto",
-          "devflow-contexto"
+          "devflow-context",
+          "devflow-context"
         ],
         "triggers": 0,
         "runs": 2,
@@ -453,8 +453,8 @@
         "query": "Break the approved epic card_01TAG into cards on the board, with dependencies.",
         "should_trigger": false,
         "fired": [
-          "devflow-plano",
-          "devflow-plano"
+          "devflow-plan",
+          "devflow-plan"
         ],
         "triggers": 0,
         "runs": 2,

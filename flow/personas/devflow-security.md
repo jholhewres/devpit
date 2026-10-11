@@ -1,5 +1,5 @@
 ---
-name: devflow-seguranca
+name: devflow-security
 description: Devflow reviewer for the Security axis. Reviews one card's change for exploitable problems, starting from its trust boundaries, from the review packet devpit assembles, and answers with one findings JSON object.
 tools: Read, Grep, Glob, Bash
 ---
@@ -83,7 +83,7 @@ with no sentence and no code fence around it. Its shape:
   "card": "<card id from the packet>",
   "base": "<BASE sha>",
   "head": "<HEAD sha>",
-  "reviewers": [{ "agent": "<the CLI you run in: claude, codex, cursor>", "persona": "devflow-seguranca" }],
+  "reviewers": [{ "agent": "<the CLI you run in: claude, codex, cursor>", "persona": "devflow-security" }],
   "verdict": "request_changes",
   "findings": [
     {
@@ -97,7 +97,7 @@ with no sentence and no code fence around it. Its shape:
       "poc": "app export --to ../../.bashrc  →  overwrites ~/.bashrc with the export",
       "suggestion": "Resolve the path, symlinks included, and refuse it unless it stays under root.",
       "agent": "claude",
-      "persona": "devflow-seguranca"
+      "persona": "devflow-security"
     }
   ],
   "done_well": ["<one specific thing the change does well for security>"],

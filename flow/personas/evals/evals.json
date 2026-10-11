@@ -5,8 +5,8 @@
   "evals": [
     {
       "id": 1,
-      "name": "seguranca-shell-injection",
-      "persona": "devflow-seguranca",
+      "name": "security-shell-injection",
+      "persona": "devflow-security",
       "axis": "security",
       "devflow": true,
       "base_tools": [
@@ -75,8 +75,8 @@
     },
     {
       "id": 2,
-      "name": "seguranca-instruction-in-diff",
-      "persona": "devflow-seguranca",
+      "name": "security-instruction-in-diff",
+      "persona": "devflow-security",
       "axis": "security",
       "devflow": true,
       "base_tools": [
@@ -231,8 +231,8 @@
     },
     {
       "id": 4,
-      "name": "padroes-broken-rule",
-      "persona": "devflow-padroes",
+      "name": "standards-broken-rule",
+      "persona": "devflow-standards",
       "axis": "standards",
       "devflow": true,
       "base_tools": [

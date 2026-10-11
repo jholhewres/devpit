@@ -1,5 +1,5 @@
 ---
-name: devflow-plano
+name: devflow-plan
 description: Use when an approved "[devflow] Brief" epic, with its context gathered, needs breaking into cards, or when a person asks to plan, slice or order an epic's work into tasks on the devpit board. A card that already exists is implemented in the execution stage instead.
 license: Apache-2.0
 ---
@@ -26,7 +26,7 @@ card exists.
 ### 1. Read the epic
 
 Read the epic with `devpit_card`: the brief and its context section. When the
-context section is missing, say the context stage (`devflow-contexto`) comes
+context section is missing, say the context stage (`devflow-context`) comes
 first, and end the turn.
 
 Done when you can name the success check, the test seam and the test command

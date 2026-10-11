@@ -7,15 +7,15 @@ import { inOrder } from './liveStatus'
  * the round `context/now.md` writes down — so none of them costs a turn.
  */
 
-/** How many ended sessions `/status` names: the latest, not a history. */
+/** How many ended sessions `/sessions` names: the latest, not a history. */
 export const ENDED_LATELY = 3
 
-/** `/esperando`: what needs the person — a question a session is stopped on,
+/** `/waiting`: what needs the person — a question a session is stopped on,
  *  or a reply drafted for them to send — and nothing else. */
 export const needingYou = (live: readonly LiveSession[]): readonly LiveSession[] =>
   inOrder(live).filter((one) => one.waiting !== null || one.draft !== null)
 
-/** `/encerradas`: the sessions that ended, the latest first. */
+/** `/ended`: the sessions that ended, the latest first. */
 export const endedLatestFirst = (ended: readonly EndedSession[]): readonly EndedSession[] =>
   [...ended].sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))
 
@@ -27,7 +27,7 @@ export interface Round {
   readonly ended: readonly EndedSession[]
 }
 
-/** `/status`: every running session once — waiting on you before working
+/** `/sessions`: every running session once — waiting on you before working
  *  before idle — and the few that ended last. */
 export function roundOf(live: readonly LiveSession[], ended: readonly EndedSession[]): Round {
   const waiting = needingYou(live)
@@ -40,7 +40,7 @@ export function roundOf(live: readonly LiveSession[], ended: readonly EndedSessi
   }
 }
 
-/** `/retomar <sessão>`: the ended sessions those words name, as
+/** `/resume-session <session>`: the ended sessions those words name, as
  *  `devpit_resume_session` reads them — an id, or a name for the latest that
  *  ended under it — and, failing both, every name containing them. Only one
  *  with a project can be resumed: it reopens in a terminal of that project. */

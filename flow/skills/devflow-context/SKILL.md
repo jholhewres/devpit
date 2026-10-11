@@ -1,5 +1,5 @@
 ---
-name: devflow-contexto
+name: devflow-context
 description: Use when a "[devflow] Brief" epic is approved but not yet planned and the groundwork is wanted first, either its context gathered or research into what the project already knows about the work (code and tests it touches, rules, glossary, ADRs, history, devpit's memory), written onto the epic.
 license: Apache-2.0
 ---
@@ -118,7 +118,7 @@ every heading is present.
 ### 8. Hand back
 
 Reply with the assumptions, numbered, and say: "Correct me now, or the plan
-builds on these." Name the next stage, the plan (`devflow-plano`), started when
+builds on these." Name the next stage, the plan (`devflow-plan`), started when
 the person asks. End the turn there.
 
 Done when the reply lists the assumptions and the turn has ended, with no card
