@@ -61,7 +61,9 @@ pub(crate) fn run(server: &Server, args: &[&str]) -> Result<Output, TmuxError> {
 }
 
 /// What the child said, or nothing once it has run for `patience` — when it
-/// is asked to end, and the thread that asked goes on.
+/// is asked to end, and the thread that asked goes on. The thread reading its
+/// output may stay until the server answers or goes: tmux keeps a copy of
+/// every client's stdout, so the end of it is the server's to give.
 pub(crate) fn within(child: Child, patience: Duration) -> Option<std::io::Result<Output>> {
     let pid = child.id();
     let (said, heard) = std::sync::mpsc::channel();
