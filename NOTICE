@@ -8,3 +8,54 @@ this file except in compliance with the License. A copy of the License ships
 with this distribution in LICENSE, and is available at:
 
     http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+Devflow skills
+
+The skills under flow/skills/ are devpit's own text, adapted from the sources
+below. Their evals follow the pattern of anthropics/skills' skill-creator.
+
+mattpocock/skills
+  https://github.com/mattpocock/skills, commit 49dd158
+  MIT License, Copyright (c) 2026 Matt Pocock
+  Adapted from: skills/productivity/grilling, skills/productivity/grill-me,
+  skills/engineering/to-spec, skills/engineering/domain-modeling,
+  skills/engineering/to-tickets, skills/productivity/writing-for-agents
+
+addyosmani/agent-skills
+  https://github.com/addyosmani/agent-skills, commit 1be8e34
+  MIT License, Copyright (c) 2025 Addy Osmani
+  Adapted from: skills/interview-me, skills/spec-driven-development,
+  skills/planning-and-task-breakdown
+
+obra/superpowers
+  https://github.com/obra/superpowers, commit bb92a77
+  MIT License, Copyright (c) 2025 Jesse Vincent
+  Adapted from: skills/writing-skills (a description that names the trigger
+  and never summarizes the steps)
+
+anthropics/skills
+  https://github.com/anthropics/skills, commit dbd4588
+  Apache License, Version 2.0, Copyright 2026 Anthropic, PBC
+  Adapted from: skills/skill-creator (the evals.json, trigger query and
+  benchmark.json formats, and running each case with and without the skill)
+
+The three MIT-licensed sources above are distributed under these terms:
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
