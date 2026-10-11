@@ -4,7 +4,7 @@ use std::path::Path;
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{card_of, pane_of, pane_target, read, start_of};
+use super::{card_of, pane_of, pane_target, read, remote_of, start_of};
 
 /// tmux's answer to which window each pane is in.
 fn windows(panes: &[(&str, &str)]) -> HashMap<String, String> {
@@ -206,4 +206,62 @@ fn a_project_added_since_the_list_was_kept_is_a_reason_to_read_it_again() {
     assert!(super::same_ids(["prj_b", "prj_a"].into_iter(), &there));
     assert!(!super::same_ids(["prj_a"].into_iter(), &there));
     assert!(!super::same_ids(["prj_a", "prj_c"].into_iter(), &there));
+}
+
+#[test]
+fn remote_control_is_on_while_the_listing_names_a_bridge_and_links_its_page() {
+    let off = devpit_rpc::RemoteState::default();
+    assert_eq!(remote_of(None), off);
+    assert_eq!(remote_of(Some("")), off);
+    let on = |url: Option<&str>| devpit_rpc::RemoteState {
+        on: true,
+        url: url.map(str::to_owned),
+    };
+    assert_eq!(
+        remote_of(Some("session_01AbC-x_9")),
+        on(Some("https://claude.ai/code/session_01AbC-x_9"))
+    );
+    // The infrastructure form names the same page.
+    assert_eq!(
+        remote_of(Some("cse_01AbC")),
+        on(Some("https://claude.ai/code/session_01AbC"))
+    );
+    // On, with no page on claude.ai to send anybody to.
+    assert_eq!(remote_of(Some("session_staging_01A")), on(None));
+    assert_eq!(remote_of(Some("session_01A/../x")), on(None));
+    assert_eq!(remote_of(Some("bridge-7")), on(None));
+}
+
+#[test]
+fn a_listing_says_whether_remote_control_is_on() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sessions = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions).expect("mkdir");
+    let write = |pid: i32, name: &str, bridge: serde_json::Value| {
+        let body = json!({ "pid": pid, "name": name, "status": "idle", "kind": "interactive",
+            "cwd": dir.path().display().to_string(), "bridgeSessionId": bridge });
+        std::fs::write(sessions.join(format!("{pid}.json")), body.to_string()).expect("listing");
+    };
+    write(1, "reached", json!("session_01Q"));
+    // Disconnected: the CLI writes null over it.
+    write(2, "dropped", serde_json::Value::Null);
+    let found = read(
+        &sessions,
+        |_| true,
+        &[],
+        dir.path(),
+        &HashMap::new(),
+        |_| None,
+    );
+    let remote: Vec<_> = found
+        .iter()
+        .map(|one| (one.name.as_str(), one.remote.on, one.remote.url.as_deref()))
+        .collect();
+    assert_eq!(
+        remote,
+        [
+            ("dropped", false, None),
+            ("reached", true, Some("https://claude.ai/code/session_01Q"))
+        ]
+    );
 }

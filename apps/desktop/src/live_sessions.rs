@@ -29,6 +29,8 @@ struct Listed {
     session_id: Option<String>,
     /// When the process started, in the kernel's clock ticks since boot.
     proc_start: Option<String>,
+    /// Remote Control's session, written while connected and nulled after.
+    bridge_session_id: Option<String>,
 }
 
 impl Listed {
@@ -111,6 +113,7 @@ pub(crate) fn read(
                     .as_deref()
                     .and_then(crate::island_feed::step_of),
                 session_id: listed.session_id.filter(|id| crate::adopting::plain(id)),
+                remote: remote_of(listed.bridge_session_id.as_deref()),
             })
         })
         .collect();
@@ -186,6 +189,29 @@ pub(crate) fn pane_of(target: &str) -> Option<devpit_rpc::LivePane> {
         project_id: session.strip_prefix("devpit_")?.to_owned(),
         pane_id: window.to_owned(),
     })
+}
+
+/// Remote Control as a listing says it. The page is the one the CLI links to
+/// (2.1.296): claude.ai's, under the `session_` form of the bridge's id. A
+/// staging or local bridge, or an id that would not stay a path, has none.
+pub(crate) fn remote_of(bridge: Option<&str>) -> devpit_rpc::RemoteState {
+    let Some(id) = bridge.filter(|id| !id.is_empty()) else {
+        return devpit_rpc::RemoteState::default();
+    };
+    let body = id
+        .strip_prefix("session_")
+        .or_else(|| id.strip_prefix("cse_"))
+        .filter(|body| {
+            !body.is_empty()
+                && body
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+        })
+        .filter(|_| !id.contains("_staging_") && !id.contains("_local_"));
+    devpit_rpc::RemoteState {
+        on: true,
+        url: body.map(|body| format!("https://claude.ai/code/session_{body}")),
+    }
 }
 
 /// Which window each of devpit's panes is in now. Empty when tmux cannot say,

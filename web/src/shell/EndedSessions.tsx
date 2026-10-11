@@ -11,7 +11,7 @@ import { refreshSessions } from './liveStatus'
  */
 
 /** How it ended, in words. */
-export function endedHow(one: EndedSession): string {
+export function endedHow(one: Pick<EndedSession, 'endedBy' | 'lastStatus'>): string {
   if (one.endedBy === 'orchestrator') return 'stopped by the orchestrator'
   if (one.endedBy === 'person') return 'stopped by you'
   return one.lastStatus === 'busy' ? 'ended while working' : 'ended'

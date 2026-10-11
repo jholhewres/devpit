@@ -5,8 +5,9 @@ import type { LiveSession } from '../gen/bindings'
 import { since, SessionsView } from './SessionsView'
 
 const replied = vi.fn()
+const opened = vi.fn()
 const live = (name: string, projectName: string, extra: Partial<LiveSession> = {}): LiveSession =>
-  ({ name, status: 'idle', kind: 'interactive', cwd: '/w', projectId: 'p', projectName, cardId: null, since: null, inDevpit: true, waiting: null, pane: null, ...extra }) as LiveSession
+  ({ name, status: 'idle', kind: 'interactive', cwd: '/w', projectId: 'p', projectName, cardId: null, since: null, inDevpit: true, waiting: null, pane: null, remote: { on: false, url: null }, ...extra }) as LiveSession
 
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
@@ -14,7 +15,7 @@ vi.mock('./live', () => ({
     orchestratorSessions: () => ({
       sessions: [
         live('api-b', 'api'),
-        live('web-a', 'web', { status: 'busy', projectId: 'w', step: 'Edit invoice.ts', pane: { projectId: 'w', paneId: 'leaf_2' } }),
+        live('web-a', 'web', { status: 'busy', projectId: 'w', step: 'Edit invoice.ts', pane: { projectId: 'w', paneId: 'leaf_2' }, remote: { on: true, url: 'https://claude.ai/code/session_01W' } }),
         live('api-a', 'api', { waiting: { question: 'Deploy now?', options: [], cursor: 0 }, pane: { projectId: 'p', paneId: 'leaf_1' } }),
       ],
     }),
@@ -26,6 +27,7 @@ vi.mock('./live', () => ({
     orchestratorLinks: () => ['p'],
     orchestratorStop: () => 'stopped',
     orchestratorEnded: () => ({ sessions: [] }),
+    urlOpen: (url: string) => (opened(url), { opened: true }),
   },
 }))
 vi.mock('./useShell', () => ({
@@ -35,6 +37,7 @@ vi.mock('./useShell', () => ({
 afterEach(() => {
   cleanup()
   replied.mockClear()
+  opened.mockClear()
 })
 
 describe("an orchestrator's sessions", () => {
@@ -83,6 +86,14 @@ describe("an orchestrator's sessions", () => {
     expect(replied).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     expect(replied).toHaveBeenCalledWith('claude', 'web-a', '/model opus', 'the Sessions panel')
+  })
+
+  it('says on each row whether Remote Control is on, and opens its page when it is', async () => {
+    render(<SessionsView shown />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Open web-a on claude.ai' }))
+    expect(opened).toHaveBeenCalledWith('https://claude.ai/code/session_01W')
+    expect(screen.getByRole('img', { name: 'Remote Control off for api-b' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Open api-b on claude.ai' })).toBeNull()
   })
 
   it('says what a busy session is on right now', async () => {

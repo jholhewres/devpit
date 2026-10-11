@@ -267,6 +267,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         ended_sessions::orchestrator_ended,
         ended_sessions::orchestrator_resume,
         ended_sessions::orchestrator_told,
+        ended_sessions::card_session_history,
         opening::session_watch,
         worktree_setup::project_worktree_setup,
         worktree_setup::project_worktree_setup_set,

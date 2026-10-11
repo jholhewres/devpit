@@ -104,6 +104,9 @@
 .sess__wait { color: var(--warning); font-weight: 600; }
 .sess__icon { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--text-3); }
 .sess__icon:hover { color: var(--text); background: var(--overlay-strong); }
+/* Remote Control's state where there is no page to open: a mark, not a control. */
+.rcmark { flex: none; display: grid; place-items: center; width: 24px; height: 24px; color: var(--text-3); opacity: .5; }
+.rcmark[data-on='true'] { opacity: 1; }
 .sess__group { display: flex; flex-direction: column; gap: 2px; }
 .sess__gbtn { display: block; width: 100%; text-align: left; }
 .sess__gbtn:hover { color: var(--text); }

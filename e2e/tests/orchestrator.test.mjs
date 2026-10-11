@@ -323,6 +323,52 @@ describe('the orchestrator', () => {
     assert.ok(await window.findElement(By.css('textarea.composer__ph')), "the orchestrator's chat went with the restart")
   })
 
+  // The Remote itself needs Tailscale and a paired device, and the harness has
+  // neither. Its DraftSend types a waiting draft through `reply_now`, as the
+  // island's send does, and its AgentRestart is `agent_restart`'s: driven here.
+  test('sends a drafted command and restarts the MCP down the paths the Remote takes, the row following Remote Control', async () => {
+    const project = (await invoke(window, 'project_list')).projects.find((one) => one.name === 'termed')
+    const layout = await invoke(window, 'session_ensure', { projectId: project.id, tabId: 'tab_e2e_remoted', worktreeId: null })
+    const target = `devpit_${project.id}:${layout.focusedId}`
+    const stub = join(process.env.E2E_ROOT, 'e2e', 'stub', 'claude.mjs')
+    tmux(home, 'send-keys', '-t', target, '-l', `${process.execPath} ${stub} --name remoted-stub`)
+    tmux(home, 'send-keys', '-t', target, 'Enter')
+    const screen = () => String(tmux(home, 'capture-pane', '-p', '-t', target))
+    const orchestrator = join(home, '.devpit', 'orchestrator', 'client-work')
+    const profileId = (await invoke(window, 'project_list')).projects.find((one) => one.orchestrator)?.orchestrator
+    const listed = async () => (await invoke(window, 'orchestrator_sessions', { profileId })).sessions.find((one) => one.name === 'remoted-stub')
+    const shown = (label) =>
+      window.executeScript(function (label) {
+        return document.querySelector('[aria-label="' + label + '"]') !== null
+      }, label)
+    const sendDrafted = async () => {
+      const drafted = await window
+        .wait(async () => ((await ask('draft', { name: 'remoted-stub', text: '/remote-control' }, orchestrator)).ok ? true : false), 20000)
+        .catch(() => false)
+      assert.ok(drafted, 'the draft was refused')
+      await invoke(window, 'island_draft_send', { sessionId: (await listed()).sessionId })
+      assert.equal((await listed()).draft, null, 'the draft still waits after it was sent')
+    }
+
+    await sendDrafted()
+    const on = await window.wait(async () => (await listed())?.remote.on === true, 15000).catch(() => false)
+    assert.ok(on, `Remote Control never read as on. It shows: ${screen().slice(-300)}`)
+    assert.match((await listed()).remote.url ?? '', /^https:\/\/claude\.ai\/code\/session_e2e\d+$/)
+    assert.ok(await window.wait(() => shown('Open remoted-stub on claude.ai'), 15000).catch(() => false), "the session's row has no link to its page")
+
+    const before = (await invoke(window, 'agent_health')).restarts
+    assert.equal((await invoke(window, 'agent_restart')).restarts, before + 1)
+    assert.ok(JSON.stringify(await ask('sessions', {}, orchestrator)).includes('remoted-stub'), 'the restarted MCP lost the session')
+
+    // The draft after the restart goes through the new door, and turns it off.
+    await sendDrafted()
+    const off = await window.wait(async () => (await listed())?.remote.on === false, 15000).catch(() => false)
+    assert.ok(off, `Remote Control never read as off. It shows: ${screen().slice(-300)}`)
+    assert.ok(await window.wait(() => shown('Remote Control off for remoted-stub'), 15000).catch(() => false), 'the row never said Remote Control went off')
+    tmux(home, 'send-keys', '-t', target, '-l', '/exit')
+    tmux(home, 'send-keys', '-t', target, 'Enter')
+  })
+
   test('hands a card to a session of its account, linked to the card — and nothing else may', async () => {
     const repo = seedRepo(home, 'handed')
     const project = await invoke(window, 'project_add', { rootPath: repo })

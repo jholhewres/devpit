@@ -8,7 +8,7 @@
 use std::path::Path;
 
 use devpit_core::store::SeenSessionRow;
-use devpit_rpc::{EndedSession, EndedSessions, ErrorCode, RpcError};
+use devpit_rpc::{EndedSession, EndedSessions, ErrorCode, RpcError, SessionOnCard, SessionsOnCard};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
@@ -91,6 +91,80 @@ pub(crate) fn ended_now(profile_id: &str) -> Result<EndedSessions, RpcError> {
             .map(|row| drawn(row, &projects))
             .collect(),
     })
+}
+
+/// How many sessions a card lists.
+const MOST_ON_CARD: u32 = 30;
+
+/// A card's kept sessions, joined with the live ones of their accounts, the
+/// newest first: running ones, then by when they ended.
+pub(crate) fn on_card(
+    mut rows: Vec<SeenSessionRow>,
+    live: &[devpit_rpc::LiveSession],
+    dirty: impl Fn(&str) -> Option<u32>,
+) -> Vec<SessionOnCard> {
+    rows.sort_by_key(|row| {
+        std::cmp::Reverse((row.ended_at.unwrap_or(i64::MAX), row.first_seen_at))
+    });
+    rows.into_iter()
+        .map(|row| {
+            let running = row
+                .ended_at
+                .is_none()
+                .then(|| {
+                    live.iter()
+                        .find(|one| one.session_id.as_deref() == Some(row.session_id.as_str()))
+                })
+                .flatten();
+            SessionOnCard {
+                dirty: dirty(&row.cwd),
+                started_at: row.first_seen_at as f64 * 1000.0,
+                ended_at: row.ended_at.map(|at| at as f64 * 1000.0),
+                pane: running.and_then(|one| one.pane.clone()),
+                remote: running.map(|one| one.remote.clone()).unwrap_or_default(),
+                profile_id: row.profile_id,
+                session_id: row.session_id,
+                name: row.name,
+                ended_by: row.ended_by,
+                last_status: row.last_status,
+            }
+        })
+        .collect()
+}
+
+/// [`card_session_history`], on the calling thread.
+fn on_card_now(card_id: &str) -> Result<SessionsOnCard, RpcError> {
+    let store = crate::projects::store()?;
+    let rows = store.sessions_on_card(card_id, MOST_ON_CARD)?;
+    // A row still open is as fresh as its account's last listing: listed
+    // again, the ones that ended since are closed.
+    let mut accounts: Vec<&str> = rows
+        .iter()
+        .filter(|row| row.ended_at.is_none())
+        .map(|row| row.profile_id.as_str())
+        .collect();
+    accounts.sort_unstable();
+    accounts.dedup();
+    let live: Vec<_> = accounts
+        .iter()
+        .filter_map(|profile| crate::live_sessions::orchestrator_sessions_now(profile).ok())
+        .flat_map(|listed| listed.sessions)
+        .collect();
+    let rows = if accounts.is_empty() {
+        rows
+    } else {
+        store.sessions_on_card(card_id, MOST_ON_CARD)?
+    };
+    Ok(SessionsOnCard {
+        sessions: on_card(rows, &live, dirty_in),
+    })
+}
+
+/// `card.sessionHistory` — every session devpit saw on a card, running or ended.
+#[tauri::command]
+#[specta::specta]
+pub async fn card_session_history(card_id: String) -> Result<SessionsOnCard, RpcError> {
+    crate::off_main::blocking(move || on_card_now(&card_id)).await
 }
 
 /// `orchestrator.ended` — what this account ran that has ended.

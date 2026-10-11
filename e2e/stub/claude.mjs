@@ -62,6 +62,7 @@ function interactive() {
   appendFileSync(join(home, '.claude', 'stub-calls.log'), `${JSON.stringify({ argv, cwd: process.cwd(), interactive: true })}\n`)
   const session = valueOf('--session-id') ?? `stub-${process.pid}`
   const listing = register()
+  let bridged = null
   process.on('exit', () => listing && rmSync(listing, { force: true }))
   fireHooks('SessionStart', { source: 'startup' }, session)
   process.stdout.write('\n  devpit end-to-end stub — type /exit to leave\n\n> ')
@@ -75,6 +76,13 @@ function interactive() {
         process.stdout.write(`\n  chosen: ${picked}\n> `)
         lines = listen(onLine)
       })
+      return
+    }
+    // As the CLI does: the bridge's id in its listing while connected, null after.
+    if (said === '/remote-control') {
+      bridged = bridged ? null : `session_e2e${process.pid}`
+      if (listing) writeFileSync(listing, JSON.stringify({ ...JSON.parse(readFileSync(listing, 'utf8')), bridgeSessionId: bridged }))
+      process.stdout.write(bridged ? `\n  Remote Control active · https://claude.ai/code/${bridged}\n> ` : '\n  Remote Control disconnected\n> ')
       return
     }
     if (said === '/exit') {

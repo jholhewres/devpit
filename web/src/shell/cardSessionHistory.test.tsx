@@ -1,0 +1,69 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { SessionOnCard } from '../gen/bindings'
+import { CardSessionHistory, resumable, sessionWords } from './CardSessionHistory'
+
+const resumed = vi.fn()
+const setProject = vi.fn()
+const openPane = vi.fn()
+
+const seen = (name: string, extra: Partial<SessionOnCard> = {}): SessionOnCard => ({
+  profileId: 'claude',
+  sessionId: `id-${name}`,
+  name,
+  startedAt: Date.UTC(2026, 9, 10, 9),
+  endedAt: null,
+  endedBy: null,
+  lastStatus: 'idle',
+  dirty: null,
+  pane: null,
+  remote: { on: false, url: null },
+  ...extra,
+})
+
+const running = seen('api-live', { pane: { projectId: 'p', paneId: 'leaf_1' }, remote: { on: true, url: 'https://claude.ai/code/session_01L' } })
+const ended = seen('api-done', { endedAt: Date.UTC(2026, 9, 10, 11), endedBy: 'person', dirty: 2 })
+
+vi.mock('./live', () => ({
+  ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
+  commands: {
+    cardSessionHistory: () => ({ sessions: [running, ended] }),
+    orchestratorResume: (...args: unknown[]) => (resumed(...args), 'api-done'),
+  },
+}))
+vi.mock('./useShell', () => ({
+  useShell: () => ({ setProject, openPane }),
+}))
+
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
+
+describe("a card's session history", () => {
+  it('offers Resume for an ended session only', () => {
+    expect(resumable(ended)).toBe(true)
+    expect(resumable(running)).toBe(false)
+  })
+
+  it('says how each stands, and what it left uncommitted', () => {
+    expect(sessionWords(running)).toMatch(/^running since /)
+    expect(sessionWords(ended)).toMatch(/^stopped by you .+ · 2 file\(s\) not committed$/)
+  })
+
+  it('resumes an ended one as the same conversation, and goes to a running one', async () => {
+    render(<CardSessionHistory cardId="card_a" running={1} />)
+    const rows = (await screen.findAllByText(/^api-/)).map((one) => one.textContent)
+    expect(rows).toEqual(['api-live', 'api-done'])
+    expect(screen.getAllByRole('button', { name: 'Resume' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Go to' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Open api-live on claude.ai' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    expect(resumed).toHaveBeenCalledWith('claude', 'id-api-done')
+    fireEvent.click(screen.getByRole('button', { name: 'Go to' }))
+    expect(setProject).toHaveBeenCalledWith('p')
+    expect(openPane).toHaveBeenCalledWith('leaf_1')
+  })
+})

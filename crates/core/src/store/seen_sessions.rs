@@ -124,6 +124,21 @@ impl Store {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// The kept sessions that worked on `card_id`, of any account, the latest
+    /// seen first.
+    pub fn sessions_on_card(
+        &self,
+        card_id: &str,
+        most: u32,
+    ) -> Result<Vec<SeenSessionRow>, StoreError> {
+        let mut statement = self.conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM seen_session WHERE card_id = ?1 \
+             ORDER BY last_seen_at DESC LIMIT ?2"
+        ))?;
+        let rows = statement.query_map(rusqlite::params![card_id, most], row)?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     /// A kept session of `profile`, by its id or, the latest of them, by its name.
     pub fn seen_session(
         &self,

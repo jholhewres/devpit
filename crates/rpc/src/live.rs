@@ -41,6 +41,8 @@ pub struct LiveSession {
     /// A reply the orchestrator drafted for the person to send it as theirs.
     /// Never sent by the orchestrator: only the person's click types it.
     pub draft: Option<String>,
+    /// Claude Code's Remote Control for it, as its listing says.
+    pub remote: RemoteState,
 }
 
 /// A devpit terminal, as a tab attaches to it.
@@ -86,6 +88,33 @@ pub struct EndedSessions {
     pub sessions: Vec<EndedSession>,
 }
 
+/// A session devpit saw working on a card, running or ended.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionOnCard {
+    /// The account it ran as, which resumes it.
+    pub profile_id: String,
+    pub session_id: String,
+    pub name: String,
+    /// In ms since the epoch.
+    pub started_at: f64,
+    /// `None` while it runs.
+    pub ended_at: Option<f64>,
+    /// As in [`EndedSession`].
+    pub ended_by: Option<String>,
+    pub last_status: Option<String>,
+    pub dirty: Option<u32>,
+    /// The devpit terminal a running one is in.
+    pub pane: Option<LivePane>,
+    pub remote: RemoteState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionsOnCard {
+    pub sessions: Vec<SessionOnCard>,
+}
+
 /// What a session said last, read from its transcript.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -96,14 +125,13 @@ pub struct SessionTold {
     pub prompts: Vec<String>,
 }
 
-/// Whether an orchestrator's conversation can be reached by Remote Control,
-/// and where.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+/// Whether a conversation can be reached by Remote Control, and where.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteState {
     pub on: bool,
-    /// The session's page on claude.ai, once the CLI has said it. Absent while
-    /// on but not connected yet — its process starts with the next message.
+    /// The session's page on claude.ai, once known. Absent while a chat is on
+    /// but not connected yet — its process starts with the next message.
     pub url: Option<String>,
 }
 

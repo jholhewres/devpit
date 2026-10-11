@@ -7,6 +7,7 @@ import { CardDiff } from './CardDiff'
 import { CardElsewhere } from './CardElsewhere'
 import { CardLane, type LaneChoice } from './CardLane'
 import { CardPlay } from './CardPlay'
+import { CardSessionHistory } from './CardSessionHistory'
 import { CardSessions } from './CardSessions'
 import { liveWork, stopLiveWork } from './liveWork'
 import { CardWork } from './CardWork'
@@ -266,6 +267,8 @@ export function CardPane({
               />
 
               <CardSessions cardId={cardId} title={detail.card.title} sessions={detail.sessions} onChanged={card.reload} />
+
+              <CardSessionHistory cardId={cardId} running={detail.sessions.length} />
 
               <Attachments pinned={detail.pinned} onPin={card.pin} onUnpin={card.unpin} />
             </div>

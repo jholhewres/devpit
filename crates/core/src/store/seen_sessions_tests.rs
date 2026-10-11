@@ -99,3 +99,46 @@ fn a_kept_session_is_found_by_id_or_by_its_latest_name() {
     );
     assert_eq!(store.seen_session("other", "api").expect("read"), None);
 }
+
+#[test]
+fn a_card_has_the_sessions_seen_in_its_checkout_of_every_account_running_or_ended() {
+    let (_dir, store) = store();
+    let on = |id, card| SessionSeen {
+        card_id: card,
+        ..seen(id, id)
+    };
+    store
+        .saw_sessions(
+            "claude",
+            &[
+                on("s1", Some("card_a")),
+                on("s2", Some("card_b")),
+                on("s3", None),
+            ],
+            10,
+        )
+        .expect("saw");
+    store
+        .saw_sessions("work", &[on("s4", Some("card_a"))], 20)
+        .expect("saw");
+    // s1 ends; still the card's.
+    store.saw_sessions("claude", &[], 30).expect("saw");
+
+    let ids: Vec<_> = store
+        .sessions_on_card("card_a", 10)
+        .expect("read")
+        .into_iter()
+        .map(|one| (one.session_id, one.profile_id, one.ended_at))
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            ("s4".into(), "work".into(), None),
+            ("s1".into(), "claude".into(), Some(30))
+        ]
+    );
+    assert!(store
+        .sessions_on_card("card_c", 10)
+        .expect("read")
+        .is_empty());
+}

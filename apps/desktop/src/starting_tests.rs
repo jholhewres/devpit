@@ -32,7 +32,7 @@ fn listed(name: &str) -> LiveSession {
         "name": name, "pid": 1, "job": null, "status": "idle", "kind": "interactive",
         "cwd": "/w", "projectId": null, "projectName": null, "cardId": null, "since": null,
         "inDevpit": true, "waiting": null, "pane": null, "sessionId": null, "step": null,
-        "draft": null,
+        "draft": null, "remote": { "on": false, "url": null },
     }))
     .expect("a session")
 }

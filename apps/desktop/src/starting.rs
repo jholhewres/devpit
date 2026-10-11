@@ -99,6 +99,7 @@ pub(crate) fn shown(
                 session_id: None,
                 step: None,
                 draft: None,
+                remote: Default::default(),
             })
         })
         .collect()

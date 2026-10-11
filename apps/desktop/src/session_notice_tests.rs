@@ -8,6 +8,7 @@ fn session(name: &str, status: &str, since: f64, waiting: bool) -> LiveSession {
         "name": name, "pid": 1, "job": null, "status": status, "kind": "interactive", "cwd": "/w",
         "projectId": "prj_a", "projectName": "a", "cardId": null, "since": since, "inDevpit": true,
         "waiting": null, "pane": null, "sessionId": null, "step": null, "draft": null,
+        "remote": { "on": false, "url": null },
     }))
     .expect("a session");
     if waiting {

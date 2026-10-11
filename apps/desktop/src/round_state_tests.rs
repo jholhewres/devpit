@@ -20,6 +20,7 @@ fn session(name: &str) -> LiveSession {
         session_id: None,
         step: None,
         draft: None,
+        remote: Default::default(),
     }
 }
 

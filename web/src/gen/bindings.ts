@@ -1226,6 +1226,8 @@ export const commands = {
 	orchestratorResume: (profileId: string, sessionId: string) => typedError<string, RpcError>(__TAURI_INVOKE("orchestrator_resume", { profileId, sessionId })),
 	/**  `orchestrator.told` — what a session said last, running or ended. */
 	orchestratorTold: (profileId: string, session: string) => typedError<SessionTold, RpcError>(__TAURI_INVOKE("orchestrator_told", { profileId, session })),
+	/**  `card.sessionHistory` — every session devpit saw on a card, running or ended. */
+	cardSessionHistory: (cardId: string) => typedError<SessionsOnCard, RpcError>(__TAURI_INVOKE("card_session_history", { cardId })),
 	/**
 	 *  `session.watch` — a background session, attached in a new terminal tab of
 	 *  its project: it ran under the CLI's own supervisor, where nobody could see
@@ -3123,6 +3125,8 @@ export type LiveSession = {
 	 *  Never sent by the orchestrator: only the person's click types it.
 	 */
 	draft: string | null,
+	/**  Claude Code's Remote Control for it, as its listing says. */
+	remote: RemoteState,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */
@@ -4001,15 +4005,12 @@ export type RemoteShapes = {
 	outgoing: RemoteOut[],
 };
 
-/**
- *  Whether an orchestrator's conversation can be reached by Remote Control,
- *  and where.
- */
+/**  Whether a conversation can be reached by Remote Control, and where. */
 export type RemoteState = {
 	on: boolean,
 	/**
-	 *  The session's page on claude.ai, once the CLI has said it. Absent while
-	 *  on but not connected yet — its process starts with the next message.
+	 *  The session's page on claude.ai, once known. Absent while a chat is on
+	 *  but not connected yet — its process starts with the next message.
 	 */
 	url: string | null,
 };
@@ -4235,12 +4236,35 @@ export type SessionLayout = {
 	tree: LayoutNode,
 };
 
+/**  A session devpit saw working on a card, running or ended. */
+export type SessionOnCard = {
+	/**  The account it ran as, which resumes it. */
+	profileId: string,
+	sessionId: string,
+	name: string,
+	/**  In ms since the epoch. */
+	startedAt: number | null,
+	/**  `None` while it runs. */
+	endedAt: number | null,
+	/**  As in [`EndedSession`]. */
+	endedBy: string | null,
+	lastStatus: string | null,
+	dirty: number | null,
+	/**  The devpit terminal a running one is in. */
+	pane: LivePane | null,
+	remote: RemoteState,
+};
+
 /**  What a session said last, read from its transcript. */
 export type SessionTold = {
 	/**  Its latest replies, oldest first. */
 	replies: string[],
 	/**  The latest prompts it was given, oldest first. */
 	prompts: string[],
+};
+
+export type SessionsOnCard = {
+	sessions: SessionOnCard[],
 };
 
 export type Settings = {

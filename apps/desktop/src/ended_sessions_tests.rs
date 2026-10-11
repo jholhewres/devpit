@@ -58,3 +58,69 @@ fn a_stop_that_would_lose_work_says_why_and_asks() {
         Some("a7: its folder has 12 file(s) not committed — stop it anyway?")
     );
 }
+
+fn kept(id: &str, first: i64, ended: Option<i64>) -> SeenSessionRow {
+    SeenSessionRow {
+        session_id: id.to_owned(),
+        profile_id: "claude".to_owned(),
+        name: format!("api-{id}"),
+        cwd: "/w/card".to_owned(),
+        project_id: Some("prj_api".to_owned()),
+        card_id: Some("card_a".to_owned()),
+        first_seen_at: first,
+        last_seen_at: ended.unwrap_or(first),
+        last_status: Some("idle".to_owned()),
+        ended_at: ended,
+        ended_by: None,
+    }
+}
+
+#[test]
+fn a_cards_sessions_are_the_running_ones_then_the_latest_to_end() {
+    let rows = vec![
+        kept("old", 10, Some(20)),
+        kept("run-early", 5, None),
+        kept("late", 15, Some(50)),
+        kept("run-late", 40, None),
+    ];
+    let order: Vec<_> = on_card(rows, &[], |_| None)
+        .into_iter()
+        .map(|one| one.session_id)
+        .collect();
+    assert_eq!(order, ["run-late", "run-early", "late", "old"]);
+}
+
+#[test]
+fn only_a_running_session_carries_its_terminal_and_remote_control() {
+    let live: devpit_rpc::LiveSession = serde_json::from_value(json!({
+        "name": "api-s1", "pid": 1, "job": null, "status": "idle", "kind": "interactive",
+        "cwd": "/w/card", "projectId": "prj_api", "projectName": "api", "cardId": "card_a",
+        "since": null, "inDevpit": true, "waiting": null,
+        "pane": { "projectId": "prj_api", "paneId": "leaf_1" }, "sessionId": "s1", "step": null,
+        "draft": null, "remote": { "on": true, "url": "https://claude.ai/code/session_1" },
+    }))
+    .expect("a session");
+    // Kept as ended under an id that runs again: the row is history until listed.
+    let ended_id = devpit_rpc::LiveSession {
+        session_id: Some("s2".into()),
+        ..live.clone()
+    };
+    let both = on_card(
+        vec![kept("s1", 10, None), kept("s2", 5, Some(9))],
+        &[live, ended_id],
+        |cwd| (cwd == "/w/card").then_some(3),
+    );
+    let running = &both[0];
+    assert_eq!(
+        running.pane.as_ref().map(|pane| pane.pane_id.as_str()),
+        Some("leaf_1")
+    );
+    assert!(running.remote.on);
+    assert_eq!((running.ended_at, running.dirty), (None, Some(3)));
+    let ended = &both[1];
+    assert_eq!(
+        (ended.session_id.as_str(), ended.ended_at),
+        ("s2", Some(9000.0))
+    );
+    assert!(ended.pane.is_none() && !ended.remote.on);
+}

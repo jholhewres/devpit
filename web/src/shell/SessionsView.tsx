@@ -12,6 +12,7 @@ import { remember, remembered } from './tabs'
 import { PanelAct, PanelEmpty, PanelHead } from './PanelHead'
 import { useShell } from './useShell'
 import { EndedSessions } from './EndedSessions'
+import { RemoteControlMark } from './RemoteControlMark'
 import { SessionCommand } from './SessionCommand'
 import { REMOTE_CONTROL } from './sessionCommands'
 import { SessionCost } from './SessionCost'
@@ -165,6 +166,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
         sessionId: null,
         step: null,
         draft: null,
+        remote: { on: false, url: null },
       })
     })
   }
@@ -293,6 +295,7 @@ export function SessionsView({ shown }: { shown: boolean }): React.JSX.Element {
                     </span>
                   </button>
                   <SessionCost sessionId={one.sessionId} />
+                  <RemoteControlMark remote={one.remote} name={one.name} />
                   {one.pane && (
                     <button className="sess__icon" onClick={() => setTerminal(one)} title="Open its terminal here" aria-label={`Open ${one.name}'s terminal here`}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 10 3 2-3 2M13 14h4" /></svg>
