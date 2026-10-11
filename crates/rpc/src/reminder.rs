@@ -16,6 +16,8 @@ pub struct Reminder {
     pub due_at: f64,
     /// Whether the date carries a time somebody chose, rather than a day.
     pub timed: bool,
+    /// The project's secret it says to rotate, by name, when it is one.
+    pub secret: Option<String>,
 }
 
 /// A list, so tomorrow's field has somewhere to go.

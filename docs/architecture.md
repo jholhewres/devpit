@@ -163,6 +163,10 @@ serves its own viewer (`web/remote.html`):
 - **Terminals.** Each watched terminal is a tmux client of its own,
   `ignore-size`, and `read-only` for a device that may not type. The desk
   never changes.
+- **Secrets.** A device allowed to type can keep a secret in a project's
+  `.env` through the window's own write. The pairing is read again first, a
+  device keeps at most five a minute, and the value is never said back,
+  logged or sent on.
 
 The protocol is `RemoteIn`/`RemoteOut` in `devpit-rpc`, one JSON message per
 WebSocket frame.

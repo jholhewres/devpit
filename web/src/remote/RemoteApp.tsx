@@ -5,6 +5,7 @@ import { launcherLink } from '../shell/remoteLauncher'
 import { RemoteBoard } from './RemoteBoard'
 import { RemoteChats } from './RemoteChats'
 import { RemotePair } from './RemotePair'
+import { RemoteSecret } from './RemoteSecret'
 import { RemoteTerminal } from './RemoteTerminal'
 import { RemoteWaiting } from './RemoteWaiting'
 import { connect, keepToken, tokenKept, type Link } from './socket'
@@ -15,7 +16,7 @@ import { connect, keepToken, tokenKept, type Link } from './socket'
  * said in its welcome; asking past it is refused there, not only here.
  */
 
-type View = 'terminals' | 'board' | 'waiting' | 'chats'
+type View = 'terminals' | 'board' | 'waiting' | 'chats' | 'secrets'
 
 export interface Welcome {
   device: string
@@ -41,6 +42,7 @@ export function RemoteApp(): React.JSX.Element {
   const [chats, setChats] = useState<Conversations | null>(null)
   const [chat, setChat] = useState<Conversation | null>(null)
   const [started, setStarted] = useState<string | null>(null)
+  const [kept, setKept] = useState<string | null>(null)
   const link = useRef<Link | null>(null)
   const bytes = useRef<(pane: string, b64: string) => void>(() => {})
   const projectRef = useRef(projectId)
@@ -96,6 +98,10 @@ export function RemoteApp(): React.JSX.Element {
         case 'started':
           setStarted(message.name)
           window.setTimeout(() => setStarted(null), 6000)
+          return
+        case 'secretKept':
+          setKept(message.name)
+          window.setTimeout(() => setKept(null), 6000)
           return
         case 'failed':
           setFailed(message.why)
@@ -157,8 +163,9 @@ export function RemoteApp(): React.JSX.Element {
       </header>
       {failed && <p className="rm__failed" role="alert">{failed}</p>}
       {started && <p className="rm__said" role="status">Started {started}: it runs in a terminal tab of the project.</p>}
+      {kept && <p className="rm__said" role="status">{kept} is kept. A session reads it by that name.</p>}
       <nav className="rm__tabs">
-        {(['terminals', 'board', 'waiting', 'chats'] as const).map((one) => (
+        {(['terminals', 'board', 'waiting', 'chats', 'secrets'] as const).map((one) => (
           <button key={one} className="rm__tab" data-on={view === one ? 'true' : undefined} onClick={() => setView(one)}>
             {one === 'waiting' && questions.length + drafts.length > 0 ? `waiting ${questions.length + drafts.length}` : one}
           </button>
@@ -182,6 +189,7 @@ export function RemoteApp(): React.JSX.Element {
         {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} waiting={questions.length + drafts.length} onWaiting={() => setView('waiting')} send={send} />}
         {view === 'waiting' && <RemoteWaiting questions={questions} drafts={drafts} health={health} answering={welcome?.answering ?? false} typing={welcome?.typing ?? false} send={send} />}
         {view === 'chats' && projectId && <RemoteChats project={projectId} chats={chats} chat={chat} onClose={() => setChat(null)} send={send} />}
+        {view === 'secrets' && <RemoteSecret key={projectId} projects={projects} project={projectId} typing={welcome?.typing ?? false} send={send} />}
       </section>
     </main>
   )

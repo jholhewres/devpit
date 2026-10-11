@@ -538,8 +538,18 @@ export const commands = {
 	agentTrustSet: (on: boolean) => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_trust_set", { on })),
 	/**  `project.secrets` — the names kept for a project, and where. */
 	projectSecrets: (projectId: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secrets", { projectId })),
-	/**  `project.secret_set` — puts one in the project's `.env`. */
+	/**
+	 *  `project.secret_set` — puts one in the project's `.env`. Set again, a
+	 *  secret with a rotation counts as rotated.
+	 */
 	projectSecretSet: (projectId: string, name: string, value: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secret_set", { projectId, name, value })),
+	/**
+	 *  `project.secret_rotation` — when a secret is to be rotated: every so many
+	 *  days, by a date, or, with neither, no longer.
+	 */
+	projectSecretRotation: (projectId: string, name: string, everyDays: number | null, at: number | null) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secret_rotation", { projectId, name, everyDays, at })),
+	/**  `project.secret_rotated` — the person rotated it: the date moves on. */
+	projectSecretRotated: (projectId: string, name: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secret_rotated", { projectId, name })),
 	/**  `channels.read` — what is connected, and the rules. */
 	channelsRead: () => typedError<Channels, RpcError>(__TAURI_INVOKE("channels_read")),
 	/**  `channels.rules_set` — which events go where, quiet hours, grouping. */
@@ -3914,6 +3924,8 @@ export type Reminder = {
 	dueAt: number | null,
 	/**  Whether the date carries a time somebody chose, rather than a day. */
 	timed: boolean,
+	/**  The project's secret it says to rotate, by name, when it is one. */
+	secret: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */
@@ -3990,7 +4002,12 @@ export type RemoteIn =
  */
 { t: "sessionStart"; project: string; card: string | null; prompt: string; anyway: boolean } | 
 /**  Opens devpit's own MCP again. Only a device allowed to type. */
-{ t: "agentRestart" } | { t: "ping" };
+{ t: "agentRestart" } | 
+/**
+ *  A secret put in the project's `.env` by the window's own write. Only a
+ *  device allowed to type; the value is never said back or logged.
+ */
+{ t: "secretSet"; project: string; name: string; value: string } | { t: "ping" };
 
 /**  What the host says. */
 export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean } | 
@@ -3998,6 +4015,8 @@ export type RemoteOut = { t: "welcome"; device: string; host: string; typing: bo
 { t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | { t: "drafts"; drafts: RemoteDraft[] } | { t: "agentHealth"; health: AgentHealth } | 
 /**  A session started from here, by the name to find it under. */
 { t: "started"; name: string } | 
+/**  A secret was kept, said by its name alone. */
+{ t: "secretKept"; project: string; name: string } | 
 /**  One request could not be done; the connection stays. */
 { t: "failed"; why: string } | { t: "pong" };
 
@@ -4161,6 +4180,12 @@ export type Secret = {
 	name: string,
 	/**  When it was last set, in seconds since the epoch. */
 	setAt: number | null,
+	/**  Every how many days it is to be rotated, when the person asked. */
+	rotateDays?: number | null,
+	/**  When it is next due to be rotated, in seconds since the epoch. */
+	rotateAt?: number | null,
+	/**  The card on the project's board whose date reminds of it. */
+	reminderCard?: string | null,
 };
 
 export type SecretList = {

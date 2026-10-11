@@ -137,6 +137,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         agent_choice::agent_trust_set,
         crate::vault::project_secrets,
         crate::vault::project_secret_set,
+        crate::vault_rotation::project_secret_rotation,
+        crate::vault_rotation::project_secret_rotated,
         crate::channels::channels_read,
         crate::channels::channels_rules_set,
         crate::telegram::telegram_status,

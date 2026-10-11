@@ -18,6 +18,8 @@ use devpit_core::{preference, ReminderRow, Store};
 use devpit_rpc::{Reminder, Reminders, RpcError};
 use tauri::{AppHandle, Emitter};
 
+use crate::channels::Action;
+
 /// The window hears this when reminders go off, with them.
 pub(crate) const FIRED: &str = "reminder:fired";
 /// …and this when one was snoozed, dealt with or moved, to read them again.
@@ -146,6 +148,29 @@ pub(crate) fn fire(store: &Store, at: i64) -> Vec<ReminderRow> {
     due
 }
 
+/// The buttons under a reminder on a channel: a secret's rotation is
+/// rotated or forgotten rather than done.
+pub(crate) fn offered(card_id: &str, rotation: bool) -> Vec<Action> {
+    let card_id = card_id.to_owned();
+    if rotation {
+        return vec![
+            Action::Rotated {
+                card_id: card_id.clone(),
+            },
+            Action::Snooze {
+                card_id: card_id.clone(),
+            },
+            Action::ForgetRotation { card_id },
+        ];
+    }
+    vec![
+        Action::ReminderDone {
+            card_id: card_id.clone(),
+        },
+        Action::Snooze { card_id },
+    ]
+}
+
 /// The window, the bell and — when devpit is behind — the system.
 fn tell(app: &AppHandle, store: &Store, fired: &[ReminderRow]) {
     let _ = app.emit(crate::notices::RANG, ());
@@ -156,14 +181,10 @@ fn tell(app: &AppHandle, store: &Store, fired: &[ReminderRow]) {
             event: devpit_rpc::ChannelEvent::Reminder,
             line: format!("Reminder: {}", one.title),
             bare: "A reminder went off.".to_owned(),
-            actions: vec![
-                crate::channels::Action::ReminderDone {
-                    card_id: one.card_id.clone(),
-                },
-                crate::channels::Action::Snooze {
-                    card_id: one.card_id.clone(),
-                },
-            ],
+            actions: offered(
+                &one.card_id,
+                crate::vault_rotation::secret_on(store, &one.project_id, &one.card_id).is_some(),
+            ),
             asking: None,
             about: Some(crate::channel_escalation::About::Reminder {
                 card_id: one.card_id.clone(),
@@ -198,6 +219,7 @@ pub(crate) fn drawn(store: &Store, rows: Vec<ReminderRow>) -> Reminders {
             .into_iter()
             .map(|row| Reminder {
                 project: names.get(&row.project_id).cloned(),
+                secret: crate::vault_rotation::secret_on(store, &row.project_id, &row.card_id),
                 card_id: row.card_id,
                 project_id: row.project_id,
                 title: row.title,

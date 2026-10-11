@@ -20,12 +20,15 @@ const reminder = (cardId: string, title: string, extra: Partial<Reminder> = {}):
   title,
   dueAt: Date.now() / 1000 - 60,
   timed: true,
+  secret: null,
   ...extra,
 })
 
 let pending: Reminder[] = []
 const snoozed = vi.fn()
 const finished = vi.fn()
+const rotated = vi.fn()
+const rotation = vi.fn()
 const rearmed = vi.fn(async () => undefined)
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<unknown>) => ({ data: await call(), error: null, loading: false }),
@@ -42,6 +45,16 @@ vi.mock('./live', () => ({
       return { reminders: pending }
     },
     remindersRearm: () => rearmed(),
+    projectSecretRotated: async (projectId: string, name: string) => {
+      rotated(projectId, name)
+      pending = []
+      return { secrets: [], file: '/p/.env' }
+    },
+    projectSecretRotation: async (projectId: string, name: string, everyDays: number | null, at: number | null) => {
+      rotation(projectId, name, everyDays, at)
+      pending = []
+      return { secrets: [], file: '/p/.env' }
+    },
   },
 }))
 
@@ -81,6 +94,21 @@ describe('a reminder that went off', () => {
     expect(opened.openCard).toHaveBeenCalledWith('card_1')
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(finished).toHaveBeenCalledWith('card_1'))
+  })
+
+  it('names the secret it says to rotate, and offers Rotated and Forget for Done', async () => {
+    pending = [reminder('card_9', 'Rotate HF_TOKEN', { secret: 'HF_TOKEN' })]
+    render(<RemindersBanner />)
+    await waitFor(() => screen.getByText('Rotate HF_TOKEN'))
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Rotated' }))
+    await waitFor(() => expect(rotated).toHaveBeenCalledWith('prj_api', 'HF_TOKEN'))
+    await waitFor(() => expect(screen.queryByText('Rotate HF_TOKEN')).toBeNull())
+
+    pending = [reminder('card_9', 'Rotate HF_TOKEN', { secret: 'HF_TOKEN' })]
+    await act(async () => heard['reminder:changed']!(null))
+    fireEvent.click(await waitFor(() => screen.getByRole('button', { name: 'Forget' })))
+    await waitFor(() => expect(rotation).toHaveBeenCalledWith('prj_api', 'HF_TOKEN', null, null))
   })
 
   it('stacks several into one strip that opens', async () => {

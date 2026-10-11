@@ -87,6 +87,13 @@ pub enum RemoteIn {
     },
     /// Opens devpit's own MCP again. Only a device allowed to type.
     AgentRestart,
+    /// A secret put in the project's `.env` by the window's own write. Only a
+    /// device allowed to type; the value is never said back or logged.
+    SecretSet {
+        project: String,
+        name: String,
+        value: String,
+    },
     Ping,
 }
 
@@ -140,6 +147,11 @@ pub enum RemoteOut {
     },
     /// A session started from here, by the name to find it under.
     Started {
+        name: String,
+    },
+    /// A secret was kept, said by its name alone.
+    SecretKept {
+        project: String,
         name: String,
     },
     /// One request could not be done; the connection stays.

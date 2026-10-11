@@ -13,10 +13,10 @@ use std::path::Path;
 use devpit_rpc::{ErrorCode, RpcError, Secret, SecretList};
 
 /// The file the values go in, at the project's root.
-const FILE: &str = ".env";
+pub(crate) const FILE: &str = ".env";
 /// The most of an existing `.env` read: a bigger one is not a `.env`.
 const CEILING: u64 = 1024 * 1024;
-const LONGEST_VALUE: usize = 8 * 1024;
+pub(crate) const LONGEST_VALUE: usize = 8 * 1024;
 
 /// A variable name a shell and every `.env` reader take as it is.
 pub(crate) fn plain_name(name: &str) -> bool {
@@ -110,22 +110,34 @@ pub(crate) fn keep(
         RpcError::internal(err.to_string())
     })?;
     let mut list = listed(kept);
-    list.retain(|one| one.name != name);
-    list.push(Secret {
-        name: name.to_owned(),
-        set_at: devpit_core::reports::now() as f64,
-    });
-    list.sort_by(|a, b| a.name.cmp(&b.name));
-    let text =
-        serde_json::to_string_pretty(&list).map_err(|err| RpcError::internal(err.to_string()))?;
-    if let Some(parent) = kept.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| RpcError::internal(err.to_string()))?;
+    let set_at = devpit_core::reports::now() as f64;
+    // Set again, it keeps its rotation: what changed is the value.
+    match list.iter_mut().find(|one| one.name == name) {
+        Some(was) => was.set_at = set_at,
+        None => list.push(Secret {
+            name: name.to_owned(),
+            set_at,
+            rotate_days: None,
+            rotate_at: None,
+            reminder_card: None,
+        }),
     }
-    std::fs::write(kept, text).map_err(|err| RpcError::internal(err.to_string()))?;
+    list.sort_by(|a, b| a.name.cmp(&b.name));
+    write_list(kept, &list)?;
     Ok(SecretList {
         secrets: list,
         file: file.display().to_string(),
     })
+}
+
+/// `secrets.json` written whole: names, dates and rotations, never a value.
+pub(crate) fn write_list(kept: &Path, list: &[Secret]) -> Result<(), RpcError> {
+    let text =
+        serde_json::to_string_pretty(list).map_err(|err| RpcError::internal(err.to_string()))?;
+    if let Some(parent) = kept.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| RpcError::internal(err.to_string()))?;
+    }
+    std::fs::write(kept, text).map_err(|err| RpcError::internal(err.to_string()))
 }
 
 /// The names kept, as `secrets.json` lists them.
@@ -168,24 +180,32 @@ pub async fn project_secrets(project_id: String) -> Result<SecretList, RpcError>
     .await
 }
 
-/// `project.secret_set` — puts one in the project's `.env`.
+/// `project.secret_set` — puts one in the project's `.env`. Set again, a
+/// secret with a rotation counts as rotated.
 #[tauri::command]
 #[specta::specta]
 pub async fn project_secret_set(
+    app: tauri::AppHandle,
     project_id: String,
     name: String,
     value: String,
 ) -> Result<SecretList, RpcError> {
     crate::off_main::blocking(move || {
+        let store = crate::projects::store()?;
         let root = crate::roots::root_of(&project_id, None)?;
-        keep(
-            &root,
-            &crate::projects::project_home(&project_id)?.secrets(),
-            name.trim(),
-            &value,
-        )
+        let kept = crate::projects::project_home(&project_id)?.secrets();
+        let mut list = keep(&root, &kept, name.trim(), &value)?;
+        if crate::vault_rotation::kept_again(&store, &project_id, &kept, name.trim(), now())? {
+            list.secrets = listed(&kept);
+            crate::vault_rotation::told(&app, &project_id);
+        }
+        Ok(list)
     })
     .await
+}
+
+pub(crate) fn now() -> i64 {
+    devpit_core::reports::now() as i64
 }
 
 #[cfg(test)]

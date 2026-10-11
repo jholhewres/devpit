@@ -89,7 +89,10 @@ pub(crate) fn settles(action: &Action, told: &Told) -> bool {
             }),
         ) => profile == p && session == s,
         (
-            Action::ReminderDone { card_id } | Action::Snooze { card_id },
+            Action::ReminderDone { card_id }
+            | Action::Snooze { card_id }
+            | Action::Rotated { card_id }
+            | Action::ForgetRotation { card_id },
             Some(About::Reminder { card_id: c, .. }),
         ) => card_id == c,
         (Action::Answer { target, .. }, _) => told.asking.as_deref() == Some(target.as_str()),

@@ -352,6 +352,31 @@ fn answer(
                 },
             )
         }
+        RemoteIn::SecretSet {
+            project,
+            name,
+            value,
+        } => Some(
+            match crate::projects::store()
+                .map_err(|err| err.message)
+                .and_then(|store| {
+                    crate::remote_secret::keep(
+                        &store,
+                        root,
+                        &device.id,
+                        &project,
+                        &name,
+                        &value,
+                        crate::remote::now(),
+                    )
+                }) {
+                Ok(name) => {
+                    crate::vault_rotation::told(app, &project);
+                    RemoteOut::SecretKept { project, name }
+                }
+                Err(why) => RemoteOut::Failed { why },
+            },
+        ),
         RemoteIn::AgentHealth => Some(RemoteOut::AgentHealth {
             health: crate::agent_door::health_now(app),
         }),

@@ -16,6 +16,8 @@ export function useReminders(): {
   reminders: readonly Reminder[]
   snooze: (cardId: string, until: number) => void
   done: (cardId: string) => void
+  rotated: (one: Reminder) => void
+  forget: (one: Reminder) => void
 } {
   const [reminders, setReminders] = useState<readonly Reminder[]>([])
 
@@ -43,6 +45,15 @@ export function useReminders(): {
     reminders,
     snooze: (cardId, until) => void ask(() => commands.reminderSnooze(cardId, until)).then(told),
     done: (cardId) => void ask(() => commands.reminderDone(cardId)).then(told),
+    // A rotation answers with the project's secrets, so the reminders are read again.
+    rotated: (one) => {
+      const name = one.secret
+      if (name) void ask(() => commands.projectSecretRotated(one.projectId, name)).then(reload)
+    },
+    forget: (one) => {
+      const name = one.secret
+      if (name) void ask(() => commands.projectSecretRotation(one.projectId, name, null, null)).then(reload)
+    },
   }
 }
 

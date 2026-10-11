@@ -36,6 +36,8 @@ pub(crate) fn label(action: &Action) -> String {
         Action::SendDraft { .. } => "Send the draft".to_owned(),
         Action::ReminderDone { .. } => "Done".to_owned(),
         Action::Snooze { .. } => "In 15 minutes".to_owned(),
+        Action::Rotated { .. } => "Rotated".to_owned(),
+        Action::ForgetRotation { .. } => "Forget".to_owned(),
         Action::Answer { seen, choice, .. } => {
             let said = seen
                 .options
@@ -87,6 +89,8 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
                     .map_err(|err| err.message)
             })
             .map(|_| "Again in 15 minutes.".to_owned()),
+        Action::Rotated { card_id } => crate::vault_rotation::by_card(card_id, true),
+        Action::ForgetRotation { card_id } => crate::vault_rotation::by_card(card_id, false),
         Action::Answer {
             target,
             seen,
@@ -95,6 +99,7 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
             .map(|_| format!("Answered: {}.", label(action)))
             .map_err(|err| err.message),
     };
+    // A rotation's buttons tell the window themselves, through the vault.
     if matches!(action, Action::ReminderDone { .. } | Action::Snooze { .. }) {
         if let Some(app) = crate::telegram::app().get() {
             crate::reminders::changed(app);

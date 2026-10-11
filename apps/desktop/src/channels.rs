@@ -32,6 +32,14 @@ pub(crate) enum Action {
     Snooze {
         card_id: String,
     },
+    /// A secret's rotation reminder: rotated, so the date moves on…
+    Rotated {
+        card_id: String,
+    },
+    /// …or no more reminders to rotate it.
+    ForgetRotation {
+        card_id: String,
+    },
     /// Picks a choice on the question a session is stopped on — only while
     /// it is still the question that was offered.
     Answer {

@@ -5,6 +5,7 @@ import type { Project } from '../gen/bindings'
 
 const edited = vi.fn()
 const kept = vi.fn()
+const rotation = vi.fn()
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve(call()),
   commands: {
@@ -18,6 +19,10 @@ vi.mock('./live', () => ({
     projectSecretSet: (...args: unknown[]) => {
       kept(...args)
       return { data: { secrets: [{ name: 'JEV_API_KEY', setAt: 1 }], file: '/p/.env' }, error: null }
+    },
+    projectSecretRotation: (...args: unknown[]) => {
+      rotation(...args)
+      return { data: { secrets: [{ name: 'JEV_API_KEY', setAt: 1, rotateDays: 90, rotateAt: 4e9 }], file: '/p/.env' }, error: null }
     },
   },
 }))
@@ -93,5 +98,16 @@ describe('the project dialog', () => {
     fireEvent.click(screen.getByText('Keep it'))
     await waitFor(() => expect(kept).toHaveBeenCalledWith('p1', 'JEV_API_KEY', 'sk-abc'))
     await waitFor(() => expect(value.value).toBe(''))
+  })
+
+  it('reminds to rotate a kept secret every so many days', async () => {
+    render(<ProjectDialog project={project()} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('JEV_API_KEY'), { target: { value: 'JEV_API_KEY' } })
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'sk-abc' } })
+    fireEvent.click(screen.getByText('Keep it'))
+    const picker = await waitFor(() => screen.getByLabelText('Rotation of JEV_API_KEY'))
+    fireEvent.change(picker, { target: { value: '90' } })
+    await waitFor(() => expect(rotation).toHaveBeenCalledWith('p1', 'JEV_API_KEY', 90, null))
+    await waitFor(() => expect(screen.getByText(/rotate by/)).toBeTruthy())
   })
 })
