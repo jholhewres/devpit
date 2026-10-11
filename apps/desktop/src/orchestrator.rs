@@ -111,6 +111,23 @@ pub(crate) fn reaches(project_id: &str) -> Vec<String> {
         .collect()
 }
 
+/// The name an orchestrator's chat runs under, from its folder, so it is the
+/// same after every restart: its sessions report back to it by name.
+pub(crate) fn address(folder: &Path) -> Option<String> {
+    let name = folder.file_name()?.to_str()?;
+    Some(format!("orchestrator-{name}"))
+}
+
+/// [`address`] for a chat in `project_id`, when that project is an
+/// orchestrator; nothing for any other project, whose chats stay unnamed.
+pub(crate) fn address_of(project_id: &str) -> Option<String> {
+    let store = crate::projects::store().ok()?;
+    let (_, root) = crate::projects::locate(&store, project_id).ok()?;
+    let home = Store::root().ok()?.canonicalize().ok()?;
+    devpit_core::home::orchestrator_of(&store, &home, &root)?;
+    address(&root)
+}
+
 /// The profile, if an orchestrator can speak as it: Claude Code, since only it
 /// reaches its other sessions, and one devpit can start rather than a shell
 /// function it has not read yet.

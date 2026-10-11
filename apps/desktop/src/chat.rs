@@ -159,6 +159,7 @@ pub async fn chat_send(
     let env = devpit_agentcli::running::runner(&profile).env;
     let mcp = crate::agent_reach::chat_mcp(&profile.driver);
     let reach = crate::orchestrator::reaches(&project_id);
+    let address = crate::orchestrator::address_of(&project_id);
 
     let file = conversation_path(&sessions, &conversation_id);
     let turn_id = id("turn");
@@ -256,6 +257,7 @@ pub async fn chat_send(
                 control: Some(&control),
                 on_session: Some(&hold),
                 add_dirs: &reach,
+                name: address.as_deref(),
             },
             // Only once the turn has the process: a woken turn it waited for
             // is written first, and its changes are not this turn's.

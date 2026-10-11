@@ -18,7 +18,7 @@ import { PaneCorner } from './PaneCorner'
 import { useTaking } from './useTaking'
 import { Turn } from './Turn'
 import { SkillPills } from './SkillPills'
-import { ResumePicker } from './ResumePicker'
+import { OwnCommand } from './OwnCommand'
 import { useFollow } from './useFollow'
 import { useDraft } from './useDraft'
 import { JumpToEnd } from './JumpToEnd'
@@ -59,7 +59,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const { pasted, dropped } = useTaking(chat)
   /* A chat opened from a card starts with the card in the composer, unsent. */
   const [prompt, setPrompt] = useDraft(tab.id, tab.draft)
-  const slash = useSlash(chat.profileId, prompt, setPrompt)
+  const slash = useSlash(chat.profileId, prompt, setPrompt, Boolean(project?.orchestrator))
   /* New output belongs at the bottom, where the eye already is — unless it went up to read. */
   const follow = useFollow<HTMLDivElement>(chat.messages)
   const field = useRef<HTMLTextAreaElement>(null)
@@ -91,7 +91,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const sendDraft = useDraftShortcut(project?.orchestrator ?? null, setPrompt)
   const send = (): void => {
     if (!ready(prompt, false, chat.profileId)) return
-    if (sendDraft(prompt)) return setPrompt('')
+    if (sendDraft(prompt) || slash.ran(prompt)) return setPrompt('')
     if (chat.sending) queue.add(prompt)
     else chat.say(prompt)
     setPrompt('')
@@ -163,7 +163,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
             <SkillPills picked={chat.skills} onChange={chat.setSkills} profile={chat.profiles.find((one) => one.id === chat.profileId)} />
             <SlashMenu slash={slash} />
             <MentionMenu menu={mention} />
-            {slash.own === 'resume' && <ResumePicker from={tab.id} profileId={chat.profileId} onClose={() => (slash.closeOwn(), field.current?.focus())} />}
+            <OwnCommand slash={slash} from={tab.id} profileId={chat.profileId} orchestrator={project?.orchestrator ?? null} onClose={() => (slash.closeOwn(), field.current?.focus())} />
             <textarea
               className="composer__ph"
               placeholder="Do anything… @ for a file, / for a command"

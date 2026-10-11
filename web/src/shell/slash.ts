@@ -34,8 +34,35 @@ export const picked = (command: string): string => `/${command} `
    had no way back into an earlier conversation from where you type. */
 export const OWN: readonly string[] = ['resume']
 
+/* An orchestrator's chat answers these from the sessions devpit already
+   follows: at once, and without a turn. The words are the owner's. */
+export const ORCHESTRATOR_OWN: readonly string[] = ['status', 'esperando', 'encerradas', 'retomar']
+
+/* The only one of them that takes words: which session to resume. */
+const WITH_WORDS: readonly string[] = ['retomar']
+
+/* devpit's own commands in a chat; an orchestrator's has its shortcuts too. */
+export const ownFor = (orchestrator: boolean): readonly string[] => (orchestrator ? [...OWN, ...ORCHESTRATOR_OWN] : OWN)
+
 /* The menu's list: devpit's own, then the CLI's, once each. */
-export const offeredWith = (cli: readonly string[]): readonly string[] => [
-  ...OWN,
-  ...cli.filter((one) => !OWN.includes(one)),
+export const offeredWith = (cli: readonly string[], own: readonly string[] = OWN): readonly string[] => [
+  ...own,
+  ...cli.filter((one) => !own.includes(one)),
 ]
+
+/** One of devpit's own commands, with what was typed after it. */
+export interface OwnAsked {
+  readonly name: string
+  readonly arg: string
+}
+
+/* The own command a message is, sent as typed rather than picked from the
+   menu: `/retomar api-fix`. Words after a command that takes none make it a
+   message for the agent, and so does anything that is not one of `own`. */
+export function ownAsked(prompt: string, own: readonly string[]): OwnAsked | null {
+  const match = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(prompt.trim())
+  if (!match || !own.includes(match[1]!)) return null
+  const name = match[1]!
+  const arg = (match[2] ?? '').trim()
+  return arg && !WITH_WORDS.includes(name) ? null : { name, arg }
+}

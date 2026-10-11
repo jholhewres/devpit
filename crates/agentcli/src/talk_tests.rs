@@ -19,6 +19,7 @@ fn turn(budget: Option<f64>) -> Say<'static> {
         control: None,
         on_session: None,
         add_dirs: &[],
+        name: None,
     }
 }
 
@@ -82,6 +83,7 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
         control: None,
         on_session: None,
         add_dirs: &[],
+        name: None,
     };
     // A script written a moment ago can be "text file busy" to exec while
     // another test forks with it still open, and `say` reports any failed
@@ -166,6 +168,7 @@ fn a_chat_turn_runs_under_its_profile_env() {
         control: None,
         on_session: None,
         add_dirs: &[],
+        name: None,
     };
     // Same retry as the test above, for the same reason: a script written a
     // moment ago can be "text file busy" while another test forks.
@@ -228,4 +231,22 @@ fn every_folder_it_may_reach_is_its_own_flag() {
     assert!(said.contains(&"--add-dir=/work/api".to_owned()));
     assert!(said.contains(&"--add-dir=/work/web app".to_owned()));
     assert!(!argv(&turn(None)).iter().any(|a| a.starts_with("--add-dir")));
+}
+
+/// An orchestrator's sessions report to it by name. Unnamed, the CLI makes a
+/// new one up for every process — `workspace-c9`, then `workspace-ff` — and a
+/// report sent to the old one reaches nobody.
+#[test]
+fn a_named_turn_is_started_under_that_name() {
+    let with = Say {
+        name: Some("orchestrator-workspace"),
+        ..turn(None)
+    };
+    let said = argv(&with);
+    let at = said
+        .iter()
+        .position(|a| a == "--name")
+        .expect("no name in the line");
+    assert_eq!(said[at + 1], "orchestrator-workspace");
+    assert!(!argv(&turn(None)).iter().any(|a| a == "--name"));
 }

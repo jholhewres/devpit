@@ -43,14 +43,32 @@ fn the_rules_for_sessions_go_with_every_brief() {
     assert_eq!(super::rules_in("## Rules for sessions\n\n"), None);
 
     let dir = tempfile::tempdir().expect("dir");
-    std::fs::create_dir_all(dir.path().join("context")).expect("context");
-    std::fs::write(dir.path().join("context/preferences.md"), text).expect("prefs");
-    let brief = super::briefed(dir.path(), "Fix the invoice total.");
+    let folder = dir.path().join("workspace");
+    std::fs::create_dir_all(folder.join("context")).expect("context");
+    std::fs::write(folder.join("context/preferences.md"), text).expect("prefs");
+    let brief = super::briefed(&folder, "Fix the invoice total.");
     assert_eq!(
         brief,
-        "Fix the invoice total.\n\n## Rules for sessions\n\n- Never push to main.\n- Write commit messages in English."
+        "Fix the invoice total.\n\n## Reporting back\n\nThe orchestrator that started you is `orchestrator-workspace`: SendMessage to that name to report back. It keeps the name when its chat restarts.\n\n## Rules for sessions\n\n- Never push to main.\n- Write commit messages in English."
     );
     // Too long already, it goes as it is rather than being refused.
     let long = "x".repeat(7990);
-    assert_eq!(super::briefed(dir.path(), &long), long);
+    assert_eq!(super::briefed(&folder, &long), long);
+}
+
+/// A session reports to the orchestrator by a name taken from its folder, so
+/// the address in a brief still reaches it after its chat restarted.
+#[test]
+fn a_session_is_told_the_orchestrators_lasting_name() {
+    let folder = std::path::Path::new("/home/someone/.devpit/orchestrator/claude/workspace");
+    assert_eq!(
+        crate::orchestrator::address(folder).as_deref(),
+        Some("orchestrator-workspace")
+    );
+    let brief = super::briefed(folder, "Ship it.");
+    assert!(brief.starts_with("Ship it.\n\n## Reporting back\n\n"));
+    assert!(brief.contains("SendMessage to that name"));
+    assert!(brief.contains("`orchestrator-workspace`"));
+    // Nothing to brief, nothing added.
+    assert_eq!(super::briefed(folder, "  "), "  ");
 }

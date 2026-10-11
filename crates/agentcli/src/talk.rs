@@ -45,6 +45,9 @@ pub struct Say<'a> {
     /// Folders beyond `cwd` the agent may read and work in: every project,
     /// for an orchestrator.
     pub add_dirs: &'a [String],
+    /// The name other sessions message it by. Left to the CLI, it is new
+    /// with every process, and a reply sent to the old one is lost.
+    pub name: Option<&'a str>,
     /// Where the turn's stdin is kept while it runs, for control requests.
     pub control: Option<&'a crate::control::Control>,
     /// Told the CLI's session id as soon as the stream names it, while the

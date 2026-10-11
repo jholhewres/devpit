@@ -53,7 +53,7 @@ describe('the slash menu', () => {
     await waitFor(() => expect(result.current.items).toEqual(['resume']))
     act(() => result.current.choose('resume'))
     expect(setPrompt).toHaveBeenCalledWith('')
-    expect(result.current.own).toBe('resume')
+    expect(result.current.own).toEqual({ name: 'resume', arg: '' })
     act(() => result.current.closeOwn())
     expect(result.current.own).toBeNull()
   })
@@ -67,7 +67,7 @@ describe('the slash menu', () => {
 
   it('draws the items and picks on press', () => {
     const choose = vi.fn()
-    render(<SlashMenu slash={{ items: ['compact', 'clear'], at: 1, choose, keyDown: () => false, own: null, closeOwn: vi.fn() }} />)
+    render(<SlashMenu slash={{ items: ['compact', 'clear'], at: 1, choose, keyDown: () => false, own: null, closeOwn: vi.fn(), ran: () => false }} />)
     expect(screen.getByRole('option', { name: '/clear' }).getAttribute('aria-selected')).toBe('true')
     fireEvent.mouseDown(screen.getByRole('option', { name: '/compact' }))
     expect(choose).toHaveBeenCalledWith('compact')

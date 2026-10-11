@@ -209,6 +209,22 @@
 .resume__m { font-size: 11.5px; color: var(--text-3); }
 .resume__none { padding: 14px 10px; font-size: 12.5px; color: var(--text-3); }
 
+/* An orchestrator's shortcut, answered where the slash menu opens: devpit's
+   own reading of the sessions, kept open and current until it is closed. */
+.oans { gap: 2px; padding: 6px 8px 8px; max-height: min(420px, 55vh); overflow-y: auto; scrollbar-width: thin; }
+.oans__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.oans__t { margin: 0; font: 600 12px var(--mono); color: var(--text-2); }
+.oans__g { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.oans__h { margin: 0; font-size: 11px; font-weight: 600; color: var(--text-3); }
+.oans__i { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding: 3px 4px; border-radius: 6px; font-size: 12.5px; }
+.oans__i:hover { background: var(--overlay); }
+.oans__n { font: 600 12px var(--mono); color: var(--text); }
+.oans__w { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-3); }
+.oans__s { font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
+.oans__i[data-state='waiting'] .oans__s { color: var(--warning); font-weight: 600; }
+.oans__i[data-state='busy'] .oans__s { color: var(--accent); }
+.oans__q { flex: 1 1 100%; margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--text); }
+
 /* Messages typed while a turn runs, waiting for it to end. */
 .queued { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
 .queued__o {

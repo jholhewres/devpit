@@ -284,13 +284,14 @@ pub(crate) fn interrupt(app: &AppHandle, conversation_id: &str) -> bool {
 
 fn started_as(turn: &Say<'_>) -> String {
     format!(
-        "{}|{:?}|{:?}|{:?}|{}|{}",
+        "{}|{:?}|{:?}|{:?}|{}|{}|{:?}",
         turn.command,
         turn.model,
         turn.permission,
         turn.effort,
         turn.cwd.display(),
-        turn.add_dirs.join(":")
+        turn.add_dirs.join(":"),
+        turn.name
     )
 }
 

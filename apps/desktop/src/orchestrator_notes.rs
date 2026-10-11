@@ -81,17 +81,41 @@ pub(crate) fn rules_in(text: &str) -> Option<String> {
 /// The longest brief a session is started with, rules included.
 const LONGEST_BRIEF: usize = 8000;
 
-/// A session's brief, with the person's standing rules after it — cut to
-/// what still fits, so the rules never make a brief too long to start.
+/// Whom a session reports to: the orchestrator's own name, which outlives a
+/// restart of its chat where the one the CLI makes up does not.
+pub(crate) fn report_to(folder: &Path) -> Option<String> {
+    crate::orchestrator::address(folder).map(|name| {
+        format!(
+            "The orchestrator that started you is `{name}`: SendMessage to that name to report back. It keeps the name when its chat restarts."
+        )
+    })
+}
+
+/// A session's brief, with whom to report to and the person's standing rules
+/// after it — cut to what still fits, so they never make a brief too long to
+/// start.
 pub(crate) fn briefed(folder: &Path, prompt: &str) -> String {
-    let prompt_chars = prompt.trim_end().chars().count();
-    match rules(folder) {
-        Some(rules) if !prompt.trim().is_empty() && prompt_chars + 64 < LONGEST_BRIEF => {
-            let room = LONGEST_BRIEF - prompt_chars - 64;
-            let rules: String = rules.chars().take(room).collect();
-            format!("{}\n\n## Rules for sessions\n\n{rules}", prompt.trim_end())
-        }
-        _ => prompt.to_owned(),
+    if prompt.trim().is_empty() {
+        return prompt.to_owned();
+    }
+    let mut brief = prompt.trim_end().to_owned();
+    let added = [
+        ("Reporting back", report_to(folder)),
+        ("Rules for sessions", rules(folder)),
+    ];
+    for (heading, body) in added {
+        let Some(body) = body else { continue };
+        let used = brief.chars().count() + heading.len() + 64;
+        let Some(room) = LONGEST_BRIEF.checked_sub(used).filter(|room| *room > 0) else {
+            break;
+        };
+        let body: String = body.chars().take(room).collect();
+        brief = format!("{brief}\n\n## {heading}\n\n{body}");
+    }
+    if brief == prompt.trim_end() {
+        prompt.to_owned()
+    } else {
+        brief
     }
 }
 

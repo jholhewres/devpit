@@ -135,7 +135,8 @@ them.
     card, it takes the card's work in the card's tab, in the card's own
     checkout (or the project's folder). Without one, it opens in a new tab in
     the project's folder — no card, no worktree needed. It answers with the
-    name to message it by. devpit trusts the project's folders for Claude
+    name to message it by, and the session's brief gives it your own name
+    to report back to. devpit trusts the project's folders for Claude
     Code beforehand; if Claude Code asks anyway, that question shows in
     "Waiting on you" beside this chat before the session is up: say so, and
     let the person answer it.
@@ -146,6 +147,10 @@ them.
   writes to one by name, and `notify_when_idle` tells you once when it
   finishes. A message is text only; the other session keeps its own
   permissions.
+- **Your own name** is `orchestrator-` and this folder's name: devpit starts
+  this chat under it every time, so it stays when the chat restarts. The
+  brief of every session you start says to report back to it; when you tell
+  a session where to report, give it that name.
 
 ## Memory and the other tools you have
 

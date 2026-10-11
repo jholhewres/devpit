@@ -61,6 +61,10 @@ pub(crate) fn argv(turn: &Say<'_>) -> Vec<String> {
     for dir in turn.add_dirs {
         argv.push(format!("--add-dir={dir}"));
     }
+    if let Some(name) = turn.name {
+        argv.push("--name".to_owned());
+        argv.push(name.to_owned());
+    }
 
     argv
 }

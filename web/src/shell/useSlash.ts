@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
-import { matching, offeredWith, OWN, picked, slashQuery } from './slash'
+import { matching, offeredWith, ownAsked, ownFor, picked, slashQuery, type OwnAsked } from './slash'
 import { abandoned, committed } from './typing'
 
 /*
@@ -18,30 +18,40 @@ export interface Slash {
   choose: (command: string) => void
   keyDown: (event: React.KeyboardEvent) => boolean
   /** One of devpit's own commands (`slash.OWN`), chosen and still open. */
-  readonly own: string | null
+  readonly own: OwnAsked | null
   closeOwn: () => void
+  /** Takes a message that is one of devpit's own commands: true when it did. */
+  ran: (prompt: string) => boolean
 }
 
-export function useSlash(profileId: string | null, prompt: string, setPrompt: (next: string) => void): Slash {
+export function useSlash(profileId: string | null, prompt: string, setPrompt: (next: string) => void, orchestrator = false): Slash {
   /* devpit's own commands are done here, not sent to the CLI. */
-  const [own, setOwn] = useState<string | null>(null)
+  const mine = ownFor(orchestrator)
+  const [own, setOwn] = useState<OwnAsked | null>(null)
   const [known, setKnown] = useState<readonly string[]>([])
   const [at, setAt] = useState(0)
   const [dismissed, setDismissed] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!profileId) return setKnown(OWN)
-    void ask(() => commands.chatSlashCommands(profileId)).then((answer) => setKnown(offeredWith(answer.data ?? [])))
-  }, [profileId])
+    const ours = ownFor(orchestrator)
+    if (!profileId) return setKnown(ours)
+    void ask(() => commands.chatSlashCommands(profileId)).then((answer) => setKnown(offeredWith(answer.data ?? [], ours)))
+  }, [profileId, orchestrator])
 
   const query = slashQuery(prompt)
   const items = query === null || prompt === dismissed ? [] : matching(known, query)
   useEffect(() => setAt(0), [query])
 
   const choose = (command: string): void => {
-    if (!OWN.includes(command)) return setPrompt(picked(command))
+    if (!mine.includes(command)) return setPrompt(picked(command))
     setPrompt('')
-    setOwn(command)
+    setOwn({ name: command, arg: '' })
+  }
+
+  const ran = (text: string): boolean => {
+    const asked = ownAsked(text, mine)
+    if (asked) setOwn(asked)
+    return asked !== null
   }
 
   const keyDown = (event: React.KeyboardEvent): boolean => {
@@ -69,5 +79,5 @@ export function useSlash(profileId: string | null, prompt: string, setPrompt: (n
     return false
   }
 
-  return { items, at, choose, keyDown, own, closeOwn: () => setOwn(null) }
+  return { items, at, choose, keyDown, own, closeOwn: () => setOwn(null), ran }
 }
