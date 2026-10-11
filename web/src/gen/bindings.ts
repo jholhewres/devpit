@@ -559,10 +559,15 @@ export const commands = {
 	hubStatus: () => typedError<HubStatus, RpcError>(__TAURI_INVOKE("hub_status")),
 	/**  `hub.set` — whether notices go through devpit.app, and whether they name things. */
 	hubSet: (on: boolean, titles: boolean) => typedError<HubStatus, RpcError>(__TAURI_INVOKE("hub_set", { on, titles })),
-	/**  `calendar.link` — the calendar's path on the Remote, made the first time. */
-	calendarLink: () => typedError<CalendarLink, RpcError>(__TAURI_INVOKE("calendar_link")),
-	/**  `calendar.renew` — a new address; the old one stops answering. */
-	calendarRenew: () => typedError<CalendarLink, RpcError>(__TAURI_INVOKE("calendar_renew")),
+	/**  `calendar.read` */
+	calendarRead: () => typedError<CalendarFeed, RpcError>(__TAURI_INVOKE("calendar_read")),
+	/**
+	 *  `calendar.set` — the calendar on devpit.app on or off, and whether its
+	 *  events name the card. Off ends the address and the events there.
+	 */
+	calendarSet: (on: boolean, titles: boolean) => typedError<CalendarFeed, RpcError>(__TAURI_INVOKE("calendar_set", { on, titles })),
+	/**  `calendar.reset` — a new address; the old one stops answering at once. */
+	calendarReset: () => typedError<CalendarFeed, RpcError>(__TAURI_INVOKE("calendar_reset")),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -1944,9 +1949,17 @@ export type Branches = {
 	branches: Branch[],
 };
 
-/**  The calendar's path on the Remote, with its secret. */
-export type CalendarLink = {
-	path: string,
+/**
+ *  Card dates and reminders as a calendar on devpit.app, for a calendar app
+ *  to subscribe to.
+ */
+export type CalendarFeed = {
+	/**  The address with its secret, while there is one. */
+	link: string | null,
+	/**  Whether events name the card and project, or only that something is due. */
+	titles: boolean,
+	/**  Signed in to devpit.app on this machine, which the feed needs. */
+	signedIn: boolean,
 };
 
 /**  How a tool call ended, or that it has not. */
@@ -2144,6 +2157,12 @@ export type ChannelInfo = {
 export type ChannelRoute = {
 	event: ChannelEvent,
 	channels: string[],
+	/**
+	 *  Minutes a notice waits for the person on one channel before it moves
+	 *  to the next — push, then Telegram, then e-mail. None sends it to
+	 *  every channel at once.
+	 */
+	escalateAfter?: number | null,
 };
 
 export type ChannelRules = {
@@ -2156,6 +2175,11 @@ export type ChannelRules = {
 export type Channels = {
 	connected: ChannelInfo[],
 	rules: ChannelRules,
+	/**
+	 *  The events devpit can tell were dealt with, so a notice about them can
+	 *  move on to the next channel while nobody does.
+	 */
+	escalates: ChannelEvent[],
 };
 
 /**

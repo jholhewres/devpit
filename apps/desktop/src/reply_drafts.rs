@@ -44,6 +44,10 @@ pub(crate) fn draft(profile: &str, name: &str, text: &str) -> Result<(), String>
             session: name.to_owned(),
         }],
         asking: None,
+        about: Some(crate::channel_escalation::About::Draft {
+            profile: profile.to_owned(),
+            session: name.to_owned(),
+        }),
     });
     Ok(())
 }

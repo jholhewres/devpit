@@ -58,6 +58,8 @@ pub(crate) fn label(action: &Action) -> String {
 
 /// Does what a button asks, here, as the person on `channel`; answers what happened.
 pub(crate) fn act(action: &Action, channel: &str) -> String {
+    // Pressed is acted on, whatever comes of it: the notice stops moving on.
+    crate::channel_escalation::acted(action);
     let now = devpit_core::reports::now() as i64;
     let done = match action {
         Action::SendDraft { profile, session } => {

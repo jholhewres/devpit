@@ -1,6 +1,83 @@
 use devpit_rpc::{ChannelEvent, QuietHours};
 
-use super::{defaults, grouped, local, quiet, routed};
+use super::{
+    climb, defaults, escalation, grouped, ladder, local, next_rung, quiet, routed, Climb, Rung,
+    ESCALATE_MINUTES,
+};
+
+const EVERY_RUNG: [Rung; 3] = [Rung::Push, Rung::Telegram, Rung::Email];
+
+fn both() -> Vec<String> {
+    vec![crate::telegram::ID.to_owned(), crate::hub::ID.to_owned()]
+}
+
+#[test]
+fn a_notice_moves_from_push_to_telegram_to_email() {
+    let all = ladder(&both(), &EVERY_RUNG);
+    assert_eq!(all, EVERY_RUNG);
+    assert_eq!(next_rung(&all, None), Some(Rung::Push));
+    assert_eq!(next_rung(&all, Some(Rung::Push)), Some(Rung::Telegram));
+    assert_eq!(next_rung(&all, Some(Rung::Telegram)), Some(Rung::Email));
+    assert_eq!(next_rung(&all, Some(Rung::Email)), None);
+}
+
+#[test]
+fn a_channel_not_set_up_or_not_ticked_is_skipped() {
+    // No push device: Telegram first, then e-mail.
+    let no_push = ladder(&both(), &[Rung::Telegram, Rung::Email]);
+    assert_eq!(next_rung(&no_push, None), Some(Rung::Telegram));
+    assert_eq!(next_rung(&no_push, Some(Rung::Telegram)), Some(Rung::Email));
+    // No Telegram: push straight to e-mail.
+    let no_telegram = ladder(&both(), &[Rung::Push, Rung::Email]);
+    assert_eq!(next_rung(&no_telegram, Some(Rung::Push)), Some(Rung::Email));
+    // Ticked for Telegram alone: nothing above it.
+    let telegram = ladder(&[crate::telegram::ID.to_owned()], &EVERY_RUNG);
+    assert_eq!(telegram, [Rung::Telegram]);
+    assert_eq!(next_rung(&telegram, Some(Rung::Telegram)), None);
+}
+
+#[test]
+fn a_notice_waits_its_minutes_on_a_channel_then_moves_on() {
+    let all = ladder(&both(), &EVERY_RUNG);
+    let sent = 1_000;
+    assert_eq!(
+        climb(false, &all, Rung::Push, sent, 10, sent + 10 * 60 - 1),
+        Climb::Wait
+    );
+    assert_eq!(
+        climb(false, &all, Rung::Push, sent, 10, sent + 10 * 60),
+        Climb::Send(Rung::Telegram)
+    );
+    assert_eq!(
+        climb(false, &all, Rung::Email, sent, 10, sent + 60 * 60),
+        Climb::Stop,
+        "nothing above e-mail"
+    );
+}
+
+#[test]
+fn acting_stops_the_notice_where_it_is() {
+    let all = ladder(&both(), &EVERY_RUNG);
+    assert_eq!(climb(true, &all, Rung::Push, 0, 10, 0), Climb::Stop);
+    assert_eq!(climb(true, &all, Rung::Push, 0, 10, 99_999), Climb::Stop);
+}
+
+#[test]
+fn only_what_devpit_sees_dealt_with_moves_on_and_each_rule_has_its_minutes() {
+    let mut rules = defaults(&both());
+    assert_eq!(
+        escalation(&rules, ChannelEvent::SessionWaiting),
+        Some(ESCALATE_MINUTES)
+    );
+    assert_eq!(escalation(&rules, ChannelEvent::SessionDone), None);
+    for route in &mut rules.routes {
+        route.escalate_after = Some(30);
+    }
+    assert_eq!(escalation(&rules, ChannelEvent::SessionDone), Some(30));
+    // Nothing tells devpit a failed step or a restarted MCP was dealt with.
+    assert_eq!(escalation(&rules, ChannelEvent::StepFailed), None);
+    assert_eq!(escalation(&rules, ChannelEvent::McpRestarted), None);
+}
 
 fn connected() -> Vec<String> {
     vec!["telegram".to_owned(), "email".to_owned()]

@@ -109,6 +109,10 @@ pub(crate) fn changed(app: &tauri::AppHandle, session: &IslandSession, was: Opti
             )),
             _ => None,
         },
+        about: Some(crate::channel_escalation::About::Session {
+            id: session.session_id.clone(),
+            state: session.state,
+        }),
     });
     let project = session.project_id.clone();
     let app = app.clone();
@@ -135,6 +139,8 @@ pub(crate) fn asked(app: &tauri::AppHandle, tool: &str, input: &str) {
         bare: "An agent is asking for a permission.".to_owned(),
         actions: Vec::new(),
         asking: None,
+        // Held two minutes at most; the session's own waiting notice moves on.
+        about: None,
     });
     let app = app.clone();
     std::thread::spawn(move || {

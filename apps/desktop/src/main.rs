@@ -68,6 +68,7 @@ mod card_work;
 mod cards;
 mod chaining;
 mod channel_actions;
+mod channel_escalation;
 mod channel_rules;
 mod channels;
 mod chat;
@@ -358,6 +359,8 @@ fn main() {
             telegram::listen(app.handle());
             // Buttons pressed on devpit.app's channels, done here.
             hub::listen();
+            // Card dates on devpit.app's calendar, when it is on.
+            calendar::keep_sent();
             // The window rebuilt around a container that can hold a page
             // *beside* the app rather than under it. Done now, while the
             // window has exactly one webview in it, so the swap has nothing to

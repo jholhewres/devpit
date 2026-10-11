@@ -94,5 +94,7 @@ pub const CHANNEL_RULES: &str = "channels.rules";
 pub const CHANNEL_HUB: &str = "channels.hub";
 /// Whether those notices name what they are about. Off unless turned on.
 pub const CHANNEL_HUB_TITLES: &str = "channels.hub_titles";
-/// The secret in the calendar's address, served by the Remote. Absent until asked for.
-pub const CALENDAR_TOKEN: &str = "remote.calendar_token";
+/// The calendar's address on devpit.app, with its secret. Absent until turned on.
+pub const CALENDAR_LINK: &str = "calendar.link";
+/// Whether the calendar's events name the card and project. Off unless turned on.
+pub const CALENDAR_TITLES: &str = "calendar.titles";

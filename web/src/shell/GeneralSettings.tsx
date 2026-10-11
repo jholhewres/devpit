@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import type { IslandDrawn } from '../gen/bindings'
+import { CalendarSettings } from './CalendarSettings'
 import { DeskSettings } from './DeskSettings'
 import { ErrorReportsPreview } from './ErrorReportsPreview'
 import { commands } from './live'
@@ -64,6 +65,7 @@ export function GeneralSettings({ on, set }: { on: (field: Flag) => boolean; set
 
       <div className="acc__sub">Other devices</div>
       <RemoteSettings />
+      <CalendarSettings />
 
       <div className="acc__sub">Updates and privacy</div>
       <PrefSwitch on={on('automaticUpdates')} onFlip={flip('automaticUpdates')} title="Automatic updates" said="Check in the background and offer to install." />

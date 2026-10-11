@@ -3,6 +3,7 @@
 //! to be done. What goes is what the person chose to say — by default only
 //! that something waits — and the buttons as keys only this machine reads.
 
+use std::sync::Mutex;
 use std::time::Duration;
 
 use devpit_core::preference;
@@ -44,8 +45,9 @@ pub(crate) fn titles() -> bool {
     flag(preference::CHANNEL_HUB_TITLES)
 }
 
-/// Posts a notice to the hub.
-pub(crate) fn send(text: &str, offered: &[Action]) {
+/// Posts a notice to the hub, on the channels in `via` — `push`, `email` —
+/// or on every one when none is named.
+pub(crate) fn send(text: &str, offered: &[Action], via: &[&str]) {
     let Some(token) = crate::account::token::read() else {
         return;
     };
@@ -53,7 +55,7 @@ pub(crate) fn send(text: &str, offered: &[Action]) {
         .iter()
         .map(|action| json!({ "action": crate::channel_actions::remember(action), "label": crate::channel_actions::label(action) }))
         .collect();
-    let body = json!({ "text": text, "buttons": buttons });
+    let body = json!({ "text": text, "buttons": buttons, "via": via });
     tauri::async_runtime::spawn(async move {
         let sent = match crate::account::client() {
             Ok(client) => client
@@ -78,11 +80,28 @@ pub(crate) fn send(text: &str, offered: &[Action]) {
 #[derive(Deserialize)]
 struct Pending {
     pressed: Vec<Pressed>,
+    /// Absent from a devpit.app that predates it.
+    #[serde(default)]
+    reach: Option<Reach>,
 }
 
 #[derive(Deserialize)]
 struct Pressed {
     action: String,
+}
+
+/// Which of the account's channels a notice would reach, as devpit.app said.
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub(crate) struct Reach {
+    pub push: bool,
+    pub email: bool,
+}
+
+static REACH: Mutex<Option<Reach>> = Mutex::new(None);
+
+/// What devpit.app last said a notice would reach; none until it has said.
+pub(crate) fn reach() -> Option<Reach> {
+    REACH.lock().ok().and_then(|held| *held)
 }
 
 /// Picks up the buttons pressed on the person's channels and does them here,
@@ -110,6 +129,9 @@ pub(crate) fn listen() {
             let Ok(pending) = answer.json::<Pending>().await else {
                 continue;
             };
+            if let (Some(said), Ok(mut held)) = (pending.reach, REACH.lock()) {
+                *held = Some(said);
+            }
             for pressed in pending.pressed {
                 // A key from before a restart names nothing: that button has expired.
                 if let Some(action) = crate::channel_actions::take(&pressed.action) {

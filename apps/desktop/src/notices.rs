@@ -143,6 +143,7 @@ pub fn run_ended(app: &tauri::AppHandle, store: &Store, card_id: &str, step: &st
             bare: "A step failed.".to_owned(),
             actions: Vec::new(),
             asking: None,
+            about: None,
         });
     }
     ring(

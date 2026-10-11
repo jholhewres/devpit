@@ -55,6 +55,7 @@ pub(crate) fn changed(app: &AppHandle) {
     rearm();
     let _ = app.emit(CHANGED, ());
     crate::tray::refresh_soon();
+    crate::calendar::nudge();
 }
 
 /// Whether reminders go off. On unless the person turned them off.
@@ -164,6 +165,10 @@ fn tell(app: &AppHandle, store: &Store, fired: &[ReminderRow]) {
                 },
             ],
             asking: None,
+            about: Some(crate::channel_escalation::About::Reminder {
+                card_id: one.card_id.clone(),
+                due_at: one.due_at,
+            }),
         });
     }
     if crate::island_notify::in_front(app) {

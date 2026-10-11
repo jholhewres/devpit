@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { ChannelRules, Channels } from '../gen/bindings'
-import { clock, EVENTS, flipped, minutes, offsetNow } from './channelRules'
+import { clock, ESCALATE_CHOICES, escalated, EVENTS, flipped, minutes, offsetNow } from './channelRules'
 import { ask, commands } from './live'
 import { PlusLink } from './PlusLink'
 import { HubSetup } from './HubSetup'
@@ -44,6 +44,7 @@ export function ChannelsPane(): React.JSX.Element {
                 {connected.map((one) => (
                   <th key={one.id}>{one.label}</th>
                 ))}
+                <th>If nobody acts</th>
               </tr>
             </thead>
             <tbody>
@@ -60,10 +61,30 @@ export function ChannelsPane(): React.JSX.Element {
                       />
                     </td>
                   ))}
+                  <td>
+                    {channels.escalates.includes(event) && (
+                      <select
+                        aria-label={`${label}: if nobody acts`}
+                        value={String(rules.routes.find((route) => route.event === event)?.escalateAfter ?? '')}
+                        onChange={(change) => save(escalated(rules, event, change.target.value ? Number(change.target.value) : null))}
+                      >
+                        {ESCALATE_CHOICES.map((choice) => (
+                          <option key={String(choice)} value={choice ?? ''}>
+                            {choice === null ? 'Every channel at once' : `Next channel after ${choice} min`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <p className="acc__note">
+            With a delay, a notice goes to its first channel — push, then Telegram, then e-mail — and moves to the next while nobody answers the session, sends
+            the draft, deals with the reminder or presses one of its buttons. Channels you have not set up are skipped. It moves on from this computer: while it
+            is off or asleep, nothing moves on.
+          </p>
 
           <div className="acc__sub">Quiet hours</div>
           <div className="pref">

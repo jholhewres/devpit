@@ -1,4 +1,4 @@
-import type { ChannelEvent, ChannelRules } from '../gen/bindings'
+import type { ChannelEvent, ChannelRoute, ChannelRules } from '../gen/bindings'
 
 /* The events the screen lists, in this order, with what a person reads. */
 export const EVENTS: ReadonlyArray<readonly [ChannelEvent, string]> = [
@@ -11,17 +11,28 @@ export const EVENTS: ReadonlyArray<readonly [ChannelEvent, string]> = [
   ['mcp_restarted', 'devpit’s MCP was restarted'],
 ]
 
+/** Every event's route, in the screen's order, one made up where none was kept. */
+const every = (rules: ChannelRules): ChannelRoute[] =>
+  EVENTS.map(([one]) => rules.routes.find((route) => route.event === one) ?? { event: one, channels: [], escalateAfter: null })
+
 /** `rules` with `channel` switched on or off for `event`. */
 export function flipped(rules: ChannelRules, event: ChannelEvent, channel: string, on: boolean): ChannelRules {
-  const routes = EVENTS.map(([one]) => rules.routes.find((route) => route.event === one) ?? { event: one, channels: [] })
   return {
     ...rules,
-    routes: routes.map((route) =>
+    routes: every(rules).map((route) =>
       route.event !== event
         ? route
         : { ...route, channels: on ? [...new Set([...route.channels, channel])] : route.channels.filter((one) => one !== channel) },
     ),
   }
+}
+
+/** The minutes a notice waits per channel before it moves on; null is every channel at once. */
+export const ESCALATE_CHOICES: ReadonlyArray<number | null> = [null, 5, 10, 15, 30, 60]
+
+/** `rules` with `event` moving on after `minutes`, or going everywhere at once. */
+export function escalated(rules: ChannelRules, event: ChannelEvent, minutes: number | null): ChannelRules {
+  return { ...rules, routes: every(rules).map((route) => (route.event !== event ? route : { ...route, escalateAfter: minutes })) }
 }
 
 /** "22:00" as minutes since midnight, and back. */

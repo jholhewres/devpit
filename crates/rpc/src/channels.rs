@@ -32,6 +32,11 @@ pub enum ChannelEvent {
 pub struct ChannelRoute {
     pub event: ChannelEvent,
     pub channels: Vec<String>,
+    /// Minutes a notice waits for the person on one channel before it moves
+    /// to the next — push, then Telegram, then e-mail. None sends it to
+    /// every channel at once.
+    #[serde(default)]
+    pub escalate_after: Option<u32>,
 }
 
 /// Hours nothing is sent, but a reminder.
@@ -70,6 +75,9 @@ pub struct ChannelInfo {
 pub struct Channels {
     pub connected: Vec<ChannelInfo>,
     pub rules: ChannelRules,
+    /// The events devpit can tell were dealt with, so a notice about them can
+    /// move on to the next channel while nobody does.
+    pub escalates: Vec<ChannelEvent>,
 }
 
 /// The person's Telegram bot, as the screen shows it: never its token.
@@ -97,9 +105,15 @@ pub struct HubStatus {
     pub signed_in: bool,
 }
 
-/// The calendar's path on the Remote, with its secret.
+/// Card dates and reminders as a calendar on devpit.app, for a calendar app
+/// to subscribe to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct CalendarLink {
-    pub path: String,
+pub struct CalendarFeed {
+    /// The address with its secret, while there is one.
+    pub link: Option<String>,
+    /// Whether events name the card and project, or only that something is due.
+    pub titles: bool,
+    /// Signed in to devpit.app on this machine, which the feed needs.
+    pub signed_in: bool,
 }

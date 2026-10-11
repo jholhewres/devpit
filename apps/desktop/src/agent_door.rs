@@ -97,6 +97,7 @@ fn check(app: &AppHandle) -> AgentHealth {
                 bare: "devpit's MCP was restarted.".to_owned(),
                 actions: Vec::new(),
                 asking: None,
+                about: None,
             });
             crate::notices::ring(
                 app,

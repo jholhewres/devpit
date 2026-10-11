@@ -61,7 +61,7 @@ pub use card::{
     DeleteRefusal, Notice, Notices, Pinned, Played,
 };
 pub use channels::{
-    CalendarLink, ChannelEvent, ChannelInfo, ChannelRoute, ChannelRules, Channels, HubStatus,
+    CalendarFeed, ChannelEvent, ChannelInfo, ChannelRoute, ChannelRules, Channels, HubStatus,
     QuietHours, TelegramStatus,
 };
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};

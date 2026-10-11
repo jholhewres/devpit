@@ -1,6 +1,8 @@
 //! What happens in devpit, told on the person's channels while they are away
 //! from it: which events go where is `channel_rules`; this gathers them for a
-//! moment, so five sessions ending at once are one message, and sends.
+//! moment, so five sessions ending at once are one message, and sends. A
+//! notice whose rule moves it along goes to its first channel alone, and
+//! `channel_escalation` takes it from there.
 //!
 //! Only when devpit's window is not in front and nothing is paused — the bell
 //! and the island already say it to someone looking.
@@ -11,6 +13,9 @@ use std::time::Duration;
 
 use devpit_core::preference;
 use devpit_rpc::{ChannelEvent, ChannelInfo, ChannelRules, Channels, RpcError};
+
+use crate::channel_escalation::About;
+use crate::channel_rules::Rung;
 
 /// A button under a message, and what it does back on this machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +53,8 @@ pub(crate) struct Told {
     /// The terminal of a session waiting on a question: its choices become
     /// buttons when the notice goes, by then drawn on its screen.
     pub asking: Option<String>,
+    /// What it is about, when devpit can tell it was dealt with.
+    pub about: Option<About>,
 }
 
 fn queue() -> &'static Mutex<Vec<Told>> {
@@ -67,6 +74,10 @@ fn connected() -> Vec<ChannelInfo> {
 
 fn ids(connected: &[ChannelInfo]) -> Vec<String> {
     connected.iter().map(|one| one.id.clone()).collect()
+}
+
+pub(crate) fn connected_ids() -> Vec<String> {
+    ids(&connected())
 }
 
 /// The rules the person set, or the defaults for what is connected.
@@ -104,7 +115,7 @@ pub(crate) fn emit(told: Told) {
 }
 
 /// Sends a gathered batch: per channel, one message, with buttons only when
-/// it is about one thing.
+/// it is about one thing. A notice that moves along goes to its first channel.
 fn deliver(batch: &[Told]) {
     // Someone looking at devpit has the bell and the island.
     if crate::telegram::app()
@@ -115,48 +126,100 @@ fn deliver(batch: &[Told]) {
     }
     let rules = rules();
     let channels = connected();
+    let now = devpit_core::reports::now() as i64;
     let offset = rules.quiet.as_ref().map_or(0, |hours| hours.offset_minutes);
-    let (weekday, minute) = crate::channel_rules::local(devpit_core::reports::now() as i64, offset);
+    let (weekday, minute) = crate::channel_rules::local(now, offset);
+    let routed = |one: &Told| {
+        crate::channel_rules::routed(&rules, one.event, &ids(&channels), weekday, minute)
+    };
+    let set_up = crate::channel_escalation::set_up();
+    let mut climbing: Vec<(Rung, &Told)> = Vec::new();
+    let mut at_once: Vec<&Told> = Vec::new();
+    // One with nothing devpit can watch still goes to the first channel alone.
+    for one in batch {
+        let first = crate::channel_rules::escalation(&rules, one.event).and_then(|_| {
+            crate::channel_rules::next_rung(
+                &crate::channel_rules::ladder(&routed(one), &set_up),
+                None,
+            )
+        });
+        match first {
+            Some(rung) => climbing.push((rung, one)),
+            None => at_once.push(one),
+        }
+    }
     for channel in &channels {
-        let mine: Vec<&Told> = batch
+        let mine: Vec<&Told> = at_once
             .iter()
-            .filter(|one| {
-                crate::channel_rules::routed(&rules, one.event, &ids(&channels), weekday, minute)
-                    .contains(&channel.id)
-            })
+            .copied()
+            .filter(|one| routed(one).contains(&channel.id))
             .collect();
         let titles = if channel.id == crate::hub::ID {
             crate::hub::titles()
         } else {
             crate::telegram::titles()
         };
-        let lines: Vec<String> = mine
-            .iter()
-            .map(|one| {
-                if titles {
-                    one.line.clone()
-                } else {
-                    one.bare.clone()
-                }
-            })
-            .collect();
-        let Some(text) = crate::channel_rules::grouped(&lines) else {
+        let Some((text, actions)) = message(&mine, titles) else {
             continue;
-        };
-        let actions = match mine.as_slice() {
-            [one] => one
-                .actions
-                .iter()
-                .cloned()
-                .chain(choices(one.asking.as_deref()))
-                .collect(),
-            _ => Vec::new(),
         };
         match channel.id.as_str() {
             crate::telegram::ID => crate::telegram::send(&text, &actions),
-            crate::hub::ID => crate::hub::send(&text, &actions),
+            crate::hub::ID => crate::hub::send(&text, &actions, &[]),
             _ => {}
         }
+    }
+    for rung in [Rung::Push, Rung::Telegram, Rung::Email] {
+        let mine: Vec<&Told> = climbing
+            .iter()
+            .filter(|(on, _)| *on == rung)
+            .map(|(_, one)| *one)
+            .collect();
+        send_on(rung, &mine);
+        for one in mine {
+            crate::channel_escalation::start(one.clone(), rung, now);
+        }
+    }
+}
+
+/// One message for what goes on a channel together: named when `titles`,
+/// and with buttons only when it is about one thing.
+fn message(mine: &[&Told], titles: bool) -> Option<(String, Vec<Action>)> {
+    let lines: Vec<String> = mine
+        .iter()
+        .map(|one| {
+            if titles {
+                one.line.clone()
+            } else {
+                one.bare.clone()
+            }
+        })
+        .collect();
+    let text = crate::channel_rules::grouped(&lines)?;
+    let actions = match mine {
+        [one] => one
+            .actions
+            .iter()
+            .cloned()
+            .chain(choices(one.asking.as_deref()))
+            .collect(),
+        _ => Vec::new(),
+    };
+    Some((text, actions))
+}
+
+/// Tells `mine` on one rung: push and e-mail through devpit.app, each alone.
+pub(crate) fn send_on(rung: Rung, mine: &[&Told]) {
+    let titles = match rung {
+        Rung::Telegram => crate::telegram::titles(),
+        Rung::Push | Rung::Email => crate::hub::titles(),
+    };
+    let Some((text, actions)) = message(mine, titles) else {
+        return;
+    };
+    match rung {
+        Rung::Push => crate::hub::send(&text, &actions, &["push"]),
+        Rung::Telegram => crate::telegram::send(&text, &actions),
+        Rung::Email => crate::hub::send(&text, &actions, &["email"]),
     }
 }
 
@@ -184,13 +247,18 @@ fn choices(target: Option<&str>) -> Vec<Action> {
 #[tauri::command]
 #[specta::specta]
 pub async fn channels_read() -> Result<Channels, RpcError> {
-    crate::off_main::blocking(|| {
-        Ok(Channels {
-            connected: connected(),
-            rules: rules(),
-        })
-    })
-    .await
+    crate::off_main::blocking(|| Ok(now())).await
+}
+
+fn now() -> Channels {
+    Channels {
+        connected: connected(),
+        rules: rules(),
+        escalates: crate::channel_rules::EVENTS
+            .into_iter()
+            .filter(|&event| crate::channel_rules::escalates(event))
+            .collect(),
+    }
 }
 
 /// `channels.rules_set` — which events go where, quiet hours, grouping.
@@ -201,10 +269,7 @@ pub async fn channels_rules_set(rules: ChannelRules) -> Result<Channels, RpcErro
         let text =
             serde_json::to_string(&rules).map_err(|err| RpcError::internal(err.to_string()))?;
         crate::projects::store()?.set_preference(preference::CHANNEL_RULES, &text)?;
-        Ok(Channels {
-            connected: connected(),
-            rules: crate::channels::rules(),
-        })
+        Ok(now())
     })
     .await
 }
