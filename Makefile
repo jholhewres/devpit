@@ -174,7 +174,7 @@ fmt: ## Format the tree
 
 clean: ## Remove build output
 	cargo clean
-	rm -rf web/dist web/dist-sourcemaps
+	rm -rf web/dist web/dist-sourcemaps web/dist-relay web/dist-relay-sourcemaps
 
 # Targets needing JS deps depend on this, so a fresh clone fails with the
 # install rather than with "tauri: not found".

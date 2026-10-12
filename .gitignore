@@ -13,7 +13,8 @@
 node_modules/
 dist/
 dist-ssr/
-dist-sourcemaps/
+dist-relay/
+dist*-sourcemaps/
 .vite/
 *.local
 
