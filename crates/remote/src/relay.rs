@@ -186,6 +186,16 @@ impl Relay {
         Ok(Control { socket })
     }
 
+    /// A device's way to this machine, from somewhere else: the relay joins
+    /// it to the splice the machine opens for it. A bearer token, not a
+    /// browser's cookie, so no page origin is asked for.
+    pub fn view(&self) -> Result<Socket, RelayError> {
+        if !id_ok(&self.host) {
+            return Err(RelayError::BadId);
+        }
+        self.open(&format!("/v1/relay/view?host={}", self.host))
+    }
+
     /// This machine's side of splice `id`, for the relay to join to the
     /// device waiting under it.
     pub fn splice(&self, id: &str) -> Result<Socket, RelayError> {

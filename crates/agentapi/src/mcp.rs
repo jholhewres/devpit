@@ -29,7 +29,7 @@ pub(crate) struct Tool {
     pub(crate) input: fn() -> Value,
 }
 
-const TOOLS: [Tool; 32] = [
+pub(crate) const TOOLS: [Tool; 32] = [
     Tool {
         name: "devpit_context",
         method: "context",

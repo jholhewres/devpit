@@ -5,7 +5,8 @@
 //! made. Both post to the listener's `/agent` route through the same door the
 //! hooks use — the endpoint and the secret read off disk on every call — so a
 //! restarted app is found at its new port, and nothing is written into any
-//! tool's own configuration to make this work.
+//! tool's own configuration to make this work. What a client on another
+//! machine is offered, through the relay, is `remote_mcp`.
 //!
 //! No dependency on the rest of the app: the caller hands over where devpit
 //! keeps its state, and everything else is a socket and some JSON.
@@ -18,6 +19,7 @@ pub mod events;
 pub mod guide;
 pub mod hook;
 pub mod mcp;
+pub mod remote_mcp;
 pub mod skills;
 mod slim;
 

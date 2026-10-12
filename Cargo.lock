@@ -1182,6 +1182,7 @@ dependencies = [
 name = "devpit-remote"
 version = "0.1.40"
 dependencies = [
+ "devpit-agentapi",
  "rustls",
  "rustls-platform-verifier",
  "serde",

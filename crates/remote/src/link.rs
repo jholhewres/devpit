@@ -20,6 +20,9 @@ pub enum LinkError {
     NotAFrame,
     /// The connection ended.
     Gone,
+    /// The relay closed it with a code that says why: 4401 sign in, 4404 the
+    /// machine is not connected, 4408 the other end left.
+    Closed(u16),
 }
 
 impl std::fmt::Display for LinkError {
@@ -30,6 +33,7 @@ impl std::fmt::Display for LinkError {
             LinkError::Late => f.write_str("the handshake did not finish in time"),
             LinkError::NotAFrame => f.write_str("something other than a binary frame"),
             LinkError::Gone => f.write_str("the connection ended"),
+            LinkError::Closed(code) => write!(f, "the relay closed the connection ({code})"),
         }
     }
 }
@@ -56,6 +60,14 @@ pub struct Link<S: Read + Write> {
     session: Session,
 }
 
+/// A close as the relay meant it: its code when it gave one of its own.
+fn closed(frame: Option<tungstenite::protocol::CloseFrame>) -> LinkError {
+    match frame.map(|frame| u16::from(frame.code)) {
+        Some(code) if (4000..5000).contains(&code) => LinkError::Closed(code),
+        _ => LinkError::Gone,
+    }
+}
+
 fn waiting(err: &tungstenite::Error) -> bool {
     matches!(err, tungstenite::Error::Io(io) if matches!(io.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut))
 }
@@ -75,7 +87,7 @@ fn frame_by<S: Read + Write>(
             Ok(Message::Binary(frame)) => return Ok(frame.to_vec()),
             Ok(Message::Ping(_) | Message::Pong(_) | Message::Frame(_)) => {}
             Ok(Message::Text(_)) => return Err(LinkError::NotAFrame),
-            Ok(Message::Close(_)) => return Err(LinkError::Gone),
+            Ok(Message::Close(frame)) => return Err(closed(frame)),
             Err(err) if waiting(&err) => {}
             Err(_) => return Err(LinkError::Gone),
         }
@@ -159,7 +171,7 @@ impl<S: Read + Write> Link<S> {
             }),
             Ok(Message::Ping(_) | Message::Pong(_) | Message::Frame(_)) => Ok(Heard::Alive),
             Ok(Message::Text(_)) => Err(LinkError::NotAFrame),
-            Ok(Message::Close(_)) => Err(LinkError::Gone),
+            Ok(Message::Close(frame)) => Err(closed(frame)),
             Err(err) if waiting(&err) => Ok(Heard::Nothing),
             Err(_) => Err(LinkError::Gone),
         }
