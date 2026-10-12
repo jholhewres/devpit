@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 33] = [
+pub(crate) const METHODS: [&str; 37] = [
     "context",
     "board",
     "card",
@@ -76,6 +76,10 @@ pub(crate) const METHODS: [&str; 33] = [
     "resume",
     "decide",
     "rubric_run",
+    "devflow_offer",
+    "devflow_status",
+    "devflow_setup",
+    "devflow_set",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -298,6 +302,9 @@ fn respond_in(
     }
     let project = reached(projects, here, text("project").as_deref())?;
     crate::orchestrator_links::reaches(here, project)?;
+    if crate::devflow::METHODS.contains(&asked.method.as_str()) {
+        return crate::devflow::respond(app, &asked.method, project, &asked.params);
+    }
     if crate::agent_decide::METHODS.contains(&asked.method.as_str()) {
         return crate::agent_decide::respond(
             &asked.method,

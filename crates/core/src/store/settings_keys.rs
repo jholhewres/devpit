@@ -88,6 +88,14 @@ pub const DECISIONS_DAILY_CAP: &str = "decisions.daily_cap_usd";
 pub const DECISIONS_OPTED_OUT: &str = "decisions.opted_out";
 /// The gates that enforce, as a JSON object of gate to mode. Shadow unless named.
 pub const DECISIONS_MODES: &str = "decisions.modes";
+/// Whether Devflow is offered to any project at all. On unless turned off.
+pub const DEVFLOW: &str = "devflow.enabled";
+/// The projects whose Devflow the person switched on on this machine, as a
+/// JSON array. A devflow.yaml saying `enabled: true` is not a click.
+pub const DEVFLOW_ON: &str = "devflow.switched_on";
+/// The projects whose Devflow Decisions the person moved to enforce, as a
+/// JSON array.
+pub const DEVFLOW_ENFORCED: &str = "devflow.enforced";
 /// Which events reach which channels, quiet hours and grouping, as JSON.
 pub const CHANNEL_RULES: &str = "channels.rules";
 /// Whether notices also go through devpit.app's hub (e-mail, push). Off unless turned on.

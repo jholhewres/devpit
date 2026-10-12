@@ -8,6 +8,28 @@ fn reply(line: &str, ask: &dyn Fn(&str, Value) -> Result<Value, String>) -> Valu
     serde_json::from_str(&handle(line, ask).expect("an answer")).expect("json")
 }
 
+fn offering(
+    line: &str,
+    offer: &Offer,
+    ask: &dyn Fn(&str, Value) -> Result<Value, String>,
+) -> Value {
+    serde_json::from_str(&handle_offering(line, ask, true, offer).expect("an answer"))
+        .expect("json")
+}
+
+fn listed(offer: &Offer) -> Vec<String> {
+    offering(
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#,
+        offer,
+        &never,
+    )["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap_or_default().to_owned())
+        .collect()
+}
+
 #[test]
 fn the_handshake_offers_tools_and_says_what_devpit_is() {
     let said = reply(
@@ -20,6 +42,118 @@ fn the_handshake_offers_tools_and_says_what_devpit_is() {
         .as_str()
         .unwrap_or_default()
         .contains("devpit_context"));
+}
+
+/// Switching Devflow on or off changes the list mid-session.
+#[test]
+fn the_handshake_says_the_tool_list_can_change() {
+    let said = reply(
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        &never,
+    );
+    assert_eq!(said["result"]["capabilities"]["tools"]["listChanged"], true);
+    assert!(greets(r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#));
+    assert!(!greets(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#));
+}
+
+/// The names devpit listed before Devflow existed, in their order.
+const BEFORE_DEVFLOW: [&str; 32] = [
+    "devpit_context",
+    "devpit_board",
+    "devpit_artifacts",
+    "devpit_artifact_save",
+    "devpit_artifact_restore",
+    "devpit_artifact_remove",
+    "devpit_projects",
+    "devpit_sessions",
+    "devpit_session_screen",
+    "devpit_stop_session",
+    "devpit_resume_session",
+    "devpit_session_transcript",
+    "devpit_repo_state",
+    "devpit_remind",
+    "devpit_reminders",
+    "devpit_resolve_reminder",
+    "devpit_propose_project",
+    "devpit_draft_reply",
+    "devpit_send_draft",
+    "devpit_handoff",
+    "devpit_mcp_health",
+    "devpit_log",
+    "devpit_start_session",
+    "devpit_card",
+    "devpit_comment",
+    "devpit_create_card",
+    "devpit_update_card",
+    "devpit_start_card",
+    "devpit_finish_card",
+    "devpit_move_card",
+    "devpit_decide",
+    "devpit_rubric_run",
+];
+
+#[test]
+fn with_devflow_off_the_list_and_the_instructions_are_what_they_were() {
+    assert_eq!(listed(&Offer::Off), BEFORE_DEVFLOW);
+    let said = offering(
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        &Offer::Off,
+        &never,
+    );
+    assert_eq!(said["result"]["instructions"], crate::guide::INSTRUCTIONS);
+}
+
+#[test]
+fn the_setup_tools_come_after_devpits_own_until_devflow_is_switched_off() {
+    let setup = listed(&Offer::Setup);
+    assert_eq!(setup[..32], BEFORE_DEVFLOW);
+    assert_eq!(
+        setup[32..],
+        [
+            "devpit_devflow_status",
+            "devpit_devflow_setup",
+            "devpit_devflow_set"
+        ]
+    );
+    let schema = |name: &str| {
+        (SETUP_TOOLS
+            .iter()
+            .find(|tool| tool.name == name)
+            .expect("a setup tool")
+            .input)()
+    };
+    assert_eq!(
+        schema("devpit_devflow_setup")["properties"]["preset"]["enum"],
+        json!(["recommended", "custom"])
+    );
+    assert_eq!(
+        schema("devpit_devflow_set")["required"],
+        json!(["path", "value"])
+    );
+    let active = offering(
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        &Offer::Active(vec!["plan".into()]),
+        &never,
+    );
+    assert!(active["result"]["instructions"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("Devflow is on in this project"));
+}
+
+#[test]
+fn a_setup_tool_answers_with_devflow_off_in_the_project() {
+    let ask = |method: &str, params: Value| -> Result<Value, String> {
+        assert_eq!(method, "devflow_setup");
+        assert_eq!(params, json!({ "preset": "recommended" }));
+        Ok(json!({ "applied": false }))
+    };
+    let said = offering(
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"devpit_devflow_setup","arguments":{"preset":"recommended"}}}"#,
+        &Offer::Off,
+        &ask,
+    );
+    assert_eq!(said["result"]["isError"], false);
 }
 
 #[test]

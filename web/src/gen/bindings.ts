@@ -400,6 +400,10 @@ export const commands = {
 	 *  decision takes: its latency and cost, or why it did not answer.
 	 */
 	decisionsTest: () => typedError<DecisionTried, RpcError>(__TAURI_INVOKE("decisions_test")),
+	/**  `devflow.asks` — the Devflow changes waiting for the person's click. */
+	devflowAsks: () => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_asks")),
+	/**  `devflow.answer` — the person's click: yes makes the change, no drops it. */
+	devflowAnswer: (id: string, yes: boolean) => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_answer", { id, yes })),
 	/**  `orchestrator.proposals` — what this orchestrator proposed, oldest first. */
 	orchestratorProposals: (projectId: string) => __TAURI_INVOKE<ProjectProposal[]>("orchestrator_proposals", { projectId }),
 	/**  `orchestrator.proposal_drop` — done or dropped by the person, it goes. */
@@ -2528,6 +2532,28 @@ export type DeleteRefusal = {
 	/**  True only for unsaved work, which is the person's to throw away. */
 	forcible: boolean,
 };
+
+/**  One change waiting for the person's click. */
+export type DevflowAsk = {
+	id: string,
+	projectId: string,
+	project: string,
+	change: DevflowChange,
+	/**  Seconds since the epoch. */
+	askedAt: number | null,
+};
+
+/**  A list, so tomorrow's field has somewhere to go. */
+export type DevflowAsks = {
+	asks: DevflowAsk[],
+};
+
+/**  What the click does. */
+export type DevflowChange = 
+/**  Devflow switched on in the project. */
+"enable" | 
+/**  Decisions moved from shadow to enforce in the project's Devflow. */
+"enforce";
 
 /**
  *  What somebody did in the menu, on its way back to the pane that owns it.

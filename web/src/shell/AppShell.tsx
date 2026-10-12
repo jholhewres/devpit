@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import './shell.css'
 import { ContextMenu } from './ContextMenu'
+import { DevflowAsks } from './DevflowAsks'
 import { Grips } from './Grips'
 import { Overlays } from './Overlays'
 import { ProjectRail } from './ProjectRail'
@@ -104,6 +105,7 @@ function Window(): React.JSX.Element {
       <ContextMenu />
       <TopBar onAddProject={() => setAdding(true)} maximized={maximized} />
       <RemindersBanner />
+      <DevflowAsks />
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>
         <ProjectRail onAddProject={() => setAdding(true)} onRemove={setRemoving} />

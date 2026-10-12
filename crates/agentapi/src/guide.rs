@@ -26,6 +26,15 @@ another project's board. When the person has set up Decisions, devpit_decide \
 answers typed questions about evidence you pass, and devpit_rubric_run judges \
 it against a rubric; `devpit agent guide` says when they fit.";
 
+/// Added to [`INSTRUCTIONS`] for a project where the person switched
+/// Devflow on, and only there.
+pub const DEVFLOW: &str = "\
+Devflow is on in this project: work goes briefing → context → plan → \
+execution → review → completion, configured in .devpit/devflow/devflow.yaml, \
+and the board is the plan. A stage the person approves stops for their \
+explicit yes. Switching Devflow on, or Decisions to enforce, is the person's \
+click in the app, never a tool's.";
+
 /// The long form: `devpit agent guide`.
 pub const GUIDE: &str = "\
 devpit agent — read and work on the devpit board of the project you are in
@@ -94,4 +103,10 @@ in Settings → Decisions; each call costs money and is logged.
   devpit_rubric_run takes a rubric's name — .devpit/rubrics/<name>.json in the
   project, or the built-in `done` — and answers pass, grey or fail per
   question by its thresholds. Grey is for a person to look at.
+
+Devflow (devpit_devflow_status, devpit_devflow_setup, devpit_devflow_set) —
+a short engineering flow configured in .devpit/devflow/devflow.yaml. Setup
+and set preview unless apply is true, and never commit. Switching Devflow on,
+or its Decisions to enforce, is the person's click in the app; once on, the
+tools of its stages are listed too.
 ";

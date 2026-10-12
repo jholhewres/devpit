@@ -10,20 +10,23 @@
 
 use std::io::{BufRead, Write};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use serde_json::{json, Value};
 
-use crate::{client, guide};
+use crate::client;
+use crate::devflow::{Offer, Watch, SETUP_TOOLS, STAGED};
 
 /// The protocol revision offered when the client names none this knows.
 const PROTOCOL: &str = "2025-06-18";
 
 /// One tool: its name, what it says it does, its input, and the app's method.
-struct Tool {
-    name: &'static str,
-    method: &'static str,
-    description: &'static str,
-    input: fn() -> Value,
+pub(crate) struct Tool {
+    pub(crate) name: &'static str,
+    pub(crate) method: &'static str,
+    pub(crate) description: &'static str,
+    pub(crate) input: fn() -> Value,
 }
 
 const TOOLS: [Tool; 32] = [
@@ -239,28 +242,77 @@ const TOOLS: [Tool; 32] = [
 pub fn serve(root: &Path) -> i32 {
     let cwd = crate::standing();
     let offered = !beside_the_flag(root);
+    let watch = Arc::new(Mutex::new(Watch::new(root)));
+    let initialized = Arc::new(AtomicBool::new(false));
+    if offered {
+        let ask = |method: &str, params| client::ask(root, method, params, &cwd);
+        look(&watch, &ask);
+        let (root, cwd) = (root.to_path_buf(), cwd.clone());
+        let (watch, initialized) = (watch.clone(), initialized.clone());
+        std::thread::spawn(move || loop {
+            std::thread::sleep(crate::devflow::EVERY);
+            let ask = |method: &str, params| client::ask(&root, method, params, &cwd);
+            // Before the handshake the client has not listed anything yet.
+            if let Some(note) = look(&watch, &ask) {
+                if initialized.load(Ordering::Relaxed) && !send(note) {
+                    break;
+                }
+            }
+        });
+    }
     let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
     for line in stdin.lock().lines() {
         let Ok(line) = line else { break };
         if line.trim().is_empty() {
             continue;
         }
+        let offer = watch
+            .lock()
+            .map(|watch| watch.offer.clone())
+            .unwrap_or(Offer::Off);
         let answer = handle_offering(
             &line,
             &|method, params| client::ask(root, method, params, &cwd),
             offered,
+            &offer,
         );
         if let Some(answer) = answer {
-            if writeln!(stdout, "{answer}")
-                .and_then(|()| stdout.flush())
-                .is_err()
-            {
+            if !send(&answer) {
                 break;
             }
         }
+        if greets(&line) {
+            initialized.store(true, Ordering::Relaxed);
+        }
     }
     0
+}
+
+/// Whether `line` is the client's `initialize`, answered by now.
+fn greets(line: &str) -> bool {
+    serde_json::from_str::<Value>(line)
+        .ok()
+        .is_some_and(|message| message.get("method").and_then(Value::as_str) == Some("initialize"))
+}
+
+/// Asks the app what to offer once a watched file changed, and says the
+/// notification to send when the offer did. Asked outside the lock, so a
+/// slow app never holds a `tools/list`.
+fn look(
+    watch: &Mutex<Watch>,
+    ask: &dyn Fn(&str, Value) -> Result<Value, String>,
+) -> Option<&'static str> {
+    let looked = watch.lock().ok()?.due()?;
+    let answer = ask("devflow_offer", json!({}));
+    watch.lock().ok()?.settle(looked, answer)
+}
+
+/// One message out, whole: the watch and the replies share stdout.
+fn send(message: &str) -> bool {
+    let mut out = std::io::stdout().lock();
+    writeln!(out, "{message}")
+        .and_then(|()| out.flush())
+        .is_ok()
 }
 
 /// Set by the devpit plugin for Claude Code on the server it starts.
@@ -304,15 +356,16 @@ pub(crate) fn handle(
     line: &str,
     ask: &dyn Fn(&str, Value) -> Result<Value, String>,
 ) -> Option<String> {
-    handle_offering(line, ask, true)
+    handle_offering(line, ask, true, &Offer::Off)
 }
 
 /// [`handle`], offering the tools or, where another server already does,
-/// none.
+/// none; and of Devflow's, what `offer` says.
 pub(crate) fn handle_offering(
     line: &str,
     ask: &dyn Fn(&str, Value) -> Result<Value, String>,
     offered: bool,
+    offer: &Offer,
 ) -> Option<String> {
     let Ok(message) = serde_json::from_str::<Value>(line) else {
         return Some(error(Value::Null, -32700, "that is not JSON"));
@@ -328,13 +381,14 @@ pub(crate) fn handle_offering(
     let result = match method {
         "initialize" => json!({
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or(PROTOCOL),
-            "capabilities": { "tools": {}, "resources": {} },
+            // The list changes when the person switches Devflow on or off.
+            "capabilities": { "tools": { "listChanged": true }, "resources": {} },
             "serverInfo": { "name": "devpit", "version": env!("CARGO_PKG_VERSION") },
-            "instructions": guide::INSTRUCTIONS,
+            "instructions": offer.instructions(),
         }),
         "ping" => json!({}),
         "tools/list" if !offered => json!({ "tools": [] }),
-        "tools/list" => json!({ "tools": TOOLS.iter().map(|tool| {
+        "tools/list" => json!({ "tools": TOOLS.iter().chain(offer.tools(&STAGED)).map(|tool| {
             let mut listed = json!({
                 "name": tool.name,
                 "description": tool.description,
@@ -373,7 +427,12 @@ fn call(params: &Value, ask: &dyn Fn(&str, Value) -> Result<Value, String>) -> V
         .get("name")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    let Some(tool) = TOOLS.iter().find(|tool| tool.name == name) else {
+    // Devflow's are answered whatever is listed: the app says when one is off.
+    let mut every = TOOLS
+        .iter()
+        .chain(&SETUP_TOOLS)
+        .chain(STAGED.iter().map(|(_, tool)| tool));
+    let Some(tool) = every.find(|tool| tool.name == name) else {
         return said(&format!("devpit has no tool `{name}`"), true);
     };
     let arguments = params

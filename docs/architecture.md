@@ -12,6 +12,7 @@ crates/rpc       the contract; frontend types are generated from it
 crates/tmux      the sessions that outlive the window
 crates/agentcli  the agent catalogue, headless turns, hooks
 crates/steps     what a column runs, and the runner that runs it
+crates/devflow   devflow.yaml, its detection and setup; flow/ ships inside it
 apps/desktop     the shell — the only crate allowed to know it
 web              React + Vite + xterm.js
 xtask            the architectural guards
@@ -143,6 +144,26 @@ The limits are the point:
   the person. That path is the window's alone; no agent reaches it.
 - **Heard, not polling.** Its conversation keeps one process between turns, so a
   session's reply wakes it; nothing here runs it on a timer.
+
+## Devflow is switched on by a click
+
+Devflow — briefing, context, plan, execution, review, completion — is a
+module of devpit's MCP. A project configures it in
+`.devpit/devflow/devflow.yaml`, which is the source of truth: the store keeps
+no copy, only that the person clicked.
+
+- **Three levels.** Settings switches it off everywhere, and then the MCP
+  lists exactly what it did before Devflow. Otherwise every project gets
+  `devpit_devflow_status`, `_setup` and `_set`, which is how it is set up;
+  the tools of its stages come only where it is on, stage by stage.
+- **Agents write files, people switch it on.** Setup and set preview unless
+  told to apply, and never commit. `enabled: true` and Decisions in
+  `enforce` are never written by a tool: they wait for the person's click on
+  a card under the top bar. A file that says `enabled: true` by itself — a
+  hand edit, a fresh clone — waits for that click too.
+- **Open sessions hear it.** The MCP server declares `tools.listChanged`
+  and watches the project's devflow.yaml and the app's stamp file, so
+  switching Devflow on or off reaches a session already running.
 
 ## Remote
 
