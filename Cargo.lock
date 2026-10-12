@@ -1137,6 +1137,7 @@ dependencies = [
  "portable-pty",
  "qrcode",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "sha2",

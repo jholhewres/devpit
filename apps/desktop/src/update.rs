@@ -49,6 +49,14 @@ pub(crate) enum Event {
     PackageIn {
         version: String,
     },
+    /// A release newer than the one already downloaded, found while that one
+    /// waits for its restart.
+    Superseded {
+        version: String,
+        notes: String,
+        kind: InstallKind,
+        test_feed: bool,
+    },
     /// Not now.
     Cancel,
     /// Put it in.
@@ -110,6 +118,24 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
         // version still behind the feed, and offered the update it had just
         // installed — which read as the install not having happened.
         (S::ManualInstall { .. }, E::PackageIn { version }) => Some(S::Ready { version }),
+        // Downloaded is not the end of looking. A release that came out while
+        // this one waited for its restart is offered in its place; held on
+        // to, the restart installed it only to offer the newer one straight
+        // after, and two releases took two updates.
+        (
+            S::Ready { .. } | S::ManualInstall { .. },
+            E::Superseded {
+                version,
+                notes,
+                kind,
+                test_feed,
+            },
+        ) => Some(S::Available {
+            version,
+            notes,
+            kind,
+            test_feed,
+        }),
         (S::Ready { .. }, E::Blocked { runs, turns, since }) => {
             Some(S::Waiting { runs, turns, since })
         }
@@ -134,6 +160,27 @@ pub(crate) fn next(state: &UpdateStatus, event: Event) -> Option<UpdateStatus> {
         // than politely somewhere else.
         _ => None,
     }
+}
+
+/// Whether `found` is a newer release than `held`, the one already downloaded.
+/// A version that does not read is never newer: a feed that answers nonsense
+/// must not cost the person the update they already have.
+pub(crate) fn supersedes(held: &str, found: &str) -> bool {
+    match (semver::Version::parse(held), semver::Version::parse(found)) {
+        (Ok(held), Ok(found)) => found > held,
+        _ => false,
+    }
+}
+
+/// The states the feed is still asked from although an update is held: one
+/// downloaded and waiting for the restart, or a package waiting for its
+/// command. Not a chosen wait — that one is a promise to install what it has
+/// — and nothing while a download or the install runs.
+pub(crate) fn looks_past(state: &UpdateStatus) -> bool {
+    matches!(
+        state,
+        UpdateStatus::Ready { .. } | UpdateStatus::ManualInstall { .. }
+    )
 }
 
 /// How long to wait before looking again.
@@ -429,7 +476,8 @@ async fn check_when_due(
     // Only when a check may start from here: one in the middle of a download
     // is refused, and counting that as a failure would back the next check
     // off for nothing.
-    if next(current, Event::Check).is_none() || !due(*last, now(), *failures, enabled) {
+    let may = next(current, Event::Check).is_some() || looks_past(current);
+    if !may || !due(*last, now(), *failures, enabled) {
         return;
     }
     *last = Some(now());
@@ -495,6 +543,11 @@ pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcErro
         .try_state::<Updating>()
         .map(|updating| updating.state())
         .unwrap_or(UpdateStatus::Idle);
+    if let Some(updating) = app.try_state::<Updating>() {
+        if let Some(held) = held_version(&updating, &now) {
+            return Ok(look_past(&app, &updating, kind, &now, &held).await);
+        }
+    }
     let checking = next(&now, Event::Check).ok_or_else(|| {
         RpcError::new(
             devpit_rpc::ErrorCode::Conflict,
@@ -530,6 +583,83 @@ pub async fn update_check(app: tauri::AppHandle) -> Result<UpdateStatus, RpcErro
         updating.moved_to(&app, ended.clone());
     }
     Ok(ended)
+}
+
+/// The version of the update held for the restart, when one is.
+fn held_version(updating: &Updating, state: &UpdateStatus) -> Option<String> {
+    if !looks_past(state) {
+        return None;
+    }
+    match state {
+        UpdateStatus::Ready { version } => Some(version.clone()),
+        _ => updating
+            .package
+            .lock()
+            .ok()?
+            .as_ref()
+            .map(|package| package.version.clone()),
+    }
+}
+
+/// From an update already held: asks the feed again, and offers what it
+/// answers in place of the held one only when it is newer. The same version,
+/// nothing, or a feed that could not be reached leaves the held update as it
+/// was — a failed look is no reason to lose what is already downloaded.
+async fn look_past(
+    app: &tauri::AppHandle,
+    updating: &Updating,
+    kind: InstallKind,
+    now: &UpdateStatus,
+    held: &str,
+) -> UpdateStatus {
+    let (heard, found) = if let Some(feed) = fixture_feed() {
+        (
+            feed_says(&feed, &app.package_info().version.to_string()),
+            None,
+        )
+    } else {
+        asked(app, kind).await
+    };
+    let Event::Found {
+        version,
+        notes,
+        kind,
+        test_feed,
+    } = heard
+    else {
+        return now.clone();
+    };
+    // The person may have restarted into the held update while the feed was
+    // being asked: what is under way now is not this look's to replace.
+    if !supersedes(held, &version) || updating.state() != *now {
+        return updating.state();
+    }
+    let Some(offered) = next(
+        now,
+        Event::Superseded {
+            version,
+            notes,
+            kind,
+            test_feed,
+        },
+    ) else {
+        return now.clone();
+    };
+    // What was held is the release this one replaces.
+    if let Ok(mut held) = updating.downloaded.lock() {
+        *held = None;
+    }
+    if let Ok(mut held) = updating.package.lock() {
+        *held = None;
+    }
+    updating
+        .package_in
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    if let Ok(mut held) = updating.found.lock() {
+        *held = found;
+    }
+    updating.moved_to(app, offered.clone());
+    offered
 }
 
 /// What the feed answers, through the plugin, and the update it answered with.

@@ -23,6 +23,8 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 # The downloaded package is checked again before its command is shown.
 sha2 = "0.10"
+# Whether a release found later is newer than the update already downloaded.
+semver = "1"
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 specta-typescript = "0.0.12"
 # `unstable` is on for one thing: `Window::add_child`, which is the only way

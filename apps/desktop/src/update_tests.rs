@@ -928,3 +928,56 @@ fn only_the_windows_installer_closes_the_terminals() {
         assert!(terminals_survive(kind), "{kind:?}");
     }
 }
+
+/// Two releases while the app stays open: the first downloaded and waiting
+/// for its restart, the second found by the next look. The second is offered
+/// in the first's place, so one restart lands on the newest.
+#[test]
+fn a_newer_release_replaces_the_one_waiting_for_its_restart() {
+    let newer = || Event::Superseded {
+        version: "0.2.0".to_owned(),
+        notes: "what changed".to_owned(),
+        kind: InstallKind::AppImage,
+        test_feed: false,
+    };
+    let ready = S::Ready {
+        version: "0.1.9".to_owned(),
+    };
+    let manual = S::ManualInstall {
+        command: "pkexec apt install ./devpit.deb".to_owned(),
+        path: "/cache/devpit.deb".to_owned(),
+    };
+    assert!(looks_past(&ready) && looks_past(&manual));
+    assert_eq!(next(&ready, newer()), Some(available()));
+    assert_eq!(next(&manual, newer()), Some(available()));
+
+    // Never from a chosen wait, a download or an install under way.
+    let waiting = S::Waiting {
+        runs: 1,
+        turns: 0,
+        since: 0.0,
+    };
+    for busy in [
+        waiting,
+        S::Downloading { percent: 40 },
+        S::Installing,
+        S::Idle,
+    ] {
+        assert!(!looks_past(&busy), "{busy:?}");
+        assert_eq!(next(&busy, newer()), None, "{busy:?}");
+    }
+}
+
+#[test]
+fn only_a_newer_version_supersedes_the_one_held() {
+    assert!(supersedes("0.1.40", "0.1.41"));
+    assert!(
+        supersedes("0.1.9", "0.1.10"),
+        "compared as numbers, not text"
+    );
+    assert!(supersedes("0.1.41-rc.1", "0.1.41"));
+    assert!(!supersedes("0.1.41", "0.1.41"));
+    assert!(!supersedes("0.1.41", "0.1.40"));
+    assert!(!supersedes("0.1.41", "not a version"));
+    assert!(!supersedes("garbage", "0.1.42"));
+}
