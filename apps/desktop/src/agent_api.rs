@@ -438,6 +438,7 @@ fn respond_in(
         }
         "move" => {
             let to = text("columnId").unwrap_or_default();
+            crate::card_follows::may_enter(&board, &card_id, column_of(&board, &to)?)?;
             match by_press(here, &board, &card_id, &to) {
                 Some(asked) => asked,
                 None => moved(app, &board, &card_id, &to)?,

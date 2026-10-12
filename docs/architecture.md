@@ -188,7 +188,8 @@ no copy, only that the person clicked.
   person moves, cuts or edits it and clicks Create. An agent's `apply`
   creates only the plan the person last saw, and only once. A card's epic
   and blockers are rows (`card_parent`, `card_blocker`); its criteria stay
-  in its body.
+  in its body. An agent cannot start a card, or move it into the lane for
+  work in progress, while a card blocking it is not done.
 - **The card keeps its proof.** `devpit_devflow_evidence` runs the card's
   checks through the step runner, in the checkout the agent stands in, the
   card reaching them only through the environment. Each run is a folder,

@@ -117,7 +117,8 @@ skill:// resources, and prompts such as /devpit:devflow-plan in Claude Code.
 The board is the plan: devpit_devflow_brief writes the brief as an epic card,
 and devpit_devflow_plan previews the epic's cards — criteria as checkboxes,
 what blocks what — which the person creates on the board, or which apply
-creates after their yes. devpit_devflow_evidence runs a card's checks, keeps
-their reports, screenshots and video under .devpit/devflow/runs/<card>/<time>/,
-attaches them to the card and answers with each check's result and counts.
+creates after their yes. A card still blocked by one not done is not started.
+devpit_devflow_evidence runs a card's checks, keeps their reports, screenshots
+and video under .devpit/devflow/runs/<card>/<time>/, attaches them to the card
+and answers with each check's result and counts.
 ";

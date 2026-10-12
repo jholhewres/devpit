@@ -1,7 +1,87 @@
+use devpit_core::NewCard;
+use devpit_devflow::Ask;
 use devpit_rpc::Board;
 use serde_json::json;
 
-use super::{column_with, when_started};
+use super::{column_with, start, unblocked, when_started};
+
+#[test]
+fn a_card_blocked_by_one_not_done_is_refused_only_with_devflow_on() {
+    let mut blocked = card("second", "inbox");
+    blocked["blockedBy"] = json!([
+        { "id": "first", "title": "Index the bodies", "done": false },
+        { "id": "zero", "title": "Set up", "done": true }
+    ]);
+    let mut freed = card("third", "inbox");
+    freed["blockedBy"] = json!([{ "id": "zero", "title": "Set up", "done": true }]);
+    let board = board(
+        vec![
+            column("inbox", 0, Some("backlog"), false),
+            column("doing", 1, Some("doing"), false),
+        ],
+        vec![blocked, freed],
+    );
+    let refused = unblocked(&board, "second", true).expect_err("blocked");
+    assert_eq!(
+        refused,
+        "blocked by \"Index the bodies\" (first): finish it first, or ask the person to change the plan"
+    );
+    // A blocker that is done holds nothing back.
+    assert_eq!(unblocked(&board, "third", true), Ok(()));
+    // Without Devflow the board behaves as it did.
+    assert_eq!(unblocked(&board, "second", false), Ok(()));
+}
+
+/// Through `start_card` as an agent asks it, against the store: where the
+/// gate lets a card through, the move that follows needs the window.
+#[test]
+fn starting_a_blocked_card_is_refused_where_devflow_is_on() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = crate::projects::store().expect("store");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let first = store.columns(&project).expect("columns")[0].id.clone();
+    let epic = store
+        .create_card(&project, &first, "[devflow] Brief: search", "")
+        .expect("epic");
+    store.keep_plan(&epic, "[{},{}]", false).expect("plan");
+    let cards = [
+        NewCard {
+            title: "[devflow] index",
+            body: "",
+            waits_on: &[],
+        },
+        NewCard {
+            title: "[devflow] box",
+            body: "",
+            waits_on: &[0],
+        },
+    ];
+    let ids = store
+        .create_plan(&epic, &first, &cards, |_| String::new())
+        .expect("create")
+        .expect("made");
+    let board = crate::board::board_get_now(project.clone()).expect("board");
+    let went_on = |said: Result<serde_json::Value, String>| {
+        said.expect_err("no window").contains("running app")
+    };
+
+    assert!(went_on(start(None, &board, &ids[1])), "Devflow is off here");
+
+    std::fs::create_dir_all(dir.path().join(".devpit/devflow")).expect("folder");
+    std::fs::write(
+        dir.path().join(".devpit/devflow/devflow.yaml"),
+        "version: 1\nenabled: true\n",
+    )
+    .expect("yaml");
+    crate::devflow_asks::remember(&store, &project, Ask::Enable, true).expect("clicked");
+    let refused = start(None, &board, &ids[1]).expect_err("blocked");
+    assert!(
+        refused.starts_with("blocked by \"[devflow] index\""),
+        "{refused}"
+    );
+    assert!(went_on(start(None, &board, &ids[0])), "nothing blocks it");
+}
 
 fn column(id: &str, position: i32, role: Option<&str>, step: bool) -> serde_json::Value {
     json!({

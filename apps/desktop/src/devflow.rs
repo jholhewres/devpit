@@ -119,6 +119,21 @@ pub(crate) fn respond(
     }
 }
 
+/// Whether Devflow is on in `project`: a card's blockers hold it back only there.
+pub(crate) fn is_on(project_id: &str, root: &Path) -> bool {
+    let Ok(store) = crate::projects::store() else {
+        return false;
+    };
+    matches!(
+        offered(
+            globally_on(&store),
+            &folder::read(root),
+            made(&store, project_id, Ask::Enable)
+        ),
+        Offered::Active(_)
+    )
+}
+
 /// The stages switched on, when Devflow is on here: nowhere else are its
 /// skills given, whatever the MCP server last listed.
 fn stages_on(store: &Store, project: &Project, state: &State) -> Result<Vec<&'static str>, String> {

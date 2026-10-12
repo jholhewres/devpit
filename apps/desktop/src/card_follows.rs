@@ -36,6 +36,47 @@ pub(crate) fn when_started<'a>(board: &'a Board, card_id: &str) -> Option<&'a Co
         .flatten()
 }
 
+/// Refuses a card still blocked by one that is not done, where Devflow is on:
+/// the plan's order is the person's, and work started out of it builds on
+/// work that is not there yet. Elsewhere a blocker says, and holds nothing.
+pub(crate) fn unblocked(board: &Board, card_id: &str, devflow_on: bool) -> Result<(), String> {
+    let Some(card) = board.cards.iter().find(|card| card.id == card_id) else {
+        return Ok(());
+    };
+    let waiting: Vec<String> = card
+        .blocked_by
+        .iter()
+        .filter(|by| !by.done)
+        .map(|by| format!("\"{}\" ({})", by.title, by.id))
+        .collect();
+    if !devflow_on || waiting.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "blocked by {}: finish {} first, or ask the person to change the plan",
+        waiting.join(" and "),
+        if waiting.len() == 1 { "it" } else { "them" }
+    ))
+}
+
+/// Whether Devflow is on in the board's project.
+fn devflow_on(board: &Board) -> bool {
+    crate::projects::store()
+        .ok()
+        .and_then(|store| store.project(&board.project_id).ok().flatten())
+        .is_some_and(|row| {
+            crate::devflow::is_on(&board.project_id, std::path::Path::new(&row.root_path))
+        })
+}
+
+/// A move into the lane for work in progress, refused for a blocked card.
+pub(crate) fn may_enter(board: &Board, card_id: &str, column: &Column) -> Result<(), String> {
+    if column.role.as_deref() != Some("doing") {
+        return Ok(());
+    }
+    unblocked(board, card_id, devflow_on(board))
+}
+
 /// `start_card`: the card goes to work in progress, wherever it waited.
 pub(crate) fn start(
     app: Option<&AppHandle>,
@@ -45,6 +86,7 @@ pub(crate) fn start(
     let to = column_with(board, "doing").ok_or(
         "this board has no column for work in progress that runs no step: say which with devpit_move_card, or leave the card where it is",
     )?;
+    may_enter(board, card_id, to)?;
     crate::agent_api::moved(app, board, card_id, &to.id)
 }
 
@@ -86,7 +128,10 @@ pub(crate) fn prompted(app: &AppHandle, card_id: &str) {
             return;
         };
         if let Some(to) = when_started(&board, &card_id) {
-            if crate::agent_api::moved(Some(&app), &board, &card_id, &to.id).is_ok() {
+            // A blocked card stays put: its session was started anyway, not the card.
+            if may_enter(&board, &card_id, to).is_ok()
+                && crate::agent_api::moved(Some(&app), &board, &card_id, &to.id).is_ok()
+            {
                 let _ = app.emit("board:changed", &project);
             }
         }

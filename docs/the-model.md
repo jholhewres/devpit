@@ -45,9 +45,10 @@ no way to lie.
 
 A card can belong to an epic and wait on other cards. Those are edges between
 cards, not a second kind of card: an epic counts its cards done by the lane they
-sit in, and a card says what blocks it until that card is done. Its acceptance
-criteria are checkboxes under `## Acceptance criteria` in its own description,
-so ticking one edits the text everyone reads.
+sit in, and a card says what blocks it until that card is done. Where Devflow
+is on, an agent cannot start a card that is still blocked; the person can still
+move it. Its acceptance criteria are checkboxes under `## Acceptance criteria`
+in its own description, so ticking one edits the text everyone reads.
 
 ## `step`
 
