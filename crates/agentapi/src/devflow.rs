@@ -60,9 +60,57 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
     },
 ];
 
+/// The gate's tool, which devpit's own stop hooks call too.
+pub const GATE_TOOL: &str = "devpit_devflow_gate";
+
+/// Where Claude Code reads how many stops in a row a hook may send back;
+/// the gate follows it (`devpit_devflow::gate::CAP_ENV`).
+pub const CAP_ENV: &str = "CLAUDE_CODE_STOP_HOOK_BLOCK_CAP";
+
+/// What only this process can add to a stop hook's call to the gate: the
+/// pane the session runs in and the cap its CLI was given, both in the
+/// environment the CLI started this server with.
+pub(crate) fn hooked(
+    tool: &str,
+    mut arguments: Value,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Value {
+    if tool != GATE_TOOL || arguments.get("event").is_none() {
+        return arguments;
+    }
+    for (key, variable) in [("pane", crate::hook::PANE_ENV), ("cap", CAP_ENV)] {
+        if let Some(value) = env(variable).filter(|value| !value.is_empty()) {
+            if arguments.get(key).is_none() {
+                arguments[key] = json!(value);
+            }
+        }
+    }
+    arguments
+}
+
+/// What `devpit agent devflow-context` asks the app, from the payload a
+/// session-start hook pipes in.
+pub(crate) fn context_params(payload: &Value, pane: &str, agent: &str) -> Value {
+    json!({
+        "pane": pane,
+        "session": payload.get("session_id").and_then(Value::as_str).unwrap_or_default(),
+        "agent": agent,
+    })
+}
+
+/// The session-start hook's reply, as Claude Code and Codex both read it;
+/// nothing when the app had nothing to say.
+pub(crate) fn context_reply(answer: &Value) -> Option<String> {
+    let said = answer.get("context")?.as_str()?;
+    Some(
+        json!({ "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": said } })
+            .to_string(),
+    )
+}
+
 /// The tools only an active project gets: each under the stage that must be
 /// switched on for it, or `None` for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(Option<&str>, Tool); 4] = [
+pub(crate) static STAGED: [(Option<&str>, Tool); 5] = [
     (
         None,
         Tool {
@@ -132,6 +180,22 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 4] = [
                     "failure": { "type": "string", "description": "The failing line you saw, secrets redacted." }
                 }, "required": ["test", "failure"] } }
             }, "required": ["card"] }),
+        },
+    ),
+    (
+        Some("completion"),
+        Tool {
+            name: GATE_TOOL,
+            method: "devflow_gate",
+            description: "Devflow: whether a card may be called done. First what devpit can check itself: its checks ran after the last change to the code and passed (devpit_devflow_evidence's newest run), every acceptance criterion maps to tests that passed, the card's E2E spec kept a screenshot, and the review's findings.json has nothing in review.block_on. Then, where Decisions is set up, the devflow-done rubric: in shadow it only records, in enforce (the person's click) it can hold the card. Writes gate.json into the run, comments '[devflow] gate: n of m criteria with evidence' on the card, and answers result passed or failed with a short list of what is missing and the stage that fixes it. Call it before devpit_finish_card, which waits for it to pass; devpit's own stop hooks call it too.",
+            input: || json!({ "type": "object", "properties": {
+                "card": { "type": "string", "description": "The card's id." },
+                "event": { "type": "string", "enum": ["Stop", "SubagentStop"], "description": "Set by devpit's own hooks; leave it out." },
+                "session": { "type": "string", "description": "Set by devpit's own hooks; leave it out." },
+                "stop_hook_active": { "description": "Set by devpit's own hooks; leave it out." },
+                "agent": { "type": "string", "description": "Set by devpit's own hooks; leave it out." },
+                "transcript": { "type": "string", "description": "Set by devpit's own hooks; leave it out." }
+            } }),
         },
     ),
 ];

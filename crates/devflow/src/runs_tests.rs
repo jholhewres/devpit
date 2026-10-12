@@ -159,3 +159,54 @@ fn the_setups_gitignore_keeps_every_run_out_of_the_repository() {
     let kept = git(&["check-ignore", "-q", ".devpit/devflow/devflow.yaml"]);
     assert!(!kept.status.success(), "devflow.yaml is ignored");
 }
+
+#[test]
+fn a_file_of_the_runs_goes_inside_its_run_or_beside_the_runs_and_nowhere_else() {
+    let root = tempfile::tempdir().expect("root");
+    let (inside, path) =
+        file_in(root.path(), "card_1", Some("20261011T143005Z"), "gate.json").expect("in a run");
+    assert_eq!(
+        inside,
+        ".devpit/devflow/runs/card_1/20261011T143005Z/gate.json"
+    );
+    assert!(path.parent().expect("its run").is_dir());
+    let (beside, _) = file_in(root.path(), "card_1", None, "gate.json").expect("beside");
+    assert_eq!(beside, ".devpit/devflow/runs/card_1/gate.json");
+    assert!(file_in(root.path(), "card_1", Some("../x"), "gate.json").is_err());
+    assert!(file_in(root.path(), "../card", None, "gate.json").is_err());
+}
+
+#[test]
+fn a_runs_name_reads_back_as_the_second_it_was_made() {
+    for seconds in [0, 951_782_400, 1_791_729_005, 4_102_444_799] {
+        assert_eq!(seconds_of(&stamp(at(seconds))), Some(seconds), "{seconds}");
+    }
+    assert_eq!(
+        seconds_of("20261011T143005Z-2"),
+        seconds_of("20261011T143005Z")
+    );
+    assert_eq!(seconds_of("local"), None);
+}
+
+#[test]
+fn the_newest_run_holding_a_file_is_found_and_a_newer_one_without_it_skipped() {
+    let folder = tempfile::tempdir().expect("folder");
+    for (name, file) in [
+        ("20261011T120000Z", "evidence.json"),
+        ("20261011T120000Z-1", "evidence.json"),
+        ("20261011T130000Z", "findings.json"),
+        ("not-a-run", "evidence.json"),
+    ] {
+        std::fs::create_dir_all(folder.path().join(name)).expect("run");
+        std::fs::write(folder.path().join(name).join(file), "{}").expect("file");
+    }
+    assert_eq!(
+        newest_with(folder.path(), "evidence.json").as_deref(),
+        Some("20261011T120000Z-1")
+    );
+    assert_eq!(
+        newest_with(folder.path(), "findings.json").as_deref(),
+        Some("20261011T130000Z")
+    );
+    assert_eq!(newest_with(folder.path(), "gate.json"), None);
+}

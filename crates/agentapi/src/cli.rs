@@ -27,6 +27,24 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
             );
             0
         }
+        // Devflow's session-start hook: always 0, and silent when the app
+        // has nothing to say, so a session never fails to start on it.
+        Ok(Parsed::Context(agent)) => {
+            let payload = stdin_json();
+            let pane = std::env::var(crate::hook::PANE_ENV).unwrap_or_default();
+            let params = crate::devflow::context_params(&payload, &pane, &agent);
+            let here = payload
+                .get("cwd")
+                .and_then(Value::as_str)
+                .map_or(cwd, std::path::PathBuf::from);
+            if let Some(said) = client::ask(root, "devflow_session", params, &here)
+                .ok()
+                .and_then(|answer| crate::devflow::context_reply(&answer))
+            {
+                println!("{said}");
+            }
+            0
+        }
         Ok(Parsed::Ask(method, params)) => match client::ask(root, &method, params, &cwd) {
             Ok(answer) => {
                 println!(
@@ -54,6 +72,9 @@ pub(crate) enum Parsed {
     /// `devpit agent hook --agent NAME EVENT …`: an event from an agent that
     /// is not Claude Code, in the shape devpit reads.
     Hook(crate::events::Call),
+    /// `devpit agent devflow-context [--agent NAME]`: what Devflow's
+    /// session-start hook adds, for that agent CLI.
+    Context(String),
 }
 
 /// The JSON an agent piped in, when it piped any: an object, or nothing.
@@ -118,6 +139,13 @@ pub(crate) fn parsed(args: &[String]) -> Result<Parsed, String> {
             ask("update", Value::Object(params))
         }
         Some("hook") => crate::events::parsed(&options, &plain).map(Parsed::Hook),
+        Some("devflow-context") => Ok(Parsed::Context(
+            options
+                .iter()
+                .find(|(name, _)| *name == "agent")
+                .map_or("claude", |(_, agent)| agent)
+                .to_owned(),
+        )),
         Some("move") => {
             let id = one(&plain, "a card id")?;
             let column = plain.get(1).ok_or("move needs a column id")?;

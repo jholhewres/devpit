@@ -22,8 +22,12 @@ pub(crate) const MOST_QUESTIONS: usize = 20;
 /// The most of a rubric file read.
 const MOST_RUBRIC_BYTES: u64 = 64 * 1024;
 
+/// The rubric for whether a card is done, which Devflow's gate asks once
+/// per criterion (`devflow_gate`).
+pub(crate) const DONE: &str = include_str!("rubrics/done.json");
+
 /// The rubrics devpit ships, by name.
-const BUILT_IN: [(&str, &str); 1] = [("done", include_str!("rubrics/done.json"))];
+const BUILT_IN: [(&str, &str); 1] = [("done", DONE)];
 
 pub(crate) fn respond(
     method: &str,

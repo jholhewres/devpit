@@ -53,7 +53,7 @@ pub(crate) fn open(
         &project.id,
         &tab_id,
         std::path::Path::new(&project.root_path),
-        &launched(profile_id, &name, prompt)?,
+        &launched(profile_id, &project.id, &name, prompt)?,
     )?;
     let _ = app.emit(
         TAB_OPENED,
@@ -94,12 +94,17 @@ pub(crate) fn typeable(text: &str) -> Result<(), RpcError> {
 }
 
 /// The account's Claude Code, named and briefed, as one line to type.
-pub(crate) fn launched(profile_id: &str, name: &str, prompt: &str) -> Result<String, RpcError> {
+pub(crate) fn launched(
+    profile_id: &str,
+    project_id: &str,
+    name: &str,
+    prompt: &str,
+) -> Result<String, RpcError> {
     typeable(name)?;
     typeable(prompt)?;
     Ok(format!(
         "{} --name {} {}",
-        crate::shell_launch::to_start(profile_id)?,
+        crate::shell_launch::to_start_in(profile_id, Some(project_id))?,
         devpit_agentcli::declaring::quoted(name),
         devpit_agentcli::declaring::quoted(prompt)
     ))

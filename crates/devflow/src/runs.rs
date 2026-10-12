@@ -71,6 +71,21 @@ fn civil(days: i64) -> (i64, u32, u32) {
     (year_of_era + era * 400 + i64::from(month <= 2), month, day)
 }
 
+/// The second a run's name stands for, since the epoch: [`stamp`] undone.
+pub fn seconds_of(name: &str) -> Option<u64> {
+    let (stamp, _) = order_of(name)?;
+    let number = |range: std::ops::Range<usize>| stamp[range].parse::<i64>().ok();
+    let (year, month, day) = (number(0..4)?, number(4..6)?, number(6..8)?);
+    // Hinnant's `days_from_civil`, the inverse of `civil`.
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let of_era = year - era * 400;
+    let of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let days = era * 146_097 + of_era * 365 + of_era / 4 - of_era / 100 + of_year - 719_468;
+    let time = number(9..11)? * 3600 + number(11..13)? * 60 + number(13..15)?;
+    u64::try_from(days * 86_400 + time).ok()
+}
+
 /// A run's place in time: its stamp, then the count a second run started in
 /// the same second takes (`…Z-1`). `None` for a name no run has.
 fn order_of(name: &str) -> Option<(&str, u32)> {
@@ -114,6 +129,32 @@ pub fn fresh(root: &Path, card: &str, at: SystemTime) -> Result<(String, PathBuf
     ))
 }
 
+/// Where `file` of a card's runs is written: inside run `run`, or beside
+/// the runs when there is none yet, never through a link out of `root`. Its
+/// path relative to `root`, and where it is.
+pub fn file_in(
+    root: &Path,
+    card: &str,
+    run: Option<&str>,
+    file: &str,
+) -> Result<(String, PathBuf), String> {
+    if !plain_card(card) {
+        return Err(format!(
+            "`{card}` is not a card id devpit makes a folder of"
+        ));
+    }
+    let folder = match run {
+        Some(run) if order_of(run).is_some() => format!("{RUNS}/{card}/{run}"),
+        Some(run) => return Err(format!("`{run}` is not a run of the card")),
+        None => format!("{RUNS}/{card}"),
+    };
+    crate::setup::folders(root, &folder)?;
+    let relative = format!("{folder}/{file}");
+    let path = devpit_core::paths::resolve_new(root, &relative)
+        .map_err(|err| format!("{relative}: {err}"))?;
+    Ok((relative, path))
+}
+
 /// Removes every run in `folder` but the newest `keep`, answering what went.
 /// Only folders named as runs are touched: a link, a file or `local/` stays.
 pub fn prune(folder: &Path, keep: usize) -> Vec<String> {
@@ -131,6 +172,18 @@ pub fn prune(folder: &Path, keep: usize) -> Vec<String> {
         .skip(keep)
         .filter(|name| std::fs::remove_dir_all(folder.join(name)).is_ok())
         .collect()
+}
+
+/// The newest run in `folder` that holds `file`: the checks' runs and the
+/// review's are folders of one kind, and each reader looks for its own.
+pub fn newest_with(folder: &Path, file: &str) -> Option<String> {
+    std::fs::read_dir(folder)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| order_of(name).is_some() && folder.join(name).join(file).is_file())
+        .max_by(|a, b| order_of(a).cmp(&order_of(b)))
 }
 
 /// The pictures and videos a check left, moved beside the run's other evidence.

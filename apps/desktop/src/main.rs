@@ -95,6 +95,8 @@ mod decisions;
 mod devflow;
 mod devflow_asks;
 mod devflow_evidence;
+mod devflow_gate;
+mod devflow_launch;
 mod devflow_plan;
 mod devflow_skills;
 mod diagnostics;

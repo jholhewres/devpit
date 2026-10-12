@@ -132,6 +132,10 @@ pub(crate) fn remember(
     ask: Ask,
     yes: bool,
 ) -> Result<(), RpcError> {
+    // One list for every project, read and written whole: two at once would
+    // each write back a list without the other's change.
+    static REMEMBERING: Mutex<()> = Mutex::new(());
+    let _one_at_a_time = REMEMBERING.lock();
     let mut ids = projects_with(store, ask);
     ids.retain(|id| id != project_id);
     if yes {

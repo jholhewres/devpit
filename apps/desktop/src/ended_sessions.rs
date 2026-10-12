@@ -194,9 +194,14 @@ pub(crate) fn ended_one(profile_id: &str, id_or_name: &str) -> Result<SeenSessio
 }
 
 /// The line that resumes `session_id` as `name`, for this account.
-fn resumed_line(profile_id: &str, name: &str, session_id: &str) -> Result<String, RpcError> {
+fn resumed_line(
+    profile_id: &str,
+    project_id: &str,
+    name: &str,
+    session_id: &str,
+) -> Result<String, RpcError> {
     resumed(
-        &crate::shell_launch::to_start(profile_id)?,
+        &crate::shell_launch::to_start_in(profile_id, Some(project_id))?,
         name,
         crate::restoring::resume_flag_of(profile_id),
         session_id,
@@ -273,7 +278,7 @@ pub(crate) fn resume(
             .to_owned(),
         &crate::handing::live_names(profile_id),
     );
-    let line = resumed_line(profile_id, &name, &row.session_id)?;
+    let line = resumed_line(profile_id, &project_id, &name, &row.session_id)?;
     let cwd = if Path::new(&row.cwd).is_dir() {
         std::path::PathBuf::from(&row.cwd)
     } else {

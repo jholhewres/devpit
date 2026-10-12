@@ -460,6 +460,7 @@ fn call(params: &Value, ask: &dyn Fn(&str, Value) -> Result<Value, String>) -> V
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    let arguments = crate::devflow::hooked(tool.name, arguments, &|name| std::env::var(name).ok());
     match ask(tool.method, arguments) {
         // A skill is read as the markdown it is, not as JSON.
         Ok(answer) if tool.name == crate::skills::TOOL => crate::skills::said(&answer),

@@ -106,6 +106,21 @@ pub fn offered(stages_on: &[&str]) -> Vec<&'static str> {
         .collect()
 }
 
+/// Each built-in skill's name, stage and the `description` its frontmatter
+/// gives: what a plugin's pointer to it says.
+pub fn described() -> Vec<(&'static str, Option<&'static str>, String)> {
+    BUILT_IN
+        .iter()
+        .map(|(name, stage, text)| {
+            let said = frontmatter(text, name)
+                .ok()
+                .and_then(|front| front.get("description")?.as_str().map(str::to_owned))
+                .unwrap_or_default();
+            (*name, *stage, said)
+        })
+        .collect()
+}
+
 /// The resource URI of a skill's SKILL.md: `devflow` the prefix, the name the
 /// last segment, as the extension requires.
 pub fn uri(name: &str) -> String {

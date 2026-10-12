@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 42] = [
+pub(crate) const METHODS: [&str; 44] = [
     "context",
     "board",
     "card",
@@ -85,6 +85,8 @@ pub(crate) const METHODS: [&str; 42] = [
     "devflow_brief",
     "devflow_plan",
     "devflow_evidence",
+    "devflow_gate",
+    "devflow_session",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -450,6 +452,7 @@ fn respond_in(
         }
         "finish_card" => {
             on_board(&board, &card_id)?;
+            crate::devflow_gate::may_finish(project, &card_id, Path::new(&asked.cwd))?;
             crate::card_follows::finish(
                 app,
                 &board,

@@ -36,6 +36,24 @@ pub fn commits_in(root: &Path, range: &str, limit: u32) -> Vec<Commit> {
         .unwrap_or_default()
 }
 
+/// Every file a commit since `since` (seconds since the epoch, by commit
+/// time) touched, once each. Nothing, where git cannot say.
+pub fn touched_since(root: &Path, since: u64) -> Vec<String> {
+    let after = format!("--since=@{since}");
+    let Ok(raw) = run(root, &["log", &after, "--name-only", "--format=", "-z"]) else {
+        return Vec::new();
+    };
+    let mut touched: Vec<String> = raw
+        .split(['\0', '\n'])
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(str::to_owned)
+        .collect();
+    touched.sort();
+    touched.dedup();
+    touched
+}
+
 /// The branch's upstream, as `origin/main`, when it has one.
 pub fn upstream_of(root: &Path) -> Option<String> {
     let named = run(
@@ -166,5 +184,22 @@ mod range_tests {
         assert!(commits_in(dir.path(), "nowhere..HEAD", 20).is_empty());
         // A branch with no upstream has none to name.
         assert_eq!(upstream_of(dir.path()), None);
+    }
+
+    #[test]
+    fn the_files_touched_since_a_time_are_those_of_the_commits_after_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        repo(dir.path());
+        for (file, message) in [("a b.txt", "first"), ("c", "second"), ("a b.txt", "third")] {
+            std::fs::write(dir.path().join(file), message).expect("write");
+            commit(dir.path(), message);
+        }
+        assert_eq!(super::touched_since(dir.path(), 0), ["a b.txt", "c"]);
+        let tomorrow = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("now")
+            .as_secs()
+            + 86_400;
+        assert!(super::touched_since(dir.path(), tomorrow).is_empty());
     }
 }

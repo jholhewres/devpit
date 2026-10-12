@@ -273,3 +273,88 @@ fn the_brief_and_the_plan_take_what_their_skills_send() {
         ]
     );
 }
+
+#[test]
+fn the_gate_comes_with_the_completion_stage_only() {
+    let listed = |stage: &str| {
+        Offer::Active(vec![stage.to_owned()])
+            .tools(&STAGED)
+            .iter()
+            .any(|tool| tool.name == GATE_TOOL)
+    };
+    assert!(listed("completion"));
+    assert!(!listed("execution"));
+    assert!(Offer::Setup
+        .tools(&STAGED)
+        .iter()
+        .all(|tool| tool.name != GATE_TOOL));
+}
+
+/// The pane and the cap are in the environment the CLI started the server
+/// with, never in a payload: added to a hook's call, and only to it.
+#[test]
+fn a_stop_hooks_call_carries_the_pane_and_the_cap_of_its_session() {
+    let env = |name: &str| match name {
+        "DEVPIT_PANE" => Some("%7".to_owned()),
+        "CLAUDE_CODE_STOP_HOOK_BLOCK_CAP" => Some("3".to_owned()),
+        _ => None,
+    };
+    let hooked_stop = hooked(GATE_TOOL, json!({ "event": "Stop" }), &env);
+    assert_eq!(
+        hooked_stop,
+        json!({ "event": "Stop", "pane": "%7", "cap": "3" })
+    );
+    let by_agent = json!({ "card": "card_1" });
+    assert_eq!(hooked(GATE_TOOL, by_agent.clone(), &env), by_agent);
+    let other = json!({ "event": "Stop" });
+    assert_eq!(hooked("devpit_card", other.clone(), &env), other);
+}
+
+/// The fields devpit's own stop hooks fill, by name, beside the agent's card.
+#[test]
+fn the_gate_takes_a_card_and_what_the_stop_hooks_fill() {
+    let (_, tool) = STAGED
+        .iter()
+        .find(|(_, tool)| tool.name == GATE_TOOL)
+        .expect("the gate");
+    assert_eq!(tool.method, "devflow_gate");
+    let schema = (tool.input)();
+    let mut keys: Vec<&String> = schema["properties"]
+        .as_object()
+        .expect("properties")
+        .keys()
+        .collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        [
+            "agent",
+            "card",
+            "event",
+            "session",
+            "stop_hook_active",
+            "transcript"
+        ]
+    );
+    assert!(schema.get("required").is_none(), "a hook names no card");
+}
+
+#[test]
+fn the_session_start_reply_carries_the_card_or_nothing() {
+    let said = context_reply(&json!({ "context": "card_1 \"Rename\"" })).expect("a reply");
+    let read: Value = serde_json::from_str(&said).expect("json");
+    assert_eq!(read["hookSpecificOutput"]["hookEventName"], "SessionStart");
+    assert_eq!(
+        read["hookSpecificOutput"]["additionalContext"],
+        "card_1 \"Rename\""
+    );
+    assert_eq!(context_reply(&json!({ "context": null })), None);
+    assert_eq!(
+        context_params(
+            &json!({ "session_id": "s-1", "source": "startup" }),
+            "%2",
+            "codex"
+        ),
+        json!({ "pane": "%2", "session": "s-1", "agent": "codex" })
+    );
+}

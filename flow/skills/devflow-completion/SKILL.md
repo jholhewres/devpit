@@ -77,16 +77,29 @@ test or a finding. A row with nothing to name makes the gate fail.
 
 ### 4. Post the gate
 
-Comment on the card with `devpit_comment`, the table under one line:
+Call `devpit_devflow_gate` with the card:
+
+```json
+{ "card": "<card id>" }
+```
+
+devpit checks the rows above against the newest run and review, asks
+Decisions where it is set up, keeps `gate.json` in the run folder, and signs
+the comment on the card: the table under one line,
 
 ```markdown
 [devflow] gate: <n> of <m> criteria with evidence
 ```
 
-The gate passes when n equals m, every check is green and the review verdict is
-`approve`. When it fails, add what is missing and which stage fixes it
-(execution, or review), reply with the same, and end the turn: no handoff as
-finished, no `devpit_finish_card`.
+and answers `result` (`passed` or `failed`) with what is `missing`. When devpit
+does not offer the tool, post that comment yourself with `devpit_comment`.
+
+The gate passes when n equals m, every check is green and no finding is in
+`review.block_on`. When it fails, reply with what is missing and which stage
+fixes it (execution, or review), and end the turn: no handoff as finished, no
+`devpit_finish_card`, which devpit refuses anyway while the gate fails. Where
+Devflow's hooks are on, a turn that ends with the gate failing is sent back
+with the same list.
 
 Done when the gate comment is on the card with n and m filled.
 

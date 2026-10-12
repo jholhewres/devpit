@@ -408,7 +408,7 @@ impl Evidence {
 }
 
 /// Text compared the way a person reads it: trimmed, one space between words.
-fn plain(text: &str) -> String {
+pub(crate) fn plain(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 

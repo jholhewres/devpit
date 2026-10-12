@@ -59,3 +59,15 @@ fn an_unknown_command_is_refused_by_name() {
         Err("`deploy` is not a devpit agent command".to_owned())
     );
 }
+
+#[test]
+fn devflows_session_start_hook_names_its_cli() {
+    assert_eq!(
+        parsed(&words("devflow-context --agent codex")),
+        Ok(Parsed::Context("codex".into()))
+    );
+    assert_eq!(
+        parsed(&words("devflow-context")),
+        Ok(Parsed::Context("claude".into()))
+    );
+}

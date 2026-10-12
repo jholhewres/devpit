@@ -120,5 +120,9 @@ what blocks what — which the person creates on the board, or which apply
 creates after their yes. A card still blocked by one not done is not started.
 devpit_devflow_evidence runs a card's checks, keeps their reports, screenshots
 and video under .devpit/devflow/runs/<card>/<time>/, attaches them to the card
-and answers with each check's result and counts.
+and answers with each check's result and counts. devpit_devflow_gate says
+whether the card may be called done — passed, or what is missing — and
+devpit_finish_card waits for it; in sessions devpit starts there, a turn that
+ends while it fails is sent back. `devpit agent devflow-context` is what those
+sessions' start hook runs: the card they work on, as context.
 ";

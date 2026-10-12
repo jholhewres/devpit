@@ -203,6 +203,29 @@ no copy, only that the person clicked.
   Playwright the setup writes `.devpit/devflow/playwright.config.ts`: the
   project's own config as its base, Devflow's specs from `e2e_dir`, a JUnit
   report and every screenshot and video.
+- **A card is done at the gate.** `devpit_devflow_gate` checks what devpit
+  can check itself: the card's checks ran after the last change to the code
+  (each changed file by when it was written, so a commit is not a change)
+  and passed, every criterion maps to tests that passed, the card's E2E spec
+  kept a screenshot, and `findings.json` has nothing in `review.block_on`.
+  Then, where Decisions is set up, the `devflow-done` rubric — `done` asked
+  once per criterion — which in `shadow` only records and in `enforce`, the
+  person's click, can hold the card; without a key the checks alone decide.
+  It writes `gate.json` into the run, attaches it, and signs the comment
+  `[devflow] gate: n of m criteria with evidence`. `devpit_finish_card` waits
+  for it.
+- **Hooks only on devpit's own launches.** A session devpit starts in a
+  project where Devflow is on gets its hooks on the launch line, never in a
+  CLI's settings: Claude Code a plugin folder (`--plugin-dir`, skills
+  `/devflow:<stage>`), Codex the hooks with `-c` and the trust Codex keys
+  them by. `Stop` and `SubagentStop` call the gate (`mcp_tool`); a failing
+  one sends the turn back with what is missing. A stop the CLI did not
+  continue starts the count again; past the cap (Claude Code's own, 8), or
+  sent back and back with nothing changed, the turn ends and the card and a
+  notice say so. A subagent is held only for code it changed. `SessionStart`
+  runs `devpit agent devflow-context`, which gives the session its card.
+  Switched off, the next launch has none of it, and a running session's
+  gate answers nothing.
 - **Skills by layer.** Where it is on, each stage's skill is a
   `skill://devflow/<name>/SKILL.md` resource carrying its SEP-2640 entry
   (digest and size), the `devpit_devflow_skill` tool, and a prompt such as

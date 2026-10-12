@@ -20,7 +20,7 @@ use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
 
-pub(crate) const METHODS: [&str; 9] = [
+pub(crate) const METHODS: [&str; 11] = [
     "devflow_offer",
     "devflow_status",
     "devflow_setup",
@@ -30,6 +30,8 @@ pub(crate) const METHODS: [&str; 9] = [
     "devflow_brief",
     "devflow_plan",
     "devflow_evidence",
+    "devflow_gate",
+    "devflow_session",
 ];
 
 /// The stage a method of a stage's own belongs to: it answers only where
@@ -39,6 +41,7 @@ pub(crate) fn stage_of(method: &str) -> Option<&'static str> {
         "devflow_brief" => Some("briefing"),
         "devflow_plan" => Some("plan"),
         "devflow_evidence" => Some("execution"),
+        "devflow_gate" => Some("completion"),
         _ => None,
     }
 }
@@ -91,6 +94,9 @@ pub(crate) fn respond(
         "devflow_status" => Ok(status(&store, project, root, &state)),
         "devflow_setup" => setup_of(app, &store, project, root, &state, params),
         "devflow_set" => set_of(app, &store, project, root, &state, params),
+        // Answered where the stage is off too: a hook there says nothing.
+        "devflow_gate" => crate::devflow_gate::respond(app, &store, project, &state, cwd, params),
+        "devflow_session" => crate::devflow_gate::session(&store, project, &state, cwd, params),
         "devflow_skills" | "devflow_skill" => crate::devflow_skills::respond(
             method,
             root,
@@ -136,7 +142,11 @@ pub(crate) fn is_on(project_id: &str, root: &Path) -> bool {
 
 /// The stages switched on, when Devflow is on here: nowhere else are its
 /// skills given, whatever the MCP server last listed.
-fn stages_on(store: &Store, project: &Project, state: &State) -> Result<Vec<&'static str>, String> {
+pub(crate) fn stages_on(
+    store: &Store,
+    project: &Project,
+    state: &State,
+) -> Result<Vec<&'static str>, String> {
     let switched_on = made(store, &project.id, Ask::Enable);
     match offered(globally_on(store), state, switched_on) {
         Offered::Active(stages) => Ok(stages),

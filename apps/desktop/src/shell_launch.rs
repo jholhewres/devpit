@@ -417,7 +417,7 @@ pub async fn session_launch_agent(
     // A profile first, then a built-in agent. The same menu offers both, and
     // a profile is the more specific answer when an id is both — which it is
     // for a discovered command, whose id *is* the command.
-    let start = to_start(&agent_id)?;
+    let start = to_start_in(&agent_id, Some(&project_id))?;
 
     // The pane has to be this project's. Reached from a menu, the id comes
     // from the screen, and the screen is not the authority on what is open.
@@ -521,7 +521,12 @@ pub(crate) fn profile_id(id: &str) -> String {
 ///
 /// The MCP server rides the same way and under the same switch: devpit's
 /// tools on the line of the agents devpit starts (`agent_reach`).
-fn launch_line(launch: &str, agent: &str, settings_flag: Option<&str>) -> String {
+fn launch_line(
+    launch: &str,
+    agent: &str,
+    settings_flag: Option<&str>,
+    project_id: Option<&str>,
+) -> String {
     let mut line = launch.to_owned();
     if let Some(settings) = settings_flag.and_then(|_| hook_settings()) {
         line.push(' ');
@@ -530,6 +535,14 @@ fn launch_line(launch: &str, agent: &str, settings_flag: Option<&str>) -> String
     if let Some(tools) = devpit_tools(agent) {
         line.push(' ');
         line.push_str(&tools);
+    }
+    // Devflow's hooks call devpit's tools: with the switch off there are none.
+    let devflow = project_id
+        .filter(|_| integrated())
+        .and_then(|id| crate::devflow_launch::flags(agent, id));
+    if let Some(devflow) = devflow {
+        line.push(' ');
+        line.push_str(&devflow);
     }
     line
 }
@@ -557,12 +570,18 @@ fn integrated() -> bool {
 /// bare word it always was. Either way the hook flag is appended last, because
 /// it is about this launch and not about the account.
 pub(crate) fn to_start(id: &str) -> Result<String, RpcError> {
+    to_start_in(id, None)
+}
+
+/// [`to_start`] for a session of `project_id`, which brings Devflow's hooks
+/// and skills where the person switched it on there.
+pub(crate) fn to_start_in(id: &str, project_id: Option<&str>) -> Result<String, RpcError> {
     if let Ok(store) = crate::projects::store() {
         if let Ok(profiles) = crate::agent_profiles::all(&store) {
             if let Some(found) = profiles.iter().find(|one| one.id == id && one.mine) {
                 let flag = devpit_pty::agents::known(&found.base).and_then(|one| one.settings_flag);
                 let said = devpit_agentcli::running::line(&devpit_agentcli::running::runner(found));
-                return Ok(launch_line(&said, &found.base, flag));
+                return Ok(launch_line(&said, &found.base, flag, project_id));
             }
         }
     }
@@ -572,7 +591,12 @@ pub(crate) fn to_start(id: &str) -> Result<String, RpcError> {
             format!("{id} is not an agent this build knows"),
         )
     })?;
-    Ok(launch_line(agent.launch, agent.id, agent.settings_flag))
+    Ok(launch_line(
+        agent.launch,
+        agent.id,
+        agent.settings_flag,
+        project_id,
+    ))
 }
 
 /// Where the hook settings live, written if they are not there yet.

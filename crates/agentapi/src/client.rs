@@ -25,7 +25,7 @@ const CHECKING: Duration = Duration::from_secs(20 * 60);
 pub fn wait_for(method: &str) -> Duration {
     if method == "start" || method == "resume" {
         STARTING
-    } else if method == "decide" || method == "rubric_run" {
+    } else if method == "decide" || method == "rubric_run" || method == "devflow_gate" {
         DECIDING
     } else if method == "devflow_evidence" {
         CHECKING
