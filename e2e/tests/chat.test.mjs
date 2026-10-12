@@ -27,6 +27,17 @@ let repo
 const card = async (title) =>
   (await invoke(window, 'board_get', { projectId: project.id })).cards.find((one) => one.title === title)
 
+/** The tool calls an MCP app's page made that the stub really ran. */
+function appCalls() {
+  const log = join(home, '.claude', 'stub-calls.log')
+  if (!existsSync(log)) return []
+  return readFileSync(log, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter((one) => one.app?.subtype === 'mcp_call')
+}
+
 /** Until no answer is being written: typed during one, a message waits in the queue. */
 async function idle() {
   // A turn ending re-renders the pane under the query; WebKit's driver then
@@ -297,7 +308,10 @@ describe('MCP Apps in a chat', () => {
       asked = await window.wait(until.elementLocated(By.css('.mcpapp__ask')), 5000).catch(() => null)
       if (!asked) await window.switchTo().frame(await window.findElement(By.css('.mcpapp__frame')))
     }
-    assert.ok(asked, 'the page ran a tool without asking')
+    // Which of the two went wrong is read off the stub, not guessed: a night
+    // run said "ran without asking" when nothing had run at all.
+    assert.ok(asked, appCalls().length > 0 ? 'the page ran a tool without asking' : "nobody was asked about the page's call, and nothing ran")
+    assert.equal(appCalls().length, 0, 'the page ran a tool before the person allowed it')
     await press(window, 'Allow once')
 
     await window.switchTo().frame(await window.findElement(By.css('.mcpapp__frame')))
@@ -307,8 +321,7 @@ describe('MCP Apps in a chat', () => {
     await window.switchTo().defaultContent()
     assert.ok(called, 'the call the person allowed never answered the page')
 
-    const calls = readFileSync(join(home, '.claude', 'stub-calls.log'), 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
-    const ran = calls.find((one) => one.app?.subtype === 'mcp_call')
+    const ran = appCalls()[0]
     // Its own server's tool, through a host started as one.
     assert.equal(ran?.app?.tool, 'mcp__stubapps__echo')
     assert.equal(ran?.appsHost, '1')
