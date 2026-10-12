@@ -2,10 +2,10 @@
 //! message or a voice note in, the orchestrator's answer out.
 //!
 //! A transport hands in what the paired chat said — Telegram through the
-//! person's own bot today, devpit.app's bot later — and only the paired chat:
-//! a message from any other never reaches here. It becomes the person's turn
-//! in the orchestrator's chat through the composer's own door, marked with its
-//! channel. While that turn runs, what it would do on the person's consent —
+//! person's own bot, or through devpit.app's (`telegram_devpit`) — and only
+//! the paired chat: a message from any other never reaches here. It becomes
+//! the person's turn in the orchestrator's chat through the composer's own
+//! door, marked with its channel. While that turn runs, what it would do on the person's consent —
 //! send a draft, stop a session, start a lane's step — becomes a button under
 //! the answer, and only the press does it: a yes typed or heard on a phone is
 //! the agent's reading of words, a button says exactly what it does.

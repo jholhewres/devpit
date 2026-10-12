@@ -155,6 +155,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         crate::channels::channels_rules_set,
         crate::telegram::telegram_status,
         crate::telegram::telegram_link,
+        crate::telegram::telegram_use_devpit,
         crate::telegram::telegram_privacy_set,
         crate::telegram::telegram_orchestrator_set,
         crate::telegram::telegram_unlink,

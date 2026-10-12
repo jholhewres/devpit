@@ -587,17 +587,24 @@ export const commands = {
 	projectSecretRotation: (projectId: string, name: string, everyDays: number | null, at: number | null) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secret_rotation", { projectId, name, everyDays, at })),
 	/**  `project.secret_rotated` — the person rotated it: the date moves on. */
 	projectSecretRotated: (projectId: string, name: string) => typedError<SecretList, RpcError>(__TAURI_INVOKE("project_secret_rotated", { projectId, name })),
-	/**  `channels.read` — what is connected, and the rules. */
 	channelsRead: () => typedError<Channels, RpcError>(__TAURI_INVOKE("channels_read")),
 	/**  `channels.rules_set` — which events go where, quiet hours, grouping. */
 	channelsRulesSet: (rules: ChannelRules) => typedError<Channels, RpcError>(__TAURI_INVOKE("channels_rules_set", { rules })),
-	/**  `telegram.status` */
+	/**
+	 *  `telegram.status` — the person's own bot, or else devpit's, as devpit.app
+	 *  tells it.
+	 */
 	telegramStatus: () => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_status")),
 	/**
 	 *  `telegram.link` — takes the person's bot token, checks it, and offers a code
 	 *  to send to the bot from the chat devpit should use.
 	 */
 	telegramLink: (token: string) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_link", { token })),
+	/**
+	 *  `telegram.use_devpit` — devpit's own bot instead of one of the person's:
+	 *  a single-use code from devpit.app, and the link that sends it.
+	 */
+	telegramUseDevpit: () => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_use_devpit")),
 	/**  `telegram.privacy_set` — how much of what devpit says goes to the chat. */
 	telegramPrivacySet: (privacy: Privacy) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_privacy_set", { privacy })),
 	/**
@@ -605,7 +612,10 @@ export const commands = {
 	 *  is the only one there is.
 	 */
 	telegramOrchestratorSet: (project: string | null) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_orchestrator_set", { project })),
-	/**  `telegram.unlink` — forgets the bot and the chat. */
+	/**
+	 *  `telegram.unlink` — forgets the bot and the chat: the person's own, or
+	 *  else the chat linked to devpit's.
+	 */
 	telegramUnlink: () => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_unlink")),
 	/**  `hub.status` */
 	hubStatus: () => typedError<HubStatus, RpcError>(__TAURI_INVOKE("hub_status")),
@@ -5046,6 +5056,13 @@ export type TelegramStatus = {
 	orchestrator: string | null,
 	/**  The orchestrators on this machine, to choose from. */
 	orchestrators: ChannelOrchestrator[],
+	/**  devpit.app offers its own bot to this account: shown only then. */
+	devpitBot: boolean,
+	/**
+	 *  The chat is linked through devpit's bot on devpit.app, which carries
+	 *  names at most.
+	 */
+	throughDevpit: boolean,
 };
 
 /**  The command, and the file it was read from. Both `None` when nothing says. */

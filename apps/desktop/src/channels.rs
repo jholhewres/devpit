@@ -185,12 +185,14 @@ fn deliver(batch: &[Told]) {
         } else {
             crate::telegram::titles()
         };
-        let Some((text, actions)) = message(&mine, titles) else {
+        let Some((text, actions)) = message(&mine, titles, choices) else {
             continue;
         };
         match channel.id.as_str() {
             crate::telegram::ID => crate::telegram::send(&text, &actions),
-            crate::hub::ID => crate::hub::send(&text, &actions, &[]),
+            // Named, so devpit's Telegram bot — a channel of its own here —
+            // is not sent the same notice twice.
+            crate::hub::ID => crate::hub::send(&text, &actions, &["push", "email"]),
             _ => {}
         }
     }
@@ -208,8 +210,13 @@ fn deliver(batch: &[Told]) {
 }
 
 /// One message for what goes on a channel together: named when `titles`,
-/// and with buttons only when it is about one thing.
-fn message(mine: &[&Told], titles: bool) -> Option<(String, Vec<Action>)> {
+/// and with buttons only when it is about one thing. A question's choices,
+/// read by `choices`, are its words: without titles they stay here.
+pub(crate) fn message(
+    mine: &[&Told],
+    titles: bool,
+    choices: impl Fn(Option<&str>) -> Vec<Action>,
+) -> Option<(String, Vec<Action>)> {
     let lines: Vec<String> = mine
         .iter()
         .map(|one| {
@@ -222,12 +229,13 @@ fn message(mine: &[&Told], titles: bool) -> Option<(String, Vec<Action>)> {
         .collect();
     let text = crate::channel_rules::grouped(&lines)?;
     let actions = match mine {
-        [one] => one
+        [one] if titles => one
             .actions
             .iter()
             .cloned()
             .chain(choices(one.asking.as_deref()))
             .collect(),
+        [one] => one.actions.clone(),
         _ => Vec::new(),
     };
     Some((text, actions))
@@ -239,7 +247,7 @@ pub(crate) fn send_on(rung: Rung, mine: &[&Told]) {
         Rung::Telegram => crate::telegram::titles(),
         Rung::Push | Rung::Email => crate::hub::titles(),
     };
-    let Some((text, actions)) = message(mine, titles) else {
+    let Some((text, actions)) = message(mine, titles, choices) else {
         return;
     };
     match rung {
@@ -270,6 +278,10 @@ fn choices(target: Option<&str>) -> Vec<Action> {
 }
 
 /// `channels.read` — what is connected, and the rules.
+#[cfg(test)]
+#[path = "channels_tests.rs"]
+mod tests;
+
 #[tauri::command]
 #[specta::specta]
 pub async fn channels_read() -> Result<Channels, RpcError> {

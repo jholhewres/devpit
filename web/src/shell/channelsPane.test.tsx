@@ -26,7 +26,17 @@ vi.mock('./live', () => ({
   commands: {
     channelsRead: async () => channels(rules),
     channelsRulesSet: async (kept: ChannelRules) => (saved(kept), channels(kept)),
-    telegramStatus: async () => ({ linked: true, bot: 'my_bot', code: null, link: null, privacy: 'minimal', orchestrator: null, orchestrators: [] }),
+    telegramStatus: async () => ({
+      linked: true,
+      bot: 'my_bot',
+      code: null,
+      link: null,
+      privacy: 'minimal',
+      orchestrator: null,
+      orchestrators: [],
+      devpitBot: false,
+      throughDevpit: false,
+    }),
     hubStatus: async () => ({ on: true, titles: false, signedIn: true }),
     urlOpen: async () => ({ path: '' }),
   },

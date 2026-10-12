@@ -163,6 +163,19 @@ session and moving a card into a lane with a step become buttons under the
 answer, and the press does it, as the person. `channel_talk` takes any
 transport; Telegram through the person's own bot is the first.
 
+**devpit's own bot** is the second, for a person who would rather not make
+one: Settings → Channels → Telegram offers it only when devpit.app says it has
+one, and opens `t.me/<bot>?start=<code>` with a single-use code. It is the
+same Telegram channel, through devpit.app: notices go with the hub's
+(`via: telegram`), answers to the hub's bot, and what the chat writes comes
+back with the hub's pressed buttons, taken only by the machine that linked
+it. devpit.app carries what the person lets it — by default only that
+something waits, names and an answer's first line once titles are on, never
+a whole answer — and keeps none of it; a message or a press the machine
+never takes, because it is off, lapses there with a notice to the chat.
+At the minimal level a question's choices stay on the machine too, on every
+channel: their words are what waits.
+
 ## Devflow is switched on by a click
 
 Devflow — briefing, context, plan, execution, review, completion — is a
@@ -318,8 +331,8 @@ turned on in Settings → Account → Sync. The design is `docs/sync.md`.
 ## devpit Plus
 
 Plus pays for what devpit.app carries for the person away from the machine:
-the relay (the Remote, and MCP from another machine), sync and notices
-through the hub. Nothing that runs on this machine is ever part of it.
+the relay (the Remote, and MCP from another machine), sync, notices
+through the hub and devpit's Telegram bot. Nothing that runs on this machine is ever part of it.
 
 - **Checked offline.** devpit.app signs an entitlement (ed25519);
   `plus.refresh` fetches it with the account's token and keeps it, and

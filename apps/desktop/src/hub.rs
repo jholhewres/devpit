@@ -83,6 +83,14 @@ struct Pending {
     /// Absent from a devpit.app that predates it.
     #[serde(default)]
     reach: Option<Reach>,
+    /// What the chat linked to devpit's bot wrote, when asked for.
+    #[serde(default)]
+    said: Vec<Said>,
+}
+
+#[derive(Deserialize)]
+struct Said {
+    text: String,
 }
 
 #[derive(Deserialize)]
@@ -95,6 +103,9 @@ struct Pressed {
 pub(crate) struct Reach {
     pub push: bool,
     pub email: bool,
+    /// A chat linked to devpit's bot.
+    #[serde(default)]
+    pub telegram: bool,
 }
 
 static REACH: Mutex<Option<Reach>> = Mutex::new(None);
@@ -105,12 +116,14 @@ pub(crate) fn reach() -> Option<Reach> {
 }
 
 /// Picks up the buttons pressed on the person's channels and does them here,
-/// for as long as the app runs.
+/// and what the chat linked to devpit's bot wrote, for as long as the app runs.
 pub(crate) fn listen() {
     tauri::async_runtime::spawn(async {
         loop {
             tokio::time::sleep(EVERY).await;
-            if connected().is_none() {
+            // Only a machine that linked devpit's bot takes what its chat wrote.
+            let bot = crate::telegram_devpit::linked();
+            if connected().is_none() && !bot {
                 continue;
             }
             let (Some(token), Ok(client)) =
@@ -119,7 +132,10 @@ pub(crate) fn listen() {
                 continue;
             };
             let Ok(answer) = client
-                .get(format!("{}/v1/hub/actions", crate::account::origin()))
+                .get(format!(
+                    "{}/v1/hub/actions?said={bot}",
+                    crate::account::origin()
+                ))
                 .bearer_auth(token)
                 .send()
                 .await
@@ -129,9 +145,13 @@ pub(crate) fn listen() {
             let Ok(pending) = answer.json::<Pending>().await else {
                 continue;
             };
+            if let Some(reach) = pending.reach {
+                crate::telegram_devpit::seen(reach.telegram);
+            }
             if let (Some(said), Ok(mut held)) = (pending.reach, REACH.lock()) {
                 *held = Some(said);
             }
+            crate::telegram_devpit::heard(pending.said.into_iter().map(|one| one.text).collect());
             for pressed in pending.pressed {
                 // A key from before a restart names nothing: that button has expired.
                 if let Some(action) = crate::channel_actions::take(&pressed.action) {

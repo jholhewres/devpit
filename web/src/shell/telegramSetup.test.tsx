@@ -3,20 +3,33 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { TelegramStatus } from '../gen/bindings'
 
-const unlinked: TelegramStatus = { linked: false, bot: null, code: null, link: null, privacy: 'minimal', orchestrator: null, orchestrators: [] }
+const unlinked: TelegramStatus = {
+  linked: false,
+  bot: null,
+  code: null,
+  link: null,
+  privacy: 'minimal',
+  orchestrator: null,
+  orchestrators: [],
+  devpitBot: false,
+  throughDevpit: false,
+}
 let status: TelegramStatus = unlinked
 const linked = vi.fn()
 const privacySet = vi.fn()
 const orchestratorSet = vi.fn()
+const usedDevpit = vi.fn()
+const opened = vi.fn()
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null }),
   commands: {
     telegramStatus: () => status,
     telegramLink: (token: string) => (linked(token), { ...unlinked, bot: 'my_bot', code: 'A1B2C3', link: 'https://t.me/my_bot?start=A1B2C3' }),
+    telegramUseDevpit: () => (usedDevpit(), { ...status, bot: 'devpit_app_bot', code: 'ABCD-EFGH', link: 'https://t.me/devpit_app_bot?start=ABCD-EFGH' }),
     telegramUnlink: () => unlinked,
     telegramPrivacySet: (privacy: string) => (privacySet(privacy), { ...status, privacy }),
     telegramOrchestratorSet: (project: string | null) => (orchestratorSet(project), { ...status, orchestrator: project }),
-    urlOpen: () => ({ path: '' }),
+    urlOpen: (url: string) => (opened(url), { path: '' }),
   },
 }))
 
@@ -33,6 +46,29 @@ describe('linking a Telegram bot', () => {
     fireEvent.click(screen.getByText('Link'))
     await waitFor(() => expect(linked).toHaveBeenCalledWith('123:abc'))
     expect(await screen.findByText('/start A1B2C3')).toBeTruthy()
+  })
+
+  it('offers devpit’s bot only when devpit.app says it has one', async () => {
+    status = unlinked
+    render(<TelegramSetup onLinked={vi.fn()} />)
+    await screen.findByPlaceholderText('123456:ABC…')
+    expect(screen.queryByText('Use devpit’s bot')).toBeNull()
+  })
+
+  it('opens devpit’s bot with a single-use code', async () => {
+    status = { ...unlinked, devpitBot: true }
+    render(<TelegramSetup onLinked={vi.fn()} />)
+    fireEvent.click(await screen.findByText('Use devpit’s bot'))
+    await waitFor(() => expect(usedDevpit).toHaveBeenCalled())
+    expect(await screen.findByText('/start ABCD-EFGH')).toBeTruthy()
+    expect(opened).toHaveBeenCalledWith('https://t.me/devpit_app_bot?start=ABCD-EFGH')
+  })
+
+  it('offers no whole answers through devpit’s bot', async () => {
+    status = { ...unlinked, linked: true, bot: 'devpit_app_bot', throughDevpit: true }
+    render(<TelegramSetup onLinked={vi.fn()} />)
+    const told = (await screen.findByLabelText('What Telegram is told')) as HTMLSelectElement
+    expect([...told.options].map((one) => one.value)).toEqual(['minimal', 'titles'])
   })
 
   it('offers to unlink once a chat is linked', async () => {

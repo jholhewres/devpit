@@ -8,6 +8,9 @@
 //! bot, and that chat is the one devpit talks to and listens to; any other
 //! chat is counted and ignored, its words never read. What the paired chat
 //! says goes to an orchestrator through `channel_talk`.
+//!
+//! Without a bot of their own, the person can link a chat to devpit's bot on
+//! devpit.app instead (`telegram_devpit`): one Telegram channel either way.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
@@ -72,10 +75,18 @@ pub(crate) fn app() -> &'static OnceLock<AppHandle> {
     &APP
 }
 
-/// The channel, when a chat is linked.
+/// The person's own bot, with a chat linked.
+fn own() -> Option<Kept> {
+    read().filter(|kept| kept.chat_id.is_some())
+}
+
+/// The channel, when a chat is linked: through the person's own bot, or else
+/// through devpit's.
 pub(crate) fn connected() -> Option<ChannelInfo> {
-    let kept = read()?;
-    kept.chat_id.map(|_| ChannelInfo {
+    let Some(kept) = own() else {
+        return crate::telegram_devpit::connected();
+    };
+    Some(ChannelInfo {
         id: ID.to_owned(),
         label: format!("Telegram, @{}", kept.bot),
     })
@@ -83,7 +94,10 @@ pub(crate) fn connected() -> Option<ChannelInfo> {
 
 /// Whether messages say what they are about, or only that something happened.
 pub(crate) fn titles() -> bool {
-    read().is_some_and(|kept| kept.privacy() != Privacy::Minimal)
+    match read() {
+        Some(kept) => kept.privacy() != Privacy::Minimal,
+        None => crate::telegram_devpit::titles(),
+    }
 }
 
 /// A call to the Bot API. Any failure is one sentence with no URL in it.
@@ -111,6 +125,9 @@ async fn call(token: &str, method: &str, body: Value) -> Result<Value, String> {
 
 /// Sends `text` to the linked chat, with a button per action.
 pub(crate) fn send(text: &str, offered: &[crate::channels::Action]) {
+    if own().is_none() {
+        return crate::telegram_devpit::send(text, offered);
+    }
     let (text, offered) = (text.to_owned(), offered.to_vec());
     tauri::async_runtime::spawn(async move { said(&text, &offered).await });
 }
@@ -345,6 +362,8 @@ fn status(kept: Option<&Kept>) -> TelegramStatus {
         privacy: kept.map(Kept::privacy).unwrap_or_default(),
         orchestrator: kept.and_then(|kept| kept.orchestrator.clone()),
         orchestrators: crate::channel_talk::orchestrators(),
+        devpit_bot: false,
+        through_devpit: false,
     }
 }
 
@@ -353,11 +372,23 @@ async fn status_now(kept: Option<Kept>) -> Result<TelegramStatus, RpcError> {
     crate::off_main::blocking(move || Ok(status(kept.as_ref()))).await
 }
 
-/// `telegram.status`
+/// `telegram.status` — the person's own bot, or else devpit's, as devpit.app
+/// tells it.
 #[tauri::command]
 #[specta::specta]
 pub async fn telegram_status() -> Result<TelegramStatus, RpcError> {
-    status_now(read()).await
+    match read() {
+        Some(kept) => status_now(Some(kept)).await,
+        None => crate::telegram_devpit::status().await,
+    }
+}
+
+/// `telegram.use_devpit` — devpit's own bot instead of one of the person's:
+/// a single-use code from devpit.app, and the link that sends it.
+#[tauri::command]
+#[specta::specta]
+pub async fn telegram_use_devpit() -> Result<TelegramStatus, RpcError> {
+    crate::telegram_devpit::link().await
 }
 
 /// `telegram.link` — takes the person's bot token, checks it, and offers a code
@@ -413,6 +444,10 @@ fn set_up() -> Result<Kept, RpcError> {
 #[tauri::command]
 #[specta::specta]
 pub async fn telegram_privacy_set(privacy: Privacy) -> Result<TelegramStatus, RpcError> {
+    if read().is_none() {
+        crate::telegram_devpit::privacy_set(privacy)?;
+        return crate::telegram_devpit::status().await;
+    }
     let mut kept = set_up()?;
     kept.privacy = Some(privacy);
     write(&kept)?;
@@ -426,7 +461,6 @@ pub async fn telegram_privacy_set(privacy: Privacy) -> Result<TelegramStatus, Rp
 pub async fn telegram_orchestrator_set(
     project: Option<String>,
 ) -> Result<TelegramStatus, RpcError> {
-    let mut kept = set_up()?;
     if let Some(chosen) = &project {
         let known = crate::off_main::blocking(|| Ok(crate::channel_talk::orchestrators())).await?;
         if !known.iter().any(|one| &one.project == chosen) {
@@ -436,19 +470,28 @@ pub async fn telegram_orchestrator_set(
             ));
         }
     }
+    if read().is_none() {
+        crate::telegram_devpit::orchestrator_set(project)?;
+        return crate::telegram_devpit::status().await;
+    }
+    let mut kept = set_up()?;
     kept.orchestrator = project;
     write(&kept)?;
     status_now(Some(kept)).await
 }
 
-/// `telegram.unlink` — forgets the bot and the chat.
+/// `telegram.unlink` — forgets the bot and the chat: the person's own, or
+/// else the chat linked to devpit's.
 #[tauri::command]
 #[specta::specta]
 pub async fn telegram_unlink() -> Result<TelegramStatus, RpcError> {
-    if let Some(path) = file() {
-        let _ = std::fs::remove_file(path);
+    match (read(), file()) {
+        (Some(_), Some(path)) => {
+            let _ = std::fs::remove_file(path);
+        }
+        _ => crate::telegram_devpit::unlink().await,
     }
-    status_now(None).await
+    crate::telegram_devpit::status().await
 }
 
 #[cfg(test)]

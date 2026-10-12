@@ -224,6 +224,7 @@ mod transcribe;
 #[cfg(any(windows, test))]
 mod tap_file;
 mod telegram;
+mod telegram_devpit;
 mod threads;
 mod tray;
 mod tray_look;

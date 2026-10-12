@@ -117,6 +117,11 @@ pub struct TelegramStatus {
     pub orchestrator: Option<String>,
     /// The orchestrators on this machine, to choose from.
     pub orchestrators: Vec<ChannelOrchestrator>,
+    /// devpit.app offers its own bot to this account: shown only then.
+    pub devpit_bot: bool,
+    /// The chat is linked through devpit's bot on devpit.app, which carries
+    /// names at most.
+    pub through_devpit: bool,
 }
 
 /// devpit.app as a channel: e-mail and push, set up at devpit.app/account.
