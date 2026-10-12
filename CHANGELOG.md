@@ -3,6 +3,33 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.42 — 2026-10-12
+
+### Fixed
+
+- **An update goes straight to the newest release.** With an update
+  downloaded and waiting for its restart, devpit stopped looking, so two
+  releases in a row took two updates. It keeps looking now, and a newer
+  release takes the waiting one's place.
+
+### Better at what it already did
+
+- **Buttons you can see.** Every button has a face and an edge, the main
+  action on a screen is filled with the accent, and the controls inside a
+  row are smaller and quieter.
+- **The Devflow screen, redone.** What a setup found is a table — each
+  command with where it came from, each agent CLI with its sign-in, long
+  lists folded — and Recommended and Custom are two cards to choose from.
+  The stages are numbered cards along the flow, checks and reviewers are
+  tables, the severities that hold a card are one control, and a Custom
+  setup walks a stepper with Back and Next always at the foot of the pane.
+  Its text is a size larger.
+- **Your way of reviewing, in every project.** A reviewer persona is now read
+  from the project, then the team layers it extends, then your own
+  `~/.devpit/devflow/reviewers/`, then devpit's. Name a persona of yours in
+  your own `devflow.yaml` and it reviews all your projects; a company's
+  persona in its layer reviews the company's.
+
 ## 0.1.41 — 2026-10-12
 
 ### Fixed
