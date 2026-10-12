@@ -228,6 +228,10 @@ fn a_window_is_given_its_variables() {
 #[cfg(unix)]
 #[test]
 fn a_server_that_never_answers_is_given_up_on() {
+    if !Server::available() {
+        eprintln!("skip: tmux not on PATH");
+        return;
+    }
     let dir = tempfile::tempdir().expect("tempdir");
     let socket = dir.path().join("tmux.sock");
     let _deaf = std::os::unix::net::UnixListener::bind(&socket).expect("bind");
