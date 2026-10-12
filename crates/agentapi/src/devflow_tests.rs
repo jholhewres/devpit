@@ -151,3 +151,75 @@ fn the_watch_asks_again_only_when_a_file_it_watches_changed() {
     std::fs::write(root.path().join(STAMP), "1\n").expect("stamp");
     assert!(watch.due().is_some(), "the app's stamp changed");
 }
+
+#[test]
+fn the_brief_and_the_plan_come_only_with_their_stages() {
+    let listed = |stages: &[&str]| -> Vec<&'static str> {
+        Offer::Active(stages.iter().map(|stage| stage.to_string()).collect())
+            .tools(&STAGED)
+            .iter()
+            .map(|tool| tool.name)
+            .collect()
+    };
+    let briefing = listed(&["briefing"]);
+    assert!(briefing.contains(&"devpit_devflow_brief"), "{briefing:?}");
+    assert!(!briefing.contains(&"devpit_devflow_plan"), "{briefing:?}");
+    let plan = listed(&["plan"]);
+    assert!(plan.contains(&"devpit_devflow_plan"), "{plan:?}");
+    assert!(!plan.contains(&"devpit_devflow_brief"), "{plan:?}");
+    assert!(Offer::Setup
+        .tools(&STAGED)
+        .iter()
+        .all(|tool| !tool.name.ends_with("_brief") && !tool.name.ends_with("_plan")));
+}
+
+/// The fields the briefing and plan skills fill, by name: a tool that renamed
+/// one would answer a shape no skill sends.
+#[test]
+fn the_brief_and_the_plan_take_what_their_skills_send() {
+    let schema = |name: &str| {
+        let (_, tool) = STAGED
+            .iter()
+            .find(|(_, tool)| tool.name == name)
+            .expect("a staged tool");
+        (tool.input)()
+    };
+    let keys = |value: &Value| -> Vec<String> {
+        let mut keys: Vec<String> = value
+            .as_object()
+            .expect("properties")
+            .keys()
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    };
+    let plan = schema("devpit_devflow_plan");
+    assert_eq!(keys(&plan["properties"]), ["apply", "cards", "epic"]);
+    assert_eq!(
+        keys(&plan["properties"]["cards"]["items"]["properties"]),
+        [
+            "build",
+            "criteria",
+            "depends_on",
+            "files",
+            "key",
+            "title",
+            "verify"
+        ]
+    );
+    assert_eq!(
+        keys(&schema("devpit_devflow_brief")["properties"]),
+        [
+            "card",
+            "constraints",
+            "context",
+            "decisions",
+            "for_whom",
+            "goal",
+            "out_of_scope",
+            "success",
+            "title"
+        ]
+    );
+}

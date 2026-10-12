@@ -9,6 +9,7 @@
 //! shells costs days instead of months.
 
 pub mod bus;
+pub mod criteria;
 pub mod data_files;
 pub mod home;
 pub mod paths;
@@ -24,8 +25,8 @@ mod tree_tests;
 
 pub use bus::{Bus, Event, Severity};
 pub use store::{
-    limits, preference, AttachmentRow, CardRow, ColumnRow, CommentRow, NoticeRow, PaneLayoutWrite,
-    ProjectRow, ReminderRow, RunRow, SessionLink, StepRow, Store, StoreError, DEFAULT_COLUMNS,
-    DEV_ROOT, RELEASE_ROOT, ROOT_NAME,
+    limits, preference, AttachmentRow, CardEdges, CardRow, ColumnRow, CommentRow, NewCard,
+    NoticeRow, PaneLayoutWrite, ProjectRow, ReminderRow, RunRow, SessionLink, StepRow, Store,
+    StoreError, DEFAULT_COLUMNS, DEV_ROOT, RELEASE_ROOT, ROOT_NAME,
 };
 pub use tree::TreeError;

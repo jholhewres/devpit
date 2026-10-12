@@ -131,6 +131,11 @@
 .tile__due, .tile__n { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); }
 .tile__due[data-near='past'] { color: var(--danger); }
 .tile__due[data-near='today'] { color: var(--warning); }
+/* A plan on the board: what still blocks a card, how far an epic's cards are,
+   and a plan waiting for the person's yes. */
+.tile__blocked { margin-top: 5px; font-size: 11px; color: var(--warning); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile__progress[data-done='true'] { color: var(--success); }
+.tile__plan { padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10.5px; }
 
 /* Right after an archive, the one thing worth offering is taking it back. */
 .undo { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 14px; padding: 7px 8px 7px 14px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border-strong); box-shadow: 0 12px 30px var(--shade); font-size: 12.5px; color: var(--text); animation: rise 180ms ease-out both; }

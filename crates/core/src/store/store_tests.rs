@@ -234,7 +234,8 @@ fn a_row_written_before_a_migration_survives_it() {
     store
         .conn()
         .execute_batch(
-            "DROP TABLE finding_dismissal; DROP TABLE seen_session; DROP TABLE decision;",
+            "DROP TABLE finding_dismissal; DROP TABLE seen_session; DROP TABLE decision; \
+             DROP TABLE card_parent; DROP TABLE card_blocker; DROP TABLE devflow_plan;",
         )
         .expect("undo 025");
     store

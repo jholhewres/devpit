@@ -34,6 +34,33 @@
 .cardp__ph { font-size: 13px; color: var(--text-3); }
 .cardp__saved { margin: 6px 0 0; font-size: 11.5px; color: var(--text-3); }
 
+/* Acceptance criteria, ticked where they live: the card's body. */
+.crit { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.crit__one { display: flex; align-items: flex-start; gap: 9px; padding: 6px 10px; border-radius: 8px; background: var(--raised); font-size: 13px; line-height: 1.45; color: var(--text); }
+.crit__one input { margin-top: 3px; accent-color: var(--accent); }
+.crit__one[data-done='true'] span { color: var(--text-3); text-decoration: line-through; }
+
+/* A Devflow plan waiting on its epic: cards that do not exist yet. */
+.dplan__note { margin: -4px 0 10px; font-size: 12px; color: var(--text-3); }
+.dplan__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.dplan__card { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--border-strong); }
+.dplan__head { display: flex; align-items: center; gap: 8px; }
+.dplan__n { flex: none; width: 18px; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.dplan__t { flex: 1; min-width: 0; background: none; border: 0; border-bottom: 1px solid transparent; font: inherit; font-size: 13.5px; font-weight: 550; color: var(--text); padding: 2px 0; }
+.dplan__t:focus { outline: none; border-bottom-color: var(--accent); }
+.dplan__by { margin: 0; font-size: 11.5px; color: var(--warning); }
+.dplan__ta { width: 100%; padding: 7px 9px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); font: inherit; font-size: 12.5px; line-height: 1.5; color: var(--text); resize: vertical; }
+.dplan__ta:focus { outline: none; border-color: var(--accent); }
+.dplan__verify { align-self: flex-start; padding: 2px 7px; border-radius: 5px; background: var(--inset); font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.dplan__acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* What ties the card to the others: its epic, its blockers, an epic's cards. */
+.ties { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+.ties__group { display: flex; flex-direction: column; gap: 5px; }
+.ties__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.ties__one { padding: 5px 9px; border-radius: 7px; background: var(--raised); font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ties__one[data-done='true'] { color: var(--text-3); text-decoration: line-through; }
+
 /* Where this card's work happens. */
 .cwork__wt { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--raised); border-radius: 10px; }
 .cwork__wt[data-gone='true'] { opacity: 0.7; }

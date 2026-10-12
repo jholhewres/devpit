@@ -135,7 +135,12 @@ pub(crate) fn detail_of(project_id: String, card_id: String) -> Result<CardDetai
         .and_then(|column| column.step_id)
         .and_then(|step_id| steps.iter().find(|one| one.id == step_id).cloned());
 
+    let ties = crate::card_ties::Ties::read(&store, &project_id)?;
+    ties.fill(&mut card);
     Ok(CardDetail {
+        parent: ties.parent(&card_id),
+        children: ties.children(&card_id),
+        plan: crate::devflow_plan::waiting(&store, &card_id),
         runs: card.runs.clone(),
         comments: store.comments(&card_id)?.into_iter().map(spoken).collect(),
         pinned: store

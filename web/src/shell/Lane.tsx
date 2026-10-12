@@ -7,6 +7,7 @@ import { InlineAdd } from './InlineAdd'
 import { LaneMenu } from './LaneMenuView'
 import { LaneStep } from './LaneStep'
 import { money } from './chat'
+import { stillBlocking } from './planEdit'
 import { abandoned, committed } from './typing'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -32,6 +33,16 @@ const Speech = (): React.JSX.Element => (
 
 const Clip = (): React.JSX.Element => (
   <svg {...line}><path d="M21 12.5 12.9 20.6a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 1 1 4.7 4.7l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.5-7.4" /></svg>
+)
+
+/* An epic's cards. */
+const Stack = (): React.JSX.Element => (
+  <svg {...line}><rect x="4" y="9" width="16" height="11" rx="2" /><path d="M7 5h10" /></svg>
+)
+
+/* Criteria met. */
+const CheckBox = (): React.JSX.Element => (
+  <svg {...line}><rect x="3.5" y="3.5" width="17" height="17" rx="3" /><path d="m8 12 3 3 5-6" /></svg>
 )
 
 const Spark = (): React.JSX.Element => (
@@ -70,6 +81,9 @@ export function Tile({
   const run = card.runs[0]
   const near = nearness(card.dueAt)
   const spent = money(card.costUsd ?? 0)
+  const blocking = stillBlocking(card.blockedBy)
+  const criteria = card.criteria ?? []
+  const ticked = criteria.filter((one) => one.done).length
   return (
     <>
       {renaming ? (
@@ -100,6 +114,11 @@ export function Tile({
       {/* What the step is printing, as it prints it. One line, the last one:
           a tile is not a log, and the whole output is on the card. */}
       {progress && run?.state === 'running' && <div className="tile__log">{progress}</div>}
+      {blocking.length > 0 && (
+        <div className="tile__blocked" title={`Blocked by ${blocking.map((by) => by.title).join(', ')}`}>
+          Blocked by {blocking.map((by) => by.title).join(', ')}
+        </div>
+      )}
       <div className="tile__m">
         {card.activity && (
           <button
@@ -136,6 +155,27 @@ export function Tile({
           <span className="tile__due" data-near={near}>
             <Clock />
             {dueLabel(card.dueAt, undefined, card.dueTime)}
+          </span>
+        )}
+        {card.progress && (
+          <span
+            className="tile__n tile__progress"
+            data-done={card.progress.done === card.progress.total}
+            title={`${card.progress.done} of ${card.progress.total} cards done`}
+          >
+            <Stack />
+            {card.progress.done}/{card.progress.total}
+          </span>
+        )}
+        {criteria.length > 0 && (
+          <span className="tile__n" title={`${ticked} of ${criteria.length} criteria met`}>
+            <CheckBox />
+            {ticked}/{criteria.length}
+          </span>
+        )}
+        {(card.planWaiting ?? 0) > 0 && (
+          <span className="tile__plan" title={`A plan of ${card.planWaiting} cards waits for you on this card`}>
+            Plan · {card.planWaiting}
           </span>
         )}
         {card.comments > 0 && (

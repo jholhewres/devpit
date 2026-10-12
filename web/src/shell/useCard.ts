@@ -22,6 +22,8 @@ export interface Card {
   readonly busy: boolean
   /** Answers why the title and body were not kept, or null once they are. */
   save: (title: string, body: string) => Promise<string | null>
+  /** Ticks, or unticks, one acceptance criterion: an edit of the body. */
+  tick: (at: number, done: boolean) => Promise<string | null>
   setDue: (seconds: number | null, timed?: boolean) => void
   comment: (body: string) => Promise<string | null>
   editComment: (commentId: string, body: string) => Promise<string | null>
@@ -89,23 +91,28 @@ export function useCard(
   ): Promise<string | null> =>
     projectId && cardId ? wrote(() => call(projectId, cardId)) : Promise.resolve('no card open')
 
+  /* Not through `wrote`: these answer with the card alone, and taking that
+     for the whole detail left the open card with nothing to draw. */
+  const cardWrite = async (
+    call: (project: string, card: string) => ReturnType<typeof commands.cardUpdate>,
+  ): Promise<string | null> => {
+    if (!projectId || !cardId) return 'no card open'
+    const answer = await ask(() => call(projectId, cardId))
+    if (current.current !== cardId) return answer.error
+    setError(answer.error)
+    if (!answer.data) return answer.error
+    const kept = answer.data
+    setDetail((was) => (was && was.card.id === kept.id ? { ...was, card: kept } : was))
+    onChanged?.()
+    return null
+  }
+
   return {
     detail,
     error,
     busy,
-    /* Not through `wrote`: this answers with the card alone, and taking that
-       for the whole detail left the open card with nothing to draw. */
-    save: async (title, body) => {
-      if (!projectId || !cardId) return 'no card open'
-      const answer = await ask(() => commands.cardUpdate(projectId, cardId, title, body))
-      if (current.current !== cardId) return answer.error
-      setError(answer.error)
-      if (!answer.data) return answer.error
-      const kept = answer.data
-      setDetail((was) => (was && was.card.id === kept.id ? { ...was, card: kept } : was))
-      onChanged?.()
-      return null
-    },
+    save: (title, body) => cardWrite((p, c) => commands.cardUpdate(p, c, title, body)),
+    tick: (at, done) => cardWrite((p, c) => commands.cardCriterionTick(p, c, at, done)),
     setDue: (seconds, timed = false) => void here((p, c) => commands.cardSetDue(p, c, seconds, timed)),
     comment: (body) => here((p, c) => commands.cardComment(p, c, body)),
     editComment: (id, body) => here((p, c) => commands.cardCommentEdit(p, c, id, body)),

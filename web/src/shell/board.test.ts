@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Board, Card, Column, Run } from '../gen/bindings'
-import { endOf, landed, lanes, moveQuestion, placed, playable } from './board'
+import { endOf, landed, lanes, moveQuestion, placed, playable, tiedToOthers } from './board'
 
 const column = (id: string, position: number): Column => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual', role: null, roleChosen: false })
 const card = (id: string, columnId: string, position: number): Card =>
@@ -100,5 +100,24 @@ describe('a refused move', () => {
     expect(moveQuestion(going, false)).toBe(going.error)
     expect(moveQuestion(going, true)).toBeNull()
     expect(moveQuestion({ error: 'no such lane', code: 'not_found' }, false)).toBeNull()
+  })
+})
+
+describe('a move other tiles hear about', () => {
+  const planned: Board = {
+    ...board,
+    cards: [
+      { ...card('epic', 'a', 0), progress: { done: 0, total: 1 } },
+      { ...card('child', 'a', 1), parentId: 'epic' },
+      { ...card('after', 'b', 0), blockedBy: [{ id: 'blocker', title: 'blocker', done: false }] },
+      card('blocker', 'b', 1),
+    ],
+  }
+
+  it("is a card of an epic's, or one another card waits on", () => {
+    expect(tiedToOthers(planned, 'child')).toBe(true)
+    expect(tiedToOthers(planned, 'blocker')).toBe(true)
+    expect(tiedToOthers(planned, 'after')).toBe(false)
+    expect(tiedToOthers(board, 'c1')).toBe(false)
   })
 })

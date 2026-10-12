@@ -61,6 +61,13 @@ export function playable(card: Card, column: Column): boolean {
   return column.step !== null && !card.runs.some((run) => run.state === 'running')
 }
 
+/** Whether moving a card changes what other tiles say: an epic's progress, or
+ *  a card that waits on it. Those moves read the board again. */
+export function tiedToOthers(board: Board, cardId: string): boolean {
+  const card = board.cards.find((one) => one.id === cardId)
+  return Boolean(card?.parentId) || board.cards.some((one) => one.blockedBy?.some((by) => by.id === cardId))
+}
+
 /** Whether a card is one the board's filter keeps: its title holds the query, in any case. */
 export function matches(card: Card, query: string): boolean {
   const wanted = query.trim().toLowerCase()

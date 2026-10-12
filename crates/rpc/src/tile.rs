@@ -33,6 +33,47 @@ pub struct Card {
     /// What the sessions working on this card add up to, the one most worth a
     /// look. `None` when nothing is working on it.
     pub activity: Option<Doing>,
+    /// The epic this card was planned under.
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// The cards this one waits on, done or not: "blocked by" while any is not.
+    #[serde(default)]
+    pub blocked_by: Vec<CardRef>,
+    /// For an epic, how many of its cards are done.
+    #[serde(default)]
+    pub progress: Option<Progress>,
+    /// The checkboxes of its `## Acceptance criteria`, read from the body.
+    #[serde(default)]
+    pub criteria: Vec<Criterion>,
+    /// How many cards a Devflow plan waiting on this epic would make; 0 for none.
+    #[serde(default)]
+    pub plan_waiting: u32,
+}
+
+/// Another card, as one card names it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRef {
+    pub id: String,
+    pub title: String,
+    /// In a lane whose role is done.
+    pub done: bool,
+}
+
+/// An epic's cards: how many there are, and how many are done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Progress {
+    pub done: u32,
+    pub total: u32,
+}
+
+/// One acceptance criterion, ticked or not.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Criterion {
+    pub text: String,
+    pub done: bool,
 }
 
 /// What a session is doing, as its agent last said.

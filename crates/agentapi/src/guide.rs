@@ -114,4 +114,8 @@ tools of its stages are listed too, and devpit_devflow_skill returns the skill
 to follow for each stage: the project's .devpit/devflow/skills/<name>/SKILL.md,
 else the person's in devpit's home, else the built-in one. The same skills are
 skill:// resources, and prompts such as /devpit:devflow-plan in Claude Code.
+The board is the plan: devpit_devflow_brief writes the brief as an epic card,
+and devpit_devflow_plan previews the epic's cards — criteria as checkboxes,
+what blocks what — which the person creates on the board, or which apply
+creates after their yes.
 ";

@@ -55,6 +55,12 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
         // What was heard, without asking the CLI: a card answered alone does
         // not pay for a process. `board_get` and `card_detail` add the rest.
         activity: snapshot(&row.id).activity,
+        criteria: crate::card_ties::criteria_of(&row.body),
+        // What ties it to other cards is read for the whole board at once.
+        parent_id: None,
+        blocked_by: Vec::new(),
+        progress: None,
+        plan_waiting: 0,
         id: row.id.clone(),
         column_id: row.column_id,
         title: row.title,
@@ -161,6 +167,8 @@ pub(crate) fn board_get_now(project_id: String) -> Result<Board, RpcError> {
         card.activity = activity(&sessions);
         cards.push(card);
     }
+    let ties = crate::card_ties::Ties::read(&store, &project_id)?;
+    cards.iter_mut().for_each(|card| ties.fill(card));
 
     Ok(Board {
         project_id,
@@ -191,7 +199,7 @@ pub(crate) fn card_create_now(
     let store = store()?;
     let id = store.create_card(&project_id, &column_id, &title, &body)?;
     let steps = steps_of(&store, &project_id)?;
-    card_of(&store, &id, &steps)
+    crate::card_ties::tied(&store, &project_id, card_of(&store, &id, &steps)?)
 }
 
 #[tauri::command]
@@ -215,7 +223,7 @@ pub(crate) fn card_update_now(
     let store = store()?;
     store.update_card(&card_id, &title, &body)?;
     let steps = steps_of(&store, &project_id)?;
-    card_of(&store, &card_id, &steps)
+    crate::card_ties::tied(&store, &project_id, card_of(&store, &card_id, &steps)?)
 }
 
 #[cfg(test)]

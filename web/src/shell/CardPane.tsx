@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Attachments } from './Attachments'
 import { savesBeforeRestart } from './beforeRestart'
+import { CardCriteria } from './CardCriteria'
 import { CardDescription } from './CardDescription'
 import { CardDiff } from './CardDiff'
 import { CardElsewhere } from './CardElsewhere'
@@ -9,6 +10,8 @@ import { CardLane, type LaneChoice } from './CardLane'
 import { CardPlay } from './CardPlay'
 import { CardSessionHistory } from './CardSessionHistory'
 import { CardSessions } from './CardSessions'
+import { CardTies } from './CardTies'
+import { PlanReview } from './PlanReview'
 import { liveWork, stopLiveWork } from './liveWork'
 import { CardWork } from './CardWork'
 import { Comments } from './Comments'
@@ -194,6 +197,27 @@ export function CardPane({
                 </p>
               )}
 
+              {/* What was typed is kept first: a tick rewrites the body. */}
+              <CardCriteria
+                criteria={detail.card.criteria ?? []}
+                onTick={(at, done) =>
+                  void save().then((refused) => {
+                    if (refused === null) void card.tick(at, done)
+                  })
+                }
+              />
+              {project && detail.plan && (
+                <PlanReview
+                  key={JSON.stringify(detail.plan.cards)}
+                  projectId={project.id}
+                  plan={detail.plan}
+                  onChanged={() => {
+                    card.reload()
+                    onChanged()
+                  }}
+                />
+              )}
+
               {/* Only once the card has a checkout: there is nothing to
                   compare against until it has started somewhere. */}
               {detail.worktree?.exists && <CardDiff cardId={cardId} />}
@@ -257,6 +281,8 @@ export function CardPane({
                   <span className="cardp__cost">{money(detail.card.costUsd ?? 0)} spent</span>
                 )}
               </div>
+
+              <CardTies detail={detail} />
 
               <CardWork
                 cardId={cardId}

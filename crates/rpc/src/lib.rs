@@ -71,7 +71,9 @@ pub use checkpoint::{
 };
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
 pub use decisions::{Deciding, DecisionTried};
-pub use devflow::{DevflowAsk, DevflowAsks, DevflowChange};
+pub use devflow::{
+    DevflowAsk, DevflowAsks, DevflowChange, DevflowPlan, DevflowPlanCreated, PlannedCard,
+};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};
@@ -125,7 +127,9 @@ pub use spend::{
 };
 pub use tested::{FailedTest, Tested, MOST_FAILURES_KEPT, TESTS_EVIDENCE};
 pub use threads::{Conversations, Thread};
-pub use tile::{Card, CardHappening, CardSession, Doing, SessionKind};
+pub use tile::{
+    Card, CardHappening, CardRef, CardSession, Criterion, Doing, Progress, SessionKind,
+};
 pub use tray::Tray;
 pub use update::{InstallKind, UpdateBlocking, UpdateStatus, UpdateWork};
 pub use usage::{PaneCost, Usage};

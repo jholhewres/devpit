@@ -31,3 +31,37 @@ pub struct DevflowAsk {
 pub struct DevflowAsks {
     pub asks: Vec<DevflowAsk>,
 }
+
+/// One card of a Devflow plan, before it is a card.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PlannedCard {
+    /// The plan's own id for it, which `depends_on` names.
+    pub key: String,
+    /// Without the `[devflow] ` the card's title gets.
+    pub title: String,
+    pub build: String,
+    pub criteria: Vec<String>,
+    pub files: Vec<String>,
+    pub verify: String,
+    pub depends_on: Vec<String>,
+}
+
+/// A plan previewed for an epic, waiting for the person to create its cards.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowPlan {
+    pub epic_id: String,
+    pub cards: Vec<PlannedCard>,
+    /// The person changed it on the board.
+    pub edited: bool,
+    /// Seconds since the epoch.
+    pub planned_at: f64,
+}
+
+/// Response of `devflow.plan_create`: the cards made, in the plan's order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowPlanCreated {
+    pub card_ids: Vec<String>,
+}

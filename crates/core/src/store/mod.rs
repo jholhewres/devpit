@@ -2,6 +2,7 @@
 //! the access pattern is a window drawing while a watcher writes.
 
 mod board;
+mod card_edges;
 mod card_links;
 mod cards;
 pub mod column_roles;
@@ -14,6 +15,7 @@ mod layouts;
 mod migrations;
 mod orchestrators;
 pub mod pane_agents;
+mod plans;
 mod plugins;
 pub mod project_runs;
 mod projects;
@@ -55,13 +57,19 @@ pub enum StoreError {
     /// pass a check made before either wrote.
     #[error("a run is already going on this card")]
     AlreadyRunning,
+
+    /// Cards that would wait on each other in a circle, which never starts.
+    #[error("those cards would wait on each other in a circle")]
+    Circle,
 }
 
 pub use board::{CardRow, ColumnRow, StepRow, StepUse, DEFAULT_COLUMNS};
+pub use card_edges::CardEdges;
 pub use card_links::{BackgroundLink, CardLinks, ChatLink, RunLink, SessionHeld};
 pub use cards::{AttachmentRow, CommentRow, NoticeRow};
 pub use evidence::{Evidence, EvidenceError, Ran, MOST_EVIDENCE};
 pub use layouts::{CardTabLayout, PaneLayoutWrite};
+pub use plans::{NewCard, PlanRow, MOST_PLAN};
 pub use runs::RunRow;
 pub use seen_sessions::{SeenSessionRow, SessionSeen};
 pub use session_links::SessionLink;

@@ -20,14 +20,26 @@ use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
 
-pub(crate) const METHODS: [&str; 6] = [
+pub(crate) const METHODS: [&str; 8] = [
     "devflow_offer",
     "devflow_status",
     "devflow_setup",
     "devflow_set",
     "devflow_skills",
     "devflow_skill",
+    "devflow_brief",
+    "devflow_plan",
 ];
+
+/// The stage a method of a stage's own belongs to: it answers only where
+/// that stage is on, as the MCP server lists it.
+pub(crate) fn stage_of(method: &str) -> Option<&'static str> {
+    match method {
+        "devflow_brief" => Some("briefing"),
+        "devflow_plan" => Some("plan"),
+        _ => None,
+    }
+}
 
 /// What the MCP server lists for a project.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,7 +93,15 @@ pub(crate) fn respond(
             &stages_on(&store, project, &state)?,
             params,
         ),
-        _ => Err(format!("devpit does not answer `{method}`")),
+        _ => match stage_of(method) {
+            Some(stage) if stages_on(&store, project, &state)?.contains(&stage) => {
+                crate::devflow_plan::respond(app, method, project, params)
+            }
+            Some(stage) => Err(format!(
+                "Devflow's {stage} stage is switched off in this project's devflow.yaml."
+            )),
+            None => Err(format!("devpit does not answer `{method}`")),
+        },
     }
 }
 

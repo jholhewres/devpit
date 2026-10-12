@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Board, CardHappening, CardSession, ColumnDeleted, Played, Step } from '../gen/bindings'
-import { endOf, landed, lanes, moveQuestion, type Lane } from './board'
+import { endOf, landed, lanes, moveQuestion, tiedToOthers, type Lane } from './board'
 import { shifted } from './laneOrder'
 import { ask, commands } from './live'
 import { onCarried } from './window'
@@ -170,8 +170,9 @@ export function useBoard(projectId: string | null): UseBoard {
         /* Refused: the board as it is now, read again — not a snapshot from
            before the drop, which would also undo whatever arrived since. */
         if (answer.error) read(false, before)
-        /* Taken: the card as the store wrote it, and a started run read in. */
-        else if (answer.data?.started) reload()
+        /* Taken: the card as the store wrote it, and a started run read in —
+           or an epic's count and a blocked card's word, said by the store. */
+        else if (answer.data?.started || tiedToOthers(before, cardId)) reload()
         else if (answer.data) {
           const card = answer.data.card
           /* Laid out the way the store lays out a lane — renumbered from

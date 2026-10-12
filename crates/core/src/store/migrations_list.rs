@@ -729,4 +729,43 @@ CREATE TABLE decision (
 CREATE INDEX decision_at ON decision(at);
 "#,
     },
+    // Migration 028 — a plan on the board: an epic's cards, and what each waits on.
+    Migration {
+        version: 28,
+        sql: r#"
+-- The epic a card was planned under, one at most. A table rather than a
+-- column on `card`: an epic deleted takes the row and leaves its cards on the
+-- board as work of their own, and `card` keeps the shape older rows had.
+CREATE TABLE card_parent (
+    card_id    TEXT PRIMARY KEY REFERENCES card(id) ON DELETE CASCADE,
+    parent_id  TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    CHECK (card_id != parent_id)
+);
+CREATE INDEX card_parent_of ON card_parent(parent_id);
+
+-- A card that cannot start until another is done. Rows, not a list in the
+-- body: the board draws "blocked by" from them, and the body is the person's.
+CREATE TABLE card_blocker (
+    card_id    TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    blocked_by TEXT NOT NULL REFERENCES card(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (card_id, blocked_by),
+    CHECK (card_id != blocked_by)
+);
+CREATE INDEX card_blocker_by ON card_blocker(blocked_by);
+
+-- A Devflow plan previewed for an epic, waiting for the person to create its
+-- cards or drop it. One per epic; a new preview replaces it.
+CREATE TABLE devflow_plan (
+    epic_id    TEXT PRIMARY KEY REFERENCES card(id) ON DELETE CASCADE,
+    cards      TEXT NOT NULL,
+    -- 1 once the person changed it on the board: their edits are what apply.
+    edited     INTEGER NOT NULL DEFAULT 0,
+    planned_at INTEGER NOT NULL,
+    -- What was created, once it was, and by whose yes.
+    created    TEXT,
+    applied_at INTEGER
+);
+"#,
+    },
 ];

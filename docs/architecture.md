@@ -166,6 +166,13 @@ no copy, only that the person clicked.
   tools, resources and prompts, and watches the project's devflow.yaml and
   the app's stamp file, so switching Devflow on or off reaches a session
   already running.
+- **The board is the plan.** `devpit_devflow_brief` writes the brief as an
+  epic card, `[devflow] Brief: <title>`. `devpit_devflow_plan` previews the
+  epic's cards and creates none: the preview waits on the epic, where the
+  person moves, cuts or edits it and clicks Create. An agent's `apply`
+  creates only the plan the person last saw, and only once. A card's epic
+  and blockers are rows (`card_parent`, `card_blocker`); its criteria stay
+  in its body.
 - **Skills by layer.** Where it is on, each stage's skill is a
   `skill://devflow/<name>/SKILL.md` resource carrying its SEP-2640 entry
   (digest and size), the `devpit_devflow_skill` tool, and a prompt such as

@@ -419,6 +419,18 @@ export const commands = {
 	devflowAsks: () => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_asks")),
 	/**  `devflow.answer` — the person's click: yes makes the change, no drops it. */
 	devflowAnswer: (id: string, yes: boolean) => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_answer", { id, yes })),
+	/**
+	 *  `devflow.plan_keep` — the person moved, cut or edited a waiting plan on
+	 *  the board.
+	 */
+	devflowPlanKeep: (projectId: string, epicId: string, cards: PlannedCard[]) => typedError<DevflowPlan, RpcError>(__TAURI_INVOKE("devflow_plan_keep", { projectId, epicId, cards })),
+	/**
+	 *  `devflow.plan_create` — the person's click: the epic's waiting plan
+	 *  becomes its cards.
+	 */
+	devflowPlanCreate: (projectId: string, epicId: string) => typedError<DevflowPlanCreated, RpcError>(__TAURI_INVOKE("devflow_plan_create", { projectId, epicId })),
+	/**  `devflow.plan_drop` — the person dropped a waiting plan: no card is made. */
+	devflowPlanDrop: (projectId: string, epicId: string) => typedError<null, RpcError>(__TAURI_INVOKE("devflow_plan_drop", { projectId, epicId })),
 	/**  `orchestrator.proposals` — what this orchestrator proposed, oldest first. */
 	orchestratorProposals: (projectId: string) => __TAURI_INVOKE<ProjectProposal[]>("orchestrator_proposals", { projectId }),
 	/**  `orchestrator.proposal_drop` — done or dropped by the person, it goes. */
@@ -1140,6 +1152,11 @@ export const commands = {
 	 *  open card reads it again whenever one of its sessions says something.
 	 */
 	cardDetail: (projectId: string, cardId: string) => typedError<CardDetail, RpcError>(__TAURI_INVOKE("card_detail", { projectId, cardId })),
+	/**
+	 *  `card.criterion_tick` — the person ticks, or unticks, one of a card's
+	 *  acceptance criteria. It is an edit of the body, where the criterion lives.
+	 */
+	cardCriterionTick: (projectId: string, cardId: string, at: number, done: boolean) => typedError<Card, RpcError>(__TAURI_INVOKE("card_criterion_tick", { projectId, cardId, at, done })),
 	/**
 	 *  `card.set_due` — when this card is due, or nothing.
 	 * 
@@ -2025,6 +2042,16 @@ export type Card = {
 	 *  look. `None` when nothing is working on it.
 	 */
 	activity: Doing | null,
+	/**  The epic this card was planned under. */
+	parentId?: string | null,
+	/**  The cards this one waits on, done or not: "blocked by" while any is not. */
+	blockedBy?: CardRef[],
+	/**  For an epic, how many of its cards are done. */
+	progress?: Progress | null,
+	/**  The checkboxes of its `## Acceptance criteria`, read from the body. */
+	criteria?: Criterion[],
+	/**  How many cards a Devflow plan waiting on this epic would make; 0 for none. */
+	planWaiting?: number,
 };
 
 /**  Response of `card.create` and `card.move`. */
@@ -2066,6 +2093,12 @@ export type CardDetail = {
 	 *  its background session and its conversations.
 	 */
 	sessions: CardSession[],
+	/**  The epic it was planned under. */
+	parent?: CardRef | null,
+	/**  For an epic, its cards in board order. */
+	children?: CardRef[],
+	/**  For an epic, the Devflow plan waiting for the person. */
+	plan?: DevflowPlan | null,
 };
 
 /**  Every review a card's runs left, newest first. */
@@ -2079,6 +2112,14 @@ export type CardHappening = {
 	/**  The one the tile shows. `None` once nothing is left. */
 	activity: Doing | null,
 	sessions: CardSession[],
+};
+
+/**  Another card, as one card names it. */
+export type CardRef = {
+	id: string,
+	title: string,
+	/**  In a lane whose role is done. */
+	done: boolean,
 };
 
 /**  One run's review, as a card's diff draws it. */
@@ -2449,6 +2490,12 @@ export type Credentials = "saved" | "missing" | "unknown" |
 /**  Saved, but past renewing itself: the CLI asks for /login. */
 "expired";
 
+/**  One acceptance criterion, ticked or not. */
+export type Criterion = {
+	text: string,
+	done: boolean,
+};
+
 /**  Where the cursor is, in the island window's pixels, for the eyes. */
 export type Cursor = {
 	x: number | null,
@@ -2571,6 +2618,21 @@ export type DevflowChange =
 "enable" | 
 /**  Decisions moved from shadow to enforce in the project's Devflow. */
 "enforce";
+
+/**  A plan previewed for an epic, waiting for the person to create its cards. */
+export type DevflowPlan = {
+	epicId: string,
+	cards: PlannedCard[],
+	/**  The person changed it on the board. */
+	edited: boolean,
+	/**  Seconds since the epoch. */
+	plannedAt: number | null,
+};
+
+/**  Response of `devflow.plan_create`: the cards made, in the plan's order. */
+export type DevflowPlanCreated = {
+	cardIds: string[],
+};
 
 /**
  *  What somebody did in the menu, on its way back to the pane that owns it.
@@ -3625,6 +3687,19 @@ export type PlanWindow = {
 	resetsAt: number | null,
 };
 
+/**  One card of a Devflow plan, before it is a card. */
+export type PlannedCard = {
+	/**  The plan's own id for it, which `depends_on` names. */
+	key: string,
+	/**  Without the `[devflow] ` the card's title gets. */
+	title: string,
+	build: string,
+	criteria: string[],
+	files: string[],
+	verify: string,
+	dependsOn: string[],
+};
+
 /**
  *  What pressing play did, or why it did not.
  * 
@@ -3765,6 +3840,12 @@ export type Profile = {
 	 *  nothing off for them.
 	 */
 	enabled?: boolean,
+};
+
+/**  An epic's cards: how many there are, and how many are done. */
+export type Progress = {
+	done: number,
+	total: number,
 };
 
 /**

@@ -62,17 +62,59 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
 
 /// The tools only an active project gets: each under the stage that must be
 /// switched on for it, or `None` for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(Option<&str>, Tool); 1] = [(
-    None,
-    Tool {
-        name: crate::skills::TOOL,
-        method: "devflow_skill",
-        description: "The Devflow skill to follow for a stage, as this project resolves it: its own .devpit/devflow/skills/<name>/SKILL.md, else the person's, else devpit's built-in one. Call it before each stage and follow what it returns; devflow-setup is for changing the setup. A stage switched off in devflow.yaml has no skill.",
-        input: || json!({ "type": "object", "properties": {
-            "name": { "type": "string", "enum": crate::skills::NAMES, "description": "The skill: devflow-<stage>, or devflow-setup." }
-        }, "required": ["name"] }),
-    },
-)];
+pub(crate) static STAGED: [(Option<&str>, Tool); 3] = [
+    (
+        None,
+        Tool {
+            name: crate::skills::TOOL,
+            method: "devflow_skill",
+            description: "The Devflow skill to follow for a stage, as this project resolves it: its own .devpit/devflow/skills/<name>/SKILL.md, else the person's, else devpit's built-in one. Call it before each stage and follow what it returns; devflow-setup is for changing the setup. A stage switched off in devflow.yaml has no skill.",
+            input: || json!({ "type": "object", "properties": {
+                "name": { "type": "string", "enum": crate::skills::NAMES, "description": "The skill: devflow-<stage>, or devflow-setup." }
+            }, "required": ["name"] }),
+        },
+    ),
+    (
+        Some("briefing"),
+        Tool {
+            name: "devpit_devflow_brief",
+            method: "devflow_brief",
+            description: "Devflow: write a brief onto the board, as the epic card titled '[devflow] Brief: <title>' — goal, for whom, success, out of scope, constraints and decisions. Only after the person's explicit yes to your restate. Without `card` it creates the epic; with `card` it writes onto that card, renaming it when `title` is given. `context` (the context stage's summary, a markdown ## Context section) replaces the epic's context. Fields left out stay as they were. Answers with the card id.",
+            input: || json!({ "type": "object", "properties": {
+                "card": { "type": "string", "description": "An existing card to write the brief onto: the epic, or the card the work started from." },
+                "title": { "type": "string", "description": "The short title; the card becomes '[devflow] Brief: <title>'. Needed for a new epic." },
+                "goal": { "type": "string" },
+                "for_whom": { "type": "string" },
+                "success": { "type": "string", "description": "An observable check: a command, a screen, a number." },
+                "out_of_scope": { "type": "array", "items": { "type": "string" } },
+                "constraints": { "type": "array", "items": { "type": "string" } },
+                "decisions": { "type": "array", "items": { "type": "string" } },
+                "context": { "type": "string", "description": "The context stage's summary, starting with ## Context." }
+            } }),
+        },
+    ),
+    (
+        Some("plan"),
+        Tool {
+            name: "devpit_devflow_plan",
+            method: "devflow_plan",
+            description: "Devflow: an epic's plan as its child cards, each titled '[devflow] <title>', its body the build, the criteria as checkboxes under ## Acceptance criteria, the likely files and the verify command, and its depends_on as blocking edges the board shows. Without apply it previews and creates nothing: the plan waits on the epic, where the person can move, cut or edit it and create the cards with a click. apply: true creates the cards, only after the person's explicit yes to the preview, and only the plan the person last saw: cards that differ become a new preview. When the person already approved on the board, the answer says so with the card ids.",
+            input: || json!({ "type": "object", "properties": {
+                "epic": { "type": "string", "description": "The epic's card id." },
+                "cards": { "type": "array", "items": { "type": "object", "properties": {
+                    "key": { "type": "string", "description": "A short local id, e.g. s1, that depends_on refers to." },
+                    "title": { "type": "string", "description": "The behaviour, in the glossary's words; the tool adds '[devflow] '." },
+                    "build": { "type": "string", "description": "What works end to end when it lands, one paragraph." },
+                    "criteria": { "type": "array", "items": { "type": "string" }, "description": "Testable conditions; they become checkboxes." },
+                    "files": { "type": "array", "items": { "type": "string" }, "description": "The files it likely touches." },
+                    "verify": { "type": "string", "description": "One command that proves the criteria." },
+                    "depends_on": { "type": "array", "items": { "type": "string" }, "description": "The keys of the cards that block it." }
+                }, "required": ["key", "title"] } },
+                "apply": { "type": "boolean", "description": "Create the cards. Only after the person's explicit yes to the preview." }
+            }, "required": ["epic", "cards"] }),
+        },
+    ),
+];
 
 /// What the server offers the project it stands in.
 #[derive(Debug, Clone, PartialEq, Eq)]

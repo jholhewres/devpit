@@ -43,6 +43,12 @@ from going stale: a board that merely describes what happens elsewhere is out of
 date by the first busy day. If moving the card is what starts the work, it has
 no way to lie.
 
+A card can belong to an epic and wait on other cards. Those are edges between
+cards, not a second kind of card: an epic counts its cards done by the lane they
+sit in, and a card says what blocks it until that card is done. Its acceptance
+criteria are checkboxes under `## Acceptance criteria` in its own description,
+so ticking one edits the text everyone reads.
+
 ## `step`
 
 A column's rule: *on arrival here, run this*. A step is one of three kinds.

@@ -88,6 +88,15 @@ pub struct CardDetail {
     /// Every session working on the card: its tab's panes, runs with a session,
     /// its background session and its conversations.
     pub sessions: Vec<crate::tile::CardSession>,
+    /// The epic it was planned under.
+    #[serde(default)]
+    pub parent: Option<crate::tile::CardRef>,
+    /// For an epic, its cards in board order.
+    #[serde(default)]
+    pub children: Vec<crate::tile::CardRef>,
+    /// For an epic, the Devflow plan waiting for the person.
+    #[serde(default)]
+    pub plan: Option<crate::devflow::DevflowPlan>,
 }
 
 /// Something worth telling somebody about.
