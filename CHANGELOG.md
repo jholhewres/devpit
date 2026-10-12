@@ -3,6 +3,71 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.41 — 2026-10-12
+
+### Fixed
+
+- **The window no longer stops answering when tmux is busy.** A tmux server
+  too slow to answer used to hold one of devpit's threads per call until
+  none was left, and then nothing reached the board. tmux calls now give up
+  after 10 s, the window waits for one answer before asking again, and
+  devpit writes `devpit stall:` to its log if anything stands still.
+- **"database is locked" is gone again.** Commits and closes no longer wait
+  for the disk while holding the store's locks, so a slow disk under a build
+  refuses nobody.
+- **A file's tab is named after the file**, however it was opened — not
+  `files.rs`.
+
+### Better at what it already did
+
+- **Keyboard shortcuts, all in one place.** Settings → Keyboard lists every
+  shortcut, lets you record new keys and refuses one already taken, naming
+  which. `?` or Ctrl+/ shows them all. Inside a terminal only the shortcuts
+  meant for it fire; the rest go to the program. Splitting no longer splits
+  every open tab, Ctrl+G no longer opens Claude Code's editor too, and Ctrl
+  vs ⌘ follows the platform.
+- **The tray icon stays and helps.** Closing the window keeps devpit in the
+  tray where there is one (off in Settings → General). The icon shows a dot
+  and a count when something waits on you, and its menu opens each item,
+  recent projects, a new terminal, pause and Settings.
+- **Every control shows the pointer it acts with**, maximize turns into
+  restore, icon-only buttons have tooltips, and hover and focus are the same
+  everywhere.
+- **Sign-ins before a session starts.** A footer chip shows each account's
+  sign-in; a start from the window checks it and holds with the command that
+  fixes it. The MCP check no longer slows a start.
+- **Sessions.** A session's row says whether Remote Control is on, with its
+  link, and a card lists the sessions that worked on it, each resumable.
+- **The orchestrator keeps one name across restarts**, so sessions can
+  always report back, and its chat answers `/sessions`, `/waiting`, `/ended`
+  and `/resume-session` itself.
+- **Channels escalate.** A notice nobody acts on moves from push to Telegram
+  to e-mail; the calendar of card dates is now served by devpit.app, titles
+  off unless you switch them on.
+- **Secrets can carry a rotation reminder**, and the Remote can add one to a
+  project's `.env` without the value passing anywhere else.
+
+### New
+
+- **The Remote from any network.** Without Tailscale, the Remote reaches
+  this computer through devpit.app's relay, encrypted end to end: devpit.app
+  splices bytes it cannot read. Tailscale stays as the other choice.
+- **Chat on your phone.** The Remote talks to the orchestrators and their
+  sessions, with dictation transcribed by this computer and photos that land
+  in the project.
+- **Talk to the orchestrator from Telegram**, in text or voice. Sending a
+  draft, stopping a session or moving a card is a button, never a typed yes.
+- **devpit's MCP from another computer**, read-only: board, sessions and
+  what waits on you, through the same encrypted relay. Off by default.
+- **Sync between your computers**: preferences and project settings, sealed
+  with a key devpit.app never holds. Off by default; secrets never sync.
+- **Devflow**: a short engineering flow served by devpit's MCP — briefing,
+  context, plan, execution, review and completion — with the plan on the
+  board (epics, child cards, dependencies, acceptance criteria you tick),
+  evidence kept on each card, a completion gate before a card is done,
+  review by several agent CLIs at once, Jev judging in shadow first, and a
+  Devflow screen in every project. Off until you switch it on, with a click.
+
 ## 0.1.40 — 2026-10-08
 
 ### Channels
