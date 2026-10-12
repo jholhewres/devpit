@@ -120,7 +120,7 @@ describe('Devflow is set up, activated and edited on its screen', () => {
     const holding = await window.executeScript(function () {
       return Array.prototype.slice
         .call(document.querySelectorAll('[aria-label="Severities that hold the card"] button[aria-pressed="true"]'))
-        .map((button) => button.innerText.trim())
+        .map((button) => button.textContent.trim())
     })
     assert.deepEqual(holding, ['critical'])
     await photographed('devflow-6-outside')
