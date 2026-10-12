@@ -65,22 +65,77 @@ pub struct DevflowSkill {
 #[serde(rename_all = "camelCase")]
 pub struct DevflowStage {
     pub name: String,
+    /// `builtin/<stage>`, or `<where>/<skill>` for an own stage.
+    pub uses: String,
+    /// One of the project's or a team's own stages.
+    pub own: bool,
     pub enabled: bool,
     /// `person` or `none`, for a stage whose result is approved.
     pub approve: Option<String>,
+    /// The plan's: `board`, `jira`, `linear` or `github`, when said.
+    pub publish: Option<String>,
     /// The execution stage's checks.
     pub checks: Vec<DevflowCheck>,
-    /// The completion stage's rubric.
+    /// The execution stage's folder for E2E specs.
+    pub e2e_dir: Option<String>,
+    /// The completion stage's rubric, or an own stage's.
     pub gate: Option<String>,
+    /// An own stage's gate command.
+    pub command: Option<String>,
     /// Decisions' rubric for this stage, when one is named.
     pub rubric: Option<String>,
     pub skill: Option<DevflowSkill>,
+}
+
+/// A team or company layer the project extends.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowTeam {
+    /// What its own stages are used under: `<name>/<skill>`.
+    pub name: String,
+    pub git: String,
+    /// The ref devflow.yaml names.
+    pub wanted: String,
+    /// What the lockfile pins, when it pins it.
+    pub locked_ref: Option<String>,
+    pub commit: Option<String>,
+    /// `applied`, `approve` or `fetch`.
+    pub state: String,
+}
+
+/// What approving a layer's ref changes: shown before the person's click.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowTeamChange {
+    pub name: String,
+    pub git: String,
+    pub from_ref: Option<String>,
+    pub from_commit: Option<String>,
+    pub to_ref: String,
+    pub to_commit: String,
+    /// `added path`, `changed path` or `removed path`.
+    pub files: Vec<String>,
+    /// The layer's devflow.yaml: `- ` lines gone, `+ ` lines new.
+    pub diff: Vec<String>,
+}
+
+/// Response of `devflow.team_fetch`: each layer's change, nothing applied.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowTeamChanges {
+    pub changes: Vec<DevflowTeamChange>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DevflowConfig {
     pub enabled: bool,
+    pub version: u32,
+    pub teams: Vec<DevflowTeam>,
+    /// Fields a layer locked, which the project may not change.
+    pub locked: Vec<String>,
+    /// The layer the stages came from: `project`, a team's name, or `built-in`.
+    pub stages_from: String,
     pub stages: Vec<DevflowStage>,
     pub reviewers: Vec<DevflowReviewer>,
     pub block_on: Vec<String>,
@@ -121,6 +176,9 @@ pub struct DevflowDetected {
     pub adrs: Vec<String>,
     /// What detection left to the person, one sentence each.
     pub open: Vec<String>,
+    /// How the repository already works: guides, templates, git-flow's
+    /// branches, ticket keys and installed skills, one line each.
+    pub hints: Vec<String>,
     /// The recommended setup, before its commands move into scripts.
     pub recommended: DevflowConfig,
 }
@@ -187,6 +245,18 @@ pub struct DevflowPrefs {
 pub struct DevflowCodexInstalled {
     pub folder: String,
     pub said: String,
+}
+
+/// An epic's autopilot: whether it runs, and what it last did or waits for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowAutopilot {
+    pub project_id: String,
+    pub epic_id: Option<String>,
+    pub running: bool,
+    pub said: Option<String>,
+    /// The plan's cards in the order it runs them, by title.
+    pub order: Vec<String>,
 }
 
 /// One reviewer of a card's newest review.

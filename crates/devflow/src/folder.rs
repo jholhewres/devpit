@@ -24,7 +24,8 @@ pub enum State {
     Missing,
     /// The text when it could be read, and why it is refused.
     Invalid(Option<String>, Invalid),
-    Valid(String, Config),
+    /// Boxed: a configuration is many times the size of a refusal.
+    Valid(String, Box<Config>),
 }
 
 /// The state of `root`'s devflow.yaml, read through symlinks and only from
@@ -50,7 +51,7 @@ pub fn read(root: &Path) -> State {
         return refused("devflow.yaml is not UTF-8 text");
     };
     match config::parse(&text) {
-        Ok(config) => State::Valid(text, config),
+        Ok(config) => State::Valid(text, Box::new(config)),
         Err(invalid) => State::Invalid(Some(text), invalid),
     }
 }
@@ -131,9 +132,25 @@ fn find<'a>(tree: &'a Node, path: &str) -> Option<&'a Node> {
             .iter()
             .find(|(key, _)| key.name == part)
             .map(|(_, node)| node),
-        Value::Seq(items) => items.get(part.parse::<usize>().ok()?),
+        Value::Seq(items) => match part.parse::<usize>() {
+            Ok(index) => items.get(index),
+            // A stage of version 2's list, by its name.
+            Err(_) => items.iter().find(|item| stage_named(item) == Some(part)),
+        },
         _ => None,
     })
+}
+
+/// The name an item of a list of stages has: what follows the last `/` of `uses`.
+fn stage_named(item: &Node) -> Option<&str> {
+    let Value::Map(fields) = &item.value else {
+        return None;
+    };
+    let (_, uses) = fields.iter().find(|(key, _)| key.name == "uses")?;
+    let Value::Scalar(uses, _) = &uses.value else {
+        return None;
+    };
+    Some(uses.rsplit('/').next().unwrap_or(uses))
 }
 
 #[cfg(test)]

@@ -7,6 +7,7 @@ import { DevflowJev } from './DevflowJev'
 import { DevflowReviewers } from './DevflowReviewers'
 import { DevflowSetup } from './DevflowSetup'
 import { DevflowStages } from './DevflowStages'
+import { DevflowTeams } from './DevflowTeams'
 import { inOrder } from './inOrder'
 import { ask, commands } from './live'
 import { useShell } from './useShell'
@@ -173,6 +174,7 @@ export function DevflowPane(): React.JSX.Element {
               )}
             </div>
             <Waiting asks={screen.waiting} onAnswer={answer} />
+            {screen.config && <DevflowTeams projectId={screen.projectId} config={screen.config} onScreen={took} />}
             {screen.yaml && <pre className="errprev__body" aria-label="devflow.yaml">{screen.yaml}</pre>}
           </>
         )
@@ -194,8 +196,9 @@ export function DevflowPane(): React.JSX.Element {
               </button>
             </div>
             <Waiting asks={screen.waiting} onAnswer={answer} />
+            <DevflowTeams projectId={screen.projectId} config={config} onScreen={took} />
             <div className="acc__sub">Stages</div>
-            <DevflowStages config={config} edit={edit} projectId={screen.projectId} />
+            <DevflowStages config={config} edit={edit} projectId={screen.projectId} arrange />
             <div className="acc__sub">Review</div>
             <DevflowReviewers config={config} edit={edit} />
             <div className="acc__sub">Jev</div>

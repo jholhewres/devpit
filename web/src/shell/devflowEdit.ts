@@ -39,6 +39,43 @@ export const reviewerOf = (one: DevflowReviewer): Record<string, unknown> => ({
   ...(one.model ? { model: one.model } : {}),
 })
 
+export const PUBLISH = ['board', 'jira', 'linear', 'github'] as const
+
+/** A stage as version 2's list takes it. */
+export function stageJson(stage: DevflowStage): Record<string, unknown> {
+  const item: Record<string, unknown> = { uses: stage.uses, enabled: stage.enabled }
+  if (stage.approve) item.approve = stage.approve
+  if (stage.publish) item.publish = stage.publish
+  if (stage.uses === 'builtin/execution') {
+    item.checks = stage.checks.map(checkOf)
+    if (stage.e2eDir) item.e2e_dir = stage.e2eDir
+  }
+  if (stage.uses === 'builtin/completion' && stage.gate) item.gate = stage.gate
+  if (stage.own && stage.command) item.gate = { command: stage.command }
+  else if (stage.own && stage.gate) item.gate = { rubric: stage.gate }
+  return item
+}
+
+/** The list of stages with one moved by `by` places; the list as it was at an end. */
+export function moved(config: DevflowConfig, name: string, by: -1 | 1): Record<string, unknown>[] {
+  const stages = [...config.stages]
+  const at = stages.findIndex((one) => one.name === name)
+  const to = at + by
+  if (at >= 0 && to >= 0 && to < stages.length) [stages[at], stages[to]] = [stages[to]!, stages[at]!]
+  return stages.map(stageJson)
+}
+
+/** The list of stages without `name`: a built-in one left out is off. */
+export const removed = (config: DevflowConfig, name: string): Record<string, unknown>[] =>
+  config.stages.filter((one) => one.name !== name).map(stageJson)
+
+/** The list of stages with an own one added at its end, gated by `command` when given. */
+export function added(config: DevflowConfig, uses: string, command: string): Record<string, unknown>[] {
+  const item: Record<string, unknown> = { uses: uses.trim(), enabled: true }
+  if (command.trim()) item.gate = { command: command.trim() }
+  return [...config.stages.map(stageJson), item]
+}
+
 /** `decisions.rubrics` with `stage`'s rubric changed; an empty one is removed. */
 export function rubricsWith(config: DevflowConfig, stage: string, rubric: string): Record<string, string> {
   const rubrics: Record<string, string> = {}

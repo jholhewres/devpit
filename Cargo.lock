@@ -1165,6 +1165,7 @@ version = "0.1.40"
 dependencies = [
  "devpit-agentcli",
  "devpit-core",
+ "devpit-git",
  "devpit-rpc",
  "devpit-steps",
  "serde",

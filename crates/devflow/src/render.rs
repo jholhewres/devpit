@@ -1,15 +1,14 @@
 //! A configuration written out as devflow.yaml, with the comments a person
-//! needs to edit it by hand. The one layout devpit writes; reading it back
-//! gives the same configuration.
+//! needs to edit it by hand. The one layout devpit writes for each version;
+//! reading it back gives the same configuration.
 
 use std::fmt::Write;
 
-use crate::config::{Approved, Config, Stage};
+use crate::config::{Approved, Check, Config, Stage, StageGate, Step, V1};
 
 /// The text of `config`, commented.
 pub fn render(config: &Config) -> String {
     let mut out = String::new();
-    let stages = &config.stages;
     out.push_str(
         "# Devflow: briefing → context → plan → execution → review → completion,\n\
          # served by devpit's MCP. This file is the source of truth: devpit edits\n\
@@ -18,41 +17,140 @@ pub fn render(config: &Config) -> String {
     let _ = writeln!(out, "version: {}", config.version);
     out.push_str("\n# Switched on by the person's click in the devpit app, never by an agent.\n");
     let _ = writeln!(out, "enabled: {}", config.enabled);
-
-    out.push_str("\nstages:\n");
-    out.push_str("  # approve: person stops for the person's yes; none goes on.\n");
-    approved(&mut out, "briefing", &stages.briefing);
-    plain(&mut out, "context", &stages.context);
-    approved(&mut out, "plan", &stages.plan);
-    let execution = &stages.execution;
-    let _ = writeln!(out, "  execution:\n    enabled: {}", execution.enabled);
-    if execution.checks.is_empty() {
-        out.push_str("    checks: []\n");
+    if config.version == V1 {
+        stages_v1(&mut out, config);
     } else {
-        out.push_str(
-            "    # Run by devpit from the project's root for the evidence on the card.\n\
-             \x20   # report: junit | vitest | jest | cargo | none\n\
-             \x20   checks:\n",
-        );
-        for check in &execution.checks {
-            let _ = writeln!(out, "      - name: {}", scalar(&check.name));
-            let _ = writeln!(out, "        run: {}", scalar(&check.run));
-            let _ = writeln!(out, "        report: {}", check.report.word());
-            if !check.evidence.is_empty() {
-                let kept: Vec<&str> = check.evidence.iter().map(|one| one.word()).collect();
-                let _ = writeln!(out, "        evidence: [{}]", kept.join(", "));
-            }
+        extends(&mut out, config);
+        stages_v2(&mut out, config);
+    }
+    review(&mut out, config);
+    if config.version != V1 && !config.locked.is_empty() {
+        out.push_str("\n# Fields a project extending this file may not change.\nlocked:\n");
+        for path in &config.locked {
+            let _ = writeln!(out, "  - {}", scalar(path));
         }
     }
+    out
+}
+
+fn checks(out: &mut String, indent: &str, checks: &[Check]) {
+    if checks.is_empty() {
+        let _ = writeln!(out, "{indent}checks: []");
+        return;
+    }
+    let _ = writeln!(
+        out,
+        "{indent}# Run by devpit from the project's root for the evidence on the card.\n\
+         {indent}# report: junit | vitest | jest | cargo | none\n\
+         {indent}checks:"
+    );
+    for check in checks {
+        let _ = writeln!(out, "{indent}  - name: {}", scalar(&check.name));
+        let _ = writeln!(out, "{indent}    run: {}", scalar(&check.run));
+        let _ = writeln!(out, "{indent}    report: {}", check.report.word());
+        if !check.evidence.is_empty() {
+            let kept: Vec<&str> = check.evidence.iter().map(|one| one.word()).collect();
+            let _ = writeln!(out, "{indent}    evidence: [{}]", kept.join(", "));
+        }
+    }
+}
+
+fn stages_v1(out: &mut String, config: &Config) {
+    let stages = &config.stages;
+    out.push_str("\nstages:\n");
+    out.push_str("  # approve: person stops for the person's yes; none goes on.\n");
+    approved(out, "briefing", &stages.briefing);
+    plain(out, "context", &stages.context);
+    approved(out, "plan", &stages.plan);
+    let execution = &stages.execution;
+    let _ = writeln!(out, "  execution:\n    enabled: {}", execution.enabled);
+    checks(out, "    ", &execution.checks);
     let _ = writeln!(out, "    e2e_dir: {}", scalar(&execution.e2e_dir));
-    plain(&mut out, "review", &stages.review);
+    plain(out, "review", &stages.review);
     let _ = writeln!(
         out,
         "  completion:\n    enabled: {}\n    gate: {}",
         stages.completion.enabled,
         scalar(&stages.completion.gate)
     );
+}
 
+fn extends(out: &mut String, config: &Config) {
+    if config.extends.is_empty() {
+        return;
+    }
+    out.push_str(
+        "\n# Team or company layers, each at a fixed ref. devflow.lock pins the\n\
+         # commit the person approved; a new ref applies once they approve it.\n\
+         extends:\n",
+    );
+    for layer in &config.extends {
+        let _ = writeln!(out, "  - git: {}", scalar(&layer.git));
+        let _ = writeln!(out, "    ref: {}", scalar(&layer.reference));
+    }
+}
+
+fn stages_v2(out: &mut String, config: &Config) {
+    out.push_str(
+        "\n# The stages, in order. uses: builtin/<stage> is devpit's own; an own\n\
+         # stage uses project/<skill> (.devpit/devflow/skills/), personal/<skill>,\n\
+         # skills/<name> (a skill already installed for the agent CLIs) or\n\
+         # <team>/<skill>, with a gate: { command: … } or { rubric: … }.\n\
+         # approve: person stops for the person's yes; none goes on.\n\
+         stages:\n",
+    );
+    if config.flow.is_empty() {
+        out.push_str("  []\n");
+    }
+    for step in &config.flow {
+        let _ = writeln!(out, "  - uses: {}", scalar(&step.uses));
+        let _ = writeln!(out, "    enabled: {}", config.is_on(step));
+        stage_fields(out, config, step);
+    }
+}
+
+fn stage_fields(out: &mut String, config: &Config, step: &Step) {
+    let stages = &config.stages;
+    match (step.builtin(), &step.own) {
+        (Some("briefing"), _) => {
+            let _ = writeln!(out, "    approve: {}", stages.briefing.approve.word());
+        }
+        (Some("plan"), _) => {
+            let _ = writeln!(out, "    approve: {}", stages.plan.approve.word());
+            if let Some(publish) = stages.plan.publish {
+                let _ = writeln!(
+                    out,
+                    "    publish: {}   # board | jira | linear | github",
+                    publish.word()
+                );
+            }
+        }
+        (Some("execution"), _) => {
+            checks(out, "    ", &stages.execution.checks);
+            let _ = writeln!(out, "    e2e_dir: {}", scalar(&stages.execution.e2e_dir));
+        }
+        (Some("completion"), _) => {
+            let _ = writeln!(out, "    gate: {}", scalar(&stages.completion.gate));
+        }
+        (None, Some(own)) => {
+            if let Some(approve) = own.approve {
+                let _ = writeln!(out, "    approve: {}", approve.word());
+            }
+            match &own.gate {
+                Some(StageGate::Command(command)) => {
+                    let _ = writeln!(out, "    gate: {{ command: {} }}", scalar(command));
+                }
+                Some(StageGate::Rubric(rubric)) => {
+                    let _ = writeln!(out, "    gate: {{ rubric: {} }}", scalar(rubric));
+                }
+                None => {}
+            }
+        }
+        _ => {}
+    }
+}
+
+fn review(out: &mut String, config: &Config) {
     out.push_str(
         "\nreview:\n  # The agent CLI each persona runs in; a persona not listed is\n  \
          # reviewed by the session itself.\n",
@@ -104,7 +202,6 @@ pub fn render(config: &Config) -> String {
             let _ = writeln!(out, "    {stage}: {}", scalar(rubric));
         }
     }
-    out
 }
 
 fn plain(out: &mut String, name: &str, stage: &Stage) {
@@ -118,8 +215,10 @@ fn approved(out: &mut String, name: &str, stage: &Approved) {
         stage.enabled,
         stage.approve.word()
     );
+    if let Some(publish) = stage.publish {
+        let _ = writeln!(out, "    publish: {}", publish.word());
+    }
 }
-
 /// A string as YAML: plain when it reads back as the same string, double
 /// quoted otherwise.
 pub(crate) fn scalar(text: &str) -> String {

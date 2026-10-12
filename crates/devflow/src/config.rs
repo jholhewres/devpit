@@ -1,6 +1,12 @@
-//! `devflow.yaml`, version 1: what a project's Devflow does. Every field but
-//! `version` may be left out and takes its default; a field this version does
-//! not read is an error, so a typo never passes for a setting.
+//! `devflow.yaml`: what a project's Devflow does. Every field but `version`
+//! may be left out and takes its default; a field this version does not read
+//! is an error, so a typo never passes for a setting.
+//!
+//! Version 2 lists the stages in order, each one `uses:` a skill — devpit's
+//! own stages, and a project's or a team's beside them — and adds `extends`
+//! and `locked`. Version 1's map of the six built-in stages is still read in
+//! either version; a file stays version 1 until a change needs version 2,
+//! which devpit then writes.
 
 use std::collections::BTreeMap;
 
@@ -8,8 +14,14 @@ use serde::Serialize;
 
 use crate::node::{self, Key, Node, Value};
 
-/// The schema this build reads and writes.
-pub const VERSION: u64 = 1;
+/// The schema this build writes.
+pub const VERSION: u64 = 2;
+
+/// The schema whose stages are only the built-in six, as a map.
+pub const V1: u64 = 1;
+
+/// What `uses:` names devpit's own stages under.
+pub const BUILTIN: &str = "builtin";
 
 /// The stages, in the order the work goes through them.
 pub const STAGES: [&str; 6] = [
@@ -40,7 +52,7 @@ macro_rules! words {
                 match self { $($name::$variant => $word),+ }
             }
 
-            fn of(word: &str) -> Option<Self> {
+            pub(crate) fn of(word: &str) -> Option<Self> {
                 Self::ALL.iter().copied().find(|one| one.word() == word)
             }
         }
@@ -74,6 +86,10 @@ words!(
     Severity { Critical = "critical", High = "high", Medium = "medium", Low = "low", Info = "info" }
 );
 words!(
+    /// Where the plan's cards are made. Only the board yet.
+    Publish { Board = "board", Jira = "jira", Linear = "linear", Github = "github" }
+);
+words!(
     /// Whether Decisions only logs (`shadow`) or blocks (`enforce`).
     Mode { Shadow = "shadow", Enforce = "enforce" }
 );
@@ -88,9 +104,72 @@ pub struct Config {
     pub version: u64,
     /// Written `true` only by the person's click in the app.
     pub enabled: bool,
+    /// The team or company layers, each at a fixed ref.
+    #[serde(skip)]
+    pub extends: Vec<Extend>,
+    /// The built-in stages' own settings.
     pub stages: Stages,
+    /// Every stage in the order the work reaches it.
+    #[serde(skip)]
+    pub flow: Vec<Step>,
     pub review: Review,
     pub decisions: Decisions,
+    /// Fields a later layer may not change, by dotted path.
+    #[serde(skip)]
+    pub locked: Vec<String>,
+}
+
+/// A layer this one is read over: a repository at a fixed ref.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Extend {
+    pub git: String,
+    #[serde(rename = "ref")]
+    pub reference: String,
+}
+
+/// What passes an own stage: a command that exits 0, or a rubric Decisions answers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StageGate {
+    Command(String),
+    Rubric(String),
+}
+
+/// One stage of the flow: a built-in one, whose settings are in [`Stages`],
+/// or one of the project's or a team's own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Step {
+    /// `builtin/<stage>`, or `<where>/<name>` for an own stage.
+    pub uses: String,
+    /// An own stage's settings; none for a built-in one.
+    pub own: Option<Own>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Own {
+    pub enabled: bool,
+    /// `person` makes the stage a point the work stops at for their yes.
+    pub approve: Option<Approve>,
+    pub gate: Option<StageGate>,
+}
+
+impl Step {
+    /// The stage's name: what follows the last `/` of `uses`.
+    pub fn name(&self) -> &str {
+        self.uses.rsplit('/').next().unwrap_or(&self.uses)
+    }
+
+    /// The built-in stage it is, when it is one.
+    pub fn builtin(&self) -> Option<&'static str> {
+        let name = self.uses.strip_prefix(BUILTIN)?.strip_prefix('/')?;
+        STAGES.iter().copied().find(|stage| *stage == name)
+    }
+
+    pub(crate) fn of(stage: &str) -> Step {
+        Step {
+            uses: format!("{BUILTIN}/{stage}"),
+            own: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -112,6 +191,9 @@ pub struct Stage {
 pub struct Approved {
     pub enabled: bool,
     pub approve: Approve,
+    /// The plan's: where its cards are made. The board when not said.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub publish: Option<Publish>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -169,10 +251,14 @@ impl Default for Config {
         let approved = Approved {
             enabled: true,
             approve: Approve::Person,
+            publish: None,
         };
         Config {
             version: VERSION,
             enabled: false,
+            extends: Vec::new(),
+            flow: STAGES.iter().map(|stage| Step::of(stage)).collect(),
+            locked: Vec::new(),
             stages: Stages {
                 briefing: approved.clone(),
                 context: Stage { enabled: true },
@@ -202,27 +288,81 @@ impl Default for Config {
     }
 }
 
+impl Stages {
+    /// Whether the built-in `stage` is switched on.
+    pub fn on(&self, stage: &str) -> bool {
+        match stage {
+            "briefing" => self.briefing.enabled,
+            "context" => self.context.enabled,
+            "plan" => self.plan.enabled,
+            "execution" => self.execution.enabled,
+            "review" => self.review.enabled,
+            "completion" => self.completion.enabled,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn switch(&mut self, stage: &str, on: bool) {
+        match stage {
+            "briefing" => self.briefing.enabled = on,
+            "context" => self.context.enabled = on,
+            "plan" => self.plan.enabled = on,
+            "execution" => self.execution.enabled = on,
+            "review" => self.review.enabled = on,
+            "completion" => self.completion.enabled = on,
+            _ => {}
+        }
+    }
+}
+
 impl Config {
-    /// The stages switched on, in their order.
+    /// The built-in stages switched on, in the flow's order.
     pub fn stages_on(&self) -> Vec<&'static str> {
-        let stages = &self.stages;
-        let on = [
-            stages.briefing.enabled,
-            stages.context.enabled,
-            stages.plan.enabled,
-            stages.execution.enabled,
-            stages.review.enabled,
-            stages.completion.enabled,
-        ];
-        STAGES
+        self.flow
             .iter()
-            .zip(on)
-            .filter_map(|(stage, on)| on.then_some(*stage))
+            .filter_map(Step::builtin)
+            .filter(|stage| self.stages.on(stage))
             .collect()
     }
 
+    /// Whether a stage of the flow is switched on.
+    pub fn is_on(&self, step: &Step) -> bool {
+        match (step.builtin(), &step.own) {
+            (Some(stage), _) => self.stages.on(stage),
+            (None, Some(own)) => own.enabled,
+            (None, None) => false,
+        }
+    }
+
+    /// The own stages switched on, in their order.
+    pub fn own_on(&self) -> Vec<&Step> {
+        self.flow
+            .iter()
+            .filter(|step| step.builtin().is_none() && self.is_on(step))
+            .collect()
+    }
+
+    /// Where the plan's cards are made: the board unless said.
+    pub fn publish(&self) -> Publish {
+        self.stages.plan.publish.unwrap_or(Publish::Board)
+    }
+
+    /// The JSON form a change is made on: version 1's map of stages, or
+    /// version 2's list.
     pub fn to_json(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+        let mut json = serde_json::to_value(self).unwrap_or_default();
+        if self.version == V1 {
+            return json;
+        }
+        json["stages"] = serde_json::Value::Array(
+            self.flow
+                .iter()
+                .map(|step| crate::flow::step_json(self, step))
+                .collect(),
+        );
+        json["extends"] = serde_json::to_value(&self.extends).unwrap_or_default();
+        json["locked"] = serde_json::to_value(&self.locked).unwrap_or_default();
+        json
     }
 }
 
@@ -258,15 +398,16 @@ impl std::fmt::Display for Invalid {
 
 /// The configuration a devflow.yaml text says.
 pub fn parse(text: &str) -> Result<Config, Invalid> {
-    read(&node::from_yaml(text)?)
+    read(&node::from_yaml(text)?, true)
 }
 
-/// The configuration a JSON value says, checked the same way.
+/// The configuration a JSON value says, checked the same way. A change made
+/// through devpit that needs version 2 gets it: the version is devpit's to write.
 pub fn from_json(value: &serde_json::Value) -> Result<Config, Invalid> {
-    read(&node::from_json(value))
+    read(&node::from_json(value), false)
 }
 
-fn joined(path: &str, name: &str) -> String {
+pub(crate) fn joined(path: &str, name: &str) -> String {
     if path.is_empty() {
         name.to_owned()
     } else {
@@ -276,15 +417,15 @@ fn joined(path: &str, name: &str) -> String {
 
 /// A map being read: the fields taken so far, so whatever is left over is
 /// named as the error it is.
-struct Fields<'a> {
+pub(crate) struct Fields<'a> {
     path: String,
-    line: Option<usize>,
+    pub(crate) line: Option<usize>,
     items: &'a [(Key, Node)],
     taken: Vec<&'static str>,
 }
 
 impl<'a> Fields<'a> {
-    fn of(node: &'a Node, path: &str) -> Result<Self, Invalid> {
+    pub(crate) fn of(node: &'a Node, path: &str) -> Result<Self, Invalid> {
         let items: &[(Key, Node)] = match &node.value {
             Value::Map(items) => items,
             Value::Null => &[],
@@ -298,7 +439,7 @@ impl<'a> Fields<'a> {
         })
     }
 
-    fn get(&mut self, name: &'static str) -> Option<(&'a Node, String)> {
+    pub(crate) fn get(&mut self, name: &'static str) -> Option<(&'a Node, String)> {
         self.taken.push(name);
         self.items
             .iter()
@@ -306,7 +447,7 @@ impl<'a> Fields<'a> {
             .map(|(_, node)| (node, joined(&self.path, name)))
     }
 
-    fn done(self) -> Result<(), Invalid> {
+    pub(crate) fn done(self) -> Result<(), Invalid> {
         match self
             .items
             .iter()
@@ -330,7 +471,11 @@ impl<'a> Fields<'a> {
     }
 }
 
-fn scalar<'a>(node: &'a Node, path: &str, wanted: &str) -> Result<(&'a str, bool), Invalid> {
+pub(crate) fn scalar<'a>(
+    node: &'a Node,
+    path: &str,
+    wanted: &str,
+) -> Result<(&'a str, bool), Invalid> {
     match &node.value {
         Value::Scalar(text, plain) => Ok((text, *plain)),
         _ => Err(Invalid::at(
@@ -341,7 +486,7 @@ fn scalar<'a>(node: &'a Node, path: &str, wanted: &str) -> Result<(&'a str, bool
     }
 }
 
-fn boolean(field: Option<(&Node, String)>, default: bool) -> Result<bool, Invalid> {
+pub(crate) fn boolean(field: Option<(&Node, String)>, default: bool) -> Result<bool, Invalid> {
     let Some((node, path)) = field else {
         return Ok(default);
     };
@@ -352,7 +497,7 @@ fn boolean(field: Option<(&Node, String)>, default: bool) -> Result<bool, Invali
     }
 }
 
-fn text(node: &Node, path: &str, most: usize) -> Result<String, Invalid> {
+pub(crate) fn text(node: &Node, path: &str, most: usize) -> Result<String, Invalid> {
     let (text, _) = scalar(node, path, "a word or a line of text")?;
     let text = text.trim();
     if text.is_empty() || text.chars().count() > most || text.contains(['\n', '\r']) {
@@ -365,7 +510,7 @@ fn text(node: &Node, path: &str, most: usize) -> Result<String, Invalid> {
     Ok(text.to_owned())
 }
 
-fn word<T: Copy>(
+pub(crate) fn word<T: Copy>(
     node: &Node,
     path: &str,
     of: fn(&str) -> Option<T>,
@@ -383,7 +528,7 @@ fn word<T: Copy>(
     })
 }
 
-fn items<'a>(node: &'a Node, path: &str) -> Result<&'a [Node], Invalid> {
+pub(crate) fn items<'a>(node: &'a Node, path: &str) -> Result<&'a [Node], Invalid> {
     match &node.value {
         Value::Seq(items) => Ok(items),
         _ => Err(Invalid::at(node.line(), path, "expected a list")),
@@ -402,7 +547,7 @@ pub fn is_name(text: &str) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_".contains(&byte))
 }
 
-fn name(node: &Node, path: &str) -> Result<String, Invalid> {
+pub(crate) fn name(node: &Node, path: &str) -> Result<String, Invalid> {
     let given = text(node, path, 40)?;
     if !is_name(&given) {
         return Err(Invalid::at(
@@ -415,7 +560,7 @@ fn name(node: &Node, path: &str) -> Result<String, Invalid> {
 }
 
 /// A folder inside the project, written relative to its root.
-fn inside(node: &Node, path: &str) -> Result<String, Invalid> {
+pub(crate) fn inside(node: &Node, path: &str) -> Result<String, Invalid> {
     let given = text(node, path, 200)?;
     let outside = given.starts_with('/')
         || given.contains(['\\', ':'])
@@ -432,24 +577,25 @@ fn inside(node: &Node, path: &str) -> Result<String, Invalid> {
     Ok(given.trim_end_matches('/').to_owned())
 }
 
-fn read(root: &Node) -> Result<Config, Invalid> {
+fn read(root: &Node, from_file: bool) -> Result<Config, Invalid> {
     if root.value == Value::Null {
         return Err(Invalid::at(
             None,
             "version",
-            "devflow.yaml starts with `version: 1`",
+            "devflow.yaml starts with `version: 2`",
         ));
     }
     let defaults = Config::default();
     let mut fields = Fields::of(root, "")?;
-    let version = match fields.get("version") {
-        Some((node, path)) => match scalar(node, &path, "1")? {
-            ("1", true) => VERSION,
+    let mut version = match fields.get("version") {
+        Some((node, path)) => match scalar(node, &path, "1 or 2")? {
+            ("1", true) => V1,
+            ("2", true) => VERSION,
             (other, _) => {
                 return Err(Invalid::at(
                     node.line(),
                     &path,
-                    &format!("this devpit reads version 1, not {other}"),
+                    &format!("this devpit reads versions 1 and 2, not {other}"),
                 ))
             }
         },
@@ -457,14 +603,47 @@ fn read(root: &Node) -> Result<Config, Invalid> {
             return Err(Invalid::at(
                 fields.line,
                 "version",
-                "devflow.yaml starts with `version: 1`",
+                "devflow.yaml starts with `version: 2`",
             ))
         }
     };
+    // Version 2's fields in a version 1 file: a hand edit is told; a change
+    // through devpit takes version 2.
+    let mut needs_two = |node: &Node, path: &str, what: &str| {
+        if version == V1 {
+            if from_file {
+                return Err(Invalid::at(
+                    node.line(),
+                    path,
+                    &format!("{what} is read from version 2: write `version: 2`"),
+                ));
+            }
+            version = VERSION;
+        }
+        Ok(())
+    };
     let enabled = boolean(fields.get("enabled"), false)?;
-    let stages = match fields.get("stages") {
-        Some((node, path)) => stages(node, &path)?,
-        None => defaults.stages,
+    let extends = match fields.get("extends") {
+        Some((node, path)) => {
+            needs_two(node, &path, "`extends`")?;
+            crate::flow::extends(node, &path)?
+        }
+        None => Vec::new(),
+    };
+    let (stages, flow) = match fields.get("stages") {
+        Some((node, path)) if matches!(node.value, Value::Seq(_)) => {
+            needs_two(node, &path, "a list of stages")?;
+            crate::flow::read(node, &path)?
+        }
+        Some((node, path)) => (stages(node, &path)?, defaults.flow),
+        None => (defaults.stages, defaults.flow),
+    };
+    let locked = match fields.get("locked") {
+        Some((node, path)) => {
+            needs_two(node, &path, "`locked`")?;
+            crate::flow::locked(node, &path)?
+        }
+        None => Vec::new(),
     };
     let review = match fields.get("review") {
         Some((node, path)) => review(node, &path)?,
@@ -478,9 +657,12 @@ fn read(root: &Node) -> Result<Config, Invalid> {
     Ok(Config {
         version,
         enabled,
+        extends,
         stages,
+        flow,
         review,
         decisions,
+        locked,
     })
 }
 
@@ -494,27 +676,46 @@ fn stage(field: Option<(&Node, String)>) -> Result<Stage, Invalid> {
     Ok(Stage { enabled })
 }
 
-fn approved(field: Option<(&Node, String)>) -> Result<Approved, Invalid> {
-    let Some((node, path)) = field else {
-        return Ok(Config::default().stages.plan);
-    };
-    let mut fields = Fields::of(node, &path)?;
+/// An approved stage's own fields; `publish` only where `plan` says it.
+pub(crate) fn approved_in(fields: &mut Fields, plan: bool) -> Result<Approved, Invalid> {
     let enabled = boolean(fields.get("enabled"), true)?;
     let approve = match fields.get("approve") {
         Some((node, path)) => word(node, &path, Approve::of, Approve::ALL, Approve::word)?,
         None => Approve::Person,
     };
+    let publish = match plan.then(|| fields.get("publish")).flatten() {
+        Some((node, path)) => Some(word(node, &path, Publish::of, Publish::ALL, Publish::word)?),
+        None => None,
+    };
+    Ok(Approved {
+        enabled,
+        approve,
+        publish,
+    })
+}
+
+fn approved(field: Option<(&Node, String)>, plan: bool) -> Result<Approved, Invalid> {
+    let Some((node, path)) = field else {
+        return Ok(Config::default().stages.plan);
+    };
+    let mut fields = Fields::of(node, &path)?;
+    let approved = approved_in(&mut fields, plan)?;
     fields.done()?;
-    Ok(Approved { enabled, approve })
+    Ok(approved)
 }
 
 fn stages(node: &Node, path: &str) -> Result<Stages, Invalid> {
     let mut fields = Fields::of(node, path)?;
-    let briefing = approved(fields.get("briefing"))?;
+    let briefing = approved(fields.get("briefing"), false)?;
     let context = stage(fields.get("context"))?;
-    let plan = approved(fields.get("plan"))?;
+    let plan = approved(fields.get("plan"), true)?;
     let execution = match fields.get("execution") {
-        Some((node, path)) => execution(node, &path)?,
+        Some((node, path)) => {
+            let mut fields = Fields::of(node, &path)?;
+            let execution = execution_in(&mut fields)?;
+            fields.done()?;
+            execution
+        }
         None => Config::default().stages.execution,
     };
     let review = stage(fields.get("review"))?;
@@ -542,8 +743,8 @@ fn stages(node: &Node, path: &str) -> Result<Stages, Invalid> {
     })
 }
 
-fn execution(node: &Node, path: &str) -> Result<Execution, Invalid> {
-    let mut fields = Fields::of(node, path)?;
+/// The execution stage's own fields.
+pub(crate) fn execution_in(fields: &mut Fields) -> Result<Execution, Invalid> {
     let enabled = boolean(fields.get("enabled"), true)?;
     let mut checks: Vec<Check> = Vec::new();
     if let Some((node, path)) = fields.get("checks") {
@@ -564,7 +765,6 @@ fn execution(node: &Node, path: &str) -> Result<Execution, Invalid> {
         Some((node, path)) => inside(node, &path)?,
         None => E2E_DIR.to_owned(),
     };
-    fields.done()?;
     Ok(Execution {
         enabled,
         checks,
@@ -572,7 +772,7 @@ fn execution(node: &Node, path: &str) -> Result<Execution, Invalid> {
     })
 }
 
-fn check(node: &Node, path: &str) -> Result<Check, Invalid> {
+pub(crate) fn check(node: &Node, path: &str) -> Result<Check, Invalid> {
     let mut fields = Fields::of(node, path)?;
     let line = fields.line;
     let name = match fields.get("name") {
@@ -623,7 +823,7 @@ fn check(node: &Node, path: &str) -> Result<Check, Invalid> {
     })
 }
 
-fn review(node: &Node, path: &str) -> Result<Review, Invalid> {
+pub(crate) fn review(node: &Node, path: &str) -> Result<Review, Invalid> {
     let mut fields = Fields::of(node, path)?;
     let mut reviewers = Vec::new();
     if let Some((node, path)) = fields.get("reviewers") {

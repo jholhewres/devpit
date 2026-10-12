@@ -124,6 +124,13 @@ That shape is deliberate. Orchestration that keeps itself going is
 orchestration you cannot see, and the problem this project attacks is losing
 sight of what is happening.
 
+Devflow's autopilot is set up the same way, by the person and one epic at a
+time: their click on the epic, never an agent's call. It starts the plan's
+next card when one finishes or is moved, one session at a time and each in
+its card's own terminal, and stops for the person at a card others wait on,
+at a stage that asks their approval and at a session waiting on them. It is
+held in memory, so a restart stops it.
+
 ## An orchestrator is a chat you drive
 
 The orchestrator is you — or a chat you drive, whose every session is on the
@@ -200,6 +207,19 @@ no copy, only that the person clicked.
   reads the file again when it changes elsewhere. A card's pane shows its
   newest gate, reviewers and files. Settings → Devflow switches it for every
   project, picks where a setup starts, and adds its skills to Codex on a yes.
+- **Layers, the project last.** devflow.yaml is read over devpit's defaults,
+  the person's own `<home>/devflow/devflow.yaml`, and each team layer it
+  `extends` at a fixed ref; a later layer wins except where an earlier one
+  `locked` a field, and a change that weakens a lock is refused before it is
+  written. A team layer is fetched by git into a bare cache under the home,
+  never checked out, capped in size, and read blob by blob at the commit
+  `.devpit/devflow/devflow.lock` pins with every file's hash; a new ref
+  applies nothing until the person approved what it changes. Version 2 lists
+  the stages, each `uses:` a skill — devpit's, the project's, the person's, a
+  team's, or one already installed, read where it is — and an own stage's
+  gate (a command or a rubric) is run by `devpit_devflow_stage` and required
+  by the completion gate. A command a team brought runs only after the
+  person confirmed it at that commit. Version 1's map is still read.
 - **Open sessions hear it.** The MCP server declares `listChanged` for
   tools, resources and prompts, and watches the project's devflow.yaml and
   the app's stamp file, so switching Devflow on or off reaches a session

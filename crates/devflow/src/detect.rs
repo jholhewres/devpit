@@ -46,12 +46,34 @@ pub struct Cli {
     pub signed_in: Option<bool>,
 }
 
-/// What the app knows that the repository does not.
+/// What the app knows that the repository's files do not say.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Machine {
     pub clis: Vec<Cli>,
     pub decisions_key: bool,
     pub decisions_opted_out: bool,
+    /// The repository's local branches, as git lists them.
+    pub branches: Vec<String>,
+    /// Its recent commits' subjects, newest first.
+    pub subjects: Vec<String>,
+    /// The skills already installed for the agent CLIs, by name.
+    pub installed_skills: Vec<String>,
+}
+
+/// How the repository already works, as hints for a setup: nothing is
+/// configured from them by itself.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Hints {
+    /// CLAUDE.md, AGENTS.md and CONTRIBUTING.md, where they are.
+    pub guides: Vec<String>,
+    pub pr_templates: Vec<String>,
+    pub issue_templates: Vec<String>,
+    /// git-flow's branches, when it has `develop` beside them.
+    pub branches: Vec<String>,
+    /// The ticket keys its commits name, most used first, such as `LED`.
+    pub ticket_keys: Vec<String>,
+    /// Skills an own stage can use where they are: `skills/<name>`.
+    pub skills: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -65,12 +87,15 @@ pub struct Detected {
     pub decisions_opted_out: bool,
     pub glossary: Option<String>,
     pub adrs: Vec<String>,
+    pub hints: Hints,
 }
 
 /// Everything detected about the project at `root`.
 pub fn detected(root: &Path, machine: Machine) -> Detected {
     let files = Files { root };
+    let hints = hints(root, &files, &machine);
     let mut found = Detected {
+        hints,
         test: Vec::new(),
         e2e: Vec::new(),
         lint: Vec::new(),
@@ -420,6 +445,118 @@ fn e2e_tools(files: &Files) -> Vec<E2eTool> {
         }
     }
     tools
+}
+
+/// The names of the files in the folder `relative` of the project, sorted.
+fn listed(root: &Path, relative: &str) -> Vec<String> {
+    let Ok(folder) = devpit_core::tree::resolve(root, relative) else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| !name.starts_with('.'))
+        .map(|name| format!("{relative}/{name}"))
+        .collect();
+    names.sort();
+    names.truncate(20);
+    names
+}
+
+/// The keys `KEY-123` names in `subjects`, most used first.
+pub fn ticket_keys(subjects: &[String]) -> Vec<String> {
+    let mut counted: Vec<(String, usize)> = Vec::new();
+    for subject in subjects {
+        let bytes = subject.as_bytes();
+        let mut at = 0;
+        while at < bytes.len() {
+            let starts = bytes[at].is_ascii_uppercase()
+                && (at == 0 || !bytes[at - 1].is_ascii_alphanumeric());
+            if !starts {
+                at += 1;
+                continue;
+            }
+            let key_end = (at..bytes.len())
+                .find(|end| !(bytes[*end].is_ascii_uppercase() || bytes[*end].is_ascii_digit()))
+                .unwrap_or(bytes.len());
+            let digits_end = (key_end + 1..bytes.len())
+                .find(|end| !bytes[*end].is_ascii_digit())
+                .unwrap_or(bytes.len());
+            let key = &subject[at..key_end];
+            if (2..=10).contains(&key.len())
+                && bytes.get(key_end) == Some(&b'-')
+                && digits_end > key_end + 1
+                && bytes
+                    .get(digits_end)
+                    .is_none_or(|next| !next.is_ascii_alphanumeric())
+            {
+                match counted.iter_mut().find(|(seen, _)| seen == key) {
+                    Some((_, count)) => *count += 1,
+                    None => counted.push((key.to_owned(), 1)),
+                }
+            }
+            at = key_end.max(at + 1);
+        }
+    }
+    counted.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    counted.into_iter().take(5).map(|(key, _)| key).collect()
+}
+
+fn hints(root: &Path, files: &Files, machine: &Machine) -> Hints {
+    let present = |names: &[&str]| -> Vec<String> {
+        names
+            .iter()
+            .filter(|name| files.read(name).is_some())
+            .map(|name| (*name).to_owned())
+            .collect()
+    };
+    let mut pr_templates = present(&[
+        ".github/pull_request_template.md",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        "PULL_REQUEST_TEMPLATE.md",
+        "docs/pull_request_template.md",
+    ]);
+    pr_templates.extend(listed(root, ".github/PULL_REQUEST_TEMPLATE"));
+    pr_templates.extend(listed(root, ".gitlab/merge_request_templates"));
+    let mut issue_templates = present(&[".github/issue_template.md", ".github/ISSUE_TEMPLATE.md"]);
+    issue_templates.extend(listed(root, ".github/ISSUE_TEMPLATE"));
+    issue_templates.extend(listed(root, ".gitlab/issue_templates"));
+    let flow = ["release/", "feature/", "hotfix/"];
+    let branches = if machine.branches.iter().any(|name| name == "develop") {
+        machine
+            .branches
+            .iter()
+            .filter(|name| *name == "develop" || flow.iter().any(|prefix| name.starts_with(prefix)))
+            .take(10)
+            .cloned()
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let mut skills: Vec<String> = listed(root, ".claude/skills")
+        .into_iter()
+        .filter_map(|path| path.rsplit('/').next().map(str::to_owned))
+        .chain(machine.installed_skills.iter().cloned())
+        .filter(|name| crate::config::is_name(name))
+        .collect();
+    skills.sort();
+    skills.dedup();
+    Hints {
+        guides: present(&[
+            "CLAUDE.md",
+            "AGENTS.md",
+            "CONTRIBUTING.md",
+            ".github/CONTRIBUTING.md",
+        ]),
+        pr_templates,
+        issue_templates,
+        branches,
+        ticket_keys: ticket_keys(&machine.subjects),
+        skills,
+    }
 }
 
 /// The ADRs under `docs/adr/`, by name.

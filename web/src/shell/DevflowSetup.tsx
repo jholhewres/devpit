@@ -37,6 +37,11 @@ function Detected({ detected }: { detected: DevflowDetected }): React.JSX.Elemen
         <span className="pref__d">Decisions: {detected.decisionsKey ? 'set up, so Jev starts in shadow' : 'not set up — the gates run on the checks alone'}</span>
         {detected.glossary && <span className="pref__d">Glossary: {detected.glossary}</span>}
         {detected.adrs.length > 0 && <span className="pref__d">Decision records: {detected.adrs.length} under docs/adr/</span>}
+        {detected.hints.map((one) => (
+          <span key={one} className="pref__d">
+            {one}
+          </span>
+        ))}
         {detected.open.map((one) => (
           <span key={one} className="pref__d voice__bad">
             Left to you: {one}

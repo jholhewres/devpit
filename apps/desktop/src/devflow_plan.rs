@@ -50,10 +50,14 @@ pub(crate) fn respond(
     params: &Value,
 ) -> Result<Value, String> {
     let root = Path::new(&project.root_path);
-    let config = match devpit_devflow::folder::read(root) {
-        devpit_devflow::State::Valid(_, config) => Some(config),
+    let config = match crate::devflow::read(root) {
+        devpit_devflow::State::Valid(_, config) => Some(*config),
         _ => None,
     };
+    // A plan for a tracker devpit cannot write yet is refused before anything is made.
+    if let (Some(config), "devflow_plan") = (&config, method) {
+        plan::published(config)?;
+    }
     let epic = text(params, "epic");
     let jev = config
         .as_ref()

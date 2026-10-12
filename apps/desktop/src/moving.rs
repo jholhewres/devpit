@@ -69,7 +69,8 @@ pub async fn card_move(
 ) -> Result<CardChanged, RpcError> {
     crate::off_main::blocking(move || {
         let in_flight = tauri::Manager::state::<Arc<crate::in_flight::InFlight>>(&app);
-        card_move_now(
+        let project = project_id.clone();
+        let moved = card_move_now(
             in_flight,
             app.clone(),
             project_id,
@@ -77,7 +78,10 @@ pub async fn card_move(
             column_id,
             position,
             confirmed,
-        )
+        )?;
+        // The person moved a card: an autopilot waiting on their check goes on.
+        crate::devflow_autopilot::heard(Some(&app), &project);
+        Ok(moved)
     })
     .await
 }

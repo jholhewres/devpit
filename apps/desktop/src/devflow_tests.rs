@@ -4,7 +4,7 @@ use devpit_devflow::Invalid;
 use super::*;
 
 fn valid(text: &str) -> State {
-    State::Valid(text.to_owned(), parse(text).expect("valid"))
+    State::Valid(text.to_owned(), Box::new(parse(text).expect("valid")))
 }
 
 #[test]
@@ -128,4 +128,73 @@ fn every_devflow_method_is_answered_by_the_agent_api() {
     for method in METHODS {
         assert!(crate::agent_api::METHODS.contains(&method), "{method}");
     }
+}
+
+/// A team's layer as a bare repository, at tag v1, locking its reviewer.
+fn team_layer(base: &Path) -> String {
+    let run = |dir: &Path, args: &[&str]| {
+        let ran = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args([
+                "-c",
+                "user.email=team@example.invalid",
+                "-c",
+                "user.name=Team",
+            ])
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
+            .args(args)
+            .output()
+            .expect("git");
+        assert!(ran.status.success(), "git {args:?}");
+    };
+    let work = base.join("work");
+    std::fs::create_dir_all(&work).expect("work");
+    run(&work, &["init", "-q"]);
+    std::fs::write(
+        work.join("devflow.yaml"),
+        "version: 2\nreview:\n  reviewers:\n    - agent: claude\n      persona: devflow-security\nlocked: [review.reviewers.devflow-security]\n",
+    )
+    .expect("layer");
+    run(&work, &["add", "-A"]);
+    run(&work, &["commit", "-qm", "one"]);
+    run(&work, &["tag", "v1"]);
+    let bare = base.join("acme").join("flow.git");
+    run(base, &["clone", "-q", "--bare", "work", "acme/flow.git"]);
+    bare.display().to_string()
+}
+
+#[test]
+fn a_change_that_weakens_what_the_team_locked_is_refused_before_it_is_written() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let url = team_layer(dir.path());
+    let root = dir.path().join("project");
+    std::fs::create_dir_all(root.join(".devpit/devflow")).expect("folder");
+    let text = format!("version: 2\nextends:\n  - git: {url}\n    ref: v1\n");
+    std::fs::write(root.join(FILE), &text).expect("yaml");
+    let layer = devpit_devflow::config::Extend {
+        git: url,
+        reference: "v1".into(),
+    };
+    let shown = devpit_devflow::pinning::fetched(&root, &layer, &home()).expect("fetched");
+    devpit_devflow::pinning::approve(&root, &layer, &shown.to_commit, &home()).expect("approved");
+    let here = project("prj_devflow_locked", &root);
+
+    let refused = respond(
+        None,
+        "devflow_set",
+        &here,
+        &root,
+        &json!({ "path": "review.reviewers", "value": [], "apply": true }),
+    )
+    .expect_err("the team locked it");
+    assert!(refused.contains("locked by acme"), "{refused}");
+    assert_eq!(
+        std::fs::read_to_string(root.join(FILE)).expect("yaml"),
+        text
+    );
+    let State::Valid(_, config) = read(&root) else {
+        panic!("the layered file reads")
+    };
+    assert_eq!(config.review.reviewers[0].persona, "devflow-security");
 }

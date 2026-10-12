@@ -131,3 +131,59 @@ fn a_skill_is_named_by_its_name_or_its_uri_and_nothing_else() {
         .expect_err("not a skill")
         .contains("not a Devflow skill"));
 }
+
+#[test]
+fn an_own_stage_reads_its_skill_where_it_already_is() {
+    let project = tempfile::tempdir().expect("project");
+    let installed = tempfile::tempdir().expect("installed");
+    let skill = |name: &str| format!("---\nname: {name}\ndescription: Ours.\n---\nDo it.\n");
+    write(
+        project.path(),
+        ".devpit/devflow/skills/pr/SKILL.md",
+        &skill("pr"),
+    );
+    write(
+        project.path(),
+        ".claude/skills/ticket/SKILL.md",
+        &skill("ticket"),
+    );
+    write(installed.path(), "deploy/SKILL.md", &skill("deploy"));
+    let places = Places {
+        project: project.path(),
+        personal: installed.path(),
+        teams: &[],
+        installed: Some(installed.path()),
+    };
+    assert_eq!(
+        own("project/pr", &places).expect("project").layer,
+        "project"
+    );
+    let ticket = own("skills/ticket", &places).expect("the project's own .claude skill");
+    assert_eq!(
+        ticket.file.as_deref(),
+        Some(
+            project
+                .path()
+                .join(".claude/skills/ticket/SKILL.md")
+                .as_path()
+        ),
+        "read where it is, never copied"
+    );
+    assert_eq!(
+        own("skills/deploy", &places).expect("installed").layer,
+        "installed"
+    );
+    assert!(own("skills/nowhere", &places).is_err());
+    assert!(own("acme/ticket", &places)
+        .expect_err("no such layer")
+        .contains("acme"));
+    write(
+        project.path(),
+        ".devpit/devflow/skills/wrong/SKILL.md",
+        &skill("other"),
+    );
+    assert!(
+        own("project/wrong", &places).is_err(),
+        "another name in its frontmatter"
+    );
+}

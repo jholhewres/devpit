@@ -28,7 +28,10 @@ pub fn wait_for(method: &str) -> Duration {
         STARTING
     } else if method == "decide" || method == "rubric_run" || method == "devflow_gate" {
         DECIDING
-    } else if method == "devflow_evidence" || method == "devflow_review" {
+    } else if method == "devflow_evidence"
+        || method == "devflow_review"
+        || method == "devflow_stage"
+    {
         CHECKING
     } else {
         WAIT

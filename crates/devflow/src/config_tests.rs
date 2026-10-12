@@ -6,7 +6,14 @@ fn refused(text: &str) -> Invalid {
 
 #[test]
 fn a_file_of_one_line_takes_every_default() {
-    assert_eq!(parse("version: 1\n"), Ok(Config::default()));
+    assert_eq!(parse("version: 2\n"), Ok(Config::default()));
+    assert_eq!(
+        parse("version: 1\n"),
+        Ok(Config {
+            version: V1,
+            ..Config::default()
+        })
+    );
     let defaults = Config::default();
     assert!(!defaults.enabled);
     assert_eq!(defaults.stages.plan.approve, Approve::Person);
@@ -39,10 +46,10 @@ fn a_word_outside_its_list_says_the_words_it_takes() {
 }
 
 #[test]
-fn the_version_is_required_and_only_one_is_read() {
+fn the_version_is_required_and_only_one_this_devpit_knows_is_read() {
     assert_eq!(refused("enabled: true\n").field, "version");
     assert_eq!(refused("").field, "version");
-    let later = refused("version: 2\n");
+    let later = refused("version: 3\n");
     assert_eq!((later.line, later.field.as_str()), (Some(1), "version"));
 }
 

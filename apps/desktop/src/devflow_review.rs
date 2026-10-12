@@ -289,7 +289,7 @@ pub(crate) fn mark(
         }
     }
     crate::devflow_jev::finding_marked(store, &Value::Object(finding.clone()), false_positive);
-    let config = devpit_devflow::folder::read(&root);
+    let config = crate::devflow::read(&root);
     if let devpit_devflow::State::Valid(_, config) = config {
         let list = kept["findings"].as_array().cloned().unwrap_or_default();
         kept["verdict"] = json!(devpit_devflow::findings::verdict(

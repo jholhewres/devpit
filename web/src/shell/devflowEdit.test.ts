@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
 import type { DevflowConfig } from '../gen/bindings'
-import { applied, customSet, rubricsWith } from './devflowEdit'
+import { added, applied, customSet, moved, removed, rubricsWith, stageJson } from './devflowEdit'
 
 const config: DevflowConfig = {
   enabled: false,
+  version: 2,
+  teams: [],
+  locked: [],
+  stagesFrom: 'project',
   stages: ['briefing', 'plan', 'execution'].map((name) => ({
     name,
+    uses: `builtin/${name}`,
+    own: false,
+    publish: null,
+    e2eDir: null,
+    command: null,
     enabled: true,
     approve: name === 'execution' ? null : 'person',
     checks: name === 'execution' ? [{ name: 'unit', run: 'make test', report: 'none', evidence: [], source: 'Makefile:1' }] : [],
@@ -49,5 +58,23 @@ describe("Devflow's edits", () => {
   it("changes one stage's rubric and drops an emptied one", () => {
     expect(rubricsWith(config, 'briefing', 'our-brief')).toEqual({ briefing: 'our-brief', plan: 'our-plan' })
     expect(rubricsWith(config, 'plan', '  ')).toEqual({})
+  })
+})
+
+describe("Devflow's list of stages", () => {
+  const own = { ...config.stages[0]!, name: 'pr', uses: 'project/pr', own: true, approve: 'person', command: './scripts/pr.sh' }
+  const withOwn: DevflowConfig = { ...config, stages: [...config.stages, own] }
+
+  it('says each stage the way version 2 lists it', () => {
+    expect(stageJson(config.stages[2]!)).toEqual({ uses: 'builtin/execution', enabled: true, checks: [{ name: 'unit', run: 'make test', report: 'none' }] })
+    expect(stageJson(own)).toEqual({ uses: 'project/pr', enabled: true, approve: 'person', gate: { command: './scripts/pr.sh' } })
+  })
+
+  it('moves, removes and adds a stage, keeping the others as they are', () => {
+    expect(moved(withOwn, 'pr', -1).map((one) => one.uses)).toEqual(['builtin/briefing', 'builtin/plan', 'project/pr', 'builtin/execution'])
+    expect(moved(withOwn, 'briefing', -1).map((one) => one.uses)).toEqual(withOwn.stages.map((one) => one.uses))
+    expect(removed(withOwn, 'plan').map((one) => one.uses)).toEqual(['builtin/briefing', 'builtin/execution', 'project/pr'])
+    expect(added(config, ' acme/ticket ', '')).toContainEqual({ uses: 'acme/ticket', enabled: true })
+    expect(added(config, 'project/pr', 'make pr')).toContainEqual({ uses: 'project/pr', enabled: true, gate: { command: 'make pr' } })
   })
 })

@@ -23,6 +23,7 @@ fn machine() -> Machine {
         }],
         decisions_key: false,
         decisions_opted_out: false,
+        ..Machine::default()
     }
 }
 

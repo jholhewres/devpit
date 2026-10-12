@@ -165,6 +165,8 @@ pub struct Looked<'a> {
     /// When the checkout's code last changed, as a run's stamp; `None` when
     /// it cannot be told, and then a green run is enough.
     pub changed: Option<&'a str>,
+    /// Each own stage's newest `stage-<name>.json`, by the run it is in.
+    pub stages: &'a [(String, Option<(String, Value)>)],
 }
 
 /// One criterion and the evidence it has.
@@ -268,6 +270,7 @@ pub fn checked(looked: &Looked) -> Checked {
             .collect();
     }
     let review = reviewed(looked, &mut missing);
+    own_stages(looked, &mut missing);
     Checked {
         card: looked.card.to_owned(),
         run: looked.run.as_ref().map(|run| run.name.to_owned()),
@@ -340,6 +343,44 @@ fn visual(config: &Config, run: &Run, missing: &mut Vec<String>) {
             "the card's E2E spec {} kept no screenshot: end each of its tests in one (devflow-execution)",
             word(spec.unwrap_or(&Value::Null), "path")
         ));
+    }
+}
+
+/// Each own stage with a gate: passed, and since the last change to the code.
+fn own_stages(looked: &Looked, missing: &mut Vec<String>) {
+    for step in looked.config.own_on() {
+        if step
+            .own
+            .as_ref()
+            .and_then(|own| own.gate.as_ref())
+            .is_none()
+        {
+            continue;
+        }
+        let name = step.name();
+        let seen = looked
+            .stages
+            .iter()
+            .find(|(stage, _)| stage == name)
+            .and_then(|(_, seen)| seen.as_ref());
+        match seen {
+            None => missing.push(format!(
+                "the stage `{name}` ({}) has not passed its gate: follow its skill, then call devpit_devflow_stage with the card",
+                step.uses
+            )),
+            Some((run, record)) if record.get("passed").and_then(Value::as_bool) != Some(true) => {
+                missing.push(format!(
+                    "the stage `{name}`'s gate failed in {run}: fix what it says and call devpit_devflow_stage again"
+                ))
+            }
+            Some((run, _)) => {
+                if let Some(changed) = looked.changed.filter(|changed| after(changed, run)) {
+                    missing.push(format!(
+                        "the stage `{name}`'s gate passed before the last change ({changed}): call devpit_devflow_stage again"
+                    ));
+                }
+            }
+        }
     }
 }
 

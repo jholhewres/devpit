@@ -6,6 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
+use devpit_devflow::layers::Team;
 use devpit_devflow::skills;
 use serde_json::{json, Value};
 
@@ -16,24 +17,28 @@ pub(crate) fn respond(
     params: &Value,
 ) -> Result<Value, String> {
     let personal = personal()?;
+    // A team layer that applies replaces a built-in skill by its name too.
+    let teams = crate::devflow::layered(root)
+        .map(|layered| layered.applied)
+        .unwrap_or_default();
     match method {
-        "devflow_skills" => Ok(listed(root, &personal, stages)),
-        _ => one(root, &personal, stages, params),
+        "devflow_skills" => Ok(listed(root, &personal, &teams, stages)),
+        _ => one(root, &personal, &teams, stages, params),
     }
 }
 
 /// The person's own skills, under this devpit's home.
-fn personal() -> Result<PathBuf, String> {
+pub(crate) fn personal() -> Result<PathBuf, String> {
     let root = devpit_core::Store::root().map_err(|err| err.to_string())?;
     Ok(devpit_core::home::devflow_skills(&root))
 }
 
 /// Each skill offered, without its text. One whose file is refused is named
 /// with why, not left out unsaid.
-fn listed(root: &Path, personal: &Path, stages: &[&str]) -> Value {
+fn listed(root: &Path, personal: &Path, teams: &[Team], stages: &[&str]) -> Value {
     let (mut skills, mut refused) = (Vec::new(), Vec::new());
     for name in skills::offered(stages) {
-        match skills::resolve(root, personal, name) {
+        match skills::resolve_with(root, personal, teams, name) {
             Ok(skill) => skills.push(skill.to_json()),
             Err(why) => refused.push(json!({ "name": name, "why": why })),
         }
@@ -42,7 +47,13 @@ fn listed(root: &Path, personal: &Path, stages: &[&str]) -> Value {
 }
 
 /// One skill, by `name` or `uri`, with its text.
-fn one(root: &Path, personal: &Path, stages: &[&str], params: &Value) -> Result<Value, String> {
+fn one(
+    root: &Path,
+    personal: &Path,
+    teams: &[Team],
+    stages: &[&str],
+    params: &Value,
+) -> Result<Value, String> {
     let asked = ["name", "uri"]
         .iter()
         .find_map(|key| params.get(key).and_then(Value::as_str))
@@ -58,7 +69,7 @@ fn one(root: &Path, personal: &Path, stages: &[&str], params: &Value) -> Result<
             "{name} is for a stage this project's devflow.yaml switches off"
         ));
     }
-    let skill = skills::resolve(root, personal, name)?;
+    let skill = skills::resolve_with(root, personal, teams, name)?;
     let mut said = skill.to_json();
     said["text"] = json!(skill.text);
     Ok(said)

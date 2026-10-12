@@ -83,7 +83,19 @@ pub fn projects_dir(root: &Path) -> PathBuf {
 /// The person's own Devflow skills, `<root>/devflow/skills/<name>/SKILL.md`:
 /// a project's replace them, and they replace the built-in ones.
 pub fn devflow_skills(root: &Path) -> PathBuf {
-    root.join("devflow").join("skills")
+    devflow_personal(root).join("skills")
+}
+
+/// The person's own Devflow layer, `<root>/devflow/`: a `devflow.yaml` every
+/// project's is read over, and their skills.
+pub fn devflow_personal(root: &Path) -> PathBuf {
+    root.join("devflow")
+}
+
+/// Where the team layers a project extends are fetched, one bare repository
+/// each, never checked out.
+pub fn devflow_teams(root: &Path) -> PathBuf {
+    devflow_personal(root).join("teams")
 }
 
 /// One project's folder in the devpit workspace.

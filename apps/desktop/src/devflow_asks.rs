@@ -27,6 +27,9 @@ pub(crate) const CHANGED: &str = "devflow:changed";
 #[derive(Default)]
 struct Held {
     waiting: Vec<DevflowAsk>,
+    /// What a command's or an autopilot's click is for, by the ask's id: the
+    /// command's fingerprint, or the epic.
+    keys: Vec<(String, String)>,
     /// Dropped by the person, so not raised again by itself until a restart.
     dropped: Vec<(String, DevflowChange)>,
 }
@@ -43,10 +46,20 @@ pub(crate) fn change_of(ask: Ask) -> DevflowChange {
     }
 }
 
-fn ask_of(change: DevflowChange) -> Ask {
+/// The change to devflow.yaml a click makes, when it makes one.
+fn ask_of(change: DevflowChange) -> Option<Ask> {
     match change {
-        DevflowChange::Enable => Ask::Enable,
-        DevflowChange::Enforce => Ask::Enforce,
+        DevflowChange::Enable => Some(Ask::Enable),
+        DevflowChange::Enforce => Some(Ask::Enforce),
+        DevflowChange::Command | DevflowChange::Autopilot => None,
+    }
+}
+
+fn waits(held: &mut Held, ask: DevflowAsk) {
+    held.waiting.push(ask);
+    if held.waiting.len() > MOST {
+        let gone = held.waiting.remove(0);
+        held.keys.retain(|(id, _)| *id != gone.id);
     }
 }
 
@@ -75,16 +88,61 @@ pub(crate) fn raise(
             return;
         }
         held.dropped.retain(|one| *one != key);
-        held.waiting.push(DevflowAsk {
-            id: format!("dfa_{}", ulid::Ulid::generate()),
-            project_id: project_id.to_owned(),
-            project: project.to_owned(),
-            change,
-            asked_at: now(),
+        waits(
+            &mut held,
+            DevflowAsk {
+                id: format!("dfa_{}", ulid::Ulid::generate()),
+                project_id: project_id.to_owned(),
+                project: project.to_owned(),
+                change,
+                asked_at: now(),
+                detail: None,
+            },
+        );
+    }
+    if let Some(app) = app {
+        let _ = app.emit(ASKED, ());
+    }
+}
+
+/// Asks the person to run a layer's command, or to start an autopilot:
+/// `detail` is what they read, `key` what their yes is kept as. The same
+/// key asked again is the one already waiting.
+pub(crate) fn raise_for(
+    app: Option<&AppHandle>,
+    project_id: &str,
+    project: &str,
+    change: DevflowChange,
+    detail: &str,
+    key: &str,
+) {
+    {
+        let Ok(mut held) = held().lock() else {
+            return;
+        };
+        let asked = held.keys.iter().any(|(id, was)| {
+            was == key
+                && held
+                    .waiting
+                    .iter()
+                    .any(|one| one.id == *id && one.project_id == project_id)
         });
-        if held.waiting.len() > MOST {
-            held.waiting.remove(0);
+        if asked {
+            return;
         }
+        let id = format!("dfa_{}", ulid::Ulid::generate());
+        held.keys.push((id.clone(), key.to_owned()));
+        waits(
+            &mut held,
+            DevflowAsk {
+                id,
+                project_id: project_id.to_owned(),
+                project: project.to_owned(),
+                change,
+                asked_at: now(),
+                detail: Some(detail.to_owned()),
+            },
+        );
     }
     if let Some(app) = app {
         let _ = app.emit(ASKED, ());
@@ -99,10 +157,41 @@ pub(crate) fn waiting_in(project_id: &str) -> Vec<Ask> {
             held.waiting
                 .iter()
                 .filter(|one| one.project_id == project_id)
-                .map(|one| ask_of(one.change))
+                .filter_map(|one| ask_of(one.change))
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// The commands the person confirmed on this machine, by fingerprint.
+fn confirmed(store: &Store) -> Vec<String> {
+    store
+        .preference(preference::DEVFLOW_COMMANDS)
+        .ok()
+        .flatten()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
+}
+
+/// Whether the person confirmed the command with this fingerprint.
+pub(crate) fn command_confirmed(store: &Store, print: &str) -> bool {
+    confirmed(store).iter().any(|one| one == print)
+}
+
+fn confirm(store: &Store, print: &str) -> Result<(), RpcError> {
+    static CONFIRMING: Mutex<()> = Mutex::new(());
+    let _one_at_a_time = CONFIRMING.lock();
+    let mut prints = confirmed(store);
+    if !prints.iter().any(|one| one == print) {
+        prints.push(print.to_owned());
+    }
+    // The newest few hundred: an old command that comes back is asked about again.
+    let keep = prints.len().saturating_sub(256);
+    store.set_preference(
+        preference::DEVFLOW_COMMANDS,
+        &serde_json::to_string(&prints[keep..]).unwrap_or_default(),
+    )?;
+    Ok(())
 }
 
 fn key_of(ask: Ask) -> &'static str {
@@ -220,14 +309,29 @@ pub async fn devflow_answer(
             .into_iter()
             .find(|one| one.id == id)
             .ok_or_else(lost)?;
+        let key = held().lock().ok().and_then(|held| {
+            held.keys
+                .iter()
+                .find(|(was, _)| *was == id)
+                .map(|(_, key)| key.clone())
+        });
         // A click that could not be made keeps its card, with the reason.
         if yes {
-            made_now(&one.project_id, ask_of(one.change))?;
+            match (ask_of(one.change), key.as_deref()) {
+                (Some(ask), _) => made_now(&one.project_id, ask)?,
+                (None, Some(print)) if one.change == DevflowChange::Command => {
+                    confirm(&crate::projects::store()?, print)?
+                }
+                (None, Some(epic)) => crate::devflow_autopilot::start(&app, &one.project_id, epic)
+                    .map_err(|why| RpcError::new(ErrorCode::Invalid, why))?,
+                (None, None) => return Err(lost()),
+            }
         }
         {
             let mut held = held().lock().map_err(|_| lost())?;
             held.waiting.retain(|waiting| waiting.id != id);
-            if !yes {
+            held.keys.retain(|(was, _)| *was != id);
+            if !yes && ask_of(one.change).is_some() {
                 held.dropped.push((one.project_id.clone(), one.change));
             }
         }

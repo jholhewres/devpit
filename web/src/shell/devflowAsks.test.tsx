@@ -18,6 +18,7 @@ const asked = (id: string, change: DevflowAsk['change']): DevflowAsk => ({
   project: 'asc-api',
   change,
   askedAt: 1,
+  detail: null,
 })
 
 let waiting: DevflowAsk[] = []
@@ -84,5 +85,20 @@ describe('DevflowAsks', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Switch on' }))
     expect(await screen.findByText(/missing or invalid/)).toBeTruthy()
     expect(screen.getByText('Switch Devflow on in asc-api?')).toBeTruthy()
+  })
+})
+
+describe("a team's command and an autopilot", () => {
+  it('say what the click runs before it runs it', async () => {
+    waiting = [
+      { ...asked('dfa_5', 'command'), detail: 'acme at 0123456789ab (acme/pr): ./scripts/pr-checklist.sh' },
+      { ...asked('dfa_6', 'autopilot'), detail: '[devflow] Brief: Search: Index → List' },
+    ]
+    render(<DevflowAsks />)
+    expect(await screen.findByText("Run a team layer's gate command in asc-api?")).toBeTruthy()
+    expect(screen.getByText(/\.\/scripts\/pr-checklist\.sh — code from outside the project/)).toBeTruthy()
+    expect(screen.getByText('Start the autopilot in asc-api?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Run it' }))
+    await waitFor(() => expect(answered).toHaveBeenCalledWith('dfa_5', true))
   })
 })

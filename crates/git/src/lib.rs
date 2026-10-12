@@ -35,6 +35,7 @@ pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
 mod log;
+pub mod pinned;
 pub mod remote;
 mod search;
 mod snapshot;

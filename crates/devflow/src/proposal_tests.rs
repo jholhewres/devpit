@@ -19,11 +19,12 @@ fn detected() -> Detected {
         decisions_opted_out: false,
         glossary: None,
         adrs: vec![],
+        hints: Default::default(),
     }
 }
 
 fn valid(text: &str) -> State {
-    State::Valid(text.to_owned(), parse(text).expect("valid"))
+    State::Valid(text.to_owned(), Box::new(parse(text).expect("valid")))
 }
 
 fn asked(set: serde_json::Value) -> Map<String, Value> {

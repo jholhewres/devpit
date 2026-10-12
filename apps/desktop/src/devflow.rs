@@ -12,6 +12,7 @@ use devpit_core::{preference, Store};
 use devpit_devflow::config::Agent;
 use devpit_devflow::detect::{self, Cli, Machine};
 use devpit_devflow::folder::{self, State, FILE};
+use devpit_devflow::layers::{self, Home, Layered};
 use devpit_devflow::preset::{self, Preset};
 use devpit_devflow::{proposal, setup, Ask, Proposal};
 use devpit_rpc::{Credentials, Project};
@@ -20,7 +21,7 @@ use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
 
-pub(crate) const METHODS: [&str; 12] = [
+pub(crate) const METHODS: [&str; 14] = [
     "devflow_offer",
     "devflow_status",
     "devflow_setup",
@@ -33,6 +34,8 @@ pub(crate) const METHODS: [&str; 12] = [
     "devflow_review",
     "devflow_gate",
     "devflow_session",
+    "devflow_stage",
+    "devflow_autopilot",
 ];
 
 /// The stage a method of a stage's own belongs to: it answers only where
@@ -99,6 +102,18 @@ pub(crate) fn respond(
         // Answered where the stage is off too: a hook there says nothing.
         "devflow_gate" => crate::devflow_gate::respond(app, &store, project, &state, cwd, params),
         "devflow_session" => crate::devflow_gate::session(&store, project, &state, cwd, params),
+        "devflow_stage" | "devflow_autopilot" => {
+            stages_on(&store, project, &state)?;
+            let State::Valid(_, config) = &state else {
+                return Err("devflow.yaml does not read: devpit_devflow_status says why".to_owned());
+            };
+            match method {
+                "devflow_stage" => {
+                    crate::devflow_stage::respond(app, &store, project, config, cwd, params)
+                }
+                _ => crate::devflow_autopilot::respond(app, &store, project, params),
+            }
+        }
         "devflow_skills" | "devflow_skill" => crate::devflow_skills::respond(
             method,
             root,
@@ -130,6 +145,40 @@ pub(crate) fn respond(
     }
 }
 
+/// Where this devpit keeps the layers a project's Devflow is read over.
+pub(crate) fn home() -> Home {
+    Home::under(&Store::root().unwrap_or_default())
+}
+
+/// The project's devflow.yaml read over its layers — the person's own and
+/// the teams it extends at their approved commits — which is what the flow
+/// runs on. The text stays the project's own file, which a change edits.
+pub(crate) fn read(root: &Path) -> State {
+    match folder::read(root) {
+        State::Valid(text, _) => match layers::layered(root, &text, &home()) {
+            Ok(layered) => State::Valid(text, Box::new(layered.config)),
+            Err(invalid) => State::Invalid(Some(text), invalid),
+        },
+        other => other,
+    }
+}
+
+/// The layers as they stand, when the project's file reads.
+pub(crate) fn layered(root: &Path) -> Option<Layered> {
+    match folder::read(root) {
+        State::Valid(text, _) => layers::layered(root, &text, &home()).ok(),
+        _ => None,
+    }
+}
+
+/// A change refused when the file it leaves would not read over its layers:
+/// the project may not weaken what a layer locked.
+fn layered_as(root: &Path, proposal: &Proposal) -> Result<(), String> {
+    layers::layered(root, &proposal.yaml, &home())
+        .map(|_| ())
+        .map_err(|invalid| format!("{invalid}"))
+}
+
 /// Whether Devflow is on in `project`: a card's blockers hold it back only there.
 pub(crate) fn is_on(project_id: &str, root: &Path) -> bool {
     let Ok(store) = crate::projects::store() else {
@@ -138,7 +187,7 @@ pub(crate) fn is_on(project_id: &str, root: &Path) -> bool {
     matches!(
         offered(
             globally_on(&store),
-            &folder::read(root),
+            &read(root),
             made(&store, project_id, Ask::Enable)
         ),
         Offered::Active(_)
@@ -167,7 +216,7 @@ pub(crate) fn looked(
     project: &Project,
     root: &Path,
 ) -> State {
-    let state = folder::read(root);
+    let state = read(root);
     if let State::Valid(_, config) = &state {
         if config.enabled && globally_on(store) && !made(store, &project.id, Ask::Enable) {
             asks::raise(app, &project.id, &project.name, Ask::Enable, true);
@@ -209,6 +258,11 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
         "waiting_for_click": waiting,
         "note": Value::Null,
     });
+    // The layers it extends, each applied or waiting for the person.
+    if let Some(layered) = layered(root) {
+        said["teams"] = json!(layered.teams);
+        said["stages_from"] = json!(layered.stages_from);
+    }
     let note = match state {
         State::Missing => {
             Some("No devflow.yaml yet: devpit_devflow_setup previews one.".to_owned())
@@ -260,6 +314,7 @@ pub(crate) fn setup_of(
     let detected = detect::detected(root, machine(store, &project.id));
     let proposal =
         proposal::setup(state, preset, &set, &detected).map_err(|why| why.to_string())?;
+    layered_as(root, &proposal)?;
     let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
     let checks: Vec<Value> = proposal
         .config
@@ -323,6 +378,7 @@ pub(crate) fn set_of(
         .get("value")
         .ok_or("pass the new `value` for the field")?;
     let proposal = proposal::set(state, path, value).map_err(|why| why.to_string())?;
+    layered_as(root, &proposal)?;
     let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
     let before = match state {
         State::Valid(_, config) => preset::value_at(&config.to_json(), path).clone(),
@@ -425,11 +481,52 @@ pub(crate) fn machine(store: &Store, project_id: &str) -> Machine {
         .flatten()
         .and_then(|raw| serde_json::from_str(&raw).ok())
         .unwrap_or_default();
+    // How the repository already works: its branches and what its commits name.
+    let root = store
+        .project(project_id)
+        .ok()
+        .flatten()
+        .map(|row| std::path::PathBuf::from(row.root_path));
+    let branches = root
+        .as_deref()
+        .and_then(|root| devpit_git::branches(root).ok())
+        .map(|all| all.into_iter().map(|one| one.name).collect())
+        .unwrap_or_default();
+    let subjects = root
+        .as_deref()
+        .and_then(|root| devpit_git::history(root, 200, 0).ok())
+        .map(|all| all.into_iter().map(|one| one.subject).collect())
+        .unwrap_or_default();
     Machine {
         clis,
         decisions_key: crate::decisions::key().is_some(),
         decisions_opted_out: opted_out.iter().any(|id| id == project_id),
+        branches,
+        subjects,
+        installed_skills: installed_skills(),
     }
+}
+
+/// Where Claude Code keeps the skills already installed for it.
+pub(crate) fn installed_folder() -> Option<std::path::PathBuf> {
+    Some(devpit_agentcli::cli_config::config_dir()?.join("skills"))
+}
+
+/// The skills already installed for Claude Code, by name: an own stage can
+/// use one where it is.
+fn installed_skills() -> Vec<String> {
+    let Some(folder) = installed_folder() else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().join("SKILL.md").is_file())
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .take(200)
+        .collect()
 }
 
 /// The sign-in this process's Claude Code runs on, read as the footer reads

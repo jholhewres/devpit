@@ -19,6 +19,11 @@ vi.mock('./useKnownAgents', () => ({
 
 const stage = (name: string, more: Partial<DevflowStage> = {}): DevflowStage => ({
   name,
+  uses: `builtin/${name}`,
+  own: false,
+  publish: null,
+  e2eDir: null,
+  command: null,
   enabled: true,
   approve: name === 'briefing' || name === 'plan' ? 'person' : null,
   checks: [],
@@ -30,6 +35,10 @@ const stage = (name: string, more: Partial<DevflowStage> = {}): DevflowStage => 
 
 const config = (more: Partial<DevflowConfig> = {}): DevflowConfig => ({
   enabled: false,
+  version: 2,
+  teams: [],
+  locked: [],
+  stagesFrom: 'project',
   stages: ['briefing', 'context', 'plan', 'execution', 'review', 'completion'].map((name) =>
     stage(name, name === 'execution' ? { checks: [{ name: 'unit', run: 'make test', report: 'none', evidence: [], source: 'Makefile:1' }] } : {}),
   ),
@@ -65,6 +74,7 @@ const missing = (): DevflowScreen =>
       glossary: 'CONTEXT.md',
       adrs: [],
       open: [],
+      hints: ['Ticket keys in commits: LED'],
       recommended: config(),
     },
   })
@@ -100,7 +110,7 @@ vi.mock('./live', () => ({
     },
     devflowAsk: async (...args: unknown[]) => {
       called('ask', ...args)
-      const waiting: DevflowAsk = { id: 'dfa_1', projectId: 'prj_api', project: 'api', change: 'enable', askedAt: 1 }
+      const waiting: DevflowAsk = { id: 'dfa_1', projectId: 'prj_api', project: 'api', change: 'enable', askedAt: 1, detail: null }
       current = { ...current, waiting: [waiting] }
       return { asks: [waiting] }
     },
@@ -215,5 +225,29 @@ describe('the Devflow screen', () => {
     await act(async () => window.dispatchEvent(new Event('focus')))
     expect(await screen.findByText(OUTSIDE)).toBeTruthy()
     expect(screen.queryByRole('combobox', { name: 'Persona' })).toBeNull()
+  })
+})
+
+describe('the stages of a file that is on', () => {
+  afterEach(() => {
+    cleanup()
+    called.mockReset()
+    current = missing()
+  })
+
+  it('are moved, removed and added as version 2 lists them', async () => {
+    current = active()
+    render(<DevflowPane />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Move context up' }))
+    await waitFor(() => expect(called).toHaveBeenCalledWith('edit', 'prj_api', 'stages', expect.any(String)))
+    const moved = JSON.parse(called.mock.calls.find((call) => call[0] === 'edit')![3] as string) as { uses: string }[]
+    expect(moved.slice(0, 2).map((one) => one.uses)).toEqual(['builtin/context', 'builtin/briefing'])
+    called.mockReset()
+    fireEvent.change(await screen.findByLabelText('The stage uses'), { target: { value: 'project/pr' } })
+    fireEvent.change(screen.getByLabelText('Its gate command'), { target: { value: './scripts/pr.sh' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add stage' }))
+    await waitFor(() => expect(called).toHaveBeenCalledWith('edit', 'prj_api', 'stages', expect.any(String)))
+    const added = JSON.parse(called.mock.calls[0]![3] as string) as Record<string, unknown>[]
+    expect(added.at(-1)).toEqual({ uses: 'project/pr', enabled: true, gate: { command: './scripts/pr.sh' } })
   })
 })

@@ -99,6 +99,9 @@ pub const DEVFLOW: &str = "devflow.enabled";
 /// The setup a project without Devflow starts from: `recommended` or
 /// `custom`. Recommended unless set.
 pub const DEVFLOW_PRESET: &str = "devflow.preset";
+/// The gate commands of team layers the person confirmed on this machine, by
+/// fingerprint of the command, its layer and its commit, as a JSON array.
+pub const DEVFLOW_COMMANDS: &str = "devflow.commands";
 /// The projects whose Devflow the person switched on on this machine, as a
 /// JSON array. A devflow.yaml saying `enabled: true` is not a click.
 pub const DEVFLOW_ON: &str = "devflow.switched_on";

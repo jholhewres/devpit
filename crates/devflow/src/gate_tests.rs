@@ -55,6 +55,7 @@ fn look(config: &Config, run: Option<&Value>, changed: Option<&str>) -> Checked 
         }),
         review: None,
         changed,
+        stages: &[],
     })
 }
 
@@ -171,6 +172,7 @@ fn reviewed_with(config: &Config, findings: &Value, at: &str, changed: Option<&s
         }),
         review: Some(Review { at, findings }),
         changed,
+        stages: &[],
     })
 }
 

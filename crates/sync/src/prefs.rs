@@ -81,6 +81,10 @@ pub const LOCAL: &[(&str, &str)] = &[
         "new, so it stays here until someone decides it travels",
     ),
     (key::DEVFLOW_ON, "a click on this machine"),
+    (
+        key::DEVFLOW_COMMANDS,
+        "a yes to run code, given on this machine",
+    ),
     (key::DEVFLOW_ENFORCED, "a click on this machine"),
     (key::CHANNEL_RULES, "the channels set up on this machine"),
     (

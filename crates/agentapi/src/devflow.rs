@@ -113,7 +113,7 @@ pub(crate) fn context_reply(answer: &Value) -> Option<String> {
 
 /// The tools only an active project gets: each under the stage that must be
 /// switched on for it, or `None` for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(Option<&str>, Tool); 6] = [
+pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
     (
         None,
         Tool {
@@ -213,6 +213,29 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 6] = [
                 "agent": { "type": "string", "description": "Set by devpit's own hooks; leave it out." },
                 "transcript": { "type": "string", "description": "Set by devpit's own hooks; leave it out." }
             } }),
+        },
+    ),
+    (
+        None,
+        Tool {
+            name: "devpit_devflow_stage",
+            method: "devflow_stage",
+            description: "Devflow: one of this project's own stages — a `uses:` in devflow.yaml beside the built-in ones, such as a team's acme/ticket or the project's project/pr. Without `card`: the stage's skill, read where it is (the project's .devpit/devflow/skills/, a team layer at its approved commit, the person's, or a skill already installed), with its gate; follow it. With `card`: runs the stage's gate for the card — a command through devpit's step runner in your checkout, the card only in its environment, or a rubric Decisions answers — keeps stage-<name>.json in a run of the card and comments on it. devpit_devflow_gate requires each gated stage to have passed since the last change. A command a team layer brought runs only after the person confirms it in the app.",
+            input: || json!({ "type": "object", "properties": {
+                "stage": { "type": "string", "description": "The stage's name: what follows the last / of its uses." },
+                "card": { "type": "string", "description": "The card to pass the stage's gate for. Leave it out to read the stage's skill." }
+            }, "required": ["stage"] }),
+        },
+    ),
+    (
+        Some("plan"),
+        Tool {
+            name: "devpit_devflow_autopilot",
+            method: "devflow_autopilot",
+            description: "Devflow: after the person approved an epic's plan, the order its cards would run in, one session per card through the gate, and a request to the person to start it. It starts only on their click in the app, never from this tool; once started it stops for the person at a card others wait on until they checked it, at a stage with approve: person, and at a session waiting on them.",
+            input: || json!({ "type": "object", "properties": {
+                "epic": { "type": "string", "description": "The epic's card id." }
+            }, "required": ["epic"] }),
         },
     ),
 ];

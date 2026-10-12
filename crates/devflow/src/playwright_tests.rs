@@ -13,6 +13,7 @@ fn detected(tools: Vec<E2eTool>) -> Detected {
         decisions_opted_out: false,
         glossary: None,
         adrs: vec![],
+        hints: Default::default(),
     }
 }
 

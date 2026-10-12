@@ -85,6 +85,8 @@ struct Read {
     run: Option<(String, Value)>,
     review: Option<(String, Value)>,
     changed: Option<String>,
+    /// Each own stage's newest gate record.
+    stages: Vec<(String, Option<(String, Value)>)>,
 }
 
 /// A JSON file of a run, never through a link out of the checkout.
@@ -104,7 +106,7 @@ pub(crate) fn newest(root: &Path, card: &str, file: &str) -> Option<(String, Val
     Some((name, value))
 }
 
-fn read(root: &Path, card: &str) -> Read {
+fn read(root: &Path, card: &str, config: &Config) -> Read {
     let folder = format!("{}/{card}", runs::RUNS);
     let runs_at = devpit_core::tree::resolve(root, &folder).ok();
     let run = newest(root, card, "evidence.json");
@@ -121,10 +123,20 @@ fn read(root: &Path, card: &str) -> Read {
         (written, value)
     });
     let since = run.as_ref().and_then(|(name, _)| runs::seconds_of(name));
+    let stages = config
+        .own_on()
+        .iter()
+        .map(|step| {
+            let name = step.name().to_owned();
+            let seen = newest(root, card, &devpit_devflow::stage::file_of(&name));
+            (name, seen)
+        })
+        .collect();
     Read {
         changed: changed_at(root, since),
         run,
         review,
+        stages,
     }
 }
 
@@ -171,6 +183,7 @@ fn looked<'a>(
             .as_ref()
             .map(|(at, findings)| Review { at, findings }),
         changed: read.changed.as_deref(),
+        stages: &read.stages,
     }
 }
 
@@ -221,7 +234,7 @@ fn judged_for_agent(
         config,
         &card,
         &root,
-        &read(&root, &card.id),
+        &read(&root, &card.id, config),
         false,
     );
     let file = kept(project, &root, &card.id, &gate)?;
@@ -402,7 +415,7 @@ fn stopped(
         return Said::Let;
     }
     let root = checkout(project, cwd);
-    let read = read(&root, &card.id);
+    let read = read(&root, &card.id, config);
     if hook.event == Event::SubagentStop
         && !gate::subagent_changed(
             read.changed.as_deref(),
@@ -563,7 +576,7 @@ pub(crate) fn context(
 /// passed on the newest run and nothing changed since.
 pub(crate) fn may_finish(project: &Project, card_id: &str, cwd: &Path) -> Result<(), String> {
     let store = crate::projects::store().map_err(|err| err.message)?;
-    let state = devpit_devflow::folder::read(Path::new(&project.root_path));
+    let state = crate::devflow::read(Path::new(&project.root_path));
     let Some(config) = gating(&store, project, &state) else {
         return Ok(());
     };
@@ -573,7 +586,7 @@ pub(crate) fn may_finish(project: &Project, card_id: &str, cwd: &Path) -> Result
         return Ok(());
     };
     let root: PathBuf = checkout(project, cwd);
-    let read = read(&root, &card.id);
+    let read = read(&root, &card.id, config);
     let criteria = criteria_of(&card.body);
     let checked = gate::checked(&looked(config, &card.id, &criteria, &read));
     let gate = Gate::new(checked, None, "");

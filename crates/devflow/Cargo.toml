@@ -9,6 +9,8 @@ license.workspace = true
 # A review's reviewers run headless on the person's own agent CLIs.
 devpit-agentcli = { path = "../agentcli" }
 devpit-core = { path = "../core" }
+# A team layer is fetched at a pinned ref and read blob by blob, never checked out.
+devpit-git = { path = "../git" }
 # A card's checks run as a command step runs, and their verdict is a run's.
 devpit-rpc = { path = "../rpc" }
 devpit-steps = { path = "../steps" }

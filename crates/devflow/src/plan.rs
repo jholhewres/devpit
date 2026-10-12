@@ -22,6 +22,24 @@ const LONGEST_BUILD: usize = 4000;
 const LONGEST_LINE: usize = 500;
 const MOST_ITEMS: usize = 12;
 
+/// Where the plan's cards go, or why they cannot go there yet. Only the
+/// board takes them: the trackers wait on their own integration.
+pub fn published(config: &crate::Config) -> Result<(), String> {
+    use crate::config::Publish;
+    match config.publish() {
+        Publish::Board => Ok(()),
+        other => Err(format!(
+            "publish: {} is not yet — it needs O-08, the {} integration. Set stages.plan.publish to board, and the plan's cards are made on the devpit board.",
+            other.word(),
+            match other {
+                Publish::Jira => "Jira",
+                Publish::Linear => "Linear",
+                _ => "GitHub Issues",
+            }
+        )),
+    }
+}
+
 /// One card of a plan, as the plan skill fills it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Slice {

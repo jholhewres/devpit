@@ -105,7 +105,7 @@ fn fake_claude(dir: &Path) -> String {
 
 fn config_of(root: &Path) -> Config {
     match devpit_devflow::folder::read(root) {
-        devpit_devflow::State::Valid(_, config) => config,
+        devpit_devflow::State::Valid(_, config) => *config,
         other => panic!("{other:?}"),
     }
 }

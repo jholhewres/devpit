@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use crate::folder;
+use crate::layers::Team;
 
 /// A project's own skills, relative to its root.
 pub const DIR: &str = ".devpit/devflow/skills";
@@ -64,6 +65,8 @@ const BUILT_IN: [(&str, Option<&str>, &str); 7] = [
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layer {
     Project,
+    /// A team layer the project extends, at its approved commit.
+    Team,
     Personal,
     BuiltIn,
 }
@@ -72,6 +75,7 @@ impl Layer {
     pub fn word(self) -> &'static str {
         match self {
             Layer::Project => "project",
+            Layer::Team => "team",
             Layer::Personal => "personal",
             Layer::BuiltIn => "built-in",
         }
@@ -132,11 +136,21 @@ pub fn named(name_or_uri: &str) -> Option<&'static str> {
     names().find(|name| *name == name_or_uri || uri(name) == name_or_uri)
 }
 
-/// `name` from the first layer that has it: the project's, the person's
-/// (`personal`), the built-in one. A file that is there but cannot be used —
-/// outside its folder, too large, not UTF-8, another name in its frontmatter
-/// — is refused, never passed over for the next layer.
+/// `name` from the first layer that has it: the project's, a team's, the
+/// person's (`personal`), the built-in one. A file that is there but cannot
+/// be used — outside its folder, too large, not UTF-8, another name in its
+/// frontmatter — is refused, never passed over for the next layer.
 pub fn resolve(project: &Path, personal: &Path, name: &str) -> Result<Skill, String> {
+    resolve_with(project, personal, &[], name)
+}
+
+/// [`resolve`], with the team layers that apply.
+pub fn resolve_with(
+    project: &Path,
+    personal: &Path,
+    teams: &[Team],
+    name: &str,
+) -> Result<Skill, String> {
     let (name, stage, built_in) = BUILT_IN
         .iter()
         .find(|(one, ..)| *one == name)
@@ -147,24 +161,41 @@ pub fn resolve(project: &Path, personal: &Path, name: &str) -> Result<Skill, Str
                 names().collect::<Vec<_>>().join(", ")
             )
         })?;
-    let layers = [
-        (Layer::Project, project, format!("{DIR}/{name}/SKILL.md")),
-        (Layer::Personal, personal, format!("{name}/SKILL.md")),
-    ];
-    for (layer, base, relative) in layers {
+    let mine = |layer: Layer, base: &Path, relative: String| -> Result<Option<Skill>, String> {
         let refused = |why: String| format!("the {} {relative}: {why}", layer.word());
         let Some((file, text)) = read_in(base, &relative).map_err(refused)? else {
-            continue;
+            return Ok(None);
         };
         let frontmatter = frontmatter(&text, name).map_err(refused)?;
-        return Ok(Skill {
+        Ok(Some(Skill {
             name,
             stage,
             layer,
             file: Some(file),
             text,
             frontmatter,
-        });
+        }))
+    };
+    if let Some(skill) = mine(Layer::Project, project, format!("{DIR}/{name}/SKILL.md"))? {
+        return Ok(skill);
+    }
+    for team in teams {
+        let relative = format!("skills/{name}/SKILL.md");
+        if let Some(text) = team.read(&relative)? {
+            let frontmatter = frontmatter(&text, name)
+                .map_err(|why| format!("{}'s {relative}: {why}", team.name))?;
+            return Ok(Skill {
+                name,
+                stage,
+                layer: Layer::Team,
+                file: None,
+                text,
+                frontmatter,
+            });
+        }
+    }
+    if let Some(skill) = mine(Layer::Personal, personal, format!("{name}/SKILL.md"))? {
+        return Ok(skill);
     }
     Ok(Skill {
         name,
@@ -173,6 +204,80 @@ pub fn resolve(project: &Path, personal: &Path, name: &str) -> Result<Skill, Str
         file: None,
         text: built_in.to_owned(),
         frontmatter: frontmatter(built_in, name)?,
+    })
+}
+
+/// Where an own stage's skill is looked for.
+pub struct Places<'a> {
+    pub project: &'a Path,
+    /// The person's skills, under devpit's home.
+    pub personal: &'a Path,
+    pub teams: &'a [Team],
+    /// The skills the agent CLI already has installed, for `skills/<name>`.
+    pub installed: Option<&'a Path>,
+}
+
+/// An own stage's skill, read where it is and never copied.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Found {
+    pub uses: String,
+    /// `project`, `personal`, `installed` or the team's name.
+    pub layer: String,
+    pub file: Option<PathBuf>,
+    pub text: String,
+}
+
+/// The skill `uses` points at: `project/<name>` in `.devpit/devflow/skills/`,
+/// `personal/<name>` in the person's, `skills/<name>` among those already
+/// installed — the project's `.claude/skills/`, then the CLI's own — or
+/// `<team>/<name>` in a team layer that applies.
+pub fn own(uses: &str, places: &Places) -> Result<Found, String> {
+    let (place, name) = uses
+        .split_once('/')
+        .ok_or_else(|| format!("`{uses}` is not <where>/<skill>"))?;
+    let at = |layer: &str, found: Option<(PathBuf, String)>| {
+        found.map(|(file, text)| (layer.to_owned(), Some(file), text))
+    };
+    let found = match place {
+        "project" => at(
+            "project",
+            read_in(places.project, &format!("{DIR}/{name}/SKILL.md"))?,
+        ),
+        "personal" => at(
+            "personal",
+            read_in(places.personal, &format!("{name}/SKILL.md"))?,
+        ),
+        "skills" => match read_in(places.project, &format!(".claude/skills/{name}/SKILL.md"))? {
+            Some(found) => Some(("project".to_owned(), Some(found.0), found.1)),
+            None => match places.installed {
+                Some(installed) => at(
+                    "installed",
+                    read_in(installed, &format!("{name}/SKILL.md"))?,
+                ),
+                None => None,
+            },
+        },
+        team => {
+            let layer = places
+                .teams
+                .iter()
+                .find(|one| one.name == team)
+                .ok_or_else(|| {
+                    format!("no layer called `{team}` applies to this project: see its extends")
+                })?;
+            layer
+                .read(&format!("skills/{name}/SKILL.md"))?
+                .map(|text| (team.to_owned(), None, text))
+        }
+    };
+    let (layer, file, text) =
+        found.ok_or_else(|| format!("{uses}: there is no SKILL.md where it points"))?;
+    frontmatter(&text, name).map_err(|why| format!("{uses}: {why}"))?;
+    Ok(Found {
+        uses: uses.to_owned(),
+        layer,
+        file,
+        text,
     })
 }
 

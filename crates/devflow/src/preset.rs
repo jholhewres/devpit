@@ -107,6 +107,8 @@ pub fn checks(detected: &Detected) -> Vec<Proposed> {
 /// What `preset` starts from, given what was detected.
 pub fn starting(preset: Preset, detected: &Detected) -> Config {
     let mut config = Config::default();
+    // Said in the file, so where the plan goes is there to change.
+    config.stages.plan.publish = Some(config::Publish::Board);
     if preset == Preset::Custom {
         return config;
     }
@@ -171,11 +173,18 @@ pub(crate) fn set_path(mut whole: Value, path: &str, value: &Value) -> Result<Va
             }
             Value::Array(items) => {
                 let shown = parts[..index].join(".");
-                let Some(slot) = part
-                    .parse::<usize>()
-                    .ok()
-                    .filter(|slot| *slot <= items.len())
-                else {
+                let slot = match part.parse::<usize>() {
+                    Ok(slot) => Some(slot),
+                    Err(_) => named_in(items, part),
+                };
+                let Some(slot) = slot.filter(|slot| *slot <= items.len()) else {
+                    if part.parse::<usize>().is_err() {
+                        return Err(Invalid::at(
+                            None,
+                            &parts[..=index].join("."),
+                            &format!("{shown} has no stage called `{part}`"),
+                        ));
+                    }
                     return Err(Invalid::at(
                         None,
                         path,
@@ -212,10 +221,29 @@ pub fn value_at<'a>(whole: &'a Value, path: &str) -> &'a Value {
     path.split('.')
         .try_fold(whole, |at, part| match at {
             Value::Object(fields) => fields.get(part),
-            Value::Array(items) => items.get(part.parse::<usize>().ok()?),
+            Value::Array(items) => items.get(
+                part.parse::<usize>()
+                    .ok()
+                    .or_else(|| named_in(items, part))?,
+            ),
             _ => None,
         })
         .unwrap_or(&Value::Null)
+}
+
+/// The stage's name, for an item of version 2's list: what follows the last
+/// `/` of its `uses`.
+pub(crate) fn stage_name(item: &Value) -> Option<&str> {
+    let uses = item.get("uses")?.as_str()?;
+    Some(uses.rsplit('/').next().unwrap_or(uses))
+}
+
+/// Where the stage called `name` — or using it — is in a list of stages, so
+/// `stages.plan.approve` means the same in either version.
+pub(crate) fn named_in(items: &[Value], name: &str) -> Option<usize> {
+    items.iter().position(|item| {
+        stage_name(item) == Some(name) || item.get("uses").and_then(Value::as_str) == Some(name)
+    })
 }
 
 /// One field that differs, by dotted path. Lists are compared whole.
@@ -267,6 +295,36 @@ fn walk(path: &str, before: &Value, after: &Value, said: &mut Vec<Change>) {
             );
         }
         return;
+    }
+    // The same stages in the same order: a change inside one is named by the
+    // stage, so a switch flipped in the list is still one word in the file.
+    let names = |items: &[Value]| -> Option<Vec<String>> {
+        items
+            .iter()
+            .map(|item| stage_name(item).map(str::to_owned))
+            .collect()
+    };
+    match (before, after) {
+        (Value::Array(old), Value::Array(new)) => {
+            if let (Some(was), Some(now)) = (names(old), names(new)) {
+                if was == now && !was.is_empty() {
+                    for ((name, old), new) in was.iter().zip(old).zip(new) {
+                        walk(&format!("{path}.{name}"), old, new, said);
+                    }
+                    return;
+                }
+            }
+        }
+        // A list of stages written for the first time: each of its fields is new.
+        (Value::Null, Value::Array(new)) if !new.is_empty() => {
+            if let Some(now) = names(new) {
+                for (name, new) in now.iter().zip(new) {
+                    walk(&format!("{path}.{name}"), &Value::Null, new, said);
+                }
+                return;
+            }
+        }
+        _ => {}
     }
     if before != after {
         said.push(Change {

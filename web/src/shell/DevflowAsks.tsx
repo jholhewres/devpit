@@ -12,17 +12,32 @@ import { onCarried } from './window'
  */
 
 export function devflowQuestion(one: DevflowAsk): { question: string; why: string; yes: string } {
-  return one.change === 'enable'
-    ? {
+  switch (one.change) {
+    case 'enable':
+      return {
         question: `Switch Devflow on in ${one.project}?`,
         why: 'Its agents get the Devflow tools; the click writes enabled: true in its devflow.yaml.',
         yes: 'Switch on',
       }
-    : {
+    case 'enforce':
+      return {
         question: `Enforce Decisions in ${one.project}'s Devflow?`,
         why: 'Its gates then block instead of only logging; the click writes mode: enforce.',
         yes: 'Enforce',
       }
+    case 'command':
+      return {
+        question: `Run a team layer's gate command in ${one.project}?`,
+        why: `${one.detail ?? ''} — code from outside the project, asked again whenever it or its commit changes.`,
+        yes: 'Run it',
+      }
+    case 'autopilot':
+      return {
+        question: `Start the autopilot in ${one.project}?`,
+        why: `${one.detail ?? ''} — one session per card, each through the gate; it stops for you at a card others wait on.`,
+        yes: 'Start',
+      }
+  }
 }
 
 export function DevflowAsks(): React.JSX.Element | null {

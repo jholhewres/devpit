@@ -88,6 +88,7 @@ fn a_cli_signed_out_and_a_project_opted_out_are_asked_about() {
             ],
             decisions_key: true,
             decisions_opted_out: true,
+            ..Machine::default()
         },
     );
     let said = open(&found);
@@ -105,4 +106,44 @@ fn a_manifest_outside_the_project_is_not_read() {
         .expect("link");
     let found = detected(dir.path(), Machine::default());
     assert!(found.test.is_empty(), "{:?}", found.test);
+}
+
+#[test]
+fn the_repositorys_own_flow_comes_back_as_hints() {
+    let dir = project(&[
+        ("AGENTS.md", "# Agents\n"),
+        ("CONTRIBUTING.md", "# Contributing\n"),
+        (".github/pull_request_template.md", "## What\n"),
+        (".github/ISSUE_TEMPLATE/bug.md", "## Bug\n"),
+        (".claude/skills/ticket/SKILL.md", "---\nname: ticket\n---\n"),
+    ]);
+    let machine = Machine {
+        branches: vec![
+            "main".into(),
+            "develop".into(),
+            "feature/LED-1-x".into(),
+            "spike".into(),
+        ],
+        subjects: vec![
+            "LED-123 Fix the login".into(),
+            "Merge LED-99 and OPS-7".into(),
+            "Bump to v1.2-3".into(),
+            "LED-1: tidy".into(),
+        ],
+        installed_skills: vec!["deploy".into()],
+        ..Machine::default()
+    };
+    let hints = detected(dir.path(), machine).hints;
+    assert_eq!(hints.guides, ["AGENTS.md", "CONTRIBUTING.md"]);
+    assert_eq!(hints.pr_templates, [".github/pull_request_template.md"]);
+    assert_eq!(hints.issue_templates, [".github/ISSUE_TEMPLATE/bug.md"]);
+    assert_eq!(hints.branches, ["develop", "feature/LED-1-x"]);
+    assert_eq!(hints.ticket_keys, ["LED", "OPS"]);
+    assert_eq!(hints.skills, ["deploy", "ticket"]);
+    // Without develop beside them, feature branches are not git-flow.
+    let plain = Machine {
+        branches: vec!["main".into(), "feature/x".into()],
+        ..Machine::default()
+    };
+    assert!(detected(dir.path(), plain).hints.branches.is_empty());
 }

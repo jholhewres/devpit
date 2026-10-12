@@ -6,16 +6,17 @@
 use std::path::{Path, PathBuf};
 
 use devpit_core::{preference, Store};
-use devpit_devflow::config::{Config, STAGES};
+use devpit_devflow::config::{Config, StageGate, Step};
 use devpit_devflow::detect::{self, Detected};
 use devpit_devflow::folder::{State, FILE};
+use devpit_devflow::layers::Layered;
 use devpit_devflow::preset::{self, Preset};
 use devpit_devflow::{skills, Ask};
 use devpit_rpc::{
     DevflowAsks, DevflowChange, DevflowCheck, DevflowCli, DevflowConfig, DevflowDetected,
     DevflowError, DevflowFileChange, DevflowFound, DevflowPrefs, DevflowPreview, DevflowReviewer,
-    DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage, DevflowState, ErrorCode, Project,
-    RpcError,
+    DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage, DevflowState, DevflowTeam,
+    ErrorCode, Project, RpcError,
 };
 use serde_json::{json, Map, Value};
 use tauri::AppHandle;
@@ -70,11 +71,20 @@ pub(crate) fn screen(app: Option<&AppHandle>, store: &Store, project: &Project) 
                 message: invalid.message.clone(),
             }),
         ),
-        State::Valid(text, config) => (
-            Some(text.clone()),
-            Some(view(config, Some((root, &personal())), &[])),
-            None,
-        ),
+        State::Valid(text, config) => {
+            let layered = devflow::layered(root);
+            let personal = personal();
+            let places = SkillsIn {
+                root,
+                personal: &personal,
+                layered: layered.as_ref(),
+            };
+            (
+                Some(text.clone()),
+                Some(view(config, Some(&places), &[])),
+                None,
+            )
+        }
     };
     let detected = matches!(state, State::Missing).then(|| {
         let found = detect::detected(root, devflow::machine(store, &project.id));
@@ -115,12 +125,61 @@ fn skill_view(name: &str, resolved: Result<skills::Skill, String>) -> DevflowSki
     }
 }
 
-/// `config` as the screen draws it. `skills_in` resolves each stage's skill
-/// from the project and the person's folder; `sources` says where a check's
-/// command was found.
+/// Where the screen reads skills from: the project, the person's folder, and
+/// the layers that apply.
+pub(crate) struct SkillsIn<'a> {
+    pub root: &'a Path,
+    pub personal: &'a Path,
+    pub layered: Option<&'a Layered>,
+}
+
+fn stage_skill(step: &Step, places: &SkillsIn) -> DevflowSkill {
+    let teams = places
+        .layered
+        .map(|layered| layered.applied.as_slice())
+        .unwrap_or_default();
+    match step.builtin() {
+        Some(stage) => {
+            let name = format!("devflow-{stage}");
+            skill_view(
+                &name,
+                skills::resolve_with(places.root, places.personal, teams, &name),
+            )
+        }
+        None => {
+            let installed = devflow::installed_folder();
+            let found = skills::own(
+                &step.uses,
+                &skills::Places {
+                    project: places.root,
+                    personal: places.personal,
+                    teams,
+                    installed: installed.as_deref(),
+                },
+            );
+            match found {
+                Ok(found) => DevflowSkill {
+                    name: step.uses.clone(),
+                    layer: found.layer,
+                    file: found.file.map(|file| file.display().to_string()),
+                    refused: None,
+                },
+                Err(why) => DevflowSkill {
+                    name: step.uses.clone(),
+                    layer: String::new(),
+                    file: None,
+                    refused: Some(why),
+                },
+            }
+        }
+    }
+}
+
+/// `config` as the screen draws it. `skills_in` resolves each stage's skill;
+/// `sources` says where a check's command was found.
 pub(crate) fn view(
     config: &Config,
-    skills_in: Option<(&Path, &Path)>,
+    skills_in: Option<&SkillsIn>,
     sources: &[(String, String)],
 ) -> DevflowConfig {
     let stages = &config.stages;
@@ -138,35 +197,68 @@ pub(crate) fn view(
             .find(|(command, _)| *command == one.run)
             .map(|(_, source)| source.clone()),
     };
-    let staged = |name: &str, enabled: bool| {
-        let skill = format!("devflow-{name}");
+    let staged = |step: &Step| {
+        let builtin = step.builtin();
+        let own = step.own.as_ref();
         DevflowStage {
-            name: name.to_owned(),
-            enabled,
-            approve: match name {
-                "briefing" => Some(stages.briefing.approve.word().to_owned()),
-                "plan" => Some(stages.plan.approve.word().to_owned()),
-                _ => None,
+            name: step.name().to_owned(),
+            uses: step.uses.clone(),
+            own: builtin.is_none(),
+            enabled: config.is_on(step),
+            approve: match builtin {
+                Some("briefing") => Some(stages.briefing.approve.word().to_owned()),
+                Some("plan") => Some(stages.plan.approve.word().to_owned()),
+                Some(_) => None,
+                None => own
+                    .and_then(|own| own.approve)
+                    .map(|approve| approve.word().to_owned()),
             },
-            checks: if name == "execution" {
+            publish: (builtin == Some("plan"))
+                .then_some(stages.plan.publish)
+                .flatten()
+                .map(|publish| publish.word().to_owned()),
+            checks: if builtin == Some("execution") {
                 stages.execution.checks.iter().map(check).collect()
             } else {
                 Vec::new()
             },
-            gate: (name == "completion").then(|| stages.completion.gate.clone()),
-            rubric: config.decisions.rubrics.get(name).cloned(),
-            skill: skills_in.map(|(root, personal)| {
-                skill_view(&skill, skills::resolve(root, personal, &skill))
-            }),
+            e2e_dir: (builtin == Some("execution")).then(|| stages.execution.e2e_dir.clone()),
+            gate: match (builtin, own.and_then(|own| own.gate.as_ref())) {
+                (Some("completion"), _) => Some(stages.completion.gate.clone()),
+                (None, Some(StageGate::Rubric(rubric))) => Some(rubric.clone()),
+                _ => None,
+            },
+            command: match own.and_then(|own| own.gate.as_ref()) {
+                Some(StageGate::Command(command)) => Some(command.clone()),
+                _ => None,
+            },
+            rubric: config.decisions.rubrics.get(step.name()).cloned(),
+            skill: skills_in.map(|places| stage_skill(step, places)),
         }
     };
-    let on = config.stages_on();
+    let layered = skills_in.and_then(|places| places.layered);
     DevflowConfig {
         enabled: config.enabled,
-        stages: STAGES
-            .iter()
-            .map(|name| staged(name, on.contains(name)))
-            .collect(),
+        version: u32::try_from(config.version).unwrap_or_default(),
+        teams: layered
+            .map(|layered| {
+                layered
+                    .teams
+                    .iter()
+                    .map(|team| DevflowTeam {
+                        name: team.name.clone(),
+                        git: team.git.clone(),
+                        wanted: team.wanted.clone(),
+                        locked_ref: team.locked_ref.clone(),
+                        commit: team.commit.clone(),
+                        state: team.state.to_owned(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        locked: layered.map_or_else(|| config.locked.clone(), |layered| layered.locks.clone()),
+        stages_from: layered.map_or("project".to_owned(), |layered| layered.stages_from.clone()),
+        stages: config.flow.iter().map(staged).collect(),
         reviewers: config
             .review
             .reviewers
@@ -188,7 +280,6 @@ pub(crate) fn view(
         decisions_mode: config.decisions.mode.word().to_owned(),
     }
 }
-
 /// What detection found, with the recommended setup a Custom one starts from.
 pub(crate) fn detected_view(found: &Detected) -> DevflowDetected {
     let kinds = [
@@ -229,12 +320,34 @@ pub(crate) fn detected_view(found: &Detected) -> DevflowDetected {
         glossary: found.glossary.clone(),
         adrs: found.adrs.clone(),
         open: detect::open(found),
+        hints: hints_said(&found.hints),
         recommended: view(
             &preset::starting(Preset::Recommended, found),
             None,
             &sources,
         ),
     }
+}
+
+/// How the repository already works, one line each.
+fn hints_said(hints: &devpit_devflow::detect::Hints) -> Vec<String> {
+    let line = |what: &str, items: &[String]| {
+        (!items.is_empty()).then(|| format!("{what}: {}", items.join(", ")))
+    };
+    [
+        line("Guides", &hints.guides),
+        line("Pull request templates", &hints.pr_templates),
+        line("Issue templates", &hints.issue_templates),
+        line("Branches of a release flow", &hints.branches),
+        line("Ticket keys in commits", &hints.ticket_keys),
+        line(
+            "Skills an own stage can use as skills/<name>",
+            &hints.skills,
+        ),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 /// A JSON text the window sent, read only below the ceiling.
@@ -415,6 +528,13 @@ pub async fn devflow_ask(
         let ask = match change {
             DevflowChange::Enable => Ask::Enable,
             DevflowChange::Enforce => Ask::Enforce,
+            // Asked about where they come from: a stage's gate, an epic.
+            DevflowChange::Command | DevflowChange::Autopilot => {
+                return Err(RpcError::new(
+                    ErrorCode::Invalid,
+                    "only switching Devflow on or enforcing is asked from here",
+                ))
+            }
         };
         asks::raise(Some(&app), &project.id, &project.name, ask, false);
         Ok(asks::listed())

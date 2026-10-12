@@ -162,7 +162,7 @@ impl Jev {
 
 /// The rubric a project's completion is judged by.
 fn completion_rubric(root: &Path) -> String {
-    match devpit_devflow::folder::read(root) {
+    match crate::devflow::read(root) {
         devpit_devflow::State::Valid(_, config) => {
             jev::rubric_for(&config, "completion").unwrap_or_else(|| GATE.to_owned())
         }

@@ -466,6 +466,26 @@ export const commands = {
 	/**  `devflow.card_evidence` — the card's newest gate, reviewers and files. */
 	devflowCardEvidence: (projectId: string, cardId: string) => typedError<DevflowCardEvidence, RpcError>(__TAURI_INVOKE("devflow_card_evidence", { projectId, cardId })),
 	/**
+	 *  `devflow.team_fetch` — each layer at the ref devflow.yaml names, and
+	 *  what approving it would change. Nothing is applied.
+	 */
+	devflowTeamFetch: (projectId: string) => typedError<DevflowTeamChanges, RpcError>(__TAURI_INVOKE("devflow_team_fetch", { projectId })),
+	/**
+	 *  `devflow.team_approve` — the person's click: the layer pinned at the
+	 *  commit they were shown, in the project's devflow.lock. devpit never
+	 *  commits it.
+	 */
+	devflowTeamApprove: (projectId: string, git: string, commit: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_team_approve", { projectId, git, commit })),
+	/**  `devflow.autopilot` — the epic's autopilot as it stands. */
+	devflowAutopilot: (projectId: string) => typedError<DevflowAutopilot, RpcError>(__TAURI_INVOKE("devflow_autopilot", { projectId })),
+	/**  `devflow.autopilot_start` — the person's click on the epic: its cards run. */
+	devflowAutopilotStart: (projectId: string, epicId: string) => typedError<DevflowAutopilot, RpcError>(__TAURI_INVOKE("devflow_autopilot_start", { projectId, epicId })),
+	/**
+	 *  `devflow.autopilot_stop` — the person stops it; the card at work goes on
+	 *  in its own session, and nothing starts after it.
+	 */
+	devflowAutopilotStop: (projectId: string) => typedError<DevflowAutopilot, RpcError>(__TAURI_INVOKE("devflow_autopilot_stop", { projectId })),
+	/**
 	 *  `devflow.plan_keep` — the person moved, cut or edited a waiting plan on
 	 *  the board.
 	 */
@@ -2709,11 +2729,26 @@ export type DevflowAsk = {
 	change: DevflowChange,
 	/**  Seconds since the epoch. */
 	askedAt: number | null,
+	/**
+	 *  What the click is about, for a command or an autopilot: the command
+	 *  and where it came from, or the epic.
+	 */
+	detail: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */
 export type DevflowAsks = {
 	asks: DevflowAsk[],
+};
+
+/**  An epic's autopilot: whether it runs, and what it last did or waits for. */
+export type DevflowAutopilot = {
+	projectId: string,
+	epicId: string | null,
+	running: boolean,
+	said: string | null,
+	/**  The plan's cards in the order it runs them, by title. */
+	order: string[],
 };
 
 /**  Response of `devflow.calibration`: each rubric the project was judged by. */
@@ -2742,7 +2777,14 @@ export type DevflowChange =
 /**  Devflow switched on in the project. */
 "enable" | 
 /**  Decisions moved from shadow to enforce in the project's Devflow. */
-"enforce";
+"enforce" | 
+/**
+ *  A gate command a team layer brought, run for the first time since it
+ *  or its commit changed.
+ */
+"command" | 
+/**  The cards of an approved plan run one after another. */
+"autopilot";
 
 export type DevflowCheck = {
 	name: string,
@@ -2767,6 +2809,12 @@ export type DevflowCodexInstalled = {
 
 export type DevflowConfig = {
 	enabled: boolean,
+	version: number,
+	teams: DevflowTeam[],
+	/**  Fields a layer locked, which the project may not change. */
+	locked: string[],
+	/**  The layer the stages came from: `project`, a team's name, or `built-in`. */
+	stagesFrom: string,
 	stages: DevflowStage[],
 	reviewers: DevflowReviewer[],
 	blockOn: string[],
@@ -2787,6 +2835,11 @@ export type DevflowDetected = {
 	adrs: string[],
 	/**  What detection left to the person, one sentence each. */
 	open: string[],
+	/**
+	 *  How the repository already works: guides, templates, git-flow's
+	 *  branches, ticket keys and installed skills, one line each.
+	 */
+	hints: string[],
 	/**  The recommended setup, before its commands move into scripts. */
 	recommended: DevflowConfig,
 };
@@ -2909,13 +2962,23 @@ export type DevflowSkillText = {
 /**  One stage, in the order the work reaches it. */
 export type DevflowStage = {
 	name: string,
+	/**  `builtin/<stage>`, or `<where>/<skill>` for an own stage. */
+	uses: string,
+	/**  One of the project's or a team's own stages. */
+	own: boolean,
 	enabled: boolean,
 	/**  `person` or `none`, for a stage whose result is approved. */
 	approve: string | null,
+	/**  The plan's: `board`, `jira`, `linear` or `github`, when said. */
+	publish: string | null,
 	/**  The execution stage's checks. */
 	checks: DevflowCheck[],
-	/**  The completion stage's rubric. */
+	/**  The execution stage's folder for E2E specs. */
+	e2eDir: string | null,
+	/**  The completion stage's rubric, or an own stage's. */
 	gate: string | null,
+	/**  An own stage's gate command. */
+	command: string | null,
 	/**  Decisions' rubric for this stage, when one is named. */
 	rubric: string | null,
 	skill: DevflowSkill | null,
@@ -2929,6 +2992,39 @@ export type DevflowState =
 "disabled" | "active" | 
 /**  Refused, with the line and field; the tools stay off. */
 "invalid";
+
+/**  A team or company layer the project extends. */
+export type DevflowTeam = {
+	/**  What its own stages are used under: `<name>/<skill>`. */
+	name: string,
+	git: string,
+	/**  The ref devflow.yaml names. */
+	wanted: string,
+	/**  What the lockfile pins, when it pins it. */
+	lockedRef: string | null,
+	commit: string | null,
+	/**  `applied`, `approve` or `fetch`. */
+	state: string,
+};
+
+/**  What approving a layer's ref changes: shown before the person's click. */
+export type DevflowTeamChange = {
+	name: string,
+	git: string,
+	fromRef: string | null,
+	fromCommit: string | null,
+	toRef: string,
+	toCommit: string,
+	/**  `added path`, `changed path` or `removed path`. */
+	files: string[],
+	/**  The layer's devflow.yaml: `- ` lines gone, `+ ` lines new. */
+	diff: string[],
+};
+
+/**  Response of `devflow.team_fetch`: each layer's change, nothing applied. */
+export type DevflowTeamChanges = {
+	changes: DevflowTeamChange[],
+};
 
 /**
  *  What somebody did in the menu, on its way back to the pane that owns it.

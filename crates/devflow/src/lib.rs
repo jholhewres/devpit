@@ -10,16 +10,20 @@
 //! machine's half of detection (agent CLIs, the Decisions key), the board and
 //! the person's click are the app's.
 
+pub mod autopilot;
 pub mod brief;
 pub mod calibrate;
 pub mod config;
 pub mod detect;
 pub mod evidence;
 pub mod findings;
+pub mod flow;
 pub mod folder;
 pub mod gate;
 pub mod jev;
+pub mod layers;
 mod node;
+pub mod pinning;
 pub mod plan;
 pub mod playwright;
 pub mod plugin;
@@ -30,6 +34,7 @@ pub mod review;
 pub mod runs;
 pub mod setup;
 pub mod skills;
+pub mod stage;
 
 pub use config::{Config, Invalid};
 pub use folder::State;
