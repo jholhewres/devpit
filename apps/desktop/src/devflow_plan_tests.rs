@@ -229,8 +229,14 @@ fn the_brief_and_the_plan_wait_for_the_persons_click_on_devflow() {
         "version: 1\nenabled: true\n",
     )
     .expect("yaml");
-    for method in ["devflow_brief", "devflow_plan"] {
-        let refused = crate::devflow::respond(None, method, &project, &json!({ "title": "x" }));
+    for method in ["devflow_brief", "devflow_plan", "devflow_evidence"] {
+        let refused = crate::devflow::respond(
+            None,
+            method,
+            &project,
+            dir.path(),
+            &json!({ "title": "x", "card": "card_1" }),
+        );
         assert!(refused.expect_err(method).contains("not on"), "{method}");
     }
     assert!(store.cards(&project.id).expect("cards").is_empty());

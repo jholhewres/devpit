@@ -62,7 +62,7 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
 
 /// The tools only an active project gets: each under the stage that must be
 /// switched on for it, or `None` for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(Option<&str>, Tool); 3] = [
+pub(crate) static STAGED: [(Option<&str>, Tool); 4] = [
     (
         None,
         Tool {
@@ -112,6 +112,26 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 3] = [
                 }, "required": ["key", "title"] } },
                 "apply": { "type": "boolean", "description": "Create the cards. Only after the person's explicit yes to the preview." }
             }, "required": ["epic", "cards"] }),
+        },
+    ),
+    (
+        Some("execution"),
+        Tool {
+            name: "devpit_devflow_evidence",
+            method: "devflow_evidence",
+            description: "Devflow: run a card's checks from .devpit/devflow/devflow.yaml in the checkout you stand in, each through devpit's step runner with the card in its environment; keep the reports, screenshots and video under .devpit/devflow/runs/<card>/<time>/ (the newest 5 runs per card); attach them to the card as artifacts with a comment linking each; and answer with a short summary: each check passed, failed or inconclusive (exit 0 with no report devpit reads is not a pass), its counts, the failures, and the paths. It records each criterion's tests and how they ended, and the red tests you saw and whether they are green now. Leave `checks` out to run all of them. Takes as long as the checks do.",
+            input: || json!({ "type": "object", "properties": {
+                "card": { "type": "string", "description": "The card's id." },
+                "checks": { "type": "array", "items": { "type": "string" }, "description": "Checks by their name in devflow.yaml. Leave out to run all." },
+                "criteria": { "type": "array", "items": { "type": "object", "properties": {
+                    "criterion": { "type": "string", "description": "The checkbox text, verbatim." },
+                    "tests": { "type": "array", "items": { "type": "string" }, "description": "The tests that prove it, as the runner names them, e.g. tests/test_cli.py::test_rename_changes_the_title." }
+                }, "required": ["criterion", "tests"] } },
+                "red": { "type": "array", "items": { "type": "object", "properties": {
+                    "test": { "type": "string" },
+                    "failure": { "type": "string", "description": "The failing line you saw, secrets redacted." }
+                }, "required": ["test", "failure"] } }
+            }, "required": ["card"] }),
         },
     ),
 ];

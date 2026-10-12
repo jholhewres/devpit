@@ -67,7 +67,9 @@ fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
     let dir = tempfile::tempdir().expect("tempdir");
     std::fs::write(dir.path().join("Makefile"), "test:\n\ttrue\n").expect("makefile");
     let here = project("prj_devflow_setup", dir.path());
-    let ask = |method: &str, params: Value| respond(None, method, &here, &params).expect(method);
+    let ask = |method: &str, params: Value| {
+        respond(None, method, &here, dir.path(), &params).expect(method)
+    };
 
     let status = ask("devflow_status", json!({}));
     assert_eq!(status["state"], "no file");

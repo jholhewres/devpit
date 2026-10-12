@@ -1144,6 +1144,8 @@ name = "devpit-devflow"
 version = "0.1.40"
 dependencies = [
  "devpit-core",
+ "devpit-rpc",
+ "devpit-steps",
  "serde",
  "serde_json",
  "sha2",

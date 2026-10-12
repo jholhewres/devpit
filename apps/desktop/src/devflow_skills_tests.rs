@@ -28,7 +28,9 @@ fn an_active_project_gets_its_skills_its_own_layer_first() {
     std::fs::create_dir_all(dir.path().join(".devpit/devflow")).expect("folder");
     std::fs::write(dir.path().join(".devpit/devflow/devflow.yaml"), yaml).expect("yaml");
     let here = project("prj_devflow_skills", dir.path());
-    let ask = |method: &str, params: Value| crate::devflow::respond(None, method, &here, &params);
+    let ask = |method: &str, params: Value| {
+        crate::devflow::respond(None, method, &here, dir.path(), &params)
+    };
 
     // The file says enabled, but the person has not clicked: no skills.
     let refused = ask("devflow_skill", json!({ "name": "devflow-plan" })).expect_err("off");

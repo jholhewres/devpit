@@ -1,7 +1,8 @@
 //! What a setup leaves in `.devpit/devflow/`: devflow.yaml, one script per
-//! check, a `.gitignore` for the runs, and the reviewer personas and findings
-//! schema the review stage reads there. Previewed first, written only when
-//! asked, and never committed.
+//! check, a `.gitignore` for the runs, the reviewer personas and findings
+//! schema the review stage reads there, and a Playwright config when the
+//! project runs Playwright. Previewed first, written only when asked, and
+//! never committed.
 
 use std::path::Path;
 
@@ -115,8 +116,9 @@ pub struct FileChange {
     pub change: &'static str,
 }
 
-/// Every file a setup of `yaml` with `scripts` writes.
-pub fn planned(yaml: &str, scripts: &[Script]) -> Vec<Planned> {
+/// Every file a setup of `yaml` with `scripts` writes, and the Playwright
+/// config when the project runs Playwright.
+pub fn planned(yaml: &str, scripts: &[Script], playwright: Option<&str>) -> Vec<Planned> {
     let at = |path: String, text: String, kind: Kind, executable: bool| Planned {
         path,
         text,
@@ -154,12 +156,20 @@ pub fn planned(yaml: &str, scripts: &[Script]) -> Vec<Planned> {
         Kind::Theirs,
         false,
     ));
+    files.extend(playwright.map(|text| {
+        at(
+            crate::playwright::FILE.to_owned(),
+            text.to_owned(),
+            Kind::Theirs,
+            false,
+        )
+    }));
     files
 }
 
 /// Only devflow.yaml, for a change to one field.
 pub fn config_only(yaml: &str) -> Vec<Planned> {
-    planned(yaml, &[]).into_iter().take(1).collect()
+    planned(yaml, &[], None).into_iter().take(1).collect()
 }
 
 /// What writing `files` under `root` would do; nothing is written.
@@ -242,7 +252,7 @@ fn change_of(file: &Planned, existing: Option<&str>) -> &'static str {
 
 /// Makes each folder of `relative` that is missing, refusing one that
 /// leads outside the project.
-fn folders(root: &Path, relative: &str) -> Result<(), String> {
+pub(crate) fn folders(root: &Path, relative: &str) -> Result<(), String> {
     let mut walked = String::new();
     for part in relative.split('/').filter(|part| !part.is_empty()) {
         if !walked.is_empty() {

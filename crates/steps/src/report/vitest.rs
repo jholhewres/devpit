@@ -5,6 +5,8 @@ use std::path::Path;
 use devpit_rpc::{FailedTest, Tested};
 use serde::Deserialize;
 
+use super::{Outcome, Reported};
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Report {
@@ -37,15 +39,27 @@ struct Assertion {
     failure_messages: Vec<String>,
 }
 
-pub(super) fn from_json(text: &str, cwd: &Path) -> Option<Tested> {
+pub(super) fn from_json(text: &str, cwd: &Path) -> Option<Reported> {
     let report: Report = serde_json::from_str(text).ok()?;
-    let mut tested = Tested {
+    let mut reported = Reported::of(Tested {
         passed: report.num_passed_tests,
         failed: report.num_failed_tests,
         skipped: report.num_pending_tests + report.num_todo_tests,
         read_from: vec!["vitest".to_owned()],
         ..Tested::default()
-    };
+    });
+    for file in &report.test_results {
+        let place = Some(super::relative(&file.name, cwd));
+        for test in &file.assertion_results {
+            let outcome = match test.status.as_str() {
+                "passed" => Outcome::Passed,
+                "failed" => Outcome::Failed,
+                _ => Outcome::Skipped,
+            };
+            reported.case(&test.full_name, place.clone(), outcome);
+        }
+    }
+    let tested = &mut reported.tested;
     for file in &report.test_results {
         let failures: Vec<FailedTest> = file
             .assertion_results
@@ -70,5 +84,5 @@ pub(super) fn from_json(text: &str, cwd: &Path) -> Option<Tested> {
         tested.failures.extend(failures);
     }
     tested.failures.truncate(devpit_rpc::MOST_FAILURES_KEPT);
-    Some(tested)
+    Some(reported)
 }

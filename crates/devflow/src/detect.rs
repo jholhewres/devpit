@@ -32,6 +32,9 @@ pub struct Found {
 pub struct E2eTool {
     pub name: String,
     pub source: String,
+    /// The command that runs Devflow's specs with it, when devpit writes
+    /// that tool a config (`playwright.rs`).
+    pub run: Option<String>,
 }
 
 /// An agent CLI on this machine, as the app found it.
@@ -158,6 +161,19 @@ fn makefile(files: &Files, into: &mut Detected) {
     }
 }
 
+/// How the project runs a package's binary, and its package manager, by its lockfile.
+fn runner(files: &Files) -> (&'static str, &'static str) {
+    if files.read("pnpm-lock.yaml").is_some() {
+        ("pnpm exec", "pnpm")
+    } else if files.read("yarn.lock").is_some() {
+        ("yarn", "yarn")
+    } else if files.any(&["bun.lock", "bun.lockb"]).is_some() {
+        ("bunx", "bun")
+    } else {
+        ("npx", "npm")
+    }
+}
+
 fn package_json(files: &Files, into: &mut Detected) {
     const FILE: &str = "package.json";
     let Some(text) = files.read(FILE) else {
@@ -178,15 +194,7 @@ fn package_json(files: &Files, into: &mut Detected) {
             .and_then(serde_json::Value::as_str)
             .map(str::to_owned)
     };
-    let (exec, manager) = if files.read("pnpm-lock.yaml").is_some() {
-        ("pnpm exec", "pnpm")
-    } else if files.read("yarn.lock").is_some() {
-        ("yarn", "yarn")
-    } else if files.any(&["bun.lock", "bun.lockb"]).is_some() {
-        ("bunx", "bun")
-    } else {
-        ("npx", "npm")
-    };
+    let (exec, manager) = runner(files);
     let report = format!("--outputFile=\"{REPORT}/tests.json\"");
     let script_line = |name: &str| line_of(&text, &format!("\"{name}\""));
     let test = if has("vitest") {
@@ -404,6 +412,8 @@ fn e2e_tools(files: &Files) -> Vec<E2eTool> {
         });
         if let Some(source) = source {
             tools.push(E2eTool {
+                run: (name == crate::playwright::TOOL)
+                    .then(|| crate::playwright::command(runner(files).0)),
                 name: name.to_owned(),
                 source,
             });

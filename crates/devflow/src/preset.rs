@@ -40,26 +40,60 @@ pub struct Proposed {
     pub run: String,
     pub report: config::Report,
     pub source: Option<String>,
+    pub evidence: Vec<Evidence>,
 }
 
-/// The checks devpit would configure: the first test command, the first E2E
-/// command and the first lint command it found.
+/// The checks devpit would configure: the first test command, the E2E check
+/// and the first lint command it found. With Playwright the E2E check runs
+/// Devflow's specs through the config devpit writes, keeping screenshots and
+/// video; the project's own E2E command, when there is one, is still called,
+/// as `e2e-suite`.
 pub fn checks(detected: &Detected) -> Vec<Proposed> {
-    [
-        ("unit", detected.test.first()),
-        ("e2e", detected.e2e.first()),
-        ("lint", detected.lint.first()),
-    ]
-    .into_iter()
-    .filter_map(|(name, found)| {
-        let found = found?;
+    let found = |name: &str, found: &crate::detect::Found, evidence: Vec<Evidence>| Proposed {
+        name: name.to_owned(),
+        run: found.command.clone(),
+        report: found.report,
+        source: Some(found.source.clone()),
+        evidence,
+    };
+    let own_e2e = detected.e2e.first();
+    let devflows = detected.e2e_tools.iter().find_map(|tool| {
         Some(Proposed {
-            name: name.to_owned(),
-            run: found.command.clone(),
-            report: found.report,
-            source: Some(found.source.clone()),
+            name: "e2e".to_owned(),
+            run: tool.run.clone()?,
+            report: config::Report::Junit,
+            source: Some(tool.source.clone()),
+            evidence: vec![Evidence::Screenshots, Evidence::Video],
         })
-    })
+    });
+    let e2e = match devflows {
+        Some(devflows) => [
+            Some(devflows),
+            own_e2e.map(|own| found("e2e-suite", own, Vec::new())),
+        ],
+        None => {
+            let screenshots = if detected.e2e_tools.is_empty() {
+                Vec::new()
+            } else {
+                vec![Evidence::Screenshots]
+            };
+            [own_e2e.map(|own| found("e2e", own, screenshots)), None]
+        }
+    };
+    std::iter::once(
+        detected
+            .test
+            .first()
+            .map(|one| found("unit", one, Vec::new())),
+    )
+    .chain(e2e)
+    .chain(std::iter::once(
+        detected
+            .lint
+            .first()
+            .map(|one| found("lint", one, Vec::new())),
+    ))
+    .flatten()
     .collect()
 }
 
@@ -69,15 +103,10 @@ pub fn starting(preset: Preset, detected: &Detected) -> Config {
     if preset == Preset::Custom {
         return config;
     }
-    let e2e_tool = !detected.e2e_tools.is_empty();
     config.stages.execution.checks = checks(detected)
         .into_iter()
         .map(|proposed| Check {
-            evidence: if proposed.name == "e2e" && e2e_tool {
-                vec![Evidence::Screenshots]
-            } else {
-                Vec::new()
-            },
+            evidence: proposed.evidence,
             name: proposed.name,
             run: proposed.run,
             report: proposed.report,

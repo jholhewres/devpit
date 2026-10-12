@@ -7,7 +7,10 @@ license.workspace = true
 
 [dependencies]
 devpit-core = { path = "../core" }
-serde = { version = "1.0.229", features = ["derive"] }
+# A card's checks run as a command step runs, and their verdict is a run's.
+devpit-rpc = { path = "../rpc" }
+devpit-steps = { path = "../steps" }
+serde ={ version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 # The digest a skill is listed with, as the MCP Skills extension writes it.
 sha2 = "0.10"

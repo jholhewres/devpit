@@ -106,8 +106,54 @@ fn a_node_project_runs_vitest_with_a_report_and_playwright_from_its_script() {
     let setup = recommended(&found);
     let e2e = &setup.config.stages.execution.checks[1];
     assert_eq!(e2e.name, "e2e");
-    assert_eq!(e2e.evidence, [Evidence::Screenshots]);
+    assert_eq!(e2e.evidence, [Evidence::Screenshots, Evidence::Video]);
+    assert_eq!(e2e.report, Report::Junit);
     assert_eq!(e2e.run, "sh .devpit/devflow/scripts/check-e2e.sh");
+    let script = setup
+        .scripts
+        .iter()
+        .find(|script| script.name == "e2e")
+        .expect("the e2e script");
+    assert_eq!(
+        script.command,
+        "pnpm exec playwright test --config .devpit/devflow/playwright.config.ts"
+    );
+    assert_eq!(script.source.as_deref(), Some("playwright.config.ts"));
+    // The project's own E2E suite stays where it is, and is still called.
+    let suite = &setup.config.stages.execution.checks[2];
+    assert_eq!(suite.name, "e2e-suite");
+    assert!(setup
+        .scripts
+        .iter()
+        .any(|script| script.name == "e2e-suite" && script.command == "pnpm run test:e2e"));
+}
+
+#[test]
+fn a_playwright_project_gets_a_config_for_devflows_specs_with_their_evidence() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let setup = recommended(&detected(&fixture("node"), machine()));
+    let done = devpit_devflow::setup::write(root.path(), &setup.files).expect("written");
+    assert!(done
+        .iter()
+        .any(|one| one.path == ".devpit/devflow/playwright.config.ts" && one.change == "create"));
+    let written = std::fs::read_to_string(root.path().join(".devpit/devflow/playwright.config.ts"))
+        .expect("the config");
+    for said in [
+        "import base from '../../playwright.config'",
+        "testDir: `${root}/.devpit/devflow/e2e`",
+        "['junit', { outputFile: `${reports}/report.xml` }]",
+        "process.env.DEVPIT_REPORT_DIR",
+        "screenshot: 'on', video: 'on'",
+    ] {
+        assert!(written.contains(said), "{said} in:\n{written}");
+    }
+
+    // Without Playwright there is no config to write.
+    let php = recommended(&detected(&fixture("php"), machine()));
+    assert!(php
+        .files
+        .iter()
+        .all(|file| file.path != ".devpit/devflow/playwright.config.ts"));
 }
 
 #[test]

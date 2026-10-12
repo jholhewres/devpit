@@ -175,3 +175,92 @@ fn a_long_message_is_cut_and_loses_its_colour() {
     assert!(said.starts_with("xxx") && said.ends_with('…'));
     assert_eq!(said.chars().count(), LONGEST_MESSAGE + 1);
 }
+
+fn ended(cases: &[Case]) -> Vec<(&str, Outcome)> {
+    cases
+        .iter()
+        .map(|case| (case.name.as_str(), case.outcome))
+        .collect()
+}
+
+fn cases_in(text: &str) -> Vec<Case> {
+    file_cases(text, Path::new(CWD))
+        .expect("a report it recognises")
+        .cases
+}
+
+fn cases_printed(text: &str) -> Vec<Case> {
+    read_cases(None, Some(text), Path::new(CWD))
+        .expect("a result line")
+        .cases
+}
+
+#[test]
+fn each_test_a_report_names_is_kept_with_how_it_ended() {
+    use Outcome::{Failed, Passed, Skipped};
+    let junit = cases_in(fixture!("pytest-failed.xml"));
+    assert_eq!(
+        ended(&junit),
+        [
+            ("test_adds", Passed),
+            ("test_the_answer_is_wrong", Failed),
+            ("test_later", Skipped),
+            ("test_errors", Failed)
+        ]
+    );
+    assert_eq!(junit[0].place.as_deref(), Some("test_sample"));
+    assert_eq!(
+        ended(&cases_in(fixture!("vitest-failed.json"))),
+        [
+            ("adds", Passed),
+            ("the answer is wrong", Failed),
+            ("later", Skipped)
+        ]
+    );
+    let cargo = [
+        ("tests::later", Skipped),
+        ("tests::adds", Passed),
+        ("tests::the_answer_is_wrong", Failed),
+    ];
+    assert_eq!(ended(&cases_printed(fixture!("cargo-failed.txt"))), cargo);
+    assert_eq!(
+        ended(&cases_printed(fixture!("libtest-failed.jsonl"))),
+        cargo
+    );
+}
+
+#[test]
+fn a_test_is_named_by_its_whole_path_or_by_its_last_parts() {
+    let cargo = cases_printed(fixture!("cargo-failed.txt"));
+    assert_eq!(outcome_of("tests::adds", &cargo), Some(Outcome::Passed));
+    assert_eq!(outcome_of("adds", &cargo), Some(Outcome::Passed));
+    assert_eq!(
+        outcome_of("my_crate::tests::adds", &cargo),
+        Some(Outcome::Passed)
+    );
+    assert_eq!(
+        outcome_of("the_answer_is_wrong", &cargo),
+        Some(Outcome::Failed)
+    );
+    // Only at a separator: `dds` is not `adds`.
+    assert_eq!(outcome_of("dds", &cargo), None);
+    assert_eq!(outcome_of("tests::missing", &cargo), None);
+    let pytest = cases_in(fixture!("pytest-failed.xml"));
+    assert_eq!(
+        outcome_of("tests/test_sample.py::test_adds", &pytest),
+        Some(Outcome::Passed)
+    );
+    assert_eq!(outcome_of("test_later", &pytest), Some(Outcome::Skipped));
+}
+
+#[test]
+fn a_test_that_failed_anywhere_failed() {
+    let cases = [Outcome::Passed, Outcome::Failed, Outcome::Skipped].map(|outcome| Case {
+        name: "renames".into(),
+        place: None,
+        outcome,
+    });
+    assert_eq!(outcome_of("renames", &cases), Some(Outcome::Failed));
+    assert_eq!(outcome_of("renames", &cases[..1]), Some(Outcome::Passed));
+    assert_eq!(outcome_of("renames", &cases[2..]), Some(Outcome::Skipped));
+}

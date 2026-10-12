@@ -20,6 +20,7 @@ fn detected() -> Detected {
         e2e_tools: vec![E2eTool {
             name: "playwright".into(),
             source: "playwright.config.ts".into(),
+            run: Some(crate::playwright::command("pnpm exec")),
         }],
         clis: vec![
             Cli {
@@ -47,13 +48,26 @@ fn the_recommended_setup_is_built_from_what_was_detected() {
     assert_eq!(config.stages.briefing.approve, Approve::Person);
     assert_eq!(config.stages.plan.approve, Approve::Person);
     let checks = &config.stages.execution.checks;
-    assert_eq!(checks.len(), 2);
+    let ran: Vec<(&str, &str)> = checks
+        .iter()
+        .map(|check| (check.name.as_str(), check.run.as_str()))
+        .collect();
+    // With Playwright the E2E check runs Devflow's specs, and the project's
+    // own E2E command is still called.
     assert_eq!(
-        (checks[0].name.as_str(), checks[0].run.as_str()),
-        ("unit", "make test")
+        ran,
+        [
+            ("unit", "make test"),
+            (
+                "e2e",
+                "pnpm exec playwright test --config .devpit/devflow/playwright.config.ts"
+            ),
+            ("e2e-suite", "pnpm run e2e"),
+        ]
     );
-    assert_eq!(checks[1].name, "e2e");
-    assert_eq!(checks[1].evidence, [Evidence::Screenshots]);
+    assert_eq!(checks[1].report, Report::Junit);
+    assert_eq!(checks[1].evidence, [Evidence::Screenshots, Evidence::Video]);
+    assert!(checks[2].evidence.is_empty());
     // Claude is signed out, so the reviewer is the next CLI that may review.
     assert_eq!(
         config.review.reviewers,
@@ -66,6 +80,24 @@ fn the_recommended_setup_is_built_from_what_was_detected() {
     assert_eq!(config.stages.completion.gate, "devflow-done");
     assert!(config.decisions.use_);
     assert_eq!(config.decisions.mode, Mode::Shadow);
+}
+
+#[test]
+fn without_playwright_the_projects_e2e_command_is_the_e2e_check() {
+    let mut found = detected();
+    found.e2e_tools[0] = E2eTool {
+        name: "cypress".into(),
+        source: "cypress.config.ts".into(),
+        run: None,
+    };
+    let config = starting(Preset::Recommended, &found);
+    let e2e = &config.stages.execution.checks[1];
+    assert_eq!(
+        (e2e.name.as_str(), e2e.run.as_str()),
+        ("e2e", "pnpm run e2e")
+    );
+    assert_eq!(e2e.evidence, [Evidence::Screenshots]);
+    assert_eq!(config.stages.execution.checks.len(), 2);
 }
 
 #[test]

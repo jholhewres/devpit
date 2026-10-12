@@ -12,7 +12,7 @@ crates/rpc       the contract; frontend types are generated from it
 crates/tmux      the sessions that outlive the window
 crates/agentcli  the agent catalogue, headless turns, hooks
 crates/steps     what a column runs, and the runner that runs it
-crates/devflow   devflow.yaml, its detection and setup; flow/ ships inside it
+crates/devflow   devflow.yaml, its detection, setup and evidence; flow/ ships inside it
 crates/remote    the Remote through the relay: Noise, frames, the relay client
 apps/desktop     the shell — the only crate allowed to know it
 web              React + Vite + xterm.js
@@ -189,6 +189,19 @@ no copy, only that the person clicked.
   creates only the plan the person last saw, and only once. A card's epic
   and blockers are rows (`card_parent`, `card_blocker`); its criteria stay
   in its body.
+- **The card keeps its proof.** `devpit_devflow_evidence` runs the card's
+  checks through the step runner, in the checkout the agent stands in, the
+  card reaching them only through the environment. Each run is a folder,
+  `.devpit/devflow/runs/<card>/<time>/`, git-ignored by the setup's
+  `.gitignore`: each check's report and log, the screenshots and video an
+  E2E check keeps, and `evidence.json` with the criteria's tests and how
+  they ended. A check's verdict is a command step's — exit zero with no
+  report is not a pass. The files are copied among the project's artifacts
+  under `devflow/<card>/<time>/` and linked from a comment devpit signs, so
+  they open on the card; the newest five runs stay in each place. With
+  Playwright the setup writes `.devpit/devflow/playwright.config.ts`: the
+  project's own config as its base, Devflow's specs from `e2e_dir`, a JUnit
+  report and every screenshot and video.
 - **Skills by layer.** Where it is on, each stage's skill is a
   `skill://devflow/<name>/SKILL.md` resource carrying its SEP-2640 entry
   (digest and size), the `devpit_devflow_skill` tool, and a prompt such as

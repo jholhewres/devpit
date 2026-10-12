@@ -1,4 +1,5 @@
-//! JUnit XML: pytest, Node's runner, go-junit-report, Maven and Gradle.
+//! JUnit XML: pytest, Node's runner, go-junit-report, Maven, Gradle and
+//! Playwright.
 
 use std::path::Path;
 
@@ -6,18 +7,21 @@ use devpit_rpc::{FailedTest, Tested};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
+use super::{Outcome, Reported};
+
 /// One `<testcase>` while it is being read.
 struct Case {
     name: String,
     file: Option<String>,
+    class: Option<String>,
     failed: bool,
     skipped: bool,
     message: Option<String>,
 }
 
-pub(super) fn from_xml(text: &str, cwd: &Path) -> Option<Tested> {
+pub(super) fn from_xml(text: &str, cwd: &Path) -> Option<Reported> {
     let mut reader = Reader::from_str(text);
-    let mut tested: Option<Tested> = None;
+    let mut tested: Option<Reported> = None;
     let mut case: Option<Case> = None;
     let mut in_failure = false;
 
@@ -28,15 +32,18 @@ pub(super) fn from_xml(text: &str, cwd: &Path) -> Option<Tested> {
                 let empty = matches!(event, Event::Empty(_));
                 match tag.name().as_ref() {
                     b"testsuites" | b"testsuite" => {
-                        tested.get_or_insert_with(|| Tested {
-                            read_from: vec!["JUnit".to_owned()],
-                            ..Tested::default()
+                        tested.get_or_insert_with(|| {
+                            Reported::of(Tested {
+                                read_from: vec!["JUnit".to_owned()],
+                                ..Tested::default()
+                            })
                         });
                     }
                     b"testcase" => {
                         let started = Case {
                             name: attribute(tag, "name").unwrap_or_default(),
                             file: attribute(tag, "file").map(|file| super::relative(&file, cwd)),
+                            class: attribute(tag, "classname"),
                             failed: false,
                             skipped: false,
                             message: None,
@@ -83,22 +90,28 @@ pub(super) fn from_xml(text: &str, cwd: &Path) -> Option<Tested> {
     tested
 }
 
-/// Counts a finished case.
-fn ended(tested: &mut Tested, case: Case) {
-    if case.failed {
+/// Counts a finished case, and names it.
+fn ended(reported: &mut Reported, case: Case) {
+    let place = case.file.clone().or(case.class);
+    let tested = &mut reported.tested;
+    let outcome = if case.failed {
         tested.failed += 1;
         if tested.failures.len() < devpit_rpc::MOST_FAILURES_KEPT {
             tested.failures.push(FailedTest {
-                name: case.name,
+                name: case.name.clone(),
                 file: case.file,
                 message: case.message,
             });
         }
+        Outcome::Failed
     } else if case.skipped {
         tested.skipped += 1;
+        Outcome::Skipped
     } else {
         tested.passed += 1;
-    }
+        Outcome::Passed
+    };
+    reported.case(&case.name, place, outcome);
 }
 
 fn attribute(tag: &BytesStart, name: &str) -> Option<String> {

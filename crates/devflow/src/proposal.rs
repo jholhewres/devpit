@@ -13,6 +13,7 @@ use serde_json::{Map, Value};
 use crate::config::{self, Config, Invalid, Mode};
 use crate::detect::Detected;
 use crate::folder::{self, State};
+use crate::playwright;
 use crate::preset::{self, Change, Preset};
 use crate::render::render;
 use crate::setup::{self, Planned, Script};
@@ -85,12 +86,22 @@ pub fn setup(
         .into_iter()
         .flatten()
         .map(|found| (found.command.clone(), found.source.clone()))
+        .chain(
+            detected
+                .e2e_tools
+                .iter()
+                .filter_map(|tool| Some((tool.run.clone()?, tool.source.clone()))),
+        )
         .collect();
-    let (config, scripts) = setup::scripted(config::from_json(&wanted)?, &sources);
+    let config = config::from_json(&wanted)?;
+    // Before the commands move into scripts: a check the person chose names its tool there.
+    let playwright = playwright::wanted(&config, detected)
+        .then(|| playwright::text(&config.stages.execution.e2e_dir, playwright::base(detected)));
+    let (config, scripts) = setup::scripted(config, &sources);
     let yaml = render(&config);
     Ok(Proposal {
         changes: preset::diff(&before, &config.to_json()),
-        files: setup::planned(&yaml, &scripts),
+        files: setup::planned(&yaml, &scripts, playwright.as_deref()),
         config,
         yaml,
         laid_out: true,

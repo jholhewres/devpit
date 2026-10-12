@@ -3,15 +3,28 @@
 
 use devpit_rpc::{FailedTest, Tested};
 
+use super::{Outcome, Reported};
+
 /// The output's tests, or `None` when no suite in it finished.
-pub(super) fn from_output(output: &str) -> Option<Tested> {
+pub(super) fn from_output(output: &str) -> Option<Reported> {
     from_json_lines(output).or_else(|| from_text(output))
 }
 
+/// How libtest says a test ended, in either format.
+fn outcome(word: &str) -> Option<Outcome> {
+    match word {
+        "ok" => Some(Outcome::Passed),
+        "failed" | "FAILED" => Some(Outcome::Failed),
+        word if word.starts_with("ignored") => Some(Outcome::Skipped),
+        _ => None,
+    }
+}
+
 /// `-Z unstable-options --format json`: a `suite` line ends each binary.
-fn from_json_lines(output: &str) -> Option<Tested> {
+fn from_json_lines(output: &str) -> Option<Reported> {
     let mut tested: Option<Tested> = None;
     let mut failures = Vec::new();
+    let mut cases = Reported::default();
     for line in output
         .lines()
         .filter(|line| line.trim_start().starts_with('{'))
@@ -32,14 +45,20 @@ fn from_json_lines(output: &str) -> Option<Tested> {
                 suite.failed += count("failed");
                 suite.skipped += count("ignored");
             }
-            (Some("test"), Some("failed")) => {
-                let said = event["stdout"].as_str().unwrap_or_default();
-                let (file, message) = panic_of(said);
-                failures.push(FailedTest {
-                    name: event["name"].as_str().unwrap_or_default().to_owned(),
-                    file,
-                    message,
-                });
+            (Some("test"), Some(word)) => {
+                let name = event["name"].as_str().unwrap_or_default();
+                if let Some(ended) = outcome(word) {
+                    cases.case(name, None, ended);
+                }
+                if word == "failed" {
+                    let said = event["stdout"].as_str().unwrap_or_default();
+                    let (file, message) = panic_of(said);
+                    failures.push(FailedTest {
+                        name: name.to_owned(),
+                        file,
+                        message,
+                    });
+                }
             }
             _ => {}
         }
@@ -47,14 +66,16 @@ fn from_json_lines(output: &str) -> Option<Tested> {
     let mut tested = tested?;
     tested.failures = failures;
     tested.failures.truncate(devpit_rpc::MOST_FAILURES_KEPT);
-    Some(tested)
+    cases.tested = tested;
+    Some(cases)
 }
 
 /// `test result: FAILED. 1 passed; 1 failed; 1 ignored; …`, one per binary,
-/// and `test name ... FAILED` for each that failed.
-fn from_text(output: &str) -> Option<Tested> {
+/// and `test name ... ok` for each test, `FAILED` or `ignored` as it ended.
+fn from_text(output: &str) -> Option<Reported> {
     let mut tested: Option<Tested> = None;
     let mut names = Vec::new();
+    let mut cases = Reported::default();
     for line in output.lines() {
         if let Some(counts) = line.trim().strip_prefix("test result: ") {
             let suite = tested.get_or_insert_with(|| Tested {
@@ -64,11 +85,17 @@ fn from_text(output: &str) -> Option<Tested> {
             suite.passed += counted(counts, "passed");
             suite.failed += counted(counts, "failed");
             suite.skipped += counted(counts, "ignored");
-        } else if let Some(name) = line
+        } else if let Some((name, word)) = line
             .strip_prefix("test ")
-            .and_then(|rest| rest.strip_suffix(" ... FAILED"))
+            .and_then(|rest| rest.rsplit_once(" ... "))
         {
-            names.push(name.to_owned());
+            let Some(ended) = outcome(word.trim()) else {
+                continue;
+            };
+            cases.case(name, None, ended);
+            if ended == Outcome::Failed {
+                names.push(name.to_owned());
+            }
         }
     }
     let mut tested = tested?;
@@ -84,7 +111,8 @@ fn from_text(output: &str) -> Option<Tested> {
             }
         })
         .collect();
-    Some(tested)
+    cases.tested = tested;
+    Some(cases)
 }
 
 /// The number before `word` in `1 passed; 1 failed; …`.

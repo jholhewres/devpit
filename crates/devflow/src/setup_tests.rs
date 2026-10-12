@@ -42,7 +42,7 @@ fn each_command_moves_into_a_script_that_says_where_it_came_from() {
 fn a_setup_writes_the_folder_and_nothing_before_it_is_asked() {
     let root = tempfile::tempdir().expect("tempdir");
     let (config, scripts) = scripted(with_checks(&[("unit", "make test")]), &[]);
-    let files = planned(&crate::render::render(&config), &scripts);
+    let files = planned(&crate::render::render(&config), &scripts, None);
 
     let previewed = preview(root.path(), &files);
     assert!(previewed.iter().all(|one| one.change == "create"));

@@ -173,6 +173,56 @@ fn the_brief_and_the_plan_come_only_with_their_stages() {
         .all(|tool| !tool.name.ends_with("_brief") && !tool.name.ends_with("_plan")));
 }
 
+const EXECUTION: &str = include_str!("../../../flow/skills/devflow-execution/SKILL.md");
+const COMPLETION: &str = include_str!("../../../flow/skills/devflow-completion/SKILL.md");
+
+/// Every field each skill's call to the evidence tool sends is one the
+/// tool's schema lists, at every level.
+#[test]
+fn the_evidence_comes_with_execution_and_takes_what_its_skills_send() {
+    let execution = Offer::Active(vec!["execution".into()]).tools(&STAGED);
+    assert!(execution
+        .iter()
+        .any(|tool| tool.name == "devpit_devflow_evidence"));
+    let plan = Offer::Active(vec!["plan".into()]).tools(&STAGED);
+    assert!(plan
+        .iter()
+        .all(|tool| tool.name != "devpit_devflow_evidence"));
+
+    let (_, tool) = STAGED
+        .iter()
+        .find(|(_, tool)| tool.name == "devpit_devflow_evidence")
+        .expect("the evidence tool");
+    assert_eq!(tool.method, "devflow_evidence");
+    let schema = (tool.input)();
+    let listed = |at: &Value, sent: &Value| {
+        for key in sent.as_object().expect("an object").keys() {
+            assert!(at["properties"].get(key).is_some(), "{key} is not in {at}");
+        }
+    };
+    let mut calls = 0;
+    for skill in [EXECUTION, COMPLETION] {
+        let blocks = skill.split("```json").skip(1);
+        for block in blocks.filter_map(|rest| rest.split("```").next()) {
+            let Ok(sent) = serde_json::from_str::<Value>(block) else {
+                continue;
+            };
+            if sent.get("criteria").is_none() {
+                continue;
+            }
+            calls += 1;
+            listed(&schema, &sent);
+            for field in ["criteria", "red"] {
+                for item in sent[field].as_array().into_iter().flatten() {
+                    listed(&schema["properties"][field]["items"], item);
+                }
+            }
+        }
+    }
+    assert_eq!(calls, 2, "one call in each skill");
+    assert_eq!(schema["required"], json!(["card"]));
+}
+
 /// The fields the briefing and plan skills fill, by name: a tool that renamed
 /// one would answer a shape no skill sends.
 #[test]

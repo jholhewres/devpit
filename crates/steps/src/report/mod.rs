@@ -6,8 +6,11 @@ use std::path::Path;
 use devpit_rpc::Tested;
 
 mod cargo;
+mod cases;
 mod junit;
 mod vitest;
+
+pub use cases::{outcome_of, Case, Outcome, Reported, MOST_CASES};
 
 /// Largest report file read, checked before reading.
 pub const MOST_REPORT: u64 = 32 * 1024 * 1024;
@@ -21,22 +24,31 @@ const LONGEST_MESSAGE: usize = 300;
 /// Everything the run reported, added up, or `None`. `printed` is `None` when
 /// the output was cut: half an output may have lost the failures.
 pub fn read(dir: Option<&Path>, printed: Option<&str>, cwd: &Path) -> Option<Tested> {
-    let mut found: Option<Tested> = None;
-    let mut take = |tested: Tested| found.get_or_insert_with(Tested::default).add(tested);
+    read_cases(dir, printed, cwd).map(|reported| reported.tested)
+}
+
+/// [`read`], with each test the reports named and how it ended.
+pub fn read_cases(dir: Option<&Path>, printed: Option<&str>, cwd: &Path) -> Option<Reported> {
+    let mut found: Option<Reported> = None;
+    let mut take = |reported: Reported| found.get_or_insert_with(Reported::default).add(reported);
 
     for text in dir.map(files_in).unwrap_or_default() {
-        if let Some(tested) = from_file(&text, cwd) {
-            take(tested);
+        if let Some(reported) = file_cases(&text, cwd) {
+            take(reported);
         }
     }
-    if let Some(tested) = printed.and_then(cargo::from_output) {
-        take(tested);
+    if let Some(reported) = printed.and_then(cargo::from_output) {
+        take(reported);
     }
     found
 }
 
 /// A report file's text, in whichever format it turns out to be.
 pub fn from_file(text: &str, cwd: &Path) -> Option<Tested> {
+    file_cases(text, cwd).map(|reported| reported.tested)
+}
+
+fn file_cases(text: &str, cwd: &Path) -> Option<Reported> {
     match text.trim_start().as_bytes().first()? {
         b'{' => vitest::from_json(text, cwd),
         b'<' => junit::from_xml(text, cwd),
