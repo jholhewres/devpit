@@ -15,6 +15,7 @@ pub mod preset;
 pub mod proposal;
 pub mod render;
 pub mod setup;
+pub mod skills;
 
 pub use config::{Config, Invalid};
 pub use folder::State;

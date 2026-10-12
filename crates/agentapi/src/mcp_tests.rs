@@ -51,7 +51,12 @@ fn the_handshake_says_the_tool_list_can_change() {
         r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
         &never,
     );
-    assert_eq!(said["result"]["capabilities"]["tools"]["listChanged"], true);
+    for list in ["tools", "resources", "prompts"] {
+        assert_eq!(
+            said["result"]["capabilities"][list]["listChanged"], true,
+            "{list}"
+        );
+    }
     assert!(greets(r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#));
     assert!(!greets(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#));
 }
@@ -210,7 +215,7 @@ fn a_refusal_is_the_tools_error_not_the_protocols() {
 #[test]
 fn an_unknown_method_is_a_protocol_error() {
     let said = reply(
-        r#"{"jsonrpc":"2.0","id":5,"method":"prompts/list"}"#,
+        r#"{"jsonrpc":"2.0","id":5,"method":"completion/complete"}"#,
         &never,
     );
     assert_eq!(said["error"]["code"], -32601);

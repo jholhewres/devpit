@@ -1,6 +1,6 @@
 //! Devflow through the agent API: its state with what devpit detected, a
-//! setup, a change of one field, and what the MCP server offers the agent
-//! standing in a project.
+//! setup, a change of one field, what the MCP server offers the agent
+//! standing in a project, and an active project's skills.
 //!
 //! The file and the rules are `devpit_devflow`'s; this adds the machine's
 //! half — the agent CLIs and their sign-ins, the Decisions key — and the
@@ -20,11 +20,13 @@ use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
 
-pub(crate) const METHODS: [&str; 4] = [
+pub(crate) const METHODS: [&str; 6] = [
     "devflow_offer",
     "devflow_status",
     "devflow_setup",
     "devflow_set",
+    "devflow_skills",
+    "devflow_skill",
 ];
 
 /// What the MCP server lists for a project.
@@ -73,7 +75,23 @@ pub(crate) fn respond(
         "devflow_status" => Ok(status(&store, project, root, &state)),
         "devflow_setup" => setup_of(app, &store, project, root, &state, params),
         "devflow_set" => set_of(app, &store, project, root, &state, params),
+        "devflow_skills" | "devflow_skill" => crate::devflow_skills::respond(
+            method,
+            root,
+            &stages_on(&store, project, &state)?,
+            params,
+        ),
         _ => Err(format!("devpit does not answer `{method}`")),
+    }
+}
+
+/// The stages switched on, when Devflow is on here: nowhere else are its
+/// skills given, whatever the MCP server last listed.
+fn stages_on(store: &Store, project: &Project, state: &State) -> Result<Vec<&'static str>, String> {
+    let switched_on = made(store, &project.id, Ask::Enable);
+    match offered(globally_on(store), state, switched_on) {
+        Offered::Active(stages) => Ok(stages),
+        _ => Err("Devflow is not on in this project: devpit_devflow_status says why.".to_owned()),
     }
 }
 

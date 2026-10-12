@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 37] = [
+pub(crate) const METHODS: [&str; 39] = [
     "context",
     "board",
     "card",
@@ -80,6 +80,8 @@ pub(crate) const METHODS: [&str; 37] = [
     "devflow_status",
     "devflow_setup",
     "devflow_set",
+    "devflow_skills",
+    "devflow_skill",
 ];
 
 /// The methods that change the board, and so tell the window.

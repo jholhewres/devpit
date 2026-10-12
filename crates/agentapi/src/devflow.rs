@@ -1,7 +1,7 @@
 //! Devflow in the MCP server: the three tools that set it up, offered
 //! whenever Devflow is not switched off in Settings; the tools of its
-//! stages, offered only to a project where the person switched it on; and
-//! the watch that tells the client when that changes.
+//! stages and its skills, offered only to a project where the person
+//! switched it on; and the watch that tells the client when that changes.
 //!
 //! What a project gets is the app's answer to `devflow_offer`. The server
 //! asks again only when something it can see changed — the project's
@@ -22,9 +22,13 @@ pub const STAMP: &str = "devflow-stamp";
 /// How often the watch looks.
 pub(crate) const EVERY: std::time::Duration = std::time::Duration::from_secs(2);
 
-/// The notification that makes a client ask for the tools again.
-pub(crate) const LIST_CHANGED: &str =
-    r#"{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}"#;
+/// The notifications that make a client ask for the tools, the skills'
+/// resources and the stages' prompts again.
+pub(crate) const LISTS_CHANGED: [&str; 3] = [
+    r#"{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}"#,
+    r#"{"jsonrpc":"2.0","method":"notifications/resources/list_changed"}"#,
+    r#"{"jsonrpc":"2.0","method":"notifications/prompts/list_changed"}"#,
+];
 
 /// Listed even with Devflow off in a project: they are how it is set up.
 pub(crate) static SETUP_TOOLS: [Tool; 3] = [
@@ -58,7 +62,17 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
 
 /// The tools only an active project gets: each under the stage that must be
 /// switched on for it, or `None` for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(Option<&str>, Tool); 0] = [];
+pub(crate) static STAGED: [(Option<&str>, Tool); 1] = [(
+    None,
+    Tool {
+        name: crate::skills::TOOL,
+        method: "devflow_skill",
+        description: "The Devflow skill to follow for a stage, as this project resolves it: its own .devpit/devflow/skills/<name>/SKILL.md, else the person's, else devpit's built-in one. Call it before each stage and follow what it returns; devflow-setup is for changing the setup. A stage switched off in devflow.yaml has no skill.",
+        input: || json!({ "type": "object", "properties": {
+            "name": { "type": "string", "enum": crate::skills::NAMES, "description": "The skill: devflow-<stage>, or devflow-setup." }
+        }, "required": ["name"] }),
+    },
+)];
 
 /// What the server offers the project it stands in.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,10 +127,11 @@ impl Offer {
         }
     }
 
-    /// The server's `instructions`: devpit's own, and the flow's when it is on.
+    /// The server's `instructions`: devpit's own, and the flow's when it is
+    /// on — first, because Codex reads only the start.
     pub(crate) fn instructions(&self) -> String {
         match self {
-            Offer::Active(_) => format!("{} {}", guide::INSTRUCTIONS, guide::DEVFLOW),
+            Offer::Active(_) => format!("{}\n\n{}", guide::DEVFLOW, guide::INSTRUCTIONS),
             _ => guide::INSTRUCTIONS.to_owned(),
         }
     }
@@ -164,13 +179,13 @@ impl Watch {
     }
 
     /// Takes the app's answer, given after the look `looked`, and says the
-    /// notification to send when the offer changed. A question the app did
+    /// notifications to send when the offer changed. A question the app did
     /// not answer keeps the offer as it was.
     pub(crate) fn settle(
         &mut self,
         looked: Vec<Seen>,
         answer: Result<Value, String>,
-    ) -> Option<&'static str> {
+    ) -> Option<&'static [&'static str]> {
         self.looked = Some(looked);
         let answer = answer.ok()?;
         let file = answer
@@ -187,7 +202,7 @@ impl Watch {
             return None;
         }
         self.offer = offer;
-        Some(LIST_CHANGED)
+        Some(&LISTS_CHANGED)
     }
 }
 

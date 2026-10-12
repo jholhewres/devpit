@@ -80,6 +80,12 @@ pub fn projects_dir(root: &Path) -> PathBuf {
     root.join(PROJECTS)
 }
 
+/// The person's own Devflow skills, `<root>/devflow/skills/<name>/SKILL.md`:
+/// a project's replace them, and they replace the built-in ones.
+pub fn devflow_skills(root: &Path) -> PathBuf {
+    root.join("devflow").join("skills")
+}
+
 /// One project's folder in the devpit workspace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectHome {

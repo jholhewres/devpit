@@ -253,8 +253,8 @@ pub fn serve(root: &Path) -> i32 {
             std::thread::sleep(crate::devflow::EVERY);
             let ask = |method: &str, params| client::ask(&root, method, params, &cwd);
             // Before the handshake the client has not listed anything yet.
-            if let Some(note) = look(&watch, &ask) {
-                if initialized.load(Ordering::Relaxed) && !send(note) {
+            if let Some(notes) = look(&watch, &ask) {
+                if initialized.load(Ordering::Relaxed) && !notes.iter().all(|note| send(note)) {
                     break;
                 }
             }
@@ -296,12 +296,12 @@ fn greets(line: &str) -> bool {
 }
 
 /// Asks the app what to offer once a watched file changed, and says the
-/// notification to send when the offer did. Asked outside the lock, so a
+/// notifications to send when the offer did. Asked outside the lock, so a
 /// slow app never holds a `tools/list`.
 fn look(
     watch: &Mutex<Watch>,
     ask: &dyn Fn(&str, Value) -> Result<Value, String>,
-) -> Option<&'static str> {
+) -> Option<&'static [&'static str]> {
     let looked = watch.lock().ok()?.due()?;
     let answer = ask("devflow_offer", json!({}));
     watch.lock().ok()?.settle(looked, answer)
@@ -381,8 +381,12 @@ pub(crate) fn handle_offering(
     let result = match method {
         "initialize" => json!({
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or(PROTOCOL),
-            // The list changes when the person switches Devflow on or off.
-            "capabilities": { "tools": { "listChanged": true }, "resources": {} },
+            // The lists change when the person switches Devflow on or off.
+            "capabilities": {
+                "tools": { "listChanged": true },
+                "resources": { "listChanged": true },
+                "prompts": { "listChanged": true },
+            },
             "serverInfo": { "name": "devpit", "version": env!("CARGO_PKG_VERSION") },
             "instructions": offer.instructions(),
         }),
@@ -399,14 +403,31 @@ pub(crate) fn handle_offering(
             }
             listed
         }).collect::<Vec<_>>() }),
-        "resources/list" => crate::apps::listed(),
-        "resources/read" => match params
-            .get("uri")
-            .and_then(Value::as_str)
-            .and_then(crate::apps::read)
-        {
-            Some(page) => page,
-            None => return Some(error(id, -32002, "devpit has no such resource")),
+        "resources/list" => {
+            let mut listed = crate::apps::listed();
+            if let Some(all) = listed["resources"].as_array_mut() {
+                all.extend(crate::skills::resources(offer, ask));
+            }
+            listed
+        }
+        "resources/read" => {
+            let uri = params
+                .get("uri")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let read = crate::apps::read(uri)
+                .map(Ok)
+                .or_else(|| crate::skills::read(uri, offer, ask));
+            match read {
+                Some(Ok(read)) => read,
+                Some(Err(why)) => return Some(error(id, -32002, &why)),
+                None => return Some(error(id, -32002, "devpit has no such resource")),
+            }
+        }
+        "prompts/list" => crate::skills::prompts(offer, ask),
+        "prompts/get" => match crate::skills::prompt(&params, offer, ask) {
+            Ok(prompt) => prompt,
+            Err(why) => return Some(error(id, -32602, &why)),
         },
         "tools/call" => call(&params, ask),
         _ => {
@@ -440,6 +461,8 @@ fn call(params: &Value, ask: &dyn Fn(&str, Value) -> Result<Value, String>) -> V
         .cloned()
         .unwrap_or_else(|| json!({}));
     match ask(tool.method, arguments) {
+        // A skill is read as the markdown it is, not as JSON.
+        Ok(answer) if tool.name == crate::skills::TOOL => crate::skills::said(&answer),
         Ok(answer) => said(
             &serde_json::to_string_pretty(&answer).unwrap_or_default(),
             false,

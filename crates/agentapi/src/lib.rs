@@ -18,6 +18,7 @@ pub mod events;
 pub mod guide;
 pub mod hook;
 pub mod mcp;
+pub mod skills;
 mod slim;
 
 pub use client::ask;

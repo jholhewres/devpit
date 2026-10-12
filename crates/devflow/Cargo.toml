@@ -9,6 +9,8 @@ license.workspace = true
 devpit-core = { path = "../core" }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+# The digest a skill is listed with, as the MCP Skills extension writes it.
+sha2 = "0.10"
 # The event parser, for the line each key and value sits on: an invalid
 # devflow.yaml is answered with its line and field.
 yaml-rust2 = { version = "0.13.0", default-features = false }

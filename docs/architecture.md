@@ -162,9 +162,18 @@ no copy, only that the person clicked.
   `enforce` are never written by a tool: they wait for the person's click on
   a card under the top bar. A file that says `enabled: true` by itself — a
   hand edit, a fresh clone — waits for that click too.
-- **Open sessions hear it.** The MCP server declares `tools.listChanged`
-  and watches the project's devflow.yaml and the app's stamp file, so
-  switching Devflow on or off reaches a session already running.
+- **Open sessions hear it.** The MCP server declares `listChanged` for
+  tools, resources and prompts, and watches the project's devflow.yaml and
+  the app's stamp file, so switching Devflow on or off reaches a session
+  already running.
+- **Skills by layer.** Where it is on, each stage's skill is a
+  `skill://devflow/<name>/SKILL.md` resource carrying its SEP-2640 entry
+  (digest and size), the `devpit_devflow_skill` tool, and a prompt such as
+  `/devpit:devflow-plan`. The app resolves it from the project root: the
+  project's `.devpit/devflow/skills/`, then the person's under devpit's home,
+  then the one built from `flow/skills/`. When hosts declare
+  `io.modelcontextprotocol/skills`, `skills/list` and `skills/get` join
+  these with the same entries, and the tool is deprecated.
 
 ## Remote
 
