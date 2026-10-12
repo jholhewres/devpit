@@ -13,7 +13,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { notTheRealHome, theShellFindsTheStub } from '../lib/preflight.mjs'
+import { needsXvfb, notTheRealHome, theShellFindsTheStub } from '../lib/preflight.mjs'
 import { seedEnv, seedHome } from '../lib/home.mjs'
 
 const root = process.env.E2E_ROOT ?? join(import.meta.dirname, '..', '..')
@@ -63,6 +63,15 @@ test('no claude at all is refused too', () => {
   const env = seedEnv(seeded)
   const said = theShellFindsTheStub({ ...env, PATH: '/nonexistent' }, seeded.stub, '/bin/sh')
   assert.ok(said?.includes('no claude at all'), said)
+})
+
+/* A locked screen draws nothing, and the window on it failed tests the
+   suite passes on Xvfb: the person's own screen is only used when asked. */
+test('the run draws on Xvfb when it is there, and on the screen only when asked', () => {
+  assert.equal(needsXvfb({ DISPLAY: ':0' }, true), true)
+  assert.equal(needsXvfb({ DISPLAY: ':0', E2E_HEADLESS: '0' }, true), false)
+  assert.equal(needsXvfb({ DISPLAY: ':0' }, false), false)
+  assert.equal(needsXvfb({ E2E_HEADLESS: '0' }, false), true)
 })
 
 function writeStub(dir) {

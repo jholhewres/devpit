@@ -44,9 +44,15 @@ export function onPath(binary) {
   return null
 }
 
-/** Whether this run needs a virtual display, and what to install for one. */
-export function needsXvfb(env = process.env) {
-  return env.E2E_HEADLESS === '1' || !env.DISPLAY
+/**
+ * Whether this run draws on a virtual display: whenever Xvfb is installed, not
+ * only without a DISPLAY. A locked desktop gives the window no frames, so no
+ * pane finishes appearing and a quit never returns — a night run failed what
+ * the day passes. `E2E_HEADLESS=0` asks for the person's own screen.
+ */
+export function needsXvfb(env = process.env, hasXvfb = onPath('Xvfb') !== null) {
+  if (env.E2E_HEADLESS === '1' || !env.DISPLAY) return true
+  return env.E2E_HEADLESS !== '0' && hasXvfb
 }
 
 /** Why the suite cannot run, said as the command that fixes it. */
