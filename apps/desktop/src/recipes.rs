@@ -13,62 +13,21 @@ pub struct TestCommand {
     pub from: Option<String>,
 }
 
-/// The project's own test entry first: a Makefile target is what its people
-/// run, then the package manager's script, then cargo. A JS runner writes its
-/// report where the step reads it.
+/// The first test command Devflow's detection finds: a Makefile target is
+/// what its people run, then the package manager's script, then the
+/// language's own runner. One detector, so the recipe and a Devflow setup
+/// never disagree about a project.
 pub(crate) fn detected(root: &Path) -> TestCommand {
-    let read = |name: &str| std::fs::read_to_string(root.join(name)).ok();
-    let found = |command: String, from: &str| TestCommand {
-        command: Some(command),
-        from: Some(from.to_owned()),
-    };
-    if read("Makefile").is_some_and(|make| make.lines().any(|line| line.starts_with("test:"))) {
-        return found("make test".to_owned(), "Makefile");
-    }
-    if let Some(package) =
-        read("package.json").and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
-    {
-        let has = |name: &str| {
-            ["dependencies", "devDependencies"]
-                .iter()
-                .any(|deps| package.get(deps).and_then(|deps| deps.get(name)).is_some())
-        };
-        let exec = if root.join("pnpm-lock.yaml").exists() {
-            "pnpm exec"
-        } else if root.join("yarn.lock").exists() {
-            "yarn"
-        } else {
-            "npx"
-        };
-        let report = "--outputFile=\"$DEVPIT_REPORT_DIR/tests.json\"";
-        if has("vitest") {
-            return found(
-                format!("{exec} vitest run --reporter=default --reporter=json {report}"),
-                "package.json",
-            );
-        }
-        if has("jest") {
-            return found(format!("{exec} jest --json {report}"), "package.json");
-        }
-        if package
-            .get("scripts")
-            .and_then(|scripts| scripts.get("test"))
-            .is_some()
-        {
-            let manager = exec
-                .split(' ')
-                .next()
-                .filter(|one| *one != "npx")
-                .unwrap_or("npm");
-            return found(format!("{manager} test"), "package.json");
-        }
-    }
-    if root.join("Cargo.toml").exists() {
-        return found("cargo test".to_owned(), "Cargo.toml");
-    }
+    let first = devpit_devflow::detect::detected(root, Default::default())
+        .test
+        .into_iter()
+        .next();
     TestCommand {
-        command: None,
-        from: None,
+        from: first.as_ref().map(|found| {
+            let file = found.source.rsplit_once(':').map_or("", |(file, _)| file);
+            file.to_owned()
+        }),
+        command: first.map(|found| found.command),
     }
 }
 

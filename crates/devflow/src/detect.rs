@@ -1,0 +1,477 @@
+//! What a repository says about itself, read off its own files: the commands
+//! that test, lint and run its E2E suite, each with the file and line it came
+//! from, and the E2E tool, glossary and ADRs it keeps. Nothing is run and
+//! nothing is guessed: a command is found in a file or it is not found.
+//!
+//! The machine's half — the agent CLIs and the Decisions key — is handed in
+//! by the app, which already knows it.
+
+use std::path::Path;
+
+use serde::Serialize;
+
+use crate::config::{Agent, Report};
+
+/// The most of one manifest read, checked before reading.
+const MOST_BYTES: u64 = 1024 * 1024;
+
+/// Where a JS or PHP runner writes its report, for the check to read.
+const REPORT: &str = "$DEVPIT_REPORT_DIR";
+
+/// A command found in the repository.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Found {
+    pub command: String,
+    /// `file:line`.
+    pub source: String,
+    pub report: Report,
+}
+
+/// An E2E tool the repository is set up for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct E2eTool {
+    pub name: String,
+    pub source: String,
+}
+
+/// An agent CLI on this machine, as the app found it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Cli {
+    pub name: Agent,
+    pub installed: bool,
+    /// `None` when devpit has no way to tell.
+    pub signed_in: Option<bool>,
+}
+
+/// What the app knows that the repository does not.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Machine {
+    pub clis: Vec<Cli>,
+    pub decisions_key: bool,
+    pub decisions_opted_out: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Detected {
+    pub test: Vec<Found>,
+    pub e2e: Vec<Found>,
+    pub lint: Vec<Found>,
+    pub e2e_tools: Vec<E2eTool>,
+    pub clis: Vec<Cli>,
+    pub decisions_key: bool,
+    pub decisions_opted_out: bool,
+    pub glossary: Option<String>,
+    pub adrs: Vec<String>,
+}
+
+/// Everything detected about the project at `root`.
+pub fn detected(root: &Path, machine: Machine) -> Detected {
+    let files = Files { root };
+    let mut found = Detected {
+        test: Vec::new(),
+        e2e: Vec::new(),
+        lint: Vec::new(),
+        e2e_tools: e2e_tools(&files),
+        clis: machine.clis,
+        decisions_key: machine.decisions_key,
+        decisions_opted_out: machine.decisions_opted_out,
+        glossary: ["GLOSSARY.md", "CONTEXT.md"]
+            .into_iter()
+            .find(|name| files.read(name).is_some())
+            .map(str::to_owned),
+        adrs: adrs(root),
+    };
+    makefile(&files, &mut found);
+    package_json(&files, &mut found);
+    cargo(&files, &mut found);
+    pyproject(&files, &mut found);
+    go(&files, &mut found);
+    composer(&files, &mut found);
+    found
+}
+
+/// The project's files, each read only once it is resolved inside the root.
+struct Files<'a> {
+    root: &'a Path,
+}
+
+impl Files<'_> {
+    fn read(&self, name: &str) -> Option<String> {
+        let path = devpit_core::tree::resolve(self.root, name).ok()?;
+        let meta = std::fs::metadata(&path).ok()?;
+        if !meta.is_file() || meta.len() > MOST_BYTES {
+            return None;
+        }
+        std::fs::read_to_string(path).ok()
+    }
+
+    fn any(&self, names: &[&str]) -> Option<String> {
+        names
+            .iter()
+            .find(|name| self.read(name).is_some())
+            .map(|name| (*name).to_owned())
+    }
+}
+
+/// The line `needle` first appears on, from 1, else the first.
+fn line_of(text: &str, needle: &str) -> usize {
+    text.lines()
+        .position(|line| line.contains(needle))
+        .map_or(1, |at| at + 1)
+}
+
+fn found(command: String, file: &str, line: usize, report: Report) -> Found {
+    Found {
+        command,
+        source: format!("{file}:{line}"),
+        report,
+    }
+}
+
+fn makefile(files: &Files, into: &mut Detected) {
+    let Some((name, text)) = ["Makefile", "makefile", "GNUmakefile"]
+        .into_iter()
+        .find_map(|name| files.read(name).map(|text| (name, text)))
+    else {
+        return;
+    };
+    let target = |wanted: &[&str]| {
+        text.lines().enumerate().find_map(|(at, line)| {
+            let (head, rest) = line.split_once(':')?;
+            let head = head.trim_end();
+            (wanted.contains(&head) && !rest.starts_with('=') && !line.starts_with(['\t', ' ']))
+                .then(|| (head.to_owned(), at + 1))
+        })
+    };
+    // Where a make target leaves a report is unknown, so it is said to keep none.
+    if let Some((target, line)) = target(&["test", "tests"]) {
+        into.test
+            .push(found(format!("make {target}"), name, line, Report::Nothing));
+    }
+    if let Some((target, line)) = target(&["e2e", "test-e2e", "e2e-test"]) {
+        into.e2e
+            .push(found(format!("make {target}"), name, line, Report::Nothing));
+    }
+    if let Some((target, line)) = target(&["lint"]) {
+        into.lint
+            .push(found(format!("make {target}"), name, line, Report::Nothing));
+    }
+}
+
+fn package_json(files: &Files, into: &mut Detected) {
+    const FILE: &str = "package.json";
+    let Some(text) = files.read(FILE) else {
+        return;
+    };
+    let Ok(package) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return;
+    };
+    let has = |name: &str| {
+        ["dependencies", "devDependencies"]
+            .iter()
+            .any(|deps| package.get(deps).and_then(|deps| deps.get(name)).is_some())
+    };
+    let script = |name: &str| {
+        package
+            .get("scripts")
+            .and_then(|scripts| scripts.get(name))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    };
+    let (exec, manager) = if files.read("pnpm-lock.yaml").is_some() {
+        ("pnpm exec", "pnpm")
+    } else if files.read("yarn.lock").is_some() {
+        ("yarn", "yarn")
+    } else if files.any(&["bun.lock", "bun.lockb"]).is_some() {
+        ("bunx", "bun")
+    } else {
+        ("npx", "npm")
+    };
+    let report = format!("--outputFile=\"{REPORT}/tests.json\"");
+    let script_line = |name: &str| line_of(&text, &format!("\"{name}\""));
+    let test = if has("vitest") {
+        Some((
+            format!("{exec} vitest run --reporter=default --reporter=json {report}"),
+            line_of(&text, "\"vitest\""),
+            Report::Vitest,
+        ))
+    } else if has("jest") {
+        Some((
+            format!("{exec} jest --json {report}"),
+            line_of(&text, "\"jest\""),
+            Report::Jest,
+        ))
+    } else {
+        script("test").map(|_| {
+            (
+                format!("{manager} test"),
+                script_line("test"),
+                Report::Nothing,
+            )
+        })
+    };
+    if let Some((command, line, report)) = test {
+        into.test.push(found(command, FILE, line, report));
+    }
+    if let Some(name) = ["e2e", "test:e2e", "e2e:test"]
+        .into_iter()
+        .find(|name| script(name).is_some())
+    {
+        into.e2e.push(found(
+            format!("{manager} run {name}"),
+            FILE,
+            script_line(name),
+            Report::Nothing,
+        ));
+    }
+    if script("lint").is_some() {
+        into.lint.push(found(
+            format!("{manager} run lint"),
+            FILE,
+            script_line("lint"),
+            Report::Nothing,
+        ));
+    }
+}
+
+fn cargo(files: &Files, into: &mut Detected) {
+    const FILE: &str = "Cargo.toml";
+    let Some(text) = files.read(FILE) else {
+        return;
+    };
+    let line = text
+        .lines()
+        .position(|line| line.trim() == "[package]" || line.trim() == "[workspace]")
+        .map_or(1, |at| at + 1);
+    into.test
+        .push(found("cargo test".to_owned(), FILE, line, Report::Cargo));
+    into.lint.push(found(
+        "cargo clippy --all-targets -- -D warnings".to_owned(),
+        FILE,
+        line,
+        Report::Nothing,
+    ));
+}
+
+fn pyproject(files: &Files, into: &mut Detected) {
+    const FILE: &str = "pyproject.toml";
+    let Some(text) = files.read(FILE) else {
+        return;
+    };
+    let runner = if files.read("uv.lock").is_some() {
+        "uv run "
+    } else if files.read("poetry.lock").is_some() {
+        "poetry run "
+    } else {
+        ""
+    };
+    if text.contains("[tool.pytest") || text.contains("pytest") {
+        let line = line_of(&text, "pytest");
+        into.test.push(found(
+            format!("{runner}python -m pytest --junitxml=\"{REPORT}/pytest.xml\""),
+            FILE,
+            line,
+            Report::Junit,
+        ));
+    }
+    if text.contains("[tool.ruff") {
+        into.lint.push(found(
+            format!("{runner}ruff check ."),
+            FILE,
+            line_of(&text, "[tool.ruff"),
+            Report::Nothing,
+        ));
+    }
+}
+
+fn go(files: &Files, into: &mut Detected) {
+    const FILE: &str = "go.mod";
+    if files.read(FILE).is_none() {
+        return;
+    }
+    into.test
+        .push(found("go test ./...".to_owned(), FILE, 1, Report::Nothing));
+    let lint = match files.any(&[".golangci.yml", ".golangci.yaml", ".golangci.toml"]) {
+        Some(config) => found("golangci-lint run".to_owned(), &config, 1, Report::Nothing),
+        None => found("go vet ./...".to_owned(), FILE, 1, Report::Nothing),
+    };
+    into.lint.push(lint);
+}
+
+fn composer(files: &Files, into: &mut Detected) {
+    const FILE: &str = "composer.json";
+    let Some(text) = files.read(FILE) else {
+        return;
+    };
+    let Ok(composer) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return;
+    };
+    let has = |name: &str| {
+        ["require", "require-dev"]
+            .iter()
+            .any(|deps| composer.get(deps).and_then(|deps| deps.get(name)).is_some())
+    };
+    let script = |name: &str| {
+        composer
+            .get("scripts")
+            .and_then(|scripts| scripts.get(name))
+            .is_some()
+    };
+    if script("test") {
+        into.test.push(found(
+            "composer test".to_owned(),
+            FILE,
+            line_of(&text, "\"test\""),
+            Report::Nothing,
+        ));
+    } else if has("pestphp/pest") {
+        into.test.push(found(
+            format!("vendor/bin/pest --log-junit \"{REPORT}/pest.xml\""),
+            FILE,
+            line_of(&text, "\"pestphp/pest\""),
+            Report::Junit,
+        ));
+    } else if has("phpunit/phpunit") {
+        into.test.push(found(
+            format!("vendor/bin/phpunit --log-junit \"{REPORT}/phpunit.xml\""),
+            FILE,
+            line_of(&text, "\"phpunit/phpunit\""),
+            Report::Junit,
+        ));
+    }
+    if script("lint") {
+        into.lint.push(found(
+            "composer lint".to_owned(),
+            FILE,
+            line_of(&text, "\"lint\""),
+            Report::Nothing,
+        ));
+    } else if has("phpstan/phpstan") {
+        into.lint.push(found(
+            "vendor/bin/phpstan analyse".to_owned(),
+            FILE,
+            line_of(&text, "\"phpstan/phpstan\""),
+            Report::Nothing,
+        ));
+    } else if has("squizlabs/php_codesniffer") {
+        into.lint.push(found(
+            "vendor/bin/phpcs".to_owned(),
+            FILE,
+            line_of(&text, "\"squizlabs/php_codesniffer\""),
+            Report::Nothing,
+        ));
+    }
+    if script("e2e") {
+        into.e2e.push(found(
+            "composer e2e".to_owned(),
+            FILE,
+            line_of(&text, "\"e2e\""),
+            Report::Nothing,
+        ));
+    }
+}
+
+fn e2e_tools(files: &Files) -> Vec<E2eTool> {
+    let package = files.read("package.json").unwrap_or_default();
+    let mut tools = Vec::new();
+    for (name, configs, dependency) in [
+        (
+            "playwright",
+            &[
+                "playwright.config.ts",
+                "playwright.config.js",
+                "playwright.config.mjs",
+                "playwright.config.cjs",
+            ][..],
+            "\"@playwright/test\"",
+        ),
+        (
+            "cypress",
+            &[
+                "cypress.config.ts",
+                "cypress.config.js",
+                "cypress.config.mjs",
+                "cypress.config.cjs",
+                "cypress.json",
+            ][..],
+            "\"cypress\"",
+        ),
+    ] {
+        let source = files.any(configs).or_else(|| {
+            package
+                .contains(dependency)
+                .then(|| format!("package.json:{}", line_of(&package, dependency)))
+        });
+        if let Some(source) = source {
+            tools.push(E2eTool {
+                name: name.to_owned(),
+                source,
+            });
+        }
+    }
+    tools
+}
+
+/// The ADRs under `docs/adr/`, by name.
+fn adrs(root: &Path) -> Vec<String> {
+    let Ok(folder) = devpit_core::tree::resolve(root, "docs/adr") else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.ends_with(".md"))
+        .map(|name| format!("docs/adr/{name}"))
+        .collect();
+    found.sort();
+    found
+}
+
+/// What detection could not settle and the person has to: one sentence each.
+pub fn open(detected: &Detected) -> Vec<String> {
+    let mut open = Vec::new();
+    match detected.test.as_slice() {
+        [] => open.push("no test command was found".to_owned()),
+        [first, rest @ ..] if !rest.is_empty() && !first.command.starts_with("make ") => {
+            let said: Vec<String> = detected
+                .test
+                .iter()
+                .map(|one| format!("{} ({})", one.command, one.source))
+                .collect();
+            open.push(format!(
+                "{} test commands found: {}",
+                said.len(),
+                said.join(" and ")
+            ));
+        }
+        _ => {}
+    }
+    if detected.e2e.is_empty() {
+        for tool in &detected.e2e_tools {
+            open.push(format!(
+                "{} is set up ({}), but no command in the repo runs it",
+                tool.name, tool.source
+            ));
+        }
+    }
+    for cli in &detected.clis {
+        if cli.installed && cli.signed_in == Some(false) {
+            open.push(format!(
+                "{} is installed but not signed in, so it cannot review",
+                cli.name.word()
+            ));
+        }
+    }
+    if detected.decisions_key && detected.decisions_opted_out {
+        open.push("a Decisions key is kept, but this project is opted out of Decisions".to_owned());
+    }
+    open
+}
+
+#[cfg(test)]
+#[path = "detect_tests.rs"]
+mod tests;

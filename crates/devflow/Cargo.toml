@@ -1,0 +1,17 @@
+[package]
+name = "devpit-devflow"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+devpit-core = { path = "../core" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+# The event parser, for the line each key and value sits on: an invalid
+# devflow.yaml is answered with its line and field.
+yaml-rust2 = { version = "0.13.0", default-features = false }
+
+[dev-dependencies]
+tempfile = "3.27.0"
