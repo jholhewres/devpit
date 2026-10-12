@@ -258,8 +258,8 @@ export const commands = {
 	permission: string | null,
 	/**  How hard to think. Absent keeps what the conversation already had. */
 	effort: string | null,
-	/**  Sent by the person from the Remote, which the agent is told. */
-	fromRemote?: boolean,
+	/**  Where the person sent it from, when not the composer: the agent is told. */
+	from?: TurnFrom | null,
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
 	/**
 	 *  `orchestrator.create` — a new orchestrator speaking as this profile.
@@ -592,8 +592,13 @@ export const commands = {
 	 *  to send to the bot from the chat devpit should use.
 	 */
 	telegramLink: (token: string) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_link", { token })),
-	/**  `telegram.titles_set` — whether messages name what they are about. */
-	telegramTitlesSet: (titles: boolean) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_titles_set", { titles })),
+	/**  `telegram.privacy_set` — how much of what devpit says goes to the chat. */
+	telegramPrivacySet: (privacy: Privacy) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_privacy_set", { privacy })),
+	/**
+	 *  `telegram.orchestrator_set` — which orchestrator the chat talks to; none
+	 *  is the only one there is.
+	 */
+	telegramOrchestratorSet: (project: string | null) => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_orchestrator_set", { project })),
 	/**  `telegram.unlink` — forgets the bot and the chat. */
 	telegramUnlink: () => typedError<TelegramStatus, RpcError>(__TAURI_INVOKE("telegram_unlink")),
 	/**  `hub.status` */
@@ -1947,8 +1952,8 @@ export type Ask = {
 	permission: string | null,
 	/**  How hard to think. Absent keeps what the conversation already had. */
 	effort: string | null,
-	/**  Sent by the person from the Remote, which the agent is told. */
-	fromRemote?: boolean,
+	/**  Where the person sent it from, when not the composer: the agent is told. */
+	from?: TurnFrom | null,
 };
 
 /**
@@ -2223,6 +2228,12 @@ export type ChannelEvent =
 export type ChannelInfo = {
 	id: string,
 	label: string,
+};
+
+/**  An orchestrator a channel can talk to. */
+export type ChannelOrchestrator = {
+	project: string,
+	name: string,
 };
 
 /**  Which channels one event goes to, by channel id. */
@@ -3790,6 +3801,15 @@ export type PluginUninstalled = {
 	removedFiles: number,
 };
 
+/**  How much of what devpit says leaves on a channel. */
+export type Privacy = 
+/**  Only that something happened or was answered, nothing named. */
+"minimal" | 
+/**  The session, card or project named, and an answer's first line. */
+"titles" | 
+/**  Names, and the orchestrator's answer whole. */
+"full";
+
 export type Profile = {
 	id: string,
 	/**  What the person calls this account. */
@@ -4915,8 +4935,11 @@ export type TelegramStatus = {
 	code: string | null,
 	/**  `t.me/<bot>?start=<code>`, which sends it in one tap. */
 	link: string | null,
-	/**  Whether messages name the session, card or project. */
-	titles: boolean,
+	privacy: Privacy,
+	/**  The orchestrator the chat's messages go to, when one was chosen. */
+	orchestrator: string | null,
+	/**  The orchestrators on this machine, to choose from. */
+	orchestrators: ChannelOrchestrator[],
 };
 
 /**  The command, and the file it was read from. Both `None` when nothing says. */
@@ -5040,6 +5063,13 @@ export type TurnEnd = {
 	isError: boolean,
 	context: Context | null,
 };
+
+/**  Where a turn the person sent came from, other than the composer. */
+export type TurnFrom = 
+/**  devpit's Remote, on another device. */
+{ kind: "remote" } | 
+/**  The chat paired with devpit on a channel, by the channel's id. */
+{ kind: "channel"; id: string };
 
 /**  One thing an update is waiting for. */
 export type UpdateBlocking = {

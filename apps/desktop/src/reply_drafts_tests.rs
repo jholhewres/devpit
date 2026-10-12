@@ -2,8 +2,14 @@ use super::{all, draft, drafted, forget, LONGEST};
 
 #[test]
 fn a_draft_is_kept_per_session_until_it_is_let_go() {
-    draft("prof_t1", "api-a", "  yes, delete the folder  ").expect("drafted");
-    draft("prof_t1", "api-b", "go on with F0b").expect("drafted");
+    draft(
+        "orchestrator-t",
+        "prof_t1",
+        "api-a",
+        "  yes, delete the folder  ",
+    )
+    .expect("drafted");
+    draft("orchestrator-t", "prof_t1", "api-b", "go on with F0b").expect("drafted");
     assert_eq!(
         drafted("prof_t1", "api-a").as_deref(),
         Some("yes, delete the folder")
@@ -14,7 +20,13 @@ fn a_draft_is_kept_per_session_until_it_is_let_go() {
         "another account's session"
     );
 
-    draft("prof_t1", "api-a", "no, keep the rollback").expect("redrafted");
+    draft(
+        "orchestrator-t",
+        "prof_t1",
+        "api-a",
+        "no, keep the rollback",
+    )
+    .expect("redrafted");
     assert_eq!(
         drafted("prof_t1", "api-a").as_deref(),
         Some("no, keep the rollback")
@@ -30,15 +42,21 @@ fn a_draft_is_kept_per_session_until_it_is_let_go() {
 
 #[test]
 fn an_empty_or_overlong_draft_is_refused() {
-    assert!(draft("prof_t3", "api-a", "   ").is_err());
-    assert!(draft("prof_t3", "api-a", &"x".repeat(LONGEST + 1)).is_err());
+    assert!(draft("orchestrator-t", "prof_t3", "api-a", "   ").is_err());
+    assert!(draft(
+        "orchestrator-t",
+        "prof_t3",
+        "api-a",
+        &"x".repeat(LONGEST + 1)
+    )
+    .is_err());
     assert_eq!(drafted("prof_t3", "api-a"), None);
 }
 
 #[test]
 fn every_draft_waiting_is_listed_for_the_remote() {
-    draft("all-b", "web", "/compact").expect("drafted");
-    draft("all-a", "api", "go on").expect("drafted");
+    draft("orchestrator-t", "all-b", "web", "/compact").expect("drafted");
+    draft("orchestrator-t", "all-a", "api", "go on").expect("drafted");
     let listed: Vec<_> = all()
         .into_iter()
         .filter(|(profile, ..)| profile.starts_with("all-"))

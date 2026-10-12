@@ -146,6 +146,22 @@ The limits are the point:
 - **Heard, not polling.** Its conversation keeps one process between turns, so a
   session's reply wakes it; nothing here runs it on a timer.
 
+## A channel talks back
+
+The Telegram chat paired with devpit is the person, and no other chat is:
+anything else written to the bot is counted and never read. What the
+person writes or says there becomes their turn in one orchestrator's chat —
+the one chosen in Settings, or the only one — through the composer's door,
+marked as sent from that channel, and the turn's last words go back at the
+privacy chosen there: nothing named, names and a first line, or whole.
+A voice note is fetched up to 3 MB, heard by the engine Settings set up and
+deleted.
+
+From a channel a typed yes approves nothing. Sending a draft, stopping a
+session and moving a card into a lane with a step become buttons under the
+answer, and the press does it, as the person. `channel_talk` takes any
+transport; Telegram through the person's own bot is the first.
+
 ## Devflow is switched on by a click
 
 Devflow — briefing, context, plan, execution, review, completion — is a

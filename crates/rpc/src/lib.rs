@@ -62,14 +62,14 @@ pub use card::{
     DeleteRefusal, Notice, Notices, Pinned, Played,
 };
 pub use channels::{
-    CalendarFeed, ChannelEvent, ChannelInfo, ChannelRoute, ChannelRules, Channels, HubStatus,
-    QuietHours, TelegramStatus,
+    CalendarFeed, ChannelEvent, ChannelInfo, ChannelOrchestrator, ChannelRoute, ChannelRules,
+    Channels, HubStatus, Privacy, QuietHours, TelegramStatus,
 };
 pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
 pub use checkpoint::{
     validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, Whose, WouldRun,
 };
-pub use conversation::{Ask, Attachment, Conversation, OutsideSession};
+pub use conversation::{Ask, Attachment, Conversation, OutsideSession, TurnFrom};
 pub use decisions::{Deciding, DecisionTried};
 pub use devflow::{
     DevflowAsk, DevflowAsks, DevflowChange, DevflowPlan, DevflowPlanCreated, PlannedCard,

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use devpit_agentcli::person::{last_said, From};
 use devpit_core::home::ProjectHome;
 use devpit_core::Store;
-use devpit_rpc::{CallState, Conversation, Message, Part, Role, Transcript};
+use devpit_rpc::{CallState, Conversation, Message, Part, Role, Transcript, TurnFrom};
 use serde_json::json;
 
 use super::{
@@ -104,8 +104,8 @@ fn the_phone_reads_the_latest_of_a_conversation_with_long_output_cut() {
 #[test]
 fn a_message_from_the_phone_is_the_persons_turn_marked_from_the_remote() {
     let talk = conversation("claude-work", Vec::new());
-    let ask = ask_of(&talk, None, "/elsewhere", "  envie  ").expect("a turn");
-    assert!(ask.from_remote);
+    let ask = ask_of(&talk, None, "/elsewhere", "  envie  ", TurnFrom::Remote).expect("a turn");
+    assert_eq!(ask.from, Some(TurnFrom::Remote));
     assert_eq!(ask.prompt, "envie");
     assert_eq!(ask.profile_id, "claude-work");
     assert_eq!(ask.model.as_deref(), Some("opus"));
@@ -114,7 +114,7 @@ fn a_message_from_the_phone_is_the_persons_turn_marked_from_the_remote() {
     // What the agent is sent, as its log keeps a turn from the composer's
     // door: the person's words, said from the Remote.
     let sent = crate::session_notice::notices(
-        ask.from_remote,
+        ask.from.as_ref(),
         Some("[devpit, not the person] Since your last message: api ended."),
         &ask.prompt,
     );
@@ -126,11 +126,18 @@ fn a_message_from_the_phone_is_the_persons_turn_marked_from_the_remote() {
     // A chat with no turn yet speaks as its orchestrator's account, in its
     // folder; anywhere else it waits for the machine.
     let fresh = conversation("", Vec::new());
-    let first = ask_of(&fresh, Some("claude-work"), "/orchestrator", "oi").expect("a turn");
+    let first = ask_of(
+        &fresh,
+        Some("claude-work"),
+        "/orchestrator",
+        "oi",
+        TurnFrom::Remote,
+    )
+    .expect("a turn");
     assert_eq!(first.profile_id, "claude-work");
     assert_eq!(first.cwd, "/orchestrator");
-    assert!(ask_of(&fresh, None, "/orchestrator", "oi").is_err());
-    assert!(ask_of(&talk, None, "/elsewhere", "   ").is_err());
+    assert!(ask_of(&fresh, None, "/orchestrator", "oi", TurnFrom::Remote).is_err());
+    assert!(ask_of(&talk, None, "/elsewhere", "   ", TurnFrom::Remote).is_err());
 }
 
 struct Machine {

@@ -249,6 +249,18 @@ fn respond_in(
                 .and_then(Value::as_i64)
                 .map(|pid| pid as i32);
             let force = asked.params.get("force").and_then(Value::as_bool) == Some(true);
+            let press = crate::channels::Action::StopSession {
+                profile: profile.to_owned(),
+                session: name.clone(),
+                pid,
+                force,
+            };
+            if crate::channel_talk::offer(&here.id, press) {
+                return Ok(crate::channel_talk::pending(
+                    &here.id,
+                    &format!("stop {name}"),
+                ));
+            }
             return crate::stopping::stop(app, profile, &name, pid, "orchestrator", force)
                 .map_err(said);
         }
@@ -267,7 +279,13 @@ fn respond_in(
             let profile = orchestrating(here)?;
             let name = text("name").ok_or("which session? pass its name")?;
             in_reach(here, profile, &name)?;
-            crate::reply_drafts::draft(profile, &name, &text("text").unwrap_or_default())?;
+            let words = text("text").unwrap_or_default();
+            if crate::reply_drafts::draft(&here.id, profile, &name, &words)? {
+                return Ok(crate::channel_talk::pending(
+                    &here.id,
+                    &format!("send the draft to {name}"),
+                ));
+            }
             return Ok(json!({
                 "drafted": name,
                 "note": "Nothing was sent. The person sees the draft beside the session — in the Sessions panel and above this chat's composer — and sends it as their own words, edits it, or drops it.",
@@ -277,7 +295,12 @@ fn respond_in(
             let profile = orchestrating(here)?;
             let name = text("name").ok_or("which session? pass its name")?;
             in_reach(here, profile, &name)?;
-            return crate::draft_sending::send(profile, Path::new(&here.root_path), &name);
+            return crate::draft_sending::send(
+                &here.id,
+                profile,
+                Path::new(&here.root_path),
+                &name,
+            );
         }
         "log" => {
             orchestrating(here)?;
@@ -406,7 +429,13 @@ fn respond_in(
             .map_err(said)?;
             json!({ "id": changed.id, "title": changed.title })
         }
-        "move" => moved(app, &board, &card_id, &text("columnId").unwrap_or_default())?,
+        "move" => {
+            let to = text("columnId").unwrap_or_default();
+            match by_press(here, &board, &card_id, &to) {
+                Some(asked) => asked,
+                None => moved(app, &board, &card_id, &to)?,
+            }
+        }
         "start_card" => {
             on_board(&board, &card_id)?;
             crate::card_follows::start(app, &board, &card_id)?
@@ -544,6 +573,25 @@ pub(crate) fn moved(
     )
     .map_err(said)?;
     Ok(json!({ "id": changed.card.id, "columnId": changed.card.column_id }))
+}
+
+/// A move into a lane that runs a step, asked for in a turn from a channel:
+/// a button under the answer, since that decision is the person's press.
+fn by_press(here: &Project, board: &Board, card_id: &str, to: &str) -> Option<Value> {
+    let card = board.cards.iter().find(|card| card.id == card_id)?;
+    let lane = board
+        .columns
+        .iter()
+        .find(|column| column.id == to && column.step.is_some())?;
+    let press = crate::channels::Action::MoveCard {
+        project: board.project_id.clone(),
+        card_id: card.id.clone(),
+        column_id: lane.id.clone(),
+        card: card.title.clone(),
+        lane: lane.name.clone(),
+    };
+    crate::channel_talk::offer(&here.id, press)
+        .then(|| crate::channel_talk::pending(&here.id, &format!("move the card to {}", lane.name)))
 }
 
 /// Refuses a lane that runs a step: entering it starts work, and that is a

@@ -47,6 +47,24 @@ pub(crate) enum Action {
         seen: devpit_rpc::PendingPrompt,
         choice: u32,
     },
+    /// Stops a session, as the person: what an orchestrator asked for in a
+    /// turn from a channel, waiting for their press.
+    StopSession {
+        profile: String,
+        session: String,
+        pid: Option<i32>,
+        force: bool,
+    },
+    /// Moves a card into a lane that runs a step, which starts work: the
+    /// same, for a move.
+    MoveCard {
+        project: String,
+        card_id: String,
+        column_id: String,
+        /// The card's title and the lane's name, as the channel says them.
+        card: String,
+        lane: String,
+    },
 }
 
 /// One thing to tell: what it is, a line saying it, and what it offers.

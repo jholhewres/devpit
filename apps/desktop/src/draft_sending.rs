@@ -6,11 +6,13 @@
 //! wherever the person spoke to the orchestrator — the composer or the Claude
 //! app — and never from another session, a tool or the agent's own account.
 //! One message lets one draft go: a second ask on the same words is refused.
+//! From a channel's chat a word lets nothing go: the draft waits for the
+//! person's press on its button there.
 
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
-use devpit_agentcli::person::{authorises, bare, last_said, Said};
+use devpit_agentcli::person::{authorises, bare, last_said, From, Said};
 use serde_json::{json, Value};
 
 /// A message that let a draft go: (profile, message id, session). A bare
@@ -37,12 +39,29 @@ pub(crate) fn key_of(profile: &str, said: &Said, name: &str) -> Spent {
     (profile.to_owned(), said.id.clone(), session.to_owned())
 }
 
+/// Whether what the person said lets the draft for `name` go, with
+/// `waiting` drafts in all. Never a word from a channel: there the yes is a
+/// press on devpit's own button.
+pub(crate) fn lets_go(said: &Said, name: &str, waiting: usize) -> bool {
+    !matches!(said.from, From::Channel(_)) && authorises(&said.text, name, waiting)
+}
+
 /// Sends the draft for `name` when the person's last word in the log of the
-/// orchestrator standing in `root` asks for it.
-pub(crate) fn send(profile: &str, root: &Path, name: &str) -> Result<Value, String> {
+/// orchestrator of `project`, standing in `root`, asks for it.
+pub(crate) fn send(project: &str, profile: &str, root: &Path, name: &str) -> Result<Value, String> {
     let drafted = crate::reply_drafts::drafted(profile, name).ok_or_else(|| {
         format!("no draft waits for {name}: write it with devpit_draft_reply first")
     })?;
+    let press = crate::channels::Action::SendDraft {
+        profile: profile.to_owned(),
+        session: name.to_owned(),
+    };
+    if crate::channel_talk::offer(project, press) {
+        return Ok(crate::channel_talk::pending(
+            project,
+            &format!("send the draft to {name}"),
+        ));
+    }
     let config = crate::live_sessions::config_of(profile).map_err(|err| err.message)?;
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let log = devpit_agentcli::peers::newest(&devpit_agentcli::peers::logs_of(&config, &root))
@@ -55,11 +74,17 @@ pub(crate) fn send(profile: &str, root: &Path, name: &str) -> Result<Value, Stri
         .iter()
         .filter(|(whose, _, _)| whose == profile)
         .count();
-    if !authorises(&said.text, name, waiting) {
-        return Err(format!(
-            "not sent: the person's last message («{}») does not ask for the draft to {name} to go. It waits beside the session for their click, or for them to say \"envie\" or name the session.",
-            short(&said.text)
-        ));
+    if !lets_go(&said, name, waiting) {
+        return Err(match said.from {
+            From::Channel(_) => format!(
+                "not sent: the person last wrote from {}, where a draft goes only by its button. It waits beside the session for their click.",
+                said.from.label()
+            ),
+            _ => format!(
+                "not sent: the person's last message («{}») does not ask for the draft to {name} to go. It waits beside the session for their click, or for them to say \"envie\" or name the session.",
+                short(&said.text)
+            ),
+        });
     }
     let mut held = spent()
         .lock()

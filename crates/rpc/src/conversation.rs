@@ -71,9 +71,19 @@ pub struct Ask {
     pub permission: Option<String>,
     /// How hard to think. Absent keeps what the conversation already had.
     pub effort: Option<String>,
-    /// Sent by the person from the Remote, which the agent is told.
+    /// Where the person sent it from, when not the composer: the agent is told.
     #[serde(default)]
-    pub from_remote: bool,
+    pub from: Option<TurnFrom>,
+}
+
+/// Where a turn the person sent came from, other than the composer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum TurnFrom {
+    /// devpit's Remote, on another device.
+    Remote,
+    /// The chat paired with devpit on a channel, by the channel's id.
+    Channel { id: String },
 }
 
 /// A file the person put in front of the agent.

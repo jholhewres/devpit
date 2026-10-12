@@ -7,7 +7,7 @@ fn waiting(code: &str, until: i64) -> Kept {
         chat_id: None,
         code: Some(code.to_owned()),
         code_until: until,
-        titles: false,
+        ..Kept::default()
     }
 }
 

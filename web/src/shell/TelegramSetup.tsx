@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react'
 
-import type { TelegramStatus } from '../gen/bindings'
+import type { Privacy, TelegramStatus } from '../gen/bindings'
 import { ask, commands } from './live'
+
+const PRIVACY: [Privacy, string][] = [
+  ['minimal', 'Only that something waits or was answered'],
+  ['titles', 'Which session, card or project, and the first line of an answer'],
+  ['full', 'Names, and the orchestrator’s whole answer'],
+]
 
 /*
  * The person's own Telegram bot: its token from @BotFather, then a code sent
  * to it from the chat devpit should use. Sent from this machine, with no
- * server in between — and so only while it is on.
+ * server in between — and so only while it is on. What the person writes
+ * there goes to one orchestrator, the one chosen here.
  */
 export function TelegramSetup({ onLinked }: { onLinked: () => void }): React.JSX.Element {
   const [status, setStatus] = useState<TelegramStatus | null>(null)
@@ -38,16 +45,51 @@ export function TelegramSetup({ onLinked }: { onLinked: () => void }): React.JSX
     })
   }
 
+  const saved = (answer: { data: TelegramStatus | null; error: string | null }): void => {
+    if (answer.data) setStatus(answer.data)
+    setSaid(answer.error)
+  }
+
+  const chosen = status?.orchestrators.some((one) => one.project === status.orchestrator) ?? false
+
   if (status?.linked)
     return (
       <div className="pref">
         <span className="pref__body">
           <span className="pref__t">Telegram, @{status.bot}</span>
-          <span className="pref__d">Notices go to the chat you linked. Telegram is not end-to-end encrypted: what a message says, Telegram can read.</span>
+          <span className="pref__d">
+            Notices go to the chat you linked, and what you write or say there goes to your orchestrator as you. Sending a draft, stopping a session or
+            starting a lane’s step waits for a button there. Telegram is not end-to-end encrypted: what a message says, Telegram can read.
+          </span>
           <label className="voice__row">
-            <input type="checkbox" checked={status.titles} onChange={(event) => void ask(() => commands.telegramTitlesSet(event.target.checked)).then((answer) => answer.data && setStatus(answer.data))} />
-            Say which session, card or project — otherwise only that something waits
+            Says
+            <select aria-label="What Telegram is told" value={status.privacy} onChange={(event) => void ask(() => commands.telegramPrivacySet(event.target.value as Privacy)).then(saved)}>
+              {PRIVACY.map(([level, label]) => (
+                <option key={level} value={level}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </label>
+          {status.orchestrators.length === 1 && <span className="pref__d">Talks to {status.orchestrators[0].name}, your only orchestrator.</span>}
+          {status.orchestrators.length > 1 && (
+            <label className="voice__row">
+              Talks to
+              <select
+                aria-label="The orchestrator Telegram talks to"
+                value={chosen ? (status.orchestrator ?? '') : ''}
+                onChange={(event) => void ask(() => commands.telegramOrchestratorSet(event.target.value || null)).then(saved)}
+              >
+                {!chosen && <option value="">Choose an orchestrator</option>}
+                {status.orchestrators.map((one) => (
+                  <option key={one.project} value={one.project}>
+                    {one.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {said && <span className="pref__d voice__bad">{said}</span>}
         </span>
         <button className="btn" onClick={() => void ask(() => commands.telegramUnlink()).then((answer) => (setStatus(answer.data), onLinked()))}>
           Unlink

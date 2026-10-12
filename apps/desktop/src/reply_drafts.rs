@@ -24,8 +24,10 @@ fn drafts() -> &'static Mutex<Drafts> {
 }
 
 /// Keeps `text` as the reply drafted for the session `name` of `profile`,
-/// in place of any before it.
-pub(crate) fn draft(profile: &str, name: &str, text: &str) -> Result<(), String> {
+/// in place of any before it, by the orchestrator of `project`. In a turn
+/// from a channel its button goes under the answer, and the notice that
+/// would carry the same button does not; answers whether it went there.
+pub(crate) fn draft(project: &str, profile: &str, name: &str, text: &str) -> Result<bool, String> {
     let text = text.trim();
     if text.is_empty() || text.chars().count() > LONGEST {
         return Err(format!("a draft is between 1 and {LONGEST} characters"));
@@ -35,6 +37,13 @@ pub(crate) fn draft(profile: &str, name: &str, text: &str) -> Result<(), String>
         .map_err(|_| "the drafts could not be read".to_owned())?
         .insert((profile.to_owned(), name.to_owned()), text.to_owned());
     crate::tray::refresh_soon();
+    let send = crate::channels::Action::SendDraft {
+        profile: profile.to_owned(),
+        session: name.to_owned(),
+    };
+    if crate::channel_talk::offer(project, send) {
+        return Ok(true);
+    }
     crate::channels::emit(crate::channels::Told {
         event: devpit_rpc::ChannelEvent::DraftReady,
         line: format!("A draft for {name}: «{text}»"),
@@ -49,7 +58,7 @@ pub(crate) fn draft(profile: &str, name: &str, text: &str) -> Result<(), String>
             session: name.to_owned(),
         }),
     });
-    Ok(())
+    Ok(false)
 }
 
 /// The reply drafted for a session, if one is waiting to be sent.

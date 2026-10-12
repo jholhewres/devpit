@@ -6,15 +6,19 @@
 //! names its URL, and a Bot API URL holds the token, so none is passed on.
 //! Linking: devpit shows a code, the person sends `/start <code>` to their
 //! bot, and that chat is the one devpit talks to and listens to; any other
-//! chat is ignored.
+//! chat is counted and ignored, its words never read. What the paired chat
+//! says goes to an orchestrator through `channel_talk`.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use devpit_rpc::{ChannelInfo, RpcError, TelegramStatus};
+use devpit_rpc::{ChannelInfo, Privacy, RpcError, TelegramStatus};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::AppHandle;
+
+use crate::channel_talk::Heard;
 
 pub(crate) const ID: &str = "telegram";
 const API: &str = "https://api.telegram.org";
@@ -29,7 +33,21 @@ pub(crate) struct Kept {
     chat_id: Option<i64>,
     code: Option<String>,
     code_until: i64,
+    /// What a file written before `privacy` said: names, or nothing named.
     titles: bool,
+    privacy: Option<Privacy>,
+    /// The orchestrator the chat talks to, by project.
+    orchestrator: Option<String>,
+}
+
+impl Kept {
+    fn privacy(&self) -> Privacy {
+        self.privacy.unwrap_or(if self.titles {
+            Privacy::Titles
+        } else {
+            Privacy::Minimal
+        })
+    }
 }
 
 fn file() -> Option<std::path::PathBuf> {
@@ -65,7 +83,7 @@ pub(crate) fn connected() -> Option<ChannelInfo> {
 
 /// Whether messages say what they are about, or only that something happened.
 pub(crate) fn titles() -> bool {
-    read().is_some_and(|kept| kept.titles)
+    read().is_some_and(|kept| kept.privacy() != Privacy::Minimal)
 }
 
 /// A call to the Bot API. Any failure is one sentence with no URL in it.
@@ -93,6 +111,12 @@ async fn call(token: &str, method: &str, body: Value) -> Result<Value, String> {
 
 /// Sends `text` to the linked chat, with a button per action.
 pub(crate) fn send(text: &str, offered: &[crate::channels::Action]) {
+    let (text, offered) = (text.to_owned(), offered.to_vec());
+    tauri::async_runtime::spawn(async move { said(&text, &offered).await });
+}
+
+/// [`send`], done before it answers.
+async fn said(text: &str, offered: &[crate::channels::Action]) {
     let Some(kept) = read() else { return };
     let Some(chat) = kept.chat_id else { return };
     let row: Vec<Value> = offered
@@ -106,12 +130,61 @@ pub(crate) fn send(text: &str, offered: &[crate::channels::Action]) {
     if !row.is_empty() {
         body["reply_markup"] = json!({ "inline_keyboard": [row] });
     }
-    let token = kept.token;
-    tauri::async_runtime::spawn(async move {
-        if let Err(why) = call(&token, "sendMessage", body).await {
-            devpit_core::reports::background("telegram", &why);
+    if let Err(why) = call(&kept.token, "sendMessage", body).await {
+        devpit_core::reports::background("telegram", &why);
+    }
+}
+
+/// The bot, as the paired chat's side of a talk with an orchestrator.
+struct Bot;
+
+impl crate::channel_talk::Line for Bot {
+    fn id(&self) -> &'static str {
+        ID
+    }
+
+    fn privacy(&self) -> Privacy {
+        read().map(|kept| kept.privacy()).unwrap_or_default()
+    }
+
+    fn orchestrator(&self) -> Option<String> {
+        read()?.orchestrator
+    }
+
+    async fn reply(&self, text: &str, actions: &[crate::channels::Action]) {
+        said(text, actions).await;
+    }
+
+    async fn fetch(&self, file: &str, most: usize) -> Result<Vec<u8>, String> {
+        let kept = read().ok_or("no bot is set up")?;
+        let found = call(&kept.token, "getFile", json!({ "file_id": file })).await?;
+        if found["file_size"]
+            .as_u64()
+            .is_some_and(|size| size > most as u64)
+        {
+            return Err(crate::channel_talk::past_most(most));
         }
-    });
+        let path = found["file_path"]
+            .as_str()
+            .ok_or("Telegram did not say where the voice note is")?;
+        // A download URL holds the token too: its errors are not passed on.
+        let mut answer = crate::account::client()
+            .map_err(|err| err.message)?
+            .get(format!("{API}/file/bot{}/{path}", kept.token))
+            .timeout(Duration::from_secs(60))
+            .send()
+            .await
+            .map_err(|_| "Telegram did not send the voice note".to_owned())?;
+        let mut held = Vec::new();
+        while let Some(piece) = answer
+            .chunk()
+            .await
+            .map_err(|_| "the voice note stopped arriving".to_owned())?
+        {
+            crate::channel_talk::gather(&mut held, &piece, most)?;
+        }
+        Ok(held)
+    }
 }
 
 /// What a code the person sent links, if it is the one devpit showed.
@@ -124,45 +197,114 @@ pub(crate) fn links(kept: &Kept, said: &str, now: i64) -> bool {
     now < kept.code_until && said.eq_ignore_ascii_case(code)
 }
 
-/// One update from the bot: a linking code, or a button pressed in the linked chat.
+/// One update from the bot, read against what devpit keeps.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Update {
+    /// The linking code devpit showed, sent from this private chat.
+    Links(i64),
+    /// The paired chat said something to its orchestrator.
+    Said(Heard),
+    /// A button pressed: its key, when it was pressed in the paired chat.
+    Pressed { query: String, key: Option<String> },
+    /// A message from a chat that is not the paired one: counted, not read.
+    Unpaired,
+    /// Nothing devpit acts on: `/start` again, a sticker, a photo.
+    Nothing,
+}
+
+/// What `update` is: only the paired chat is the person.
+pub(crate) fn read_update(kept: &Kept, update: &Value, now: i64) -> Update {
+    if let Some(pressed) = update.get("callback_query") {
+        let paired =
+            kept.chat_id.is_some() && pressed["message"]["chat"]["id"].as_i64() == kept.chat_id;
+        return Update::Pressed {
+            query: pressed["id"].as_str().unwrap_or_default().to_owned(),
+            key: pressed["data"]
+                .as_str()
+                .and_then(|data| data.strip_prefix("a:"))
+                .filter(|_| paired)
+                .map(str::to_owned),
+        };
+    }
+    let Some(message) = update.get("message") else {
+        return Update::Nothing;
+    };
+    let chat = message["chat"]["id"].as_i64();
+    let text = message["text"].as_str();
+    if message["chat"]["type"] == "private" && links(kept, text.unwrap_or_default(), now) {
+        return chat.map_or(Update::Nothing, Update::Links);
+    }
+    if kept.chat_id.is_none() || chat != kept.chat_id {
+        return Update::Unpaired;
+    }
+    if let Some(text) = text {
+        if text.trim_start().starts_with("/start") {
+            return Update::Nothing;
+        }
+        return Update::Said(Heard::Text(text.to_owned()));
+    }
+    let voice = &message["voice"];
+    match voice["file_id"].as_str() {
+        Some(file) => Update::Said(Heard::Voice {
+            file: file.to_owned(),
+            media_type: voice["mime_type"]
+                .as_str()
+                .unwrap_or("audio/ogg")
+                .to_owned(),
+            size: voice["file_size"]
+                .as_u64()
+                .map(|size| usize::try_from(size).unwrap_or(usize::MAX)),
+        }),
+        None => Update::Nothing,
+    }
+}
+
+/// Messages from chats other than the paired one, since devpit started.
+static IGNORED: AtomicU64 = AtomicU64::new(0);
+
+/// One update from the bot: a linking code, the paired chat talking, or a
+/// button pressed there.
 async fn heard(update: &Value) {
     let Some(mut kept) = read() else { return };
     let now = devpit_core::reports::now() as i64;
-    if let Some(message) = update.get("message") {
-        let chat = message["chat"]["id"].as_i64();
-        let private = message["chat"]["type"] == "private";
-        let text = message["text"].as_str().unwrap_or_default();
-        if private && links(&kept, text, now) {
-            kept.chat_id = chat;
+    match read_update(&kept, update, now) {
+        Update::Links(chat) => {
+            kept.chat_id = Some(chat);
             kept.code = None;
             if write(&kept).is_ok() {
-                let _ = call(&kept.token, "sendMessage", json!({ "chat_id": chat, "text": "Linked: devpit tells you here what waits on you." })).await;
+                let _ = call(&kept.token, "sendMessage", json!({ "chat_id": chat, "text": "Linked: devpit tells you here what waits on you, and what you write here goes to your orchestrator." })).await;
             }
         }
-        return;
+        Update::Said(said) => {
+            let Some(app) = app().get().cloned() else {
+                return;
+            };
+            // A task of its own: a turn takes a while, and a button pressed
+            // meanwhile is still answered.
+            tauri::async_runtime::spawn(async move {
+                crate::channel_talk::heard(&Bot, &crate::channel_talk::Here(app), said).await;
+            });
+        }
+        Update::Pressed { query, key } => {
+            let action = key.and_then(|key| crate::channel_actions::take(&key));
+            let said = action.as_ref().map_or_else(
+                || "That button has expired.".to_owned(),
+                |action| crate::channel_actions::act(action, "Telegram"),
+            );
+            let _ = call(
+                &kept.token,
+                "answerCallbackQuery",
+                json!({ "callback_query_id": query, "text": said }),
+            )
+            .await;
+        }
+        // Counted, never read: whoever else writes to the bot is not the person.
+        Update::Unpaired => {
+            let ignored = IGNORED.fetch_add(1, Ordering::Relaxed) + 1;
+            eprintln!("telegram: {ignored} message(s) from chats not paired with devpit ignored");
+        }
+        Update::Nothing => {}
     }
-    let Some(pressed) = update.get("callback_query") else {
-        return;
-    };
-    let from_linked =
-        pressed["message"]["chat"]["id"].as_i64() == kept.chat_id && kept.chat_id.is_some();
-    let key = pressed["data"]
-        .as_str()
-        .and_then(|data| data.strip_prefix("a:"))
-        .unwrap_or_default();
-    let action = from_linked
-        .then(|| crate::channel_actions::take(key))
-        .flatten();
-    let said = action.as_ref().map_or_else(
-        || "That button has expired.".to_owned(),
-        |action| crate::channel_actions::act(action, "Telegram"),
-    );
-    let _ = call(
-        &kept.token,
-        "answerCallbackQuery",
-        json!({ "callback_query_id": pressed["id"], "text": said }),
-    )
-    .await;
 }
 
 static LISTENING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -200,15 +342,22 @@ fn status(kept: Option<&Kept>) -> TelegramStatus {
                 .as_ref()
                 .map(|code| format!("https://t.me/{}?start={code}", kept.bot))
         }),
-        titles: kept.is_some_and(|kept| kept.titles),
+        privacy: kept.map(Kept::privacy).unwrap_or_default(),
+        orchestrator: kept.and_then(|kept| kept.orchestrator.clone()),
+        orchestrators: crate::channel_talk::orchestrators(),
     }
+}
+
+/// [`status`] off the main thread: the orchestrators are read from the store.
+async fn status_now(kept: Option<Kept>) -> Result<TelegramStatus, RpcError> {
+    crate::off_main::blocking(move || Ok(status(kept.as_ref()))).await
 }
 
 /// `telegram.status`
 #[tauri::command]
 #[specta::specta]
 pub async fn telegram_status() -> Result<TelegramStatus, RpcError> {
-    Ok(status(read().as_ref()))
+    status_now(read()).await
 }
 
 /// `telegram.link` — takes the person's bot token, checks it, and offers a code
@@ -240,28 +389,56 @@ pub async fn telegram_link(app: AppHandle, token: String) -> Result<TelegramStat
         .rev()
         .take(6)
         .collect();
+    let was = read().unwrap_or_default();
     let kept = Kept {
         token,
         bot: me["username"].as_str().unwrap_or_default().to_owned(),
         chat_id: None,
         code: Some(code),
         code_until: devpit_core::reports::now() as i64 + CODE_SECS,
-        titles: read().is_some_and(|was| was.titles),
+        titles: was.titles,
+        privacy: was.privacy,
+        orchestrator: was.orchestrator,
     };
     write(&kept)?;
     listen(&app);
-    Ok(status(Some(&kept)))
+    status_now(Some(kept)).await
 }
 
-/// `telegram.titles_set` — whether messages name what they are about.
+fn set_up() -> Result<Kept, RpcError> {
+    read().ok_or_else(|| RpcError::new(devpit_rpc::ErrorCode::NotFound, "no bot is set up"))
+}
+
+/// `telegram.privacy_set` — how much of what devpit says goes to the chat.
 #[tauri::command]
 #[specta::specta]
-pub async fn telegram_titles_set(titles: bool) -> Result<TelegramStatus, RpcError> {
-    let mut kept =
-        read().ok_or_else(|| RpcError::new(devpit_rpc::ErrorCode::NotFound, "no bot is set up"))?;
-    kept.titles = titles;
+pub async fn telegram_privacy_set(privacy: Privacy) -> Result<TelegramStatus, RpcError> {
+    let mut kept = set_up()?;
+    kept.privacy = Some(privacy);
     write(&kept)?;
-    Ok(status(Some(&kept)))
+    status_now(Some(kept)).await
+}
+
+/// `telegram.orchestrator_set` — which orchestrator the chat talks to; none
+/// is the only one there is.
+#[tauri::command]
+#[specta::specta]
+pub async fn telegram_orchestrator_set(
+    project: Option<String>,
+) -> Result<TelegramStatus, RpcError> {
+    let mut kept = set_up()?;
+    if let Some(chosen) = &project {
+        let known = crate::off_main::blocking(|| Ok(crate::channel_talk::orchestrators())).await?;
+        if !known.iter().any(|one| &one.project == chosen) {
+            return Err(RpcError::new(
+                devpit_rpc::ErrorCode::NotFound,
+                "that is not an orchestrator here",
+            ));
+        }
+    }
+    kept.orchestrator = project;
+    write(&kept)?;
+    status_now(Some(kept)).await
 }
 
 /// `telegram.unlink` — forgets the bot and the chat.
@@ -271,7 +448,7 @@ pub async fn telegram_unlink() -> Result<TelegramStatus, RpcError> {
     if let Some(path) = file() {
         let _ = std::fs::remove_file(path);
     }
-    Ok(status(None))
+    status_now(None).await
 }
 
 #[cfg(test)]

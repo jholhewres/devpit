@@ -20,7 +20,7 @@ use devpit_core::home::ProjectHome;
 use devpit_core::Store;
 use devpit_rpc::{
     Ask, Attachment, Conversation, Frame, Part, RemoteOrchestrator, RemoteOut, RemoteSession,
-    RemoteTalks, RpcError, Transcript, TurnEnd,
+    RemoteTalks, RpcError, Transcript, TurnEnd, TurnFrom,
 };
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::{Emitter as _, Manager as _};
@@ -201,14 +201,16 @@ fn frame_for_phone(mut frame: Frame) -> Frame {
     frame
 }
 
-/// The turn the person's words from the Remote make: as the account the
-/// conversation belongs to — the orchestrator's, for one that has had no turn
-/// yet — with the model and mode it last ran with, and marked as the Remote's.
+/// The turn the person's words from the Remote or a channel make: as the
+/// account the conversation belongs to — the orchestrator's, for one that has
+/// had no turn yet — with the model and mode it last ran with, and marked
+/// with where they came from.
 pub(crate) fn ask_of(
     conversation: &Conversation,
     orchestrator: Option<&str>,
     root: &str,
     text: &str,
+    from: TurnFrom,
 ) -> Result<Ask, String> {
     let profile = Some(conversation.profile.as_str())
         .filter(|profile| !profile.is_empty())
@@ -230,8 +232,35 @@ pub(crate) fn ask_of(
         budget_usd: None,
         permission: conversation.permission.clone(),
         effort: conversation.effort.clone(),
-        from_remote: true,
+        from: Some(from),
     })
+}
+
+/// The turn `text` makes in `conversation` of `project`, sent from `from`.
+pub(crate) fn turn_of(
+    project: &str,
+    conversation: &str,
+    text: &str,
+    from: TurnFrom,
+) -> Result<Ask, String> {
+    if !plain(conversation) {
+        return Err("that is not a conversation".to_owned());
+    }
+    let history = crate::chat::chat_history_now(project.to_owned(), conversation.to_owned())
+        .map_err(|err| err.message)?;
+    let store = crate::projects::store().map_err(|err| err.message)?;
+    let (_, root) = crate::projects::locate(&store, project).map_err(|err| err.message)?;
+    let orchestrator = Store::root()
+        .ok()
+        .and_then(|home| home.canonicalize().ok())
+        .and_then(|home| devpit_core::home::orchestrator_of(&store, &home, &root));
+    ask_of(
+        &history,
+        orchestrator.as_deref(),
+        &root.display().to_string(),
+        text,
+        from,
+    )
 }
 
 /// The person's message from the phone, sent as their turn. Its frames reach
@@ -245,23 +274,7 @@ pub(crate) fn say(
     conversation: &str,
     text: &str,
 ) -> Result<(), String> {
-    if !plain(conversation) {
-        return Err("that is not a conversation".to_owned());
-    }
-    let history = crate::chat::chat_history_now(project.to_owned(), conversation.to_owned())
-        .map_err(|err| err.message)?;
-    let store = crate::projects::store().map_err(|err| err.message)?;
-    let (_, root) = crate::projects::locate(&store, project).map_err(|err| err.message)?;
-    let orchestrator = Store::root()
-        .ok()
-        .and_then(|home| home.canonicalize().ok())
-        .and_then(|home| devpit_core::home::orchestrator_of(&store, &home, &root));
-    let ask = ask_of(
-        &history,
-        orchestrator.as_deref(),
-        &root.display().to_string(),
-        text,
-    )?;
+    let ask = turn_of(project, conversation, text, TurnFrom::Remote)?;
     // Only a trigger: the first frame is sent once the turn is in the relay,
     // under its lock, so what joins it is started on its own.
     let first = AtomicBool::new(true);

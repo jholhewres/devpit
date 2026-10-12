@@ -1,6 +1,6 @@
 use devpit_agentcli::person::{From, Said};
 
-use super::{key_of, spend};
+use super::{key_of, lets_go, spend};
 
 fn said(id: &str, text: &str) -> Said {
     Said {
@@ -31,4 +31,22 @@ fn a_bare_send_is_spent_whole_whichever_draft_it_sent() {
         &mut held,
         key_of("p", &said("u2", "envie"), "ascbot-lotus")
     ));
+}
+
+#[test]
+fn a_typed_yes_from_a_channel_lets_no_draft_go() {
+    let on_telegram = |text: &str| Said {
+        id: "u1".to_owned(),
+        text: text.to_owned(),
+        from: From::Channel("telegram"),
+    };
+    // There the yes is a press on devpit's button, never the words.
+    assert!(!lets_go(&on_telegram("envie"), "noiseless-mvp", 1));
+    assert!(!lets_go(
+        &on_telegram("manda a noiseless-mvp seguir"),
+        "noiseless-mvp",
+        1
+    ));
+    // The same words from anywhere else do.
+    assert!(lets_go(&said("u2", "envie"), "noiseless-mvp", 1));
 }

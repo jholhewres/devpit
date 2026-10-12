@@ -38,6 +38,8 @@ pub(crate) fn label(action: &Action) -> String {
         Action::Snooze { .. } => "In 15 minutes".to_owned(),
         Action::Rotated { .. } => "Rotated".to_owned(),
         Action::ForgetRotation { .. } => "Forget".to_owned(),
+        Action::StopSession { .. } => "Stop the session".to_owned(),
+        Action::MoveCard { .. } => "Move the card".to_owned(),
         Action::Answer { seen, choice, .. } => {
             let said = seen
                 .options
@@ -65,14 +67,7 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
     let now = devpit_core::reports::now() as i64;
     let done = match action {
         Action::SendDraft { profile, session } => {
-            match crate::reply_drafts::drafted(profile, session) {
-                Some(draft) => {
-                    crate::live_sessions::reply_now(profile, session, &draft, Some(channel))
-                        .map(|_| format!("Sent to {session}."))
-                        .map_err(|err| err.message)
-                }
-                None => Err("That draft is no longer waiting.".to_owned()),
-            }
+            sent_draft(profile, session, channel, crate::live_sessions::reply_now)
         }
         Action::ReminderDone { card_id } => crate::projects::store()
             .map_err(|err| err.message)
@@ -98,6 +93,26 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
         } => crate::live_answer::answer_in(target, seen, Some(*choice))
             .map(|_| format!("Answered: {}.", label(action)))
             .map_err(|err| err.message),
+        Action::StopSession {
+            profile,
+            session,
+            pid,
+            force,
+        } => crate::telegram::app()
+            .get()
+            .ok_or_else(|| "devpit's window is not running.".to_owned())
+            .and_then(|app| {
+                crate::stopping::stop(app, profile, session, *pid, "person", *force)
+                    .map_err(|err| err.message)
+            })
+            .map(|_| format!("Stopped {session}.")),
+        Action::MoveCard {
+            project,
+            card_id,
+            column_id,
+            lane,
+            ..
+        } => moved(project, card_id, column_id).map(|_| format!("Moved to {lane}.")),
     };
     // A rotation's buttons tell the window themselves, through the vault.
     if matches!(action, Action::ReminderDone { .. } | Action::Snooze { .. }) {
@@ -106,6 +121,47 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
         }
     }
     done.unwrap_or_else(|why| why)
+}
+
+/// Sends the draft waiting for `session` through `reply`, as the person
+/// whose press it was on `channel`.
+pub(crate) fn sent_draft(
+    profile: &str,
+    session: &str,
+    channel: &str,
+    reply: impl FnOnce(&str, &str, &str, Option<&str>) -> Result<(), devpit_rpc::RpcError>,
+) -> Result<String, String> {
+    let draft =
+        crate::reply_drafts::drafted(profile, session).ok_or("That draft is no longer waiting.")?;
+    reply(profile, session, &draft, Some(channel))
+        .map(|_| format!("Sent to {session}."))
+        .map_err(|err| err.message)
+}
+
+/// Moves a card to the end of a lane, as the person whose press it was.
+fn moved(project: &str, card_id: &str, column_id: &str) -> Result<(), String> {
+    use tauri::{Emitter as _, Manager as _};
+    let app = crate::telegram::app()
+        .get()
+        .ok_or("devpit's window is not running.")?;
+    let board = crate::board::board_get_now(project.to_owned()).map_err(|err| err.message)?;
+    let at_end = board
+        .cards
+        .iter()
+        .filter(|card| card.column_id == column_id)
+        .count() as i32;
+    crate::moving::card_move_now(
+        app.state(),
+        app.clone(),
+        project.to_owned(),
+        card_id.to_owned(),
+        column_id.to_owned(),
+        at_end,
+        false,
+    )
+    .map_err(|err| err.message)?;
+    let _ = app.emit("board:changed", project);
+    Ok(())
 }
 
 #[cfg(test)]

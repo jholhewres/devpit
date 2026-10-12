@@ -80,6 +80,27 @@ pub struct Channels {
     pub escalates: Vec<ChannelEvent>,
 }
 
+/// How much of what devpit says leaves on a channel.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Privacy {
+    /// Only that something happened or was answered, nothing named.
+    #[default]
+    Minimal,
+    /// The session, card or project named, and an answer's first line.
+    Titles,
+    /// Names, and the orchestrator's answer whole.
+    Full,
+}
+
+/// An orchestrator a channel can talk to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelOrchestrator {
+    pub project: String,
+    pub name: String,
+}
+
 /// The person's Telegram bot, as the screen shows it: never its token.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -91,8 +112,11 @@ pub struct TelegramStatus {
     pub code: Option<String>,
     /// `t.me/<bot>?start=<code>`, which sends it in one tap.
     pub link: Option<String>,
-    /// Whether messages name the session, card or project.
-    pub titles: bool,
+    pub privacy: Privacy,
+    /// The orchestrator the chat's messages go to, when one was chosen.
+    pub orchestrator: Option<String>,
+    /// The orchestrators on this machine, to choose from.
+    pub orchestrators: Vec<ChannelOrchestrator>,
 }
 
 /// devpit.app as a channel: e-mail and push, set up at devpit.app/account.

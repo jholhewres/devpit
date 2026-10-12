@@ -71,6 +71,7 @@ mod chaining;
 mod channel_actions;
 mod channel_escalation;
 mod channel_rules;
+mod channel_talk;
 mod channels;
 mod chat;
 mod chat_listening;

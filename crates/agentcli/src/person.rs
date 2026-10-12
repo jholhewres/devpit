@@ -15,7 +15,8 @@
 //!
 //! Only the first two are the person, and devpit's own notices at the top of a
 //! composer turn — `[devpit, not the person] …` — are cut off before reading.
-//! One of them says the person wrote it on devpit's Remote, from a phone.
+//! One of them says the person wrote it on devpit's Remote, from a phone, or
+//! in a chat paired with devpit on a channel such as Telegram.
 
 use serde_json::Value;
 
@@ -26,6 +27,21 @@ const DEVPIT_NOTICE: &str = "[devpit, not the person]";
 pub const FROM_THE_REMOTE: &str =
     "[devpit, not the person] The person sent this from devpit's Remote, on another device.";
 
+/// The channels a person can talk to an orchestrator from, by id and name.
+const CHANNELS: [(&str, &str); 1] = [("telegram", "Telegram")];
+
+fn channel(id: &str) -> Option<(&'static str, &'static str)> {
+    CHANNELS.into_iter().find(|(known, _)| *known == id)
+}
+
+/// devpit's notice above a turn the person sent from the chat paired with
+/// devpit on channel `id`, when devpit knows that channel.
+pub fn from_channel(id: &str) -> Option<String> {
+    channel(id).map(|(_, name)| {
+        format!("[devpit, not the person] The person sent this from {name}, in the chat paired with devpit.")
+    })
+}
+
 /// Where the person said it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum From {
@@ -33,6 +49,9 @@ pub enum From {
     RemoteControl,
     /// devpit's own Remote, whose turns go through the composer's door.
     Remote,
+    /// A channel's paired chat, by the channel's id: its turns go through the
+    /// composer's door too, and its yes to a draft is a button, not a word.
+    Channel(&'static str),
 }
 
 impl From {
@@ -41,6 +60,7 @@ impl From {
             From::Composer => "the chat",
             From::RemoteControl => "Remote Control",
             From::Remote => "the Remote",
+            From::Channel(id) => channel(id).map_or("a channel", |(_, name)| name),
         }
     }
 }
@@ -89,28 +109,39 @@ fn person_said(entry: &Value) -> Option<Said> {
         }
         _ => return None,
     };
-    let (text, remote) = without_notices(&text);
+    let (text, sent_from) = without_notices(&text);
     Some(Said {
         id: entry["uuid"].as_str()?.to_owned(),
         text: text.trim().to_owned(),
-        from: if remote && from == From::Composer {
-            From::Remote
-        } else {
-            from
+        from: match sent_from {
+            Some(sent_from) if from == From::Composer => sent_from,
+            _ => from,
         },
     })
 }
 
-/// `text` without devpit's notices above it, and whether one said it came
-/// from the Remote.
-fn without_notices(mut text: &str) -> (&str, bool) {
-    let mut remote = false;
+/// `text` without devpit's notices above it, and where the first said the
+/// person sent it from: the Remote, or a channel. Only the first, which is
+/// where devpit puts it: words typed under it cannot pass for another door.
+fn without_notices(mut text: &str) -> (&str, Option<From>) {
+    let mut sent_from = None;
+    let mut first = true;
     while text.trim_start().starts_with(DEVPIT_NOTICE) {
         let (notice, rest) = text.trim_start().split_once("\n\n").unwrap_or((text, ""));
-        remote |= notice.trim() == FROM_THE_REMOTE;
+        let notice = notice.trim();
+        if first && notice == FROM_THE_REMOTE {
+            sent_from = Some(From::Remote);
+        }
+        if let Some((id, _)) = CHANNELS
+            .into_iter()
+            .find(|(id, _)| first && from_channel(id).is_some_and(|said| said == notice))
+        {
+            sent_from = Some(From::Channel(id));
+        }
+        first = false;
         text = rest;
     }
-    (text, remote)
+    (text, sent_from)
 }
 
 /// Words that, said alone, send the one draft waiting.

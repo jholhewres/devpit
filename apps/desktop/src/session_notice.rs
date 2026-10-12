@@ -12,7 +12,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
-use devpit_rpc::LiveSession;
+use devpit_rpc::{LiveSession, TurnFrom};
 
 /// How the sessions stood at a turn.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -75,23 +75,27 @@ pub(crate) fn notice(before: Option<&Seen>, now: &[LiveSession]) -> Option<Strin
     })
 }
 
-/// A turn's project, its account, and whether the person sent it from the
-/// Remote.
-pub(crate) type Noticed = (String, String, bool);
+/// A turn's project, its account, and where the person sent it from when
+/// not the composer.
+pub(crate) type Noticed = (String, String, Option<TurnFrom>);
 
-/// `prompt`, with devpit's notices above it: that the person sent it from the
-/// Remote, and in an orchestrator's chat what changed since the last turn.
+/// `prompt`, with devpit's notices above it: where the person sent it from,
+/// and in an orchestrator's chat what changed since the last turn.
 pub(crate) fn with_notice(noticed: &Noticed, prompt: &str, now_ms: f64) -> String {
-    let (project_id, profile_id, from_remote) = noticed;
+    let (project_id, profile_id, from) = noticed;
     let since = since(project_id, profile_id, now_ms);
-    notices(*from_remote, since.as_deref(), prompt)
+    notices(from.as_ref(), since.as_deref(), prompt)
 }
 
-/// `prompt` under its notices, the Remote's first: each its own paragraph,
-/// which is how the person's words are told apart from them.
-pub(crate) fn notices(from_remote: bool, since: Option<&str>, prompt: &str) -> String {
-    let remote = from_remote.then_some(devpit_agentcli::person::FROM_THE_REMOTE);
-    remote
+/// `prompt` under its notices, where it came from first: each its own
+/// paragraph, which is how the person's words are told apart from them.
+pub(crate) fn notices(from: Option<&TurnFrom>, since: Option<&str>, prompt: &str) -> String {
+    let origin = from.and_then(|from| match from {
+        TurnFrom::Remote => Some(devpit_agentcli::person::FROM_THE_REMOTE.to_owned()),
+        TurnFrom::Channel { id } => devpit_agentcli::person::from_channel(id),
+    });
+    origin
+        .as_deref()
         .into_iter()
         .chain(since)
         .chain([prompt])
