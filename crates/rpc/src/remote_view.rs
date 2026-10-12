@@ -11,7 +11,9 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::{Board, Conversation, Conversations};
+use crate::{
+    Attachment, Board, Conversation, Conversations, Frame, LiveSession, Message, Transcript,
+};
 
 /// What a viewer asks.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
@@ -97,6 +99,46 @@ pub enum RemoteIn {
     },
     /// Opens devpit's own MCP again. Only a device allowed to type.
     AgentRestart,
+    /// The orchestrators and the sessions of their accounts, to talk to.
+    Talks,
+    /// The person's message in a project's conversation: a turn of theirs,
+    /// marked as sent from the Remote. Only a device allowed to type.
+    ChatSay {
+        project: String,
+        conversation: String,
+        text: String,
+    },
+    /// What a session said, read from its own transcript.
+    Session {
+        profile: String,
+        name: String,
+    },
+    /// Typed into a session's terminal as the person. Only a device allowed
+    /// to type.
+    SessionSay {
+        profile: String,
+        name: String,
+        text: String,
+    },
+    /// A piece of a photo or a recording, in base64. A file goes in pieces
+    /// under the ceiling a message has, and is held here until finished.
+    UploadPart {
+        upload: String,
+        b64: String,
+    },
+    /// The pieces sent under `upload`, a photo of the type `mime`: kept in
+    /// the project as an attachment. Only a device allowed to type.
+    Photo {
+        upload: String,
+        project: String,
+        mime: String,
+    },
+    /// The pieces sent under `upload`, a recording: made into words for the
+    /// composer, then thrown away. Only a device allowed to type.
+    Voice {
+        upload: String,
+        mime: String,
+    },
     /// A secret put in the project's `.env` by the window's own write. Only a
     /// device allowed to type; the value is never said back or logged.
     SecretSet {
@@ -164,11 +206,65 @@ pub enum RemoteOut {
         project: String,
         name: String,
     },
+    Talks {
+        talks: RemoteTalks,
+    },
+    /// A moment of a turn in a conversation this device follows.
+    ChatFrame {
+        project: String,
+        conversation: String,
+        frame: Frame,
+    },
+    Session {
+        profile: String,
+        name: String,
+        messages: Vec<Message>,
+    },
+    /// A photo kept, as a message names it.
+    Attached {
+        upload: String,
+        attachment: Attachment,
+    },
+    /// A recording heard: its words, for the person to read before sending.
+    Heard {
+        upload: String,
+        transcript: Transcript,
+    },
     /// One request could not be done; the connection stays.
     Failed {
         why: String,
     },
     Pong,
+}
+
+/// Who there is to talk to from the Remote.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTalks {
+    pub orchestrators: Vec<RemoteOrchestrator>,
+    /// The sessions of the orchestrators' accounts, each account once.
+    pub sessions: Vec<RemoteSession>,
+    /// This machine makes a recording into words, as Settings set it up.
+    pub voice: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteOrchestrator {
+    pub project: String,
+    pub name: String,
+    /// The account it speaks as.
+    pub profile: String,
+    /// Its latest conversation, or a new one's id when it has had none.
+    pub conversation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteSession {
+    /// The account it runs as.
+    pub profile: String,
+    pub session: LiveSession,
 }
 
 /// A reply an orchestrator drafted, waiting on the person.

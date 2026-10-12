@@ -237,6 +237,27 @@ impl Relay {
         Some(heard)
     }
 
+    /// Whether a turn runs, or waits to, in this conversation.
+    pub(crate) fn running(&self, conversation: &str) -> bool {
+        self.0
+            .lock()
+            .is_ok_and(|all| all.by_conversation.contains_key(conversation))
+    }
+
+    /// Every turn running in this conversation, joined one after the other
+    /// until the last ends or the joiner leaves; whether one was running.
+    pub(crate) async fn rejoin(&self, conversation: &str, channel: Channel<Frame>) -> bool {
+        let mut any = false;
+        while let Some(ended) = self.join(conversation, channel.clone()) {
+            any = true;
+            // Dropped unsent: the joiner left, and hears nothing more.
+            if ended.await.is_err() {
+                break;
+            }
+        }
+        any
+    }
+
     /// Lets go of a joiner whose chat has gone: every remount joined again,
     /// and the ones before went on being sent every frame.
     fn leave(&self, conversation: &str, channel: u32) {
@@ -263,15 +284,7 @@ pub async fn chat_rejoin(
     conversation_id: String,
     on_frame: Channel<Frame>,
 ) -> Result<bool, RpcError> {
-    let mut any = false;
-    while let Some(ended) = relay.join(&conversation_id, on_frame.clone()) {
-        any = true;
-        // Dropped unsent: the chat left, and hears nothing more.
-        if ended.await.is_err() {
-            break;
-        }
-    }
-    Ok(any)
+    Ok(relay.rejoin(&conversation_id, on_frame).await)
 }
 
 /// `chat.leave` — stops sending a chat that has gone what it joined.

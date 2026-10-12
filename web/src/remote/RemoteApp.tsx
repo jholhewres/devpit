@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { AgentHealth, Board, Conversation, Conversations, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion } from '../gen/bindings'
+import type { AgentHealth, Board, Conversations, LivePane, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion, RemoteTalks } from '../gen/bindings'
 import { launcherLink } from '../shell/remoteLauncher'
 import { connectRelay, CLOSED, deviceKey, forgetMachine, keepMachine, machinesKept, offerOpened, type RelayMachine, type RelayPairing } from './relay'
 import { RelayNothing, RelayPair } from './RelayPair'
@@ -53,11 +53,13 @@ export function RemoteApp(): React.JSX.Element {
   const [drafts, setDrafts] = useState<readonly RemoteDraft[]>([])
   const [health, setHealth] = useState<AgentHealth | null>(null)
   const [chats, setChats] = useState<Conversations | null>(null)
-  const [chat, setChat] = useState<Conversation | null>(null)
+  const [talks, setTalks] = useState<RemoteTalks | null>(null)
   const [started, setStarted] = useState<string | null>(null)
   const [kept, setKept] = useState<string | null>(null)
   const link = useRef<Link | null>(null)
   const bytes = useRef<(pane: string, b64: string) => void>(() => {})
+  /* The chat open now hears what is said about it here. */
+  const talk = useRef<(heard: RemoteOut) => void>(() => {})
   const projectRef = useRef(projectId)
   projectRef.current = projectId
 
@@ -107,8 +109,15 @@ export function RemoteApp(): React.JSX.Element {
         case 'chats':
           if (message.project === projectRef.current) setChats(message.conversations)
           return
+        case 'talks':
+          setTalks(message.talks)
+          return
         case 'chat':
-          setChat(message.conversation)
+        case 'chatFrame':
+        case 'session':
+        case 'heard':
+        case 'attached':
+          talk.current(message)
           return
         case 'started':
           setStarted(message.name)
@@ -119,6 +128,7 @@ export function RemoteApp(): React.JSX.Element {
           window.setTimeout(() => setKept(null), 6000)
           return
         case 'failed':
+          talk.current(message)
           setFailed(message.why)
           window.setTimeout(() => setFailed(null), 6000)
           return
@@ -179,6 +189,14 @@ export function RemoteApp(): React.JSX.Element {
 
   const project = projects.find((one) => one.id === projectId) ?? null
   const launcher = relay ? null : launcherLink(window.location.origin, welcome?.host)
+  /* A session's own terminal, from its chat. */
+  const terminal = (at: LivePane): void => {
+    setProjectId(at.projectId)
+    setBoard(null)
+    setChats(null)
+    setPane(at.paneId)
+    setView('terminals')
+  }
   return (
     <main className="rm">
       <header className="rm__head">
@@ -189,7 +207,7 @@ export function RemoteApp(): React.JSX.Element {
             Add to devpit.app
           </a>
         )}
-        <select className="rm__pick" aria-label="Project" value={projectId ?? ''} onChange={(event) => (setProjectId(event.target.value), setPane(null), setBoard(null), setChats(null), setChat(null))}>
+        <select className="rm__pick" aria-label="Project" value={projectId ?? ''} onChange={(event) => (setProjectId(event.target.value), setPane(null), setBoard(null), setChats(null))}>
           {projects.map((one) => (
             <option key={one.id} value={one.id}>
               {one.name}
@@ -229,7 +247,7 @@ export function RemoteApp(): React.JSX.Element {
         )}
         {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} waiting={questions.length + drafts.length} onWaiting={() => setView('waiting')} send={send} />}
         {view === 'waiting' && <RemoteWaiting questions={questions} drafts={drafts} health={health} answering={welcome?.answering ?? false} typing={welcome?.typing ?? false} send={send} />}
-        {view === 'chats' && projectId && <RemoteChats project={projectId} chats={chats} chat={chat} onClose={() => setChat(null)} send={send} />}
+        {view === 'chats' && <RemoteChats project={projectId} chats={chats} talks={talks} drafts={drafts} typing={welcome?.typing ?? false} send={send} hears={talk} onTerminal={terminal} />}
         {view === 'secrets' && <RemoteSecret key={projectId} projects={projects} project={projectId} typing={welcome?.typing ?? false} send={send} />}
       </section>
     </main>

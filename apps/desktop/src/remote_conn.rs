@@ -21,6 +21,7 @@ use tungstenite::{Message, WebSocket};
 
 use crate::remote_devices::{Device, Devices};
 use crate::remote_panes::Watching;
+use crate::remote_talk::Talk;
 
 /// How long a viewer has to say who it is.
 pub(crate) const HELLO_WITHIN: Duration = Duration::from_secs(10);
@@ -103,6 +104,7 @@ pub(crate) fn serve(
     let (id, out, heard) = crate::remote_hub::join(&app, &device.id);
     crate::remote::note(&root, &device, "connected");
     let mut watching = Watching::new(id);
+    let mut talk = crate::remote_talk::Talk::default();
     let mut last = Instant::now();
     send(
         &mut wire,
@@ -125,8 +127,9 @@ pub(crate) fn serve(
                 }
                 match serde_json::from_str::<RemoteIn>(&text) {
                     Ok(asked) => {
-                        if let Some(said) = answer(&app, &root, &device, &mut watching, &out, asked)
-                        {
+                        let said =
+                            answer(&app, &root, &device, &mut watching, &mut talk, &out, asked);
+                        if let Some(said) = said {
                             send(&mut wire, &said);
                         }
                     }
@@ -242,6 +245,7 @@ fn answer(
     root: &std::path::Path,
     device: &Device,
     watching: &mut Watching,
+    talk: &mut Talk,
     out: &std::sync::mpsc::Sender<RemoteOut>,
     asked: RemoteIn,
 ) -> Option<RemoteOut> {
@@ -362,15 +366,105 @@ fn answer(
         RemoteIn::Chat {
             project,
             conversation,
-        } => Some(
-            match crate::chat::chat_history_now(project.clone(), conversation) {
-                Ok(conversation) => RemoteOut::Chat {
+        } => {
+            if !crate::remote_talk::plain(&conversation) {
+                return failed("that is not a conversation");
+            }
+            let read = crate::chat::chat_history_now(project.clone(), conversation.clone());
+            // A turn running in it reaches this device from where it is.
+            talk.follow(app, out, &project, &conversation);
+            Some(match read {
+                Ok(read) => RemoteOut::Chat {
                     project,
-                    conversation: Box::new(conversation),
+                    conversation: Box::new(crate::remote_talk::for_phone(read)),
                 },
                 Err(err) => RemoteOut::Failed { why: err.message },
-            },
-        ),
+            })
+        }
+        RemoteIn::Talks => Some(match crate::remote_talk::talks() {
+            Ok(talks) => RemoteOut::Talks { talks },
+            Err(why) => RemoteOut::Failed { why },
+        }),
+        RemoteIn::ChatSay {
+            project,
+            conversation,
+            text,
+        } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            crate::remote::note(
+                root,
+                device,
+                &format!("sent a message to a chat in {project}"),
+            );
+            crate::remote_talk::say(app, out, talk, &project, &conversation, &text)
+                .err()
+                .and_then(failed)
+        }
+        RemoteIn::Session { profile, name } => Some(crate::remote_talk::session(&profile, &name)),
+        RemoteIn::SessionSay {
+            profile,
+            name,
+            text,
+        } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            if let Err(err) =
+                crate::live_sessions::reply_now(&profile, &name, &text, Some("the Remote"))
+            {
+                return failed(err.message);
+            }
+            crate::remote::note(root, device, &format!("sent a message to {name}"));
+            None
+        }
+        RemoteIn::UploadPart { upload, b64 } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            talk.uploads.add(&upload, &b64).err().and_then(failed)
+        }
+        RemoteIn::Photo {
+            upload,
+            project,
+            mime,
+        } => {
+            let bytes = talk.uploads.take(&upload);
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            let Some(bytes) = bytes else {
+                return failed("that photo did not arrive — send it again");
+            };
+            let kept = crate::projects::store()
+                .map_err(|err| err.message)
+                .and_then(|store| crate::remote_talk::photo(&store, root, &project, &mime, &bytes));
+            Some(match kept {
+                Ok(attachment) => {
+                    crate::remote::note(root, device, &format!("sent a photo to {project}"));
+                    RemoteOut::Attached { upload, attachment }
+                }
+                Err(why) => RemoteOut::Failed { why },
+            })
+        }
+        RemoteIn::Voice { upload, mime } => {
+            let bytes = talk.uploads.take(&upload);
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            let Some(bytes) = bytes else {
+                return failed("that recording did not arrive — record it again");
+            };
+            match crate::remote_talk::voice_kind(&mime, bytes.len()) {
+                Ok(ext) => {
+                    crate::remote::note(root, device, "sent a recording to be heard");
+                    crate::remote_talk::hear(out, root, upload, ext, bytes);
+                    None
+                }
+                Err(why) => failed(why),
+            }
+        }
         RemoteIn::Drafts => Some(drafts_now()),
         RemoteIn::DraftSend { profile, name } => {
             if !device.typing {

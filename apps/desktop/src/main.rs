@@ -173,6 +173,7 @@ mod remote_relay;
 mod remote_secret;
 mod remote_start;
 mod remote_tailscale;
+mod remote_talk;
 mod reply_drafts;
 mod restoring;
 mod reveal;

@@ -1,4 +1,43 @@
-use super::{multipart, recording, spoken};
+use devpit_rpc::Transcribing;
+
+use super::{multipart, ready, recording, spoken};
+
+fn settings(engine: &str, local: Option<&str>, model: &str, key_set: bool) -> Transcribing {
+    Transcribing {
+        engine: engine.to_owned(),
+        model: model.to_owned(),
+        language: String::new(),
+        url: String::new(),
+        key_set,
+        local: local.map(str::to_owned),
+    }
+}
+
+#[test]
+fn a_recording_is_heard_here_only_when_an_engine_is_set_up() {
+    let model_on_disk = |model: &str| model == "/models/ggml-base.bin";
+    // whisper.cpp reads a model file; the Python whisper fetches its own.
+    assert!(ready(
+        &settings("local", Some("whisper-cli"), "/models/ggml-base.bin", false),
+        model_on_disk
+    ));
+    assert!(!ready(
+        &settings("local", Some("whisper-cli"), "", false),
+        model_on_disk
+    ));
+    assert!(ready(
+        &settings("local", Some("whisper"), "", false),
+        model_on_disk
+    ));
+    assert!(!ready(&settings("local", None, "", false), model_on_disk));
+    // A service needs its key; off is off.
+    assert!(ready(&settings("api", None, "", true), model_on_disk));
+    assert!(!ready(&settings("api", None, "", false), model_on_disk));
+    assert!(!ready(
+        &settings("off", Some("whisper"), "", true),
+        model_on_disk
+    ));
+}
 
 #[test]
 fn only_a_recording_the_composer_kept_is_transcribed() {

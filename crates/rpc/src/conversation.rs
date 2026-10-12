@@ -71,6 +71,9 @@ pub struct Ask {
     pub permission: Option<String>,
     /// How hard to think. Absent keeps what the conversation already had.
     pub effort: Option<String>,
+    /// Sent by the person from the Remote, which the agent is told.
+    #[serde(default)]
+    pub from_remote: bool,
 }
 
 /// A file the person put in front of the agent.

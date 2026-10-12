@@ -208,6 +208,15 @@ is `docs/remote-relay.md`.
   `.env` through the window's own write. The pairing is read again first, a
   device keeps at most five a minute, and the value is never said back,
   logged or sent on.
+- **Talking.** The orchestrators, their accounts' sessions and a project's
+  chats open as a chat on the phone. A message to a chat is the person's
+  turn through the composer's own `chat.send`, marked for the agent as sent
+  from the Remote, and streams to the phone the way a chat reopened
+  mid-turn joins it; a message to a session is typed into its terminal as
+  the person.
+  A photo or a recording goes in pieces under the message ceiling, at most
+  8 MB and 3 MB: the photo is kept with the project's pasted pictures, the
+  recording is heard by the engine Settings set up and then deleted.
 
 The protocol is `RemoteIn`/`RemoteOut` in `devpit-rpc`, one JSON message per
 WebSocket frame on the tailnet and sealed in Noise frames through the relay;

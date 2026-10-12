@@ -25,7 +25,7 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-text-size-adjust: 100%; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 /* The app's cursor rule, for the page that does not load the app's sheet. */
 :where(button, a[href], select, summary) { cursor: pointer; }
 :where(input:not([type='checkbox'], [type='radio']), textarea) { cursor: text; }
@@ -70,8 +70,6 @@ button, input, select { font: inherit; color: inherit; }
 .rm__ask { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid color-mix(in srgb, #e3a008 50%, var(--border)); border-radius: 12px; background: var(--surface); }
 .rm__what { padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--text) 6%, var(--surface)); font-size: 13px; overflow-wrap: anywhere; }
 .rm__acts { display: flex; justify-content: flex-end; gap: 8px; }
-.rm__chat { display: flex; flex-direction: column; gap: 10px; padding: 8px 12px 16px; }
-.rm__chat > .rm__btn { align-self: flex-start; }
 .rm__msg { padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); overflow-wrap: anywhere; }
 .rm__msg[data-role='user'] { align-self: flex-end; max-width: 85%; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 .rm__msg p { margin: 0 0 6px; white-space: pre-wrap; }
@@ -86,6 +84,25 @@ button, input, select { font: inherit; color: inherit; }
 /* Keeping a secret from the phone. */
 .rm__vault { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; }
 .rm__vault .rm__dim { margin: 0; }
+
+/* Talking to an orchestrator or a session: the thread scrolls, the composer
+   stays under the thumb. 16px in the field keeps iOS from zooming into it. */
+.rm__talk { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.rm__talkh { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.rm__talkh .rm__host { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm__thread { flex: 1; min-height: 160px; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 12px 12px; }
+.rm__thread > .rm__dim { margin: 0; font-size: 13px; }
+.rm__did { margin: 0 0 6px; font-size: 13px; }
+.rm__did summary { color: var(--text-3); }
+.rm__going { color: var(--text-3); font-size: 13px; }
+.rm__talk > .rm__ask { margin: 0 12px 8px; }
+.rm__compose { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 12px; border-top: 1px solid var(--border); }
+.rm__compose .rm__dim { margin: 0; }
+.rm__write { width: 100%; min-height: 64px; max-height: 40vh; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: 16px; resize: vertical; }
+.rm__files { display: flex; flex-wrap: wrap; gap: 6px; }
+.rm__file { min-height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); font-size: 13px; }
+.rm__mic[data-on] { border-color: var(--bad); color: var(--bad); }
+.rm__send { margin-left: auto; }
 
 /* Making a card or starting a session from the board. */
 .rm__new { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 10px; }

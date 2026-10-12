@@ -71,6 +71,27 @@ fn read_settings(store: &Store) -> Result<Transcribing, RpcError> {
     })
 }
 
+/// Whether a recording would be heard here: a whisper with the model file it
+/// needs, or a service with its key. The Remote offers its mic on this.
+pub(crate) fn ready(settings: &Transcribing, is_file: impl Fn(&str) -> bool) -> bool {
+    match settings.engine.as_str() {
+        "api" => settings.key_set,
+        "local" => settings.local.as_deref().is_some_and(|name| {
+            let needs_file = LOCAL.iter().any(|(one, file)| *one == name && *file);
+            !needs_file || is_file(&settings.model)
+        }),
+        _ => false,
+    }
+}
+
+/// [`ready`], for this machine as Settings left it.
+pub(crate) fn voice_ready() -> bool {
+    let Ok(store) = Store::open_default() else {
+        return false;
+    };
+    read_settings(&store).is_ok_and(|settings| ready(&settings, |model| Path::new(model).is_file()))
+}
+
 /// `transcribe.read` — how voice messages become words here.
 #[tauri::command]
 #[specta::specta]
@@ -190,7 +211,7 @@ pub async fn chat_transcribe(
 }
 
 /// What the engine chosen in Settings hears in `audio`, as a transcript.
-async fn heard_in(
+pub(crate) async fn heard_in(
     audio: &std::path::Path,
     language: Option<String>,
 ) -> Result<Transcript, RpcError> {

@@ -10,7 +10,7 @@ use devpit_rpc::{Attachment, ErrorCode, RpcError};
 
 /// The most a pasted picture may be. Checked on the encoded length before it
 /// is decoded, so an oversized paste is refused without ever being held whole.
-const MOST_BYTES: usize = 8 * 1024 * 1024;
+pub(crate) const MOST_BYTES: usize = 8 * 1024 * 1024;
 
 /// The extension a pasted type is saved under, or nothing for a type this
 /// does not take — pictures, and the voice messages the composer records.
@@ -75,7 +75,18 @@ pub(crate) fn chat_paste_now(
     })?;
     let bytes = decoded(&data)?;
     let dir = crate::projects::project_home(&project_id)?.pasted();
-    std::fs::create_dir_all(&dir).map_err(|err| RpcError::internal(err.to_string()))?;
+    kept_in(&dir, &media_type, ext, &bytes)
+}
+
+/// Writes a paste into `dir` under a name devpit makes, never one it was
+/// given, so nothing written lands outside it.
+pub(crate) fn kept_in(
+    dir: &std::path::Path,
+    media_type: &str,
+    ext: &str,
+    bytes: &[u8],
+) -> Result<Attachment, RpcError> {
+    std::fs::create_dir_all(dir).map_err(|err| RpcError::internal(err.to_string()))?;
     // A recording is named as one, which is what transcribing it asks for.
     let what = if media_type.starts_with("audio/") {
         "voice"

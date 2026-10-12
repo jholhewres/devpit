@@ -13,19 +13,26 @@
 //! - a compaction's summary: `isCompactSummary`;
 //! - a tool's result: a `tool_result` block, the turn going on.
 //!
-//! Only the first two are the person, and devpit's own notice at the top of a
-//! composer turn — `[devpit, not the person] …` — is cut off before reading.
+//! Only the first two are the person, and devpit's own notices at the top of a
+//! composer turn — `[devpit, not the person] …` — are cut off before reading.
+//! One of them says the person wrote it on devpit's Remote, from a phone.
 
 use serde_json::Value;
 
 /// The line devpit puts above a turn the person started, saying what changed.
 const DEVPIT_NOTICE: &str = "[devpit, not the person]";
 
+/// devpit's notice above a turn the person sent from devpit's Remote.
+pub const FROM_THE_REMOTE: &str =
+    "[devpit, not the person] The person sent this from devpit's Remote, on another device.";
+
 /// Where the person said it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum From {
     Composer,
     RemoteControl,
+    /// devpit's own Remote, whose turns go through the composer's door.
+    Remote,
 }
 
 impl From {
@@ -33,6 +40,7 @@ impl From {
         match self {
             From::Composer => "the chat",
             From::RemoteControl => "Remote Control",
+            From::Remote => "the Remote",
         }
     }
 }
@@ -81,23 +89,28 @@ fn person_said(entry: &Value) -> Option<Said> {
         }
         _ => return None,
     };
-    let text = without_notice(&text).trim().to_owned();
+    let (text, remote) = without_notices(&text);
     Some(Said {
         id: entry["uuid"].as_str()?.to_owned(),
-        text,
-        from,
+        text: text.trim().to_owned(),
+        from: if remote && from == From::Composer {
+            From::Remote
+        } else {
+            from
+        },
     })
 }
 
-/// `text` without devpit's notice above it.
-fn without_notice(text: &str) -> &str {
-    if !text.trim_start().starts_with(DEVPIT_NOTICE) {
-        return text;
+/// `text` without devpit's notices above it, and whether one said it came
+/// from the Remote.
+fn without_notices(mut text: &str) -> (&str, bool) {
+    let mut remote = false;
+    while text.trim_start().starts_with(DEVPIT_NOTICE) {
+        let (notice, rest) = text.trim_start().split_once("\n\n").unwrap_or((text, ""));
+        remote |= notice.trim() == FROM_THE_REMOTE;
+        text = rest;
     }
-    text.trim_start()
-        .split_once("\n\n")
-        .map(|(_, rest)| rest)
-        .unwrap_or("")
+    (text, remote)
 }
 
 /// Words that, said alone, send the one draft waiting.

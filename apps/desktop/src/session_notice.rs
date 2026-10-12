@@ -75,20 +75,39 @@ pub(crate) fn notice(before: Option<&Seen>, now: &[LiveSession]) -> Option<Strin
     })
 }
 
-/// `prompt`, with what changed since the last turn above it when the chat is
-/// an orchestrator's; the prompt as it is otherwise.
-pub(crate) fn with_notice(project_id: &str, profile_id: &str, prompt: &str, now_ms: f64) -> String {
-    let Some(here) = crate::projects::project_list_now().ok().and_then(|listed| {
-        listed
-            .projects
-            .into_iter()
-            .find(|one| one.id == project_id && one.orchestrator.is_some())
-    }) else {
-        return prompt.to_owned();
-    };
-    let Ok(live) = crate::live_sessions::orchestrator_sessions_now(profile_id) else {
-        return prompt.to_owned();
-    };
+/// A turn's project, its account, and whether the person sent it from the
+/// Remote.
+pub(crate) type Noticed = (String, String, bool);
+
+/// `prompt`, with devpit's notices above it: that the person sent it from the
+/// Remote, and in an orchestrator's chat what changed since the last turn.
+pub(crate) fn with_notice(noticed: &Noticed, prompt: &str, now_ms: f64) -> String {
+    let (project_id, profile_id, from_remote) = noticed;
+    let since = since(project_id, profile_id, now_ms);
+    notices(*from_remote, since.as_deref(), prompt)
+}
+
+/// `prompt` under its notices, the Remote's first: each its own paragraph,
+/// which is how the person's words are told apart from them.
+pub(crate) fn notices(from_remote: bool, since: Option<&str>, prompt: &str) -> String {
+    let remote = from_remote.then_some(devpit_agentcli::person::FROM_THE_REMOTE);
+    remote
+        .into_iter()
+        .chain(since)
+        .chain([prompt])
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// What changed since the orchestrator's last turn, when the chat is an
+/// orchestrator's and something did.
+fn since(project_id: &str, profile_id: &str, now_ms: f64) -> Option<String> {
+    let here = crate::projects::project_list_now()
+        .ok()?
+        .projects
+        .into_iter()
+        .find(|one| one.id == project_id && one.orchestrator.is_some())?;
+    let live = crate::live_sessions::orchestrator_sessions_now(profile_id).ok()?;
     let sessions = crate::orchestrator_links::within(
         &here.id,
         &crate::orchestrator_links::linked(Path::new(&here.root_path)),
@@ -96,15 +115,10 @@ pub(crate) fn with_notice(project_id: &str, profile_id: &str, prompt: &str, now_
     );
     // The person speaks: the round the orchestrator reads after a compaction.
     crate::round_state::keep(Path::new(&here.root_path), &here.id, profile_id, &sessions);
-    let Ok(mut held) = seen().lock() else {
-        return prompt.to_owned();
-    };
+    let mut held = seen().lock().ok()?;
     let said = notice(held.get(project_id), &sessions);
     held.insert(project_id.to_owned(), Seen::of(&sessions, now_ms));
-    match said {
-        Some(said) => format!("{said}\n\n{prompt}"),
-        None => prompt.to_owned(),
-    }
+    said
 }
 
 #[cfg(test)]

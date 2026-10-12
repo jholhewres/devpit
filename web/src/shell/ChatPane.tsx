@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Asked } from './Asked'
 import { Chips } from './Chips'
-import { ASKS, money, ready, unanswered } from './chat'
+import { ASKS, money, ready, unanswered, withHeard } from './chat'
 import { targetOf } from './stop'
 import { titleOf, type Tab } from './strip'
 import { ChatCardChip } from './ChatCardChip'
@@ -185,7 +185,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
               {/* A control takes focus and gives it back: the cursor was mid-sentence. Cancelling
                   the press instead would be cheaper and swallow the click that opens the menu. */}
               <Chips chat={chat} refocus={() => field.current?.focus()} />
-              <ComposerTools chat={chat} onHeard={(text) => (setPrompt((was) => (was.trim() ? `${was.trimEnd()} ${text}` : text)), field.current?.focus())} />
+              <ComposerTools chat={chat} onHeard={(text) => (setPrompt((was) => withHeard(was, text)), field.current?.focus())} />
               <SendButton sending={chat.sending} showEsc={showEsc} can={ready(prompt, chat.sending, chat.profileId)} onSend={send} onStop={halt} />
             </div>
           </div>

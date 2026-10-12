@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use super::{authorises, last_said, From};
+use super::{authorises, last_said, From, FROM_THE_REMOTE};
 
 /// A log, one entry per line, in the shapes Claude Code 2.1.294 writes.
 fn log(entries: &[serde_json::Value]) -> String {
@@ -95,6 +95,21 @@ fn devpits_notice_above_the_persons_words_is_cut_off() {
     )]))
     .expect("said");
     assert_eq!(alone.text, "");
+}
+
+#[test]
+fn a_message_sent_from_the_remote_is_the_person_and_says_so() {
+    let from_the_phone = format!(
+        "{FROM_THE_REMOTE}\n\n[devpit, not the person] Since your last message: api ended.\n\nenvie"
+    );
+    let said = last_said(&log(&[composer("u1", &from_the_phone)])).expect("said");
+    assert_eq!(said.text, "envie");
+    assert_eq!(said.from, From::Remote);
+    assert_eq!(said.from.label(), "the Remote");
+    assert!(authorises(&said.text, "noiseless-mvp", 1));
+    // Only devpit's own notice marks it: the words alone are the composer's.
+    let typed = last_said(&log(&[composer("u2", "envie")])).expect("said");
+    assert_eq!(typed.from, From::Composer);
 }
 
 #[test]

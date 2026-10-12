@@ -258,6 +258,8 @@ export const commands = {
 	permission: string | null,
 	/**  How hard to think. Absent keeps what the conversation already had. */
 	effort: string | null,
+	/**  Sent by the person from the Remote, which the agent is told. */
+	fromRemote?: boolean,
 } | null) => typedError<Frame[], RpcError>(__TAURI_INVOKE("chat_frames", { ask })),
 	/**
 	 *  `orchestrator.create` — a new orchestrator speaking as this profile.
@@ -1928,6 +1930,8 @@ export type Ask = {
 	permission: string | null,
 	/**  How hard to think. Absent keeps what the conversation already had. */
 	effort: string | null,
+	/**  Sent by the person from the Remote, which the agent is told. */
+	fromRemote?: boolean,
 };
 
 /**
@@ -4051,11 +4055,49 @@ export type RemoteIn =
 { t: "sessionStart"; project: string; card: string | null; prompt: string; anyway: boolean } | 
 /**  Opens devpit's own MCP again. Only a device allowed to type. */
 { t: "agentRestart" } | 
+/**  The orchestrators and the sessions of their accounts, to talk to. */
+{ t: "talks" } | 
+/**
+ *  The person's message in a project's conversation: a turn of theirs,
+ *  marked as sent from the Remote. Only a device allowed to type.
+ */
+{ t: "chatSay"; project: string; conversation: string; text: string } | 
+/**  What a session said, read from its own transcript. */
+{ t: "session"; profile: string; name: string } | 
+/**
+ *  Typed into a session's terminal as the person. Only a device allowed
+ *  to type.
+ */
+{ t: "sessionSay"; profile: string; name: string; text: string } | 
+/**
+ *  A piece of a photo or a recording, in base64. A file goes in pieces
+ *  under the ceiling a message has, and is held here until finished.
+ */
+{ t: "uploadPart"; upload: string; b64: string } | 
+/**
+ *  The pieces sent under `upload`, a photo of the type `mime`: kept in
+ *  the project as an attachment. Only a device allowed to type.
+ */
+{ t: "photo"; upload: string; project: string; mime: string } | 
+/**
+ *  The pieces sent under `upload`, a recording: made into words for the
+ *  composer, then thrown away. Only a device allowed to type.
+ */
+{ t: "voice"; upload: string; mime: string } | 
 /**
  *  A secret put in the project's `.env` by the window's own write. Only a
  *  device allowed to type; the value is never said back or logged.
  */
 { t: "secretSet"; project: string; name: string; value: string } | { t: "ping" };
+
+export type RemoteOrchestrator = {
+	project: string,
+	name: string,
+	/**  The account it speaks as. */
+	profile: string,
+	/**  Its latest conversation, or a new one's id when it has had none. */
+	conversation: string,
+};
 
 /**  What the host says. */
 export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean } | 
@@ -4064,7 +4106,13 @@ export type RemoteOut = { t: "welcome"; device: string; host: string; typing: bo
 /**  A session started from here, by the name to find it under. */
 { t: "started"; name: string } | 
 /**  A secret was kept, said by its name alone. */
-{ t: "secretKept"; project: string; name: string } | 
+{ t: "secretKept"; project: string; name: string } | { t: "talks"; talks: RemoteTalks } | 
+/**  A moment of a turn in a conversation this device follows. */
+{ t: "chatFrame"; project: string; conversation: string; frame: Frame } | { t: "session"; profile: string; name: string; messages: Message[] } | 
+/**  A photo kept, as a message names it. */
+{ t: "attached"; upload: string; attachment: Attachment } | 
+/**  A recording heard: its words, for the person to read before sending. */
+{ t: "heard"; upload: string; transcript: Transcript } | 
 /**  One request could not be done; the connection stays. */
 { t: "failed"; why: string } | { t: "pong" };
 
@@ -4103,6 +4151,12 @@ export type RemoteRelay = {
 	problem: string | null,
 };
 
+export type RemoteSession = {
+	/**  The account it runs as. */
+	profile: string,
+	session: LiveSession,
+};
+
 /**  Every message shape, for the generated contract the viewer is typed by. */
 export type RemoteShapes = {
 	incoming: RemoteIn[],
@@ -4117,6 +4171,15 @@ export type RemoteState = {
 	 *  but not connected yet — its process starts with the next message.
 	 */
 	url: string | null,
+};
+
+/**  Who there is to talk to from the Remote. */
+export type RemoteTalks = {
+	orchestrators: RemoteOrchestrator[],
+	/**  The sessions of the orchestrators' accounts, each account once. */
+	sessions: RemoteSession[],
+	/**  This machine makes a recording into words, as Settings set it up. */
+	voice: boolean,
 };
 
 export type RemoteTerminal = {

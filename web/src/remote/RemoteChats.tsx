@@ -1,50 +1,102 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
-import type { Conversation, Conversations, RemoteIn } from '../gen/bindings'
+import type { Conversations, LivePane, LiveSession, RemoteDraft, RemoteIn, RemoteOut, RemoteTalks } from '../gen/bindings'
+import { RemoteTalk } from './RemoteTalk'
+import type { Talking } from './talk'
 
-/* The project's chats, read: each one's words, latest last. */
+/*
+ * Who there is to talk to: the orchestrators, the sessions of their accounts,
+ * and this project's chats. Each opens as a chat; a session's terminal is a
+ * tap away from it.
+ */
+
+const standing = (session: LiveSession): string =>
+  session.waiting ? 'waiting on you' : session.draft ? 'a draft waits' : session.status === 'busy' ? 'working' : 'idle'
 
 export function RemoteChats({
   project,
   chats,
-  chat,
-  onClose,
+  talks,
+  drafts,
+  typing,
   send,
+  hears,
+  onTerminal,
 }: {
-  project: string
+  project: string | null
   chats: Conversations | null
-  chat: Conversation | null
-  onClose: () => void
+  talks: RemoteTalks | null
+  drafts: readonly RemoteDraft[]
+  typing: boolean
   send: (message: RemoteIn) => void
+  hears: React.MutableRefObject<(heard: RemoteOut) => void>
+  onTerminal: (pane: LivePane) => void
 }): React.JSX.Element {
-  useEffect(() => {
-    if (!chat) return
-    const again = window.setInterval(() => send({ t: 'chat', project, conversation: chat.id }), 8000)
-    return () => window.clearInterval(again)
-  }, [chat, project, send])
+  const [talking, setTalking] = useState<Talking | null>(null)
 
-  if (chat)
+  useEffect(() => {
+    if (talking) return
+    send({ t: 'talks' })
+    const again = window.setInterval(() => send({ t: 'talks' }), 15_000)
+    return () => window.clearInterval(again)
+  }, [talking, send])
+
+  if (talking)
     return (
-      <div className="rm__chat">
-        <button className="rm__btn" onClick={onClose}>
-          ← Chats
-        </button>
-        {chat.messages.map((message) => (
-          <div className="rm__msg" key={message.id} data-role={message.role}>
-            {message.parts.map((part, at) => (part.kind === 'text' ? <p key={at}>{part.text}</p> : null))}
-          </div>
-        ))}
-      </div>
+      <RemoteTalk
+        talking={talking}
+        typing={typing}
+        voice={talks?.voice ?? false}
+        drafts={drafts}
+        send={send}
+        hears={hears}
+        onBack={() => setTalking(null)}
+        onTerminal={onTerminal}
+      />
     )
-  if (!chats) return <p className="rm__said">Reading the chats…</p>
-  if (chats.conversations.length === 0) return <p className="rm__said">No chats in this project.</p>
+
   return (
     <div className="rm__list">
-      {chats.conversations.map((one) => (
-        <button key={one.id} className="rm__row" onClick={() => send({ t: 'chat', project, conversation: one.id })}>
-          <span>{one.title || 'Untitled'}</span>
+      {!talks && <p className="rm__said">Reading who there is to talk to…</p>}
+      {talks?.orchestrators.map((one) => (
+        <button
+          key={one.project}
+          className="rm__row"
+          onClick={() => setTalking({ kind: 'chat', project: one.project, conversation: one.conversation, title: one.name, orchestrator: one.profile })}
+        >
+          <span>{one.name}</span>
+          <span className="rm__dim">orchestrator</span>
         </button>
       ))}
+      {talks?.sessions.map(({ profile, session }) => (
+        <button
+          key={`${profile}/${session.name}/${session.pid}`}
+          className="rm__row"
+          onClick={() =>
+            setTalking({ kind: 'session', profile, name: session.name, title: session.name, project: session.projectId, pane: session.pane })
+          }
+        >
+          <span>{session.name}</span>
+          <span className="rm__dim">
+            {session.projectName ? `${session.projectName} · ` : ''}
+            {standing(session)}
+          </span>
+        </button>
+      ))}
+      {project &&
+        chats?.conversations.map((one) => (
+          <button
+            key={one.id}
+            className="rm__row"
+            onClick={() => setTalking({ kind: 'chat', project, conversation: one.id, title: one.title || 'Untitled', orchestrator: null })}
+          >
+            <span>{one.title || 'Untitled'}</span>
+            <span className="rm__dim">chat</span>
+          </button>
+        ))}
+      {talks && talks.orchestrators.length === 0 && talks.sessions.length === 0 && !chats?.conversations.length && (
+        <p className="rm__said">No orchestrator, session or chat to talk to yet.</p>
+      )}
     </div>
   )
 }

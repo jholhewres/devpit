@@ -78,7 +78,8 @@ After the handshake, each JSON message of the Remote's protocol
 frames. One frame is one Noise message, at most 65535 bytes, and one
 WebSocket binary frame; its plaintext is a flag byte — `0` more follows, `1`
 last — and a chunk. A message is held to a ceiling before it is kept: 256 KiB
-from a device, 8 MiB from the machine.
+from a device, 8 MiB from the machine. A photo or a recording from the phone
+goes in pieces under it (`uploadPart`), each 96 KiB before base64.
 
 Each frame's nonce is its place in the session, so a frame dropped, repeated,
 reordered or changed on the way does not open, and the session ends there.

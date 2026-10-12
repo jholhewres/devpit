@@ -125,6 +125,7 @@ pub async fn chat_send(
         budget_usd,
         permission,
         effort,
+        from_remote,
     } = ask;
     let home = home();
     let sessions = crate::projects::project_home(&project_id)?.sessions();
@@ -229,10 +230,9 @@ pub async fn chat_send(
     let guard = state.begin(&conversation_id, &steering)?;
     let control = steering.hold(&conversation_id);
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
-    let noticed = (project_id.clone(), profile_id.clone());
+    let noticed = (project_id.clone(), profile_id.clone(), from_remote);
     let said = tauri::async_runtime::spawn_blocking(move || {
-        let prompt =
-            crate::session_notice::with_notice(&noticed.0, &noticed.1, &prompt, now() * 1000.0);
+        let prompt = crate::session_notice::with_notice(&noticed, &prompt, now() * 1000.0);
         let hooks = crate::steps::hook_settings();
         let checkout = std::path::Path::new(&cwd);
         let mut before = None;
