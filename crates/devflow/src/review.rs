@@ -19,6 +19,7 @@ use crate::config::{Agent, Config, Consolidate, Reviewer};
 use crate::evidence::Card;
 use crate::findings::{self, Source};
 use crate::jev::{self, Said};
+use crate::layers::Team;
 use crate::plan::PREFIX;
 use crate::runs;
 
@@ -131,26 +132,69 @@ pub fn pending(answered: &[Source]) -> Vec<String> {
         .collect()
 }
 
-/// A persona's text: the project's own, where the setup installed it, else
-/// the one devpit ships.
-pub fn persona_text(root: &Path, persona: &str) -> Result<String, String> {
+/// Where a persona is looked for after the project's own: each team layer
+/// the project extends, then the person's own reviewers, then devpit's.
+/// Personas are layered as skills are, so one way of reviewing can follow a
+/// person into every project of theirs and a company's into each of its own.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Personas<'a> {
+    /// `<devpit home>/devflow/reviewers/`, each persona as `<name>.md`.
+    pub personal: Option<&'a Path>,
+    /// The layers that apply, each read at its approved commit.
+    pub teams: &'a [Team],
+}
+
+/// A persona's text from the first layer that has it: the project's own
+/// (where the setup installed it), a team's `reviewers/`, the person's, the
+/// one devpit ships.
+pub fn persona_text(root: &Path, elsewhere: Personas, persona: &str) -> Result<String, String> {
     if !crate::config::is_name(persona) {
         return Err(format!("`{persona}` is not a persona's name"));
     }
     let relative = format!("{}/reviewers/{persona}.md", crate::folder::DIR);
-    if let Ok(path) = devpit_core::tree::resolve(root, &relative) {
-        if let Ok(file) = std::fs::File::open(&path) {
-            let read = devpit_core::data_files::read_within(file, MOST_PERSONA)
-                .map_err(|err| format!("{relative}: {err}"))?
-                .ok_or_else(|| format!("{relative} is larger than any persona needs"))?;
-            return String::from_utf8(read).map_err(|_| format!("{relative} is not UTF-8 text"));
+    if let Some(text) = persona_in(root, &relative)? {
+        return Ok(text);
+    }
+    let in_layer = format!("reviewers/{persona}.md");
+    for team in elsewhere.teams {
+        if let Some(text) = team.read(&in_layer)? {
+            if text.len() as u64 > MOST_PERSONA {
+                return Err(format!(
+                    "{}'s {in_layer} is larger than any persona needs",
+                    team.name
+                ));
+            }
+            return Ok(text);
+        }
+    }
+    if let Some(personal) = elsewhere.personal {
+        if let Some(text) = persona_in(personal, &format!("{persona}.md"))? {
+            return Ok(text);
         }
     }
     crate::setup::PERSONAS
         .iter()
         .find(|(name, _)| *name == persona)
         .map(|(_, text)| (*text).to_owned())
-        .ok_or_else(|| format!("no persona `{persona}`: {relative} is not there"))
+        .ok_or_else(|| {
+            format!("no persona `{persona}`: not in {relative}, a layer's reviewers/ or your own")
+        })
+}
+
+/// A persona's file under `base`, when it is there.
+fn persona_in(base: &Path, relative: &str) -> Result<Option<String>, String> {
+    let Ok(path) = devpit_core::tree::resolve(base, relative) else {
+        return Ok(None);
+    };
+    let Ok(file) = std::fs::File::open(&path) else {
+        return Ok(None);
+    };
+    let read = devpit_core::data_files::read_within(file, MOST_PERSONA)
+        .map_err(|err| format!("{relative}: {err}"))?
+        .ok_or_else(|| format!("{relative} is larger than any persona needs"))?;
+    String::from_utf8(read)
+        .map(Some)
+        .map_err(|_| format!("{relative} is not UTF-8 text"))
 }
 
 /// A persona's instructions, without the frontmatter that names it.
@@ -504,6 +548,8 @@ pub struct Given<'a> {
     /// Jev, where Decisions answers here: `consolidate: jev` asks it about
     /// each finding.
     pub jev: Option<Judge<'a>>,
+    /// Where a persona the project does not have is looked for.
+    pub personas: Personas<'a>,
 }
 
 /// How the findings became one list.
@@ -606,7 +652,7 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
     let packet_at = format!("{folder}/{PACKET}");
     let deadline = given.budget.saturating_sub(PASS);
     let one = |reviewer: &Reviewer| -> Result<(Value, reviewing::Reviewed), String> {
-        let persona = persona_text(given.root, &reviewer.persona)?;
+        let persona = persona_text(given.root, given.personas, &reviewer.persona)?;
         let agent = reviewer.agent.word();
         let asked = prompt(&persona, &packet, agent, &reviewer.persona);
         let env = env_of(given.env, git, &packet_at, &reviewer.persona);

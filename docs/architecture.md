@@ -309,6 +309,13 @@ no copy, only that the person clicked.
   then the one built from `flow/skills/`. When hosts declare
   `io.modelcontextprotocol/skills`, `skills/list` and `skills/get` join
   these with the same entries, and the tool is deprecated.
+- **Personas by layer too.** A reviewer's persona is read from the project's
+  `.devpit/devflow/reviewers/<name>.md`, then each team layer's
+  `reviewers/<name>.md`, then the person's `<home>/devflow/reviewers/`, then
+  devpit's own. The setup copies the three axis personas into the project, so
+  those are the project's; a persona of another name lets one way of
+  reviewing follow a person into all their projects, named in their own
+  devflow.yaml, and a company's into its projects, named in its layer.
 
 ## Remote
 

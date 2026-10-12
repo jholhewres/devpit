@@ -235,3 +235,89 @@ fn a_layer_is_named_by_the_owner_in_its_address() {
     assert_eq!(name_of("https://github.com/Acme-Co/flow"), "acme-co");
     assert_eq!(name_of("/srv/git/acme/devflow.git"), "acme");
 }
+
+/// A team layer holding one persona of its own, approved at v1.
+fn a_team_with_a_persona(base: &Path, root: &Path, home: &Home) -> Vec<Team> {
+    let work = base.join("persona-work");
+    std::fs::create_dir_all(&work).expect("work");
+    git(&work, &["init", "-q", "--initial-branch=main"]);
+    write(&work, "devflow.yaml", "version: 2\n");
+    write(
+        &work,
+        "reviewers/acme-style.md",
+        "---\nname: acme-style\n---\nThe company's way.",
+    );
+    git(&work, &["add", "-A"]);
+    git(&work, &["commit", "-qm", "one"]);
+    git(&work, &["tag", "v1"]);
+    let bare = base.join("acme").join("review.git");
+    let cloned = Command::new("git")
+        .args(["clone", "-q", "--bare"])
+        .arg(&work)
+        .arg(&bare)
+        .output()
+        .expect("clone");
+    assert!(cloned.status.success());
+    let url = bare.display().to_string();
+    let v1 = Extend {
+        git: url.clone(),
+        reference: "v1".into(),
+    };
+    let shown = pinning::fetched(root, &v1, home).expect("fetched");
+    pinning::approve(root, &v1, &shown.to_commit, home).expect("approved");
+    layered(root, &project(&url, "v1", ""), home)
+        .expect("reads")
+        .applied
+}
+
+#[test]
+fn a_persona_comes_from_the_project_then_its_team_then_the_person() {
+    use crate::review::{persona_text, Personas};
+
+    let base = tempfile::tempdir().expect("tempdir");
+    let root = base.path().join("project");
+    std::fs::create_dir_all(&root).expect("project");
+    let home = Home::under(&base.path().join("devpit-home"));
+    let teams = a_team_with_a_persona(base.path(), &root, &home);
+    let mine = base.path().join("devpit-home/devflow/reviewers");
+    write(
+        &mine,
+        "acme-style.md",
+        "---\nname: acme-style\n---\nMy way.",
+    );
+    write(&mine, "my-style.md", "---\nname: my-style\n---\nOnly mine.");
+    let everywhere = Personas {
+        personal: Some(&mine),
+        teams: &teams,
+    };
+
+    // The person's own, in a project with no team: their way follows them.
+    let alone = Personas {
+        personal: Some(&mine),
+        teams: &[],
+    };
+    assert!(persona_text(&root, alone, "acme-style")
+        .expect("mine")
+        .ends_with("My way."));
+    // The company's layer is read over the person's, for its own projects.
+    assert!(persona_text(&root, everywhere, "acme-style")
+        .expect("the team's")
+        .ends_with("The company's way."));
+    assert!(persona_text(&root, everywhere, "my-style")
+        .expect("mine")
+        .ends_with("Only mine."));
+    // The project's own file wins over both.
+    write(
+        &root,
+        ".devpit/devflow/reviewers/acme-style.md",
+        "---\nname: acme-style\n---\nThis repo's.",
+    );
+    assert!(persona_text(&root, everywhere, "acme-style")
+        .expect("the project's")
+        .ends_with("This repo's."));
+    // devpit's own stays underneath all of them.
+    assert!(persona_text(&root, everywhere, "devflow-spec")
+        .expect("built in")
+        .contains("Devflow reviewer: Spec"));
+    assert!(persona_text(&root, Personas::default(), "my-style").is_err());
+}

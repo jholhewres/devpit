@@ -86,6 +86,12 @@ pub fn devflow_skills(root: &Path) -> PathBuf {
     devflow_personal(root).join("skills")
 }
 
+/// The person's own reviewer personas, `<root>/devflow/reviewers/<name>.md`:
+/// a project's and a team layer's replace them, and they replace devpit's.
+pub fn devflow_reviewers(root: &Path) -> PathBuf {
+    devflow_personal(root).join("reviewers")
+}
+
 /// The person's own Devflow layer, `<root>/devflow/`: a `devflow.yaml` every
 /// project's is read over, and their skills.
 pub fn devflow_personal(root: &Path) -> PathBuf {

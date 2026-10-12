@@ -50,7 +50,7 @@ fn each_answer_gets_a_file_of_its_own() {
 #[test]
 fn the_persona_is_the_projects_own_before_devpits() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let builtin = persona_text(dir.path(), "devflow-spec").expect("built in");
+    let builtin = persona_text(dir.path(), Personas::default(), "devflow-spec").expect("built in");
     assert!(builtin.contains("Devflow reviewer: Spec"));
     std::fs::create_dir_all(dir.path().join(".devpit/devflow/reviewers")).expect("dir");
     std::fs::write(
@@ -58,11 +58,13 @@ fn the_persona_is_the_projects_own_before_devpits() {
         "---\nname: devflow-spec\n---\nOurs.",
     )
     .expect("write");
-    assert!(persona_text(dir.path(), "devflow-spec")
-        .expect("ours")
-        .ends_with("Ours."));
-    assert!(persona_text(dir.path(), "acme-perf").is_err());
-    assert!(persona_text(dir.path(), "../secrets").is_err());
+    assert!(
+        persona_text(dir.path(), Personas::default(), "devflow-spec")
+            .expect("ours")
+            .ends_with("Ours.")
+    );
+    assert!(persona_text(dir.path(), Personas::default(), "acme-perf").is_err());
+    assert!(persona_text(dir.path(), Personas::default(), "../secrets").is_err());
 }
 
 fn git<'a>(files: &'a [String], diff: &'a str) -> Git<'a> {
@@ -213,6 +215,7 @@ impl Ran<'_> {
             budget: Duration::from_secs(400),
             reach: self.reach,
             redact: &no_redaction,
+            personas: Personas::default(),
             jev: self.jev,
         })
     }

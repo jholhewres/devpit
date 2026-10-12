@@ -122,6 +122,13 @@ pub(crate) fn respond_with(
     let judging = jev
         .as_ref()
         .map(|jev| move |rubric: &str, state: &Value| jev.judge(rubric, state));
+    // Personas follow the layers as skills do, read from the project's root.
+    let teams = crate::devflow::layered(Path::new(&project.root_path))
+        .map(|layered| layered.applied)
+        .unwrap_or_default();
+    let personal = devpit_core::Store::root()
+        .map(|home| devpit_core::home::devflow_reviewers(&home))
+        .ok();
     let done = review::reviewed(&Given {
         root: &root,
         config,
@@ -145,6 +152,10 @@ pub(crate) fn respond_with(
         reach,
         redact: &redact,
         jev: judging.as_ref().map(|judge| judge as review::Judge),
+        personas: review::Personas {
+            personal: personal.as_deref(),
+            teams: &teams,
+        },
     })?;
 
     let run = root.join(&done.folder);
