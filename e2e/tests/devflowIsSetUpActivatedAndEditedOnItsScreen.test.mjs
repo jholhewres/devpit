@@ -1,6 +1,6 @@
 /*
  * A project's Devflow, from its own screen: the sidebar opens it on what was
- * detected; Recommended writes .devpit/devflow/ in one click; Activate waits
+ * detected; Use recommended writes .devpit/devflow/ in one click; Activate waits
  * for the person's yes on the confirmation; a reviewer added and changed on
  * the screen is written to devflow.yaml; and a change made to the file
  * outside is read again and said. Each step is photographed.
@@ -71,14 +71,14 @@ after(async () => {
 describe('Devflow is set up, activated and edited on its screen', () => {
   test('the sidebar opens the setup on what was detected, asking nothing', async () => {
     await press(window, 'Devflow')
-    await said('Detected')
+    await said('Found in this repository')
     await said('make test')
     assert.equal(existsSync(join(repo, FILE)), false, 'opening the screen wrote the file')
     await photographed('devflow-1-setup')
   })
 
   test('Recommended writes .devpit/devflow/ in one click and says to commit it', async () => {
-    await press(window, 'Recommended')
+    await press(window, 'Use recommended')
     await said('Set up, and off')
     await window.wait(until.elementLocated(By.xpath("//*[contains(normalize-space(), 'commit these files yourself')]")), 10000)
     assert.match(yaml(), /^version: \d/m)

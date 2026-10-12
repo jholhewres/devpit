@@ -17,10 +17,10 @@ import { useShell } from './useShell'
 function RubricField({ stage, rubric, onSave }: { stage: string; rubric: string | null; onSave: (rubric: string) => void }): React.JSX.Element {
   const [said, setSaid] = useState(rubric ?? '')
   return (
-    <label className="voice__row">
-      <span className="voice__l">{stage}</span>
+    <label className="dffield">
+      <span className="dffield__l">{stage[0]!.toUpperCase() + stage.slice(1)}</span>
       <input
-        className="voice__in"
+        className="dfinput"
         aria-label={`The ${stage} stage's rubric`}
         placeholder="Devflow's own"
         value={said}
@@ -59,21 +59,27 @@ export function DevflowJev({
         title="Ask Jev at the gates"
         said="The brief, the plan, each finding and the card's criteria with their evidence are judged against a rubric — never the diff — with no retention and no training."
       >
-        <div className="voice__row">
-          <span className="voice__l">Mode</span>
-          <span className="voice__val">{enforcing ? 'enforce: a failing rubric holds the card' : 'shadow: answers are recorded, nothing is held'}</span>
-          {onEnforce && !enforcing && (
-            <button className="btn" onClick={onEnforce}>
-              Enforce…
-            </button>
-          )}
-          {onEnforce && enforcing && (
-            <button className="btn" onClick={() => edit('decisions.mode', 'shadow')}>
-              Back to shadow
-            </button>
-          )}
+        <div className="dffield">
+          <span className="dffield__l">Mode</span>
+          <span className="dffield__v">
+            <span className="dfmode" data-mode={enforcing ? 'enforce' : 'shadow'}>
+              <b>{enforcing ? 'Enforce' : 'Shadow'}</b>
+              {enforcing ? 'a failing rubric holds the card' : 'answers are recorded, nothing is held'}
+            </span>
+            {onEnforce && !enforcing && (
+              <button className="btn btn--sm" onClick={onEnforce}>
+                Enforce…
+              </button>
+            )}
+            {onEnforce && enforcing && (
+              <button className="btn btn--sm" onClick={() => edit('decisions.mode', 'shadow')}>
+                Back to shadow
+              </button>
+            )}
+          </span>
         </div>
         {!onEnforce && <span className="pref__d">It starts in shadow. Enforcing is a click of yours once Devflow is set up.</span>}
+        {projectId && <span className="dfsubhead">Rubric per stage</span>}
         {projectId &&
           config.stages.map((stage) => (
             <RubricField
@@ -89,8 +95,8 @@ export function DevflowJev({
           </span>
         ))}
         {projectId && accuracy && accuracy.rubrics.length === 0 && <span className="pref__d">No rubric has judged anything here yet, so there is no accuracy to show.</span>}
-        <div className="voice__row">
-          <button className="btn" onClick={() => openPrefs('decisions')}>
+        <div className="dfrow-end">
+          <button className="btn btn--quiet btn--sm" onClick={() => openPrefs('decisions')}>
             Key and provider in Settings → Decisions
           </button>
         </div>

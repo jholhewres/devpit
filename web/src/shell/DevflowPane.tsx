@@ -142,7 +142,8 @@ export function DevflowPane(): React.JSX.Element {
       case 'invalid':
         return (
           <>
-            <div className="pref" role="alert">
+            <div className="pref dfstate" data-tone="bad" role="alert">
+              <span className="dfstate__dot" aria-hidden />
               <span className="pref__body">
                 <span className="pref__t">devflow.yaml does not read</span>
                 <span className="pref__d voice__bad">{errorSaid(screen.error)}</span>
@@ -158,7 +159,8 @@ export function DevflowPane(): React.JSX.Element {
       case 'disabled':
         return (
           <>
-            <div className="pref">
+            <div className="pref dfstate" data-tone="off">
+              <span className="dfstate__dot" aria-hidden />
               <span className="pref__body">
                 <span className="pref__t">Set up, and off</span>
                 <span className="pref__d">Its agents do not get the Devflow tools until you activate it: the click writes enabled: true.</span>
@@ -183,7 +185,8 @@ export function DevflowPane(): React.JSX.Element {
         if (!config) return null
         return (
           <>
-            <div className="pref">
+            <div className="pref dfstate" data-tone="on">
+              <span className="dfstate__dot" aria-hidden />
               <span className="pref__body">
                 <span className="pref__t">On here</span>
                 <span className="pref__d">Each change below is written to devflow.yaml at once; devpit never commits it.</span>
@@ -211,8 +214,10 @@ export function DevflowPane(): React.JSX.Element {
 
   return (
     <div className="scroll">
-      <div className="prefs__in">
-        <h1 className="prefs__h">Devflow{project ? ` · ${project.name}` : ''}</h1>
+      <div className="prefs__in dfscreen">
+        <h1 className="prefs__h">
+          Devflow{project && <span className="dfscreen__project">{project.name}</span>}
+        </h1>
         {!project && <p className="acc__note">Open a project to see its Devflow.</p>}
         {screen && !screen.globallyOn && (
           <div className="pref">

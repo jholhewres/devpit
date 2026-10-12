@@ -14,9 +14,9 @@ use devpit_devflow::preset::{self, Preset};
 use devpit_devflow::{skills, Ask};
 use devpit_rpc::{
     DevflowAsks, DevflowChange, DevflowCheck, DevflowCli, DevflowConfig, DevflowDetected,
-    DevflowError, DevflowFileChange, DevflowFound, DevflowPrefs, DevflowPreview, DevflowReviewer,
-    DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage, DevflowState, DevflowTeam,
-    ErrorCode, Project, RpcError,
+    DevflowError, DevflowFileChange, DevflowFound, DevflowHint, DevflowPrefs, DevflowPreview,
+    DevflowReviewer, DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage, DevflowState,
+    DevflowTeam, ErrorCode, Project, RpcError,
 };
 use serde_json::{json, Map, Value};
 use tauri::AppHandle;
@@ -329,24 +329,22 @@ pub(crate) fn detected_view(found: &Detected) -> DevflowDetected {
     }
 }
 
-/// How the repository already works, one line each.
-fn hints_said(hints: &devpit_devflow::detect::Hints) -> Vec<String> {
-    let line = |what: &str, items: &[String]| {
-        (!items.is_empty()).then(|| format!("{what}: {}", items.join(", ")))
-    };
+/// How the repository already works, one kind each.
+fn hints_said(hints: &devpit_devflow::detect::Hints) -> Vec<DevflowHint> {
     [
-        line("Guides", &hints.guides),
-        line("Pull request templates", &hints.pr_templates),
-        line("Issue templates", &hints.issue_templates),
-        line("Branches of a release flow", &hints.branches),
-        line("Ticket keys in commits", &hints.ticket_keys),
-        line(
-            "Skills an own stage can use as skills/<name>",
-            &hints.skills,
-        ),
+        ("Guides", &hints.guides),
+        ("Pull request templates", &hints.pr_templates),
+        ("Issue templates", &hints.issue_templates),
+        ("Release branches", &hints.branches),
+        ("Ticket keys", &hints.ticket_keys),
+        ("Skills", &hints.skills),
     ]
     .into_iter()
-    .flatten()
+    .filter(|(_, items)| !items.is_empty())
+    .map(|(label, items)| DevflowHint {
+        label: label.to_owned(),
+        items: items.clone(),
+    })
     .collect()
 }
 

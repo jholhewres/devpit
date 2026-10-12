@@ -74,7 +74,7 @@ const missing = (): DevflowScreen =>
       glossary: 'CONTEXT.md',
       adrs: [],
       open: [],
-      hints: ['Ticket keys in commits: LED'],
+      hints: [{ label: 'Ticket keys', items: ['LED'] }],
       recommended: config(),
     },
   })
@@ -138,8 +138,8 @@ describe('the Devflow screen', () => {
     render(<DevflowPane />)
     expect(await screen.findByText('make test')).toBeTruthy()
     expect(screen.getByText(/Makefile:1/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Recommended' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Custom' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Use recommended' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Customize' })).toBeTruthy()
     expect(called).not.toHaveBeenCalled()
   })
 
@@ -173,7 +173,7 @@ describe('the Devflow screen', () => {
 
   it('writes the recommended setup in one click, as the setup tool would, and says to commit it', async () => {
     render(<DevflowPane />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Recommended' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use recommended' }))
     await waitFor(() => expect(called).toHaveBeenCalledWith('create', 'prj_api', 'recommended', '{}'))
     expect(await screen.findByText(/commit these files yourself/)).toBeTruthy()
     expect(screen.getByText('Set up, and off')).toBeTruthy()
@@ -181,7 +181,7 @@ describe('the Devflow screen', () => {
 
   it('walks a Custom setup through four steps, previews the commented file, then creates what was chosen', async () => {
     render(<DevflowPane />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Custom' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Customize' }))
     fireEvent.click(screen.getByRole('switch', { name: 'Context' }))
     for (const step of ['Checks', 'Reviewers', 'Jev']) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))

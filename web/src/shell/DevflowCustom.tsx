@@ -16,6 +16,39 @@ import { ask, commands } from './live'
 
 const STEPS = ['Stages', 'Checks', 'Reviewers', 'Jev'] as const
 
+/** What each step decides, said once above it. */
+const STEP_SAYS: Readonly<Record<(typeof STEPS)[number], string>> = {
+  Stages: 'The stages a card goes through, in order, and who approves the brief and the plan.',
+  Checks: "What devpit runs from the project's root to prove a card done. Each becomes a script under .devpit/devflow/scripts/.",
+  Reviewers: "Who reads a card's change: each reviewer a persona on one of your agent CLIs, all running at once on your own subscription. A persona nobody runs is reviewed by the session itself.",
+  Jev: 'Whether Jev judges the gates against a rubric. It starts in shadow, recording without holding anything.',
+}
+
+function Steps({ step, onStep }: { step: number; onStep: (at: number) => void }): React.JSX.Element {
+  return (
+    <ol className="dfsteps" aria-label="Steps">
+      {STEPS.map((name, at) => (
+        <li key={name} className="dfsteps__i" data-state={at === step ? 'now' : at < step ? 'done' : 'next'}>
+          <button className="dfsteps__b" aria-current={at === step ? 'step' : undefined} onClick={() => onStep(at)}>
+            <span className="dfsteps__n">{at + 1}</span>
+            <span className="dfsteps__name">{name}</span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function Nav({ step, back, children }: { step: string; back: React.ReactNode; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="dfnav">
+      {back}
+      <span className="dfnav__at">{step}</span>
+      {children}
+    </div>
+  )
+}
+
 export function DevflowCustom({
   projectId,
   start,
@@ -48,24 +81,39 @@ export function DevflowCustom({
   if (preview) {
     return (
       <>
-        <div className="acc__sub">The file it writes</div>
-        <pre className="errprev__body" aria-label="devflow.yaml preview">
-          {preview.yaml}
-        </pre>
-        {preview.files.map((file) => (
-          <span key={file.path} className="pref__d">
-            {file.change} {file.path}
-          </span>
-        ))}
+        <div className="dfstephead">
+          <h2 className="dfstephead__t">Before it is written</h2>
+          <p className="dfstephead__d">The file and everything else Create puts under .devpit/devflow/. Nothing is written until you create it, and devpit never commits.</p>
+        </div>
+        <div className="dffile">
+          <div className="dffile__head">devflow.yaml</div>
+          <pre className="dffile__body" aria-label="devflow.yaml preview">
+            {preview.yaml}
+          </pre>
+        </div>
+        <ul className="dffiles" aria-label="Files">
+          {preview.files.map((file) => (
+            <li key={file.path} className="dffiles__i">
+              <span className="dffiles__change" data-change={file.change}>
+                {file.change}
+              </span>
+              <code>{file.path}</code>
+            </li>
+          ))}
+        </ul>
         {problem && <p className="pref__d voice__bad">{problem}</p>}
-        <div className="voice__row">
-          <button className="btn" onClick={() => setPreview(null)}>
-            Back
-          </button>
+        <Nav
+          step="Ready to create"
+          back={
+            <button className="btn" onClick={() => setPreview(null)}>
+              Back
+            </button>
+          }
+        >
           <button className="btn btn--go" onClick={create}>
             Create
           </button>
-        </div>
+        </Nav>
       </>
     )
   }
@@ -73,30 +121,28 @@ export function DevflowCustom({
   const execution = draft.stages.find((stage) => stage.name === 'execution')
   return (
     <>
-      <div className="voice__row" role="group" aria-label="Steps">
-        {STEPS.map((name, at) => (
-          <button key={name} className="btn" data-on={at === step ? '' : undefined} aria-current={at === step ? 'step' : undefined} onClick={() => setStep(at)}>
-            {at + 1}. {name}
-          </button>
-        ))}
+      <Steps step={step} onStep={setStep} />
+      <div className="dfstephead">
+        <h2 className="dfstephead__t">{STEPS[step]}</h2>
+        <p className="dfstephead__d">{STEP_SAYS[STEPS[step]!]}</p>
       </div>
       {step === 0 && <DevflowStages config={draft} edit={edit} withChecks={false} />}
       {step === 1 && execution && (
-        <div className="pref pref--stack">
-          <div className="pref__body">
-            <span className="pref__t">Checks</span>
-            <span className="pref__d">Run by devpit from the project&rsquo;s root for a card&rsquo;s evidence; each becomes a script under .devpit/devflow/scripts/.</span>
-            <DevflowChecks checks={execution.checks} edit={edit} />
-          </div>
+        <div className="dfblock">
+          <DevflowChecks checks={execution.checks} edit={edit} />
         </div>
       )}
-      {step === 2 && <DevflowReviewers config={draft} edit={edit} />}
+      {step === 2 && <DevflowReviewers config={draft} edit={edit} bare />}
       {step === 3 && <DevflowJev config={draft} edit={edit} />}
       {problem && <p className="pref__d voice__bad">{problem}</p>}
-      <div className="voice__row">
-        <button className="btn" onClick={step === 0 ? onCancel : () => setStep(step - 1)}>
-          {step === 0 ? 'Cancel' : 'Back'}
-        </button>
+      <Nav
+        step={`Step ${step + 1} of ${STEPS.length}`}
+        back={
+          <button className="btn" onClick={step === 0 ? onCancel : () => setStep(step - 1)}>
+            {step === 0 ? 'Cancel' : 'Back'}
+          </button>
+        }
+      >
         {step < STEPS.length - 1 ? (
           <button className="btn btn--go" onClick={() => setStep(step + 1)}>
             Next
@@ -106,7 +152,7 @@ export function DevflowCustom({
             Preview the file
           </button>
         )}
-      </div>
+      </Nav>
     </>
   )
 }

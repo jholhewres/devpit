@@ -163,6 +163,15 @@ pub struct DevflowCli {
     pub signed_in: Option<bool>,
 }
 
+/// One kind of thing the repository already has, and each of them: the
+/// window lays them out, so it is handed the parts and not a sentence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowHint {
+    pub label: String,
+    pub items: Vec<String>,
+}
+
 /// What a setup starts from, read off the repository and this machine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -177,8 +186,8 @@ pub struct DevflowDetected {
     /// What detection left to the person, one sentence each.
     pub open: Vec<String>,
     /// How the repository already works: guides, templates, git-flow's
-    /// branches, ticket keys and installed skills, one line each.
-    pub hints: Vec<String>,
+    /// branches, ticket keys and installed skills, one kind each.
+    pub hints: Vec<DevflowHint>,
     /// The recommended setup, before its commands move into scripts.
     pub recommended: DevflowConfig,
 }

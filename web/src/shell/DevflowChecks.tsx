@@ -16,22 +16,22 @@ function CheckRow({ check, onSave, onRemove }: { check: DevflowCheck; onSave: (n
     if (name.trim() !== check.name || run.trim() !== check.run) onSave({ ...check, name: name.trim(), run: run.trim() })
   }
   return (
-    <div className="pref__body">
-      <div className="voice__row">
-        <input className="voice__in voice__in--short" aria-label="Check name" value={name} onChange={(event) => setName(event.target.value)} onBlur={leave} />
-        <input className="voice__in" aria-label={`${check.name} command`} value={run} onChange={(event) => setRun(event.target.value)} onBlur={leave} />
-        <select aria-label={`${check.name} report`} value={check.report} onChange={(event) => onSave({ ...check, report: event.target.value })}>
+    <div className="dfcheck">
+      <input className="dfinput" aria-label="Check name" value={name} onChange={(event) => setName(event.target.value)} onBlur={leave} />
+      <span className="dfcheck__run">
+        <input className="dfinput dfinput--mono" aria-label={`${check.name} command`} value={run} onChange={(event) => setRun(event.target.value)} onBlur={leave} />
+        {check.source && <span className="dfcheck__from">found in {check.source}</span>}
+      </span>
+      <select aria-label={`${check.name} report`} value={check.report} onChange={(event) => onSave({ ...check, report: event.target.value })}>
           {REPORTS.map((report) => (
             <option key={report} value={report}>
               {report}
             </option>
           ))}
-        </select>
-        <button className="btn" onClick={onRemove}>
-          Remove
-        </button>
-      </div>
-      {check.source && <span className="pref__d">Found in {check.source}</span>}
+      </select>
+      <button className="btn btn--quiet btn--sm" data-danger onClick={onRemove}>
+        Remove
+      </button>
     </div>
   )
 }
@@ -46,8 +46,14 @@ export function DevflowChecks({ checks, edit }: { checks: readonly DevflowCheck[
     setRun('')
   }
   return (
-    <>
-      {checks.length === 0 && <span className="pref__d">No checks: nothing proves a card done until one is added.</span>}
+    <div className="dfchecks">
+      <div className="dfcheck dfcheck--head" aria-hidden>
+        <span>Name</span>
+        <span>Command</span>
+        <span>Report</span>
+        <span />
+      </div>
+      {checks.length === 0 && <span className="dfempty">No checks: nothing proves a card done until one is added.</span>}
       {checks.map((check, at) => (
         <CheckRow
           key={`${check.name}\u0000${check.run}\u0000${check.report}`}
@@ -56,13 +62,14 @@ export function DevflowChecks({ checks, edit }: { checks: readonly DevflowCheck[
           onRemove={() => save(checks.filter((_, here) => here !== at))}
         />
       ))}
-      <div className="voice__row">
-        <input className="voice__in voice__in--short" aria-label="New check name" placeholder="name" value={name} onChange={(event) => setName(event.target.value)} />
-        <input className="voice__in" aria-label="New check command" placeholder="command, run from the project's root" value={run} onChange={(event) => setRun(event.target.value)} />
-        <button className="btn" disabled={!name.trim() || !run.trim()} onClick={add}>
+      <div className="dfcheck dfcheck--new">
+        <input className="dfinput" aria-label="New check name" placeholder="name" value={name} onChange={(event) => setName(event.target.value)} />
+        <input className="dfinput dfinput--mono" aria-label="New check command" placeholder="command, run from the project's root" value={run} onChange={(event) => setRun(event.target.value)} />
+        <span />
+        <button className="btn btn--sm" disabled={!name.trim() || !run.trim()} onClick={add}>
           Add check
         </button>
       </div>
-    </>
+    </div>
   )
 }

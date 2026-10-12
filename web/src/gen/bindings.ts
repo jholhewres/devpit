@@ -2837,9 +2837,9 @@ export type DevflowDetected = {
 	open: string[],
 	/**
 	 *  How the repository already works: guides, templates, git-flow's
-	 *  branches, ticket keys and installed skills, one line each.
+	 *  branches, ticket keys and installed skills, one kind each.
 	 */
-	hints: string[],
+	hints: DevflowHint[],
 	/**  The recommended setup, before its commands move into scripts. */
 	recommended: DevflowConfig,
 };
@@ -2875,6 +2875,15 @@ export type DevflowGated = {
 	withEvidence: number,
 	criteria: number,
 	missing: string[],
+};
+
+/**
+ *  One kind of thing the repository already has, and each of them: the
+ *  window lays them out, so it is handed the parts and not a sentence.
+ */
+export type DevflowHint = {
+	label: string,
+	items: string[],
 };
 
 /**  A plan previewed for an epic, waiting for the person to create its cards. */
