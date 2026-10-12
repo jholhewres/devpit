@@ -161,7 +161,12 @@ pub(crate) fn stages_on(
 
 /// The file's state, raising the person's ask when it says `enabled: true`
 /// and nobody here has clicked for it.
-fn looked(app: Option<&AppHandle>, store: &Store, project: &Project, root: &Path) -> State {
+pub(crate) fn looked(
+    app: Option<&AppHandle>,
+    store: &Store,
+    project: &Project,
+    root: &Path,
+) -> State {
     let state = folder::read(root);
     if let State::Valid(_, config) = &state {
         if config.enabled && globally_on(store) && !made(store, &project.id, Ask::Enable) {
@@ -232,7 +237,7 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
     said
 }
 
-fn setup_of(
+pub(crate) fn setup_of(
     app: Option<&AppHandle>,
     store: &Store,
     project: &Project,
@@ -240,10 +245,11 @@ fn setup_of(
     state: &State,
     params: &Value,
 ) -> Result<Value, String> {
+    let default = asks::preset(store);
     let word = params
         .get("preset")
         .and_then(Value::as_str)
-        .unwrap_or("recommended");
+        .unwrap_or(default.word());
     let preset = Preset::of(word)
         .ok_or_else(|| format!("`{word}` is not a preset: recommended or custom"))?;
     let set: Map<String, Value> = match params.get("set") {
@@ -301,7 +307,7 @@ fn setup_of(
     }))
 }
 
-fn set_of(
+pub(crate) fn set_of(
     app: Option<&AppHandle>,
     store: &Store,
     project: &Project,
@@ -393,7 +399,7 @@ fn settled(
 
 /// The reviewer CLIs on this machine, and the Decisions key, as the app
 /// already knows them.
-fn machine(store: &Store, project_id: &str) -> Machine {
+pub(crate) fn machine(store: &Store, project_id: &str) -> Machine {
     let knows = crate::shell_launch::shell_knows();
     let clis = Agent::ALL
         .iter()

@@ -5,6 +5,7 @@ import { DrawingList } from '../plugins/excalidraw/DrawingList'
 import { BoardPane } from './BoardPane'
 import { BrowserPane } from './BrowserPane'
 import { ChatPane } from './ChatPane'
+import { DevflowPane } from './DevflowPane'
 import { DiffPane } from './DiffPane'
 import { FilePane } from './FilePane'
 import { FilesPane } from './FilesPane'
@@ -86,6 +87,24 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
           <button className="sq26" onClick={() => close('skills')} aria-label="Close Skills" title="Close Skills">{closeIcon}</button>
         </div>
         <SkillsPane />
+      </>
+    ),
+  },
+  {
+    name: 'devflow',
+    many: false,
+    className: 'pane',
+    render: (close) => (
+      <>
+        <div className="pane__bar">
+          <span className="pane__ico">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2" /><circle cx="12" cy="18" r="2" /><circle cx="19" cy="6" r="2" /><path d="M5 8v2a4 4 0 0 0 4 4h1M19 8v2a4 4 0 0 1-4 4h-1" /></svg>
+          </span>
+          <span className="pane__t"><b>Devflow</b></span>
+          <span className="drag"></span>
+          <button className="sq26" onClick={() => close('devflow')} aria-label="Close Devflow" title="Close Devflow">{closeIcon}</button>
+        </div>
+        <DevflowPane />
       </>
     ),
   },

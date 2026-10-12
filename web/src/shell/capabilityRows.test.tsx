@@ -89,6 +89,7 @@ describe('Capabilities in the sidebar', () => {
     const nav = document.querySelectorAll('.side__scroll > .act > .act__label, .side__scroll > .newmenu > .act > .act__label')
     expect([...nav].map((label) => label.textContent)).toEqual([
       'Board',
+      'Devflow',
       'Files',
       'Capabilities',
       'Excalidraw',

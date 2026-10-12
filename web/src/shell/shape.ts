@@ -32,6 +32,7 @@ export type PrefsPane =
   | 'worktrees'
   | 'usage'
   | 'decisions'
+  | 'devflow'
   | 'channels'
 
 /*

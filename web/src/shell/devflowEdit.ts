@@ -1,0 +1,113 @@
+import type { DevflowCheck, DevflowConfig, DevflowReviewer, DevflowStage } from '../gen/bindings'
+
+/*
+ * A change to Devflow as devflow.yaml's dotted paths: what the screen sends
+ * `devflow.edit`, and what a Custom setup folds into `devflow.create`. The
+ * file's rules stay in the app; this only names fields.
+ */
+
+export type Edit = (path: string, value: unknown) => void
+
+/** The CLIs a reviewer runs in, in the order a setup picks them. */
+export const REVIEWER_AGENTS = ['claude', 'codex', 'cursor', 'gemini'] as const
+export const PERSONAS = ['devflow-spec', 'devflow-standards', 'devflow-security'] as const
+export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const
+export const REPORTS = ['junit', 'vitest', 'jest', 'cargo', 'none'] as const
+export const CONSOLIDATIONS = ['jev', 'agent', 'none'] as const
+
+export const STAGE_SAYS: Readonly<Record<string, string>> = {
+  briefing: 'The goal, for whom and what success is, written as an epic card.',
+  context: 'The code, glossary and decisions the work stands on, gathered before planning.',
+  plan: "The epic's cards, each with criteria and the cards it waits on.",
+  execution: "A card's change, proved by the checks devpit runs for its evidence.",
+  review: "The change read by the reviewers below, findings merged into one list.",
+  completion: 'The gate: a card is done when its evidence says so.',
+}
+
+/** A check as devflow.yaml takes it. */
+export const checkOf = (one: DevflowCheck): Record<string, unknown> => ({
+  name: one.name,
+  run: one.run,
+  report: one.report,
+  ...(one.evidence.length > 0 ? { evidence: one.evidence } : {}),
+})
+
+/** A reviewer as devflow.yaml takes it. */
+export const reviewerOf = (one: DevflowReviewer): Record<string, unknown> => ({
+  agent: one.agent,
+  persona: one.persona,
+  ...(one.model ? { model: one.model } : {}),
+})
+
+/** `decisions.rubrics` with `stage`'s rubric changed; an empty one is removed. */
+export function rubricsWith(config: DevflowConfig, stage: string, rubric: string): Record<string, string> {
+  const rubrics: Record<string, string> = {}
+  for (const one of config.stages) {
+    const named = one.name === stage ? rubric.trim() : (one.rubric ?? '')
+    if (named) rubrics[one.name] = named
+  }
+  return rubrics
+}
+
+const stageEdit = /^stages\.([a-z]+)\.(enabled|approve|checks)$/
+
+/** `config` with one edit made, for a setup that is not written yet. */
+export function applied(config: DevflowConfig, path: string, value: unknown): DevflowConfig {
+  const stage = stageEdit.exec(path)
+  if (stage) {
+    const [, name, field] = stage
+    const changed = (one: DevflowStage): DevflowStage => {
+      if (one.name !== name) return one
+      if (field === 'enabled') return { ...one, enabled: value === true }
+      if (field === 'approve') return { ...one, approve: String(value) }
+      const checks = (value as Record<string, unknown>[]).map((check) => ({
+        name: String(check.name),
+        run: String(check.run),
+        report: String(check.report ?? 'none'),
+        evidence: (check.evidence as string[] | undefined) ?? [],
+        source: one.checks.find((was) => was.run === check.run)?.source ?? null,
+      }))
+      return { ...one, checks }
+    }
+    return { ...config, stages: config.stages.map(changed) }
+  }
+  switch (path) {
+    case 'review.reviewers':
+      return {
+        ...config,
+        reviewers: (value as Record<string, unknown>[]).map((one) => ({
+          agent: String(one.agent),
+          persona: String(one.persona),
+          model: one.model ? String(one.model) : null,
+        })),
+      }
+    case 'review.block_on':
+      return { ...config, blockOn: value as string[] }
+    case 'review.consolidate':
+      return { ...config, consolidate: String(value) }
+    case 'decisions.use':
+      return { ...config, decisionsUse: value === true }
+    case 'decisions.rubrics': {
+      const rubrics = value as Record<string, string>
+      return { ...config, stages: config.stages.map((one) => ({ ...one, rubric: rubrics[one.name] ?? null })) }
+    }
+    default:
+      return config
+  }
+}
+
+/** What a Custom setup sets over the schema's defaults: everything the
+ *  person chose, so the file says it whatever the defaults become. */
+export function customSet(config: DevflowConfig): Record<string, unknown> {
+  const set: Record<string, unknown> = {}
+  for (const stage of config.stages) {
+    set[`stages.${stage.name}.enabled`] = stage.enabled
+    if (stage.approve) set[`stages.${stage.name}.approve`] = stage.approve
+    if (stage.name === 'execution') set['stages.execution.checks'] = stage.checks.map(checkOf)
+  }
+  set['review.reviewers'] = config.reviewers.map(reviewerOf)
+  set['review.block_on'] = config.blockOn
+  set['review.consolidate'] = config.consolidate
+  set['decisions.use'] = config.decisionsUse
+  return set
+}

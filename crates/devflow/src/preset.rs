@@ -31,6 +31,13 @@ impl Preset {
             _ => None,
         }
     }
+
+    pub fn word(self) -> &'static str {
+        match self {
+            Preset::Recommended => "recommended",
+            Preset::Custom => "custom",
+        }
+    }
 }
 
 /// A check the setup proposes, with where its command was found.

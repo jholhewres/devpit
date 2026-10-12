@@ -76,6 +76,10 @@ pub const LOCAL: &[(&str, &str)] = &[
         key::DEVFLOW,
         "its switch also tells open sessions, which a value from elsewhere would not",
     ),
+    (
+        key::DEVFLOW_PRESET,
+        "new, so it stays here until someone decides it travels",
+    ),
     (key::DEVFLOW_ON, "a click on this machine"),
     (key::DEVFLOW_ENFORCED, "a click on this machine"),
     (key::CHANNEL_RULES, "the channels set up on this machine"),

@@ -79,7 +79,7 @@ web/src/shell/ProjectPicker.tsx 150
 web/src/shell/Row.tsx 200
 web/src/shell/SearchResults.tsx 200
 web/src/shell/Settings.tsx 200
-web/src/shell/Sidebar.tsx 200
+web/src/shell/Sidebar.tsx 196
 web/src/shell/useShell.tsx 150
 xtask/src/dead_controls.rs 300
 xtask/src/platform_window.rs 150

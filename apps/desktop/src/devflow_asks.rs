@@ -11,6 +11,7 @@
 use std::sync::{Mutex, OnceLock};
 
 use devpit_core::{preference, Store};
+use devpit_devflow::preset::Preset;
 use devpit_devflow::{folder, proposal, setup, Ask};
 use devpit_rpc::{DevflowAsk, DevflowAsks, DevflowChange, ErrorCode, RpcError};
 use tauri::{AppHandle, Emitter};
@@ -157,6 +158,16 @@ pub(crate) fn globally_on(store: &Store) -> bool {
         .unwrap_or(true)
 }
 
+/// The setup a project without Devflow starts from, as Settings chose it.
+pub(crate) fn preset(store: &Store) -> Preset {
+    store
+        .preference(preference::DEVFLOW_PRESET)
+        .ok()
+        .flatten()
+        .and_then(|word| Preset::of(&word))
+        .unwrap_or(Preset::Recommended)
+}
+
 /// Where an MCP server looks to learn that what it offers may have changed:
 /// the click is not a change to any file it watches.
 pub(crate) fn rang(app: Option<&AppHandle>, project_id: &str) {
@@ -178,7 +189,7 @@ fn now() -> f64 {
         .unwrap_or_default()
 }
 
-fn listed() -> DevflowAsks {
+pub(crate) fn listed() -> DevflowAsks {
     DevflowAsks {
         asks: held()
             .lock()

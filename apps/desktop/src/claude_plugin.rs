@@ -284,7 +284,7 @@ fn claude(installation: &Found, args: &[&str]) -> Result<(), RpcError> {
 /// The command's output, or an error once `waits` has passed — with the
 /// command and everything it started ended, since `claude` is a node process
 /// that may have children of its own.
-fn output_within(
+pub(crate) fn output_within(
     mut command: std::process::Command,
     waits: std::time::Duration,
 ) -> Result<std::process::Output, String> {

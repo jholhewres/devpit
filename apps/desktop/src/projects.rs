@@ -48,6 +48,11 @@ pub(crate) fn drawn(store: &Store, row: devpit_core::ProjectRow) -> Project {
     drawn_with(store, row, devpit_git::worktrees)
 }
 
+/// A row without asking git for its checkouts, for what needs only its root.
+pub(crate) fn plain(store: &Store, row: devpit_core::ProjectRow) -> Project {
+    drawn_with(store, row, |_, _| Ok(Vec::new()))
+}
+
 type Listing = fn(&Path, &[PathBuf]) -> Result<Vec<devpit_rpc::Worktree>, devpit_git::GitError>;
 
 fn drawn_with(store: &Store, row: devpit_core::ProjectRow, listing: Listing) -> Project {

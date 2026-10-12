@@ -4,6 +4,7 @@ import { Attachments } from './Attachments'
 import { savesBeforeRestart } from './beforeRestart'
 import { CardCriteria } from './CardCriteria'
 import { CardDescription } from './CardDescription'
+import { CardDevflow } from './CardDevflow'
 import { CardDiff } from './CardDiff'
 import { CardElsewhere } from './CardElsewhere'
 import { CardLane, type LaneChoice } from './CardLane'
@@ -283,6 +284,8 @@ export function CardPane({
               </div>
 
               <CardTies detail={detail} />
+
+              <CardDevflow cardId={cardId} />
 
               <CardWork
                 cardId={cardId}

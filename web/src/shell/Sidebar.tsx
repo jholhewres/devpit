@@ -4,6 +4,7 @@ import { useAway } from './away'
 import { CapabilityRows } from './CapabilityRows'
 import { CommunityMenuItem } from './Community'
 import type { PaneName } from './paneList'
+import { ProjectPlaces } from './ProjectPlaces'
 import { SessionRows } from './SessionRowsView'
 import { Threads } from './Threads'
 import { useKit } from './useKit'
@@ -108,12 +109,7 @@ export function Sidebar({
             </button>
           </div>
 
-{!orchestrating && (
-          <button className="act" onClick={() => open('board')} aria-pressed={showing('board')}>
-            <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg></span>
-            <span className="act__label">Board</span>
-          </button>
-          )}
+          <ProjectPlaces open={open} showing={showing} />
 
           <button className="act" onClick={() => open('files')} aria-pressed={showing('files')}>
             <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg></span>

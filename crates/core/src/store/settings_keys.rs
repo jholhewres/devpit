@@ -96,6 +96,9 @@ pub const DECISIONS_OPTED_OUT: &str = "decisions.opted_out";
 pub const DECISIONS_MODES: &str = "decisions.modes";
 /// Whether Devflow is offered to any project at all. On unless turned off.
 pub const DEVFLOW: &str = "devflow.enabled";
+/// The setup a project without Devflow starts from: `recommended` or
+/// `custom`. Recommended unless set.
+pub const DEVFLOW_PRESET: &str = "devflow.preset";
 /// The projects whose Devflow the person switched on on this machine, as a
 /// JSON array. A devflow.yaml saying `enabled: true` is not a click.
 pub const DEVFLOW_ON: &str = "devflow.switched_on";

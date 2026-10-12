@@ -129,6 +129,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
         ),
       },
       {
+        id: 'devflow',
+        label: 'Devflow',
+        about: 'flow briefing plan review gate stages reviewers codex plugin setup preset recommended custom',
+        icon: (
+          <svg {...stroke}><circle cx="5" cy="6" r="2" /><circle cx="12" cy="18" r="2" /><circle cx="19" cy="6" r="2" /><path d="M5 8v2a4 4 0 0 0 4 4h1M19 8v2a4 4 0 0 1-4 4h-1" /></svg>
+        ),
+      },
+      {
         id: 'decisions',
         label: 'Decisions',
         about: 'jev typesafe openrouter vercel gateway rubric gate judge classify verdict probability key cap',

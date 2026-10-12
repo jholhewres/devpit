@@ -430,6 +430,41 @@ export const commands = {
 	devflowAsks: () => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_asks")),
 	/**  `devflow.answer` — the person's click: yes makes the change, no drops it. */
 	devflowAnswer: (id: string, yes: boolean) => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_answer", { id, yes })),
+	/**  `devflow.screen` — a project's Devflow, read now. */
+	devflowScreen: (projectId: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_screen", { projectId })),
+	/**  `devflow.preview` — what a setup would write; nothing is written. */
+	devflowPreview: (projectId: string, preset: string, set: string) => typedError<DevflowPreview, RpcError>(__TAURI_INVOKE("devflow_preview", { projectId, preset, set })),
+	/**
+	 *  `devflow.create` — the person's Create: writes `.devpit/devflow/` as
+	 *  `devpit_devflow_setup` would, and commits nothing.
+	 */
+	devflowCreate: (projectId: string, preset: string, set: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_create", { projectId, preset, set })),
+	/**  `devflow.edit` — one field of devflow.yaml, as the person changed it. */
+	devflowEdit: (projectId: string, path: string, value: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_edit", { projectId, path, value })),
+	/**
+	 *  `devflow.ask` — the person asked to switch Devflow on, or to enforce:
+	 *  the same confirmation an agent's request raises, so the click is one.
+	 */
+	devflowAsk: (projectId: string, change: DevflowChange) => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_ask", { projectId, change })),
+	/**  `devflow.skill_text` — a stage's skill, from the layer that has it. */
+	devflowSkillText: (projectId: string, name: string) => typedError<DevflowSkillText, RpcError>(__TAURI_INVOKE("devflow_skill_text", { projectId, name })),
+	/**
+	 *  `devflow.prefs` — Devflow's switch for every project, and where a new
+	 *  setup starts.
+	 */
+	devflowPrefs: () => typedError<DevflowPrefs, RpcError>(__TAURI_INVOKE("devflow_prefs")),
+	/**
+	 *  `devflow.prefs_set` — either of them, the other left alone. Switching
+	 *  Devflow tells every MCP server that what it offers changed.
+	 */
+	devflowPrefsSet: (enabled: boolean | null, preset: string | null) => typedError<DevflowPrefs, RpcError>(__TAURI_INVOKE("devflow_prefs_set", { enabled, preset })),
+	/**
+	 *  `devflow.codex_install` — the person's click, after their yes: Devflow's
+	 *  skills added to Codex for every session it starts.
+	 */
+	devflowCodexInstall: () => typedError<DevflowCodexInstalled, RpcError>(__TAURI_INVOKE("devflow_codex_install")),
+	/**  `devflow.card_evidence` — the card's newest gate, reviewers and files. */
+	devflowCardEvidence: (projectId: string, cardId: string) => typedError<DevflowCardEvidence, RpcError>(__TAURI_INVOKE("devflow_card_evidence", { projectId, cardId })),
 	/**
 	 *  `devflow.plan_keep` — the person moved, cut or edited a waiting plan on
 	 *  the board.
@@ -2687,12 +2722,107 @@ export type DevflowCalibration = {
 	rubrics: RubricAccuracy[],
 };
 
+/**
+ *  Response of `devflow.card_evidence`: what a card's Devflow runs left
+ *  among the project's artifacts.
+ */
+export type DevflowCardEvidence = {
+	cardId: string,
+	gate: DevflowGated | null,
+	reviewers: DevflowReviewed[],
+	verdict: string | null,
+	/**  The artifacts folder, whole, which `artifacts` are relative to. */
+	folder: string,
+	/**  The newest run's attached files, as artifact names. */
+	artifacts: string[],
+};
+
 /**  What the click does. */
 export type DevflowChange = 
 /**  Devflow switched on in the project. */
 "enable" | 
 /**  Decisions moved from shadow to enforce in the project's Devflow. */
 "enforce";
+
+export type DevflowCheck = {
+	name: string,
+	run: string,
+	report: string,
+	evidence: string[],
+	/**  `file:line` the command was found at, when detection found it. */
+	source: string | null,
+};
+
+export type DevflowCli = {
+	name: string,
+	installed: boolean,
+	signedIn: boolean | null,
+};
+
+/**  Response of `devflow.codex_install`. */
+export type DevflowCodexInstalled = {
+	folder: string,
+	said: string,
+};
+
+export type DevflowConfig = {
+	enabled: boolean,
+	stages: DevflowStage[],
+	reviewers: DevflowReviewer[],
+	blockOn: string[],
+	consolidate: string,
+	decisionsUse: boolean,
+	/**  `shadow` or `enforce`. */
+	decisionsMode: string,
+};
+
+/**  What a setup starts from, read off the repository and this machine. */
+export type DevflowDetected = {
+	found: DevflowFound[],
+	/**  `name (source)` of each E2E tool set up. */
+	e2eTools: string[],
+	clis: DevflowCli[],
+	decisionsKey: boolean,
+	glossary: string | null,
+	adrs: string[],
+	/**  What detection left to the person, one sentence each. */
+	open: string[],
+	/**  The recommended setup, before its commands move into scripts. */
+	recommended: DevflowConfig,
+};
+
+/**  Why devflow.yaml is refused. */
+export type DevflowError = {
+	line: number | null,
+	/**  A dotted path, empty when the file as a whole is refused. */
+	field: string,
+	message: string,
+};
+
+/**  One file a setup writes, and what writing it does. */
+export type DevflowFileChange = {
+	path: string,
+	/**  `create`, `replace`, `same`, `kept` or `append`. */
+	change: string,
+};
+
+/**  A command detection found. */
+export type DevflowFound = {
+	/**  `test`, `e2e` or `lint`. */
+	kind: string,
+	command: string,
+	source: string,
+};
+
+/**  The card's newest gate. */
+export type DevflowGated = {
+	passed: boolean,
+	run: string | null,
+	at: string,
+	withEvidence: number,
+	criteria: number,
+	missing: string[],
+};
 
 /**  A plan previewed for an epic, waiting for the person to create its cards. */
 export type DevflowPlan = {
@@ -2708,6 +2838,97 @@ export type DevflowPlan = {
 export type DevflowPlanCreated = {
 	cardIds: string[],
 };
+
+/**  Devflow's preferences on this machine. */
+export type DevflowPrefs = {
+	/**  Offered to any project at all. */
+	enabled: boolean,
+	/**  The setup a new project starts from: `recommended` or `custom`. */
+	preset: string,
+};
+
+/**  Response of `devflow.preview`: the commented YAML and its files. */
+export type DevflowPreview = {
+	yaml: string,
+	files: DevflowFileChange[],
+};
+
+/**  One reviewer of a card's newest review. */
+export type DevflowReviewed = {
+	agent: string,
+	persona: string,
+	/**  `answered` or `skipped`. */
+	status: string,
+	findings: number,
+	durationMs: number | null,
+	costUsd: number | null,
+	reason: string | null,
+};
+
+export type DevflowReviewer = {
+	agent: string,
+	persona: string,
+	model: string | null,
+};
+
+/**  Response of `devflow.screen`. */
+export type DevflowScreen = {
+	projectId: string,
+	state: DevflowState,
+	/**  Off in Settings for every project. */
+	globallyOn: boolean,
+	/**  Where devflow.yaml is, whole, to open in an editor. */
+	file: string,
+	yaml: string | null,
+	config: DevflowConfig | null,
+	error: DevflowError | null,
+	/**  The changes waiting for the person's click here. */
+	waiting: DevflowAsk[],
+	/**  Only while there is no file. */
+	detected: DevflowDetected | null,
+	/**  The setup a new project starts from: `recommended` or `custom`. */
+	preset: string,
+};
+
+/**  The skill a stage follows, from the layer that has it. */
+export type DevflowSkill = {
+	name: string,
+	/**  `project`, `personal` or `built-in`. */
+	layer: string,
+	file: string | null,
+	/**  Why the layer that has it cannot be used. */
+	refused: string | null,
+};
+
+/**  Response of `devflow.skill_text`. */
+export type DevflowSkillText = {
+	skill: DevflowSkill,
+	text: string,
+};
+
+/**  One stage, in the order the work reaches it. */
+export type DevflowStage = {
+	name: string,
+	enabled: boolean,
+	/**  `person` or `none`, for a stage whose result is approved. */
+	approve: string | null,
+	/**  The execution stage's checks. */
+	checks: DevflowCheck[],
+	/**  The completion stage's rubric. */
+	gate: string | null,
+	/**  Decisions' rubric for this stage, when one is named. */
+	rubric: string | null,
+	skill: DevflowSkill | null,
+};
+
+/**  Where a project's devflow.yaml stands. */
+export type DevflowState = 
+/**  No devflow.yaml: the setup. */
+"missing" | 
+/**  Valid, and not switched on by the person here. */
+"disabled" | "active" | 
+/**  Refused, with the line and field; the tools stay off. */
+"invalid";
 
 /**
  *  What somebody did in the menu, on its way back to the pane that owns it.

@@ -192,6 +192,14 @@ no copy, only that the person clicked.
   `enforce` are never written by a tool: they wait for the person's click on
   a card under the top bar. A file that says `enabled: true` by itself — a
   hand edit, a fresh clone — waits for that click too.
+- **A screen beside the board.** Each project's sidebar has Devflow next
+  to Board: the setup from what was detected (Recommended in one click, or
+  Custom in four steps and a commented preview), the file read-only with
+  Activate, an editor, or the error with its line. It calls what the tools
+  call — setup, set, the person's ask — so it has no rule of its own, and
+  reads the file again when it changes elsewhere. A card's pane shows its
+  newest gate, reviewers and files. Settings → Devflow switches it for every
+  project, picks where a setup starts, and adds its skills to Codex on a yes.
 - **Open sessions hear it.** The MCP server declares `listChanged` for
   tools, resources and prompts, and watches the project's devflow.yaml and
   the app's stamp file, so switching Devflow on or off reaches a session

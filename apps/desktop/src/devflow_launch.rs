@@ -18,7 +18,7 @@ pub(crate) fn folder(root: &Path, cli: Cli) -> PathBuf {
 }
 
 /// Writes what differs of `files` under `base`.
-fn written(base: &Path, files: &[(String, String)]) -> Option<()> {
+pub(crate) fn written(base: &Path, files: &[(String, String)]) -> Option<()> {
     for (relative, text) in files {
         let path = base.join(relative);
         if std::fs::read_to_string(&path).ok().as_deref() == Some(text.as_str()) {

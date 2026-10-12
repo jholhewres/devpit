@@ -13,6 +13,7 @@ import { ProviderRows } from './ProviderRows'
 import { flagOn, type Flag } from './settingsFlags'
 import { ChannelsPane } from './ChannelsPane'
 import { DecisionsSettings } from './DecisionsSettings'
+import { DevflowSettings } from './DevflowSettings'
 import { SkillsPane } from './SkillsPane'
 import { SyncSettings } from './SyncSettings'
 import { TerminalContrast } from './TerminalContrast'
@@ -181,6 +182,10 @@ export function Settings({
           <section className="prefs__in" hidden={pane !== 'decisions'}>
             <h1 className="prefs__h">Decisions</h1>
             <DecisionsSettings />
+          </section>
+          <section className="prefs__in" hidden={pane !== 'devflow'}>
+            <h1 className="prefs__h">Devflow</h1>
+            <DevflowSettings />
           </section>
           <section className="prefs__in prefs__in--wide" hidden={pane !== 'skills'}>
             <SkillsPane />

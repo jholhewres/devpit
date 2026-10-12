@@ -11,7 +11,7 @@ import { onCarried } from './window'
  * nothing changes until the click.
  */
 
-function devflowQuestion(one: DevflowAsk): { question: string; why: string; yes: string } {
+export function devflowQuestion(one: DevflowAsk): { question: string; why: string; yes: string } {
   return one.change === 'enable'
     ? {
         question: `Switch Devflow on in ${one.project}?`,
