@@ -38,6 +38,7 @@ fn full() -> Config {
         model: Some("pro: 2.5".into()),
     }];
     config.review.block_on = vec![Severity::Critical];
+    config.review.consolidate = crate::config::Consolidate::Agent;
     config.decisions.use_ = true;
     config.decisions.mode = Mode::Enforce;
     config.decisions.rubrics = BTreeMap::from([("completion".into(), "devflow-done".into())]);

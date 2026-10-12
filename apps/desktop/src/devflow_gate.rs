@@ -95,20 +95,28 @@ fn json_in(root: &Path, relative: &str) -> Option<Value> {
     serde_json::from_slice(&raw).ok()
 }
 
+/// The newest run of a card holding `file`, and what the file says.
+pub(crate) fn newest(root: &Path, card: &str, file: &str) -> Option<(String, Value)> {
+    let folder = format!("{}/{card}", runs::RUNS);
+    let runs_at = devpit_core::tree::resolve(root, &folder).ok()?;
+    let name = runs::newest_with(&runs_at, file)?;
+    let value = json_in(root, &format!("{folder}/{name}/{file}"))?;
+    Some((name, value))
+}
+
 fn read(root: &Path, card: &str) -> Read {
     let folder = format!("{}/{card}", runs::RUNS);
     let runs_at = devpit_core::tree::resolve(root, &folder).ok();
-    let newest = |file: &str| {
-        let name = runs::newest_with(runs_at.as_deref()?, file)?;
-        let value = json_in(root, &format!("{folder}/{name}/{file}"))?;
-        Some((name, value))
-    };
-    let run = newest("evidence.json");
-    let review = newest("findings.json").map(|(name, value)| {
-        let written = runs_at
-            .as_ref()
-            .and_then(|at| std::fs::metadata(at.join(&name).join("findings.json")).ok())
-            .and_then(|meta| meta.modified().ok())
+    let run = newest(root, card, "evidence.json");
+    let review = newest(root, card, "findings.json").map(|(name, value)| {
+        // When the review was made: review.json, which the person's "not a
+        // problem" on a finding leaves alone, else findings.json.
+        let written = ["review.json", "findings.json"]
+            .iter()
+            .find_map(|file| {
+                let at = runs_at.as_ref()?.join(&name).join(file);
+                std::fs::metadata(at).ok()?.modified().ok()
+            })
             .map_or(name, runs::stamp);
         (written, value)
     });

@@ -12,7 +12,7 @@ use crate::config::Config;
 use crate::folder::{DIR, FILE};
 
 /// The personas and the schema, as this build ships them.
-const PERSONAS: [(&str, &str); 3] = [
+pub(crate) const PERSONAS: [(&str, &str); 3] = [
     (
         "devflow-spec",
         include_str!("../../../flow/personas/devflow-spec.md"),

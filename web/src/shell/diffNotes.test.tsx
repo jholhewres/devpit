@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { CardFindings, Finding } from '../gen/bindings'
 import { DiffFiles } from './DiffFiles'
-import { newLines, notesOf, tally } from './diffNotes'
+import { falsePositiveOf, newLines, notesOf, tally } from './diffNotes'
 
 const DIFF = [
   'diff --git a/src/main.rs b/src/main.rs',
@@ -44,6 +44,17 @@ describe('findings on a card diff', () => {
     const old = eleven.querySelector('.cdiff__fd')!
     expect(old.getAttribute('data-standing')).toBe('outdated')
     expect(old.textContent).toContain('Outdated · made at abc1234def')
+  })
+
+  it('offers a Devflow finding as a false positive rather than a dismissal', () => {
+    const devflow = { ...found('current', [finding(12)], [0]), runId: 'devflow:card_1/20261011T143005Z' }
+    const notes = notesOf({ reviews: [devflow, found('current', [finding(12)])] })
+    expect(notes.map(falsePositiveOf)).toEqual([true, false])
+    const { container } = render(<DiffFiles diff={DIFF} notes={notes} onDismiss={() => undefined} />)
+    const markers = container.querySelectorAll('.cdiff__fd')
+    expect(markers[0].textContent).toContain('A false positive, you said')
+    expect(markers[0].querySelector('button')?.textContent).toBe('Not a false positive')
+    expect(markers[1].querySelector('button')?.textContent).toBe('Dismiss')
   })
 
   it('counts only what was not set aside', () => {

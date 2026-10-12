@@ -339,6 +339,47 @@ fn the_gate_takes_a_card_and_what_the_stop_hooks_fill() {
     assert!(schema.get("required").is_none(), "a hook names no card");
 }
 
+const REVIEW: &str = include_str!("../../../flow/skills/devflow-review/SKILL.md");
+
+/// The review comes with its stage, and every call the review skill shows
+/// sends only fields the tool lists.
+#[test]
+fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
+    let listed = |stage: &str| {
+        Offer::Active(vec![stage.to_owned()])
+            .tools(&STAGED)
+            .iter()
+            .any(|tool| tool.name == REVIEW_TOOL)
+    };
+    assert!(listed("review"));
+    assert!(!listed("execution") && !listed("completion"));
+    let (_, tool) = STAGED
+        .iter()
+        .find(|(_, tool)| tool.name == REVIEW_TOOL)
+        .expect("the review");
+    assert_eq!(tool.method, "devflow_review");
+    let schema = (tool.input)();
+    assert_eq!(schema["required"], json!(["card"]));
+    let mut calls = 0;
+    for block in REVIEW
+        .split("```json")
+        .skip(1)
+        .filter_map(|rest| rest.split("```").next())
+    {
+        let Ok(sent) = serde_json::from_str::<Value>(block) else {
+            continue;
+        };
+        if sent.get("card").is_none() || sent.get("version").is_some() {
+            continue;
+        }
+        calls += 1;
+        for key in sent.as_object().expect("an object").keys() {
+            assert!(schema["properties"].get(key).is_some(), "{key}");
+        }
+    }
+    assert_eq!(calls, 2, "a first call and the one that hands reports back");
+}
+
 #[test]
 fn the_session_start_reply_carries_the_card_or_nothing() {
     let said = context_reply(&json!({ "context": "card_1 \"Rename\"" })).expect("a reply");

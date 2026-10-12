@@ -98,6 +98,7 @@ mod devflow_evidence;
 mod devflow_gate;
 mod devflow_launch;
 mod devflow_plan;
+mod devflow_review;
 mod devflow_skills;
 mod diagnostics;
 mod diffs;

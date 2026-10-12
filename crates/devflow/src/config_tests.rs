@@ -97,6 +97,23 @@ fn a_reviewer_names_a_known_cli_and_a_persona() {
 }
 
 #[test]
+fn several_reviewers_are_consolidated_by_jev_unless_the_file_says_otherwise() {
+    assert_eq!(
+        parse("version: 1\n").expect("valid").review.consolidate,
+        Consolidate::Jev
+    );
+    let read = parse("version: 1\nreview:\n  consolidate: none\n").expect("valid");
+    assert_eq!(read.review.consolidate, Consolidate::Nothing);
+    let wrong = refused("version: 1\nreview:\n  consolidate: vote\n");
+    assert_eq!(wrong.field, "review.consolidate");
+    assert!(
+        wrong.message.contains("jev, agent, none"),
+        "{}",
+        wrong.message
+    );
+}
+
+#[test]
 fn rubrics_are_named_per_stage() {
     let read =
         parse("version: 1\ndecisions:\n  rubrics:\n    completion: devflow-done\n").expect("valid");

@@ -30,6 +30,10 @@ export const notesOf = (found: CardFindings): Note[] =>
     })),
   )
 
+/* A Devflow review's finding: setting it aside says it is a false positive,
+ * which the card's gate then stops blocking on. */
+export const falsePositiveOf = (note: Note): boolean => note.runId.startsWith('devflow:')
+
 /* The new side's number for each row of a hunk; `null` for a removed line. */
 export function newLines(hunk: Hunk): (number | null)[] {
   let line = Number(/\+(\d+)/.exec(hunk.header)?.[1] ?? 0)

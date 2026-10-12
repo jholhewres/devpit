@@ -150,3 +150,20 @@ fn a_file_at_head_is_what_the_last_commit_holds() {
     );
     assert_eq!(at_head(repo.path(), "new.txt").expect("read"), None);
 }
+
+#[test]
+fn a_review_starts_where_the_branch_left_main_or_where_it_is_told() {
+    let dir = repository();
+    let at = dir.path();
+    let started = head_of(at).expect("head");
+    Command::new("git")
+        .args(["checkout", "-q", "-b", "card"])
+        .current_dir(at)
+        .output()
+        .expect("branch");
+    commit(at, "work", "the card's work");
+    assert_eq!(review_base(at, None).expect("from main"), started);
+    let now = head_of(at).expect("head");
+    assert_eq!(review_base(at, Some("card")).expect("told"), now);
+    assert!(review_base(at, Some("no-such-branch")).is_err());
+}

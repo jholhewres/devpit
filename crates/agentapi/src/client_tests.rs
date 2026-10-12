@@ -66,3 +66,11 @@ fn starting_a_session_is_given_longer_than_a_lookup() {
     assert!(wait_for("start") > wait_for("board"));
     assert!(wait_for("start") >= std::time::Duration::from_secs(60));
 }
+
+/// Several reviewers on their own CLIs take minutes; given a lookup's five
+/// seconds, the agent would hear devpit closed while they still ran.
+#[test]
+fn a_review_is_waited_for_as_long_as_the_checks() {
+    assert_eq!(wait_for("devflow_review"), wait_for("devflow_evidence"));
+    assert!(wait_for("devflow_review") >= std::time::Duration::from_secs(600));
+}

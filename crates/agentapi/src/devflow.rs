@@ -60,6 +60,9 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
     },
 ];
 
+/// The review's tool.
+pub const REVIEW_TOOL: &str = "devpit_devflow_review";
+
 /// The gate's tool, which devpit's own stop hooks call too.
 pub const GATE_TOOL: &str = "devpit_devflow_gate";
 
@@ -110,7 +113,7 @@ pub(crate) fn context_reply(answer: &Value) -> Option<String> {
 
 /// The tools only an active project gets: each under the stage that must be
 /// switched on for it, or `None` for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(Option<&str>, Tool); 5] = [
+pub(crate) static STAGED: [(Option<&str>, Tool); 6] = [
     (
         None,
         Tool {
@@ -179,6 +182,20 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 5] = [
                     "test": { "type": "string" },
                     "failure": { "type": "string", "description": "The failing line you saw, secrets redacted." }
                 }, "required": ["test", "failure"] } }
+            }, "required": ["card"] }),
+        },
+    ),
+    (
+        Some("review"),
+        Tool {
+            name: REVIEW_TOOL,
+            method: "devflow_review",
+            description: "Devflow: review a card's change with the reviewers devflow.yaml lists under review.reviewers, each headless on the person's own agent CLI and subscription (claude -p, codex exec, cursor-agent -p, gemini), all at once, from one packet: the diff from BASE (the card's base, else where HEAD left the default branch) to HEAD, the card, its criteria and the reviewer's persona — never this session. Each answer is held to the findings schema and kept as findings-<agent>.json under .devpit/devflow/runs/<card>/<time>/; a CLI that is not installed or not signed in is skipped and said, and the review goes on. The findings are consolidated as review.consolidate says (jev, agent or none): the same problem found twice is kept once, saying 2 of 3. Then review.block_on gives the verdict, and findings.json — what devpit_devflow_gate reads — is written, attached to the card and commented '[devflow] review: n findings (x critical, y high)'. The answer gives each reviewer's time and cost, the verdict and `pending`: the axes' personas no reviewer answered for. Review those yourself from the same packet, then call again with `run` and `reports`. Takes as long as the reviewers do.",
+            input: || json!({ "type": "object", "properties": {
+                "card": { "type": "string", "description": "The card's id." },
+                "base": { "type": "string", "description": "The branch or commit the diff starts from, when it is not the card's own base. Usually left out." },
+                "run": { "type": "string", "description": "The run a first call answered, which `reports` complete." },
+                "reports": { "type": "array", "items": { "type": "object" }, "description": "With `run`: one findings object for each persona in `pending` that you reviewed, as .devpit/devflow/devflow-findings.schema.json describes." }
             }, "required": ["card"] }),
         },
     ),

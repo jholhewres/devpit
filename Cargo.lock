@@ -1163,6 +1163,7 @@ dependencies = [
 name = "devpit-devflow"
 version = "0.1.40"
 dependencies = [
+ "devpit-agentcli",
  "devpit-core",
  "devpit-rpc",
  "devpit-steps",

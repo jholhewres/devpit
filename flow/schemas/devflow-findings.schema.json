@@ -16,7 +16,10 @@
       "items": { "$ref": "#/$defs/reviewer" },
       "description": "Who reviewed: one entry for a single reviewer's report, one per reviewer once merged."
     },
-    "verdict": { "enum": ["approve", "request_changes"] },
+    "verdict": {
+      "enum": ["approve", "request_changes"],
+      "description": "request_changes when a finding's severity is in the project's review.block_on (critical and high unless set): the project's rule, which this file cannot see, so it is not checked here."
+    },
     "summary": { "type": "string" },
     "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
     "done_well": {
@@ -24,6 +27,11 @@
       "minItems": 1,
       "items": { "type": "string", "minLength": 1 },
       "description": "What the change does well, specific to it."
+    },
+    "pending": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "The personas no reviewer has answered for yet; the review is not complete until it is empty."
     },
     "verification": {
       "type": "object",
@@ -35,17 +43,6 @@
       }
     }
   },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "findings": { "contains": { "properties": { "severity": { "enum": ["critical", "high"] } } } }
-        },
-        "required": ["findings"]
-      },
-      "then": { "properties": { "verdict": { "const": "request_changes" } } }
-    }
-  ],
   "$defs": {
     "reviewer": {
       "type": "object",
@@ -71,7 +68,22 @@
         "poc": { "type": "string", "description": "The input, command or request that makes the problem happen. Required, and not empty, for critical and high." },
         "suggestion": { "type": "string" },
         "agent": { "type": "string", "minLength": 1 },
-        "persona": { "type": "string", "minLength": 1 }
+        "persona": { "type": "string", "minLength": 1 },
+        "found_by": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/reviewer" },
+          "description": "Every reviewer that reported this problem, once several reviewers' findings are merged."
+        },
+        "agreement": {
+          "type": "string",
+          "pattern": "^[0-9]+ of [0-9]+$",
+          "description": "How many of the reviewers that looked at this axis found it: 2 of 3."
+        },
+        "false_positive": {
+          "type": "boolean",
+          "description": "The person said it is not a problem; the gate no longer blocks on it."
+        }
       },
       "allOf": [
         {

@@ -59,9 +59,11 @@ pub(crate) fn checkpoint_findings_now(run_id: String) -> Result<Found, RpcError>
 }
 
 /// The reviews a card's runs left that found something, newest first, with
-/// what the person set aside in each.
+/// what the person set aside in each — the card's Devflow review first.
 pub(crate) fn of_card(store: &Store, card_id: &str) -> Result<CardFindings, RpcError> {
-    let mut reviews = Vec::new();
+    let mut reviews: Vec<CardReview> = crate::devflow_review::card_review(store, card_id)
+        .into_iter()
+        .collect();
     for run in store.runs(card_id)? {
         let found = findings(store, &run.id)?;
         if found.findings.is_empty() {
@@ -84,12 +86,17 @@ pub async fn card_findings(card_id: String) -> Result<CardFindings, RpcError> {
     crate::off_main::blocking(move || of_card(&crate::board::store()?, &card_id)).await
 }
 
-/// `finding.dismiss` — sets one finding aside, or brings it back.
+/// `finding.dismiss` — sets one finding aside, or brings it back. On a
+/// Devflow review it is the person saying the finding is a false positive.
 #[tauri::command]
 #[specta::specta]
 pub async fn finding_dismiss(run_id: String, at: u32, dismissed: bool) -> Result<(), RpcError> {
     crate::off_main::blocking(move || {
         let store = crate::board::store()?;
+        if crate::devflow_review::devflow_run(&run_id).is_some() {
+            return crate::devflow_review::mark(&store, &run_id, at, dismissed)
+                .map_err(|why| RpcError::new(ErrorCode::Invalid, why));
+        }
         if store.run_state(&run_id)?.is_none() {
             return Err(RpcError::new(ErrorCode::NotFound, "no such run"));
         }

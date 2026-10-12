@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 44] = [
+pub(crate) const METHODS: [&str; 45] = [
     "context",
     "board",
     "card",
@@ -85,6 +85,7 @@ pub(crate) const METHODS: [&str; 44] = [
     "devflow_brief",
     "devflow_plan",
     "devflow_evidence",
+    "devflow_review",
     "devflow_gate",
     "devflow_session",
 ];

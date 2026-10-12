@@ -20,7 +20,7 @@ use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
 
-pub(crate) const METHODS: [&str; 11] = [
+pub(crate) const METHODS: [&str; 12] = [
     "devflow_offer",
     "devflow_status",
     "devflow_setup",
@@ -30,6 +30,7 @@ pub(crate) const METHODS: [&str; 11] = [
     "devflow_brief",
     "devflow_plan",
     "devflow_evidence",
+    "devflow_review",
     "devflow_gate",
     "devflow_session",
 ];
@@ -41,6 +42,7 @@ pub(crate) fn stage_of(method: &str) -> Option<&'static str> {
         "devflow_brief" => Some("briefing"),
         "devflow_plan" => Some("plan"),
         "devflow_evidence" => Some("execution"),
+        "devflow_review" => Some("review"),
         "devflow_gate" => Some("completion"),
         _ => None,
     }
@@ -110,6 +112,9 @@ pub(crate) fn respond(
                 match method {
                     "devflow_evidence" => {
                         crate::devflow_evidence::respond(app, project, config, cwd, params)
+                    }
+                    "devflow_review" => {
+                        crate::devflow_review::respond(app, project, config, cwd, params)
                     }
                     _ => crate::devflow_plan::respond(app, method, project, params),
                 }
@@ -423,7 +428,7 @@ fn machine(store: &Store, project_id: &str) -> Machine {
 
 /// The sign-in this process's Claude Code runs on, read as the footer reads
 /// it. devpit has no such check for the other CLIs, so they say nothing.
-fn claude_signed_in() -> Option<bool> {
+pub(crate) fn claude_signed_in() -> Option<bool> {
     let directory = devpit_agentcli::cli_config::config_dir()?;
     match devpit_agentcli::cli_config::sign_in_at(&directory) {
         Credentials::Saved => Some(true),

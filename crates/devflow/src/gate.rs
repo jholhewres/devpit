@@ -354,17 +354,10 @@ fn reviewed(looked: &Looked, missing: &mut Vec<String>) -> Option<String> {
         }
         return None;
     };
-    let block_on: Vec<&str> = looked
-        .config
-        .review
-        .block_on
-        .iter()
-        .map(|severity| severity.word())
-        .collect();
-    let blocking: Vec<&Value> = list(review.findings, "findings")
-        .iter()
-        .filter(|finding| block_on.contains(&word(finding, "severity")))
-        .collect();
+    let blocking = crate::findings::blocking(
+        list(review.findings, "findings"),
+        &looked.config.review.block_on,
+    );
     for finding in blocking.iter().take(NAMED) {
         missing.push(format!(
             "finding `{}:{}` {} ({}) is in block_on: fix it (devflow-execution) and review again",
@@ -375,6 +368,16 @@ fn reviewed(looked: &Looked, missing: &mut Vec<String>) -> Option<String> {
                 .unwrap_or_default(),
             word(finding, "title"),
             word(finding, "severity")
+        ));
+    }
+    let pending: Vec<&str> = list(review.findings, "pending")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    if !pending.is_empty() {
+        missing.push(format!(
+            "the review has not covered {} yet: review them from its packet and call devpit_devflow_review with its run and your reports (devflow-review)",
+            pending.join(", ")
         ));
     }
     if let Some(changed) = looked.changed.filter(|changed| after(changed, review.at)) {

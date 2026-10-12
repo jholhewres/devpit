@@ -56,7 +56,9 @@ pub use basing::{allowed as base_allowed, chosen as base_chosen, worktree_at, Re
 pub use branches::{branch_at, branches, switch, Branch};
 pub use clone::{clone, first_commit, folder_for, init, unborn};
 pub use discard::discard;
-pub use front::{at_head, changed_since, diff_since, head_of, remove_front, unsaved_in};
+pub use front::{
+    at_head, changed_since, diff_since, head_of, remove_front, review_base, unsaved_in,
+};
 pub use glance::{glance, Glance};
 pub use ignoring::{exclude, ignored};
 pub use index::{commit, stage, unstage};

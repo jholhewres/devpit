@@ -1,5 +1,5 @@
 import { parse } from './diff'
-import { newLines, SHAPE, type Note } from './diffNotes'
+import { falsePositiveOf, newLines, SHAPE, type Note } from './diffNotes'
 import { severityWord } from './found'
 
 /*
@@ -66,6 +66,7 @@ export function DiffFiles({
 function Marker({ note, onDismiss }: { note: Note; onDismiss?: (note: Note, dismissed: boolean) => void }): React.JSX.Element {
   const { finding } = note
   const old = note.standing === 'outdated'
+  const falsePositive = falsePositiveOf(note)
   return (
     <details className="cdiff__fd" data-standing={note.standing} data-dismissed={note.dismissed || undefined}>
       <summary>
@@ -74,12 +75,12 @@ function Marker({ note, onDismiss }: { note: Note; onDismiss?: (note: Note, dism
         </span>
         {finding.line !== null && <span className="cdiff__fl">line {finding.line}</span>}
         {old && <span className="cdiff__fl">Outdated · made at {note.atRevision?.slice(0, 10) ?? 'an unknown commit'}</span>}
-        {note.dismissed && <span className="cdiff__fl">Dismissed by you</span>}
+        {note.dismissed && <span className="cdiff__fl">{falsePositive ? 'A false positive, you said' : 'Dismissed by you'}</span>}
       </summary>
       <p className="fnd__y">{finding.why}</p>
       {onDismiss && (
         <button className="btn" onClick={() => onDismiss(note, !note.dismissed)}>
-          {note.dismissed ? 'Keep' : 'Dismiss'}
+          {falsePositive ? (note.dismissed ? 'Not a false positive' : 'False positive') : note.dismissed ? 'Keep' : 'Dismiss'}
         </button>
       )}
     </details>

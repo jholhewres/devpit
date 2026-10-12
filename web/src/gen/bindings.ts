@@ -1737,7 +1737,10 @@ export const commands = {
 	checkpointFindings: (runId: string) => typedError<Found, RpcError>(__TAURI_INVOKE("checkpoint_findings", { runId })),
 	/**  `card.findings` — what every review on this card found, for its diff. */
 	cardFindings: (cardId: string) => typedError<CardFindings, RpcError>(__TAURI_INVOKE("card_findings", { cardId })),
-	/**  `finding.dismiss` — sets one finding aside, or brings it back. */
+	/**
+	 *  `finding.dismiss` — sets one finding aside, or brings it back. On a
+	 *  Devflow review it is the person saying the finding is a false positive.
+	 */
 	findingDismiss: (runId: string, at: number, dismissed: boolean) => typedError<null, RpcError>(__TAURI_INVOKE("finding_dismiss", { runId, at, dismissed })),
 	projectTestCommand: (projectId: string) => typedError<TestCommand, RpcError>(__TAURI_INVOKE("project_test_command", { projectId })),
 	sessionCost: (sessionId: string) => typedError<{

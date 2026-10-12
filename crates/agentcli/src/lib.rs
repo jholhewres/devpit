@@ -321,6 +321,7 @@ pub mod profile;
 #[cfg(test)]
 mod profile_tests;
 pub mod resident;
+pub mod reviewing;
 pub mod running;
 mod stopping;
 pub use mcp_health::mcp_health;

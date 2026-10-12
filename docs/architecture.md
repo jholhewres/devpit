@@ -217,6 +217,22 @@ no copy, only that the person clicked.
   Playwright the setup writes `.devpit/devflow/playwright.config.ts`: the
   project's own config as its base, Devflow's specs from `e2e_dir`, a JUnit
   report and every screenshot and video.
+- **Several reviewers, one list.** `devpit_devflow_review` runs each of
+  `review.reviewers` headless on the person's own CLI and subscription
+  (`claude -p`, `codex exec`, `cursor-agent -p`, `gemini`), all at once and
+  only through `crates/agentcli`, from one packet in the run: BASE and HEAD,
+  the diff, the card, its criteria and the persona — never the session's
+  history; what the review is about reaches them in their environment. Each
+  answer is held to the findings schema and kept as `findings-<agent>.json`;
+  a CLI not installed or not signed in is skipped and said. The findings are
+  merged — within an axis, the same file, lines that meet and the same cause
+  kept once with `agreement` ("2 of 3"), the cause judged as
+  `review.consolidate` says (`jev`, else one model pass, or titles alike) —
+  and `block_on` gives the verdict in `findings.json`, the gate's file. An
+  axis nobody answered for stays `pending`, which holds the gate, until the
+  session hands back its own answers. The card's diff draws the findings,
+  and the person's "false positive" there is kept on the finding, which then
+  holds nothing.
 - **A card is done at the gate.** `devpit_devflow_gate` checks what devpit
   can check itself: the card's checks ran after the last change to the code
   (each changed file by when it was written, so a commit is not a change)

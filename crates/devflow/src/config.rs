@@ -77,6 +77,11 @@ words!(
     /// Whether Decisions only logs (`shadow`) or blocks (`enforce`).
     Mode { Shadow = "shadow", Enforce = "enforce" }
 );
+words!(
+    /// How several reviewers' findings become one list: by Jev's
+    /// `devflow-finding` rubric, by one model pass, or merged as they are.
+    Consolidate { Jev = "jev", Agent = "agent", Nothing = "none" }
+);
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Config {
@@ -138,6 +143,7 @@ pub struct Review {
     /// reviewed, by the session itself.
     pub reviewers: Vec<Reviewer>,
     pub block_on: Vec<Severity>,
+    pub consolidate: Consolidate,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -185,6 +191,7 @@ impl Default for Config {
             review: Review {
                 reviewers: Vec::new(),
                 block_on: vec![Severity::Critical, Severity::High],
+                consolidate: Consolidate::Jev,
             },
             decisions: Decisions {
                 use_: false,
@@ -643,10 +650,21 @@ fn review(node: &Node, path: &str) -> Result<Review, Invalid> {
         }
         None => Config::default().review.block_on,
     };
+    let consolidate = match fields.get("consolidate") {
+        Some((node, path)) => word(
+            node,
+            &path,
+            Consolidate::of,
+            Consolidate::ALL,
+            Consolidate::word,
+        )?,
+        None => Config::default().review.consolidate,
+    };
     fields.done()?;
     Ok(Review {
         reviewers,
         block_on,
+        consolidate,
     })
 }
 

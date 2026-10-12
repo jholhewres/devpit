@@ -76,6 +76,11 @@ pub fn render(config: &Config) -> String {
         .map(|one| one.word())
         .collect();
     let _ = writeln!(out, "  block_on: [{}]", severities.join(", "));
+    out.push_str(
+        "  # How several reviewers' findings become one: jev (Decisions, else a\n  \
+         # model pass), agent (one model pass) or none (merged as they are).\n",
+    );
+    let _ = writeln!(out, "  consolidate: {}", config.review.consolidate.word());
 
     out.push_str(
         "\n# Decisions (Jev) answers typed questions about the gates. shadow logs\n\

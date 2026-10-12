@@ -118,6 +118,11 @@ without `apply`:
 { "path": "review.block_on", "value": ["critical"] }
 ```
 
+More reviewers are more items of `review.reviewers`, each
+`{ "agent": "codex", "persona": "devflow-spec", "model": "…" }` on that CLI's
+own sign-in; `review.consolidate` says how their findings become one list:
+`jev` (Decisions, else a model pass), `agent` (one model pass) or `none`.
+
 Show the before and after, ask for a yes, then call it again with
 `"apply": true`. `enabled` and `decisions.mode: enforce` go through the
 person's click, like activation: tell them where to click instead of setting

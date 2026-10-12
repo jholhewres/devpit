@@ -17,8 +17,9 @@ const STARTING: Duration = Duration::from_secs(90);
 /// A decision waits on a model over the network, which is given five seconds;
 /// the rest is room for the app to say why it gave up.
 const DECIDING: Duration = Duration::from_secs(15);
-/// A card's evidence runs its checks: a test suite, an E2E run with video.
-/// The app stops the checks short of this, so an answer always comes.
+/// A card's evidence runs its checks: a test suite, an E2E run with video;
+/// its review runs its reviewers. The app stops them short of this, so an
+/// answer always comes.
 const CHECKING: Duration = Duration::from_secs(20 * 60);
 
 /// How long devpit has to answer one question.
@@ -27,7 +28,7 @@ pub fn wait_for(method: &str) -> Duration {
         STARTING
     } else if method == "decide" || method == "rubric_run" || method == "devflow_gate" {
         DECIDING
-    } else if method == "devflow_evidence" {
+    } else if method == "devflow_evidence" || method == "devflow_review" {
         CHECKING
     } else {
         WAIT

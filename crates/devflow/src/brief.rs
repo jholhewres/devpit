@@ -147,6 +147,14 @@ pub fn written(body: &str, brief: &Brief) -> String {
         .join("\n\n")
 }
 
+/// The brief an epic's body says, when it has a `## Brief` section.
+pub fn read(body: &str) -> Option<Brief> {
+    sections(body)
+        .into_iter()
+        .find(|(title, _)| title.as_deref() == Some(BRIEF))
+        .map(|(_, text)| parsed(&text))
+}
+
 /// The body cut at its `#` and `##` headings, outside code fences: each
 /// part with its heading's title, the text before the first one with none.
 fn sections(body: &str) -> Vec<(Option<String>, String)> {

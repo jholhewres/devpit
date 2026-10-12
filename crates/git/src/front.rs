@@ -17,6 +17,33 @@ pub fn head_of(root: &Path) -> Result<String, GitError> {
     Ok(run(root, &["rev-parse", "HEAD"])?.trim().to_owned())
 }
 
+/// Where a review's diff starts: the merge base of `HEAD` and `base`, or of
+/// `HEAD` and the default branch — origin's, else `main`, else `master`.
+pub fn review_base(root: &Path, base: Option<&str>) -> Result<String, GitError> {
+    let tried: Vec<String> = match base {
+        Some(base) => vec![base.to_owned()],
+        None => run(
+            root,
+            &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+        )
+        .ok()
+        .map(|said| said.trim().to_owned())
+        .into_iter()
+        .chain(["main".to_owned(), "master".to_owned()])
+        .collect(),
+    };
+    tried
+        .iter()
+        .find_map(|one| run(root, &["merge-base", "HEAD", one]).ok())
+        .map(|sha| sha.trim().to_owned())
+        .ok_or_else(|| {
+            GitError::Refused(format!(
+                "no common commit between HEAD and {}: pass the base branch as `base`",
+                tried.join(" or ")
+            ))
+        })
+}
+
 /// The names of the files this front changed, against where it began.
 ///
 /// Includes work not yet committed: a front is judged by what it did, and half
