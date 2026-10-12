@@ -773,7 +773,7 @@ fn context(project: &Project, board: &Board, cwd: &Path) -> Value {
     })
 }
 
-fn board_view(board: &Board) -> Value {
+pub(crate) fn board_view(board: &Board) -> Value {
     json!(board
         .columns
         .iter()
@@ -799,7 +799,7 @@ fn board_view(board: &Board) -> Value {
         .collect::<Vec<_>>())
 }
 
-fn card_view(board: &Board, id: &str) -> Result<Value, String> {
+pub(crate) fn card_view(board: &Board, id: &str) -> Result<Value, String> {
     on_board(board, id)?;
     let detail = crate::cards::detail_of(board.project_id.clone(), id.to_owned()).map_err(said)?;
     serde_json::to_value(detail).map_err(|err| err.to_string())

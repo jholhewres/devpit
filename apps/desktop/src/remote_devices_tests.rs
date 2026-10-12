@@ -52,7 +52,7 @@ fn a_device_through_the_relay_is_known_by_its_key_and_by_nothing_else() {
     let dir = tempfile::tempdir().expect("dir");
     let mut devices = Devices::default();
     let key = [7u8; 32];
-    let phone = devices.pair_key("Pixel", &key, 5.0).expect("paired");
+    let phone = devices.pair_key("Pixel", &key, false, 5.0).expect("paired");
     assert!(!phone.typing && !phone.answering, "a new device only sees");
     devices.write(dir.path()).expect("write");
 
@@ -66,11 +66,32 @@ fn a_device_through_the_relay_is_known_by_its_key_and_by_nothing_else() {
     assert!(read.by_token("").is_none());
 
     // Paired again, the key is one device, not two.
-    let again = read.pair_key("Pixel 9", &key, 6.0).expect("again");
+    let again = read.pair_key("Pixel 9", &key, false, 6.0).expect("again");
     assert_eq!(read.devices.len(), 1);
     assert!(read.forget(&again.id));
     assert!(
         read.by_key(&key).is_none(),
         "forgotten, the key opens nothing"
     );
+}
+
+#[test]
+fn an_mcp_client_reads_and_is_never_granted_more() {
+    let dir = tempfile::tempdir().expect("dir");
+    let mut devices = Devices::default();
+    let laptop = devices
+        .pair_key("devpit MCP on laptop", &[9u8; 32], true, 1.0)
+        .expect("paired");
+    assert!(laptop.mcp && !laptop.typing && !laptop.answering);
+    assert!(!devices.allow(&laptop.id, true, true));
+    devices.write(dir.path()).expect("write");
+    let read = Devices::read(dir.path());
+    assert!(read
+        .by_key(&[9u8; 32])
+        .is_some_and(|one| one.mcp && !one.typing && !one.answering));
+
+    // A device kept before MCP clients existed is a viewer.
+    let old = r#"{"devices":[{"id":"dev_1","name":"Pixel","key":"00","pairedAt":1.0}]}"#;
+    let old: Devices = serde_json::from_str(old).expect("read");
+    assert!(!old.devices[0].mcp);
 }

@@ -351,9 +351,10 @@ export const commands = {
 	 *  `remote.pair` — a code for one device, shown here, good once for two
 	 *  minutes. Through the relay the QR code is the whole of it: it carries this
 	 *  machine's key, which the device checks the machine against, and a secret
-	 *  too long to type.
+	 *  too long to type. With `mcp` it pairs an MCP client on another machine,
+	 *  through the relay alone, by a link `devpit mcp --remote pair` is given.
 	 */
-	remotePair: () => typedError<RemotePairing, RpcError>(__TAURI_INVOKE("remote_pair")),
+	remotePair: (mcp: boolean) => typedError<RemotePairing, RpcError>(__TAURI_INVOKE("remote_pair", { mcp })),
 	/**  `remote.pair_cancel` — the pairing code is put away. */
 	remotePairCancel: () => __TAURI_INVOKE<void>("remote_pair_cancel"),
 	/**
@@ -366,6 +367,11 @@ export const commands = {
 	 *  connections end, and through the relay their session keys with them.
 	 */
 	remoteForget: (id: string) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_forget", { id })),
+	/**
+	 *  `remote.mcp_set` — whether paired MCP clients may read this devpit
+	 *  through the relay. Off cuts every one connected now, at once.
+	 */
+	remoteMcpSet: (on: boolean) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_mcp_set", { on })),
 	/**  `remote.drop` — every device watching now is disconnected. */
 	remoteDrop: () => __TAURI_INVOKE<void>("remote_drop"),
 	/**  `remote.shapes` — the viewer's messages, for the generated contract. */
@@ -4107,6 +4113,11 @@ export type RemoteDevice = {
 	connected: boolean,
 	/**  Paired through devpit.app's relay, and known by its key. */
 	relay: boolean,
+	/**
+	 *  An MCP client on another machine: it reads devpit's MCP through the
+	 *  relay, and nothing else.
+	 */
+	mcp: boolean,
 };
 
 /**  A reply an orchestrator drafted, waiting on the person. */
@@ -4305,6 +4316,11 @@ export type RemoteView = {
 	/**  Where a paired device opens the viewer, once it is reachable. */
 	address: string | null,
 	devices: RemoteDevice[],
+	/**
+	 *  Paired MCP clients may read this devpit through the relay. Off unless
+	 *  turned on.
+	 */
+	mcp: boolean,
 	/**  Why it is not reachable, when it is on and is not. */
 	problem: string | null,
 };

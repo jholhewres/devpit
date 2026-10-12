@@ -16,7 +16,7 @@ fn pairing(secret: &str) -> Option<RemoteIn> {
 fn an_unknown_key_pairs_only_with_the_secret_on_offer() {
     let mut devices = Devices::default();
     let phone = [3u8; 32];
-    let on_offer = |secret: &str| secret == SECRET;
+    let on_offer = |secret: &str| (secret == SECRET).then_some(false);
 
     let wrong = identify(&mut devices, &phone, || pairing("guess"), on_offer, 1.0);
     assert!(wrong.is_err());
@@ -49,10 +49,13 @@ fn an_unknown_key_pairs_only_with_the_secret_on_offer() {
 fn a_paired_key_is_its_device_without_a_word_until_it_is_forgotten() {
     let mut devices = Devices::default();
     let phone = [4u8; 32];
-    let id = devices.pair_key("Pixel", &phone, 1.0).expect("paired").id;
+    let id = devices
+        .pair_key("Pixel", &phone, false, 1.0)
+        .expect("paired")
+        .id;
 
     let never = || -> Option<RemoteIn> { panic!("a known device is not asked for a secret") };
-    let (device, fresh) = identify(&mut devices, &phone, never, |_| false, 5.0).expect("known");
+    let (device, fresh) = identify(&mut devices, &phone, never, |_| None, 5.0).expect("known");
     assert_eq!((device.id.as_str(), fresh), (id.as_str(), false));
     assert_eq!(
         devices.by_key(&phone).and_then(|one| one.last_seen),
@@ -62,8 +65,23 @@ fn a_paired_key_is_its_device_without_a_word_until_it_is_forgotten() {
     // Unpaired: the same key, at its next handshake, is a stranger again —
     // and the secret it paired with once does not bring it back.
     assert!(devices.forget(&id));
-    assert!(identify(&mut devices, &phone, || None, |_| false, 6.0).is_err());
-    assert!(identify(&mut devices, &phone, || pairing(SECRET), |_| false, 6.0).is_err());
+    assert!(identify(&mut devices, &phone, || None, |_| None, 6.0).is_err());
+    assert!(identify(&mut devices, &phone, || pairing(SECRET), |_| None, 6.0).is_err());
+}
+
+#[test]
+fn a_key_paired_from_an_offer_for_an_mcp_client_is_one() {
+    let mut devices = Devices::default();
+    let laptop = [5u8; 32];
+    let for_mcp = |secret: &str| (secret == SECRET).then_some(true);
+    let (device, fresh) =
+        identify(&mut devices, &laptop, || pairing(SECRET), for_mcp, 1.0).expect("paired");
+    assert!(fresh && device.mcp);
+    let (again, fresh) = identify(&mut devices, &laptop, || None, |_| None, 2.0).expect("known");
+    assert!(
+        !fresh && again.mcp,
+        "known by its key as what it was paired as"
+    );
 }
 
 #[test]

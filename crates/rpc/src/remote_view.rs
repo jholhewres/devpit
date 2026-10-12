@@ -346,6 +346,9 @@ pub struct RemoteDevice {
     pub connected: bool,
     /// Paired through devpit.app's relay, and known by its key.
     pub relay: bool,
+    /// An MCP client on another machine: it reads devpit's MCP through the
+    /// relay, and nothing else.
+    pub mcp: bool,
 }
 
 /// How paired devices reach this machine.
@@ -382,6 +385,9 @@ pub struct RemoteView {
     /// Where a paired device opens the viewer, once it is reachable.
     pub address: Option<String>,
     pub devices: Vec<RemoteDevice>,
+    /// Paired MCP clients may read this devpit through the relay. Off unless
+    /// turned on.
+    pub mcp: bool,
     /// Why it is not reachable, when it is on and is not.
     pub problem: Option<String>,
 }

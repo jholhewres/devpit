@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { RemoteActivity, RemoteDevice, RemotePairing, RemoteVia, RemoteView } from '../gen/bindings'
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
+import { RemoteMcp } from './RemoteMcp'
 import { launcherLink } from './remoteLauncher'
 import { onCarried } from './window'
 
@@ -48,7 +49,7 @@ export function RemoteSettings(): React.JSX.Element {
   }
 
   const pair = (): void =>
-    void ask(() => commands.remotePair()).then((answer) => {
+    void ask(() => commands.remotePair(false)).then((answer) => {
       setSaid(answer.error)
       setPairing(answer.data)
     })
@@ -56,44 +57,48 @@ export function RemoteSettings(): React.JSX.Element {
   if (!view) return <></>
   const relay = view.via === 'relay'
   const reachable = relay ? view.relay.online : Boolean(view.address)
+  const devices = view.devices.filter((device) => !device.mcp)
 
   return (
-    <PrefSwitch
-      on={view.enabled}
-      disabled={busy}
-      onFlip={flip}
-      title="Remote"
-      said={<>Reach this machine from your phone or another computer: over your Tailscale tailnet, or from anywhere through devpit.app, encrypted end to end. {RISK}</>}
-      moreLabel="How to set it up"
-      more={relay ? <RelaySteps /> : <TailnetSteps login={view.tailscale.login} />}
-    >
-      {view.enabled && (
-        <>
-          <span className="remote__chips" role="group" aria-label="How devices reach this machine">
-            <button className="remote__chip" aria-pressed={!relay} disabled={busy} onClick={() => choose('tailscale')} title="Over your tailnet, served by this machine">
-              Tailscale
-            </button>
-            <button className="remote__chip" aria-pressed={relay} disabled={busy} onClick={() => choose('relay')} title="From anywhere, through devpit.app, which cannot read what passes">
-              devpit.app relay
-            </button>
-          </span>
-          {relay ? <RelayState view={view} /> : <TailnetState view={view} />}
-          {said && <span className="pref__d voice__bad">{said}</span>}
-          {reachable && !pairing && (
-            <span className="voice__row">
-              <button className="btn" onClick={pair}>
-                Pair a device
+    <>
+      <PrefSwitch
+        on={view.enabled}
+        disabled={busy}
+        onFlip={flip}
+        title="Remote"
+        said={<>Reach this machine from your phone or another computer: over your Tailscale tailnet, or from anywhere through devpit.app, encrypted end to end. {RISK}</>}
+        moreLabel="How to set it up"
+        more={relay ? <RelaySteps /> : <TailnetSteps login={view.tailscale.login} />}
+      >
+        {view.enabled && (
+          <>
+            <span className="remote__chips" role="group" aria-label="How devices reach this machine">
+              <button className="remote__chip" aria-pressed={!relay} disabled={busy} onClick={() => choose('tailscale')} title="Over your tailnet, served by this machine">
+                Tailscale
+              </button>
+              <button className="remote__chip" aria-pressed={relay} disabled={busy} onClick={() => choose('relay')} title="From anywhere, through devpit.app, which cannot read what passes">
+                devpit.app relay
               </button>
             </span>
-          )}
-          {pairing && <PairingCode pairing={pairing} relay={relay} onDone={() => (commands.remotePairCancel(), setPairing(null))} />}
-          {view.devices.map((device) => (
-            <DeviceRow key={device.id} device={device} onView={setView} />
-          ))}
-          {view.devices.length > 0 && <Activity />}
-        </>
-      )}
-    </PrefSwitch>
+            {relay ? <RelayState view={view} /> : <TailnetState view={view} />}
+            {said && <span className="pref__d voice__bad">{said}</span>}
+            {reachable && !pairing && (
+              <span className="voice__row">
+                <button className="btn" onClick={pair}>
+                  Pair a device
+                </button>
+              </span>
+            )}
+            {pairing && <PairingCode pairing={pairing} relay={relay} onDone={() => (commands.remotePairCancel(), setPairing(null))} />}
+            {devices.map((device) => (
+              <DeviceRow key={device.id} device={device} onView={setView} />
+            ))}
+            {view.devices.length > 0 && <Activity />}
+          </>
+        )}
+      </PrefSwitch>
+      {view.enabled && relay && <RemoteMcp view={view} onView={setView} />}
+    </>
   )
 }
 

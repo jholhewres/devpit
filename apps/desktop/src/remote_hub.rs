@@ -28,6 +28,13 @@ pub(crate) fn join(
     app: &tauri::AppHandle,
     device: &str,
 ) -> (u64, Sender<RemoteOut>, Receiver<RemoteOut>) {
+    let joined = enter(device);
+    told(app);
+    joined
+}
+
+/// [`join`], without telling the window.
+fn enter(device: &str) -> (u64, Sender<RemoteOut>, Receiver<RemoteOut>) {
     let id = NEXT.fetch_add(1, Ordering::SeqCst);
     let (out, heard) = channel();
     if let Ok(mut conns) = CONNS.lock() {
@@ -37,7 +44,6 @@ pub(crate) fn join(
             out: out.clone(),
         });
     }
-    told(app);
     (id, out, heard)
 }
 
@@ -51,10 +57,15 @@ pub(crate) fn leave(app: &tauri::AppHandle, id: u64) {
 /// Ends every connection of a device: forgotten, or no longer allowed what
 /// it was connected with.
 pub(crate) fn drop_device(app: &tauri::AppHandle, device: &str) {
+    drop_conns(device);
+    told(app);
+}
+
+/// [`drop_device`], without telling the window.
+fn drop_conns(device: &str) {
     if let Ok(mut conns) = CONNS.lock() {
         conns.retain(|one| one.device != device);
     }
-    told(app);
 }
 
 pub(crate) fn drop_all(app: &tauri::AppHandle) {
@@ -152,5 +163,21 @@ pub(crate) fn listen(app: &tauri::AppHandle) {
                 settled(&id);
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{drop_conns, enter, holds};
+
+    #[test]
+    fn dropping_a_device_lets_go_of_its_connections_and_no_other() {
+        let (laptop, _, _) = enter("dev_hub_laptop");
+        let (phone, _, _) = enter("dev_hub_phone");
+        assert!(holds(laptop) && holds(phone));
+        drop_conns("dev_hub_laptop");
+        assert!(!holds(laptop), "its loop ends on its next turn");
+        assert!(holds(phone));
+        drop_conns("dev_hub_phone");
     }
 }

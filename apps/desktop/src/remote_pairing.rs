@@ -22,6 +22,9 @@ pub(crate) struct Offered {
     /// because the relay's pairing has no address only the tailnet reaches.
     pub secret: String,
     pub expires_at: f64,
+    /// It pairs an MCP client, which reads devpit's MCP through the relay
+    /// and nothing else — decided here, never by the device.
+    pub mcp: bool,
     wrong: u32,
 }
 
@@ -35,14 +38,16 @@ pub(crate) fn code_of(bytes: &[u8; 8]) -> String {
         .collect()
 }
 
-/// A new code, in place of any before it.
-pub(crate) fn offer(now: f64) -> Option<Offered> {
+/// A new code, in place of any before it: for a viewer, or for an MCP
+/// client when `mcp`.
+pub(crate) fn offer(now: f64, mcp: bool) -> Option<Offered> {
     let mut bytes = [0u8; 8];
     getrandom::fill(&mut bytes).ok()?;
     let offered = Offered {
         code: code_of(&bytes),
         secret: crate::remote_devices::fresh_token()?,
         expires_at: now + GOOD_FOR,
+        mcp,
         wrong: 0,
     };
     *OFFERED.lock().ok()? = Some(offered.clone());
@@ -58,21 +63,22 @@ pub(crate) fn take(code: &str, now: f64) -> bool {
     taken(&mut held, code, now)
 }
 
+/// An MCP client pairs through the relay alone, so the tailnet's code never
+/// takes its offer.
 pub(crate) fn taken(held: &mut Option<Offered>, code: &str, now: f64) -> bool {
     let typed = code.trim().to_ascii_uppercase().replace(['-', ' '], "");
-    settled(held, now, |offered| typed == offered.code)
+    settled(held, now, |offered| !offered.mcp && typed == offered.code).is_some()
 }
 
-/// Whether `secret` is the relay's secret on offer, still good: taken if so,
-/// burned like the code after too many that were not.
-pub(crate) fn take_secret(secret: &str, now: f64) -> bool {
-    let Ok(mut held) = OFFERED.lock() else {
-        return false;
-    };
+/// The relay's secret on offer, still good: taken if `secret` is it, and
+/// then whether it pairs an MCP client; burned like the code after too many
+/// that were not.
+pub(crate) fn take_secret(secret: &str, now: f64) -> Option<bool> {
+    let mut held = OFFERED.lock().ok()?;
     secret_taken(&mut held, secret, now)
 }
 
-pub(crate) fn secret_taken(held: &mut Option<Offered>, secret: &str, now: f64) -> bool {
+pub(crate) fn secret_taken(held: &mut Option<Offered>, secret: &str, now: f64) -> Option<bool> {
     settled(held, now, |offered| {
         // Compared without saying, by how long it took, how much matched.
         secret.len() == offered.secret.len()
@@ -84,24 +90,26 @@ pub(crate) fn secret_taken(held: &mut Option<Offered>, secret: &str, now: f64) -
     })
 }
 
-/// One try at what is on offer: taken when `matches`, counted against it when not.
-fn settled(held: &mut Option<Offered>, now: f64, matches: impl Fn(&Offered) -> bool) -> bool {
-    let Some(offered) = held.as_mut() else {
-        return false;
-    };
+/// One try at what is on offer: taken when `matches`, and then whether it
+/// paired an MCP client; counted against it when not.
+fn settled(
+    held: &mut Option<Offered>,
+    now: f64,
+    matches: impl Fn(&Offered) -> bool,
+) -> Option<bool> {
+    let offered = held.as_mut()?;
     if now > offered.expires_at {
         *held = None;
-        return false;
+        return None;
     }
     if matches(offered) {
-        *held = None;
-        return true;
+        return held.take().map(|offered| offered.mcp);
     }
     offered.wrong += 1;
     if offered.wrong >= GUESSES {
         *held = None;
     }
-    false
+    None
 }
 
 /// Puts the offered code away: paired, or the person closed it.
@@ -122,6 +130,7 @@ mod tests {
             code: code.to_owned(),
             secret: SECRET.to_owned(),
             expires_at: 100.0,
+            mcp: false,
             wrong: 0,
         })
     }
@@ -129,22 +138,32 @@ mod tests {
     #[test]
     fn the_relays_secret_pairs_once_and_burns_like_the_code() {
         let mut held = offered("ABCD2345");
-        assert!(!secret_taken(&mut held, &SECRET[..63], 10.0));
-        assert!(secret_taken(&mut held, SECRET, 10.0));
-        assert!(!secret_taken(&mut held, SECRET, 10.0), "only once");
+        assert_eq!(secret_taken(&mut held, &SECRET[..63], 10.0), None);
+        assert_eq!(secret_taken(&mut held, SECRET, 10.0), Some(false));
+        assert_eq!(secret_taken(&mut held, SECRET, 10.0), None, "only once");
         assert!(
             !taken(&mut held, "ABCD2345", 10.0),
             "and the code went with it"
         );
 
         let mut late = offered("ABCD2345");
-        assert!(!secret_taken(&mut late, SECRET, 101.0));
+        assert_eq!(secret_taken(&mut late, SECRET, 101.0), None);
 
         let mut guessed = offered("ABCD2345");
         for _ in 0..GUESSES {
-            assert!(!secret_taken(&mut guessed, "nope", 10.0));
+            assert_eq!(secret_taken(&mut guessed, "nope", 10.0), None);
         }
-        assert!(!secret_taken(&mut guessed, SECRET, 10.0));
+        assert_eq!(secret_taken(&mut guessed, SECRET, 10.0), None);
+    }
+
+    #[test]
+    fn an_offer_for_an_mcp_client_pairs_one_through_the_relay_alone() {
+        let mut held = offered("ABCD2345").map(|one| Offered { mcp: true, ..one });
+        assert!(
+            !taken(&mut held, "ABCD2345", 10.0),
+            "never by the tailnet's code"
+        );
+        assert_eq!(secret_taken(&mut held, SECRET, 10.0), Some(true));
     }
 
     #[test]

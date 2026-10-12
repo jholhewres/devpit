@@ -79,6 +79,9 @@ pub const REMOTE_PORT: &str = "remote.port";
 /// How paired devices reach this machine: `tailscale` (its tailnet) or
 /// `relay` (devpit.app's relay, encrypted end to end). Tailscale unless set.
 pub const REMOTE_VIA: &str = "remote.via";
+/// Whether a paired MCP client on another machine may read this devpit
+/// through the relay. Off unless turned on.
+pub const REMOTE_MCP: &str = "remote.mcp";
 /// Who answers Decisions: `openrouter` or `vercel`. OpenRouter unless set.
 pub const DECISIONS_PROVIDER: &str = "decisions.provider";
 /// The Decisions model; empty is the provider's default.

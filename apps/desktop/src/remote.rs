@@ -100,6 +100,7 @@ fn view(root: &Path, store: &Store, problem: Option<String>) -> RemoteView {
             .map(|one| RemoteDevice {
                 connected: connected.contains(&one.id),
                 relay: one.key.is_some(),
+                mcp: one.mcp,
                 id: one.id,
                 name: one.name,
                 typing: one.typing,
@@ -108,6 +109,7 @@ fn view(root: &Path, store: &Store, problem: Option<String>) -> RemoteView {
                 last_seen: one.last_seen,
             })
             .collect(),
+        mcp: crate::remote_mcp::allowed(store),
         problem,
     }
 }
@@ -238,32 +240,43 @@ pub async fn remote_via(app: tauri::AppHandle, via: RemoteVia) -> Result<RemoteV
 /// `remote.pair` — a code for one device, shown here, good once for two
 /// minutes. Through the relay the QR code is the whole of it: it carries this
 /// machine's key, which the device checks the machine against, and a secret
-/// too long to type.
+/// too long to type. With `mcp` it pairs an MCP client on another machine,
+/// through the relay alone, by a link `devpit mcp --remote pair` is given.
 #[tauri::command]
 #[specta::specta]
-pub async fn remote_pair() -> Result<RemotePairing, RpcError> {
-    crate::off_main::blocking(|| {
+pub async fn remote_pair(mcp: bool) -> Result<RemotePairing, RpcError> {
+    crate::off_main::blocking(move || {
         let store = Store::open_default()?;
         let relay = via(&store) == RemoteVia::Relay;
+        if mcp && !(relay && crate::remote_mcp::allowed(&store)) {
+            return Err(RpcError::new(
+                ErrorCode::Conflict,
+                "allow remote MCP through devpit.app first",
+            ));
+        }
         let address = if relay {
             crate::remote_relay::running().then_some(String::new())
         } else {
             crate::remote_host::address()
         }
         .ok_or_else(|| RpcError::new(ErrorCode::Conflict, "turn Remote on first"))?;
-        let offered = crate::remote_pairing::offer(now())
+        let offered = crate::remote_pairing::offer(now(), mcp)
             .ok_or_else(|| RpcError::internal("no pairing code could be made"))?;
         let url = if relay {
             crate::remote_relay::pairing_url(
                 &Store::root()?,
                 &offered.secret,
                 &crate::remote_conn::machine_name(),
+                mcp,
             )
             .map_err(RpcError::internal)?
         } else {
             format!("{address}#pair={}", offered.code)
         };
-        let qr_svg = qrcode::QrCode::new(url.as_bytes())
+        // A client on another machine is given the link, not a camera.
+        let qr_svg = (!mcp)
+            .then(|| qrcode::QrCode::new(url.as_bytes()).ok())
+            .flatten()
             .map(|code| {
                 code.render::<qrcode::render::svg::Color>()
                     .min_dimensions(200, 200)
@@ -302,7 +315,10 @@ pub async fn remote_allow(
         let root = Store::root()?;
         let mut devices = Devices::read(&root);
         if !devices.allow(&id, typing, answering) {
-            return Err(RpcError::new(ErrorCode::NotFound, "no such device"));
+            return Err(RpcError::new(
+                ErrorCode::NotFound,
+                "no such device — or an MCP client, which only reads",
+            ));
         }
         devices
             .write(&root)
@@ -327,6 +343,23 @@ pub async fn remote_forget(app: tauri::AppHandle, id: String) -> Result<RemoteVi
             .map_err(|err| RpcError::internal(err.to_string()))?;
         crate::remote_hub::drop_device(&app, &id);
         Ok(view(&root, &Store::open_default()?, None))
+    })
+    .await
+}
+
+/// `remote.mcp_set` — whether paired MCP clients may read this devpit
+/// through the relay. Off cuts every one connected now, at once.
+#[tauri::command]
+#[specta::specta]
+pub async fn remote_mcp_set(app: tauri::AppHandle, on: bool) -> Result<RemoteView, RpcError> {
+    crate::off_main::blocking(move || {
+        let store = Store::open_default()?;
+        let root = Store::root()?;
+        store.set_preference(preference::REMOTE_MCP, if on { "true" } else { "false" })?;
+        if !on {
+            crate::remote_mcp::cut(&app, &root);
+        }
+        Ok(view(&root, &store, None))
     })
     .await
 }

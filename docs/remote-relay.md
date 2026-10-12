@@ -94,6 +94,55 @@ the device's side the moment it does (4408). The device's next handshake
 finishes at Noise level and is refused by the machine: its key is no longer
 one it knows, and its secret was used.
 
+## MCP from another machine
+
+An MCP client on another computer — Claude Code on a laptop, say — reads
+this machine's devpit through the same relay, end to end: the board, the
+sessions and what waits on the person. The MCP server is this machine's;
+the other computer only carries its client's messages.
+
+- **Off unless allowed.** Settings → Remote → *Allow remote MCP (read-only)*,
+  shown when devices come in through the relay. Turning it off ends every MCP
+  client's session at once, and a client connecting after is refused.
+- **An MCP client is a kind of device.** It pairs like a phone, from an offer
+  the machine made for an MCP client — *Pair an MCP client* — so which kind a
+  key is, the machine decided, never the device. The link it shows carries
+  `&for=mcp`; the command to run with it on the other computer is
+  `devpit mcp --remote pair '<link>'`. The tailnet's code never takes an
+  offer for an MCP client.
+- **The other computer.** `pair` signs that computer's devpit in to the same
+  account when it is not yet (the code to approve in a browser, as Settings
+  → Account does), makes an X25519 pair, and pairs over the session the
+  link's machine key proves. The pair is kept in that computer's devpit home,
+  `remote-mcp.json`, mode 600. A link whose origin is not the one that
+  devpit signs in at is refused before anything is sent: the account's
+  session would go there. `devpit mcp --remote` is then a stdio MCP server
+  any MCP client there can start; `devpit mcp --remote forget` drops the key.
+- **On the wire.** After the handshake, each JSON-RPC message is one sealed
+  message, under the same ceilings: 256 KiB from the client, 8 MiB from the
+  machine. A device's first message is the pairing, `{"t":"pair",…}`, as a
+  phone's; a machine that will not serve the client says
+  `{"t":"refused","why":…}` and hangs up, and the client answers every
+  request still waiting with that reason. The client connects when it has
+  something to send, and the machine lets a client go after 90 s with
+  nothing said; it connects again on its next request.
+- **Read-only.** What is offered from outside is the allowlist in
+  `crates/agentapi/src/remote_mcp.rs` — `devpit_projects`, `devpit_board`,
+  `devpit_card`, `devpit_sessions` and `devpit_waiting` — and every other
+  tool is refused there before the app is asked. The app's side answers
+  those reads and nothing else (`apps/desktop/src/remote_mcp.rs`).
+  Allowing a tool, answering a session, sending a draft, moving a card stay
+  on the machine or in the Remote.
+- **Cut off at once.** Forgetting the client in Settings, or turning remote
+  MCP off, drops its session on the machine; the relay closes the other
+  side (4408) and the key opens nothing after.
+
+**What cannot connect, for now.** claude.ai and the Claude app reach an MCP
+server themselves, over HTTPS, from Anthropic's side: to read this one they
+would have to hold the key that ends the encryption, which is what devpit.app
+is kept from holding. They stay out until a way keeps it end to end. Settings
+says so beside the switch.
+
 ## The relay's ceilings
 
 A frame is at most 64 KiB, either way. At most 8 machines per account, 8
@@ -106,8 +155,10 @@ many frames and bytes a splice carried and for how long.
 
 | | |
 |---|---|
-| `crates/remote` | the Noise session (`snow`), frames, and the machine's relay client (`tungstenite` over rustls, trusting what the system trusts) |
+| `crates/remote` | the Noise session (`snow`), frames, the machine's relay client (`tungstenite` over rustls, trusting what the system trusts), and MCP carried between machines (`mcp.rs`) |
 | `apps/desktop/src/remote_relay.rs` | turning it on, the machine's key, who a device is, pairing |
+| `crates/agentapi/src/remote_mcp.rs` | the MCP offered from outside: the read-only allowlist |
+| `apps/desktop/src/remote_mcp.rs`, `remote_mcp_client.rs` | the machine serving an MCP client; `devpit mcp --remote` on the other computer |
 | `web/src/remote/noise.ts` | the viewer's Noise, on `@noble/curves`, `@noble/ciphers` and `@noble/hashes` |
 | `web/src/remote/relay.ts` | the viewer's relay transport |
 | devpit-app `crates/relay` | the relay itself |
@@ -129,6 +180,17 @@ It pairs, reads a message longer than one frame, checks every frame the relay
 carried for the words that crossed and against keys of its own making, has a
 device of another account refused, and unpairs the device to see it dropped
 and then refused.
+
+The MCP client has its own, in Rust, with the same checkout:
+
+```sh
+DEVPIT_APP_DIR=../devpit-app cargo test -p devpit-remote --test remote_mcp_through_the_relay
+```
+
+It pairs a client, reads what waits on the person, has a write refused,
+checks the capture the same way, and cuts the client off by forgetting it and
+by turning remote MCP off. `an_mcp_client_reads_through_a_splice.rs` runs the
+same without devpit-app, through a splice of its own, in `make test`.
 
 ## The viewer devpit.app serves
 

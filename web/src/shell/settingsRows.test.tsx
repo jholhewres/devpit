@@ -7,7 +7,12 @@ import { RemoteSettings } from './RemoteSettings'
 import { VoiceSettings } from './VoiceSettings'
 
 const allowed = vi.fn()
+const paired = vi.fn()
+const forgot = vi.fn()
+const mcpSet = vi.fn()
 let whisper: string | null = null
+let mcp = false
+let clients: RemoteDevice[] = []
 
 const device = (over: Partial<RemoteDevice> = {}): RemoteDevice => ({
   id: 'dev_1',
@@ -18,6 +23,7 @@ const device = (over: Partial<RemoteDevice> = {}): RemoteDevice => ({
   lastSeen: null,
   connected: false,
   relay: false,
+  mcp: false,
   ...over,
 })
 
@@ -31,7 +37,8 @@ const view = (): RemoteView => ({
   tailscale: { installed: true, running: true, name: 'box.tail1.ts.net', https: true, login: 'me@example.com', ip: null },
   address: via === 'relay' ? null : 'https://box.tail1.ts.net:8443/',
   problem: null,
-  devices: [device()],
+  devices: [device(), ...clients],
+  mcp,
 })
 
 const pairing = (): RemotePairing => ({
@@ -50,9 +57,10 @@ vi.mock('./live', () => ({
   commands: {
     remoteRead: async () => view(),
     remoteAllow: async (id: string, typing: boolean, answering: boolean) => (allowed(id, typing, answering), view()),
-    remoteForget: async () => view(),
+    remoteForget: async (id: string) => (forgot(id), view()),
     remoteVia: async (next: RemoteVia) => (chosen(next), (via = next), view()),
-    remotePair: async () => pairing(),
+    remotePair: async (forMcp: boolean) => (paired(forMcp), { ...pairing(), url: forMcp ? `${pairing().url}&for=mcp` : pairing().url, qrSvg: forMcp ? '' : '<svg></svg>' }),
+    remoteMcpSet: async (on: boolean) => (mcpSet(on), (mcp = on), view()),
     remotePairCancel: () => undefined,
     transcribeRead: async () => voice(),
   },
@@ -63,6 +71,8 @@ afterEach(() => {
   vi.clearAllMocks()
   whisper = null
   via = 'tailscale'
+  mcp = false
+  clients = []
 })
 
 describe('a settings switch', () => {
@@ -134,6 +144,58 @@ describe('Remote in Settings', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Pair a device' }))
     await screen.findByRole('button', { name: 'Copy the link' })
     expect(screen.queryByText('ABCD2345')).toBeNull()
+  })
+})
+
+describe('Remote MCP in Settings', () => {
+  const card = async (): Promise<HTMLElement> => (await screen.findByRole('switch', { name: 'Allow remote MCP (read-only)' })).closest('.pref') as HTMLElement
+
+  it('is offered through the relay alone, off, saying what claude.ai cannot do', async () => {
+    render(<RemoteSettings />)
+    await screen.findByRole('switch', { name: 'Remote' })
+    expect(screen.queryByRole('switch', { name: 'Allow remote MCP (read-only)' })).toBeNull()
+    cleanup()
+    via = 'relay'
+    render(<RemoteSettings />)
+    const mcpCard = await card()
+    expect(within(mcpCard).getByRole('switch').getAttribute('aria-checked')).toBe('false')
+    expect(within(mcpCard).getByText(/claude\.ai and the Claude app cannot connect to it directly/)).toBeTruthy()
+    expect(within(mcpCard).queryByRole('button', { name: 'Pair an MCP client' })).toBeNull()
+  })
+
+  it('turns on and off from its switch, which cuts the clients on the machine', async () => {
+    via = 'relay'
+    render(<RemoteSettings />)
+    fireEvent.click(within(await card()).getByRole('switch'))
+    await waitFor(() => expect(mcpSet).toHaveBeenCalledWith(true))
+    await waitFor(async () => expect(within(await card()).getByRole('switch').getAttribute('aria-checked')).toBe('true'))
+    fireEvent.click(within(await card()).getByRole('switch'))
+    await waitFor(() => expect(mcpSet).toHaveBeenCalledWith(false))
+  })
+
+  it('pairs a client by a command to run on the other computer, never a code to scan', async () => {
+    via = 'relay'
+    mcp = true
+    render(<RemoteSettings />)
+    fireEvent.click(within(await card()).getByRole('button', { name: 'Pair an MCP client' }))
+    await waitFor(() => expect(paired).toHaveBeenCalledWith(true))
+    const command = await screen.findByText(/^devpit mcp --remote pair '/)
+    expect(command.textContent).toContain('&for=mcp')
+    expect(document.querySelector('.remote__qr')).toBeNull()
+  })
+
+  it('lists its clients under its own switch, with Forget and nothing to grant', async () => {
+    via = 'relay'
+    clients = [device({ id: 'dev_mcp', name: 'devpit MCP on laptop', relay: true, mcp: true, answering: false })]
+    render(<RemoteSettings />)
+    const mcpCard = await card()
+    within(mcpCard).getByText('devpit MCP on laptop')
+    within(mcpCard).getByText('read-only MCP')
+    expect(within(mcpCard).queryByRole('button', { name: 'type' })).toBeNull()
+    const remote = screen.getByRole('switch', { name: 'Remote' }).closest('.pref') as HTMLElement
+    expect(within(remote).queryByText('devpit MCP on laptop')).toBeNull()
+    fireEvent.click(within(mcpCard).getByRole('button', { name: 'Forget' }))
+    await waitFor(() => expect(forgot).toHaveBeenCalledWith('dev_mcp'))
   })
 })
 

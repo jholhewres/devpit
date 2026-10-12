@@ -171,6 +171,8 @@ mod remote_devices;
 mod remote_host;
 mod remote_http;
 mod remote_hub;
+mod remote_mcp;
+mod remote_mcp_client;
 mod remote_pairing;
 mod remote_panes;
 mod remote_relay;
@@ -502,6 +504,10 @@ fn agent_door() -> Option<i32> {
         }
     };
     Some(match first {
+        // A client on this machine for devpit's MCP on another, through the relay.
+        "mcp" if args.get(1).is_some_and(|arg| arg == "--remote") => {
+            remote_mcp_client::run(&root, &args[2..])
+        }
         "mcp" => devpit_agentapi::mcp::serve(&root),
         "hook" => devpit_agentapi::hook::run(&root, &args[1..]),
         _ => devpit_agentapi::cli::run(&root, &args[1..]),

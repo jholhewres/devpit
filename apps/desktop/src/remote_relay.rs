@@ -227,7 +227,12 @@ fn join(app: tauri::AppHandle, root: PathBuf, relay: Relay, keys: Keys, splice: 
                 return wire.end();
             }
             if fresh {
-                crate::remote::note(&root, &device, "paired through devpit.app");
+                let how = if device.mcp {
+                    "paired as an MCP client through devpit.app"
+                } else {
+                    "paired through devpit.app"
+                };
+                crate::remote::note(&root, &device, how);
                 crate::remote::changed(&app);
             }
             device
@@ -237,17 +242,26 @@ fn join(app: tauri::AppHandle, root: PathBuf, relay: Relay, keys: Keys, splice: 
             return wire.end();
         }
     };
+    // An MCP client is served the MCP, and none of the viewer's protocol.
+    if device.mcp {
+        if let Some(link) = wire.0.take() {
+            crate::remote_mcp::serve(app, root, link, device);
+        }
+        return;
+    }
     crate::remote_conn::serve(app, wire, root, device);
 }
 
 /// Who the device whose handshake proved `peer` is: one paired already, or
 /// one pairing now with the secret its QR code carried as its first message
-/// — and whether it is new. Anything else is refused, saying why.
+/// — and whether it is new. `take_secret` says whether the secret is the one
+/// on offer, and then whether that offer was for an MCP client. Anything
+/// else is refused, saying why.
 pub(crate) fn identify(
     devices: &mut Devices,
     peer: &[u8; 32],
     first: impl FnOnce() -> Option<RemoteIn>,
-    take_secret: impl FnOnce(&str) -> bool,
+    take_secret: impl FnOnce(&str) -> Option<bool>,
     now: f64,
 ) -> Result<(Device, bool), String> {
     if let Some(device) = devices.by_key(peer).cloned() {
@@ -257,19 +271,22 @@ pub(crate) fn identify(
     let Some(RemoteIn::Pair { secret, name }) = first() else {
         return Err("this device is not paired with this machine — pair it again".to_owned());
     };
-    if !take_secret(&secret) {
+    let Some(mcp) = take_secret(&secret) else {
         return Err(
             "that pairing code ran out or was used already — show a new one on the machine"
                 .to_owned(),
         );
-    }
+    };
     devices
-        .pair_key(&name, peer, now)
+        .pair_key(&name, peer, mcp, now)
         .map(|device| (device, true))
 }
 
+/// A device's link through the relay.
+pub(crate) type RelayLink = Link<MaybeTlsStream<TcpStream>>;
+
 /// A viewer through the relay: JSON sealed in Noise frames.
-struct Relayed(Option<Link<MaybeTlsStream<TcpStream>>>);
+struct Relayed(Option<RelayLink>);
 
 impl Wire for Relayed {
     fn hear(&mut self) -> Result<Heard, ()> {
@@ -303,13 +320,20 @@ impl Wire for Relayed {
 
 /// The link a pairing QR code opens: devpit.app's viewer, with this machine's
 /// id, key and the one-time `secret` in the fragment, which no browser sends.
-pub(crate) fn pairing_url(root: &Path, secret: &str, name: &str) -> Result<String, String> {
+/// One for an MCP client says so, for `devpit mcp --remote pair` to check.
+pub(crate) fn pairing_url(
+    root: &Path,
+    secret: &str,
+    name: &str,
+    mcp: bool,
+) -> Result<String, String> {
     let (host, keys) = identity(root)?;
     Ok(format!(
-        "{}/remote#relay={host}&key={}&secret={secret}&name={}",
+        "{}/remote#relay={host}&key={}&secret={secret}&name={}{}",
         crate::account::origin().trim_end_matches('/'),
         hex(&keys.public),
-        fragment_value(name)
+        fragment_value(name),
+        if mcp { "&for=mcp" } else { "" }
     ))
 }
 

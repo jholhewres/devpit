@@ -13,7 +13,7 @@ crates/tmux      the sessions that outlive the window
 crates/agentcli  the agent catalogue, headless turns, hooks
 crates/steps     what a column runs, and the runner that runs it
 crates/devflow   devflow.yaml, its detection, setup and evidence; flow/ ships inside it
-crates/remote    the Remote through the relay: Noise, frames, the relay client
+crates/remote    the Remote through the relay: Noise, frames, the relay client, MCP between machines
 apps/desktop     the shell — the only crate allowed to know it
 web              React + Vite + xterm.js
 xtask            the architectural guards
@@ -225,6 +225,15 @@ the machine's key — named by the pairing QR code — to the device and the
 device's key to the machine; devpit.app carries frames it holds no key to.
 A device is known by its key, and forgetting it ends its session. The protocol
 is `docs/remote-relay.md`.
+
+**MCP from another machine** goes the same way and nowhere else. An MCP
+client is a device the machine paired as one; `devpit mcp --remote` on the
+other computer is a stdio MCP server that seals each message for this
+machine, and this machine answers it from a read-only allowlist —
+projects, boards, cards, sessions, what waits on the person — refusing every
+other tool before the app is asked. Off unless allowed in Settings → Remote;
+turning it off or forgetting the client cuts it at once. claude.ai and the
+Claude app, which would have to end the encryption themselves, stay out.
 
 **Over the tailnet** the machine serves its own viewer (`web/remote.html`):
 

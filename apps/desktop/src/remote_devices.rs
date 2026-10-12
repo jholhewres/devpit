@@ -5,7 +5,9 @@
 //! A device through the relay is known by its X25519 public key instead,
 //! proven in every handshake. Every device sees. Typing and answering are
 //! granted here, on the machine, one device at a time — never from the
-//! device itself.
+//! device itself. An MCP client is a device through the relay that reads
+//! devpit's MCP and nothing of the viewer's; what kind a device is, the
+//! machine decided when it offered the pairing.
 
 use std::path::{Path, PathBuf};
 
@@ -30,6 +32,9 @@ pub(crate) struct Device {
     pub typing: bool,
     #[serde(default)]
     pub answering: bool,
+    /// Served devpit's read-only MCP, and nothing of the viewer's.
+    #[serde(default)]
+    pub mcp: bool,
     pub paired_at: f64,
     #[serde(default)]
     pub last_seen: Option<f64>,
@@ -105,21 +110,23 @@ impl Devices {
 
     /// A new device that sees and does nothing else, with its token.
     pub(crate) fn pair(&mut self, name: &str, token: &str, now: f64) -> Result<Device, String> {
-        self.add(name, hash(token), None, now)
+        self.add(name, hash(token), None, false, now)
     }
 
-    /// A new device through the relay, known by the key its handshake proved.
-    /// Pairing a key again replaces the device it was.
+    /// A new device through the relay, known by the key its handshake proved:
+    /// a viewer, or an MCP client when `mcp`. Pairing a key again replaces
+    /// the device it was.
     pub(crate) fn pair_key(
         &mut self,
         name: &str,
         key: &[u8; 32],
+        mcp: bool,
         now: f64,
     ) -> Result<Device, String> {
         let hex = devpit_remote::noise::hex(key);
         self.devices
             .retain(|one| one.key.as_deref() != Some(hex.as_str()));
-        self.add(name, String::new(), Some(hex), now)
+        self.add(name, String::new(), Some(hex), mcp, now)
     }
 
     fn add(
@@ -127,6 +134,7 @@ impl Devices {
         name: &str,
         token_hash: String,
         key: Option<String>,
+        mcp: bool,
         now: f64,
     ) -> Result<Device, String> {
         if self.devices.len() >= MOST {
@@ -151,6 +159,7 @@ impl Devices {
             key,
             typing: false,
             answering: false,
+            mcp,
             paired_at: now,
             last_seen: None,
         };
@@ -158,8 +167,10 @@ impl Devices {
         Ok(device)
     }
 
+    /// What a viewer may do besides watching. An MCP client only reads, so
+    /// it is never granted more.
     pub(crate) fn allow(&mut self, id: &str, typing: bool, answering: bool) -> bool {
-        match self.devices.iter_mut().find(|one| one.id == id) {
+        match self.devices.iter_mut().find(|one| one.id == id && !one.mcp) {
             Some(device) => {
                 device.typing = typing;
                 device.answering = answering;
