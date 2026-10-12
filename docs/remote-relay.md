@@ -143,6 +143,16 @@ would have to hold the key that ends the encryption, which is what devpit.app
 is kept from holding. They stay out until a way keeps it end to end. Settings
 says so beside the switch.
 
+## Sync's key between two machines
+
+The relay also carries the sync key from a machine of the account to
+another, in the same session. *Pair another computer* goes online under an
+id and a Noise key made for that one offer; the other machine, signed in to
+the same account, pastes the offer, holds the session to the key it names,
+and sends its one-time secret; the first answers with the sync key and goes
+offline. Nothing of the Remote's devices is involved, and Remote need not be
+on. `docs/sync.md` has the rest.
+
 ## The relay's ceilings
 
 A frame is at most 64 KiB, either way. At most 8 machines per account, 8

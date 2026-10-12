@@ -12,6 +12,7 @@ members = [
     "crates/agentapi",
     "crates/devflow",
     "crates/remote",
+    "crates/sync",
     "apps/desktop",
     "xtask",
 ]
@@ -34,6 +35,7 @@ devpit-steps = { path = "crates/steps" }
 devpit-cookies = { path = "crates/cookies" }
 devpit-devflow = { path = "crates/devflow" }
 devpit-remote = { path = "crates/remote" }
+devpit-sync = { path = "crates/sync" }
 
 # The binary stays open all day with several fronts live. Size and startup are
 # not vanity here — and now measured: against `opt-level = 3`, "s" is 9.81 MB

@@ -215,6 +215,8 @@ mod steps;
 mod still_holds;
 mod stopping;
 mod stopping_a_run;
+mod sync;
+mod sync_pairing;
 mod tap;
 mod transcribe;
 // Only Windows copies a pane into a file; tested everywhere.
@@ -376,6 +378,8 @@ fn main() {
             hub::listen();
             // Card dates on devpit.app's calendar, when it is on.
             calendar::keep_sent();
+            // The account's other machines, sealed through devpit.app, when on.
+            sync::keep_synced(app.handle());
             // The window rebuilt around a container that can hold a page
             // *beside* the app rather than under it. Done now, while the
             // window has exactly one webview in it, so the swap has nothing to

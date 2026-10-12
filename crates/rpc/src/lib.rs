@@ -44,6 +44,7 @@ pub mod session_tree;
 pub mod settings;
 pub mod sign_ins;
 pub mod spend;
+pub mod sync;
 pub mod tested;
 mod threads;
 pub mod tile;
@@ -125,6 +126,7 @@ pub use spend::{
     PlanLimits, PlanWindow, SessionCost, SpendCard, SpendDay, SpendHistory, SpendInstallation,
     SpendRow, SpendSession, SpendShare, TokenCounts,
 };
+pub use sync::{SyncMachine, SyncOffer, SyncRecovery, SyncStatus};
 pub use tested::{FailedTest, Tested, MOST_FAILURES_KEPT, TESTS_EVIDENCE};
 pub use threads::{Conversations, Thread};
 pub use tile::{

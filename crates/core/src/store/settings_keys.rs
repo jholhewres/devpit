@@ -112,3 +112,5 @@ pub const CHANNEL_HUB_TITLES: &str = "channels.hub_titles";
 pub const CALENDAR_LINK: &str = "calendar.link";
 /// Whether the calendar's events name the card and project. Off unless turned on.
 pub const CALENDAR_TITLES: &str = "calendar.titles";
+/// Whether this machine syncs with the account's others. Off unless turned on.
+pub const SYNC: &str = "sync.enabled";

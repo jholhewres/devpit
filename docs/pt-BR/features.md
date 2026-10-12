@@ -36,5 +36,6 @@ está, e um número em cada chamada de agente.
 - **Árvore de arquivos e diffs** ao lado do terminal, para revisar o que o
   agente fez sem precisar sair.
 - **Na sua máquina.** Projetos, quadros, conversas e histórico de terminal
-  ficam em `~/.devpit`, neste computador. A conta é opcional e, hoje, só
-  identifica você — sincronizar entre máquinas não está feito.
+  ficam em `~/.devpit`, neste computador. A conta é opcional; com ela,
+  preferências e configurações de projeto sincronizam entre seus
+  computadores, cifradas em cada um com uma chave que o devpit.app nunca vê.

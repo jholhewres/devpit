@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import type { Settings as Stored } from '../gen/bindings'
 import { ask, commands } from './live'
 import { inOrder } from './inOrder'
-import { PlusLink } from './PlusLink'
 import { PrefsSide } from './PrefsSide'
 import { GeneralSettings } from './GeneralSettings'
 import { KeyboardSettings } from './KeyboardSettings'
@@ -14,9 +13,11 @@ import { flagOn, type Flag } from './settingsFlags'
 import { ChannelsPane } from './ChannelsPane'
 import { DecisionsSettings } from './DecisionsSettings'
 import { SkillsPane } from './SkillsPane'
+import { SyncSettings } from './SyncSettings'
 import { TerminalContrast } from './TerminalContrast'
 import { Usage } from './Usage'
 import { Worktrees } from './Worktrees'
+import { onEvent } from './window'
 
 /* Settings takes the window. Back and Escape leave; the gear and every
    account-menu row land here on the pane they name. */
@@ -33,8 +34,11 @@ export function Settings({
   const { closePrefs, openPrefs, theme, setTheme, signOut, account } = useShell()
   const [flags, setFlags] = useState<Stored | null>(null)
 
+  /* Read again when another computer's settings were written here. */
   useEffect(() => {
-    void ask(() => commands.settingsRead()).then((answer) => setFlags(answer.data))
+    const read = (): void => void ask(() => commands.settingsRead()).then((answer) => setFlags(answer.data))
+    read()
+    return onEvent('sync:written', read)
   }, [])
 
   /* Each toggle writes only its own field: the command takes null for
@@ -82,19 +86,10 @@ export function Settings({
               </div>
             </div>
 
-            {/* What it does today, and nothing about what it might do. A pane
-                describing a feature that is not built is a pane people plan
-                around. */}
+            <div className="acc__sub">Sync</div>
+            <SyncSettings />
             <p className="acc__note">
-              Today the account signs you in on this computer and tells devpit your name and
-              address. That is all it does: <b>nothing is uploaded and nothing is synced</b>, and
-              sync between machines is not built yet.
-            </p>
-            <p className="acc__note">
-              Projects, boards, conversations, terminal history and files are on this computer.
-            </p>
-            <p className="acc__note">
-              <PlusLink from="app-account" said="Reaching this computer from anywhere, push on your phone and sync between machines will be devpit Plus." />
+              Projects, boards, conversations, terminal history and files stay on this computer.
             </p>
 
             <div className="acc__sub">Leaving</div>

@@ -1,0 +1,142 @@
+//! The app's preferences that follow the person to another machine.
+//!
+//! An allowlist, never a denylist: a preference added tomorrow stays on
+//! this machine until someone decides here that it travels, and the test
+//! beside this file fails until every key is on one list or the other.
+
+use devpit_core::{preference as key, Store};
+
+use crate::space::{Here, Namespace, Seen};
+
+/// The one record preferences are kept under.
+pub const RECORD: &str = "app";
+
+/// The most a synced preference may hold; anything longer stays where it is.
+pub const LONGEST: usize = 64 * 1024;
+
+/// What syncs: how devpit looks and behaves, the same on every machine.
+pub const SYNCED: &[&str] = &[
+    key::THEME,
+    key::CONFIRM_STOP,
+    key::TERMINAL_CONTRAST,
+    key::SHORTCUT_KEYS,
+    key::FOCUS_MODE,
+    key::AGENT_HOOKS,
+    key::AGENT_TRUST,
+    key::AGENTS_DISABLED,
+    key::TRANSCRIBE_LANGUAGE,
+    key::DECISIONS_PROVIDER,
+    key::DECISIONS_MODEL,
+    key::DECISIONS_URL,
+    key::DECISIONS_DAILY_CAP,
+    key::DECISIONS_MODES,
+];
+
+/// What stays on this machine, and why.
+pub const LOCAL: &[(&str, &str)] = &[
+    (key::ONBOARDED_AT, "this machine's first run"),
+    (key::AUTO_UPDATE, "how this install updates itself"),
+    (key::WORKTREE_BASE, "a path on this machine"),
+    (key::OPEN_IN_APPS, "the apps installed here"),
+    (key::WORKTREES_HIDDEN, "this machine's worktrees"),
+    (
+        key::AGENT_PROFILES,
+        "config folders on this machine, and tokens",
+    ),
+    (key::AGENT_DEFAULT, "names a profile of this machine"),
+    (key::SIDEBAR_WIDTH, "window state"),
+    (key::FILES_WIDTH, "window state"),
+    (
+        key::HEADS_DOWN,
+        "a focus on this machine, by its project id",
+    ),
+    (key::PAUSED_UNTIL, "a pause on this machine"),
+    (
+        key::SHORTCUT,
+        "a shortcut this machine's system grants or refuses",
+    ),
+    (key::REMINDERS, "two machines reminding would remind twice"),
+    (key::KEEP_IN_TRAY, "the tray"),
+    (key::TRAY_TOLD, "the tray"),
+    (key::ISLAND, "a window of this machine"),
+    (key::ISLAND_SCREEN, "a screen of this machine"),
+    (key::ERROR_REPORTS, "consent given on this install"),
+    (key::TRANSCRIBE, "the engine installed here"),
+    (key::TRANSCRIBE_MODEL, "a file on this machine"),
+    (key::TRANSCRIBE_URL, "goes with the engine chosen here"),
+    (key::REMOTE, "remote access to this machine"),
+    (key::REMOTE_PORT, "remote access to this machine"),
+    (key::REMOTE_VIA, "remote access to this machine"),
+    (key::REMOTE_MCP, "remote access to this machine"),
+    (
+        key::DECISIONS_OPTED_OUT,
+        "by project id of this machine; travels per project instead",
+    ),
+    (
+        key::DEVFLOW,
+        "its switch also tells open sessions, which a value from elsewhere would not",
+    ),
+    (key::DEVFLOW_ON, "a click on this machine"),
+    (key::DEVFLOW_ENFORCED, "a click on this machine"),
+    (key::CHANNEL_RULES, "the channels set up on this machine"),
+    (
+        key::CHANNEL_HUB,
+        "two machines would send each notice twice",
+    ),
+    (key::CHANNEL_HUB_TITLES, "goes with the hub on this machine"),
+    (key::CALENDAR_LINK, "holds the calendar's secret"),
+    (
+        key::CALENDAR_TITLES,
+        "goes with the calendar on this machine",
+    ),
+    (key::SYNC, "sync is turned on per machine"),
+];
+
+/// Whether `name` is a preference that follows the person.
+pub fn syncs(name: &str) -> bool {
+    SYNCED.contains(&name)
+}
+
+/// The preferences namespace, over this machine's store.
+pub struct Prefs<'a> {
+    pub store: &'a Store,
+}
+
+impl Namespace for Prefs<'_> {
+    fn name(&self) -> &'static str {
+        "prefs"
+    }
+
+    fn here(&self) -> Result<Here, String> {
+        let mut fields = std::collections::BTreeMap::new();
+        for name in SYNCED {
+            let Some((value, at)) = self
+                .store
+                .preference_stamped(name)
+                .map_err(|err| err.to_string())?
+            else {
+                continue;
+            };
+            if value.len() <= LONGEST {
+                let at_ms = u64::try_from(at).ok().map(|seconds| seconds * 1000);
+                fields.insert((*name).to_owned(), Seen::of(Some(value), at_ms));
+            }
+        }
+        Ok(Here::from([(RECORD.to_owned(), fields)]))
+    }
+
+    fn write(&self, record: &str, field: &str, value: Option<&str>) -> Result<(), String> {
+        // A preference is never removed, only set: a cleared one is left.
+        let Some(value) = value else { return Ok(()) };
+        if record != RECORD || !syncs(field) || value.len() > LONGEST {
+            return Ok(());
+        }
+        self.store
+            .set_preference(field, value)
+            .map_err(|err| err.to_string())
+    }
+}
+
+#[cfg(test)]
+#[path = "prefs_tests.rs"]
+mod tests;

@@ -47,9 +47,9 @@ export function OnboardingAccount({ onSkip }: { onSkip: () => void }): React.JSX
     <>
       <h1 className="onb__t">Sign in, if you want to</h1>
       <p className="onb__d">
-        Free, and optional. Today it signs you in and nothing more — syncing between machines is
-        not built yet. <b>Your projects, conversations and files stay on this computer</b> either
-        way.
+        Free, and optional. It signs you in; sync between your computers is off until you turn it
+        on, and carries only preferences and project settings, sealed so devpit.app cannot read
+        them. <b>Your projects, conversations and files stay on this computer</b> either way.
       </p>
       {/* A refusal used to leave with the screen. It stays now, and the button
           says what it would be doing this time. */}

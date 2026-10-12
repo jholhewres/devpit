@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
 import { inOrder } from './inOrder'
+import { onEvent } from './window'
 import type { Theme } from './shape'
 
 /*
@@ -25,12 +26,16 @@ export function useTheme(setConfirmStop: (asked: boolean | null) => void): {
 
   useEffect(() => {
     document.documentElement.dataset.theme = 'system'
-    void ask(() => commands.settingsRead()).then((asked) => {
-      if (!asked.data) return
-      setThemeState(asked.data.theme)
-      /* Null is "never asked", and never-asked asks. */
-      setConfirmStop(asked.data.confirmStop)
-    })
+    const read = (): void =>
+      void ask(() => commands.settingsRead()).then((asked) => {
+        if (!asked.data) return
+        setThemeState(asked.data.theme)
+        /* Null is "never asked", and never-asked asks. */
+        setConfirmStop(asked.data.confirmStop)
+      })
+    read()
+    /* Another computer's choice, synced here, is read like this one's. */
+    return onEvent('sync:written', read)
   }, [setConfirmStop])
 
   return { theme, setTheme }

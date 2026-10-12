@@ -1,0 +1,31 @@
+[package]
+name = "devpit-sync"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+devpit-core = { path = "../core" }
+# The sync key goes to another machine over the Remote's Noise session.
+devpit-remote = { path = "../remote" }
+# XChaCha20-Poly1305 seals each blob: the AEAD the relay's Noise already
+# carries, with a nonce long enough to be drawn at random every time.
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+# The recovery code's letters.
+data-encoding = "2.11"
+getrandom = "0.3"
+# HKDF-SHA256 for the sealing key and the key's id; HMAC-SHA256 for names.
+hkdf = "0.12"
+hmac = "0.12"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.10"
+ulid = "3.0.0"
+zeroize = "1.9"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
+tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }

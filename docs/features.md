@@ -35,5 +35,6 @@ work stands, and a number on every agent call.
 - **File tree and diffs** beside the terminal, so reviewing what an agent did
   does not mean leaving.
 - **On your machine.** Projects, boards, conversations and terminal history
-  live in `~/.devpit` on this computer. An account is optional and, today,
-  signs you in and nothing else — syncing between machines is not built.
+  live in `~/.devpit` on this computer. An account is optional; with it,
+  preferences and project settings can sync between your computers, sealed
+  on each with a key devpit.app never sees (`docs/sync.md`).

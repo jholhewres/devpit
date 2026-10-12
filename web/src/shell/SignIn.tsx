@@ -51,8 +51,9 @@ export function SignIn({ onClose }: { onClose: () => void }): React.JSX.Element 
           <>
             <h2 className="auth__t">Sign in to devpit</h2>
             <p className="auth__d">
-              Free. Your projects, conversations and files stay on this computer &mdash; nothing is
-              uploaded, and sync between machines is not built yet.
+              Free. Your projects, conversations and files stay on this computer. Sync, off until
+              you turn it on, carries preferences and project settings to your other computers,
+              sealed so devpit.app cannot read them; boards stay where they are.
             </p>
             {failed && (
               <p className="auth__failed" role="alert">

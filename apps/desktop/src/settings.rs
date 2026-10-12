@@ -112,6 +112,7 @@ pub(crate) fn settings_write_now(
         }
         store.set_preference(preference::TERMINAL_CONTRAST, &contrast.to_string())?;
     }
+    crate::sync::nudge();
     read(&store)
 }
 

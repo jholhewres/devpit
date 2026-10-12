@@ -1110,6 +1110,7 @@ dependencies = [
  "devpit-remote",
  "devpit-rpc",
  "devpit-steps",
+ "devpit-sync",
  "devpit-tmux",
  "getrandom 0.3.4",
  "gtk",
@@ -1214,6 +1215,28 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "devpit-sync"
+version = "0.1.40"
+dependencies = [
+ "chacha20poly1305",
+ "data-encoding",
+ "devpit-core",
+ "devpit-remote",
+ "getrandom 0.3.4",
+ "hkdf",
+ "hmac",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tungstenite",
+ "ulid",
+ "zeroize",
 ]
 
 [[package]]
@@ -2154,6 +2177,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hkdf"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
+dependencies = [
+ "hmac",
+]
 
 [[package]]
 name = "hmac"

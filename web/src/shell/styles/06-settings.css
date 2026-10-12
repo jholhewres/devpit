@@ -435,6 +435,8 @@ ul.prefhow > li::before { content: ''; top: 8px; left: 3px; width: 4px; height: 
 .remote__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ghost, var(--text-3)); }
 .remote__dot[data-on] { background: var(--success); }
 .remote__addr { min-width: 0; padding: 5px 9px; border-radius: 7px; background: var(--inset); font: 12px var(--mono); color: var(--text); overflow-wrap: anywhere; user-select: all; }
+/* The computers that sync, under the Account's switch. */
+.syncm { margin: 2px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--text-2); }
 /* What a device may do, as chips that are lit or not — the switches' colour,
    not a form's checkbox. Watch is lit and not a button: it cannot be refused. */
 .remote__chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }

@@ -620,6 +620,36 @@ export const commands = {
 	calendarSet: (on: boolean, titles: boolean) => typedError<CalendarFeed, RpcError>(__TAURI_INVOKE("calendar_set", { on, titles })),
 	/**  `calendar.reset` — a new address; the old one stops answering at once. */
 	calendarReset: () => typedError<CalendarFeed, RpcError>(__TAURI_INVOKE("calendar_reset")),
+	/**  `sync.read` */
+	syncRead: () => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_read")),
+	/**
+	 *  `sync.set` — sync on or off on this machine. On, a machine without the
+	 *  key makes one only for an account that syncs nothing yet; one that does
+	 *  is joined from another machine, never written over.
+	 */
+	syncSet: (on: boolean) => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_set", { on })),
+	/**  `sync.now` — a round now, rather than at the next one. */
+	syncNow: () => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_now")),
+	/**  `sync.recovery` — the key as the person writes it down, shown when asked. */
+	syncRecovery: () => typedError<SyncRecovery, RpcError>(__TAURI_INVOKE("sync_recovery")),
+	/**
+	 *  `sync.start_over` — deletes what the account synced and starts again with
+	 *  a new key, from what this machine has. Every other machine stops until it
+	 *  is joined again.
+	 */
+	syncStartOver: () => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_start_over")),
+	/**
+	 *  `sync.offer` — an offer another machine of the account takes the key
+	 *  with, in place of any before it.
+	 */
+	syncOffer: () => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_offer")),
+	/**  `sync.offer_withdraw` — the offer on show stops being good. */
+	syncOfferWithdraw: () => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_offer_withdraw")),
+	/**
+	 *  `sync.join` — this machine takes the account's key, from another
+	 *  machine's offer or from the recovery code, and syncs with it.
+	 */
+	syncJoin: (given: string) => typedError<SyncStatus, RpcError>(__TAURI_INVOKE("sync_join", { given })),
 	/**  `agent.profiles` — the accounts this machine can talk to. */
 	agentProfiles: () => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profiles")),
 	/**
@@ -4909,6 +4939,49 @@ export type Surface =
 { type: "pane"; many: boolean } | 
 /**  A pin shown on the card face. */
 { type: "cardPin" };
+
+export type SyncMachine = {
+	id: string,
+	name: string,
+	/**  When it last synced, to the hour, in seconds since the epoch. */
+	seenAt: number | null,
+	thisOne: boolean,
+};
+
+/**
+ *  What the person carries to another machine to give it the key: good once,
+ *  for two minutes, through devpit.app's relay.
+ */
+export type SyncOffer = {
+	text: string,
+	expiresAt: number | null,
+};
+
+/**  The key as the person writes it down. Shown only when asked for. */
+export type SyncRecovery = {
+	code: string,
+};
+
+/**  Where sync stands on this machine: the answer of every sync command. */
+export type SyncStatus = {
+	/**  Signed in to devpit.app here, which sync needs. */
+	signedIn: boolean,
+	/**  Sync is on on this machine. Off unless turned on. */
+	on: boolean,
+	/**
+	 *  This machine holds the account's key. On without it, it waits to be
+	 *  joined: from another machine's offer, or with the recovery code.
+	 */
+	hasKey: boolean,
+	/**  When the last round finished, in seconds since the epoch. */
+	syncedAt: number | null,
+	/**  Why the last round stopped, while it has not gone through since. */
+	problem: string | null,
+	/**  The account's machines that sync, this one among them. */
+	machines: SyncMachine[],
+	/**  The offer this machine is making, while it lasts. */
+	offering: SyncOffer | null,
+};
 
 /**  Where Tailscale stands on this machine. */
 export type TailscaleState = {

@@ -26,6 +26,7 @@ mod seen_sessions;
 mod session_links;
 pub mod settings;
 mod spend;
+mod synced;
 mod wal;
 mod whose_run;
 
@@ -82,6 +83,7 @@ pub use plugins::{DRAWINGS_PLUGIN, DRAWING_EXTENSION};
 pub use projects::ProjectRow;
 pub use reminders::ReminderRow;
 pub use settings::key as preference;
+pub use synced::{PluginRow, SyncedProject};
 
 /// The folder an installed devpit keeps everything in, under the home.
 pub const RELEASE_ROOT: &str = ".devpit";

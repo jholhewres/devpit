@@ -4,6 +4,7 @@ import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
 import { previewing, STANDIN } from './preview'
 import { found, type Open } from './projects'
+import { onEvent } from './window'
 
 /* The project list, apart from the rest of the shell state: it is the only
    part that talks to disk, and it was pushing useShell past its ceiling. */
@@ -42,6 +43,8 @@ export function useProjects(): Projects {
   }, [])
 
   useEffect(reloadProjects, [reloadProjects])
+  /* A project's name or mark synced from another computer. */
+  useEffect(() => onEvent('sync:written', reloadProjects), [reloadProjects])
 
   /* `project.open` writes the timestamp that orders the list and answers with
      the list it just reordered. Throwing that answer away left the Projects

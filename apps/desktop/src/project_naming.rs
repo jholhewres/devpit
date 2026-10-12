@@ -33,6 +33,7 @@ pub(crate) fn project_rename_now(
     if !store.rename_project(&project_id, wanted)? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
     }
+    crate::sync::nudge();
     project_list_now()
 }
 
@@ -108,6 +109,7 @@ pub(crate) fn project_edit_now(
     )? {
         return Err(RpcError::new(ErrorCode::NotFound, "no such project"));
     }
+    crate::sync::nudge();
     project_list_now()
 }
 
@@ -129,6 +131,7 @@ pub(crate) fn project_group_rename_now(from: String, to: String) -> Result<Proje
         ));
     }
     store()?.rename_group(&from, (!to.is_empty()).then_some(to))?;
+    crate::sync::nudge();
     project_list_now()
 }
 

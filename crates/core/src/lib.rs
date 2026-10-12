@@ -26,7 +26,7 @@ mod tree_tests;
 pub use bus::{Bus, Event, Severity};
 pub use store::{
     limits, preference, AttachmentRow, CardEdges, CardRow, ColumnRow, CommentRow, NewCard,
-    NoticeRow, PaneLayoutWrite, ProjectRow, ReminderRow, RunRow, SessionLink, StepRow, Store,
-    StoreError, DEFAULT_COLUMNS, DEV_ROOT, RELEASE_ROOT, ROOT_NAME,
+    NoticeRow, PaneLayoutWrite, PluginRow, ProjectRow, ReminderRow, RunRow, SessionLink, StepRow,
+    Store, StoreError, SyncedProject, DEFAULT_COLUMNS, DEV_ROOT, RELEASE_ROOT, ROOT_NAME,
 };
 pub use tree::TreeError;

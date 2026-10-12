@@ -14,6 +14,7 @@ crates/agentcli  the agent catalogue, headless turns, hooks
 crates/steps     what a column runs, and the runner that runs it
 crates/devflow   devflow.yaml, its detection, setup and evidence; flow/ ships inside it
 crates/remote    the Remote through the relay: Noise, frames, the relay client, MCP between machines
+crates/sync      sync between machines: the key, sealing, the clock, the merge, the namespaces
 apps/desktop     the shell — the only crate allowed to know it
 web              React + Vite + xterm.js
 xtask            the architectural guards
@@ -290,3 +291,26 @@ Claude app, which would have to end the encryption themselves, stay out.
 The protocol is `RemoteIn`/`RemoteOut` in `devpit-rpc`, one JSON message per
 WebSocket frame on the tailnet and sealed in Noise frames through the relay;
 the viewer is the same either way.
+
+## Sync
+
+Two machines of one account share preferences and project settings through
+devpit.app, sealed on each with a key devpit.app never holds. Off unless
+turned on in Settings → Account → Sync. The design is `docs/sync.md`.
+
+- **One key per account**, made on the first machine and carried to the
+  next by the person: an offer the first makes on the relay, taken inside
+  the Remote's Noise session, or the recovery code. A machine joining an
+  account that syncs is never given a second key.
+- **Sealed blobs.** Each namespace — preferences, project settings, the
+  machines — is one blob, XChaCha20-Poly1305 under a key drawn from the
+  account's, named by an HMAC under another, bound to its name and version.
+- **Allowlists.** What syncs is listed per namespace, and a preference added
+  later stays local until someone lists it; paths, windows, remote access and
+  the vault never sync.
+- **Field by field.** A round merges each field by a hybrid logical clock, the
+  later change winning and a tie going to the same machine everywhere, so
+  every machine settles on the same values in any order. A project is the
+  same project on two machines when it clones the same repository.
+- **The board** is the next namespace, and stays on each machine until it is
+  safe to sync.

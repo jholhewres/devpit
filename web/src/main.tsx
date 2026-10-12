@@ -9,6 +9,7 @@ import { watchCsp } from './shell/csp'
 import { reportPresence } from './shell/presence'
 import { loadRebound } from './shell/rebound'
 import { reportUncaught } from './shell/uncaught'
+import { onEvent } from './shell/window'
 import './index.css'
 
 /*
@@ -41,6 +42,8 @@ if (!isAside) reportPresence()
 if (!isAside) answerBeforeRestart()
 // The keys a person recorded, from the settings; until then this window's own copy.
 if (!isAside) void loadRebound()
+// And again when another computer's were synced here.
+if (!isAside) onEvent('sync:written', () => void loadRebound())
 // And that its calls still get through, which the app logs when they stop.
 if (!isAside) beat()
 

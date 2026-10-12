@@ -65,6 +65,7 @@ pub(crate) fn rebound_set_now(
     let written = serde_json::to_string(&rebound.held())
         .map_err(|err| RpcError::internal(err.to_string()))?;
     store.set_preference(preference::SHORTCUT_KEYS, &written)?;
+    crate::sync::nudge();
     Ok(read(store))
 }
 
