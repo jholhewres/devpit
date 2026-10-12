@@ -14,6 +14,7 @@ devpit-tmux = { path = "../../crates/tmux" }
 devpit-agentcli = { path = "../../crates/agentcli" }
 devpit-agentapi = { path = "../../crates/agentapi" }
 devpit-cookies = { path = "../../crates/cookies" }
+devpit-remote = { path = "../../crates/remote" }
 devpit-steps = { path = "../../crates/steps" }
 devpit-devflow = { path = "../../crates/devflow" }
 portable-pty = "0.9.0"

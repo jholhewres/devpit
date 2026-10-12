@@ -46,3 +46,31 @@ fn only_a_few_devices_are_paired() {
     }
     assert!(devices.pair("one more", "t", 0.0).is_err());
 }
+
+#[test]
+fn a_device_through_the_relay_is_known_by_its_key_and_by_nothing_else() {
+    let dir = tempfile::tempdir().expect("dir");
+    let mut devices = Devices::default();
+    let key = [7u8; 32];
+    let phone = devices.pair_key("Pixel", &key, 5.0).expect("paired");
+    assert!(!phone.typing && !phone.answering, "a new device only sees");
+    devices.write(dir.path()).expect("write");
+
+    let mut read = Devices::read(dir.path());
+    assert_eq!(
+        read.by_key(&key).map(|one| one.id.as_str()),
+        Some(phone.id.as_str())
+    );
+    assert!(read.by_key(&[8u8; 32]).is_none());
+    // No token was ever given, so none — not even an empty one — finds it.
+    assert!(read.by_token("").is_none());
+
+    // Paired again, the key is one device, not two.
+    let again = read.pair_key("Pixel 9", &key, 6.0).expect("again");
+    assert_eq!(read.devices.len(), 1);
+    assert!(read.forget(&again.id));
+    assert!(
+        read.by_key(&key).is_none(),
+        "forgotten, the key opens nothing"
+    );
+}

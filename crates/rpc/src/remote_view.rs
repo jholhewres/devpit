@@ -1,8 +1,10 @@
 //! Reaching this machine from another device: what the viewer and the host
 //! say to each other, and what the settings show about it.
 //!
-//! The viewer is a page this machine serves over the person's tailnet. It
-//! speaks JSON over one WebSocket, a message at a time, tagged by `t`. What
+//! The viewer is a page this machine serves over the person's tailnet, or
+//! devpit.app serves to reach it through the relay. It speaks JSON, a message
+//! at a time, tagged by `t`: one per WebSocket frame on the tailnet, sealed in
+//! Noise frames through the relay (`docs/remote-relay.md`). What
 //! it may do is decided here, on the machine, per paired device: every
 //! device sees; typing and answering are granted one by one.
 
@@ -18,6 +20,14 @@ pub enum RemoteIn {
     /// The first message: the device's token, which only its pairing gave it.
     Hello {
         token: String,
+    },
+    /// Through the relay, the first message of a device the machine does not
+    /// know yet: the one-time secret its QR code carried, sent only after the
+    /// machine proved the key that code named. The device is then known by
+    /// its own key, proven in every handshake after.
+    Pair {
+        secret: String,
+        name: String,
     },
     Projects,
     /// Watch a terminal, sized for the viewer's screen. The desk's own size
@@ -238,6 +248,31 @@ pub struct RemoteDevice {
     pub paired_at: f64,
     pub last_seen: Option<f64>,
     pub connected: bool,
+    /// Paired through devpit.app's relay, and known by its key.
+    pub relay: bool,
+}
+
+/// How paired devices reach this machine.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoteVia {
+    /// Over the person's tailnet, served by this machine.
+    #[default]
+    Tailscale,
+    /// From anywhere, through devpit.app's relay, encrypted end to end.
+    Relay,
+}
+
+/// The relay, as this machine sees it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteRelay {
+    /// This machine is signed in to a devpit account, which the relay needs.
+    pub signed_in: bool,
+    /// Connected to the relay now, so a device can reach it.
+    pub online: bool,
+    /// Why it is not, when it should be.
+    pub problem: Option<String>,
 }
 
 /// Remote, as the settings show it.
@@ -245,6 +280,8 @@ pub struct RemoteDevice {
 #[serde(rename_all = "camelCase")]
 pub struct RemoteView {
     pub enabled: bool,
+    pub via: RemoteVia,
+    pub relay: RemoteRelay,
     pub tailscale: TailscaleState,
     /// Where a paired device opens the viewer, once it is reachable.
     pub address: Option<String>,

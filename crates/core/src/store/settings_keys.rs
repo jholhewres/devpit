@@ -76,6 +76,9 @@ pub const REMOTE: &str = "remote.enabled";
 /// The loopback port the remote viewer is served from, kept so the tailnet
 /// address stays the same across restarts.
 pub const REMOTE_PORT: &str = "remote.port";
+/// How paired devices reach this machine: `tailscale` (its tailnet) or
+/// `relay` (devpit.app's relay, encrypted end to end). Tailscale unless set.
+pub const REMOTE_VIA: &str = "remote.via";
 /// Who answers Decisions: `openrouter` or `vercel`. OpenRouter unless set.
 pub const DECISIONS_PROVIDER: &str = "decisions.provider";
 /// The Decisions model; empty is the provider's default.

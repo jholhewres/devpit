@@ -18,6 +18,9 @@ const ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Offered {
     pub code: String,
+    /// The relay's: 32 bytes as hex, carried by the QR code alone. Long,
+    /// because the relay's pairing has no address only the tailnet reaches.
+    pub secret: String,
     pub expires_at: f64,
     wrong: u32,
 }
@@ -38,6 +41,7 @@ pub(crate) fn offer(now: f64) -> Option<Offered> {
     getrandom::fill(&mut bytes).ok()?;
     let offered = Offered {
         code: code_of(&bytes),
+        secret: crate::remote_devices::fresh_token()?,
         expires_at: now + GOOD_FOR,
         wrong: 0,
     };
@@ -55,6 +59,33 @@ pub(crate) fn take(code: &str, now: f64) -> bool {
 }
 
 pub(crate) fn taken(held: &mut Option<Offered>, code: &str, now: f64) -> bool {
+    let typed = code.trim().to_ascii_uppercase().replace(['-', ' '], "");
+    settled(held, now, |offered| typed == offered.code)
+}
+
+/// Whether `secret` is the relay's secret on offer, still good: taken if so,
+/// burned like the code after too many that were not.
+pub(crate) fn take_secret(secret: &str, now: f64) -> bool {
+    let Ok(mut held) = OFFERED.lock() else {
+        return false;
+    };
+    secret_taken(&mut held, secret, now)
+}
+
+pub(crate) fn secret_taken(held: &mut Option<Offered>, secret: &str, now: f64) -> bool {
+    settled(held, now, |offered| {
+        // Compared without saying, by how long it took, how much matched.
+        secret.len() == offered.secret.len()
+            && secret
+                .bytes()
+                .zip(offered.secret.bytes())
+                .fold(0u8, |differs, (a, b)| differs | (a ^ b))
+                == 0
+    })
+}
+
+/// One try at what is on offer: taken when `matches`, counted against it when not.
+fn settled(held: &mut Option<Offered>, now: f64, matches: impl Fn(&Offered) -> bool) -> bool {
     let Some(offered) = held.as_mut() else {
         return false;
     };
@@ -62,8 +93,7 @@ pub(crate) fn taken(held: &mut Option<Offered>, code: &str, now: f64) -> bool {
         *held = None;
         return false;
     }
-    let typed = code.trim().to_ascii_uppercase().replace(['-', ' '], "");
-    if typed == offered.code {
+    if matches(offered) {
         *held = None;
         return true;
     }
@@ -83,14 +113,38 @@ pub(crate) fn withdraw() {
 
 #[cfg(test)]
 mod tests {
-    use super::{code_of, taken, Offered, GUESSES};
+    use super::{code_of, secret_taken, taken, Offered, GUESSES};
+
+    const SECRET: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
 
     fn offered(code: &str) -> Option<Offered> {
         Some(Offered {
             code: code.to_owned(),
+            secret: SECRET.to_owned(),
             expires_at: 100.0,
             wrong: 0,
         })
+    }
+
+    #[test]
+    fn the_relays_secret_pairs_once_and_burns_like_the_code() {
+        let mut held = offered("ABCD2345");
+        assert!(!secret_taken(&mut held, &SECRET[..63], 10.0));
+        assert!(secret_taken(&mut held, SECRET, 10.0));
+        assert!(!secret_taken(&mut held, SECRET, 10.0), "only once");
+        assert!(
+            !taken(&mut held, "ABCD2345", 10.0),
+            "and the code went with it"
+        );
+
+        let mut late = offered("ABCD2345");
+        assert!(!secret_taken(&mut late, SECRET, 101.0));
+
+        let mut guessed = offered("ABCD2345");
+        for _ in 0..GUESSES {
+            assert!(!secret_taken(&mut guessed, "nope", 10.0));
+        }
+        assert!(!secret_taken(&mut guessed, SECRET, 10.0));
     }
 
     #[test]

@@ -1,16 +1,19 @@
-//! Remote: this machine, reached from the person's other devices over their
-//! tailnet — terminals watched and typed into, the board, the questions
+//! Remote: this machine, reached from the person's other devices — over
+//! their tailnet, or from anywhere through devpit.app's relay, encrypted end
+//! to end — terminals watched and typed into, the board, the questions
 //! agents wait on, the chats. Off unless turned on, here.
 //!
-//! The settings' half: turning it on and off, pairing a device, what each
-//! paired device may do, and a log of who connected and did what — never
-//! what was on screen or typed.
+//! The settings' half: turning it on and off, which way devices come in,
+//! pairing a device, what each paired device may do, and a log of who
+//! connected and did what — never what was on screen or typed.
 
 use std::io::Write as _;
 use std::path::Path;
 
 use devpit_core::{preference, Store};
-use devpit_rpc::{ErrorCode, RemoteDevice, RemotePairing, RemoteShapes, RemoteView, RpcError};
+use devpit_rpc::{
+    ErrorCode, RemoteDevice, RemotePairing, RemoteShapes, RemoteVia, RemoteView, RpcError,
+};
 use tauri::Emitter as _;
 
 use crate::remote_devices::{Device, Devices};
@@ -77,17 +80,26 @@ pub(crate) fn changed(app: &tauri::AppHandle) {
     let _ = app.emit("remote:changed", ());
 }
 
-fn view(root: &Path, enabled: bool, problem: Option<String>) -> RemoteView {
+fn view(root: &Path, store: &Store, problem: Option<String>) -> RemoteView {
     let connected = crate::remote_hub::connected();
+    let via = via(store);
     RemoteView {
-        enabled,
-        tailscale: crate::remote_tailscale::state(),
+        enabled: enabled(store),
+        via,
+        relay: crate::remote_relay::state(),
+        // Tailscale is asked only when it is the way in: a `tailscale`
+        // command is seconds on a machine without it.
+        tailscale: match via {
+            RemoteVia::Tailscale => crate::remote_tailscale::state(),
+            RemoteVia::Relay => Default::default(),
+        },
         address: crate::remote_host::address(),
         devices: Devices::read(root)
             .devices
             .into_iter()
             .map(|one| RemoteDevice {
                 connected: connected.contains(&one.id),
+                relay: one.key.is_some(),
                 id: one.id,
                 name: one.name,
                 typing: one.typing,
@@ -109,6 +121,18 @@ fn enabled(store: &Store) -> bool {
         == Some("true")
 }
 
+fn via(store: &Store) -> RemoteVia {
+    match store
+        .preference(preference::REMOTE_VIA)
+        .ok()
+        .flatten()
+        .as_deref()
+    {
+        Some("relay") => RemoteVia::Relay,
+        _ => RemoteVia::Tailscale,
+    }
+}
+
 fn port(store: &Store) -> u16 {
     store
         .preference(preference::REMOTE_PORT)
@@ -118,7 +142,32 @@ fn port(store: &Store) -> u16 {
         .unwrap_or(0)
 }
 
-/// Starts the host when it was left on: at launch.
+/// Opens the way in `store` names; why it could not, if it could not. The
+/// other is closed first: one way in at a time.
+fn open(app: &tauri::AppHandle, store: &Store, root: &Path) -> Result<(), String> {
+    match via(store) {
+        RemoteVia::Tailscale => {
+            crate::remote_relay::stop(app);
+            let (_, port) = crate::remote_host::start(app, root.to_owned(), port(store))?;
+            store
+                .set_preference(preference::REMOTE_PORT, &port.to_string())
+                .map_err(|err| err.to_string())
+        }
+        RemoteVia::Relay => {
+            crate::remote_host::stop(app);
+            crate::remote_relay::start(app, root.to_owned())
+        }
+    }
+}
+
+fn close(app: &tauri::AppHandle) {
+    crate::remote_host::stop(app);
+    crate::remote_relay::stop(app);
+    crate::remote_pairing::withdraw();
+    crate::remote_hub::drop_all(app);
+}
+
+/// Opens the way in when Remote was left on: at launch.
 pub(crate) fn restore(app: &tauri::AppHandle) {
     crate::remote_hub::listen(app);
     let app = app.clone();
@@ -127,7 +176,7 @@ pub(crate) fn restore(app: &tauri::AppHandle) {
             return;
         };
         if enabled(&store) {
-            if let Err(why) = crate::remote_host::start(&app, root, port(&store)) {
+            if let Err(why) = open(&app, &store, &root) {
                 eprintln!("remote did not start: {why}");
             }
         }
@@ -140,7 +189,7 @@ pub(crate) fn restore(app: &tauri::AppHandle) {
 pub async fn remote_read() -> Result<RemoteView, RpcError> {
     crate::off_main::blocking(|| {
         let store = Store::open_default()?;
-        Ok(view(&Store::root()?, enabled(&store), None))
+        Ok(view(&Store::root()?, &store, None))
     })
     .await
 }
@@ -154,31 +203,66 @@ pub async fn remote_set(app: tauri::AppHandle, on: bool) -> Result<RemoteView, R
         let root = Store::root()?;
         store.set_preference(preference::REMOTE, if on { "true" } else { "false" })?;
         if !on {
-            crate::remote_host::stop(&app);
-            return Ok(view(&root, false, None));
+            close(&app);
+            return Ok(view(&root, &store, None));
         }
-        let problem = match crate::remote_host::start(&app, root.clone(), port(&store)) {
-            Ok((_, port)) => {
-                store.set_preference(preference::REMOTE_PORT, &port.to_string())?;
-                None
-            }
-            Err(why) => Some(why),
-        };
-        Ok(view(&root, true, problem))
+        let problem = open(&app, &store, &root).err();
+        Ok(view(&root, &store, problem))
     })
     .await
 }
 
-/// `remote.pair` — a code for one device, shown here, good once for two minutes.
+/// `remote.via` — the way devices come in: the tailnet, or devpit.app's relay.
+/// Switching drops every device connected the other way.
+#[tauri::command]
+#[specta::specta]
+pub async fn remote_via(app: tauri::AppHandle, via: RemoteVia) -> Result<RemoteView, RpcError> {
+    crate::off_main::blocking(move || {
+        let store = Store::open_default()?;
+        let root = Store::root()?;
+        let word = match via {
+            RemoteVia::Tailscale => "tailscale",
+            RemoteVia::Relay => "relay",
+        };
+        store.set_preference(preference::REMOTE_VIA, word)?;
+        if !enabled(&store) {
+            return Ok(view(&root, &store, None));
+        }
+        close(&app);
+        let problem = open(&app, &store, &root).err();
+        Ok(view(&root, &store, problem))
+    })
+    .await
+}
+
+/// `remote.pair` — a code for one device, shown here, good once for two
+/// minutes. Through the relay the QR code is the whole of it: it carries this
+/// machine's key, which the device checks the machine against, and a secret
+/// too long to type.
 #[tauri::command]
 #[specta::specta]
 pub async fn remote_pair() -> Result<RemotePairing, RpcError> {
     crate::off_main::blocking(|| {
-        let address = crate::remote_host::address()
-            .ok_or_else(|| RpcError::new(ErrorCode::Conflict, "turn Remote on first"))?;
+        let store = Store::open_default()?;
+        let relay = via(&store) == RemoteVia::Relay;
+        let address = if relay {
+            crate::remote_relay::running().then_some(String::new())
+        } else {
+            crate::remote_host::address()
+        }
+        .ok_or_else(|| RpcError::new(ErrorCode::Conflict, "turn Remote on first"))?;
         let offered = crate::remote_pairing::offer(now())
             .ok_or_else(|| RpcError::internal("no pairing code could be made"))?;
-        let url = format!("{address}#pair={}", offered.code);
+        let url = if relay {
+            crate::remote_relay::pairing_url(
+                &Store::root()?,
+                &offered.secret,
+                &crate::remote_conn::machine_name(),
+            )
+            .map_err(RpcError::internal)?
+        } else {
+            format!("{address}#pair={}", offered.code)
+        };
         let qr_svg = qrcode::QrCode::new(url.as_bytes())
             .map(|code| {
                 code.render::<qrcode::render::svg::Color>()
@@ -224,12 +308,13 @@ pub async fn remote_allow(
             .write(&root)
             .map_err(|err| RpcError::internal(err.to_string()))?;
         crate::remote_hub::drop_device(&app, &id);
-        Ok(view(&root, enabled(&Store::open_default()?), None))
+        Ok(view(&root, &Store::open_default()?, None))
     })
     .await
 }
 
-/// `remote.forget` — the device is unpaired, and dropped at once.
+/// `remote.forget` — the device is unpaired, and dropped at once: its
+/// connections end, and through the relay their session keys with them.
 #[tauri::command]
 #[specta::specta]
 pub async fn remote_forget(app: tauri::AppHandle, id: String) -> Result<RemoteView, RpcError> {
@@ -241,7 +326,7 @@ pub async fn remote_forget(app: tauri::AppHandle, id: String) -> Result<RemoteVi
             .write(&root)
             .map_err(|err| RpcError::internal(err.to_string()))?;
         crate::remote_hub::drop_device(&app, &id);
-        Ok(view(&root, enabled(&Store::open_default()?), None))
+        Ok(view(&root, &Store::open_default()?, None))
     })
     .await
 }

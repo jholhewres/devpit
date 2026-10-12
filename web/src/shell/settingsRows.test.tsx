@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { RemoteDevice, RemoteView, Transcribing } from '../gen/bindings'
+import type { RemoteDevice, RemotePairing, RemoteVia, RemoteView, Transcribing } from '../gen/bindings'
 import { PrefSwitch } from './PrefSwitch'
 import { RemoteSettings } from './RemoteSettings'
 import { VoiceSettings } from './VoiceSettings'
@@ -17,15 +17,28 @@ const device = (over: Partial<RemoteDevice> = {}): RemoteDevice => ({
   pairedAt: 1,
   lastSeen: null,
   connected: false,
+  relay: false,
   ...over,
 })
 
+let via: RemoteVia = 'tailscale'
+const chosen = vi.fn()
+
 const view = (): RemoteView => ({
   enabled: true,
+  via,
+  relay: { signedIn: true, online: via === 'relay', problem: null },
   tailscale: { installed: true, running: true, name: 'box.tail1.ts.net', https: true, login: 'me@example.com', ip: null },
-  address: 'https://box.tail1.ts.net:8443/',
+  address: via === 'relay' ? null : 'https://box.tail1.ts.net:8443/',
   problem: null,
   devices: [device()],
+})
+
+const pairing = (): RemotePairing => ({
+  code: 'ABCD2345',
+  url: via === 'relay' ? 'https://devpit.app/remote#relay=host_1&key=00&secret=11&name=box' : 'https://box.tail1.ts.net:8443/#pair=ABCD2345',
+  qrSvg: '<svg></svg>',
+  expiresAt: 0,
 })
 
 const voice = (): Transcribing => ({ engine: 'local', model: '', language: '', url: '', keySet: false, local: whisper })
@@ -38,6 +51,9 @@ vi.mock('./live', () => ({
     remoteRead: async () => view(),
     remoteAllow: async (id: string, typing: boolean, answering: boolean) => (allowed(id, typing, answering), view()),
     remoteForget: async () => view(),
+    remoteVia: async (next: RemoteVia) => (chosen(next), (via = next), view()),
+    remotePair: async () => pairing(),
+    remotePairCancel: () => undefined,
     transcribeRead: async () => voice(),
   },
 }))
@@ -46,6 +62,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   whisper = null
+  via = 'tailscale'
 })
 
 describe('a settings switch', () => {
@@ -98,6 +115,25 @@ describe('Remote in Settings', () => {
     await screen.findByText('watch')
     expect(screen.queryByRole('button', { name: 'watch' })).toBeNull()
     expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('switches the way in from its chips, one pressed at a time', async () => {
+    render(<RemoteSettings />)
+    const relay = await screen.findByRole('button', { name: 'devpit.app relay' })
+    expect(screen.getByRole('button', { name: 'Tailscale' }).getAttribute('aria-pressed')).toBe('true')
+    expect(relay.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(relay)
+    await waitFor(() => expect(chosen).toHaveBeenCalledWith('relay'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'devpit.app relay' }).getAttribute('aria-pressed')).toBe('true'))
+    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
+  })
+
+  it('pairs through the relay by the code to scan alone, never one to type', async () => {
+    via = 'relay'
+    render(<RemoteSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Pair a device' }))
+    await screen.findByRole('button', { name: 'Copy the link' })
+    expect(screen.queryByText('ABCD2345')).toBeNull()
   })
 })
 

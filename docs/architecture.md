@@ -13,6 +13,7 @@ crates/tmux      the sessions that outlive the window
 crates/agentcli  the agent catalogue, headless turns, hooks
 crates/steps     what a column runs, and the runner that runs it
 crates/devflow   devflow.yaml, its detection and setup; flow/ ships inside it
+crates/remote    the Remote through the relay: Noise, frames, the relay client
 apps/desktop     the shell — the only crate allowed to know it
 web              React + Vite + xterm.js
 xtask            the architectural guards
@@ -168,8 +169,18 @@ no copy, only that the person clicked.
 ## Remote
 
 devpit can be reached from the person's other devices over their Tailscale
-tailnet. It is off unless turned on in Settings. When on, the machine
-serves its own viewer (`web/remote.html`):
+tailnet, or from anywhere through devpit.app's relay. It is off unless turned
+on in Settings, and one way in is open at a time.
+
+**Through the relay** the machine connects out to devpit.app as the
+person's account, and a device signed in to the same account is joined to it
+there. Inside, a Noise session (`Noise_XX_25519_ChaChaPoly_BLAKE2s`) proves
+the machine's key — named by the pairing QR code — to the device and the
+device's key to the machine; devpit.app carries frames it holds no key to.
+A device is known by its key, and forgetting it ends its session. The protocol
+is `docs/remote-relay.md`.
+
+**Over the tailnet** the machine serves its own viewer (`web/remote.html`):
 
 - **Where it listens.** On loopback, published by `tailscale serve --https`.
   When the tailnet has no HTTPS, it listens on the machine's tailnet IP
@@ -190,4 +201,5 @@ serves its own viewer (`web/remote.html`):
   logged or sent on.
 
 The protocol is `RemoteIn`/`RemoteOut` in `devpit-rpc`, one JSON message per
-WebSocket frame.
+WebSocket frame on the tailnet and sealed in Noise frames through the relay;
+the viewer is the same either way.

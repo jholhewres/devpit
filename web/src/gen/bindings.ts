@@ -340,7 +340,17 @@ export const commands = {
 	remoteActivity: () => typedError<RemoteActivities, RpcError>(__TAURI_INVOKE("remote_activity")),
 	/**  `remote.set` — on or off. On says why, when it cannot be reached. */
 	remoteSet: (on: boolean) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_set", { on })),
-	/**  `remote.pair` — a code for one device, shown here, good once for two minutes. */
+	/**
+	 *  `remote.via` — the way devices come in: the tailnet, or devpit.app's relay.
+	 *  Switching drops every device connected the other way.
+	 */
+	remoteVia: (via: RemoteVia) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_via", { via })),
+	/**
+	 *  `remote.pair` — a code for one device, shown here, good once for two
+	 *  minutes. Through the relay the QR code is the whole of it: it carries this
+	 *  machine's key, which the device checks the machine against, and a secret
+	 *  too long to type.
+	 */
 	remotePair: () => typedError<RemotePairing, RpcError>(__TAURI_INVOKE("remote_pair")),
 	/**  `remote.pair_cancel` — the pairing code is put away. */
 	remotePairCancel: () => __TAURI_INVOKE<void>("remote_pair_cancel"),
@@ -349,7 +359,10 @@ export const commands = {
 	 *  end, and it connects again with what it has now.
 	 */
 	remoteAllow: (id: string, typing: boolean, answering: boolean) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_allow", { id, typing, answering })),
-	/**  `remote.forget` — the device is unpaired, and dropped at once. */
+	/**
+	 *  `remote.forget` — the device is unpaired, and dropped at once: its
+	 *  connections end, and through the relay their session keys with them.
+	 */
 	remoteForget: (id: string) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_forget", { id })),
 	/**  `remote.drop` — every device watching now is disconnected. */
 	remoteDrop: () => __TAURI_INVOKE<void>("remote_drop"),
@@ -3987,6 +4000,8 @@ export type RemoteDevice = {
 	pairedAt: number | null,
 	lastSeen: number | null,
 	connected: boolean,
+	/**  Paired through devpit.app's relay, and known by its key. */
+	relay: boolean,
 };
 
 /**  A reply an orchestrator drafted, waiting on the person. */
@@ -4001,7 +4016,14 @@ export type RemoteDraft = {
 /**  What a viewer asks. */
 export type RemoteIn = 
 /**  The first message: the device's token, which only its pairing gave it. */
-{ t: "hello"; token: string } | { t: "projects" } | 
+{ t: "hello"; token: string } | 
+/**
+ *  Through the relay, the first message of a device the machine does not
+ *  know yet: the one-time secret its QR code carried, sent only after the
+ *  machine proved the key that code named. The device is then known by
+ *  its own key, proven in every handshake after.
+ */
+{ t: "pair"; secret: string; name: string } | { t: "projects" } | 
 /**
  *  Watch a terminal, sized for the viewer's screen. The desk's own size
  *  does not change.
@@ -4071,6 +4093,16 @@ export type RemoteQuestion = {
 	input: string,
 };
 
+/**  The relay, as this machine sees it. */
+export type RemoteRelay = {
+	/**  This machine is signed in to a devpit account, which the relay needs. */
+	signedIn: boolean,
+	/**  Connected to the relay now, so a device can reach it. */
+	online: boolean,
+	/**  Why it is not, when it should be. */
+	problem: string | null,
+};
+
 /**  Every message shape, for the generated contract the viewer is typed by. */
 export type RemoteShapes = {
 	incoming: RemoteIn[],
@@ -4093,9 +4125,18 @@ export type RemoteTerminal = {
 	command: string,
 };
 
+/**  How paired devices reach this machine. */
+export type RemoteVia = 
+/**  Over the person's tailnet, served by this machine. */
+"tailscale" | 
+/**  From anywhere, through devpit.app's relay, encrypted end to end. */
+"relay";
+
 /**  Remote, as the settings show it. */
 export type RemoteView = {
 	enabled: boolean,
+	via: RemoteVia,
+	relay: RemoteRelay,
 	tailscale: TailscaleState,
 	/**  Where a paired device opens the viewer, once it is reachable. */
 	address: string | null,

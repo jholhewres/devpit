@@ -1,10 +1,14 @@
-//! One viewer's connection: the hello that names its device, then requests
-//! answered one by one, each checked against what the device may do.
+//! One viewer's connection: the device it is, then requests answered one by
+//! one, each checked against what the device may do.
 //!
 //! What a device may do is fixed for the connection. Changing it on the
 //! machine drops the device's connections, and the viewer connects again
 //! with what it has now — so a terminal watched read-only is attached again
 //! read-only or not, by tmux, rather than trusted to the page.
+//!
+//! The connection is a `Wire`: a WebSocket on the tailnet, where the device
+//! says hello with its token, or a Noise session through the relay, where
+//! the handshake already proved which device it is.
 
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
@@ -19,34 +23,92 @@ use crate::remote_devices::{Device, Devices};
 use crate::remote_panes::Watching;
 
 /// How long a viewer has to say who it is.
-const HELLO_WITHIN: Duration = Duration::from_secs(10);
+pub(crate) const HELLO_WITHIN: Duration = Duration::from_secs(10);
 /// The most a message from a viewer may be.
-const MOST_MESSAGE: usize = 256 * 1024;
+pub(crate) const MOST_MESSAGE: usize = 256 * 1024;
 /// A connection that says nothing for this long is closed.
 const IDLE: Duration = Duration::from_secs(90);
 
-pub(crate) fn run(app: tauri::AppHandle, mut ws: WebSocket<TcpStream>, root: std::path::PathBuf) {
+/// What one read of a connection brought.
+pub(crate) enum Heard {
+    Text(String),
+    /// A ping, or part of a message: the viewer is there.
+    Alive,
+    /// Nothing within the read's timeout.
+    Nothing,
+}
+
+/// A viewer's connection, however it came.
+pub(crate) trait Wire {
+    /// One read; an error when the connection is gone.
+    fn hear(&mut self) -> Result<Heard, ()>;
+    fn say(&mut self, text: &str);
+    /// Ends the connection, and with it whatever keys it held.
+    fn end(&mut self);
+}
+
+/// The tailnet's: one JSON message per WebSocket frame, on the machine's own
+/// TLS or the tailnet's encryption.
+pub(crate) struct Tailnet(pub WebSocket<TcpStream>);
+
+impl Wire for Tailnet {
+    fn hear(&mut self) -> Result<Heard, ()> {
+        match self.0.read() {
+            Ok(Message::Text(text)) => Ok(Heard::Text(text.to_string())),
+            Ok(Message::Ping(_) | Message::Pong(_)) => Ok(Heard::Alive),
+            Ok(Message::Close(_)) => Err(()),
+            Ok(_) => Ok(Heard::Nothing),
+            Err(tungstenite::Error::Io(err))
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                Ok(Heard::Nothing)
+            }
+            Err(_) => Err(()),
+        }
+    }
+
+    fn say(&mut self, text: &str) {
+        let _ = self.0.send(Message::text(text));
+    }
+
+    fn end(&mut self) {
+        let _ = self.0.close(None);
+        let _ = self.0.flush();
+    }
+}
+
+/// A tailnet viewer: its hello names the device, then it is served.
+pub(crate) fn run(app: tauri::AppHandle, ws: WebSocket<TcpStream>, root: std::path::PathBuf) {
     let _ = ws
         .get_ref()
         .set_read_timeout(Some(Duration::from_millis(40)));
-    let Some(device) = hello(&mut ws, &root) else {
-        let _ = ws.close(None);
-        let _ = ws.flush();
-        return;
-    };
+    let mut wire = Tailnet(ws);
+    match hello(&mut wire, &root) {
+        Some(device) => serve(app, wire, root, device),
+        None => wire.end(),
+    }
+}
+
+/// `device`'s requests, answered until it leaves, goes silent or is dropped
+/// here.
+pub(crate) fn serve(
+    app: tauri::AppHandle,
+    mut wire: impl Wire,
+    root: std::path::PathBuf,
+    device: Device,
+) {
     let (id, out, heard) = crate::remote_hub::join(&app, &device.id);
     crate::remote::note(&root, &device, "connected");
     let mut watching = Watching::new(id);
     let mut last = Instant::now();
-    let host = std::env::var("HOSTNAME")
-        .ok()
-        .or_else(hostname)
-        .unwrap_or_else(|| "this machine".to_owned());
     send(
-        &mut ws,
+        &mut wire,
         &RemoteOut::Welcome {
             device: device.name.clone(),
-            host,
+            host: machine_name(),
             typing: device.typing,
             answering: device.answering,
         },
@@ -55,8 +117,8 @@ pub(crate) fn run(app: tauri::AppHandle, mut ws: WebSocket<TcpStream>, root: std
         if !crate::remote_hub::holds(id) {
             break;
         }
-        match ws.read() {
-            Ok(Message::Text(text)) => {
+        match wire.hear() {
+            Ok(Heard::Text(text)) => {
                 last = Instant::now();
                 if text.len() > MOST_MESSAGE {
                     break;
@@ -65,40 +127,40 @@ pub(crate) fn run(app: tauri::AppHandle, mut ws: WebSocket<TcpStream>, root: std
                     Ok(asked) => {
                         if let Some(said) = answer(&app, &root, &device, &mut watching, &out, asked)
                         {
-                            send(&mut ws, &said);
+                            send(&mut wire, &said);
                         }
                     }
                     Err(_) => send(
-                        &mut ws,
+                        &mut wire,
                         &RemoteOut::Failed {
                             why: "that is not a message devpit reads".to_owned(),
                         },
                     ),
                 }
             }
-            Ok(Message::Ping(_) | Message::Pong(_)) => last = Instant::now(),
-            Ok(Message::Close(_)) => break,
-            Ok(_) => {}
-            Err(tungstenite::Error::Io(err))
-                if matches!(
-                    err.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) => {}
-            Err(_) => break,
+            Ok(Heard::Alive) => last = Instant::now(),
+            Ok(Heard::Nothing) => {}
+            Err(()) => break,
         }
         if last.elapsed() > IDLE {
             break;
         }
         while let Ok(said) = heard.try_recv() {
-            send(&mut ws, &said);
+            send(&mut wire, &said);
         }
-        let _ = ws.flush();
     }
     watching.close_all();
     crate::remote_hub::leave(&app, id);
     crate::remote::note(&root, &device, "disconnected");
-    let _ = ws.close(None);
-    let _ = ws.flush();
+    wire.end();
+}
+
+/// What this machine is called, as a viewer shows it.
+pub(crate) fn machine_name() -> String {
+    std::env::var("HOSTNAME")
+        .ok()
+        .or_else(hostname)
+        .unwrap_or_else(|| "this machine".to_owned())
 }
 
 fn hostname() -> Option<String> {
@@ -108,52 +170,53 @@ fn hostname() -> Option<String> {
         .filter(|name| !name.is_empty())
 }
 
-fn send(ws: &mut WebSocket<TcpStream>, said: &RemoteOut) {
+pub(crate) fn send(wire: &mut impl Wire, said: &RemoteOut) {
     if let Ok(text) = serde_json::to_string(said) {
-        let _ = ws.write(Message::text(text));
+        wire.say(&text);
     }
 }
 
-/// The device a connection's first message names, or nothing — said why.
-fn hello(ws: &mut WebSocket<TcpStream>, root: &std::path::Path) -> Option<Device> {
+pub(crate) fn refuse(wire: &mut impl Wire, why: &str) {
+    send(
+        wire,
+        &RemoteOut::Refused {
+            why: why.to_owned(),
+        },
+    );
+}
+
+/// The first message a viewer sends, within `HELLO_WITHIN`.
+pub(crate) fn first(wire: &mut impl Wire) -> Option<RemoteIn> {
     let began = Instant::now();
     while began.elapsed() < HELLO_WITHIN {
-        match ws.read() {
-            Ok(Message::Text(text)) => {
-                let Ok(RemoteIn::Hello { token }) = serde_json::from_str::<RemoteIn>(&text) else {
-                    send(
-                        ws,
-                        &RemoteOut::Refused {
-                            why: "say hello first".to_owned(),
-                        },
-                    );
-                    return None;
-                };
-                let mut devices = Devices::read(root);
-                let Some(device) = devices.by_token(&token).cloned() else {
-                    send(
-                        ws,
-                        &RemoteOut::Refused {
-                            why: "this device is not paired with this machine — pair it again"
-                                .to_owned(),
-                        },
-                    );
-                    return None;
-                };
-                devices.seen(&device.id, crate::remote::now());
-                let _ = devices.write(root);
-                return Some(device);
+        match wire.hear() {
+            Ok(Heard::Text(text)) if text.len() <= MOST_MESSAGE => {
+                return serde_json::from_str::<RemoteIn>(&text).ok();
             }
-            Ok(_) => {}
-            Err(tungstenite::Error::Io(err))
-                if matches!(
-                    err.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) => {}
-            Err(_) => return None,
+            Ok(Heard::Text(_)) | Err(()) => return None,
+            Ok(Heard::Alive | Heard::Nothing) => {}
         }
     }
     None
+}
+
+/// The device a tailnet connection's hello names, or nothing — said why.
+fn hello(wire: &mut impl Wire, root: &std::path::Path) -> Option<Device> {
+    let Some(RemoteIn::Hello { token }) = first(wire) else {
+        refuse(wire, "say hello first");
+        return None;
+    };
+    let mut devices = Devices::read(root);
+    let Some(device) = devices.by_token(&token).cloned() else {
+        refuse(
+            wire,
+            "this device is not paired with this machine — pair it again",
+        );
+        return None;
+    };
+    devices.seen(&device.id, crate::remote::now());
+    let _ = devices.write(root);
+    Some(device)
 }
 
 fn drafts_now() -> RemoteOut {
@@ -183,7 +246,8 @@ fn answer(
     asked: RemoteIn,
 ) -> Option<RemoteOut> {
     match asked {
-        RemoteIn::Hello { .. } => None,
+        // Who the device is was settled before its requests were read.
+        RemoteIn::Hello { .. } | RemoteIn::Pair { .. } => None,
         RemoteIn::Ping => Some(RemoteOut::Pong),
         RemoteIn::Projects => Some(match projects() {
             Ok(projects) => RemoteOut::Projects { projects },

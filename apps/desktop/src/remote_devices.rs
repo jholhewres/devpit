@@ -1,9 +1,11 @@
 //! The devices paired with this machine, and what each may do.
 //!
-//! A device holds a token its pairing gave it once; the machine keeps only
-//! the token's SHA-256, in a file only this user can read. Every device sees.
-//! Typing and answering are granted here, on the machine, one device at a
-//! time — never from the device itself.
+//! A device on the tailnet holds a token its pairing gave it once; the
+//! machine keeps only the token's SHA-256, in a file only this user can read.
+//! A device through the relay is known by its X25519 public key instead,
+//! proven in every handshake. Every device sees. Typing and answering are
+//! granted here, on the machine, one device at a time — never from the
+//! device itself.
 
 use std::path::{Path, PathBuf};
 
@@ -18,8 +20,12 @@ pub(crate) const MOST: usize = 16;
 pub(crate) struct Device {
     pub id: String,
     pub name: String,
-    /// SHA-256 of the token, in hex.
+    /// SHA-256 of the token, in hex; empty for a device known by its key.
+    #[serde(default)]
     pub token_hash: String,
+    /// The public key of a device paired through the relay, in hex.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
     #[serde(default)]
     pub typing: bool,
     #[serde(default)]
@@ -81,8 +87,48 @@ impl Devices {
         found
     }
 
+    /// The device a relay handshake proved `key` for.
+    pub(crate) fn by_key(&self, key: &[u8; 32]) -> Option<&Device> {
+        let wanted = devpit_remote::noise::hex(key);
+        let mut found = None;
+        for device in &self.devices {
+            if device
+                .key
+                .as_deref()
+                .is_some_and(|kept| same(kept, &wanted))
+            {
+                found = Some(device);
+            }
+        }
+        found
+    }
+
     /// A new device that sees and does nothing else, with its token.
     pub(crate) fn pair(&mut self, name: &str, token: &str, now: f64) -> Result<Device, String> {
+        self.add(name, hash(token), None, now)
+    }
+
+    /// A new device through the relay, known by the key its handshake proved.
+    /// Pairing a key again replaces the device it was.
+    pub(crate) fn pair_key(
+        &mut self,
+        name: &str,
+        key: &[u8; 32],
+        now: f64,
+    ) -> Result<Device, String> {
+        let hex = devpit_remote::noise::hex(key);
+        self.devices
+            .retain(|one| one.key.as_deref() != Some(hex.as_str()));
+        self.add(name, String::new(), Some(hex), now)
+    }
+
+    fn add(
+        &mut self,
+        name: &str,
+        token_hash: String,
+        key: Option<String>,
+        now: f64,
+    ) -> Result<Device, String> {
         if self.devices.len() >= MOST {
             return Err(format!(
                 "{MOST} devices are paired already — forget one first"
@@ -101,7 +147,8 @@ impl Devices {
             } else {
                 name
             },
-            token_hash: hash(token),
+            token_hash,
+            key,
             typing: false,
             answering: false,
             paired_at: now,

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AgentHealth, Board, Conversation, Conversations, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion } from '../gen/bindings'
 import { launcherLink } from '../shell/remoteLauncher'
+import { connectRelay, CLOSED, deviceKey, forgetMachine, keepMachine, machinesKept, offerOpened, type RelayMachine, type RelayPairing } from './relay'
+import { RelayNothing, RelayPair } from './RelayPair'
 import { RemoteBoard } from './RemoteBoard'
 import { RemoteChats } from './RemoteChats'
 import { RemotePair } from './RemotePair'
@@ -14,7 +16,14 @@ import { connect, keepToken, tokenKept, type Link } from './socket'
  * The viewer: which machine, which project, and its terminals, board,
  * questions and chats. What it may do — type, answer — is the machine's word,
  * said in its welcome; asking past it is refused there, not only here.
+ *
+ * It comes two ways and looks the same: served by the machine on the
+ * tailnet, a token said in hello; or served by devpit.app at /remote/, a Noise
+ * session through the relay with a machine whose key its QR code carried.
  */
+
+/** devpit.app's build of the viewer, for the relay, lives under /remote/. */
+const RELAY_PAGE = import.meta.env.BASE_URL !== '/'
 
 type View = 'terminals' | 'board' | 'waiting' | 'chats' | 'secrets'
 
@@ -27,6 +36,10 @@ export interface Welcome {
 
 export function RemoteApp(): React.JSX.Element {
   const [token, setToken] = useState<string | null>(tokenKept)
+  const [offer, setOffer] = useState(() => offerOpened(location.hash))
+  const [relay, setRelay] = useState<RelayMachine | null>(() => machinesKept()[0] ?? null)
+  const [pairing, setPairing] = useState<RelayPairing | null>(null)
+  const [away, setAway] = useState<{ why: string; code: number } | null>(null)
   const [up, setUp] = useState(false)
   const [welcome, setWelcome] = useState<Welcome | null>(null)
   const [refused, setRefused] = useState<string | null>(null)
@@ -51,7 +64,7 @@ export function RemoteApp(): React.JSX.Element {
   const send = useCallback((message: RemoteIn) => link.current?.send(message), [])
 
   useEffect(() => {
-    if (!token) return
+    if (!token && !relay) return
     const heard = (message: RemoteOut): void => {
       switch (message.t) {
         case 'welcome':
@@ -63,6 +76,8 @@ export function RemoteApp(): React.JSX.Element {
           return
         case 'refused':
           setRefused(message.why)
+          // Through the relay, asking again would only be refused again.
+          if (relay) link.current?.close()
           return
         case 'projects':
           setProjects(message.projects)
@@ -111,9 +126,17 @@ export function RemoteApp(): React.JSX.Element {
           return
       }
     }
-    link.current = connect(token, heard, setUp)
+    if (relay) {
+      const state = (now: boolean, why?: string, code = 0): void => {
+        setUp(now)
+        setAway(now || !why ? null : { why, code })
+      }
+      link.current = connectRelay(relay, deviceKey(), heard, state, { origin: location.origin, pairing })
+    } else if (token) {
+      link.current = connect(token, heard, setUp)
+    }
     return () => link.current?.close()
-  }, [token])
+  }, [token, relay, pairing])
 
   /* Each view asks for what it shows when it is opened. */
   useEffect(() => {
@@ -128,26 +151,39 @@ export function RemoteApp(): React.JSX.Element {
     }
   }, [view, projectId, up, send])
 
-  if (!token) return <RemotePair onPaired={(fresh) => (keepToken(fresh), setToken(fresh))} />
+  if (offer) {
+    const pair = (name: string): void => {
+      // The secret is good once: off the address before it is used.
+      history.replaceState(null, '', location.pathname)
+      keepMachine(offer.machine)
+      setPairing({ secret: offer.secret, name })
+      setRelay(offer.machine)
+      setRefused(null)
+      setOffer(null)
+    }
+    return <RelayPair machine={offer.machine} onPair={pair} />
+  }
+
+  if (!token && !relay) return RELAY_PAGE ? <RelayNothing /> : <RemotePair onPaired={(fresh) => (keepToken(fresh), setToken(fresh))} />
 
   if (refused)
     return (
       <main className="rm rm--center">
         <h1 className="rm__title">Not let in</h1>
         <p className="rm__said">{refused}</p>
-        <button className="rm__btn" onClick={() => (keepToken(null), setToken(null), setRefused(null))}>
+        <button className="rm__btn" onClick={() => (relay ? (forgetMachine(relay.host), setRelay(null), setPairing(null)) : (keepToken(null), setToken(null)), setRefused(null))}>
           Pair again
         </button>
       </main>
     )
 
   const project = projects.find((one) => one.id === projectId) ?? null
-  const launcher = launcherLink(window.location.origin, welcome?.host)
+  const launcher = relay ? null : launcherLink(window.location.origin, welcome?.host)
   return (
     <main className="rm">
       <header className="rm__head">
         <span className="rm__dot" data-up={up ? 'true' : undefined} />
-        <span className="rm__host">{welcome?.host ?? 'devpit'}</span>
+        <span className="rm__host">{welcome?.host ?? relay?.name ?? 'devpit'}</span>
         {launcher && (
           <a className="rm__dim rm__add" href={launcher} target="_blank" rel="noreferrer" title="Adds this machine's address to devpit.app/remote; nothing else is sent">
             Add to devpit.app
@@ -161,6 +197,11 @@ export function RemoteApp(): React.JSX.Element {
           ))}
         </select>
       </header>
+      {away && (
+        <p className="rm__failed" role="status">
+          {away.why} {away.code === CLOSED.signIn && <a href="/login?next=/remote">Sign in</a>}
+        </p>
+      )}
       {failed && <p className="rm__failed" role="alert">{failed}</p>}
       {started && <p className="rm__said" role="status">Started {started}: it runs in a terminal tab of the project.</p>}
       {kept && <p className="rm__said" role="status">{kept} is kept. A session reads it by that name.</p>}

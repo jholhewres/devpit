@@ -81,6 +81,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         remote::remote_read,
         remote::remote_activity,
         remote::remote_set,
+        remote::remote_via,
         remote::remote_pair,
         remote::remote_pair_cancel,
         remote::remote_allow,
