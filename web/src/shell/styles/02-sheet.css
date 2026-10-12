@@ -40,10 +40,51 @@
 .run__what { margin-top: 3px; font-size: 12px; color: var(--text-3); line-height: 1.45; }
 
 .sheet__foot { flex: none; display: flex; align-items: center; gap: 6px; padding: 12px 16px; border-top: 1px solid var(--border); }
-.btn { height: 30px; padding: 0 11px; border-radius: 7px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); background: var(--overlay); }
-.btn:hover { background: var(--overlay-strong); color: var(--text); }
-.btn--go { background: var(--inverse); color: var(--on-inverse); font-weight: 550; }
-.btn--go:hover { background: var(--inverse); opacity: 0.9; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────
+   One button in three weights, defined here and nowhere else. `.btn` is
+   the ordinary one: a raised face with an edge, readable at rest rather
+   than a smudge on the panel. `.btn--go` is the one thing a screen wants
+   done, filled with the accent; `.btn--danger` is the one that cannot be
+   undone. The hand over all of them is index.css's. */
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--overlay-strong);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.18);
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 80ms ease;
+}
+.btn:hover { background: color-mix(in srgb, var(--text) 14%, transparent); border-color: color-mix(in srgb, var(--text) 26%, transparent); color: var(--text); }
+.btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+.btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; box-shadow: none; }
+.btn:disabled:hover { background: var(--overlay-strong); border-color: var(--border-strong); }
+
+.btn--go { font-weight: 600; color: var(--on-accent); background: var(--accent); border-color: color-mix(in srgb, var(--accent) 80%, #000); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 2px 8px color-mix(in srgb, var(--accent) 28%, transparent); }
+.btn--go:hover { color: var(--on-accent); background: color-mix(in srgb, var(--accent) 88%, #fff); border-color: color-mix(in srgb, var(--accent) 80%, #000); }
+.btn--go:disabled:hover { background: var(--accent); border-color: color-mix(in srgb, var(--accent) 80%, #000); }
+.btn--go svg { color: currentColor; }
+
+/* A small one, for the controls inside a row: a remove, a move, an add. */
+.btn--sm { height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; gap: 6px; }
+/* A quiet one, for what sits beside the content rather than over it: no face
+   until it is pointed at. `data-danger` turns it red on the way to a click. */
+.btn--quiet { color: var(--text-2); background: transparent; border-color: transparent; box-shadow: none; }
+.btn--quiet:hover { color: var(--text); background: var(--overlay-strong); border-color: transparent; }
+.btn--quiet[data-danger]:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.btn--quiet:disabled:hover { background: transparent; border-color: transparent; }
+
+.btn--danger { color: #fff; background: var(--danger); border-color: color-mix(in srgb, var(--danger) 80%, #000); }
+.btn--danger:hover { color: #fff; background: color-mix(in srgb, var(--danger) 85%, #000); border-color: color-mix(in srgb, var(--danger) 70%, #000); }
 
 @media (prefers-reduced-motion: reduce) { .scrim, .sheet { animation: none; } .run[data-state='run']::before { animation: none; } }
 
