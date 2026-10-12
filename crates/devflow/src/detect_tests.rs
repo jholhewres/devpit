@@ -147,3 +147,17 @@ fn the_repositorys_own_flow_comes_back_as_hints() {
     };
     assert!(detected(dir.path(), plain).hints.branches.is_empty());
 }
+
+/// A file counts under the spelling its folder lists, so a case-insensitive
+/// disk does not report one template under two names.
+#[test]
+fn a_file_counts_only_under_its_own_spelling() {
+    let dir = project(&[
+        (".github/pull_request_template.md", "## What\n"),
+        ("AGENTS.md", "# A\n"),
+    ]);
+    assert!(spelled_as(dir.path(), ".github/pull_request_template.md"));
+    assert!(!spelled_as(dir.path(), ".github/PULL_REQUEST_TEMPLATE.md"));
+    assert!(spelled_as(dir.path(), "AGENTS.md"));
+    assert!(!spelled_as(dir.path(), "agents.md"));
+}

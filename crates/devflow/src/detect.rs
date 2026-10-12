@@ -505,11 +505,27 @@ pub fn ticket_keys(subjects: &[String]) -> Vec<String> {
     counted.into_iter().take(5).map(|(key, _)| key).collect()
 }
 
+/// Whether `relative` exists under that exact spelling. On a case-insensitive
+/// disk (macOS, Windows) `PULL_REQUEST_TEMPLATE.md` also opens
+/// `pull_request_template.md`, and one file must not be reported twice.
+fn spelled_as(root: &Path, relative: &str) -> bool {
+    let (folder, name) = relative.rsplit_once('/').unwrap_or(("", relative));
+    let Ok(folder) = devpit_core::tree::resolve(root, if folder.is_empty() { "." } else { folder })
+    else {
+        return false;
+    };
+    std::fs::read_dir(folder).is_ok_and(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .any(|entry| entry.file_name().to_str() == Some(name))
+    })
+}
+
 fn hints(root: &Path, files: &Files, machine: &Machine) -> Hints {
     let present = |names: &[&str]| -> Vec<String> {
         names
             .iter()
-            .filter(|name| files.read(name).is_some())
+            .filter(|name| files.read(name).is_some() && spelled_as(root, name))
             .map(|name| (*name).to_owned())
             .collect()
     };
