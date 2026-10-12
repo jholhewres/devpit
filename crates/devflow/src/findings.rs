@@ -33,7 +33,7 @@ pub const REQUIRED: [&str; 9] = [
 ];
 
 /// Everything a finding may carry: the schema allows nothing else.
-pub const FIELDS: [&str; 15] = [
+pub const FIELDS: [&str; 16] = [
     "file",
     "line",
     "end_line",
@@ -49,10 +49,11 @@ pub const FIELDS: [&str; 15] = [
     "found_by",
     "agreement",
     "false_positive",
+    "jev",
 ];
 
 /// What devpit sets on a finding, never a reviewer.
-const DEVPITS: [&str; 3] = ["found_by", "agreement", "false_positive"];
+const DEVPITS: [&str; 4] = ["found_by", "agreement", "false_positive", "jev"];
 
 /// The most findings one answer may hold: a review, not a lint run.
 const MOST_FINDINGS: usize = 200;
@@ -147,6 +148,9 @@ fn finding_problems(finding: &Value, at: &str, wrong: &mut Vec<String>) {
         .is_some_and(|value| !value.is_boolean())
     {
         wrong.push(format!("`{at}.false_positive` is true or false"));
+    }
+    if finding.get("jev").is_some_and(|value| !value.is_object()) {
+        wrong.push(format!("`{at}.jev` is an object"));
     }
 }
 
@@ -447,12 +451,18 @@ pub fn carried(merged: &mut [Value], earlier: &[Value]) {
     }
 }
 
-/// The findings that hold the card: in `block_on`, and not set aside by the
-/// person as a false positive.
+/// Whether a finding still stands: not a false positive, as the person
+/// said, nor set aside by Jev acting.
+pub fn standing(finding: &Value) -> bool {
+    finding.get("false_positive") != Some(&json!(true))
+        && finding["jev"].get("set_aside") != Some(&json!(true))
+}
+
+/// The findings that hold the card: in `block_on`, and still standing.
 pub fn blocking<'a>(findings: &'a [Value], block_on: &[Severity]) -> Vec<&'a Value> {
     findings
         .iter()
-        .filter(|finding| finding.get("false_positive") != Some(&json!(true)))
+        .filter(|finding| standing(finding))
         .filter(|finding| {
             severity_of(text(finding, "severity")).is_some_and(|one| block_on.contains(&one))
         })
@@ -505,11 +515,11 @@ pub fn said_together(answers: &[Value]) -> (Vec<String>, Value) {
     (done_well, Value::Object(verification))
 }
 
-/// How many findings hold each severity, ignoring the false positives.
+/// How many findings still standing hold each severity.
 pub fn counted(findings: &[Value], severity: Severity) -> usize {
     findings
         .iter()
-        .filter(|finding| finding.get("false_positive") != Some(&json!(true)))
+        .filter(|finding| standing(finding))
         .filter(|finding| text(finding, "severity") == severity.word())
         .count()
 }
@@ -519,12 +529,9 @@ pub fn headline(findings: &Value) -> String {
     let list = findings["findings"]
         .as_array()
         .map_or(&[][..], Vec::as_slice);
-    let standing = list
-        .iter()
-        .filter(|finding| finding.get("false_positive") != Some(&json!(true)))
-        .count();
+    let still = list.iter().filter(|finding| standing(finding)).count();
     format!(
-        "{PREFIX}review: {standing} findings ({} critical, {} high) · verdict: {}",
+        "{PREFIX}review: {still} findings ({} critical, {} high) · verdict: {}",
         counted(list, Severity::Critical),
         counted(list, Severity::High),
         text(findings, "verdict")
@@ -545,6 +552,9 @@ pub fn line_of(finding: &Value) -> String {
     }
     if finding.get("false_positive") == Some(&json!(true)) {
         said.push_str(" — a false positive, the person said");
+    } else if let Some(acted) = finding["jev"]["acted"].as_array() {
+        let acted: Vec<&str> = acted.iter().filter_map(Value::as_str).collect();
+        said.push_str(&format!(" — Jev: {}", acted.join("; ")));
     }
     said
 }

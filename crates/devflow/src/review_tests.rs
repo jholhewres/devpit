@@ -186,6 +186,7 @@ struct Ran<'a> {
     config: &'a Config,
     asked: Asked,
     reach: Reach<'a>,
+    jev: Option<Judge<'a>>,
 }
 
 impl Ran<'_> {
@@ -201,7 +202,10 @@ impl Ran<'_> {
                 title: "[devflow] Open links",
                 body: "## Acceptance criteria\n- [ ] opens the first link\n",
             },
-            git: Some(git(&files, "+os.system(f\"xdg-open {link}\")\n")),
+            git: Some(git(
+                &files,
+                "--- a/src/app.rs\n+++ b/src/app.rs\n@@ -0,0 +1 @@\n+os.system(f\"xdg-open {link}\")\n",
+            )),
             brief: None,
             evidence: None,
             env: &[("DEVPIT_CARD".to_owned(), "card_1".to_owned())],
@@ -209,7 +213,7 @@ impl Ran<'_> {
             budget: Duration::from_secs(400),
             reach: self.reach,
             redact: &no_redaction,
-            jev: false,
+            jev: self.jev,
         })
     }
 }
@@ -247,6 +251,7 @@ fn one_reviewer_answers_end_to_end_and_leaves_the_other_axes_to_the_session() {
         config: &config,
         asked: fresh(),
         reach: &reach,
+        jev: None,
     }
     .review()
     .expect("reviewed");
@@ -314,6 +319,7 @@ fn one_reviewer_answers_end_to_end_and_leaves_the_other_axes_to_the_session() {
         config: &config,
         asked: again,
         reach: &reach,
+        jev: None,
     }
     .review()
     .expect("completed");
@@ -379,6 +385,7 @@ fn three_reviewers_run_at_once_and_the_problem_two_found_is_kept_once() {
         config: &config,
         asked: fresh(),
         reach: &reach,
+        jev: None,
     }
     .review()
     .expect("reviewed");
@@ -435,6 +442,7 @@ fn a_missing_cli_is_skipped_and_said_and_the_review_goes_on() {
         config: &config,
         asked: fresh(),
         reach: &reach,
+        jev: None,
     }
     .review()
     .expect("the stage does not fail");
@@ -460,6 +468,7 @@ fn a_missing_cli_is_skipped_and_said_and_the_review_goes_on() {
         config: &alone,
         asked: fresh(),
         reach: &none,
+        jev: None,
     }
     .review()
     .expect("still not a failure");
@@ -492,6 +501,7 @@ fn an_answer_that_breaks_the_schema_is_not_kept_and_says_why() {
         config: &config,
         asked: fresh(),
         reach: &reach,
+        jev: None,
     }
     .review()
     .expect("reviewed");
@@ -505,4 +515,127 @@ fn an_answer_that_breaks_the_schema_is_not_kept_and_says_why() {
         .join(&done.folder)
         .join("findings-claude.json")
         .exists());
+}
+
+fn said_of(mode: crate::config::Mode, real: f64, duplicate: f64) -> Said {
+    let verdict = |passed: bool| if passed { "pass" } else { "fail" };
+    Said {
+        rubric: crate::jev::FINDING.into(),
+        decision: Some(format!("dcn_{real}_{duplicate}")),
+        mode,
+        outcome: verdict(real >= 0.7 && duplicate <= 0.3).into(),
+        verdicts: json!({
+            "real": { "verdict": verdict(real >= 0.7), "value": real },
+            "duplicate": { "verdict": verdict(duplicate <= 0.3), "value": duplicate },
+        }),
+        answers: json!({}),
+        skipped: None,
+    }
+}
+
+/// Jev asked of every finding: in shadow its word is kept and the list is
+/// what the reviewers said; acting, what it called not real is set aside
+/// and holds nothing, and what it called the same is kept once.
+#[cfg(unix)]
+#[test]
+fn jev_in_shadow_records_each_finding_and_acting_sets_aside_and_joins() {
+    use crate::config::Mode;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for mode in [Mode::Shadow, Mode::Enforce] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        let persona = "devflow-security";
+        let claude = fake_cli(
+            root,
+            "claude-fake",
+            &answer(
+                "claude",
+                persona,
+                vec![
+                    finding("src/app.rs", 1, "critical", "Shell injection in open"),
+                    finding("src/app.rs", 3, "high", "Imaginary race"),
+                ],
+            ),
+            "{}",
+            "0",
+        );
+        let codex = fake_cli(
+            root,
+            "codex-fake",
+            &answer(
+                "codex",
+                persona,
+                vec![finding(
+                    "src/app.rs",
+                    1,
+                    "critical",
+                    "Link passed to a shell",
+                )],
+            ),
+            "{}",
+            "0",
+        );
+        let reach = move |agent: Agent| match agent {
+            Agent::Claude => Ok(claude.clone()),
+            _ => Ok(codex.clone()),
+        };
+        let asked = AtomicUsize::new(0);
+        let judge = |rubric: &str, state: &Value| {
+            assert_eq!(rubric, crate::jev::FINDING);
+            assert_eq!(state["changed"], json!(["1-1"]), "{state}");
+            asked.fetch_add(1, Ordering::SeqCst);
+            match state["finding"]["title"].as_str().unwrap_or_default() {
+                "Imaginary race" => said_of(mode, 0.1, 0.05),
+                "Link passed to a shell" => said_of(mode, 0.9, 0.9),
+                _ => said_of(mode, 0.95, 0.05),
+            }
+        };
+        let config = config_with(
+            vec![
+                reviewer(Agent::Claude, persona),
+                reviewer(Agent::Codex, persona),
+            ],
+            Consolidate::Jev,
+        );
+        let done = Ran {
+            root,
+            config: &config,
+            asked: fresh(),
+            reach: &reach,
+            jev: Some(&judge),
+        }
+        .review()
+        .expect("reviewed");
+        assert_eq!(asked.load(Ordering::SeqCst), 3, "each finding asked once");
+        assert_eq!(done.consolidated.used, Consolidate::Jev);
+        let findings = done.findings.expect("findings.json");
+        assert!(crate::findings::problems(&findings).is_empty());
+        let list = findings["findings"].as_array().expect("findings");
+        let block_on = &config.review.block_on;
+        match mode {
+            Mode::Shadow => {
+                assert_eq!(list.len(), 3, "{list:#?}");
+                assert!(list.iter().all(|one| one["jev"]["decision"].is_string()));
+                assert!(list.iter().all(|one| one["jev"].get("set_aside").is_none()));
+                assert_eq!(crate::findings::blocking(list, block_on).len(), 3);
+            }
+            Mode::Enforce => {
+                assert_eq!(list.len(), 2, "{list:#?}");
+                let shell = list.iter().find(|one| one["line"] == 1).expect("once");
+                assert_eq!(shell["agreement"], "2 of 2");
+                let race = list
+                    .iter()
+                    .find(|one| one["title"] == "Imaginary race")
+                    .expect("race");
+                assert_eq!(race["jev"]["set_aside"], true);
+                assert_eq!(crate::findings::blocking(list, block_on).len(), 1);
+            }
+        }
+        let kept: Value = serde_json::from_str(
+            &std::fs::read_to_string(root.join(&done.folder).join(RECORD)).expect("review.json"),
+        )
+        .expect("json");
+        assert_eq!(kept["jev"].as_object().map(|all| all.len()), Some(3));
+        assert_eq!(kept["changed"]["src/app.rs"], json!([[1, 1]]));
+    }
 }

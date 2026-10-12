@@ -43,11 +43,42 @@ pub struct DecisionRow {
     pub rubric: Option<String>,
     pub questions: String,
     pub answers: Option<String>,
+    /// JSON, as the rubric had them when it was asked.
+    pub thresholds: Option<String>,
     pub outcome: String,
     pub cost_usd: f64,
     pub latency_ms: i64,
     pub state_digest: String,
+    /// `pass` or `fail`, said by what the person did; `None` until they did.
+    pub person_verdict: Option<String>,
 }
+
+/// The columns a decision is read back with, in [`DecisionRow`]'s order.
+const READ: &str = "id, at, project_id, card_id, gate, mode, rubric, questions, answers, \
+                    thresholds, outcome, cost_usd, latency_ms, state_digest, person_verdict";
+
+fn row_of(row: &rusqlite::Row<'_>) -> rusqlite::Result<DecisionRow> {
+    Ok(DecisionRow {
+        id: row.get(0)?,
+        at: row.get(1)?,
+        project_id: row.get(2)?,
+        card_id: row.get(3)?,
+        gate: row.get(4)?,
+        mode: row.get(5)?,
+        rubric: row.get(6)?,
+        questions: row.get(7)?,
+        answers: row.get(8)?,
+        thresholds: row.get(9)?,
+        outcome: row.get(10)?,
+        cost_usd: row.get(11)?,
+        latency_ms: row.get(12)?,
+        state_digest: row.get(13)?,
+        person_verdict: row.get(14)?,
+    })
+}
+
+/// The most decisions a project's calibration reads.
+const MOST_CALIBRATED: u32 = 5_000;
 
 impl Store {
     /// Writes a decision and prunes the ones past [`DECISIONS_KEPT_DAYS`]:
@@ -97,28 +128,51 @@ impl Store {
 
     /// The latest decisions, newest first.
     pub fn decisions_latest(&self, most: u32) -> Result<Vec<DecisionRow>, StoreError> {
-        let mut statement = self.conn.prepare(
-            "SELECT id, at, project_id, card_id, gate, mode, rubric, questions, answers, outcome, \
-             cost_usd, latency_ms, state_digest FROM decision ORDER BY at DESC, id DESC LIMIT ?1",
-        )?;
-        let rows = statement.query_map([most], |row| {
-            Ok(DecisionRow {
-                id: row.get(0)?,
-                at: row.get(1)?,
-                project_id: row.get(2)?,
-                card_id: row.get(3)?,
-                gate: row.get(4)?,
-                mode: row.get(5)?,
-                rubric: row.get(6)?,
-                questions: row.get(7)?,
-                answers: row.get(8)?,
-                outcome: row.get(9)?,
-                cost_usd: row.get(10)?,
-                latency_ms: row.get(11)?,
-                state_digest: row.get(12)?,
-            })
-        })?;
+        let mut statement = self.conn.prepare(&format!(
+            "SELECT {READ} FROM decision ORDER BY at DESC, id DESC LIMIT ?1"
+        ))?;
+        let rows = statement.query_map([most], row_of)?;
         Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// A card's decisions by `rubric` that were answered, newest first.
+    pub fn decisions_of_card(
+        &self,
+        card_id: &str,
+        rubric: &str,
+    ) -> Result<Vec<DecisionRow>, StoreError> {
+        let mut statement = self.conn.prepare(&format!(
+            "SELECT {READ} FROM decision WHERE card_id = ?1 AND rubric = ?2 \
+             AND outcome IN ('pass', 'grey', 'fail') ORDER BY at DESC, id DESC"
+        ))?;
+        let rows = statement.query_map([card_id, rubric], row_of)?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// A project's answered decisions under a rubric, newest first: what a
+    /// rubric's agreement with the person is counted from.
+    pub fn decisions_of_project(&self, project_id: &str) -> Result<Vec<DecisionRow>, StoreError> {
+        let mut statement = self.conn.prepare(&format!(
+            "SELECT {READ} FROM decision WHERE project_id = ?1 AND rubric IS NOT NULL \
+             AND outcome IN ('pass', 'grey', 'fail') ORDER BY at DESC, id DESC LIMIT ?2"
+        ))?;
+        let rows = statement.query_map(rusqlite::params![project_id, MOST_CALIBRATED], row_of)?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// The person's own verdict on a decision, from what they did; a later
+    /// word replaces an earlier one. False when there is no such decision.
+    pub fn label_decision(
+        &self,
+        id: &str,
+        verdict: &str,
+        action: &str,
+    ) -> Result<bool, StoreError> {
+        let changed = self.conn.execute(
+            "UPDATE decision SET person_verdict = ?2, action_taken = ?3 WHERE id = ?1",
+            rusqlite::params![id, verdict, action],
+        )?;
+        Ok(changed > 0)
     }
 }
 

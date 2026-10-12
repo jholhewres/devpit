@@ -65,3 +65,36 @@ pub struct DevflowPlan {
 pub struct DevflowPlanCreated {
     pub card_ids: Vec<String>,
 }
+
+/// How one rubric agrees with the person in a project, from the decisions
+/// they labelled by what they did, and the threshold that would agree most.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RubricAccuracy {
+    pub rubric: String,
+    /// Answered in the last ninety days.
+    pub decisions: u32,
+    pub labelled: u32,
+    /// Labelled, judged pass or fail, and the same as the person.
+    pub agreed: u32,
+    /// Labelled and left grey.
+    pub grey: u32,
+    /// `agreed` of the labelled ones not left grey.
+    pub accuracy: Option<f64>,
+    /// The lowest `min` its yes/no questions have now.
+    pub min: Option<f64>,
+    pub suggested_min: Option<f64>,
+    pub suggested_grey: Option<f64>,
+    /// What `suggestedMin` would have agreed on, of the labelled.
+    pub suggested_accuracy: Option<f64>,
+    /// Why nothing is suggested yet.
+    pub note: Option<String>,
+}
+
+/// Response of `devflow.calibration`: each rubric the project was judged by.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowCalibration {
+    pub project_id: String,
+    pub rubrics: Vec<RubricAccuracy>,
+}

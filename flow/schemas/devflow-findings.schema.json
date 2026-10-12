@@ -83,6 +83,10 @@
         "false_positive": {
           "type": "boolean",
           "description": "The person said it is not a problem; the gate no longer blocks on it."
+        },
+        "jev": {
+          "type": "object",
+          "description": "What Jev's devflow-finding rubric said of it — real, severity, duplicate, inside the diff — and, in enforce, what that did: set_aside, a new severity."
         }
       },
       "allOf": [

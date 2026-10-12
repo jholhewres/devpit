@@ -16,7 +16,7 @@ use devpit_core::Store;
 use devpit_devflow::config::{Mode, GATE};
 use devpit_devflow::folder::State;
 use devpit_devflow::gate::{self, Event, Gate, Hook, Judged, Looked, Review, Run, Said, Streak};
-use devpit_devflow::{runs, Ask, Config};
+use devpit_devflow::{runs, Config};
 use devpit_rpc::{Board, Project};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
@@ -196,9 +196,10 @@ fn gated(
     let criteria = criteria_of(&card.body);
     let checked = gate::checked(&looked(config, &card.id, &criteria, read));
     let asked = checked.missing.is_empty()
-        && (!for_a_hook || mode_of(store, project, config) == Mode::Enforce);
+        && (!for_a_hook
+            || crate::devflow_jev::mode_of(store, &project.id, config) == Mode::Enforce);
     let decisions = asked
-        .then(|| judged(store, project, config, card, &criteria, &checked, root))
+        .then(|| judged(project, config, card, &criteria, &checked, root))
         .flatten();
     Gate::new(checked, decisions, &runs::stamp(SystemTime::now()))
 }
@@ -258,20 +259,6 @@ fn kept(project: &Project, root: &Path, card: &str, gate: &Gate) -> Result<Strin
     Ok(relative)
 }
 
-/// The rubric a card's completion is judged by: the project's own when it
-/// keeps one, else `done` asked once per criterion as `devflow-done`.
-fn rubric_for(
-    root: &Path,
-    name: &str,
-    criteria: &[String],
-) -> Result<crate::rubric::Rubric, String> {
-    let own = root.join(".devpit/rubrics").join(format!("{name}.json"));
-    if name == GATE && !own.exists() {
-        return Ok(done_per_criterion(criteria));
-    }
-    crate::agent_decide::rubric_named(root, name)
-}
-
 /// `done` with its `criteriaMet` asked once for each criterion, which is how
 /// a missing one is named rather than averaged away.
 pub(crate) fn done_per_criterion(criteria: &[String]) -> crate::rubric::Rubric {
@@ -311,21 +298,9 @@ pub(crate) fn done_per_criterion(criteria: &[String]) -> crate::rubric::Rubric {
     done
 }
 
-/// `enforce` holds the card only once the person clicked for it.
-fn mode_of(store: &Store, project: &Project, config: &Config) -> Mode {
-    if config.decisions.mode == Mode::Enforce
-        && crate::devflow_asks::made(store, &project.id, Ask::Enforce)
-    {
-        Mode::Enforce
-    } else {
-        Mode::Shadow
-    }
-}
-
 /// What Decisions said, where the project set it up: never the diff, only
 /// the criteria with their evidence, the checks and the review.
 fn judged(
-    store: &Store,
     project: &Project,
     config: &Config,
     card: &devpit_core::store::CardRow,
@@ -333,27 +308,9 @@ fn judged(
     checked: &gate::Checked,
     root: &Path,
 ) -> Option<Judged> {
-    if !config.decisions.use_ {
-        return None;
-    }
-    let name = config
-        .decisions
-        .rubrics
-        .get("completion")
-        .cloned()
-        .unwrap_or_else(|| config.stages.completion.gate.clone());
-    let mode = mode_of(store, project, config);
-    let skipped = |why: String| Judged {
-        rubric: name.clone(),
-        mode,
-        outcome: "skipped".to_owned(),
-        said: vec![why],
-    };
-    let rubric = match rubric_for(root, &name, criteria) {
-        Ok(rubric) => rubric,
-        Err(why) => return Some(skipped(why)),
-    };
-    let state = json!({
+    let jev = crate::devflow_jev::Jev::of(project, config, root, Some(&card.id), criteria)?;
+    let name = devpit_devflow::jev::rubric_for(config, "completion").unwrap_or_else(|| GATE.into());
+    let state = devpit_devflow::jev::capped(&json!({
         "card": { "id": card.id, "title": card.title },
         "criteria": checked.rows.iter().enumerate().map(|(at, row)| json!({
             "id": format!("criterion{}", at + 1), "criterion": row.criterion,
@@ -362,45 +319,16 @@ fn judged(
         "checks": checked.checks.iter().map(|(name, result)| json!({ "name": name, "result": result })).collect::<Vec<_>>(),
         "review": checked.review,
         "run": checked.run,
-    });
-    let mut conf = match crate::decisions::conf(store) {
-        Ok(conf) => conf,
-        Err(why) => return Some(skipped(why)),
-    };
-    // Logged under the mode it ran in: the flow's, not the Settings' gates.
-    conf.modes = json!({ name.as_str(): mode.word() });
-    let asking = crate::deciding::Asking {
-        project_id: Some(&project.id),
-        card_id: Some(&card.id),
-        gate: &name,
-        rubric: Some(&rubric),
-        state: &state,
-        questions: &rubric.questions,
-    };
-    let result = crate::deciding::gated(
-        crate::deciding::decide_in(store, &conf, &asking, crate::deciding::now()),
-        &rubric,
-        mode.word().to_owned(),
-    );
-    let said = match &result.skipped {
-        Some(skip) => vec![skip.reason()],
-        None => result
-            .verdicts
-            .as_object()
-            .map(|verdicts| {
-                verdicts
-                    .iter()
-                    .filter(|(_, verdict)| verdict["verdict"] == "fail")
-                    .map(|(id, _)| id.clone())
-                    .collect()
-            })
-            .unwrap_or_default(),
-    };
+    }));
+    let said = jev.judge(&name, &state);
     Some(Judged {
         rubric: name,
-        mode,
-        outcome: result.outcome.to_owned(),
-        said,
+        mode: said.mode,
+        outcome: said.outcome.clone(),
+        said: match said.skipped {
+            Some(why) => vec![why],
+            None => said.failing(),
+        },
     })
 }
 

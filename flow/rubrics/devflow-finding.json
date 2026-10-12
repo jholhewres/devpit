@@ -1,0 +1,34 @@
+{
+  "name": "devflow-finding",
+  "version": "1",
+  "description": "Whether one code-review finding holds up: a real problem, at the severity it deserves, said once, about the change under review. Asked of each finding a Devflow review consolidates; the state is the finding, the others at its place, the lines its file changed and the card's criteria, never the diff.",
+  "questions": {
+    "real": {
+      "type": "noul",
+      "instructions": "Is the finding a real problem in the change, as its evidence shows it?",
+      "criteria": {
+        "true": "the evidence quotes code, a rule or output that shows the problem, and the description follows from it",
+        "false": "the evidence does not show it, it is a matter of taste, or it describes code that is not there"
+      }
+    },
+    "severity": {
+      "type": "choice",
+      "instructions": "Which severity does the finding deserve? critical: an exploitable hole, data loss or a criterion broken. high: a criterion partly met or untested, or a written rule broken. medium: an edge case, a weak test or a design problem. low: a simpler shape, a name or a smell. info: context, no action.",
+      "options": ["critical", "high", "medium", "low", "info"]
+    },
+    "duplicate": {
+      "type": "noul",
+      "instructions": "Does the finding describe the same problem, with the same cause, as one of the other findings at its place (others_here)?"
+    },
+    "inDiff": {
+      "type": "noul",
+      "instructions": "Is the finding about code this change added or altered: its line inside the changed ranges of its file, or a problem the change causes?"
+    }
+  },
+  "thresholds": {
+    "real": { "min": 0.7, "grey": 0.4 },
+    "severity": { "min": 0.5 },
+    "duplicate": { "max": 0.3, "grey": 0.6 },
+    "inDiff": { "min": 0.6, "grey": 0.35 }
+  }
+}

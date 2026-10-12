@@ -7,14 +7,19 @@
 //! agent creates them with `apply` only after the person's yes, and then
 //! only the plan the person last saw.
 
+use std::path::Path;
+
 use devpit_core::{NewCard, Store};
 use devpit_devflow::brief::{self, Brief};
+use devpit_devflow::jev::{self, Said};
 use devpit_devflow::plan::{self, Slice, PREFIX};
+use devpit_devflow::Config;
 use devpit_rpc::{DevflowPlan, DevflowPlanCreated, ErrorCode, PlannedCard, Project, RpcError};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
 use crate::cards::YOU;
+use crate::devflow_jev::Jev;
 
 /// The window reads the board again.
 const BOARD_CHANGED: &str = "board:changed";
@@ -44,10 +49,37 @@ pub(crate) fn respond(
     project: &Project,
     params: &Value,
 ) -> Result<Value, String> {
+    let root = Path::new(&project.root_path);
+    let config = match devpit_devflow::folder::read(root) {
+        devpit_devflow::State::Valid(_, config) => Some(config),
+        _ => None,
+    };
+    let epic = text(params, "epic");
+    let jev = config
+        .as_ref()
+        .and_then(|config| Jev::of(project, config, root, epic.as_deref(), &[]));
+    respond_judged(
+        app,
+        method,
+        project,
+        params,
+        config.as_ref().zip(jev.as_ref()),
+    )
+}
+
+/// [`respond`], with Jev where the project uses it: the brief judged before
+/// planning, the plan before its cards are created.
+pub(crate) fn respond_judged(
+    app: Option<&AppHandle>,
+    method: &str,
+    project: &Project,
+    params: &Value,
+    judged: Option<(&Config, &Jev)>,
+) -> Result<Value, String> {
     let store = crate::projects::store().map_err(|err| err.message)?;
     let answer = match method {
         "devflow_brief" => briefed(&store, &project.id, params)?,
-        _ => planned(&store, &project.id, params)?,
+        _ => planned(&store, &project.id, params, judged)?,
     };
     if let Some(app) = app {
         let _ = app.emit(BOARD_CHANGED, &project.id);
@@ -141,10 +173,46 @@ fn briefed(store: &Store, project_id: &str, params: &Value) -> Result<Value, Str
     }))
 }
 
-fn planned(store: &Store, project_id: &str, params: &Value) -> Result<Value, String> {
+/// Jev's word on a stage's work, by the rubric devflow.yaml gives it.
+fn judge(
+    judged: Option<(&Config, &Jev)>,
+    stage: &str,
+    state: impl FnOnce() -> Value,
+) -> Option<Said> {
+    let (config, jev) = judged?;
+    let rubric = jev::rubric_for(config, stage)?;
+    Some(jev.judge(&rubric, &state()))
+}
+
+fn jev_said(brief: Option<&Said>, plan: Option<&Said>) -> Value {
+    json!({
+        "brief": brief.map(Said::to_json),
+        "plan": plan.map(Said::to_json),
+    })
+}
+
+fn planned(
+    store: &Store,
+    project_id: &str,
+    params: &Value,
+    judged: Option<(&Config, &Jev)>,
+) -> Result<Value, String> {
     let epic = text(params, "epic").ok_or("which epic? pass its card id as `epic`")?;
-    own_card(store, project_id, &epic)?;
+    let epic_card = own_card(store, project_id, &epic)?;
     let slices = plan::read(params.get("cards").unwrap_or(&Value::Null))?;
+    // Before planning: whether the brief can be planned from.
+    let brief = judge(judged, "briefing", || {
+        jev::brief_state(
+            &epic_card.title,
+            &brief::read(&epic_card.body).unwrap_or_default(),
+        )
+    });
+    if let Some(held) = brief.as_ref().and_then(jev::holds) {
+        return Err(format!(
+            "{held}: write the brief's goal, out of scope and success with devpit_devflow_brief \
+             (devflow-briefing), then plan again"
+        ));
+    }
     let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
     let kept = store.plan(&epic).map_err(|err| err.to_string())?;
     if let (true, Some(row)) = (apply, &kept) {
@@ -155,9 +223,22 @@ fn planned(store: &Store, project_id: &str, params: &Value) -> Result<Value, Str
         // What the person saw last is what their yes was to: their own edits
         // on the board, or this very preview.
         if row.edited || shown == slices {
+            // Before the cards are made: whether they are ready to be.
+            let plan = judge(judged, "plan", || jev::plan_state(&shown));
+            if let Some(held) = plan.as_ref().and_then(jev::holds) {
+                return Err(format!(
+                    "{held}: nothing was created. Make each card a vertical slice with testable \
+                     criteria and the cards it waits on, then show the plan again; the person \
+                     can still create it on the board"
+                ));
+            }
             let made =
                 create(store, project_id, &epic, &shown, Yes::Agent).map_err(|err| err.message)?;
-            return Ok(said_created(&epic, &made, true));
+            let mut said = said_created(&epic, &made, true);
+            if judged.is_some() {
+                said["jev"] = jev_said(brief.as_ref(), plan.as_ref());
+            }
+            return Ok(said);
         }
     }
     keep(store, &epic, &slices, false)?;
@@ -169,7 +250,7 @@ fn planned(store: &Store, project_id: &str, params: &Value) -> Result<Value, Str
          move, cut or edit it and create the cards with a click. Or, after their explicit yes \
          here, call again with the same cards and apply: true."
     };
-    Ok(json!({
+    let mut said = json!({
         "applied": false,
         "epic": epic,
         "preview": slices.iter().map(|slice| json!({
@@ -178,7 +259,11 @@ fn planned(store: &Store, project_id: &str, params: &Value) -> Result<Value, Str
             "blockedBy": slice.depends_on,
         })).collect::<Vec<_>>(),
         "note": note,
-    }))
+    });
+    if judged.is_some() {
+        said["jev"] = jev_said(brief.as_ref(), None);
+    }
+    Ok(said)
 }
 
 fn slices_of(cards: &str) -> Vec<Slice> {

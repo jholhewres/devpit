@@ -69,3 +69,53 @@ fn a_decision_past_the_retention_is_pruned_on_the_next_write() {
     assert_eq!(kept.len(), 1);
     assert_eq!(kept[0].at, later);
 }
+
+#[test]
+fn a_decision_is_labelled_by_what_the_person_did_and_read_back_by_card_and_project() {
+    let (_dir, store) = store();
+    let done = |card: &'static str, outcome: &'static str| DecisionWrite {
+        card_id: Some(card),
+        gate: "devflow-done",
+        rubric: Some("devflow-done"),
+        thresholds: Some(r#"{"criterion1":{"min":0.85}}"#),
+        ..decision(outcome, 0.001)
+    };
+    let older = store
+        .log_decision(&done("card_1", "pass"), 1_000)
+        .expect("log");
+    let newer = store
+        .log_decision(&done("card_1", "fail"), 2_000)
+        .expect("log");
+    store
+        .log_decision(&done("card_2", "pass"), 3_000)
+        .expect("log");
+    store
+        .log_decision(&done("card_1", "skipped"), 4_000)
+        .expect("log");
+
+    let of_card = store
+        .decisions_of_card("card_1", "devflow-done")
+        .expect("read");
+    let ids: Vec<&str> = of_card.iter().map(|row| row.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        [newer.as_str(), older.as_str()],
+        "newest first, and no skip"
+    );
+    assert_eq!(of_card[0].person_verdict, None);
+    assert!(of_card[0].thresholds.is_some());
+
+    assert!(store
+        .label_decision(&older, "fail", "reopened")
+        .expect("label"));
+    assert!(!store
+        .label_decision("dcn_none", "fail", "reopened")
+        .expect("label"));
+    let of_project = store.decisions_of_project("prj_api").expect("read");
+    assert_eq!(of_project.len(), 3);
+    let labelled = of_project
+        .iter()
+        .find(|row| row.id == older)
+        .expect("older");
+    assert_eq!(labelled.person_verdict.as_deref(), Some("fail"));
+}

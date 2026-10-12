@@ -137,32 +137,9 @@ pub(crate) fn rubric_name(name: &str) -> bool {
 
 /// `<root>/.devpit/rubrics/<name>.json`, or the built-in rubric of that name.
 pub(crate) fn rubric_named(root: &Path, name: &str) -> Result<Rubric, String> {
-    if !rubric_name(name) {
-        return Err("a rubric's name is letters, digits, - and _".to_owned());
-    }
-    let file = root
-        .join(".devpit")
-        .join("rubrics")
-        .join(format!("{name}.json"));
-    let text = match std::fs::canonicalize(&file) {
-        Ok(real) => {
-            let inside = std::fs::canonicalize(root)
-                .map(|root| real.starts_with(root))
-                .unwrap_or(false);
-            if !inside {
-                return Err(format!("the rubric `{name}` leads outside the project"));
-            }
-            let size = std::fs::metadata(&real)
-                .map_err(|err| err.to_string())?
-                .len();
-            if size > MOST_RUBRIC_BYTES {
-                return Err(format!(
-                    "the rubric `{name}` is larger than any rubric needs"
-                ));
-            }
-            std::fs::read_to_string(&real).map_err(|err| err.to_string())?
-        }
-        Err(_) => BUILT_IN
+    let text = match rubric_text_in(root, ".devpit/rubrics", name)? {
+        Some(text) => text,
+        None => BUILT_IN
             .iter()
             .find(|(built, _)| *built == name)
             .map(|(_, text)| (*text).to_owned())
@@ -170,7 +147,44 @@ pub(crate) fn rubric_named(root: &Path, name: &str) -> Result<Rubric, String> {
                 format!("no rubric `{name}`: none in .devpit/rubrics/ and none built in")
             })?,
     };
-    let mut rubric: Rubric = serde_json::from_str(&text)
+    rubric_of(name, &text)
+}
+
+/// The text of `<root>/<folder>/<name>.json`, read only from inside the
+/// project; `None` when there is no such file.
+pub(crate) fn rubric_text_in(
+    root: &Path,
+    folder: &str,
+    name: &str,
+) -> Result<Option<String>, String> {
+    if !rubric_name(name) {
+        return Err("a rubric's name is letters, digits, - and _".to_owned());
+    }
+    let Ok(real) = std::fs::canonicalize(root.join(folder).join(format!("{name}.json"))) else {
+        return Ok(None);
+    };
+    let inside = std::fs::canonicalize(root)
+        .map(|root| real.starts_with(root))
+        .unwrap_or(false);
+    if !inside {
+        return Err(format!("the rubric `{name}` leads outside the project"));
+    }
+    let size = std::fs::metadata(&real)
+        .map_err(|err| err.to_string())?
+        .len();
+    if size > MOST_RUBRIC_BYTES {
+        return Err(format!(
+            "the rubric `{name}` is larger than any rubric needs"
+        ));
+    }
+    std::fs::read_to_string(&real)
+        .map(Some)
+        .map_err(|err| err.to_string())
+}
+
+/// A rubric's text read, under the name it was asked by.
+pub(crate) fn rubric_of(name: &str, text: &str) -> Result<Rubric, String> {
+    let mut rubric: Rubric = serde_json::from_str(text)
         .map_err(|err| format!("the rubric `{name}` is not one devpit reads: {err}"))?;
     counted(&rubric.questions)?;
     rubric.name = name.to_owned();

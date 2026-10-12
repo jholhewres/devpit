@@ -198,26 +198,37 @@ pub(crate) fn gated(decided: Decided, rubric: &Rubric, mode: String) -> GateResu
 /// Nothing is sent without a key, for a project opted out or past the day's
 /// cap; those skips are not logged, because nothing was decided.
 pub(crate) fn decide_in(store: &Store, conf: &Conf, asking: &Asking<'_>, now: i64) -> Decided {
+    decide_logged(store, conf, asking, now).0
+}
+
+/// [`decide_in`], and the decision log's row for it: what a person's label
+/// on it later names.
+pub(crate) fn decide_logged(
+    store: &Store,
+    conf: &Conf,
+    asking: &Asking<'_>,
+    now: i64,
+) -> (Decided, Option<String>) {
     let Some(key) = conf.key.as_deref() else {
-        return Decided::Skipped(Skip::Off);
+        return (Decided::Skipped(Skip::Off), None);
     };
     if asking
         .project_id
         .is_some_and(|id| conf.opted_out.iter().any(|out| out == id))
     {
-        return Decided::Skipped(Skip::OptedOut);
+        return (Decided::Skipped(Skip::OptedOut), None);
     }
     let spent = store
         .decision_spend_since(today(now))
         .map(|(spent, _)| spent)
         .unwrap_or(f64::INFINITY);
     if spent >= conf.cap_usd {
-        return Decided::Skipped(Skip::Budget);
+        return (Decided::Skipped(Skip::Budget), None);
     }
     let (state, truncated) = prepared(asking.state, &conf.secrets);
     let questions = match wire_questions(asking.questions) {
         Ok(questions) => questions,
-        Err(why) => return Decided::Skipped(Skip::Failed(why)),
+        Err(why) => return (Decided::Skipped(Skip::Failed(why)), None),
     };
     let began = Instant::now();
     let called = call(&conf.base, &conf.model, key, &state, &questions);
@@ -246,7 +257,7 @@ pub(crate) fn decide_in(store: &Store, conf: &Conf, asking: &Asking<'_>, now: i6
     let thresholds = asking
         .rubric
         .map(|rubric| json!(rubric.thresholds).to_string());
-    let _ = store.log_decision(
+    let logged = store.log_decision(
         &DecisionWrite {
             project_id: asking.project_id,
             card_id: asking.card_id,
@@ -264,7 +275,7 @@ pub(crate) fn decide_in(store: &Store, conf: &Conf, asking: &Asking<'_>, now: i6
         },
         now,
     );
-    decided
+    (decided, logged.ok())
 }
 
 /// `enforce` only for a gate the settings name so; every other gate watches.

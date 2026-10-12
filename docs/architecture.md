@@ -244,6 +244,23 @@ no copy, only that the person clicked.
   It writes `gate.json` into the run, attaches it, and signs the comment
   `[devflow] gate: n of m criteria with evidence`. `devpit_finish_card` waits
   for it.
+- **Jev judges, the person labels.** Devflow asks Decisions four rubrics,
+  shipped from `flow/rubrics/` and overridden by the project's
+  `.devpit/devflow/rubrics/`: `devflow-brief` before planning,
+  `devflow-plan` before the cards are made, `devflow-finding` of each
+  finding the review consolidates (real, severity, duplicate, inside the
+  diff) and `devflow-done` at the gate. The state is small and capped — a
+  finding with the lines its file changed, the criteria with their evidence,
+  the brief's fields, the plan's cards — never the diff, and every request
+  asks for no retention and no training. In `shadow` an answer is recorded
+  and nothing else; in `enforce`, the person's click, a failing brief or plan
+  holds the agent, and a finding not real or outside the change stops
+  holding the card. Every decision is logged; what the person does then is
+  its label — reopening a card Jev called done, calling a finding a false
+  positive, finishing a card — and Settings → Decisions shows each rubric's
+  agreement with them and the `min` and `grey` that would agree most. Only
+  the threshold moves; the model is never trained. Without a key, an opt-out
+  or `decisions.use`, nothing is asked and the flow runs as it did.
 - **Hooks only on devpit's own launches.** A session devpit starts in a
   project where Devflow is on gets its hooks on the launch line, never in a
   CLI's settings: Claude Code a plugin folder (`--plugin-dir`, skills

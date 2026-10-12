@@ -135,6 +135,15 @@ pub(crate) fn card_move_now(
     }
 
     store.move_card(&card_id, &column_id, position as i64)?;
+    // The person reopening a card Jev called done, or finishing one, is the
+    // label its decisions are calibrated by.
+    crate::devflow_jev::moved(
+        &store,
+        &project_id,
+        &card_id,
+        came_from.as_deref(),
+        &column_id,
+    );
 
     let started = match runs {
         None => None,

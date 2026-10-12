@@ -7,6 +7,7 @@
 //! gate reads. An axis no reviewer answered for is the session's: it
 //! reviews it from the same packet and hands the answer back with `run`.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -17,6 +18,7 @@ use crate::brief::Brief;
 use crate::config::{Agent, Config, Consolidate, Reviewer};
 use crate::evidence::Card;
 use crate::findings::{self, Source};
+use crate::jev::{self, Said};
 use crate::plan::PREFIX;
 use crate::runs;
 
@@ -36,8 +38,9 @@ const MOST_REPORTS: usize = 6;
 const MOST_DIFF: usize = 60_000;
 /// Far past what a persona needs, checked before reading one.
 const MOST_PERSONA: u64 = 32 * 1024;
-/// The changed files a packet names.
+/// The changed files a packet names, and whose changed lines are kept.
 const MOST_LISTED: usize = 100;
+const MOST_CHANGED: usize = 200;
 /// Kept back from the reviewers for the consolidating pass.
 const PASS: Duration = Duration::from_secs(180);
 
@@ -478,6 +481,9 @@ pub fn turn(
     .map_err(|unreviewed| unreviewed.reason())
 }
 
+/// Asks Jev one rubric about one state, the way the app reaches Decisions.
+pub type Judge<'a> = &'a (dyn Fn(&str, &Value) -> Said + Sync);
+
 /// What the review is given.
 pub struct Given<'a> {
     pub root: &'a Path,
@@ -495,8 +501,9 @@ pub struct Given<'a> {
     pub budget: Duration,
     pub reach: Reach<'a>,
     pub redact: &'a (dyn Fn(&str) -> String + Sync),
-    /// Whether Decisions can answer here, for `consolidate: jev`.
-    pub jev: bool,
+    /// Jev, where Decisions answers here: `consolidate: jev` asks it about
+    /// each finding.
+    pub jev: Option<Judge<'a>>,
 }
 
 /// How the findings became one list.
@@ -526,6 +533,10 @@ pub struct Done {
     /// `findings.json`, once anyone answered.
     pub findings: Option<Value>,
     pub consolidated: Consolidated,
+    /// The lines each file changed, which Jev is asked about instead of the diff.
+    pub changed: BTreeMap<String, Vec<(u64, u64)>>,
+    /// What Jev said of each finding, by its key, so it is asked once.
+    pub judged: BTreeMap<String, Value>,
 }
 
 impl Done {
@@ -555,6 +566,15 @@ struct Record {
     head: String,
     ran: Vec<Ran>,
     answers: Vec<Value>,
+    changed: BTreeMap<String, Vec<(u64, u64)>>,
+    judged: BTreeMap<String, Value>,
+}
+
+fn criteria_of(body: &str) -> Vec<String> {
+    devpit_core::criteria::criteria(body)
+        .into_iter()
+        .map(|one| one.text)
+        .collect()
 }
 
 /// A new review: a fresh run, its packet, and every reviewer at once.
@@ -569,10 +589,7 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
         ));
     }
     let (folder, path) = runs::fresh(given.root, given.card.id, given.at)?;
-    let criteria: Vec<String> = devpit_core::criteria::criteria(given.card.body)
-        .into_iter()
-        .map(|one| one.text)
-        .collect();
+    let criteria = criteria_of(given.card.body);
     let packet = (given.redact)(&packet(&Packet {
         card: Card {
             id: given.card.id,
@@ -611,6 +628,11 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
         head: git.head.to_owned(),
         ran: Vec::new(),
         answers: Vec::new(),
+        changed: jev::changed_lines(git.diff)
+            .into_iter()
+            .take(MOST_CHANGED)
+            .collect(),
+        judged: BTreeMap::new(),
     };
     for (reviewer, outcome) in given.config.review.reviewers.iter().zip(outcomes) {
         let mut ran = Ran {
@@ -668,6 +690,8 @@ fn reviewed_again(given: &Given, run: &str) -> Result<(String, PathBuf, Record),
         head: kept["head"].as_str().unwrap_or_default().to_owned(),
         ran: Vec::new(),
         answers: Vec::new(),
+        changed: serde_json::from_value(kept["changed"].clone()).unwrap_or_default(),
+        judged: serde_json::from_value(kept["jev"].clone()).unwrap_or_default(),
     };
     for mut one in ran {
         let answer = one.file.as_deref().and_then(|file| read_json(&path, file));
@@ -707,15 +731,104 @@ fn reviewed_again(given: &Given, run: &str) -> Result<(String, PathBuf, Record),
     Ok((run.to_owned(), path, record))
 }
 
+/// Jev asked about each finding, at most [`jev::MOST_FINDINGS`] and each
+/// once a review; its word kept on the finding. Acting, it sets aside what
+/// it called not real and joins what it called the same; in shadow the
+/// findings are merged as `none` merges them.
+fn judged_by_jev(
+    given: &Given,
+    judge: Judge,
+    record: &mut Record,
+    all: &mut [Value],
+    mut consolidated: Consolidated,
+) -> (Vec<Vec<usize>>, Consolidated) {
+    let rubric = jev::rubric_for(given.config, "review").unwrap_or_else(|| jev::FINDING.into());
+    let criteria = criteria_of(given.card.body);
+    let mut saids: Vec<Option<Said>> = Vec::with_capacity(all.len());
+    for at in 0..all.len() {
+        if at >= jev::MOST_FINDINGS {
+            saids.push(None);
+            continue;
+        }
+        let key = jev::finding_key(&all[at]);
+        let said = record
+            .judged
+            .get(&key)
+            .and_then(Said::of)
+            .unwrap_or_else(|| {
+                let others: Vec<&Value> = (0..all.len())
+                    .filter(|other| *other != at && findings::candidates(&all[at], &all[*other]))
+                    .map(|other| &all[other])
+                    .collect();
+                let file = all[at]["file"].as_str().unwrap_or_default();
+                let changed = record.changed.get(file).map_or(&[][..], Vec::as_slice);
+                judge(
+                    &rubric,
+                    &jev::finding_state(&all[at], &others, changed, &criteria),
+                )
+            });
+        record.judged.insert(key, said.to_json());
+        saids.push(Some(said));
+    }
+    for (finding, said) in all.iter_mut().zip(&saids) {
+        if let Some(said) = said {
+            jev::on_finding(finding, said);
+        }
+    }
+    let all: &[Value] = all;
+    let asked: Vec<&Said> = saids.iter().flatten().collect();
+    let unanswered = asked.iter().filter(|said| said.skipped.is_some()).count();
+    let acting = asked.iter().any(|said| said.acts());
+    let aside = all
+        .iter()
+        .filter(|finding| !findings::standing(finding))
+        .count();
+    let mut note = if acting {
+        format!(
+            "Jev, acting: {} findings judged, {aside} set aside",
+            asked.len()
+        )
+    } else {
+        format!(
+            "Jev, in shadow: {} findings judged and recorded, merged as they are",
+            asked.len()
+        )
+    };
+    if unanswered > 0 {
+        note.push_str(&format!(", {unanswered} not answered"));
+    }
+    consolidated.note = Some(note);
+    let acts = |at: usize| {
+        saids
+            .get(at)
+            .and_then(Option::as_ref)
+            .is_some_and(Said::acts)
+    };
+    let duplicate = |at: usize| {
+        saids
+            .get(at)
+            .and_then(Option::as_ref)
+            .is_some_and(jev::duplicate)
+    };
+    let same = |one: usize, other: usize| {
+        if acts(one) && acts(other) {
+            duplicate(one) || duplicate(other)
+        } else {
+            findings::alike(&all[one], &all[other])
+        }
+    };
+    (findings::grouped(all, &same), consolidated)
+}
+
 /// The groups of one problem, as the consolidation asked for decides them.
 fn grouped(
     given: &Given,
-    record: &Record,
-    all: &[Value],
+    record: &mut Record,
+    all: &mut [Value],
     deadline: Duration,
 ) -> (Vec<Vec<usize>>, Consolidated) {
     let asked = given.config.review.consolidate;
-    let used = findings::consolidation(asked, given.jev, record.answers.len());
+    let used = findings::consolidation(asked, given.jev.is_some(), record.answers.len());
     let mut consolidated = Consolidated {
         asked,
         used,
@@ -726,6 +839,10 @@ fn grouped(
         from: all.len(),
         into: all.len(),
     };
+    if let (Consolidate::Jev, Some(judge)) = (used, given.jev) {
+        return judged_by_jev(given, judge, record, all, consolidated);
+    }
+    let all: &[Value] = all;
     let alike = |one: usize, other: usize| findings::alike(&all[one], &all[other]);
     if used != Consolidate::Agent || !findings::any_candidates(all) {
         if used == Consolidate::Agent {
@@ -792,7 +909,7 @@ fn grouped(
 /// keeps what came of it in the run's folder.
 pub fn reviewed(given: &Given) -> Result<Done, String> {
     let began = Instant::now();
-    let (stamp, path, record) = match &given.asked.run {
+    let (stamp, path, mut record) = match &given.asked.run {
         None => reviewed_anew(given)?,
         Some(run) => reviewed_again(given, run)?,
     };
@@ -804,13 +921,13 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         .map(Ran::source)
         .collect();
     let pending = pending(&sources);
-    let all: Vec<Value> = record
+    let mut all: Vec<Value> = record
         .answers
         .iter()
         .flat_map(|answer| answer["findings"].as_array().cloned().unwrap_or_default())
         .collect();
     let left = given.budget.saturating_sub(began.elapsed()).min(PASS);
-    let (groups, mut consolidated) = grouped(given, &record, &all, left);
+    let (groups, mut consolidated) = grouped(given, &mut record, &mut all, left);
     let mut merged = findings::merged(&all, &groups, &sources);
     let earlier = read_json(&path, FINDINGS);
     findings::carried(
@@ -859,6 +976,8 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         pending,
         findings: findings_json,
         consolidated,
+        changed: record.changed,
+        judged: record.judged,
     };
     write(&path, RECORD, &pretty(&recorded(&done)))?;
     Ok(done)
@@ -886,6 +1005,8 @@ pub fn recorded(done: &Done) -> Value {
         "ran": done.ran.iter().map(Ran::to_json).collect::<Vec<_>>(),
         "pending": done.pending,
         "consolidation": consolidation_json(&done.consolidated),
+        "changed": done.changed,
+        "jev": done.judged,
     })
 }
 

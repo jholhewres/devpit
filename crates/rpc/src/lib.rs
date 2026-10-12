@@ -74,7 +74,8 @@ pub use checkpoint::{
 pub use conversation::{Ask, Attachment, Conversation, OutsideSession, TurnFrom};
 pub use decisions::{Deciding, DecisionTried};
 pub use devflow::{
-    DevflowAsk, DevflowAsks, DevflowChange, DevflowPlan, DevflowPlanCreated, PlannedCard,
+    DevflowAsk, DevflowAsks, DevflowCalibration, DevflowChange, DevflowPlan, DevflowPlanCreated,
+    PlannedCard, RubricAccuracy,
 };
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};

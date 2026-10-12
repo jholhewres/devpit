@@ -11,12 +11,14 @@
 //! the person's click are the app's.
 
 pub mod brief;
+pub mod calibrate;
 pub mod config;
 pub mod detect;
 pub mod evidence;
 pub mod findings;
 pub mod folder;
 pub mod gate;
+pub mod jev;
 mod node;
 pub mod plan;
 pub mod playwright;

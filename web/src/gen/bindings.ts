@@ -421,6 +421,11 @@ export const commands = {
 	 *  decision takes: its latency and cost, or why it did not answer.
 	 */
 	decisionsTest: () => typedError<DecisionTried, RpcError>(__TAURI_INVOKE("decisions_test")),
+	/**
+	 *  `devflow.calibration` — how each rubric agrees with the person in a
+	 *  project, and the `min` and `grey` that would agree most.
+	 */
+	devflowCalibration: (projectId: string) => typedError<DevflowCalibration, RpcError>(__TAURI_INVOKE("devflow_calibration", { projectId })),
 	/**  `devflow.asks` — the Devflow changes waiting for the person's click. */
 	devflowAsks: () => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_asks")),
 	/**  `devflow.answer` — the person's click: yes makes the change, no drops it. */
@@ -2676,6 +2681,12 @@ export type DevflowAsks = {
 	asks: DevflowAsk[],
 };
 
+/**  Response of `devflow.calibration`: each rubric the project was judged by. */
+export type DevflowCalibration = {
+	projectId: string,
+	rubrics: RubricAccuracy[],
+};
+
 /**  What the click does. */
 export type DevflowChange = 
 /**  Devflow switched on in the project. */
@@ -4404,6 +4415,31 @@ export type RpcError = {
 	message: string,
 	retryAfterMs: number | null,
 	details: string | null,
+};
+
+/**
+ *  How one rubric agrees with the person in a project, from the decisions
+ *  they labelled by what they did, and the threshold that would agree most.
+ */
+export type RubricAccuracy = {
+	rubric: string,
+	/**  Answered in the last ninety days. */
+	decisions: number,
+	labelled: number,
+	/**  Labelled, judged pass or fail, and the same as the person. */
+	agreed: number,
+	/**  Labelled and left grey. */
+	grey: number,
+	/**  `agreed` of the labelled ones not left grey. */
+	accuracy: number | null,
+	/**  The lowest `min` its yes/no questions have now. */
+	min: number | null,
+	suggestedMin: number | null,
+	suggestedGrey: number | null,
+	/**  What `suggestedMin` would have agreed on, of the labelled. */
+	suggestedAccuracy: number | null,
+	/**  Why nothing is suggested yet. */
+	note: string | null,
 };
 
 /**

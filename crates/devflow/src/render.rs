@@ -85,6 +85,10 @@ pub fn render(config: &Config) -> String {
     out.push_str(
         "\n# Decisions (Jev) answers typed questions about the gates. shadow logs\n\
          # them; enforce blocks, and waits for the person's click in the app.\n\
+         # It is sent findings, criteria with their evidence, the brief and the\n\
+         # plan — never the diff — through the provider in Settings → Decisions\n\
+         # (OpenRouter unless changed), with no retention and no training.\n\
+         # rubrics: a stage's own rubric, from .devpit/devflow/rubrics/.\n\
          decisions:\n",
     );
     let decisions = &config.decisions;

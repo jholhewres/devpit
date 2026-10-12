@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import type { Deciding } from '../gen/bindings'
+import type { Deciding, DevflowCalibration } from '../gen/bindings'
+import { DevflowAccuracy } from './DevflowAccuracy'
 import { ask, commands } from './live'
 import { PrefMore } from './PrefRow'
 import { PrefSwitch } from './PrefSwitch'
@@ -26,10 +27,17 @@ export function DecisionsSettings(): React.JSX.Element {
   const [said, setSaid] = useState<string | null>(null)
   const [tried, setTried] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
+  const [accuracy, setAccuracy] = useState<DevflowCalibration | null>(null)
 
   useEffect(() => {
     void ask(() => commands.decisionsRead()).then((answer) => setNow(answer.data))
   }, [])
+
+  const projectId = project?.id
+  useEffect(() => {
+    if (!projectId) return
+    void ask(() => commands.devflowCalibration(projectId)).then((answer) => setAccuracy(answer.data))
+  }, [projectId])
 
   const save = (next: Deciding): void => {
     setNow(next)
@@ -145,6 +153,7 @@ export function DecisionsSettings(): React.JSX.Element {
           said="Off keeps this project's cards, diffs and output from ever reaching Decisions; its gates then do what they did without it."
         />
       )}
+      {accuracy && accuracy.rubrics.length > 0 && <DevflowAccuracy calibration={accuracy} />}
     </>
   )
 }

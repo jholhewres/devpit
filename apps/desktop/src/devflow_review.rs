@@ -116,6 +116,12 @@ pub(crate) fn respond_with(
     let redact = |text: &str| crate::kept_out::kept_out(text, &secrets);
     let evidence = crate::devflow_gate::newest(&root, &card.id, "evidence.json");
     let brief = brief_of(&store, project, &card.id);
+    // Asked only where it can answer: else the review falls back as without it.
+    let jev = crate::devflow_jev::Jev::of(project, config, &root, Some(&card.id), &[])
+        .filter(crate::devflow_jev::Jev::answers);
+    let judging = jev
+        .as_ref()
+        .map(|jev| move |rubric: &str, state: &Value| jev.judge(rubric, state));
     let done = review::reviewed(&Given {
         root: &root,
         config,
@@ -138,7 +144,7 @@ pub(crate) fn respond_with(
         budget: devpit_agentapi::client::wait_for("devflow_review").saturating_sub(SPARE),
         reach,
         redact: &redact,
-        jev: false,
+        jev: judging.as_ref().map(|judge| judge as review::Judge),
     })?;
 
     let run = root.join(&done.folder);
@@ -169,19 +175,9 @@ pub(crate) fn respond_with(
     Ok(answer)
 }
 
-/// Where a card's work is: its own checkout, else its project's root.
-fn checkout_of(store: &Store, card: &devpit_core::CardRow) -> Option<PathBuf> {
-    if let Some(tree) = card.worktree_path.as_deref() {
-        return Some(PathBuf::from(tree));
-    }
-    let project = store.project_id_of_card(&card.id).ok()??;
-    Some(PathBuf::from(store.project(&project).ok()??.root_path))
-}
-
 /// The newest Devflow review of a card, with its run's name.
 fn newest_review(store: &Store, card_id: &str) -> Option<(PathBuf, String, Value)> {
-    let card = store.card(card_id).ok()??;
-    let root = checkout_of(store, &card)?;
+    let root = crate::devflow_jev::checkout_of(store, card_id)?;
     let (run, findings) = crate::devflow_gate::newest(&root, card_id, review::FINDINGS)?;
     Some((root, run, findings))
 }
@@ -206,6 +202,10 @@ pub(crate) fn as_drawn(finding: &Value) -> Finding {
     );
     if let Some(agreement) = finding["agreement"].as_str() {
         why.push_str(&format!(" ({agreement})"));
+    }
+    if let Some(acted) = finding["jev"]["acted"].as_array() {
+        let acted: Vec<&str> = acted.iter().filter_map(Value::as_str).collect();
+        why.push_str(&format!(" — Jev: {}", acted.join("; ")));
     }
     Finding {
         file: text("file").to_owned(),
@@ -234,7 +234,7 @@ pub(crate) fn card_review(store: &Store, card_id: &str) -> Option<CardReview> {
     let dismissed = list
         .iter()
         .enumerate()
-        .filter(|(_, finding)| finding["false_positive"] == json!(true))
+        .filter(|(_, finding)| !devpit_devflow::findings::standing(finding))
         .filter_map(|(at, _)| u32::try_from(at).ok())
         .collect();
     Some(CardReview {
@@ -258,7 +258,8 @@ pub(crate) fn devflow_run(run_id: &str) -> Option<(&str, &str)> {
 
 /// The person's "not a problem" on one finding of a Devflow review, or
 /// taking it back: kept on the finding in findings.json, which the gate
-/// then no longer blocks on.
+/// then no longer blocks on, and kept as a label on what Jev said of it.
+/// Bringing back one Jev set aside overrules Jev.
 pub(crate) fn mark(
     store: &Store,
     run_id: &str,
@@ -266,11 +267,7 @@ pub(crate) fn mark(
     false_positive: bool,
 ) -> Result<(), String> {
     let (card_id, run) = devflow_run(run_id).ok_or("not a Devflow review")?;
-    let card = store
-        .card(card_id)
-        .map_err(|err| err.to_string())?
-        .ok_or("no such card")?;
-    let root = checkout_of(store, &card).ok_or("the card has no checkout")?;
+    let root = crate::devflow_jev::checkout_of(store, card_id).ok_or("the card has no checkout")?;
     let (relative, path) = runs::file_in(&root, card_id, Some(run), review::FINDINGS)?;
     let mut kept: Value = std::fs::read_to_string(&path)
         .ok()
@@ -284,7 +281,14 @@ pub(crate) fn mark(
         finding.insert("false_positive".to_owned(), json!(true));
     } else {
         finding.remove("false_positive");
+        if let Some(jev) = finding.get_mut("jev").and_then(Value::as_object_mut) {
+            if jev.get("set_aside") == Some(&json!(true)) {
+                jev.insert("set_aside".to_owned(), json!(false));
+                jev.insert("overruled".to_owned(), json!(true));
+            }
+        }
     }
+    crate::devflow_jev::finding_marked(store, &Value::Object(finding.clone()), false_positive);
     let config = devpit_devflow::folder::read(&root);
     if let devpit_devflow::State::Valid(_, config) = config {
         let list = kept["findings"].as_array().cloned().unwrap_or_default();
