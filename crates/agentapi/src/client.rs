@@ -7,16 +7,26 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
-/// How long a question may take. Short, because an agent is waiting on the
-/// answer; a devpit that has gone away should cost it a moment, not a hang.
-const WAIT: Duration = Duration::from_secs(5);
+/// How long a question may take. A devpit that has gone away fails at once,
+/// at the connection; one that took the question is alive, and five seconds
+/// turned a store busy behind another writer into "not answered", and a retry
+/// into a second card or comment.
+const WAIT: Duration = Duration::from_secs(30);
+/// What nobody waits on: the server polling what to offer, the door knocked
+/// to see it answers, and a session-start hook that gets ten seconds.
+const GLANCE: Duration = Duration::from_secs(5);
 /// Starting a session waits for its terminal to settle and may make the
 /// card's checkout first. Given up on at five seconds, it was told "devpit is
 /// not open" while the session started anyway — and asked again.
 const STARTING: Duration = Duration::from_secs(90);
-/// A decision waits on a model over the network, which is given five seconds;
-/// the rest is room for the app to say why it gave up.
-const DECIDING: Duration = Duration::from_secs(15);
+/// A decision waits on a model over the network, given five seconds a call;
+/// a plan asks it twice, about the brief and then the cards.
+const DECIDING: Duration = Duration::from_secs(45);
+/// The gate may ask Decisions too, but a stop hook calls it and gives up at
+/// thirty seconds (`devpit_devflow::plugin::GATE_WAITS`): it answers first.
+const GATING: Duration = Duration::from_secs(25);
+/// A fetch over the network, a whole transcript parsed, a large file copied.
+const READING: Duration = Duration::from_secs(60);
 /// A card's evidence runs its checks: a test suite, an E2E run with video;
 /// its review runs its reviewers. The app stops them short of this, so an
 /// answer always comes.
@@ -24,17 +34,14 @@ const CHECKING: Duration = Duration::from_secs(20 * 60);
 
 /// How long devpit has to answer one question.
 pub fn wait_for(method: &str) -> Duration {
-    if method == "start" || method == "resume" {
-        STARTING
-    } else if method == "decide" || method == "rubric_run" || method == "devflow_gate" {
-        DECIDING
-    } else if method == "devflow_evidence"
-        || method == "devflow_review"
-        || method == "devflow_stage"
-    {
-        CHECKING
-    } else {
-        WAIT
+    match method {
+        "devflow_offer" | "devflow_session" | "methods" => GLANCE,
+        "start" | "resume" => STARTING,
+        "decide" | "rubric_run" | "devflow_plan" => DECIDING,
+        "devflow_gate" => GATING,
+        "repo" | "transcript" | "artifact_save" | "artifact_restore" => READING,
+        "devflow_evidence" | "devflow_review" | "devflow_stage" => CHECKING,
+        _ => WAIT,
     }
 }
 

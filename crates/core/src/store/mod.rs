@@ -104,6 +104,10 @@ pub const ROOT_NAME: &str = if cfg!(debug_assertions) {
     RELEASE_ROOT
 };
 
+/// How long a write waits behind another writer before it is refused. An
+/// agent's question has to outlast it, or a queued write reads as lost.
+pub const BUSY_WAIT_MS: u32 = 5_000;
+
 pub struct Store {
     conn: Connection,
 }
@@ -130,7 +134,7 @@ impl Store {
         // same moment is refused outright rather than waiting. Measured — a
         // test that opens eight at once failed about a quarter of the time
         // with these two lines the other way round.
-        conn.pragma_update(None, "busy_timeout", 5_000)?;
+        conn.pragma_update(None, "busy_timeout", BUSY_WAIT_MS)?;
 
         // WAL outlives the process, so it is set once — asked about first and
         // only written when it has to be.

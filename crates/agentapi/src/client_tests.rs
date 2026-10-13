@@ -74,3 +74,23 @@ fn a_review_is_waited_for_as_long_as_the_checks() {
     assert_eq!(wait_for("devflow_review"), wait_for("devflow_evidence"));
     assert!(wait_for("devflow_review") >= std::time::Duration::from_secs(600));
 }
+
+/// What the server polls, and the door's own knock, are waited on by nobody:
+/// a stalled devpit should cost them a moment, while an agent's question
+/// waits long enough to outlast the stall.
+#[test]
+fn polling_is_given_less_than_an_agents_question() {
+    for method in ["devflow_offer", "devflow_session", "methods"] {
+        assert!(wait_for(method) < wait_for("comment"), "{method}");
+    }
+    assert!(wait_for("comment") >= std::time::Duration::from_secs(30));
+}
+
+/// A plan asks Decisions twice; given one call's budget, a plan made in time
+/// was reported as maybe not made.
+#[test]
+fn a_plan_is_waited_for_like_a_decision_and_a_fetch_longer_than_a_read() {
+    assert_eq!(wait_for("devflow_plan"), wait_for("decide"));
+    assert!(wait_for("repo") > wait_for("board"));
+    assert!(wait_for("transcript") > wait_for("board"));
+}

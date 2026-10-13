@@ -21,9 +21,9 @@ pub const SERVER: &str = "devpit";
 /// The gate's tool.
 pub const GATE_TOOL: &str = "devpit_devflow_gate";
 /// A stop may wait on Decisions; the gate answers well inside this.
-const GATE_WAITS: u64 = 30;
+pub const GATE_WAITS: u64 = 30;
 /// The card's context is a question to the app on loopback.
-const CONTEXT_WAITS: u64 = 10;
+pub const CONTEXT_WAITS: u64 = 10;
 
 /// The CLIs Devflow has hooks for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

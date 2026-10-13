@@ -195,6 +195,27 @@ fn the_app_stops_waiting_before_the_agent_does() {
     }
 }
 
+/// A write queued behind another writer waits out the store's busy timeout
+/// and then lands; told "still working" before that, the agent wrote twice.
+#[test]
+fn a_write_is_waited_for_longer_than_the_store_waits_for_its_lock() {
+    let busy = std::time::Duration::from_millis(devpit_core::store::BUSY_WAIT_MS.into());
+    for method in WRITES {
+        assert!(super::patience(method) > busy * 2, "{method}");
+    }
+}
+
+/// Hooks give up on their own clock: the answer has to come inside it, or
+/// the hook fails instead of hearing why.
+#[test]
+fn a_hooks_question_is_answered_inside_the_hooks_own_timeout() {
+    use devpit_agentapi::client::wait_for;
+    use devpit_devflow::plugin::{CONTEXT_WAITS, GATE_WAITS};
+    use std::time::Duration;
+    assert!(wait_for("devflow_gate") < Duration::from_secs(GATE_WAITS));
+    assert!(wait_for("devflow_session") < Duration::from_secs(CONTEXT_WAITS));
+}
+
 /// Decisions reads the state it is handed and changes nothing on the board.
 #[test]
 fn decisions_are_answered_and_write_nothing() {
