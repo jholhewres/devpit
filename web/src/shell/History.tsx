@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 
 import type { Commit } from '../gen/bindings'
+import { onCameBack } from './cameBack'
 import { appended, byDay, matches, since, subjectOf } from './commitLog'
 import { ask, commands } from './live'
 import { CommitMenu, type CommitAt } from './CommitMenu'
@@ -62,16 +63,11 @@ export function History(): React.JSX.Element {
   /* A commit made from a terminal, an agent or another window moves nothing
      here; coming back to the window, or a change announced in it, does. */
   useEffect(() => {
-    const onVisible = (): void => {
-      if (document.visibilityState === 'visible') load()
-    }
-    window.addEventListener('focus', load)
+    const back = onCameBack(load)
     window.addEventListener(CHANGED, load)
-    document.addEventListener('visibilitychange', onVisible)
     return () => {
-      window.removeEventListener('focus', load)
+      back()
       window.removeEventListener(CHANGED, load)
-      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [load])
 

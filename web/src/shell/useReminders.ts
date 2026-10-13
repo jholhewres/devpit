@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { Reminder, Reminders } from '../gen/bindings'
+import { onCameBack } from './cameBack'
 import { ask, commands } from './live'
 import { onCarried } from './window'
 
@@ -30,14 +31,11 @@ export function useReminders(): {
     reload()
     const fired = onCarried<Reminders>('reminder:fired', reload)
     const changed = onCarried<null>('reminder:changed', reload)
-    const back = (): void => {
-      void commands.remindersRearm().catch(() => undefined)
-    }
-    window.addEventListener('focus', back)
+    const back = onCameBack(() => void commands.remindersRearm().catch(() => undefined))
     return () => {
       fired()
       changed()
-      window.removeEventListener('focus', back)
+      back()
     }
   }, [reload])
 

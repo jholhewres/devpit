@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Change, FileNode } from '../gen/bindings'
 import { ask, commands } from './live'
+import { onCameBack } from './cameBack'
 import { watchDisk } from './diskMoves'
 import { CHANGED } from './treeChanged'
 
@@ -89,21 +90,16 @@ export function useTree(projectId: string | null): UseTree {
      another process, an agent. Reacting to the moments that plausibly mean
      that beats polling, which this codebase treats as work that keeps itself
      going for no reason: the window regaining focus and the tab becoming
-     visible again. Both are event listeners registered from an effect, never
-     called from render — a render path may not reach I/O, only schedule it. */
+     visible again (`onCameBack`, once for both). Event listeners registered
+     from an effect, never called from render — a render path may not reach
+     I/O, only schedule it. */
   useEffect(() => {
-    const onFocus = (): void => reload()
-    const onVisible = (): void => {
-      if (document.visibilityState === 'visible') reload()
-    }
     const onChanged = (): void => reload()
-    window.addEventListener('focus', onFocus)
+    const back = onCameBack(reload)
     window.addEventListener(CHANGED, onChanged)
-    document.addEventListener('visibilitychange', onVisible)
     return () => {
-      window.removeEventListener('focus', onFocus)
+      back()
       window.removeEventListener(CHANGED, onChanged)
-      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [reload])
 

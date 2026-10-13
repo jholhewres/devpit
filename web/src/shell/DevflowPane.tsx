@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DevflowAsk, DevflowChange, DevflowError, DevflowScreen } from '../gen/bindings'
+import { onCameBack } from './cameBack'
 import { devflowQuestion } from './DevflowAsks'
 import { type Edit } from './devflowEdit'
 import { DevflowJev } from './DevflowJev'
@@ -98,11 +99,11 @@ export function DevflowPane(): React.JSX.Element {
     setScreen(null)
     setNote(null)
     look()
-    window.addEventListener('focus', look)
+    const back = onCameBack(look)
     const changed = onCarried<string>('devflow:changed', look)
     const asked = onCarried<null>('devflow:asked', look)
     return () => {
-      window.removeEventListener('focus', look)
+      back()
       changed()
       asked()
     }

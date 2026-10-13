@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { LiveSession, SessionChanges } from '../gen/bindings'
+import { onCameBack } from './cameBack'
 import { ask, commands } from './live'
 
 /*
@@ -27,10 +28,7 @@ export function useSessionChanges(session: LiveSession): {
 
   useEffect(reload, [reload, session.status, session.step])
 
-  useEffect(() => {
-    window.addEventListener('focus', reload)
-    return () => window.removeEventListener('focus', reload)
-  }, [reload])
+  useEffect(() => onCameBack(reload), [reload])
 
   return { changes, problem, reload }
 }

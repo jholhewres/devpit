@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { onCameBack } from './cameBack'
 import { ask, commands } from './live'
 import { CHANGED } from './useTree'
 
@@ -63,21 +64,15 @@ export function useFileIndex(projectId: string | null): UseFileIndex {
       cache.current.delete(projectId)
       setEntry(null)
     }
-    const onFocus = (): void => drop(false)
-    const onVisible = (): void => {
-      if (document.visibilityState === 'visible') drop(false)
-    }
     const onChanged = (): void => {
       if (projectId) generation.current.set(projectId, (generation.current.get(projectId) ?? 0) + 1)
       drop(true)
     }
-    window.addEventListener('focus', onFocus)
+    const back = onCameBack(() => drop(false))
     window.addEventListener(CHANGED, onChanged)
-    document.addEventListener('visibilitychange', onVisible)
     return () => {
-      window.removeEventListener('focus', onFocus)
+      back()
       window.removeEventListener(CHANGED, onChanged)
-      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [projectId])
 
