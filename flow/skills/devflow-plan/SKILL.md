@@ -112,15 +112,21 @@ delivers. Ask whether the granularity is right, whether each edge really
 gates, and whether any card should merge or split. Ask them to approve on the
 board, or with an explicit yes here. End the turn.
 
-Done when the preview is shown, nothing was created, and the turn has ended.
+When your client has a tool for asking the person multiple-choice questions
+(Claude Code's `AskUserQuestion`), ask through it instead of ending the turn:
+`Yes, create the cards (Recommended)`, `Change something` and `I'll approve on
+the board`. Picking yes is an explicit yes; the board option ends the turn.
+
+Done when the preview is shown, nothing was created, and the person answered or
+the turn has ended.
 
 ### 6. Apply what the person approved
 
-On an explicit, unconditional yes, fold in the person's edits and call
-`devpit_devflow_plan` again with the same cards and `"apply": true`. When the
-tool answers that the plan was already approved on the board, take the card
-ids from that answer. A reply that changes the plan ("yes, but…") is a change:
-update the cards, preview again, and end the turn.
+On an explicit, unconditional yes, or the yes option picked, fold in the
+person's edits and call `devpit_devflow_plan` again with the same cards and
+`"apply": true`. When the tool answers that the plan was already approved on
+the board, take the card ids from that answer. A reply that changes the plan
+("yes, but…") is a change: update the cards, preview again, and end the turn.
 
 Reply with the created card ids in dependency order and name the cards with no
 blockers: those can start now. End the turn.

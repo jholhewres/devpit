@@ -19,7 +19,13 @@ Devflow **on** is the person's click in the devpit app, never yours.
   explicit yes to the latest preview.
 - **Facts are devpit's, decisions are the person's.** Detection answers what is
   in the repo; the person answers what detection could not settle.
-- **One decision per turn,** each with your recommendation.
+- **One decision at a time,** each with your recommendation.
+- **Let the person pick.** When your client has a tool for asking the person
+  multiple-choice questions (Claude Code's `AskUserQuestion`), ask each
+  decision and each yes through it, your recommendation first as
+  `<answer> (Recommended)` with the reason as its description. What it asks
+  about, the preview or the restate, is still shown as text first. Without
+  one, ask as text, as shown below.
 - **devpit does not commit.** The files it writes are the person's to commit.
 - **Activation is a click.** Writing the file leaves Devflow off; turning it on,
   and moving Decisions from `shadow` to `enforce`, wait for the person's click
@@ -72,8 +78,9 @@ Ask the first open decision, alone:
 → Recommended: <answer>, because <reason>.
 ```
 
-End the turn and wait. Fold the answer into the setup as a `set` entry (step 4)
-and ask the next one in the next turn. Never ask what the preview already
+With a question tool, the answer comes back in this turn: fold it into the
+setup as a `set` entry (step 4) and ask the next one. As text, end the turn and
+wait, and ask the next one in the next turn. Never ask what the preview already
 settled.
 
 Done when every open decision has an answer, or there was none.
@@ -87,7 +94,9 @@ at the preview when nothing was asked), ending with:
 Reply **yes** to write these files, or change any line.
 ```
 
-End the turn. On an explicit, unconditional yes to that restate, call:
+With a question tool, ask it as `Yes, write them (Recommended)` and `Change
+something` instead of the last line; otherwise end the turn. On an explicit,
+unconditional yes to that restate, or the yes option picked, call:
 
 ```json
 {
@@ -123,8 +132,8 @@ More reviewers are more items of `review.reviewers`, each
 own sign-in; `review.consolidate` says how their findings become one list:
 `jev` (Decisions, else a model pass), `agent` (one model pass) or `none`.
 
-Show the before and after, ask for a yes, then call it again with
-`"apply": true`. `enabled` and `decisions.mode: enforce` go through the
+Show the before and after, ask for a yes (through the question tool when
+there is one), then call it again with `"apply": true`. `enabled` and `decisions.mode: enforce` go through the
 person's click, like activation: tell them where to click instead of setting
 them.
 

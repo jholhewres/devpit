@@ -21,6 +21,10 @@ says an explicit **yes** to your restate.
 - **Speak the glossary.** When the repo has `GLOSSARY.md` or `CONTEXT.md`, use its
   terms in questions and in the brief, and point out a term the person uses
   differently.
+- **Let the person pick.** When your client has a tool for asking the person
+  multiple-choice questions (Claude Code's `AskUserQuestion`), ask through it,
+  so the person selects an answer instead of typing one. Without one, ask as
+  text, as shown below.
 - **This skill ends at the approved brief.** The context and the plan are the
   next stages, and the person starts them.
 
@@ -49,11 +53,19 @@ every open decision whose prerequisites are settled.
 
 Done when each open decision is on the frontier or waits on one that is.
 
-### 3. Ask the frontier, one round per turn
+### 3. Ask the frontier, one round at a time
 
-Ask the frontier as one numbered round, at most four questions; the rest waits
-for the next round. Give each question your **recommended answer** and the
-reason in one line, worded so that "yes" accepts it:
+Ask the frontier as one round, at most four questions; the rest waits for the
+next round. Give each question your **recommended answer** and the reason in
+one line.
+
+With a question tool, the round is one call: a question per decision, its short
+title as the header, your recommended answer first as `<answer> (Recommended)`
+with the reason as its description, then the real alternatives. The answers
+come back in this turn; go on to step 4.
+
+Without one, post the round as numbered text, each recommendation worded so
+that "yes" accepts it:
 
 ```
 **Q1 · <short title>**: <the question, with the options if there are any>
@@ -66,8 +78,8 @@ have to justify it.
 
 End the turn after the round and wait for the answers.
 
-Done when the round is posted, every question carries a recommendation, and the
-turn has ended.
+Done when every question carries a recommendation and you have the answers, or
+the round is posted and the turn has ended.
 
 ### 4. Stop asking when you can predict
 
@@ -97,14 +109,18 @@ Write the brief back in the person's own words, one line each:
 Reply **yes** to create the brief on the board, or correct any line.
 ```
 
+With a question tool, show the restate as text without its last line, then ask
+for the approval through the tool: `Yes, create it (Recommended)` and `Change
+something`. Picking yes is an explicit yes; anything else is a change.
+
 **Out of scope is never empty.** Half of all misalignment is silent
 disagreement about what is not being built, so name at least one exclusion the
 conversation settled, or ask for one.
 
-End the turn after the restate.
+End the turn after the restate, or wait for the tool's answer.
 
 Done when every line is filled, Out of scope names at least one thing, and the
-turn has ended.
+person answered or the turn has ended.
 
 ### 6. Read the reply
 
@@ -112,7 +128,7 @@ Only an explicit, unconditional yes to the latest restate approves it.
 
 | The person replies | It means | Do |
 |---|---|---|
-| "yes", "approved", "create it" | approval | step 7 |
+| "yes", "approved", "create it", or the yes option picked | approval | step 7 |
 | "sounds good", "sure", "whatever you think", "go ahead" with no restate shown yet | not yet | restate (step 5) or ask "Anything to change? Reply yes to create it." |
 | "yes, but…", "yes, and also…", any correction | a change | fold it in, restate again, end the turn |
 | a new question or silence | not yet | answer it, restate, end the turn |
@@ -147,6 +163,7 @@ card, file or stage was started in this turn.
 
 ## When nobody can answer
 
-In a run with no person to reply (a step, an autopilot, a scheduled run), leave
+In a run with no person to reply (a step, an autopilot, a scheduled run, or a
+question tool that answers with an error), leave
 the decisions to the person: post the open round as a `[devflow] Questions`
 comment on the card with `devpit_comment`, and end.
