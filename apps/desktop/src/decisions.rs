@@ -164,7 +164,7 @@ pub(crate) fn reachable_address(url: &str) -> bool {
 pub async fn decisions_key_set(key: Option<String>) -> Result<(), RpcError> {
     crate::off_main::blocking(move || {
         let file = key_file()?;
-        match key
+        let kept = match key
             .map(|key| key.trim().to_owned())
             .filter(|key| !key.is_empty())
         {
@@ -179,7 +179,10 @@ pub async fn decisions_key_set(key: Option<String>) -> Result<(), RpcError> {
                 }
                 _ => Ok(()),
             },
-        }
+        };
+        // The MCP servers list Decisions' tools only with a key: ask again.
+        crate::devflow_asks::rang(None, "");
+        kept
     })
     .await
 }

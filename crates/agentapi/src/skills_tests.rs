@@ -40,8 +40,11 @@ fn app(method: &str, params: Value) -> Result<Value, String> {
 }
 
 fn answer(line: &str, offer: &Offer, ask: Ask) -> Value {
-    serde_json::from_str(&handle_offering(line, ask, true, offer).expect("an answer"))
-        .expect("json")
+    serde_json::from_str(
+        &handle_offering(line, ask, true, offer, &crate::listing::Seat::default())
+            .expect("an answer"),
+    )
+    .expect("json")
 }
 
 fn active() -> Offer {

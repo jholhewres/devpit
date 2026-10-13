@@ -17,6 +17,7 @@ use serde_json::{json, Value};
 
 use crate::client;
 use crate::devflow::{Offer, Watch, SETUP_TOOLS, STAGED};
+use crate::listing::Seat;
 
 /// The protocol revision offered when the client names none this knows.
 const PROTOCOL: &str = "2025-06-18";
@@ -266,15 +267,16 @@ pub fn serve(root: &Path) -> i32 {
         if line.trim().is_empty() {
             continue;
         }
-        let offer = watch
+        let (offer, seat) = watch
             .lock()
-            .map(|watch| watch.offer.clone())
-            .unwrap_or(Offer::Off);
+            .map(|watch| (watch.offer.clone(), watch.seat.clone()))
+            .unwrap_or((Offer::Off, Seat::default()));
         let answer = handle_offering(
             &line,
             &|method, params| client::ask(root, method, params, &cwd),
             offered,
             &offer,
+            &seat,
         );
         if let Some(answer) = answer {
             if !send(&answer) {
@@ -356,16 +358,18 @@ pub(crate) fn handle(
     line: &str,
     ask: &dyn Fn(&str, Value) -> Result<Value, String>,
 ) -> Option<String> {
-    handle_offering(line, ask, true, &Offer::Off)
+    handle_offering(line, ask, true, &Offer::Off, &Seat::default())
 }
 
 /// [`handle`], offering the tools or, where another server already does,
-/// none; and of Devflow's, what `offer` says.
+/// none; of Devflow's, what `offer` says; and of devpit's own, what `seat`
+/// can use.
 pub(crate) fn handle_offering(
     line: &str,
     ask: &dyn Fn(&str, Value) -> Result<Value, String>,
     offered: bool,
     offer: &Offer,
+    seat: &Seat,
 ) -> Option<String> {
     let Ok(message) = serde_json::from_str::<Value>(line) else {
         return Some(error(Value::Null, -32700, "that is not JSON"));
@@ -392,17 +396,11 @@ pub(crate) fn handle_offering(
         }),
         "ping" => json!({}),
         "tools/list" if !offered => json!({ "tools": [] }),
-        "tools/list" => json!({ "tools": TOOLS.iter().chain(offer.tools(&STAGED)).map(|tool| {
-            let mut listed = json!({
-                "name": tool.name,
-                "description": tool.description,
-                "inputSchema": (tool.input)(),
-            });
-            if let Some(meta) = crate::apps::meta_for(tool.name) {
-                listed["_meta"] = meta;
-            }
-            listed
-        }).collect::<Vec<_>>() }),
+        "tools/list" => json!({ "tools": TOOLS
+            .iter()
+            .chain(offer.tools(&STAGED))
+            .filter_map(|tool| crate::listing::listed(tool, seat))
+            .collect::<Vec<_>>() }),
         "resources/list" => {
             let mut listed = crate::apps::listed();
             if let Some(all) = listed["resources"].as_array_mut() {

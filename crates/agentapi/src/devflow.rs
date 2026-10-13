@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{json, Value};
 
 use crate::guide;
+use crate::listing::Seat;
 use crate::mcp::Tool;
 
 /// The file the app touches when what it offers changed without devflow.yaml
@@ -316,6 +317,7 @@ fn seen(path: &Path) -> Seen {
 /// the offer changed.
 pub(crate) struct Watch {
     pub offer: Offer,
+    pub seat: Seat,
     root: PathBuf,
     file: Option<PathBuf>,
     looked: Option<Vec<Seen>>,
@@ -325,6 +327,7 @@ impl Watch {
     pub(crate) fn new(root: &Path) -> Self {
         Watch {
             offer: Offer::Off,
+            seat: Seat::default(),
             root: root.to_path_buf(),
             file: None,
             looked: None,
@@ -363,11 +366,12 @@ impl Watch {
             // Seen again with the file in the look, or the next one is "due" for nothing.
             self.looked = Some(self.now());
         }
-        let offer = Offer::of(&answer);
-        if offer == self.offer {
+        let (offer, seat) = (Offer::of(&answer), Seat::of(&answer));
+        if offer == self.offer && seat == self.seat {
             return None;
         }
         self.offer = offer;
+        self.seat = seat;
         Some(&LISTS_CHANGED)
     }
 }

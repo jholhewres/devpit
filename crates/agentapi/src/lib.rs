@@ -18,6 +18,7 @@ pub mod devflow;
 pub mod events;
 pub mod guide;
 pub mod hook;
+mod listing;
 pub mod mcp;
 pub mod remote_mcp;
 pub mod skills;

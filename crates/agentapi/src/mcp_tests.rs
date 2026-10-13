@@ -13,8 +13,10 @@ fn offering(
     offer: &Offer,
     ask: &dyn Fn(&str, Value) -> Result<Value, String>,
 ) -> Value {
-    serde_json::from_str(&handle_offering(line, ask, true, offer).expect("an answer"))
-        .expect("json")
+    serde_json::from_str(
+        &handle_offering(line, ask, true, offer, &Seat::default()).expect("an answer"),
+    )
+    .expect("json")
 }
 
 fn listed(offer: &Offer) -> Vec<String> {

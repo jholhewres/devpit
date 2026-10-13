@@ -123,6 +123,25 @@ fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
     assert!(text().contains("block_on: [critical]"), "{}", text());
 }
 
+/// The server lists from this answer: an orchestrator gets its own tools and
+/// no flow to set up in its notes; a project, neither of an orchestrator's.
+#[test]
+fn the_offer_says_who_asks_and_an_orchestrator_is_offered_no_flow() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut here = project("prj_offer_seat", dir.path());
+    let offer = |here: &Project| {
+        respond(None, "devflow_offer", here, dir.path(), &json!({})).expect("offer")
+    };
+    let plain = offer(&here);
+    assert_eq!(plain["offer"], "setup");
+    assert_eq!(plain["orchestrator"], false);
+    assert!(plain["decisions"].is_boolean());
+    here.orchestrator = Some("claude".to_owned());
+    let orchestrating = offer(&here);
+    assert_eq!(orchestrating["offer"], "off");
+    assert_eq!(orchestrating["orchestrator"], true);
+}
+
 #[test]
 fn every_devflow_method_is_answered_by_the_agent_api() {
     for method in METHODS {

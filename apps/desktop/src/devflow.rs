@@ -231,12 +231,22 @@ fn offer(store: &Store, project: &Project, root: &Path, state: &State) -> Value 
         state,
         made(store, &project.id, Ask::Enable),
     );
+    let orchestrator = project.orchestrator.is_some();
     let (word, stages) = match offer {
+        // An orchestrator's folder is its notes, not a codebase to set a flow up in.
+        _ if orchestrator => ("off", Vec::new()),
         Offered::Off => ("off", Vec::new()),
         Offered::Setup => ("setup", Vec::new()),
         Offered::Active(stages) => ("active", stages),
     };
-    json!({ "offer": word, "stages": stages, "watch": root.join(FILE).display().to_string() })
+    json!({
+        "offer": word,
+        "stages": stages,
+        "watch": root.join(FILE).display().to_string(),
+        // What else the server lists: an orchestrator's tools, and Decisions'.
+        "orchestrator": orchestrator,
+        "decisions": crate::decisions::key().is_some(),
+    })
 }
 
 fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value {
