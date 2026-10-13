@@ -6,6 +6,7 @@ mod account;
 mod adopted_history;
 mod adopting;
 mod advancing;
+mod agent_aliases;
 mod agent_api;
 mod agent_door;
 mod agent_reach;

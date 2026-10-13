@@ -189,6 +189,13 @@ fn respond_in(
     here: &Project,
     asked: &Asked,
 ) -> Result<Value, String> {
+    // Every spelling of a card or a session, under the key this method reads.
+    let asked = &Asked {
+        method: asked.method.clone(),
+        params: crate::agent_aliases::aliased(&asked.method, asked.params.clone()),
+        cwd: asked.cwd.clone(),
+        author: asked.author.clone(),
+    };
     let text = |name: &str| {
         asked
             .params
@@ -250,7 +257,9 @@ fn respond_in(
         "resume" => {
             let profile = orchestrating(here)?;
             let app = app.ok_or("devpit's window is not running")?;
-            let session = text("session").ok_or("which session? pass its name or sessionId")?;
+            let session = text("session").ok_or(
+                "which session? pass `session`: its sessionId, or its name — devpit_sessions with include_ended lists them",
+            )?;
             ended_in_reach(here, profile, &session)?;
             return crate::ended_sessions::resume(app, profile, &session, text("name").as_deref())
                 .map_err(said);
@@ -258,7 +267,7 @@ fn respond_in(
         "stop" => {
             let profile = orchestrating(here)?;
             let app = app.ok_or("devpit's window is not running")?;
-            let name = text("name").ok_or("which session? pass its name")?;
+            let name = text("name").ok_or(WHICH_SESSION)?;
             in_reach(here, profile, &name)?;
             let pid = asked
                 .params
@@ -283,7 +292,7 @@ fn respond_in(
         }
         "transcript" => {
             let profile = orchestrating(here)?;
-            let name = text("name").ok_or("which session? pass its name")?;
+            let name = text("name").ok_or(WHICH_SESSION)?;
             in_reach(here, profile, &name).or_else(|_| ended_in_reach(here, profile, &name))?;
             let last = asked
                 .params
@@ -294,7 +303,7 @@ fn respond_in(
         }
         "draft" => {
             let profile = orchestrating(here)?;
-            let name = text("name").ok_or("which session? pass its name")?;
+            let name = text("name").ok_or(WHICH_SESSION)?;
             in_reach(here, profile, &name)?;
             let words = text("text").unwrap_or_default();
             if crate::reply_drafts::draft(&here.id, profile, &name, &words)? {
@@ -310,7 +319,7 @@ fn respond_in(
         }
         "send_draft" => {
             let profile = orchestrating(here)?;
-            let name = text("name").ok_or("which session? pass its name")?;
+            let name = text("name").ok_or(WHICH_SESSION)?;
             in_reach(here, profile, &name)?;
             return crate::draft_sending::send(
                 &here.id,
@@ -331,7 +340,7 @@ fn respond_in(
         }
         "screen" => {
             let profile = orchestrating(here)?;
-            let name = text("name").ok_or("which session? pass its name")?;
+            let name = text("name").ok_or(WHICH_SESSION)?;
             in_reach(here, profile, &name)?;
             return Ok(
                 match crate::live_sessions::screen_for(profile, &name).map_err(said)? {
@@ -772,9 +781,15 @@ fn resolved(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
+/// What a tool acting on a session says when it was not told which.
+const WHICH_SESSION: &str = "which session? pass `name` as devpit_sessions gives it";
+
 /// The card, if it is on this project's board. A card id from another
 /// project is not this agent's to touch, however it came by it.
 fn on_board<'a>(board: &'a Board, id: &str) -> Result<&'a Card, String> {
+    if id.trim().is_empty() {
+        return Err("which card? pass `cardId` — devpit_board lists the cards".to_owned());
+    }
     board
         .cards
         .iter()
