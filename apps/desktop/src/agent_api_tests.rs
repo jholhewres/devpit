@@ -229,3 +229,32 @@ fn decisions_are_answered_and_write_nothing() {
         assert!(!WRITES.contains(&method), "{method}");
     }
 }
+
+/// A card id from another project's board does not open that project's
+/// checkout: its git state is out of this session's reach.
+#[test]
+fn a_cards_checkout_is_read_only_from_its_own_project() {
+    let store = crate::projects::store().expect("store");
+    let (mine, theirs) = (
+        tempfile::tempdir().expect("tempdir"),
+        tempfile::tempdir().expect("tempdir"),
+    );
+    let ids: Vec<String> = [&mine, &theirs]
+        .iter()
+        .map(|dir| {
+            let id = store.add_project(dir.path(), None).expect("project");
+            store.ensure_board(&id).expect("board");
+            id
+        })
+        .collect();
+    let column = store.columns(&ids[1]).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&ids[1], &column, "Theirs", "")
+        .expect("card");
+    let refused = checkout_of(&project(&ids[0], mine.path(), &[]), &card).expect_err("refused");
+    assert!(refused.contains("no card"), "{refused}");
+    assert_eq!(
+        checkout_of(&project(&ids[1], theirs.path(), &[]), &card),
+        Ok(None)
+    );
+}

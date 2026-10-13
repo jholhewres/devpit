@@ -38,15 +38,16 @@ pub(crate) const METHODS: [&str; 14] = [
     "devflow_autopilot",
 ];
 
-/// The stage a method of a stage's own belongs to: it answers only where
-/// that stage is on, as the MCP server lists it.
-pub(crate) fn stage_of(method: &str) -> Option<&'static str> {
+/// The stages a method of a stage's own belongs to: it answers where one of
+/// them is on, as the MCP server lists it. The context stage writes its
+/// summary onto the brief, so the brief's tool is its too.
+pub(crate) fn stage_of(method: &str) -> Option<&'static [&'static str]> {
     match method {
-        "devflow_brief" => Some("briefing"),
-        "devflow_plan" => Some("plan"),
-        "devflow_evidence" => Some("execution"),
-        "devflow_review" => Some("review"),
-        "devflow_gate" => Some("completion"),
+        "devflow_brief" => Some(&["briefing", "context"]),
+        "devflow_plan" => Some(&["plan"]),
+        "devflow_evidence" => Some(&["execution"]),
+        "devflow_review" => Some(&["review"]),
+        "devflow_gate" => Some(&["completion"]),
         _ => None,
     }
 }
@@ -121,8 +122,10 @@ pub(crate) fn respond(
             params,
         ),
         _ => match (stage_of(method), &state) {
-            (Some(stage), State::Valid(_, config))
-                if stages_on(&store, project, &state)?.contains(&stage) =>
+            (Some(stages), State::Valid(_, config))
+                if stages_on(&store, project, &state)?
+                    .iter()
+                    .any(|on| stages.contains(on)) =>
             {
                 match method {
                     "devflow_evidence" => {
@@ -134,10 +137,11 @@ pub(crate) fn respond(
                     _ => crate::devflow_plan::respond(app, method, project, params),
                 }
             }
-            (Some(stage), _) => {
+            (Some(stages), _) => {
                 stages_on(&store, project, &state)?;
                 Err(format!(
-                    "Devflow's {stage} stage is switched off in this project's devflow.yaml."
+                    "Devflow's {} stage is switched off in this project's devflow.yaml.",
+                    stages.join(" and ")
                 ))
             }
             (None, _) => Err(format!("devpit does not answer `{method}`")),

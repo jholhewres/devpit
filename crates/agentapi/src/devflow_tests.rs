@@ -2,9 +2,9 @@ use serde_json::json;
 
 use super::*;
 
-static STAGES: [(Option<&str>, Tool); 3] = [
+static STAGES: [(&[&str], Tool); 3] = [
     (
-        None,
+        &[],
         Tool {
             name: "devpit_devflow_skill",
             method: "devflow_skill",
@@ -13,7 +13,7 @@ static STAGES: [(Option<&str>, Tool); 3] = [
         },
     ),
     (
-        Some("plan"),
+        &["plan"],
         Tool {
             name: "devpit_devflow_plan",
             method: "devflow_plan",
@@ -22,7 +22,7 @@ static STAGES: [(Option<&str>, Tool); 3] = [
         },
     ),
     (
-        Some("review"),
+        &["review"],
         Tool {
             name: "devpit_devflow_review",
             method: "devflow_review",
@@ -167,6 +167,9 @@ fn the_brief_and_the_plan_come_only_with_their_stages() {
     let plan = listed(&["plan"]);
     assert!(plan.contains(&"devpit_devflow_plan"), "{plan:?}");
     assert!(!plan.contains(&"devpit_devflow_brief"), "{plan:?}");
+    // The context stage's skill writes its summary with the brief's tool.
+    let context = listed(&["context"]);
+    assert!(context.contains(&"devpit_devflow_brief"), "{context:?}");
     assert!(Offer::Setup
         .tools(&STAGED)
         .iter()

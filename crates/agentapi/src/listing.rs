@@ -30,6 +30,25 @@ pub(crate) const ORCHESTRATOR_ONLY: [&str; 12] = [
 /// The tools that answer only once the person kept a Decisions key.
 pub(crate) const DECISIONS: [&str; 2] = ["devpit_decide", "devpit_rubric_run"];
 
+/// The tools that change nothing, which a host may run without asking.
+pub(crate) const READ_ONLY: [&str; 12] = [
+    "devpit_context",
+    "devpit_board",
+    "devpit_card",
+    "devpit_artifacts",
+    "devpit_projects",
+    "devpit_sessions",
+    "devpit_session_screen",
+    "devpit_session_transcript",
+    "devpit_repo_state",
+    "devpit_reminders",
+    "devpit_devflow_status",
+    "devpit_devflow_skill",
+];
+
+/// The tools whose change cannot be taken back: work in flight, a file.
+pub(crate) const DESTRUCTIVE: [&str; 2] = ["devpit_stop_session", "devpit_artifact_remove"];
+
 /// Who the session is, as the app's answer to `devflow_offer` says. `None`
 /// is an app too old to say, which gets the whole list it always had.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -74,6 +93,11 @@ pub(crate) fn listed(tool: &Tool, seat: &Seat) -> Option<Value> {
         "description": tool.description,
         "inputSchema": input,
     });
+    if READ_ONLY.contains(&tool.name) {
+        listed["annotations"] = json!({ "readOnlyHint": true });
+    } else if DESTRUCTIVE.contains(&tool.name) {
+        listed["annotations"] = json!({ "destructiveHint": true });
+    }
     if let Some(meta) = crate::apps::meta_for(tool.name) {
         listed["_meta"] = meta;
     }

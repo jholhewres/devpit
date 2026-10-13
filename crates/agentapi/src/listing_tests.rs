@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 
 use super::*;
-use crate::devflow::{Offer, Watch, SETUP_TOOLS};
+use crate::devflow::{Offer, Watch, SETUP_TOOLS, STAGED};
 use crate::mcp::{handle_offering, TOOLS};
 
 fn never(_: &str, _: Value) -> Result<Value, String> {
@@ -37,9 +37,43 @@ const PROJECT: Seat = Seat {
 
 #[test]
 fn every_tool_named_here_is_one_devpit_has() {
-    for name in ORCHESTRATOR_ONLY.iter().chain(&DECISIONS) {
-        assert!(TOOLS.iter().any(|tool| tool.name == *name), "{name}");
+    let every: Vec<&str> = TOOLS
+        .iter()
+        .chain(&SETUP_TOOLS)
+        .chain(STAGED.iter().map(|(_, tool)| tool))
+        .map(|tool| tool.name)
+        .collect();
+    for name in ORCHESTRATOR_ONLY
+        .iter()
+        .chain(&DECISIONS)
+        .chain(&READ_ONLY)
+        .chain(&DESTRUCTIVE)
+    {
+        assert!(every.contains(name), "{name}");
     }
+}
+
+/// A host approves a read without asking, and asks before what it cannot undo.
+#[test]
+fn a_read_and_a_loss_say_so_to_the_host() {
+    let listed = tools(&Offer::Active(vec!["plan".into()]), &Seat::default());
+    let hint = |name: &str| {
+        listed
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .map(|tool| tool["annotations"].clone())
+            .expect(name)
+    };
+    assert_eq!(hint("devpit_board"), json!({ "readOnlyHint": true }));
+    assert_eq!(
+        hint("devpit_devflow_skill"),
+        json!({ "readOnlyHint": true })
+    );
+    assert_eq!(
+        hint("devpit_stop_session"),
+        json!({ "destructiveHint": true })
+    );
+    assert_eq!(hint("devpit_comment"), Value::Null);
 }
 
 /// An app that does not say who the session is gets the list it always had.

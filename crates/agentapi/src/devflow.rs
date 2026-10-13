@@ -112,11 +112,11 @@ pub(crate) fn context_reply(answer: &Value) -> Option<String> {
     )
 }
 
-/// The tools only an active project gets: each under the stage that must be
-/// switched on for it, or `None` for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
+/// The tools only an active project gets: each under the stages one of which
+/// must be switched on for it, or none for any. The stages' own cards add theirs.
+pub(crate) static STAGED: [(&[&str], Tool); 8] = [
     (
-        None,
+        &[],
         Tool {
             name: crate::skills::TOOL,
             method: "devflow_skill",
@@ -126,8 +126,9 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
             }, "required": ["name"] }),
         },
     ),
+    // The context stage writes its summary onto the brief.
     (
-        Some("briefing"),
+        &["briefing", "context"],
         Tool {
             name: "devpit_devflow_brief",
             method: "devflow_brief",
@@ -146,7 +147,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         },
     ),
     (
-        Some("plan"),
+        &["plan"],
         Tool {
             name: "devpit_devflow_plan",
             method: "devflow_plan",
@@ -167,7 +168,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         },
     ),
     (
-        Some("execution"),
+        &["execution"],
         Tool {
             name: "devpit_devflow_evidence",
             method: "devflow_evidence",
@@ -187,7 +188,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         },
     ),
     (
-        Some("review"),
+        &["review"],
         Tool {
             name: REVIEW_TOOL,
             method: "devflow_review",
@@ -201,7 +202,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         },
     ),
     (
-        Some("completion"),
+        &["completion"],
         Tool {
             name: GATE_TOOL,
             method: "devflow_gate",
@@ -212,7 +213,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         },
     ),
     (
-        None,
+        &[],
         Tool {
             name: "devpit_devflow_stage",
             method: "devflow_stage",
@@ -224,7 +225,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         },
     ),
     (
-        Some("plan"),
+        &["plan"],
         Tool {
             name: "devpit_devflow_autopilot",
             method: "devflow_autopilot",
@@ -271,7 +272,7 @@ impl Offer {
     }
 
     /// The Devflow tools offered, after devpit's own.
-    pub(crate) fn tools<'a>(&self, staged: &'a [(Option<&'a str>, Tool)]) -> Vec<&'a Tool> {
+    pub(crate) fn tools<'a>(&self, staged: &'a [(&'a [&'a str], Tool)]) -> Vec<&'a Tool> {
         match self {
             Offer::Off => Vec::new(),
             Offer::Setup => SETUP_TOOLS.iter().collect(),
@@ -280,8 +281,8 @@ impl Offer {
                 .chain(
                     staged
                         .iter()
-                        .filter(|(stage, _)| {
-                            stage.is_none_or(|stage| stages.iter().any(|on| on == stage))
+                        .filter(|(under, _)| {
+                            under.is_empty() || stages.iter().any(|on| under.contains(&on.as_str()))
                         })
                         .map(|(_, tool)| tool),
                 )

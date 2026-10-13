@@ -686,16 +686,10 @@ pub(crate) fn gate(column: &Column) -> Result<(), String> {
 
 /// Where a project's repository, or a card's checkout, stands.
 fn repo(project: &Project, card_id: &str, params: &Value) -> Result<Value, String> {
-    let checkout = (!card_id.is_empty())
-        .then(|| {
-            crate::projects::store()
-                .ok()?
-                .card(card_id)
-                .ok()
-                .flatten()?
-                .worktree_path
-        })
-        .flatten();
+    let checkout = match card_id.trim() {
+        "" => None,
+        id => checkout_of(project, id)?,
+    };
     let root = checkout.unwrap_or_else(|| project.root_path.clone());
     let branches: Vec<String> = params
         .get("branches")
@@ -727,6 +721,22 @@ fn repo(project: &Project, card_id: &str, params: &Value) -> Result<Value, Strin
         "tag": state.tag,
         "sinceTag": state.since_tag,
     }))
+}
+
+/// A card's own checkout, if it has one. A card on another project's board
+/// is refused: its checkout is that project's, out of this session's reach.
+pub(crate) fn checkout_of(project: &Project, card_id: &str) -> Result<Option<String>, String> {
+    let store = crate::projects::store().map_err(said)?;
+    let theirs = store
+        .project_id_of_card(card_id)
+        .map_err(|err| err.to_string())?;
+    if theirs.as_deref() != Some(project.id.as_str()) {
+        return Err(format!("no card `{card_id}` on this project's board"));
+    }
+    Ok(store
+        .card(card_id)
+        .map_err(|err| err.to_string())?
+        .and_then(|card| card.worktree_path))
 }
 
 /// Refuses a session outside the orchestrator's linked projects, by name.

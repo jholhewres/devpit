@@ -104,9 +104,10 @@ pub(crate) fn finish(
     )?;
     let summary = summary.trim();
     if !summary.is_empty() {
+        let said = crate::cards::sayable(summary).map_err(|err| err.message)?;
         crate::projects::store()
             .map_err(|err| err.message)?
-            .add_comment(card_id, crate::agent_api::signed(author), summary)
+            .add_comment(card_id, crate::agent_api::signed(author), said)
             .map_err(|err| err.to_string())?;
     }
     crate::agent_api::moved(app, board, card_id, &to.id)
