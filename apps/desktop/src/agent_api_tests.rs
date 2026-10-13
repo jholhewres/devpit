@@ -139,6 +139,11 @@ fn only_an_orchestrator_reaches_another_project() {
         reached(&projects, orch, Some("prj_orch")).is_err(),
         "an orchestrator was reachable as a project"
     );
+    // Naming its own project asks for nothing a project's session lacks.
+    assert_eq!(
+        reached(&projects, app, Some("prj_app")).map(|one| one.id.as_str()),
+        Ok("prj_app")
+    );
 }
 
 #[test]

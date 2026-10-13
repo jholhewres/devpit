@@ -45,6 +45,32 @@ pub fn wait_for(method: &str) -> Duration {
     }
 }
 
+/// What to do about a question devpit took and did not answer in time: it
+/// may still be done, and asking again would do it twice.
+pub fn unanswered(method: &str) -> String {
+    let next = match method {
+        "create" | "remind" | "devflow_brief" | "devflow_plan" => {
+            "devpit_board shows whether the card landed: check it before asking again"
+        }
+        "comment" | "handoff" | "finish_card" => {
+            "devpit_card shows the card's latest comments: check them before asking again"
+        }
+        "update" | "move" | "start_card" => {
+            "devpit_card shows where the card stands: check it before asking again"
+        }
+        "log" => "it was most likely written: do not write it again",
+        "start" | "resume" | "stop" => {
+            "devpit_sessions shows whether it runs: check it before asking again"
+        }
+        "draft" => "a new draft replaces the last, so asking again is safe",
+        "context" | "board" | "card" | "projects" | "sessions" | "screen" | "transcript"
+        | "repo" | "reminders" | "artifacts" | "devflow_status" | "devflow_skill" | "health"
+        | "methods" => "it only reads, so asking again is safe",
+        _ => "check whether it happened before asking again",
+    };
+    format!("devpit is still working on `{method}` and may yet finish it — {next}")
+}
+
 /// Asks the devpit keeping its state in `root`, from `cwd`, and answers with
 /// what it said or why it could not.
 pub fn ask(root: &Path, method: &str, params: Value, cwd: &Path) -> Result<Value, String> {
@@ -65,7 +91,7 @@ pub fn ask(root: &Path, method: &str, params: Value, cwd: &Path) -> Result<Value
     // is still on it, and asking again would do it twice.
     let reply = read_reply(stream).map_err(|why| {
         if why == closed() {
-            format!("devpit took the question but did not answer in time — check before asking `{method}` again")
+            unanswered(method)
         } else {
             why
         }
@@ -80,7 +106,7 @@ pub fn ask(root: &Path, method: &str, params: Value, cwd: &Path) -> Result<Value
 }
 
 fn closed() -> String {
-    "devpit is not open: start it, then ask again".to_owned()
+    "devpit is not open: ask the person to open it, then ask again".to_owned()
 }
 
 /// Where the app listens and the header that gets a post in, read from the
@@ -107,7 +133,10 @@ fn read_reply(stream: TcpStream) -> Result<String, String> {
     if status.split_whitespace().nth(1) != Some("200") {
         return Err(match status.split_whitespace().nth(1) {
             Some("401") => "devpit refused the question: its secret changed, which means it restarted — ask again".to_owned(),
-            _ => format!("devpit answered `{}`", status.trim()),
+            _ => match said_with(reader) {
+                Some(said) => format!("devpit answered `{}`: {said}", status.trim()),
+                None => format!("devpit answered `{}`", status.trim()),
+            },
         });
     }
     let mut length = None;
@@ -138,6 +167,17 @@ fn read_reply(stream: TcpStream) -> Result<String, String> {
         }
     }
     Ok(body)
+}
+
+/// The body of a refusal, cut short: what devpit said, past the headers.
+fn said_with(reader: BufReader<TcpStream>) -> Option<String> {
+    let mut rest = String::new();
+    reader.take(2048).read_to_string(&mut rest).ok()?;
+    let body = rest
+        .split_once("\r\n\r\n")
+        .map_or("", |(_, body)| body)
+        .trim();
+    (!body.is_empty()).then(|| body.chars().take(300).collect())
 }
 
 #[cfg(test)]

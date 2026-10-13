@@ -94,3 +94,46 @@ fn a_plan_is_waited_for_like_a_decision_and_a_fetch_longer_than_a_read() {
     assert!(wait_for("repo") > wait_for("board"));
     assert!(wait_for("transcript") > wait_for("board"));
 }
+
+/// Unanswered is not undone: the agent is told how to see whether a write
+/// landed, and that a read is safe to ask again.
+#[test]
+fn an_unanswered_question_says_how_to_check_before_asking_again() {
+    assert!(unanswered("create").contains("devpit_board"));
+    assert!(unanswered("comment").contains("devpit_card"));
+    assert!(unanswered("start").contains("devpit_sessions"));
+    assert!(unanswered("board").contains("safe"));
+    assert!(unanswered("log").contains("do not write it again"));
+    assert!(unanswered("create").contains("`create`"));
+}
+
+/// A refusal with a body says what the body says, not only its status.
+#[test]
+fn a_refusal_carries_what_devpit_said() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    std::fs::write(
+        dir.path().join("hook-endpoint"),
+        format!("http://127.0.0.1:{port}/hook"),
+    )
+    .expect("write");
+    std::fs::write(dir.path().join("hook-auth"), "x-devpit-hook: s\n").expect("write");
+    let served = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut seen = vec![0u8; 4096];
+        let _ = stream.read(&mut seen);
+        let body = "the store is locked";
+        let _ = stream.write_all(
+            format!(
+                "HTTP/1.1 500 Internal Server Error\r\ncontent-length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .as_bytes(),
+        );
+    });
+    let why = ask(dir.path(), "board", json!({}), dir.path()).expect_err("refused");
+    served.join().expect("served");
+    assert!(why.contains("500"), "{why}");
+    assert!(why.contains("the store is locked"), "{why}");
+}

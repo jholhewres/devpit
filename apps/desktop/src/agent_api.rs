@@ -146,8 +146,7 @@ fn within(
         let _ = said.send(work());
     });
     heard.recv_timeout(wait).unwrap_or_else(|_| {
-        json!({ "error": format!("devpit is still working on `{method}` and may yet finish it — check before asking again") })
-            .to_string()
+        json!({ "error": devpit_agentapi::client::unanswered(method) }).to_string()
     })
 }
 
@@ -161,7 +160,10 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
         return Ok(json!(crate::agent_door::health_now(app)));
     }
     if !METHODS.contains(&asked.method.as_str()) {
-        return Err(format!("devpit does not answer `{}`", asked.method));
+        return Err(format!(
+            "devpit does not answer `{}` — `devpit-agent methods` lists what it does",
+            asked.method
+        ));
     }
     // Found from the files git keeps; git is asked only when they do not say.
     let cwd = Path::new(&asked.cwd);
@@ -176,7 +178,12 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
                 .projects;
             project_at(&projects, cwd)
                 .cloned()
-                .ok_or_else(|| format!("no devpit project contains {}", asked.cwd))?
+                .ok_or_else(|| {
+                    format!(
+                        "no devpit project contains {} — work from a project's checkout, or ask the person to add this folder to devpit",
+                        asked.cwd
+                    )
+                })?
         }
     };
     respond_in(app, &projects, &here, asked)
@@ -560,7 +567,9 @@ fn respond_in(
 fn orchestrating(here: &Project) -> Result<&str, String> {
     here.orchestrator
         .as_deref()
-        .ok_or_else(|| "only an orchestrator sees past its own project".to_owned())
+        .ok_or_else(|| {
+            "only an orchestrator sees past its own project: this tool is for devpit's orchestrator, and a project's session works on its own board without `project`".to_owned()
+        })
 }
 
 /// The project a call is about: where the agent stands, or — for an
@@ -573,6 +582,10 @@ pub(crate) fn reached<'a>(
     let Some(named) = named.map(str::trim).filter(|named| !named.is_empty()) else {
         return Ok(here);
     };
+    // A project's session naming its own project asks for nothing it lacks.
+    if here.orchestrator.is_none() && (here.id == named || here.name.eq_ignore_ascii_case(named)) {
+        return Ok(here);
+    }
     orchestrating(here)?;
     projects
         .iter()
@@ -802,7 +815,11 @@ fn column_of<'a>(board: &'a Board, id: &str) -> Result<&'a Column, String> {
         .columns
         .iter()
         .find(|column| column.id == id)
-        .ok_or_else(|| format!("no column `{id}` on this project's board"))
+        .ok_or_else(|| {
+            format!(
+                "no column `{id}` on this project's board — devpit_context lists the column ids"
+            )
+        })
 }
 
 fn first_column(board: &Board) -> Result<&Column, String> {
