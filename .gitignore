@@ -3,6 +3,8 @@
 .project/
 .omc/
 .claude/settings.local.json
+# devpit's own Devflow setup for this checkout: local, not the product's.
+.devpit/
 
 # --- Rust ---
 /target
