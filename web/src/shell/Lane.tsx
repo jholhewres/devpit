@@ -9,7 +9,7 @@ import { LaneStep } from './LaneStep'
 import { money } from './chat'
 import { stillBlocking } from './planEdit'
 import { abandoned, committed } from './typing'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 const line = {
@@ -52,7 +52,9 @@ const Spark = (): React.JSX.Element => (
   </svg>
 )
 
-export function Tile({
+/* Memoized, with callbacks that take the card: one card's activity or a run's
+   line used to draw every tile on the board again. */
+export const Tile = memo(function Tile({
   card,
   progress,
   stepName,
@@ -67,15 +69,15 @@ export function Tile({
   /** The lane's step, for the button and for the question a step with no undo asks. */
   stepName?: string
   /** Present only when the tile can be played (`playable`); absent on the card in the air. */
-  onPlay?: (confirmed: boolean) => Promise<Played | null>
+  onPlay?: (cardId: string, confirmed: boolean) => Promise<Played | null>
   /** The title is being renamed in place, from the card's menu. */
   renaming?: boolean
   /** The new title, or null when the rename was abandoned. */
-  onRenamed?: (title: string | null) => void
+  onRenamed?: (card: Card, title: string | null) => void
   /** A finish on this card nobody has looked at yet. */
   unread?: boolean
   /** Goes where the dot points: the session waiting, or else the card. */
-  onDoing?: () => void
+  onDoing?: (card: Card) => void
 }): React.JSX.Element {
   const [asking, setAsking] = useState(false)
   const run = card.runs[0]
@@ -87,7 +89,7 @@ export function Tile({
   return (
     <>
       {renaming ? (
-        <TileRename title={card.title} onDone={(title) => onRenamed?.(title)} />
+        <TileRename title={card.title} onDone={(title) => onRenamed?.(card, title)} />
       ) : (
         <div className="tile__t">{card.title}</div>
       )}
@@ -103,7 +105,7 @@ export function Tile({
           onClick={(event) => {
             event.stopPropagation()
             /* It used to open the card. It plays; a step with no undo asks first. */
-            void onPlay(false).then((answer) => setAsking(Boolean(answer?.needsConfirming)))
+            void onPlay(card.id, false).then((answer) => setAsking(Boolean(answer?.needsConfirming)))
           }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -131,7 +133,7 @@ export function Tile({
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation()
-              onDoing?.()
+              onDoing?.(card)
             }}
           >
             {/* Colour alone does not carry a question to everyone. */}
@@ -201,12 +203,12 @@ export function Tile({
         <RunConfirm
           stepName={stepName}
           onClose={() => setAsking(false)}
-          onConfirm={() => void onPlay?.(true).then(() => setAsking(false))}
+          onConfirm={() => void onPlay?.(card.id, true).then(() => setAsking(false))}
         />
       )}
     </>
   )
-}
+})
 
 /** The question a step with no undo asks before it runs, from the tile or its menu. */
 export function RunConfirm({

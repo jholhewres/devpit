@@ -81,16 +81,16 @@ describe('the play button on a tile', () => {
       { run: null, needsConfirming: true, laneRunsNothing: false },
       { run, needsConfirming: false, laneRunsNothing: false },
     ]
-    const onPlay = vi.fn((_confirmed: boolean) => Promise.resolve<Played | null>(said.shift() ?? null))
+    const onPlay = vi.fn((_cardId: string, _confirmed: boolean) => Promise.resolve<Played | null>(said.shift() ?? null))
     render(<Tile card={card()} stepName="deploy" onPlay={onPlay} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Run deploy' }))
-    expect(onPlay).toHaveBeenCalledWith(false)
+    expect(onPlay).toHaveBeenCalledWith('card_1', false)
     const question = await screen.findByRole('dialog')
     expect(within(question).getByText('Run deploy?')).toBeTruthy()
 
     fireEvent.click(within(question).getByRole('button', { name: 'Run deploy' }))
-    await waitFor(() => expect(onPlay).toHaveBeenLastCalledWith(true))
+    await waitFor(() => expect(onPlay).toHaveBeenLastCalledWith('card_1', true))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 

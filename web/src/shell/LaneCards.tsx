@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Card, Played } from '../gen/bindings'
 import { playable, type Lane } from './board'
@@ -54,6 +54,19 @@ export function LaneCards({
   const [renaming, setRenaming] = useState<string | null>(null)
   const playFor = (card: Card) =>
     playable(card, lane.column) ? (confirmed: boolean) => onPlay(card.id, confirmed) : undefined
+  /* The same callbacks every render, taking the card: a tile is memoized, and
+     a fresh closure per tile drew them all again for one card's change. */
+  const doing = useRef(onDoing)
+  const rename = useRef(onRename)
+  useLayoutEffect(() => {
+    doing.current = onDoing
+    rename.current = onRename
+  })
+  const onTileDoing = useCallback((card: Card) => doing.current?.(card), [])
+  const onTileRenamed = useCallback((card: Card, title: string | null) => {
+    setRenaming(null)
+    if (title && title !== card.title) rename.current(card.id, title)
+  }, [])
   const slot = held && <div className="slot" style={{ height: held.height }} />
 
   return (
@@ -96,14 +109,11 @@ export function LaneCards({
               card={card}
               progress={progress[card.runs[0]?.id ?? '']}
               stepName={lane.column.step?.name}
-              onPlay={playFor(card)}
+              onPlay={playable(card, lane.column) ? onPlay : undefined}
               unread={unread?.has(card.id)}
-              onDoing={() => onDoing?.(card)}
+              onDoing={onTileDoing}
               renaming={renaming === card.id}
-              onRenamed={(title) => {
-                setRenaming(null)
-                if (title && title !== card.title) onRename(card.id, title)
-              }}
+              onRenamed={onTileRenamed}
             />
           </div>
         </Fragment>

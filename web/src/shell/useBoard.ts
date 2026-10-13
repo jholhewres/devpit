@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { Board, CardHappening, CardSession, ColumnDeleted, Played, Step } from '../gen/bindings'
 import { endOf, landed, lanes, moveQuestion, tiedToOthers, type Lane } from './board'
@@ -348,8 +348,12 @@ export function useBoard(projectId: string | null, inFront = true): UseBoard {
     [projectId, then],
   )
 
+  /* The same lanes, and the same cards in them, until the board changes: a
+     tile is drawn again only when its own card is a new one. */
+  const laid = useMemo(() => lanes(board), [board])
+
   return {
-    lanes: lanes(board),
+    lanes: laid,
     error,
     dismiss: () => setError(null),
     report: setError,
