@@ -11,7 +11,7 @@ vi.mock('./window', () => ({
   },
 }))
 
-const shell = { project: { id: 'prj_api', name: 'api' }, show: vi.fn(), openPrefs: vi.fn() }
+const shell = { project: { id: 'prj_api', name: 'api' }, show: vi.fn(), openPrefs: vi.fn(), active: { kind: 'devflow' } }
 vi.mock('./useShell', () => ({ useShell: () => shell }))
 vi.mock('./useKnownAgents', () => ({
   useKnownAgents: () => [{ id: 'claude', label: 'Claude Code', launch: 'claude', installed: true }],
@@ -84,6 +84,7 @@ const active = (yaml = 'version: 1\nenabled: true\n', more: Partial<DevflowConfi
 
 let current: DevflowScreen = missing()
 const called = vi.fn()
+const looked = vi.fn()
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<unknown>) => {
     try {
@@ -93,7 +94,10 @@ vi.mock('./live', () => ({
     }
   },
   commands: {
-    devflowScreen: async () => current,
+    devflowScreen: async () => {
+      looked()
+      return current
+    },
     devflowCreate: async (...args: unknown[]) => {
       called('create', ...args)
       current = disabled()
@@ -124,7 +128,7 @@ vi.mock('./live', () => ({
   },
 }))
 
-const { DevflowPane, OUTSIDE } = await import('./DevflowPane')
+const { DevflowPane, LOOK_EVERY_MS, OUTSIDE } = await import('./DevflowPane')
 
 afterEach(() => {
   cleanup()
@@ -225,6 +229,43 @@ describe('the Devflow screen', () => {
     await act(async () => window.dispatchEvent(new Event('focus')))
     expect(await screen.findByText(OUTSIDE)).toBeTruthy()
     expect(screen.queryByRole('combobox', { name: 'Persona' })).toBeNull()
+  })
+})
+
+/* The pane stays mounted behind other tabs, and it read the file every few
+   seconds there for nobody. */
+describe('the Devflow screen behind another tab', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+    shell.active = { kind: 'devflow' }
+    current = missing()
+  })
+
+  const settle = async (ms: number): Promise<void> => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+
+  it('does not look at the file on the beat, and looks at once back in front', async () => {
+    vi.useFakeTimers()
+    current = active()
+    const { rerender } = render(<DevflowPane />)
+    await settle(0)
+    shell.active = { kind: 'board' }
+    rerender(<DevflowPane />)
+    looked.mockClear()
+
+    await settle(LOOK_EVERY_MS * 3)
+    expect(looked).not.toHaveBeenCalled()
+
+    shell.active = { kind: 'devflow' }
+    rerender(<DevflowPane />)
+    await settle(0)
+    expect(looked).toHaveBeenCalledTimes(1)
+    await settle(LOOK_EVERY_MS)
+    expect(looked).toHaveBeenCalledTimes(2)
   })
 })
 

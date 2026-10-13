@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { IslandAsked, IslandSession, PendingPrompt } from '../gen/bindings'
@@ -14,10 +14,14 @@ const onScreen: PendingPrompt = {
 } as PendingPrompt
 let shown: PendingPrompt | null = onScreen
 const answered = vi.fn(async (..._args: unknown[]) => null)
+const prompted = vi.fn()
 vi.mock('../shell/live', () => ({
   ask: async (call: () => Promise<unknown>) => ({ data: await call(), error: null, loading: false }),
   commands: {
-    islandPrompt: async () => shown,
+    islandPrompt: async () => {
+      prompted()
+      return shown
+    },
     islandAnswer: (...args: unknown[]) => answered(...args),
   },
 }))
@@ -54,5 +58,21 @@ describe('a question on the island', () => {
     render(<AskedHere session={session} questions={questions} waiting />)
     await waitFor(() => expect(screen.getByText('Native app')).toBeTruthy())
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  /* Each read captures the terminal's screen through tmux. */
+  it('does not read the screen again while the window is hidden', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+    try {
+      render(<AskedHere session={session} questions={questions} waiting />)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000 * 3)
+      })
+      expect(prompted).toHaveBeenCalledTimes(1)
+    } finally {
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+      vi.useRealTimers()
+    }
   })
 })

@@ -146,4 +146,19 @@ describe('what a session is on', () => {
       vi.useRealTimers()
     }
   })
+
+  /* Each read is the card's detail, which forks tmux and ps. */
+  it('reads nothing on the beat while the window is hidden', () => {
+    vi.useFakeTimers()
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+    try {
+      const onChanged = vi.fn()
+      render(<CardSessions cardId="card_1" title="t" sessions={[session({ state: 'working' })]} onChanged={onChanged} />)
+      vi.advanceTimersByTime(STEP_EVERY_MS * 3)
+      expect(onChanged).not.toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+      vi.useRealTimers()
+    }
+  })
 })

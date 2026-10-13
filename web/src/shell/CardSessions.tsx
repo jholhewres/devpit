@@ -60,11 +60,12 @@ export function CardSessions({
   }, [cardId, onChanged])
 
   /* A state change is what the card hears; a tool after a tool is not one,
-     so while something works the step it is on is read again on a beat. */
+     so while something works the step it is on is read again on a beat —
+     not for a hidden window, where each read forks tmux and ps for nobody. */
   const working = sessions.some((one) => one.state === 'working')
   useEffect(() => {
     if (!working) return
-    const beat = window.setInterval(onChanged, STEP_EVERY_MS)
+    const beat = window.setInterval(() => !document.hidden && onChanged(), STEP_EVERY_MS)
     return () => window.clearInterval(beat)
   }, [working, onChanged])
 

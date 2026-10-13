@@ -9,7 +9,7 @@ import { ask, commands } from '../shell/live'
  * island, and again every minute it stays open.
  */
 
-const AGAIN = 60_000
+export const AGAIN = 60_000
 
 /** The words of the badge. */
 export function checksWords(checks: IslandChecks): string {
@@ -27,7 +27,8 @@ export function Checks({ sessionId }: { sessionId: string }): React.JSX.Element 
         if (current) setChecks(answer.data)
       })
     asked()
-    const every = window.setInterval(asked, AGAIN)
+    /* Each ask goes to the code host; a hidden window needs none. */
+    const every = window.setInterval(() => !document.hidden && asked(), AGAIN)
     return () => {
       current = false
       window.clearInterval(every)

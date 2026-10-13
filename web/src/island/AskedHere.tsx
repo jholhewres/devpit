@@ -38,7 +38,8 @@ export function AskedHere({
         if (!gone) setPrompt(answer.data ?? null)
       })
     read()
-    const every = window.setInterval(read, 2_000)
+    /* Each read captures the terminal's screen; a hidden window needs none. */
+    const every = window.setInterval(() => !document.hidden && read(), 2_000)
     return () => {
       gone = true
       window.clearInterval(every)

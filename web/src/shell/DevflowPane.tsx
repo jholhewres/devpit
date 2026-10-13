@@ -25,7 +25,7 @@ import { onCarried } from './window'
 
 /** How often an open screen looks at the file again, for an edit made in an
  *  editor that never took the window's focus away. */
-const LOOK_EVERY_MS = 4000
+export const LOOK_EVERY_MS = 4000
 
 /** Where the file is refused and why, as the MCP's status says it. */
 export function errorSaid(error: DevflowError | null): string {
@@ -62,8 +62,9 @@ function Waiting({ asks, onAnswer }: { asks: readonly DevflowAsk[]; onAnswer: (i
 }
 
 export function DevflowPane(): React.JSX.Element {
-  const { project, show, openPrefs } = useShell()
+  const { project, show, openPrefs, active } = useShell()
   const projectId = project?.id ?? null
+  const inFront = active?.kind === 'devflow'
   const [screen, setScreen] = useState<DevflowScreen | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
@@ -108,11 +109,22 @@ export function DevflowPane(): React.JSX.Element {
   }, [look])
 
   const missing = screen?.state === 'missing'
+  /* The pane stays mounted behind other tabs, where nobody reads the file; back
+     in front it looks at once rather than a beat late. */
+  const behind = useRef(false)
   useEffect(() => {
+    if (!inFront) {
+      behind.current = true
+      return
+    }
+    if (behind.current) {
+      behind.current = false
+      look()
+    }
     if (missing) return
     const every = window.setInterval(() => document.visibilityState === 'visible' && look(), LOOK_EVERY_MS)
     return () => window.clearInterval(every)
-  }, [look, missing])
+  }, [look, missing, inFront])
 
   const edit: Edit = (path, value) => {
     if (!projectId) return
