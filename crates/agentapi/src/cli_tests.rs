@@ -56,7 +56,7 @@ fn options_travel_under_the_names_the_app_reads() {
 fn an_unknown_command_is_refused_by_name() {
     assert_eq!(
         parsed(&words("deploy")),
-        Err("`deploy` is not a devpit agent command".to_owned())
+        Err("`deploy` is not a devpit-agent command".to_owned())
     );
 }
 
@@ -70,4 +70,16 @@ fn devflows_session_start_hook_names_its_cli() {
         parsed(&words("devflow-context")),
         Ok(Parsed::Context("claude".into()))
     );
+}
+
+/// The guide names the command an agent can run: `devpit-agent` is what
+/// devpit puts on its PATH, and `devpit` may be nothing there.
+#[test]
+fn the_guide_and_the_hint_name_the_command_on_the_agents_path() {
+    assert!(PARSE_HINT.contains("devpit-agent guide"));
+    assert!(!guide::GUIDE.contains("devpit agent "), "{}", guide::GUIDE);
+    assert!(!guide::INSTRUCTIONS.contains("devpit agent "));
+    for tool in &crate::mcp::TOOLS {
+        assert!(!tool.description.contains("devpit agent "), "{}", tool.name);
+    }
 }

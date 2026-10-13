@@ -58,12 +58,16 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
                 1
             }
         },
+        // The error and where to read more: the whole guide buried it.
         Err(why) => {
-            eprintln!("devpit: {why}\n\n{}", guide::GUIDE);
+            eprintln!("devpit: {why}\n{PARSE_HINT}");
             2
         }
     }
 }
+
+/// Said under a command that did not parse.
+pub(crate) const PARSE_HINT: &str = "`devpit-agent guide` says what it takes";
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Parsed {
@@ -151,7 +155,7 @@ pub(crate) fn parsed(args: &[String]) -> Result<Parsed, String> {
             let column = plain.get(1).ok_or("move needs a column id")?;
             ask("move", json!({ "cardId": id, "columnId": column }))
         }
-        Some(other) => Err(format!("`{other}` is not a devpit agent command")),
+        Some(other) => Err(format!("`{other}` is not a devpit-agent command")),
     }
 }
 
