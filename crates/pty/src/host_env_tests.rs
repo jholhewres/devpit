@@ -111,3 +111,36 @@ fn the_names_of_the_appimage_itself_are_removed() {
         vec![change("APPIMAGE", None), change("ARGV0", None)]
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn a_program_is_found_where_the_path_has_it_executable() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (first, second) = (dir.path().join("a"), dir.path().join("b"));
+    std::fs::create_dir_all(&first).expect("a");
+    std::fs::create_dir_all(&second).expect("b");
+    // Not executable in the first folder: skipped, as a shell would.
+    std::fs::write(first.join("tool"), "").expect("plain");
+    std::fs::write(second.join("tool"), "#!/bin/sh\n").expect("tool");
+    std::fs::set_permissions(second.join("tool"), std::fs::Permissions::from_mode(0o755))
+        .expect("chmod");
+    let path = std::env::join_paths(["relative/bin".into(), first, second.clone()]).expect("path");
+    assert_eq!(found_on(&path, "tool".as_ref()), Some(second.join("tool")));
+    assert_eq!(found_on(&path, "missing".as_ref()), None);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_command_is_spawned_by_its_path_so_it_needs_no_fork() {
+    let sh = command("sh");
+    assert!(
+        Path::new(sh.get_program()).is_absolute(),
+        "{:?}",
+        sh.get_program()
+    );
+    let missing = command("devpit-no-such-program");
+    assert_eq!(missing.get_program(), "devpit-no-such-program");
+    let given = command("/bin/sh");
+    assert_eq!(given.get_program(), "/bin/sh");
+}

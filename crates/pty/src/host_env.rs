@@ -40,7 +40,7 @@ pub fn changes() -> &'static [Change] {
 /// `Command::new` for a program that runs on the person's behalf — a shell,
 /// an agent, git, an opener — with the AppImage taken out of its environment.
 pub fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
-    let mut command = Command::new(program);
+    let mut command = Command::new(resolved(program.as_ref()));
     scrub(&mut command);
     // A console program started by a windowed one gets a console window of
     // its own: git, the agent CLI, tasklist — each flashed on screen at
@@ -53,6 +53,65 @@ pub fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     // Found where the person's own shell finds it — see `login_path`.
     command.env("PATH", crate::login_path::search_path());
     command
+}
+
+/// The program as a path on [`login_path::search_path`], found once and kept.
+///
+/// With `PATH` set on the command and a bare name, std cannot `posix_spawn`
+/// and falls back to `fork()` — a copy of this whole process, hundreds of MB,
+/// for every git or tmux. A path keeps the cheap spawn. A name not found stays
+/// bare, so the error is the one it always was; a miss is not kept, so a
+/// program installed later is found.
+///
+/// [`login_path::search_path`]: crate::login_path::search_path
+fn resolved(program: &std::ffi::OsStr) -> std::ffi::OsString {
+    use std::collections::HashMap;
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    static FOUND: OnceLock<Mutex<HashMap<OsString, PathBuf>>> = OnceLock::new();
+    if cfg!(windows) || Path::new(program).components().count() != 1 {
+        return program.to_owned();
+    }
+    let found = FOUND.get_or_init(Default::default);
+    let kept = found
+        .lock()
+        .ok()
+        .and_then(|found| found.get(program).cloned())
+        .filter(|path| path.is_file());
+    if let Some(path) = kept {
+        return path.into_os_string();
+    }
+    match found_on(crate::login_path::search_path(), program) {
+        Some(path) => {
+            if let Ok(mut found) = found.lock() {
+                found.insert(program.to_owned(), path.clone());
+            }
+            path.into_os_string()
+        }
+        None => program.to_owned(),
+    }
+}
+
+/// The first executable file called `program` in the `PATH`-style `path`.
+pub fn found_on(path: &std::ffi::OsStr, program: &std::ffi::OsStr) -> Option<std::path::PathBuf> {
+    std::env::split_paths(path)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join(program))
+        .find(|candidate| executable(candidate))
+}
+
+#[cfg(unix)]
+fn executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    path.metadata()
+        .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+}
+
+#[cfg(not(unix))]
+fn executable(path: &Path) -> bool {
+    path.is_file()
 }
 
 /// `CREATE_NO_WINDOW`, for a child that must not open a console window.
