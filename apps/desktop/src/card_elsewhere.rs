@@ -101,10 +101,9 @@ pub(crate) fn touched(card_id: &str, path: &str) {
     let Ok(Some(card)) = store.card(card_id) else {
         return;
     };
-    let Ok(projects) = crate::live_sessions::recent_projects() else {
-        return;
-    };
-    let Some(project) = projects.iter().find(|one| one.id == project_id) else {
+    // The project's folder from its row: this runs on every file a session
+    // writes, and listing the projects asks git about every one of them.
+    let Ok(Some(project)) = store.project(&project_id) else {
         return;
     };
     let home = card

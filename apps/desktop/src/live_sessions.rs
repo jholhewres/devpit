@@ -462,18 +462,35 @@ pub(crate) fn recent_projects() -> Result<Vec<Project>, RpcError> {
         .map(|row| row.id)
         .collect();
     there.sort();
-    if let Some((at, kept)) = PROJECTS.lock().ok().and_then(|held| held.clone()) {
-        if at.elapsed() < PROJECTS_FRESH && same_ids(kept.iter().map(|one| one.id.as_str()), &there)
-        {
-            return Ok(kept);
-        }
+    let kept = || {
+        PROJECTS
+            .lock()
+            .ok()
+            .and_then(|held| held.clone())
+            .filter(|(at, kept)| {
+                at.elapsed() < PROJECTS_FRESH
+                    && same_ids(kept.iter().map(|one| one.id.as_str()), &there)
+            })
+            .map(|(_, kept)| kept)
+    };
+    if let Some(kept) = kept() {
+        return Ok(kept);
     }
-    let fresh = crate::projects::project_list_now()?.projects;
+    // One listing at a time: callers that missed together wait for it and
+    // take what it read, instead of each asking every project's git.
+    let _listing = LISTING.lock();
+    if let Some(kept) = kept() {
+        return Ok(kept);
+    }
+    // Where the checkouts are, not their status: nobody here reads the dirt.
+    let fresh = crate::projects::project_list_unread_now()?.projects;
     if let Ok(mut held) = PROJECTS.lock() {
         *held = Some((std::time::Instant::now(), fresh.clone()));
     }
     Ok(fresh)
 }
+
+static LISTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Whether a kept list is of the projects `there` names, in any order.
 pub(crate) fn same_ids<'a>(kept: impl Iterator<Item = &'a str>, there: &[String]) -> bool {
