@@ -34,6 +34,22 @@ fn codex_is_given_the_server_as_overrides_on_its_own_line() {
         "{flags}"
     );
     assert!(flags.contains(r#"DEVPIT_AGENT_ID="codex""#), "{flags}");
+    assert!(
+        flags.contains("-c 'mcp_servers.devpit.tool_timeout_sec=1260'"),
+        "{flags}"
+    );
+}
+
+/// Codex's own sixty seconds cut off a card's checks and review while they
+/// ran on, and the agent ran them again.
+#[test]
+fn codex_waits_on_a_tool_longer_than_devpit_does() {
+    for method in crate::agent_api::METHODS {
+        assert!(
+            codex_tool_timeout() > devpit_agentapi::client::wait_for(method),
+            "{method}"
+        );
+    }
 }
 
 #[test]

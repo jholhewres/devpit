@@ -55,12 +55,27 @@ pub(crate) fn mcp_flags(agent: &str, exe: &Path, config: &Path) -> Option<String
             // it swallowed whatever came after it, a subcommand included.
             (!path.contains('\'')).then(|| format!("--mcp-config='{path}'"))
         }
+        // Codex gives up on a tool at sixty seconds; a card's checks and
+        // review run up to twenty minutes, and were run again on a retry.
         "codex" => Some(format!(
             "-c 'mcp_servers.devpit.command=\"{exe}\"' -c 'mcp_servers.devpit.args=[\"mcp\"]' \
-             -c 'mcp_servers.devpit.env={{DEVPIT_AGENT_ID=\"codex\"}}'"
+             -c 'mcp_servers.devpit.env={{DEVPIT_AGENT_ID=\"codex\"}}' \
+             -c 'mcp_servers.devpit.tool_timeout_sec={}'",
+            codex_tool_timeout().as_secs()
         )),
         _ => None,
     }
+}
+
+/// How long Codex waits on a devpit tool: past the longest the server itself
+/// waits, so the answer, or devpit's own "still working", always arrives.
+pub(crate) fn codex_tool_timeout() -> std::time::Duration {
+    crate::agent_api::METHODS
+        .iter()
+        .map(|method| devpit_agentapi::client::wait_for(method))
+        .max()
+        .unwrap_or_default()
+        + std::time::Duration::from_secs(60)
 }
 
 /// Claude's `--mcp-config` file: devpit as a stdio server, told which agent
