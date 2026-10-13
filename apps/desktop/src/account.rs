@@ -303,9 +303,10 @@ mod browser {
             .stderr(std::process::Stdio::null())
             .spawn();
 
-        if let Err(err) = opened {
+        match opened {
+            Ok(child) => devpit_pty::host_env::let_go(child),
             // Not fatal: the screen shows the code and the address as well.
-            tracing_note(&format!("could not open a browser with {program}: {err}"));
+            Err(err) => tracing_note(&format!("could not open a browser with {program}: {err}")),
         }
     }
 

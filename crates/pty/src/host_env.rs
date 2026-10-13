@@ -114,6 +114,14 @@ fn executable(path: &Path) -> bool {
     path.is_file()
 }
 
+/// Waits for a child nobody else waits for, on a thread of its own: an opener
+/// left unwaited stays a zombie for as long as devpit runs.
+pub fn let_go(mut child: std::process::Child) {
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+}
+
 /// `CREATE_NO_WINDOW`, for a child that must not open a console window.
 #[cfg(windows)]
 pub const NO_WINDOW: u32 = 0x0800_0000;

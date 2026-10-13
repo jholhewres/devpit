@@ -90,9 +90,12 @@ fn hand_over(
         .arg(what)
         .spawn();
     match ran {
-        Ok(_) => Ok(Opened {
-            path: shown.to_owned(),
-        }),
+        Ok(child) => {
+            devpit_pty::host_env::let_go(child);
+            Ok(Opened {
+                path: shown.to_owned(),
+            })
+        }
         Err(err) => Err(RpcError::new(
             ErrorCode::Unsupported,
             format!("could not open {shown}: {err}"),

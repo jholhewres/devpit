@@ -311,6 +311,7 @@ pub(crate) fn apps_open_now(app_id: String, path: String) -> Result<(), RpcError
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
+        .map(devpit_pty::host_env::let_go)
         .map_err(|err| {
             RpcError::new(
                 ErrorCode::Unsupported,
