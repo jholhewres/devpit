@@ -52,7 +52,7 @@ export interface UseBoard {
   reload: () => void
 }
 
-export function useBoard(projectId: string | null): UseBoard {
+export function useBoard(projectId: string | null, inFront = true): UseBoard {
   const [board, setBoard] = useState<Board | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,14 +66,17 @@ export function useBoard(projectId: string | null): UseBoard {
   useLayoutEffect(() => {
     current.current = projectId
   }, [projectId])
+  /* A change heard while nobody could see the board, owed a read when it shows. */
+  const stale = useRef(false)
   const read = useCallback(
-    (saysError: boolean, orElse?: Board) => {
+    (saysError: boolean, orElse?: Board): Promise<void> => {
       const mine = ++asking.current
+      stale.current = false
       if (!projectId) {
         setBoard(null)
-        return
+        return Promise.resolve()
       }
-      void ask(() => commands.boardGet(projectId)).then((asked) => {
+      return ask(() => commands.boardGet(projectId)).then((asked) => {
         if (mine !== asking.current || projectId !== current.current) return
         if (saysError) setError(asked.error)
         if (asked.data) setBoard(asked.data)
@@ -83,9 +86,33 @@ export function useBoard(projectId: string | null): UseBoard {
     },
     [projectId],
   )
-  const reload = useCallback(() => read(true), [read])
+  const reload = useCallback(() => void read(true), [read])
 
   useEffect(reload, [reload])
+
+  /* An agent writes to the board many times a turn, and each write was a read
+     of every card. A burst is read once; behind another tab or a hidden
+     window it is read when the board shows again. */
+  const front = useRef(inFront)
+  const gather = useRef<() => void>(() => undefined)
+  useEffect(() => {
+    const gathered = coalesced(() => {
+      if (seen(front.current)) return read(true)
+      stale.current = true
+      return Promise.resolve()
+    })
+    gather.current = gathered.want
+    return gathered.stop
+  }, [read])
+  useEffect(() => {
+    front.current = inFront
+    const back = (): void => {
+      if (stale.current && seen(front.current)) reload()
+    }
+    back()
+    document.addEventListener('visibilitychange', back)
+    return () => document.removeEventListener('visibilitychange', back)
+  }, [inFront, reload])
 
   /* A run ends on a thread of its own and says so. Without this the board
      only ever caught up when somebody touched it — a step finishing in the
@@ -99,9 +126,9 @@ export function useBoard(projectId: string | null): UseBoard {
   useEffect(
     () =>
       onCarried<string>('run:changed', (cardId) => {
-        if (shown.current?.cards.some((card) => card.id === cardId)) reload()
+        if (shown.current?.cards.some((card) => card.id === cardId)) gather.current()
       }),
-    [reload],
+    [],
   )
 
   /* An agent wrote to the board — a comment, a card, a move — through
@@ -110,9 +137,9 @@ export function useBoard(projectId: string | null): UseBoard {
   useEffect(
     () =>
       onCarried<string>('board:changed', (changed) => {
-        if (changed === projectId) reload()
+        if (changed === projectId) gather.current()
       }),
-    [reload, projectId],
+    [projectId],
   )
 
   /* What a step is printing as it prints it, by card. Held apart from the
@@ -368,5 +395,48 @@ export function withActivity(board: Board | null, happening: CardHappening): Boa
   return {
     ...board,
     cards: board.cards.map((one) => (one.id === happening.cardId ? { ...one, activity: happening.activity } : one)),
+  }
+}
+
+/** How long the first "read again" of a burst waits for the rest of it. */
+export const GATHER_MS = 200
+
+const seen = (inFront: boolean): boolean => inFront && !(typeof document !== 'undefined' && document.hidden)
+
+/**
+ * Many asks to read again, as few reads: the first ask waits `wait` ms and the
+ * asks inside that wait ride along. Not restarted by each ask, so a steady
+ * stream still reads every `wait` ms. An ask while a read is out is one more
+ * read when it lands, never a second one alongside it.
+ */
+export function coalesced(pull: () => Promise<unknown>, wait = GATHER_MS): { want: () => void; stop: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let out = false
+  let again = false
+  let stopped = false
+  const go = (): void => {
+    timer = undefined
+    if (stopped) return
+    if (out) {
+      again = true
+      return
+    }
+    out = true
+    const landed = (): void => {
+      out = false
+      if (!again) return
+      again = false
+      go()
+    }
+    void pull().then(landed, landed)
+  }
+  return {
+    want: () => {
+      if (timer === undefined && !stopped) timer = setTimeout(go, wait)
+    },
+    stop: () => {
+      stopped = true
+      clearTimeout(timer)
+    },
   }
 }

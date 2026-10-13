@@ -30,7 +30,7 @@ import { useShellPick } from './shellStore'
 export function BoardPane(): React.JSX.Element {
   /* Mounted from the start: it renders when what it shows changes, not with everything else. */
   const { project, wantedCard, openCard, inFront } = useShellPick((s) => ({ project: s.project, wantedCard: s.wantedCard, openCard: s.openCard, inFront: s.active?.kind === 'board' }))
-  const live = useBoard(project?.id ?? null)
+  const live = useBoard(project?.id ?? null, inFront)
   const drag = useDrag()
   /* The card being read. Held here rather than on the tile, because a tile
      unmounts the moment a drag reorders the lane it is in. */
