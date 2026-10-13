@@ -42,7 +42,7 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
     Tool {
         name: "devpit_devflow_setup",
         method: "devflow_setup",
-        description: "Set Devflow up in this project. preset recommended: briefing and plan approved by the person, the detected checks each as a script under .devpit/devflow/scripts/, one reviewer with the devflow-security persona, the devflow-done gate, and Decisions in shadow when a key exists; custom: the defaults, with nothing chosen. `set` folds answers in as dotted paths. A preview unless apply is true: the commented YAML and each file it would write. apply: true, only after the person said yes to the preview, writes .devpit/devflow/ (devflow.yaml, the check scripts, a .gitignore for runs/, the reviewer personas and the findings schema). devpit never commits, and Devflow stays off: it switches on when the person clicks the confirmation devpit then shows in the app.",
+        description: "Set Devflow up here. preset recommended (the default): briefing and plan approved by the person, the detected checks as scripts, a devflow-security reviewer, the devflow-done gate, Decisions in shadow when a key exists; custom: the bare defaults. `set` folds answers in by dotted path. A preview of the YAML and its files unless apply: true, sent only after the person's yes. Never commits, and Devflow stays off until the person clicks devpit's confirmation.",
         input: || json!({ "type": "object", "properties": {
             "preset": { "type": "string", "enum": ["recommended", "custom"], "description": "Where the setup starts. Defaults to recommended." },
             "set": { "type": "object", "description": "Dotted path to value, over the preset, e.g. { \"stages.execution.checks\": [{ \"name\": \"unit\", \"run\": \"make test\", \"report\": \"junit\" }] }." },
@@ -191,7 +191,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         Tool {
             name: REVIEW_TOOL,
             method: "devflow_review",
-            description: "Devflow: review a card's change with the reviewers devflow.yaml lists under review.reviewers, each headless on the person's own agent CLI and subscription (claude -p, codex exec, cursor-agent -p, gemini), all at once, from one packet: the diff from BASE (the card's base, else where HEAD left the default branch) to HEAD, the card, its criteria and the reviewer's persona — never this session. Each answer is held to the findings schema and kept as findings-<agent>.json under .devpit/devflow/runs/<card>/<time>/; a CLI that is not installed or not signed in is skipped and said, and the review goes on. The findings are consolidated as review.consolidate says (jev, agent or none): the same problem found twice is kept once, saying 2 of 3. Then review.block_on gives the verdict, and findings.json — what devpit_devflow_gate reads — is written, attached to the card and commented '[devflow] review: n findings (x critical, y high)'. The answer gives each reviewer's time and cost, the verdict and `pending`: the axes' personas no reviewer answered for. Review those yourself from the same packet, then call again with `run` and `reports`. Takes as long as the reviewers do.",
+            description: "Devflow: review a card's change with devflow.yaml's review.reviewers, each headless on the person's own agent CLI (one missing or signed out is skipped), from one packet: the diff from the card's base to HEAD, the card, its criteria and the persona. Writes findings.json for the gate and comments the count on the card. Answers the verdict by review.block_on, each reviewer's time and cost, and `pending`: personas no reviewer covered — review those yourself, then call again with `run` and `reports`. Takes as long as the reviewers do.",
             input: || json!({ "type": "object", "properties": {
                 "card": { "type": "string", "description": "The card's id." },
                 "base": { "type": "string", "description": "The branch or commit the diff starts from, when it is not the card's own base. Usually left out." },
@@ -205,14 +205,9 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         Tool {
             name: GATE_TOOL,
             method: "devflow_gate",
-            description: "Devflow: whether a card may be called done. First what devpit can check itself: its checks ran after the last change to the code and passed (devpit_devflow_evidence's newest run), every acceptance criterion maps to tests that passed, the card's E2E spec kept a screenshot, and the review's findings.json has nothing in review.block_on. Then, where Decisions is set up, the devflow-done rubric: in shadow it only records, in enforce (the person's click) it can hold the card. Writes gate.json into the run, comments '[devflow] gate: n of m criteria with evidence' on the card, and answers result passed or failed with a short list of what is missing and the stage that fixes it. Call it before devpit_finish_card, which is refused until it passes; devpit's own stop hooks call it too.",
+            description: "Devflow: whether a card may be called done — its newest evidence passed after the last code change, each criterion maps to passing tests, its E2E spec kept a screenshot, findings.json has nothing in review.block_on, each gated stage passed; then, with Decisions, the devflow-done rubric, which holds the card only in enforce. Comments on the card; answers passed or failed with what is missing and the stage that fixes it. Call it with `card` before devpit_finish_card, which is refused until it passes.",
             input: || json!({ "type": "object", "properties": {
-                "card": { "type": "string", "description": "The card's id." },
-                "event": { "type": "string", "enum": ["Stop", "SubagentStop"], "description": "Set by devpit's own hooks; leave it out." },
-                "session": { "type": "string", "description": "Set by devpit's own hooks; leave it out." },
-                "stop_hook_active": { "description": "Set by devpit's own hooks; leave it out." },
-                "agent": { "type": "string", "description": "Set by devpit's own hooks; leave it out." },
-                "transcript": { "type": "string", "description": "Set by devpit's own hooks; leave it out." }
+                "card": { "type": "string", "description": "The card's id." }
             } }),
         },
     ),
@@ -221,7 +216,7 @@ pub(crate) static STAGED: [(Option<&str>, Tool); 8] = [
         Tool {
             name: "devpit_devflow_stage",
             method: "devflow_stage",
-            description: "Devflow: one of this project's own stages — a `uses:` in devflow.yaml beside the built-in ones, such as a team's acme/ticket or the project's project/pr. Without `card`: the stage's skill, read where it is (the project's .devpit/devflow/skills/, a team layer at its approved commit, the person's, or a skill already installed), with its gate; follow it. With `card`: runs the stage's gate for the card — a command through devpit's step runner in your checkout, the card only in its environment, or a rubric Decisions answers — keeps stage-<name>.json in a run of the card and comments on it. devpit_devflow_gate requires each gated stage to have passed since the last change. A command a team layer brought runs only after the person confirms it in the app.",
+            description: "Devflow: one of the project's own stages, a `uses:` in devflow.yaml beside the built-in ones (e.g. acme/ticket, project/pr). Without `card`: its skill and gate, to follow. With `card`: runs its gate for the card (a command through devpit's step runner in your checkout, or a Decisions rubric), keeps stage-<name>.json in the card's run and comments. devpit_devflow_gate requires each gated stage to pass after the last change. A team layer's command runs only after the person confirms it in the app.",
             input: || json!({ "type": "object", "properties": {
                 "stage": { "type": "string", "description": "The stage's name: what follows the last / of its uses." },
                 "card": { "type": "string", "description": "The card to pass the stage's gate for. Leave it out to read the stage's skill." }
