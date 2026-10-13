@@ -17,6 +17,9 @@ interface Watch {
   said: string
   heard: Set<(sessions: readonly LiveSession[]) => void>
   timer: number | null
+  /* Reads still out. A tick waits for them: tmux under load answers late, and
+     a read every tick regardless piles up one waiting thread each. */
+  out: number
 }
 
 const watches = new Map<string, Watch>()
@@ -24,7 +27,10 @@ const watches = new Map<string, Watch>()
 function read(profileId: string, watch: Watch, forced = false): void {
   /* Nobody is looking at a hidden window; it is read again on the next tick. */
   if (!forced && typeof document !== 'undefined' && document.hidden) return
+  if (!forced && watch.out > 0) return
+  watch.out += 1
   void ask(() => commands.orchestratorSessions(profileId)).then((answer) => {
+    watch.out -= 1
     const sessions = answer.data?.sessions ?? []
     const said = JSON.stringify(sessions)
     if (said === watch.said) return
@@ -51,7 +57,7 @@ export function useLiveSessions(profileId: string | null): readonly LiveSession[
     if (!profileId) return
     let watch = watches.get(profileId)
     if (!watch) {
-      watch = { sessions: [], said: '', heard: new Set(), timer: null }
+      watch = { sessions: [], said: '', heard: new Set(), timer: null, out: 0 }
       watches.set(profileId, watch)
     }
     const mine = watch
