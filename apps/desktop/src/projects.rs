@@ -121,6 +121,22 @@ pub(crate) fn project_list_unread_now() -> Result<ProjectList, RpcError> {
     listed(devpit_git::worktrees_unread)
 }
 
+/// Every project without its checkouts: no git at all, for finding which one
+/// an agent stands in (`whose_checkout`).
+pub(crate) fn project_list_plain_now() -> Result<ProjectList, RpcError> {
+    listed(|_, _| Ok(Vec::new()))
+}
+
+/// One project as [`project_list_unread_now`] draws it, for the one an agent's
+/// question is about.
+pub(crate) fn with_checkouts(project: &Project) -> Result<Project, RpcError> {
+    let store = store()?;
+    let row = store
+        .project(&project.id)?
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such project"))?;
+    Ok(drawn_with(&store, row, devpit_git::worktrees_unread))
+}
+
 fn listed(listing: Listing) -> Result<ProjectList, RpcError> {
     let store = store()?;
 

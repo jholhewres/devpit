@@ -245,6 +245,7 @@ mod update_deb;
 mod vault;
 mod vault_rotation;
 mod watching;
+mod whose_checkout;
 mod windows_bin;
 mod working;
 mod workspace;

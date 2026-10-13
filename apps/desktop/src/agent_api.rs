@@ -163,12 +163,23 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     if !METHODS.contains(&asked.method.as_str()) {
         return Err(format!("devpit does not answer `{}`", asked.method));
     }
-    let projects = crate::projects::project_list_unread_now()
+    // Found from the files git keeps; git is asked only when they do not say.
+    let cwd = Path::new(&asked.cwd);
+    let mut projects = crate::projects::project_list_plain_now()
         .map_err(said)?
         .projects;
-    let here = project_at(&projects, Path::new(&asked.cwd))
-        .ok_or_else(|| format!("no devpit project contains {}", asked.cwd))?;
-    respond_in(app, &projects, here, asked)
+    let here = match crate::whose_checkout::owner(&projects, cwd) {
+        Some(found) => crate::projects::with_checkouts(found).map_err(said)?,
+        None => {
+            projects = crate::projects::project_list_unread_now()
+                .map_err(said)?
+                .projects;
+            project_at(&projects, cwd)
+                .cloned()
+                .ok_or_else(|| format!("no devpit project contains {}", asked.cwd))?
+        }
+    };
+    respond_in(app, &projects, &here, asked)
 }
 
 /// A method asked by the agent standing in `here`, among `projects`.
@@ -337,6 +348,14 @@ fn respond_in(
         .or_else(|| crate::card_numbers::project_named(&asked.params, here).map(str::to_owned));
     let project = reached(projects, here, named.as_deref())?;
     crate::orchestrator_links::reaches(here, project)?;
+    // Another project, named by an orchestrator, read with its checkouts too.
+    let named_project;
+    let project = if project.id == here.id {
+        project
+    } else {
+        named_project = crate::projects::with_checkouts(project).map_err(said)?;
+        &named_project
+    };
     let asked = &Asked {
         params: crate::card_numbers::resolved(&asked.params, project, |number| {
             crate::projects::store()
