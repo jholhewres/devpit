@@ -224,6 +224,9 @@ no copy, only that the person clicked.
   tools, resources and prompts, and watches the project's devflow.yaml and
   the app's stamp file, so switching Devflow on or off reaches a session
   already running.
+- **The skills are devpit's own text.** `flow/skills/` and `flow/personas/`
+  ship inside the binary; the MIT skills their method draws on are credited
+  in [`flow/NOTICE.md`](../flow/NOTICE.md).
 - **The board is the plan.** `devpit_devflow_brief` writes the brief as an
   epic card, `[devflow] Brief: <title>`. `devpit_devflow_plan` previews the
   epic's cards and creates none: the preview waits on the epic, where the
