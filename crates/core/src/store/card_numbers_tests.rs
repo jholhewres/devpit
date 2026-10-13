@@ -26,9 +26,9 @@ fn cards_are_numbered_in_the_order_they_are_made_per_project() {
         .create_card(&other, &other_column, "c", "")
         .expect("c");
 
-    assert_eq!(store.card_number(&first).expect("read"), Some(1));
-    assert_eq!(store.card_number(&second).expect("read"), Some(2));
-    assert_eq!(store.card_number(&elsewhere).expect("read"), Some(1));
+    assert_eq!(store.card_tally(&first).expect("read").number, Some(1));
+    assert_eq!(store.card_tally(&second).expect("read").number, Some(2));
+    assert_eq!(store.card_tally(&elsewhere).expect("read").number, Some(1));
     assert_eq!(
         store.card_numbered(&project, 2).expect("read"),
         Some(second)
@@ -42,7 +42,7 @@ fn a_number_is_never_handed_out_again() {
     let first = store.create_card(&project, &column, "a", "").expect("a");
     store.archive_card(&first).expect("archive");
     let next = store.create_card(&project, &column, "b", "").expect("b");
-    assert_eq!(store.card_number(&next).expect("read"), Some(2));
+    assert_eq!(store.card_tally(&next).expect("read").number, Some(2));
     assert_eq!(store.card_numbered(&project, 1).expect("read"), Some(first));
 }
 
@@ -62,7 +62,7 @@ fn a_planned_card_takes_the_next_number_too() {
         .create_plan(&epic, &column, &one, |_| String::new())
         .expect("create")
         .expect("it was waiting");
-    assert_eq!(store.card_number(&planned[0]).expect("read"), Some(2));
+    assert_eq!(store.card_tally(&planned[0]).expect("read").number, Some(2));
 }
 
 #[test]
@@ -104,4 +104,27 @@ fn a_number_is_read_with_or_without_its_project() {
     assert_eq!(card_number_of("#0"), None);
     assert_eq!(card_number_of("#-3"), None);
     assert_eq!(card_number_of("42a"), None);
+}
+
+#[test]
+fn a_tally_counts_what_the_tile_shows_for_each_card_at_once() {
+    let (_dir, store, project, column) = seeded();
+    let talked = store.create_card(&project, &column, "a", "").expect("a");
+    let quiet = store.create_card(&project, &column, "b", "").expect("b");
+    store.add_comment(&talked, "you", "one").expect("one");
+    store.add_comment(&talked, "you", "two").expect("two");
+    let tallies = store.card_tallies(&project).expect("tallies");
+    let expected = CardTally {
+        comments: 2,
+        pinned: 0,
+        cost_usd: 0.0,
+        number: Some(1),
+    };
+    assert_eq!(tallies[&talked], expected);
+    assert_eq!(tallies[&quiet].comments, 0);
+    assert_eq!(store.card_tally(&talked).expect("one"), expected);
+    assert_eq!(
+        store.card_tally("card_gone").expect("none"),
+        CardTally::default()
+    );
 }

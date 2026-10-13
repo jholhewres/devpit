@@ -31,17 +31,60 @@ impl Store {
             )
             .optional()?)
     }
+}
 
-    /// A card's number; `None` for one an older devpit made.
-    pub fn card_number(&self, card_id: &str) -> Result<Option<i64>, StoreError> {
+/// What a card's tile counts, read for a whole board in one query rather than
+/// four per card.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct CardTally {
+    pub comments: u32,
+    pub pinned: u32,
+    pub cost_usd: f64,
+    pub number: Option<i64>,
+}
+
+const TALLY: &str = "SELECT c.id, \
+     (SELECT COUNT(*) FROM card_comment WHERE card_id = c.id), \
+     (SELECT COUNT(*) FROM card_attachment WHERE card_id = c.id), \
+     (SELECT COALESCE(SUM(cost_usd), 0.0) FROM run WHERE card_id = c.id), \
+     c.number FROM card c";
+
+impl Store {
+    /// Every card of the project, archived ones included, by id.
+    pub fn card_tallies(
+        &self,
+        project_id: &str,
+    ) -> Result<std::collections::HashMap<String, CardTally>, StoreError> {
+        let mut stmt = self
+            .conn
+            .prepare_cached(&format!("{TALLY} WHERE c.project_id = ?1"))?;
+        let rows = stmt
+            .query_map([project_id], tally_row)?
+            .collect::<Result<_, _>>()?;
+        Ok(rows)
+    }
+
+    /// One card's, or nothing for a card that is not there.
+    pub fn card_tally(&self, card_id: &str) -> Result<CardTally, StoreError> {
         Ok(self
             .conn
-            .query_row("SELECT number FROM card WHERE id = ?1", [card_id], |row| {
-                row.get(0)
-            })
+            .query_row(&format!("{TALLY} WHERE c.id = ?1"), [card_id], tally_row)
             .optional()?
-            .flatten())
+            .map(|(_, tally)| tally)
+            .unwrap_or_default())
     }
+}
+
+fn tally_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<(String, CardTally)> {
+    Ok((
+        row.get(0)?,
+        CardTally {
+            comments: row.get(1)?,
+            pinned: row.get(2)?,
+            cost_usd: row.get(3)?,
+            number: row.get(4)?,
+        },
+    ))
 }
 
 /// `#42`, `42` or `devpit#42`: the project named before the `#`, if any, and

@@ -5,6 +5,7 @@
 //! no other way to start a step: no schedule, no retry, no loop that keeps
 //! itself going.
 
+use devpit_core::store::card_numbers::CardTally;
 use devpit_core::Store;
 use devpit_rpc::{Board, Card, Column, ErrorCode, RpcError, Run, RunState, Step, StepKind};
 
@@ -51,6 +52,18 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
     let row = store
         .card(id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such card"))?;
+    let tally = store.card_tally(id)?;
+    card_from(store, row, tally, steps)
+}
+
+/// A card from its row and what its tile counts, which a board reads for every
+/// card at once.
+fn card_from(
+    store: &Store,
+    row: devpit_core::CardRow,
+    tally: CardTally,
+    steps: &[Step],
+) -> Result<Card, RpcError> {
     Ok(Card {
         // What was heard, without asking the CLI: a card answered alone does
         // not pay for a process. `board_get` and `card_detail` add the rest.
@@ -61,7 +74,8 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
         blocked_by: Vec::new(),
         progress: None,
         plan_waiting: 0,
-        id: row.id.clone(),
+        runs: runs_of(store, &row.id, steps)?,
+        id: row.id,
         column_id: row.column_id,
         title: row.title,
         body: row.body,
@@ -69,15 +83,12 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
         worktree_path: row.worktree_path,
         due_at: row.due_at.map(|at| at as f64),
         due_time: row.due_time,
-        cost_usd: store.card_cost(&row.id)?,
+        cost_usd: tally.cost_usd,
         // Counted rather than carried. A board of thirty cards would otherwise
         // read thirty conversations to draw thirty badges.
-        comments: store.comments(&row.id)?.len() as u32,
-        pinned: store.attachments(&row.id)?.len() as u32,
-        runs: runs_of(store, &row.id, steps)?,
-        number: store
-            .card_number(&row.id)?
-            .and_then(|number| u32::try_from(number).ok()),
+        comments: tally.comments,
+        pinned: tally.pinned,
+        number: tally.number.and_then(|number| u32::try_from(number).ok()),
     })
 }
 
@@ -162,11 +173,13 @@ pub(crate) fn board_get_now(project_id: String) -> Result<Board, RpcError> {
 
     // One listing for the whole board, not one per card.
     let live = live_sessions(&store, &project_id);
+    let tallies = store.card_tallies(&project_id)?;
     let mut cards = Vec::new();
     for row in store.cards(&project_id)? {
-        let mut card = card_of(&store, &row.id, &steps)?;
-        let sessions = card_sessions(&store, &project_id, &row.id, &live, &snapshot(&row.id));
-        background_read(&row.id, &sessions);
+        let tally = tallies.get(&row.id).copied().unwrap_or_default();
+        let mut card = card_from(&store, row, tally, &steps)?;
+        let sessions = card_sessions(&store, &project_id, &card.id, &live, &snapshot(&card.id));
+        background_read(&card.id, &sessions);
         card.activity = activity(&sessions);
         cards.push(card);
     }
