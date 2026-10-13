@@ -24,7 +24,7 @@ orchestrator/ — also has devpit_projects, devpit_sessions, \
 devpit_session_screen and devpit_start_session, and passes `project` to work \
 on another project's board. When the person has set up Decisions, \
 devpit_decide answers typed questions about evidence you pass, and \
-devpit_rubric_run judges it against a rubric; `devpit agent guide` says when \
+devpit_rubric_run judges it against a rubric; `devpit-agent guide` says when \
 they fit.";
 
 /// Put before [`INSTRUCTIONS`] for a project where the person switched

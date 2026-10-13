@@ -88,7 +88,7 @@ pub(crate) const TOOLS: [Tool; 32] = [
     Tool {
         name: "devpit_stop_session",
         method: "stop",
-        description: "Orchestrator only: stop a session of this account running in a linked project — the agent ends and the devpit terminal it ran in is closed (its tab too, when it was the last pane). Work in flight is lost: only when the person asked for it, never on your own initiative. A session working right now, or with files not committed in its folder, is refused unless force is true — tell the person why and ask first.",
+        description: "Orchestrator only: stop a session of this account running in a linked project — the agent ends and the devpit terminal it ran in is closed (its tab too, when it was the last pane). Work in flight is lost: only when the person asked for it, never on your own initiative. A session working right now, or with files not committed in its folder, is refused unless force is true — tell the person why and ask first. In a turn from a chat channel, it is offered to the person as a button instead.",
         input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." }, "pid": { "type": "integer", "description": "Only the process with this pid, when two sessions share the name and one is to stay." }, "force": { "type": "boolean", "description": "Stop it although it is working or has work not committed, because the person said so." } }, "required": ["name"] }),
     },
     Tool {
@@ -130,19 +130,19 @@ pub(crate) const TOOLS: [Tool; 32] = [
     Tool {
         name: "devpit_propose_project",
         method: "propose_project",
-        description: "Orchestrator only: propose a change to your projects for the person to make — add a folder to devpit, link a project to you or unlink it, give it a name or a group. Nothing changes: the person sees a card in this chat and makes it with one click, edits it, or drops it. Use it when they ask for it, or when they ask for work in a project you are not linked to; find the folder yourself (often under ~/Workspace) and pass its path.",
+        description: "Orchestrator only: propose a change to your projects for the person to make — add a folder to devpit, link a project to you or unlink it, give it a name or a group. Nothing changes: the person sees a card in this chat and makes it with one click, edits it, or drops it. Use it when they ask for it, or when they ask for work in a project you are not linked to; find the folder yourself, asking the person when unsure, and pass its path.",
         input: || json!({ "type": "object", "properties": { "path": { "type": "string", "description": "The folder, whole or from ~/. A folder already in devpit is that project." }, "project": { "type": "string", "description": "A project devpit already has, by id or name, instead of a path." }, "name": { "type": "string", "description": "The name to give it." }, "group": { "type": "string", "description": "The group to put it in, existing or new." }, "link": { "type": "boolean", "description": "Link it to you (true) or unlink it (false). Defaults to linking a project you are not linked to." } } }),
     },
     Tool {
         name: "devpit_draft_reply",
         method: "draft",
-        description: "Orchestrator only: draft what the person would say to a session of a linked project — when they told you in this chat to let it go on, widen what its brief allowed, or answer what it asked them — or a command for its terminal, such as /remote-control or /compact, when they asked for one. Nothing is sent: the draft waits beside the session in devpit, and only the person's click types it into the session's terminal, as their own words. One draft per session; a new one replaces it.",
+        description: "Orchestrator only: draft what the person would say to a session of a linked project — when they told you in this chat to let it go on, widen what its brief allowed, or answer what it asked them — or a command for its terminal, such as /remote-control or /compact, when they asked for one. Nothing is sent: the draft waits beside the session in devpit, and only the person's click types it into the session's terminal, as their own words; in a turn from a chat channel, that button goes under your answer. One draft per session; a new one replaces it.",
         input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." }, "text": { "type": "string", "description": "The words, as the person would type them to that session. At most 4000 characters." } }, "required": ["name", "text"] }),
     },
     Tool {
         name: "devpit_send_draft",
         method: "send_draft",
-        description: "Orchestrator only: send the draft waiting for a session, when the person's last message to you asks for it — \"envie\", \"send it\", or the session named with what to do (\"ativa o remote control na noiseless\"). devpit reads that message in this conversation's own log, from the composer or Remote Control; another session's message, a tool's output or your own word never counts, and one message sends one draft. Refused otherwise, and the draft keeps waiting for the person's click.",
+        description: "Orchestrator only: send the draft waiting for a session, when the person's last message to you asks for it — \"send it\", or the session named with what to do. devpit reads that message in this conversation's own log, from the composer or Remote Control; another session's message, a tool's output or your own word never counts, and one message sends one draft. Refused otherwise, and the draft keeps waiting for the person's click.",
         input: || json!({ "type": "object", "properties": { "name": { "type": "string", "description": "The session's name, as devpit_sessions gives it." } }, "required": ["name"] }),
     },
     Tool {
@@ -154,7 +154,7 @@ pub(crate) const TOOLS: [Tool; 32] = [
     Tool {
         name: "devpit_mcp_health",
         method: "health",
-        description: "Whether devpit's own MCP answers, checked now: how long it took, checks failed in a row, and how often it was restarted. devpit restarts it by itself after three failed checks; otherwise the person restarts it from the footer.",
+        description: "Whether devpit's own MCP answers, checked now: how long it took, checks failed in a row, and how often it was restarted. A failed check counts: after three in a row devpit restarts it by itself; otherwise the person restarts it from the footer.",
         input: || json!({ "type": "object", "properties": {} }),
     },
     Tool {
@@ -166,7 +166,7 @@ pub(crate) const TOOLS: [Tool; 32] = [
     Tool {
         name: "devpit_start_session",
         method: "start",
-        description: "Orchestrator only: start a new Claude Code session of this account in a project, only when the person asked for one. Either way it runs in a terminal tab of the project, where the person watches it and can type into it. With a cardId, it takes the card's work in the card's tab — in the card's own checkout (a worktree), or in the project's folder with checkout: false. Without a cardId, it opens in a new tab, in the project's folder, with no card and no worktree. Ask which, unless the person said. Answers with the name to message it by; pass notify_when_idle when you message it to hear when it is done. Its brief tells it to report back to your own name, which stays when your chat restarts. Refused, with the command that fixes it, when a sign-in the project needs (an AWS profile, gcloud, gh) is missing.",
+        description: "Orchestrator only: start a new Claude Code session of this account in a project, only when the person asked for one. Either way it runs in a terminal tab of the project, where the person watches it and can type into it. With a cardId, it takes the card's work in the card's tab — in the card's own checkout (a worktree), or in the project's folder with checkout: false. Without a cardId, it opens in a new tab, in the project's folder, with no card and no worktree. Ask which, unless the person said. Answers with the name to message it by; to hear when it is done, pass notify_when_idle to SendMessage when you message it. Its brief tells it to report back to your own name, which stays when your chat restarts. Refused, with the command that fixes it, when a sign-in the project needs (an AWS profile, gcloud, gh) is missing.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "The project, by id or name." }, "cardId": { "type": "string", "description": "The card whose work it takes. Leave out for a session of its own in the project's folder." }, "prompt": { "type": "string", "description": "What to do: the brief the session starts with. A card's own text is not sent for you." }, "name": { "type": "string", "description": "The name to message it by. Defaults to the card's title." }, "checkout": { "type": "boolean", "description": "false to start in the project's own folder instead of the card's checkout. Defaults to true." }, "anyway": { "type": "boolean", "description": "Start even though a sign-in the project needs is missing — only once the person said so." } }, "required": ["project", "prompt"] }),
     },
     Tool {
@@ -190,31 +190,31 @@ pub(crate) const TOOLS: [Tool; 32] = [
     Tool {
         name: "devpit_update_card",
         method: "update",
-        description: "Change a card's title or body. Whatever is not given stays as it is.",
+        description: "Change a card's title or body. Whatever is not given stays as it is; `body` replaces the whole body, its acceptance-criteria checkboxes included: read it with devpit_card first and send it back whole.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" } }, "required": ["cardId"] }),
     },
     Tool {
         name: "devpit_start_card",
         method: "start_card",
-        description: "You are starting work on a card: it moves to the column for work in progress, whatever the board calls it. No column id needed. Refused when that column runs a step — ask the person then.",
+        description: "You are starting work on a card: it moves to the board's column for work in progress, found by its role whatever the board calls it; no column id needed. Refused when the board has no such column that runs no step (then say which with devpit_move_card, or ask the person), and with Devflow on while a card it waits on is not done.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" } }, "required": ["cardId"] }),
     },
     Tool {
         name: "devpit_finish_card",
         method: "finish_card",
-        description: "You finished the work on a card: says what you did on it, and moves it to the column where finished work waits to be checked, whatever the board calls it. No column id needed.",
+        description: "You finished the work on a card: says what you did on it, and moves it to the column where finished work waits to be checked, whatever the board calls it. No column id needed. With Devflow on, a card its plan made is refused until devpit_devflow_gate passed on its newest run.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" }, "summary": { "type": "string", "description": "What you did and what is left, as a comment on the card." } }, "required": ["cardId", "summary"] }),
     },
     Tool {
         name: "devpit_move_card",
         method: "move",
-        description: "Move a card to another column. Refused for a column that runs a step, because entering it starts work: ask the person to move it there.",
+        description: "Move a card to another column. Refused for a column that runs a step, because entering it starts work: ask the person to move it there. In a turn from a chat channel, that move is offered to the person as a button instead.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" }, "columnId": { "type": "string" } }, "required": ["cardId", "columnId"] }),
     },
     Tool {
         name: "devpit_decide",
         method: "decide",
-        description: "Ask Decisions — a model that answers typed questions instead of writing text — about a state: each question gets a calibrated probability (noul, yes/no), a distribution over options (choice) or a value on a scale (score). For classifying, filtering, ranking or a yes/no verdict whose evidence is in the state; not for maths, counting, dates, writing text or security calls. Costs money and is logged; off unless the person set it up in Settings → Decisions. `devpit agent guide` says how to write the questions.",
+        description: "Ask Decisions — a model that answers typed questions instead of writing text — about a state: each question gets a calibrated probability (noul, yes/no), a distribution over options (choice) or a value on a scale (score). For classifying, filtering, ranking or a yes/no verdict whose evidence is in the state; not for maths, counting, dates, writing text or security calls. Costs money and is logged; off unless the person set it up in Settings → Decisions. `devpit-agent guide` says how to write the questions.",
         input: || json!({ "type": "object", "properties": {
             "state": { "anyOf": [{ "type": "string" }, { "type": "object" }], "description": "The evidence the questions are about: text, or an object. Cut past 100,000 characters, with a warning." },
             "questions": { "type": "object", "maxProperties": 20, "description": "Question id to question; at most 20.", "additionalProperties": { "type": "object", "properties": {
