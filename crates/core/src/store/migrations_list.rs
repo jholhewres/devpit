@@ -768,4 +768,20 @@ CREATE TABLE devflow_plan (
 );
 "#,
     },
+    // Migration 029 — a card's number in its project.
+    Migration {
+        version: 29,
+        sql: r#"
+-- `#42`: what a person says and types, where `card_<ULID>` is what nothing
+-- else can collide with. Numbered in the order the cards were made, archived
+-- ones too, so a number is never handed out twice. NULL only for a card an
+-- older devpit made on this file.
+ALTER TABLE card ADD COLUMN number INTEGER;
+UPDATE card SET number = numbered.n
+  FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at, id) AS n
+          FROM card) AS numbered
+ WHERE card.id = numbered.id;
+CREATE UNIQUE INDEX card_number ON card(project_id, number);
+"#,
+    },
 ];

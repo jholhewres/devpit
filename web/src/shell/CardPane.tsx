@@ -172,6 +172,7 @@ export function CardPane({
         {detail && (
           <div className="cardp__in cardp__grid">
             <div className="cardp__main">
+              {detail.card.number != null && <span className="cardp__no">#{detail.card.number}</span>}
               <input
                 className="cardp__title"
                 value={title}

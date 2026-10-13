@@ -2170,6 +2170,11 @@ export type Card = {
 	criteria?: Criterion[],
 	/**  How many cards a Devflow plan waiting on this epic would make; 0 for none. */
 	planWaiting?: number,
+	/**
+	 *  Its number in the project, shown and typed as `#42`. `None` for a card
+	 *  an older devpit made.
+	 */
+	number?: number | null,
 };
 
 /**  Response of `card.create` and `card.move`. */

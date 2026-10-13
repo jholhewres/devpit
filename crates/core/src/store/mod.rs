@@ -4,6 +4,7 @@
 mod board;
 mod card_edges;
 mod card_links;
+pub mod card_numbers;
 mod cards;
 pub mod column_roles;
 pub mod decisions;

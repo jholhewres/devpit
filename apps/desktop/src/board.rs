@@ -75,6 +75,9 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
         comments: store.comments(&row.id)?.len() as u32,
         pinned: store.attachments(&row.id)?.len() as u32,
         runs: runs_of(store, &row.id, steps)?,
+        number: store
+            .card_number(&row.id)?
+            .and_then(|number| u32::try_from(number).ok()),
     })
 }
 

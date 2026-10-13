@@ -128,8 +128,7 @@ impl Store {
         for card in cards {
             let id = format!("card_{}", ulid::Ulid::generate());
             tx.execute(
-                "INSERT INTO card (id, project_id, column_id, title, body, position, \
-                 created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+                super::card_numbers::INSERT,
                 rusqlite::params![id, project_id, column_id, card.title, card.body, position, at],
             )?;
             tx.execute(

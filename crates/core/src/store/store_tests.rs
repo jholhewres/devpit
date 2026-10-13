@@ -240,6 +240,10 @@ fn a_row_written_before_a_migration_survives_it() {
         .expect("undo 025");
     store
         .conn()
+        .execute_batch("DROP INDEX card_number; ALTER TABLE card DROP COLUMN number;")
+        .expect("undo 029");
+    store
+        .conn()
         .execute_batch("PRAGMA user_version = 16;")
         .expect("back to 16");
     drop(store);

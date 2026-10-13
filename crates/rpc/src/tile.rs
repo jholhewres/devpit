@@ -48,6 +48,10 @@ pub struct Card {
     /// How many cards a Devflow plan waiting on this epic would make; 0 for none.
     #[serde(default)]
     pub plan_waiting: u32,
+    /// Its number in the project, shown and typed as `#42`. `None` for a card
+    /// an older devpit made.
+    #[serde(default)]
+    pub number: Option<u32>,
 }
 
 /// Another card, as one card names it.

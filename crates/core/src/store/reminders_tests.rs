@@ -100,6 +100,7 @@ fn dates_past_before_the_upgrade_do_not_remind() {
              ALTER TABLE card DROP COLUMN reminded_at; ALTER TABLE card DROP COLUMN handled_at; \
              ALTER TABLE board_column DROP COLUMN role; DROP TABLE finding_dismissal; DROP TABLE seen_session; DROP TABLE decision; \
              DROP TABLE card_parent; DROP TABLE card_blocker; DROP TABLE devflow_plan; \
+             DROP INDEX card_number; ALTER TABLE card DROP COLUMN number; \
              PRAGMA user_version = 22;",
         )
         .expect("back to 22");

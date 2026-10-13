@@ -333,8 +333,28 @@ fn respond_in(
         }
         _ => {}
     }
-    let project = reached(projects, here, text("project").as_deref())?;
+    let named = text("project")
+        .or_else(|| crate::card_numbers::project_named(&asked.params, here).map(str::to_owned));
+    let project = reached(projects, here, named.as_deref())?;
     crate::orchestrator_links::reaches(here, project)?;
+    let asked = &Asked {
+        params: crate::card_numbers::resolved(&asked.params, project, |number| {
+            crate::projects::store()
+                .map_err(said)?
+                .card_numbered(&project.id, number)
+                .map_err(|err| err.to_string())
+        })?,
+        method: asked.method.clone(),
+        cwd: asked.cwd.clone(),
+        author: asked.author.clone(),
+    };
+    let text = |name: &str| {
+        asked
+            .params
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
     if crate::devflow::METHODS.contains(&asked.method.as_str()) {
         return crate::devflow::respond(
             app,
@@ -792,6 +812,7 @@ pub(crate) fn board_view(board: &Board) -> Value {
             "runsAStep": column.step.is_some(),
             "cards": board.cards.iter().filter(|card| card.column_id == column.id).map(|card| json!({
                 "id": card.id,
+                "number": card.number,
                 "title": card.title,
                 "comments": card.comments,
                 "lastRun": card.runs.first().map(|run| &run.state),

@@ -128,6 +128,8 @@
 .lstep__pop--wide .src__o { flex: 1; padding: 0 6px; }
 
 /* What the tile says besides its title. */
+/* What a person types to name the card: #42. */
+.tile__no { font-variant-numeric: tabular-nums; color: var(--text-3); }
 .tile__due, .tile__n { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); }
 .tile__due[data-near='past'] { color: var(--danger); }
 .tile__due[data-near='today'] { color: var(--warning); }

@@ -74,6 +74,14 @@ describe('what a tile says', () => {
     expect(screen.queryByTitle(/files/)).toBeNull()
   })
 
+  it('shows the number a person types to name the card, and none when it has none', () => {
+    render(<Tile card={card({ number: 42 })} />)
+    expect(screen.getByText('#42')).toBeTruthy()
+    cleanup()
+    render(<Tile card={card()} />)
+    expect(screen.queryByText(/^#\d+$/)).toBeNull()
+  })
+
   /* Counted on the card rather than carried: a board of thirty cards would
      otherwise read thirty conversations to draw thirty badges. */
   it('counts the conversation and the files', () => {

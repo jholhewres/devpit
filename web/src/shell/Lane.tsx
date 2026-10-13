@@ -120,6 +120,7 @@ export function Tile({
         </div>
       )}
       <div className="tile__m">
+        {card.number != null && <span className="tile__no">#{card.number}</span>}
         {card.activity && (
           <button
             className="tile__doing"

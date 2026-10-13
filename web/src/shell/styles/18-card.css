@@ -8,6 +8,7 @@
 .cardp__acts { margin-left: auto; display: flex; align-items: center; gap: 2px; }
 .cardp__col { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
 .cardp__in { padding: 20px 24px 28px; }
+.cardp__no { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .cardp__title { width: 100%; background: none; border: 0; font: inherit; font-size: 18px; font-weight: 550; color: var(--text); padding: 4px 0; }
 .cardp__title:focus { outline: none; border-bottom: 1px solid var(--accent); }
 .cardp__row { display: flex; align-items: center; gap: 14px; margin: 14px 0 4px; }
