@@ -45,6 +45,23 @@ fn the_answer_and_its_cost_are_read_from_each_clis_shape() {
     assert!(signed_out(&why), "{why}");
 }
 
+/// `"verbose": true` in the person's settings: every event of the run, the
+/// result last. Read as one result, it was "invalid JSON" on every review.
+#[test]
+fn a_verbose_run_is_read_from_its_last_result() {
+    let verbose = r#"[
+        {"type":"system","subtype":"init","tools":["Read"]},
+        {"type":"assistant","message":{"content":[{"type":"text","text":"looking"}]}},
+        {"type":"result","is_error":false,"result":"{\"version\":1}","total_cost_usd":0.5}
+    ]"#;
+    assert_eq!(
+        answer_of(Cli::Claude, verbose),
+        Ok(("{\"version\":1}".to_owned(), Some(0.5)))
+    );
+    let unfinished = r#"[{"type":"system","subtype":"init"}]"#;
+    assert!(answer_of(Cli::Claude, unfinished).is_err());
+}
+
 #[test]
 fn a_cli_that_is_not_signed_in_is_told_from_one_that_failed() {
     assert!(signed_out("Error: Not logged in. Run `codex login`."));

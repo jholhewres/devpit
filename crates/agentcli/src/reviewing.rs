@@ -152,10 +152,13 @@ pub fn on_stdin(cli: Cli) -> bool {
 /// Cursor print a result object, Gemini a response object, Codex its last
 /// message as it is. Output in none of these shapes is taken as the text.
 pub fn answer_of(cli: Cli, stdout: &str) -> Result<(String, Option<f64>), String> {
-    let printed: Option<Value> = serde_json::from_str(stdout.trim()).ok();
+    let printed: Option<Value> = serde_json::from_str(stdout.trim()).ok().map(last_result);
     let Some(printed) = printed.filter(|_| cli != Cli::Codex) else {
         return Ok((stdout.to_owned(), None));
     };
+    if printed.is_null() {
+        return Err("its CLI printed no result".to_owned());
+    }
     let field = if cli == Cli::Gemini {
         "response"
     } else {
@@ -181,6 +184,20 @@ pub fn answer_of(cli: Cli, stdout: &str) -> Result<(String, Option<f64>), String
         .or_else(|| printed.get("cost_usd"))
         .and_then(Value::as_f64);
     Ok((text, cost))
+}
+
+/// The result object of what a CLI printed. With `"verbose": true` in the
+/// person's settings, Claude Code prints every event of the run as an array
+/// instead of the result alone: the result is its last `type: result`.
+fn last_result(printed: Value) -> Value {
+    match printed {
+        Value::Array(events) => events
+            .into_iter()
+            .rev()
+            .find(|event| event.get("type").and_then(Value::as_str) == Some("result"))
+            .unwrap_or(Value::Null),
+        printed => printed,
+    }
 }
 
 /// What the CLIs say when nobody is signed in to them.
