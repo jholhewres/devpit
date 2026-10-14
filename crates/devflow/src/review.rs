@@ -800,16 +800,19 @@ fn reviewed_again(given: &Given, run: &str) -> Result<(String, PathBuf, Record),
 }
 
 /// Jev asked about each finding, at most [`jev::MOST_FINDINGS`] and each
-/// once a review; its word kept on the finding. Acting, it sets aside what
-/// it called not real and joins what it called the same; in shadow the
-/// findings are merged as `none` merges them.
+/// answer kept for the review; its word kept on the finding. Acting, it sets
+/// aside what it called not real and joins what it called the same; in
+/// shadow the findings are merged as `none` merges them.
+///
+/// `Err` with Decisions' reason when it answered none: the first failure
+/// stops the asking, and the findings are left untouched for the fallback.
 fn judged_by_jev(
     given: &Given,
     judge: Judge,
     record: &mut Record,
     all: &mut [Value],
-    mut consolidated: Consolidated,
-) -> (Vec<Vec<usize>>, Consolidated) {
+    consolidated: &mut Consolidated,
+) -> Result<Vec<Vec<usize>>, String> {
     let rubric = jev::rubric_for(given.config, "review").unwrap_or_else(|| jev::FINDING.into());
     let criteria = criteria_of(given.card.body);
     let mut saids: Vec<Option<Said>> = Vec::with_capacity(all.len());
@@ -819,10 +822,12 @@ fn judged_by_jev(
             continue;
         }
         let key = jev::finding_key(&all[at]);
+        // A failed call cost nothing, so it is asked again rather than kept.
         let said = record
             .judged
             .get(&key)
             .and_then(Said::of)
+            .filter(|said| said.skipped.is_none())
             .unwrap_or_else(|| {
                 let others: Vec<&Value> = (0..all.len())
                     .filter(|other| *other != at && findings::candidates(&all[at], &all[*other]))
@@ -835,7 +840,13 @@ fn judged_by_jev(
                     &jev::finding_state(&all[at], &others, changed, &criteria),
                 )
             });
-        record.judged.insert(key, said.to_json());
+        if let Some(why) = &said.skipped {
+            if !saids.iter().flatten().any(|said| said.skipped.is_none()) {
+                return Err(why.clone());
+            }
+        } else {
+            record.judged.insert(key, said.to_json());
+        }
         saids.push(Some(said));
     }
     for (finding, said) in all.iter_mut().zip(&saids) {
@@ -851,16 +862,11 @@ fn judged_by_jev(
         .iter()
         .filter(|finding| !findings::standing(finding))
         .count();
+    let answered = asked.len() - unanswered;
     let mut note = if acting {
-        format!(
-            "Jev, acting: {} findings judged, {aside} set aside",
-            asked.len()
-        )
+        format!("Jev, acting: {answered} findings judged, {aside} set aside")
     } else {
-        format!(
-            "Jev, in shadow: {} findings judged and recorded, merged as they are",
-            asked.len()
-        )
+        format!("Jev, in shadow: {answered} findings judged and recorded, merged as they are")
     };
     if unanswered > 0 {
         note.push_str(&format!(", {unanswered} not answered"));
@@ -885,10 +891,11 @@ fn judged_by_jev(
             findings::alike(&all[one], &all[other])
         }
     };
-    (findings::grouped(all, &same), consolidated)
+    Ok(findings::grouped(all, &same))
 }
 
 /// The groups of one problem, as the consolidation asked for decides them.
+/// Jev failing falls back to what runs without it, and the note says why.
 fn grouped(
     given: &Given,
     record: &mut Record,
@@ -907,10 +914,35 @@ fn grouped(
         from: all.len(),
         into: all.len(),
     };
-    if let (Consolidate::Jev, Some(judge)) = (used, given.jev) {
-        return judged_by_jev(given, judge, record, all, consolidated);
-    }
-    let all: &[Value] = all;
+    let Some(judge) = given.jev.filter(|_| used == Consolidate::Jev) else {
+        return without_jev(given, record, all, deadline, consolidated);
+    };
+    let why = match judged_by_jev(given, judge, record, all, &mut consolidated) {
+        Ok(groups) => return (groups, consolidated),
+        Err(why) => why,
+    };
+    consolidated.used = findings::consolidation(asked, false, record.answers.len());
+    let (groups, mut consolidated) = without_jev(given, record, all, deadline, consolidated);
+    consolidated.note = Some(jev_failed_note(&why, consolidated.note.as_deref()));
+    (groups, consolidated)
+}
+
+/// What a consolidation Jev could not answer says: Decisions' reason first,
+/// then what was done instead.
+fn jev_failed_note(why: &str, instead: Option<&str>) -> String {
+    let instead = instead.unwrap_or("the findings were merged as they are");
+    format!("Decisions failed: {why} — {instead}")
+}
+
+/// The groups by a model pass, or as they are: every consolidation but Jev's.
+fn without_jev(
+    given: &Given,
+    record: &Record,
+    all: &[Value],
+    deadline: Duration,
+    mut consolidated: Consolidated,
+) -> (Vec<Vec<usize>>, Consolidated) {
+    let used = consolidated.used;
     let alike = |one: usize, other: usize| findings::alike(&all[one], &all[other]);
     if used != Consolidate::Agent || !findings::any_candidates(all) {
         if used == Consolidate::Agent {

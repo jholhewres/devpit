@@ -653,3 +653,155 @@ fn jev_in_shadow_records_each_finding_and_acting_sets_aside_and_joins() {
         assert_eq!(kept["changed"]["src/app.rs"], json!([[1, 1]]));
     }
 }
+
+/// What a review hears from Jev when Decisions refuses every call.
+const REFUSED: &str = "Decisions refused it (400 Bad Request): questions.severity.criteria: expected record, received undefined";
+
+fn refused(mode: crate::config::Mode) -> Said {
+    Said {
+        rubric: crate::jev::FINDING.into(),
+        decision: Some("dcn_refused".into()),
+        mode,
+        outcome: "skipped".into(),
+        verdicts: Value::Null,
+        answers: Value::Null,
+        skipped: Some(REFUSED.into()),
+    }
+}
+
+/// Jev failing is Jev off: with two reviewers, one model pass joins what
+/// they both found, the note says Decisions failed and why, and no finding
+/// claims a word Jev never said. The first failure stops the asking.
+#[cfg(unix)]
+#[test]
+fn jev_failing_with_two_reviewers_falls_back_to_one_model_pass() {
+    use crate::config::Mode;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for mode in [Mode::Shadow, Mode::Enforce] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        let persona = "devflow-security";
+        let worded = |agent: &str, title: &str| {
+            answer(
+                agent,
+                persona,
+                vec![finding("src/app.rs", 1, "high", title)],
+            )
+        };
+        let claude = fake_cli(
+            root,
+            "claude-fake",
+            &worded("claude", "Shell injection in open"),
+            "{\"same\": [[0, 1]]}",
+            "0",
+        );
+        let codex = fake_cli(
+            root,
+            "codex-fake",
+            &worded("codex", "Link passed to a shell"),
+            "{}",
+            "0",
+        );
+        let reach = move |agent: Agent| match agent {
+            Agent::Claude => Ok(claude.clone()),
+            _ => Ok(codex.clone()),
+        };
+        let asked = AtomicUsize::new(0);
+        let judge = |_: &str, _: &Value| {
+            asked.fetch_add(1, Ordering::SeqCst);
+            refused(mode)
+        };
+        let config = config_with(
+            vec![
+                reviewer(Agent::Claude, persona),
+                reviewer(Agent::Codex, persona),
+            ],
+            Consolidate::Jev,
+        );
+        let done = Ran {
+            root,
+            config: &config,
+            asked: fresh(),
+            reach: &reach,
+            jev: Some(&judge),
+        }
+        .review()
+        .expect("reviewed");
+        assert_eq!(
+            asked.load(Ordering::SeqCst),
+            1,
+            "stopped at the first failure"
+        );
+        assert_eq!(done.consolidated.used, Consolidate::Agent);
+        let note = done.consolidated.note.as_deref().unwrap_or_default();
+        assert!(
+            note.starts_with(&format!("Decisions failed: {REFUSED}")),
+            "{note}"
+        );
+        assert!(note.contains("one pass by claude"), "{note}");
+        let findings = done.findings.expect("findings.json");
+        let list = findings["findings"].as_array().expect("findings");
+        assert_eq!(list.len(), 1, "{list:#?}");
+        assert_eq!(list[0]["agreement"], "2 of 2");
+        assert!(list[0].get("jev").is_none(), "{list:#?}");
+        let kept: Value = serde_json::from_str(
+            &std::fs::read_to_string(root.join(&done.folder).join(RECORD)).expect("review.json"),
+        )
+        .expect("json");
+        assert_eq!(
+            kept["jev"].as_object().map_or(0, |all| all.len()),
+            0,
+            "a failure is asked again, not kept"
+        );
+    }
+}
+
+/// With one reviewer there is nothing for a model to reconcile: Jev failing
+/// merges the findings as they are, and the note still says why.
+#[cfg(unix)]
+#[test]
+fn jev_failing_with_one_reviewer_merges_the_findings_as_they_are() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let persona = "devflow-security";
+    let claude = fake_cli(
+        root,
+        "claude-fake",
+        &answer(
+            "claude",
+            persona,
+            vec![
+                finding("src/app.rs", 1, "high", "Shell injection in open"),
+                finding("src/app.rs", 1, "high", "Link passed to a shell"),
+            ],
+        ),
+        "{\"same\": [[0, 1]]}",
+        "0",
+    );
+    let reach = move |agent: Agent| match agent {
+        Agent::Claude => Ok(claude.clone()),
+        _ => Err("not installed".to_owned()),
+    };
+    let judge = |_: &str, _: &Value| refused(crate::config::Mode::Enforce);
+    let config = config_with(vec![reviewer(Agent::Claude, persona)], Consolidate::Jev);
+    let done = Ran {
+        root,
+        config: &config,
+        asked: fresh(),
+        reach: &reach,
+        jev: Some(&judge),
+    }
+    .review()
+    .expect("reviewed");
+    assert_eq!(done.consolidated.used, Consolidate::Nothing);
+    assert_eq!(
+        done.consolidated.note.as_deref(),
+        Some(
+            format!("Decisions failed: {REFUSED} — the findings were merged as they are").as_str()
+        )
+    );
+    let findings = done.findings.expect("findings.json");
+    let list = findings["findings"].as_array().expect("findings");
+    assert_eq!(list.len(), 2, "merged as they are, not by the model");
+    assert!(list.iter().all(|one| one.get("jev").is_none()), "{list:#?}");
+}
