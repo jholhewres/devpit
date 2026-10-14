@@ -316,10 +316,40 @@ pub(crate) fn wire_questions(questions: &Value) -> Result<Value, String> {
             "choice" | "score" => kind,
             _ => return Err(format!("question `{id}` is noul, choice or score")),
         };
+        if kind == "choice" {
+            if let Some(gap) = unexplained_choice(&question) {
+                return Err(format!(
+                    "choice question `{id}` needs criteria saying what each option means: {gap}"
+                ));
+            }
+        }
         question["type"] = json!(kind);
         wire.insert(id.clone(), question);
     }
     Ok(Value::Object(wire))
+}
+
+/// What a choice question leaves unsaid: no criteria, or an option they do
+/// not explain. Decisions refuses such a question with a 400, on every call.
+fn unexplained_choice(question: &Value) -> Option<String> {
+    let Some(criteria) = question.get("criteria").and_then(Value::as_object) else {
+        return Some("it has no criteria".to_owned());
+    };
+    let options = question.get("options").and_then(Value::as_array)?;
+    options
+        .iter()
+        .map(|option| {
+            option
+                .as_str()
+                .map_or_else(|| option.to_string(), str::to_owned)
+        })
+        .find(|option| {
+            criteria
+                .get(option)
+                .and_then(Value::as_str)
+                .is_none_or(|meaning| meaning.trim().is_empty())
+        })
+        .map(|option| format!("`{option}` has none"))
 }
 
 /// The answers with a noul's probability under a name an agent reads.

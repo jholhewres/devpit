@@ -1,6 +1,6 @@
 {
   "name": "devflow-finding",
-  "version": "1",
+  "version": "2",
   "description": "Whether one code-review finding holds up: a real problem, at the severity it deserves, said once, about the change under review. Asked of each finding a Devflow review consolidates; the state is the finding, the others at its place, the lines its file changed and the card's criteria, never the diff.",
   "questions": {
     "real": {
@@ -13,8 +13,15 @@
     },
     "severity": {
       "type": "choice",
-      "instructions": "Which severity does the finding deserve? critical: an exploitable hole, data loss or a criterion broken. high: a criterion partly met or untested, or a written rule broken. medium: an edge case, a weak test or a design problem. low: a simpler shape, a name or a smell. info: context, no action.",
-      "options": ["critical", "high", "medium", "low", "info"]
+      "instructions": "Which severity does the finding deserve?",
+      "options": ["critical", "high", "medium", "low", "info"],
+      "criteria": {
+        "critical": "an exploitable hole, data loss or a criterion broken",
+        "high": "a criterion partly met or untested, or a written rule broken",
+        "medium": "an edge case, a weak test or a design problem",
+        "low": "a simpler shape, a name or a smell",
+        "info": "context, no action"
+      }
     },
     "duplicate": {
       "type": "noul",

@@ -27,7 +27,7 @@ const MOST_RUBRIC_BYTES: u64 = 64 * 1024;
 pub(crate) const DONE: &str = include_str!("rubrics/done.json");
 
 /// The rubrics devpit ships, by name.
-const BUILT_IN: [(&str, &str); 1] = [("done", DONE)];
+pub(crate) const BUILT_IN: [(&str, &str); 1] = [("done", DONE)];
 
 pub(crate) fn respond(
     method: &str,

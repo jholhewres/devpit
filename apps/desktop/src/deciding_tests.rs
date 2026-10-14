@@ -230,14 +230,45 @@ fn a_long_state_is_cut_after_its_secrets_are_taken_out() {
 
 #[test]
 fn the_questions_go_out_as_the_wire_names_them() {
-    let wire = wire_questions(
-        &json!({ "a": { "type": "boolean" }, "b": { "type": "choice", "options": ["x", "y"] } }),
-    )
+    let wire = wire_questions(&json!({ "a": { "type": "boolean" }, "b": {
+        "type": "choice", "options": ["x", "y"], "criteria": { "x": "an x", "y": "a y" } } }))
     .expect("wire");
     assert_eq!(wire["a"]["type"], "noul");
     assert_eq!(wire["b"]["options"], json!(["x", "y"]));
     assert!(wire_questions(&json!({})).is_err());
     assert!(wire_questions(&json!({ "a": { "type": "essay" } })).is_err());
+}
+
+#[test]
+fn a_choice_that_does_not_say_what_its_options_mean_is_refused_before_it_is_sent() {
+    let unsaid =
+        wire_questions(&json!({ "severity": { "type": "choice", "options": ["high", "low"] } }))
+            .expect_err("no criteria");
+    assert!(
+        unsaid.contains("`severity`") && unsaid.contains("no criteria"),
+        "{unsaid}"
+    );
+    let half = wire_questions(&json!({ "severity": { "type": "choice",
+        "options": ["high", "low"], "criteria": { "high": "breaks a criterion", "low": " " } } }))
+    .expect_err("one option unexplained");
+    assert!(half.contains("`low` has none"), "{half}");
+}
+
+/// Every rubric devpit ships, as each is sent: one with a choice whose options
+/// mean nothing to Decisions is refused on every call (devflow-finding was).
+#[test]
+fn every_rubric_devpit_ships_says_what_each_option_of_a_choice_means() {
+    let shipped = devpit_devflow::jev::BUILT_IN
+        .iter()
+        .chain(crate::agent_decide::BUILT_IN.iter());
+    for (name, text) in shipped {
+        let rubric: Rubric = serde_json::from_str(text).expect(name);
+        if let Err(why) = wire_questions(&rubric.questions) {
+            panic!("the built-in rubric `{name}` would be refused: {why}");
+        }
+    }
+    let per_criterion = crate::devflow_gate::done_per_criterion(&["it works".to_owned()]);
+    wire_questions(&per_criterion.questions).expect("devflow-done");
 }
 
 #[test]
