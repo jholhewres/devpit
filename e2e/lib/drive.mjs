@@ -44,10 +44,11 @@ export async function openCardMenu(window, title) {
     // terminal was in front is a layer that is already on its way out.
     await window.executeScript(function (title) {
       const tiles = Array.prototype.slice.call(document.querySelectorAll('[data-card]'))
+      // By the tile's own title: a board behind another tab is not drawn, and
+      // then innerText runs the title into the card's number.
       const tile = tiles.find(function (one) {
-        return one.innerText.split('\n').some(function (line) {
-          return line.trim() === title
-        })
+        const named = one.querySelector('.tile__t')
+        return named !== null && named.textContent.trim() === title
       })
       if (!tile) return
       tile.scrollIntoView({ block: 'center' })
