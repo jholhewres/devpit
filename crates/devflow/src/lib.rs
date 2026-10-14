@@ -35,6 +35,7 @@ pub mod runs;
 pub mod setup;
 pub mod skills;
 pub mod stage;
+pub mod started;
 
 pub use config::{Config, Invalid};
 pub use folder::State;

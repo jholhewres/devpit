@@ -207,3 +207,33 @@ fn a_devflow_review_is_named_apart_from_a_runs() {
     assert_eq!(devflow_run("run_123"), None);
     assert_eq!(devflow_run("devflow:../x/y"), None);
 }
+
+#[test]
+fn a_card_started_in_a_devflow_checkout_keeps_where_it_began() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let (_store, project, card) = reviewed_project(root);
+    let head = devpit_git::head_of(root).expect("head");
+    began(&project, root, &card);
+    assert_eq!(
+        devpit_devflow::started::start_of(root, &card),
+        Some(head.clone())
+    );
+
+    // A second start, after more commits, does not move where it began.
+    git(root, &["commit", "-q", "-am", "more"]);
+    began(&project, root, &card);
+    assert_eq!(devpit_devflow::started::start_of(root, &card), Some(head));
+}
+
+#[test]
+fn a_checkout_without_devflow_keeps_no_start() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    git(root, &["init", "-q", "-b", "main"]);
+    git(root, &["config", "user.email", "t@example.com"]);
+    git(root, &["config", "user.name", "Test"]);
+    git(root, &["commit", "-q", "--allow-empty", "-m", "start"]);
+    began(&project_at("p", root), root, "card_01ABC");
+    assert!(!root.join(".devpit").exists());
+}

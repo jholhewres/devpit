@@ -70,9 +70,20 @@ fn pinned(
     let said = |err: devpit_git::GitError| err.to_string();
     let base = devpit_git::review_base(root, base).map_err(said)?;
     let head = devpit_git::head_of(root).map_err(said)?;
-    let files = devpit_git::changed_since(root, &base).map_err(said)?;
-    let diff = devpit_git::diff_since(root, &base).map_err(said)?;
-    Ok((base, head, files, diff))
+    let read = devpit_git::review_diff(root, &base, &head).map_err(said)?;
+    Ok((base, head, read.files, read.diff))
+}
+
+/// Keeps where `card` began in the checkout `cwd` is in, when Devflow is set up
+/// there: what a later review without a base diffs from.
+pub(crate) fn began(project: &Project, cwd: &Path, card: &str) {
+    let root = checkout(project, cwd);
+    if !root.join(devpit_devflow::folder::FILE).is_file() {
+        return;
+    }
+    if let Ok(head) = devpit_git::head_of(&root) {
+        let _ = devpit_devflow::started::keep_start(&root, card, &head);
+    }
 }
 
 /// The brief of the epic the card was planned under.
@@ -94,10 +105,17 @@ pub(crate) fn respond_with(
     let store = crate::projects::store().map_err(|err| err.message)?;
     let card = card_here(&store, project, &asked.card)?;
     let root = checkout(project, cwd);
+    // The card's own base, else where it was started here, else the default
+    // branch: a card worked in the project's folder has only the second.
+    let started = devpit_devflow::started::start_of(&root, &card.id);
     let pinned = match asked.run {
         None => Some(pinned(
             &root,
-            asked.base.as_deref().or(card.base_ref.as_deref()),
+            asked
+                .base
+                .as_deref()
+                .or(card.base_ref.as_deref())
+                .or(started.as_deref()),
         )?),
         Some(_) => None,
     };
