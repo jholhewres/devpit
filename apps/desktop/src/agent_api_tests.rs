@@ -258,3 +258,40 @@ fn a_cards_checkout_is_read_only_from_its_own_project() {
         Ok(None)
     );
 }
+
+#[test]
+fn a_comment_lands_on_its_own_projects_card_and_on_no_other() {
+    let store = crate::projects::store().expect("store");
+    let (mine, theirs) = (
+        tempfile::tempdir().expect("tempdir"),
+        tempfile::tempdir().expect("tempdir"),
+    );
+    let ids: Vec<String> = [&mine, &theirs]
+        .iter()
+        .map(|dir| {
+            let id = store.add_project(dir.path(), None).expect("project");
+            store.ensure_board(&id).expect("board");
+            id
+        })
+        .collect();
+    let card_in = |id: &str| {
+        let column = store.columns(id).expect("columns")[0].id.clone();
+        store.create_card(id, &column, "A card", "").expect("card")
+    };
+    let (ours, other) = (card_in(&ids[0]), card_in(&ids[1]));
+    let projects = vec![project(&ids[0], mine.path(), &[])];
+    let comment = |card: &str| -> Asked {
+        serde_json::from_value(json!({
+            "method": "comment", "params": { "cardId": card, "body": "seen" }, "cwd": "",
+        }))
+        .expect("asked")
+    };
+
+    let refused = respond_in(None, &projects, &projects[0], &comment(&other)).expect_err("theirs");
+    assert!(refused.contains("no card"), "{refused}");
+    assert!(store.comments(&other).expect("comments").is_empty());
+
+    let answered = respond_in(None, &projects, &projects[0], &comment(&ours)).expect("ours");
+    assert_eq!(answered["card"]["id"], ours.as_str());
+    assert_eq!(store.comments(&ours).expect("comments").len(), 1);
+}

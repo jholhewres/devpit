@@ -440,36 +440,45 @@ fn respond_in(
             return Err(crate::credentials::refused(&missing));
         }
     }
-    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
-    let answer = match asked.method.as_str() {
-        "context" => context(project, &board, Path::new(&asked.cwd)),
-        "board" => board_view(&board),
-        "card" => card_view(&board, &card_id)?,
-        "handoff" => {
-            on_board(&board, &card_id)?;
-            let said = crate::handoff::note(
+    // One card read or commented on: whether it is this project's is one
+    // query, not a read of every card on the board.
+    if matches!(asked.method.as_str(), "card" | "comment" | "handoff") {
+        let store = crate::projects::store().map_err(said)?;
+        if card_id.trim().is_empty() {
+            return Err("which card? pass `cardId` — devpit_board lists the cards".to_owned());
+        }
+        let owner = store
+            .live_card_project(&card_id)
+            .map_err(|err| err.to_string())?;
+        if owner.as_deref() != Some(project.id.as_str()) {
+            return Err(format!("no card `{card_id}` on this project's board"));
+        }
+        let words = match asked.method.as_str() {
+            "handoff" => Some(crate::handoff::note(
                 &text("done").unwrap_or_default(),
                 &text("left").unwrap_or_default(),
                 &text("test").unwrap_or_default(),
                 &text("risks").unwrap_or_default(),
-            )?;
-            let sayable = crate::cards::sayable(&said).map_err(said_of)?;
-            crate::projects::store()
-                .map_err(said_of)?
+            )?),
+            "comment" => Some(text("body").unwrap_or_default()),
+            _ => None,
+        };
+        if let Some(words) = words {
+            let sayable = crate::cards::sayable(&words).map_err(said_of)?;
+            store
                 .add_comment(&card_id, signed(&asked.author), sayable)
                 .map_err(|err| err.to_string())?;
-            card_view(&board, &card_id)?
+            if let Some(app) = app {
+                let _ = app.emit("board:changed", &project.id);
+            }
         }
-        "comment" => {
-            on_board(&board, &card_id)?;
-            let body = text("body").unwrap_or_default();
-            let sayable = crate::cards::sayable(&body).map_err(said)?;
-            crate::projects::store()
-                .map_err(said)?
-                .add_comment(&card_id, signed(&asked.author), sayable)
-                .map_err(|err| err.to_string())?;
-            card_view(&board, &card_id)?
-        }
+        let detail = crate::cards::detail_of(project.id.clone(), card_id).map_err(said)?;
+        return serde_json::to_value(detail).map_err(|err| err.to_string());
+    }
+    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
+    let answer = match asked.method.as_str() {
+        "context" => context(project, &board, Path::new(&asked.cwd)),
+        "board" => board_view(&board),
         "create" => {
             let title = text("title")
                 .filter(|title| !title.trim().is_empty())
