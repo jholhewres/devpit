@@ -30,7 +30,7 @@ pub fn asked() -> &'static Asked {
     ASKED.get_or_init(|| {
         let shell = std::env::var("SHELL").ok().filter(|one| !one.is_empty());
         let started = Instant::now();
-        let (outcome, path) = if std::env::var_os("SHLVL").is_some() {
+        let (outcome, path) = if from_a_shell(std::env::var_os("SHLVL").as_deref()) {
             ("started from a shell", None)
         } else if let Some(shell) = &shell {
             ask(shell)
@@ -44,6 +44,16 @@ pub fn asked() -> &'static Asked {
             path,
         }
     })
+}
+
+/// Whether this process was started from a shell, whose `PATH` it then has.
+/// A shell counts itself in `SHLVL` from 1; GNOME starts apps with `SHLVL=0`,
+/// and a value nobody can read is asked about too, which costs one slow start.
+pub(crate) fn from_a_shell(shlvl: Option<&OsStr>) -> bool {
+    shlvl
+        .and_then(OsStr::to_str)
+        .and_then(|level| level.trim().parse::<i64>().ok())
+        .is_some_and(|level| level > 0)
 }
 
 /// The shell's `PATH` joined with this process's. `None` when it was not read.
@@ -67,14 +77,27 @@ pub fn search_path() -> &'static OsString {
             .or_else(|| std::env::var_os("PATH"))
             .unwrap_or_default();
         let home = std::env::var_os("HOME").map(PathBuf::from);
-        let extra: Vec<PathBuf> = home
-            .map(|home| known_dirs(&home))
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|dir| dir.is_dir())
-            .collect();
-        with_dirs(&base, &extra)
+        searched(&base, home.as_deref(), &crate::host_env::mount_prefix())
     })
+}
+
+/// `base`, then the known folders under `home` that exist, without an AppImage
+/// mount's entries: the shell was asked from inside one, and a mount moves.
+pub(crate) fn searched(base: &OsStr, home: Option<&Path>, mounts: &str) -> OsString {
+    let extra: Vec<PathBuf> = home
+        .map(known_dirs)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|dir| dir.is_dir())
+        .collect();
+    let path = with_dirs(base, &extra);
+    let Some(text) = path.to_str() else {
+        return path;
+    };
+    match crate::host_env::cleaned([("PATH".to_owned(), text.to_owned())], mounts).pop() {
+        Some((_, kept)) => OsString::from(kept.unwrap_or_default()),
+        None => path,
+    }
 }
 
 /// Where agent CLIs and their runtimes are commonly installed, in the order
@@ -92,6 +115,9 @@ pub fn known_dirs(home: &Path) -> Vec<PathBuf> {
         ".asdf/shims",
         ".local/share/mise/shims",
         ".cargo/bin",
+        // Go's tarball unpacked at home, and what `go install` puts in GOPATH.
+        ".local/go/bin",
+        "go/bin",
     ]
     .iter()
     .map(|dir| home.join(dir))
@@ -101,6 +127,7 @@ pub fn known_dirs(home: &Path) -> Vec<PathBuf> {
         [
             "/opt/homebrew/bin",
             "/usr/local/bin",
+            "/usr/local/go/bin",
             "/home/linuxbrew/.linuxbrew/bin",
         ]
         .iter()
@@ -136,6 +163,8 @@ fn ask(shell: &str) -> (&'static str, Option<OsString>) {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
+    // Not with an AppImage's libraries, which would load into the shell too.
+    crate::host_env::scrub(&mut command);
     // A group of its own, so a timeout ends what the config started too.
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(&mut command, 0);
