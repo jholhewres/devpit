@@ -167,6 +167,9 @@ pub struct Looked<'a> {
     pub changed: Option<&'a str>,
     /// Each own stage's newest `stage-<name>.json`, by the run it is in.
     pub stages: &'a [(String, Option<(String, Value)>)],
+    /// The commit the review read, when code changed between it and `HEAD`:
+    /// what was approved is not what would be called done.
+    pub unreviewed: Option<&'a str>,
 }
 
 /// One criterion and the evidence it has.
@@ -419,6 +422,12 @@ fn reviewed(looked: &Looked, missing: &mut Vec<String>) -> Option<String> {
         missing.push(format!(
             "the review has not covered {} yet: review them from its packet and call devpit_devflow_review with its run and your reports (devflow-review)",
             pending.join(", ")
+        ));
+    }
+    if let Some(read) = looked.unreviewed {
+        missing.push(format!(
+            "the review read {}, and the code changed since: review again (devflow-review)",
+            read.get(..12).unwrap_or(read)
         ));
     }
     if let Some(changed) = looked.changed.filter(|changed| after(changed, review.at)) {

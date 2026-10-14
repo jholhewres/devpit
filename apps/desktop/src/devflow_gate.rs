@@ -87,6 +87,8 @@ struct Read {
     changed: Option<String>,
     /// Each own stage's newest gate record.
     stages: Vec<(String, Option<(String, Value)>)>,
+    /// The commit the review read, when the code changed after it.
+    unreviewed: Option<String>,
 }
 
 /// A JSON file of a run, never through a link out of the checkout.
@@ -132,12 +134,28 @@ fn read(root: &Path, card: &str, config: &Config) -> Read {
             (name, seen)
         })
         .collect();
+    let unreviewed = review
+        .as_ref()
+        .and_then(|(_, findings)| unreviewed_since(root, findings));
     Read {
         changed: changed_at(root, since),
         run,
         review,
         stages,
+        unreviewed,
     }
+}
+
+/// The commit a review read, when the code changed between it and `HEAD`.
+/// A review that names no commit, or a checkout git cannot answer for, is
+/// judged by when it was written, as before.
+fn unreviewed_since(root: &Path, findings: &Value) -> Option<String> {
+    let read = findings["head"]
+        .as_str()
+        .filter(|head| !head.is_empty() && head.bytes().all(|b| b.is_ascii_hexdigit()))?;
+    let head = devpit_git::head_of(root).ok()?;
+    (read != head && devpit_git::code_changed_between(root, read, &head).ok()?)
+        .then(|| read.to_owned())
 }
 
 /// When the checkout's code last changed: the newest of the files git says
@@ -184,6 +202,7 @@ fn looked<'a>(
             .map(|(at, findings)| Review { at, findings }),
         changed: read.changed.as_deref(),
         stages: &read.stages,
+        unreviewed: read.unreviewed.as_deref(),
     }
 }
 

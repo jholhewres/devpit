@@ -515,7 +515,9 @@ fn respond_in(
         }
         "start_card" => {
             on_board(&board, &card_id)?;
-            crate::card_follows::start(app, &board, &card_id)?
+            let started = crate::card_follows::start(app, &board, &card_id)?;
+            crate::devflow_review::began(project, Path::new(&asked.cwd), &card_id);
+            started
         }
         "finish_card" => {
             on_board(&board, &card_id)?;

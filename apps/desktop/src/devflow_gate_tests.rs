@@ -364,3 +364,54 @@ fn a_sessions_context_names_its_card_and_the_gate_it_ends_at() {
     assert!(!context(Some(&brief), &[], &stages, "claude").contains("devpit_devflow_gate"));
     assert!(context(None, &[], &stages, "claude").contains("on no card yet"));
 }
+
+/// The ascbot review approved one commit and the gate passed with a fix
+/// committed after it, which nobody reviewed.
+#[test]
+fn a_review_counts_for_the_commit_it_read_and_not_for_code_after_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let git = |args: &[&str]| -> String {
+        let done = std::process::Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "t")
+            .env("GIT_AUTHOR_EMAIL", "t@t")
+            .env("GIT_COMMITTER_NAME", "t")
+            .env("GIT_COMMITTER_EMAIL", "t@t")
+            .output()
+            .expect("git");
+        assert!(done.status.success(), "git {args:?}: {done:?}");
+        String::from_utf8_lossy(&done.stdout).trim().to_owned()
+    };
+    let commit = |file: &str, text: &str| -> String {
+        let path = root.join(file);
+        std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+        std::fs::write(path, text).expect("write");
+        git(&["add", "-A"]);
+        git(&["commit", "-q", "-m", file]);
+        git(&["rev-parse", "HEAD"])
+    };
+    git(&["init", "-q", "-b", "main"]);
+    let reviewed = commit("app.py", "print('hi')\n");
+    let findings = json!({ "verdict": "approve", "head": reviewed });
+
+    assert_eq!(
+        unreviewed_since(root, &findings),
+        None,
+        "HEAD is what it read"
+    );
+    commit(".devpit/devflow/notes.md", "a note\n");
+    assert_eq!(
+        unreviewed_since(root, &findings),
+        None,
+        "only Devflow's files"
+    );
+    commit("app.py", "print('fixed')\n");
+    assert_eq!(unreviewed_since(root, &findings), Some(reviewed));
+    assert_eq!(
+        unreviewed_since(root, &json!({ "verdict": "approve" })),
+        None
+    );
+}

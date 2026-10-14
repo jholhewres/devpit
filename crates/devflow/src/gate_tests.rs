@@ -56,6 +56,7 @@ fn look(config: &Config, run: Option<&Value>, changed: Option<&str>) -> Checked 
         review: None,
         changed,
         stages: &[],
+        unreviewed: None,
     })
 }
 
@@ -173,7 +174,41 @@ fn reviewed_with(config: &Config, findings: &Value, at: &str, changed: Option<&s
         review: Some(Review { at, findings }),
         changed,
         stages: &[],
+        unreviewed: None,
     })
+}
+
+#[test]
+fn a_review_of_a_commit_the_code_moved_on_from_holds_the_card() {
+    let config = config_with(true);
+    let run = green_run();
+    let criteria = criteria();
+    let findings = json!({ "verdict": "approve", "findings": [] });
+    let looked = |unreviewed| {
+        checked(&Looked {
+            config: &config,
+            card: "card_1",
+            criteria: &criteria,
+            run: Some(Run {
+                name: RUN,
+                evidence: &run,
+            }),
+            review: Some(Review {
+                at: "20261011T121000Z",
+                findings: &findings,
+            }),
+            changed: None,
+            stages: &[],
+            unreviewed,
+        })
+    };
+    assert!(looked(None).missing.is_empty());
+    let held = looked(Some("98097779aaaabbbbcccc"));
+    assert_eq!(held.missing.len(), 1, "{held:?}");
+    assert!(
+        held.missing[0].contains("98097779aaaa") && held.missing[0].contains("review again"),
+        "{held:?}"
+    );
 }
 
 #[test]
