@@ -518,6 +518,17 @@ fn an_answer_that_breaks_the_schema_is_not_kept_and_says_why() {
         .join(&done.folder)
         .join("findings-claude.json")
         .exists());
+    // What it said is kept beside the reason, to be read rather than guessed.
+    assert!(
+        reason.contains("raw-claude-devflow-security.txt"),
+        "{reason}"
+    );
+    let kept = std::fs::read_to_string(
+        root.join(&done.folder)
+            .join("raw-claude-devflow-security.txt"),
+    )
+    .expect("the raw answer");
+    assert!(kept.contains("devflow-security"), "{kept}");
 }
 
 fn said_of(mode: crate::config::Mode, real: f64, duplicate: f64) -> Said {

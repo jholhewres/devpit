@@ -406,17 +406,6 @@ pub fn env_of(
 /// The file a reviewer's answer is kept in: `findings-<agent>.json`, and
 /// the persona after it when that agent already has one.
 pub fn file_for(taken: &[String], agent: &str, persona: &str) -> String {
-    let plain = |name: &str| {
-        name.chars()
-            .map(|ch| {
-                if ch.is_ascii_alphanumeric() || ch == '-' {
-                    ch
-                } else {
-                    '-'
-                }
-            })
-            .collect::<String>()
-    };
     let (agent, persona) = (plain(agent), plain(persona));
     let mut name = format!("findings-{agent}.json");
     if taken.contains(&name) {
@@ -428,6 +417,23 @@ pub fn file_for(taken: &[String], agent: &str, persona: &str) -> String {
         again += 1;
     }
     name
+}
+
+/// The file a reviewer's answer is kept in when it was not findings.
+pub fn raw_file_for(agent: &str, persona: &str) -> String {
+    format!("raw-{}-{}.txt", plain(agent), plain(persona))
+}
+
+fn plain(name: &str) -> String {
+    name.chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect()
 }
 
 /// One reviewer's turn and what came of it.
@@ -651,8 +657,12 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
     write(&path, PACKET, &packet)?;
     let packet_at = format!("{folder}/{PACKET}");
     let deadline = given.budget.saturating_sub(PASS);
-    let one = |reviewer: &Reviewer| -> Result<(Value, reviewing::Reviewed), String> {
-        let persona = persona_text(given.root, given.personas, &reviewer.persona)?;
+    // An answer that is not findings keeps what was said: "invalid JSON" with
+    // nothing to read was every review of the first real project.
+    type Unread = (String, Option<reviewing::Reviewed>);
+    let one = |reviewer: &Reviewer| -> Result<(Value, reviewing::Reviewed), Unread> {
+        let persona = persona_text(given.root, given.personas, &reviewer.persona)
+            .map_err(|why| (why, None))?;
         let agent = reviewer.agent.word();
         let asked = prompt(&persona, &packet, agent, &reviewer.persona);
         let env = env_of(given.env, git, &packet_at, &reviewer.persona);
@@ -664,9 +674,12 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
             given.root,
             &env,
             deadline,
-        )?;
-        let answer = findings::read_answer(&said.text)?;
-        Ok((findings::signed(answer, agent, &reviewer.persona), said))
+        )
+        .map_err(|why| (why, None))?;
+        match findings::read_answer(&said.text) {
+            Ok(answer) => Ok((findings::signed(answer, agent, &reviewer.persona), said)),
+            Err(why) => Err((why, Some(said))),
+        }
     };
     let outcomes = in_parallel(&given.config.review.reviewers, &one);
     let mut record = Record {
@@ -692,7 +705,9 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
             findings: 0,
             reason: None,
         };
-        match outcome.unwrap_or_else(|| Err("its turn stopped before it answered".to_owned())) {
+        match outcome
+            .unwrap_or_else(|| Err(("its turn stopped before it answered".to_owned(), None)))
+        {
             Ok((answer, said)) => {
                 let taken: Vec<String> = record.ran.iter().filter_map(|r| r.file.clone()).collect();
                 let file = file_for(&taken, &ran.agent, &ran.persona);
@@ -703,7 +718,14 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
                 ran.file = Some(file);
                 record.answers.push(answer);
             }
-            Err(why) => ran.reason = Some(why),
+            Err((why, None)) => ran.reason = Some(why),
+            Err((why, Some(said))) => {
+                let file = raw_file_for(&ran.agent, &ran.persona);
+                write(&path, &file, &(given.redact)(&said.text))?;
+                ran.duration_ms = Some(said.duration_ms);
+                ran.cost_usd = said.cost_usd;
+                ran.reason = Some(format!("{why}; what it said is in {file}"));
+            }
         }
         record.ran.push(ran);
     }
