@@ -132,6 +132,11 @@ More reviewers are more items of `review.reviewers`, each
 own sign-in; `review.consolidate` says how their findings become one list:
 `jev` (Decisions, else a model pass), `agent` (one model pass) or `none`.
 
+A check's `report` is the file it writes into `$DEVPIT_REPORT_DIR` for devpit
+to read test by test (`junit`, `vitest`, `jest`, `cargo`); one that writes
+none, and leaves it out or says `none`, is judged by its exit code: 0 passed,
+127 not run (its command was not found), anything else failed.
+
 Show the before and after, ask for a yes (through the question tool when
 there is one), then call it again with `"apply": true`. `enabled` and `decisions.mode: enforce` go through the
 person's click, like activation: tell them where to click instead of setting

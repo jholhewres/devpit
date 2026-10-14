@@ -12,7 +12,7 @@ use devpit_steps::Context;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::config::{Check, Config};
+use crate::config::{Check, Config, Report as Format};
 use crate::plan::PREFIX;
 use crate::runs::{self, Attached, Media};
 
@@ -175,9 +175,32 @@ pub fn said(verdict: Verdict) -> &'static str {
     }
 }
 
+/// The shell's exit for a command it could not find.
+const NOT_FOUND: i32 = 127;
+
+/// A check's verdict. One that writes a report is held to a command step's
+/// rule, where exit zero with no report is not a pass; one set to `report:
+/// none` never writes one, so its exit code is all it says and it decides.
+pub fn checked(
+    format: Format,
+    state: RunState,
+    read: Option<Report>,
+    exit: Option<i32>,
+) -> Verdict {
+    if format != Format::Nothing {
+        return verdict(state, read);
+    }
+    match (state, read, exit) {
+        (_, Some(read), _) if read.failed > 0 => Verdict::Failed,
+        (_, _, Some(NOT_FOUND)) => Verdict::NotRun,
+        (RunState::Ok, ..) => Verdict::Passed,
+        _ => Verdict::Failed,
+    }
+}
+
 /// Runs one check through the steps runner from `cwd`: the card's context in
 /// its environment, `$DEVPIT_REPORT_DIR` its own folder of the run, and its
-/// verdict a command step's — exit zero with no report is not a pass.
+/// verdict [`checked`].
 pub fn run_check(
     check: &Check,
     cwd: &Path,
@@ -244,9 +267,10 @@ pub fn run_check(
         .lines()
         .filter(|line| !line.trim().is_empty())
         .collect();
+    let verdict = checked(check.report, state, read, ended.exit_code);
     Ran {
         name: check.name.clone(),
-        verdict: verdict(state, read),
+        verdict,
         exit_code: ended.exit_code,
         timed_out: ended.timed_out,
         seconds: ended.duration_ms as f64 / 1000.0,
@@ -260,7 +284,9 @@ pub fn run_check(
             .map(|line| line.chars().take(300).collect())
             .collect(),
         reported,
-        not_run: None,
+        not_run: (verdict == Verdict::NotRun).then(|| {
+            format!("exit {NOT_FOUND}, the shell found no such command: install it or fix `run` in devflow.yaml")
+        }),
     }
 }
 
@@ -642,7 +668,10 @@ fn tests_said(ran: &Ran) -> String {
         return format!("not run: {why}");
     }
     let Some(read) = &ran.reported else {
-        return "no report devpit reads".to_owned();
+        return match ran.exit_code {
+            Some(code) => format!("exit {code}, no report devpit reads"),
+            None => "no report devpit reads".to_owned(),
+        };
     };
     let tested = &read.tested;
     let mut said = vec![format!("{} passed", tested.passed)];

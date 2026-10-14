@@ -239,9 +239,12 @@ pub fn checked(looked: &Looked) -> Checked {
                         "check `{}` did not run in {}: leave `checks` out of devpit_devflow_evidence to run them all",
                         wanted.name, run.name
                     )),
+                    // Only a check set to write a report is ever inconclusive: one
+                    // set to `report: none` is judged by its exit code.
                     Some((_, result)) if result == "inconclusive" => missing.push(format!(
-                        "check `{}` exited 0 but left no report devpit reads: write it to $DEVPIT_REPORT_DIR (devflow-setup)",
-                        wanted.name
+                        "check `{}` left no {} report devpit reads: write it to $DEVPIT_REPORT_DIR, or set its report to none so its exit code decides (devflow-setup)",
+                        wanted.name,
+                        wanted.report.word()
                     )),
                     Some((_, result)) if result != "passed" => missing.push(format!(
                         "check `{}` {result} in {}: fix it (devflow-execution) and run the checks again",

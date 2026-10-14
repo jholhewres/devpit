@@ -154,7 +154,7 @@ fn a_green_run_with_a_report_is_green_and_one_without_a_report_is_not() {
     let config = config(vec![check("unit", PASSING), check("lint", "echo fine")]);
     let evidence = run_of(root.path(), &config, &nothing_asked(), "Rename", 0);
     let verdicts: Vec<Verdict> = evidence.checks.iter().map(|ran| ran.verdict).collect();
-    // Exit zero with nothing devpit reads proves nothing: a command step's rule.
+    // A check set to write a report that wrote none proves nothing: a command step's rule.
     assert_eq!(verdicts, [Verdict::Passed, Verdict::Inconclusive]);
     assert!(!evidence.green());
 
@@ -165,6 +165,72 @@ fn a_green_run_with_a_report_is_green_and_one_without_a_report_is_not() {
     assert_eq!(summary["green"], true);
     assert_eq!(summary["checks"][0]["result"], "passed");
     assert_eq!(summary["checks"][0]["tests"]["passed"], 2);
+}
+
+/// A check that writes no report: Makefile targets, `go test`, linters.
+fn bare(name: &str, run: &str) -> Check {
+    Check {
+        report: Format::Nothing,
+        ..check(name, run)
+    }
+}
+
+#[test]
+fn a_check_set_to_no_report_is_judged_by_its_exit_code() {
+    let root = tempfile::tempdir().expect("root");
+    let config = config(vec![
+        bare("lint", "echo fine"),
+        bare("vet", "echo broken; exit 1"),
+        bare("go", "devpit-no-such-command-anywhere ./..."),
+    ]);
+    let evidence = run_of(root.path(), &config, &nothing_asked(), "Rename", 0);
+    let verdicts: Vec<Verdict> = evidence.checks.iter().map(|ran| ran.verdict).collect();
+    assert_eq!(
+        verdicts,
+        [Verdict::Passed, Verdict::Failed, Verdict::NotRun]
+    );
+    let missing = evidence.checks[2].not_run.as_deref().unwrap_or_default();
+    assert!(missing.contains("no such command"), "{missing}");
+
+    let lint_only = asked(&json!({ "card": "card_1", "checks": ["lint"] })).expect("asked");
+    let evidence = run_of(root.path(), &config, &lint_only, "Rename", 1);
+    assert!(evidence.green());
+    let said = comment(&evidence, &[]);
+    assert!(
+        said.contains("- lint: passed, exit 0, no report devpit reads\n"),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_check_set_to_a_report_keeps_a_command_steps_rule() {
+    let ok = |format| checked(format, RunState::Ok, None, Some(0));
+    let missing = |format| checked(format, RunState::Failed, None, Some(127));
+    for format in [Format::Junit, Format::Cargo, Format::Vitest, Format::Jest] {
+        assert_eq!(ok(format), Verdict::Inconclusive, "{format:?}");
+        assert_eq!(missing(format), Verdict::Inconclusive, "{format:?}");
+        let none_ran = Some(Report {
+            passed: 0,
+            failed: 0,
+        });
+        assert_eq!(
+            checked(format, RunState::Ok, none_ran, Some(0)),
+            Verdict::Inconclusive
+        );
+    }
+    // A report that names a failure fails a check whatever it was set to write.
+    let red = Some(Report {
+        passed: 3,
+        failed: 1,
+    });
+    assert_eq!(
+        checked(Format::Nothing, RunState::Ok, red, Some(0)),
+        Verdict::Failed
+    );
+    assert_eq!(
+        checked(Format::Nothing, RunState::Failed, None, None),
+        Verdict::Failed
+    );
 }
 
 #[test]

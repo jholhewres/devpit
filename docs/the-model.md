@@ -97,6 +97,11 @@ Node's runner, go-junit-report, Maven or Gradle — and the `test result:` lines
 and empty when it starts, so a report left by an earlier run is never read as
 this one's. Zero tests passed is still no result.
 
+A Devflow check set to `report: none` is the one exception: it says up front
+that it writes nothing to read — a Makefile target, `go test`, a linter — so its
+exit code is its verdict: 0 passed, 127 not run (no such command), anything
+else failed. A board step and a check set to write a report keep the rule.
+
 **Secrets devpit handed out are taken out of a run's output before it is
 stored**: a profile's environment, the account token, the hook secret. This is
 not detection. A secret the command read from a file or fetched itself is one

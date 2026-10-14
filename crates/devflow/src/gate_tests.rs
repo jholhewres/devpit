@@ -117,7 +117,8 @@ fn a_failed_skipped_or_inconclusive_check_is_named_with_what_fixes_it() {
     assert!(found
         .missing
         .iter()
-        .any(|item| item.contains("`e2e` exited 0 but left no report")));
+        .any(|item| item.contains("`e2e` left no junit report")
+            && item.contains("set its report to none")));
 
     run["checks"] = json!([{ "name": "unit", "result": "passed" }]);
     let found = look(&config, Some(&run), None);
