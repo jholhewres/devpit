@@ -3,6 +3,47 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.43 — 2026-10-13
+
+### Fixed
+
+- **"devpit is still working on …" should be rare now.** Every question an
+  agent asked made devpit run git once for every project you have, and each
+  of those copied the whole app in memory to start. Under a build that
+  took longer than the agent waited, so a comment or a card move looked
+  lost and then landed. devpit now finds the project from the files git
+  keeps, starts programs without copying itself, and an agent waits 30 s
+  instead of 5 for an answer. Codex waits on devpit's long tools —
+  checks, reviews, a new session — instead of giving up after a minute.
+- **A card from another project stays out of reach.** Reading the state of
+  a card's checkout now checks that the card is on the asking project's
+  board.
+- **No more leftover processes** from opening a folder, a file or the
+  sign-in page.
+
+### Better at what it already did
+
+- **Cards have numbers.** Every card gets a number in its project, shown as
+  `#42` on the board and on the card. An agent can name a card by its number
+  wherever it took the id, and an orchestrator can write `project#42`.
+- **The board keeps up without working so hard.** A burst of changes from
+  an agent is one reload, not one per change. A board behind another tab or
+  a hidden window reloads when you come back to it. Only the tile whose card
+  changed is drawn again. Cost and session readers stop while the window is
+  hidden.
+- **Agents get a shorter, truer list of tools.** A project session no longer
+  sees the orchestrator's tools, and Decisions' tools appear once a key is
+  set. That is about half the tokens on every turn. Descriptions now say what
+  each tool really does and when it refuses. A card can be passed as
+  `cardId`, `card` or `epic`, and a session as `name` or `session`. An error
+  says what to do next.
+- **Devflow asks with buttons.** In Claude Code, the briefing's questions,
+  the setup's decisions and the yes to a plan come through its question
+  picker, with the recommended answer first. Other agents get the questions
+  as text, as before.
+- **Credits.** The Devflow skills now name the MIT skills their method draws
+  on, in `flow/NOTICE.md`.
+
 ## 0.1.42 — 2026-10-12
 
 ### Fixed
