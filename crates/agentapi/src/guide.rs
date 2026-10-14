@@ -97,12 +97,16 @@ up in Settings → Decisions; each call costs money and is logged.
   Not for maths, counting, dates, writing text, or anything about security —
   and not for facts the state does not hold.
   Write instructions as one precise question answerable from the state alone;
-  say in criteria what each answer means. Ask at most 20 at once.
+  say in criteria what each answer means — a choice needs one entry per
+  option, or Decisions refuses it. Ask at most 20 at once.
     noul   { \"type\": \"noul\", \"instructions\": \"Does the test output show
            every test passing?\", \"criteria\": { \"true\": \"a run with zero
            failures\", \"false\": \"failures, skips or no run\" } }
     choice { \"type\": \"choice\", \"instructions\": \"What kind of change is
-           this diff?\", \"options\": [\"bug fix\", \"feature\", \"refactor\"] }
+           this diff?\", \"options\": [\"bug fix\", \"feature\", \"refactor\"],
+           \"criteria\": { \"bug fix\": \"corrects behaviour that was wrong\",
+           \"feature\": \"adds behaviour\", \"refactor\": \"same behaviour,
+           new shape\" } }
     score  { \"type\": \"score\", \"instructions\": \"How risky is this change to
            ship?\", \"scale\": { \"min\": 1, \"max\": 5 } }
   devpit_rubric_run takes a rubric's name — .devpit/rubrics/<name>.json in the

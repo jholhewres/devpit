@@ -220,8 +220,8 @@ pub(crate) const TOOLS: [Tool; 32] = [
             "questions": { "type": "object", "maxProperties": 20, "description": "Question id to question; at most 20.", "additionalProperties": { "type": "object", "properties": {
                 "type": { "type": "string", "enum": ["noul", "choice", "score"] },
                 "instructions": { "type": "string", "description": "The question, precise and answerable from the state alone." },
-                "criteria": { "type": "object", "description": "What each answer means, e.g. { \"true\": \"…\", \"false\": \"…\" }." },
-                "options": { "type": "array", "items": { "type": "string" }, "description": "choice: the options, up to 255." },
+                "criteria": { "type": "object", "additionalProperties": { "type": "string" }, "description": "What each answer means, e.g. { \"true\": \"…\", \"false\": \"…\" } for noul. Required for choice: one entry per option, e.g. { \"bug fix\": \"…\", \"feature\": \"…\" }; without it Decisions refuses the question." },
+                "options": { "type": "array", "items": { "type": "string" }, "description": "choice: the options, up to 255, each one explained in criteria." },
                 "scale": { "type": "object", "description": "score: the ordered scale, e.g. { \"min\": 1, \"max\": 5 }." }
             }, "required": ["type", "instructions"] } },
             "cardId": { "type": "string", "description": "The card this is about, for the log." }
