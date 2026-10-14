@@ -95,12 +95,18 @@ pub fn suggested(samples: &[(f64, bool)]) -> Option<Suggested> {
     })
 }
 
+/// Whether a decision's outcome is one Jev reached. `skipped` is a call that
+/// never answered: not a decision, so never counted or labelled as one.
+pub fn decided(outcome: &str) -> bool {
+    matches!(outcome, "pass" | "grey" | "fail")
+}
+
 /// A rubric's agreement with the person at the thresholds it had, and the
 /// one it would have agreed best at.
 pub fn calibrated(labelled: &[Labelled]) -> Calibration {
     let judged: Vec<&Labelled> = labelled
         .iter()
-        .filter(|one| matches!(one.outcome.as_str(), "pass" | "grey" | "fail"))
+        .filter(|one| decided(&one.outcome))
         .collect();
     let grey = judged.iter().filter(|one| one.outcome == "grey").count();
     let decided = judged.len() - grey;

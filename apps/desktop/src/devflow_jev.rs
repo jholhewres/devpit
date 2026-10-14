@@ -234,6 +234,10 @@ pub(crate) fn moved(store: &Store, project_id: &str, card_id: &str, from: Option
 /// The person's word on one finding Jev judged: a false positive is a "no"
 /// to its being real; taking that back, or keeping one Jev set aside, a "yes".
 pub(crate) fn finding_marked(store: &Store, finding: &Value, false_positive: bool) {
+    let outcome = finding["jev"]["outcome"].as_str().unwrap_or_default();
+    if !calibrate::decided(outcome) {
+        return;
+    }
     if let Some(decision) = finding["jev"]["decision"].as_str() {
         let action = if false_positive {
             "false_positive"
@@ -291,7 +295,7 @@ fn parsed(text: Option<&str>) -> Value {
 /// first, in the flow's order.
 pub(crate) fn calibration(rows: &[DecisionRow]) -> Vec<RubricAccuracy> {
     let mut by_rubric: BTreeMap<&str, Vec<&DecisionRow>> = BTreeMap::new();
-    for row in rows {
+    for row in rows.iter().filter(|row| calibrate::decided(&row.outcome)) {
         if let Some(rubric) = row.rubric.as_deref() {
             by_rubric.entry(rubric).or_default().push(row);
         }

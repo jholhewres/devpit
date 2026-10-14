@@ -515,3 +515,30 @@ fn accuracy_and_a_suggested_threshold_come_from_the_labelled_decisions() {
         Some(0.6)
     );
 }
+
+/// A call Decisions never answered is not a decision: it is not counted
+/// under its rubric, a rubric with nothing else does not show, and marking
+/// its finding labels nothing.
+#[test]
+fn a_skipped_call_is_neither_counted_nor_labelled_as_a_decision() {
+    let mut rows = vec![row(jev::FINDING, 0.9, "pass", "pass")];
+    for at in 0..3 {
+        let mut skipped = row(jev::FINDING, f64::from(at) / 10.0, "skipped", "fail");
+        skipped.id = format!("dcn_skipped_{at}");
+        rows.push(skipped);
+    }
+    rows.push(row(jev::BRIEF, 0.5, "skipped", ""));
+    let all = calibration(&rows);
+    assert_eq!(all.len(), 1, "{all:?}");
+    assert_eq!((all[0].decisions, all[0].labelled), (1, 1));
+    assert_eq!(all[0].accuracy, Some(1.0));
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, project) = project(&dir.path().canonicalize().expect("root"));
+    let id = decision(&store, &project.id, "card", jev::FINDING, "skipped");
+    let finding = json!({ "jev": { "decision": id, "mode": "shadow", "outcome": "skipped" } });
+    finding_marked(&store, &finding, true);
+    let logged = store.decisions_latest(5).expect("log");
+    let row = logged.iter().find(|row| row.id == id).expect("logged");
+    assert_eq!(row.person_verdict, None);
+}
