@@ -20,6 +20,37 @@ release notes are taken from here when a version is tagged.
   board.
 - **No more leftover processes** from opening a folder, a file or the
   sign-in page.
+- **Devflow's headless reviewer works with `"verbose": true`.** With verbose
+  on in Claude Code's settings, every review came back as "invalid JSON".
+  When an answer is not findings, what the reviewer said is kept in the run
+  and named in the reason.
+- **A review reads the card's own work.** A card started in a Devflow
+  checkout keeps the commit it began at, and a review without a base diffs
+  from there instead of from where the branch left `main`. The diff is the
+  commits to `HEAD`, a submodule as its log, and work not yet committed in
+  a section of its own.
+- **The gate holds code nobody reviewed.** A review counts for the commit
+  it read. If the code changed after that commit, the gate asks for a new
+  review, so a card that used to pass with a fix committed after its
+  approval no longer does. Changes under `.devpit/` do not count.
+- **Devflow checks with no report can pass.** A check set to `report: none`
+  (a Makefile target, a linter) is judged by its exit code: 0 passes, 127
+  (command not found) is "not run", and anything else fails. Before, it was
+  always inconclusive, so a gate on it could never pass.
+- **`go: not found` is gone.** When GNOME starts devpit (it sets
+  `SHLVL=0`), devpit now asks your login shell for `PATH`. It also searches
+  Go's usual folders and never keeps an AppImage's temporary mount on it.
+- **Go and parameterized tests count.** A Go check reads `go test -json`
+  test by test, and setup recommends it for a Go module. A criterion's test
+  matches every run of a parameterized test: PHPUnit and Pest data sets,
+  pytest parameters and Go subtests.
+- **Devflow without Decisions, and Decisions that fails, both work.** The
+  `devflow-finding` rubric now says what each severity means, so Decisions
+  no longer refuses every call. devpit refuses a choice question without
+  per-option criteria before sending it. When Decisions fails during a
+  review, the findings are consolidated as if it were off, and the note
+  says why. Calls Decisions never answered no longer count toward a
+  rubric's accuracy.
 
 ### Better at what it already did
 
