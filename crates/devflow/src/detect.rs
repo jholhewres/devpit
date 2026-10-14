@@ -322,8 +322,12 @@ fn go(files: &Files, into: &mut Detected) {
     if files.read(FILE).is_none() {
         return;
     }
-    into.test
-        .push(found("go test ./...".to_owned(), FILE, 1, Report::Nothing));
+    into.test.push(found(
+        format!("go test -json ./... > \"{REPORT}/go-test.json\""),
+        FILE,
+        1,
+        Report::Go,
+    ));
     let lint = match files.any(&[".golangci.yml", ".golangci.yaml", ".golangci.toml"]) {
         Some(config) => found("golangci-lint run".to_owned(), &config, 1, Report::Nothing),
         None => found("go vet ./...".to_owned(), FILE, 1, Report::Nothing),

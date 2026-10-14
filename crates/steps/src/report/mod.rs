@@ -1,5 +1,6 @@
-//! Test reports: files in `$DEVPIT_REPORT_DIR` (vitest/jest JSON, JUnit XML)
-//! and `cargo test` output. Nothing recognised means no result, never a pass.
+//! Test reports: files in `$DEVPIT_REPORT_DIR` (vitest/jest JSON, JUnit XML,
+//! `go test -json`) and what `cargo test` or `go test -json` printed. Nothing
+//! recognised means no result, never a pass.
 
 use std::path::Path;
 
@@ -7,6 +8,7 @@ use devpit_rpc::Tested;
 
 mod cargo;
 mod cases;
+mod go;
 mod junit;
 mod vitest;
 
@@ -37,7 +39,9 @@ pub fn read_cases(dir: Option<&Path>, printed: Option<&str>, cwd: &Path) -> Opti
             take(reported);
         }
     }
-    if let Some(reported) = printed.and_then(cargo::from_output) {
+    if let Some(reported) =
+        printed.and_then(|printed| cargo::from_output(printed).or_else(|| go::from_lines(printed)))
+    {
         take(reported);
     }
     found
@@ -50,7 +54,7 @@ pub fn from_file(text: &str, cwd: &Path) -> Option<Tested> {
 
 fn file_cases(text: &str, cwd: &Path) -> Option<Reported> {
     match text.trim_start().as_bytes().first()? {
-        b'{' => vitest::from_json(text, cwd),
+        b'{' => vitest::from_json(text, cwd).or_else(|| go::from_lines(text)),
         b'<' => junit::from_xml(text, cwd),
         _ => None,
     }

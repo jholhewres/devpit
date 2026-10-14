@@ -167,7 +167,7 @@ fn a_green_run_with_a_report_is_green_and_one_without_a_report_is_not() {
     assert_eq!(summary["checks"][0]["tests"]["passed"], 2);
 }
 
-/// A check that writes no report: Makefile targets, `go test`, linters.
+/// A check that writes no report: a Makefile target, a linter.
 fn bare(name: &str, run: &str) -> Check {
     Check {
         report: Format::Nothing,

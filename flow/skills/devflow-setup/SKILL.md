@@ -133,7 +133,7 @@ own sign-in; `review.consolidate` says how their findings become one list:
 `jev` (Decisions, else a model pass), `agent` (one model pass) or `none`.
 
 A check's `report` is the file it writes into `$DEVPIT_REPORT_DIR` for devpit
-to read test by test (`junit`, `vitest`, `jest`, `cargo`); one that writes
+to read test by test (`junit`, `vitest`, `jest`, `cargo`, `go`); one that writes
 none, and leaves it out or says `none`, is judged by its exit code: 0 passed,
 127 not run (its command was not found), anything else failed.
 

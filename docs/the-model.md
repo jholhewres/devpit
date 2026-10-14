@@ -92,13 +92,14 @@ no result rather than a green tick.
 
 What devpit reads: every file a command step writes into `$DEVPIT_REPORT_DIR`
 — vitest or jest JSON (`--reporter=json --outputFile=…`), JUnit XML from pytest,
-Node's runner, go-junit-report, Maven or Gradle — and the `test result:` lines
-`cargo test` prints, or its JSON lines on nightly. The folder is the run's own
+Node's runner, go-junit-report, Maven or Gradle — the JSON lines of
+`go test -json`, and the `test result:` lines `cargo test` prints, or its JSON
+lines on nightly. The folder is the run's own
 and empty when it starts, so a report left by an earlier run is never read as
 this one's. Zero tests passed is still no result.
 
 A Devflow check set to `report: none` is the one exception: it says up front
-that it writes nothing to read — a Makefile target, `go test`, a linter — so its
+that it writes nothing to read — a Makefile target, a linter — so its
 exit code is its verdict: 0 passed, 127 not run (no such command), anything
 else failed. A board step and a check set to write a report keep the rule.
 

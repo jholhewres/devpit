@@ -35,6 +35,22 @@ fn a_makefile_target_is_found_with_its_line_and_settles_the_choice() {
     assert!(open(&found).is_empty(), "{:?}", open(&found));
 }
 
+/// `go test -json` is read test by test, so a Go check is more than its exit code.
+#[test]
+fn a_go_module_tests_with_go_test_json_into_the_report_folder() {
+    let dir = project(&[("go.mod", "module example.com/cards\n")]);
+    let found = detected(dir.path(), Machine::default());
+    assert_eq!(found.test[0].report, Report::Go);
+    assert!(
+        found.test[0]
+            .command
+            .starts_with("go test -json ./... > \"$DEVPIT_REPORT_DIR/"),
+        "{}",
+        found.test[0].command
+    );
+    assert_eq!(found.lint[0].command, "go vet ./...");
+}
+
 #[test]
 fn two_test_commands_without_a_makefile_are_left_to_the_person() {
     let dir = project(&[

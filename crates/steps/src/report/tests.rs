@@ -94,6 +94,48 @@ fn libtest_json_reads_like_its_text() {
     assert_eq!(tested.failures[0].file.as_deref(), Some("src/lib.rs"));
 }
 
+/// A subtest counts and its parent does not; a package that never built fails.
+#[test]
+fn go_test_json_counts_each_test_once_and_a_package_that_did_not_build() {
+    let text = fixture!("go-failed.jsonl");
+    for tested in [printed(text).expect("go events"), file(text)] {
+        assert_eq!((tested.passed, tested.failed, tested.skipped), (1, 2, 1));
+        assert_eq!(tested.read_from, ["go test"]);
+        let failure = &tested.failures[0];
+        assert_eq!(failure.name, "TestRename/empty_title");
+        assert_eq!(failure.file.as_deref(), Some("rename_test.go"));
+        assert_eq!(
+            failure.message.as_deref(),
+            Some("expected an error, got none")
+        );
+        assert_eq!(tested.failures[1].name, "example.com/broken");
+        assert_eq!(tested.failures[1].file.as_deref(), Some("broken.go"));
+    }
+    let cases = cases_printed(text);
+    assert_eq!(outcome_of("TestRename", &cases), Some(Outcome::Failed));
+    assert_eq!(outcome_of("TestAdds", &cases), Some(Outcome::Passed));
+    // Lines that are not go's events are not read as them.
+    assert!(printed(fixture!("libtest-failed.jsonl"))
+        .is_some_and(|tested| tested.read_from == ["cargo test"]));
+}
+
+/// A parent that fails on its own, its subtests green, is still a failure.
+#[test]
+fn a_go_test_that_failed_after_its_subtests_passed_failed() {
+    let event = |action: &str, test: &str| {
+        format!(r#"{{"Action":"{action}","Package":"example.com/cards","Test":"{test}"}}"#)
+    };
+    let text = [
+        event("pass", "TestRename/a"),
+        event("fail", "TestRename"),
+        r#"{"Action":"fail","Package":"example.com/cards"}"#.to_owned(),
+    ]
+    .join("\n");
+    let tested = printed(&text).expect("go events");
+    assert_eq!((tested.passed, tested.failed), (1, 1));
+    assert_eq!(tested.failures[0].name, "TestRename");
+}
+
 #[test]
 fn pytest_junit_counts_failures_errors_and_skips() {
     let tested = file(fixture!("pytest-failed.xml"));
