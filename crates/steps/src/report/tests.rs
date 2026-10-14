@@ -264,3 +264,50 @@ fn a_test_that_failed_anywhere_failed() {
     assert_eq!(outcome_of("renames", &cases[..1]), Some(Outcome::Passed));
     assert_eq!(outcome_of("renames", &cases[2..]), Some(Outcome::Skipped));
 }
+
+#[test]
+fn a_parameterized_test_is_named_by_the_test_every_run_belongs_to() {
+    // The first run passed and the second failed.
+    let runs = |[first, second]: [&str; 2]| {
+        [(first, Outcome::Passed), (second, Outcome::Failed)].map(|(name, outcome)| Case {
+            name: name.into(),
+            place: None,
+            outcome,
+        })
+    };
+    for (named, cases) in [
+        (
+            "testRename",
+            runs([
+                "testRename with data set #0",
+                "testRename with data set \"empty\"",
+            ]),
+        ),
+        (
+            "it renames",
+            runs(["it renames with ('a')", "it renames with ('')"]),
+        ),
+        (
+            "tests/test_cli.py::test_rename",
+            runs(["test_rename[a-b]", "test_rename[]"]),
+        ),
+        (
+            "TestRename",
+            runs(["TestRename/a", "TestRename/empty_title"]),
+        ),
+    ] {
+        assert_eq!(outcome_of(named, &cases), Some(Outcome::Failed), "{named}");
+        assert_eq!(
+            outcome_of(named, &cases[..1]),
+            Some(Outcome::Passed),
+            "{named}"
+        );
+        assert_eq!(outcome_of(&cases[0].name, &cases), Some(Outcome::Passed));
+    }
+    // A test whose name only starts the same is another test.
+    let other = runs(["test_rename_twice[a]", "TestRenameAll/a"]);
+    assert_eq!(outcome_of("test_rename", &other), None);
+    assert_eq!(outcome_of("TestRename", &other), None);
+    // A slash outside a Go test is part of its name.
+    assert_eq!(cases::base("renames a/b"), None);
+}

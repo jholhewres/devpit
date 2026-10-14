@@ -94,6 +94,22 @@ fn names(named: &str, case: &Case) -> bool {
                 .is_some_and(|before| before.ends_with(SEPARATORS))
     };
     !named.is_empty()
-        && !case.name.is_empty()
-        && (ends(named, &case.name) || ends(&case.name, named))
+        && std::iter::once(case.name.as_str())
+            .chain(base(&case.name))
+            .any(|name| !name.is_empty() && (ends(named, name) || ends(name, named)))
+}
+
+/// The test a parameterized case is one run of, so naming the test names every
+/// run: PHPUnit's `… with data set #0`, Pest's `… with ('a')`, pytest's
+/// `test_x[a-b]`, a Go subtest's `TestX/case`.
+pub(crate) fn base(name: &str) -> Option<&str> {
+    let go = ["Test", "Example", "Fuzz", "Benchmark"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix));
+    let cut = name
+        .find(" with data set ")
+        .or_else(|| name.find(" with ("))
+        .or_else(|| name.ends_with(']').then(|| name.find('[')).flatten())
+        .or_else(|| go.then(|| name.find('/')).flatten())?;
+    Some(name[..cut].trim_end()).filter(|base| !base.is_empty())
 }
