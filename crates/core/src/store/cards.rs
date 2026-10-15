@@ -147,6 +147,19 @@ impl Store {
         Ok(changed > 0)
     }
 
+    /// The card a comment is on and who wrote it, or nothing when it is gone.
+    pub fn comment_of(&self, comment_id: &str) -> Result<Option<(String, String)>, StoreError> {
+        use rusqlite::OptionalExtension;
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT card_id, author FROM card_comment WHERE id = ?1",
+                [comment_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?)
+    }
+
     pub fn delete_comment(&self, comment_id: &str) -> Result<bool, StoreError> {
         let changed = self
             .conn

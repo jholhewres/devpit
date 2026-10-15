@@ -32,6 +32,21 @@ fn a_comment_is_every_word_after_the_card() {
         ))
     );
     assert!(parsed(&words("comment crd_1")).is_err());
+    assert_eq!(
+        parsed(&words("comment-edit cmt_1 the right words")),
+        Ok(Parsed::Ask(
+            "comment_edit".into(),
+            json!({ "commentId": "cmt_1", "body": "the right words" })
+        ))
+    );
+    assert_eq!(
+        parsed(&words("comment-delete cmt_1")),
+        Ok(Parsed::Ask(
+            "comment_delete".into(),
+            json!({ "commentId": "cmt_1" })
+        ))
+    );
+    assert!(parsed(&words("comment-edit cmt_1")).is_err());
 }
 
 #[test]

@@ -30,7 +30,7 @@ pub(crate) struct Tool {
     pub(crate) input: fn() -> Value,
 }
 
-pub(crate) const TOOLS: [Tool; 32] = [
+pub(crate) const TOOLS: [Tool; 34] = [
     Tool {
         name: "devpit_context",
         method: "context",
@@ -180,6 +180,18 @@ pub(crate) const TOOLS: [Tool; 32] = [
         method: "comment",
         description: "Say something on a card: what you did, what you found, what is left. Signed as an agent.",
         input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "cardId": { "type": "string" }, "body": { "type": "string" } }, "required": ["cardId", "body"] }),
+    },
+    Tool {
+        name: "devpit_comment_edit",
+        method: "comment_edit",
+        description: "Rewrite a comment you wrote, by its id from devpit_card; it shows as edited. The person's comments and other agents' are refused.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "commentId": { "type": "string" }, "body": { "type": "string" } }, "required": ["commentId", "body"] }),
+    },
+    Tool {
+        name: "devpit_comment_delete",
+        method: "comment_delete",
+        description: "Delete a comment you wrote, by its id from devpit_card: one on the wrong card or said by mistake. The person's comments and other agents' are refused.",
+        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." }, "commentId": { "type": "string" } }, "required": ["commentId"] }),
     },
     Tool {
         name: "devpit_create_card",

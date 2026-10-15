@@ -42,11 +42,13 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 47] = [
+pub(crate) const METHODS: [&str; 49] = [
     "context",
     "board",
     "card",
     "comment",
+    "comment_edit",
+    "comment_delete",
     "create",
     "update",
     "move",
@@ -93,8 +95,10 @@ pub(crate) const METHODS: [&str; 47] = [
 ];
 
 /// The methods that change the board, and so tell the window.
-const WRITES: [&str; 8] = [
+const WRITES: [&str; 10] = [
     "comment",
+    "comment_edit",
+    "comment_delete",
     "create",
     "update",
     "move",
@@ -451,6 +455,37 @@ fn respond_in(
             return Err(crate::credentials::refused(&missing));
         }
     }
+    if matches!(asked.method.as_str(), "comment_edit" | "comment_delete") {
+        let store = crate::projects::store().map_err(said)?;
+        let comment_id = text("commentId").unwrap_or_default();
+        let (card, author) = store
+            .comment_of(&comment_id)
+            .map_err(|err| err.to_string())?
+            .ok_or_else(|| format!("no comment `{comment_id}`: devpit_card lists a card's"))?;
+        let owner = store
+            .live_card_project(&card)
+            .map_err(|err| err.to_string())?;
+        if owner.as_deref() != Some(project.id.as_str()) {
+            return Err(format!("no comment `{comment_id}` on this project's board"));
+        }
+        may_change_comment(&author, signed(&asked.author))?;
+        if asked.method == "comment_edit" {
+            let body = text("body").unwrap_or_default();
+            let sayable = crate::cards::sayable(&body).map_err(said_of)?;
+            store
+                .edit_comment(&comment_id, sayable)
+                .map_err(|err| err.to_string())?;
+        } else {
+            store
+                .delete_comment(&comment_id)
+                .map_err(|err| err.to_string())?;
+        }
+        if let Some(app) = app {
+            let _ = app.emit("board:changed", &project.id);
+        }
+        let detail = crate::cards::detail_of(project.id.clone(), card).map_err(said)?;
+        return serde_json::to_value(detail).map_err(|err| err.to_string());
+    }
     // One card read or commented on: whether it is this project's is one
     // query, not a read of every card on the board.
     if matches!(asked.method.as_str(), "card" | "comment" | "handoff") {
@@ -793,6 +828,20 @@ fn said_of(err: RpcError) -> String {
 
 fn said(err: RpcError) -> String {
     err.message
+}
+
+/// Whether an agent signed `by` may change a comment `author` wrote: only
+/// its own. What the person said is theirs, and another agent's is that one's.
+pub(crate) fn may_change_comment(author: &str, by: &str) -> Result<(), String> {
+    if author == crate::cards::YOU {
+        return Err("that comment is the person's: only they edit or delete it".to_owned());
+    }
+    if author != by {
+        return Err(format!(
+            "that comment is {author}'s: an agent edits or deletes only its own"
+        ));
+    }
+    Ok(())
 }
 
 /// The name a comment is signed with: the agent's id when it is one devpit

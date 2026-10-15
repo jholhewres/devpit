@@ -118,6 +118,18 @@ pub(crate) fn parsed(args: &[String]) -> Result<Parsed, String> {
             }
             ask("comment", json!({ "cardId": id, "body": text }))
         }
+        Some("comment-edit") => {
+            let id = one(&plain, "a comment id")?;
+            let text = plain[1..].join(" ");
+            if text.trim().is_empty() {
+                return Err("comment-edit needs the new text".to_owned());
+            }
+            ask("comment_edit", json!({ "commentId": id, "body": text }))
+        }
+        Some("comment-delete") => ask(
+            "comment_delete",
+            json!({ "commentId": one(&plain, "a comment id")? }),
+        ),
         Some("create") => {
             let title = plain.join(" ");
             if title.trim().is_empty() {

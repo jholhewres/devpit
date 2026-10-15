@@ -52,7 +52,7 @@ pub fn unanswered(method: &str) -> String {
         "create" | "remind" | "devflow_brief" | "devflow_plan" => {
             "devpit_board shows whether the card landed: check it before asking again"
         }
-        "comment" | "handoff" | "finish_card" => {
+        "comment" | "comment_edit" | "comment_delete" | "handoff" | "finish_card" => {
             "devpit_card shows the card's latest comments: check them before asking again"
         }
         "update" | "move" | "start_card" => {

@@ -49,6 +49,9 @@ current directory. devpit must be open.
   devpit-agent board                every column with its cards
   devpit-agent card <id>            one card: body, comments, runs, sessions
   devpit-agent comment <id> <text>  say something on a card
+  devpit-agent comment-edit <comment> <text>
+  devpit-agent comment-delete <comment>
+                                    rewrite or delete a comment you wrote
   devpit-agent create <title> [--body TEXT] [--column ID]
                                     a new card (first column unless named)
   devpit-agent update <id> [--title TEXT] [--body TEXT]

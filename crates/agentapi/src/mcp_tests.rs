@@ -64,7 +64,7 @@ fn the_handshake_says_the_tool_list_can_change() {
 }
 
 /// The names devpit listed before Devflow existed, in their order.
-const BEFORE_DEVFLOW: [&str; 32] = [
+const BEFORE_DEVFLOW: [&str; 34] = [
     "devpit_context",
     "devpit_board",
     "devpit_artifacts",
@@ -90,6 +90,8 @@ const BEFORE_DEVFLOW: [&str; 32] = [
     "devpit_start_session",
     "devpit_card",
     "devpit_comment",
+    "devpit_comment_edit",
+    "devpit_comment_delete",
     "devpit_create_card",
     "devpit_update_card",
     "devpit_start_card",
@@ -113,9 +115,9 @@ fn with_devflow_off_the_list_and_the_instructions_are_what_they_were() {
 #[test]
 fn the_setup_tools_come_after_devpits_own_until_devflow_is_switched_off() {
     let setup = listed(&Offer::Setup);
-    assert_eq!(setup[..32], BEFORE_DEVFLOW);
+    assert_eq!(setup[..34], BEFORE_DEVFLOW);
     assert_eq!(
-        setup[32..],
+        setup[34..],
         [
             "devpit_devflow_status",
             "devpit_devflow_setup",

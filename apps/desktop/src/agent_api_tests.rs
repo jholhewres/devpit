@@ -306,3 +306,11 @@ fn only_the_board_and_the_context_ask_what_each_cards_sessions_are_doing() {
     assert!(shows_activity("board"));
     assert!(shows_activity("context"));
 }
+
+#[test]
+fn an_agent_changes_only_the_comments_it_wrote() {
+    assert!(may_change_comment("claude", "claude").is_ok());
+    let theirs = may_change_comment(crate::cards::YOU, "claude").expect_err("the person's");
+    assert!(theirs.contains("person"), "{theirs}");
+    assert!(may_change_comment("codex", "claude").is_err());
+}

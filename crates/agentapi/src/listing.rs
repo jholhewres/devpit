@@ -47,7 +47,11 @@ pub(crate) const READ_ONLY: [&str; 12] = [
 ];
 
 /// The tools whose change cannot be taken back: work in flight, a file.
-pub(crate) const DESTRUCTIVE: [&str; 2] = ["devpit_stop_session", "devpit_artifact_remove"];
+pub(crate) const DESTRUCTIVE: [&str; 3] = [
+    "devpit_stop_session",
+    "devpit_artifact_remove",
+    "devpit_comment_delete",
+];
 
 /// Who the session is, as the app's answer to `devflow_offer` says. `None`
 /// is an app too old to say, which gets the whole list it always had.

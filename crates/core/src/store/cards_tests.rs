@@ -75,6 +75,20 @@ fn an_edited_comment_says_that_it_was() {
 }
 
 #[test]
+fn a_comment_says_its_card_and_who_wrote_it_until_it_is_deleted() {
+    let (_dir, store, card) = seeded();
+    let id = store
+        .add_comment(&card, "claude", "on the wrong card")
+        .expect("add");
+    assert_eq!(
+        store.comment_of(&id).expect("read"),
+        Some((card.clone(), "claude".to_owned()))
+    );
+    assert!(store.delete_comment(&id).expect("delete"));
+    assert_eq!(store.comment_of(&id).expect("read"), None);
+}
+
+#[test]
 fn editing_something_that_is_not_there_says_so() {
     let (_dir, store, _card) = seeded();
     assert!(!store.edit_comment("cmt_nothing", "x").expect("edit"));
