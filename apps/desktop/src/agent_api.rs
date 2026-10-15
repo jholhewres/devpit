@@ -150,6 +150,12 @@ fn within(
     })
 }
 
+/// The methods whose answer says what each card's sessions are doing; every
+/// other one reads the board without asking the agent CLIs for theirs.
+pub(crate) fn shows_activity(method: &str) -> bool {
+    matches!(method, "context" | "board")
+}
+
 fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
     if asked.method == "methods" {
         return Ok(json!(METHODS.as_slice()));
@@ -475,7 +481,12 @@ fn respond_in(
         let detail = crate::cards::detail_of(project.id.clone(), card_id).map_err(said)?;
         return serde_json::to_value(detail).map_err(|err| err.to_string());
     }
-    let board = crate::board::board_get_now(project.id.clone()).map_err(said)?;
+    let board = if shows_activity(&asked.method) {
+        crate::board::board_get_now(project.id.clone())
+    } else {
+        crate::board::board_still_now(project.id.clone())
+    }
+    .map_err(said)?;
     let answer = match asked.method.as_str() {
         "context" => context(project, &board, Path::new(&asked.cwd)),
         "board" => board_view(&board),

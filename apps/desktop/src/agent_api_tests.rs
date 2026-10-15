@@ -295,3 +295,14 @@ fn a_comment_lands_on_its_own_projects_card_and_on_no_other() {
     assert_eq!(answered["card"]["id"], ours.as_str());
     assert_eq!(store.comments(&ours).expect("comments").len(), 1);
 }
+
+/// A move, a start or a finish waited on every agent CLI listing its live
+/// sessions, and the agent heard "devpit is still working" (B12).
+#[test]
+fn only_the_board_and_the_context_ask_what_each_cards_sessions_are_doing() {
+    for method in WRITES {
+        assert!(!shows_activity(method), "{method}");
+    }
+    assert!(shows_activity("board"));
+    assert!(shows_activity("context"));
+}

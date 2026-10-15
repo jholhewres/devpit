@@ -149,6 +149,16 @@ pub async fn board_get(project_id: String) -> Result<Board, RpcError> {
 
 /// [`board_get`], on the calling thread.
 pub(crate) fn board_get_now(project_id: String) -> Result<Board, RpcError> {
+    board_read(project_id, true)
+}
+
+/// The board without what its cards' sessions are doing: asking every agent
+/// CLI for its live sessions is what kept an agent's move waiting.
+pub(crate) fn board_still_now(project_id: String) -> Result<Board, RpcError> {
+    board_read(project_id, false)
+}
+
+fn board_read(project_id: String, live_too: bool) -> Result<Board, RpcError> {
     let store = store()?;
     store.ensure_board(&project_id)?;
     let steps = steps_of(&store, &project_id)?;
@@ -172,15 +182,21 @@ pub(crate) fn board_get_now(project_id: String) -> Result<Board, RpcError> {
         .collect();
 
     // One listing for the whole board, not one per card.
-    let live = live_sessions(&store, &project_id);
+    let live = if live_too {
+        live_sessions(&store, &project_id)
+    } else {
+        Vec::new()
+    };
     let tallies = store.card_tallies(&project_id)?;
     let mut cards = Vec::new();
     for row in store.cards(&project_id)? {
         let tally = tallies.get(&row.id).copied().unwrap_or_default();
         let mut card = card_from(&store, row, tally, &steps)?;
-        let sessions = card_sessions(&store, &project_id, &card.id, &live, &snapshot(&card.id));
-        background_read(&card.id, &sessions);
-        card.activity = activity(&sessions);
+        if live_too {
+            let sessions = card_sessions(&store, &project_id, &card.id, &live, &snapshot(&card.id));
+            background_read(&card.id, &sessions);
+            card.activity = activity(&sessions);
+        }
         cards.push(card);
     }
     let ties = crate::card_ties::Ties::read(&store, &project_id)?;
