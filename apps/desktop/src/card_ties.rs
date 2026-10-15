@@ -29,12 +29,14 @@ impl Ties {
             .filter(|column| role_of(column.role.as_deref(), &column.name) == Some(DONE))
             .map(|column| column.id)
             .collect();
+        let numbers = store.card_numbers(project_id)?;
         let named = store
             .cards(project_id)?
             .into_iter()
             .map(|row| {
                 let card = CardRef {
                     done: done.contains(&row.column_id),
+                    number: numbers.get(&row.id).copied(),
                     id: row.id.clone(),
                     title: row.title,
                 };

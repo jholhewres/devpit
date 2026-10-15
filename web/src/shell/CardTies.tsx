@@ -27,6 +27,7 @@ function Named({ label, cards }: { label: string; cards: readonly CardRef[] }): 
       <ul className="ties__list">
         {cards.map((card) => (
           <li key={card.id} className="ties__one" data-done={card.done}>
+            {card.number != null && <span className="ties__no">#{card.number}</span>}
             {card.title}
           </li>
         ))}

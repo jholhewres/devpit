@@ -59,12 +59,21 @@ fn a_card_says_what_blocks_it_until_that_is_done_and_its_epic_counts_what_is_don
     let mut second = card(&ids[1]);
     ties.fill(&mut second);
     assert_eq!(second.parent_id.as_deref(), Some(epic.as_str()));
+    assert!(
+        second.blocked_by[0].number.is_some(),
+        "the blocker says its number"
+    );
     assert_eq!(
         second.blocked_by,
         [CardRef {
             id: ids[0].clone(),
             title: "[devflow] index".into(),
-            done: false
+            done: false,
+            number: store
+                .card_tally(&ids[0])
+                .expect("read")
+                .number
+                .and_then(|n| u32::try_from(n).ok()),
         }]
     );
 
@@ -90,6 +99,7 @@ fn a_card_with_no_children_has_no_progress() {
         id: "c".into(),
         title: "c".into(),
         done: true,
+        number: None,
     };
     assert_eq!(progress(&[child]), Some(Progress { done: 1, total: 1 }));
 }

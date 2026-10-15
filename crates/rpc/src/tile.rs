@@ -62,6 +62,9 @@ pub struct CardRef {
     pub title: String,
     /// In a lane whose role is done.
     pub done: bool,
+    /// Its number in the project, `#42`.
+    #[serde(default)]
+    pub number: Option<u32>,
 }
 
 /// An epic's cards: how many there are, and how many are done.

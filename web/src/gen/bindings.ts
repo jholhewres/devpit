@@ -2243,6 +2243,8 @@ export type CardRef = {
 	title: string,
 	/**  In a lane whose role is done. */
 	done: boolean,
+	/**  Its number in the project, `#42`. */
+	number?: number | null,
 };
 
 /**  One run's review, as a card's diff draws it. */

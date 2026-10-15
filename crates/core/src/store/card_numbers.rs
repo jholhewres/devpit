@@ -33,6 +33,48 @@ impl Store {
     }
 }
 
+/// A number for each card an older devpit made on this file, after the
+/// highest its project has, in the order they were made.
+const NUMBER_THE_REST: &str = "UPDATE card SET number = numbered.top + numbered.n \
+     FROM (SELECT c.id, \
+             ROW_NUMBER() OVER (PARTITION BY c.project_id ORDER BY c.created_at, c.id) AS n, \
+             (SELECT COALESCE(MAX(m.number), 0) FROM card m WHERE m.project_id = c.project_id) AS top \
+           FROM card c WHERE c.number IS NULL) AS numbered \
+     WHERE card.id = numbered.id";
+
+impl Store {
+    /// Numbers the cards an older devpit made without one; how many it did.
+    /// Asked first, so a start with nothing to number writes nothing.
+    pub fn number_unnumbered(&self) -> Result<usize, StoreError> {
+        let any: bool = self.conn.query_row(
+            "SELECT EXISTS (SELECT 1 FROM card WHERE number IS NULL)",
+            [],
+            |row| row.get(0),
+        )?;
+        if !any {
+            return Ok(0);
+        }
+        let tx = self.writing()?;
+        let numbered = tx.execute(NUMBER_THE_REST, [])?;
+        tx.commit()?;
+        Ok(numbered)
+    }
+
+    /// Each card's number in the project, by id: what a card shows of another.
+    pub fn card_numbers(
+        &self,
+        project_id: &str,
+    ) -> Result<std::collections::HashMap<String, u32>, StoreError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, number FROM card WHERE project_id = ?1 AND number IS NOT NULL",
+        )?;
+        let rows = stmt
+            .query_map([project_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<_, _>>()?;
+        Ok(rows)
+    }
+}
+
 /// What a card's tile counts, read for a whole board in one query rather than
 /// four per card.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]

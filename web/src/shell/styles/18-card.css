@@ -60,6 +60,7 @@
 .ties__group { display: flex; flex-direction: column; gap: 5px; }
 .ties__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
 .ties__one { padding: 5px 9px; border-radius: 7px; background: var(--raised); font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ties__no { margin-right: 6px; font-variant-numeric: tabular-nums; color: var(--text-3); }
 .ties__one[data-done='true'] { color: var(--text-3); text-decoration: line-through; }
 
 /* Where this card's work happens. */

@@ -451,6 +451,12 @@ fn main() {
                     eprintln!("project folders were not settled: {err}");
                 }
             }
+            // A card an older devpit made on this file gets its number.
+            if let Err(err) =
+                devpit_core::Store::open_default().and_then(|store| store.number_unnumbered())
+            {
+                eprintln!("cards were left without a number: {err}");
+            }
             // A pause given before this start still holds, until its time.
             if let Ok(store) = devpit_core::Store::open_default() {
                 pausing::restore(app.handle(), &store);

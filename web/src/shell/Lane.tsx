@@ -7,7 +7,7 @@ import { InlineAdd } from './InlineAdd'
 import { LaneMenu } from './LaneMenuView'
 import { LaneStep } from './LaneStep'
 import { money } from './chat'
-import { stillBlocking } from './planEdit'
+import { named, stillBlocking } from './planEdit'
 import { abandoned, committed } from './typing'
 import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -117,8 +117,8 @@ export const Tile = memo(function Tile({
           a tile is not a log, and the whole output is on the card. */}
       {progress && run?.state === 'running' && <div className="tile__log">{progress}</div>}
       {blocking.length > 0 && (
-        <div className="tile__blocked" title={`Blocked by ${blocking.map((by) => by.title).join(', ')}`}>
-          Blocked by {blocking.map((by) => by.title).join(', ')}
+        <div className="tile__blocked" title={`Blocked by ${blocking.map(named).join(', ')}`}>
+          Blocked by {blocking.map(named).join(', ')}
         </div>
       )}
       <div className="tile__m">

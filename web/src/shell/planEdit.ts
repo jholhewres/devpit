@@ -40,3 +40,8 @@ export function linesOf(text: string): string[] {
 export function stillBlocking(blockedBy: readonly CardRef[] | undefined): CardRef[] {
   return (blockedBy ?? []).filter((by) => !by.done)
 }
+
+/** Another card as a person says it: `#42 title`, or the title alone before it had a number. */
+export function named(card: CardRef): string {
+  return card.number != null ? `#${card.number} ${card.title}` : card.title
+}

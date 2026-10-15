@@ -128,3 +128,29 @@ fn a_tally_counts_what_the_tile_shows_for_each_card_at_once() {
         CardTally::default()
     );
 }
+
+/// A card an older devpit made on this file has no number until the next
+/// start gives it one, after the project's highest and never a taken one.
+#[test]
+fn a_card_made_without_a_number_gets_the_next_one_at_the_start() {
+    let (_dir, store, project, column) = seeded();
+    let first = store.create_card(&project, &column, "a", "").expect("a");
+    let older = store.create_card(&project, &column, "b", "").expect("b");
+    let oldest = store.create_card(&project, &column, "c", "").expect("c");
+    store
+        .conn
+        .execute(
+            "UPDATE card SET number = NULL, \
+             created_at = CASE id WHEN ?1 THEN 100 ELSE 200 END WHERE id IN (?1, ?2)",
+            rusqlite::params![older, oldest],
+        )
+        .expect("as an older devpit left them");
+
+    assert_eq!(store.number_unnumbered().expect("numbered"), 2);
+    assert_eq!(store.card_tally(&first).expect("read").number, Some(1));
+    assert_eq!(store.card_tally(&older).expect("read").number, Some(2));
+    assert_eq!(store.card_tally(&oldest).expect("read").number, Some(3));
+    assert_eq!(store.number_unnumbered().expect("nothing left"), 0);
+    let numbers = store.card_numbers(&project).expect("numbers");
+    assert_eq!(numbers.get(&oldest), Some(&3));
+}

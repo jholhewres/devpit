@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PlannedCard } from '../gen/bindings'
-import { cut, edited, linesOf, moved, stillBlocking } from './planEdit'
+import { cut, edited, linesOf, moved, named, stillBlocking } from './planEdit'
 
 const card = (key: string, dependsOn: string[] = []): PlannedCard => ({
   key,
@@ -48,5 +48,12 @@ describe('a plan on the board', () => {
       ]).map((one) => one.id),
     ).toEqual(['b'])
     expect(stillBlocking(undefined)).toEqual([])
+  })
+})
+
+describe('named', () => {
+  it('says a blocker by its number when it has one', () => {
+    expect(named({ id: 'a', title: 'Index bodies', done: false, number: 42 })).toBe('#42 Index bodies')
+    expect(named({ id: 'a', title: 'Index bodies', done: false, number: null })).toBe('Index bodies')
   })
 })
