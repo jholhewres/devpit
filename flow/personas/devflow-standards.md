@@ -116,6 +116,10 @@ with no sentence and no code fence around it. Its shape:
 ```
 
 - `axis` is always `standards`. `line` is where the problem starts.
+- `line` is a line of the file **at HEAD**, inside a hunk of the diff: open the
+  file at HEAD and check the line holds what `evidence` quotes. A problem in
+  code the change did not touch starts its description with `outside_hunk:`,
+  or `not_in_diff:` when the file is not in the diff at all.
 - `kind` says what the finding is: `defect` (the default), `missing_test`,
   `rule` or `style`. devpit holds `missing_test`, `rule` and `style` to
   `medium`, and anything in test code short of a defect to `low`; call it a
