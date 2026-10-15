@@ -119,7 +119,12 @@ fn an_orchestrator_is_offered_its_own_tools_and_another_projects_board() {
     for name in ORCHESTRATOR_ONLY.iter().chain(&DECISIONS) {
         assert!(names.contains(name), "{name} was not listed");
     }
-    assert!(!names.iter().any(|name| name.starts_with("devpit_devflow")));
+    // Of Devflow, only what passes the person's yes on to a linked project.
+    let devflow: Vec<&&str> = names
+        .iter()
+        .filter(|name| name.starts_with("devpit_devflow"))
+        .collect();
+    assert_eq!(devflow, [&"devpit_devflow_plan"]);
     let board = listed
         .iter()
         .find(|tool| tool["name"] == "devpit_board")

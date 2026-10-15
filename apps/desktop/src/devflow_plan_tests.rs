@@ -241,3 +241,74 @@ fn the_brief_and_the_plan_wait_for_the_persons_click_on_devflow() {
     }
     assert!(store.cards(&project.id).expect("cards").is_empty());
 }
+
+/// The ecopar plans waited since the person said yes to the orchestrator,
+/// which had no way to pass it on.
+#[test]
+fn the_orchestrator_passes_the_persons_yes_on_and_the_epic_quotes_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, project) = project(dir.path());
+    let epic = epic(&store, &project);
+    let preview = json!({ "epic": epic, "cards": cards() });
+    respond(None, "devflow_plan", &project, &preview).expect("a preview");
+
+    let bare = json!({ "epic": epic, "apply": true });
+    assert!(relayed_refusal("devflow_plan", &bare).is_some());
+    assert!(relayed_refusal("devflow_plan", &preview).is_none());
+    let unquoted = json!({ "epic": epic, "apply": true, "approval": { "by": "orchestrator" } });
+    assert!(respond(None, "devflow_plan", &project, &unquoted).is_err());
+    assert!(relayed_refusal("devflow_plan", &unquoted).is_some());
+
+    let yes = json!({
+        "epic": epic, "apply": true,
+        "approval": { "by": "orchestrator", "quote": "pode criar os cards" },
+    });
+    assert!(relayed_refusal("devflow_plan", &yes).is_none());
+    let said = respond(None, "devflow_plan", &project, &yes).expect("created");
+    assert_eq!(said["applied"], true);
+    assert_eq!(titles(&store, &project).len(), 4);
+    let record: Value = serde_json::from_str(
+        &store
+            .plan(&epic)
+            .expect("plan")
+            .expect("row")
+            .created
+            .expect("made"),
+    )
+    .expect("json");
+    assert_eq!(record["by"], "orchestrator");
+    let comments = store.comments(&epic).expect("comments");
+    assert!(
+        comments
+            .iter()
+            .any(|one| one.body.contains("«pode criar os cards»")),
+        "{:?}",
+        comments.iter().map(|one| &one.body).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn cards_that_differ_from_the_preview_are_a_new_preview_even_with_the_persons_words() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, project) = project(dir.path());
+    let epic = epic(&store, &project);
+    respond(
+        None,
+        "devflow_plan",
+        &project,
+        &json!({ "epic": epic, "cards": cards() }),
+    )
+    .expect("a preview");
+    let mut other = cards();
+    other[2]["title"] = json!("Matches are bold");
+    let said = respond(
+        None,
+        "devflow_plan",
+        &project,
+        &json!({ "epic": epic, "cards": other, "apply": true,
+                 "approval": { "quote": "sim" } }),
+    )
+    .expect("a new preview");
+    assert_eq!(said["applied"], false);
+    assert_eq!(titles(&store, &project).len(), 1);
+}

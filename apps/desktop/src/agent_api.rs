@@ -397,6 +397,11 @@ fn respond_in(
             .map(str::to_owned)
     };
     if crate::devflow::METHODS.contains(&asked.method.as_str()) {
+        if project.id != here.id {
+            if let Some(why) = crate::devflow_plan::relayed_refusal(&asked.method, &asked.params) {
+                return Err(why);
+            }
+        }
         return crate::devflow::respond(
             app,
             &asked.method,

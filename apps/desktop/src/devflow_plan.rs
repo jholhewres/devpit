@@ -31,6 +31,8 @@ enum Yes {
     Board,
     /// An agent's `apply`, after the person's yes in its conversation.
     Agent,
+    /// The orchestrator's `apply`, passing on the yes the person gave it.
+    Relayed,
 }
 
 impl Yes {
@@ -38,6 +40,7 @@ impl Yes {
         match self {
             Yes::Board => "board",
             Yes::Agent => "agent",
+            Yes::Relayed => "orchestrator",
         }
     }
 }
@@ -203,7 +206,17 @@ fn planned(
 ) -> Result<Value, String> {
     let epic = text(params, "epic").ok_or("which epic? pass its card id as `epic`")?;
     let epic_card = own_card(store, project_id, &epic)?;
-    let slices = plan::read(params.get("cards").unwrap_or(&Value::Null))?;
+    let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
+    let kept = store.plan(&epic).map_err(|err| err.to_string())?;
+    let relayed = approval(params)?;
+    let slices = match params.get("cards") {
+        // An apply that names no cards is the yes to the preview the person saw.
+        None | Some(Value::Null) if apply => kept
+            .as_ref()
+            .map(|row| slices_of(&row.cards))
+            .ok_or("there is no preview on this epic to apply: send the cards first")?,
+        cards => plan::read(cards.unwrap_or(&Value::Null))?,
+    };
     // Before planning: whether the brief can be planned from.
     let brief = judge(judged, "briefing", || {
         jev::brief_state(
@@ -217,8 +230,6 @@ fn planned(
              (devflow-briefing), then plan again"
         ));
     }
-    let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
-    let kept = store.plan(&epic).map_err(|err| err.to_string())?;
     if let (true, Some(row)) = (apply, &kept) {
         if let Some(created) = &row.created {
             return Ok(said_created(&epic, created, false));
@@ -236,8 +247,13 @@ fn planned(
                      can still create it on the board"
                 ));
             }
-            let made =
-                create(store, project_id, &epic, &shown, Yes::Agent).map_err(|err| err.message)?;
+            let yes = if relayed.is_some() {
+                Yes::Relayed
+            } else {
+                Yes::Agent
+            };
+            let made = create(store, project_id, &epic, &shown, yes, relayed.as_deref())
+                .map_err(|err| err.message)?;
             let mut said = said_created(&epic, &made, true);
             if judged.is_some() {
                 said["jev"] = jev_said(brief.as_ref(), plan.as_ref());
@@ -270,6 +286,35 @@ fn planned(
     Ok(said)
 }
 
+/// The person's words an orchestrator passes on with its `apply`.
+fn approval(params: &Value) -> Result<Option<String>, String> {
+    let Some(given) = params.get("approval").filter(|given| !given.is_null()) else {
+        return Ok(None);
+    };
+    let quote = text(given, "quote").ok_or(
+        "approval needs the person's own words as `quote`, the message where they said yes",
+    )?;
+    match text(given, "by").as_deref() {
+        None | Some("orchestrator") => Ok(Some(quote)),
+        Some(other) => Err(format!(
+            "approval is passed on by the orchestrator, not `{other}`: in your own \
+             conversation, apply after the person's yes"
+        )),
+    }
+}
+
+/// Why an orchestrator's `apply` for another project cannot go on: it
+/// stands in no conversation with the person about that plan, so the yes it
+/// passes on is quoted.
+pub(crate) fn relayed_refusal(method: &str, params: &Value) -> Option<String> {
+    let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
+    (method == "devflow_plan" && apply && !matches!(approval(params), Ok(Some(_)))).then(|| {
+        "nothing was created: an orchestrator applies another project's plan with \
+         approval: { by: \"orchestrator\", quote: \"<the person's yes, in their words>\" }"
+            .to_owned()
+    })
+}
+
 fn slices_of(cards: &str) -> Vec<Slice> {
     serde_json::from_str(cards).unwrap_or_default()
 }
@@ -293,6 +338,7 @@ fn create(
     epic: &str,
     slices: &[Slice],
     yes: Yes,
+    quote: Option<&str>,
 ) -> Result<String, RpcError> {
     let lane =
         waiting_lane(store, project_id).map_err(|why| RpcError::new(ErrorCode::Invalid, why))?;
@@ -310,8 +356,12 @@ fn create(
     // None when another yes got there first: its cards are the answer.
     if store.create_plan(epic, &lane, &cards, record)?.is_some() {
         let whose = match yes {
-            Yes::Board => "on the person's click on the board",
-            Yes::Agent => "after the person's yes in the conversation",
+            Yes::Board => "on the person's click on the board".to_owned(),
+            Yes::Agent => "after the person's yes in the conversation".to_owned(),
+            Yes::Relayed => format!(
+                "after the person's yes, passed on by the orchestrator: «{}»",
+                quote.unwrap_or_default()
+            ),
         };
         let note = format!("{PREFIX}Plan created {whose}: {} cards.", slices.len());
         let _ = store.add_comment(epic, if yes == Yes::Board { YOU } else { "agent" }, &note);
@@ -445,6 +495,7 @@ pub(crate) fn created_on_board(
         epic_id,
         &slices_of(&row.cards),
         Yes::Board,
+        None,
     )?;
     let record: Value = serde_json::from_str(&created).unwrap_or_default();
     Ok(DevflowPlanCreated {

@@ -151,7 +151,7 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: "devpit_devflow_plan",
             method: "devflow_plan",
-            description: "Devflow: an epic's plan as its child cards, each titled '[devflow] <title>', its body the build, the criteria as checkboxes under ## Acceptance criteria, the likely files and the verify command, and its depends_on as blocking edges the board shows. Without apply it previews and creates nothing: the plan waits on the epic, where the person can move, cut or edit it and create the cards with a click. apply: true creates the cards, only after the person's explicit yes to the preview, and only the plan the person last saw: cards that differ become a new preview. When the person already approved on the board, the answer says so with the card ids.",
+            description: "Devflow: an epic's plan as its child cards, each titled '[devflow] <title>', its body the build, the criteria as checkboxes under ## Acceptance criteria, the likely files and the verify command, and its depends_on as blocking edges the board shows. Without apply it previews and creates nothing: the plan waits on the epic, where the person can move, cut or edit it and create the cards with a click. apply: true creates the cards, only after the person's explicit yes to the preview, and only the plan the person last saw: cards that differ become a new preview. When the person already approved on the board, the answer says so with the card ids. An orchestrator plans another project's epic with `project`, shows the person the preview, and applies with `approval` quoting their yes; apply without `cards` applies the preview as it stands.",
             input: || json!({ "type": "object", "properties": {
                 "epic": { "type": "string", "description": "The epic's card id." },
                 "cards": { "type": "array", "items": { "type": "object", "properties": {
@@ -163,8 +163,13 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
                     "verify": { "type": "string", "description": "One command that proves the criteria." },
                     "depends_on": { "type": "array", "items": { "type": "string" }, "description": "The keys of the cards that block it." }
                 }, "required": ["key", "title"] } },
-                "apply": { "type": "boolean", "description": "Create the cards. Only after the person's explicit yes to the preview." }
-            }, "required": ["epic", "cards"] }),
+                "apply": { "type": "boolean", "description": "Create the cards. Only after the person's explicit yes to the preview." },
+                "approval": { "type": "object", "description": "Orchestrator only, with apply: the yes the person gave you, passed on.", "properties": {
+                    "by": { "type": "string", "enum": ["orchestrator"] },
+                    "quote": { "type": "string", "description": "The person's message saying yes, in their words." }
+                }, "required": ["quote"] },
+                "project": { "type": "string", "description": "Orchestrator only: the epic's project, by id or name." }
+            }, "required": ["epic"] }),
         },
     ),
     (
@@ -236,6 +241,27 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         },
     ),
 ];
+
+/// What an orchestrator is offered of Devflow wherever it stands: planning
+/// a linked project's epic and passing the person's yes on.
+pub(crate) const RELAYED: [&str; 1] = ["devpit_devflow_plan"];
+
+/// The Devflow tools an orchestrator gets that `offered` left out.
+pub(crate) fn relayed<'a>(
+    staged: &'a [(&'a [&'a str], Tool)],
+    offered: &[&Tool],
+    seat: &Seat,
+) -> Vec<&'a Tool> {
+    if seat.orchestrator != Some(true) {
+        return Vec::new();
+    }
+    staged
+        .iter()
+        .map(|(_, tool)| tool)
+        .filter(|tool| RELAYED.contains(&tool.name))
+        .filter(|tool| !offered.iter().any(|one| one.name == tool.name))
+        .collect()
+}
 
 /// What the server offers the project it stands in.
 #[derive(Debug, Clone, PartialEq, Eq)]

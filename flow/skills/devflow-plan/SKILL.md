@@ -128,6 +128,12 @@ person's edits and call `devpit_devflow_plan` again with the same cards and
 the board, take the card ids from that answer. A reply that changes the plan
 ("yes, but…") is a change: update the cards, preview again, and end the turn.
 
+When the yes reached devpit's orchestrator instead of you, the orchestrator
+applies it: `devpit_devflow_plan` with `project`, the `epic`, `"apply": true`
+and `"approval": { "by": "orchestrator", "quote": "<the person's yes, in their
+words>" }`. Without `cards` it applies the preview the person saw; the epic
+keeps the quote.
+
 Reply with the created card ids in dependency order and name the cards with no
 blockers: those can start now. End the turn.
 

@@ -248,7 +248,10 @@ fn the_brief_and_the_plan_take_what_their_skills_send() {
         keys
     };
     let plan = schema("devpit_devflow_plan");
-    assert_eq!(keys(&plan["properties"]), ["apply", "cards", "epic"]);
+    assert_eq!(
+        keys(&plan["properties"]),
+        ["apply", "approval", "cards", "epic", "project"]
+    );
     assert_eq!(
         keys(&plan["properties"]["cards"]["items"]["properties"]),
         [
@@ -394,4 +397,29 @@ fn the_session_start_reply_carries_the_card_or_nothing() {
         ),
         json!({ "pane": "%2", "session": "s-1", "agent": "codex" })
     );
+}
+
+/// An orchestrator stands in no Devflow project, and still passes on the
+/// person's yes to a linked project's plan.
+#[test]
+fn an_orchestrator_is_offered_the_plan_wherever_it_stands() {
+    let orchestrator = Seat {
+        orchestrator: Some(true),
+        decisions: None,
+    };
+    let named = |offer: &Offer, seat: &Seat| -> Vec<&'static str> {
+        relayed(&STAGED, &offer.tools(&STAGED), seat)
+            .iter()
+            .map(|tool| tool.name)
+            .collect()
+    };
+    assert_eq!(named(&Offer::Off, &orchestrator), ["devpit_devflow_plan"]);
+    assert!(named(&Offer::Off, &Seat::default()).is_empty());
+    let session = Seat {
+        orchestrator: Some(false),
+        decisions: None,
+    };
+    assert!(named(&Offer::Off, &session).is_empty());
+    let planning = Offer::Active(vec!["plan".to_owned()]);
+    assert!(named(&planning, &orchestrator).is_empty(), "listed once");
 }

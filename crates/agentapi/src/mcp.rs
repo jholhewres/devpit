@@ -396,11 +396,16 @@ pub(crate) fn handle_offering(
         }),
         "ping" => json!({}),
         "tools/list" if !offered => json!({ "tools": [] }),
-        "tools/list" => json!({ "tools": TOOLS
-            .iter()
-            .chain(offer.tools(&STAGED))
-            .filter_map(|tool| crate::listing::listed(tool, seat))
-            .collect::<Vec<_>>() }),
+        "tools/list" => {
+            let offered = offer.tools(&STAGED);
+            let relayed = crate::devflow::relayed(&STAGED, &offered, seat);
+            json!({ "tools": TOOLS
+                .iter()
+                .chain(offered)
+                .chain(relayed)
+                .filter_map(|tool| crate::listing::listed(tool, seat))
+                .collect::<Vec<_>>() })
+        }
         "resources/list" => {
             let mut listed = crate::apps::listed();
             if let Some(all) = listed["resources"].as_array_mut() {
