@@ -21,6 +21,7 @@ fn decision(outcome: &str, cost_usd: f64) -> DecisionWrite<'_> {
         cost_usd,
         latency_ms: 120,
         state_digest: "abc:10",
+        failure: None,
     }
 }
 
@@ -118,4 +119,33 @@ fn a_decision_is_labelled_by_what_the_person_did_and_read_back_by_card_and_proje
         .find(|row| row.id == older)
         .expect("older");
     assert_eq!(labelled.person_verdict.as_deref(), Some("fail"));
+}
+
+#[test]
+fn the_newest_call_of_a_project_says_why_it_failed_and_an_answer_after_it_clears_it() {
+    let (_dir, store) = store();
+    assert_eq!(store.decision_failed_last("prj_api").expect("read"), None);
+    let refused = DecisionWrite {
+        answers: None,
+        failure: Some("Decisions refused it (400 Bad Request): no"),
+        ..decision("skipped", 0.0)
+    };
+    store.log_decision(&refused, 1_000).expect("log");
+    assert_eq!(
+        store
+            .decision_failed_last("prj_api")
+            .expect("read")
+            .as_deref(),
+        Some("Decisions refused it (400 Bad Request): no")
+    );
+    assert_eq!(
+        store.decision_failed_last("prj_other").expect("read"),
+        None,
+        "another project's failure is not this one's"
+    );
+    // The same second: the one written last is the newest.
+    store
+        .log_decision(&decision("answered", 0.001), 1_000)
+        .expect("log");
+    assert_eq!(store.decision_failed_last("prj_api").expect("read"), None);
 }

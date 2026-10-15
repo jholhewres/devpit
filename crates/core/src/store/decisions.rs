@@ -4,6 +4,8 @@
 //! Kept so a gate running in shadow can be judged before it is trusted, and so
 //! the daily cap is summed from what was actually spent.
 
+use rusqlite::OptionalExtension;
+
 use crate::store::{Store, StoreError};
 
 /// How long a decision is kept.
@@ -29,6 +31,8 @@ pub struct DecisionWrite<'a> {
     pub latency_ms: i64,
     /// A hash and a length, never the state itself.
     pub state_digest: &'a str,
+    /// Why the call came to nothing, when it was sent and did.
+    pub failure: Option<&'a str>,
 }
 
 /// One decision, as it is read back.
@@ -51,11 +55,13 @@ pub struct DecisionRow {
     pub state_digest: String,
     /// `pass` or `fail`, said by what the person did; `None` until they did.
     pub person_verdict: Option<String>,
+    pub failure: Option<String>,
 }
 
 /// The columns a decision is read back with, in [`DecisionRow`]'s order.
 const READ: &str = "id, at, project_id, card_id, gate, mode, rubric, questions, answers, \
-                    thresholds, outcome, cost_usd, latency_ms, state_digest, person_verdict";
+                    thresholds, outcome, cost_usd, latency_ms, state_digest, person_verdict, \
+                    failure";
 
 fn row_of(row: &rusqlite::Row<'_>) -> rusqlite::Result<DecisionRow> {
     Ok(DecisionRow {
@@ -74,6 +80,7 @@ fn row_of(row: &rusqlite::Row<'_>) -> rusqlite::Result<DecisionRow> {
         latency_ms: row.get(12)?,
         state_digest: row.get(13)?,
         person_verdict: row.get(14)?,
+        failure: row.get(15)?,
     })
 }
 
@@ -88,8 +95,8 @@ impl Store {
         let tx = self.writing()?;
         tx.execute(
             "INSERT INTO decision (id, at, project_id, card_id, gate, mode, rubric, rubric_version, \
-             questions, answers, thresholds, outcome, cost_usd, latency_ms, state_digest) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+             questions, answers, thresholds, outcome, cost_usd, latency_ms, state_digest, failure) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             rusqlite::params![
                 id,
                 now,
@@ -106,6 +113,7 @@ impl Store {
                 one.cost_usd,
                 one.latency_ms,
                 one.state_digest,
+                one.failure,
             ],
         )?;
         tx.execute(
@@ -133,6 +141,22 @@ impl Store {
         ))?;
         let rows = statement.query_map([most], row_of)?;
         Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Why a project's newest call to Decisions failed; `None` when it was
+    /// answered, or nothing was sent.
+    pub fn decision_failed_last(&self, project_id: &str) -> Result<Option<String>, StoreError> {
+        // The insert order breaks a tie within one second: ids are random there.
+        let newest = self
+            .conn
+            .query_row(
+                "SELECT failure FROM decision WHERE project_id = ?1 \
+                 ORDER BY at DESC, rowid DESC LIMIT 1",
+                [project_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?;
+        Ok(newest.flatten())
     }
 
     /// A card's decisions by `rubric` that were answered, newest first.

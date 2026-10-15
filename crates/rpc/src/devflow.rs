@@ -105,4 +105,29 @@ pub struct RubricAccuracy {
 pub struct DevflowCalibration {
     pub project_id: String,
     pub rubrics: Vec<RubricAccuracy>,
+    /// Where Decisions stands for the project's Devflow now.
+    #[serde(default)]
+    pub decisions: Option<DevflowDecisions>,
+}
+
+/// Whether Devflow's questions reach Decisions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionsState {
+    On,
+    /// `decisions.use` is false, or the project's state is never sent.
+    Off,
+    NoKey,
+    /// The last call came to nothing.
+    Failing,
+}
+
+/// Where Decisions stands, said the same in every Devflow reply, on the Jev
+/// panel and on the card.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowDecisions {
+    pub state: DecisionsState,
+    /// Why it is not `on`.
+    pub reason: Option<String>,
 }

@@ -145,10 +145,10 @@ pub(crate) fn respond_with(
     let evidence = crate::devflow_gate::newest(&root, &card.id, "evidence.json");
     let brief = brief_of(&store, project, &card.id);
     // Asked only where it can answer: else the review falls back as without it.
-    let jev = crate::devflow_jev::Jev::of(project, config, &root, Some(&card.id), &[])
-        .filter(crate::devflow_jev::Jev::answers);
+    let jev = crate::devflow_jev::Jev::of(project, config, &root, Some(&card.id), &[]);
     let judging = jev
         .as_ref()
+        .filter(|jev| jev.answers())
         .map(|jev| move |rubric: &str, state: &Value| jev.judge(rubric, state));
     // Personas follow the layers as skills do, read from the project's root.
     let teams = crate::devflow::layered(Path::new(&project.root_path))
@@ -217,6 +217,7 @@ pub(crate) fn respond_with(
     }
     answer["attached"] =
         json!({ "under": under, "files": attached.names.len(), "left_out": attached.left_out });
+    answer["decisions"] = crate::devflow_jev::decisions_of(config, jev.as_ref());
     Ok(answer)
 }
 

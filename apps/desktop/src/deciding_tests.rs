@@ -191,6 +191,7 @@ fn write(cost_usd: f64) -> DecisionWrite<'static> {
         cost_usd,
         latency_ms: 0,
         state_digest: "x:1",
+        failure: None,
     }
 }
 
@@ -209,10 +210,9 @@ fn a_refusal_is_a_skip_that_says_why_and_is_logged() {
         panic!("{decided:?}");
     };
     assert!(why.contains("bad key"), "{why}");
-    assert_eq!(
-        store.decisions_latest(5).expect("log")[0].outcome,
-        "skipped"
-    );
+    let logged = &store.decisions_latest(5).expect("log")[0];
+    assert_eq!(logged.outcome, "skipped");
+    assert_eq!(logged.failure.as_deref(), Some(why.as_str()));
 }
 
 #[test]

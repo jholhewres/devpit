@@ -1,6 +1,6 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
-use std::sync::{Arc, Mutex as Shared};
+use std::sync::{Arc, Mutex as Shared, OnceLock};
 
 use devpit_core::store::decisions::DecisionWrite;
 use devpit_devflow::config::Mode;
@@ -10,6 +10,37 @@ use super::*;
 /// A provider on loopback answering every request, each question by
 /// `answer(id)`, and keeping what it was asked.
 fn provider(answer: fn(&str) -> Value) -> (String, Arc<Shared<Vec<Value>>>) {
+    listening(move |asked| {
+        let answers: serde_json::Map<String, Value> = asked["questions"]
+            .as_object()
+            .map(|questions| {
+                questions
+                    .keys()
+                    .map(|id| (id.clone(), answer(id)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let reply = json!({ "answers": answers, "usage": { "cost": 0.0001 } });
+        ("200 OK", reply.to_string())
+    })
+}
+
+/// What Decisions answers a question it will not take, on every call.
+pub(crate) const REFUSED: &str = "choice question `severity` needs criteria";
+
+/// A provider on loopback refusing every request as Decisions does.
+fn refusing() -> String {
+    listening(|_| {
+        let reply = json!({ "error": { "message": REFUSED } });
+        ("400 Bad Request", reply.to_string())
+    })
+    .0
+}
+
+/// A server on loopback replying to each request by `reply(body)`.
+fn listening(
+    reply: impl Fn(&Value) -> (&'static str, String) + Send + 'static,
+) -> (String, Arc<Shared<Vec<Value>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let base = format!(
         "http://127.0.0.1:{}/api/v1",
@@ -39,27 +70,89 @@ fn provider(answer: fn(&str) -> Value) -> (String, Arc<Shared<Vec<Value>>>) {
             let mut body = vec![0; length];
             let _ = reader.read_exact(&mut body);
             let asked: Value = serde_json::from_slice(&body).unwrap_or_default();
-            let answers: serde_json::Map<String, Value> = asked["questions"]
-                .as_object()
-                .map(|questions| {
-                    questions
-                        .keys()
-                        .map(|id| (id.clone(), answer(id)))
-                        .collect()
-                })
-                .unwrap_or_default();
+            let (status, said) = reply(&asked);
             if let Ok(mut all) = kept.lock() {
                 all.push(asked);
             }
-            let reply = json!({ "answers": answers, "usage": { "cost": 0.0001 } }).to_string();
             let _ = write!(
                 stream,
-                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{reply}",
-                reply.len()
+                "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{said}",
+                said.len()
             );
         }
     });
     (base, heard)
+}
+
+/// Sure of everything: every rubric passes.
+fn sure(id: &str) -> Value {
+    match id {
+        "severity" => {
+            json!({ "type": "choice", "choice": "low", "probabilities": { "low": 0.9, "high": 0.1 } })
+        }
+        "duplicate" => noul(0.05),
+        _ => noul(0.95),
+    }
+}
+
+/// The four ways Decisions stands for a project's Devflow, which every reply
+/// that asks it is checked in.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Standing {
+    NoKey,
+    NotUsed,
+    Answering,
+    Refusing,
+}
+
+pub(crate) const STANDINGS: [Standing; 4] = [
+    Standing::NoKey,
+    Standing::NotUsed,
+    Standing::Answering,
+    Standing::Refusing,
+];
+
+impl Standing {
+    /// devflow.yaml's `decisions:`.
+    pub(crate) fn yaml(self) -> &'static str {
+        match self {
+            Standing::NotUsed => "decisions:\n  use: false\n",
+            _ => "decisions:\n  use: true\n",
+        }
+    }
+
+    /// The settings `project_id` is asked with, in place of the key file's.
+    pub(crate) fn give(self, project_id: &str) {
+        static ANSWERING: OnceLock<String> = OnceLock::new();
+        static REFUSING: OnceLock<String> = OnceLock::new();
+        let answering = ANSWERING.get_or_init(|| provider(sure).0);
+        let given = match self {
+            Standing::NoKey => conf(answering, None),
+            Standing::NotUsed | Standing::Answering => conf(answering, Some("key")),
+            Standing::Refusing => conf(REFUSING.get_or_init(refusing), Some("key")),
+        };
+        GIVEN
+            .lock()
+            .expect("given")
+            .insert(project_id.to_owned(), given);
+    }
+
+    /// That `reply` says where Decisions stands, and why.
+    pub(crate) fn said_in(self, reply: &Value) {
+        let said = &reply["decisions"];
+        let reason = said["reason"].as_str().unwrap_or_default();
+        let (state, why) = match self {
+            Standing::NoKey => ("no_key", "no key — set one in Settings → Decisions"),
+            Standing::NotUsed => ("off", "decisions.use is false"),
+            Standing::Answering => ("on", ""),
+            Standing::Refusing => ("failing", REFUSED),
+        };
+        assert_eq!(said["state"], state, "{self:?}: {reply}");
+        assert!(reason.contains(why), "{self:?}: {reply}");
+        if let Standing::Answering = self {
+            assert!(said["reason"].is_null(), "{self:?}: {reply}");
+        }
+    }
 }
 
 fn noul(p: f64) -> Value {
@@ -290,6 +383,96 @@ fn shadow_records_the_plans_fail_and_enforce_holds_its_cards() {
     }
 }
 
+/// However Decisions stands, a plan's reply says so and its cards are made.
+#[test]
+fn a_plan_says_where_decisions_stands_and_makes_its_cards_in_each_standing() {
+    for standing in STANDINGS {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().canonicalize().expect("root");
+        let (store, project) = project(&root);
+        std::fs::create_dir_all(root.join(".devpit/devflow")).expect("folder");
+        std::fs::write(
+            root.join(".devpit/devflow/devflow.yaml"),
+            format!("version: 1\nenabled: true\n{}", standing.yaml()),
+        )
+        .expect("yaml");
+        standing.give(&project.id);
+        let epic = epic_of(&project);
+        let plan = |apply: bool| {
+            crate::devflow_plan::respond(
+                None,
+                "devflow_plan",
+                &project,
+                &json!({ "epic": epic, "apply": apply, "cards": [
+                    { "key": "s1", "title": "Open a link", "criteria": ["opens it"] }
+                ] }),
+            )
+            .expect("planned")
+        };
+        standing.said_in(&plan(false));
+        standing.said_in(&plan(true));
+        let cards = store.cards(&project.id).expect("cards").len();
+        assert_eq!(cards, 2, "{standing:?}: the epic and its card");
+    }
+}
+
+/// The panel's word: the project's last call, so a refusal reads as failing
+/// until an answer follows it.
+#[test]
+fn the_panel_says_failing_with_why_until_a_call_is_answered() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (store, project) = project(&root);
+    std::fs::create_dir_all(root.join(".devpit/devflow")).expect("folder");
+    std::fs::write(
+        root.join(".devpit/devflow/devflow.yaml"),
+        "version: 1\nenabled: true\ndecisions:\n  use: true\n",
+    )
+    .expect("yaml");
+    let reply = |standing: DevflowDecisions| json!({ "decisions": standing });
+    Standing::NoKey.give(&project.id);
+    Standing::NoKey.said_in(&reply(standing(&store, &project.id, &root)));
+    Standing::Refusing.give(&project.id);
+    Standing::Answering.said_in(&reply(standing(&store, &project.id, &root)));
+    let ask = |given: Standing| {
+        given.give(&project.id);
+        let devpit_devflow::State::Valid(_, config) = crate::devflow::read(&root) else {
+            panic!("devflow.yaml reads");
+        };
+        let jev = Jev::of(&project, &config, &root, None, &[]).expect("used");
+        jev.judge(jev::PLAN, &json!({}));
+    };
+    ask(Standing::Refusing);
+    Standing::Refusing.said_in(&reply(standing(&store, &project.id, &root)));
+    ask(Standing::Answering);
+    Standing::Answering.said_in(&reply(standing(&store, &project.id, &root)));
+}
+
+/// A call never sent is not in the log, but this reply's state still says
+/// why Decisions did not answer it.
+#[test]
+fn a_spent_budget_reads_as_failing_though_nothing_was_logged() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let spent = Conf {
+        cap_usd: 0.0,
+        ..conf("http://127.0.0.1:9", Some("key"))
+    };
+    let jev = Jev::with(
+        log_store(dir.path()),
+        spent,
+        "prj_spent",
+        None,
+        dir.path(),
+        Mode::Shadow,
+        &[],
+    );
+    assert_eq!(jev.state().state, devpit_rpc::DecisionsState::On);
+    jev.judge(jev::PLAN, &json!({}));
+    let state = jev.state();
+    assert_eq!(state.state, devpit_rpc::DecisionsState::Failing);
+    assert!(state.reason.is_some_and(|why| why.contains("budget")));
+}
+
 /// No key: nothing is asked, nothing acts, and the plan is made as it
 /// would be without Decisions.
 #[test]
@@ -355,6 +538,7 @@ fn decision(store: &Store, project: &str, card: &str, rubric: &str, outcome: &st
                 cost_usd: 0.0,
                 latency_ms: 1,
                 state_digest: "d:1",
+                failure: None,
             },
             crate::deciding::now(),
         )
@@ -468,6 +652,7 @@ fn row(rubric: &str, real: f64, outcome: &str, verdict: &str) -> DecisionRow {
         latency_ms: 0,
         state_digest: "d".into(),
         person_verdict: (!verdict.is_empty()).then(|| verdict.to_owned()),
+        failure: None,
     }
 }
 

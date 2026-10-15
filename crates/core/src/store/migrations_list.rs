@@ -784,4 +784,14 @@ UPDATE card SET number = numbered.n
 CREATE UNIQUE INDEX card_number ON card(project_id, number);
 "#,
     },
+    // Migration 030 — why a call to Decisions failed.
+    Migration {
+        version: 30,
+        sql: r#"
+-- The provider's own words when a call it was sent came to nothing, so the
+-- Jev panel can say why Decisions is failing. NULL for an answer and for
+-- every row an older devpit wrote.
+ALTER TABLE decision ADD COLUMN failure TEXT;
+"#,
+    },
 ];

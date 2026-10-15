@@ -114,6 +114,7 @@ pub(crate) fn evidence_in(artifacts: &Path, card: &str) -> DevflowCardEvidence {
         verdict: None,
         folder: artifacts.display().to_string(),
         artifacts: Vec::new(),
+        decisions: None,
     };
     if !runs::plain_card(card) {
         return said;
@@ -152,7 +153,12 @@ pub async fn devflow_card_evidence(
 ) -> Result<DevflowCardEvidence, RpcError> {
     crate::off_main::blocking(move || {
         let home = crate::projects::project_home(&project_id)?;
-        Ok(evidence_in(&home.artifacts(), &card_id))
+        let mut said = evidence_in(&home.artifacts(), &card_id);
+        let store = crate::projects::store()?;
+        said.decisions = store.project(&project_id)?.map(|project| {
+            crate::devflow_jev::standing(&store, &project_id, Path::new(&project.root_path))
+        });
+        Ok(said)
     })
     .await
 }

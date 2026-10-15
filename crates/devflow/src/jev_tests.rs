@@ -165,3 +165,47 @@ fn a_duplicate_and_a_failing_plan_hold_only_in_enforce() {
     );
     assert_eq!(Said::of(&enforced.to_json()), Some(enforced));
 }
+
+#[test]
+fn decisions_is_off_without_use_then_without_a_key_then_failing_on_the_last_call() {
+    let state = |used, opted_out, key, failed| decisions_state(used, opted_out, key, failed).state;
+    assert_eq!(state(false, false, true, None), DecisionsState::Off);
+    assert_eq!(
+        state(false, true, false, Some("refused")),
+        DecisionsState::Off,
+        "not used is off whatever else holds"
+    );
+    assert_eq!(state(true, true, true, None), DecisionsState::Off);
+    assert_eq!(
+        state(true, false, false, Some("refused")),
+        DecisionsState::NoKey
+    );
+    assert_eq!(
+        state(true, false, true, Some("refused")),
+        DecisionsState::Failing
+    );
+    assert_eq!(state(true, false, true, None), DecisionsState::On);
+
+    let off = decisions_state(false, false, true, None);
+    assert!(off
+        .reason
+        .as_deref()
+        .is_some_and(|why| why.contains("decisions.use")));
+    let no_key = decisions_state(true, false, false, None);
+    assert_eq!(
+        no_key.reason.as_deref(),
+        Some("no key — set one in Settings → Decisions")
+    );
+    let failing = decisions_state(true, false, true, Some("Decisions refused it (400): no"));
+    assert_eq!(
+        failing.reason.as_deref(),
+        Some("Decisions refused it (400): no")
+    );
+    assert_eq!(decisions_state(true, false, true, None).reason, None);
+    assert_eq!(
+        json!(failing)["state"],
+        "failing",
+        "a reply names it as the panel reads it"
+    );
+    assert_eq!(json!(no_key)["state"], "no_key");
+}

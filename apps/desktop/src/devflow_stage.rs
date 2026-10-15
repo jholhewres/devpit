@@ -52,12 +52,19 @@ pub(crate) fn respond(
         .filter(|_| on_board.as_deref() == Some(project.id.as_str()))
         .ok_or_else(|| format!("no card `{card_id}` on this project's board"))?;
     let checkout = crate::devflow_evidence::checkout(project, cwd);
-    let (passed, said) = match gate {
+    // Where Decisions stands, said only by a stage it judges.
+    let (passed, said, decisions) = match gate {
         StageGate::Command(command) => {
             confirmed(app, store, project, layered.as_ref(), step, command)?;
-            ran(command, &checkout, project, &card, name)
+            let (passed, said) = ran(command, &checkout, project, &card, name);
+            (passed, said, None)
         }
-        StageGate::Rubric(rubric) => judged(project, config, &checkout, &card, name, rubric),
+        StageGate::Rubric(rubric) => {
+            let jev = crate::devflow_jev::Jev::of(project, config, &checkout, Some(&card.id), &[]);
+            let (passed, said) = judged(jev.as_ref(), &card, name, rubric);
+            let decisions = crate::devflow_jev::decisions_of(config, jev.as_ref());
+            (passed, said, Some(decisions))
+        }
     };
     let at = SystemTime::now();
     let (folder, path) = runs::fresh(&checkout, &card.id, at)?;
@@ -97,7 +104,7 @@ pub(crate) fn respond(
     if let Some(app) = app {
         let _ = app.emit("board:changed", &project.id);
     }
-    Ok(json!({
+    let mut answer = json!({
         "stage": name,
         "uses": step.uses,
         "result": if passed { "passed" } else { "failed" },
@@ -108,7 +115,11 @@ pub(crate) fn respond(
         } else {
             "Fix what the gate says, then call devpit_devflow_stage again."
         },
-    }))
+    });
+    if let Some(decisions) = decisions {
+        answer["decisions"] = decisions;
+    }
+    Ok(answer)
 }
 
 /// An own stage's skill, from wherever `uses` points; never copied.
@@ -256,15 +267,12 @@ fn ran(
 /// A rubric gate: Decisions answers where the project uses it, and holds the
 /// card only in `enforce`; without it the stage passes, as the gate does.
 fn judged(
-    project: &Project,
-    config: &Config,
-    checkout: &Path,
+    jev: Option<&crate::devflow_jev::Jev>,
     card: &devpit_core::CardRow,
     name: &str,
     rubric: &str,
 ) -> (bool, Vec<String>) {
-    let Some(jev) = crate::devflow_jev::Jev::of(project, config, checkout, Some(&card.id), &[])
-    else {
+    let Some(jev) = jev else {
         return (
             true,
             vec![format!(

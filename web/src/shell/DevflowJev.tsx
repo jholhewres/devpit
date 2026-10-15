@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { DevflowCalibration, DevflowConfig } from '../gen/bindings'
 import { accuracyLine } from './DevflowAccuracy'
+import { decisionsLine } from './devflowDecisions'
 import { rubricsWith, type Edit } from './devflowEdit'
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
@@ -78,6 +79,14 @@ export function DevflowJev({
             )}
           </span>
         </div>
+        {accuracy?.decisions && (
+          <div className="dffield">
+            <span className="dffield__l">State</span>
+            <span className="dffield__v" data-decisions={accuracy.decisions.state}>
+              {decisionsLine(accuracy.decisions)}
+            </span>
+          </div>
+        )}
         {!onEnforce && <span className="pref__d">It starts in shadow. Enforcing is a click of yours once Devflow is set up.</span>}
         {projectId && <span className="dfsubhead">Rubric per stage</span>}
         {projectId &&

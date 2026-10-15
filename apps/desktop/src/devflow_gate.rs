@@ -22,6 +22,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
 use crate::devflow_evidence::{checkout, SIGNED};
+use crate::devflow_jev::Jev;
 
 /// The most of evidence.json or findings.json read.
 const MOST_READ: u64 = 4 * 1024 * 1024;
@@ -224,16 +225,27 @@ fn gated(
     root: &Path,
     read: &Read,
     for_a_hook: bool,
-) -> Gate {
+) -> (Gate, Option<Jev>) {
     let criteria = criteria_of(&card.body);
     let checked = gate::checked(&looked(config, &card.id, &criteria, read));
     let asked = checked.missing.is_empty()
         && (!for_a_hook
             || crate::devflow_jev::mode_of(store, &project.id, config) == Mode::Enforce);
-    let decisions = asked
-        .then(|| judged(project, config, card, &criteria, &checked, root))
+    let jev = asked
+        .then(|| Jev::of(project, config, root, Some(&card.id), &criteria))
         .flatten();
-    Gate::new(checked, decisions, &runs::stamp(SystemTime::now()))
+    let decisions = jev.as_ref().map(|jev| judged(jev, config, card, &checked));
+    let gate = Gate::new(checked, decisions, &runs::stamp(SystemTime::now()));
+    (gate, jev)
+}
+
+/// Where Decisions stands, beside what its rubric said: added to that
+/// object, so a reply that read it still does.
+fn with_standing(answer: &mut Value, standing: Value) {
+    match (answer["decisions"].as_object_mut(), standing) {
+        (Some(said), Value::Object(standing)) => said.extend(standing),
+        (_, standing) => answer["decisions"] = standing,
+    }
 }
 
 fn judged_for_agent(
@@ -247,7 +259,7 @@ fn judged_for_agent(
     let card = card_here(store, project, card_id)
         .ok_or_else(|| format!("no card `{card_id}` on this project's board"))?;
     let root = checkout(project, cwd);
-    let gate = gated(
+    let (gate, asked) = gated(
         store,
         project,
         config,
@@ -256,6 +268,8 @@ fn judged_for_agent(
         &read(&root, &card.id, config),
         false,
     );
+    // Not asked, held by the checks: the project's last call says how it stands.
+    let jev = asked.or_else(|| Jev::of(project, config, &root, Some(&card.id), &[]));
     let file = kept(project, &root, &card.id, &gate)?;
     let said = gate::comment(&gate);
     let sayable = crate::cards::sayable(&said).map_err(|err| err.message)?;
@@ -265,7 +279,12 @@ fn judged_for_agent(
     if let Some(app) = app {
         let _ = app.emit("board:changed", &project.id);
     }
-    Ok(gate::answer(&gate, Some(&file)))
+    let mut answer = gate::answer(&gate, Some(&file));
+    with_standing(
+        &mut answer,
+        crate::devflow_jev::decisions_of(config, jev.as_ref()),
+    );
+    Ok(answer)
 }
 
 /// Writes gate.json into the run it judged — beside the card's runs when
@@ -333,14 +352,11 @@ pub(crate) fn done_per_criterion(criteria: &[String]) -> crate::rubric::Rubric {
 /// What Decisions said, where the project set it up: never the diff, only
 /// the criteria with their evidence, the checks and the review.
 fn judged(
-    project: &Project,
+    jev: &Jev,
     config: &Config,
     card: &devpit_core::store::CardRow,
-    criteria: &[String],
     checked: &gate::Checked,
-    root: &Path,
-) -> Option<Judged> {
-    let jev = crate::devflow_jev::Jev::of(project, config, root, Some(&card.id), criteria)?;
+) -> Judged {
     let name = devpit_devflow::jev::rubric_for(config, "completion").unwrap_or_else(|| GATE.into());
     let state = devpit_devflow::jev::capped(&json!({
         "card": { "id": card.id, "title": card.title },
@@ -353,7 +369,7 @@ fn judged(
         "run": checked.run,
     }));
     let said = jev.judge(&name, &state);
-    Some(Judged {
+    Judged {
         rubric: name,
         mode: said.mode,
         outcome: said.outcome.clone(),
@@ -361,7 +377,7 @@ fn judged(
             Some(why) => vec![why],
             None => said.failing(),
         },
-    })
+    }
 }
 
 fn streaks() -> &'static Mutex<HashMap<String, Streak>> {
@@ -443,7 +459,7 @@ fn stopped(
     {
         return Said::Let;
     }
-    let gate = gated(store, project, config, &card, &root, &read, true);
+    let (gate, _) = gated(store, project, config, &card, &root, &read, true);
     let failed = (!gate.passed()).then(|| (gate.fingerprint(), gate.reason()));
     let key = format!(
         "{}/{}",

@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::devflow::DevflowAsk;
+use crate::devflow::{DevflowAsk, DevflowDecisions};
 
 /// Where a project's devflow.yaml stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -307,4 +307,7 @@ pub struct DevflowCardEvidence {
     pub folder: String,
     /// The newest run's attached files, as artifact names.
     pub artifacts: Vec<String>,
+    /// Where Decisions stands for the card's project.
+    #[serde(default)]
+    pub decisions: Option<DevflowDecisions>,
 }

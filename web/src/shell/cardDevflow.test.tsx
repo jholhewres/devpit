@@ -47,5 +47,22 @@ describe("a card's Devflow", () => {
     fireEvent.click(screen.getByRole('button', { name: 'gate.json' }))
     expect(shell.show).toHaveBeenCalledWith('file', expect.objectContaining({ path: '/home/me/artifacts/devflow/c1/20261011T150000Z/gate.json' }))
     expect(reviewerSaid({ ...evidence.reviewers[0]!, findings: 1, durationMs: null, costUsd: null })).toBe('1 finding')
+    expect(screen.queryByText('Decisions')).toBeNull()
+  })
+
+  it('says where Decisions stands as the Jev panel does, and nothing of it when it is off', async () => {
+    const ran = { cardId: 'c1', gate: { passed: true, run: 'r', at: 'r', withEvidence: 1, criteria: 1, missing: [] }, reviewers: [], verdict: null, folder: '/a', artifacts: [] }
+    evidence = { ...ran, decisions: { state: 'failing', reason: 'Decisions refused it (400 Bad Request): no criteria' } }
+    render(<CardDevflow cardId="c1" />)
+    expect(await screen.findByText('failing: Decisions refused it (400 Bad Request): no criteria')).toBeTruthy()
+    cleanup()
+    evidence = { ...ran, decisions: { state: 'no_key', reason: 'no key — set one in Settings → Decisions' } }
+    render(<CardDevflow cardId="c1" />)
+    expect(await screen.findByText('no key — set one in Settings → Decisions')).toBeTruthy()
+    cleanup()
+    evidence = { ...ran, decisions: { state: 'off', reason: 'decisions.use is false in devflow.yaml' } }
+    render(<CardDevflow cardId="c1" />)
+    expect(await screen.findByText('Gate passed')).toBeTruthy()
+    expect(screen.queryByText('Decisions')).toBeNull()
   })
 })

@@ -304,6 +304,26 @@ fn without_a_decisions_key_the_checks_alone_decide() {
     );
 }
 
+/// However Decisions stands, in shadow the checks give the verdict and the
+/// reply says where it stands, beside what the rubric said.
+#[test]
+fn the_gate_says_where_decisions_stands_and_the_checks_decide_in_each_standing() {
+    use crate::devflow_jev::tests::{Standing, STANDINGS};
+    for standing in STANDINGS {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().canonicalize().expect("root");
+        let (_store, project, card) = devflow_on(&root, standing.yaml());
+        standing.give(&project.id);
+        evidence(&project, &root, &card);
+        let said = ask(&project, &root, "devflow_gate", json!({ "card": card }));
+        assert_eq!(said["result"], "passed", "{standing:?}: {said}");
+        standing.said_in(&said);
+        if !matches!(standing, Standing::NotUsed) {
+            assert_eq!(said["decisions"]["rubric"], "devflow-done", "{said}");
+        }
+    }
+}
+
 #[test]
 fn devflow_done_asks_done_once_per_criterion_and_keeps_verified_and_in_scope() {
     let criteria = vec!["one".to_owned(), "two".to_owned()];

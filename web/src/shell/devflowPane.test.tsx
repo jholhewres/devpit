@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { DevflowAsk, DevflowConfig, DevflowScreen, DevflowStage } from '../gen/bindings'
+import type { DevflowAsk, DevflowConfig, DevflowDecisions, DevflowScreen, DevflowStage } from '../gen/bindings'
 
 const heard: Record<string, (payload: unknown) => void> = {}
 vi.mock('./window', () => ({
@@ -83,6 +83,7 @@ const active = (yaml = 'version: 1\nenabled: true\n', more: Partial<DevflowConfi
   base({ state: 'active', yaml, config: config({ enabled: true, ...more }) })
 
 let current: DevflowScreen = missing()
+let standing: DevflowDecisions | null = null
 const called = vi.fn()
 const looked = vi.fn()
 vi.mock('./live', () => ({
@@ -124,13 +125,14 @@ vi.mock('./live', () => ({
       return { asks: [] }
     },
     devflowSkillText: async () => ({ skill: { name: 'devflow-plan', layer: 'built-in', file: null, refused: null }, text: '# Devflow: plan' }),
-    devflowCalibration: async () => ({ projectId: 'prj_api', rubrics: [] }),
+    devflowCalibration: async () => ({ projectId: 'prj_api', rubrics: [], decisions: standing }),
   },
 }))
 
 const { DevflowPane, LOOK_EVERY_MS, OUTSIDE } = await import('./DevflowPane')
 
 afterEach(() => {
+  standing = null
   cleanup()
   called.mockReset()
   shell.show.mockReset()
@@ -164,6 +166,17 @@ describe('the Devflow screen', () => {
     expect(screen.getByText('Reviewers')).toBeTruthy()
     expect(screen.getByText('Ask Jev at the gates')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Key and provider in Settings → Decisions' })).toBeTruthy()
+  })
+
+  it('says on the Jev panel that Decisions has no key, or why it is failing', async () => {
+    current = active()
+    standing = { state: 'no_key', reason: 'no key — set one in Settings → Decisions' }
+    render(<DevflowPane />)
+    expect(await screen.findByText('no key — set one in Settings → Decisions')).toBeTruthy()
+    cleanup()
+    standing = { state: 'failing', reason: 'Decisions refused it (400 Bad Request): no criteria' }
+    render(<DevflowPane />)
+    expect(await screen.findByText('failing: Decisions refused it (400 Bad Request): no criteria')).toBeTruthy()
   })
 
   it('says where an invalid file is refused, and opens it', async () => {

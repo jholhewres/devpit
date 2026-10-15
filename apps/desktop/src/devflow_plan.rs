@@ -65,13 +65,17 @@ pub(crate) fn respond(
     let jev = config
         .as_ref()
         .and_then(|config| Jev::of(project, config, root, epic.as_deref(), &[]));
-    respond_judged(
+    let mut answer = respond_judged(
         app,
         method,
         project,
         params,
         config.as_ref().zip(jev.as_ref()),
-    )
+    )?;
+    if let (Some(config), "devflow_plan") = (&config, method) {
+        answer["decisions"] = crate::devflow_jev::decisions_of(config, jev.as_ref());
+    }
+    Ok(answer)
 }
 
 /// [`respond`], with Jev where the project uses it: the brief judged before

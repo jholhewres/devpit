@@ -11,6 +11,7 @@
 
 use std::collections::BTreeMap;
 
+use devpit_rpc::{DecisionsState, DevflowDecisions};
 use serde_json::{json, Map, Value};
 
 use crate::brief::Brief;
@@ -49,6 +50,37 @@ pub const STAGES: [(&str, &str); 4] = [
     ("review", FINDING),
     ("completion", DONE),
 ];
+
+/// Where Decisions stands for a project's Devflow: off where devflow.yaml or
+/// the person's Settings keep its state home, `no_key` without a key,
+/// `failing` when the last call came to nothing, else on.
+pub fn decisions_state(
+    used: bool,
+    opted_out: bool,
+    key: bool,
+    failed: Option<&str>,
+) -> DevflowDecisions {
+    let (state, reason) = match failed {
+        _ if !used => (
+            DecisionsState::Off,
+            Some("decisions.use is false in devflow.yaml"),
+        ),
+        _ if opted_out => (
+            DecisionsState::Off,
+            Some("this project's state is not sent to Decisions — see Settings → Decisions"),
+        ),
+        _ if !key => (
+            DecisionsState::NoKey,
+            Some("no key — set one in Settings → Decisions"),
+        ),
+        Some(why) => (DecisionsState::Failing, Some(why)),
+        None => (DecisionsState::On, None),
+    };
+    DevflowDecisions {
+        state,
+        reason: reason.map(str::to_owned),
+    }
+}
 
 /// The rubric `stage`'s work is judged by: the one devflow.yaml names for
 /// it, else devpit's.

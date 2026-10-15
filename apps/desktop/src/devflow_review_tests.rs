@@ -120,6 +120,41 @@ fn config_of(root: &Path) -> Config {
     }
 }
 
+/// However Decisions stands, a review's reply says so; refused, Jev's
+/// consolidation falls back and the review still ends.
+#[cfg(unix)]
+#[test]
+fn a_review_says_where_decisions_stands_in_each_standing() {
+    use crate::devflow_jev::tests::STANDINGS;
+    for standing in STANDINGS {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let scripts = tempfile::tempdir().expect("scripts");
+        let root = dir.path().canonicalize().expect("root");
+        let (_store, project, card) = reviewed_project(&root);
+        let yaml = root.join(".devpit/devflow/devflow.yaml");
+        let mut text = std::fs::read_to_string(&yaml).expect("yaml");
+        text.push_str(standing.yaml());
+        std::fs::write(&yaml, text).expect("yaml");
+        standing.give(&project.id);
+        let claude = fake_claude(scripts.path());
+        let reach = move |agent: Agent| match agent {
+            Agent::Claude => Ok(claude.clone()),
+            _ => Err("not installed".to_owned()),
+        };
+        let said = respond_with(
+            None,
+            &project,
+            &config_of(&root),
+            &root,
+            &json!({ "card": card }),
+            &reach,
+        )
+        .expect("reviewed");
+        assert_eq!(said["verdict"], "request_changes", "{standing:?}: {said}");
+        standing.said_in(&said);
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn one_reviewer_on_a_fake_cli_reviews_the_card_and_its_critical_finding_holds_the_gate() {

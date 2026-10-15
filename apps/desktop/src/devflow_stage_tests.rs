@@ -15,11 +15,16 @@ fn project_at(id: &str, root: &Path) -> Project {
 /// A project on version 2 with an own stage gated by `command`, switched on,
 /// and a card on its board.
 fn flow_with(dir: &Path, command: &str, publish: &str) -> (Store, Project, String) {
+    flow_gated(dir, &format!("{{ command: '{command}' }}"), publish, "")
+}
+
+/// [`flow_with`], the own stage's `gate` as given and `extra` after the stages.
+fn flow_gated(dir: &Path, gate: &str, publish: &str, extra: &str) -> (Store, Project, String) {
     let store = crate::projects::store().expect("store");
     let id = store.add_project(dir, None).expect("project");
     store.ensure_board(&id).expect("board");
     let yaml = format!(
-        "version: 2\nenabled: true\nstages:\n  - uses: builtin/plan\n    publish: {publish}\n  - uses: builtin/execution\n    checks:\n      - {{ name: unit, run: 'true' }}\n  - uses: project/pr\n    gate: {{ command: '{command}' }}\n  - uses: builtin/completion\n"
+        "version: 2\nenabled: true\nstages:\n  - uses: builtin/plan\n    publish: {publish}\n  - uses: builtin/execution\n    checks:\n      - {{ name: unit, run: 'true' }}\n  - uses: project/pr\n    gate: {gate}\n  - uses: builtin/completion\n{extra}"
     );
     std::fs::create_dir_all(dir.join(".devpit/devflow/skills/pr")).expect("folder");
     std::fs::write(dir.join(".devpit/devflow/devflow.yaml"), yaml).expect("yaml");
@@ -113,4 +118,40 @@ fn a_plan_published_to_jira_is_deferred_with_the_reason() {
     .expect_err("not yet");
     assert!(refused.contains("publish: jira is not yet"), "{refused}");
     assert!(refused.contains("O-08"), "{refused}");
+}
+
+/// However Decisions stands, a stage it judges says so, and in shadow passes.
+#[test]
+fn a_rubric_stage_says_where_decisions_stands_in_each_standing() {
+    use crate::devflow_jev::tests::STANDINGS;
+    for standing in STANDINGS {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().canonicalize().expect("root");
+        let (_store, project, card) =
+            flow_gated(&root, "{ rubric: devflow-plan }", "board", standing.yaml());
+        standing.give(&project.id);
+        let said = ask(
+            &project,
+            &root,
+            "devflow_stage",
+            json!({ "stage": "pr", "card": card }),
+        )
+        .expect("ran");
+        assert_eq!(said["result"], "passed", "{standing:?}: {said}");
+        standing.said_in(&said);
+    }
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (_store, project, card) = flow_with(&root, "true", "board");
+    let said = ask(
+        &project,
+        &root,
+        "devflow_stage",
+        json!({ "stage": "pr", "card": card }),
+    )
+    .expect("ran");
+    assert!(
+        said.get("decisions").is_none(),
+        "a command asks nothing: {said}"
+    );
 }

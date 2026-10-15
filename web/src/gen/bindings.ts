@@ -2678,6 +2678,13 @@ export type DecisionTried = {
 	note: string | null,
 };
 
+/**  Whether Devflow's questions reach Decisions. */
+export type DecisionsState = "on" | 
+/**  `decisions.use` is false, or the project's state is never sent. */
+"off" | "no_key" | 
+/**  The last call came to nothing. */
+"failing";
+
 /**
  *  A profile as the person wrote it.
  * 
@@ -2762,6 +2769,8 @@ export type DevflowAutopilot = {
 export type DevflowCalibration = {
 	projectId: string,
 	rubrics: RubricAccuracy[],
+	/**  Where Decisions stands for the project's Devflow now. */
+	decisions?: DevflowDecisions | null,
 };
 
 /**
@@ -2777,6 +2786,8 @@ export type DevflowCardEvidence = {
 	folder: string,
 	/**  The newest run's attached files, as artifact names. */
 	artifacts: string[],
+	/**  Where Decisions stands for the card's project. */
+	decisions?: DevflowDecisions | null,
 };
 
 /**  What the click does. */
@@ -2829,6 +2840,16 @@ export type DevflowConfig = {
 	decisionsUse: boolean,
 	/**  `shadow` or `enforce`. */
 	decisionsMode: string,
+};
+
+/**
+ *  Where Decisions stands, said the same in every Devflow reply, on the Jev
+ *  panel and on the card.
+ */
+export type DevflowDecisions = {
+	state: DecisionsState,
+	/**  Why it is not `on`. */
+	reason: string | null,
 };
 
 /**  What a setup starts from, read off the repository and this machine. */

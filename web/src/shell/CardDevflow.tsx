@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 
 import type { DevflowCardEvidence, DevflowReviewed } from '../gen/bindings'
+import { decisionsLine, decisionsTone } from './devflowDecisions'
 import { ask, commands } from './live'
 import { useShell } from './useShell'
 import { onCarried } from './window'
 
 /*
  * What a card's Devflow runs left, compact: the newest gate, the newest
- * review's reviewers, and the files that run attached. Nothing at all for a
- * card Devflow never ran on.
+ * review's reviewers, where Decisions stands, and the files that run
+ * attached. Nothing at all for a card Devflow never ran on.
  */
 
 const seconds = (ms: number): string => (ms >= 60000 ? `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s` : `${Math.round(ms / 1000)} s`)
@@ -68,6 +69,14 @@ export function CardDevflow({ cardId }: { cardId: string }): React.JSX.Element |
           </span>
         </div>
       ))}
+      {evidence.decisions && evidence.decisions.state !== 'off' && (
+        <div className="crun" data-state={decisionsTone(evidence.decisions)}>
+          <span className="crun__b">
+            <span className="crun__t">Decisions</span>
+            <span className="crun__s">{decisionsLine(evidence.decisions)}</span>
+          </span>
+        </div>
+      )}
       {evidence.verdict && <p className="crun__s">Review: {evidence.verdict === 'request_changes' ? 'changes requested' : evidence.verdict}</p>}
       {evidence.artifacts.map((name) => (
         <button key={name} className="conv__act" title={name} onClick={() => open(name)}>

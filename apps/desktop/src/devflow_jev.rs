@@ -18,11 +18,30 @@ use devpit_devflow::calibrate::{self, Labelled};
 use devpit_devflow::config::{Mode, GATE};
 use devpit_devflow::jev::{self, Said};
 use devpit_devflow::{Ask, Config};
-use devpit_rpc::{DevflowCalibration, Project, RpcError, RubricAccuracy};
+use devpit_rpc::{DevflowCalibration, DevflowDecisions, Project, RpcError, RubricAccuracy};
 use serde_json::{json, Value};
 
-use crate::deciding::{Asking, Conf};
+use crate::deciding::{Asking, Conf, Decided, Skip};
 use crate::rubric::Rubric;
+
+/// The Decisions settings a test gives a project in place of the key file's,
+/// which every test shares.
+#[cfg(test)]
+pub(crate) static GIVEN: Mutex<BTreeMap<String, Conf>> = Mutex::new(BTreeMap::new());
+
+#[cfg(not(test))]
+fn conf_for(store: &Store, _project_id: &str) -> Result<Conf, String> {
+    crate::decisions::conf(store)
+}
+
+#[cfg(test)]
+fn conf_for(store: &Store, project_id: &str) -> Result<Conf, String> {
+    let given = GIVEN
+        .lock()
+        .ok()
+        .and_then(|given| given.get(project_id).cloned());
+    given.map_or_else(|| crate::decisions::conf(store), Ok)
+}
 
 /// `enforce` acts only once the person clicked for it.
 pub(crate) fn mode_of(store: &Store, project_id: &str, config: &Config) -> Mode {
@@ -61,6 +80,8 @@ pub(crate) struct Jev {
     mode: Mode,
     /// The card's criteria, which `devflow-done` asks one by one.
     criteria: Vec<String>,
+    /// This reply's last call: `Some(None)` answered, `Some(Some(why))` not.
+    called: Mutex<Option<Option<String>>>,
 }
 
 impl Jev {
@@ -77,7 +98,7 @@ impl Jev {
             return None;
         }
         let store = crate::projects::store().ok()?;
-        let conf = crate::decisions::conf(&store).ok()?;
+        let conf = conf_for(&store, &project.id).ok()?;
         let mode = mode_of(&store, &project.id, config);
         Some(Jev::with(
             store,
@@ -107,6 +128,33 @@ impl Jev {
             root: root.to_path_buf(),
             mode,
             criteria: criteria.to_vec(),
+            called: Mutex::new(None),
+        }
+    }
+
+    /// Where Decisions stands after this reply's calls: the last of them, or
+    /// the project's last before it when none was made.
+    pub(crate) fn state(&self) -> DevflowDecisions {
+        let called = self.called.lock().ok().and_then(|called| called.clone());
+        let failed = called.unwrap_or_else(|| {
+            self.store
+                .lock()
+                .ok()?
+                .decision_failed_last(&self.project_id)
+                .ok()
+                .flatten()
+        });
+        jev::decisions_state(
+            true,
+            self.conf.opted_out.contains(&self.project_id),
+            self.conf.key.is_some(),
+            failed.as_deref(),
+        )
+    }
+
+    fn called(&self, failed: Option<String>) {
+        if let Ok(mut called) = self.called.lock() {
+            *called = Some(failed);
         }
     }
 
@@ -118,14 +166,17 @@ impl Jev {
     /// The rubric `name` asked about `state`, logged under the mode it ran
     /// in, and judged by its thresholds.
     pub(crate) fn judge(&self, name: &str, state: &Value) -> Said {
-        let skipped = |why: String| Said {
-            rubric: name.to_owned(),
-            decision: None,
-            mode: self.mode,
-            outcome: "skipped".to_owned(),
-            verdicts: Value::Null,
-            answers: Value::Null,
-            skipped: Some(why),
+        let skipped = |why: String| {
+            self.called(Some(why.clone()));
+            Said {
+                rubric: name.to_owned(),
+                decision: None,
+                mode: self.mode,
+                outcome: "skipped".to_owned(),
+                verdicts: Value::Null,
+                answers: Value::Null,
+                skipped: Some(why),
+            }
         };
         let rubric = match rubric(&self.root, name, &self.criteria) {
             Ok(rubric) => rubric,
@@ -147,6 +198,12 @@ impl Jev {
         };
         let (decided, decision) =
             crate::deciding::decide_logged(&store, &conf, &asking, crate::deciding::now());
+        match &decided {
+            Decided::Answered { .. } => self.called(None),
+            // Not a call: the state says these without one.
+            Decided::Skipped(Skip::Off | Skip::OptedOut) => {}
+            Decided::Skipped(skip) => self.called(Some(skip.reason())),
+        }
         let result = crate::deciding::gated(decided, &rubric, self.mode.word().to_owned());
         Said {
             rubric: name.to_owned(),
@@ -158,6 +215,32 @@ impl Jev {
             skipped: result.skipped.map(|skip| skip.reason()),
         }
     }
+}
+
+/// Where Decisions stands for a reply, with the Jev it asked, if any.
+pub(crate) fn decisions_of(config: &Config, jev: Option<&Jev>) -> Value {
+    let state = jev.map_or_else(
+        || jev::decisions_state(config.decisions.use_, false, false, None),
+        Jev::state,
+    );
+    json!(state)
+}
+
+/// Where Decisions stands for a project now, as the Jev panel and the card
+/// say it: its devflow.yaml, the settings and its last call.
+pub(crate) fn standing(store: &Store, project_id: &str, root: &Path) -> DevflowDecisions {
+    let used = match crate::devflow::read(root) {
+        devpit_devflow::State::Valid(_, config) => config.decisions.use_,
+        _ => false,
+    };
+    let conf = conf_for(store, project_id).unwrap_or_default();
+    let failed = store.decision_failed_last(project_id).ok().flatten();
+    jev::decisions_state(
+        used,
+        conf.opted_out.iter().any(|out| out == project_id),
+        conf.key.is_some(),
+        failed.as_deref(),
+    )
 }
 
 /// The rubric a project's completion is judged by.
@@ -353,9 +436,13 @@ pub async fn devflow_calibration(project_id: String) -> Result<DevflowCalibratio
     crate::off_main::blocking(move || {
         let store = crate::projects::store()?;
         let rows = store.decisions_of_project(&project_id)?;
+        let decisions = store
+            .project(&project_id)?
+            .map(|project| standing(&store, &project_id, Path::new(&project.root_path)));
         Ok(DevflowCalibration {
             rubrics: calibration(&rows),
             project_id,
+            decisions,
         })
     })
     .await
@@ -363,4 +450,4 @@ pub async fn devflow_calibration(project_id: String) -> Result<DevflowCalibratio
 
 #[cfg(test)]
 #[path = "devflow_jev_tests.rs"]
-mod tests;
+pub(crate) mod tests;

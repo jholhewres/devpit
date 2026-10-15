@@ -257,6 +257,10 @@ pub(crate) fn decide_logged(
     let thresholds = asking
         .rubric
         .map(|rubric| json!(rubric.thresholds).to_string());
+    let failure = match &decided {
+        Decided::Skipped(Skip::Failed(why)) => Some(why.as_str()),
+        _ => None,
+    };
     let logged = store.log_decision(
         &DecisionWrite {
             project_id: asking.project_id,
@@ -272,6 +276,7 @@ pub(crate) fn decide_logged(
             cost_usd,
             latency_ms: latency_ms as i64,
             state_digest: &digest(&state),
+            failure,
         },
         now,
     );
