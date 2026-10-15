@@ -142,3 +142,61 @@ fn a_card_has_the_sessions_seen_in_its_checkout_of_every_account_running_or_ende
         .expect("read")
         .is_empty());
 }
+
+#[test]
+fn a_poll_that_saw_what_is_kept_takes_no_write_lock() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("state.db");
+    let store = Store::open(&path).expect("open");
+    store
+        .saw_sessions("claude", &[seen("s1", "api")], 10)
+        .expect("saw");
+    // Held as a write stuck on the disk holds it; short, so a regression fails fast.
+    let other = Store::open(&path).expect("open");
+    other.conn().execute_batch("BEGIN IMMEDIATE").expect("lock");
+    store
+        .conn()
+        .busy_timeout(std::time::Duration::from_millis(50))
+        .expect("timeout");
+
+    let polled = store.saw_sessions("claude", &[seen("s1", "api")], 20);
+    other.conn().execute_batch("ROLLBACK").expect("unlock");
+    assert!(
+        polled.is_ok(),
+        "a poll that saw nothing new waited to write: {polled:?}"
+    );
+}
+
+#[test]
+fn only_what_changed_or_went_stale_is_written_again() {
+    let (_dir, store) = store();
+    store
+        .saw_sessions("claude", &[seen("s1", "api")], 10)
+        .expect("saw");
+    let kept = store.open_sessions("claude").expect("kept");
+    let fresh = 10 + SEEN_REFRESH_SECS - 1;
+
+    assert!(already_kept(&kept, &[seen("s1", "api")], fresh));
+    assert!(!already_kept(&kept, &[seen("s1", "api")], fresh + 1));
+    assert!(!already_kept(&kept, &[seen("s1", "renamed")], fresh));
+    let idle = SessionSeen {
+        status: "idle",
+        ..seen("s1", "api")
+    };
+    assert!(!already_kept(&kept, &[idle], fresh));
+    assert!(!already_kept(
+        &kept,
+        &[seen("s1", "api"), seen("s2", "web")],
+        fresh
+    ));
+    assert!(!already_kept(&kept, &[], fresh));
+
+    store
+        .saw_sessions("claude", &[seen("s1", "api")], fresh + 1)
+        .expect("saw");
+    let seen_at = store
+        .seen_session("claude", "s1")
+        .expect("read")
+        .map(|one| one.last_seen_at);
+    assert_eq!(seen_at, Some(fresh + 1));
+}

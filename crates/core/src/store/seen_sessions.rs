@@ -51,6 +51,30 @@ fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SeenSessionRow> {
     })
 }
 
+/// How old a running session's `last_seen_at` may get before a poll that saw
+/// nothing new writes it anyway.
+const SEEN_REFRESH_SECS: i64 = 60;
+
+/// Whether `running` is what `kept` (the profile's open rows) already says,
+/// recently enough that writing it again would say nothing new.
+fn already_kept(kept: &[SeenSessionRow], running: &[SessionSeen<'_>], now: i64) -> bool {
+    let same = |row: &SeenSessionRow, one: &SessionSeen<'_>| {
+        row.session_id == one.session_id
+            && row.name == one.name
+            && row.cwd == one.cwd
+            && row.project_id.as_deref() == one.project_id
+            && row.card_id.as_deref() == one.card_id
+            && row.last_status.as_deref() == Some(one.status)
+            && now - row.last_seen_at < SEEN_REFRESH_SECS
+    };
+    running
+        .iter()
+        .all(|one| kept.iter().any(|row| same(row, one)))
+        && kept
+            .iter()
+            .all(|row| running.iter().any(|one| one.session_id == row.session_id))
+}
+
 impl Store {
     /// Records what `profile` has running at `now`; a session it had that is
     /// no longer among them has ended.
@@ -60,6 +84,12 @@ impl Store {
         running: &[SessionSeen<'_>],
         now: i64,
     ) -> Result<(), StoreError> {
+        // Most polls see what the last one kept. Rewriting it made nine in ten
+        // of the WAL's pages, and each WAL restart syncs under the write lock.
+        let kept = self.open_sessions(profile_id)?;
+        if already_kept(&kept, running, now) {
+            return Ok(());
+        }
         let tx = self.writing()?;
         for one in running {
             tx.execute(
@@ -108,6 +138,15 @@ impl Store {
             rusqlite::params![session_id, by, now],
         )?;
         Ok(())
+    }
+
+    /// The kept sessions of `profile` that have not ended.
+    fn open_sessions(&self, profile_id: &str) -> Result<Vec<SeenSessionRow>, StoreError> {
+        let mut statement = self.conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM seen_session WHERE profile_id = ?1 AND ended_at IS NULL"
+        ))?;
+        let rows = statement.query_map([profile_id], row)?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     /// The sessions of `profile` that ended, the latest first.

@@ -166,3 +166,49 @@ fn a_close_stuck_on_the_disk_refuses_no_open() {
         "opening waited on another's close: {opened:?}"
     );
 }
+
+/// The automatic checkpoint copies the whole WAL into the database, and the
+/// write after it starts the WAL over: SQLite syncs the new header under the
+/// write lock, however `synchronous` is set. Reported from 0.1.42, with polls
+/// of the live sessions rewriting what they had kept making most of the WAL.
+#[test]
+fn a_write_starting_the_wal_over_refuses_no_poll() {
+    let _alone = alone();
+    slow_disk();
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("state.db");
+    // Another connection open, as the app always has one: the WAL's index
+    // then remembers the checkpoint, rather than being rebuilt by the next open.
+    let open = Store::open(&path).expect("open");
+    open.saw_sessions("claude", &running("s1"), 1)
+        .expect("write");
+    open.saw_sessions("codex", &running("s2"), 1)
+        .expect("write");
+    let copied: i64 = open
+        .conn()
+        .query_row("PRAGMA wal_checkpoint(PASSIVE)", [], |row| row.get(0))
+        .expect("checkpoint");
+    assert_eq!(copied, 0, "the checkpoint was refused");
+
+    let writing = path.clone();
+    let polled = while_stuck(
+        move || {
+            let [one] = running("s1");
+            let [started] = running("s3");
+            let store = Store::open(&writing).expect("open");
+            store
+                .saw_sessions("claude", &[one, started], 2)
+                .expect("write");
+        },
+        || {
+            let store = Store::open(&path).expect("open");
+            store.saw_sessions("codex", &running("s2"), 2)
+        },
+    );
+    drop(open);
+    assert!(STALLED.load(SeqCst), "the new WAL's header was not synced");
+    assert!(
+        polled.is_ok(),
+        "a poll waited on the WAL starting over: {polled:?}"
+    );
+}
