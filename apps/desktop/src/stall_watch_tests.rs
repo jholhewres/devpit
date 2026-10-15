@@ -44,3 +44,23 @@ fn waking_from_a_suspend_is_not_a_stall() {
     assert!(!overslept(100 + LOOK_EVERY.as_secs(), 100));
     assert!(overslept(100 + 600, 100));
 }
+
+#[test]
+fn what_the_page_said_is_cut_without_splitting_a_character() {
+    assert_eq!(cut("view board, 231 cards", 10), "view board");
+    // `é` is two bytes: cutting through it keeps neither.
+    assert_eq!(cut("café", 4), "caf");
+    assert_eq!(cut("short", PAGE_ON_MOST), "short");
+}
+
+#[test]
+fn a_stall_says_what_the_page_was_on_and_what_was_working() {
+    assert_eq!(
+        doing(
+            "view board, 231 cards",
+            "working on board_get 12.0s; answered nothing"
+        ),
+        "page: view board, 231 cards\ncommands: working on board_get 12.0s; answered nothing"
+    );
+    assert!(doing("", "").starts_with("page: nothing said\n"));
+}

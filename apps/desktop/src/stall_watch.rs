@@ -9,6 +9,7 @@
 //! the others last ran.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use devpit_core::reports;
@@ -31,6 +32,10 @@ static CLOCKS: [(&str, &AtomicU64); 4] = [
 ];
 /// What the page last said about itself; a hidden page owes no beat.
 static SHOWN: AtomicBool = AtomicBool::new(false);
+/// And what it was on: the kind of tab in front and the board's size.
+static PAGE_ON: Mutex<String> = Mutex::new(String::new());
+/// The page's text is the window's to send, so it is cut to this.
+const PAGE_ON_MOST: usize = 120;
 
 /// What one look at a clock has to say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,15 +76,27 @@ pub(crate) fn overslept(now: u64, looked: u64) -> bool {
     now.saturating_sub(looked) > 3 * LOOK_EVERY.as_secs()
 }
 
-/// `window.beat` — the page is alive, its calls get through, and whether it
-/// is shown. It calls every few seconds while it is.
+/// `window.beat` — the page is alive, its calls get through, whether it is
+/// shown and what it is on. It calls every few seconds while it is shown.
 #[tauri::command]
 #[specta::specta]
-pub fn window_beat(webview: tauri::Webview, shown: bool) {
+pub fn window_beat(webview: tauri::Webview, shown: bool, on: String) {
     if webview.label() == "main" {
         PAGE.store(reports::now(), Ordering::Relaxed);
         SHOWN.store(shown, Ordering::Relaxed);
+        if let Ok(mut kept) = PAGE_ON.lock() {
+            *kept = cut(&on, PAGE_ON_MOST).to_owned();
+        }
     }
+}
+
+/// `text` up to `most` bytes, never splitting a character.
+pub(crate) fn cut(text: &str, most: usize) -> &str {
+    let mut end = most.min(text.len());
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
 }
 
 /// The watcher. Started once, in `setup`.
@@ -145,13 +162,26 @@ fn tell(said: Option<Said>, who: &str, ages: &str) {
         Some(Said::Back(seconds)) => format!("{who} ran again after {seconds}s"),
         None => return,
     };
-    eprintln!("devpit stall: {message}");
+    let page = PAGE_ON.lock().map(|on| on.clone()).unwrap_or_default();
+    let doing = doing(&page, &crate::off_main::said());
+    eprintln!("devpit stall: {message} [{doing}]");
+    // In the stack, not the message: the same stall stays one report.
     reports::record(reports::Report {
         kind: "background",
         location: Some("stall_watch"),
         message: &message,
-        stack: None,
+        stack: Some(&doing),
     });
+}
+
+/// What was going on when a clock stood still or ran again: what the page
+/// last said it was on, and the commands working and lately answered.
+pub(crate) fn doing(page: &str, commands: &str) -> String {
+    let page = match page {
+        "" => "nothing said",
+        said => said,
+    };
+    format!("page: {page}\ncommands: {commands}")
 }
 
 #[cfg(test)]

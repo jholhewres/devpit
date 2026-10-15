@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { Board, CardHappening, CardSession, ColumnDeleted, Played, Step } from '../gen/bindings'
+import { noteCards } from './beat'
 import { endOf, landed, lanes, moveQuestion, tiedToOthers, type Lane } from './board'
 import { shifted } from './laneOrder'
 import { ask, commands } from './live'
@@ -89,6 +90,8 @@ export function useBoard(projectId: string | null, inFront = true): UseBoard {
   const reload = useCallback(() => void read(true), [read])
 
   useEffect(reload, [reload])
+  // For the stall report: how big a board the page holds in front.
+  useEffect(() => void (board && inFront && noteCards(board.cards.length)), [board, inFront])
 
   /* An agent writes to the board many times a turn, and each write was a read
      of every card. A burst is read once; behind another tab or a hidden

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { noteView } from './beat'
 import { ask, commands } from './live'
 import { useWantedPane } from './useWantedPane'
 import type { PaneName } from './paneList'
@@ -70,6 +71,9 @@ export function useTabs(projectId: string | null): Tabs {
     [],
   )
   useEffect(() => remember(held.projectId, held.strip), [held])
+  // For the stall report: which kind of tab is in front.
+  const front = focused(strip)?.kind ?? null
+  useEffect(() => noteView(front), [front])
 
   const show = useCallback(
     (kind: PaneName, tab: Partial<Tab> = {}) =>

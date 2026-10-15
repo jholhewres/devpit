@@ -613,10 +613,10 @@ export const commands = {
 	 */
 	reboundSet: (rebound: Rebound) => typedError<Rebound, RpcError>(__TAURI_INVOKE("rebound_set", { rebound })),
 	/**
-	 *  `window.beat` — the page is alive, its calls get through, and whether it
-	 *  is shown. It calls every few seconds while it is.
+	 *  `window.beat` — the page is alive, its calls get through, whether it is
+	 *  shown and what it is on. It calls every few seconds while it is shown.
 	 */
-	windowBeat: (shown: boolean) => __TAURI_INVOKE<void>("window_beat", { shown }),
+	windowBeat: (shown: boolean, on: string) => __TAURI_INVOKE<void>("window_beat", { shown, on }),
 	/**  `agent.choice` — the default and the ones switched off. */
 	agentChoice: () => typedError<AgentChoice, RpcError>(__TAURI_INVOKE("agent_choice")),
 	/**  `agent.default_set` — what a new terminal opens. */

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { BEAT_MS, beat } from './beat'
+import { BEAT_MS, beat, doing, noteCards, noteView } from './beat'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -19,16 +19,16 @@ describe('the beat', () => {
     ;(window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {}
     vi.useFakeTimers()
     const shown = page()
-    const send = vi.fn((_shown: boolean) => Promise.resolve())
-    const stop = beat(shown, send)
+    const send = vi.fn((_shown: boolean, _on: string) => Promise.resolve())
+    const stop = beat(shown, send, BEAT_MS, () => 'view board')
 
-    expect(send).toHaveBeenLastCalledWith(true)
+    expect(send).toHaveBeenLastCalledWith(true, 'view board')
     vi.advanceTimersByTime(BEAT_MS * 2)
     expect(send).toHaveBeenCalledTimes(3)
 
     shown.visibilityState = 'hidden'
     shown.dispatchEvent(new Event('visibilitychange'))
-    expect(send).toHaveBeenLastCalledWith(false)
+    expect(send).toHaveBeenLastCalledWith(false, 'view board')
     vi.advanceTimersByTime(BEAT_MS * 3)
     expect(send).toHaveBeenCalledTimes(4)
 
@@ -39,8 +39,16 @@ describe('the beat', () => {
     expect(send).toHaveBeenCalledTimes(4)
   })
 
+  it('says what the page is on, by kind and count only', () => {
+    noteView('board')
+    noteCards(231)
+    expect(doing()).toBe('view board, 231 cards')
+    noteView(null)
+    expect(doing()).toBe('view none, 231 cards')
+  })
+
   it('does nothing outside the app', () => {
-    const send = vi.fn((_shown: boolean) => Promise.resolve())
+    const send = vi.fn((_shown: boolean, _on: string) => Promise.resolve())
     beat(page(), send)
     expect(send).not.toHaveBeenCalled()
   })
