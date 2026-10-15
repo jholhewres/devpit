@@ -253,6 +253,18 @@ fn offer(store: &Store, project: &Project, root: &Path, state: &State) -> Value 
     })
 }
 
+/// The fields a newer devpit wrote, left out here rather than refused.
+pub(crate) fn unread_note(unread: &[devpit_devflow::Invalid]) -> Option<String> {
+    let named: Vec<String> = unread.iter().map(ToString::to_string).collect();
+    (!named.is_empty()).then(|| {
+        format!(
+            "This devpit does not read {}, and runs without it: a newer devpit wrote it, \
+             or it is misspelled.",
+            named.join("; ")
+        )
+    })
+}
+
 fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value {
     let switched_on = made(store, &project.id, Ask::Enable);
     let globally = globally_on(store);
@@ -291,11 +303,17 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
         State::Valid(text, config) => {
             said["yaml"] = json!(text);
             said["config"] = config.to_json();
-            (config.enabled && !switched_on).then(|| {
+            let unread = devpit_devflow::config::unread(text);
+            said["unread"] = json!(unread);
+            let waiting = (config.enabled && !switched_on).then(|| {
                 "devflow.yaml says enabled: true, but the person has not switched Devflow on \
                  here yet: devpit shows them a confirmation in the app."
                     .to_owned()
-            })
+            });
+            [waiting, unread_note(&unread)]
+                .into_iter()
+                .flatten()
+                .reduce(|one, other| format!("{one} {other}"))
         }
     };
     said["note"] = match (globally, note) {

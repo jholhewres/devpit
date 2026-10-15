@@ -8,6 +8,7 @@
 //! either version; a file stays version 1 until a change needs version 2,
 //! which devpit then writes.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use serde::Serialize;
@@ -396,9 +397,28 @@ impl std::fmt::Display for Invalid {
     }
 }
 
-/// The configuration a devflow.yaml text says.
+thread_local! {
+    /// While a file is read: the fields it names that this build does not.
+    static UNREAD: RefCell<Option<Vec<Invalid>>> = const { RefCell::new(None) };
+}
+
+/// The configuration a devflow.yaml text says. A field this build does not
+/// read is left out, not refused: a file a newer devpit wrote still reads
+/// here, and [`unread`] names what was left out.
 pub fn parse(text: &str) -> Result<Config, Invalid> {
-    read(&node::from_yaml(text)?, true)
+    parsed(text).0
+}
+
+/// The fields `text` names that this build does not read.
+pub fn unread(text: &str) -> Vec<Invalid> {
+    parsed(text).1
+}
+
+fn parsed(text: &str) -> (Result<Config, Invalid>, Vec<Invalid>) {
+    let before = UNREAD.with(|unread| unread.replace(Some(Vec::new())));
+    let config = node::from_yaml(text).and_then(|root| read(&root, true));
+    let unread = UNREAD.with(|unread| unread.replace(before));
+    (config, unread.unwrap_or_default())
 }
 
 /// The configuration a JSON value says, checked the same way. A change made
@@ -447,27 +467,35 @@ impl<'a> Fields<'a> {
             .map(|(_, node)| (node, joined(&self.path, name)))
     }
 
+    /// What is left over: told and skipped in a file, refused in a change
+    /// made through devpit, where the caller can still correct it.
     pub(crate) fn done(self) -> Result<(), Invalid> {
-        match self
+        let left = self
             .items
             .iter()
-            .find(|(key, _)| !self.taken.contains(&key.name.as_str()))
-        {
-            Some((key, _)) => Err(Invalid::at(
-                key.line,
-                &joined(&self.path, &key.name),
-                &format!(
-                    "not a field of {}: it takes {}",
-                    if self.path.is_empty() {
-                        "devflow.yaml"
-                    } else {
-                        &self.path
-                    },
-                    self.taken.join(", ")
-                ),
-            )),
-            None => Ok(()),
-        }
+            .filter(|(key, _)| !self.taken.contains(&key.name.as_str()))
+            .map(|(key, _)| {
+                Invalid::at(
+                    key.line,
+                    &joined(&self.path, &key.name),
+                    &format!(
+                        "not a field of {}: it takes {}",
+                        if self.path.is_empty() {
+                            "devflow.yaml"
+                        } else {
+                            &self.path
+                        },
+                        self.taken.join(", ")
+                    ),
+                )
+            });
+        UNREAD.with(|unread| match unread.borrow_mut().as_mut() {
+            Some(told) => {
+                told.extend(left);
+                Ok(())
+            }
+            None => left.into_iter().next().map_or(Ok(()), Err),
+        })
     }
 }
 

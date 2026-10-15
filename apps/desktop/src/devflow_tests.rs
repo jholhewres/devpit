@@ -217,3 +217,12 @@ fn a_change_that_weakens_what_the_team_locked_is_refused_before_it_is_written() 
     };
     assert_eq!(config.review.reviewers[0].persona, "devflow-security");
 }
+
+#[test]
+fn a_field_this_devpit_does_not_read_is_said_in_the_status_note() {
+    let unread = devpit_devflow::config::unread("version: 2\nreview:\n  scale: risk\n");
+    let note = unread_note(&unread).expect("a note");
+    assert!(note.contains("review.scale"), "{note}");
+    assert!(note.contains("line 3"), "{note}");
+    assert_eq!(unread_note(&[]), None);
+}

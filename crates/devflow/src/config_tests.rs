@@ -25,12 +25,30 @@ fn a_file_of_one_line_takes_every_default() {
     assert_eq!(defaults.decisions.mode, Mode::Shadow);
 }
 
+/// A file a newer devpit wrote, with a field this one does not know, still
+/// reads: the field is named with its line and left out, the rest kept.
 #[test]
-fn a_field_this_version_does_not_read_is_named_with_its_line() {
-    let invalid = refused("version: 1\nstages:\n  plan:\n    aprove: person\n");
-    assert_eq!(invalid.line, Some(4));
+fn a_field_this_version_does_not_read_is_told_and_the_rest_is_read() {
+    let text = "version: 1\nenabled: true\nstages:\n  plan:\n    aprove: person\n    requires: x\n";
+    let read = parse(text).expect("still reads");
+    assert!(read.enabled);
+    assert_eq!(read.version, V1);
+    let told = unread(text);
+    assert_eq!(told.len(), 2);
+    assert_eq!(told[0].line, Some(5));
+    assert_eq!(told[0].field, "stages.plan.aprove");
+    assert!(told[0].message.contains("enabled, approve"), "{}", told[0]);
+    assert!(unread("version: 2\n").is_empty());
+}
+
+/// A change made through devpit is refused instead: its caller can fix it.
+#[test]
+fn a_change_naming_a_field_this_version_does_not_read_is_refused() {
+    let invalid = from_json(&serde_json::json!({
+        "version": 2, "stages": { "plan": { "aprove": "person" } }
+    }))
+    .expect_err("refused");
     assert_eq!(invalid.field, "stages.plan.aprove");
-    assert!(invalid.message.contains("enabled, approve"), "{invalid}");
 }
 
 #[test]
