@@ -805,3 +805,29 @@ fn jev_failing_with_one_reviewer_merges_the_findings_as_they_are() {
     assert_eq!(list.len(), 2, "merged as they are, not by the model");
     assert!(list.iter().all(|one| one.get("jev").is_none()), "{list:#?}");
 }
+
+/// Every reviewer of a run opens on the same packet, a prefix the
+/// provider's cache can serve; the persona comes after it.
+#[test]
+fn a_reviewers_prompt_opens_on_the_packet_and_names_its_persona_after() {
+    let spec = prompt("# spec rules", "PACKET BODY", "claude", "devflow-spec");
+    let security = prompt(
+        "# security rules",
+        "PACKET BODY",
+        "codex",
+        "devflow-security",
+    );
+    let opening = spec.find("PACKET BODY").expect("the packet") + "PACKET BODY".len();
+    assert_eq!(spec[..opening], security[..opening]);
+    assert!(spec.find("spec rules") > Some(opening));
+}
+
+#[test]
+fn a_review_without_a_base_that_reads_many_commits_says_so() {
+    assert!(wide(MANY_COMMITS + 1, false).is_some());
+    assert!(
+        wide(MANY_COMMITS + 1, true).is_none(),
+        "the base was asked for"
+    );
+    assert!(wide(MANY_COMMITS, false).is_none());
+}

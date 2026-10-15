@@ -66,12 +66,12 @@ fn card_here(store: &Store, project: &Project, id: &str) -> Result<devpit_core::
 fn pinned(
     root: &Path,
     base: Option<&str>,
-) -> Result<(String, String, Vec<String>, String), String> {
+) -> Result<(String, String, Vec<String>, String, u32), String> {
     let said = |err: devpit_git::GitError| err.to_string();
     let base = devpit_git::review_base(root, base).map_err(said)?;
     let head = devpit_git::head_of(root).map_err(said)?;
     let read = devpit_git::review_diff(root, &base, &head).map_err(said)?;
-    Ok((base, head, read.files, read.diff))
+    Ok((base, head, read.files, read.diff, read.commits))
 }
 
 /// Keeps where `card` began in the checkout `cwd` is in, when Devflow is set up
@@ -156,7 +156,7 @@ pub(crate) fn respond_with(
             title: &card.title,
             body: &card.body,
         },
-        git: pinned.as_ref().map(|(base, head, files, diff)| Git {
+        git: pinned.as_ref().map(|(base, head, files, diff, _)| Git {
             base,
             head,
             files,
@@ -199,6 +199,10 @@ pub(crate) fn respond_with(
         let _ = app.emit("board:changed", &project.id);
     }
     let mut answer = review::summary(&done);
+    let commits = pinned.as_ref().map_or(0, |pinned| pinned.4);
+    if let Some(warning) = review::wide(commits, asked.base.is_some()) {
+        answer["warning"] = json!(warning);
+    }
     answer["attached"] =
         json!({ "under": under, "files": attached.names.len(), "left_out": attached.left_out });
     Ok(answer)

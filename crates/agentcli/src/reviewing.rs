@@ -107,6 +107,10 @@ const CLAUDE_READS: [&str; 6] = [
     "Bash(git show:*)",
 ];
 
+/// The most turns a Claude Code reviewer takes: generous for reading a diff,
+/// a stop for one wandering the repository at the person's cost.
+pub const CLAUDE_TURNS: u32 = 60;
+
 /// The arguments after the program. A CLI that reads its prompt from stdin
 /// gets none of it here; the others get it last.
 pub fn argv(cli: Cli, model: Option<&str>, prompt: &str) -> Vec<String> {
@@ -129,6 +133,10 @@ pub fn argv(cli: Cli, model: Option<&str>, prompt: &str) -> Vec<String> {
     }
     match cli {
         Cli::Claude => {
+            // None of the person's MCP servers: a reviewer reads files and git.
+            argv.push("--strict-mcp-config".into());
+            argv.push("--max-turns".into());
+            argv.push(CLAUDE_TURNS.to_string());
             argv.push("--allowedTools".into());
             argv.extend(CLAUDE_READS.iter().map(|tool| (*tool).to_owned()));
         }
@@ -164,6 +172,11 @@ pub fn answer_of(cli: Cli, stdout: &str) -> Result<(String, Option<f64>), String
     } else {
         "result"
     };
+    if printed.get("subtype").and_then(Value::as_str) == Some("error_max_turns") {
+        return Err(format!(
+            "it used its {CLAUDE_TURNS} turns without answering"
+        ));
+    }
     if printed.get("is_error").and_then(Value::as_bool) == Some(true) {
         let said = printed.get(field).and_then(Value::as_str).unwrap_or("");
         return Err(format!("its CLI reported an error: {}", first_line(said)));

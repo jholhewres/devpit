@@ -16,6 +16,8 @@ use crate::GitError;
 pub struct Reviewed {
     pub files: Vec<String>,
     pub diff: String,
+    /// The commits in `base..head`.
+    pub commits: u32,
 }
 
 /// The heading the work not yet committed is put under, after the commits.
@@ -36,7 +38,15 @@ pub fn review_diff(root: &Path, base: &str, head: &str) -> Result<Reviewed, GitE
         }
         diff.push_str(&format!("\n{UNCOMMITTED}\n\n{loose}"));
     }
-    Ok(Reviewed { files, diff })
+    let commits = run(root, &["rev-list", "--count", &range])?
+        .trim()
+        .parse()
+        .unwrap_or(0);
+    Ok(Reviewed {
+        files,
+        diff,
+        commits,
+    })
 }
 
 /// Whether code changed from `from` to `to`, leaving `.devpit/` aside: what

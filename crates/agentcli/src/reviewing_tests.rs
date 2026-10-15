@@ -149,3 +149,28 @@ fn a_missing_cli_a_signed_out_one_and_a_hung_one_each_say_why() {
         Err(Unreviewed::TimedOut)
     );
 }
+
+/// A headless security reviewer cost US$ 8.54 on three PRs: every MCP server
+/// of the person's loaded, and no end to its turns.
+#[test]
+fn a_claude_reviewer_loads_no_mcp_server_and_has_a_last_turn() {
+    let claude = argv(Cli::Claude, None, "the packet");
+    assert!(claude.contains(&"--strict-mcp-config".to_owned()));
+    let turns = CLAUDE_TURNS.to_string();
+    assert!(claude
+        .windows(2)
+        .any(|pair| pair[0] == "--max-turns" && pair[1] == turns));
+    // --allowedTools takes every argument after it.
+    let allowed = claude
+        .iter()
+        .position(|one| one == "--allowedTools")
+        .expect("listed");
+    assert!(claude[allowed + 1..]
+        .iter()
+        .all(|one| !one.starts_with("--")));
+
+    let ran_out =
+        r#"{"type":"result","subtype":"error_max_turns","is_error":false,"num_turns":61}"#;
+    let why = answer_of(Cli::Claude, ran_out).expect_err("no answer");
+    assert!(why.contains("turns"), "{why}");
+}
