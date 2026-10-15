@@ -78,24 +78,34 @@ fn written_apart(path: &Path, text: &str) {
     assert!(done.success(), "{done}");
 }
 
+/// The critical finding a fake Claude Code reports on the changed line.
+fn shell_injection() -> Value {
+    json!({
+        "file": "app.py", "line": 2, "severity": "critical", "axis": "security",
+        "title": "Shell injection", "description": "The link reaches a shell.",
+        "evidence": "app.py:2 `os.system(link)`", "poc": "a title with `; rm -rf ~`",
+        "agent": "claude", "persona": "devflow-security",
+    })
+}
+
 /// A fake Claude Code: one critical finding on the changed line.
 #[cfg(unix)]
 fn fake_claude(dir: &Path) -> String {
+    fake_claude_finding(dir, "claude-fake", vec![shell_injection()])
+}
+
+#[cfg(unix)]
+fn fake_claude_finding(dir: &Path, name: &str, findings: Vec<Value>) -> String {
     let answer = json!({
         "version": 1,
         "reviewers": [{ "agent": "claude", "persona": "devflow-security" }],
         "verdict": "request_changes",
-        "findings": [{
-            "file": "app.py", "line": 2, "severity": "critical", "axis": "security",
-            "title": "Shell injection", "description": "The link reaches a shell.",
-            "evidence": "app.py:2 `os.system(link)`", "poc": "a title with `; rm -rf ~`",
-            "agent": "claude", "persona": "devflow-security",
-        }],
+        "findings": findings,
         "done_well": ["small change"],
         "verification": { "tests": "none ran", "evidence": "no checks" },
     });
     let wrapped = json!({ "type": "result", "is_error": false, "result": answer.to_string(), "total_cost_usd": 0.02 });
-    let path = dir.join("claude-fake");
+    let path = dir.join(name);
     written_apart(
         &path,
         &format!("#!/bin/sh\ncat > /dev/null\ncat <<'EOF'\n{wrapped}\nEOF\n"),
@@ -236,4 +246,91 @@ fn a_checkout_without_devflow_keeps_no_start() {
     git(root, &["commit", "-q", "--allow-empty", "-m", "start"]);
     began(&project_at("p", root), root, "card_01ABC");
     assert!(!root.join(".devpit").exists());
+}
+
+fn rev(at: &Path, name: &str) -> String {
+    let done = Command::new("git")
+        .args(["rev-parse", name])
+        .current_dir(at)
+        .output()
+        .expect("git");
+    String::from_utf8_lossy(&done.stdout).trim().to_owned()
+}
+
+/// After a fix, a review with `previous` pins the diff from the HEAD that
+/// run read, carries what did not block, and the gate takes it as current.
+#[cfg(unix)]
+#[test]
+fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let scripts = tempfile::tempdir().expect("scripts");
+    let root = dir.path().canonicalize().expect("root");
+    let (_store, project, card) = reviewed_project(&root);
+    git(&root, &["commit", "-q", "-am", "open links"]);
+    let start = rev(&root, "HEAD~1");
+    let mut vague = shell_injection();
+    vague["severity"] = json!("low");
+    vague["title"] = json!("Vague opener name");
+    vague.as_object_mut().expect("finding").remove("poc");
+    let first = fake_claude_finding(scripts.path(), "first", vec![shell_injection(), vague]);
+    let reach = move |_: Agent| Ok(first.clone());
+    let config = config_of(&root);
+    let before = respond_with(
+        None,
+        &project,
+        &config,
+        &root,
+        &json!({ "card": card, "base": start }),
+        &reach,
+    )
+    .expect("the first review");
+    assert_eq!(before["verdict"], "request_changes", "{before}");
+    let run = before["run"].as_str().expect("its run").to_owned();
+    let read = rev(&root, "HEAD");
+
+    std::fs::write(
+        root.join("app.py"),
+        "import subprocess\nsubprocess.run(['xdg-open', link])\n",
+    )
+    .expect("the fix");
+    git(&root, &["commit", "-q", "-am", "no shell"]);
+    let fixed = fake_claude_finding(scripts.path(), "fixed", Vec::new());
+    let reach = move |_: Agent| Ok(fixed.clone());
+    let after = respond_with(
+        None,
+        &project,
+        &config,
+        &root,
+        &json!({ "card": card, "previous": run }),
+        &reach,
+    )
+    .expect("the re-review");
+    assert_eq!(after["base"], json!(read), "{after}");
+    assert_eq!(after["head"], json!(rev(&root, "HEAD")));
+    assert_eq!(after["previous"], json!(run));
+    assert_eq!(after["verdict"], "approve", "{after}");
+    let packet = std::fs::read_to_string(root.join(after["packet"].as_str().expect("packet")))
+        .expect("the packet");
+    assert!(packet.contains("+subprocess.run"), "{packet}");
+    assert!(!packet.contains("+import os"), "only the delta: {packet}");
+    assert!(packet.contains("Shell injection"), "{packet}");
+    let kept: Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join(after["findings_file"].as_str().expect("file")))
+            .expect("findings.json"),
+    )
+    .expect("json");
+    assert_eq!(kept["findings"][0]["title"], "Vague opener name");
+    assert_eq!(kept["findings"][0]["carried_from"], json!(run));
+
+    let gate = crate::devflow::respond(
+        None,
+        "devflow_gate",
+        &project,
+        &root,
+        &json!({ "card": card }),
+    )
+    .expect("the gate");
+    let missing = gate["missing"].to_string();
+    assert!(!missing.contains("the review read"), "{missing}");
+    assert!(!missing.contains("Shell injection"), "{missing}");
 }

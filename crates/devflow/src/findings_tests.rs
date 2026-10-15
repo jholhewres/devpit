@@ -334,6 +334,50 @@ fn the_persons_false_positive_stays_on_the_finding_when_the_list_is_made_again()
     assert!(again[1].get("false_positive").is_none());
 }
 
+/// A re-review read only the delta: what blocked before is the reviewers'
+/// to find again, the rest still stands and says where it came from.
+#[test]
+fn a_rereview_carries_what_did_not_block_and_names_the_run_it_was_found_in() {
+    let block_on = [Severity::Critical, Severity::High];
+    let mut called_off = finding("a.rs", 2, "high", "called off");
+    called_off["false_positive"] = json!(true);
+    let mut older = finding("c.rs", 3, "info", "older");
+    older["carried_from"] = json!("20261001T000000Z");
+    let previous = vec![
+        finding("a.rs", 1, "critical", "shell injection"),
+        finding("a.rs", 9, "low", "a long name"),
+        finding("b.rs", 5, "medium", "said again"),
+        called_off,
+        older,
+    ];
+    let mut merged = vec![finding("b.rs", 5, "medium", "said again here")];
+    carried_over(&mut merged, &previous, &block_on, "20261014T120000Z");
+    let titles: Vec<&str> = merged
+        .iter()
+        .filter_map(|one| one["title"].as_str())
+        .collect();
+    assert_eq!(
+        titles,
+        ["said again here", "a long name", "called off", "older"]
+    );
+    assert!(merged[0].get("carried_from").is_none());
+    assert_eq!(merged[1]["carried_from"], "20261014T120000Z");
+    assert_eq!(merged[3]["carried_from"], "20261001T000000Z");
+    assert_eq!(verdict(&merged, &block_on), "approve");
+    assert!(line_of(&merged[1]).ends_with(" — carried from run 20261014T120000Z"));
+    let report = json!({
+        "version": 1, "reviewers": [{ "agent": "claude", "persona": "devflow-spec" }],
+        "verdict": "approve", "findings": merged, "done_well": ["small"],
+        "verification": { "tests": "t", "evidence": "e" },
+    });
+    assert!(problems(&report).is_empty(), "{:?}", problems(&report));
+    let signed = signed(report, "claude", "devflow-spec");
+    assert!(
+        signed["findings"][1].get("carried_from").is_none(),
+        "devpit's to say, never a reviewer's"
+    );
+}
+
 #[test]
 fn the_headline_counts_what_still_stands() {
     let mut list = vec![

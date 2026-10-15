@@ -33,7 +33,7 @@ pub const REQUIRED: [&str; 9] = [
 ];
 
 /// Everything a finding may carry: the schema allows nothing else.
-pub const FIELDS: [&str; 18] = [
+pub const FIELDS: [&str; 19] = [
     "file",
     "line",
     "end_line",
@@ -52,10 +52,18 @@ pub const FIELDS: [&str; 18] = [
     "agreement",
     "false_positive",
     "jev",
+    "carried_from",
 ];
 
 /// What devpit sets on a finding, never a reviewer.
-const DEVPITS: [&str; 5] = ["found_by", "agreement", "false_positive", "jev", "capped"];
+const DEVPITS: [&str; 6] = [
+    "found_by",
+    "agreement",
+    "false_positive",
+    "jev",
+    "capped",
+    "carried_from",
+];
 
 /// What a finding is: a defect, or something short of one that a severity
 /// cannot outgrow without a PoC showing a defect.
@@ -124,7 +132,7 @@ fn finding_problems(finding: &Value, at: &str, wrong: &mut Vec<String>) {
     if !AXES.contains(&text(finding, "axis")) {
         wrong.push(format!("`{at}.axis` is spec, standards or security"));
     }
-    for key in ["poc", "suggestion", "agreement"] {
+    for key in ["poc", "suggestion", "agreement", "carried_from"] {
         if finding.get(key).is_some_and(|value| !value.is_string()) {
             wrong.push(format!("`{at}.{key}` is text"));
         }
@@ -559,15 +567,35 @@ pub fn standing(finding: &Value) -> bool {
         && finding["jev"].get("set_aside") != Some(&json!(true))
 }
 
-/// The findings that hold the card: in `block_on`, and still standing.
+/// Whether a finding holds the card: in `block_on`, and still standing.
+pub fn blocks(finding: &Value, block_on: &[Severity]) -> bool {
+    standing(finding)
+        && severity_of(text(finding, "severity")).is_some_and(|one| block_on.contains(&one))
+}
+
+/// The findings that hold the card.
 pub fn blocking<'a>(findings: &'a [Value], block_on: &[Severity]) -> Vec<&'a Value> {
     findings
         .iter()
-        .filter(|finding| standing(finding))
-        .filter(|finding| {
-            severity_of(text(finding, "severity")).is_some_and(|one| block_on.contains(&one))
-        })
+        .filter(|finding| blocks(finding, block_on))
         .collect()
+}
+
+/// A re-review's findings with what the previous run found that did not
+/// block: only the delta was read again, so those still stand. Each keeps
+/// the run it was first found in; one a new finding repeats is left out.
+pub fn carried_over(merged: &mut Vec<Value>, previous: &[Value], block_on: &[Severity], run: &str) {
+    let new = merged.len();
+    for finding in previous.iter().filter(|one| !blocks(one, block_on)) {
+        if merged[..new].iter().any(|now| alike(now, finding)) {
+            continue;
+        }
+        let mut kept = finding.clone();
+        if kept.get("carried_from").is_none() {
+            kept["carried_from"] = json!(run);
+        }
+        merged.push(kept);
+    }
 }
 
 pub fn verdict(findings: &[Value], block_on: &[Severity]) -> &'static str {
@@ -656,6 +684,9 @@ pub fn line_of(finding: &Value) -> String {
             " (said {from}: {})",
             text(&finding["capped"], "why")
         ));
+    }
+    if let Some(run) = finding.get("carried_from").and_then(Value::as_str) {
+        said.push_str(&format!(" — carried from run {run}"));
     }
     if finding.get("false_positive") == Some(&json!(true)) {
         said.push_str(" — a false positive, the person said");

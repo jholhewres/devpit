@@ -359,6 +359,14 @@ fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
     assert_eq!(tool.method, "devflow_review");
     let schema = (tool.input)();
     assert_eq!(schema["required"], json!(["card"]));
+    let mut keys: Vec<&String> = schema["properties"]
+        .as_object()
+        .expect("properties")
+        .keys()
+        .collect();
+    keys.sort();
+    // devpit_devflow::review::FIELDS, which the app holds every call to.
+    assert_eq!(keys, ["base", "card", "previous", "reports", "run"]);
     let mut calls = 0;
     for block in REVIEW
         .split("```json")
@@ -376,7 +384,10 @@ fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
             assert!(schema["properties"].get(key).is_some(), "{key}");
         }
     }
-    assert_eq!(calls, 2, "a first call and the one that hands reports back");
+    assert_eq!(
+        calls, 3,
+        "a first call, the one that hands reports back, and a re-review"
+    );
 }
 
 #[test]

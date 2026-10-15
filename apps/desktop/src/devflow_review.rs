@@ -62,13 +62,17 @@ fn card_here(store: &Store, project: &Project, id: &str) -> Result<devpit_core::
         .ok_or_else(|| format!("no card `{id}` on this project's board"))
 }
 
+type Pinned = (String, String, Vec<String>, String, u32);
+
 /// BASE, HEAD and the diff between them, in the checkout.
-fn pinned(
-    root: &Path,
-    base: Option<&str>,
-) -> Result<(String, String, Vec<String>, String, u32), String> {
+fn pinned(root: &Path, base: Option<&str>) -> Result<Pinned, String> {
+    let base = devpit_git::review_base(root, base).map_err(|err| err.to_string())?;
+    pinned_from(root, base)
+}
+
+/// A re-review's: from the HEAD the previous run read, not the merge base.
+fn pinned_from(root: &Path, base: String) -> Result<Pinned, String> {
     let said = |err: devpit_git::GitError| err.to_string();
-    let base = devpit_git::review_base(root, base).map_err(said)?;
     let head = devpit_git::head_of(root).map_err(said)?;
     let read = devpit_git::review_diff(root, &base, &head).map_err(said)?;
     Ok((base, head, read.files, read.diff, read.commits))
@@ -108,8 +112,14 @@ pub(crate) fn respond_with(
     // The card's own base, else where it was started here, else the default
     // branch: a card worked in the project's folder has only the second.
     let started = devpit_devflow::started::start_of(&root, &card.id);
-    let pinned = match asked.run {
-        None => Some(pinned(
+    let previous = asked
+        .previous
+        .as_deref()
+        .map(|run| review::previous_of(&root, &card.id, run))
+        .transpose()?;
+    let pinned = match (&asked.run, &previous) {
+        (None, Some(previous)) => Some(pinned_from(&root, previous.head.clone())?),
+        (None, None) => Some(pinned(
             &root,
             asked
                 .base
@@ -117,7 +127,7 @@ pub(crate) fn respond_with(
                 .or(card.base_ref.as_deref())
                 .or(started.as_deref()),
         )?),
-        Some(_) => None,
+        (Some(_), _) => None,
     };
     let branch = devpit_git::branch_at(&root).unwrap_or_default();
     let env = context_of(
@@ -174,6 +184,7 @@ pub(crate) fn respond_with(
             personal: personal.as_deref(),
             teams: &teams,
         },
+        previous: previous.as_ref(),
     })?;
 
     let run = root.join(&done.folder);
@@ -200,7 +211,8 @@ pub(crate) fn respond_with(
     }
     let mut answer = review::summary(&done);
     let commits = pinned.as_ref().map_or(0, |pinned| pinned.4);
-    if let Some(warning) = review::wide(commits, asked.base.is_some()) {
+    let ranged = asked.base.is_some() || previous.is_some();
+    if let Some(warning) = review::wide(commits, ranged) {
         answer["warning"] = json!(warning);
     }
     answer["attached"] =

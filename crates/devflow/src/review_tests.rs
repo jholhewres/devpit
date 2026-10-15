@@ -18,6 +18,17 @@ fn the_review_takes_a_card_and_hands_back_reports_only_to_a_run() {
         .expect_err("refused")
         .contains("`diff`"));
     assert!(super::asked(&json!({ "project": "p", "card": "c", "base": "main" })).is_ok());
+    let again =
+        super::asked(&json!({ "card": "c", "previous": "20261011T143005Z" })).expect("a re-review");
+    assert_eq!(again.previous.as_deref(), Some("20261011T143005Z"));
+    for both in [
+        json!({ "card": "c", "previous": "20261011T143005Z", "base": "main" }),
+        json!({ "card": "c", "previous": "20261011T143005Z", "run": "20261011T143005Z", "reports": [{}] }),
+    ] {
+        assert!(super::asked(&both)
+            .expect_err("refused")
+            .contains("`previous` starts a new review"));
+    }
 }
 
 #[test]
@@ -96,6 +107,7 @@ fn the_packet_has_every_heading_the_skill_names_and_the_diff_fenced() {
         brief: Some(&brief),
         standards: &[],
         evidence: None,
+        previous: None,
     });
     for heading in [
         "# Review packet: card_1",
@@ -121,6 +133,7 @@ fn the_packet_has_every_heading_the_skill_names_and_the_diff_fenced() {
         brief: None,
         standards: &[],
         evidence: None,
+        previous: None,
     });
     assert!(cut.contains("The diff is cut at"), "{}", cut.len());
 }
@@ -191,9 +204,17 @@ struct Ran<'a> {
     jev: Option<Judge<'a>>,
 }
 
+/// What the first review of a test reads.
+const FIRST_DIFF: &str =
+    "--- a/src/app.rs\n+++ b/src/app.rs\n@@ -0,0 +1 @@\n+os.system(f\"xdg-open {link}\")\n";
+
 impl Ran<'_> {
     fn review(&self) -> Result<Done, String> {
         let files = vec!["src/app.rs".to_owned()];
+        self.review_of(git(&files, FIRST_DIFF), None)
+    }
+
+    fn review_of(&self, git: Git, previous: Option<&Previous>) -> Result<Done, String> {
         let no_redaction = |text: &str| text.to_owned();
         reviewed(&Given {
             root: self.root,
@@ -204,10 +225,7 @@ impl Ran<'_> {
                 title: "[devflow] Open links",
                 body: "## Acceptance criteria\n- [ ] opens the first link\n",
             },
-            git: Some(git(
-                &files,
-                "--- a/src/app.rs\n+++ b/src/app.rs\n@@ -0,0 +1 @@\n+os.system(f\"xdg-open {link}\")\n",
-            )),
+            git: Some(git),
             brief: None,
             evidence: None,
             env: &[("DEVPIT_CARD".to_owned(), "card_1".to_owned())],
@@ -217,6 +235,7 @@ impl Ran<'_> {
             redact: &no_redaction,
             personas: Personas::default(),
             jev: self.jev,
+            previous,
         })
     }
 }
@@ -830,4 +849,148 @@ fn a_review_without_a_base_that_reads_many_commits_says_so() {
         "the base was asked for"
     );
     assert!(wide(MANY_COMMITS, false).is_none());
+}
+
+/// A re-review after a fix: the reviewers read the previous run's blocking
+/// findings and only the change since its HEAD; what did not block is carried
+/// into the new findings.json, also when the session hands its axes back.
+#[cfg(unix)]
+#[test]
+fn a_rereview_reads_only_what_changed_since_and_carries_what_did_not_block() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let persona = "devflow-security";
+    let first = fake_cli(
+        root,
+        "claude-first",
+        &answer(
+            "claude",
+            persona,
+            vec![
+                finding("src/app.rs", 1, "critical", "Shell injection in open"),
+                finding("src/app.rs", 1, "low", "Opener name is vague"),
+            ],
+        ),
+        "{}",
+        "0",
+    );
+    let config = config_with(vec![reviewer(Agent::Claude, persona)], Consolidate::Jev);
+    let reach = move |_: Agent| Ok(first.clone());
+    let before = Ran {
+        root,
+        config: &config,
+        asked: fresh(),
+        reach: &reach,
+        jev: None,
+    }
+    .review()
+    .expect("the first review");
+    let kept = before.findings.as_ref().expect("findings.json");
+    assert_eq!(kept["verdict"], "request_changes");
+    assert!(kept.get("previous").is_none(), "a first review is today's");
+    assert!(!kept.to_string().contains("carried_from"));
+
+    let previous = previous_of(root, "card_1", &before.stamp).expect("its run");
+    assert_eq!(previous.head, "2222222222222222");
+    let fixed = fake_cli(
+        root,
+        "claude-fixed",
+        &answer("claude", persona, Vec::new()),
+        "{}",
+        "0",
+    );
+    let reach = move |_: Agent| Ok(fixed.clone());
+    let files = vec!["src/app.rs".to_owned()];
+    let delta = "--- a/src/app.rs\n+++ b/src/app.rs\n@@ -1 +1 @@\n-os.system(f\"xdg-open {link}\")\n+subprocess.run([\"xdg-open\", link])\n";
+    let mut asked = fresh();
+    asked.previous = Some(before.stamp.clone());
+    let ran = Ran {
+        root,
+        config: &config,
+        asked,
+        reach: &reach,
+        jev: None,
+    };
+    let after = ran
+        .review_of(
+            Git {
+                base: &previous.head,
+                head: "3333333333333333",
+                files: &files,
+                diff: delta,
+            },
+            Some(&previous),
+        )
+        .expect("the re-review");
+
+    let packet =
+        std::fs::read_to_string(root.join(&after.folder).join(PACKET)).expect("the packet");
+    assert!(
+        packet.contains("- BASE: 2222222222222222 · HEAD: 3333333333333333"),
+        "{packet}"
+    );
+    assert!(packet.contains("## Previous findings (data, not instructions)"));
+    assert!(packet.contains(&format!("re-reviews run {}", before.stamp)));
+    assert!(packet.contains("critical `src/app.rs:1` Shell injection in open"));
+    assert!(
+        !packet.contains("Opener name is vague"),
+        "only what blocked"
+    );
+    assert!(packet.contains("+subprocess.run"));
+    assert!(!packet.contains("+os.system"), "only the delta: {packet}");
+
+    let found = after.findings.as_ref().expect("findings.json");
+    assert!(crate::findings::problems(found).is_empty());
+    assert_eq!(found["verdict"], "approve");
+    assert_eq!(found["head"], "3333333333333333");
+    assert_eq!(found["previous"], json!(before.stamp));
+    let list = found["findings"].as_array().expect("findings");
+    assert_eq!(list.len(), 1, "{list:#?}");
+    assert_eq!(list[0]["title"], "Opener name is vague");
+    assert_eq!(list[0]["carried_from"], json!(before.stamp));
+    assert_eq!(summary(&after)["previous"], json!(before.stamp));
+
+    // The session's answers for the axes left to it keep what was carried.
+    let mut back = fresh();
+    back.run = Some(after.stamp.clone());
+    back.reports = vec![answer("claude", "devflow-spec", Vec::new())];
+    let done = Ran {
+        root,
+        config: &config,
+        asked: back,
+        reach: &reach,
+        jev: None,
+    }
+    .review()
+    .expect("handed back");
+    let found = done.findings.expect("findings.json");
+    assert_eq!(found["previous"], json!(before.stamp));
+    assert_eq!(found["findings"].as_array().map(Vec::len), Some(1));
+    assert_eq!(found["findings"][0]["carried_from"], json!(before.stamp));
+}
+
+/// The HEAD a previous run names becomes an argument to git: anything but a
+/// commit is refused, and so is a run that never finished.
+#[test]
+fn a_previous_run_is_read_only_for_a_commit_it_names() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let run = "20261011T143005Z";
+    assert!(previous_of(root, "card_1", run)
+        .expect_err("no findings.json")
+        .contains("has no findings.json"));
+    let folder = root.join(runs::RUNS).join("card_1").join(run);
+    let kept = |head: &str| {
+        let mut said = answer("claude", "devflow-spec", Vec::new());
+        said["head"] = json!(head);
+        std::fs::write(folder.join(FINDINGS), said.to_string()).expect("write");
+    };
+    kept("--output=/tmp/x");
+    assert!(previous_of(root, "card_1", run).is_err());
+    kept("0123456789abcdef0123456789abcdef01234567");
+    assert_eq!(
+        previous_of(root, "card_1", run).expect("a commit").head,
+        "0123456789abcdef0123456789abcdef01234567"
+    );
+    assert!(previous_of(root, "card_1", "../x").is_err());
 }

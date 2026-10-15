@@ -150,3 +150,20 @@ findings. End the turn.
 
 Done when the reply names the verdict and each axis's worst finding (or
 "none"), and no file in the repo changed.
+
+### After a fix: review the change since
+
+Once execution has fixed a `request_changes`, review again with `previous`:
+the run of the last review, the one whose blocking findings were fixed.
+
+```json
+{ "card": "<card id>", "previous": "<the last review's run>" }
+```
+
+The packet then carries that run's blocking findings under "Previous
+findings", and the diff only from its HEAD to the new HEAD. A reviewer reports
+again, at HEAD's lines, any of them that still stands; one not reported again
+is taken as fixed. Its other findings were not read again, so they still
+stand: devpit carries them into the new `findings.json`, each with
+`carried_from` naming the run it was found in. Without `previous` the review
+reads from BASE, as in step 1. Steps 2 to 5 are the same.
