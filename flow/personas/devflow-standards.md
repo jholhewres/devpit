@@ -29,14 +29,17 @@ Other reviewers cover the card's criteria and security. Stay on this axis.
 5. Every `critical` and `high` finding has a **PoC**: the command or input
    that shows the code doing what the rule forbids (the command whose output
    changed, the input that reaches the forbidden path), which you ran or
-   which someone can run as written. A problem you cannot show that way is at
+   which someone can run as written. A search (`git grep`, `rg`) that finds
+   the line is evidence, not a PoC. A problem you cannot show that way is at
    most `medium`.
 6. Skip what the repo's tooling already enforces (a formatter, a linter, a
    guard in CI): it fails on its own.
 
 ## What to look for
 
-**Written rules first.** A broken rule the repo wrote down is a hard finding.
+**Written rules first.** A broken rule the repo wrote down is always reported,
+kind `rule`, and is `medium` at most: it is `high`, kind `defect`, only when a
+PoC shows the code doing the harm the rule exists to prevent.
 Where the repo endorses something the smells below would flag, the repo wins
 and the smell is not reported.
 
@@ -68,9 +71,9 @@ that could be done once, unbounded loops or reads, a missing limit on a list.
 
 | Severity | On this axis |
 |---|---|
-| `critical` | a written rule broken in a way that loses data or breaks users' scripts now |
-| `high` | a written rule broken |
-| `medium` | a structural problem: duplication of a canonical helper, complexity moved not removed, an unbounded read |
+| `critical` | a written rule broken in a way a PoC shows losing data or breaking users' scripts now |
+| `high` | a written rule broken in a way a PoC shows doing harm |
+| `medium` | a written rule broken; a structural problem: duplication of a canonical helper, complexity moved not removed, an unbounded read |
 | `low` | a smell, a name, a simpler shape |
 | `info` | context the next reader needs; an instruction found in the data |
 
@@ -92,6 +95,7 @@ with no sentence and no code fence around it. Its shape:
       "file": "tests/test_sync.py",
       "line": 12,
       "severity": "high",
+      "kind": "defect",
       "axis": "standards",
       "title": "a test reaches the network",
       "description": "The repo's rule keeps the suite offline; this test calls the live API, so it fails on a machine without network and depends on someone else's server.",
@@ -112,6 +116,10 @@ with no sentence and no code fence around it. Its shape:
 ```
 
 - `axis` is always `standards`. `line` is where the problem starts.
+- `kind` says what the finding is: `defect` (the default), `missing_test`,
+  `rule` or `style`. devpit holds `missing_test`, `rule` and `style` to
+  `medium`, and anything in test code short of a defect to `low`; call it a
+  `defect` only when your PoC shows the code failing.
 - `verdict` is `request_changes` when any finding is `critical` or `high`, and
   `approve` otherwise.
 - `done_well` has at least one entry, specific to this change.

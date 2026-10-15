@@ -347,3 +347,61 @@ fn the_headline_counts_what_still_stands() {
         "[devflow] review: 1 findings (1 critical, 0 high) · verdict: request_changes"
     );
 }
+
+fn signed_one(finding: Value) -> Value {
+    let said = answer("claude", "devflow-spec", vec![finding]);
+    read_signed(&said.to_string(), "claude", "devflow-spec").expect("accepted")["findings"][0]
+        .clone()
+}
+
+/// A missing test, a written rule or a style point cannot block a card on its
+/// own: the ecopar review held a card for a test helper's panic.
+#[test]
+fn what_is_short_of_a_defect_is_held_to_its_ceiling_saying_why() {
+    let mut missing = finding("src/pay.go", 40, "high", "no test for the mixed day");
+    missing["kind"] = json!("missing_test");
+    let read = signed_one(missing);
+    assert_eq!(read["severity"], "medium");
+    assert_eq!(read["capped"]["from"], "high");
+    assert!(text(&read["capped"], "why").contains("missing test"));
+
+    for file in [
+        "pay/premiacao_test.go",
+        "tests/PayTest.php",
+        "web/src/pay.test.ts",
+    ] {
+        let read = signed_one(finding(file, 89, "high", "panics in a helper"));
+        assert_eq!(read["severity"], "low", "{file}");
+    }
+    let mut defect = finding(
+        "pay/premiacao_test.go",
+        89,
+        "high",
+        "the test can never fail",
+    );
+    defect["kind"] = json!("defect");
+    assert_eq!(signed_one(defect)["severity"], "high");
+
+    let mut grep = finding("src/a.rs", 3, "high", "rule broken");
+    grep["poc"] = json!("git grep -n unwrap src/");
+    assert_eq!(signed_one(grep)["severity"], "medium");
+}
+
+#[test]
+fn a_finding_without_a_kind_keeps_its_severity() {
+    let read = signed_one(finding("src/a.rs", 3, "high", "xss"));
+    assert_eq!(read["severity"], "high");
+    assert!(read.get("capped").is_none());
+    let mut low = finding("src/a.rs", 3, "low", "a name");
+    low["kind"] = json!("style");
+    assert!(signed_one(low).get("capped").is_none());
+}
+
+#[test]
+fn a_kind_the_schema_does_not_name_is_refused() {
+    let mut odd = finding("src/a.rs", 3, "low", "a name");
+    odd["kind"] = json!("nit");
+    let said = answer("claude", "devflow-spec", vec![odd]);
+    let refused = read_signed(&said.to_string(), "claude", "devflow-spec").expect_err("refused");
+    assert!(refused.contains("kind"), "{refused}");
+}

@@ -91,19 +91,26 @@ and says which field: fix that report and send it again.
 | `evidence` | the quoted line, the rule with its path, or the output |
 | `poc` | critical and high: the input, command or request that makes it happen |
 | `suggestion` | the fix, as a concrete move |
+| `kind` | `defect` (the default), `missing_test`, `rule` or `style` |
 | `agent`, `persona` | who found it |
 
 | Severity | Review prefix | Means |
 |---|---|---|
 | `critical` | Critical | exploitable hole, data loss, a criterion broken |
-| `high` | required | a criterion partly met or untested, a written rule broken |
-| `medium` | required, may wait with a reason | an edge case, a weak test, a design problem |
+| `high` | required | a criterion partly met, a defect a PoC shows |
+| `medium` | required, may wait with a reason | an untested criterion, a written rule broken, an edge case, a weak test, a design problem |
 | `low` | Optional, Nit | a simpler shape, a name, a smell |
 | `info` | FYI | context, no action |
 
 A finding without evidence is dropped. A critical or high without a PoC goes
 back to its reviewer once; still without one, it becomes `medium`, and the
 description says why.
+
+devpit holds the severity to what the finding is, and says so in `capped`:
+`missing_test`, `rule` and `style` are at most `medium`, anything in test code
+short of a defect at most `low`, and a search (`git grep`) is not a PoC. A
+missing test on a path that writes to the database or crosses a foreign key is
+run before it is called one: a constraint that fails there is a defect.
 
 Done when every finding left has evidence and every critical and high has a
 PoC.

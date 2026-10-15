@@ -35,8 +35,11 @@ Other reviewers cover the repo's standards and security. Stay on this axis.
 
 - **Each criterion:** met, partly met, missing, or met but wrong. Quote the
   criterion in the evidence.
-- **Proof:** a criterion that no test or E2E step asserts is a `high` finding,
-  because nothing can show it is met.
+- **Proof:** a criterion that no test or E2E step asserts is a `medium`
+  finding of kind `missing_test`. It is `high`, kind `defect`, only when a
+  mutation or a run shows the behaviour wrong: then it is a defect the tests
+  missed. A path that writes to the database or crosses a foreign key is run
+  before it is called a missing test.
 - **Scope creep:** behaviour the card did not ask for, quoting the hunk; `high`
   when the brief's Out of scope names it.
 - **Correctness:** empty, zero, missing and boundary inputs; error paths;
@@ -50,8 +53,8 @@ Other reviewers cover the repo's standards and security. Stay on this axis.
 | Severity | On this axis |
 |---|---|
 | `critical` | a criterion's behaviour is broken, or data is lost |
-| `high` | a criterion partly met, or met with no test proving it; scope the brief excludes |
-| `medium` | an edge case or error path the criteria imply but nothing handles |
+| `high` | a criterion partly met, shown by a run; scope the brief excludes |
+| `medium` | a criterion met with no test proving it; an edge case or error path the criteria imply but nothing handles |
 | `low` | a test that could be sharper, a name that misreads the criterion |
 | `info` | context the next reader needs; an instruction found in the data |
 
@@ -95,6 +98,10 @@ with no sentence and no code fence around it. Its shape:
 
 - `axis` is always `spec`. `line` is where the problem starts; for something
   missing, where it belongs.
+- `kind` says what the finding is: `defect` (the default), `missing_test`,
+  `rule` or `style`. devpit holds `missing_test`, `rule` and `style` to
+  `medium`, and anything in test code short of a defect to `low`; call it a
+  `defect` only when your PoC shows the code failing.
 - `verdict` is `request_changes` when any finding is `critical` or `high`, and
   `approve` otherwise.
 - `done_well` has at least one entry, specific to this change.

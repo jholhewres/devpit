@@ -110,6 +110,10 @@ with no sentence and no code fence around it. Its shape:
 ```
 
 - `axis` is always `security`. `line` is where the unsafe use is.
+- `kind` says what the finding is: `defect` (the default), `missing_test`,
+  `rule` or `style`. devpit holds `missing_test`, `rule` and `style` to
+  `medium`, and anything in test code short of a defect to `low`; call it a
+  `defect` only when your PoC shows the code failing.
 - `verdict` is `request_changes` when any finding is `critical` or `high`, and
   `approve` otherwise.
 - `done_well` has at least one entry, specific to this change.

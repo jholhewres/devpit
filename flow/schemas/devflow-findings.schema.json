@@ -67,8 +67,16 @@
         "evidence": { "type": "string", "minLength": 1, "description": "The quoted line, the rule with its path, or the command and its output." },
         "poc": { "type": "string", "description": "The input, command or request that makes the problem happen. Required, and not empty, for critical and high." },
         "suggestion": { "type": "string" },
+        "kind": {
+          "enum": ["defect", "missing_test", "rule", "style"],
+          "description": "What the finding is. missing_test, rule and style are at most medium, and anything in test code short of a defect at most low; a finding without it is read as a defect."
+        },
         "agent": { "type": "string", "minLength": 1 },
         "persona": { "type": "string", "minLength": 1 },
+        "capped": {
+          "type": "object",
+          "description": "Set by devpit when it lowered the severity the reviewer gave: from, the severity said, and why."
+        },
         "found_by": {
           "type": "array",
           "minItems": 1,

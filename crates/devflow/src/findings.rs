@@ -33,7 +33,7 @@ pub const REQUIRED: [&str; 9] = [
 ];
 
 /// Everything a finding may carry: the schema allows nothing else.
-pub const FIELDS: [&str; 16] = [
+pub const FIELDS: [&str; 18] = [
     "file",
     "line",
     "end_line",
@@ -44,8 +44,10 @@ pub const FIELDS: [&str; 16] = [
     "evidence",
     "poc",
     "suggestion",
+    "kind",
     "agent",
     "persona",
+    "capped",
     "found_by",
     "agreement",
     "false_positive",
@@ -53,7 +55,11 @@ pub const FIELDS: [&str; 16] = [
 ];
 
 /// What devpit sets on a finding, never a reviewer.
-const DEVPITS: [&str; 4] = ["found_by", "agreement", "false_positive", "jev"];
+const DEVPITS: [&str; 5] = ["found_by", "agreement", "false_positive", "jev", "capped"];
+
+/// What a finding is: a defect, or something short of one that a severity
+/// cannot outgrow without a PoC showing a defect.
+pub const KINDS: [&str; 4] = ["defect", "missing_test", "rule", "style"];
 
 /// The most findings one answer may hold: a review, not a lint run.
 const MOST_FINDINGS: usize = 200;
@@ -127,6 +133,17 @@ fn finding_problems(finding: &Value, at: &str, wrong: &mut Vec<String>) {
         wrong.push(format!(
             "`{at}` is {severity} and needs a `poc`: the input, command or request that shows it"
         ));
+    }
+    if finding.get("kind").is_some() && !KINDS.contains(&text(finding, "kind")) {
+        wrong.push(format!(
+            "`{at}.kind` is defect, missing_test, rule or style"
+        ));
+    }
+    if finding
+        .get("capped")
+        .is_some_and(|value| !value.is_object())
+    {
+        wrong.push(format!("`{at}.capped` is an object"));
     }
     if let Some(agreement) = finding.get("agreement").and_then(Value::as_str) {
         if agreement_of(agreement).is_none() {
@@ -263,9 +280,76 @@ pub fn signed(mut report: Value, agent: &str, persona: &str) -> Value {
             for key in DEVPITS {
                 finding.remove(key);
             }
+            capped(finding);
         }
     }
     report
+}
+
+/// Code under test, by the names test runners look for.
+pub fn in_tests(file: &str) -> bool {
+    let name = file.rsplit('/').next().unwrap_or(file);
+    let stem = name.split('.').next().unwrap_or(name);
+    file.split('/')
+        .any(|part| matches!(part, "tests" | "test" | "__tests__" | "spec"))
+        || name.contains(".test.")
+        || name.contains(".spec.")
+        || stem.ends_with("_test")
+        || stem.ends_with("_tests")
+        || stem.ends_with("Test")
+        || stem.ends_with("_spec")
+        || stem.starts_with("test_")
+}
+
+/// A PoC that only searches the code shows it is there, not that it fails.
+pub fn only_searches(poc: &str) -> bool {
+    let first: Vec<&str> = poc.split_whitespace().take(2).collect();
+    match first.as_slice() {
+        ["git", "grep", ..] => true,
+        [one, ..] => matches!(*one, "grep" | "rg" | "ag" | "ack"),
+        [] => false,
+    }
+}
+
+/// The worst a finding may be as it stands, and why: what it is short of a
+/// shown defect cannot block a card on its own.
+pub fn ceiling(finding: &Value) -> Option<(Severity, &'static str)> {
+    let kind = text(finding, "kind");
+    if in_tests(text(finding, "file")) && kind != "defect" {
+        return Some((
+            Severity::Low,
+            "a finding in test code is at most low unless it is a defect",
+        ));
+    }
+    if matches!(kind, "missing_test" | "rule" | "style") {
+        return Some((
+            Severity::Medium,
+            "a missing test, a written rule or a style point is at most medium unless a PoC shows a defect",
+        ));
+    }
+    if only_searches(text(finding, "poc")) {
+        return Some((
+            Severity::Medium,
+            "a search shows the code is there, not that it fails, so it is not a PoC",
+        ));
+    }
+    None
+}
+
+/// A finding held to its ceiling, keeping what the reviewer said and why
+/// devpit lowered it.
+fn capped(finding: &mut Map<String, Value>) {
+    let value = Value::Object(finding.clone());
+    let Some((most, why)) = ceiling(&value) else {
+        return;
+    };
+    let Some(said) = severity_of(text(&value, "severity")) else {
+        return;
+    };
+    if said < most {
+        finding.insert("severity".into(), json!(most.word()));
+        finding.insert("capped".into(), json!({ "from": said.word(), "why": why }));
+    }
 }
 
 pub fn severity_of(word: &str) -> Option<Severity> {
@@ -566,6 +650,12 @@ pub fn line_of(finding: &Value) -> String {
     );
     if let Some(agreement) = finding.get("agreement").and_then(Value::as_str) {
         said.push_str(&format!(" ({agreement})"));
+    }
+    if let Some(from) = finding["capped"]["from"].as_str() {
+        said.push_str(&format!(
+            " (said {from}: {})",
+            text(&finding["capped"], "why")
+        ));
     }
     if finding.get("false_positive") == Some(&json!(true)) {
         said.push_str(" — a false positive, the person said");
