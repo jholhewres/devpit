@@ -676,8 +676,8 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
             deadline,
         )
         .map_err(|why| (why, None))?;
-        match findings::read_answer(&said.text) {
-            Ok(answer) => Ok((findings::signed(answer, agent, &reviewer.persona), said)),
+        match findings::read_signed(&said.text, agent, &reviewer.persona) {
+            Ok(answer) => Ok((answer, said)),
             Err(why) => Err((why, Some(said))),
         }
     };
@@ -774,12 +774,11 @@ fn reviewed_again(given: &Given, run: &str) -> Result<(String, PathBuf, Record),
         record.ran.push(one);
     }
     for (at, report) in given.asked.reports.iter().enumerate() {
-        let answer = findings::read_answer(&report.to_string())
-            .map_err(|why| format!("reports.{at}: {}", why.replacen("its answer", "it", 1)))?;
-        let who = &answer["reviewers"][0];
+        let who = &report["reviewers"][0];
         let agent = who["agent"].as_str().unwrap_or("session").to_owned();
         let persona = who["persona"].as_str().unwrap_or_default().to_owned();
-        let answer = findings::signed(answer, &agent, &persona);
+        let answer = findings::read_signed(&report.to_string(), &agent, &persona)
+            .map_err(|why| format!("reports.{at}: {}", why.replacen("its answer", "it", 1)))?;
         let taken: Vec<String> = record.ran.iter().filter_map(|r| r.file.clone()).collect();
         let file = file_for(&taken, &agent, &persona);
         write(&path, &file, &pretty(&answer))?;

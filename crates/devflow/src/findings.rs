@@ -213,13 +213,27 @@ pub fn problems(report: &Value) -> Vec<String> {
     wrong
 }
 
-/// A reviewer's answer: the one JSON object it wrote, held to the schema.
-pub fn read_answer(said: &str) -> Result<Value, String> {
+/// The one JSON object a reviewer wrote, through any prose or fence around it.
+fn object_in(said: &str) -> Result<Value, String> {
     let (Some(start), Some(end)) = (said.find('{'), said.rfind('}')) else {
         return Err("its answer holds no JSON object".to_owned());
     };
-    let value: Value = serde_json::from_str(said.get(start..=end).unwrap_or_default())
-        .map_err(|why| format!("its answer is not one JSON object: {why}"))?;
+    serde_json::from_str(said.get(start..=end).unwrap_or_default())
+        .map_err(|why| format!("its answer is not one JSON object: {why}"))
+}
+
+/// A reviewer's answer: the one JSON object it wrote, held to the schema.
+pub fn read_answer(said: &str) -> Result<Value, String> {
+    held(object_in(said)?)
+}
+
+/// A reviewer devpit ran, signed before it is held to the schema: a name it
+/// left out is one devpit fills anyway, not a reason to throw the review away.
+pub fn read_signed(said: &str, agent: &str, persona: &str) -> Result<Value, String> {
+    held(signed(object_in(said)?, agent, persona))
+}
+
+fn held(value: Value) -> Result<Value, String> {
     let wrong = problems(&value);
     if !wrong.is_empty() {
         let mut told: Vec<String> = wrong.iter().take(NAMED).cloned().collect();
@@ -237,6 +251,9 @@ pub fn read_answer(said: &str) -> Result<Value, String> {
 /// The answer under the name of who gave it: who found a finding is
 /// devpit's to say, and so is anything devpit sets after.
 pub fn signed(mut report: Value, agent: &str, persona: &str) -> Value {
+    if !report.is_object() {
+        return report;
+    }
     let who = json!({ "agent": agent, "persona": persona });
     report["reviewers"] = json!([who]);
     if let Some(findings) = report["findings"].as_array_mut() {

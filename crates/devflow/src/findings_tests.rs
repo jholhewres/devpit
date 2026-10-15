@@ -142,6 +142,31 @@ fn an_answer_is_signed_by_who_gave_it_and_carries_nothing_devpit_sets() {
     assert!(signed["findings"][0].get("false_positive").is_none());
 }
 
+/// A headless reviewer that left out the names devpit fills was refused, and
+/// its whole review was lost (B15).
+#[test]
+fn a_reviewer_devpit_ran_is_not_refused_for_the_names_devpit_fills() {
+    let mut said = answer(
+        "claude",
+        "devflow-security",
+        vec![finding("a.rs", 3, "medium", "fails open")],
+    );
+    for key in ["agent", "persona"] {
+        said["findings"][0]
+            .as_object_mut()
+            .expect("finding")
+            .remove(key);
+    }
+    said.as_object_mut().expect("answer").remove("reviewers");
+    let read = read_signed(&said.to_string(), "claude", "devflow-security").expect("accepted");
+    assert_eq!(read["findings"][0]["persona"], "devflow-security");
+    said["findings"][0]["severity"] = json!("blocker");
+    let refused = read_signed(&said.to_string(), "claude", "devflow-security")
+        .expect_err("another break is still refused");
+    assert!(refused.contains("severity"), "{refused}");
+    assert!(read_signed("not json", "claude", "devflow-security").is_err());
+}
+
 fn all_of(answers: &[Value]) -> (Vec<Value>, Vec<Source>) {
     let all = answers
         .iter()
