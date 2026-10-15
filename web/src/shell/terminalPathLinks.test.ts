@@ -2,7 +2,7 @@ import type { IBufferLine } from '@xterm/xterm'
 import { describe, expect, it } from 'vitest'
 
 import { pathsIn } from './terminalLinks'
-import { logicalLine } from './terminalPathLinks'
+import { logicalLine, REACH } from './terminalPathLinks'
 
 /** A buffer row of `cols` cells, from characters and their widths. */
 function row(chars: Array<[string, number]>, cols: number, isWrapped = false): IBufferLine {
@@ -41,5 +41,17 @@ describe('a path in the terminal, on screen', () => {
       expect(read.cells[path!.start]).toMatchObject({ x: 4, y: 0 })
       expect(read.cells[path!.end - 1]).toMatchObject({ x: 17, y: 1 })
     }
+  })
+})
+
+describe('a line the terminal wrapped over thousands of rows', () => {
+  it('is read only a few rows either side of the pointer', () => {
+    const cols = 80
+    const lines = Array.from({ length: 5000 }, (_, y) => row(narrow('/a'.repeat(cols / 2)), cols, y > 0))
+    const read = logicalLine((y) => lines[y], 2500, cols)
+    expect(read.text.length).toBe((2 * REACH + 1) * cols)
+    const started = performance.now()
+    pathsIn(read.text)
+    expect(performance.now() - started).toBeLessThan(200)
   })
 })

@@ -71,8 +71,13 @@ export interface Cell {
   readonly width: number
 }
 
+/** How many rows either side of the one under the pointer a line is joined
+ *  over. The path pattern is quadratic in what it reads, and a wrapped line of
+ *  scrollback held the page for seconds on each hover. */
+export const REACH = 4
+
 /**
- * The whole line row `row` is part of — the rows before it and after it that
+ * The whole line row `row` is part of, up to REACH rows either side, — the rows before it and after it that
  * the terminal wrapped joined back — as text, with the cell each character of
  * that text sits at. A wide character takes two cells and one character, so a
  * string index is not a column.
@@ -83,7 +88,7 @@ export function logicalLine(
   cols: number,
 ): { text: string; cells: Cell[] } {
   let first = row
-  while (first > 0 && line(first)?.isWrapped) first--
+  while (first > 0 && first > row - REACH && line(first)?.isWrapped) first--
   let text = ''
   const cells: Cell[] = []
   for (let y = first; ; y++) {
@@ -98,7 +103,7 @@ export function logicalLine(
       for (let i = 0; i < chars.length; i++) cells.push({ x, y, width })
       text += chars
     }
-    if (!line(y + 1)?.isWrapped) break
+    if (y >= row + REACH || !line(y + 1)?.isWrapped) break
   }
   const kept = text.trimEnd().length
   return { text: text.slice(0, kept), cells: cells.slice(0, kept) }
