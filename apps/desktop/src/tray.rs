@@ -305,11 +305,17 @@ fn chosen(app: &AppHandle, id: &str) {
         Some(Act::Open) => forward(app),
         Some(Act::Terminal) => told(app, "tray:new-terminal", ()),
         Some(Act::Settings) => told(app, "tray:settings", ()),
-        Some(Act::Pause) => crate::pausing::for_an_hour(app),
-        Some(Act::Resume) => crate::pausing::resume(app),
+        // A store write, never on the window's thread: a slow disk froze it.
+        Some(Act::Pause) => off_the_window(app, crate::pausing::for_an_hour),
+        Some(Act::Resume) => off_the_window(app, crate::pausing::resume),
         Some(Act::Quit) => quit(app),
         None => {}
     }
+}
+
+fn off_the_window(app: &AppHandle, act: fn(&AppHandle)) {
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || act(&app));
 }
 
 /// devpit forward, and its window told what to open.
