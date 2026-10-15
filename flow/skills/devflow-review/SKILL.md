@@ -122,7 +122,10 @@ reads. Within an axis, the same problem found by several reviewers — same
 file, lines that meet, same cause — is kept once, the most severe as said,
 with `found_by` and `agreement` ("2 of 3"); `review.consolidate` says who
 judges the cause (`jev`, `agent`: one model pass, `none`: titles alike). A
-finding is never moved or re-ranked across axes. The verdict is
+finding is never moved or re-ranked across axes. Each finding gets an
+`anchor` from the diff and HEAD: `added`, `context`, `outside_hunk`,
+`not_in_diff`, or `beyond_eof` — a line HEAD does not have, which is taken out
+and listed in `dropped` with why. The verdict is
 `request_changes` when any finding's severity is in `review.block_on`
 (`critical` and `high` when unset), else `approve`. devpit attaches the
 files to the card and comments:
@@ -135,6 +138,10 @@ Reviewers: each one's findings, time and cost, or why it was skipped
 ## Standards
 ## Security
 ```
+
+Findings of different axes at one `file:line` are one item in the comment,
+under the first axis, naming them all (`[spec+standards]`); `findings.json`
+keeps them apart.
 
 The person can call a finding a false positive in the card's diff; it then
 holds nothing.

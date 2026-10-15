@@ -133,6 +133,7 @@ fn an_answer_is_signed_by_who_gave_it_and_carries_nothing_devpit_sets() {
     );
     said["findings"][0]["agent"] = json!("someone else");
     said["findings"][0]["false_positive"] = json!(true);
+    said["findings"][0]["anchor"] = json!("added");
     let signed = signed(said, "codex", "devflow-security");
     assert_eq!(
         signed["reviewers"],
@@ -140,6 +141,7 @@ fn an_answer_is_signed_by_who_gave_it_and_carries_nothing_devpit_sets() {
     );
     assert_eq!(signed["findings"][0]["agent"], "codex");
     assert!(signed["findings"][0].get("false_positive").is_none());
+    assert!(signed["findings"][0].get("anchor").is_none());
 }
 
 /// A headless reviewer that left out the names devpit fills was refused, and
@@ -448,4 +450,183 @@ fn a_kind_the_schema_does_not_name_is_refused() {
     let said = answer("claude", "devflow-spec", vec![odd]);
     let refused = read_signed(&said.to_string(), "claude", "devflow-spec").expect_err("refused");
     assert!(refused.contains("kind"), "{refused}");
+}
+
+/// Two changed files, one added, one deleted and one binary: what the
+/// anchors below are read against.
+const DIFF: &str = "diff --git a/src/app.rs b/src/app.rs
+index 1111111..2222222 100644
+--- a/src/app.rs
++++ b/src/app.rs
+@@ -1,3 +1,4 @@ fn main() {
+ fn main() {
+-    old();
++    open(link);
++    log(link);
+ }
+@@ -20,3 +21,3 @@ fn other() {
+ a
+-b
++c
+ d
+diff --git a/src/new.rs b/src/new.rs
+new file mode 100644
+--- /dev/null
++++ b/src/new.rs
+@@ -0,0 +1,2 @@
++++ x
++fn x() {}
+diff --git a/src/gone.rs b/src/gone.rs
+deleted file mode 100644
+--- a/src/gone.rs
++++ /dev/null
+@@ -1,2 +0,0 @@
+-a
+-b
+diff --git a/logo.png b/logo.png
+Binary files a/logo.png and b/logo.png differ
+";
+
+#[test]
+fn a_diff_is_read_into_its_hunks_and_the_lines_it_added() {
+    let read = diffed(DIFF);
+    assert_eq!(
+        read.keys().collect::<Vec<_>>(),
+        ["logo.png", "src/app.rs", "src/new.rs"],
+        "a deleted file is not on the new side"
+    );
+    assert_eq!(read["src/app.rs"].hunks, [(1, 4), (21, 23)]);
+    assert_eq!(read["src/app.rs"].added, [(2, 3), (22, 22)]);
+    // `+++ x` is an added line inside a hunk, not a file header.
+    assert_eq!(read["src/new.rs"].added, [(1, 2)]);
+    assert_eq!(read["logo.png"], Diffed::default());
+}
+
+/// The line counts at HEAD the fixture's findings are held to.
+fn at_head(file: &str) -> Result<Option<usize>, String> {
+    match file {
+        "src/app.rs" => Ok(Some(30)),
+        "src/new.rs" => Ok(Some(2)),
+        "src/other.rs" => Ok(Some(50)),
+        "src/gone.rs" => Ok(None),
+        _ => Err("larger than 8192 KB".to_owned()),
+    }
+}
+
+#[test]
+fn findings_are_anchored_where_the_diff_and_head_put_them() {
+    let cases = [
+        ("src/app.rs", 2, "added"),
+        ("src/app.rs", 3, "added"),
+        ("src/app.rs", 22, "added"),
+        ("src/new.rs", 1, "added"),
+        ("src/app.rs", 1, "context"),
+        ("src/app.rs", 23, "context"),
+        ("src/app.rs", 10, "outside_hunk"),
+        ("logo.png", 1, "outside_hunk"),
+        ("src/other.rs", 7, "not_in_diff"),
+        ("src/huge.rs", 99_999, "not_in_diff"),
+        ("src/app.rs", 31, "beyond_eof"),
+        ("src/other.rs", 51, "beyond_eof"),
+        ("src/gone.rs", 1, "beyond_eof"),
+    ];
+    let mut list: Vec<Value> = cases
+        .iter()
+        .map(|(file, line, _)| finding(file, *line, "low", &format!("{file}:{line}")))
+        .collect();
+    let asked = std::cell::RefCell::new(Vec::new());
+    let lines_at = |file: &str| {
+        asked.borrow_mut().push(file.to_owned());
+        at_head(file)
+    };
+    let dropped = anchored(&mut list, &diffed(DIFF), &lines_at);
+
+    let kept: Vec<(String, u64, String)> = list
+        .iter()
+        .map(|one| {
+            (
+                text(one, "file").to_owned(),
+                one["line"].as_u64().unwrap_or_default(),
+                text(one, "anchor").to_owned(),
+            )
+        })
+        .collect();
+    let expected: Vec<(String, u64, String)> = cases
+        .iter()
+        .filter(|(_, _, anchor)| *anchor != "beyond_eof")
+        .map(|(file, line, anchor)| ((*file).to_owned(), *line, (*anchor).to_owned()))
+        .collect();
+    assert_eq!(kept, expected);
+    let reasons: Vec<&str> = dropped.iter().map(|one| text(one, "reason")).collect();
+    assert_eq!(
+        reasons,
+        [
+            "line 31 is past the end of src/app.rs, which has 30 lines at HEAD",
+            "line 51 is past the end of src/other.rs, which has 50 lines at HEAD",
+            "src/gone.rs is not a file at HEAD",
+        ]
+    );
+    assert_eq!(dropped[2]["title"], "src/gone.rs:1");
+    assert_eq!(dropped[2]["agent"], "claude");
+    let mut asked = asked.into_inner();
+    let all = asked.len();
+    asked.dedup();
+    assert_eq!(all, asked.len(), "HEAD is asked once per file: {asked:?}");
+    assert!(
+        !asked.iter().any(|file| file == "src/new.rs"),
+        "a line in a hunk needs no count"
+    );
+}
+
+#[test]
+fn a_finding_beyond_the_end_of_its_file_is_taken_out_with_why() {
+    let mut list = vec![
+        finding("src/app.rs", 200, "high", "past the end"),
+        finding("src/other.rs", 7, "low", "elsewhere"),
+    ];
+    let dropped = anchored(&mut list, &diffed(DIFF), &at_head);
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0]["anchor"], "not_in_diff");
+    assert_eq!(dropped.len(), 1);
+    assert!(text(&dropped[0], "reason").contains("past the end of src/app.rs"));
+    let held = answer("claude", "devflow-spec", list);
+    assert!(problems(&held).is_empty(), "{:?}", problems(&held));
+}
+
+#[test]
+fn an_anchor_is_one_devpit_names() {
+    let mut odd = finding("src/a.rs", 3, "low", "a name");
+    odd["anchor"] = json!("nearby");
+    assert!(problems(&answer("claude", "devflow-spec", vec![odd]))
+        .iter()
+        .any(|wrong| wrong.contains("anchor")));
+}
+
+#[test]
+fn the_comment_names_one_place_once_across_its_axes() {
+    let on = |axis: &str, file: &str, line: u64, title: &str| {
+        let mut one = finding(file, line, "low", title);
+        one["axis"] = json!(axis);
+        one
+    };
+    let list = [
+        on("spec", "a.rs", 3, "not what the card asks"),
+        on("spec", "a.rs", 3, "and a second spec problem"),
+        on("standards", "a.rs", 3, "breaks the rule"),
+        on("security", "a.rs", 3, "injects"),
+        on("standards", "a.rs", 9, "a name"),
+        on("security", "b.rs", 1, "a secret"),
+    ];
+    let items = listed(&list);
+    assert_eq!(
+        items,
+        [
+            vec![
+                "- low `a.rs:3` [spec+standards+security] not what the card asks",
+                "- low `a.rs:3` and a second spec problem",
+            ],
+            vec!["- low `a.rs:9` a name"],
+            vec!["- low `b.rs:1` a secret"],
+        ]
+    );
 }

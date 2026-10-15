@@ -25,6 +25,8 @@ use crate::steps::context::{context_of, Checkout};
 const SPARE: Duration = Duration::from_secs(30);
 /// How a Devflow review's run is named among a card's reviews.
 const RUN: &str = "devflow:";
+/// The most of a file read to count its lines, when a finding cites one.
+const MOST_COUNTED: u64 = 8 * 1024 * 1024;
 
 pub(crate) fn respond(
     app: Option<&AppHandle>,
@@ -157,6 +159,9 @@ pub(crate) fn respond_with(
     let personal = devpit_core::Store::root()
         .map(|home| devpit_core::home::devflow_reviewers(&home))
         .ok();
+    let lines_at = |commit: &str, file: &str| {
+        devpit_git::lines_at(&root, commit, file, MOST_COUNTED).map_err(|err| err.to_string())
+    };
     let done = review::reviewed(&Given {
         root: &root,
         config,
@@ -185,6 +190,7 @@ pub(crate) fn respond_with(
             teams: &teams,
         },
         previous: previous.as_ref(),
+        lines_at: &lines_at,
     })?;
 
     let run = root.join(&done.folder);

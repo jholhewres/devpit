@@ -70,3 +70,16 @@ fn only_a_change_outside_devpit_is_a_change_to_the_code() {
     let fixed = committed(at, "a.txt", "one, fixed\n");
     assert!(code_changed_between(at, &reviewed, &fixed).expect("diff"));
 }
+
+#[test]
+fn a_files_lines_are_counted_at_a_commit_and_a_missing_one_is_none() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let at = dir.path();
+    git(at, &["init", "-q", "-b", "main"]);
+    let head = committed(at, "a.txt", "one\ntwo\nthree\n");
+    std::fs::write(at.join("a.txt"), "one\n").expect("not committed");
+    assert_eq!(lines_at(at, &head, "a.txt", 1024).expect("read"), Some(3));
+    assert_eq!(lines_at(at, &head, "b.txt", 1024).expect("read"), None);
+    assert!(lines_at(at, &head, "a.txt", 4).is_err(), "past the ceiling");
+    assert!(lines_at(at, &head, "../a.txt", 1024).is_err());
+}

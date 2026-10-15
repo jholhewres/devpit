@@ -6,8 +6,9 @@
 //!
 //! Pure: running the reviewers is `review.rs`'s.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 use crate::config::{Consolidate, Severity};
@@ -33,7 +34,7 @@ pub const REQUIRED: [&str; 9] = [
 ];
 
 /// Everything a finding may carry: the schema allows nothing else.
-pub const FIELDS: [&str; 19] = [
+pub const FIELDS: [&str; 20] = [
     "file",
     "line",
     "end_line",
@@ -53,16 +54,30 @@ pub const FIELDS: [&str; 19] = [
     "false_positive",
     "jev",
     "carried_from",
+    "anchor",
 ];
 
 /// What devpit sets on a finding, never a reviewer.
-const DEVPITS: [&str; 6] = [
+const DEVPITS: [&str; 7] = [
     "found_by",
     "agreement",
     "false_positive",
     "jev",
     "capped",
     "carried_from",
+    "anchor",
+];
+
+/// Where a finding's line sits in the change, as devpit reads it from the
+/// diff and HEAD: on a line the change added, on a line a hunk shows around
+/// it, outside every hunk of a file it changed, in a file it did not change,
+/// or on no line HEAD has.
+pub const ANCHORS: [&str; 5] = [
+    "added",
+    "context",
+    "outside_hunk",
+    "not_in_diff",
+    "beyond_eof",
 ];
 
 /// What a finding is: a defect, or something short of one that a severity
@@ -176,6 +191,11 @@ fn finding_problems(finding: &Value, at: &str, wrong: &mut Vec<String>) {
     }
     if finding.get("jev").is_some_and(|value| !value.is_object()) {
         wrong.push(format!("`{at}.jev` is an object"));
+    }
+    if finding.get("anchor").is_some() && !ANCHORS.contains(&text(finding, "anchor")) {
+        wrong.push(format!(
+            "`{at}.anchor` is added, context, outside_hunk, not_in_diff or beyond_eof"
+        ));
     }
 }
 
@@ -644,6 +664,183 @@ pub fn said_together(answers: &[Value]) -> (Vec<String>, Value) {
     (done_well, Value::Object(verification))
 }
 
+/// One file of a unified diff, on its new side: every hunk's range and the
+/// lines the change added, each as `(first, last)`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Diffed {
+    pub hunks: Vec<(u64, u64)>,
+    pub added: Vec<(u64, u64)>,
+}
+
+/// The ranges a file keeps: past them a finding is read as outside a hunk.
+const MOST_RANGES: usize = 1_000;
+
+fn push_range(ranges: &mut Vec<(u64, u64)>, line: u64) {
+    if let Some((_, last)) = ranges.last_mut().filter(|(_, last)| *last + 1 == line) {
+        *last = line;
+    } else if ranges.len() < MOST_RANGES {
+        ranges.push((line, line));
+    }
+}
+
+/// `+c,d` of a hunk header: where the new side starts and how many lines.
+fn new_side(header: &str) -> Option<(u64, u64, u64)> {
+    let ranges = header.strip_prefix("@@ ")?.split(" @@").next()?;
+    let mut parts = ranges.split_whitespace();
+    let count = |part: &str| -> Option<(u64, u64)> {
+        match part.split_once(',') {
+            Some((start, count)) => Some((start.parse().ok()?, count.parse().ok()?)),
+            None => Some((part.parse().ok()?, 1)),
+        }
+    };
+    let (_, old) = count(parts.next()?.strip_prefix('-')?)?;
+    let (start, new) = count(parts.next()?.strip_prefix('+')?)?;
+    Some((start, old, new))
+}
+
+/// Each file a unified diff changes, by its path on the new side; a file
+/// the diff deletes is not one. Lines are counted through each hunk, so an
+/// added line that reads like a header is still a line.
+pub fn diffed(diff: &str) -> BTreeMap<String, Diffed> {
+    let mut files: BTreeMap<String, Diffed> = BTreeMap::new();
+    let mut file: Option<String> = None;
+    // The next new-side line, and what the open hunk has left of each side.
+    let (mut at, mut old, mut new) = (0u64, 0u64, 0u64);
+    for line in diff.lines() {
+        if old > 0 || new > 0 {
+            let entry = file
+                .as_ref()
+                .map(|file| files.entry(file.clone()).or_default());
+            match line.chars().next() {
+                Some('+') => {
+                    if let Some(entry) = entry {
+                        push_range(&mut entry.added, at);
+                    }
+                    (at, new) = (at + 1, new.saturating_sub(1));
+                    continue;
+                }
+                Some('-') => {
+                    old = old.saturating_sub(1);
+                    continue;
+                }
+                Some(' ') | None => {
+                    (at, old, new) = (at + 1, old.saturating_sub(1), new.saturating_sub(1));
+                    continue;
+                }
+                Some('\\') => continue,
+                // A hunk shorter than its header said: the next header starts.
+                _ => (old, new) = (0, 0),
+            }
+        }
+        if let Some(rest) = line.strip_prefix("diff --git ") {
+            // A file with no hunk, binary or only renamed, is still in the diff.
+            file = rest.rsplit_once(" b/").map(|(_, path)| path.to_owned());
+            if let Some(file) = &file {
+                files.entry(file.clone()).or_default();
+            }
+        } else if let Some(path) = line.strip_prefix("+++ ") {
+            if let Some(gone) = file.take().filter(|_| path == "/dev/null") {
+                files.remove(&gone);
+            }
+            file = path.strip_prefix("b/").map(str::to_owned);
+        } else if let Some((start, from, to)) = new_side(line) {
+            (at, old, new) = (start, from, to);
+            if let Some(file) = &file {
+                let hunks = &mut files.entry(file.clone()).or_default().hunks;
+                if hunks.len() < MOST_RANGES {
+                    hunks.push((start, start + to.max(1) - 1));
+                }
+            }
+        }
+    }
+    files
+}
+
+fn within(ranges: &[(u64, u64)], line: u64) -> bool {
+    ranges
+        .iter()
+        .any(|(first, last)| (*first..=*last).contains(&line))
+}
+
+/// Where `line` of `file` sits: its anchor, and for `beyond_eof` why.
+/// `at_head` is the file's line count at HEAD, `None` when HEAD has no such
+/// file, `Err` when it could not be read; it is asked only outside the
+/// hunks, and an unread count never puts a finding beyond the end.
+pub fn anchor_of(
+    file: &str,
+    line: u64,
+    diffed: Option<&Diffed>,
+    at_head: &mut dyn FnMut() -> Result<Option<usize>, String>,
+) -> (&'static str, Option<String>) {
+    if let Some(diffed) = diffed {
+        if within(&diffed.added, line) {
+            return ("added", None);
+        }
+        if within(&diffed.hunks, line) {
+            return ("context", None);
+        }
+    }
+    let outside = if diffed.is_some() {
+        "outside_hunk"
+    } else {
+        "not_in_diff"
+    };
+    match at_head() {
+        Ok(None) => ("beyond_eof", Some(format!("{file} is not a file at HEAD"))),
+        Ok(Some(count)) if line > count as u64 => (
+            "beyond_eof",
+            Some(format!(
+                "line {line} is past the end of {file}, which has {count} lines at HEAD"
+            )),
+        ),
+        _ => (outside, None),
+    }
+}
+
+/// Each finding anchored, and those on no line of HEAD taken out: what was
+/// taken out, with why, is what this returns. HEAD is asked once per file.
+pub fn anchored(
+    findings: &mut Vec<Value>,
+    diffed: &BTreeMap<String, Diffed>,
+    lines_at: &dyn Fn(&str) -> Result<Option<usize>, String>,
+) -> Vec<Value> {
+    let mut counted: BTreeMap<String, Result<Option<usize>, String>> = BTreeMap::new();
+    let mut dropped = Vec::new();
+    findings.retain_mut(|finding| {
+        let file = text(finding, "file").to_owned();
+        let line = whole(finding, "line").unwrap_or(1).max(1) as u64;
+        let mut at_head = || {
+            counted
+                .entry(file.clone())
+                .or_insert_with(|| lines_at(&file))
+                .clone()
+        };
+        let (anchor, why) = anchor_of(&file, line, diffed.get(&file), &mut at_head);
+        finding["anchor"] = json!(anchor);
+        let Some(why) = why else {
+            return true;
+        };
+        let mut said = texts_of(
+            finding,
+            &["file", "line", "axis", "title", "agent", "persona"],
+        );
+        said["reason"] = json!(why);
+        dropped.push(said);
+        false
+    });
+    dropped
+}
+
+fn texts_of(value: &Value, keys: &[&str]) -> Value {
+    let mut kept = Map::new();
+    for key in keys {
+        if let Some(item) = value.get(*key) {
+            kept.insert((*key).to_owned(), item.clone());
+        }
+    }
+    Value::Object(kept)
+}
+
 /// How many findings still standing hold each severity.
 pub fn counted(findings: &[Value], severity: Severity) -> usize {
     findings
@@ -669,8 +866,18 @@ pub fn headline(findings: &Value) -> String {
 
 /// One finding as the comment lists it.
 pub fn line_of(finding: &Value) -> String {
+    item_of(finding, &[])
+}
+
+/// A finding with the other axes found at its file:line, as one item.
+fn item_of(finding: &Value, axes: &[&str]) -> String {
+    let across = if axes.len() > 1 {
+        format!(" [{}]", axes.join("+"))
+    } else {
+        String::new()
+    };
     let mut said = format!(
-        "- {} `{}:{}` {}",
+        "- {} `{}:{}`{across} {}",
         text(finding, "severity"),
         text(finding, "file"),
         lines(finding).0,
@@ -695,6 +902,41 @@ pub fn line_of(finding: &Value) -> String {
         said.push_str(&format!(" — Jev: {}", acted.join("; ")));
     }
     said
+}
+
+/// The comment's items under each axis, in [`AXES`]' order. Findings of
+/// different axes at one file:line are one item under the first of them,
+/// naming every axis; findings.json keeps them apart.
+pub fn listed(list: &[Value]) -> Vec<Vec<String>> {
+    let axis_of = |finding: &Value| {
+        AXES.iter()
+            .position(|axis| *axis == text(finding, "axis"))
+            .unwrap_or(AXES.len())
+    };
+    let place = |finding: &Value| (text(finding, "file").to_owned(), lines(finding).0);
+    let mut items: Vec<Vec<String>> = vec![Vec::new(); AXES.len()];
+    // Places an earlier axis already listed: a later axis is named there.
+    let mut listed: Vec<(String, i64)> = Vec::new();
+    for (at, axis) in AXES.iter().enumerate() {
+        let mut here: Vec<(String, i64)> = Vec::new();
+        for finding in list.iter().filter(|one| axis_of(one) == at) {
+            let place_of = place(finding);
+            if listed.contains(&place_of) {
+                continue;
+            }
+            let mut axes = vec![*axis];
+            if !here.contains(&place_of) {
+                axes.extend(AXES[at + 1..].iter().filter(|later| {
+                    list.iter()
+                        .any(|other| text(other, "axis") == **later && place(other) == place_of)
+                }));
+                here.push(place_of);
+            }
+            items[at].push(item_of(finding, &axes));
+        }
+        listed.extend(here);
+    }
+    items
 }
 
 #[cfg(test)]

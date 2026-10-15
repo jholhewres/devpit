@@ -145,37 +145,11 @@ pub fn capped(state: &Value) -> Value {
 /// The new side's line ranges of each file a unified diff changes: what a
 /// finding is asked to be inside, without the diff itself.
 pub fn changed_lines(diff: &str) -> BTreeMap<String, Vec<(u64, u64)>> {
-    let mut changed: BTreeMap<String, Vec<(u64, u64)>> = BTreeMap::new();
-    let mut file: Option<String> = None;
-    for line in diff.lines() {
-        if let Some(path) = line.strip_prefix("+++ ") {
-            file = path
-                .strip_prefix("b/")
-                .filter(|_| path != "/dev/null")
-                .map(str::to_owned);
-            continue;
-        }
-        let Some(hunk) = line.strip_prefix("@@ ") else {
-            continue;
-        };
-        let (Some(file), Some(new)) = (
-            &file,
-            hunk.split_whitespace().find(|part| part.starts_with('+')),
-        ) else {
-            continue;
-        };
-        let (start, count) = match new[1..].split_once(',') {
-            Some((start, count)) => (start.parse().ok(), count.parse().ok()),
-            None => (new[1..].parse().ok(), Some(1)),
-        };
-        if let (Some(start), Some(count)) = (start, count) {
-            let ranges = changed.entry(file.clone()).or_default();
-            if ranges.len() < 50 {
-                ranges.push((start, start + u64::max(count, 1) - 1));
-            }
-        }
-    }
-    changed
+    crate::findings::diffed(diff)
+        .into_iter()
+        .filter(|(_, diffed)| !diffed.hunks.is_empty())
+        .map(|(file, diffed)| (file, diffed.hunks.into_iter().take(50).collect()))
+        .collect()
 }
 
 fn texts(value: &Value, keys: &[&str]) -> Value {

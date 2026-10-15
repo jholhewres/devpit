@@ -204,6 +204,9 @@ struct Ran<'a> {
     jev: Option<Judge<'a>>,
 }
 
+/// Every file at HEAD, as long as any finding of these tests needs.
+const LONG_ENOUGH: usize = 1_000;
+
 /// What the first review of a test reads.
 const FIRST_DIFF: &str =
     "--- a/src/app.rs\n+++ b/src/app.rs\n@@ -0,0 +1 @@\n+os.system(f\"xdg-open {link}\")\n";
@@ -236,6 +239,7 @@ impl Ran<'_> {
             personas: Personas::default(),
             jev: self.jev,
             previous,
+            lines_at: &|_, _| Ok(Some(LONG_ENOUGH)),
         })
     }
 }
@@ -993,4 +997,81 @@ fn a_previous_run_is_read_only_for_a_commit_it_names() {
         "0123456789abcdef0123456789abcdef01234567"
     );
     assert!(previous_of(root, "card_1", "../x").is_err());
+}
+
+/// The session's reports are anchored as a reviewer devpit ran is: in the
+/// diff the first call kept, one on no line of HEAD taken out and said.
+#[test]
+fn the_sessions_reports_are_anchored_and_one_past_the_end_is_dropped_with_why() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let config = config_with(Vec::new(), Consolidate::Nothing);
+    let reach = |_: Agent| Err("not installed".to_owned());
+    let first = Ran {
+        root,
+        config: &config,
+        asked: fresh(),
+        reach: &reach,
+        jev: None,
+    }
+    .review()
+    .expect("a run for the session");
+    let mut again = fresh();
+    again.run = Some(first.stamp.clone());
+    let mut elsewhere = finding("src/other.rs", 7, "low", "Not in the change");
+    elsewhere["axis"] = json!("spec");
+    again.reports = vec![
+        answer("claude", "devflow-spec", vec![elsewhere]),
+        answer(
+            "claude",
+            "devflow-security",
+            vec![
+                finding("src/app.rs", 1, "critical", "Shell injection in open"),
+                finding("src/app.rs", 4_000, "high", "A line HEAD does not have"),
+            ],
+        ),
+    ];
+    let done = Ran {
+        root,
+        config: &config,
+        asked: again,
+        reach: &reach,
+        jev: None,
+    }
+    .review()
+    .expect("handed back");
+
+    let findings = done.findings.as_ref().expect("findings.json");
+    let anchors: Vec<(&str, &str)> = findings["findings"]
+        .as_array()
+        .expect("findings")
+        .iter()
+        .map(|one| {
+            (
+                one["title"].as_str().unwrap_or_default(),
+                one["anchor"].as_str().unwrap_or_default(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        anchors,
+        [
+            ("Not in the change", "not_in_diff"),
+            ("Shell injection in open", "added")
+        ]
+    );
+    let why = "line 4000 is past the end of src/app.rs, which has 1000 lines at HEAD";
+    assert_eq!(findings["dropped"][0]["reason"], why);
+    assert_eq!(findings["dropped"][0]["title"], "A line HEAD does not have");
+    let kept: Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join(&done.folder).join(RECORD)).expect("review.json"),
+    )
+    .expect("json");
+    assert_eq!(kept["dropped"][0]["reason"], why);
+    assert!(comment(&done, &[]).contains(&format!(
+        "Dropped, on no line of HEAD:\n- [security] `src/app.rs:4000` A line HEAD does not have — {why}"
+    )));
+    assert!(summary(&done)["dropped"][0]
+        .as_str()
+        .is_some_and(|said| said.ends_with(why)));
 }

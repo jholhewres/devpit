@@ -34,6 +34,11 @@
       "items": { "type": "string", "minLength": 1 },
       "description": "The personas no reviewer has answered for yet; the review is not complete until it is empty."
     },
+    "dropped": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Set by devpit: the findings taken out because their line is on no line of HEAD, each with its file, line, axis, title, who found it and the reason."
+    },
     "verification": {
       "type": "object",
       "required": ["tests", "evidence"],
@@ -101,6 +106,10 @@
           "type": "string",
           "minLength": 1,
           "description": "Set by devpit on a re-review: the run this finding, which did not block, was found in. Only the change since was read again, so it still stands."
+        },
+        "anchor": {
+          "enum": ["added", "context", "outside_hunk", "not_in_diff", "beyond_eof"],
+          "description": "Set by devpit from the diff and HEAD: the line is one the change added, one a hunk shows around it, outside every hunk of a changed file, or in a file the change did not touch. A finding on no line of HEAD (beyond_eof) is taken out and listed in dropped."
         }
       },
       "allOf": [

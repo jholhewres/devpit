@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 use crate::brief::Brief;
 use crate::config::{Agent, Config, Consolidate, Reviewer};
 use crate::evidence::Card;
-use crate::findings::{self, Source};
+use crate::findings::{self, Diffed, Source};
 use crate::jev::{self, Said};
 use crate::layers::Team;
 use crate::plan::PREFIX;
@@ -592,6 +592,9 @@ pub fn turn(
     .map_err(|unreviewed| unreviewed.reason())
 }
 
+/// A file's line count at a commit: `None` when the commit has no such file.
+pub type LinesAt<'a> = &'a (dyn Fn(&str, &str) -> Result<Option<usize>, String> + Sync);
+
 /// Asks Jev one rubric about one state, the way the app reaches Decisions.
 pub type Judge<'a> = &'a (dyn Fn(&str, &Value) -> Said + Sync);
 
@@ -619,6 +622,8 @@ pub struct Given<'a> {
     pub personas: Personas<'a>,
     /// The earlier review a new one reads only the change since.
     pub previous: Option<&'a Previous>,
+    /// What a finding's line is held to past the hunks.
+    pub lines_at: LinesAt<'a>,
 }
 
 /// An earlier review of the card, which a re-review starts from.
@@ -695,6 +700,11 @@ pub struct Done {
     pub judged: BTreeMap<String, Value>,
     /// The run a re-review read the change since.
     pub previous: Option<String>,
+    /// Each file of the diff, which findings are anchored in; `None` for a
+    /// run an older devpit made.
+    pub diffed: Option<BTreeMap<String, Diffed>>,
+    /// The findings on no line of HEAD, taken out with why.
+    pub dropped: Vec<Value>,
 }
 
 impl Done {
@@ -727,6 +737,7 @@ struct Record {
     changed: BTreeMap<String, Vec<(u64, u64)>>,
     judged: BTreeMap<String, Value>,
     previous: Option<String>,
+    diffed: Option<BTreeMap<String, Diffed>>,
 }
 
 fn criteria_of(body: &str) -> Vec<String> {
@@ -809,6 +820,12 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
             .collect(),
         judged: BTreeMap::new(),
         previous: given.previous.map(|previous| previous.run.clone()),
+        diffed: Some(
+            findings::diffed(git.diff)
+                .into_iter()
+                .take(MOST_CHANGED)
+                .collect(),
+        ),
     };
     for (reviewer, outcome) in given.config.review.reviewers.iter().zip(outcomes) {
         let mut ran = Ran {
@@ -878,6 +895,9 @@ fn reviewed_again(given: &Given, run: &str) -> Result<(String, PathBuf, Record),
         changed: serde_json::from_value(kept["changed"].clone()).unwrap_or_default(),
         judged: serde_json::from_value(kept["jev"].clone()).unwrap_or_default(),
         previous: kept["previous"].as_str().map(str::to_owned),
+        diffed: kept
+            .get("diffed")
+            .and_then(|diffed| serde_json::from_value(diffed.clone()).ok()),
     };
     for mut one in ran {
         let answer = one.file.as_deref().and_then(|file| read_json(&path, file));
@@ -1143,6 +1163,11 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         .iter()
         .flat_map(|answer| answer["findings"].as_array().cloned().unwrap_or_default())
         .collect();
+    // After signing, so a reviewer's own `anchor` is never the one kept.
+    let head = record.head.clone();
+    let dropped = record.diffed.as_ref().map_or_else(Vec::new, |diffed| {
+        findings::anchored(&mut all, diffed, &|file| (given.lines_at)(&head, file))
+    });
     let left = given.budget.saturating_sub(began.elapsed()).min(PASS);
     let (groups, mut consolidated) = grouped(given, &mut record, &mut all, left);
     let mut merged = findings::merged(&all, &groups, &sources);
@@ -1191,6 +1216,9 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         if let Some(run) = &record.previous {
             findings_json["previous"] = json!(run);
         }
+        if !dropped.is_empty() {
+            findings_json["dropped"] = json!(dropped);
+        }
         findings_json
     });
     if let Some(findings_json) = &findings_json {
@@ -1216,6 +1244,8 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         changed: record.changed,
         judged: record.judged,
         previous: record.previous,
+        diffed: record.diffed,
+        dropped,
     };
     write(&path, RECORD, &pretty(&recorded(&done)))?;
     Ok(done)
@@ -1249,7 +1279,26 @@ pub fn recorded(done: &Done) -> Value {
     if let Some(run) = &done.previous {
         recorded["previous"] = json!(run);
     }
+    if let Some(diffed) = &done.diffed {
+        recorded["diffed"] = json!(diffed);
+    }
+    if !done.dropped.is_empty() {
+        recorded["dropped"] = json!(done.dropped);
+    }
     recorded
+}
+
+/// A finding taken out, as the comment and the answer say it.
+pub fn dropped_said(dropped: &Value) -> String {
+    let text = |key: &str| dropped[key].as_str().unwrap_or_default();
+    format!(
+        "[{}] `{}:{}` {} — {}",
+        text("axis"),
+        text("file"),
+        dropped["line"],
+        text("title"),
+        text("reason")
+    )
 }
 
 /// A duration as a person reads it.
@@ -1317,18 +1366,23 @@ pub fn comment(done: &Done, links: &[(String, String)]) -> String {
         let list = findings["findings"]
             .as_array()
             .map_or(&[][..], Vec::as_slice);
-        for (axis, heading) in findings::AXES.iter().zip(["Spec", "Standards", "Security"]) {
+        for (lines, heading) in
+            findings::listed(list)
+                .into_iter()
+                .zip(["Spec", "Standards", "Security"])
+        {
             text.push_str(&format!("\n## {heading}\n"));
-            let lines: Vec<String> = list
-                .iter()
-                .filter(|finding| finding["axis"] == json!(axis))
-                .map(findings::line_of)
-                .collect();
             text.push_str(&if lines.is_empty() {
                 "none\n".to_owned()
             } else {
                 lines.join("\n") + "\n"
             });
+        }
+    }
+    if !done.dropped.is_empty() {
+        text.push_str("\nDropped, on no line of HEAD:\n");
+        for dropped in &done.dropped {
+            text.push_str(&format!("- {}\n", dropped_said(dropped)));
         }
     }
     if !done.pending.is_empty() {
@@ -1395,6 +1449,9 @@ pub fn summary(done: &Done) -> Value {
     });
     if let Some(run) = &done.previous {
         answer["previous"] = json!(run);
+    }
+    if !done.dropped.is_empty() {
+        answer["dropped"] = json!(done.dropped.iter().map(dropped_said).collect::<Vec<_>>());
     }
     answer
 }

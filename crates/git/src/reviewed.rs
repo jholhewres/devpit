@@ -67,6 +67,38 @@ pub fn code_changed_between(root: &Path, from: &str, to: &str) -> Result<bool, G
     Ok(!names(&raw).is_empty())
 }
 
+/// How many lines `path` has at `commit`: `None` when the commit has no such
+/// file. Refused past `most` bytes before it is read.
+pub fn lines_at(
+    root: &Path,
+    commit: &str,
+    path: &str,
+    most: u64,
+) -> Result<Option<usize>, GitError> {
+    if commit.starts_with('-') || path.starts_with('/') || path.split('/').any(|part| part == "..")
+    {
+        return Err(GitError::Refused(format!(
+            "`{commit}:{path}` is not a file of a commit"
+        )));
+    }
+    let object = format!("{commit}:{path}");
+    if run(root, &["cat-file", "-e", &object]).is_err() {
+        return Ok(None);
+    }
+    let size: u64 = run(root, &["cat-file", "-s", &object])?
+        .trim()
+        .parse()
+        .unwrap_or(u64::MAX);
+    if size > most {
+        return Err(GitError::Refused(format!(
+            "{path} is larger than {} KB",
+            most / 1024
+        )));
+    }
+    let text = run(root, &["cat-file", "blob", &object])?;
+    Ok(Some(text.lines().count()))
+}
+
 fn names(raw: &str) -> Vec<String> {
     raw.lines()
         .map(str::trim)
