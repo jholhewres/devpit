@@ -112,3 +112,37 @@ fn an_invalid_file_is_fixed_one_field_at_a_time() {
     assert_eq!(fixed.yaml, text.replace("robot", "person"));
     assert!(set(&State::Missing, "enabled", &json!(false)).is_err());
 }
+
+/// The person switched Devflow on between an agent's preview and its apply.
+#[test]
+fn a_setup_over_a_file_the_click_changed_is_not_the_one_previewed() {
+    let preview = setup(
+        &State::Missing,
+        Preset::Recommended,
+        &Map::new(),
+        &detected(),
+    )
+    .expect("preview");
+    let again = setup(
+        &State::Missing,
+        Preset::Recommended,
+        &Map::new(),
+        &detected(),
+    )
+    .expect("again");
+    assert_eq!(again.changed_since(&preview), None);
+
+    let written = valid(&preview.yaml);
+    let clicked = switched(&written, Ask::Enable).expect("clicked");
+    let applied = setup(
+        &valid(&clicked.yaml),
+        Preset::Recommended,
+        &Map::new(),
+        &detected(),
+    )
+    .expect("apply");
+    assert_eq!(
+        applied.changed_since(&preview),
+        Some(vec!["enabled".to_owned()])
+    );
+}

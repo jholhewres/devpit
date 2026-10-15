@@ -95,14 +95,16 @@ fn one_click_recommended_setup_writes_what_devpit_devflow_setup_writes() {
         &setup_params("recommended", "{}", true).expect("params"),
     )
     .expect("created");
-    devflow::respond(
-        None,
-        "devflow_setup",
-        &by_tool,
-        tool_dir.path(),
-        &json!({ "preset": "recommended", "apply": true }),
-    )
-    .expect("set up");
+    for apply in [false, true] {
+        devflow::respond(
+            None,
+            "devflow_setup",
+            &by_tool,
+            tool_dir.path(),
+            &json!({ "preset": "recommended", "apply": apply }),
+        )
+        .expect("set up");
+    }
 
     let read = |dir: &Path| std::fs::read_to_string(dir.join(FILE)).expect("yaml");
     assert_eq!(read(screen_dir.path()), read(tool_dir.path()));

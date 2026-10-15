@@ -36,13 +36,13 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
     Tool {
         name: "devpit_devflow_status",
         method: "devflow_status",
-        description: "Devflow in this project: its state (no file, disabled, active or invalid, with the line and field of the error), what devpit detected with the file each fact came from (test, E2E and lint commands, Playwright or Cypress, the agent CLIs installed and signed in, a Decisions key, the glossary and ADRs), the checks it recommends, the decisions detection left open, and the current .devpit/devflow/devflow.yaml. Read it first.",
+        description: "Devflow in this project: its state (no file, disabled, active or invalid, with the line and field of the error), what devpit detected with the file each fact came from (test, E2E and lint commands, Playwright or Cypress, the agent CLIs installed and signed in, a Decisions key, the glossary and ADRs), the checks it recommends, the decisions detection left open, the current .devpit/devflow/devflow.yaml, and `next`, the step that comes next. Read it first.",
         input: || json!({ "type": "object", "properties": {} }),
     },
     Tool {
         name: "devpit_devflow_setup",
         method: "devflow_setup",
-        description: "Set Devflow up here. preset recommended (the default): briefing and plan approved by the person, the detected checks as scripts, a devflow-security reviewer, the devflow-done gate, Decisions in shadow when a key exists; custom: the bare defaults. `set` folds answers in by dotted path. A preview of the YAML and its files unless apply: true, sent only after the person's yes. Never commits, and Devflow stays off until the person clicks devpit's confirmation.",
+        description: "Set Devflow up here. preset recommended (the default): briefing and plan approved by the person, the detected checks as scripts, a devflow-security reviewer, the devflow-done gate, Decisions in shadow when a key exists; custom: the bare defaults. `set` folds answers in by dotted path. A preview of the YAML and its files unless apply: true, sent only after the person's yes, which writes only the setup last previewed: one that changed since comes back as a new preview with applied: false. Never commits, and Devflow stays off until the person clicks devpit's confirmation.",
         input: || json!({ "type": "object", "properties": {
             "preset": { "type": "string", "enum": ["recommended", "custom"], "description": "Where the setup starts. Defaults to recommended." },
             "set": { "type": "object", "description": "Dotted path to value, over the preset, e.g. { \"stages.execution.checks\": [{ \"name\": \"unit\", \"run\": \"make test\", \"report\": \"junit\" }] }." },

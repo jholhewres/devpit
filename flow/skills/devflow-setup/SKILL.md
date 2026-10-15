@@ -110,10 +110,15 @@ unconditional yes to that restate, or the yes option picked, call:
 nothing was asked. Use `"preset": "custom"` only when the person rejected the
 recommended setup as a whole.
 
+An answer with `"applied": false` wrote nothing: the setup changed since the
+preview the person saw (a click in the app, a key saved). Show them the new
+preview and ask again.
+
 Reply with the files devpit wrote (`.devpit/devflow/devflow.yaml`, `scripts/`,
-`.gitignore` ignoring `runs/`), that they are theirs to commit, and that
-**Devflow is still off: it switches on when they click the confirmation devpit
-shows in the app**. End the turn.
+`.gitignore` ignoring `runs/`), that they are theirs to commit, and whether
+Devflow is on as the tool's note says: unless the person already switched it
+on, **Devflow is still off until they click the confirmation devpit shows in
+the app**. End the turn.
 
 Done when the tool reported the files written and the reply says that
 activation waits for their click.

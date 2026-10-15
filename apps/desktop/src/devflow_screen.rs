@@ -387,7 +387,16 @@ pub(crate) fn setup_now(
 ) -> Result<Value, RpcError> {
     let root = Path::new(&project.root_path);
     let state = devflow::looked(app, store, project, root);
-    devflow::setup_of(app, store, project, root, &state, params).map_err(refused)
+    devflow::setup_of(
+        app,
+        store,
+        project,
+        root,
+        &state,
+        params,
+        devflow::By::Screen,
+    )
+    .map_err(refused)
 }
 
 /// `devflow_set` with `apply`, as the MCP answers it, for the screen.

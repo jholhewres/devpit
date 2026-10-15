@@ -12,7 +12,7 @@ use std::sync::{Mutex, OnceLock};
 
 use devpit_core::{preference, Store};
 use devpit_devflow::preset::Preset;
-use devpit_devflow::{folder, proposal, setup, Ask};
+use devpit_devflow::{folder, proposal, setup, Ask, Proposal};
 use devpit_rpc::{DevflowAsk, DevflowAsks, DevflowChange, ErrorCode, RpcError};
 use tauri::{AppHandle, Emitter};
 
@@ -147,6 +147,34 @@ pub(crate) fn raise_for(
     if let Some(app) = app {
         let _ = app.emit(ASKED, ());
     }
+}
+
+/// The last setup an agent previewed in each project: its apply writes only
+/// what the person saw. Newest last.
+fn previews() -> &'static Mutex<Vec<(String, Proposal)>> {
+    static PREVIEWS: OnceLock<Mutex<Vec<(String, Proposal)>>> = OnceLock::new();
+    PREVIEWS.get_or_init(Mutex::default)
+}
+
+/// Keeps `shown` as the project's last setup preview, or forgets it once applied.
+pub(crate) fn previewed(project_id: &str, shown: Option<&Proposal>) {
+    let Ok(mut kept) = previews().lock() else {
+        return;
+    };
+    kept.retain(|(id, _)| id != project_id);
+    if let Some(shown) = shown {
+        kept.push((project_id.to_owned(), shown.clone()));
+        let over = kept.len().saturating_sub(MOST);
+        kept.drain(..over);
+    }
+}
+
+/// The project's last setup preview, if one is kept.
+pub(crate) fn last_preview(project_id: &str) -> Option<Proposal> {
+    let kept = previews().lock().ok()?;
+    kept.iter()
+        .find(|(id, _)| id == project_id)
+        .map(|(_, shown)| shown.clone())
 }
 
 /// Whether `ask` waits for the person in the project.

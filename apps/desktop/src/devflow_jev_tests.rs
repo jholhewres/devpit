@@ -358,11 +358,21 @@ fn shadow_records_the_plans_fail_and_enforce_holds_its_cards() {
                 &json!({ "epic": epic, "apply": apply, "cards": [
                     { "key": "s1", "title": "Open a link", "criteria": ["opens it"] }
                 ] }),
-                Some((&config, &jev)),
+                Some(&config),
+                Some(&jev),
             )
         };
         let preview = plan(false).expect("a preview");
         assert_eq!(preview["jev"]["brief"]["outcome"], "pass", "{preview}");
+        // The preview is judged too: enforce warns there, and refuses nothing yet.
+        assert_eq!(preview["jev"]["plan"]["outcome"], "fail", "{preview}");
+        assert_eq!(
+            preview["warning"]
+                .as_str()
+                .is_some_and(|warning| warning.contains("testable")),
+            mode == Mode::Enforce,
+            "{preview}"
+        );
         let applied = plan(true);
         let cards = store.cards(&project.id).expect("cards").len();
         match mode {
@@ -373,6 +383,68 @@ fn shadow_records_the_plans_fail_and_enforce_holds_its_cards() {
             }
             Mode::Enforce => {
                 let why = applied.expect_err("held");
+                assert!(
+                    why.contains("testable") && why.contains("nothing was created"),
+                    "{why}"
+                );
+                assert_eq!(cards, 1, "only the epic");
+            }
+        }
+    }
+}
+
+/// The person's click on the board is judged as an agent's apply is: in
+/// shadow the plan rubric is asked and the cards are made; in enforce its
+/// "fail" refuses them, with why.
+#[test]
+fn the_board_create_runs_the_plan_rubric_and_enforce_refuses_with_its_reason() {
+    let (base, _heard) = provider(untestable_plan);
+    let mut config = Config::default();
+    config.decisions.use_ = true;
+    for mode in [Mode::Shadow, Mode::Enforce] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let (store, project) = project(dir.path());
+        let epic = epic_of(&project);
+        let jev = Jev::with(
+            log_store(dir.path()),
+            conf(&base, Some("key")),
+            &project.id,
+            Some(&epic),
+            dir.path(),
+            mode,
+            &[],
+        );
+        crate::devflow_plan::respond(
+            None,
+            "devflow_plan",
+            &project,
+            &json!({ "epic": epic, "cards": [
+                { "key": "s1", "title": "Open a link", "criteria": ["opens it"] }
+            ] }),
+        )
+        .expect("a preview");
+        let created = crate::devflow_plan::created_on_board(
+            &store,
+            &project.id,
+            &epic,
+            Some((&config, &jev)),
+        );
+        let asked = jev
+            .store
+            .lock()
+            .expect("store")
+            .decisions_latest(5)
+            .expect("log")
+            .len();
+        assert_eq!(asked, 1, "{mode:?}: the plan rubric, asked on the click");
+        let cards = store.cards(&project.id).expect("cards").len();
+        match mode {
+            Mode::Shadow => {
+                assert_eq!(created.expect("made").card_ids.len(), 1);
+                assert_eq!(cards, 2, "the epic and its card");
+            }
+            Mode::Enforce => {
+                let why = created.expect_err("refused").message;
                 assert!(
                     why.contains("testable") && why.contains("nothing was created"),
                     "{why}"
@@ -504,7 +576,8 @@ fn without_a_key_devflow_works_as_it_does_without_jev() {
             "devflow_plan",
             &project,
             &json!({ "epic": epic, "apply": apply, "cards": [{ "key": "s1", "title": "Open a link" }] }),
-            Some((&config, &jev)),
+            Some(&config),
+                Some(&jev),
         )
         .expect("planned")
     };

@@ -60,6 +60,19 @@ pub struct Proposal {
     pub asks: Vec<Ask>,
 }
 
+impl Proposal {
+    /// The fields set apart from `shown` when this writes other files than
+    /// it would: a yes to `shown` is not a yes to this.
+    pub fn changed_since(&self, shown: &Proposal) -> Option<Vec<String>> {
+        (self.files != shown.files).then(|| {
+            preset::diff(&shown.config.to_json(), &self.config.to_json())
+                .into_iter()
+                .map(|change| change.path)
+                .collect()
+        })
+    }
+}
+
 /// The setup `preset` makes over what `state` is, with `set` folded in as
 /// dotted paths.
 pub fn setup(

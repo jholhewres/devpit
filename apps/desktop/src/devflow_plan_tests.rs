@@ -75,6 +75,8 @@ fn a_brief_becomes_an_epic_and_the_context_is_written_onto_it() {
     )
     .expect("the context");
     assert_eq!(said["created"], false);
+    let note = said["note"].as_str().expect("a note");
+    assert!(note.contains("the plan (devflow-plan)"), "{note}");
     let body = store.card(&epic).expect("read").expect("card").body;
     assert!(
         body.starts_with("## Brief\n- Goal: Find a card by its body"),
@@ -93,6 +95,29 @@ fn a_brief_becomes_an_epic_and_the_context_is_written_onto_it() {
         &json!({ "card": "card_nope", "goal": "x" }),
     );
     assert!(elsewhere.expect_err("no such card").contains("no card"));
+}
+
+/// The context stage switched off is not where a brief sends the agent.
+#[test]
+fn a_brief_points_past_the_context_stage_when_it_is_off() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (_store, project) = project(dir.path());
+    std::fs::create_dir_all(dir.path().join(".devpit/devflow")).expect("folder");
+    std::fs::write(
+        dir.path().join(".devpit/devflow/devflow.yaml"),
+        "version: 1\nenabled: true\nstages:\n  context: { enabled: false }\n",
+    )
+    .expect("yaml");
+    let said = respond(
+        None,
+        "devflow_brief",
+        &project,
+        &json!({ "title": "Search by body", "goal": "Find a card by its body" }),
+    )
+    .expect("a brief");
+    let note = said["note"].as_str().expect("a note");
+    assert!(note.contains("the plan (devflow-plan)"), "{note}");
+    assert!(after_brief(false, true).contains("devflow-context"));
 }
 
 #[test]
@@ -195,7 +220,7 @@ fn a_plan_the_person_edited_and_created_on_the_board_is_the_agents_answer() {
     edited[1].title = "The search box lists matches".into();
     let kept = kept_on_board(&store, &project.id, &epic, edited).expect("kept");
     assert!(kept.edited);
-    let made = created_on_board(&store, &project.id, &epic).expect("created");
+    let made = created_on_board(&store, &project.id, &epic, None).expect("created");
     assert_eq!(made.card_ids.len(), 2);
     assert!(waiting(&store, &epic).is_none());
 

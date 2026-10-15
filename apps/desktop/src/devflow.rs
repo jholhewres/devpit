@@ -98,7 +98,7 @@ pub(crate) fn respond(
     match method {
         "devflow_offer" => Ok(offer(&store, project, root, &state)),
         "devflow_status" => Ok(status(&store, project, root, &state)),
-        "devflow_setup" => setup_of(app, &store, project, root, &state, params),
+        "devflow_setup" => setup_of(app, &store, project, root, &state, params, By::Agent),
         "devflow_set" => set_of(app, &store, project, root, &state, params),
         // Answered where the stage is off too: a hook there says nothing.
         "devflow_gate" => crate::devflow_gate::respond(app, &store, project, &state, cwd, params),
@@ -281,6 +281,13 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
         "recommended_checks": preset::checks(&detected),
         "open": detect::open(&detected),
         "detected": detected,
+        "next": next_step(
+            state,
+            globally,
+            switched_on,
+            waiting.contains(&Ask::Enable.word()),
+            active,
+        ),
         "waiting_for_click": waiting,
         "note": Value::Null,
     });
@@ -290,6 +297,11 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
         said["stages_from"] = json!(layered.stages_from);
     }
     let note = match state {
+        State::Missing if switched_on => Some(
+            "The person switched Devflow on here, but this checkout has no devflow.yaml: \
+             it is on another branch, or was never committed."
+                .to_owned(),
+        ),
         State::Missing => {
             Some("No devflow.yaml yet: devpit_devflow_setup previews one.".to_owned())
         }
@@ -323,6 +335,72 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
     said
 }
 
+/// The step `devpit_devflow_status` says comes next in a project.
+pub(crate) fn next_step(
+    state: &State,
+    globally: bool,
+    switched_on: bool,
+    click_waits: bool,
+    active: bool,
+) -> &'static str {
+    match state {
+        _ if !globally => "the person switches Devflow on in devpit's Settings",
+        _ if active => "start with devpit_devflow_skill devflow-briefing",
+        // Seen where the file was committed only on a feature branch.
+        State::Missing if switched_on => "commit .devpit/devflow/ on the default branch",
+        State::Missing => "devpit_devflow_setup previews one",
+        State::Invalid(..) => "devpit_devflow_set fixes the field the error names",
+        State::Valid(..) if click_waits => "waiting for Switch on in the app",
+        State::Valid(..) => "the person activates it on the Devflow screen",
+    }
+}
+
+/// Who asks for a setup.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum By {
+    /// An agent, which applies only the preview the person saw.
+    Agent,
+    /// The person's own Create on the Devflow screen.
+    Screen,
+}
+
+/// Why an agent's apply is a preview again: the setup worked out now is not
+/// the one it last showed the person, if it showed one.
+pub(crate) fn unseen(shown: Option<&Proposal>, now: &Proposal) -> Option<String> {
+    let Some(shown) = shown else {
+        return Some("the person has not seen a preview of this setup".to_owned());
+    };
+    let changed = now.changed_since(shown)?;
+    Some(match changed.is_empty() {
+        true => "the files it writes changed since the preview the person saw".to_owned(),
+        false => format!(
+            "it changed since the preview the person saw ({})",
+            changed.join(", ")
+        ),
+    })
+}
+
+/// What an applied setup's note says, from what it wrote and what waits.
+pub(crate) fn applied_note(enabled: bool, switched_on: bool, waiting: &[&str]) -> String {
+    let on = match (enabled, switched_on) {
+        (true, true) => "Devflow is on here.",
+        (true, false) => {
+            "devflow.yaml says enabled: true, but Devflow stays off until the person \
+             clicks the confirmation devpit now shows in the app."
+        }
+        (false, _) => {
+            "Devflow is still off until the person clicks the confirmation devpit now \
+             shows in the app."
+        }
+    };
+    let enforce = if waiting.contains(&Ask::Enforce.word()) {
+        " Decisions stays in shadow until the person clicks for enforce."
+    } else {
+        ""
+    };
+    format!("Written. devpit never commits: these files are the person's to commit. {on}{enforce}")
+}
+
 pub(crate) fn setup_of(
     app: Option<&AppHandle>,
     store: &Store,
@@ -330,6 +408,7 @@ pub(crate) fn setup_of(
     root: &Path,
     state: &State,
     params: &Value,
+    by: By,
 ) -> Result<Value, String> {
     let default = asks::preset(store);
     let word = params
@@ -347,7 +426,17 @@ pub(crate) fn setup_of(
     let proposal =
         proposal::setup(state, preset, &set, &detected).map_err(|why| why.to_string())?;
     layered_as(root, &proposal)?;
-    let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
+    let asked = params.get("apply").and_then(Value::as_bool) == Some(true);
+    // The person's yes was to a preview: a setup that moved since then (a
+    // click, a key saved) is shown again rather than written.
+    let moved = match (by, asked) {
+        (By::Agent, true) => unseen(asks::last_preview(&project.id).as_ref(), &proposal),
+        _ => None,
+    };
+    let apply = asked && moved.is_none();
+    if by == By::Agent {
+        asks::previewed(&project.id, (!apply).then_some(&proposal));
+    }
     let checks: Vec<Value> = proposal
         .config
         .stages
@@ -384,12 +473,19 @@ pub(crate) fn setup_of(
         "open": detect::open(&detected),
         "asks": proposal.asks,
         "waiting_for_click": waiting,
-        "note": if apply {
-            "Written. devpit never commits: these files are the person's to commit. Devflow is \
-             still off until the person clicks the confirmation devpit now shows in the app."
-        } else {
-            "Nothing was written. apply: true writes these files, once the person said yes to \
-             this preview."
+        "note": match (apply, moved) {
+            (true, _) => applied_note(
+                proposal.config.enabled,
+                made(store, &project.id, Ask::Enable),
+                &waiting,
+            ),
+            (false, Some(why)) => format!(
+                "Nothing was written: {why}. This is the setup now: show it, and apply once \
+                 the person says yes to it."
+            ),
+            (false, None) => "Nothing was written. apply: true writes these files, once the \
+                person said yes to this preview."
+                .to_owned(),
         },
     }))
 }
