@@ -21,7 +21,7 @@ use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
 
-pub(crate) const METHODS: [&str; 14] = [
+pub(crate) const METHODS: [&str; 15] = [
     "devflow_offer",
     "devflow_status",
     "devflow_setup",
@@ -32,6 +32,7 @@ pub(crate) const METHODS: [&str; 14] = [
     "devflow_plan",
     "devflow_evidence",
     "devflow_review",
+    "devflow_publish",
     "devflow_gate",
     "devflow_session",
     "devflow_stage",
@@ -124,6 +125,10 @@ pub(crate) fn respond(
             let asked = devpit_devflow::adhoc::standalone(params)?
                 .ok_or("a card's review is asked with its card")?;
             crate::devflow_adhoc::respond(app, project, &state, asked)
+        }
+        "devflow_publish" => {
+            on_demand_here(&store, project, &state)?;
+            crate::devflow_publish::respond(project, &state, params)
         }
         "devflow_plan" if crate::devflow_plan::on_demand(params) => {
             on_demand_here(&store, project, &state)?;

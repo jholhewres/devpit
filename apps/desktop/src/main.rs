@@ -106,6 +106,7 @@ mod devflow_jev;
 mod devflow_launch;
 mod devflow_plan;
 mod devflow_plan_edit;
+mod devflow_publish;
 mod devflow_review;
 mod devflow_screen;
 mod devflow_skills;

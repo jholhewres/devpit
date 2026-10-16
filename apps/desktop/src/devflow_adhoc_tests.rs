@@ -26,7 +26,7 @@ fn standing(root: &Path) -> Vec<String> {
 
 /// A checkout on main with work of the person's not committed, and a
 /// `feature` branch whose commit opens a link through a shell.
-fn checkout_with_a_feature(root: &Path) -> String {
+pub(crate) fn checkout_with_a_feature(root: &Path) -> String {
     git(root, &["init", "-q", "-b", "main"]);
     git(root, &["config", "user.email", "t@example.com"]);
     git(root, &["config", "user.name", "Test"]);

@@ -282,15 +282,25 @@ pub fn persona_file(persona: &str) -> String {
 
 /// A persona's file under `base`, when it is there.
 fn persona_in(base: &Path, relative: &str) -> Result<Option<String>, String> {
+    text_in(base, relative, MOST_PERSONA, "persona")
+}
+
+/// A text file under `base`, never through a link out of it, when it is there.
+pub(crate) fn text_in(
+    base: &Path,
+    relative: &str,
+    most: u64,
+    what: &str,
+) -> Result<Option<String>, String> {
     let Ok(path) = devpit_core::tree::resolve(base, relative) else {
         return Ok(None);
     };
     let Ok(file) = std::fs::File::open(&path) else {
         return Ok(None);
     };
-    let read = devpit_core::data_files::read_within(file, MOST_PERSONA)
+    let read = devpit_core::data_files::read_within(file, most)
         .map_err(|err| format!("{relative}: {err}"))?
-        .ok_or_else(|| format!("{relative} is larger than any persona needs"))?;
+        .ok_or_else(|| format!("{relative} is larger than any {what} needs"))?;
     String::from_utf8(read)
         .map(Some)
         .map_err(|_| format!("{relative} is not UTF-8 text"))

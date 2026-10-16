@@ -67,7 +67,10 @@ pub const REVIEW_TOOL: &str = "devpit_devflow_review";
 
 /// Listed wherever Devflow is on in Settings, devflow.yaml or not: a stage
 /// run on demand, without a card, needs no setup.
-pub(crate) const ON_DEMAND: [&str; 3] = [crate::skills::TOOL, PLAN_TOOL, REVIEW_TOOL];
+pub(crate) const ON_DEMAND: [&str; 4] = [crate::skills::TOOL, PLAN_TOOL, REVIEW_TOOL, PUBLISH_TOOL];
+
+/// The tool that publishes a review without a card on its pull request.
+pub const PUBLISH_TOOL: &str = "devpit_devflow_publish";
 
 /// The plan's tool.
 pub(crate) const PLAN_TOOL: &str = "devpit_devflow_plan";
@@ -134,7 +137,7 @@ pub(crate) fn context_reply(answer: &Value) -> Option<String> {
 
 /// The tools only an active project gets: each under the stages one of which
 /// must be switched on for it, or none for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(&[&str], Tool); 8] = [
+pub(crate) static STAGED: [(&[&str], Tool); 9] = [
     (
         &[],
         Tool {
@@ -243,6 +246,20 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
                     "evidence": { "type": "string", "description": "Where the PoC ran and what it showed, or why it was not run." }
                 }, "required": ["finding", "result", "evidence"] }, "description": "With `run` and without `reports`: the PoC you ran for each critical and high, as review.verify asks." }
             } }),
+        },
+    ),
+    (
+        &["review"],
+        Tool {
+            name: PUBLISH_TOOL,
+            method: "devflow_publish",
+            description: "Devflow: a review without a card drafted for its pull request, as publish.json beside its findings.json: inline, each critical, high and medium on a line the diff shows, one short comment per line whatever its axes; in one general comment, the low and info as numbered nits, what lies outside the diff (a critical or high there as a separate ticket), the verification and what is good, in the destination's template (a layer's reviewers/publish/<destination>.md replaces devpit's). Without apply it drafts and posts nothing: show the person the draft. apply: true, only after their explicit yes and only to the draft they last saw (one that changed since comes back as the new draft), posts it to the GitHub pull request with gh: one review that only comments, unless the person asked to approve or request changes, and the general comment. Published again, it edits those comments instead of posting new ones. gitlab and bitbucket are drafted to paste.",
+            input: || json!({ "type": "object", "properties": {
+                "review": { "type": "string", "description": "The review's folder and run as devpit_devflow_review answered them, e.g. pr-42/20261016T120000Z." },
+                "destination": { "type": "string", "enum": ["github", "gitlab", "bitbucket"], "description": "Where it goes. Defaults to github." },
+                "event": { "type": "string", "enum": ["comment", "approve", "request_changes"], "description": "What the review asks. comment unless the person asked for more." },
+                "apply": { "type": "boolean", "description": "Post the draft. Only after the person's explicit yes to it." }
+            }, "required": ["review"] }),
         },
     ),
     (

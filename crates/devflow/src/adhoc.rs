@@ -164,6 +164,15 @@ pub fn label(subject: &Subject, base: &str, head: &str) -> String {
     }
 }
 
+/// The pull request a review's folder is of, when it is one's.
+pub fn pr_of(label: &str) -> Option<u64> {
+    label
+        .strip_prefix("pr-")?
+        .parse()
+        .ok()
+        .filter(|number| *number > 0)
+}
+
 /// What a pull request is held to: the criteria passed, then its body's
 /// checkboxes; with neither, its title and body.
 pub fn pr_criteria(given: &[String], title: &str, body: &str) -> Vec<String> {
@@ -196,10 +205,23 @@ pub fn body_of(criteria: &[String]) -> String {
 
 /// What the session does next, said for a review without a card. `detached`
 /// is the HEAD read in a worktree of devpit's, gone once the review is.
-pub fn next(subject: &Subject, stamp: &str, pending: &[String], detached: Option<&str>) -> String {
+pub fn next(
+    subject: &Subject,
+    label: &str,
+    stamp: &str,
+    pending: &[String],
+    detached: Option<&str>,
+) -> String {
     if pending.is_empty() {
-        return "Done: the findings are in findings.json; nothing is commented on any card."
-            .to_owned();
+        let posted = match subject {
+            Subject::Pr(number) => format!(
+                "drafts it for pull request #{number}, and posts it there only after the person's explicit yes to that draft"
+            ),
+            _ => "drafts it to paste where the person wants it".to_owned(),
+        };
+        return format!(
+            "Done: the findings are in findings.json; nothing is commented on any card. devpit_devflow_publish with review \"{label}/{stamp}\" {posted}."
+        );
     }
     let reading = detached.map_or_else(String::new, |head| {
         format!(" A file as HEAD has it is read with `git show {head}:<path>`, never by checking HEAD out.")

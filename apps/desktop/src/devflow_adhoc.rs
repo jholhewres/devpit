@@ -58,7 +58,7 @@ fn pull(root: &Path, number: u64) -> Result<Pull, String> {
 
 /// What the review runs on: the project's devflow.yaml over its layers, else
 /// the person's own layer over the defaults.
-fn config_of(state: &State) -> Result<Config, String> {
+pub(crate) fn config_of(state: &State) -> Result<Config, String> {
     match state {
         State::Valid(_, config) => Ok((**config).clone()),
         State::Missing => {
@@ -285,6 +285,7 @@ pub(crate) fn respond_with(
     answer["reviewed"] = json!(label);
     answer["next"] = json!(adhoc::next(
         &asked.subject,
+        &label,
         &done.stamp,
         &done.pending,
         read_detached.as_deref()
@@ -296,4 +297,4 @@ pub(crate) fn respond_with(
 
 #[cfg(test)]
 #[path = "devflow_adhoc_tests.rs"]
-mod tests;
+pub(crate) mod tests;

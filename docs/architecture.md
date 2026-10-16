@@ -277,6 +277,13 @@ no copy, only that the person clicked.
   detached worktree under devpit's home, removed once it is done, and keeps
   the run under the project's `reviews/<pr-or-range>/`, attached and on no
   card. Without devflow.yaml it runs on the person's own layer.
+- **A pull request hears a review only after the person's yes.**
+  `devpit_devflow_publish` writes `publish.json` beside `findings.json`:
+  each critical, high and medium on a line of the diff as one comment per
+  line, everything else in one general comment, in the destination's
+  template (`flow/publish/`, replaced by a layer's `reviewers/publish/`).
+  Applied, it posts only the draft last shown, with `gh`, as a review that
+  only comments; `published.json` keeps the ids, so publishing again edits.
 - **A card is done at the gate.** `devpit_devflow_gate` checks what devpit
   can check itself: the card's checks ran after the last change to the code
   (each changed file by when it was written, so a commit is not a change)

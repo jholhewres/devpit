@@ -974,7 +974,7 @@ pub fn line_of(finding: &Value, verify: Verify) -> String {
 
 /// What a critical or high's PoC run showed, once the review asks for one
 /// or a run was recorded, and how the verdict counts it.
-fn verification_said(finding: &Value, verify: Verify) -> Option<String> {
+pub fn verification_said(finding: &Value, verify: Verify) -> Option<String> {
     let verified = &finding["verified"];
     let evidence = text(verified, "evidence").replace('\n', " ");
     let mut said = match text(verified, "result") {

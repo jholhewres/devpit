@@ -31,6 +31,7 @@ pub mod playwright;
 pub mod plugin;
 pub mod preset;
 pub mod proposal;
+pub mod publish;
 pub mod render;
 pub mod review;
 pub mod runs;

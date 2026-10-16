@@ -39,7 +39,7 @@ pub fn wait_for(method: &str) -> Duration {
         "start" | "resume" => STARTING,
         "decide" | "rubric_run" | "devflow_plan" => DECIDING,
         "devflow_gate" => GATING,
-        "repo" | "transcript" | "artifact_save" | "artifact_restore" => READING,
+        "repo" | "transcript" | "artifact_save" | "artifact_restore" | "devflow_publish" => READING,
         "devflow_evidence" | "devflow_review" | "devflow_stage" => CHECKING,
         _ => WAIT,
     }
