@@ -320,10 +320,10 @@ fn a_stop_hooks_call_carries_the_pane_and_the_cap_of_its_session() {
     assert_eq!(hooked("devpit_card", other.clone(), &env), other);
 }
 
-/// An agent is shown the card alone: the fields devpit's own stop hooks fill
-/// are still taken (`devpit_devflow::gate::FIELDS`), but listing them cost
-/// every turn and invited an agent to fake a stop. A hook names no card, so
-/// none is required.
+/// An agent is shown the card and its kind alone: the fields devpit's own
+/// stop hooks fill are still taken (`devpit_devflow::gate::FIELDS`), but
+/// listing them cost every turn and invited an agent to fake a stop. A hook
+/// names no card, so none is required.
 #[test]
 fn the_gate_lists_only_the_card_an_agent_passes() {
     let (_, tool) = STAGED
@@ -338,7 +338,7 @@ fn the_gate_lists_only_the_card_an_agent_passes() {
         .keys()
         .collect();
     keys.sort();
-    assert_eq!(keys, ["card"]);
+    assert_eq!(keys, ["card", "kind"]);
     assert!(schema.get("required").is_none(), "a hook names no card");
 }
 

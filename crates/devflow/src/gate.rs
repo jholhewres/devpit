@@ -1,7 +1,8 @@
 //! `devpit_devflow_gate`: whether a card's work may be called done. Its
 //! checks ran after the last change and passed, every criterion it lists has
-//! a test that passed, the evidence it asked for is there, and the review
-//! blocks nothing; then, where Decisions is set up, the `devflow-done`
+//! a test that passed or a proof file, the evidence it asked for is there,
+//! and the review blocks nothing (an evidence or doc card with no code needs
+//! none); then, where Decisions is set up, the `devflow-done`
 //! rubric. At the end of an agent's turn it also says whether the turn may
 //! end, without ever sending it back forever.
 //!
@@ -16,8 +17,9 @@ use crate::plan::PREFIX;
 
 /// The fields the tool takes: the card from an agent, the rest from devpit's
 /// own hooks (`project` is an orchestrator's, as on every board tool).
-pub const FIELDS: [&str; 8] = [
+pub const FIELDS: [&str; 9] = [
     "card",
+    "kind",
     "event",
     "session",
     "stop_hook_active",
@@ -69,7 +71,46 @@ pub struct Hook {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Asked {
     pub card: Option<String>,
+    /// The card's kind when the agent says it, over its body's `Kind:` line.
+    pub kind: Option<String>,
     pub hook: Option<Hook>,
+}
+
+/// The kinds of card whose deliverable is its proofs, not code.
+const PROOF_KINDS: [&str; 2] = ["evidence", "doc"];
+
+/// Whether a card is evidence or a doc: `kind` when the gate was told it,
+/// else a `Kind: evidence` or `Kind: doc` line of its body.
+pub fn proof_only(body: &str, kind: Option<&str>) -> bool {
+    let said = kind.map(str::to_owned).or_else(|| {
+        body.lines().find_map(|line| {
+            let line = line
+                .trim()
+                .trim_start_matches(['-', '*', ' '])
+                .replace("**", "");
+            let (key, value) = line.split_once(':')?;
+            key.trim()
+                .eq_ignore_ascii_case("kind")
+                .then(|| value.trim().to_owned())
+        })
+    });
+    said.is_some_and(|said| PROOF_KINDS.contains(&said.to_ascii_lowercase().as_str()))
+}
+
+/// What an evidence or doc card may commit and still have no code to review.
+const NOT_CODE: [&str; 12] = [
+    "md", "txt", "pdf", "png", "jpg", "jpeg", "gif", "webp", "avif", "mp4", "webm", "mov",
+];
+
+/// Whether a branch's changed files are only docs and pictures: an empty
+/// diff is, and anything else, a script or a spec included, is code.
+pub fn changed_no_code(files: &[String]) -> bool {
+    files.iter().all(|file| {
+        std::path::Path::new(file)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| NOT_CODE.contains(&ext.to_ascii_lowercase().as_str()))
+    })
 }
 
 /// A text a hook filled in: a placeholder its CLI left as written, or
@@ -117,7 +158,14 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
     if card.is_none() && hook.is_none() {
         return Err("which card? pass its id as `card`".to_owned());
     }
-    Ok(Asked { card, hook })
+    let kind = filled(fields.get("kind"));
+    if kind
+        .as_deref()
+        .is_some_and(|kind| kind != "code" && !PROOF_KINDS.contains(&kind))
+    {
+        return Err("`kind` is code, evidence or doc".to_owned());
+    }
+    Ok(Asked { card, kind, hook })
 }
 
 /// A card the plan made, and so the flow's to hold: titled `[devflow] `,
@@ -170,6 +218,9 @@ pub struct Looked<'a> {
     /// The commit the review read, when code changed between it and `HEAD`:
     /// what was approved is not what would be called done.
     pub unreviewed: Option<&'a str>,
+    /// An evidence or doc card whose branch changed no code: there is no
+    /// diff to review, so it closes on its proofs.
+    pub no_code: bool,
 }
 
 /// One criterion and the evidence it has.
@@ -192,6 +243,8 @@ pub struct Checked {
     /// The review's verdict and what blocks, when there is a review.
     pub review: Option<String>,
     pub missing: Vec<String>,
+    /// Judged as an evidence or doc card with no code.
+    pub no_code: bool,
 }
 
 fn word<'a>(value: &'a Value, key: &str) -> &'a str {
@@ -285,11 +338,15 @@ pub fn checked(looked: &Looked) -> Checked {
         checks,
         review,
         missing,
+        no_code: looked.no_code,
     }
 }
 
+const NO_TEST: &str =
+    "names no test: map it to its tests, or a proof file, in devpit_devflow_evidence's criteria";
+
 /// One criterion against the run: green when evidence.json maps it, on the
-/// card, to tests that all passed.
+/// card, to tests that all passed and a proof file that is there.
 fn row(criterion: &str, run: &Run) -> Row {
     let seen = list(run.evidence, "criteria")
         .iter()
@@ -297,22 +354,31 @@ fn row(criterion: &str, run: &Run) -> Row {
     let Some(seen) = seen else {
         return Row {
             criterion: criterion.to_owned(),
-            evidence: "names no test: map it to its tests in devpit_devflow_evidence's criteria"
-                .to_owned(),
+            evidence: NO_TEST.to_owned(),
             green: false,
         };
     };
-    let tests: Vec<String> = list(seen, "tests")
+    let mut tests: Vec<String> = list(seen, "tests")
         .iter()
         .map(|test| format!("`{}` {}", word(test, "test"), word(test, "result")))
         .collect();
     let green = seen.get("green").and_then(Value::as_bool) == Some(true);
+    if let Some(proof) = seen.get("proof").filter(|proof| proof.is_object()) {
+        let (kind, path) = (word(proof, "kind"), word(proof, "path"));
+        tests.push(
+            if proof.get("exists").and_then(Value::as_bool) == Some(true) {
+                format!("proved by {kind} {path}")
+            } else {
+                format!("{kind} {path} is not in the run's folder or the checkout")
+            },
+        );
+    }
     Row {
         criterion: criterion.to_owned(),
         evidence: if green {
             format!("{} in run {}", tests.join(", "), run.name)
         } else if tests.is_empty() {
-            "names no test: map it to its tests in devpit_devflow_evidence's criteria".to_owned()
+            NO_TEST.to_owned()
         } else {
             format!("{}: make them pass (devflow-execution)", tests.join(", "))
         },
@@ -393,7 +459,7 @@ fn own_stages(looked: &Looked, missing: &mut Vec<String>) {
 /// The review: required where its stage is on, read wherever it exists.
 fn reviewed(looked: &Looked, missing: &mut Vec<String>) -> Option<String> {
     let Some(review) = &looked.review else {
-        if looked.config.stages.review.enabled {
+        if looked.config.stages.review.enabled && !looked.no_code {
             missing.push(
                 "no review yet: run the review stage (devflow-review), which writes findings.json"
                     .to_owned(),
@@ -567,6 +633,7 @@ pub fn recorded(gate: &Gate) -> Value {
         "checks": checked.checks.iter().map(|(name, result)| json!({ "name": name, "result": result })).collect::<Vec<_>>(),
         "review": checked.review,
         "missing": checked.missing,
+        "no_code": checked.no_code,
         "decisions": decisions_json(gate),
     })
 }

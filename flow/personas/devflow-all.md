@@ -50,7 +50,9 @@ finding across axes: a change can follow every rule and build the wrong thing.
 **Spec** (`axis: spec`)
 - Each criterion: met, partly met, missing, or met but wrong; quote it.
 - A criterion no test asserts is `medium`, kind `missing_test`; `high`, kind
-  `defect`, only when a mutation or a run shows the behaviour wrong.
+  `defect`, only when a mutation or a run shows the behaviour wrong. A visual
+  criterion with a proof (a screenshot in evidence.json) and no test is at
+  most `medium`, kind `missing_test`.
 - Scope creep, quoting the hunk; `high` when the brief's Out of scope names it.
 - Correctness at the edges: empty, zero, missing, boundary; error paths;
   off-by-one; state returned but never saved. Tests that cannot fail.

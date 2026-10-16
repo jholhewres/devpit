@@ -38,7 +38,7 @@ pub(crate) const PERSONAS: [(&str, &str); 4] = [
 /// The setup copied them into projects once: a copy still one of these is
 /// devpit's default, not the person's, and is read from devpit instead, so
 /// an old text never outlives the release that replaced it.
-const SHIPPED: [(&str, &str); 10] = [
+const SHIPPED: [(&str, &str); 12] = [
     (
         "devflow-spec",
         "40b270801839a2e79d7acfbbaeb6ef83530c706f0dd9c27f09588277bccbc710",
@@ -50,6 +50,10 @@ const SHIPPED: [(&str, &str); 10] = [
     (
         "devflow-spec",
         "8d171a41e5e73a9d48633068a4205d8191efaef43bbddc36aef846f4a14844b4",
+    ),
+    (
+        "devflow-spec",
+        "02d06643e806befcf736691db93a0e31dad06a0ba206ebf309afa9b2c3965c55",
     ),
     (
         "devflow-standards",
@@ -78,6 +82,10 @@ const SHIPPED: [(&str, &str); 10] = [
     (
         "devflow-all",
         "dd7bf263271b5d641328c37e1dddf9e152f21d1528f1e0bb3409d6889107c072",
+    ),
+    (
+        "devflow-all",
+        "5c2674452e08c8fc099ceebbf005e39465d18ce28f97a38659cd666f0f233f6f",
     ),
 ];
 

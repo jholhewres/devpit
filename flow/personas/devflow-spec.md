@@ -39,7 +39,9 @@ Other reviewers cover the repo's standards and security. Stay on this axis.
   finding of kind `missing_test`. It is `high`, kind `defect`, only when a
   mutation or a run shows the behaviour wrong: then it is a defect the tests
   missed. A path that writes to the database or crosses a foreign key is run
-  before it is called a missing test.
+  before it is called a missing test. A visual criterion with a proof
+  (a screenshot in evidence.json) and no test is at most `medium`, kind
+  `missing_test`.
 - **Scope creep:** behaviour the card did not ask for, quoting the hunk; `high`
   when the brief's Out of scope names it.
 - **Correctness:** empty, zero, missing and boundary inputs; error paths;

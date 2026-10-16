@@ -117,13 +117,22 @@ or failed, the counts and the paths.
   "card": "<card id>",
   "checks": ["<check name from devflow.yaml>"],
   "criteria": [
-    { "criterion": "<checkbox text>", "tests": ["tests/test_cli.py::test_rename_changes_the_title"] }
+    { "criterion": "<checkbox text>", "tests": ["tests/test_cli.py::test_rename_changes_the_title"] },
+    { "criterion": "<a visual checkbox>", "proof": { "kind": "screenshot", "path": "docs/shots/rename-dialog.png" } }
   ],
   "red": [
     { "test": "tests/test_cli.py::test_rename_changes_the_title", "failure": "<the failing line, redacted>" }
   ]
 }
 ```
+
+A criterion no test runner here can prove (a UI change where the project has
+no front-end runner, or a card whose deliverable is screenshots) takes a
+`proof` instead: `kind` is `screenshot`, `e2e` or `artifact`, `path` a file in
+the run's folder or the checkout. Take the screenshot first; a path that is not
+there does not count, and a proof never excuses a red test. A card whose body
+says `Kind: evidence` or `Kind: doc` and changes no code closes on its proofs
+without a review.
 
 Leave `checks` out to run all of them. A red check sends you back to step 3,
 then call the tool again; a red run stays on the card as history.

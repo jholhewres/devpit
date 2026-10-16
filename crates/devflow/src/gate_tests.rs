@@ -57,6 +57,7 @@ fn look(config: &Config, run: Option<&Value>, changed: Option<&str>) -> Checked 
         changed,
         stages: &[],
         unreviewed: None,
+        no_code: false,
     })
 }
 
@@ -176,6 +177,7 @@ fn reviewed_with(config: &Config, findings: &Value, at: &str, changed: Option<&s
         changed,
         stages: &[],
         unreviewed: None,
+        no_code: false,
     })
 }
 
@@ -201,6 +203,7 @@ fn a_review_of_a_commit_the_code_moved_on_from_holds_the_card() {
             changed: None,
             stages: &[],
             unreviewed,
+            no_code: false,
         })
     };
     assert!(looked(None).missing.is_empty());
@@ -434,4 +437,108 @@ fn a_subagent_is_held_only_for_code_changed_after_it_began() {
     assert!(!subagent_changed(Some("20261011T115959Z"), began));
     assert!(!subagent_changed(None, began));
     assert!(!subagent_changed(Some("20261011T120001Z"), None));
+}
+
+/// A run whose second criterion is proved by a screenshot alone, as the
+/// evidence tool records it when the file is (or is not) there.
+fn proved_run(there: bool) -> Value {
+    let mut run = green_run();
+    run["criteria"][1]["tests"] = json!([]);
+    run["criteria"][1]["green"] = json!(there);
+    run["criteria"][1]["proof"] =
+        json!({ "kind": "screenshot", "path": "shots/refused.png", "exists": there });
+    run
+}
+
+#[test]
+fn a_criterion_proved_by_a_screenshot_that_is_there_passes_and_a_missing_one_does_not() {
+    let config = config_with(false);
+    let run = proved_run(true);
+    let found = look(&config, Some(&run), None);
+    assert_eq!(found.missing, Vec::<String>::new());
+    assert!(
+        found.rows[1]
+            .evidence
+            .contains("proved by screenshot shots/refused.png"),
+        "{found:?}"
+    );
+
+    let run = proved_run(false);
+    let found = look(&config, Some(&run), None);
+    assert!(
+        found.missing.iter().any(|item| item
+            .contains("screenshot shots/refused.png is not in the run's folder or the checkout")),
+        "{found:?}"
+    );
+}
+
+fn look_no_code(config: &Config, run: &Value, no_code: bool) -> Checked {
+    let criteria = criteria();
+    checked(&Looked {
+        config,
+        card: "card_1",
+        criteria: &criteria,
+        run: Some(Run {
+            name: RUN,
+            evidence: run,
+        }),
+        review: None,
+        changed: None,
+        stages: &[],
+        unreviewed: None,
+        no_code,
+    })
+}
+
+#[test]
+fn an_evidence_card_with_no_code_closes_on_its_proofs_without_a_review() {
+    let review_on = config_with(true);
+    let run = proved_run(true);
+    assert_eq!(
+        look_no_code(&review_on, &run, true).missing,
+        Vec::<String>::new()
+    );
+    assert!(look_no_code(&review_on, &run, false)
+        .missing
+        .iter()
+        .any(|item| item.contains("no review yet")));
+
+    // Without a review, a criterion with neither a proof nor a test still holds it.
+    let mut bare = run.clone();
+    bare["criteria"].as_array_mut().expect("criteria").remove(1);
+    assert!(look_no_code(&review_on, &bare, true)
+        .missing
+        .iter()
+        .any(|item| item.contains("\"an empty title is refused\": names no test")));
+}
+
+#[test]
+fn a_card_is_evidence_or_a_doc_by_its_kind_line_or_what_the_gate_was_told() {
+    assert!(proof_only(
+        "Screenshots of the board.\n\nKind: evidence\n",
+        None
+    ));
+    assert!(proof_only("- **Kind:** Doc\n", None));
+    assert!(!proof_only("Kind: code\n", None));
+    assert!(!proof_only("Rename a card.\n", None));
+    assert!(proof_only("Rename a card.\n", Some("evidence")));
+    assert!(!proof_only("Kind: evidence\n", Some("code")));
+
+    let files = |names: &[&str]| {
+        names
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect::<Vec<_>>()
+    };
+    assert!(changed_no_code(&[]));
+    assert!(changed_no_code(&files(&[
+        "docs/shots/Before.PNG",
+        "docs/a0.md"
+    ])));
+    assert!(!changed_no_code(&files(&["docs/a0.md", "src/main.rs"])));
+    assert!(!changed_no_code(&files(&["Makefile"])));
+
+    let told = asked(&json!({ "card": "c", "kind": "doc" })).expect("a kind");
+    assert_eq!(told.kind.as_deref(), Some("doc"));
+    assert!(asked(&json!({ "card": "c", "kind": "screenshots" })).is_err());
 }

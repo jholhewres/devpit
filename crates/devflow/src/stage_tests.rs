@@ -26,6 +26,7 @@ fn missing(
         changed,
         stages,
         unreviewed: None,
+        no_code: false,
     })
     .missing
     .into_iter()

@@ -21,7 +21,7 @@ use crate::runs::{self, Attached, Media, Runs};
 pub const FIELDS: [&str; 4] = ["card", "checks", "criteria", "red"];
 
 const SHAPE: &str =
-    "{ card, checks?: [name], criteria?: [{ criterion, tests: [test id] }], red?: [{ test, failure }] }";
+    "{ card, checks?: [name], criteria?: [{ criterion, tests?: [test id], proof?: { kind: screenshot|e2e|artifact, path } }], red?: [{ test, failure }] }";
 const MOST_CRITERIA: usize = 100;
 const MOST_TESTS: usize = 50;
 const MOST_RED: usize = 200;
@@ -39,6 +39,36 @@ pub struct Mapped {
     pub criterion: String,
     #[serde(default)]
     pub tests: Vec<String>,
+    /// A file that shows it, for what no test runner here can: a screenshot.
+    #[serde(default)]
+    pub proof: Option<Proof>,
+}
+
+/// What a proof is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProofKind {
+    Screenshot,
+    E2e,
+    Artifact,
+}
+
+impl ProofKind {
+    pub fn word(self) -> &'static str {
+        match self {
+            ProofKind::Screenshot => "screenshot",
+            ProofKind::E2e => "e2e",
+            ProofKind::Artifact => "artifact",
+        }
+    }
+}
+
+/// A criterion's proof: a file in the run's folder or the checkout.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Proof {
+    pub kind: ProofKind,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -79,7 +109,11 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
     let texts = asked
         .criteria
         .iter()
-        .flat_map(|one| std::iter::once(&one.criterion).chain(&one.tests))
+        .flat_map(|one| {
+            std::iter::once(&one.criterion)
+                .chain(&one.tests)
+                .chain(one.proof.as_ref().map(|proof| &proof.path))
+        })
         .chain(asked.red.iter().flat_map(|one| [&one.test, &one.failure]))
         .chain(asked.checks.iter().flatten());
     let too_many = asked.criteria.len() > MOST_CRITERIA
@@ -95,7 +129,7 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
     }
     if texts.into_iter().any(|text| text.chars().count() > LONGEST) {
         return Err(format!(
-            "each criterion, test and failure is at most {LONGEST} characters: quote the failing line"
+            "each criterion, test, proof path and failure is at most {LONGEST} characters: quote the failing line"
         ));
     }
     Ok(asked)
@@ -415,17 +449,29 @@ pub struct Seen {
     /// Whether the card's body lists it under its acceptance criteria.
     pub on_card: bool,
     pub tests: Vec<(String, Option<Outcome>)>,
+    /// Its proof, and whether the file is there.
+    pub proof: Option<(Proof, bool)>,
 }
 
 impl Seen {
-    /// Every test named for it ran and passed — and it named one.
+    /// It named a test or a proof, every test ran and passed, and the proof
+    /// is there: a screenshot never excuses a red test.
     pub fn green(&self) -> bool {
-        !self.tests.is_empty()
+        (!self.tests.is_empty() || self.proof.is_some())
             && self
                 .tests
                 .iter()
                 .all(|(_, ended)| *ended == Some(Outcome::Passed))
+            && self.proof.as_ref().is_none_or(|(_, there)| *there)
     }
+}
+
+/// Whether a proof's file is there, in the run's folder or else the
+/// checkout: resolved through symlinks and never outside either.
+pub fn proved(proof: &Proof, run: &Path, root: &Path) -> bool {
+    [run, root].iter().any(|base| {
+        devpit_core::tree::resolve(base, &proof.path).is_ok_and(|found| found.is_file())
+    })
 }
 
 /// A test the agent saw fail, and how it ended now.
@@ -595,6 +641,10 @@ pub fn gathered(given: &Given) -> Result<Evidence, String> {
                 .iter()
                 .map(|test| (test.clone(), report::outcome_of(test, &cases)))
                 .collect(),
+            proof: mapped
+                .proof
+                .as_ref()
+                .map(|proof| (proof.clone(), proved(proof, &run, root))),
         })
         .collect();
     let not_mapped = on_card
@@ -702,6 +752,9 @@ fn criteria_json(evidence: &Evidence) -> Vec<Value> {
                 "tests": seen.tests.iter().map(|(test, ended)| json!({
                     "test": test, "result": outcome_word(*ended),
                 })).collect::<Vec<_>>(),
+                "proof": seen.proof.as_ref().map(|(proof, there)| json!({
+                    "kind": proof.kind.word(), "path": proof.path, "exists": there,
+                })),
             })
         })
         .collect()

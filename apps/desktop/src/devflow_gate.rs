@@ -71,7 +71,25 @@ pub(crate) fn respond(
         "Devflow's completion stage is not on in this project: devpit_devflow_status says why.",
     )?;
     let card = asked.card.as_deref().unwrap_or_default();
-    judged_for_agent(app, store, project, config, cwd, card)
+    judged_for_agent(
+        app,
+        store,
+        project,
+        config,
+        cwd,
+        card,
+        asked.kind.as_deref(),
+    )
+}
+
+/// An evidence or doc card whose checkout changed no code since it left the
+/// default branch, by the same diff a review reads; one git cannot answer for
+/// counts as changed.
+fn no_code(card: &devpit_core::store::CardRow, kind: Option<&str>, root: &Path) -> bool {
+    gate::proof_only(&card.body, kind)
+        && devpit_git::review_base(root, None)
+            .and_then(|base| devpit_git::changed_since(root, &base))
+            .is_ok_and(|files| gate::changed_no_code(&files))
 }
 
 /// A card of this project's board, by id.
@@ -91,6 +109,8 @@ struct Read {
     stages: Vec<(String, Option<(String, Value)>)>,
     /// The commit the review read, when the code changed after it.
     unreviewed: Option<String>,
+    /// An evidence or doc card with no code: set by who knows its kind.
+    no_code: bool,
 }
 
 /// A JSON file of a run, already resolved inside where runs are kept.
@@ -145,6 +165,7 @@ fn read(runs: &Runs, card: &str, config: &Config) -> Read {
         review,
         stages,
         unreviewed,
+        no_code: false,
     }
 }
 
@@ -205,6 +226,7 @@ fn looked<'a>(
         changed: read.changed.as_deref(),
         stages: &read.stages,
         unreviewed: read.unreviewed.as_deref(),
+        no_code: read.no_code,
     }
 }
 
@@ -256,20 +278,15 @@ fn judged_for_agent(
     config: &Config,
     cwd: &Path,
     card_id: &str,
+    kind: Option<&str>,
 ) -> Result<Value, String> {
     let card = card_here(store, project, card_id)
         .ok_or_else(|| format!("no card `{card_id}` on this project's board"))?;
     let root = checkout(project, cwd);
     let runs = crate::devflow_evidence::runs_of(&project.id, &root)?;
-    let (gate, asked) = gated(
-        store,
-        project,
-        config,
-        &card,
-        &root,
-        &read(&runs, &card.id, config),
-        false,
-    );
+    let mut read = read(&runs, &card.id, config);
+    read.no_code = no_code(&card, kind, &root);
+    let (gate, asked) = gated(store, project, config, &card, &root, &read, false);
     // Not asked, held by the checks: the project's last call says how it stands.
     let jev = asked.or_else(|| Jev::of(project, config, &root, Some(&card.id), &[]));
     let file = kept(project, &runs, &card.id, &gate)?;
@@ -456,7 +473,8 @@ fn stopped(
     let Ok(runs) = crate::devflow_evidence::runs_of(&project.id, &root) else {
         return Said::Let;
     };
-    let read = read(&runs, &card.id, config);
+    let mut read = read(&runs, &card.id, config);
+    read.no_code = no_code(&card, None, &root);
     if hook.event == Event::SubagentStop
         && !gate::subagent_changed(
             read.changed.as_deref(),
@@ -644,8 +662,19 @@ fn gate_passed_on(
     };
     let root: PathBuf = checkout(project, cwd);
     let runs = crate::devflow_evidence::runs_of(&project.id, &root)?;
-    let read = read(&runs, &card.id, config);
+    let mut read = read(&runs, &card.id, config);
     let criteria = criteria_of(&card.body);
+    let last = read
+        .run
+        .as_ref()
+        .and_then(|(run, _)| runs.found(&card.id, Some(run), "gate.json"))
+        .and_then(|at| json_at(&at));
+    // The kind the agent told the gate, which the card's body may not say.
+    let told = last
+        .as_ref()
+        .is_some_and(|last| last["no_code"] == true)
+        .then_some("evidence");
+    read.no_code = no_code(&card, told, &root);
     let checked = gate::checked(&looked(config, &card.id, &criteria, &read));
     let gate = Gate::new(checked, None, "");
     if !gate.passed() {
@@ -656,9 +685,6 @@ fn gate_passed_on(
         ));
     }
     let run = gate.checked.run.as_deref().unwrap_or_default();
-    let last = runs
-        .found(&card.id, Some(run), "gate.json")
-        .and_then(|at| json_at(&at));
     let passed = last.is_some_and(|last| last["passed"] == true && last["run"] == run);
     if !passed {
         return Err(format!(

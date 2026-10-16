@@ -67,6 +67,8 @@ What counts:
 |---|---|---|
 | Tests pass | this turn's run: 0 failed | an earlier run, "should pass" |
 | A criterion is met | a test or E2E step that asserts it, green | the suite passing in general |
+| A visual criterion is met, no runner can test it | a `proof` in the evidence call (`{ "kind": "screenshot", "path": "<file in the run or checkout>" }`) that the gate says "proved by" | a screenshot described, a path that is not there |
+| An evidence or doc card is done | `Kind: evidence` or `Kind: doc` on the card, no code changed, every criterion proved | a code change called evidence |
 | A bug is fixed | the original symptom's loop, green | the code changed |
 | A regression test guards | it was seen red before the fix | it passes |
 | Reviewed | findings with nothing in `block_on` | "looks good" |

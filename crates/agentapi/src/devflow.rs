@@ -188,8 +188,12 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
                 "checks": { "type": "array", "items": { "type": "string" }, "description": "Checks by their name in devflow.yaml. Leave out to run all." },
                 "criteria": { "type": "array", "items": { "type": "object", "properties": {
                     "criterion": { "type": "string", "description": "The checkbox text, verbatim." },
-                    "tests": { "type": "array", "items": { "type": "string" }, "description": "The tests that prove it, as the runner names them, e.g. tests/test_cli.py::test_rename_changes_the_title." }
-                }, "required": ["criterion", "tests"] } },
+                    "tests": { "type": "array", "items": { "type": "string" }, "description": "The tests that prove it, as the runner names them, e.g. tests/test_cli.py::test_rename_changes_the_title." },
+                    "proof": { "type": "object", "description": "A file that shows it where no test can, e.g. a screenshot of a UI change: its path in the run's folder or the checkout. A path that is not there does not count.", "properties": {
+                        "kind": { "type": "string", "enum": ["screenshot", "e2e", "artifact"] },
+                        "path": { "type": "string" }
+                    }, "required": ["kind", "path"] }
+                }, "required": ["criterion"] } },
                 "red": { "type": "array", "items": { "type": "object", "properties": {
                     "test": { "type": "string" },
                     "failure": { "type": "string", "description": "The failing line you saw, secrets redacted." }
@@ -217,9 +221,10 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: GATE_TOOL,
             method: "devflow_gate",
-            description: "Devflow: whether a card may be called done — its newest evidence passed after the last code change, each criterion maps to passing tests, its E2E spec kept a screenshot, findings.json has nothing in review.block_on, each gated stage passed; then, with Decisions, the devflow-done rubric, which holds the card only in enforce. Comments on the card; answers passed or failed with what is missing and the stage that fixes it. Call it with `card` before devpit_finish_card, which is refused until it passes.",
+            description: "Devflow: whether a card may be called done — its newest evidence passed after the last code change, each criterion maps to passing tests or a proof file that is there, its E2E spec kept a screenshot, findings.json has nothing in review.block_on, each gated stage passed; then, with Decisions, the devflow-done rubric, which holds the card only in enforce. An evidence or doc card (`kind`, or a `Kind: evidence` line in its body) that changed no code closes on its proofs without a review. Comments on the card; answers passed or failed with what is missing and the stage that fixes it. Call it with `card` before devpit_finish_card, which is refused until it passes.",
             input: || json!({ "type": "object", "properties": {
-                "card": { "type": "string", "description": "The card's id." }
+                "card": { "type": "string", "description": "The card's id." },
+                "kind": { "type": "string", "enum": ["code", "evidence", "doc"], "description": "What the card delivers, when its body does not say. Usually left out." }
             } }),
         },
     ),

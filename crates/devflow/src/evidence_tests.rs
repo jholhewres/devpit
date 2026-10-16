@@ -97,6 +97,40 @@ fn every_check_runs_unless_some_are_named_and_a_name_not_configured_is_refused()
     assert!(chosen(&[], None).is_err());
 }
 
+/// A proof counts only when its file is there, in the run's folder or the
+/// checkout, and never outside them; a criterion naming neither a test nor
+/// a proof proves nothing.
+#[test]
+fn a_criterion_is_proved_by_a_file_that_is_there_and_not_by_one_that_is_not() {
+    let base = tempfile::tempdir().expect("base");
+    let root = base.path().join("checkout");
+    std::fs::create_dir_all(root.join("shots")).expect("shots");
+    std::fs::write(root.join("shots/dialog.png"), "png").expect("a screenshot");
+    std::fs::write(base.path().join("outside.png"), "png").expect("outside");
+    let config = config(vec![check(
+        "unit",
+        &format!(r#"{PASSING}; printf png > "$DEVPIT_REPORT_DIR/shot.png""#),
+    )]);
+    let proof = |kind: &str, path: &str| json!({ "kind": kind, "path": path });
+    let asked = asked(&json!({ "card": "card_1", "criteria": [
+        { "criterion": "rename changes the title", "proof": proof("screenshot", "shots/dialog.png") },
+        { "criterion": "an empty title is refused", "proof": proof("e2e", "unit/shot.png") },
+        { "criterion": "the old title is kept in history", "proof": proof("screenshot", "shots/missing.png") },
+        { "criterion": "outside", "proof": proof("artifact", "../outside.png") },
+        { "criterion": "neither" },
+    ] }))
+    .expect("asked");
+    let evidence = run_of(&root, &config, &asked, "Rename", 0);
+    let green: Vec<bool> = evidence.criteria.iter().map(Seen::green).collect();
+    assert_eq!(green, [true, true, false, false, false]);
+    let record = recorded(&evidence);
+    assert_eq!(
+        record["criteria"][0]["proof"],
+        json!({ "kind": "screenshot", "path": "shots/dialog.png", "exists": true })
+    );
+    assert_eq!(record["criteria"][2]["proof"]["exists"], false);
+}
+
 /// A JUnit report the check writes, as a test runner would.
 const PASSING: &str = r#"printf '<testsuite><testcase classname="cli" name="rename changes the title"/><testcase classname="cli" name="an empty title is refused"/></testsuite>' > "$DEVPIT_REPORT_DIR/report.xml""#;
 const FAILING: &str = r#"printf '<testsuite><testcase classname="cli" name="rename changes the title"/><testcase classname="cli" name="an empty title is refused"><failure message="expected an error"/></testcase></testsuite>' > "$DEVPIT_REPORT_DIR/report.xml"; echo the last words; exit 1"#;
