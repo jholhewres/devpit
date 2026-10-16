@@ -244,6 +244,10 @@ fn a_row_written_before_a_migration_survives_it() {
         .expect("undo 029");
     store
         .conn()
+        .execute_batch("DROP TABLE card_superseded;")
+        .expect("undo 031");
+    store
+        .conn()
         .execute_batch("PRAGMA user_version = 16;")
         .expect("back to 16");
     drop(store);

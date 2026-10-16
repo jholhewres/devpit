@@ -93,6 +93,12 @@ pub(crate) fn respond_judged(
             let context_on = config.is_none_or(|config| config.stages.on("context"));
             briefed(&store, &project.id, params, context_on)?
         }
+        _ if crate::devflow_plan_edit::asks(params) => crate::devflow_plan_edit::respond(
+            &store,
+            &project.id,
+            params,
+            approval(params)?.as_deref(),
+        )?,
         _ => planned(&store, &project.id, params, config.zip(jev))?,
     };
     if let Some(app) = app {

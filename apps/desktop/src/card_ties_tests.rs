@@ -69,6 +69,7 @@ fn a_card_says_what_blocks_it_until_that_is_done_and_its_epic_counts_what_is_don
             id: ids[0].clone(),
             title: "[devflow] index".into(),
             done: false,
+            released: false,
             number: store
                 .card_tally(&ids[0])
                 .expect("read")
@@ -99,6 +100,7 @@ fn a_card_with_no_children_has_no_progress() {
         id: "c".into(),
         title: "c".into(),
         done: true,
+        released: false,
         number: None,
     };
     assert_eq!(progress(&[child]), Some(Progress { done: 1, total: 1 }));
@@ -120,4 +122,60 @@ fn a_cards_criteria_are_read_from_its_body() {
             }
         ]
     );
+}
+
+#[test]
+fn a_cut_card_releases_and_a_merged_one_as_the_card_its_work_went_into_does() {
+    let closed: HashMap<String, Option<String>> = [
+        ("cut".to_owned(), None),
+        ("merged".to_owned(), Some("into".to_owned())),
+    ]
+    .into_iter()
+    .collect();
+    let nothing_done = |_: &str| false;
+    assert!(releases("cut", &nothing_done, &closed));
+    assert!(!releases("merged", &nothing_done, &closed));
+    assert!(!releases("open", &nothing_done, &closed));
+    let into_done = |id: &str| id == "into";
+    assert!(releases("merged", &into_done, &closed));
+}
+
+#[test]
+fn a_card_waiting_on_one_cut_or_merged_into_a_done_card_is_no_longer_held() {
+    let (_dir, store, project, _epic, ids) = planned();
+    let held = |ties: &Ties, id: &str| {
+        let mut one = card(id);
+        ties.fill(&mut one);
+        one.blocked_by.iter().any(CardRef::holds)
+    };
+    // index ← box ← highlight: box goes into index, which is not done yet.
+    store.close_card(&ids[1], Some(&ids[0])).expect("merged");
+    let ties = Ties::read(&store, &project).expect("ties");
+    assert!(held(&ties, &ids[2]));
+    let mut merged = card(&ids[1]);
+    ties.fill(&mut merged);
+    assert_eq!(
+        merged.superseded_by.map(|into| into.id).as_deref(),
+        Some(ids[0].as_str())
+    );
+
+    let ship = store
+        .columns(&project)
+        .expect("columns")
+        .into_iter()
+        .find(|column| column.name == "ship")
+        .expect("ship");
+    store.move_card(&ids[0], &ship.id, 0).expect("move");
+    assert!(!held(&Ties::read(&store, &project).expect("ties"), &ids[2]));
+
+    store.close_card(&ids[1], None).expect("cut instead");
+    store
+        .move_card(&ids[0], &store.columns(&project).expect("columns")[0].id, 0)
+        .expect("back");
+    let ties = Ties::read(&store, &project).expect("ties");
+    assert!(!held(&ties, &ids[2]), "a cut card holds nothing");
+    assert!(held(&ties, &ids[1]), "index is not done");
+    let mut cut = card(&ids[1]);
+    ties.fill(&mut cut);
+    assert!(cut.cut);
 }

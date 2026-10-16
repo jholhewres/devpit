@@ -438,3 +438,91 @@ fn a_review_counts_for_the_commit_it_read_and_not_for_code_after_it() {
         None
     );
 }
+
+/// A card of `project` waiting on `card`.
+fn waiting_on(store: &Store, project: &Project, card: &str, title: &str) -> String {
+    let first = store.columns(&project.id).expect("columns")[0].id.clone();
+    let next = store
+        .create_card(&project.id, &first, title, "")
+        .expect("card");
+    store
+        .conn()
+        .execute(
+            "INSERT INTO card_blocker (card_id, blocked_by, created_at) VALUES (?1, ?2, 0)",
+            [next.as_str(), card],
+        )
+        .expect("waits");
+    next
+}
+
+/// Whether `start_card` would let the card go, by the board as it stands.
+fn startable(project: &Project, card: &str) -> bool {
+    let board = crate::board::board_still_now(project.id.clone()).expect("board");
+    crate::card_follows::unblocked(&board, card, true).is_ok()
+}
+
+#[test]
+fn a_passed_gate_releases_the_cards_waiting_only_where_the_plan_says_unblock_on_gate() {
+    for (extra, releases) in [("", false), ("  plan:\n    unblock_on: gate\n", true)] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().canonicalize().expect("root");
+        let (store, project, card) = devflow_on(&root, extra);
+        let next = waiting_on(&store, &project, &card, "[devflow] Show the new title");
+        assert!(!startable(&project, &next), "no gate yet: {extra:?}");
+        evidence(&project, &root, &card);
+        ask(&project, &root, "devflow_gate", json!({ "card": card }));
+        assert_eq!(startable(&project, &next), releases, "{extra:?}");
+    }
+}
+
+#[test]
+fn a_card_merged_into_another_finishes_on_its_evidence_and_a_cut_one_on_none() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (store, project, card) = devflow_on(&root, "");
+    let plan = |params: Value| {
+        crate::devflow_plan::respond(None, "devflow_plan", &project, &params).expect("plan")
+    };
+    let first = store.columns(&project.id).expect("columns")[0].id.clone();
+    let criteria = "## Acceptance criteria\n- [ ] the menu renames\n";
+    let merged = store
+        .create_card(
+            &project.id,
+            &first,
+            "[devflow] Rename from the menu",
+            criteria,
+        )
+        .expect("card");
+    let next = waiting_on(&store, &project, &merged, "[devflow] Show the new title");
+    plan(json!({ "merge": { "from": merged, "into": card }, "apply": true }));
+    let refused = may_finish(&project, &merged, &root).expect_err("nothing passed yet");
+    assert!(refused.contains("its work went into"), "{refused}");
+    assert!(
+        !startable(&project, &next),
+        "the card it went into is not done"
+    );
+
+    evidence(&project, &root, &card);
+    ask(&project, &root, "devflow_gate", json!({ "card": card }));
+    may_finish(&project, &merged, &root).expect("finishes on the card it went into");
+    let done = store
+        .columns(&project.id)
+        .expect("columns")
+        .into_iter()
+        .find(|column| {
+            devpit_core::store::column_roles::role_of(column.role.as_deref(), &column.name)
+                == Some("done")
+        })
+        .expect("a done lane");
+    store.move_card(&card, &done.id, 0).expect("done");
+    assert!(startable(&project, &next));
+
+    let dropped = store
+        .create_card(&project.id, &first, "[devflow] Rename by voice", criteria)
+        .expect("card");
+    let after = waiting_on(&store, &project, &dropped, "[devflow] Say the new title");
+    assert!(may_finish(&project, &dropped, &root).is_err());
+    plan(json!({ "cut": dropped, "apply": true }));
+    may_finish(&project, &dropped, &root).expect("closes without evidence");
+    assert!(startable(&project, &after));
+}

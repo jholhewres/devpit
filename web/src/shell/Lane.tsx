@@ -7,7 +7,7 @@ import { InlineAdd } from './InlineAdd'
 import { LaneMenu } from './LaneMenuView'
 import { LaneStep } from './LaneStep'
 import { money } from './chat'
-import { named, stillBlocking } from './planEdit'
+import { closedLabel, named, stillBlocking } from './planEdit'
 import { abandoned, committed } from './typing'
 import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -84,6 +84,7 @@ export const Tile = memo(function Tile({
   const near = nearness(card.dueAt)
   const spent = money(card.costUsd ?? 0)
   const blocking = stillBlocking(card.blockedBy)
+  const closed = closedLabel(card)
   const criteria = card.criteria ?? []
   const ticked = criteria.filter((one) => one.done).length
   return (
@@ -116,6 +117,7 @@ export const Tile = memo(function Tile({
       {/* What the step is printing, as it prints it. One line, the last one:
           a tile is not a log, and the whole output is on the card. */}
       {progress && run?.state === 'running' && <div className="tile__log">{progress}</div>}
+      {closed && <div className="tile__closed">{closed}</div>}
       {blocking.length > 0 && (
         <div className="tile__blocked" title={`Blocked by ${blocking.map(named).join(', ')}`}>
           Blocked by {blocking.map(named).join(', ')}

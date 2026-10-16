@@ -62,6 +62,7 @@
 .ties__one { padding: 5px 9px; border-radius: 7px; background: var(--raised); font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ties__no { margin-right: 6px; font-variant-numeric: tabular-nums; color: var(--text-3); }
 .ties__one[data-done='true'] { color: var(--text-3); text-decoration: line-through; }
+.ties__closed { margin: 0; font-size: 12px; color: var(--text-3); }
 
 /* Where this card's work happens. */
 .cwork__wt { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--raised); border-radius: 10px; }

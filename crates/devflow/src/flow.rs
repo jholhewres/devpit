@@ -229,6 +229,9 @@ pub(crate) fn step_json(config: &Config, step: &Step) -> Json {
             if let Some(publish) = stages.plan.publish {
                 item["publish"] = json!(publish);
             }
+            if let Some(unblock_on) = stages.plan.unblock_on {
+                item["unblock_on"] = json!(unblock_on);
+            }
         }
         (Some("execution"), _) => {
             item["checks"] = json!(stages.execution.checks);

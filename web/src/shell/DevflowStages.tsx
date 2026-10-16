@@ -207,6 +207,15 @@ export function DevflowStages({
               </select>
             </label>
           )}
+          {stage.uses === 'builtin/plan' && (
+            <label className="dffield">
+              <span className="dffield__l">Next cards start</span>
+              <select aria-label="When a card releases the cards waiting on it" value={stage.unblockOn ?? 'done'} onChange={(event) => edit('stages.plan.unblock_on', event.target.value)}>
+                <option value="done">once it is done</option>
+                <option value="gate">once its gate passed</option>
+              </select>
+            </label>
+          )}
           {stage.uses === 'builtin/execution' && withChecks && (
             <div className="dffield dffield--top">
               <span className="dffield__l">Checks</span>

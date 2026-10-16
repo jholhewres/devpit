@@ -136,6 +136,7 @@
 /* A plan on the board: what still blocks a card, how far an epic's cards are,
    and a plan waiting for the person's yes. */
 .tile__blocked { margin-top: 5px; font-size: 11px; color: var(--warning); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile__closed { margin-top: 5px; font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile__progress[data-done='true'] { color: var(--success); }
 .tile__plan { padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10.5px; }
 

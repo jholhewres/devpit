@@ -46,6 +46,7 @@ export function stageJson(stage: DevflowStage): Record<string, unknown> {
   const item: Record<string, unknown> = { uses: stage.uses, enabled: stage.enabled }
   if (stage.approve) item.approve = stage.approve
   if (stage.publish) item.publish = stage.publish
+  if (stage.unblockOn) item.unblock_on = stage.unblockOn
   if (stage.uses === 'builtin/execution') {
     item.checks = stage.checks.map(checkOf)
     if (stage.e2eDir) item.e2e_dir = stage.e2eDir

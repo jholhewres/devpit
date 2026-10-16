@@ -139,3 +139,28 @@ blockers: those can start now. End the turn.
 
 Done when the tool returned the card ids, every card carries its edges, and no
 card was moved or started.
+
+### 7. Merge or cut a card once the cards exist
+
+When the work changes shape after the cards were created — one card's work
+landed in another, or a card is no longer wanted — change the plan with the
+same tool instead of leaving the card open: an open card keeps every card
+waiting on it from starting.
+
+- **Merge:** `devpit_devflow_plan` with `"merge": { "from": "<card>", "into":
+  "<card>" }`. The merged card finishes on the other card's evidence, and the
+  cards waiting on it start once that card is done.
+- **Cut:** `devpit_devflow_plan` with `"cut": "<card>"`. The card closes without
+  evidence and holds nothing back.
+
+Cards are named by id or `#number`. Without `apply` the tool only says what
+would change and which cards it lets start: show that to the person, and call
+again with `"apply": true` only after their explicit yes. Then finish the card
+with `devpit_finish_card`.
+
+`stages.plan.unblock_on: gate` in devflow.yaml lets a card's dependants start
+as soon as its gate passed, while it waits for the person's acceptance; the
+default, `done`, waits for the card to be done.
+
+Done when the person said yes, the tool answered `applied: true`, and the cards
+in `releases` are named as free to start.

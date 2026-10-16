@@ -106,6 +106,11 @@ pub(crate) fn newest(runs: &Runs, card: &str, file: &str) -> Option<(String, Val
     Some((name, json_at(&at)?))
 }
 
+/// Whether the newest gate a card was judged at passed.
+pub(crate) fn gate_passed(runs: &Runs, card: &str) -> bool {
+    newest(runs, card, "gate.json").is_some_and(|(_, gate)| gate["passed"] == true)
+}
+
 fn read(runs: &Runs, card: &str, config: &Config) -> Read {
     let root = runs.checkout.as_path();
     let run = newest(runs, card, "evidence.json");
@@ -553,7 +558,7 @@ fn blocked_by(board: &Board, card: &str) -> Vec<String> {
         .map(|one| {
             one.blocked_by
                 .iter()
-                .filter(|by| !by.done)
+                .filter(|by| by.holds())
                 .map(|by| format!("\"{}\" ({})", by.title, by.id))
                 .collect()
         })
@@ -609,15 +614,31 @@ pub(crate) fn context(
 }
 
 /// `devpit_finish_card` on a card the gate holds: refused until the gate
-/// passed on the newest run and nothing changed since.
+/// passed on the newest run and nothing changed since. A card cut from the
+/// plan closes without evidence, and one merged into another on that card's.
 pub(crate) fn may_finish(project: &Project, card_id: &str, cwd: &Path) -> Result<(), String> {
     let store = crate::projects::store().map_err(|err| err.message)?;
     let state = crate::devflow::read(Path::new(&project.root_path));
     let Some(config) = gating(&store, project, &state) else {
         return Ok(());
     };
+    match judged_on(&store, card_id) {
+        None => Ok(()),
+        Some(on) if on == card_id => gate_passed_on(&store, project, config, &on, cwd),
+        Some(on) => gate_passed_on(&store, project, config, &on, cwd)
+            .map_err(|why| format!("its work went into {on}, whose gate it finishes on: {why}")),
+    }
+}
+
+fn gate_passed_on(
+    store: &Store,
+    project: &Project,
+    config: &Config,
+    card_id: &str,
+    cwd: &Path,
+) -> Result<(), String> {
     let Some(card) =
-        card_here(&store, project, card_id).filter(|card| gate::gated_card(&card.title))
+        card_here(store, project, card_id).filter(|card| gate::gated_card(&card.title))
     else {
         return Ok(());
     };
@@ -645,6 +666,21 @@ pub(crate) fn may_finish(project: &Project, card_id: &str, cwd: &Path) -> Result
         ));
     }
     Ok(())
+}
+
+/// The card whose evidence `card_id` finishes on: itself, the card its work
+/// went into, or `None` once cut from the plan.
+fn judged_on(store: &Store, card_id: &str) -> Option<String> {
+    let mut at = card_id.to_owned();
+    // A merge never lands on a closed card; bounded all the same.
+    for _ in 0..8 {
+        match store.card_closed(&at).ok().flatten() {
+            None => return Some(at),
+            Some(None) => return None,
+            Some(Some(into)) => at = into,
+        }
+    }
+    Some(at)
 }
 
 #[cfg(test)]

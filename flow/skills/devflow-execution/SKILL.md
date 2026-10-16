@@ -32,7 +32,9 @@ Read the card with `devpit_card`: criteria, likely files, verify command,
 blocked by. Read the epic's context section for the seam and the commands, and
 `.devpit/devflow/devflow.yaml` for the checks under `stages.execution.checks`.
 When a card it depends on is not finished, name it and end the turn. Otherwise
-call `devpit_start_card`.
+call `devpit_start_card`. When this card's work already landed in another, or
+the work is no longer wanted, it is not built: the plan skill's step 7 merges
+or cuts it, after the person's yes.
 
 Done when you can name each criterion, the seam, the verify command and every
 configured check.

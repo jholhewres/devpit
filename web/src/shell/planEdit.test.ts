@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PlannedCard } from '../gen/bindings'
-import { cut, edited, linesOf, moved, named, stillBlocking } from './planEdit'
+import { closedLabel, cut, edited, linesOf, moved, named, stillBlocking } from './planEdit'
 
 const card = (key: string, dependsOn: string[] = []): PlannedCard => ({
   key,
@@ -40,14 +40,21 @@ describe('a plan on the board', () => {
     expect(linesOf(' one \n\n two\n')).toEqual(['one', 'two'])
   })
 
-  it('counts only what is not done as blocking', () => {
+  it('counts only what is neither done nor released as blocking', () => {
     expect(
       stillBlocking([
         { id: 'a', title: 'a', done: true },
         { id: 'b', title: 'b', done: false },
+        { id: 'c', title: 'c', done: false, released: true },
       ]).map((one) => one.id),
     ).toEqual(['b'])
     expect(stillBlocking(undefined)).toEqual([])
+  })
+
+  it('says a card merged into another or cut from the plan', () => {
+    expect(closedLabel({ supersededBy: { id: 'a', title: 'Index bodies', done: false, number: 2 } })).toBe('Merged into #2 Index bodies')
+    expect(closedLabel({ cut: true })).toBe('Cut from the plan')
+    expect(closedLabel({})).toBeNull()
   })
 })
 

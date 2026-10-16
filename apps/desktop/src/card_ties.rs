@@ -6,9 +6,11 @@
 //! thirty cards must not ask thirty times.
 
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 use devpit_core::store::column_roles::role_of;
 use devpit_core::{CardEdges, Store};
+use devpit_devflow::config::UnblockOn;
 use devpit_rpc::{Card, CardRef, Criterion, ErrorCode, Progress, RpcError};
 
 /// The role of the lane where finished work sits.
@@ -30,17 +32,38 @@ impl Ties {
             .map(|column| column.id)
             .collect();
         let numbers = store.card_numbers(project_id)?;
-        let named = store
-            .cards(project_id)?
-            .into_iter()
+        let rows = store.cards(project_id)?;
+        let edges = store.card_edges(project_id)?;
+        let lane_done: HashSet<&str> = rows
+            .iter()
+            .filter(|row| done.contains(&row.column_id))
+            .map(|row| row.id.as_str())
+            .collect();
+        let on_board: HashSet<&str> = rows.iter().map(|row| row.id.as_str()).collect();
+        // Only a card something waits on, or whose work another took, is worth its gate.
+        let asked: HashSet<&str> = edges
+            .blockers
+            .iter()
+            .map(|(_, by)| by.as_str())
+            .chain(edges.closed.iter().filter_map(|(_, into)| into.as_deref()))
+            .filter(|id| !lane_done.contains(id))
+            .collect();
+        let passed = gates_passed(store, project_id, &asked);
+        let closed: HashMap<String, Option<String>> = edges.closed.iter().cloned().collect();
+        let free =
+            |id: &str| lane_done.contains(id) || passed.contains(id) || !on_board.contains(id);
+        let named = rows
+            .iter()
             .map(|row| {
                 let card = CardRef {
-                    done: done.contains(&row.column_id),
+                    done: lane_done.contains(row.id.as_str()),
+                    released: !lane_done.contains(row.id.as_str())
+                        && releases(&row.id, &free, &closed),
                     number: numbers.get(&row.id).copied(),
                     id: row.id.clone(),
-                    title: row.title,
+                    title: row.title.clone(),
                 };
-                (row.id, card)
+                (row.id.clone(), card)
             })
             .collect();
         let waiting = store
@@ -50,7 +73,7 @@ impl Ties {
             .collect();
         Ok(Ties {
             named,
-            edges: store.card_edges(project_id)?,
+            edges,
             waiting,
         })
     }
@@ -88,7 +111,61 @@ impl Ties {
         card.blocked_by = self.blockers(&card.id);
         card.progress = progress(&self.children(&card.id));
         card.plan_waiting = self.waiting.get(&card.id).copied().unwrap_or_default();
+        let closed = self.edges.closed.iter().find(|(id, _)| *id == card.id);
+        card.cut = matches!(closed, Some((_, None)));
+        card.superseded_by = closed
+            .and_then(|(_, into)| into.as_ref())
+            .and_then(|into| self.named.get(into).cloned());
     }
+}
+
+/// Whether the cards waiting on `id` may start: it is `free` (done, or past
+/// its gate where the plan says so), cut, or its work went into a card that
+/// would release them.
+pub(crate) fn releases(
+    id: &str,
+    free: &dyn Fn(&str) -> bool,
+    closed: &HashMap<String, Option<String>>,
+) -> bool {
+    let mut at = id;
+    // A merge never lands on a closed card, so the chain ends; bounded anyway.
+    for _ in 0..=closed.len() {
+        if free(at) {
+            return true;
+        }
+        match closed.get(at) {
+            None => return false,
+            Some(None) => return true,
+            Some(Some(into)) => at = into,
+        }
+    }
+    false
+}
+
+/// The cards among `asked` whose newest gate passed, where devflow.yaml says
+/// `stages.plan.unblock_on: gate`; none otherwise.
+fn gates_passed(store: &Store, project_id: &str, asked: &HashSet<&str>) -> HashSet<String> {
+    if asked.is_empty() {
+        return HashSet::new();
+    }
+    let Some(row) = store.project(project_id).ok().flatten() else {
+        return HashSet::new();
+    };
+    let root = Path::new(&row.root_path);
+    let devpit_devflow::State::Valid(_, config) = crate::devflow::read(root) else {
+        return HashSet::new();
+    };
+    if config.unblock_on() != UnblockOn::Gate {
+        return HashSet::new();
+    }
+    let Ok(runs) = crate::devflow_evidence::runs_of(project_id, root) else {
+        return HashSet::new();
+    };
+    asked
+        .iter()
+        .filter(|card| crate::devflow_gate::gate_passed(&runs, card))
+        .map(|card| (*card).to_owned())
+        .collect()
 }
 
 /// How far an epic's cards are, or `None` for a card with none.

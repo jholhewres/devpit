@@ -1,4 +1,5 @@
 import type { CardDetail, CardRef } from '../gen/bindings'
+import { closedLabel } from './planEdit'
 
 /*
  * What ties a card to the others: the epic it was planned under, the cards
@@ -9,11 +10,13 @@ export function CardTies({ detail }: { detail: CardDetail }): React.JSX.Element 
   const blockers = detail.card.blockedBy ?? []
   const children = detail.children ?? []
   const parent = detail.parent ?? null
-  if (!parent && blockers.length === 0 && children.length === 0) return null
+  const closed = closedLabel(detail.card)
+  if (!parent && !closed && blockers.length === 0 && children.length === 0) return null
   const done = children.filter((child) => child.done).length
   return (
     <section className="ties" aria-label="Plan">
       {parent && <Named label="Epic" cards={[parent]} />}
+      {closed && <p className="ties__closed">{closed}</p>}
       {blockers.length > 0 && <Named label="Blocked by" cards={blockers} />}
       {children.length > 0 && <Named label={`Cards · ${done} of ${children.length} done`} cards={children} />}
     </section>

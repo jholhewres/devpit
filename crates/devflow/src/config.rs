@@ -92,6 +92,11 @@ words!(
     Publish { Board = "board", Jira = "jira", Linear = "linear", Github = "github" }
 );
 words!(
+    /// When a planned card lets the cards waiting on it start: once it is
+    /// done, or once its gate passed while it waits for the person.
+    UnblockOn { Done = "done", Gate = "gate" }
+);
+words!(
     /// Whether Decisions only logs (`shadow`) or blocks (`enforce`).
     Mode { Shadow = "shadow", Enforce = "enforce" }
 );
@@ -196,6 +201,10 @@ pub struct Approved {
     /// The plan's: where its cards are made. The board when not said.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub publish: Option<Publish>,
+    /// The plan's: when a card releases the cards waiting on it. `done` when
+    /// not said.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unblock_on: Option<UnblockOn>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -257,6 +266,7 @@ impl Default for Config {
             enabled: true,
             approve: Approve::Person,
             publish: None,
+            unblock_on: None,
         };
         Config {
             version: VERSION,
@@ -351,6 +361,12 @@ impl Config {
     /// Where the plan's cards are made: the board unless said.
     pub fn publish(&self) -> Publish {
         self.stages.plan.publish.unwrap_or(Publish::Board)
+    }
+
+    /// When a planned card releases the cards waiting on it: once done
+    /// unless said.
+    pub fn unblock_on(&self) -> UnblockOn {
+        self.stages.plan.unblock_on.unwrap_or(UnblockOn::Done)
     }
 
     /// The JSON form a change is made on: version 1's map of stages, or
@@ -720,10 +736,21 @@ pub(crate) fn approved_in(fields: &mut Fields, plan: bool) -> Result<Approved, I
         Some((node, path)) => Some(word(node, &path, Publish::of, Publish::ALL, Publish::word)?),
         None => None,
     };
+    let unblock_on = match plan.then(|| fields.get("unblock_on")).flatten() {
+        Some((node, path)) => Some(word(
+            node,
+            &path,
+            UnblockOn::of,
+            UnblockOn::ALL,
+            UnblockOn::word,
+        )?),
+        None => None,
+    };
     Ok(Approved {
         enabled,
         approve,
         publish,
+        unblock_on,
     })
 }
 

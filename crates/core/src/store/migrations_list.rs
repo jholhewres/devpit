@@ -794,4 +794,19 @@ CREATE UNIQUE INDEX card_number ON card(project_id, number);
 ALTER TABLE decision ADD COLUMN failure TEXT;
 "#,
     },
+    // Migration 031 — a planned card closed without its own evidence.
+    Migration {
+        version: 31,
+        sql: r#"
+-- A card whose work went into another (by_card_id), or that was cut from the
+-- plan (NULL): it no longer holds the cards waiting on it, and its gate is
+-- the other card's, or none.
+CREATE TABLE card_superseded (
+    card_id    TEXT PRIMARY KEY REFERENCES card(id) ON DELETE CASCADE,
+    by_card_id TEXT REFERENCES card(id) ON DELETE CASCADE,
+    at         INTEGER NOT NULL,
+    CHECK (card_id != by_card_id)
+);
+"#,
+    },
 ];

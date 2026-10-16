@@ -61,9 +61,11 @@ pub(crate) fn planned(board: &Board, epic: &str) -> Vec<Planned> {
             blocked_by: card
                 .blocked_by
                 .iter()
-                .map(|by| (by.id.clone(), by.done))
+                .map(|by| (by.id.clone(), !by.holds()))
                 .collect(),
+            // Merged or cut: its work is elsewhere or nowhere, never started.
             standing: match role(&card.column_id) {
+                _ if card.cut || card.superseded_by.is_some() => Standing::Done,
                 Some("done") => Standing::Done,
                 Some("check") => Standing::Finished,
                 Some("doing") => match card.activity {

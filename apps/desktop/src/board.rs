@@ -74,6 +74,8 @@ fn card_from(
         blocked_by: Vec::new(),
         progress: None,
         plan_waiting: 0,
+        superseded_by: None,
+        cut: false,
         runs: runs_of(store, &row.id, steps)?,
         id: row.id,
         column_id: row.column_id,

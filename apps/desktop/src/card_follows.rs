@@ -46,7 +46,7 @@ pub(crate) fn unblocked(board: &Board, card_id: &str, devflow_on: bool) -> Resul
     let waiting: Vec<String> = card
         .blocked_by
         .iter()
-        .filter(|by| !by.done)
+        .filter(|by| by.holds())
         .map(|by| format!("\"{}\" ({})", by.title, by.id))
         .collect();
     if !devflow_on || waiting.is_empty() {

@@ -151,7 +151,7 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: "devpit_devflow_plan",
             method: "devflow_plan",
-            description: "Devflow: an epic's plan as its child cards, each titled '[devflow] <title>', its body the build, the criteria as checkboxes under ## Acceptance criteria, the likely files and the verify command, and its depends_on as blocking edges the board shows. Without apply it previews and creates nothing: the plan waits on the epic, where the person can move, cut or edit it and create the cards with a click. apply: true creates the cards, only after the person's explicit yes to the preview, and only the plan the person last saw: cards that differ become a new preview. When the person already approved on the board, the answer says so with the card ids. An orchestrator plans another project's epic with `project`, shows the person the preview, and applies with `approval` quoting their yes; apply without `cards` applies the preview as it stands.",
+            description: "Devflow: an epic's plan as its child cards, each titled '[devflow] <title>', its body the build, the criteria as checkboxes under ## Acceptance criteria, the likely files and the verify command, and its depends_on as blocking edges the board shows. Without apply it previews and creates nothing: the plan waits on the epic, where the person can move, cut or edit it and create the cards with a click. apply: true creates the cards, only after the person's explicit yes to the preview, and only the plan the person last saw: cards that differ become a new preview. When the person already approved on the board, the answer says so with the card ids. An orchestrator plans another project's epic with `project`, shows the person the preview, and applies with `approval` quoting their yes; apply without `cards` applies the preview as it stands. Once the cards exist, `merge: { from, into }` says a card's work went into another — it finishes on that card's evidence — and `cut` drops a card from the plan, closing it without evidence; either releases the cards waiting on it. Without apply it previews what changes; apply: true only after the person's explicit yes.",
             input: || json!({ "type": "object", "properties": {
                 "epic": { "type": "string", "description": "The epic's card id." },
                 "cards": { "type": "array", "items": { "type": "object", "properties": {
@@ -168,8 +168,13 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
                     "by": { "type": "string", "enum": ["orchestrator"] },
                     "quote": { "type": "string", "description": "The person's message saying yes, in their words." }
                 }, "required": ["quote"] },
-                "project": { "type": "string", "description": "Orchestrator only: the epic's project, by id or name." }
-            }, "required": ["epic"] }),
+                "project": { "type": "string", "description": "Orchestrator only: the epic's project, by id or name." },
+                "merge": { "type": "object", "description": "Instead of epic and cards: a created card whose work went into another.", "properties": {
+                    "from": { "type": "string", "description": "The card merged, by id or #number." },
+                    "into": { "type": "string", "description": "The card that holds its work now." }
+                }, "required": ["from", "into"] },
+                "cut": { "type": "string", "description": "Instead of epic and cards: a created card dropped from the plan, by id or #number." }
+            } }),
         },
     ),
     (

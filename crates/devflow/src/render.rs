@@ -131,6 +131,9 @@ fn stage_fields(out: &mut String, config: &Config, step: &Step) {
                     publish.word()
                 );
             }
+            if let Some(unblock_on) = stages.plan.unblock_on {
+                let _ = writeln!(out, "    unblock_on: {}   # done | gate", unblock_on.word());
+            }
         }
         (Some("execution"), _) => {
             checks(out, "    ", &stages.execution.checks);
@@ -236,6 +239,9 @@ fn approved(out: &mut String, name: &str, stage: &Approved) {
     );
     if let Some(publish) = stage.publish {
         let _ = writeln!(out, "    publish: {}", publish.word());
+    }
+    if let Some(unblock_on) = stage.unblock_on {
+        let _ = writeln!(out, "    unblock_on: {}", unblock_on.word());
     }
 }
 /// A string as YAML: plain when it reads back as the same string, double

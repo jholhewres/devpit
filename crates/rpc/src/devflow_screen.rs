@@ -74,6 +74,9 @@ pub struct DevflowStage {
     pub approve: Option<String>,
     /// The plan's: `board`, `jira`, `linear` or `github`, when said.
     pub publish: Option<String>,
+    /// The plan's: `done` or `gate`, when said.
+    #[serde(default)]
+    pub unblock_on: Option<String>,
     /// The execution stage's checks.
     pub checks: Vec<DevflowCheck>,
     /// The execution stage's folder for E2E specs.

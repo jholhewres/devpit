@@ -198,3 +198,31 @@ fn the_stages_switched_on_keep_their_order() {
         ["briefing", "plan", "execution", "completion"]
     );
 }
+
+#[test]
+fn a_card_releases_the_cards_waiting_on_it_once_done_unless_the_plan_says_its_gate() {
+    let unblock_on = |text: &str| parse(text).expect("valid").unblock_on();
+    assert_eq!(unblock_on("version: 1\n"), UnblockOn::Done);
+    assert_eq!(unblock_on("version: 2\n"), UnblockOn::Done);
+    let v1 = "version: 1\nstages:\n  plan:\n    unblock_on: gate\n";
+    assert_eq!(unblock_on(v1), UnblockOn::Gate);
+    let v2 = "version: 2\nstages:\n  - uses: builtin/plan\n    unblock_on: gate\n";
+    assert_eq!(unblock_on(v2), UnblockOn::Gate);
+    // Written back as it was said, in either version.
+    for text in [v1, v2] {
+        let config = parse(text).expect("valid");
+        assert_eq!(
+            parse(&crate::render::render(&config))
+                .expect("rendered")
+                .unblock_on(),
+            UnblockOn::Gate
+        );
+        assert_eq!(from_json(&config.to_json()).expect("json"), config);
+    }
+    let wrong = refused("version: 1\nstages:\n  plan:\n    unblock_on: review\n");
+    assert_eq!(wrong.field, "stages.plan.unblock_on");
+    assert!(wrong.message.contains("done, gate"), "{wrong}");
+    // Only the plan's.
+    let told = unread("version: 1\nstages:\n  briefing:\n    unblock_on: gate\n");
+    assert_eq!(told[0].field, "stages.briefing.unblock_on");
+}

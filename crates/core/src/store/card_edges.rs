@@ -16,6 +16,9 @@ pub struct CardEdges {
     pub parents: Vec<(String, String)>,
     /// A card, and a card it waits on.
     pub blockers: Vec<(String, String)>,
+    /// A card closed without its own evidence, and the card its work went
+    /// into: `None` for one cut from the plan.
+    pub closed: Vec<(String, Option<String>)>,
 }
 
 impl Store {
@@ -40,7 +43,61 @@ impl Store {
                  WHERE c.project_id = ?1 AND c.archived_at IS NULL AND w.archived_at IS NULL \
                  ORDER BY c.position, w.position, b.card_id, b.blocked_by",
             )?,
+            closed: self.closed_cards(project_id)?,
         })
+    }
+
+    fn closed_cards(&self, project_id: &str) -> Result<Vec<(String, Option<String>)>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT s.card_id, s.by_card_id FROM card_superseded s \
+             JOIN card c ON c.id = s.card_id \
+             WHERE c.project_id = ?1 AND c.archived_at IS NULL ORDER BY s.card_id",
+        )?;
+        let rows = stmt
+            .query_map([project_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Closes `card` without its own evidence: its work went `into` another
+    /// card, or with `None` it was cut from the plan. A second close replaces
+    /// the first. Refused, as false, into itself, into a card of another
+    /// project, or into one closed itself: the work has to land somewhere.
+    pub fn close_card(&self, card: &str, into: Option<&str>) -> Result<bool, StoreError> {
+        if let Some(into) = into {
+            let open_here: Option<i64> = self
+                .conn
+                .query_row(
+                    "SELECT 1 FROM card a JOIN card b ON a.project_id = b.project_id \
+                     WHERE a.id = ?1 AND b.id = ?2 \
+                     AND NOT EXISTS (SELECT 1 FROM card_superseded WHERE card_id = ?2)",
+                    [card, into],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if card == into || open_here.is_none() {
+                return Ok(false);
+            }
+        }
+        self.conn.execute(
+            "INSERT INTO card_superseded (card_id, by_card_id, at) VALUES (?1, ?2, ?3) \
+             ON CONFLICT(card_id) DO UPDATE SET by_card_id = ?2, at = ?3",
+            rusqlite::params![card, into, crate::store::board::now()],
+        )?;
+        Ok(true)
+    }
+
+    /// How `card` was closed, when it was: `Some(None)` cut, `Some(Some(id))`
+    /// merged into `id`.
+    pub fn card_closed(&self, card: &str) -> Result<Option<Option<String>>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT by_card_id FROM card_superseded WHERE card_id = ?1",
+                [card],
+                |row| row.get(0),
+            )
+            .optional()?)
     }
 }
 

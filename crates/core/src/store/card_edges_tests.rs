@@ -56,3 +56,38 @@ fn an_archived_card_neither_blocks_nor_is_blocked_on_the_board() {
         .blockers
         .is_empty());
 }
+
+#[test]
+fn a_card_closes_into_another_open_card_of_its_project_or_is_cut() {
+    let (dir, store, project, cards) = seeded();
+    assert!(!store
+        .close_card(&cards[0], Some(&cards[0]))
+        .expect("into itself"));
+    assert!(store
+        .close_card(&cards[2], Some(&cards[1]))
+        .expect("c into b"));
+    // c's work went into b: nothing lands in it any more.
+    assert!(!store
+        .close_card(&cards[0], Some(&cards[2]))
+        .expect("into c, closed"));
+    assert!(store.close_card(&cards[0], None).expect("a cut"));
+    let root = dir.path().join("other");
+    std::fs::create_dir_all(&root).expect("create");
+    let other = store.add_project(&root, None).expect("project");
+    store.ensure_board(&other).expect("board");
+    let column = store.columns(&other).expect("columns")[0].id.clone();
+    let theirs = store
+        .create_card(&other, &column, "theirs", "")
+        .expect("card");
+    assert!(!store.close_card(&cards[1], Some(&theirs)).expect("across"));
+    assert_eq!(store.card_edges(&project).expect("edges").closed, {
+        let mut closed = vec![
+            (cards[0].clone(), None),
+            (cards[2].clone(), Some(cards[1].clone())),
+        ];
+        closed.sort();
+        closed
+    });
+    assert_eq!(store.card_closed(&cards[1]).expect("read"), None);
+    assert_eq!(store.card_closed(&cards[0]).expect("read"), Some(None));
+}

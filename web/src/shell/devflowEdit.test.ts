@@ -68,6 +68,7 @@ describe("Devflow's list of stages", () => {
   it('says each stage the way version 2 lists it', () => {
     expect(stageJson(config.stages[2]!)).toEqual({ uses: 'builtin/execution', enabled: true, checks: [{ name: 'unit', run: 'make test', report: 'none' }] })
     expect(stageJson(own)).toEqual({ uses: 'project/pr', enabled: true, approve: 'person', gate: { command: './scripts/pr.sh' } })
+    expect(stageJson({ ...config.stages[1]!, unblockOn: 'gate' })).toEqual({ uses: 'builtin/plan', enabled: true, approve: 'person', unblock_on: 'gate' })
   })
 
   it('moves, removes and adds a stage, keeping the others as they are', () => {

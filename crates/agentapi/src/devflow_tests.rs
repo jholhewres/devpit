@@ -250,7 +250,7 @@ fn the_brief_and_the_plan_take_what_their_skills_send() {
     let plan = schema("devpit_devflow_plan");
     assert_eq!(
         keys(&plan["properties"]),
-        ["apply", "approval", "cards", "epic", "project"]
+        ["apply", "approval", "cards", "cut", "epic", "merge", "project"]
     );
     assert_eq!(
         keys(&plan["properties"]["cards"]["items"]["properties"]),
@@ -263,6 +263,10 @@ fn the_brief_and_the_plan_take_what_their_skills_send() {
             "title",
             "verify"
         ]
+    );
+    assert_eq!(
+        keys(&plan["properties"]["merge"]["properties"]),
+        ["from", "into"]
     );
     assert_eq!(
         keys(&schema("devpit_devflow_brief")["properties"]),

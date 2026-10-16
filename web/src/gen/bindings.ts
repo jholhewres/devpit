@@ -2175,6 +2175,10 @@ export type Card = {
 	 *  an older devpit made.
 	 */
 	number?: number | null,
+	/**  The card its work went into, when it was merged there. */
+	supersededBy?: CardRef | null,
+	/**  Cut from the plan: it closes without evidence. */
+	cut?: boolean,
 };
 
 /**  Response of `card.create` and `card.move`. */
@@ -2245,6 +2249,12 @@ export type CardRef = {
 	done: boolean,
 	/**  Its number in the project, `#42`. */
 	number?: number | null,
+	/**
+	 *  Not done, yet the cards waiting on it may start: it was cut, its work
+	 *  went into a card that releases them, or its gate passed where the plan
+	 *  says `unblock_on: gate`.
+	 */
+	released?: boolean,
 };
 
 /**  One run's review, as a card's diff draws it. */
@@ -3012,6 +3022,8 @@ export type DevflowStage = {
 	approve: string | null,
 	/**  The plan's: `board`, `jira`, `linear` or `github`, when said. */
 	publish: string | null,
+	/**  The plan's: `done` or `gate`, when said. */
+	unblockOn?: string | null,
 	/**  The execution stage's checks. */
 	checks: DevflowCheck[],
 	/**  The execution stage's folder for E2E specs. */

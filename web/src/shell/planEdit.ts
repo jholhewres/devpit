@@ -1,4 +1,4 @@
-import type { CardRef, PlannedCard } from '../gen/bindings'
+import type { Card, CardRef, PlannedCard } from '../gen/bindings'
 
 /*
  * A Devflow plan as the person changes it on the board, before any card
@@ -36,9 +36,15 @@ export function linesOf(text: string): string[] {
     .filter((line) => line !== '')
 }
 
-/** What still blocks a card: the ones it waits on that are not done. */
+/** What still blocks a card: the ones it waits on that are neither done nor released. */
 export function stillBlocking(blockedBy: readonly CardRef[] | undefined): CardRef[] {
-  return (blockedBy ?? []).filter((by) => !by.done)
+  return (blockedBy ?? []).filter((by) => !by.done && !by.released)
+}
+
+/** How a card left the plan without its own evidence, or null while it is in it. */
+export function closedLabel(card: Pick<Card, 'cut' | 'supersededBy'>): string | null {
+  if (card.supersededBy) return `Merged into ${named(card.supersededBy)}`
+  return card.cut ? 'Cut from the plan' : null
 }
 
 /** Another card as a person says it: `#42 title`, or the title alone before it had a number. */

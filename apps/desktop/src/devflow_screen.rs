@@ -217,6 +217,10 @@ pub(crate) fn view(
                 .then_some(stages.plan.publish)
                 .flatten()
                 .map(|publish| publish.word().to_owned()),
+            unblock_on: (builtin == Some("plan"))
+                .then_some(stages.plan.unblock_on)
+                .flatten()
+                .map(|unblock_on| unblock_on.word().to_owned()),
             checks: if builtin == Some("execution") {
                 stages.execution.checks.iter().map(check).collect()
             } else {

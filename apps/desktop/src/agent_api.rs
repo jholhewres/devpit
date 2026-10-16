@@ -954,8 +954,8 @@ pub(crate) fn board_view(board: &Board) -> Value {
                 "comments": card.comments,
                 "lastRun": card.runs.first().map(|run| &run.state),
                 "parentId": card.parent_id,
-                // What still blocks it: a blocker that is done no longer does.
-                "blockedBy": card.blocked_by.iter().filter(|by| !by.done).map(|by| json!({ "id": by.id, "title": by.title })).collect::<Vec<_>>(),
+                // What still blocks it: a blocker done or released no longer does.
+                "blockedBy": card.blocked_by.iter().filter(|by| by.holds()).map(|by| json!({ "id": by.id, "title": by.title })).collect::<Vec<_>>(),
                 "progress": card.progress,
                 "criteria": (!card.criteria.is_empty()).then(|| json!({
                     "done": card.criteria.iter().filter(|one| one.done).count(),

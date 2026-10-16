@@ -52,6 +52,12 @@ pub struct Card {
     /// an older devpit made.
     #[serde(default)]
     pub number: Option<u32>,
+    /// The card its work went into, when it was merged there.
+    #[serde(default)]
+    pub superseded_by: Option<CardRef>,
+    /// Cut from the plan: it closes without evidence.
+    #[serde(default)]
+    pub cut: bool,
 }
 
 /// Another card, as one card names it.
@@ -65,6 +71,18 @@ pub struct CardRef {
     /// Its number in the project, `#42`.
     #[serde(default)]
     pub number: Option<u32>,
+    /// Not done, yet the cards waiting on it may start: it was cut, its work
+    /// went into a card that releases them, or its gate passed where the plan
+    /// says `unblock_on: gate`.
+    #[serde(default)]
+    pub released: bool,
+}
+
+impl CardRef {
+    /// Whether it still keeps the cards waiting on it from starting.
+    pub fn holds(&self) -> bool {
+        !self.done && !self.released
+    }
 }
 
 /// An epic's cards: how many there are, and how many are done.
