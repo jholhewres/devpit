@@ -47,6 +47,7 @@ fn an_active_project_gets_the_tools_of_the_stages_switched_on() {
             "devpit_devflow_setup",
             "devpit_devflow_set",
             "devpit_devflow_skill",
+            "devpit_devflow_plan",
             "devpit_devflow_review"
         ]
     );
@@ -160,7 +161,7 @@ fn the_watch_asks_again_only_when_a_file_it_watches_changed() {
 }
 
 #[test]
-fn the_brief_and_the_plan_come_only_with_their_stages() {
+fn the_brief_comes_only_with_its_stages_and_the_plan_wherever_devflow_is_on() {
     let listed = |stages: &[&str]| -> Vec<&'static str> {
         Offer::Active(stages.iter().map(|stage| stage.to_string()).collect())
             .tools(&STAGED)
@@ -170,17 +171,22 @@ fn the_brief_and_the_plan_come_only_with_their_stages() {
     };
     let briefing = listed(&["briefing"]);
     assert!(briefing.contains(&"devpit_devflow_brief"), "{briefing:?}");
-    assert!(!briefing.contains(&"devpit_devflow_plan"), "{briefing:?}");
+    // A plan without an epic is a preview on demand, listed with any stage.
+    assert!(briefing.contains(&PLAN_TOOL), "{briefing:?}");
     let plan = listed(&["plan"]);
     assert!(plan.contains(&"devpit_devflow_plan"), "{plan:?}");
     assert!(!plan.contains(&"devpit_devflow_brief"), "{plan:?}");
     // The context stage's skill writes its summary with the brief's tool.
     let context = listed(&["context"]);
     assert!(context.contains(&"devpit_devflow_brief"), "{context:?}");
-    assert!(Offer::Setup
+    // The plan is listed without the flow too, as a preview without an epic.
+    let setup: Vec<&str> = Offer::Setup
         .tools(&STAGED)
         .iter()
-        .all(|tool| !tool.name.ends_with("_brief") && !tool.name.ends_with("_plan")));
+        .map(|tool| tool.name)
+        .collect();
+    assert!(!setup.contains(&"devpit_devflow_brief"), "{setup:?}");
+    assert!(setup.contains(&PLAN_TOOL), "{setup:?}");
 }
 
 const EXECUTION: &str = include_str!("../../../flow/skills/devflow-execution/SKILL.md");

@@ -123,6 +123,7 @@ fn the_setup_and_on_demand_tools_come_after_devpits_own_until_devflow_is_switche
             "devpit_devflow_setup",
             "devpit_devflow_set",
             "devpit_devflow_skill",
+            "devpit_devflow_plan",
             "devpit_devflow_review"
         ]
     );

@@ -67,7 +67,22 @@ pub const REVIEW_TOOL: &str = "devpit_devflow_review";
 
 /// Listed wherever Devflow is on in Settings, devflow.yaml or not: a stage
 /// run on demand, without a card, needs no setup.
-pub(crate) const ON_DEMAND: [&str; 2] = [crate::skills::TOOL, REVIEW_TOOL];
+pub(crate) const ON_DEMAND: [&str; 3] = [crate::skills::TOOL, PLAN_TOOL, REVIEW_TOOL];
+
+/// The plan's tool.
+pub(crate) const PLAN_TOOL: &str = "devpit_devflow_plan";
+
+/// Each stage, as `devpit agent devflow <stage>` names it, and the method
+/// its tool asks the app.
+pub(crate) const STAGE_METHODS: [(&str, &str); 7] = [
+    ("briefing", "devflow_brief"),
+    ("context", "devflow_brief"),
+    ("plan", "devflow_plan"),
+    ("execution", "devflow_evidence"),
+    ("review", "devflow_review"),
+    ("completion", "devflow_gate"),
+    ("setup", "devflow_setup"),
+];
 
 /// The gate's tool, which devpit's own stop hooks call too.
 pub const GATE_TOOL: &str = "devpit_devflow_gate";
@@ -154,11 +169,11 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
     (
         &["plan"],
         Tool {
-            name: "devpit_devflow_plan",
+            name: PLAN_TOOL,
             method: "devflow_plan",
-            description: "Devflow: an epic's plan as its child cards, each titled '[devflow] <title>', its body the build, the criteria as checkboxes under ## Acceptance criteria, the likely files and the verify command, and its depends_on as blocking edges the board shows: a key of the plan, or a card already on this board (another epic's) by its id or #42. Without apply it previews and creates nothing: the plan waits on the epic, where the person can move, cut or edit it and create the cards with a click. apply: true creates the cards, only after the person's explicit yes to the preview, and only the plan the person last saw: cards that differ become a new preview. When the person already approved on the board, the answer says so with the card ids. An orchestrator plans another project's epic with `project`, shows the person the preview, and applies with `approval` quoting their yes; apply without `cards` applies the preview as it stands. Once the cards exist, `merge: { from, into }` says a card's work went into another — it finishes on that card's evidence — and `cut` drops a card from the plan, closing it without evidence; either releases the cards waiting on it. Without apply it previews what changes; apply: true only after the person's explicit yes.",
+            description: "Devflow: an epic's plan as its child cards, each titled '[devflow] <title>', its body the build, the criteria as checkboxes under ## Acceptance criteria, the likely files and the verify command, and its depends_on as blocking edges the board shows: a key of the plan, or a card already on this board (another epic's) by its id or #42. Without apply it previews and creates nothing: the plan waits on the epic, where the person can move, cut or edit it and create the cards with a click. apply: true creates the cards, only after the person's explicit yes to the preview, and only the plan the person last saw: cards that differ become a new preview. When the person already approved on the board, the answer says so with the card ids. An orchestrator plans another project's epic with `project`, shows the person the preview, and applies with `approval` quoting their yes; apply without `cards` applies the preview as it stands. Once the cards exist, `merge: { from, into }` says a card's work went into another — it finishes on that card's evidence — and `cut` drops a card from the plan, closing it without evidence; either releases the cards waiting on it. Without apply it previews what changes; apply: true only after the person's explicit yes. Without `epic`, on demand wherever Devflow is on in Settings: the cards read and checked as a preview, created nowhere and kept nowhere.",
             input: || json!({ "type": "object", "properties": {
-                "epic": { "type": "string", "description": "The epic's card id." },
+                "epic": { "type": "string", "description": "The epic's card id. Leave it out for a preview alone." },
                 "cards": { "type": "array", "items": { "type": "object", "properties": {
                     "key": { "type": "string", "description": "A short local id, e.g. s1, that depends_on refers to." },
                     "title": { "type": "string", "description": "The behaviour, in the glossary's words; the tool adds '[devflow] '." },

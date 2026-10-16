@@ -60,6 +60,10 @@ current directory. devpit must be open.
                                     a step starts work, and only a person moves
                                     cards there
   devpit-agent methods              what this devpit answers
+  devpit-agent devflow <stage> [--json OBJECT]
+                                    a Devflow stage on demand: its skill, or
+                                    its tool asked with OBJECT, e.g.
+                                    devflow review --json '{\"pr\": 42}'
   devpit-agent hook --agent NAME EVENT [--session ID] [--tool T] [--target X] [--said TEXT]
                                     an agent that is not Claude Code reporting
                                     what it does: SessionStart, UserPromptSubmit,

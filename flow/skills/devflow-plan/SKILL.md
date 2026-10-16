@@ -117,6 +117,10 @@ When your client has a tool for asking the person multiple-choice questions
 `Yes, create the cards (Recommended)`, `Change something` and `I'll approve on
 the board`. Picking yes is an explicit yes; the board option ends the turn.
 
+Without an epic — a plan asked on demand, from a brief given as text — leave
+`epic` out: the answer is the preview alone, checked as an epic's is, and kept
+nowhere. To make its cards, the work is briefed as an epic first.
+
 Done when the preview is shown, nothing was created, and the person answered or
 the turn has ended.
 

@@ -260,7 +260,7 @@ fn the_brief_and_the_plan_wait_for_the_persons_click_on_devflow() {
             method,
             &project,
             dir.path(),
-            &json!({ "title": "x", "card": "card_1" }),
+            &json!({ "title": "x", "card": "card_1", "epic": "card_1" }),
         );
         assert!(refused.expect_err(method).contains("not on"), "{method}");
     }
@@ -400,4 +400,33 @@ fn a_plan_waits_on_a_card_of_another_epic_and_the_autopilot_waits_with_it() {
         "{said}"
     );
     assert!(sessions.0.borrow().is_empty(), "it started a blocked card");
+}
+
+/// With no epic the plan runs on demand, devflow.yaml or not: the cards are
+/// checked as an epic's are, and nothing is created or kept.
+#[test]
+fn a_plan_without_an_epic_is_a_preview_alone_and_needs_no_setup() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, project) = project(dir.path());
+    let ask = |params: Value| {
+        crate::devflow::respond(None, "devflow_plan", &project, dir.path(), &params)
+    };
+
+    let said = ask(json!({ "cards": cards() })).expect("a preview");
+    assert_eq!(said["applied"], false);
+    assert_eq!(said["epic"], Value::Null);
+    let keys: Vec<&str> = said["preview"]
+        .as_array()
+        .expect("preview")
+        .iter()
+        .filter_map(|card| card["key"].as_str())
+        .collect();
+    assert_eq!(keys, ["s1", "s2", "s3"]);
+    assert_eq!(said["preview"][1]["blockedBy"], json!(["s1"]));
+
+    let twice = json!([{ "key": "s1", "title": "a" }, { "key": "s1", "title": "b" }]);
+    assert!(ask(json!({ "cards": twice })).is_err());
+    let applied = ask(json!({ "cards": cards(), "apply": true })).expect_err("no epic");
+    assert!(applied.contains("epic"), "{applied}");
+    assert!(store.cards(&project.id).expect("cards").is_empty());
 }

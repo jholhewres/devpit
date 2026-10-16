@@ -112,8 +112,11 @@ Take the boundaries from the project's rules and ADRs, with their paths. Write
 "none" under a heading that has nothing, so the reader can tell empty from
 forgotten.
 
-Done when the tool accepted the context, every line under Facts has a path, and
-every heading is present.
+With no epic — context gathered on demand, before any brief — write nothing
+onto the board: the summary, with the same headings, is your reply.
+
+Done when the tool accepted the context (or, with no epic, the reply holds it),
+every line under Facts has a path, and every heading is present.
 
 ### 8. Hand back
 

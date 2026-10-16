@@ -98,3 +98,38 @@ fn the_guide_and_the_hint_name_the_command_on_the_agents_path() {
         assert!(!tool.description.contains("devpit agent "), "{}", tool.name);
     }
 }
+
+/// A stage on demand from a shell: its skill by name, or its tool with the
+/// arguments the MCP tool takes.
+#[test]
+fn a_devflow_stage_is_its_skill_or_its_tool() {
+    assert_eq!(
+        parsed(&words("devflow review")),
+        Ok(Parsed::Skill("devflow-review".into()))
+    );
+    let args: Vec<String> = ["devflow", "review", "--json", r#"{"pr": 42}"#]
+        .iter()
+        .map(|word| (*word).to_owned())
+        .collect();
+    assert_eq!(
+        parsed(&args),
+        Ok(Parsed::Ask("devflow_review".into(), json!({ "pr": 42 })))
+    );
+    assert!(parsed(&words("devflow deploy")).is_err());
+    assert!(parsed(&words("devflow")).is_err());
+    assert!(parsed(&words("devflow plan --json [1]")).is_err());
+    assert!(parsed(&words("devflow plan --epic e1")).is_err());
+    // Every stage's skill is one devpit ships, and its method a tool's.
+    let tools = crate::devflow::STAGED
+        .iter()
+        .map(|(_, tool)| tool)
+        .chain(&crate::devflow::SETUP_TOOLS);
+    let methods: Vec<&str> = tools.map(|tool| tool.method).collect();
+    for (stage, method) in crate::devflow::STAGE_METHODS {
+        assert!(methods.contains(&method), "{method}");
+        let Ok(Parsed::Skill(name)) = parsed(&words(&format!("devflow {stage}"))) else {
+            panic!("{stage}");
+        };
+        assert!(crate::skills::NAMES.contains(&name.as_str()), "{name}");
+    }
+}

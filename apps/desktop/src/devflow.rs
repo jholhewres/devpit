@@ -125,6 +125,10 @@ pub(crate) fn respond(
                 .ok_or("a card's review is asked with its card")?;
             crate::devflow_adhoc::respond(app, project, &state, asked)
         }
+        "devflow_plan" if crate::devflow_plan::on_demand(params) => {
+            on_demand_here(&store, project, &state)?;
+            crate::devflow_plan::previewed(params)
+        }
         "devflow_skills" => crate::devflow_skills::respond(
             method,
             root,
@@ -222,8 +226,9 @@ pub(crate) fn stages_on(
     }
 }
 
-/// Whether a stage may be run on demand — a review without a card, any
-/// stage's skill: wherever Devflow is on in Settings, devflow.yaml or not.
+/// Whether a stage may be run on demand — a review without a card, a plan
+/// without an epic, any stage's skill: wherever Devflow is on in Settings,
+/// devflow.yaml or not.
 pub(crate) fn on_demand(offer: &Offered) -> bool {
     !matches!(offer, Offered::Off)
 }

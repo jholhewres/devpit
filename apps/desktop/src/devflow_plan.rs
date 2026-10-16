@@ -252,6 +252,41 @@ fn briefed(
     }))
 }
 
+/// A plan asked with no epic, merge or cut: run on demand, a preview only.
+pub(crate) fn on_demand(params: &Value) -> bool {
+    text(params, "epic").is_none() && !crate::devflow_plan_edit::asks(params)
+}
+
+/// The plan's preview with no epic to wait on: its cards read and checked
+/// as an epic's are, then created nowhere and kept nowhere.
+pub(crate) fn previewed(params: &Value) -> Result<Value, String> {
+    if params.get("apply").and_then(Value::as_bool) == Some(true) {
+        return Err("cards are created under their epic: pass `epic`".to_owned());
+    }
+    let slices = plan::read(params.get("cards").unwrap_or(&Value::Null))?;
+    Ok(json!({
+        "applied": false,
+        "epic": Value::Null,
+        "preview": preview_of(&slices),
+        "note": "Nothing was created, and nothing is kept: with no epic, this plan is the preview \
+                 alone. To make its cards, brief the work as an epic (devflow-briefing) and plan \
+                 it with `epic`.",
+    }))
+}
+
+fn preview_of(slices: &[Slice]) -> Vec<Value> {
+    slices
+        .iter()
+        .map(|slice| {
+            json!({
+                "key": slice.key,
+                "title": plan::title(slice),
+                "blockedBy": slice.depends_on,
+            })
+        })
+        .collect()
+}
+
 /// Jev's word on a stage's work, by the rubric devflow.yaml gives it.
 fn judge(
     judged: Option<(&Config, &Jev)>,
@@ -351,11 +386,7 @@ fn planned(
     let mut said = json!({
         "applied": false,
         "epic": epic,
-        "preview": slices.iter().map(|slice| json!({
-            "key": slice.key,
-            "title": plan::title(slice),
-            "blockedBy": slice.depends_on,
-        })).collect::<Vec<_>>(),
+        "preview": preview_of(&slices),
         "note": note,
     });
     if judged.is_some() {

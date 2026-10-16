@@ -103,6 +103,10 @@ fixes it (execution, or review), and end the turn: no handoff as finished, no
 Devflow's hooks are on, a turn that ends with the gate failing is sent back
 with the same list.
 
+The gate is a card's, by design: it is what lets a card be finished, so it
+has no on-demand form. Work without a card — a pull request reviewed on
+demand, say — ends at its review's verdict.
+
 Done when the gate comment is on the card with n and m filled.
 
 ### 5. Write the handoff note

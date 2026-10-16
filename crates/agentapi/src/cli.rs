@@ -45,6 +45,19 @@ pub fn run(root: &Path, args: &[String]) -> i32 {
             }
             0
         }
+        // A skill is read as the markdown it is.
+        Ok(Parsed::Skill(name)) => {
+            match client::ask(root, "devflow_skill", json!({ "name": name }), &cwd) {
+                Ok(answer) => {
+                    print!("{}", answer["text"].as_str().unwrap_or_default());
+                    0
+                }
+                Err(why) => {
+                    eprintln!("devpit: {why}");
+                    1
+                }
+            }
+        }
         Ok(Parsed::Ask(method, params)) => match client::ask(root, &method, params, &cwd) {
             Ok(answer) => {
                 println!(
@@ -79,6 +92,8 @@ pub(crate) enum Parsed {
     /// `devpit agent devflow-context [--agent NAME]`: what Devflow's
     /// session-start hook adds, for that agent CLI.
     Context(String),
+    /// `devpit agent devflow <stage>`: the stage's skill, by name.
+    Skill(String),
 }
 
 /// The JSON an agent piped in, when it piped any: an object, or nothing.
@@ -162,12 +177,38 @@ pub(crate) fn parsed(args: &[String]) -> Result<Parsed, String> {
                 .map_or("claude", |(_, agent)| agent)
                 .to_owned(),
         )),
+        Some("devflow") => devflow(&options, &plain),
         Some("move") => {
             let id = one(&plain, "a card id")?;
             let column = plain.get(1).ok_or("move needs a column id")?;
             ask("move", json!({ "cardId": id, "columnId": column }))
         }
         Some(other) => Err(format!("`{other}` is not a devpit-agent command")),
+    }
+}
+
+/// `devpit agent devflow <stage>`: the stage's skill, or with `--json` its
+/// tool asked with that object, as the MCP tool would be.
+fn devflow(options: &[(&str, &str)], plain: &[&str]) -> Result<Parsed, String> {
+    let stage = one(plain, "a stage")?;
+    let stages = crate::devflow::STAGE_METHODS;
+    let (_, method) = stages
+        .iter()
+        .find(|(name, _)| *name == stage)
+        .ok_or_else(|| {
+            let names: Vec<&str> = stages.iter().map(|(name, _)| *name).collect();
+            format!("`{stage}` is not a Devflow stage: {}", names.join(", "))
+        })?;
+    match options {
+        [] => Ok(Parsed::Skill(format!("devflow-{stage}"))),
+        [("json", said)] => {
+            let params: Value = serde_json::from_str(said)
+                .ok()
+                .filter(Value::is_object)
+                .ok_or("--json takes one JSON object, the tool's arguments")?;
+            Ok(Parsed::Ask((*method).to_owned(), params))
+        }
+        _ => Err("devflow takes a stage, and --json with the tool's arguments".to_owned()),
     }
 }
 

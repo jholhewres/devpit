@@ -193,7 +193,9 @@ no copy, only that the person clicked.
 - **Three levels.** Settings switches it off everywhere, and then the MCP
   lists exactly what it did before Devflow. Otherwise every project gets
   `devpit_devflow_status`, `_setup` and `_set`, which is how it is set up,
-  and `_skill` and `_review`, which run a stage on demand without a card;
+  and `_skill`, `_plan` (a preview without an epic) and `_review`, which
+  run a stage on demand without a card, as `devpit agent devflow <stage>`
+  does from a shell;
   the tools of its stages come only where it is on, stage by stage.
 - **Agents write files, people switch it on.** Setup and set preview unless
   told to apply, and never commit. `enabled: true` and Decisions in
