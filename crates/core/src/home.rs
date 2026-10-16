@@ -265,6 +265,17 @@ impl ProjectHome {
         self.dir().join("devflow").join("locks")
     }
 
+    /// Devflow's reviews asked without a card, `<pr-or-range>/<time>/` each.
+    pub fn devflow_reviews(&self) -> PathBuf {
+        self.dir().join("reviews")
+    }
+
+    /// The detached worktrees such a review reads its commit in, each gone
+    /// once the review is.
+    pub fn review_trees(&self) -> PathBuf {
+        self.dir().join("devflow").join("trees")
+    }
+
     /// Per-run folders for command steps' test reports.
     pub fn reports(&self) -> PathBuf {
         self.dir().join("reports")

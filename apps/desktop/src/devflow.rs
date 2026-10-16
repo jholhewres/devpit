@@ -115,7 +115,17 @@ pub(crate) fn respond(
                 _ => crate::devflow_autopilot::respond(app, &store, project, params),
             }
         }
-        "devflow_skills" | "devflow_skill" => crate::devflow_skills::respond(
+        "devflow_skill" => {
+            on_demand_here(&store, project, &state)?;
+            crate::devflow_skills::respond(method, root, &[], params)
+        }
+        "devflow_review" if params.get("card").is_none_or(Value::is_null) => {
+            on_demand_here(&store, project, &state)?;
+            let asked = devpit_devflow::adhoc::standalone(params)?
+                .ok_or("a card's review is asked with its card")?;
+            crate::devflow_adhoc::respond(app, project, &state, asked)
+        }
+        "devflow_skills" => crate::devflow_skills::respond(
             method,
             root,
             &stages_on(&store, project, &state)?,
@@ -210,6 +220,24 @@ pub(crate) fn stages_on(
         Offered::Active(stages) => Ok(stages),
         _ => Err("Devflow is not on in this project: devpit_devflow_status says why.".to_owned()),
     }
+}
+
+/// Whether a stage may be run on demand — a review without a card, any
+/// stage's skill: wherever Devflow is on in Settings, devflow.yaml or not.
+pub(crate) fn on_demand(offer: &Offered) -> bool {
+    !matches!(offer, Offered::Off)
+}
+
+fn on_demand_here(store: &Store, project: &Project, state: &State) -> Result<(), String> {
+    let offer = offered(
+        globally_on(store),
+        state,
+        made(store, &project.id, Ask::Enable),
+    );
+    if project.orchestrator.is_some() || !on_demand(&offer) {
+        return Err("Devflow is switched off in devpit's Settings.".to_owned());
+    }
+    Ok(())
 }
 
 /// The file's state, raising the person's ask when it says `enabled: true`

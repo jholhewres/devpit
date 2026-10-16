@@ -26,7 +26,7 @@ const SPARE: Duration = Duration::from_secs(30);
 /// How a Devflow review's run is named among a card's reviews.
 const RUN: &str = "devflow:";
 /// The most of a file read to count its lines, when a finding cites one.
-const MOST_COUNTED: u64 = 8 * 1024 * 1024;
+pub(crate) const MOST_COUNTED: u64 = 8 * 1024 * 1024;
 
 pub(crate) fn respond(
     app: Option<&AppHandle>,
@@ -39,7 +39,7 @@ pub(crate) fn respond(
 }
 
 /// The CLI on this machine that runs `agent`, or why there is none.
-fn reach(agent: Agent) -> Result<String, String> {
+pub(crate) fn reach(agent: Agent) -> Result<String, String> {
     let cli = devpit_agentcli::reviewing::Cli::of(agent.word())
         .ok_or("devpit does not run this CLI headless")?;
     let program = cli.program();
@@ -352,4 +352,4 @@ pub(crate) fn mark(
 
 #[cfg(test)]
 #[path = "devflow_review_tests.rs"]
-mod tests;
+pub(crate) mod tests;

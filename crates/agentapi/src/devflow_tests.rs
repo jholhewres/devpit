@@ -39,18 +39,25 @@ fn names(offer: &Offer) -> Vec<&'static str> {
 #[test]
 fn an_active_project_gets_the_tools_of_the_stages_switched_on() {
     assert!(names(&Offer::Off).is_empty());
+    // Without the flow switched on, the stages run on demand and no other.
     assert_eq!(
         names(&Offer::Setup),
         [
             "devpit_devflow_status",
             "devpit_devflow_setup",
-            "devpit_devflow_set"
+            "devpit_devflow_set",
+            "devpit_devflow_skill",
+            "devpit_devflow_review"
         ]
     );
     let active = names(&Offer::Active(vec!["briefing".into(), "plan".into()]));
     assert_eq!(
         &active[3..],
-        ["devpit_devflow_skill", "devpit_devflow_plan"]
+        [
+            "devpit_devflow_skill",
+            "devpit_devflow_plan",
+            "devpit_devflow_review"
+        ]
     );
 }
 
@@ -344,25 +351,28 @@ fn the_gate_lists_only_the_card_an_agent_passes() {
 
 const REVIEW: &str = include_str!("../../../flow/skills/devflow-review/SKILL.md");
 
-/// The review comes with its stage, and every call the review skill shows
-/// sends only fields the tool lists.
+/// The review is listed wherever Devflow is on in Settings, as it runs on
+/// demand without a card, and every call the review skill shows sends only
+/// fields the tool lists.
 #[test]
-fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
-    let listed = |stage: &str| {
-        Offer::Active(vec![stage.to_owned()])
+fn the_review_runs_on_demand_and_takes_what_its_skill_sends() {
+    let listed = |offer: Offer| {
+        offer
             .tools(&STAGED)
             .iter()
             .any(|tool| tool.name == REVIEW_TOOL)
     };
-    assert!(listed("review"));
-    assert!(!listed("execution") && !listed("completion"));
+    assert!(listed(Offer::Active(vec!["review".to_owned()])));
+    assert!(listed(Offer::Active(vec!["execution".to_owned()])));
+    assert!(listed(Offer::Setup));
+    assert!(!listed(Offer::Off));
     let (_, tool) = STAGED
         .iter()
         .find(|(_, tool)| tool.name == REVIEW_TOOL)
         .expect("the review");
     assert_eq!(tool.method, "devflow_review");
     let schema = (tool.input)();
-    assert_eq!(schema["required"], json!(["card"]));
+    assert!(schema.get("required").is_none(), "a pr needs no card");
     let mut keys: Vec<&String> = schema["properties"]
         .as_object()
         .expect("properties")
@@ -372,7 +382,10 @@ fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
     // devpit_devflow::review::FIELDS, which the app holds every call to.
     assert_eq!(
         keys,
-        ["base", "card", "previous", "reports", "run", "verified"]
+        [
+            "base", "card", "criteria", "head", "path", "pr", "previous", "reports", "run",
+            "verified"
+        ]
     );
     let mut calls = 0;
     for block in REVIEW
@@ -383,7 +396,8 @@ fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
         let Ok(sent) = serde_json::from_str::<Value>(block) else {
             continue;
         };
-        if sent.get("card").is_none() || sent.get("version").is_some() {
+        let subject = ["card", "pr", "base", "path"];
+        if !subject.iter().any(|key| sent.get(key).is_some()) || sent.get("version").is_some() {
             continue;
         }
         calls += 1;
@@ -392,8 +406,8 @@ fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
         }
     }
     assert_eq!(
-        calls, 4,
-        "a first call, the one that hands reports back, the verified PoCs and a re-review"
+        calls, 6,
+        "a first call, the one that hands reports back, the verified PoCs, a re-review, and a pr and a range without a card"
     );
 }
 

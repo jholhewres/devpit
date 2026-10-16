@@ -26,8 +26,13 @@ use crate::scale::{self, Sized};
 
 /// The fields the tool takes; `project` is an orchestrator's, as on every
 /// board tool.
-pub const FIELDS: [&str; 6] = ["card", "base", "run", "reports", "previous", "verified"];
-const SHAPE: &str = "{ card, base?, previous?, run?, reports?: [one findings object per persona you reviewed], verified?: [{ finding, result, evidence }] }";
+pub const FIELDS: [&str; 10] = [
+    "card", "base", "head", "pr", "path", "criteria", "run", "reports", "previous", "verified",
+];
+/// The fields of a review without a card, which a card's refuses.
+pub const WITHOUT_CARD: [&str; 4] = ["head", "pr", "path", "criteria"];
+const SHAPE: &str =
+    "{ card, base?, previous?, run?, reports?: [one findings object per persona you reviewed], verified?: [{ finding, result, evidence }] }, or without a card { pr | base and head | path, criteria?, run?, reports? }";
 
 /// What a review leaves in its run's folder.
 pub const PACKET: &str = "review-context.md";
@@ -85,26 +90,23 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
             .filter(|said| !said.is_empty())
             .map(str::to_owned)
     };
-    let card = word("card").ok_or("which card? pass its id as `card`")?;
+    let card = word("card").ok_or(
+        "which card? pass its id as `card`, or review without one with `pr`, `base` and `head`, or `path`",
+    )?;
+    if let Some(alone) = WITHOUT_CARD.iter().find(|key| fields.contains_key(**key)) {
+        return Err(format!(
+            "`{alone}` is for a review without a card: leave out `card`"
+        ));
+    }
     let base = word("base");
     // An argument to git, never an option to it.
-    if base.as_deref().is_some_and(|base| {
-        base.starts_with('-')
-            || base.len() > 200
-            || base.chars().any(|ch| ch.is_whitespace() || ch.is_control())
-    }) {
+    if base
+        .as_deref()
+        .is_some_and(|base| !devpit_git::plain_revision(base))
+    {
         return Err("`base` is a branch or a commit".to_owned());
     }
-    let reports = match fields.get("reports") {
-        None | Some(Value::Null) => Vec::new(),
-        Some(Value::Array(list)) if list.len() <= MOST_REPORTS => list.clone(),
-        Some(Value::Array(_)) => {
-            return Err(format!(
-                "at most {MOST_REPORTS} reports: one per persona you reviewed"
-            ))
-        }
-        Some(_) => return Err("`reports` is a list of findings objects".to_owned()),
-    };
+    let reports = reports_of(fields)?;
     let run = word("run");
     let previous = word("previous");
     let verified = verified_asked(fields.get("verified"))?;
@@ -128,7 +130,32 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
                 .to_owned(),
         );
     }
-    match (&run, reports.is_empty()) {
+    handed_back(run.as_deref(), &reports)?;
+    Ok(Asked {
+        card,
+        base,
+        run,
+        reports,
+        previous,
+        verified,
+    })
+}
+
+/// The session's own findings objects, at most one per persona.
+pub(crate) fn reports_of(fields: &serde_json::Map<String, Value>) -> Result<Vec<Value>, String> {
+    match fields.get("reports") {
+        None | Some(Value::Null) => Ok(Vec::new()),
+        Some(Value::Array(list)) if list.len() <= MOST_REPORTS => Ok(list.clone()),
+        Some(Value::Array(_)) => Err(format!(
+            "at most {MOST_REPORTS} reports: one per persona you reviewed"
+        )),
+        Some(_) => Err("`reports` is a list of findings objects".to_owned()),
+    }
+}
+
+/// `run` and `reports` come together or not at all.
+pub(crate) fn handed_back(run: Option<&str>, reports: &[Value]) -> Result<(), String> {
+    match (run, reports.is_empty()) {
         (Some(_), true) => Err(
             "pass `reports` with `run`: the findings objects of the personas you reviewed"
                 .to_owned(),
@@ -136,14 +163,7 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
         (None, false) => Err(
             "`reports` go to the run devpit_devflow_review answered: pass it as `run`".to_owned(),
         ),
-        _ => Ok(Asked {
-            card,
-            base,
-            run,
-            reports,
-            previous,
-            verified,
-        }),
+        _ => Ok(()),
     }
 }
 

@@ -1,7 +1,8 @@
-//! Devflow in the MCP server: the three tools that set it up, offered
-//! whenever Devflow is not switched off in Settings; the tools of its
-//! stages and its skills, offered only to a project where the person
-//! switched it on; and the watch that tells the client when that changes.
+//! Devflow in the MCP server: the three tools that set it up, and the stages
+//! run on demand, offered whenever Devflow is not switched off in Settings;
+//! the tools of its stages and its skills, offered only to a project where
+//! the person switched it on; and the watch that tells the client when that
+//! changes.
 //!
 //! What a project gets is the app's answer to `devflow_offer`. The server
 //! asks again only when something it can see changed — the project's
@@ -64,6 +65,10 @@ pub(crate) static SETUP_TOOLS: [Tool; 3] = [
 /// The review's tool.
 pub const REVIEW_TOOL: &str = "devpit_devflow_review";
 
+/// Listed wherever Devflow is on in Settings, devflow.yaml or not: a stage
+/// run on demand, without a card, needs no setup.
+pub(crate) const ON_DEMAND: [&str; 2] = [crate::skills::TOOL, REVIEW_TOOL];
+
 /// The gate's tool, which devpit's own stop hooks call too.
 pub const GATE_TOOL: &str = "devpit_devflow_gate";
 
@@ -120,7 +125,7 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: crate::skills::TOOL,
             method: "devflow_skill",
-            description: "The Devflow skill to follow for a stage, as this project resolves it: its own .devpit/devflow/skills/<name>/SKILL.md, else the person's, else devpit's built-in one. Call it before each stage and follow what it returns; devflow-setup is for changing the setup. A stage switched off in devflow.yaml has no skill.",
+            description: "The Devflow skill to follow for a stage, as this project resolves it: its own .devpit/devflow/skills/<name>/SKILL.md, else the person's, else devpit's built-in one. Call it before each stage and follow what it returns; devflow-setup is for changing the setup. Any stage's skill is given when asked, to run that stage on demand: also one devflow.yaml switches off, or with no devflow.yaml.",
             input: || json!({ "type": "object", "properties": {
                 "name": { "type": "string", "enum": crate::skills::NAMES, "description": "The skill: devflow-<stage>, or devflow-setup." }
             }, "required": ["name"] }),
@@ -206,10 +211,14 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: REVIEW_TOOL,
             method: "devflow_review",
-            description: "Devflow: review a card's change with devflow.yaml's review.reviewers, each headless on the person's own agent CLI (one missing or signed out is skipped), from one packet: the diff from the card's base to HEAD (from a previous run's HEAD with `previous`), the card, its criteria and the persona. Writes findings.json for the gate and comments the count on the card. Answers the verdict by review.block_on, each reviewer's time and cost, and `pending`: personas no reviewer covered — review those yourself, then call again with `run` and `reports`. With review.verify on, `next` names the criticals and highs whose PoC to run: send what each showed with `run` and `verified`. Takes as long as the reviewers do.",
+            description: "Devflow: review a card's change with devflow.yaml's review.reviewers, each headless on the person's own agent CLI (one missing or signed out is skipped), from one packet: the diff from the card's base to HEAD (from a previous run's HEAD with `previous`), the card, its criteria and the persona. Writes findings.json for the gate and comments the count on the card. Answers the verdict by review.block_on, each reviewer's time and cost, and `pending`: personas no reviewer covered — review those yourself, then call again with `run` and `reports`. With review.verify on, `next` names the criticals and highs whose PoC to run: send what each showed with `run` and `verified`. Without `card`, on demand: a GitHub pull request (`pr`: BASE is its merge-base with the PR's base branch, HEAD its head commit, its body's checkboxes else its title and body the criteria), a range (`base` and `head`) or a worktree of the project (`path`), read in a detached worktree or the one named so the person's checkout never moves; with no devflow.yaml the reviewers are the person's own. That run is kept under the project's reviews/ in devpit's home and attached, and no card is commented. Takes as long as the reviewers do.",
             input: || json!({ "type": "object", "properties": {
-                "card": { "type": "string", "description": "The card's id." },
-                "base": { "type": "string", "description": "The branch or commit the diff starts from, when it is not the card's own base. Usually left out." },
+                "card": { "type": "string", "description": "The card's id. Leave it out to review `pr`, `base` and `head`, or `path` instead." },
+                "base": { "type": "string", "description": "The branch or commit the diff starts from, when it is not the card's own base or a worktree's default branch. Usually left out with a card; with `head`, where the range starts." },
+                "head": { "type": "string", "description": "Without a card, with `base`: the branch or commit the range ends at." },
+                "pr": { "type": ["integer", "string"], "description": "Without a card: a pull request of the project's GitHub repository, by number or URL." },
+                "path": { "type": "string", "description": "Without a card: a worktree of this project, reviewed at its own HEAD." },
+                "criteria": { "type": "array", "items": { "type": "string" }, "description": "Without a card: what the change is held to, one line each." },
                 "previous": { "type": "string", "description": "After fixing a review's blocking findings: that review's run. The reviewers read only what changed since its HEAD, with its blocking findings to check again; its other findings are carried over. Leave out `base` and `run`." },
                 "run": { "type": "string", "description": "The run a first call answered, which `reports` complete." },
                 "reports": { "type": "array", "items": { "type": "object" }, "description": "With `run`: one findings object for each persona in `pending` that you reviewed, as devflow-findings.schema.json beside the run's packet describes." },
@@ -218,7 +227,7 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
                     "result": { "enum": ["confirmed", "refuted", "not_run"] },
                     "evidence": { "type": "string", "description": "Where the PoC ran and what it showed, or why it was not run." }
                 }, "required": ["finding", "result", "evidence"] }, "description": "With `run` and without `reports`: the PoC you ran for each critical and high, as review.verify asks." }
-            }, "required": ["card"] }),
+            } }),
         },
     ),
     (
@@ -315,20 +324,30 @@ impl Offer {
 
     /// The Devflow tools offered, after devpit's own.
     pub(crate) fn tools<'a>(&self, staged: &'a [(&'a [&'a str], Tool)]) -> Vec<&'a Tool> {
+        if *self == Offer::Off {
+            return Vec::new();
+        }
+        SETUP_TOOLS
+            .iter()
+            .chain(
+                staged
+                    .iter()
+                    .filter(|(under, tool)| self.lists(under, tool.name))
+                    .map(|(_, tool)| tool),
+            )
+            .collect()
+    }
+
+    /// Whether a stage's tool is listed: one run on demand wherever Devflow
+    /// is on in Settings, the others under a stage switched on.
+    fn lists(&self, under: &[&str], name: &str) -> bool {
         match self {
-            Offer::Off => Vec::new(),
-            Offer::Setup => SETUP_TOOLS.iter().collect(),
-            Offer::Active(stages) => SETUP_TOOLS
-                .iter()
-                .chain(
-                    staged
-                        .iter()
-                        .filter(|(under, _)| {
-                            under.is_empty() || stages.iter().any(|on| under.contains(&on.as_str()))
-                        })
-                        .map(|(_, tool)| tool),
-                )
-                .collect(),
+            Offer::Off => false,
+            _ if ON_DEMAND.contains(&name) => true,
+            Offer::Setup => false,
+            Offer::Active(stages) => {
+                under.is_empty() || stages.iter().any(|on| under.contains(&on.as_str()))
+            }
         }
     }
 

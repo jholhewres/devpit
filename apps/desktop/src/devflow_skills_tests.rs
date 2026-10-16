@@ -32,9 +32,12 @@ fn an_active_project_gets_its_skills_its_own_layer_first() {
         crate::devflow::respond(None, method, &here, dir.path(), &params)
     };
 
-    // The file says enabled, but the person has not clicked: no skills.
-    let refused = ask("devflow_skill", json!({ "name": "devflow-plan" })).expect_err("off");
+    // The file says enabled, but the person has not clicked: none listed,
+    // and one asked by name is still given, to run its stage on demand.
+    let refused = ask("devflow_skills", json!({})).expect_err("off");
     assert!(refused.contains("not on"), "{refused}");
+    let asked = ask("devflow_skill", json!({ "name": "devflow-review" })).expect("on demand");
+    assert_eq!(asked["layer"], "built-in");
 
     let store = crate::projects::store().expect("store");
     crate::devflow_asks::remember(&store, &here.id, Ask::Enable, true).expect("clicked");
@@ -73,6 +76,8 @@ fn an_active_project_gets_its_skills_its_own_layer_first() {
     assert_eq!(plan["layer"], "project");
     assert_eq!(plan["text"], ours);
 
-    let off = ask("devflow_skill", json!({ "name": "devflow-context" })).expect_err("off");
-    assert!(off.contains("switches off"), "{off}");
+    // A stage devflow.yaml switches off is not listed, but given when asked.
+    assert!(!names.contains(&"devflow-context"));
+    let off = ask("devflow_skill", json!({ "name": "devflow-context" })).expect("asked for");
+    assert_eq!(off["name"], "devflow-context");
 }

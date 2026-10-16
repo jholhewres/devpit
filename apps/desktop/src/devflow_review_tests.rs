@@ -5,7 +5,7 @@ use serde_json::json;
 
 use super::*;
 
-fn project_at(id: &str, root: &Path) -> Project {
+pub(crate) fn project_at(id: &str, root: &Path) -> Project {
     serde_json::from_value(json!({
         "id": id, "name": id, "rootPath": root.display().to_string(), "group": null,
         "accent": "#000000", "worktrees": [], "unreadable": null, "orchestrator": null,
@@ -14,7 +14,7 @@ fn project_at(id: &str, root: &Path) -> Project {
     .expect("a project")
 }
 
-fn git(at: &Path, args: &[&str]) {
+pub(crate) fn git(at: &Path, args: &[&str]) {
     let done = Command::new("git")
         .args(args)
         .current_dir(at)
@@ -90,7 +90,7 @@ fn shell_injection() -> Value {
 
 /// A fake Claude Code: one critical finding on the changed line.
 #[cfg(unix)]
-fn fake_claude(dir: &Path) -> String {
+pub(crate) fn fake_claude(dir: &Path) -> String {
     fake_claude_finding(dir, "claude-fake", vec![shell_injection()])
 }
 

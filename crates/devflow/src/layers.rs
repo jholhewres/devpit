@@ -391,6 +391,19 @@ pub fn layered(root: &Path, text: &str, home: &Home) -> Result<Layered, Invalid>
     })
 }
 
+/// What a project with no devflow.yaml of its own runs a stage on demand
+/// with: the person's layer over the defaults.
+pub fn personal_only(home: &Home) -> Result<Config, Invalid> {
+    let mut merged = serde_json::json!({ "version": config::VERSION });
+    if let Some(layer) = personal(home)? {
+        merge(&mut merged, &layer);
+    }
+    if let Some(fields) = merged.as_object_mut() {
+        fields.remove("locked");
+    }
+    config::from_json(&merged)
+}
+
 #[cfg(test)]
 #[path = "layers_tests.rs"]
 mod tests;

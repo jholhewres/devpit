@@ -321,3 +321,21 @@ fn a_persona_comes_from_the_project_then_its_team_then_the_person() {
         .contains("Devflow reviewer: Spec"));
     assert!(persona_text(&root, Personas::default(), "my-style").is_err());
 }
+
+#[test]
+fn a_project_without_a_file_reviews_with_the_persons_reviewers() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let home = Home::under(base.path());
+    let bare = personal_only(&home).expect("the defaults");
+    assert!(bare.review.reviewers.is_empty());
+    write(&home.personal, LAYER_FILE, TEAM_V2);
+    let mine = personal_only(&home).expect("the person's");
+    let personas: Vec<&str> = mine
+        .review
+        .reviewers
+        .iter()
+        .map(|one| one.persona.as_str())
+        .collect();
+    assert_eq!(personas, ["devflow-security", "devflow-spec"]);
+    assert!(!mine.enabled, "a layer never switches a project on");
+}

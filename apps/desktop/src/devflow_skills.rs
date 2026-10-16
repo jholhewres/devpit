@@ -23,7 +23,7 @@ pub(crate) fn respond(
         .unwrap_or_default();
     match method {
         "devflow_skills" => Ok(listed(root, &personal, &teams, stages)),
-        _ => one(root, &personal, &teams, stages, params),
+        _ => one(root, &personal, &teams, params),
     }
 }
 
@@ -46,14 +46,9 @@ fn listed(root: &Path, personal: &Path, teams: &[Team], stages: &[&str]) -> Valu
     json!({ "skills": skills, "refused": refused })
 }
 
-/// One skill, by `name` or `uri`, with its text.
-fn one(
-    root: &Path,
-    personal: &Path,
-    teams: &[Team],
-    stages: &[&str],
-    params: &Value,
-) -> Result<Value, String> {
+/// One skill, by `name` or `uri`, with its text: any stage's, asked by
+/// name, so a stage can be run on demand where devflow.yaml leaves it off.
+fn one(root: &Path, personal: &Path, teams: &[Team], params: &Value) -> Result<Value, String> {
     let asked = ["name", "uri"]
         .iter()
         .find_map(|key| params.get(key).and_then(Value::as_str))
@@ -64,11 +59,6 @@ fn one(
             skills::names().collect::<Vec<_>>().join(", ")
         )
     })?;
-    if !skills::offered(stages).contains(&name) {
-        return Err(format!(
-            "{name} is for a stage this project's devflow.yaml switches off"
-        ));
-    }
     let skill = skills::resolve_with(root, personal, teams, name)?;
     let mut said = skill.to_json();
     said["text"] = json!(skill.text);

@@ -80,7 +80,8 @@ fn a_read_and_a_loss_say_so_to_the_host() {
 #[test]
 fn an_app_too_old_to_say_lists_everything() {
     let all = tools(&Offer::Setup, &Seat::default());
-    assert_eq!(all.len(), TOOLS.len() + SETUP_TOOLS.len());
+    let on_demand = crate::devflow::ON_DEMAND.len();
+    assert_eq!(all.len(), TOOLS.len() + SETUP_TOOLS.len() + on_demand);
     let board = all
         .iter()
         .find(|tool| tool["name"] == "devpit_board")

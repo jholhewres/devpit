@@ -113,7 +113,7 @@ fn with_devflow_off_the_list_and_the_instructions_are_what_they_were() {
 }
 
 #[test]
-fn the_setup_tools_come_after_devpits_own_until_devflow_is_switched_off() {
+fn the_setup_and_on_demand_tools_come_after_devpits_own_until_devflow_is_switched_off() {
     let setup = listed(&Offer::Setup);
     assert_eq!(setup[..34], BEFORE_DEVFLOW);
     assert_eq!(
@@ -121,7 +121,9 @@ fn the_setup_tools_come_after_devpits_own_until_devflow_is_switched_off() {
         [
             "devpit_devflow_status",
             "devpit_devflow_setup",
-            "devpit_devflow_set"
+            "devpit_devflow_set",
+            "devpit_devflow_skill",
+            "devpit_devflow_review"
         ]
     );
     let schema = |name: &str| {

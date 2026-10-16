@@ -95,6 +95,7 @@ mod cycles;
 mod deciding;
 mod decisions;
 mod devflow;
+mod devflow_adhoc;
 mod devflow_asks;
 mod devflow_autopilot;
 mod devflow_card;

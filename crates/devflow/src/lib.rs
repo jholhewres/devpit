@@ -10,6 +10,7 @@
 //! machine's half of detection (agent CLIs, the Decisions key), the board and
 //! the person's click are the app's.
 
+pub mod adhoc;
 pub mod autopilot;
 pub mod available;
 pub mod brief;

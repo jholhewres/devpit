@@ -72,7 +72,7 @@ impl Check {
 }
 
 /// `gh` in a folder, given up on when it takes too long.
-fn gh(root: &Path, args: &[&str]) -> Option<String> {
+pub(crate) fn gh(root: &Path, args: &[&str]) -> Option<String> {
     let root = root.to_path_buf();
     let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
     let (tell, hear) = std::sync::mpsc::channel();

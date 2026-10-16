@@ -23,6 +23,7 @@ pub mod branches;
 #[cfg(test)]
 mod branches_tests;
 mod clone;
+mod detached;
 mod discard;
 mod front;
 mod glance;
@@ -57,6 +58,9 @@ pub use again::{branch_left, reattach};
 pub use basing::{allowed as base_allowed, chosen as base_chosen, worktree_at, Refused};
 pub use branches::{branch_at, branches, switch, Branch};
 pub use clone::{clone, first_commit, folder_for, init, unborn};
+pub use detached::{
+    add_detached, commit_of, fetch_pull, merge_base, plain_revision, remove_detached,
+};
 pub use discard::discard;
 pub use front::{
     at_head, changed_since, diff_since, head_of, remove_front, review_base, unsaved_in,

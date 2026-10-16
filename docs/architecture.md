@@ -192,7 +192,8 @@ no copy, only that the person clicked.
 
 - **Three levels.** Settings switches it off everywhere, and then the MCP
   lists exactly what it did before Devflow. Otherwise every project gets
-  `devpit_devflow_status`, `_setup` and `_set`, which is how it is set up;
+  `devpit_devflow_status`, `_setup` and `_set`, which is how it is set up,
+  and `_skill` and `_review`, which run a stage on demand without a card;
   the tools of its stages come only where it is on, stage by stage.
 - **Agents write files, people switch it on.** Setup and set preview unless
   told to apply, and never commit. `enabled: true` and Decisions in
@@ -268,6 +269,12 @@ no copy, only that the person clicked.
   answers for every axis; the reply says which way it went. The card's diff draws the findings,
   and the person's "false positive" there is kept on the finding, which then
   holds nothing.
+- **A review without a card never moves a checkout.** Given a pull request
+  (`gh` reads it; BASE is its merge-base with the base branch), a range or a
+  worktree of the project, the review reads a pull request or a range in a
+  detached worktree under devpit's home, removed once it is done, and keeps
+  the run under the project's `reviews/<pr-or-range>/`, attached and on no
+  card. Without devflow.yaml it runs on the person's own layer.
 - **A card is done at the gate.** `devpit_devflow_gate` checks what devpit
   can check itself: the card's checks ran after the last change to the code
   (each changed file by when it was written, so a commit is not a change)

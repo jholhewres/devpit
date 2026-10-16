@@ -52,7 +52,7 @@ fn first_remote(root: &Path) -> Result<String, GitError> {
 
 /// git over the network, which must never ask: with no terminal attached a
 /// credential prompt hangs the command, and the button with it.
-fn talk(root: &Path, args: &[&str]) -> Result<(), GitError> {
+pub(crate) fn talk(root: &Path, args: &[&str]) -> Result<(), GitError> {
     let output = devpit_pty::host_env::command("git")
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_ASKPASS", "")
