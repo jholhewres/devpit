@@ -335,6 +335,10 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
     said
 }
 
+/// Where the files a setup wrote belong: a worktree branched from the default
+/// branch reads devflow.yaml only once it is committed there.
+const COMMIT_IT: &str = "commit .devpit/devflow/ on the default branch";
+
 /// The step `devpit_devflow_status` says comes next in a project.
 pub(crate) fn next_step(
     state: &State,
@@ -347,7 +351,7 @@ pub(crate) fn next_step(
         _ if !globally => "the person switches Devflow on in devpit's Settings",
         _ if active => "start with devpit_devflow_skill devflow-briefing",
         // Seen where the file was committed only on a feature branch.
-        State::Missing if switched_on => "commit .devpit/devflow/ on the default branch",
+        State::Missing if switched_on => COMMIT_IT,
         State::Missing => "devpit_devflow_setup previews one",
         State::Invalid(..) => "devpit_devflow_set fixes the field the error names",
         State::Valid(..) if click_waits => "waiting for Switch on in the app",
@@ -398,7 +402,10 @@ pub(crate) fn applied_note(enabled: bool, switched_on: bool, waiting: &[&str]) -
     } else {
         ""
     };
-    format!("Written. devpit never commits: these files are the person's to commit. {on}{enforce}")
+    format!(
+        "Written. devpit never commits: these files are the person's to commit — {COMMIT_IT}, \
+         or a worktree started from it finds no setup. {on}{enforce}"
+    )
 }
 
 pub(crate) fn setup_of(

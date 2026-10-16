@@ -370,6 +370,10 @@ fn one_reviewer_answers_end_to_end_and_leaves_the_other_axes_to_the_session() {
             .expect("json");
     assert_eq!(&on_disk, findings);
     assert!(run.join(RECORD).is_file());
+    assert_eq!(findings["devpit"]["version"], env!("CARGO_PKG_VERSION"));
+    assert!(findings["devpit"]["skills"]["devflow-review"]
+        .as_str()
+        .is_some_and(|digest| digest.starts_with("sha256:")));
     // The session's subagents read devpit's persona and schema beside the
     // packet, never a copy in the repository.
     assert!(!root.join(".devpit").exists());

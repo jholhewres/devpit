@@ -576,6 +576,7 @@ fn counts(ran: &Ran) -> Value {
 /// `evidence.json`: everything the run showed, for the gate and the review.
 pub fn recorded(evidence: &Evidence) -> Value {
     json!({
+        "devpit": crate::skills::made_by(&["devflow-execution", "devflow-completion"]),
         "card": evidence.card,
         "at": evidence.stamp,
         "green": evidence.green(),

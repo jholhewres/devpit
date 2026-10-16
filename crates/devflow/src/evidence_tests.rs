@@ -320,6 +320,10 @@ fn the_report_leads_to_a_short_summary_with_the_counts_the_failures_and_the_path
     )
     .expect("json");
     assert_eq!(kept["red"][0]["now"], "passed");
+    assert_eq!(kept["devpit"]["version"], env!("CARGO_PKG_VERSION"));
+    assert!(kept["devpit"]["skills"]["devflow-execution"]
+        .as_str()
+        .is_some_and(|digest| digest.starts_with("sha256:")));
     assert_eq!(kept["criteria"][2]["tests"][0]["result"], "not found");
     assert!(evidence.spec.is_none(), "no e2e check, no spec");
 }

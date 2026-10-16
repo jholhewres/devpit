@@ -198,3 +198,14 @@ fn a_card_is_closed_with_a_handoff_and_the_next_starts_in_a_fresh_session() {
         assert!(text.contains("**fresh session**"), "{name}");
     }
 }
+
+#[test]
+fn a_record_names_this_devpit_and_the_text_of_each_skill_it_followed() {
+    let made = made_by(&["devflow-review", "not-a-skill"]);
+    assert_eq!(made["version"], env!("CARGO_PKG_VERSION"));
+    let shipped = include_str!("../../../flow/skills/devflow-review/SKILL.md");
+    assert_eq!(
+        made["skills"],
+        json!({ "devflow-review": format!("sha256:{:x}", Sha256::digest(shipped.as_bytes())) })
+    );
+}

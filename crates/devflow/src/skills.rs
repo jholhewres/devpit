@@ -61,6 +61,21 @@ const BUILT_IN: [(&str, Option<&str>, &str); 7] = [
     ),
 ];
 
+/// What made a record: this devpit's version, which every crate shares with
+/// the app, and the digest of each built-in skill named, as this build ships
+/// it — so a run says which text of the flow it followed.
+pub fn made_by(skills: &[&str]) -> Value {
+    let digests: serde_json::Map<String, Value> = BUILT_IN
+        .iter()
+        .filter(|(name, _, _)| skills.contains(name))
+        .map(|(name, _, text)| {
+            let digest = format!("sha256:{:x}", Sha256::digest(text.as_bytes()));
+            ((*name).to_owned(), Value::from(digest))
+        })
+        .collect();
+    json!({ "version": env!("CARGO_PKG_VERSION"), "skills": digests })
+}
+
 /// Where a skill was found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layer {

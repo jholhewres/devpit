@@ -330,6 +330,7 @@ fn a_setup_apply_writes_nothing_when_the_setup_changed_since_the_preview() {
 #[test]
 fn an_applied_setup_says_what_it_wrote() {
     assert!(applied_note(true, true, &[]).contains("Devflow is on here."));
+    assert!(applied_note(false, false, &[]).contains(COMMIT_IT));
     assert!(applied_note(false, false, &["enable"]).contains("still off until the person clicks"));
     assert!(applied_note(true, false, &["enable"]).contains("stays off"));
     assert!(applied_note(false, false, &["enable", "enforce"]).contains("shadow"));

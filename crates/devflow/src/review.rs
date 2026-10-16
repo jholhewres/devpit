@@ -1257,6 +1257,7 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
             let (done_well, verification) = findings::said_together(&record.answers);
             json!({
                 "version": 1,
+                "devpit": crate::skills::made_by(&["devflow-review"]),
                 "card": given.card.id,
                 "base": record.base,
                 "head": record.head,
