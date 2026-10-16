@@ -1,7 +1,8 @@
 //! What a repository says about itself, read off its own files: the commands
 //! that test, lint and run its E2E suite, each with the file and line it came
-//! from, and the E2E tool, glossary and ADRs it keeps. Nothing is run and
-//! nothing is guessed: a command is found in a file or it is not found.
+//! from, and the E2E tool, glossary and ADRs it keeps. Nothing is guessed: a
+//! command is found in a file or it is not found. Given the `PATH` checks
+//! run with, each is then validated (`available.rs`).
 //!
 //! The machine's half — the agent CLIs and the Decisions key — is handed in
 //! by the app, which already knows it.
@@ -25,7 +26,25 @@ pub struct Found {
     /// `file:line`.
     pub source: String,
     pub report: Report,
+    /// Why it cannot run on this machine, when validation found it cannot.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unavailable: Option<String>,
 }
+
+/// A test command of a module in a subfolder, which the root's command does
+/// not reach: a Go module of its own, say.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Nested {
+    /// Relative to the root, `/` separated.
+    pub folder: String,
+    pub test: Found,
+}
+
+/// Folders a module is never looked for in: dependencies and build output.
+const NOT_SEARCHED: [&str; 5] = ["node_modules", "vendor", ".git", "target", "dist"];
+/// The most subfolders looked into, and the most modules kept.
+const MOST_FOLDERS: usize = 200;
+const MOST_NESTED: usize = 10;
 
 /// An E2E tool the repository is set up for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -58,6 +77,9 @@ pub struct Machine {
     pub subjects: Vec<String>,
     /// The skills already installed for the agent CLIs, by name.
     pub installed_skills: Vec<String>,
+    /// The `PATH` checks run with; each command found is validated against
+    /// it. `None` leaves them unvalidated.
+    pub path: Option<std::ffi::OsString>,
 }
 
 /// How the repository already works, as hints for a setup: nothing is
@@ -81,6 +103,9 @@ pub struct Detected {
     pub test: Vec<Found>,
     pub e2e: Vec<Found>,
     pub lint: Vec<Found>,
+    pub typecheck: Vec<Found>,
+    /// Modules in subfolders, at depth 1 and 2.
+    pub nested: Vec<Nested>,
     pub e2e_tools: Vec<E2eTool>,
     pub clis: Vec<Cli>,
     pub decisions_key: bool,
@@ -90,15 +115,43 @@ pub struct Detected {
     pub hints: Hints,
 }
 
+impl Detected {
+    /// Every command found, with the kind of check it would be.
+    pub fn every(&self) -> impl Iterator<Item = (&Found, &'static str)> {
+        let kinds = [
+            ("test", &self.test),
+            ("e2e", &self.e2e),
+            ("lint", &self.lint),
+            ("typecheck", &self.typecheck),
+        ];
+        kinds
+            .into_iter()
+            .flat_map(|(kind, all)| all.iter().map(move |one| (one, kind)))
+            .chain(self.nested.iter().map(|one| (&one.test, "test")))
+    }
+
+    pub(crate) fn every_mut(&mut self) -> impl Iterator<Item = &mut Found> {
+        self.test
+            .iter_mut()
+            .chain(&mut self.e2e)
+            .chain(&mut self.lint)
+            .chain(&mut self.typecheck)
+            .chain(self.nested.iter_mut().map(|one| &mut one.test))
+    }
+}
+
 /// Everything detected about the project at `root`.
 pub fn detected(root: &Path, machine: Machine) -> Detected {
     let files = Files { root };
     let hints = hints(root, &files, &machine);
+    let path = machine.path;
     let mut found = Detected {
         hints,
         test: Vec::new(),
         e2e: Vec::new(),
         lint: Vec::new(),
+        typecheck: Vec::new(),
+        nested: nested(root, &files),
         e2e_tools: e2e_tools(&files),
         clis: machine.clis,
         decisions_key: machine.decisions_key,
@@ -115,6 +168,9 @@ pub fn detected(root: &Path, machine: Machine) -> Detected {
     pyproject(&files, &mut found);
     go(&files, &mut found);
     composer(&files, &mut found);
+    if let Some(path) = path {
+        crate::available::validated(root, &path, &mut found);
+    }
     found
 }
 
@@ -153,6 +209,7 @@ fn found(command: String, file: &str, line: usize, report: Report) -> Found {
         command,
         source: format!("{file}:{line}"),
         report,
+        unavailable: None,
     }
 }
 
@@ -265,6 +322,26 @@ fn package_json(files: &Files, into: &mut Detected) {
             Report::Nothing,
         ));
     }
+    if typechecked_by_tsc(
+        has("typescript"),
+        files.read("tsconfig.json").is_some(),
+        ["typecheck", "type-check"]
+            .into_iter()
+            .any(|name| script(name).is_some()),
+    ) {
+        into.typecheck.push(found(
+            format!("{exec} tsc --noEmit"),
+            FILE,
+            line_of(&text, "\"typescript\""),
+            Report::Nothing,
+        ));
+    }
+}
+
+/// Whether a project gets `tsc --noEmit` as its typecheck: TypeScript with a
+/// tsconfig, and no script of its own that already does it.
+pub(crate) fn typechecked_by_tsc(typescript: bool, tsconfig: bool, script: bool) -> bool {
+    typescript && tsconfig && !script
 }
 
 fn cargo(files: &Files, into: &mut Detected) {
@@ -333,6 +410,71 @@ fn go(files: &Files, into: &mut Detected) {
         None => found("go vet ./...".to_owned(), FILE, 1, Report::Nothing),
     };
     into.lint.push(lint);
+}
+
+/// The Go modules in subfolders at depth 1 and 2, each tested from the root
+/// with `go -C`: `go test ./...` at the root stops at a module's edge.
+fn nested(root: &Path, files: &Files) -> Vec<Nested> {
+    let mut kept = Vec::new();
+    for folder in subfolders(root) {
+        if kept.len() == MOST_NESTED {
+            break;
+        }
+        let module = format!("{folder}/go.mod");
+        if files.read(&module).is_some() {
+            kept.push(Nested {
+                test: found(
+                    format!("go -C {folder} test -json ./... > \"{REPORT}/go-test.json\""),
+                    &module,
+                    1,
+                    Report::Go,
+                ),
+                folder,
+            });
+        }
+    }
+    kept
+}
+
+/// The project's folders at depth 1 and 2, sorted, never into dependencies,
+/// build output or a hidden folder, and never through a link. A name that
+/// would be shell syntax in a command is left out.
+pub(crate) fn subfolders(root: &Path) -> Vec<String> {
+    let folders_in = |relative: &str| -> Vec<String> {
+        let Ok(folder) = devpit_core::tree::resolve(root, relative) else {
+            return Vec::new();
+        };
+        let Ok(entries) = std::fs::read_dir(folder) else {
+            return Vec::new();
+        };
+        let mut names: Vec<String> = entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| plain_folder(name) && !NOT_SEARCHED.contains(&name.as_str()))
+            .collect();
+        names.sort();
+        names
+    };
+    let mut all = Vec::new();
+    for first in folders_in(".") {
+        let deeper = folders_in(&first);
+        all.push(first.clone());
+        all.extend(deeper.into_iter().map(|name| format!("{first}/{name}")));
+        if all.len() >= MOST_FOLDERS {
+            all.truncate(MOST_FOLDERS);
+            break;
+        }
+    }
+    all
+}
+
+/// A folder name a command can carry unquoted.
+fn plain_folder(name: &str) -> bool {
+    !name.starts_with(['.', '-'])
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
 }
 
 fn composer(files: &Files, into: &mut Detected) {
@@ -630,6 +772,14 @@ pub fn open(detected: &Detected) -> Vec<String> {
             open.push(format!(
                 "{} is installed but not signed in, so it cannot review",
                 cli.name.word()
+            ));
+        }
+    }
+    for (one, kind) in detected.every() {
+        if let Some(why) = &one.unavailable {
+            open.push(format!(
+                "`{}` ({}) cannot run here, so it is not recommended as the {kind} check: {why}",
+                one.command, one.source
             ));
         }
     }

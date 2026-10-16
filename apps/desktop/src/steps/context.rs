@@ -85,6 +85,7 @@ impl Context {
             // Set by the run, which creates the folder.
             report_dir: String::new(),
             shared: Vec::new(),
+            locks: Vec::new(),
         }
     }
 }

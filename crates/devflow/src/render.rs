@@ -52,6 +52,12 @@ fn checks(out: &mut String, indent: &str, checks: &[Check]) {
             let kept: Vec<&str> = check.evidence.iter().map(|one| one.word()).collect();
             let _ = writeln!(out, "{indent}    evidence: [{}]", kept.join(", "));
         }
+        if let Some(requires) = &check.requires {
+            let _ = writeln!(out, "{indent}    requires: {}", scalar(requires));
+        }
+        if let Some(exclusive) = &check.exclusive {
+            let _ = writeln!(out, "{indent}    exclusive: {}", scalar(exclusive));
+        }
     }
 }
 

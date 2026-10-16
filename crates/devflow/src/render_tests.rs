@@ -17,18 +17,24 @@ fn full() -> Config {
                 .into(),
             report: Report::Vitest,
             evidence: Vec::new(),
+            requires: None,
+            exclusive: None,
         },
         Check {
             name: "e2e".into(),
             run: "make e2e # not a comment: true".into(),
             report: Report::Junit,
             evidence: vec![Evidence::Screenshots, Evidence::Video],
+            requires: None,
+            exclusive: None,
         },
         Check {
             name: "lint".into(),
             run: "true".into(),
             report: Report::Nothing,
             evidence: Vec::new(),
+            requires: Some("pg_isready -q".into()),
+            exclusive: Some("postgres-test".into()),
         },
     ];
     config.stages.execution.e2e_dir = "tests/e2e".into();

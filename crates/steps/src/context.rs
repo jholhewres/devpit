@@ -41,6 +41,9 @@ pub struct Context {
     /// command in a checkout (`CARGO_TARGET_DIR`, say). Never a `DEVPIT_` key:
     /// those are devpit's to say.
     pub shared: Vec<(String, String)>,
+    /// The named locks the run holds, name to lock file, as
+    /// `DEVPIT_LOCK_<NAME>`: what a script or a reviewer must not run beside.
+    pub locks: Vec<(String, String)>,
 }
 
 impl Context {
@@ -73,6 +76,15 @@ impl Context {
                 (
                     format!("DEVPIT_{}", screaming_snake(key)),
                     self.get(key).unwrap_or_default().to_owned(),
+                )
+            }))
+            .chain(self.locks.iter().map(|(name, file)| {
+                (
+                    format!(
+                        "DEVPIT_LOCK_{}",
+                        name.to_ascii_uppercase().replace('-', "_")
+                    ),
+                    file.clone(),
                 )
             }))
             .collect()

@@ -9,6 +9,7 @@ fn detected() -> Detected {
         command: command.into(),
         source: source.into(),
         report,
+        unavailable: None,
     };
     Detected {
         test: vec![
@@ -17,6 +18,8 @@ fn detected() -> Detected {
         ],
         e2e: vec![found("pnpm run e2e", "package.json:6", Report::Nothing)],
         lint: vec![],
+        typecheck: vec![],
+        nested: vec![],
         e2e_tools: vec![E2eTool {
             name: "playwright".into(),
             source: "playwright.config.ts".into(),

@@ -56,9 +56,11 @@ pub(crate) fn respond(
     .for_a_command();
     let secrets = crate::kept_out::what_devpit_gave(&store);
     let redact = |text: &str| crate::kept_out::kept_out(text, &secrets);
+    let home = crate::projects::project_home(&project.id).map_err(|err| err.message)?;
     let found = evidence::gathered(&Given {
         root: &root,
         runs: &runs_of(&project.id, &root)?,
+        locks: &home.devflow_locks(),
         config,
         asked: &asked,
         card: Card {
@@ -73,9 +75,7 @@ pub(crate) fn respond(
     })?;
 
     let run = PathBuf::from(&found.folder);
-    let artifacts = crate::projects::project_home(&project.id)
-        .map_err(|err| err.message)?
-        .artifacts();
+    let artifacts = home.artifacts();
     let card_folder = runs::attached_under(&card.id);
     let under = format!("{card_folder}/{}", found.stamp);
     let attached = runs::attach(&run, &found.files(&run), &artifacts, &under);

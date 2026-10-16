@@ -11,7 +11,7 @@ import { ask, commands } from './live'
  * walks through the same choices first.
  */
 
-const kinds: Readonly<Record<string, string>> = { test: 'Tests', e2e: 'E2E', lint: 'Lint' }
+const kinds: Readonly<Record<string, string>> = { test: 'Tests', e2e: 'E2E', lint: 'Lint', typecheck: 'Typecheck' }
 
 /** A list longer than this shows its first few and a count. */
 const SHOWN = 8
@@ -29,9 +29,10 @@ function Commands({ found }: { found: readonly DevflowFound[] }): React.JSX.Elem
   return (
     <>
       {found.map((one) => (
-        <span key={one.command} className="dfcmd">
+        <span key={one.command} className="dfcmd" data-unavailable={one.unavailable ? '' : undefined} title={one.unavailable ?? undefined}>
           <code>{one.command}</code>
           <span className="dfcmd__at">{one.source}</span>
+          {one.unavailable && <span className="dfcmd__off">unavailable</span>}
         </span>
       ))}
     </>
@@ -77,7 +78,7 @@ function Detected({ detected }: { detected: DevflowDetected }): React.JSX.Elemen
     <section className="dfcard" aria-label="Found in this repository">
       <header className="dfcard__head">
         <h2 className="dfcard__t">Found in this repository</h2>
-        <span className="dfcard__tag">Read only · nothing was run</span>
+        <span className="dfcard__tag">Read only · each command looked for, none run</span>
       </header>
       <dl className="dfgrid">
         {detected.found.length === 0 && <Row label="Checks">No test, E2E or lint command in the repository&rsquo;s own files.</Row>}

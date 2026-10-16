@@ -259,6 +259,12 @@ impl ProjectHome {
         self.dir().join("devflow").join("runs")
     }
 
+    /// The locks Devflow's `exclusive` checks take, one file per name, so
+    /// two cards' checks on one database never overlap.
+    pub fn devflow_locks(&self) -> PathBuf {
+        self.dir().join("devflow").join("locks")
+    }
+
     /// Per-run folders for command steps' test reports.
     pub fn reports(&self) -> PathBuf {
         self.dir().join("reports")

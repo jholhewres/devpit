@@ -177,3 +177,48 @@ fn a_file_counts_only_under_its_own_spelling() {
     assert!(spelled_as(dir.path(), "AGENTS.md"));
     assert!(!spelled_as(dir.path(), "agents.md"));
 }
+
+/// `go test ./...` at the root stops at a module's edge.
+#[test]
+fn a_go_module_in_a_subfolder_becomes_a_check_of_its_own() {
+    let dir = project(&[
+        ("Makefile", "test:\n\ttrue\n"),
+        ("services/api/go.mod", "module example.com/api\n"),
+        ("node_modules/x/go.mod", "module example.com/x\n"),
+        ("a/b/c/go.mod", "module example.com/c\n"),
+    ]);
+    let found = detected(dir.path(), Machine::default());
+    let folders: Vec<&str> = found.nested.iter().map(|one| one.folder.as_str()).collect();
+    assert_eq!(folders, ["services/api"]);
+    let checks = crate::preset::checks(&found);
+    let api = checks
+        .iter()
+        .find(|one| one.name == "unit-services-api")
+        .expect("unit-services-api");
+    assert!(
+        api.run.starts_with("go -C services/api test -json ./..."),
+        "{}",
+        api.run
+    );
+    assert_eq!(api.source.as_deref(), Some("services/api/go.mod:1"));
+}
+
+#[test]
+fn typescript_with_a_tsconfig_and_no_typecheck_script_is_checked_by_tsc() {
+    let package = "{\n  \"devDependencies\": {\n    \"typescript\": \"^5\"\n  }\n}\n";
+    let dir = project(&[("package.json", package), ("tsconfig.json", "{}")]);
+    let found = detected(dir.path(), Machine::default());
+    let checks = crate::preset::checks(&found);
+    let typecheck = checks
+        .iter()
+        .find(|one| one.name == "typecheck")
+        .expect("typecheck");
+    assert_eq!(typecheck.run, "npx tsc --noEmit");
+    assert_eq!(typecheck.source.as_deref(), Some("package.json:3"));
+
+    let scripted = "{\n  \"scripts\": { \"typecheck\": \"vue-tsc\" },\n  \"devDependencies\": { \"typescript\": \"^5\" }\n}\n";
+    let dir = project(&[("package.json", scripted), ("tsconfig.json", "{}")]);
+    assert!(detected(dir.path(), Machine::default())
+        .typecheck
+        .is_empty());
+}

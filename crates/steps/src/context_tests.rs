@@ -13,6 +13,7 @@ fn sample() -> Context {
         card_title: "Ship it".to_owned(),
         report_dir: "/home/x/.devpit/reports/run_1".to_owned(),
         shared: Vec::new(),
+        locks: Vec::new(),
     }
 }
 

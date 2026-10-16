@@ -286,24 +286,18 @@ pub(crate) fn view(
 }
 /// What detection found, with the recommended setup a Custom one starts from.
 pub(crate) fn detected_view(found: &Detected) -> DevflowDetected {
-    let kinds = [
-        ("test", &found.test),
-        ("e2e", &found.e2e),
-        ("lint", &found.lint),
-    ];
     let sources: Vec<(String, String)> = preset::checks(found)
         .into_iter()
         .filter_map(|one| Some((one.run, one.source?)))
         .collect();
     DevflowDetected {
-        found: kinds
-            .iter()
-            .flat_map(|(kind, all)| {
-                all.iter().map(|one| DevflowFound {
-                    kind: (*kind).to_owned(),
-                    command: one.command.clone(),
-                    source: one.source.clone(),
-                })
+        found: found
+            .every()
+            .map(|(one, kind)| DevflowFound {
+                kind: kind.to_owned(),
+                command: one.command.clone(),
+                source: one.source.clone(),
+                unavailable: one.unavailable.clone(),
             })
             .collect(),
         e2e_tools: found

@@ -3,7 +3,7 @@
 //! command; their reports read; and what they prove kept in the run's folder
 //! (`runs.rs`), summed up for the agent and for the card.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
 use devpit_rpc::{verdict, Report, RunState, Verdict};
@@ -175,6 +175,9 @@ pub fn said(verdict: Verdict) -> &'static str {
     }
 }
 
+/// How long a check's `requires` probe has.
+const PROBE: Duration = Duration::from_secs(30);
+
 /// The shell's exit for a command it could not find.
 const NOT_FOUND: i32 = 127;
 
@@ -198,13 +201,68 @@ pub fn checked(
     }
 }
 
+/// The lock `name` in `locks`, waited for up to `timeout`, with its file.
+/// It is held until the file is dropped, and a process that dies lets it go.
+pub fn locked(
+    locks: &Path,
+    name: &str,
+    timeout: Duration,
+) -> Result<(std::fs::File, PathBuf), String> {
+    std::fs::create_dir_all(locks).map_err(|err| err.to_string())?;
+    let path = locks.join(format!("{name}.lock"));
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&path)
+        .map_err(|err| err.to_string())?;
+    let started = Instant::now();
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok((file, path)),
+            Err(std::fs::TryLockError::WouldBlock) if started.elapsed() < timeout => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(std::fs::TryLockError::WouldBlock) => {
+                return Err(format!(
+                    "another check held the lock `{name}` for all the time the evidence had"
+                ))
+            }
+            Err(std::fs::TryLockError::Error(err)) => return Err(err.to_string()),
+        }
+    }
+}
+
+/// Why the probe `requires` says a check cannot run now, or `None` when it
+/// passed: a database that is down is not the code's failure.
+pub fn prerequisite_failed(
+    requires: &str,
+    cwd: &Path,
+    context: &Context,
+    timeout: Duration,
+) -> Option<String> {
+    let ended = devpit_steps::run(requires, cwd, context, Some(timeout), |_| {}, |_| {});
+    let how = match ended {
+        Err(err) => format!("it did not start: {err}"),
+        Ok(ended) if ended.timed_out => format!("it took over {}s", timeout.as_secs()),
+        Ok(ended) => match ended.exit_code {
+            Some(0) => return None,
+            Some(code) => format!("it exited {code}"),
+            None => "it was stopped".to_owned(),
+        },
+    };
+    Some(format!("prerequisite failed: `{requires}`: {how}"))
+}
+
 /// Runs one check through the steps runner from `cwd`: the card's context in
 /// its environment, `$DEVPIT_REPORT_DIR` its own folder of the run, and its
-/// verdict [`checked`].
+/// verdict [`checked`]. Its `exclusive` lock is held from `locks` for the
+/// whole run, and its `requires` probe must pass first.
 pub fn run_check(
     check: &Check,
     cwd: &Path,
     run: &Path,
+    locks: &Path,
     context: &Context,
     timeout: Duration,
     redact: &dyn Fn(&str) -> String,
@@ -212,6 +270,31 @@ pub fn run_check(
     let folder = run.join(&check.name);
     let mut context = context.clone();
     context.report_dir = folder.display().to_string();
+    let waited = Instant::now();
+    let _held = match &check.exclusive {
+        Some(name) => match locked(locks, name, timeout) {
+            Ok((file, path)) => {
+                context
+                    .locks
+                    .push((name.clone(), path.display().to_string()));
+                Some(file)
+            }
+            Err(why) => return Ran::not_run(&check.name, why),
+        },
+        None => None,
+    };
+    let timeout = timeout.saturating_sub(waited.elapsed());
+    if timeout < Duration::from_secs(1) {
+        return Ran::not_run(
+            &check.name,
+            "waiting for its lock took all the time".to_owned(),
+        );
+    }
+    if let Some(requires) = &check.requires {
+        if let Some(why) = prerequisite_failed(requires, cwd, &context, timeout.min(PROBE)) {
+            return Ran::not_run(&check.name, why);
+        }
+    }
     let mut output = String::new();
     let ended = std::fs::create_dir(&folder)
         .map_err(|err| err.to_string())
@@ -444,6 +527,8 @@ pub struct Given<'a> {
     pub root: &'a Path,
     /// Where the run is kept.
     pub runs: &'a Runs,
+    /// Where the project's `exclusive` locks are, in devpit's folder for it.
+    pub locks: &'a Path,
     pub config: &'a Config,
     pub asked: &'a Asked,
     pub card: Card<'a>,
@@ -462,6 +547,7 @@ pub fn gathered(given: &Given) -> Result<Evidence, String> {
     let Given {
         root,
         runs: kept,
+        locks,
         config,
         asked,
         card,
@@ -485,7 +571,7 @@ pub fn gathered(given: &Given) -> Result<Evidence, String> {
                     "the checks before it took all the time".to_owned(),
                 )
             } else {
-                run_check(check, root, &run, context, left, redact)
+                run_check(check, root, &run, locks, context, left, redact)
             }
         })
         .collect();

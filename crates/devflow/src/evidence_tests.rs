@@ -62,6 +62,8 @@ fn check(name: &str, run: &str) -> Check {
         run: run.into(),
         report: Format::Junit,
         evidence: Vec::new(),
+        requires: None,
+        exclusive: None,
     }
 }
 
@@ -117,6 +119,7 @@ fn run_of(root: &Path, config: &Config, asked: &Asked, title: &str, seconds: u64
     gathered(&Given {
         root,
         runs: &runs_of(root),
+        locks: &root.join("devpit-home").join("locks"),
         config,
         asked,
         card: Card {
@@ -439,4 +442,77 @@ fn the_cards_comment_says_each_check_and_links_what_was_attached() {
         said.contains("[screenshots/e2e-test-results-a-shot.png](/artifacts/devflow/card_1/x/screenshots/e2e-test-results-a-shot.png)"),
         "{said}"
     );
+}
+
+#[test]
+fn a_check_whose_prerequisite_fails_is_not_run_rather_than_red() {
+    let root = tempfile::tempdir().expect("root");
+    let needs = |requires: &str| Check {
+        requires: Some(requires.into()),
+        ..bare("db", "touch ran; exit 1")
+    };
+    let failing = config(vec![needs("exit 2")]);
+    let evidence = run_of(root.path(), &failing, &nothing_asked(), "Rename", 0);
+    assert_eq!(evidence.checks[0].verdict, Verdict::NotRun);
+    let why = evidence.checks[0].not_run.as_deref().expect("why");
+    assert!(why.starts_with("prerequisite failed: `exit 2`"), "{why}");
+    assert!(!root.path().join("ran").exists());
+
+    let passing = config(vec![needs("true")]);
+    let evidence = run_of(root.path(), &passing, &nothing_asked(), "Rename", 1);
+    assert_eq!(evidence.checks[0].verdict, Verdict::Failed);
+    assert!(root.path().join("ran").exists());
+}
+
+/// Two cards' checks on one test database: each appends its start and end,
+/// and a lock that holds never lets the other's start fall in between.
+#[test]
+fn two_checks_with_the_same_exclusive_never_overlap() {
+    let root = tempfile::tempdir().expect("root");
+    let locks = root.path().join("locks");
+    let exclusive = |name: &str| Check {
+        exclusive: Some("postgres-test".into()),
+        ..bare(
+            name,
+            &format!(
+                "echo {name}-start >> markers; sleep 0.5; echo {name}-end >> markers; \
+                 test -n \"$DEVPIT_LOCK_POSTGRES_TEST\""
+            ),
+        )
+    };
+    let ran: Vec<Ran> = std::thread::scope(|scope| {
+        let runs: Vec<_> = ["a", "b"]
+            .into_iter()
+            .map(|name| {
+                let (root, locks, check) = (root.path(), &locks, exclusive(name));
+                scope.spawn(move || {
+                    let run = root.join(format!("run-{}", check.name));
+                    std::fs::create_dir_all(&run).expect("run");
+                    run_check(
+                        &check,
+                        root,
+                        &run,
+                        locks,
+                        &Context::default(),
+                        Duration::from_secs(30),
+                        &|text: &str| text.to_owned(),
+                    )
+                })
+            })
+            .collect();
+        runs.into_iter()
+            .map(|one| one.join().expect("ran"))
+            .collect()
+    });
+    assert!(
+        ran.iter().all(|one| one.verdict == Verdict::Passed),
+        "{ran:?}"
+    );
+    let markers = std::fs::read_to_string(root.path().join("markers")).expect("markers");
+    let lines: Vec<&str> = markers.lines().collect();
+    assert_eq!(lines.len(), 4, "{markers}");
+    for pair in lines.chunks(2) {
+        let name = pair[0].strip_suffix("-start").expect("a start");
+        assert_eq!(pair[1], format!("{name}-end"), "{markers}");
+    }
 }

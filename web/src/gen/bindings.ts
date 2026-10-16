@@ -2903,10 +2903,12 @@ export type DevflowFileChange = {
 
 /**  A command detection found. */
 export type DevflowFound = {
-	/**  `test`, `e2e` or `lint`. */
+	/**  `test`, `e2e`, `lint` or `typecheck`. */
 	kind: string,
 	command: string,
 	source: string,
+	/**  Why it cannot run here (a program not installed), so it is not proposed. */
+	unavailable: string | null,
 };
 
 /**  The card's newest gate. */

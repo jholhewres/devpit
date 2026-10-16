@@ -58,7 +58,9 @@ reviewer, with the security persona; the `devflow-done` gate; Decisions in
 
 Show the preview as a short list (stages, each check with its command and the
 file it came from, reviewers, gate, Decisions), then the open decisions from
-step 3, if any.
+step 3, if any. A command found that cannot run here is not recommended: its
+program is not installed, or a `make` target's recipe calls one that is not.
+The preview's `unavailable` says which and why; show each.
 
 Done when the preview is shown and nothing was written.
 
@@ -69,6 +71,7 @@ An open decision is one the preview could not settle from the repo:
 - no test command found, or more than one candidate;
 - an E2E tool configured (Playwright, Cypress) with no command that runs it;
 - a reviewer CLI installed but not signed in;
+- a command found that cannot run here (install what it names, or pick another);
 - a Decisions key with the project opted out.
 
 Ask the first open decision, alone:
@@ -149,6 +152,12 @@ A check's `report` is the file it writes into `$DEVPIT_REPORT_DIR` for devpit
 to read test by test (`junit`, `vitest`, `jest`, `cargo`, `go`); one that writes
 none, and leaves it out or says `none`, is judged by its exit code: 0 passed,
 127 not run (its command was not found), anything else failed.
+
+Two optional fields keep a check off what it shares. `requires` is a probe run
+first, such as `pg_isready -q`: when it fails the check is not run rather than
+red, since what it needs is down, not the code. `exclusive` names a lock, such
+as `postgres-test`: checks naming the same one never run at once, across cards
+and worktrees, and the one holding it is given `$DEVPIT_LOCK_POSTGRES_TEST`.
 
 Show the before and after, ask for a yes (through the question tool when
 there is one), then call it again with `"apply": true`. `enabled` and `decisions.mode: enforce` go through the

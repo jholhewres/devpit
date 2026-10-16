@@ -7,6 +7,8 @@ fn detected(tools: Vec<E2eTool>) -> Detected {
         test: vec![],
         e2e: vec![],
         lint: vec![],
+        typecheck: vec![],
+        nested: vec![],
         e2e_tools: tools,
         clis: vec![],
         decisions_key: false,
@@ -79,6 +81,8 @@ fn playwright_is_wanted_when_detected_or_when_a_check_runs_it() {
         run: "npx playwright test".into(),
         report: Report::Junit,
         evidence: vec![],
+        requires: None,
+        exclusive: None,
     });
     assert!(wanted(&config, &detected(vec![])));
 }

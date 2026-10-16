@@ -50,11 +50,12 @@ pub struct Proposed {
     pub evidence: Vec<Evidence>,
 }
 
-/// The checks devpit would configure: the first test command, the E2E check
-/// and the first lint command it found. With Playwright the E2E check runs
-/// Devflow's specs through the config devpit writes, keeping screenshots and
-/// video; the project's own E2E command, when there is one, is still called,
-/// as `e2e-suite`.
+/// The checks devpit would configure: the first test command, the E2E check,
+/// the first lint and typecheck commands it found, and `unit-<folder>` for a
+/// module in a subfolder — each only when it can run here. With Playwright
+/// the E2E check runs Devflow's specs through the config devpit writes,
+/// keeping screenshots and video; the project's own E2E command, when there
+/// is one, is still called, as `e2e-suite`.
 pub fn checks(detected: &Detected) -> Vec<Proposed> {
     let found = |name: &str, found: &crate::detect::Found, evidence: Vec<Evidence>| Proposed {
         name: name.to_owned(),
@@ -63,7 +64,7 @@ pub fn checks(detected: &Detected) -> Vec<Proposed> {
         source: Some(found.source.clone()),
         evidence,
     };
-    let own_e2e = detected.e2e.first();
+    let own_e2e = first(&detected.e2e);
     let devflows = detected.e2e_tools.iter().find_map(|tool| {
         Some(Proposed {
             name: "e2e".to_owned(),
@@ -87,21 +88,42 @@ pub fn checks(detected: &Detected) -> Vec<Proposed> {
             [own_e2e.map(|own| found("e2e", own, screenshots)), None]
         }
     };
-    std::iter::once(
-        detected
-            .test
-            .first()
-            .map(|one| found("unit", one, Vec::new())),
-    )
-    .chain(e2e)
-    .chain(std::iter::once(
-        detected
-            .lint
-            .first()
-            .map(|one| found("lint", one, Vec::new())),
-    ))
-    .flatten()
-    .collect()
+    let nested = detected
+        .nested
+        .iter()
+        .filter(|one| one.test.unavailable.is_none())
+        .filter_map(|one| Some(found(&nested_name(&one.folder)?, &one.test, Vec::new())));
+    let mut proposed: Vec<Proposed> =
+        std::iter::once(first(&detected.test).map(|one| found("unit", one, Vec::new())))
+            .chain(e2e)
+            .chain([
+                first(&detected.lint).map(|one| found("lint", one, Vec::new())),
+                first(&detected.typecheck).map(|one| found("typecheck", one, Vec::new())),
+            ])
+            .flatten()
+            .chain(nested)
+            .collect();
+    let mut seen = Vec::new();
+    proposed.retain(|one| {
+        let fresh = !seen.contains(&one.name);
+        seen.push(one.name.clone());
+        fresh
+    });
+    proposed
+}
+
+/// The first of `all` that can run here.
+fn first(all: &[crate::detect::Found]) -> Option<&crate::detect::Found> {
+    all.iter().find(|one| one.unavailable.is_none())
+}
+
+/// `unit-<folder>`, the folder's `/` and `.` as `-`: a check's name.
+pub(crate) fn nested_name(folder: &str) -> Option<String> {
+    let name = format!(
+        "unit-{}",
+        folder.to_ascii_lowercase().replace(['/', '.'], "-")
+    );
+    config::is_name(&name).then_some(name)
 }
 
 /// What `preset` starts from, given what was detected.
@@ -119,6 +141,8 @@ pub fn starting(preset: Preset, detected: &Detected) -> Config {
             name: proposed.name,
             run: proposed.run,
             report: proposed.report,
+            requires: None,
+            exclusive: None,
         })
         .collect();
     let reviewer = REVIEWERS.into_iter().find(|agent| {

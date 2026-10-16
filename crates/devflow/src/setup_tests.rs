@@ -10,6 +10,8 @@ fn with_checks(runs: &[(&str, &str)]) -> Config {
             run: (*run).into(),
             report: Report::Nothing,
             evidence: Vec::new(),
+            requires: None,
+            exclusive: None,
         })
         .collect();
     config

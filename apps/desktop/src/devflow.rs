@@ -479,6 +479,13 @@ pub(crate) fn setup_of(
         "checks": checks,
         "files": files,
         "open": detect::open(&detected),
+        "unavailable": detected
+            .every()
+            .filter_map(|(one, kind)| {
+                let why = one.unavailable.as_deref()?;
+                Some(json!({ "kind": kind, "command": one.command, "source": one.source, "why": why }))
+            })
+            .collect::<Vec<_>>(),
         "asks": proposal.asks,
         "waiting_for_click": waiting,
         "note": match (apply, moved) {
@@ -646,6 +653,8 @@ pub(crate) fn machine(store: &Store, project_id: &str) -> Machine {
         branches,
         subjects,
         installed_skills: installed_skills(),
+        // What a check's shell searches, so a command found is one it finds.
+        path: Some(devpit_pty::login_path::search_path().clone()),
     }
 }
 

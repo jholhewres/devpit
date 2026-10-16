@@ -152,10 +152,12 @@ pub struct DevflowConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DevflowFound {
-    /// `test`, `e2e` or `lint`.
+    /// `test`, `e2e`, `lint` or `typecheck`.
     pub kind: String,
     pub command: String,
     pub source: String,
+    /// Why it cannot run here (a program not installed), so it is not proposed.
+    pub unavailable: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]

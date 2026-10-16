@@ -28,6 +28,8 @@
 .dfcmd { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 3px 9px 3px 3px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); }
 .dfcmd code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); font-size: 12.5px; color: var(--code-text); background: var(--code-wash); }
 .dfcmd__at { flex: none; font-family: var(--mono); font-size: 11.5px; color: var(--text-3); }
+.dfcmd[data-unavailable] code { color: var(--text-3); text-decoration: line-through; }
+.dfcmd__off { flex: none; font-size: 11.5px; color: var(--warning); }
 
 .dftag { display: inline-flex; align-items: center; gap: 7px; height: 27px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; color: var(--text-2); background: var(--overlay); border: 1px solid var(--border); }
 .dftag__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }

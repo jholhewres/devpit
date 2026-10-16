@@ -80,7 +80,10 @@ Start one fresh subagent per pending persona, in parallel. Each gets the
 packet's path and its persona's text from `persona-<persona>.md` beside the
 packet (the answer's `next` names the folder), and answers with one findings
 object. When you cannot start subagents, review the axes one after another
-yourself, from the packet alone. Then hand the answers to the same run:
+yourself, from the packet alone. Never run a suite that a check in
+`devflow.yaml` runs under `exclusive` (a shared test database, say): a card's
+checks may hold that lock, and your run would break theirs. Its evidence is in
+the packet. Then hand the answers to the same run:
 
 ```json
 { "card": "<card id>", "run": "<the run it answered>", "reports": [{ "version": 1, "reviewers": [{ "agent": "claude", "persona": "devflow-spec" }], "verdict": "approve", "findings": [], "done_well": ["<a specific thing the change does well>"], "verification": { "tests": "<what the tests prove>", "evidence": "<the checks on the card>" } }] }

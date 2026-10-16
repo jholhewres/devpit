@@ -13,6 +13,7 @@ fn context() -> Context {
         card_title: "a card".to_owned(),
         report_dir: String::new(),
         shared: Vec::new(),
+        locks: Vec::new(),
     }
 }
 

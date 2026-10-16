@@ -1167,6 +1167,7 @@ dependencies = [
  "devpit-agentcli",
  "devpit-core",
  "devpit-git",
+ "devpit-pty",
  "devpit-rpc",
  "devpit-steps",
  "serde",

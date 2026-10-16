@@ -67,7 +67,10 @@ const base = (more: Partial<DevflowScreen>): DevflowScreen => ({
 const missing = (): DevflowScreen =>
   base({
     detected: {
-      found: [{ kind: 'test', command: 'make test', source: 'Makefile:1' }],
+      found: [
+        { kind: 'test', command: 'make test', source: 'Makefile:1', unavailable: null },
+        { kind: 'lint', command: 'make lint', source: 'Makefile:4', unavailable: '`phpstan` is not installed' },
+      ],
       e2eTools: [],
       clis: [{ name: 'claude', installed: true, signedIn: true }],
       decisionsKey: false,
@@ -144,6 +147,8 @@ describe('the Devflow screen', () => {
     render(<DevflowPane />)
     expect(await screen.findByText('make test')).toBeTruthy()
     expect(screen.getByText(/Makefile:1/)).toBeTruthy()
+    expect(screen.getByText('make lint').closest('.dfcmd')?.getAttribute('title')).toBe('`phpstan` is not installed')
+    expect(screen.getAllByText('unavailable')).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Use recommended' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Customize' })).toBeTruthy()
     expect(called).not.toHaveBeenCalled()

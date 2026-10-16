@@ -91,6 +91,8 @@ fn a_check_is_named_once_and_runs_one_line() {
             run: "pnpm e2e".into(),
             report: Report::Junit,
             evidence: vec![Evidence::Screenshots, Evidence::Video],
+            requires: None,
+            exclusive: None,
         }]
     );
 }

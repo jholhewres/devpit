@@ -222,6 +222,14 @@ pub struct Check {
     pub report: Report,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<Evidence>,
+    /// A probe run first, such as `pg_isready -q`: when it fails the check is
+    /// not run rather than red, since what it needs is down, not the code.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires: Option<String>,
+    /// A lock named per project: checks naming the same one never overlap,
+    /// across cards and worktrees.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusive: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -874,12 +882,22 @@ pub(crate) fn check(node: &Node, path: &str) -> Result<Check, Invalid> {
             }
         }
     }
+    let requires = match fields.get("requires") {
+        Some((node, path)) => Some(text(node, &path, 1000)?),
+        None => None,
+    };
+    let exclusive = match fields.get("exclusive") {
+        Some((node, path)) => Some(self::name(node, &path)?),
+        None => None,
+    };
     fields.done()?;
     Ok(Check {
         name,
         run,
         report,
         evidence,
+        requires,
+        exclusive,
     })
 }
 
