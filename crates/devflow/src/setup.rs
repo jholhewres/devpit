@@ -1,17 +1,19 @@
 //! What a setup leaves in `.devpit/devflow/`: devflow.yaml, one script per
-//! check, a `.gitignore` for the runs, the reviewer personas and findings
-//! schema the review stage reads there, and a Playwright config when the
-//! project runs Playwright. Previewed first, written only when asked, and
-//! never committed.
+//! check, a `.gitignore` for a check run by hand, and a Playwright config
+//! when the project runs Playwright. The reviewer personas and the findings
+//! schema are devpit's and stay in devpit: a project holds only a persona it
+//! made its own, under a name of its own. Previewed first, written only when
+//! asked, and never committed.
 
 use std::path::Path;
 
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 
 use crate::config::Config;
 use crate::folder::{DIR, FILE};
 
-/// The personas and the schema, as this build ships them.
+/// The personas, as this build ships them.
 pub(crate) const PERSONAS: [(&str, &str); 4] = [
     (
         "devflow-spec",
@@ -31,7 +33,65 @@ pub(crate) const PERSONAS: [(&str, &str); 4] = [
         include_str!("../../../flow/personas/devflow-all.md"),
     ),
 ];
-const FINDINGS_SCHEMA: &str = include_str!("../../../flow/schemas/devflow-findings.schema.json");
+
+/// SHA-256 of every text a devpit release shipped for a persona, by name.
+/// The setup copied them into projects once: a copy still one of these is
+/// devpit's default, not the person's, and is read from devpit instead, so
+/// an old text never outlives the release that replaced it.
+const SHIPPED: [(&str, &str); 10] = [
+    (
+        "devflow-spec",
+        "40b270801839a2e79d7acfbbaeb6ef83530c706f0dd9c27f09588277bccbc710",
+    ),
+    (
+        "devflow-spec",
+        "141a02169cd34705791dce505f7a7cac98ffbf88f8be6b7c6240ea047ff7340f",
+    ),
+    (
+        "devflow-spec",
+        "8d171a41e5e73a9d48633068a4205d8191efaef43bbddc36aef846f4a14844b4",
+    ),
+    (
+        "devflow-standards",
+        "6a015556578ad4dc0ccf58ce6271e7bda9946326e6202ed82e9907c2ecbd871e",
+    ),
+    (
+        "devflow-standards",
+        "ba55083b7d3b4e2c4587c6d85350ea36533281c8f050ee9ec62c248b47bcf538",
+    ),
+    (
+        "devflow-standards",
+        "bae2a29b386f8a22755f052879521600b779e4ca3d061871e95650e60fa5782c",
+    ),
+    (
+        "devflow-security",
+        "950bc4a1142ae6b037ea7090e4e890d90d3368d8db5b243594d9cc87c0bc2e3e",
+    ),
+    (
+        "devflow-security",
+        "3257393088653ddcd25a8b3e2f1ca7ab84a68914169d5c547c32fb988282a464",
+    ),
+    (
+        "devflow-security",
+        "1e5e6383cdedd2783b7ca5d77a2fd49e4e7c8bb85001acb384089d275a93b9b6",
+    ),
+    (
+        "devflow-all",
+        "dd7bf263271b5d641328c37e1dddf9e152f21d1528f1e0bb3409d6889107c072",
+    ),
+];
+
+/// Whether `text` is a persona text devpit shipped as `name`: a copy the
+/// person never changed. Line endings a checkout rewrote do not count.
+pub(crate) fn shipped(name: &str, text: &str) -> bool {
+    let digest = format!(
+        "{:x}",
+        Sha256::digest(text.replace("\r\n", "\n").as_bytes())
+    );
+    SHIPPED
+        .iter()
+        .any(|(shipped, sum)| *shipped == name && *sum == digest)
+}
 
 /// The line the `.gitignore` needs: a check run by hand reports there.
 const IGNORED: &str = "runs/";
@@ -53,11 +113,25 @@ pub fn script_run(name: &str) -> String {
 
 /// `config` with every check that runs a command of its own running a script
 /// instead, and the scripts to write. `sources` says where a command was found.
-pub fn scripted(mut config: Config, sources: &[(String, String)]) -> (Config, Vec<Script>) {
+pub fn scripted(config: Config, sources: &[(String, String)]) -> (Config, Vec<Script>) {
+    scripted_but(config, sources, &[])
+}
+
+/// [`scripted`] for a change: only the checks not among `had` move into a
+/// script, so a command the person wrote in devflow.yaml stays theirs.
+pub fn scripted_new(config: Config, had: &[String]) -> (Config, Vec<Script>) {
+    scripted_but(config, &[], had)
+}
+
+fn scripted_but(
+    mut config: Config,
+    sources: &[(String, String)],
+    had: &[String],
+) -> (Config, Vec<Script>) {
     let mut scripts = Vec::new();
     for check in &mut config.stages.execution.checks {
         let run = script_run(&check.name);
-        if check.run == run {
+        if check.run == run || had.contains(&check.name) {
             continue;
         }
         scripts.push(Script {
@@ -102,6 +176,9 @@ enum Kind {
     Theirs,
     /// The `.gitignore`: the line added to what is there.
     Ignore,
+    /// A check script no check runs any more: removed when devpit wrote it
+    /// and nobody changed it, else said and left.
+    Unused,
 }
 
 /// One file a setup writes, relative to the project's root.
@@ -117,7 +194,9 @@ pub struct Planned {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FileChange {
     pub path: String,
-    /// `create`, `replace`, `same`, `kept` (a copy of the person's) or `append`.
+    /// `create`, `replace`, `same`, `kept` (a copy of the person's), `append`,
+    /// `remove` (a script devpit wrote that no check runs) or `unused` (one
+    /// the person changed, left for them).
     pub change: &'static str,
 }
 
@@ -139,28 +218,7 @@ pub fn planned(yaml: &str, scripts: &[Script], playwright: Option<&str>) -> Vec<
             false,
         ),
     ];
-    files.extend(scripts.iter().map(|script| {
-        at(
-            format!("{DIR}/scripts/check-{}.sh", script.name),
-            script_text(script),
-            Kind::Ours,
-            true,
-        )
-    }));
-    files.extend(PERSONAS.iter().map(|(name, text)| {
-        at(
-            format!("{DIR}/reviewers/{name}.md"),
-            (*text).to_owned(),
-            Kind::Theirs,
-            false,
-        )
-    }));
-    files.push(at(
-        format!("{DIR}/devflow-findings.schema.json"),
-        FINDINGS_SCHEMA.to_owned(),
-        Kind::Theirs,
-        false,
-    ));
+    files.extend(scripts_planned(scripts));
     files.extend(playwright.map(|text| {
         at(
             crate::playwright::FILE.to_owned(),
@@ -172,9 +230,85 @@ pub fn planned(yaml: &str, scripts: &[Script], playwright: Option<&str>) -> Vec<
     files
 }
 
-/// Only devflow.yaml, for a change to one field.
-pub fn config_only(yaml: &str) -> Vec<Planned> {
-    planned(yaml, &[], None).into_iter().take(1).collect()
+/// devflow.yaml, and the scripts of the checks a change to one field added.
+pub fn config_only(yaml: &str, scripts: &[Script]) -> Vec<Planned> {
+    let mut files: Vec<Planned> = planned(yaml, &[], None).into_iter().take(1).collect();
+    files.extend(scripts_planned(scripts));
+    files
+}
+
+fn scripts_planned(scripts: &[Script]) -> impl Iterator<Item = Planned> + '_ {
+    scripts.iter().map(|script| Planned {
+        path: format!("{DIR}/scripts/{}", script_file(&script.name)),
+        text: script_text(script),
+        kind: Kind::Ours,
+        executable: true,
+    })
+}
+
+fn script_file(name: &str) -> String {
+    format!("check-{name}.sh")
+}
+
+/// `files`, and each check script under `scripts/` that `config` no longer
+/// runs: the setup says so, and removes the one devpit wrote as it was.
+pub fn with_unused(root: &Path, config: &Config, files: Vec<Planned>) -> Vec<Planned> {
+    let mut files = files;
+    let Ok(folder) = devpit_core::tree::resolve(root, &format!("{DIR}/scripts")) else {
+        return files;
+    };
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return files;
+    };
+    // A link is not devpit's script, whatever it points at.
+    let mut unused: Vec<Planned> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter_map(|file| {
+            let name = file.strip_prefix("check-")?.strip_suffix(".sh")?.to_owned();
+            let path = format!("{DIR}/scripts/{file}");
+            let run = config
+                .stages
+                .execution
+                .checks
+                .iter()
+                .any(|check| check.run.contains(&format!("scripts/{file}")));
+            let planned = files.iter().any(|one| one.path == path);
+            (!run && !planned).then_some(Planned {
+                path,
+                text: name,
+                kind: Kind::Unused,
+                executable: false,
+            })
+        })
+        .collect();
+    unused.sort_by(|a, b| a.path.cmp(&b.path));
+    files.extend(unused);
+    files
+}
+
+/// Whether `text` is the script devpit writes for check `name`, unchanged:
+/// written again from the command and source it names, it is the same. A
+/// command of more than one line was the person's to grow, so it is theirs.
+fn generated(name: &str, text: &str) -> bool {
+    let Some((head, command)) = text.split_once("mkdir -p \"$DEVPIT_REPORT_DIR\"\n") else {
+        return false;
+    };
+    if command.trim_end_matches('\n').contains('\n') {
+        return false;
+    }
+    let source = head
+        .lines()
+        .nth(1)
+        .and_then(|line| line.strip_prefix(&format!("# Devflow check `{name}`, found in ")))
+        .and_then(|rest| rest.strip_suffix('.'));
+    let script = Script {
+        name: name.to_owned(),
+        command: command.strip_suffix('\n').unwrap_or(command).to_owned(),
+        source: source.map(str::to_owned),
+    };
+    script_text(&script) == text
 }
 
 /// What writing `files` under `root` would do; nothing is written.
@@ -196,7 +330,15 @@ pub fn write(root: &Path, files: &[Planned]) -> Result<Vec<FileChange>, String> 
         let existing = there(root, &file.path);
         let change = change_of(file, existing.as_deref());
         let text = match (change, file.kind) {
-            ("same" | "kept", _) => {
+            ("same" | "kept" | "unused", _) => {
+                done.push(FileChange {
+                    path: file.path.clone(),
+                    change,
+                });
+                continue;
+            }
+            ("remove", _) => {
+                removed(root, &file.path)?;
                 done.push(FileChange {
                     path: file.path.clone(),
                     change,
@@ -230,6 +372,19 @@ pub fn write(root: &Path, files: &[Planned]) -> Result<Vec<FileChange>, String> 
     Ok(done)
 }
 
+/// Removes the file at `path`, itself and never what a link points at,
+/// inside a folder of the project.
+fn removed(root: &Path, path: &str) -> Result<(), String> {
+    let (parent, name) = path.rsplit_once('/').unwrap_or(("", path));
+    let folder =
+        devpit_core::tree::resolve(root, parent).map_err(|err| format!("{path}: {err}"))?;
+    let entry = folder.join(name);
+    if !std::fs::symlink_metadata(&entry).is_ok_and(|meta| meta.is_file()) {
+        return Err(format!("{path} is not a file devpit wrote"));
+    }
+    std::fs::remove_file(entry).map_err(|err| format!("{path}: {err}"))
+}
+
 /// The file's text, when it is there and inside the project.
 fn there(root: &Path, path: &str) -> Option<String> {
     let resolved = devpit_core::tree::resolve(root, path).ok()?;
@@ -241,6 +396,9 @@ fn there(root: &Path, path: &str) -> Option<String> {
 
 fn change_of(file: &Planned, existing: Option<&str>) -> &'static str {
     match (existing, file.kind) {
+        // The text of an unused script's plan is its check's name.
+        (Some(text), Kind::Unused) if generated(&file.text, text) => "remove",
+        (_, Kind::Unused) => "unused",
         (None, _) => "create",
         (Some(text), Kind::Ignore) => {
             if text.lines().any(|line| line.trim() == IGNORED) {

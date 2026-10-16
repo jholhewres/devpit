@@ -454,10 +454,11 @@ pub(crate) fn setup_of(
             })
         })
         .collect();
+    let planned = setup::with_unused(root, &proposal.config, proposal.files.clone());
     let files = if apply {
-        setup::write(root, &proposal.files)?
+        setup::write(root, &planned)?
     } else {
-        setup::preview(root, &proposal.files)
+        setup::preview(root, &planned)
     };
     let waiting = if apply {
         settled(app, store, project, &proposal, true)
@@ -513,8 +514,13 @@ pub(crate) fn set_of(
         _ => Value::Null,
     };
     let written = apply && !proposal.changes.is_empty();
+    let planned = setup::with_unused(root, &proposal.config, proposal.files.clone());
+    let files = if written {
+        setup::write(root, &planned)?
+    } else {
+        setup::preview(root, &planned)
+    };
     if written {
-        setup::write(root, &proposal.files)?;
         if !proposal.config.enabled && made(store, &project.id, Ask::Enable) {
             // Switched off: switching on again is the person's click again.
             let _ = asks::remember(store, &project.id, Ask::Enable, false);
@@ -551,6 +557,7 @@ pub(crate) fn set_of(
         "changes": proposal.changes,
         "yaml": proposal.yaml,
         "laid_out": proposal.laid_out,
+        "files": files,
         "asks": proposal.asks,
         "waiting_for_click": waiting,
         "note": note,

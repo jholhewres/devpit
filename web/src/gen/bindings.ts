@@ -2883,7 +2883,11 @@ export type DevflowError = {
 /**  One file a setup writes, and what writing it does. */
 export type DevflowFileChange = {
 	path: string,
-	/**  `create`, `replace`, `same`, `kept` or `append`. */
+	/**
+	 *  `create`, `replace`, `same`, `kept`, `append`, `remove` (a check
+	 *  script devpit wrote that no check runs) or `unused` (one the person
+	 *  changed, left for them).
+	 */
 	change: string,
 };
 

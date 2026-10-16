@@ -4,7 +4,7 @@
 
 use std::fmt::Write;
 
-use crate::config::{Approved, Check, Config, Stage, StageGate, Step, V1};
+use crate::config::{Approved, Check, Config, Stage, StageGate, Step, E2E_DIR, V1};
 
 /// The text of `config`, commented.
 pub fn render(config: &Config) -> String {
@@ -55,6 +55,13 @@ fn checks(out: &mut String, indent: &str, checks: &[Check]) {
     }
 }
 
+/// Where the specs go, written only when it is not where they go anyway.
+fn e2e_dir(out: &mut String, dir: &str) {
+    if dir != E2E_DIR {
+        let _ = writeln!(out, "    e2e_dir: {}", scalar(dir));
+    }
+}
+
 fn stages_v1(out: &mut String, config: &Config) {
     let stages = &config.stages;
     out.push_str("\nstages:\n");
@@ -65,7 +72,7 @@ fn stages_v1(out: &mut String, config: &Config) {
     let execution = &stages.execution;
     let _ = writeln!(out, "  execution:\n    enabled: {}", execution.enabled);
     checks(out, "    ", &execution.checks);
-    let _ = writeln!(out, "    e2e_dir: {}", scalar(&execution.e2e_dir));
+    e2e_dir(out, &execution.e2e_dir);
     plain(out, "review", &stages.review);
     let _ = writeln!(
         out,
@@ -127,7 +134,7 @@ fn stage_fields(out: &mut String, config: &Config, step: &Step) {
         }
         (Some("execution"), _) => {
             checks(out, "    ", &stages.execution.checks);
-            let _ = writeln!(out, "    e2e_dir: {}", scalar(&stages.execution.e2e_dir));
+            e2e_dir(out, &stages.execution.e2e_dir);
         }
         (Some("completion"), _) => {
             let _ = writeln!(out, "    gate: {}", scalar(&stages.completion.gate));

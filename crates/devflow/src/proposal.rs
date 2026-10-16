@@ -15,7 +15,6 @@ use crate::detect::Detected;
 use crate::folder::{self, State};
 use crate::playwright;
 use crate::preset::{self, Change, Preset};
-use crate::render::render;
 use crate::setup::{self, Planned, Script};
 
 /// A change only the person's click makes.
@@ -111,13 +110,16 @@ pub fn setup(
     let playwright = playwright::wanted(&config, detected)
         .then(|| playwright::text(&config.stages.execution.e2e_dir, playwright::base(detected)));
     let (config, scripts) = setup::scripted(config, &sources);
-    let yaml = render(&config);
+    let changes = preset::diff(&before, &config.to_json());
+    // A setup run again over the person's file keeps their comments, unless
+    // what it changes is more than a word.
+    let (yaml, laid_out) = folder::rewritten(text_of(state), &changes, &config);
     Ok(Proposal {
-        changes: preset::diff(&before, &config.to_json()),
+        changes,
         files: setup::planned(&yaml, &scripts, playwright.as_deref()),
         config,
         yaml,
-        laid_out: true,
+        laid_out,
         scripts,
         asks,
     })
@@ -163,6 +165,14 @@ pub fn switched(state: &State, ask: Ask) -> Result<Proposal, Invalid> {
     written(text, &before, &wanted, Vec::new())
 }
 
+/// The file's text, when there is one that reads as YAML.
+fn text_of(state: &State) -> Option<&str> {
+    match state {
+        State::Valid(text, _) | State::Invalid(Some(text), _) => Some(text),
+        _ => None,
+    }
+}
+
 /// What the file says as JSON: the configuration when it is valid, the raw
 /// fields when it is YAML but invalid, and null otherwise.
 fn said(state: &State) -> Value {
@@ -180,15 +190,33 @@ fn written(
     asks: Vec<Ask>,
 ) -> Result<Proposal, Invalid> {
     let config = config::from_json(wanted)?;
-    let changes = preset::diff(before, wanted);
+    // A check the change adds runs a script of its own, as a setup's does.
+    let (config, scripts) = match config::from_json(before) {
+        Ok(had) => {
+            let had: Vec<String> = had
+                .stages
+                .execution
+                .checks
+                .into_iter()
+                .map(|check| check.name)
+                .collect();
+            setup::scripted_new(config, &had)
+        }
+        Err(_) => (config, Vec::new()),
+    };
+    let changes = if scripts.is_empty() {
+        preset::diff(before, wanted)
+    } else {
+        preset::diff(before, &config.to_json())
+    };
     let (yaml, laid_out) = folder::rewritten(Some(text), &changes, &config);
     Ok(Proposal {
-        files: setup::config_only(&yaml),
+        files: setup::config_only(&yaml, &scripts),
         config,
         yaml,
         laid_out,
         changes,
-        scripts: Vec::new(),
+        scripts,
         asks,
     })
 }

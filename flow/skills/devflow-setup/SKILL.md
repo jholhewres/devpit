@@ -115,7 +115,9 @@ preview the person saw (a click in the app, a key saved). Show them the new
 preview and ask again.
 
 Reply with the files devpit wrote (`.devpit/devflow/devflow.yaml`, `scripts/`,
-`.gitignore` ignoring `runs/`), that they are theirs to commit, and whether
+`.gitignore` ignoring `runs/`) and any check script it removed (`remove`: one
+it wrote that no check runs) or left (`unused`: one the person changed), that
+they are theirs to commit on the default branch, and whether
 Devflow is on as the tool's note says: unless the person already switched it
 on, **Devflow is still off until they click the confirmation devpit shows in
 the app**. End the turn.
@@ -138,7 +140,10 @@ own sign-in; `review.consolidate` says how their findings become one list:
 `jev` (Decisions, else a model pass), `agent` (one model pass) or `none`.
 `review.scale` (off unless set; `true`, or `{ small_lines, sensitive }`)
 sends a small diff that touches no sensitive path to one `devflow-all`
-reviewer instead.
+reviewer instead. devpit's personas are read from devpit, never copied: to
+customize one, write it as `.devpit/devflow/reviewers/<a new name>.md` and
+name that persona in `review.reviewers`. A check added here gets a script
+under `scripts/` of its own, as the setup's do.
 
 A check's `report` is the file it writes into `$DEVPIT_REPORT_DIR` for devpit
 to read test by test (`junit`, `vitest`, `jest`, `cargo`, `go`); one that writes

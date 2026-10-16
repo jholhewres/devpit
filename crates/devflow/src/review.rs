@@ -171,15 +171,17 @@ pub struct Personas<'a> {
     pub teams: &'a [Team],
 }
 
-/// A persona's text from the first layer that has it: the project's own
-/// (where the setup installed it), a team's `reviewers/`, the person's, the
-/// one devpit ships.
+/// A persona's text from the first layer that has it: the project's own, a
+/// team's `reviewers/`, the person's, the one devpit ships. A project's copy
+/// of a text devpit shipped is not its own: an older setup made it.
 pub fn persona_text(root: &Path, elsewhere: Personas, persona: &str) -> Result<String, String> {
     if !crate::config::is_name(persona) {
         return Err(format!("`{persona}` is not a persona's name"));
     }
     let relative = format!("{}/reviewers/{persona}.md", crate::folder::DIR);
-    if let Some(text) = persona_in(root, &relative)? {
+    if let Some(text) =
+        persona_in(root, &relative)?.filter(|text| !crate::setup::shipped(persona, text))
+    {
         return Ok(text);
     }
     let in_layer = format!("reviewers/{persona}.md");

@@ -97,6 +97,36 @@ fn the_persona_is_the_projects_own_before_devpits() {
     assert!(persona_text(dir.path(), Personas::default(), "../secrets").is_err());
 }
 
+/// An older setup copied devpit's personas into the project: a copy nobody
+/// changed is devpit's default, read from the layers under it.
+#[test]
+fn a_persona_copy_an_older_setup_made_is_not_the_projects_own() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mine = dir.path().join("mine");
+    std::fs::create_dir_all(&mine).expect("mine");
+    std::fs::write(
+        mine.join("devflow-spec.md"),
+        "---\nname: devflow-spec\n---\nMine.",
+    )
+    .expect("mine");
+    let personas = Personas {
+        personal: Some(&mine),
+        teams: &[],
+    };
+    let copy = dir.path().join(".devpit/devflow/reviewers/devflow-spec.md");
+    std::fs::create_dir_all(copy.parent().expect("folder")).expect("folder");
+    let (_, shipped) = crate::setup::PERSONAS[0];
+    std::fs::write(&copy, shipped.replace('\n', "\r\n")).expect("copy");
+    assert!(persona_text(dir.path(), personas, "devflow-spec")
+        .expect("the person's")
+        .ends_with("Mine."));
+
+    std::fs::write(&copy, format!("{shipped}\nAlso check the docs.\n")).expect("changed");
+    assert!(persona_text(dir.path(), personas, "devflow-spec")
+        .expect("the project's")
+        .ends_with("Also check the docs.\n"));
+}
+
 fn git<'a>(files: &'a [String], diff: &'a str) -> Git<'a> {
     Git {
         base: "1111111111111111",

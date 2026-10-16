@@ -78,3 +78,17 @@ fn a_string_that_would_read_as_something_else_is_quoted() {
     }
     assert_eq!(scalar("say \"hi\"\n"), r#""say \"hi\"\n""#);
 }
+
+#[test]
+fn where_the_specs_go_is_written_only_when_it_was_moved() {
+    let v1 = parse("version: 1\n").expect("a version 1 file");
+    for mut config in [Config::default(), full(), v1] {
+        config.stages.execution.e2e_dir = crate::config::E2E_DIR.into();
+        let text = render(&config);
+        assert!(!text.contains("e2e_dir"), "{text}");
+        config.stages.execution.e2e_dir = "tests/e2e".into();
+        let moved = render(&config);
+        assert!(moved.contains("    e2e_dir: tests/e2e\n"), "{moved}");
+        assert_eq!(parse(&moved), Ok(config));
+    }
+}

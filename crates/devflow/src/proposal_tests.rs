@@ -146,3 +146,82 @@ fn a_setup_over_a_file_the_click_changed_is_not_the_one_previewed() {
         Some(vec!["enabled".to_owned()])
     );
 }
+
+#[test]
+fn a_setup_run_again_over_the_persons_file_keeps_their_comments() {
+    let first = setup(
+        &State::Missing,
+        Preset::Recommended,
+        &Map::new(),
+        &detected(),
+    )
+    .expect("first");
+    let edited = first.yaml.replace(
+        "enabled: false\n",
+        "enabled: false   # ours: on next sprint\n# and a note of our own\n",
+    );
+    let again = setup(
+        &valid(&edited),
+        Preset::Recommended,
+        &Map::new(),
+        &detected(),
+    )
+    .expect("again");
+    assert!(!again.laid_out, "{}", again.yaml);
+    assert_eq!(again.yaml, edited);
+
+    let set = setup(
+        &valid(&edited),
+        Preset::Recommended,
+        &asked(json!({ "review.block_on": ["critical"] })),
+        &detected(),
+    )
+    .expect("a list changed");
+    assert!(set.laid_out, "a list is more than a word");
+}
+
+#[test]
+fn a_version_1_file_stays_version_1_after_an_unrelated_change() {
+    let v1 = valid("version: 1\n# ours\nenabled: false\nreview:\n  consolidate: none\n");
+    let changed = set(&v1, "review.consolidate", &json!("agent")).expect("changed");
+    assert_eq!(
+        changed.yaml,
+        "version: 1\n# ours\nenabled: false\nreview:\n  consolidate: agent\n"
+    );
+    let listed = set(&v1, "review.block_on", &json!(["critical"])).expect("laid out");
+    assert!(listed.yaml.contains("\nversion: 1\n"), "{}", listed.yaml);
+    assert_eq!(
+        parse(&listed.yaml).expect("reads").version,
+        crate::config::V1
+    );
+}
+
+#[test]
+fn a_check_added_by_a_change_gets_a_script_and_one_already_there_keeps_its_command() {
+    let text = "version: 1\nstages:\n  execution:\n    checks:\n      - name: unit\n        run: make test\n";
+    let checks = json!([
+        { "name": "unit", "run": "make test" },
+        { "name": "lint", "run": "make lint" },
+    ]);
+    let added = set(&valid(text), "stages.execution.checks", &checks).expect("added");
+    let runs: Vec<&str> = added
+        .config
+        .stages
+        .execution
+        .checks
+        .iter()
+        .map(|check| check.run.as_str())
+        .collect();
+    assert_eq!(
+        runs,
+        ["make test", "sh .devpit/devflow/scripts/check-lint.sh"]
+    );
+    let paths: Vec<&str> = added.files.iter().map(|file| file.path.as_str()).collect();
+    assert_eq!(
+        paths,
+        [
+            ".devpit/devflow/devflow.yaml",
+            ".devpit/devflow/scripts/check-lint.sh"
+        ]
+    );
+}

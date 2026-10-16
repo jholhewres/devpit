@@ -90,16 +90,16 @@ fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
         json!({ "preset": "recommended", "apply": true }),
     );
     assert_eq!(applied["applied"], true);
-    for file in [
-        "devflow.yaml",
-        ".gitignore",
-        "scripts/check-unit.sh",
-        "reviewers/devflow-security.md",
-        "devflow-findings.schema.json",
-    ] {
+    for file in ["devflow.yaml", ".gitignore", "scripts/check-unit.sh"] {
         assert!(
             dir.path().join(".devpit/devflow").join(file).is_file(),
             "{file}"
+        );
+    }
+    for devpits in ["reviewers", "devflow-findings.schema.json"] {
+        assert!(
+            !dir.path().join(".devpit/devflow").join(devpits).exists(),
+            "{devpits} copied"
         );
     }
     assert_eq!(applied["waiting_for_click"], json!(["enable"]));
@@ -124,6 +124,24 @@ fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
     );
     assert_eq!(changed["applied"], true);
     assert!(text().contains("block_on: [critical]"), "{}", text());
+
+    // A check taken out leaves its script: the next preview says it goes.
+    let script = dir.path().join(".devpit/devflow/scripts/check-unit.sh");
+    let emptied = ask(
+        "devflow_set",
+        json!({ "path": "stages.execution.checks", "value": [] }),
+    );
+    let said: Vec<(&str, &str)> = emptied["files"]
+        .as_array()
+        .expect("files")
+        .iter()
+        .filter_map(|one| Some((one["path"].as_str()?, one["change"].as_str()?)))
+        .collect();
+    assert!(
+        said.contains(&(".devpit/devflow/scripts/check-unit.sh", "remove")),
+        "{said:?}"
+    );
+    assert!(script.is_file(), "a preview removed it");
 }
 
 /// The server lists from this answer: an orchestrator gets its own tools and

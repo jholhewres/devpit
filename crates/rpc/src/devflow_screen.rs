@@ -218,7 +218,9 @@ pub struct DevflowScreen {
 #[serde(rename_all = "camelCase")]
 pub struct DevflowFileChange {
     pub path: String,
-    /// `create`, `replace`, `same`, `kept` or `append`.
+    /// `create`, `replace`, `same`, `kept`, `append`, `remove` (a check
+    /// script devpit wrote that no check runs) or `unused` (one the person
+    /// changed, left for them).
     pub change: String,
 }
 
