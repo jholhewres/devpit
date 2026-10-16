@@ -3,6 +3,88 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.44 — 2026-10-16
+
+### Fixed
+
+- **"database is locked" on live sessions is gone.** The poll that lists
+  agent sessions rewrote what it had already kept on every pass, taking
+  the write lock each time; a poll that sees nothing new now writes nothing.
+- **Fewer pauses of the window.** A hover over the terminal reads only the
+  rows around the pointer, and pausing or resuming from the tray no longer
+  writes from the window's thread. When the page does stall, the report
+  says what it was on and which commands were working.
+- **A headless reviewer's answer is no longer thrown away** for a field
+  devpit fills in itself: the answer is signed before it is checked.
+- **Severity is held to what a finding is.** A missing test, a written rule
+  or style is at most medium, a problem in test code at most low, and a
+  search is not a proof of concept.
+- **A newer devflow.yaml still reads.** A field this devpit does not know is
+  named and skipped instead of refusing the whole file.
+- **An agent moving, starting or finishing a card is quick again.** It reads
+  the board without asking every agent CLI for its live sessions.
+- **A setup's apply writes only what the person saw.** An agent's apply
+  that differs from the last preview comes back as a new preview.
+
+### Better at what it already did
+
+- **Setup proposes only checks that can run here.** A command whose program
+  is missing — or a `make` target whose recipe calls one — is listed as
+  unavailable with why, on the setup screen too, and is not recommended.
+  Setup also finds modules in subfolders (`unit-<folder>`) and adds a `tsc`
+  typecheck when TypeScript has none.
+- **Checks with prerequisites and shared resources.** `requires:` runs a
+  probe first and leaves the check "not run" when it fails, instead of red.
+  `exclusive:` makes checks that share a resource (a test database) wait
+  for each other, across cards and worktrees.
+- **Proof without a test runner.** A criterion can be proved by a
+  screenshot, an E2E run or a file, which the gate checks is there. A card
+  that only gathers evidence or writes docs closes on its proofs without a
+  code review.
+- **Reviews that fit the change.** `review.scale` runs one combined
+  reviewer on a small change that touches nothing sensitive. After a fix,
+  `previous` re-reviews only what changed and carries the rest over.
+  `review.verify` has the session run the proof of concept of each critical
+  and high, and records it as confirmed, refuted or not run.
+- **Findings point at real lines.** Each finding is anchored on a line of
+  the diff; one on no line is dropped with why, and the card lists each
+  `file:line` once across reviewers. The reviewers start with no MCP
+  servers and a turn limit, and all read the same packet.
+- **Decisions says where it stands.** Every Devflow answer that asks
+  Decisions says whether it is on, off, without a key or failing, and why;
+  the Jev panel and the card say the same.
+- **Plans across epics, merged and cut cards.** A plan card can wait on a
+  card of another epic (`#42`). Once the cards exist, a card can be merged
+  into another or cut from the plan, releasing the cards waiting on it.
+  `unblock_on: gate` lets them start as soon as the gate passes. An
+  orchestrator can pass on the person's yes to a plan, quoted on the epic.
+- **Runs stay out of the repository.** A card's runs are kept in devpit's
+  folder for the project and attached to the card. A setup copies no
+  persona or schema into the repository, keeps the comments in your
+  devflow.yaml, and evidence names the devpit and skills that made it.
+- **Cards name what blocks them by number,** and an agent can edit or
+  delete a comment it wrote — never someone else's.
+
+### New
+
+- **Devflow on demand.** Wherever Devflow is on in Settings, a review can
+  run without a card or a setup: on a GitHub pull request, a `base`..`head`
+  range or a worktree. A pull request or range is read in a detached
+  worktree in devpit's own folder, so your checkout never moves. A plan
+  without an epic is a preview. `devpit-agent devflow <stage>` reads a
+  stage's skill or calls its tool from a shell.
+- **Publish a review on its pull request.** A review of a pull request is
+  drafted for it: what needs changing goes on the lines it concerns, one
+  short comment per line, and suggestions go in one general comment.
+  `devpit_devflow_publish` posts only the draft you said yes to, as a
+  review that only comments, and edits those comments when published
+  again instead of posting them twice. GitHub posts; GitLab and Bitbucket
+  get the text to paste.
+- **Review code already in production.** `mode: retro` on a merged range
+  answers "follow-up" instead of "request changes", drafts one follow-up
+  ticket per medium or worse finding, and asks each defect for a
+  read-only query of what it touched since the deploy.
+
 ## 0.1.43 — 2026-10-14
 
 ### Fixed
