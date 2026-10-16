@@ -110,6 +110,15 @@
         "anchor": {
           "enum": ["added", "context", "outside_hunk", "not_in_diff", "beyond_eof"],
           "description": "Set by devpit from the diff and HEAD: the line is one the change added, one a hunk shows around it, outside every hunk of a changed file, or in a file the change did not touch. A finding on no line of HEAD (beyond_eof) is taken out and listed in dropped."
+        },
+        "verified": {
+          "type": "object",
+          "required": ["result", "evidence"],
+          "properties": {
+            "result": { "enum": ["confirmed", "refuted", "not_run"] },
+            "evidence": { "type": "string", "minLength": 1, "description": "Where the PoC run shows it, or why it was not run." }
+          },
+          "description": "Set by devpit from the session's review.verify step: what running this critical or high's PoC showed. With review.verify: required, a high not confirmed counts as medium and a refuted one holds nothing."
         }
       },
       "allOf": [

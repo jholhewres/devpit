@@ -141,6 +141,24 @@ fn several_reviewers_are_consolidated_by_jev_unless_the_file_says_otherwise() {
 }
 
 #[test]
+fn the_review_asks_for_no_poc_run_unless_the_file_says_verify() {
+    let verify = |text: &str| parse(text).expect("valid").review.verify;
+    assert_eq!(verify("version: 1\n"), Verify::Off);
+    assert_eq!(verify("version: 2\n"), Verify::Off);
+    assert_eq!(
+        verify("version: 1\nreview:\n  verify: advise\n"),
+        Verify::Advise
+    );
+    assert_eq!(
+        verify("version: 2\nreview:\n  verify: required\n"),
+        Verify::Required
+    );
+    let wrong = refused("version: 2\nreview:\n  verify: always\n");
+    assert_eq!(wrong.field, "review.verify");
+    assert!(wrong.message.contains("off, advise, required"), "{wrong}");
+}
+
+#[test]
 fn the_review_is_scaled_only_when_the_file_asks() {
     let scale = |text: &str| parse(text).expect("valid").review.scale;
     assert_eq!(scale("version: 2\n"), None);

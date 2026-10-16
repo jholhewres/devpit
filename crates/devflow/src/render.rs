@@ -207,6 +207,13 @@ fn review(out: &mut String, config: &Config) {
             let _ = writeln!(out, "    sensitive: [{}]", globs.join(", "));
         }
     }
+    if config.review.verify != crate::config::Verify::Off {
+        out.push_str(
+            "  # The session runs each critical and high's PoC: advise asks it,\n  \
+             # required also counts a high it did not confirm as medium.\n",
+        );
+        let _ = writeln!(out, "  verify: {}", config.review.verify.word());
+    }
 
     out.push_str(
         "\n# Decisions (Jev) answers typed questions about the gates. shadow logs\n\

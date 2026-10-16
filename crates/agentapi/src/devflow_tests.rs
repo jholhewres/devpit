@@ -370,7 +370,10 @@ fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
         .collect();
     keys.sort();
     // devpit_devflow::review::FIELDS, which the app holds every call to.
-    assert_eq!(keys, ["base", "card", "previous", "reports", "run"]);
+    assert_eq!(
+        keys,
+        ["base", "card", "previous", "reports", "run", "verified"]
+    );
     let mut calls = 0;
     for block in REVIEW
         .split("```json")
@@ -389,8 +392,8 @@ fn the_review_comes_with_its_stage_and_takes_what_its_skill_sends() {
         }
     }
     assert_eq!(
-        calls, 3,
-        "a first call, the one that hands reports back, and a re-review"
+        calls, 4,
+        "a first call, the one that hands reports back, the verified PoCs and a re-review"
     );
 }
 

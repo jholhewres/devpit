@@ -206,13 +206,18 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: REVIEW_TOOL,
             method: "devflow_review",
-            description: "Devflow: review a card's change with devflow.yaml's review.reviewers, each headless on the person's own agent CLI (one missing or signed out is skipped), from one packet: the diff from the card's base to HEAD (from a previous run's HEAD with `previous`), the card, its criteria and the persona. Writes findings.json for the gate and comments the count on the card. Answers the verdict by review.block_on, each reviewer's time and cost, and `pending`: personas no reviewer covered — review those yourself, then call again with `run` and `reports`. Takes as long as the reviewers do.",
+            description: "Devflow: review a card's change with devflow.yaml's review.reviewers, each headless on the person's own agent CLI (one missing or signed out is skipped), from one packet: the diff from the card's base to HEAD (from a previous run's HEAD with `previous`), the card, its criteria and the persona. Writes findings.json for the gate and comments the count on the card. Answers the verdict by review.block_on, each reviewer's time and cost, and `pending`: personas no reviewer covered — review those yourself, then call again with `run` and `reports`. With review.verify on, `next` names the criticals and highs whose PoC to run: send what each showed with `run` and `verified`. Takes as long as the reviewers do.",
             input: || json!({ "type": "object", "properties": {
                 "card": { "type": "string", "description": "The card's id." },
                 "base": { "type": "string", "description": "The branch or commit the diff starts from, when it is not the card's own base. Usually left out." },
                 "previous": { "type": "string", "description": "After fixing a review's blocking findings: that review's run. The reviewers read only what changed since its HEAD, with its blocking findings to check again; its other findings are carried over. Leave out `base` and `run`." },
                 "run": { "type": "string", "description": "The run a first call answered, which `reports` complete." },
-                "reports": { "type": "array", "items": { "type": "object" }, "description": "With `run`: one findings object for each persona in `pending` that you reviewed, as devflow-findings.schema.json beside the run's packet describes." }
+                "reports": { "type": "array", "items": { "type": "object" }, "description": "With `run`: one findings object for each persona in `pending` that you reviewed, as devflow-findings.schema.json beside the run's packet describes." },
+                "verified": { "type": "array", "items": { "type": "object", "properties": {
+                    "finding": { "type": "integer", "minimum": 0, "description": "The finding's place in the run's findings.json `findings`, from 0." },
+                    "result": { "enum": ["confirmed", "refuted", "not_run"] },
+                    "evidence": { "type": "string", "description": "Where the PoC ran and what it showed, or why it was not run." }
+                }, "required": ["finding", "result", "evidence"] }, "description": "With `run` and without `reports`: the PoC you ran for each critical and high, as review.verify asks." }
             }, "required": ["card"] }),
         },
     ),

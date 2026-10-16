@@ -15,7 +15,7 @@ use devpit_agentcli::reviewing::{self, Cli};
 use serde_json::{json, Value};
 
 use crate::brief::Brief;
-use crate::config::{Agent, Config, Consolidate, Reviewer};
+use crate::config::{Agent, Config, Consolidate, Reviewer, Verify};
 use crate::evidence::Card;
 use crate::findings::{self, Diffed, Source};
 use crate::jev::{self, Said};
@@ -26,9 +26,8 @@ use crate::scale::{self, Sized};
 
 /// The fields the tool takes; `project` is an orchestrator's, as on every
 /// board tool.
-pub const FIELDS: [&str; 5] = ["card", "base", "run", "reports", "previous"];
-const SHAPE: &str =
-    "{ card, base?, previous?, run?, reports?: [one findings object per persona you reviewed] }";
+pub const FIELDS: [&str; 6] = ["card", "base", "run", "reports", "previous", "verified"];
+const SHAPE: &str = "{ card, base?, previous?, run?, reports?: [one findings object per persona you reviewed], verified?: [{ finding, result, evidence }] }";
 
 /// What a review leaves in its run's folder.
 pub const PACKET: &str = "review-context.md";
@@ -60,6 +59,9 @@ pub struct Asked {
     /// An earlier review of the card: only what changed since its HEAD is
     /// read again.
     pub previous: Option<String>,
+    /// The PoCs the session ran on `run`'s critical and high findings, each
+    /// naming its finding by its place in findings.json.
+    pub verified: Vec<Value>,
 }
 
 /// The tool's input, refused with what it takes when it is not that.
@@ -105,6 +107,21 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
     };
     let run = word("run");
     let previous = word("previous");
+    let verified = verified_asked(fields.get("verified"))?;
+    if !verified.is_empty() {
+        // A place in findings.json holds only while nothing is merged again.
+        return match (&run, reports.is_empty()) {
+            (Some(_), true) => Ok(Asked {
+                card,
+                base,
+                run,
+                reports,
+                previous,
+                verified,
+            }),
+            _ => Err("pass `verified` with `run` and without `reports`".to_owned()),
+        };
+    }
     if previous.is_some() && (run.is_some() || base.is_some()) {
         return Err(
             "`previous` starts a new review from that run's HEAD: leave out `run` and `base`"
@@ -125,8 +142,36 @@ pub fn asked(params: &Value) -> Result<Asked, String> {
             run,
             reports,
             previous,
+            verified,
         }),
     }
+}
+
+/// `verified`, each held to `{ finding, result, evidence }`.
+fn verified_asked(given: Option<&Value>) -> Result<Vec<Value>, String> {
+    let list = match given {
+        None | Some(Value::Null) => return Ok(Vec::new()),
+        Some(Value::Array(list)) if list.len() <= findings::MOST_FINDINGS => list,
+        Some(_) => {
+            return Err(
+                "`verified` is a list of { finding, result, evidence }, one per PoC you ran"
+                    .to_owned(),
+            )
+        }
+    };
+    for (at, one) in list.iter().enumerate() {
+        let shaped = one["finding"].is_u64()
+            && findings::RESULTS.contains(&one["result"].as_str().unwrap_or_default())
+            && one["evidence"]
+                .as_str()
+                .is_some_and(|said| !said.trim().is_empty());
+        if !shaped {
+            return Err(format!(
+                "`verified.{at}` is {{ finding: its place in findings.json from 0, result: confirmed, refuted or not_run, evidence }}"
+            ));
+        }
+    }
+    Ok(list.clone())
 }
 
 /// The personas every review covers, one per axis.
@@ -425,7 +470,7 @@ fn previous_said(run: &str, blocking: &[Value]) -> String {
                 .collect();
             format!(
                 "{} [{}]\n  {}",
-                findings::line_of(finding),
+                findings::line_of(finding, Verify::Off),
                 finding["axis"].as_str().unwrap_or_default(),
                 description.replace('\n', " ")
             )
@@ -733,6 +778,8 @@ pub struct Done {
     pub dropped: Vec<Value>,
     /// Which way `review.scale` sent the review; `None` with it off.
     pub scale: Option<Sized>,
+    /// `review.verify`, which says how each critical and high is listed.
+    pub verify: Verify,
 }
 
 impl Done {
@@ -790,10 +837,14 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
     let path = given.runs.fresh(given.card.id, given.at)?;
     let criteria = criteria_of(given.card.body);
     let blocked: Vec<Value> = given.previous.map_or_else(Vec::new, |previous| {
-        findings::blocking(&previous.findings, &given.config.review.block_on)
-            .into_iter()
-            .cloned()
-            .collect()
+        findings::blocking(
+            &previous.findings,
+            &given.config.review.block_on,
+            given.config.review.verify,
+        )
+        .into_iter()
+        .cloned()
+        .collect()
     });
     let packet = (given.redact)(&packet(&Packet {
         card: Card {
@@ -1199,6 +1250,9 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         None => reviewed_anew(given)?,
         Some(run) => reviewed_again(given, run)?,
     };
+    if !given.asked.verified.is_empty() {
+        return verified(given, stamp, &path, record);
+    }
     let folder = path.display().to_string();
     let sources: Vec<Source> = record
         .ran
@@ -1241,6 +1295,7 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
             &mut merged,
             &previous.findings,
             &given.config.review.block_on,
+            given.config.review.verify,
             &previous.run,
         );
     }
@@ -1262,7 +1317,7 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
                 "base": record.base,
                 "head": record.head,
                 "reviewers": record.ran.iter().filter(|ran| ran.file.is_some()).map(Ran::to_json).collect::<Vec<_>>(),
-                "verdict": findings::verdict(&merged, &given.config.review.block_on),
+                "verdict": findings::verdict(&merged, &given.config.review.block_on, given.config.review.verify),
                 "findings": merged,
                 "done_well": done_well,
                 "verification": verification,
@@ -1306,9 +1361,74 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         diffed: record.diffed,
         dropped,
         scale: record.scale,
+        verify: given.config.review.verify,
     };
     write(&path, RECORD, &pretty(&recorded(&done)))?;
     Ok(done)
+}
+
+/// The session's PoC runs kept on the run's findings as they stand, and
+/// the verdict weighed again: nothing is merged anew, so each place holds.
+fn verified(given: &Given, stamp: String, path: &Path, record: Record) -> Result<Done, String> {
+    let mut kept = read_json(path, FINDINGS).ok_or_else(|| {
+        format!("run {stamp} has no findings.json yet: verify once its review answered")
+    })?;
+    let mut list = kept["findings"].as_array().cloned().unwrap_or_default();
+    findings::verified_on(&mut list, &given.asked.verified)?;
+    let review = &given.config.review;
+    kept["verdict"] = json!(findings::verdict(&list, &review.block_on, review.verify));
+    kept["findings"] = json!(list);
+    let wrong = findings::problems(&kept);
+    if !wrong.is_empty() {
+        return Err(format!(
+            "the verified findings do not follow the schema: {}",
+            wrong.join("; ")
+        ));
+    }
+    write(path, FINDINGS, &pretty(&kept))?;
+    let said = &kept["consolidation"];
+    let consolidate = |key: &str| {
+        said[key]
+            .as_str()
+            .and_then(Consolidate::of)
+            .unwrap_or(Consolidate::Nothing)
+    };
+    let count = |key: &str| said[key].as_u64().unwrap_or_default() as usize;
+    let words = |key: &str| -> Vec<String> {
+        kept[key]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect()
+    };
+    Ok(Done {
+        card: given.card.id.to_owned(),
+        folder: path.display().to_string(),
+        stamp,
+        base: record.base,
+        head: record.head,
+        ran: record.ran,
+        pending: words("pending"),
+        consolidated: Consolidated {
+            asked: consolidate("asked"),
+            used: consolidate("used"),
+            note: said["note"].as_str().map(str::to_owned),
+            cost_usd: said["cost_usd"].as_f64(),
+            duration_ms: said["duration_ms"].as_u64(),
+            from: count("from"),
+            into: count("into"),
+        },
+        dropped: kept["dropped"].as_array().cloned().unwrap_or_default(),
+        findings: Some(kept),
+        changed: record.changed,
+        judged: record.judged,
+        previous: record.previous,
+        diffed: record.diffed,
+        scale: record.scale,
+        verify: review.verify,
+    })
 }
 
 fn consolidation_json(consolidated: &Consolidated) -> Value {
@@ -1433,7 +1553,7 @@ pub fn comment(done: &Done, links: &[(String, String)]) -> String {
             .as_array()
             .map_or(&[][..], Vec::as_slice);
         for (lines, heading) in
-            findings::listed(list)
+            findings::listed(list, done.verify)
                 .into_iter()
                 .zip(["Spec", "Standards", "Security"])
         {
@@ -1471,6 +1591,22 @@ fn short(sha: &str) -> &str {
     sha.get(..12).unwrap_or(sha)
 }
 
+/// The places of the standing criticals and highs no PoC run was recorded
+/// for, when `review.verify` asks for one.
+fn unverified(verify: Verify, list: &[Value]) -> Option<String> {
+    let places: Vec<String> = list
+        .iter()
+        .enumerate()
+        .filter(|(_, finding)| {
+            findings::standing(finding)
+                && matches!(finding["severity"].as_str(), Some("critical" | "high"))
+                && finding.get("verified").is_none()
+        })
+        .map(|(at, _)| at.to_string())
+        .collect();
+    (verify != Verify::Off && !places.is_empty()).then(|| places.join(", "))
+}
+
 /// What the agent is answered.
 pub fn summary(done: &Done) -> Value {
     let packet = format!("{}/{PACKET}", done.folder);
@@ -1485,6 +1621,11 @@ pub fn summary(done: &Done) -> Value {
             "Review {} yourself: one fresh subagent per persona, each given only the packet at {packet} and its persona at {persona}, each answering one findings object. Then call devpit_devflow_review again with this card, run \"{}\" and reports: those objects.",
             done.pending.join(", "),
             done.stamp
+        )
+    } else if let Some(places) = unverified(done.verify, list) {
+        format!(
+            "Verify (devflow-review): run the PoC of findings {places} of {}/{FINDINGS} where there is an environment, then call devpit_devflow_review with this card, run \"{}\" and verified: one {{ finding, result, evidence }} each.",
+            done.folder, done.stamp
         )
     } else if verdict == Some("request_changes") {
         format!(
@@ -1509,7 +1650,7 @@ pub fn summary(done: &Done) -> Value {
         })).collect::<Vec<_>>(),
         "consolidation": consolidation_json(&done.consolidated),
         "verdict": verdict,
-        "findings": list.iter().map(|finding| findings::line_of(finding).trim_start_matches("- ").to_owned()).collect::<Vec<_>>(),
+        "findings": list.iter().map(|finding| findings::line_of(finding, done.verify).trim_start_matches("- ").to_owned()).collect::<Vec<_>>(),
         "findings_file": findings.map(|_| format!("{}/{FINDINGS}", done.folder)),
         "pending": done.pending,
         "next": next,

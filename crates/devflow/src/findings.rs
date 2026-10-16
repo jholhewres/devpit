@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use crate::config::{Consolidate, Severity};
+use crate::config::{Consolidate, Severity, Verify};
 use crate::plan::PREFIX;
 
 /// The schema, as this build ships it and the setup installs it.
@@ -34,7 +34,7 @@ pub const REQUIRED: [&str; 9] = [
 ];
 
 /// Everything a finding may carry: the schema allows nothing else.
-pub const FIELDS: [&str; 20] = [
+pub const FIELDS: [&str; 21] = [
     "file",
     "line",
     "end_line",
@@ -55,10 +55,11 @@ pub const FIELDS: [&str; 20] = [
     "jev",
     "carried_from",
     "anchor",
+    "verified",
 ];
 
 /// What devpit sets on a finding, never a reviewer.
-const DEVPITS: [&str; 7] = [
+const DEVPITS: [&str; 8] = [
     "found_by",
     "agreement",
     "false_positive",
@@ -66,6 +67,7 @@ const DEVPITS: [&str; 7] = [
     "capped",
     "carried_from",
     "anchor",
+    "verified",
 ];
 
 /// Where a finding's line sits in the change, as devpit reads it from the
@@ -84,8 +86,12 @@ pub const ANCHORS: [&str; 5] = [
 /// cannot outgrow without a PoC showing a defect.
 pub const KINDS: [&str; 4] = ["defect", "missing_test", "rule", "style"];
 
+/// What running a critical or high's PoC showed: `not_run` where there was
+/// no environment to run it in.
+pub const RESULTS: [&str; 3] = ["confirmed", "refuted", "not_run"];
+
 /// The most findings one answer may hold: a review, not a lint run.
-const MOST_FINDINGS: usize = 200;
+pub(crate) const MOST_FINDINGS: usize = 200;
 /// The problems an answer refused is told about.
 const NAMED: usize = 5;
 
@@ -191,6 +197,13 @@ fn finding_problems(finding: &Value, at: &str, wrong: &mut Vec<String>) {
     }
     if finding.get("jev").is_some_and(|value| !value.is_object()) {
         wrong.push(format!("`{at}.jev` is an object"));
+    }
+    if let Some(verified) = finding.get("verified") {
+        if !RESULTS.contains(&text(verified, "result")) || !filled(verified, "evidence") {
+            wrong.push(format!(
+                "`{at}.verified` is {{ result: confirmed, refuted or not_run, evidence }}"
+            ));
+        }
     }
     if finding.get("anchor").is_some() && !ANCHORS.contains(&text(finding, "anchor")) {
         wrong.push(format!(
@@ -563,20 +576,77 @@ pub fn merged(findings: &[Value], groups: &[Vec<usize>], answered: &[Source]) ->
     merged
 }
 
-/// The person's "not a problem" from an earlier findings.json, kept on the
-/// same finding when the list is made again.
+/// The person's "not a problem" and the session's PoC run from an earlier
+/// findings.json, kept on the same finding when the list is made again.
 pub fn carried(merged: &mut [Value], earlier: &[Value]) {
     for finding in merged.iter_mut() {
-        let marked = earlier.iter().any(|before| {
-            before.get("false_positive") == Some(&json!(true))
-                && ["file", "axis", "title"]
+        let before: Vec<&Value> = earlier
+            .iter()
+            .filter(|before| {
+                ["file", "axis", "title"]
                     .iter()
                     .all(|key| text(before, key) == text(finding, key))
-                && lines(before) == lines(finding)
-        });
-        if marked {
+                    && lines(before) == lines(finding)
+            })
+            .collect();
+        if before
+            .iter()
+            .any(|one| one.get("false_positive") == Some(&json!(true)))
+        {
             finding["false_positive"] = json!(true);
         }
+        if let Some(verified) = before.iter().find_map(|one| one.get("verified")) {
+            finding["verified"] = verified.clone();
+        }
+    }
+}
+
+/// The PoCs the session ran, each kept on the finding at its place in
+/// findings.json's `findings`. Only a critical or high has a PoC to run.
+pub fn verified_on(list: &mut [Value], verified: &[Value]) -> Result<(), String> {
+    for (at, one) in verified.iter().enumerate() {
+        let place = one["finding"]
+            .as_u64()
+            .and_then(|place| usize::try_from(place).ok())
+            .filter(|place| *place < list.len())
+            .ok_or_else(|| {
+                format!(
+                    "`verified.{at}.finding` is a finding's place in findings.json, from 0 to {}",
+                    list.len().saturating_sub(1)
+                )
+            })?;
+        let finding = &mut list[place];
+        if !matches!(text(finding, "severity"), "critical" | "high") {
+            return Err(format!(
+                "finding {place} is {}: only a critical or high has a PoC to verify",
+                text(finding, "severity")
+            ));
+        }
+        finding["verified"] = json!({ "result": one["result"], "evidence": one["evidence"] });
+    }
+    Ok(())
+}
+
+/// Why `verify: required` counts a finding apart from its severity.
+const UNCONFIRMED: &str =
+    "review.verify is required and no PoC run confirmed it, so it counts as medium";
+const REFUTED: &str = "its PoC was run and refuted it, so it holds nothing";
+
+/// The severity a finding counts as in the verdict, and why when that is not
+/// its own: only `verify: required` weighs a PoC run, and a critical with
+/// none still counts as critical.
+pub fn weighed(finding: &Value, verify: Verify) -> (Option<Severity>, Option<&'static str>) {
+    let said = severity_of(text(finding, "severity"));
+    if verify != Verify::Required {
+        return (said, None);
+    }
+    let result = text(&finding["verified"], "result");
+    match said {
+        Some(Severity::Critical | Severity::High) if result == "refuted" => (None, Some(REFUTED)),
+        Some(Severity::High) if result != "confirmed" => {
+            (Some(Severity::Medium), Some(UNCONFIRMED))
+        }
+        _ => (said, None),
     }
 }
 
@@ -607,26 +677,39 @@ pub fn standing(finding: &Value) -> bool {
         && finding["jev"].get("set_aside") != Some(&json!(true))
 }
 
-/// Whether a finding holds the card: in `block_on`, and still standing.
-pub fn blocks(finding: &Value, block_on: &[Severity]) -> bool {
+/// Whether a finding holds the card: in `block_on` as [`weighed`], and
+/// still standing.
+pub fn blocks(finding: &Value, block_on: &[Severity], verify: Verify) -> bool {
     standing(finding)
-        && severity_of(text(finding, "severity")).is_some_and(|one| block_on.contains(&one))
+        && weighed(finding, verify)
+            .0
+            .is_some_and(|one| block_on.contains(&one))
 }
 
 /// The findings that hold the card.
-pub fn blocking<'a>(findings: &'a [Value], block_on: &[Severity]) -> Vec<&'a Value> {
+pub fn blocking<'a>(
+    findings: &'a [Value],
+    block_on: &[Severity],
+    verify: Verify,
+) -> Vec<&'a Value> {
     findings
         .iter()
-        .filter(|finding| blocks(finding, block_on))
+        .filter(|finding| blocks(finding, block_on, verify))
         .collect()
 }
 
 /// A re-review's findings with what the previous run found that did not
 /// block: only the delta was read again, so those still stand. Each keeps
 /// the run it was first found in; one a new finding repeats is left out.
-pub fn carried_over(merged: &mut Vec<Value>, previous: &[Value], block_on: &[Severity], run: &str) {
+pub fn carried_over(
+    merged: &mut Vec<Value>,
+    previous: &[Value],
+    block_on: &[Severity],
+    verify: Verify,
+    run: &str,
+) {
     let new = merged.len();
-    for finding in previous.iter().filter(|one| !blocks(one, block_on)) {
+    for finding in previous.iter().filter(|one| !blocks(one, block_on, verify)) {
         if merged[..new].iter().any(|now| alike(now, finding)) {
             continue;
         }
@@ -638,8 +721,8 @@ pub fn carried_over(merged: &mut Vec<Value>, previous: &[Value], block_on: &[Sev
     }
 }
 
-pub fn verdict(findings: &[Value], block_on: &[Severity]) -> &'static str {
-    if blocking(findings, block_on).is_empty() {
+pub fn verdict(findings: &[Value], block_on: &[Severity], verify: Verify) -> &'static str {
+    if blocking(findings, block_on, verify).is_empty() {
         "approve"
     } else {
         "request_changes"
@@ -885,12 +968,32 @@ pub fn headline(findings: &Value) -> String {
 }
 
 /// One finding as the comment lists it.
-pub fn line_of(finding: &Value) -> String {
-    item_of(finding, &[])
+pub fn line_of(finding: &Value, verify: Verify) -> String {
+    item_of(finding, &[], verify)
+}
+
+/// What a critical or high's PoC run showed, once the review asks for one
+/// or a run was recorded, and how the verdict counts it.
+fn verification_said(finding: &Value, verify: Verify) -> Option<String> {
+    let verified = &finding["verified"];
+    let evidence = text(verified, "evidence").replace('\n', " ");
+    let mut said = match text(verified, "result") {
+        "confirmed" => format!("confirmed in {evidence}"),
+        "refuted" => format!("refuted in {evidence}"),
+        "not_run" => format!("not verified: {evidence}"),
+        _ if verify != Verify::Off && matches!(text(finding, "severity"), "critical" | "high") => {
+            "not verified".to_owned()
+        }
+        _ => return None,
+    };
+    if let (_, Some(why)) = weighed(finding, verify) {
+        said.push_str(&format!(" — {why}"));
+    }
+    Some(said)
 }
 
 /// A finding with the other axes found at its file:line, as one item.
-fn item_of(finding: &Value, axes: &[&str]) -> String {
+fn item_of(finding: &Value, axes: &[&str], verify: Verify) -> String {
     let across = if axes.len() > 1 {
         format!(" [{}]", axes.join("+"))
     } else {
@@ -912,6 +1015,9 @@ fn item_of(finding: &Value, axes: &[&str]) -> String {
             text(&finding["capped"], "why")
         ));
     }
+    if let Some(verification) = verification_said(finding, verify) {
+        said.push_str(&format!(" — {verification}"));
+    }
     if let Some(run) = finding.get("carried_from").and_then(Value::as_str) {
         said.push_str(&format!(" — carried from run {run}"));
     }
@@ -927,7 +1033,7 @@ fn item_of(finding: &Value, axes: &[&str]) -> String {
 /// The comment's items under each axis, in [`AXES`]' order. Findings of
 /// different axes at one file:line are one item under the first of them,
 /// naming every axis; findings.json keeps them apart.
-pub fn listed(list: &[Value]) -> Vec<Vec<String>> {
+pub fn listed(list: &[Value], verify: Verify) -> Vec<Vec<String>> {
     let axis_of = |finding: &Value| {
         AXES.iter()
             .position(|axis| *axis == text(finding, "axis"))
@@ -952,7 +1058,7 @@ pub fn listed(list: &[Value]) -> Vec<Vec<String>> {
                 }));
                 here.push(place_of);
             }
-            items[at].push(item_of(finding, &axes));
+            items[at].push(item_of(finding, &axes, verify));
         }
         listed.extend(here);
     }

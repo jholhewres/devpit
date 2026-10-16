@@ -105,6 +105,17 @@ words!(
     /// `devflow-finding` rubric, by one model pass, or merged as they are.
     Consolidate { Jev = "jev", Agent = "agent", Nothing = "none" }
 );
+words!(
+    /// Whether the session runs the PoC of each critical and high: not
+    /// asked, asked, or asked with an unconfirmed high counted as medium.
+    Verify { Off = "off", Advise = "advise", Required = "required" }
+);
+
+impl Verify {
+    fn off(&self) -> bool {
+        *self == Verify::Off
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Config {
@@ -248,6 +259,8 @@ pub struct Review {
     /// One reviewer for a small, unsensitive diff; off when absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scale: Option<Scale>,
+    #[serde(skip_serializing_if = "Verify::off")]
+    pub verify: Verify,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -302,6 +315,7 @@ impl Default for Config {
                 block_on: vec![Severity::Critical, Severity::High],
                 consolidate: Consolidate::Jev,
                 scale: None,
+                verify: Verify::Off,
             },
             decisions: Decisions {
                 use_: false,
@@ -942,12 +956,17 @@ pub(crate) fn review(node: &Node, path: &str) -> Result<Review, Invalid> {
         Some((node, path)) => scale(node, &path)?,
         None => None,
     };
+    let verify = match fields.get("verify") {
+        Some((node, path)) => word(node, &path, Verify::of, Verify::ALL, Verify::word)?,
+        None => Verify::Off,
+    };
     fields.done()?;
     Ok(Review {
         reviewers,
         block_on,
         consolidate,
         scale,
+        verify,
     })
 }
 

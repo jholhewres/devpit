@@ -49,6 +49,7 @@ fn full() -> Config {
         small_lines: 40,
         sensitive: vec!["*.sql".into(), ".github/workflows/**".into()],
     });
+    config.review.verify = crate::config::Verify::Required;
     config.decisions.use_ = true;
     config.decisions.mode = Mode::Enforce;
     config.decisions.rubrics = BTreeMap::from([("completion".into(), "devflow-done".into())]);

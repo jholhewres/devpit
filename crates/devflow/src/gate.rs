@@ -470,6 +470,7 @@ fn reviewed(looked: &Looked, missing: &mut Vec<String>) -> Option<String> {
     let blocking = crate::findings::blocking(
         list(review.findings, "findings"),
         &looked.config.review.block_on,
+        looked.config.review.verify,
     );
     for finding in blocking.iter().take(NAMED) {
         missing.push(format!(

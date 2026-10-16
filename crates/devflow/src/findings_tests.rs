@@ -313,12 +313,16 @@ fn a_critical_finding_blocks_until_the_person_calls_it_a_false_positive() {
         finding("a.rs", 1, "critical", "x"),
         finding("a.rs", 9, "low", "y"),
     ];
-    assert_eq!(verdict(&list, &block_on), "request_changes");
-    assert_eq!(blocking(&list, &block_on).len(), 1);
+    assert_eq!(verdict(&list, &block_on, Verify::Off), "request_changes");
+    assert_eq!(blocking(&list, &block_on, Verify::Off).len(), 1);
     list[0]["false_positive"] = json!(true);
-    assert_eq!(verdict(&list, &block_on), "approve");
+    assert_eq!(verdict(&list, &block_on, Verify::Off), "approve");
     assert_eq!(
-        verdict(&[finding("a.rs", 1, "high", "x")], &[Severity::Critical]),
+        verdict(
+            &[finding("a.rs", 1, "high", "x")],
+            &[Severity::Critical],
+            Verify::Off
+        ),
         "approve"
     );
 }
@@ -353,7 +357,13 @@ fn a_rereview_carries_what_did_not_block_and_names_the_run_it_was_found_in() {
         older,
     ];
     let mut merged = vec![finding("b.rs", 5, "medium", "said again here")];
-    carried_over(&mut merged, &previous, &block_on, "20261014T120000Z");
+    carried_over(
+        &mut merged,
+        &previous,
+        &block_on,
+        Verify::Off,
+        "20261014T120000Z",
+    );
     let titles: Vec<&str> = merged
         .iter()
         .filter_map(|one| one["title"].as_str())
@@ -365,8 +375,8 @@ fn a_rereview_carries_what_did_not_block_and_names_the_run_it_was_found_in() {
     assert!(merged[0].get("carried_from").is_none());
     assert_eq!(merged[1]["carried_from"], "20261014T120000Z");
     assert_eq!(merged[3]["carried_from"], "20261001T000000Z");
-    assert_eq!(verdict(&merged, &block_on), "approve");
-    assert!(line_of(&merged[1]).ends_with(" — carried from run 20261014T120000Z"));
+    assert_eq!(verdict(&merged, &block_on, Verify::Off), "approve");
+    assert!(line_of(&merged[1], Verify::Off).ends_with(" — carried from run 20261014T120000Z"));
     let report = json!({
         "version": 1, "reviewers": [{ "agent": "claude", "persona": "devflow-spec" }],
         "verdict": "approve", "findings": merged, "done_well": ["small"],
@@ -617,7 +627,7 @@ fn the_comment_names_one_place_once_across_its_axes() {
         on("standards", "a.rs", 9, "a name"),
         on("security", "b.rs", 1, "a secret"),
     ];
-    let items = listed(&list);
+    let items = listed(&list, Verify::Off);
     assert_eq!(
         items,
         [
@@ -653,4 +663,93 @@ fn the_persons_word_on_a_finding_is_kept_beside_jevs() {
         unjudged.get("jev").is_none(),
         "nothing of Jev's to sit beside"
     );
+}
+
+fn ran(mut finding: Value, result: &str) -> Value {
+    finding["verified"] = json!({ "result": result, "evidence": "staging: curl answered 500" });
+    finding
+}
+
+#[test]
+fn with_verify_required_an_unconfirmed_high_counts_as_medium_and_says_why() {
+    let block_on = [Severity::Critical, Severity::High];
+    let unverified = finding("a.rs", 1, "high", "x");
+    for high in [unverified.clone(), ran(unverified.clone(), "not_run")] {
+        let list = [high];
+        assert_eq!(verdict(&list, &block_on, Verify::Required), "approve");
+        assert_eq!(
+            weighed(&list[0], Verify::Required).0,
+            Some(Severity::Medium)
+        );
+        let said = line_of(&list[0], Verify::Required);
+        assert!(said.contains("so it counts as medium"), "{said}");
+    }
+    assert!(line_of(&unverified, Verify::Required).contains("— not verified —"));
+    // A critical needs no PoC run to keep blocking.
+    let critical = [finding("a.rs", 1, "critical", "x")];
+    assert_eq!(
+        verdict(&critical, &block_on, Verify::Required),
+        "request_changes"
+    );
+}
+
+#[test]
+fn with_verify_required_a_refuted_high_is_cleared_and_a_confirmed_one_blocks() {
+    let block_on = [Severity::Critical, Severity::High, Severity::Medium];
+    let high = finding("a.rs", 1, "high", "x");
+    let refuted = [ran(high.clone(), "refuted")];
+    assert_eq!(verdict(&refuted, &block_on, Verify::Required), "approve");
+    assert!(line_of(&refuted[0], Verify::Required).contains("refuted in staging"));
+    let confirmed = [ran(high, "confirmed")];
+    assert_eq!(
+        verdict(&confirmed, &block_on, Verify::Required),
+        "request_changes"
+    );
+    let said = line_of(&confirmed[0], Verify::Required);
+    assert!(
+        said.contains("— confirmed in staging: curl answered 500"),
+        "{said}"
+    );
+    assert!(!said.contains("counts as"), "{said}");
+}
+
+#[test]
+fn with_verify_off_or_advise_the_verdict_is_todays() {
+    let block_on = [Severity::Critical, Severity::High];
+    let high = finding("a.rs", 1, "high", "x");
+    for verify in [Verify::Off, Verify::Advise] {
+        for list in [[high.clone()], [ran(high.clone(), "refuted")]] {
+            assert_eq!(verdict(&list, &block_on, verify), "request_changes");
+        }
+    }
+    assert!(!line_of(&high, Verify::Off).contains("verified"));
+    assert!(line_of(&high, Verify::Advise).ends_with("— not verified"));
+}
+
+#[test]
+fn a_poc_run_is_kept_only_on_a_critical_or_high_and_carried_with_it() {
+    let mut list = vec![
+        finding("a.rs", 1, "high", "x"),
+        finding("a.rs", 9, "low", "y"),
+    ];
+    let run = |finding: u64, result: &str| json!({ "finding": finding, "result": result, "evidence": "local" });
+    verified_on(&mut list, &[run(0, "confirmed")]).expect("a high");
+    assert_eq!(list[0]["verified"]["result"], "confirmed");
+    assert!(verified_on(&mut list, &[run(1, "confirmed")])
+        .expect_err("a low")
+        .contains("only a critical or high"));
+    assert!(verified_on(&mut list, &[run(2, "confirmed")])
+        .expect_err("past the end")
+        .contains("from 0 to 1"));
+    let mut wrong = list[0].clone();
+    wrong["verified"]["result"] = json!("maybe");
+    let mut problems = Vec::new();
+    finding_problems(&wrong, "findings.0", &mut problems);
+    assert!(
+        problems[0].contains("`findings.0.verified`"),
+        "{problems:?}"
+    );
+    let mut again = vec![finding("a.rs", 1, "high", "x")];
+    carried(&mut again, &list);
+    assert_eq!(again[0]["verified"], list[0]["verified"]);
 }

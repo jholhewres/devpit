@@ -730,7 +730,10 @@ fn jev_in_shadow_records_each_finding_and_acting_sets_aside_and_joins() {
                 assert_eq!(list.len(), 3, "{list:#?}");
                 assert!(list.iter().all(|one| one["jev"]["decision"].is_string()));
                 assert!(list.iter().all(|one| one["jev"].get("set_aside").is_none()));
-                assert_eq!(crate::findings::blocking(list, block_on).len(), 3);
+                assert_eq!(
+                    crate::findings::blocking(list, block_on, Verify::Off).len(),
+                    3
+                );
             }
             Mode::Enforce => {
                 assert_eq!(list.len(), 2, "{list:#?}");
@@ -741,7 +744,10 @@ fn jev_in_shadow_records_each_finding_and_acting_sets_aside_and_joins() {
                     .find(|one| one["title"] == "Imaginary race")
                     .expect("race");
                 assert_eq!(race["jev"]["set_aside"], true);
-                assert_eq!(crate::findings::blocking(list, block_on).len(), 1);
+                assert_eq!(
+                    crate::findings::blocking(list, block_on, Verify::Off).len(),
+                    1
+                );
             }
         }
         let kept: Value = serde_json::from_str(
@@ -1268,4 +1274,91 @@ fn a_scaled_review_runs_one_reviewer_on_docs_and_the_configured_ones_on_a_migrat
     assert_eq!(done.scale, None);
     assert!(summary(&done).get("scale").is_none());
     assert!(!comment(&done, &[]).contains("Scale:"));
+}
+
+#[test]
+fn the_pocs_run_go_to_a_run_without_reports() {
+    let run = "20261011T143005Z";
+    let one = json!([{ "finding": 0, "result": "confirmed", "evidence": "local" }]);
+    let asked = asked(&json!({ "card": "c", "run": run, "verified": one })).expect("verified");
+    assert_eq!(asked.verified.len(), 1);
+    for wrong in [
+        json!({ "card": "c", "verified": one }),
+        json!({ "card": "c", "run": run, "reports": [{}], "verified": one }),
+    ] {
+        assert!(super::asked(&wrong)
+            .expect_err("refused")
+            .contains("with `run` and without `reports`"));
+    }
+    let unshaped = json!([{ "finding": 0, "result": "maybe", "evidence": "local" }]);
+    assert!(
+        super::asked(&json!({ "card": "c", "run": run, "verified": unshaped }))
+            .expect_err("refused")
+            .contains("`verified.0`")
+    );
+}
+
+/// With `verify: required`, the session is sent to run the high's PoC, and
+/// what it showed weighs the verdict and is said on the card.
+#[test]
+fn a_required_verify_asks_for_the_highs_poc_and_weighs_what_it_showed() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let mut config = config_with(Vec::new(), Consolidate::Nothing);
+    config.review.verify = Verify::Required;
+    let reach = |_: Agent| Err("not installed".to_owned());
+    let ran = |asked: Asked| {
+        Ran {
+            root,
+            config: &config,
+            asked,
+            reach: &reach,
+            jev: None,
+        }
+        .review()
+    };
+    let first = ran(fresh()).expect("a run for the session");
+    let mut reports = fresh();
+    reports.run = Some(first.stamp.clone());
+    reports.reports = vec![
+        answer("claude", "devflow-spec", Vec::new()),
+        answer("claude", "devflow-standards", Vec::new()),
+        answer(
+            "claude",
+            "devflow-security",
+            vec![finding("src/app.rs", 1, "high", "Shell injection in open")],
+        ),
+    ];
+    let reviewed = ran(reports).expect("handed back");
+    let next = summary(&reviewed)["next"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    assert!(
+        next.starts_with("Verify (devflow-review): run the PoC of findings 0 "),
+        "{next}"
+    );
+    assert!(comment(&reviewed, &[]).contains("not verified — review.verify is required"));
+    assert_eq!(
+        reviewed.findings.as_ref().expect("findings")["verdict"],
+        "approve"
+    );
+
+    let mut verified = fresh();
+    verified.run = Some(first.stamp.clone());
+    verified.verified =
+        vec![json!({ "finding": 0, "result": "confirmed", "evidence": "a local build" })];
+    let done = ran(verified).expect("verified");
+    let kept: Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join(&done.folder).join(FINDINGS)).expect("findings.json"),
+    )
+    .expect("json");
+    assert_eq!(kept["verdict"], "request_changes");
+    assert_eq!(kept["findings"][0]["verified"]["result"], "confirmed");
+    assert!(comment(&done, &[]).contains("— confirmed in a local build"));
+    let next = summary(&done)["next"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    assert!(next.starts_with("Back to execution"), "{next}");
 }

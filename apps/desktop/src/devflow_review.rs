@@ -342,7 +342,8 @@ pub(crate) fn mark(
         let list = kept["findings"].as_array().cloned().unwrap_or_default();
         kept["verdict"] = json!(devpit_devflow::findings::verdict(
             &list,
-            &config.review.block_on
+            &config.review.block_on,
+            config.review.verify
         ));
     }
     let text = serde_json::to_string_pretty(&kept).unwrap_or_default();

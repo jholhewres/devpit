@@ -122,13 +122,18 @@ fn shadow_records_jevs_word_and_enforce_acts_on_it() {
     assert_eq!(shadowed["jev"]["decision"], "dcn_1");
     assert!(shadowed["jev"].get("set_aside").is_none());
     let block_on = [crate::config::Severity::High];
-    assert_eq!(crate::findings::blocking(&[shadowed], &block_on).len(), 1);
+    assert_eq!(
+        crate::findings::blocking(&[shadowed], &block_on, crate::config::Verify::Off).len(),
+        1
+    );
 
     let mut enforced = reviewed.clone();
     on_finding(&mut enforced, &said(Mode::Enforce, verdicts, answers));
     assert_eq!(enforced["jev"]["set_aside"], true);
     assert_eq!(enforced["severity"], "low");
-    assert!(crate::findings::blocking(&[enforced], &block_on).is_empty());
+    assert!(
+        crate::findings::blocking(&[enforced], &block_on, crate::config::Verify::Off).is_empty()
+    );
 }
 
 #[test]
