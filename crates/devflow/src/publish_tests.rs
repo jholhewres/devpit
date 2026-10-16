@@ -559,3 +559,79 @@ fn a_projects_template_replaces_devpits_and_says_nothing_it_was_not_given() {
     let said = rendered(&ours, &sections);
     assert_eq!(said, "Ours. {{nits}} as a title\nNits: 1. one\n");
 }
+
+/// The fixture as a retro review would keep it: merged, in production, each
+/// defect it follows up with the query that shows what it touched.
+fn retro_like_a_real_one() -> Value {
+    let mut kept = review_like_a_real_one();
+    kept["mode"] = json!("retro");
+    kept["verdict"] = json!("follow_up");
+    for finding in kept["findings"].as_array_mut().expect("findings") {
+        if findings::followed_up(finding) {
+            finding["impact"] = json!(format!(
+                "SELECT count(*) FROM audit WHERE source = '{}' AND at > :deployed",
+                finding["file"].as_str().unwrap_or_default()
+            ));
+        }
+    }
+    assert!(findings::problems(&kept).is_empty());
+    assert!(findings::retro_problems(&kept).is_empty());
+    kept
+}
+
+#[test]
+fn a_retro_draft_carries_one_ticket_per_medium_or_worse_each_with_its_impact_query() {
+    let kept = retro_like_a_real_one();
+
+    let drafted = draft(&kept, &asked_for(json!({})), &github(), Verify::Advise);
+
+    // The seven lines' eight findings, the ledger's high and the medium
+    // outside the hunks; the false positive and the refuted one are not.
+    let tickets = drafted["tickets"].as_array().expect("tickets");
+    assert_eq!(tickets.len(), 10, "{tickets:#?}");
+    let list = kept["findings"].as_array().expect("findings");
+    for ticket in tickets {
+        let finding = list
+            .iter()
+            .find(|one| one["title"] == ticket["title"])
+            .expect("its finding");
+        assert_eq!(ticket["impact"], finding["impact"], "{ticket}");
+        let impact = finding["impact"].as_str().expect("impact");
+        assert!(ticket["body"]
+            .as_str()
+            .is_some_and(|body| body.contains(impact)));
+    }
+    let general = drafted["general"]["body"].as_str().expect("general");
+    assert!(
+        general.contains("### Follow-up tickets") && general.contains("10 tickets"),
+        "{general}"
+    );
+    let not_retro = draft(
+        &review_like_a_real_one(),
+        &asked_for(json!({})),
+        &github(),
+        Verify::Advise,
+    );
+    assert!(not_retro.get("tickets").is_none());
+    assert!(!not_retro["general"]["body"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("Follow-up"));
+}
+
+#[test]
+fn a_retro_review_is_never_published_as_asking_for_changes() {
+    let run = run_with(&retro_like_a_real_one());
+    let host = FakeGitHub::of(change());
+
+    let refused = respond(
+        run.path(),
+        &asked_for(json!({ "event": "request_changes" })),
+        &github(),
+        Verify::Advise,
+        Ok(&host),
+    );
+
+    assert!(refused.is_err_and(|why| why.contains("never requests changes")));
+    assert_eq!(host.calls(), 0);
+}

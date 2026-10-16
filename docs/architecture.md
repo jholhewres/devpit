@@ -284,6 +284,11 @@ no copy, only that the person clicked.
   template (`flow/publish/`, replaced by a layer's `reviewers/publish/`).
   Applied, it posts only the draft last shown, with `gh`, as a review that
   only comments; `published.json` keeps the ids, so publishing again edits.
+- **Code in production is followed up, not held.** A retro review
+  (`mode: retro`, a merged `base` and `head`) answers `follow_up` where it
+  would have said `request_changes`; each medium or worse defect carries the
+  read-only `impact` query for what it touched since the deploy, and its
+  draft one ticket per medium or worse finding.
 - **A card is done at the gate.** `devpit_devflow_gate` checks what devpit
   can check itself: the card's checks ran after the last change to the code
   (each changed file by when it was written, so a commit is not a change)

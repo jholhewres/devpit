@@ -45,6 +45,8 @@ pub struct Standalone {
     pub criteria: Vec<String>,
     pub run: Option<String>,
     pub reports: Vec<Value>,
+    /// A range already merged and in production, followed up, never held.
+    pub retro: bool,
 }
 
 /// The review's input when it names no card; `None` when it does, which is
@@ -90,6 +92,16 @@ pub fn standalone(params: &Value) -> Result<Option<Standalone>, String> {
                 .to_owned(),
         ),
     };
+    let retro = match word("mode").as_deref() {
+        None => false,
+        Some("retro") if matches!(subject, Subject::Range { .. }) => true,
+        Some("retro") => {
+            return Err(
+                "a retro review reads what is already merged: pass `base` and `head`".to_owned(),
+            )
+        }
+        Some(_) => return Err("`mode` is retro, or left out".to_owned()),
+    };
     let reports = review::reports_of(fields)?;
     let run = word("run");
     review::handed_back(run.as_deref(), &reports)?;
@@ -98,6 +110,7 @@ pub fn standalone(params: &Value) -> Result<Option<Standalone>, String> {
         criteria: criteria_of(fields.get("criteria"))?,
         run,
         reports,
+        retro,
     }))
 }
 
@@ -211,23 +224,35 @@ pub fn next(
     stamp: &str,
     pending: &[String],
     detached: Option<&str>,
+    retro: bool,
 ) -> String {
     if pending.is_empty() {
         let posted = match subject {
             Subject::Pr(number) => format!(
                 "drafts it for pull request #{number}, and posts it there only after the person's explicit yes to that draft"
             ),
+            _ if retro => "drafts one follow-up ticket per medium or worse finding, to file".to_owned(),
             _ => "drafts it to paste where the person wants it".to_owned(),
         };
+        let impact = if retro {
+            " The code is in production: for each defect, run its `impact` read-only (the data or logs it touched since the deploy, never a write) and tell the person what it showed."
+        } else {
+            ""
+        };
         return format!(
-            "Done: the findings are in findings.json; nothing is commented on any card. devpit_devflow_publish with review \"{label}/{stamp}\" {posted}."
+            "Done: the findings are in findings.json; nothing is commented on any card.{impact} devpit_devflow_publish with review \"{label}/{stamp}\" {posted}."
         );
     }
     let reading = detached.map_or_else(String::new, |head| {
         format!(" A file as HEAD has it is read with `git show {head}:<path>`, never by checking HEAD out.")
     });
+    let impact = if retro {
+        " The range is in production: give each medium or worse defect an `impact`, the read-only query or log search for what it touched since the deploy."
+    } else {
+        ""
+    };
     format!(
-        "Review {} yourself: one fresh subagent per persona, each given only the packet and its persona beside it, each answering one findings object.{reading} Then call devpit_devflow_review again with {}, run \"{stamp}\" and reports: those objects.",
+        "Review {} yourself: one fresh subagent per persona, each given only the packet and its persona beside it, each answering one findings object.{reading}{impact} Then call devpit_devflow_review again with {}, run \"{stamp}\" and reports: those objects.",
         pending.join(", "),
         subject.again()
     )

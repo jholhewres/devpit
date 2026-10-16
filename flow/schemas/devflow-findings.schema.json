@@ -11,6 +11,7 @@
     "base": { "type": "string", "minLength": 1, "description": "The BASE commit the diff starts from." },
     "head": { "type": "string", "minLength": 1, "description": "The HEAD commit reviewed." },
     "previous": { "type": "string", "minLength": 1, "description": "Set by devpit on a re-review: the earlier run whose HEAD the diff starts from." },
+    "mode": { "const": "retro", "description": "Set by devpit on a retro review: the range is already merged and in production." },
     "reviewers": {
       "type": "array",
       "minItems": 1,
@@ -18,8 +19,8 @@
       "description": "Who reviewed: one entry for a single reviewer's report, one per reviewer once merged."
     },
     "verdict": {
-      "enum": ["approve", "request_changes"],
-      "description": "request_changes when a finding's severity is in the project's review.block_on (critical and high unless set): the project's rule, which this file cannot see, so it is not checked here."
+      "enum": ["approve", "request_changes", "follow_up"],
+      "description": "request_changes when a finding's severity is in the project's review.block_on (critical and high unless set): the project's rule, which this file cannot see, so it is not checked here. A retro review says follow_up instead: its code is already in production."
     },
     "summary": { "type": "string" },
     "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
@@ -119,6 +120,10 @@
             "evidence": { "type": "string", "minLength": 1, "description": "Where the PoC run shows it, or why it was not run." }
           },
           "description": "Set by devpit from the session's review.verify step: what running this critical or high's PoC showed. With review.verify: required, a high not confirmed counts as medium and a refuted one holds nothing."
+        },
+        "impact": {
+          "type": "string",
+          "description": "A retro review's: the read-only query or log search that shows what this defect touched in production since the deploy. Required of every medium or worse defect there."
         }
       },
       "allOf": [

@@ -1,4 +1,10 @@
 {{summary}}
+{{#tickets}}
+
+### Follow-up tickets
+
+{{tickets}}
+{{/tickets}}
 {{#elsewhere}}
 
 ### Outside the diff

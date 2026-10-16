@@ -194,6 +194,7 @@ pub(crate) fn respond_with(
         },
         previous: previous.as_ref(),
         lines_at: &lines_at,
+        retro: false,
     })?;
 
     let run = PathBuf::from(&done.folder);

@@ -86,3 +86,32 @@ fn a_reviews_runs_are_kept_under_its_pr_or_its_commits() {
     assert_eq!(named, format!("{}-{}", &base[..12], &head[..12]));
     assert!(crate::runs::plain_card(&named));
 }
+
+#[test]
+fn a_retro_review_reads_a_merged_range_and_nothing_else() {
+    let read = |params: Value| standalone(&params).map(|asked| asked.map(|one| one.retro));
+    assert_eq!(
+        read(json!({ "base": "v1", "head": "v2", "mode": "retro" })),
+        Ok(Some(true))
+    );
+    assert_eq!(read(json!({ "base": "v1", "head": "v2" })), Ok(Some(false)));
+    for params in [
+        json!({ "pr": 4, "mode": "retro" }),
+        json!({ "path": "/w", "mode": "retro" }),
+        json!({ "base": "v1", "head": "v2", "mode": "strict" }),
+    ] {
+        assert!(read(params.clone()).is_err(), "{params}");
+    }
+    let refused =
+        review::asked(&json!({ "card": "card_1", "mode": "retro" })).expect_err("refused");
+    assert!(refused.contains("leave out `card`"), "{refused}");
+    let range = Subject::Range {
+        base: "v1".into(),
+        head: "v2".into(),
+    };
+    let done = next(&range, "aaa-bbb", "20261014T120000Z", &[], None, true);
+    assert!(
+        done.contains("`impact` read-only") && done.contains("ticket"),
+        "{done}"
+    );
+}

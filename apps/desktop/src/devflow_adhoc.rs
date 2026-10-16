@@ -264,6 +264,7 @@ pub(crate) fn respond_with(
         },
         previous: None,
         lines_at: &lines_at,
+        retro: asked.retro,
     });
     let read_detached = detached
         .as_ref()
@@ -288,7 +289,8 @@ pub(crate) fn respond_with(
         &label,
         &done.stamp,
         &done.pending,
-        read_detached.as_deref()
+        read_detached.as_deref(),
+        done.retro
     ));
     answer["attached"] =
         json!({ "under": under, "files": attached.names.len(), "left_out": attached.left_out });

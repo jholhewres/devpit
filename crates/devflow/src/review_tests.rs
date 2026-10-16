@@ -157,6 +157,7 @@ fn the_packet_has_every_heading_the_skill_names_and_the_diff_fenced() {
         standards: &[],
         evidence: None,
         previous: None,
+        retro: false,
     });
     for heading in [
         "# Review packet: card_1",
@@ -183,6 +184,7 @@ fn the_packet_has_every_heading_the_skill_names_and_the_diff_fenced() {
         standards: &[],
         evidence: None,
         previous: None,
+        retro: false,
     });
     assert!(cut.contains("The diff is cut at"), "{}", cut.len());
 }
@@ -275,6 +277,21 @@ impl Ran<'_> {
     }
 
     fn review_of(&self, git: Git, previous: Option<&Previous>) -> Result<Done, String> {
+        self.reviewed_as(git, previous, false)
+    }
+
+    /// A retro review of the first diff: already merged, in production.
+    fn retro(&self) -> Result<Done, String> {
+        let files = vec!["src/app.rs".to_owned()];
+        self.reviewed_as(git(&files, FIRST_DIFF), None, true)
+    }
+
+    fn reviewed_as(
+        &self,
+        git: Git,
+        previous: Option<&Previous>,
+        retro: bool,
+    ) -> Result<Done, String> {
         let no_redaction = |text: &str| text.to_owned();
         reviewed(&Given {
             root: self.root,
@@ -298,6 +315,7 @@ impl Ran<'_> {
             jev: self.jev,
             previous,
             lines_at: &|_, _| Ok(Some(LONG_ENOUGH)),
+            retro,
         })
     }
 }
@@ -1361,4 +1379,62 @@ fn a_required_verify_asks_for_the_highs_poc_and_weighs_what_it_showed() {
         .unwrap_or_default()
         .to_owned();
     assert!(next.starts_with("Back to execution"), "{next}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_retro_review_follows_up_what_would_have_held_it_and_never_asks_for_changes() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let mut shell = finding("src/app.rs", 1, "critical", "Shell injection in open");
+    shell["impact"] = json!("grep -c 'xdg-open' in the app's logs since the deploy");
+    let said = answer("claude", "devflow-all", vec![shell]);
+    let cli = fake_cli(root, "claude-fake", &said, "{}", "0");
+    let reach = move |agent: Agent| match agent {
+        Agent::Claude => Ok(cli.clone()),
+        _ => Err("not installed".to_owned()),
+    };
+    let config = config_with(
+        vec![reviewer(Agent::Claude, "devflow-all")],
+        Consolidate::Nothing,
+    );
+    let ran = Ran {
+        root,
+        config: &config,
+        asked: fresh(),
+        reach: &reach,
+        jev: None,
+    };
+
+    let done = ran.retro().expect("reviewed");
+
+    let kept = done.findings.as_ref().expect("findings.json");
+    assert!(crate::findings::problems(kept).is_empty());
+    assert_eq!(
+        (kept["verdict"].as_str(), kept["mode"].as_str()),
+        (Some("follow_up"), Some("retro"))
+    );
+    // The same finding holds a change that is not in production yet.
+    let held = ran.review().expect("reviewed");
+    let held = held.findings.as_ref().expect("findings.json");
+    assert_eq!(held["verdict"], "request_changes");
+    assert!(held.get("mode").is_none());
+
+    // A defect that says no impact to look for is refused, from the session
+    // too, and the run stays retro though the hand-back does not say so.
+    let bare = answer(
+        "claude",
+        "devflow-spec",
+        vec![finding("src/app.rs", 1, "high", "Opens any scheme")],
+    );
+    let handed = Ran {
+        root,
+        config: &config,
+        asked: asked(&json!({ "card": "card_1", "run": done.stamp, "reports": [bare] }))
+            .expect("asked"),
+        reach: &reach,
+        jev: None,
+    };
+    let refused = handed.review().expect_err("refused");
+    assert!(refused.contains("needs an `impact`"), "{refused}");
 }

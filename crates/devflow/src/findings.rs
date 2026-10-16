@@ -34,7 +34,7 @@ pub const REQUIRED: [&str; 9] = [
 ];
 
 /// Everything a finding may carry: the schema allows nothing else.
-pub const FIELDS: [&str; 21] = [
+pub const FIELDS: [&str; 22] = [
     "file",
     "line",
     "end_line",
@@ -56,6 +56,7 @@ pub const FIELDS: [&str; 21] = [
     "carried_from",
     "anchor",
     "verified",
+    "impact",
 ];
 
 /// What devpit sets on a finding, never a reviewer.
@@ -89,6 +90,10 @@ pub const KINDS: [&str; 4] = ["defect", "missing_test", "rule", "style"];
 /// What running a critical or high's PoC showed: `not_run` where there was
 /// no environment to run it in.
 pub const RESULTS: [&str; 3] = ["confirmed", "refuted", "not_run"];
+
+/// What a review concludes: `follow_up` only of a retro review, whose code
+/// is already in production.
+pub const VERDICTS: [&str; 3] = ["approve", "request_changes", "follow_up"];
 
 /// The most findings one answer may hold: a review, not a lint run.
 pub(crate) const MOST_FINDINGS: usize = 200;
@@ -153,7 +158,7 @@ fn finding_problems(finding: &Value, at: &str, wrong: &mut Vec<String>) {
     if !AXES.contains(&text(finding, "axis")) {
         wrong.push(format!("`{at}.axis` is spec, standards or security"));
     }
-    for key in ["poc", "suggestion", "agreement", "carried_from"] {
+    for key in ["poc", "suggestion", "agreement", "carried_from", "impact"] {
         if finding.get(key).is_some_and(|value| !value.is_string()) {
             wrong.push(format!("`{at}.{key}` is text"));
         }
@@ -235,8 +240,8 @@ pub fn problems(report: &Value) -> Vec<String> {
         }
         _ => wrong.push("`reviewers` lists at least one { agent, persona }".to_owned()),
     }
-    if !matches!(text(report, "verdict"), "approve" | "request_changes") {
-        wrong.push("`verdict` is approve or request_changes".to_owned());
+    if !VERDICTS.contains(&text(report, "verdict")) {
+        wrong.push("`verdict` is approve, request_changes or follow_up".to_owned());
     }
     for key in ["card", "base", "head"] {
         if report.get(key).is_some() && !filled(report, key) {
@@ -727,6 +732,46 @@ pub fn verdict(findings: &[Value], block_on: &[Severity], verify: Verify) -> &'s
     } else {
         "request_changes"
     }
+}
+
+/// The verdict of a review, retro or not: code already in production cannot
+/// be held back, so what would have held it is followed up instead.
+pub fn verdict_of(
+    findings: &[Value],
+    block_on: &[Severity],
+    verify: Verify,
+    retro: bool,
+) -> &'static str {
+    match verdict(findings, block_on, verify) {
+        "request_changes" if retro => "follow_up",
+        said => said,
+    }
+}
+
+/// Whether a finding of a retro review is a defect to follow up with a
+/// ticket: a medium or worse, short of a missing test, a rule or a style.
+pub fn followed_up(finding: &Value) -> bool {
+    matches!(text(finding, "severity"), "critical" | "high" | "medium")
+        && matches!(text(finding, "kind"), "" | "defect")
+}
+
+/// What a retro review's answer lacks: each defect it follows up carries
+/// `impact`, the read-only query or log search for what it touched since
+/// the deploy.
+pub fn retro_problems(report: &Value) -> Vec<String> {
+    report["findings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .filter(|(_, finding)| followed_up(finding) && !filled(finding, "impact"))
+        .map(|(at, finding)| {
+            format!(
+                "`findings.{at}` is a {} defect of code already in production and needs an `impact`: the read-only query or log search that shows what it touched since the deploy",
+                text(finding, "severity")
+            )
+        })
+        .collect()
 }
 
 /// `done_well` and `verification` of every answer, said once each.

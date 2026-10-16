@@ -28,7 +28,14 @@ const MOST_SAID: usize = 280;
 const MOST_TEMPLATE: u64 = 32 * 1024;
 /// What a template places, each as `{{name}}`, and `{{#name}}…{{/name}}`
 /// around what is left out when it is empty.
-pub const SECTIONS: [&str; 5] = ["summary", "elsewhere", "nits", "verification", "done_well"];
+pub const SECTIONS: [&str; 6] = [
+    "summary",
+    "tickets",
+    "elsewhere",
+    "nits",
+    "verification",
+    "done_well",
+];
 
 const SHAPE: &str = "{ review: \"<the review's folder>/<its run>\", apply?, destination?: github | gitlab | bitbucket, event?: comment | approve | request_changes }";
 const FIELDS: [&str; 5] = ["review", "apply", "destination", "event", "project"];
@@ -212,6 +219,50 @@ pub fn inline(finding: &Value) -> bool {
 /// Whether a finding off the diff's lines deserves a ticket of its own.
 pub fn separate_ticket(finding: &Value) -> bool {
     matches!(text(finding, "severity"), "critical" | "high")
+}
+
+/// Whether a retro review follows a finding up with a ticket: every medium
+/// or worse, as the code is already in production.
+pub fn ticketed(finding: &Value) -> bool {
+    matches!(text(finding, "severity"), "critical" | "high" | "medium")
+}
+
+/// A retro review's follow-up ticket, with the read-only query that shows
+/// what its defect touched since the deploy.
+fn ticket_of(finding: &Value, verify: Verify) -> Value {
+    let mut body = format!(
+        "**{}** [{}] {}\n\n{} — {}",
+        text(finding, "severity"),
+        text(finding, "axis"),
+        text(finding, "title"),
+        place(finding),
+        text(finding, "description")
+    );
+    let suggestion = text(finding, "suggestion").trim();
+    if !suggestion.is_empty() {
+        body.push_str(&format!("\n\nFix: {suggestion}"));
+    }
+    if let Some(verification) = findings::verification_said(finding, verify) {
+        body.push_str(&format!("\n\nPoC: {verification}"));
+    }
+    let impact = text(finding, "impact").trim();
+    if !impact.is_empty() {
+        let fence = review::fence_for(impact);
+        body.push_str(&format!(
+            "\n\nImpact in production, read-only:\n{fence}\n{impact}\n{fence}"
+        ));
+    }
+    let mut ticket = json!({
+        "title": text(finding, "title"),
+        "severity": text(finding, "severity"),
+        "file": text(finding, "file"),
+        "line": line_of(finding),
+        "body": body,
+    });
+    if !impact.is_empty() {
+        ticket["impact"] = json!(impact);
+    }
+    ticket
 }
 
 /// What to do about a finding: its suggestion, else why it matters.
@@ -454,7 +505,40 @@ pub fn draft(kept: &Value, asked: &Asked, template: &str, verify: Verify) -> Val
             json!({ "file": file, "line": line, "axes": axes, "findings": places, "body": body })
         })
         .collect();
-    let (sections, nits, elsewhere) = sections(kept, &said, inline.len(), verify);
+    let (mut sections, nits, elsewhere) = sections(kept, &said, inline.len(), verify);
+    let retro = kept["mode"] == "retro";
+    let tickets: Vec<Value> = said
+        .iter()
+        .filter(|finding| retro && ticketed(finding))
+        .map(|finding| ticket_of(finding, verify))
+        .collect();
+    if retro {
+        let listed: Vec<String> = tickets
+            .iter()
+            .enumerate()
+            .map(|(at, one)| {
+                let impact = one["impact"].as_str().map_or(String::new(), |impact| {
+                    format!(" — impact: `{}`", short(impact))
+                });
+                format!(
+                    "{}. **{}** `{}:{}` {}{impact}",
+                    at + 1,
+                    text(one, "severity"),
+                    text(one, "file"),
+                    line_of(one),
+                    short(text(one, "title"))
+                )
+            })
+            .collect();
+        sections.insert("tickets", listed.join("\n"));
+        if let Some(summary) = sections.get_mut("summary") {
+            summary.push_str(&format!(
+                " Already in production, so it is followed up: {} ticket{}.",
+                tickets.len(),
+                if tickets.len() == 1 { "" } else { "s" }
+            ));
+        }
+    }
     let review_body = format!(
         "devpit review: {} on the lines; the rest is in the comment below.",
         match inline.len() {
@@ -462,7 +546,7 @@ pub fn draft(kept: &Value, asked: &Asked, template: &str, verify: Verify) -> Val
             count => format!("{count} comments"),
         }
     );
-    json!({
+    let mut drafted = json!({
         "version": 1,
         "review": asked.review(),
         "destination": asked.destination.word(),
@@ -477,7 +561,12 @@ pub fn draft(kept: &Value, asked: &Asked, template: &str, verify: Verify) -> Val
             "elsewhere": elsewhere,
             "body": rendered(template, &sections),
         },
-    })
+    });
+    if retro {
+        drafted["mode"] = json!("retro");
+        drafted["tickets"] = json!(tickets);
+    }
+    drafted
 }
 
 /// An inline comment as the host takes it.
@@ -634,6 +723,9 @@ pub fn respond(
             asked.review(),
             pending.join(", ")
         ));
+    }
+    if kept["mode"] == "retro" && asked.event == Event::RequestChanges {
+        return Err("a retro review never requests changes: its code is already in production, so it is followed up with its tickets".to_owned());
     }
     let drafted = draft(&kept, asked, template, verify);
     let at = folder.join(DRAFT).display().to_string();

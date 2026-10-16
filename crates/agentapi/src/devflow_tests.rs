@@ -389,7 +389,7 @@ fn the_review_runs_on_demand_and_takes_what_its_skill_sends() {
     assert_eq!(
         keys,
         [
-            "base", "card", "criteria", "head", "path", "pr", "previous", "reports", "run",
+            "base", "card", "criteria", "head", "mode", "path", "pr", "previous", "reports", "run",
             "verified"
         ]
     );
@@ -412,8 +412,8 @@ fn the_review_runs_on_demand_and_takes_what_its_skill_sends() {
         }
     }
     assert_eq!(
-        calls, 6,
-        "a first call, the one that hands reports back, the verified PoCs, a re-review, and a pr and a range without a card"
+        calls, 7,
+        "a first call, the one that hands reports back, the verified PoCs, a re-review, and a pr, a range and a retro range without a card"
     );
 }
 
