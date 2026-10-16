@@ -79,7 +79,9 @@ before(async () => {
   project = await invoke(window, 'project_add', { rootPath: repo })
   await invoke(window, 'project_open', { projectId: project.id })
 
-  // Set up by the agent, switched on by the person's click.
+  // Set up by the agent from the preview the person saw, switched on by their click.
+  const preview = await ask('devflow_setup', { preset: 'recommended' })
+  assert.equal(preview.ok?.applied, false, JSON.stringify(preview))
   const setup = await ask('devflow_setup', { preset: 'recommended', apply: true })
   assert.equal(setup.ok?.applied, true, JSON.stringify(setup))
   const { asks } = await invoke(window, 'devflow_asks')
@@ -154,7 +156,8 @@ describe('the board is the plan', () => {
     await escape(window)
     await escape(window)
     await settle(600)
-    const blocked = `Blocked by [devflow] ${PLAN[0].title}`
+    const first = titled((await board()).cards, `[devflow] ${PLAN[0].title}`)
+    const blocked = `Blocked by #${first.number} [devflow] ${PLAN[0].title}`
     await window.wait(until.elementLocated(By.xpath(`//*[contains(@class,'tile__blocked') and normalize-space()='${blocked}']`)), 10000)
     await window.wait(until.elementLocated(By.css('[title="0 of 3 cards done"]')), 10000)
   })
