@@ -75,7 +75,7 @@ Out of scope is.
 | `criteria` | two to four testable conditions; they become checkboxes |
 | `files` | the files it likely touches, at most five, taken from the context |
 | `verify` | one command, from the repo's own tooling, that proves the criteria |
-| `depends_on` | the keys of the cards that block it; empty starts at once |
+| `depends_on` | the keys of the cards that block it; empty starts at once. A card already on the board, such as another epic's, is named by its id or `#42` |
 
 Build `verify` from the test command in the context. A card that adds
 behaviour narrows it to the tests that card adds (a test file or a test name),

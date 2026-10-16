@@ -21,16 +21,19 @@ const THREE: [NewCard<'static>; 3] = [
         title: "[devflow] index the bodies",
         body: "",
         waits_on: &[],
+        waits_on_cards: &[],
     },
     NewCard {
         title: "[devflow] search box",
         body: "",
         waits_on: &[0],
+        waits_on_cards: &[],
     },
     NewCard {
         title: "[devflow] highlight",
         body: "",
         waits_on: &[1],
+        waits_on_cards: &[],
     },
 ];
 
@@ -100,11 +103,13 @@ fn cards_that_would_wait_on_each_other_in_a_circle_are_not_made() {
             title: "a",
             body: "",
             waits_on: &[1],
+            waits_on_cards: &[],
         },
         NewCard {
             title: "b",
             body: "",
             waits_on: &[0],
+            waits_on_cards: &[],
         },
     ];
     assert!(matches!(

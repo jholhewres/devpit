@@ -57,6 +57,7 @@ fn a_planned_card_takes_the_next_number_too() {
         title: "s1",
         body: "",
         waits_on: &[],
+        waits_on_cards: &[],
     }];
     let planned = store
         .create_plan(&epic, &column, &one, |_| String::new())

@@ -21,16 +21,19 @@ fn planned() -> (tempfile::TempDir, Store, String, String, Vec<String>) {
             title: "[devflow] index",
             body: "",
             waits_on: &[],
+            waits_on_cards: &[],
         },
         NewCard {
             title: "[devflow] box",
             body: "",
             waits_on: &[0],
+            waits_on_cards: &[],
         },
         NewCard {
             title: "[devflow] highlight",
             body: "",
             waits_on: &[1],
+            waits_on_cards: &[],
         },
     ];
     let ids = store

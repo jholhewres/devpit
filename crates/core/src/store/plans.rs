@@ -32,6 +32,8 @@ pub struct NewCard<'a> {
     pub title: &'a str,
     pub body: &'a str,
     pub waits_on: &'a [usize],
+    /// Cards already on the project's board, such as another epic's.
+    pub waits_on_cards: &'a [String],
 }
 
 impl Store {
@@ -139,8 +141,9 @@ impl Store {
             ids.push(id);
         }
         for (card, id) in cards.iter().zip(&ids) {
-            for on in card.waits_on {
-                let on = ids.get(*on).ok_or(StoreError::Circle)?;
+            let inside = card.waits_on.iter().map(|on| ids.get(*on));
+            for on in inside.chain(card.waits_on_cards.iter().map(Some)) {
+                let on = on.ok_or(StoreError::Circle)?;
                 if !wait_on(&tx, id, on, at)? {
                     return Err(StoreError::Circle);
                 }

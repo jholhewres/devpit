@@ -128,6 +128,42 @@ fn own_card(store: &Store, project_id: &str, id: &str) -> Result<devpit_core::Ca
         .ok_or_else(|| format!("no card `{id}` on this project's board"))
 }
 
+/// The cards on the board each slice waits on outside its plan, by id:
+/// refused when one names no card of this project.
+fn outside_cards(
+    store: &Store,
+    project_id: &str,
+    slices: &[Slice],
+) -> Result<Vec<Vec<String>>, String> {
+    let card = |on: &str| -> Option<String> {
+        let id = match on.strip_prefix('#') {
+            Some(number) => store
+                .card_numbered(project_id, number.parse().ok()?)
+                .ok()??,
+            None => on.to_owned(),
+        };
+        own_card(store, project_id, &id).ok().map(|card| card.id)
+    };
+    slices
+        .iter()
+        .enumerate()
+        .map(|(at, slice)| {
+            plan::outside(slices, slice)
+                .into_iter()
+                .map(|on| {
+                    card(on).ok_or_else(|| {
+                        format!(
+                            "card {} ({}): depends_on `{on}` is no card on this project's board",
+                            at + 1,
+                            slice.key
+                        )
+                    })
+                })
+                .collect()
+        })
+        .collect()
+}
+
 /// Where new work waits: the lane whose role is backlog, else the first.
 fn waiting_lane(store: &Store, project_id: &str) -> Result<String, String> {
     store
@@ -253,6 +289,7 @@ fn planned(
             .ok_or("there is no preview on this epic to apply: send the cards first")?,
         cards => plan::read(cards.unwrap_or(&Value::Null))?,
     };
+    outside_cards(store, project_id, &slices)?;
     // Before planning: whether the brief can be planned from.
     let brief = judge(judged, "briefing", || {
         jev::brief_state(
@@ -389,11 +426,14 @@ fn create(
     let titles: Vec<String> = slices.iter().map(plan::title).collect();
     let bodies: Vec<String> = slices.iter().map(plan::body).collect();
     let waits = plan::waits_on(slices);
+    let outside = outside_cards(store, project_id, slices)
+        .map_err(|why| RpcError::new(ErrorCode::Invalid, why))?;
     let cards: Vec<NewCard<'_>> = (0..slices.len())
         .map(|at| NewCard {
             title: &titles[at],
             body: &bodies[at],
             waits_on: &waits[at],
+            waits_on_cards: &outside[at],
         })
         .collect();
     let record = |ids: &[String]| created_record(yes, slices, ids);
@@ -519,7 +559,9 @@ pub(crate) fn kept_on_board(
     let invalid = |why: String| RpcError::new(ErrorCode::Invalid, why);
     let slices: Vec<Slice> = cards.into_iter().map(slice_of).collect();
     let cards = serde_json::to_value(slices).map_err(|err| invalid(err.to_string()))?;
-    keep(store, epic_id, &plan::read(&cards).map_err(invalid)?, true).map_err(invalid)?;
+    let slices = plan::read(&cards).map_err(invalid)?;
+    outside_cards(store, project_id, &slices).map_err(invalid)?;
+    keep(store, epic_id, &slices, true).map_err(invalid)?;
     waiting(store, epic_id).ok_or_else(|| RpcError::new(ErrorCode::NotFound, "the plan is gone"))
 }
 

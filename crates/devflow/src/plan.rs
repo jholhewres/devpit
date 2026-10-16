@@ -123,9 +123,10 @@ pub fn checked(slices: &[Slice]) -> Result<(), String> {
             ));
         }
         for key in &slice.depends_on {
-            if key == &slice.key || !slices.iter().any(|one| &one.key == key) {
+            if key == &slice.key || (!is_key(slices, key) && !names_a_card(key)) {
                 return Err(format!(
-                    "{named}: depends_on `{key}` is not another card of this plan"
+                    "{named}: depends_on `{key}` is not another card of this plan, nor a card \
+                     on the board (`card_…` or `#42`)"
                 ));
             }
         }
@@ -136,6 +137,29 @@ pub fn checked(slices: &[Slice]) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+fn is_key(slices: &[Slice], key: &str) -> bool {
+    slices.iter().any(|one| one.key == key)
+}
+
+/// Whether a `depends_on` that is no key of the plan names a card already on
+/// the board, by its id or its `#42`: how a plan waits on another epic.
+pub fn names_a_card(on: &str) -> bool {
+    on.starts_with("card_")
+        || on
+            .strip_prefix('#')
+            .is_some_and(|number| !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// What `slice` waits on outside the plan: cards already on the board.
+pub fn outside<'a>(slices: &[Slice], slice: &'a Slice) -> Vec<&'a str> {
+    slice
+        .depends_on
+        .iter()
+        .filter(|on| !is_key(slices, on))
+        .map(String::as_str)
+        .collect()
 }
 
 /// The cards each one waits on, as indexes into the plan.

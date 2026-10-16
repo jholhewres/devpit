@@ -50,11 +50,13 @@ fn starting_a_blocked_card_is_refused_where_devflow_is_on() {
             title: "[devflow] index",
             body: "",
             waits_on: &[],
+            waits_on_cards: &[],
         },
         NewCard {
             title: "[devflow] box",
             body: "",
             waits_on: &[0],
+            waits_on_cards: &[],
         },
     ];
     let ids = store

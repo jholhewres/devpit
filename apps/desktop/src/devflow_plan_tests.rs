@@ -337,3 +337,67 @@ fn cards_that_differ_from_the_preview_are_a_new_preview_even_with_the_persons_wo
     assert_eq!(said["applied"], false);
     assert_eq!(titles(&store, &project).len(), 1);
 }
+
+/// Sessions that only count what the autopilot started.
+struct Started(std::cell::RefCell<Vec<String>>);
+
+impl crate::devflow_autopilot::Sessions for Started {
+    fn start(&self, _: &devpit_rpc::Board, card_id: &str, _: &str) -> Result<(), String> {
+        self.0.borrow_mut().push(card_id.to_owned());
+        Ok(())
+    }
+}
+
+#[test]
+fn a_plan_waits_on_a_card_of_another_epic_and_the_autopilot_waits_with_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (store, project) = project(dir.path());
+    let lane = waiting_lane(&store, &project.id).expect("a lane");
+    let other = store
+        .create_card(&project.id, &lane, "[devflow] The index exists", "")
+        .expect("another epic's card");
+    let number = store.card_numbers(&project.id).expect("numbers")[&other];
+    let epic = epic(&store, &project);
+    let plan = |depends_on: &str, apply: bool| {
+        respond(
+            None,
+            "devflow_plan",
+            &project,
+            &json!({ "epic": epic, "apply": apply, "cards": [
+                { "key": "s1", "title": "The search box lists them", "depends_on": [depends_on] },
+            ] }),
+        )
+    };
+
+    let unknown = plan("#999", false).expect_err("an unknown card");
+    assert!(unknown.contains("`#999` is no card"), "{unknown}");
+    assert!(waiting(&store, &epic).is_none(), "an unknown card was kept");
+
+    let by_number = format!("#{number}");
+    plan(&by_number, false).expect("a preview");
+    let applied = plan(&by_number, true).expect("applied");
+    let card = applied["cards"][0]["cardId"].as_str().expect("an id");
+    assert_eq!(
+        store.card_edges(&project.id).expect("edges").blockers,
+        [(card.to_owned(), other.clone())]
+    );
+
+    let board = crate::board::board_still_now(project.id.clone()).expect("the board");
+    let shown = board.cards.iter().find(|one| one.id == card).expect("card");
+    assert!(
+        shown
+            .blocked_by
+            .iter()
+            .any(|by| by.id == other && by.holds()),
+        "{:?}",
+        shown.blocked_by
+    );
+    let sessions = Started(std::cell::RefCell::default());
+    let (next, said) =
+        crate::devflow_autopilot::stepped(&board, &epic, false, &sessions).expect("stepped");
+    assert!(
+        matches!(next, devpit_devflow::autopilot::Next::Blocked { .. }),
+        "{said}"
+    );
+    assert!(sessions.0.borrow().is_empty(), "it started a blocked card");
+}
