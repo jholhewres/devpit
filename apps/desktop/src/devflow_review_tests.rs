@@ -260,15 +260,17 @@ fn a_card_started_in_a_devflow_checkout_keeps_where_it_began() {
     let (_store, project, card) = reviewed_project(root);
     let head = devpit_git::head_of(root).expect("head");
     began(&project, root, &card);
+    let runs = runs_of(&project.id, root).expect("runs");
     assert_eq!(
-        devpit_devflow::started::start_of(root, &card),
+        devpit_devflow::started::start_of(&runs, &card),
         Some(head.clone())
     );
+    assert!(!root.join(devpit_devflow::runs::RUNS).exists());
 
     // A second start, after more commits, does not move where it began.
     git(root, &["commit", "-q", "-am", "more"]);
     began(&project, root, &card);
-    assert_eq!(devpit_devflow::started::start_of(root, &card), Some(head));
+    assert_eq!(devpit_devflow::started::start_of(&runs, &card), Some(head));
 }
 
 #[test]

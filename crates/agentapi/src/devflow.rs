@@ -177,7 +177,7 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: "devpit_devflow_evidence",
             method: "devflow_evidence",
-            description: "Devflow: run a card's checks from .devpit/devflow/devflow.yaml in the checkout you stand in, each through devpit's step runner with the card in its environment; keep the reports, screenshots and video under .devpit/devflow/runs/<card>/<time>/ (the newest 5 runs per card); attach them to the card as artifacts with a comment linking each; and answer with a short summary: each check passed, failed, inconclusive or not run (a check set to write a report that left none devpit reads is inconclusive; one set to `report: none` is judged by its exit code, 127 meaning its command was not found), its counts, the failures, and the paths. It records each criterion's tests and how they ended, and the red tests you saw and whether they are green now. Leave `checks` out to run all of them. Takes as long as the checks do.",
+            description: "Devflow: run a card's checks from .devpit/devflow/devflow.yaml in the checkout you stand in, each through devpit's step runner with the card in its environment; keep the reports, screenshots and video in devpit's own folder for the project, never the repository (the newest 5 runs per card; the answer's `run` says where); attach them to the card as artifacts with a comment linking each; and answer with a short summary: each check passed, failed, inconclusive or not run (a check set to write a report that left none devpit reads is inconclusive; one set to `report: none` is judged by its exit code, 127 meaning its command was not found), its counts, the failures, and the paths. It records each criterion's tests and how they ended, and the red tests you saw and whether they are green now. Leave `checks` out to run all of them. Takes as long as the checks do.",
             input: || json!({ "type": "object", "properties": {
                 "card": { "type": "string", "description": "The card's id." },
                 "checks": { "type": "array", "items": { "type": "string" }, "description": "Checks by their name in devflow.yaml. Leave out to run all." },
@@ -203,7 +203,7 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
                 "base": { "type": "string", "description": "The branch or commit the diff starts from, when it is not the card's own base. Usually left out." },
                 "previous": { "type": "string", "description": "After fixing a review's blocking findings: that review's run. The reviewers read only what changed since its HEAD, with its blocking findings to check again; its other findings are carried over. Leave out `base` and `run`." },
                 "run": { "type": "string", "description": "The run a first call answered, which `reports` complete." },
-                "reports": { "type": "array", "items": { "type": "object" }, "description": "With `run`: one findings object for each persona in `pending` that you reviewed, as .devpit/devflow/devflow-findings.schema.json describes." }
+                "reports": { "type": "array", "items": { "type": "object" }, "description": "With `run`: one findings object for each persona in `pending` that you reviewed, as devflow-findings.schema.json beside the run's packet describes." }
             }, "required": ["card"] }),
         },
     ),

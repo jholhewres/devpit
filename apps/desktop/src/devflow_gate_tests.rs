@@ -85,7 +85,10 @@ fn a_card_whose_checks_never_ran_fails_the_gate_and_its_comment_says_what_is_mis
         .as_str()
         .is_some_and(|missing| missing.contains("devpit_devflow_evidence")));
     let gate_json = root.join(said["gate"].as_str().expect("where gate.json is"));
-    assert!(gate_json.ends_with(format!(".devpit/devflow/runs/{card}/gate.json")));
+    let home = crate::devflow_evidence::runs_of(&project.id, &root)
+        .expect("runs")
+        .home;
+    assert_eq!(gate_json, home.join(&card).join("gate.json"));
     let comment = last_comment(&store, &card);
     assert!(
         comment.starts_with("[devflow] gate: 0 of 1 criteria with evidence"),

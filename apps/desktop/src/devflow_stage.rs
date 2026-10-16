@@ -67,7 +67,8 @@ pub(crate) fn respond(
         }
     };
     let at = SystemTime::now();
-    let (folder, path) = runs::fresh(&checkout, &card.id, at)?;
+    let path = crate::devflow_evidence::runs_of(&project.id, &checkout)?.fresh(&card.id, at)?;
+    let folder = path.display();
     let file = stage::file_of(name);
     let record = stage::recorded(name, gate, passed, &runs::stamp(at), &said);
     std::fs::write(

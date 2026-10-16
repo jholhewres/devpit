@@ -71,7 +71,12 @@ fn running_a_cards_checks_keeps_the_run_and_attaches_it_to_the_card() {
     assert_eq!(said["checks"][0]["result"], "passed");
     assert_eq!(said["criteria_green"], "1 of 1");
     let run = root.join(said["run"].as_str().expect("the run's folder"));
-    assert!(run.starts_with(root.join(".devpit/devflow/runs").join(&card)));
+    let home = runs_of(&project.id, &root).expect("runs").home;
+    assert!(run.starts_with(home.join(&card)), "{run:?}");
+    assert!(
+        !root.join(".devpit/devflow/runs").exists(),
+        "a run in the repository"
+    );
     for kept in [
         "e2e/report.xml",
         "e2e.log",

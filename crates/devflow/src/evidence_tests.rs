@@ -99,6 +99,14 @@ fn every_check_runs_unless_some_are_named_and_a_name_not_configured_is_refused()
 const PASSING: &str = r#"printf '<testsuite><testcase classname="cli" name="rename changes the title"/><testcase classname="cli" name="an empty title is refused"/></testsuite>' > "$DEVPIT_REPORT_DIR/report.xml""#;
 const FAILING: &str = r#"printf '<testsuite><testcase classname="cli" name="rename changes the title"/><testcase classname="cli" name="an empty title is refused"><failure message="expected an error"/></testcase></testsuite>' > "$DEVPIT_REPORT_DIR/report.xml"; echo the last words; exit 1"#;
 
+/// devpit's folder for the runs of a checkout at `root`, beside it in a test.
+fn runs_of(root: &Path) -> runs::Runs {
+    runs::Runs {
+        home: root.join("devpit-home"),
+        checkout: root.to_path_buf(),
+    }
+}
+
 fn run_of(root: &Path, config: &Config, asked: &Asked, title: &str, seconds: u64) -> Evidence {
     let context = Context {
         card: "card_1".into(),
@@ -108,6 +116,7 @@ fn run_of(root: &Path, config: &Config, asked: &Asked, title: &str, seconds: u64
     let body = "## Acceptance criteria\n- [ ] rename changes the title\n- [ ] an empty title is refused\n- [ ] the old title is kept in history\n";
     gathered(&Given {
         root,
+        runs: &runs_of(root),
         config,
         asked,
         card: Card {
@@ -268,8 +277,16 @@ fn the_report_leads_to_a_short_summary_with_the_counts_the_failures_and_the_path
     assert_eq!(unit["failures"][0]["name"], "an empty title is refused");
     assert_eq!(unit["failures"][0]["message"], "expected an error");
     assert_eq!(unit["last_lines"], json!(["the last words"]));
-    let run = ".devpit/devflow/runs/card_1/20261011T143005Z";
+    let run = runs_of(&root.path().canonicalize().expect("real"))
+        .home
+        .join("card_1/20261011T143005Z")
+        .display()
+        .to_string();
     assert_eq!(said["run"], run);
+    assert!(
+        !root.path().join(runs::RUNS).exists(),
+        "a run in the checkout"
+    );
     assert_eq!(unit["reports"], json!([format!("{run}/unit/report.xml")]));
     assert_eq!(unit["log"], format!("{run}/unit.log"));
     assert!(said.to_string().len() < 4096, "short: {said}");
@@ -341,7 +358,7 @@ fn a_card_keeps_only_its_newest_runs() {
         pruned.extend(run_of(root.path(), &config, &nothing_asked(), "Rename", second).pruned);
     }
     assert_eq!(pruned, ["20261011T143005Z", "20261011T143006Z"]);
-    let left = std::fs::read_dir(root.path().join(runs::RUNS).join("card_1"))
+    let left = std::fs::read_dir(runs_of(root.path()).home.join("card_1"))
         .expect("runs")
         .count();
     assert_eq!(left, runs::KEPT);

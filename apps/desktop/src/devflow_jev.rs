@@ -311,7 +311,9 @@ pub(crate) fn moved(store: &Store, project_id: &str, card_id: &str, from: Option
     if let Some(last) = last.filter(|row| row.person_verdict.is_none()) {
         label(store, &last.id, true, "finished");
     }
-    let Some((_, kept)) = crate::devflow_gate::newest(&root, card_id, "findings.json") else {
+    let Some((_, kept)) = crate::devflow_evidence::runs_of_card(store, card_id, &root)
+        .and_then(|runs| crate::devflow_gate::newest(&runs, card_id, "findings.json"))
+    else {
         return;
     };
     let unlabelled: Vec<String> = store

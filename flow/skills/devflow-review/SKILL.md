@@ -49,8 +49,8 @@ Call `devpit_devflow_review` with the card:
 ```
 
 devpit pins BASE (the card's own base, else where HEAD left the default
-branch) and HEAD, writes the packet as
-`.devpit/devflow/runs/<card>/<UTC time>/review-context.md` — BASE, HEAD, the
+branch) and HEAD, writes the packet as `review-context.md` in the run's folder
+in devpit's home for the project (the answer's `packet`) — BASE, HEAD, the
 changed files, the card's criteria, the brief, the standards, the evidence
 and the diff — and runs every reviewer `review.reviewers` lists in
 `devflow.yaml` at once, each headless on its own agent CLI and from that
@@ -77,8 +77,8 @@ persona `review.reviewers` does not list, or one whose CLI was skipped — or
 `devflow-all` alone, for a scaled review nobody answered. They are yours.
 
 Start one fresh subagent per pending persona, in parallel. Each gets the
-packet's path and its persona's text from
-`.devpit/devflow/reviewers/<persona>.md`, and answers with one findings
+packet's path and its persona's text from `persona-<persona>.md` beside the
+packet (the answer's `next` names the folder), and answers with one findings
 object. When you cannot start subagents, review the axes one after another
 yourself, from the packet alone. Then hand the answers to the same run:
 
@@ -91,8 +91,8 @@ step.
 
 ### 3. Hold every finding to the shape
 
-devpit refuses an answer that breaks `.devpit/devflow/devflow-findings.schema.json`
-and says which field: fix that report and send it again.
+devpit refuses an answer that breaks `devflow-findings.schema.json`, beside the
+packet, and says which field: fix that report and send it again.
 
 | Field | What goes in it |
 |---|---|

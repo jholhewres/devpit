@@ -129,8 +129,8 @@ and devpit_devflow_plan previews the epic's cards — criteria as checkboxes,
 what blocks what — which the person creates on the board, or which apply
 creates after their yes. A card still blocked by one not done is not started.
 devpit_devflow_evidence runs a card's checks, keeps their reports, screenshots
-and video under .devpit/devflow/runs/<card>/<time>/, attaches them to the card
-and answers with each check's result and counts. devpit_devflow_review has
+and video in devpit's folder for the project, never the repository, attaches
+them to the card and answers with each check's result and counts. devpit_devflow_review has
 the reviewers devflow.yaml lists review the card's change, headless on the
 person's own agent CLIs, and keeps their findings as findings.json, which the
 gate reads; the axes no reviewer answered for are the session's to review.

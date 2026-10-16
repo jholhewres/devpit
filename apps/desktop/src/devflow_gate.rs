@@ -16,7 +16,8 @@ use devpit_core::Store;
 use devpit_devflow::config::{Mode, GATE};
 use devpit_devflow::folder::State;
 use devpit_devflow::gate::{self, Event, Gate, Hook, Judged, Looked, Review, Run, Said, Streak};
-use devpit_devflow::{runs, Config};
+use devpit_devflow::runs::{self, Runs};
+use devpit_devflow::Config;
 use devpit_rpc::{Board, Project};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
@@ -92,34 +93,29 @@ struct Read {
     unreviewed: Option<String>,
 }
 
-/// A JSON file of a run, never through a link out of the checkout.
-fn json_in(root: &Path, relative: &str) -> Option<Value> {
-    let path = devpit_core::tree::resolve(root, relative).ok()?;
+/// A JSON file of a run, already resolved inside where runs are kept.
+fn json_at(path: &Path) -> Option<Value> {
     let file = std::fs::File::open(path).ok()?;
     let raw = devpit_core::data_files::read_within(file, MOST_READ).ok()??;
     serde_json::from_slice(&raw).ok()
 }
 
 /// The newest run of a card holding `file`, and what the file says.
-pub(crate) fn newest(root: &Path, card: &str, file: &str) -> Option<(String, Value)> {
-    let folder = format!("{}/{card}", runs::RUNS);
-    let runs_at = devpit_core::tree::resolve(root, &folder).ok()?;
-    let name = runs::newest_with(&runs_at, file)?;
-    let value = json_in(root, &format!("{folder}/{name}/{file}"))?;
-    Some((name, value))
+pub(crate) fn newest(runs: &Runs, card: &str, file: &str) -> Option<(String, Value)> {
+    let (name, at) = runs.newest_with(card, file)?;
+    Some((name, json_at(&at)?))
 }
 
-fn read(root: &Path, card: &str, config: &Config) -> Read {
-    let folder = format!("{}/{card}", runs::RUNS);
-    let runs_at = devpit_core::tree::resolve(root, &folder).ok();
-    let run = newest(root, card, "evidence.json");
-    let review = newest(root, card, "findings.json").map(|(name, value)| {
+fn read(runs: &Runs, card: &str, config: &Config) -> Read {
+    let root = runs.checkout.as_path();
+    let run = newest(runs, card, "evidence.json");
+    let review = newest(runs, card, "findings.json").map(|(name, value)| {
         // When the review was made: review.json, which the person's "not a
         // problem" on a finding leaves alone, else findings.json.
         let written = ["review.json", "findings.json"]
             .iter()
             .find_map(|file| {
-                let at = runs_at.as_ref()?.join(&name).join(file);
+                let at = runs.found(card, Some(&name), file)?;
                 std::fs::metadata(at).ok()?.modified().ok()
             })
             .map_or(name, runs::stamp);
@@ -131,7 +127,7 @@ fn read(root: &Path, card: &str, config: &Config) -> Read {
         .iter()
         .map(|step| {
             let name = step.name().to_owned();
-            let seen = newest(root, card, &devpit_devflow::stage::file_of(&name));
+            let seen = newest(runs, card, &devpit_devflow::stage::file_of(&name));
             (name, seen)
         })
         .collect();
@@ -259,18 +255,19 @@ fn judged_for_agent(
     let card = card_here(store, project, card_id)
         .ok_or_else(|| format!("no card `{card_id}` on this project's board"))?;
     let root = checkout(project, cwd);
+    let runs = crate::devflow_evidence::runs_of(&project.id, &root)?;
     let (gate, asked) = gated(
         store,
         project,
         config,
         &card,
         &root,
-        &read(&root, &card.id, config),
+        &read(&runs, &card.id, config),
         false,
     );
     // Not asked, held by the checks: the project's last call says how it stands.
     let jev = asked.or_else(|| Jev::of(project, config, &root, Some(&card.id), &[]));
-    let file = kept(project, &root, &card.id, &gate)?;
+    let file = kept(project, &runs, &card.id, &gate)?;
     let said = gate::comment(&gate);
     let sayable = crate::cards::sayable(&said).map_err(|err| err.message)?;
     store
@@ -289,8 +286,9 @@ fn judged_for_agent(
 
 /// Writes gate.json into the run it judged — beside the card's runs when
 /// there is none — and attaches it with that run. Answers where it is.
-fn kept(project: &Project, root: &Path, card: &str, gate: &Gate) -> Result<String, String> {
-    let (relative, path) = runs::file_in(root, card, gate.checked.run.as_deref(), "gate.json")?;
+fn kept(project: &Project, runs: &Runs, card: &str, gate: &Gate) -> Result<String, String> {
+    let path = runs.file_in(card, gate.checked.run.as_deref(), "gate.json")?;
+    let relative = path.display().to_string();
     let text = serde_json::to_string_pretty(&gate::recorded(gate)).unwrap_or_default();
     std::fs::write(&path, text).map_err(|err| format!("{relative}: {err}"))?;
     if let (Some(run), Ok(home)) = (
@@ -450,7 +448,10 @@ fn stopped(
         return Said::Let;
     }
     let root = checkout(project, cwd);
-    let read = read(&root, &card.id, config);
+    let Ok(runs) = crate::devflow_evidence::runs_of(&project.id, &root) else {
+        return Said::Let;
+    };
+    let read = read(&runs, &card.id, config);
     if hook.event == Event::SubagentStop
         && !gate::subagent_changed(
             read.changed.as_deref(),
@@ -621,7 +622,8 @@ pub(crate) fn may_finish(project: &Project, card_id: &str, cwd: &Path) -> Result
         return Ok(());
     };
     let root: PathBuf = checkout(project, cwd);
-    let read = read(&root, &card.id, config);
+    let runs = crate::devflow_evidence::runs_of(&project.id, &root)?;
+    let read = read(&runs, &card.id, config);
     let criteria = criteria_of(&card.body);
     let checked = gate::checked(&looked(config, &card.id, &criteria, &read));
     let gate = Gate::new(checked, None, "");
@@ -633,10 +635,9 @@ pub(crate) fn may_finish(project: &Project, card_id: &str, cwd: &Path) -> Result
         ));
     }
     let run = gate.checked.run.as_deref().unwrap_or_default();
-    let last = json_in(
-        &root,
-        &format!("{}/{}/{run}/gate.json", runs::RUNS, card.id),
-    );
+    let last = runs
+        .found(&card.id, Some(run), "gate.json")
+        .and_then(|at| json_at(&at));
     let passed = last.is_some_and(|last| last["passed"] == true && last["run"] == run);
     if !passed {
         return Err(format!(

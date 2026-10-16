@@ -253,6 +253,12 @@ impl ProjectHome {
         self.dir().join("artifacts")
     }
 
+    /// Devflow's runs, `<card>/<time>/` each: evidence kept out of the
+    /// repository, where it was copied twice.
+    pub fn devflow_runs(&self) -> PathBuf {
+        self.dir().join("devflow").join("runs")
+    }
+
     /// Per-run folders for command steps' test reports.
     pub fn reports(&self) -> PathBuf {
         self.dir().join("reports")

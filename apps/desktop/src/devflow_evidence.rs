@@ -1,6 +1,6 @@
 //! `devflow_evidence`: a card's checks run in the checkout the agent stands
-//! in, the run kept under `.devpit/devflow/runs/<card>/<time>/`, and what it
-//! left attached to the card — copied among the project's artifacts and
+//! in, the run kept in devpit's folder for the project, `<card>/<time>/`, and
+//! what it left attached to the card — among the project's artifacts and
 //! linked from a comment, so a screenshot or a video opens on the card.
 //!
 //! The rules are `devpit_devflow::evidence`'s and `runs`'s; this adds the
@@ -10,7 +10,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use devpit_devflow::evidence::{self, Card, Given};
-use devpit_devflow::{runs, Config};
+use devpit_devflow::runs::{self, Runs};
+use devpit_devflow::Config;
 use devpit_rpc::Project;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter};
@@ -57,6 +58,7 @@ pub(crate) fn respond(
     let redact = |text: &str| crate::kept_out::kept_out(text, &secrets);
     let found = evidence::gathered(&Given {
         root: &root,
+        runs: &runs_of(&project.id, &root)?,
         config,
         asked: &asked,
         card: Card {
@@ -70,7 +72,7 @@ pub(crate) fn respond(
         at: SystemTime::now(),
     })?;
 
-    let run = root.join(&found.folder);
+    let run = PathBuf::from(&found.folder);
     let artifacts = crate::projects::project_home(&project.id)
         .map_err(|err| err.message)?
         .artifacts();
@@ -95,6 +97,26 @@ pub(crate) fn respond(
         let _ = app.emit("board:changed", &project.id);
     }
     Ok(evidence::summary(&found, &attached, &under))
+}
+
+/// Where `project_id`'s runs are kept, read with what an older devpit left
+/// in `checkout`.
+pub(crate) fn runs_of(project_id: &str, checkout: &Path) -> Result<Runs, String> {
+    let home = crate::projects::project_home(project_id).map_err(|err| err.message)?;
+    Ok(Runs {
+        home: home.devflow_runs(),
+        checkout: checkout.to_path_buf(),
+    })
+}
+
+/// The runs of the project `card_id` is on, with its checkout's.
+pub(crate) fn runs_of_card(
+    store: &devpit_core::Store,
+    card_id: &str,
+    checkout: &Path,
+) -> Option<Runs> {
+    let project = store.project_id_of_card(card_id).ok()??;
+    runs_of(&project, checkout).ok()
 }
 
 /// The project's root or worktree the agent stands in — where its work is —

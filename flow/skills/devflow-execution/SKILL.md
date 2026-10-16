@@ -106,8 +106,8 @@ no `e2e` check.
 ### 6. Record the evidence
 
 Call `devpit_devflow_evidence`. devpit runs the card's checks from
-`devflow.yaml`, keeps the reports under `.devpit/devflow/runs/<card>/<time>/`,
-attaches them to the card and answers with a short summary: each check passed
+`devflow.yaml`, keeps the reports in devpit's own folder for the project (the
+answer's `run`; never the repository), attaches them to the card and answers with a short summary: each check passed
 or failed, the counts and the paths.
 
 ```json

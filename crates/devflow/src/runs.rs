@@ -1,22 +1,132 @@
-//! Where a card's evidence is kept: a folder per run under
-//! `.devpit/devflow/runs/<card>/<time>/`, which the setup's `.gitignore`
-//! keeps out of the repository; and the copies attached to the card among
-//! the project's artifacts. Only the newest [`KEPT`] runs stay in either.
+//! Where a card's evidence is kept: a folder per run, `<card>/<time>/`,
+//! under devpit's own folder for the project, never in the repository; and
+//! the files attached to the card among the project's artifacts, linked
+//! rather than copied where the disk allows. Only the newest [`KEPT`] runs
+//! stay in either. An older devpit kept runs in the checkout's [`RUNS`]:
+//! they are still read, and nothing new is written there.
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config::Evidence;
 
-/// The runs, relative to the checkout's root.
+/// Where an older devpit kept the runs, relative to the checkout's root.
 pub const RUNS: &str = ".devpit/devflow/runs";
 
-/// How many runs a card keeps, in its checkout and among its artifacts.
+/// How many runs a card keeps, in devpit's folder and among its artifacts.
 pub const KEPT: usize = 5;
 
 /// Where a card's runs are attached among the project's artifacts.
 pub fn attached_under(card: &str) -> String {
     format!("devflow/{card}")
+}
+
+/// Where a project's runs are: `home`, devpit's own folder for them, where
+/// every run is written; and the checkout's [`RUNS`], still read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Runs {
+    pub home: PathBuf,
+    pub checkout: PathBuf,
+}
+
+impl Runs {
+    /// A fresh folder for a run of `card`, never through a link out of
+    /// devpit's folder.
+    pub fn fresh(&self, card: &str, at: SystemTime) -> Result<PathBuf, String> {
+        let parent = self.made(card, card)?;
+        let base = stamp(at);
+        for again in 0..100 {
+            let name = match again {
+                0 => base.clone(),
+                again => format!("{base}-{again}"),
+            };
+            let path = devpit_core::paths::resolve_new(&self.home, &format!("{card}/{name}"))
+                .map_err(|err| format!("{}: {err}", parent.join(&name).display()))?;
+            match std::fs::create_dir(&path) {
+                Ok(()) => return Ok(path),
+                Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(err) => return Err(format!("{}: {err}", path.display())),
+            }
+        }
+        Err(format!(
+            "{} already has a hundred runs from this second",
+            parent.display()
+        ))
+    }
+
+    /// Where `file` of a card's runs is written: inside run `run`, or beside
+    /// the runs when there is none yet. A run an older devpit left in the
+    /// checkout is written where it is; anything else goes to devpit's folder.
+    pub fn file_in(&self, card: &str, run: Option<&str>, file: &str) -> Result<PathBuf, String> {
+        let folder = inner(card, run)?;
+        let older = format!("{RUNS}/{folder}");
+        let has = |base: &Path, folder: &str| match run {
+            Some(_) => devpit_core::tree::resolve(base, folder).is_ok_and(|at| at.is_dir()),
+            None => devpit_core::tree::resolve(base, &format!("{folder}/{file}"))
+                .is_ok_and(|at| at.is_file()),
+        };
+        if !has(&self.home, &folder) && has(&self.checkout, &older) {
+            return devpit_core::paths::resolve_new(&self.checkout, &format!("{older}/{file}"))
+                .map_err(|err| format!("{older}/{file}: {err}"));
+        }
+        let at = self.made(card, &folder)?;
+        devpit_core::paths::resolve_new(&self.home, &format!("{folder}/{file}"))
+            .map_err(|err| format!("{}: {err}", at.join(file).display()))
+    }
+
+    /// `file` of a card's run, or beside its runs, where it is: devpit's
+    /// folder first, then the checkout's. Never through a link out of either.
+    pub fn found(&self, card: &str, run: Option<&str>, file: &str) -> Option<PathBuf> {
+        let relative = format!("{}/{file}", inner(card, run).ok()?);
+        devpit_core::tree::resolve(&self.home, &relative)
+            .or_else(|_| devpit_core::tree::resolve(&self.checkout, &format!("{RUNS}/{relative}")))
+            .ok()
+            .filter(|path| path.is_file())
+    }
+
+    /// The newest run of `card` that holds `file`, in either place: its name,
+    /// and where the file is.
+    pub fn newest_with(&self, card: &str, file: &str) -> Option<(String, PathBuf)> {
+        if !plain_card(card) {
+            return None;
+        }
+        let home = devpit_core::tree::resolve(&self.home, card).ok();
+        let older = devpit_core::tree::resolve(&self.checkout, &format!("{RUNS}/{card}")).ok();
+        let name = [home, older]
+            .into_iter()
+            .flatten()
+            .filter_map(|folder| newest_with(&folder, file))
+            .max_by(|a, b| order_of(a).cmp(&order_of(b)))?;
+        let at = self.found(card, Some(&name), file)?;
+        Some((name, at))
+    }
+
+    /// devpit's folder for `card`, and `relative` under it, made when missing.
+    fn made(&self, card: &str, relative: &str) -> Result<PathBuf, String> {
+        if !plain_card(card) {
+            return Err(format!(
+                "`{card}` is not a card id devpit makes a folder of"
+            ));
+        }
+        std::fs::create_dir_all(&self.home)
+            .map_err(|err| format!("{}: {err}", self.home.display()))?;
+        crate::setup::folders(&self.home, relative)?;
+        Ok(self.home.join(relative))
+    }
+}
+
+/// `card`, or its run `run`, as a folder under the runs.
+fn inner(card: &str, run: Option<&str>) -> Result<String, String> {
+    if !plain_card(card) {
+        return Err(format!(
+            "`{card}` is not a card id devpit makes a folder of"
+        ));
+    }
+    match run {
+        Some(run) if order_of(run).is_some() => Ok(format!("{card}/{run}")),
+        Some(run) => Err(format!("`{run}` is not a run of the card")),
+        None => Ok(card.to_owned()),
+    }
 }
 
 /// The most pictures, and the most videos, one check keeps.
@@ -97,62 +207,6 @@ fn order_of(name: &str) -> Option<(&str, u32)> {
     let digits = |range: std::ops::Range<usize>| bytes[range].iter().all(u8::is_ascii_digit);
     (bytes.len() == 16 && digits(0..8) && bytes[8] == b'T' && digits(9..15) && bytes[15] == b'Z')
         .then_some((stamp, again))
-}
-
-/// A fresh folder for a run of `card`'s checks inside `root`, never through a
-/// link out of it: its path relative to `root`, and where it is.
-pub fn fresh(root: &Path, card: &str, at: SystemTime) -> Result<(String, PathBuf), String> {
-    if !plain_card(card) {
-        return Err(format!(
-            "`{card}` is not a card id devpit makes a folder of"
-        ));
-    }
-    let parent = format!("{RUNS}/{card}");
-    crate::setup::folders(root, &parent)?;
-    let base = stamp(at);
-    for again in 0..100 {
-        let name = match again {
-            0 => base.clone(),
-            again => format!("{base}-{again}"),
-        };
-        let relative = format!("{parent}/{name}");
-        let path = devpit_core::paths::resolve_new(root, &relative)
-            .map_err(|err| format!("{relative}: {err}"))?;
-        match std::fs::create_dir(&path) {
-            Ok(()) => return Ok((relative, path)),
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(err) => return Err(format!("{relative}: {err}")),
-        }
-    }
-    Err(format!(
-        "{parent} already has a hundred runs from this second"
-    ))
-}
-
-/// Where `file` of a card's runs is written: inside run `run`, or beside
-/// the runs when there is none yet, never through a link out of `root`. Its
-/// path relative to `root`, and where it is.
-pub fn file_in(
-    root: &Path,
-    card: &str,
-    run: Option<&str>,
-    file: &str,
-) -> Result<(String, PathBuf), String> {
-    if !plain_card(card) {
-        return Err(format!(
-            "`{card}` is not a card id devpit makes a folder of"
-        ));
-    }
-    let folder = match run {
-        Some(run) if order_of(run).is_some() => format!("{RUNS}/{card}/{run}"),
-        Some(run) => return Err(format!("`{run}` is not a run of the card")),
-        None => format!("{RUNS}/{card}"),
-    };
-    crate::setup::folders(root, &folder)?;
-    let relative = format!("{folder}/{file}");
-    let path = devpit_core::paths::resolve_new(root, &relative)
-        .map_err(|err| format!("{relative}: {err}"))?;
-    Ok((relative, path))
 }
 
 /// Removes every run in `folder` but the newest `keep`, answering what went.
@@ -305,8 +359,8 @@ pub struct Attached {
     pub left_out: Vec<String>,
 }
 
-/// Copies `files` of the run at `run` into `artifacts` under `under`,
-/// keeping their paths. A file past the ceiling is left out and said so.
+/// Puts `files` of the run at `run` into `artifacts` under `under`, keeping
+/// their paths. A file past the ceiling is left out and said so.
 pub fn attach(run: &Path, files: &[String], artifacts: &Path, under: &str) -> Attached {
     let mut attached = Attached::default();
     let mut weight = 0;
@@ -327,7 +381,7 @@ pub fn attach(run: &Path, files: &[String], artifacts: &Path, under: &str) -> At
         let copied = to
             .parent()
             .is_some_and(|parent| std::fs::create_dir_all(parent).is_ok())
-            && std::fs::copy(&from, &to).is_ok();
+            && linked(&from, &to);
         if copied {
             weight += size;
             attached.names.push(name);
@@ -336,6 +390,13 @@ pub fn attach(run: &Path, files: &[String], artifacts: &Path, under: &str) -> At
         }
     }
     attached
+}
+
+/// `to` made the same file as `from`: a hard link, so a run and its
+/// attachment are one copy on disk, else a copy where links cannot go.
+pub fn linked(from: &Path, to: &Path) -> bool {
+    let _ = std::fs::remove_file(to);
+    std::fs::hard_link(from, to).is_ok() || std::fs::copy(from, to).is_ok()
 }
 
 #[cfg(test)]

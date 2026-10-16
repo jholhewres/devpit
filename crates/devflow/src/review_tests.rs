@@ -215,6 +215,14 @@ fn config_with(reviewers: Vec<Reviewer>, consolidate: Consolidate) -> Config {
     config
 }
 
+/// devpit's folder for the runs of a checkout at `root`, inside it in a test.
+fn runs_of(root: &Path) -> Runs {
+    Runs {
+        home: root.join("devpit-home"),
+        checkout: root.to_path_buf(),
+    }
+}
+
 struct Ran<'a> {
     root: &'a Path,
     config: &'a Config,
@@ -240,6 +248,7 @@ impl Ran<'_> {
         let no_redaction = |text: &str| text.to_owned();
         reviewed(&Given {
             root: self.root,
+            runs: &runs_of(self.root),
             config: self.config,
             asked: &self.asked,
             card: Card {
@@ -331,6 +340,20 @@ fn one_reviewer_answers_end_to_end_and_leaves_the_other_axes_to_the_session() {
             .expect("json");
     assert_eq!(&on_disk, findings);
     assert!(run.join(RECORD).is_file());
+    // The session's subagents read devpit's persona and schema beside the
+    // packet, never a copy in the repository.
+    assert!(!root.join(".devpit").exists());
+    assert_eq!(
+        std::fs::read_to_string(run.join(SCHEMA)).expect("the schema"),
+        findings::SCHEMA
+    );
+    let spec = std::fs::read_to_string(run.join(persona_file("devflow-spec"))).expect("persona");
+    assert!(spec.contains("Devflow reviewer: Spec"), "{spec}");
+    let next = summary(&done)["next"].as_str().expect("next").to_owned();
+    assert!(
+        next.contains(&format!("{}/persona-<persona>.md", done.folder)),
+        "{next}"
+    );
 
     let comment = comment(&done, &[]);
     assert!(
@@ -913,7 +936,7 @@ fn a_rereview_reads_only_what_changed_since_and_carries_what_did_not_block() {
     assert!(kept.get("previous").is_none(), "a first review is today's");
     assert!(!kept.to_string().contains("carried_from"));
 
-    let previous = previous_of(root, "card_1", &before.stamp).expect("its run");
+    let previous = previous_of(&runs_of(root), "card_1", &before.stamp).expect("its run");
     assert_eq!(previous.head, "2222222222222222");
     let fixed = fake_cli(
         root,
@@ -999,23 +1022,25 @@ fn a_previous_run_is_read_only_for_a_commit_it_names() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
     let run = "20261011T143005Z";
-    assert!(previous_of(root, "card_1", run)
+    let runs = runs_of(root);
+    assert!(previous_of(&runs, "card_1", run)
         .expect_err("no findings.json")
         .contains("has no findings.json"));
-    let folder = root.join(runs::RUNS).join("card_1").join(run);
+    let folder = runs.home.join("card_1").join(run);
+    std::fs::create_dir_all(&folder).expect("the run");
     let kept = |head: &str| {
         let mut said = answer("claude", "devflow-spec", Vec::new());
         said["head"] = json!(head);
         std::fs::write(folder.join(FINDINGS), said.to_string()).expect("write");
     };
     kept("--output=/tmp/x");
-    assert!(previous_of(root, "card_1", run).is_err());
+    assert!(previous_of(&runs, "card_1", run).is_err());
     kept("0123456789abcdef0123456789abcdef01234567");
     assert_eq!(
-        previous_of(root, "card_1", run).expect("a commit").head,
+        previous_of(&runs, "card_1", run).expect("a commit").head,
         "0123456789abcdef0123456789abcdef01234567"
     );
-    assert!(previous_of(root, "card_1", "../x").is_err());
+    assert!(previous_of(&runs, "card_1", "../x").is_err());
 }
 
 /// The session's reports are anchored as a reviewer devpit ran is: in the

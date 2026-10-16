@@ -237,14 +237,16 @@ no copy, only that the person clicked.
   work in progress, while a card blocking it is not done.
 - **The card keeps its proof.** `devpit_devflow_evidence` runs the card's
   checks through the step runner, in the checkout the agent stands in, the
-  card reaching them only through the environment. Each run is a folder,
-  `.devpit/devflow/runs/<card>/<time>/`, git-ignored by the setup's
-  `.gitignore`: each check's report and log, the screenshots and video an
-  E2E check keeps, and `evidence.json` with the criteria's tests and how
-  they ended. A check's verdict is a command step's — exit zero with no
-  report is not a pass. The files are copied among the project's artifacts
-  under `devflow/<card>/<time>/` and linked from a comment devpit signs, so
-  they open on the card; the newest five runs stay in each place. With
+  card reaching them only through the environment. Each run is a folder in
+  devpit's home for the project, `devflow/runs/<card>/<time>/`, never in the
+  repository: each check's report and log, the screenshots and video an E2E
+  check keeps, and `evidence.json` with the criteria's tests and how they
+  ended. A check's verdict is a command step's — exit zero with no report is
+  not a pass. The files are attached among the project's artifacts under
+  `devflow/<card>/<time>/` as hard links, one copy on disk, and linked from a
+  comment devpit signs, so they open on the card; the newest five runs stay
+  in each place. Runs an older devpit left in `.devpit/devflow/runs/` are
+  still read. With
   Playwright the setup writes `.devpit/devflow/playwright.config.ts`: the
   project's own config as its base, Devflow's specs from `e2e_dir`, a JUnit
   report and every screenshot and video.

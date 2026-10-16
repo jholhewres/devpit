@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 
 use crate::config::{Check, Config, Report as Format};
 use crate::plan::PREFIX;
-use crate::runs::{self, Attached, Media};
+use crate::runs::{self, Attached, Media, Runs};
 
 /// The fields the tool takes, as the execution and completion skills send
 /// them; `project` is an orchestrator's, as on every board tool.
@@ -391,7 +391,7 @@ pub struct Evidence {
     pub card: String,
     /// The run's name, its time.
     pub stamp: String,
-    /// Relative to the checkout's root.
+    /// Where the run is, in devpit's folder for the project.
     pub folder: String,
     pub checks: Vec<Ran>,
     pub criteria: Vec<Seen>,
@@ -442,6 +442,8 @@ pub(crate) fn plain(text: &str) -> String {
 pub struct Given<'a> {
     /// The checkout the checks run in.
     pub root: &'a Path,
+    /// Where the run is kept.
+    pub runs: &'a Runs,
     pub config: &'a Config,
     pub asked: &'a Asked,
     pub card: Card<'a>,
@@ -454,11 +456,12 @@ pub struct Given<'a> {
 }
 
 /// Runs the checks `given` names for its card, and keeps the run in
-/// `.devpit/devflow/runs/<card>/<time>/` with `evidence.json`; older runs
-/// past [`runs::KEPT`] go.
+/// devpit's folder, `<card>/<time>/` with `evidence.json`; older runs past
+/// [`runs::KEPT`] go.
 pub fn gathered(given: &Given) -> Result<Evidence, String> {
     let Given {
         root,
+        runs: kept,
         config,
         asked,
         card,
@@ -469,7 +472,8 @@ pub fn gathered(given: &Given) -> Result<Evidence, String> {
     } = given;
     let (root, budget, redact) = (*root, *budget, *redact);
     let checks = chosen(&config.stages.execution.checks, asked.checks.as_deref())?;
-    let (folder, run) = runs::fresh(root, card.id, *at)?;
+    let run = kept.fresh(card.id, *at)?;
+    let folder = run.display().to_string();
     let started = Instant::now();
     let ran: Vec<Ran> = checks
         .iter()
@@ -527,7 +531,11 @@ pub fn gathered(given: &Given) -> Result<Evidence, String> {
         });
     let mut evidence = Evidence {
         card: card.id.to_owned(),
-        stamp: folder.rsplit('/').next().unwrap_or_default().to_owned(),
+        stamp: run
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_owned(),
         folder,
         checks: ran,
         criteria,

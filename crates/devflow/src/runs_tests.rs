@@ -16,6 +16,16 @@ fn names_in(folder: &Path) -> Vec<String> {
     names
 }
 
+/// devpit's folder for the runs, and a checkout, under `base`.
+fn runs_in(base: &Path) -> Runs {
+    let checkout = base.join("checkout");
+    std::fs::create_dir_all(&checkout).expect("checkout");
+    Runs {
+        home: base.join("home/devflow/runs"),
+        checkout,
+    }
+}
+
 #[test]
 fn a_run_is_named_by_its_time_in_utc() {
     assert_eq!(stamp(at(1_791_729_005)), "20261011T143005Z");
@@ -26,23 +36,25 @@ fn a_run_is_named_by_its_time_in_utc() {
 
 #[test]
 fn a_second_run_in_the_same_second_gets_a_folder_of_its_own() {
-    let root = tempfile::tempdir().expect("root");
-    let (first, path) = fresh(root.path(), "card_1", at(1_791_729_005)).expect("first");
-    assert_eq!(first, ".devpit/devflow/runs/card_1/20261011T143005Z");
-    assert!(path.is_dir());
-    let (second, _) = fresh(root.path(), "card_1", at(1_791_729_005)).expect("second");
-    assert_eq!(second, ".devpit/devflow/runs/card_1/20261011T143005Z-1");
-    assert!(fresh(root.path(), "../card", at(0)).is_err());
+    let base = tempfile::tempdir().expect("base");
+    let runs = runs_in(base.path());
+    let first = runs.fresh("card_1", at(1_791_729_005)).expect("first");
+    assert_eq!(first, runs.home.join("card_1/20261011T143005Z"));
+    assert!(first.is_dir());
+    let second = runs.fresh("card_1", at(1_791_729_005)).expect("second");
+    assert_eq!(second, runs.home.join("card_1/20261011T143005Z-1"));
+    assert!(runs.fresh("../card", at(0)).is_err());
 }
 
 #[cfg(unix)]
 #[test]
-fn a_runs_folder_that_leads_outside_the_checkout_is_refused() {
-    let root = tempfile::tempdir().expect("root");
+fn a_cards_folder_that_leads_outside_devpits_is_refused() {
+    let base = tempfile::tempdir().expect("base");
     let elsewhere = tempfile::tempdir().expect("elsewhere");
-    std::fs::create_dir_all(root.path().join(".devpit/devflow")).expect("folder");
-    std::os::unix::fs::symlink(elsewhere.path(), root.path().join(RUNS)).expect("link");
-    assert!(fresh(root.path(), "card_1", at(0)).is_err());
+    let runs = runs_in(base.path());
+    std::fs::create_dir_all(&runs.home).expect("home");
+    std::os::unix::fs::symlink(elsewhere.path(), runs.home.join("card_1")).expect("link");
+    assert!(runs.fresh("card_1", at(0)).is_err());
     assert!(names_in(elsewhere.path()).is_empty());
 }
 
@@ -106,7 +118,7 @@ fn a_checks_pictures_and_videos_join_the_run_when_its_evidence_keeps_them() {
 }
 
 #[test]
-fn attaching_copies_the_runs_files_into_the_artifacts_under_the_card() {
+fn attaching_puts_the_runs_files_among_the_artifacts_under_the_card_as_one_copy() {
     let run = tempfile::tempdir().expect("run");
     let artifacts = tempfile::tempdir().expect("artifacts");
     std::fs::create_dir_all(run.path().join("e2e")).expect("e2e");
@@ -132,48 +144,92 @@ fn attaching_copies_the_runs_files_into_the_artifacts_under_the_card() {
         std::fs::read_to_string(artifacts.path().join(&attached.names[0])).expect("copied"),
         "<testsuites/>"
     );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let inode = |path: &Path| std::fs::metadata(path).expect("there").ino();
+        assert_eq!(
+            inode(&artifacts.path().join(&attached.names[1])),
+            inode(&run.path().join("evidence.json")),
+            "attached as a second copy"
+        );
+    }
+    // Attached again, as gate.json is once it is rewritten: still one file.
+    let again = attach(run.path(), &files[1..2], artifacts.path(), &under);
+    assert_eq!(again.names, attached.names[1..2]);
 }
 
 #[test]
-fn the_setups_gitignore_keeps_every_run_out_of_the_repository() {
-    let root = tempfile::tempdir().expect("root");
+fn a_run_leaves_nothing_in_the_repository() {
+    let base = tempfile::tempdir().expect("base");
+    let runs = runs_in(base.path());
     let git = |args: &[&str]| {
         std::process::Command::new("git")
             .args(args)
-            .current_dir(root.path())
+            .current_dir(&runs.checkout)
             .output()
             .expect("git runs")
     };
     assert!(git(&["init", "-q"]).status.success());
-    let files = crate::setup::planned("version: 1\n", &[], None);
-    crate::setup::write(root.path(), &files).expect("setup");
-    let (_, run) = fresh(root.path(), "card_1", at(1_791_729_005)).expect("run");
+    let run = runs.fresh("card_1", at(1_791_729_005)).expect("run");
     std::fs::write(run.join("evidence.json"), "{}").expect("evidence");
+    let gate = runs.file_in("card_1", None, "gate.json").expect("beside");
+    std::fs::write(gate, "{}").expect("gate");
 
-    let ignored = git(&[
-        "check-ignore",
-        "-q",
-        ".devpit/devflow/runs/card_1/20261011T143005Z/evidence.json",
-    ]);
-    assert!(ignored.status.success(), "runs/ is not ignored");
-    let kept = git(&["check-ignore", "-q", ".devpit/devflow/devflow.yaml"]);
-    assert!(!kept.status.success(), "devflow.yaml is ignored");
+    let status = git(&["status", "--porcelain", "--untracked-files=all"]);
+    assert_eq!(String::from_utf8_lossy(&status.stdout), "");
+    assert!(run.starts_with(&runs.home));
 }
 
 #[test]
 fn a_file_of_the_runs_goes_inside_its_run_or_beside_the_runs_and_nowhere_else() {
-    let root = tempfile::tempdir().expect("root");
-    let (inside, path) =
-        file_in(root.path(), "card_1", Some("20261011T143005Z"), "gate.json").expect("in a run");
+    let base = tempfile::tempdir().expect("base");
+    let runs = runs_in(base.path());
+    let inside = runs
+        .file_in("card_1", Some("20261011T143005Z"), "gate.json")
+        .expect("in a run");
+    assert_eq!(inside, runs.home.join("card_1/20261011T143005Z/gate.json"));
+    assert!(inside.parent().expect("its run").is_dir());
+    let beside = runs.file_in("card_1", None, "gate.json").expect("beside");
+    assert_eq!(beside, runs.home.join("card_1/gate.json"));
+    assert!(runs.file_in("card_1", Some("../x"), "gate.json").is_err());
+    assert!(runs.file_in("../card", None, "gate.json").is_err());
+}
+
+#[test]
+fn an_older_devpits_runs_in_the_checkout_are_still_read_and_finished_where_they_are() {
+    let base = tempfile::tempdir().expect("base");
+    let runs = runs_in(base.path());
+    let older = runs.checkout.join(RUNS).join("card_1/20261011T120000Z");
+    std::fs::create_dir_all(&older).expect("older run");
+    std::fs::write(older.join("findings.json"), "{}").expect("findings");
+    std::fs::write(runs.checkout.join(RUNS).join("card_1/start.json"), "{}").expect("start");
+
+    let (name, path) = runs.newest_with("card_1", "findings.json").expect("found");
+    assert_eq!(name, "20261011T120000Z");
     assert_eq!(
-        inside,
-        ".devpit/devflow/runs/card_1/20261011T143005Z/gate.json"
+        path,
+        older.join("findings.json").canonicalize().expect("real")
     );
-    assert!(path.parent().expect("its run").is_dir());
-    let (beside, _) = file_in(root.path(), "card_1", None, "gate.json").expect("beside");
-    assert_eq!(beside, ".devpit/devflow/runs/card_1/gate.json");
-    assert!(file_in(root.path(), "card_1", Some("../x"), "gate.json").is_err());
-    assert!(file_in(root.path(), "../card", None, "gate.json").is_err());
+    // A review an older devpit began is answered in its own run.
+    let record = runs
+        .file_in("card_1", Some("20261011T120000Z"), "review.json")
+        .expect("its run");
+    assert!(
+        record.starts_with(older.canonicalize().expect("real")),
+        "{record:?}"
+    );
+    // The start it kept is still the card's start.
+    assert!(runs
+        .file_in("card_1", None, "start.json")
+        .expect("start")
+        .starts_with(runs.checkout.canonicalize().expect("real")));
+
+    // A newer run, in devpit's folder, is the newest.
+    let newer = runs.fresh("card_1", at(1_791_729_005)).expect("newer");
+    std::fs::write(newer.join("findings.json"), "{}").expect("findings");
+    let (name, _) = runs.newest_with("card_1", "findings.json").expect("found");
+    assert_eq!(name, "20261011T143005Z");
 }
 
 #[test]

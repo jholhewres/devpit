@@ -671,10 +671,10 @@ fn reopening_a_card_and_a_false_positive_are_labels_on_jevs_decisions() {
 
     let real = decision(&store, &project.id, &card, jev::FINDING, "pass");
     let other = decision(&store, &project.id, &card, jev::FINDING, "pass");
-    let (relative, path) =
-        devpit_devflow::runs::file_in(&root, &card, Some("20261011T143005Z"), "findings.json")
-            .expect("a run");
-    assert!(relative.ends_with("findings.json"));
+    let path = crate::devflow_evidence::runs_of(&project.id, &root)
+        .expect("runs")
+        .file_in(&card, Some("20261011T143005Z"), "findings.json")
+        .expect("a run");
     let finding = |title: &str, decision: &str| {
         json!({
             "file": "app.py", "line": 2, "severity": "low", "axis": "security", "title": title,

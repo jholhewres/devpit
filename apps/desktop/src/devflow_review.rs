@@ -18,7 +18,7 @@ use devpit_rpc::{CardReview, Finding, Found, Project, Review, Severity};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
-use crate::devflow_evidence::{checkout, SIGNED};
+use crate::devflow_evidence::{checkout, runs_of, runs_of_card, SIGNED};
 use crate::steps::context::{context_of, Checkout};
 
 /// What the agent's wait keeps for attaching and answering once the reviewers stop.
@@ -87,9 +87,10 @@ pub(crate) fn began(project: &Project, cwd: &Path, card: &str) {
     if !root.join(devpit_devflow::folder::FILE).is_file() {
         return;
     }
-    if let Ok(head) = devpit_git::head_of(&root) {
-        let _ = devpit_devflow::started::keep_start(&root, card, &head);
-    }
+    let (Ok(head), Ok(runs)) = (devpit_git::head_of(&root), runs_of(&project.id, &root)) else {
+        return;
+    };
+    let _ = devpit_devflow::started::keep_start(&runs, card, &head);
 }
 
 /// The brief of the epic the card was planned under.
@@ -111,13 +112,14 @@ pub(crate) fn respond_with(
     let store = crate::projects::store().map_err(|err| err.message)?;
     let card = card_here(&store, project, &asked.card)?;
     let root = checkout(project, cwd);
+    let runs = runs_of(&project.id, &root)?;
     // The card's own base, else where it was started here, else the default
     // branch: a card worked in the project's folder has only the second.
-    let started = devpit_devflow::started::start_of(&root, &card.id);
+    let started = devpit_devflow::started::start_of(&runs, &card.id);
     let previous = asked
         .previous
         .as_deref()
-        .map(|run| review::previous_of(&root, &card.id, run))
+        .map(|run| review::previous_of(&runs, &card.id, run))
         .transpose()?;
     let pinned = match (&asked.run, &previous) {
         (None, Some(previous)) => Some(pinned_from(&root, previous.head.clone())?),
@@ -144,7 +146,7 @@ pub(crate) fn respond_with(
     .environment();
     let secrets = crate::kept_out::what_devpit_gave(&store);
     let redact = |text: &str| crate::kept_out::kept_out(text, &secrets);
-    let evidence = crate::devflow_gate::newest(&root, &card.id, "evidence.json");
+    let evidence = crate::devflow_gate::newest(&runs, &card.id, "evidence.json");
     let brief = brief_of(&store, project, &card.id);
     // Asked only where it can answer: else the review falls back as without it.
     let jev = crate::devflow_jev::Jev::of(project, config, &root, Some(&card.id), &[]);
@@ -164,6 +166,7 @@ pub(crate) fn respond_with(
     };
     let done = review::reviewed(&Given {
         root: &root,
+        runs: &runs,
         config,
         asked: &asked,
         card: Card {
@@ -193,7 +196,7 @@ pub(crate) fn respond_with(
         lines_at: &lines_at,
     })?;
 
-    let run = root.join(&done.folder);
+    let run = PathBuf::from(&done.folder);
     let artifacts = crate::projects::project_home(&project.id)
         .map_err(|err| err.message)?
         .artifacts();
@@ -230,7 +233,8 @@ pub(crate) fn respond_with(
 /// The newest Devflow review of a card, with its run's name.
 fn newest_review(store: &Store, card_id: &str) -> Option<(PathBuf, String, Value)> {
     let root = crate::devflow_jev::checkout_of(store, card_id)?;
-    let (run, findings) = crate::devflow_gate::newest(&root, card_id, review::FINDINGS)?;
+    let runs = runs_of_card(store, card_id, &root)?;
+    let (run, findings) = crate::devflow_gate::newest(&runs, card_id, review::FINDINGS)?;
     Some((root, run, findings))
 }
 
@@ -320,11 +324,13 @@ pub(crate) fn mark(
 ) -> Result<(), String> {
     let (card_id, run) = devflow_run(run_id).ok_or("not a Devflow review")?;
     let root = crate::devflow_jev::checkout_of(store, card_id).ok_or("the card has no checkout")?;
-    let (relative, path) = runs::file_in(&root, card_id, Some(run), review::FINDINGS)?;
+    let path = runs_of_card(store, card_id, &root)
+        .and_then(|runs| runs.found(card_id, Some(run), review::FINDINGS))
+        .ok_or_else(|| format!("run {run} has no {}", review::FINDINGS))?;
     let mut kept: Value = std::fs::read_to_string(&path)
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
-        .ok_or_else(|| format!("{relative} is not there"))?;
+        .ok_or_else(|| format!("{} is not there", path.display()))?;
     let finding = kept["findings"]
         .get_mut(at as usize)
         .filter(|finding| finding.is_object())
@@ -340,7 +346,7 @@ pub(crate) fn mark(
         ));
     }
     let text = serde_json::to_string_pretty(&kept).unwrap_or_default();
-    std::fs::write(&path, text).map_err(|err| format!("{relative}: {err}"))
+    std::fs::write(&path, text).map_err(|err| format!("{}: {err}", path.display()))
 }
 
 #[cfg(test)]

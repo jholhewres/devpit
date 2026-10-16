@@ -33,7 +33,7 @@ pub(crate) const PERSONAS: [(&str, &str); 4] = [
 ];
 const FINDINGS_SCHEMA: &str = include_str!("../../../flow/schemas/devflow-findings.schema.json");
 
-/// The line the `.gitignore` needs: evidence stays out of the repository.
+/// The line the `.gitignore` needs: a check run by hand reports there.
 const IGNORED: &str = "runs/";
 
 /// A check's command, kept in a script of its own.
@@ -134,7 +134,7 @@ pub fn planned(yaml: &str, scripts: &[Script], playwright: Option<&str>) -> Vec<
         at(FILE.to_owned(), yaml.to_owned(), Kind::Ours, false),
         at(
             format!("{DIR}/.gitignore"),
-            format!("# Evidence devpit keeps per run, attached to the card.\n{IGNORED}\n"),
+            format!("# A check run by hand reports under runs/local.\n{IGNORED}\n"),
             Kind::Ignore,
             false,
         ),

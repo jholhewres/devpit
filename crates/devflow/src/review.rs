@@ -21,7 +21,7 @@ use crate::findings::{self, Diffed, Source};
 use crate::jev::{self, Said};
 use crate::layers::Team;
 use crate::plan::PREFIX;
-use crate::runs;
+use crate::runs::Runs;
 use crate::scale::{self, Sized};
 
 /// The fields the tool takes; `project` is an orchestrator's, as on every
@@ -34,6 +34,8 @@ const SHAPE: &str =
 pub const PACKET: &str = "review-context.md";
 pub const RECORD: &str = "review.json";
 pub const FINDINGS: &str = "findings.json";
+/// The findings schema, beside the packet: devpit's, never a project's copy.
+pub const SCHEMA: &str = "devflow-findings.schema.json";
 
 const MOST_REPORTS: usize = 6;
 /// The diff a packet carries; past it a reviewer reads the rest with git.
@@ -204,6 +206,11 @@ pub fn persona_text(root: &Path, elsewhere: Personas, persona: &str) -> Result<S
         .ok_or_else(|| {
             format!("no persona `{persona}`: not in {relative}, a layer's reviewers/ or your own")
         })
+}
+
+/// Where a pending persona's text is written in the run, for the session.
+pub fn persona_file(persona: &str) -> String {
+    format!("persona-{persona}.md")
 }
 
 /// A persona's file under `base`, when it is there.
@@ -397,7 +404,7 @@ pub fn packet(given: &Packet) -> String {
         ));
     }
     said.push_str(
-        "## Output\nOne JSON object following .devpit/devflow/devflow-findings.schema.json, and nothing else.\n",
+        "## Output\nOne JSON object following devflow-findings.schema.json beside this packet, and nothing else.\n",
     );
     said
 }
@@ -615,6 +622,8 @@ pub type Judge<'a> = &'a (dyn Fn(&str, &Value) -> Said + Sync);
 /// What the review is given.
 pub struct Given<'a> {
     pub root: &'a Path,
+    /// Where the review's run is kept.
+    pub runs: &'a Runs,
     pub config: &'a Config,
     pub asked: &'a Asked,
     pub card: Card<'a>,
@@ -657,15 +666,16 @@ fn a_commit(said: &str) -> bool {
 
 /// Run `run` of the card's reviews, read for a re-review: its HEAD from
 /// findings.json, else from review.json, and its findings.
-pub fn previous_of(root: &Path, card: &str, run: &str) -> Result<Previous, String> {
-    let (relative, at) = runs::file_in(root, card, Some(run), FINDINGS)?;
-    let path = at
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| format!("{relative} has no folder"))?;
-    let kept = read_json(&path, FINDINGS).ok_or_else(|| {
-        format!("run {run} has no findings.json: pass as `previous` a review of this card that finished")
-    })?;
+pub fn previous_of(runs: &Runs, card: &str, run: &str) -> Result<Previous, String> {
+    let kept = runs
+        .found(card, Some(run), FINDINGS)
+        .filter(|_| crate::runs::plain_card(card))
+        .and_then(|at| at.parent().map(Path::to_path_buf));
+    let (path, kept) = kept
+        .and_then(|path| read_json(&path, FINDINGS).map(|kept| (path, kept)))
+        .ok_or_else(|| {
+            format!("run {run} has no findings.json: pass as `previous` a review of this card that finished")
+        })?;
     let head = kept["head"]
         .as_str()
         .map(str::to_owned)
@@ -698,7 +708,7 @@ pub struct Consolidated {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Done {
     pub card: String,
-    /// The run's folder, relative to the checkout, and its name.
+    /// Where the run's folder is, and its name.
     pub folder: String,
     pub stamp: String,
     pub base: String,
@@ -775,7 +785,7 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
             git.base
         ));
     }
-    let (folder, path) = runs::fresh(given.root, given.card.id, given.at)?;
+    let path = given.runs.fresh(given.card.id, given.at)?;
     let criteria = criteria_of(given.card.body);
     let blocked: Vec<Value> = given.previous.map_or_else(Vec::new, |previous| {
         findings::blocking(&previous.findings, &given.config.review.block_on)
@@ -799,7 +809,8 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
             .map(|previous| (previous.run.as_str(), blocked.as_slice())),
     }));
     write(&path, PACKET, &packet)?;
-    let packet_at = format!("{folder}/{PACKET}");
+    write(&path, SCHEMA, findings::SCHEMA)?;
+    let packet_at = path.join(PACKET).display().to_string();
     let deadline = given.budget.saturating_sub(PASS);
     // An answer that is not findings keeps what was said: "invalid JSON" with
     // nothing to read was every review of the first real project.
@@ -891,7 +902,11 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
         }
         record.ran.push(ran);
     }
-    let stamp = folder.rsplit('/').next().unwrap_or_default().to_owned();
+    let stamp = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_owned();
     Ok((stamp, path, record))
 }
 
@@ -901,11 +916,11 @@ fn pretty(value: &Value) -> String {
 
 /// A review devpit already ran, with the session's own answers added.
 fn reviewed_again(given: &Given, run: &str) -> Result<(String, PathBuf, Record), String> {
-    let (relative, record_at) = runs::file_in(given.root, given.card.id, Some(run), RECORD)?;
+    let record_at = given.runs.file_in(given.card.id, Some(run), RECORD)?;
     let path = record_at
         .parent()
         .map(Path::to_path_buf)
-        .ok_or_else(|| format!("{relative} has no folder"))?;
+        .ok_or_else(|| format!("{} has no folder", record_at.display()))?;
     let kept = read_json(&path, RECORD).ok_or_else(|| {
         format!("run {run} is not a review of this card: call devpit_devflow_review with only the card first")
     })?;
@@ -1182,7 +1197,7 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         None => reviewed_anew(given)?,
         Some(run) => reviewed_again(given, run)?,
     };
-    let folder = format!("{}/{}/{stamp}", runs::RUNS, given.card.id);
+    let folder = path.display().to_string();
     let sources: Vec<Source> = record
         .ran
         .iter()
@@ -1193,6 +1208,12 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         &sources,
         record.scale.as_ref().is_some_and(|scale| scale.one),
     );
+    // The session's subagents read each persona as this project resolves it,
+    // beside the packet: the project keeps no copy of devpit's.
+    for persona in &pending {
+        let text = persona_text(given.root, given.personas, persona)?;
+        write(&path, &persona_file(persona), &text)?;
+    }
     let mut all: Vec<Value> = record
         .answers
         .iter()
@@ -1210,7 +1231,7 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
     // The session's hand-back to a re-review carries what its first call did.
     let previous = match (given.previous, &record.previous) {
         (Some(previous), _) => Some(previous.clone()),
-        (None, Some(run)) => Some(previous_of(given.root, given.card.id, run)?),
+        (None, Some(run)) => Some(previous_of(given.runs, given.card.id, run)?),
         (None, None) => None,
     };
     if let Some(previous) = &previous {
@@ -1450,6 +1471,7 @@ fn short(sha: &str) -> &str {
 /// What the agent is answered.
 pub fn summary(done: &Done) -> Value {
     let packet = format!("{}/{PACKET}", done.folder);
+    let persona = format!("{}/{}", done.folder, persona_file("<persona>"));
     let findings = done.findings.as_ref();
     let list = findings
         .and_then(|findings| findings["findings"].as_array())
@@ -1457,7 +1479,7 @@ pub fn summary(done: &Done) -> Value {
     let verdict = findings.and_then(|findings| findings["verdict"].as_str());
     let next = if !done.pending.is_empty() {
         format!(
-            "Review {} yourself: one fresh subagent per persona, each given only the packet at {packet} and its persona at .devpit/devflow/reviewers/<persona>.md, each answering one findings object. Then call devpit_devflow_review again with this card, run \"{}\" and reports: those objects.",
+            "Review {} yourself: one fresh subagent per persona, each given only the packet at {packet} and its persona at {persona}, each answering one findings object. Then call devpit_devflow_review again with this card, run \"{}\" and reports: those objects.",
             done.pending.join(", "),
             done.stamp
         )
