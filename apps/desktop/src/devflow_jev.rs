@@ -163,6 +163,23 @@ impl Jev {
         self.conf.key.is_some() && !self.conf.opted_out.contains(&self.project_id)
     }
 
+    /// The mode `name` is asked in: devpit's finding rubric, which sets
+    /// findings aside, acts only once the person's labels show it keeps the
+    /// ones they confirm.
+    fn mode_for(&self, store: &Store, name: &str, rubric: &Rubric) -> Mode {
+        if self.mode != Mode::Enforce || name != jev::FINDING {
+            return self.mode;
+        }
+        let rows = store
+            .decisions_of_project(&self.project_id)
+            .unwrap_or_default();
+        let rows: Vec<&DecisionRow> = rows.iter().collect();
+        match enforce_held(&rows, &json!(rubric.thresholds)) {
+            None => Mode::Enforce,
+            Some(_) => Mode::Shadow,
+        }
+    }
+
     /// The rubric `name` asked about `state`, logged under the mode it ran
     /// in, and judged by its thresholds.
     pub(crate) fn judge(&self, name: &str, state: &Value) -> Said {
@@ -182,12 +199,13 @@ impl Jev {
             Ok(rubric) => rubric,
             Err(why) => return skipped(why),
         };
-        let mut conf = self.conf.clone();
-        // Logged under the flow's mode, not the Settings' gates.
-        conf.modes = json!({ name: self.mode.word() });
         let Ok(store) = self.store.lock() else {
             return skipped("the decision log is busy".to_owned());
         };
+        let mode = self.mode_for(&store, name, &rubric);
+        let mut conf = self.conf.clone();
+        // Logged under the flow's mode, not the Settings' gates.
+        conf.modes = json!({ name: mode.word() });
         let asking = Asking {
             project_id: Some(&self.project_id),
             card_id: self.card_id.as_deref(),
@@ -204,11 +222,11 @@ impl Jev {
             Decided::Skipped(Skip::Off | Skip::OptedOut) => {}
             Decided::Skipped(skip) => self.called(Some(skip.reason())),
         }
-        let result = crate::deciding::gated(decided, &rubric, self.mode.word().to_owned());
+        let result = crate::deciding::gated(decided, &rubric, mode.word().to_owned());
         Said {
             rubric: name.to_owned(),
             decision,
-            mode: self.mode,
+            mode,
             outcome: result.outcome.to_owned(),
             verdicts: result.verdicts,
             answers: result.answers,
@@ -374,6 +392,36 @@ fn parsed(text: Option<&str>) -> Value {
         .unwrap_or(Value::Null)
 }
 
+/// Each decision the person labelled, as calibration reads it.
+fn labelled_of(rows: &[&DecisionRow]) -> Vec<Labelled> {
+    rows.iter()
+        .filter_map(|row| {
+            Some(Labelled {
+                score: score_of(
+                    &parsed(row.answers.as_deref()),
+                    &parsed(row.thresholds.as_deref()),
+                ),
+                outcome: row.outcome.clone(),
+                truth: row.person_verdict.as_deref()? == "pass",
+            })
+        })
+        .collect()
+}
+
+/// Why devpit's finding rubric may not act yet, from the decisions judged
+/// by `thresholds`: what an older version failed says nothing of this one.
+pub(crate) fn enforce_held(rows: &[&DecisionRow], thresholds: &Value) -> Option<String> {
+    let judged: Vec<&DecisionRow> = rows
+        .iter()
+        .copied()
+        .filter(|row| {
+            row.rubric.as_deref() == Some(jev::FINDING)
+                && parsed(row.thresholds.as_deref()) == *thresholds
+        })
+        .collect();
+    calibrate::enforceable(&labelled_of(&judged)).err()
+}
+
 /// How each rubric a project was judged by agrees with the person: Devflow's
 /// first, in the flow's order.
 pub(crate) fn calibration(rows: &[DecisionRow]) -> Vec<RubricAccuracy> {
@@ -394,19 +442,11 @@ pub(crate) fn calibration(rows: &[DecisionRow]) -> Vec<RubricAccuracy> {
     rubrics
         .into_iter()
         .map(|(name, rows)| {
-            let labelled: Vec<Labelled> = rows
-                .iter()
-                .filter_map(|row| {
-                    Some(Labelled {
-                        score: score_of(
-                            &parsed(row.answers.as_deref()),
-                            &parsed(row.thresholds.as_deref()),
-                        ),
-                        outcome: row.outcome.clone(),
-                        truth: row.person_verdict.as_deref()? == "pass",
-                    })
-                })
-                .collect();
+            let labelled = labelled_of(&rows);
+            let held = rows
+                .first()
+                .filter(|_| name == jev::FINDING)
+                .and_then(|newest| enforce_held(&rows, &parsed(newest.thresholds.as_deref())));
             let calibrated = calibrate::calibrated(&labelled);
             let suggested = calibrated.suggested.as_ref();
             RubricAccuracy {
@@ -423,6 +463,7 @@ pub(crate) fn calibration(rows: &[DecisionRow]) -> Vec<RubricAccuracy> {
                 suggested_grey: suggested.and_then(|one| one.grey),
                 suggested_accuracy: suggested.map(|one| one.accuracy),
                 note: calibrated.note,
+                held,
             }
         })
         .collect()

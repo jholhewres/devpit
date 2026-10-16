@@ -310,8 +310,8 @@ pub(crate) fn devflow_run(run_id: &str) -> Option<(&str, &str)> {
 
 /// The person's "not a problem" on one finding of a Devflow review, or
 /// taking it back: kept on the finding in findings.json, which the gate
-/// then no longer blocks on, and kept as a label on what Jev said of it.
-/// Bringing back one Jev set aside overrules Jev.
+/// then no longer blocks on, beside Jev's word and as a label on its
+/// decision. Bringing back one Jev set aside overrules Jev.
 pub(crate) fn mark(
     store: &Store,
     run_id: &str,
@@ -327,20 +327,10 @@ pub(crate) fn mark(
         .ok_or_else(|| format!("{relative} is not there"))?;
     let finding = kept["findings"]
         .get_mut(at as usize)
-        .and_then(Value::as_object_mut)
+        .filter(|finding| finding.is_object())
         .ok_or("no such finding")?;
-    if false_positive {
-        finding.insert("false_positive".to_owned(), json!(true));
-    } else {
-        finding.remove("false_positive");
-        if let Some(jev) = finding.get_mut("jev").and_then(Value::as_object_mut) {
-            if jev.get("set_aside") == Some(&json!(true)) {
-                jev.insert("set_aside".to_owned(), json!(false));
-                jev.insert("overruled".to_owned(), json!(true));
-            }
-        }
-    }
-    crate::devflow_jev::finding_marked(store, &Value::Object(finding.clone()), false_positive);
+    devpit_devflow::findings::person_said(finding, false_positive);
+    crate::devflow_jev::finding_marked(store, finding, false_positive);
     let config = crate::devflow::read(&root);
     if let devpit_devflow::State::Valid(_, config) = config {
         let list = kept["findings"].as_array().cloned().unwrap_or_default();

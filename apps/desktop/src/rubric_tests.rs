@@ -2,11 +2,15 @@ use serde_json::json;
 
 use super::*;
 
+fn verdict(answer: Option<&Value>, threshold: Option<&Threshold>) -> Verdict {
+    verdict_of(answer.and_then(scalar), threshold)
+}
+
 fn at_least(min: f64, grey: Option<f64>) -> Threshold {
     Threshold {
         min: Some(min),
-        max: None,
         grey,
+        ..Threshold::default()
     }
 }
 
@@ -28,9 +32,9 @@ fn a_probability_passes_at_its_minimum_greys_in_the_band_and_fails_below() {
 #[test]
 fn a_score_where_lower_is_better_passes_at_or_below_its_maximum() {
     let threshold = Threshold {
-        min: None,
         max: Some(3.0),
         grey: Some(4.0),
+        ..Threshold::default()
     };
     let score = |s: f64| json!({ "type": "score", "score": s });
     assert_eq!(verdict(Some(&score(2.0)), Some(&threshold)), Verdict::Pass);
@@ -77,4 +81,38 @@ fn the_worst_question_decides_the_outcome() {
     assert_eq!(outcome, Verdict::Fail);
     assert_eq!(verdicts["tested"]["verdict"], "fail");
     assert_eq!(verdicts["met"]["verdict"], "grey");
+}
+
+/// A severity split between two neighbours is sure of the band they make;
+/// split between two far apart, it is not.
+#[test]
+fn an_adjacent_threshold_judges_a_choice_with_its_likelier_neighbour() {
+    let options = ["critical", "high", "medium", "low", "info"];
+    let rubric = |adjacent: bool| Rubric {
+        name: "finding".into(),
+        version: None,
+        questions: json!({ "severity": { "type": "choice", "options": options } }),
+        thresholds: [(
+            "severity".to_owned(),
+            Threshold {
+                min: Some(0.5),
+                adjacent,
+                ..Threshold::default()
+            },
+        )]
+        .into(),
+    };
+    let severity = |probabilities: Value| json!({ "severity": { "type": "choice", "choice": "medium", "probabilities": probabilities } });
+    let split = severity(json!({ "medium": 0.49, "high": 0.32, "low": 0.19 }));
+    assert_eq!(judged(&rubric(false), &split).0, Verdict::Fail);
+    let (outcome, verdicts) = judged(&rubric(true), &split);
+    assert_eq!(outcome, Verdict::Pass);
+    assert!((verdicts["severity"]["value"].as_f64().unwrap_or_default() - 0.81).abs() < 1e-9);
+    let apart = severity(json!({ "medium": 0.4, "critical": 0.35, "info": 0.25 }));
+    assert_eq!(judged(&rubric(true), &apart).0, Verdict::Fail);
+    assert_eq!(
+        banded(&split["severity"], &options),
+        Some(0.49 + 0.32),
+        "the likelier neighbour, not the other"
+    );
 }

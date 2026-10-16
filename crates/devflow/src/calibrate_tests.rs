@@ -76,3 +76,26 @@ fn too_few_labels_suggest_nothing_and_say_how_many_there_are() {
         .is_some_and(|note| note.starts_with("2 labelled so far")));
     assert_eq!(calibrated(&[]).accuracy, None);
 }
+
+/// Enforce waits for twenty findings the person confirmed, and then for Jev
+/// to have failed at most one in ten of them; what the person called false
+/// and what was left grey do not count against it.
+#[test]
+fn enforce_is_refused_below_the_bar_of_confirmed_findings() {
+    let confirmed = |failed: usize, of: usize| -> Vec<Labelled> {
+        (0..of)
+            .map(|at| labelled(0.9, if at < failed { "fail" } else { "pass" }, true))
+            .collect()
+    };
+    let too_few = enforceable(&confirmed(0, ENFORCE_AFTER - 1)).expect_err("too few");
+    assert!(too_few.contains("has 19"), "{too_few}");
+    assert!(enforceable(&confirmed(2, ENFORCE_AFTER)).is_ok());
+    let failing = enforceable(&confirmed(3, ENFORCE_AFTER)).expect_err("3 of 20");
+    assert!(failing.contains("failed 3 of 20"), "{failing}");
+
+    let mut with_others = confirmed(2, ENFORCE_AFTER);
+    with_others.extend((0..10).map(|_| labelled(0.1, "fail", false)));
+    with_others.extend((0..10).map(|_| labelled(0.5, "skipped", true)));
+    assert_eq!(failing_confirmed(&with_others), (2, ENFORCE_AFTER));
+    assert!(enforceable(&with_others).is_ok());
+}

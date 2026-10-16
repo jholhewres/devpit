@@ -210,6 +210,7 @@ fn the_four_rubrics_are_asked_with_no_retention_and_judged_by_their_thresholds()
     let finding = json!({
         "file": "app.py", "line": 2, "severity": "high", "axis": "security", "title": "Shell injection",
         "description": "d", "evidence": "e", "poc": "p", "agent": "claude", "persona": "devflow-security",
+        "anchor": "added",
     });
     let brief = devpit_devflow::brief::Brief {
         goal: Some("open links".into()),
@@ -251,7 +252,13 @@ fn the_four_rubrics_are_asked_with_no_retention_and_judged_by_their_thresholds()
         assert_eq!(request["provider"]["data_collection"], "deny");
         assert!(!request["state"].to_string().contains("diff --git"));
     }
-    assert!(heard[0]["questions"].get("inDiff").is_some());
+    assert!(
+        heard[0]["questions"].get("inDiff").is_none(),
+        "the anchor says it"
+    );
+    let told: Value = serde_json::from_str(heard[0]["state"].as_str().unwrap_or_default())
+        .expect("the state is JSON text");
+    assert_eq!(told["finding"]["anchor"], "added");
     assert!(heard[1]["questions"].get("outOfScope").is_some());
     assert!(heard[2]["questions"].get("vertical").is_some());
     assert!(heard[3]["questions"].get("criterion2").is_some());
@@ -688,6 +695,12 @@ fn reopening_a_card_and_a_false_positive_are_labels_on_jevs_decisions() {
         verdict_of(&store, &card, jev::FINDING, &real).as_deref(),
         Some("fail")
     );
+    let kept: Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).expect("kept")).expect("json");
+    assert_eq!(
+        kept["findings"][0]["jev"]["person_verdict"], "fail",
+        "beside Jev's word"
+    );
     crate::devflow_review::mark(&store, &run, 0, false).expect("taken back");
     assert_eq!(
         verdict_of(&store, &card, jev::FINDING, &real).as_deref(),
@@ -799,4 +812,151 @@ fn a_skipped_call_is_neither_counted_nor_labelled_as_a_decision() {
     let logged = store.decisions_latest(5).expect("log");
     let row = logged.iter().find(|row| row.id == id).expect("logged");
     assert_eq!(row.person_verdict, None);
+}
+
+/// One finding as Decisions answered it in 0.43's shadow run, shaped on
+/// the calls whose findings people confirmed: how sure it was the finding
+/// is real, and how its severity split.
+fn answered(real: f64, severity: &str, split: Value) -> Value {
+    json!({
+        "real": noul(real),
+        "severity": { "type": "choice", "choice": severity, "probabilities": split },
+        "duplicate": noul(0.1),
+    })
+}
+
+/// Synthetic findings with the person's word on each, replayed through
+/// devpit's finding rubric as it ships: of those the person confirmed, at
+/// most one in ten fails — the split severities that failed half of them in
+/// 0.43 pass as the band they make — and the false positives still fail.
+#[test]
+fn the_finding_rubric_fails_few_of_the_findings_people_confirmed() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let rubric = rubric(dir.path(), jev::FINDING, &[]).expect("devpit's");
+    assert_eq!(rubric.version.as_deref(), Some("3"));
+    let mut replayed: Vec<(Value, bool)> = Vec::new();
+    for _ in 0..8 {
+        replayed.push((
+            answered(
+                0.92,
+                "low",
+                json!({ "low": 0.8, "info": 0.1, "medium": 0.1 }),
+            ),
+            true,
+        ));
+    }
+    for _ in 0..10 {
+        let split = json!({ "medium": 0.49, "high": 0.32, "low": 0.19 });
+        replayed.push((answered(0.85, "medium", split), true));
+    }
+    for _ in 0..6 {
+        let split = json!({ "high": 0.45, "critical": 0.3, "medium": 0.25 });
+        replayed.push((answered(0.8, "high", split), true));
+    }
+    for _ in 0..4 {
+        replayed.push((
+            answered(0.55, "low", json!({ "low": 0.7, "medium": 0.3 })),
+            true,
+        ));
+    }
+    for _ in 0..2 {
+        replayed.push((
+            answered(0.3, "low", json!({ "low": 0.7, "medium": 0.3 })),
+            true,
+        ));
+    }
+    for _ in 0..6 {
+        replayed.push((
+            answered(0.2, "low", json!({ "low": 0.6, "info": 0.4 })),
+            false,
+        ));
+    }
+    let labelled: Vec<Labelled> = replayed
+        .iter()
+        .map(|(answers, truth)| Labelled {
+            score: None,
+            outcome: crate::rubric::judged(&rubric, answers)
+                .0
+                .as_str()
+                .to_owned(),
+            truth: *truth,
+        })
+        .collect();
+    let (failed, confirmed) = calibrate::failing_confirmed(&labelled);
+    assert_eq!(confirmed, 30);
+    assert!(
+        failed as f64 <= confirmed as f64 * calibrate::ENFORCE_MOST_FAILING,
+        "{failed} of {confirmed} confirmed findings failed"
+    );
+    assert!(calibrate::enforceable(&labelled).is_ok());
+    assert!(labelled
+        .iter()
+        .filter(|one| !one.truth)
+        .all(|one| one.outcome == "fail"));
+}
+
+/// Enforce acts for devpit's finding rubric only past the bar, counted on
+/// the decisions judged by the thresholds it has now; the other rubrics act
+/// on the person's click alone.
+#[test]
+fn enforce_for_the_finding_rubric_is_refused_below_the_calibration_bar() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (base, _) = provider(sure);
+    let jev = Jev::with(
+        log_store(dir.path()),
+        conf(&base, Some("key")),
+        "prj_bar",
+        Some("card_1"),
+        dir.path(),
+        Mode::Enforce,
+        &[],
+    );
+    let finding = json!({
+        "file": "app.py", "line": 2, "severity": "low", "axis": "security", "title": "t",
+        "description": "d", "evidence": "e", "agent": "claude", "persona": "devflow-security",
+        "anchor": "added",
+    });
+    let state = jev::finding_state(&finding, &[], &[], &[]);
+    assert_eq!(jev.judge(jev::FINDING, &state).mode, Mode::Shadow);
+    assert_eq!(
+        jev.judge(jev::BRIEF, &json!({ "goal": "open links" })).mode,
+        Mode::Enforce
+    );
+
+    let current = rubric(dir.path(), jev::FINDING, &[]).expect("devpit's");
+    let confirmed_under = |thresholds: &str| {
+        let store = jev.store.lock().expect("store");
+        for _ in 0..calibrate::ENFORCE_AFTER {
+            let id = store
+                .log_decision(
+                    &DecisionWrite {
+                        project_id: Some("prj_bar"),
+                        card_id: Some("card_1"),
+                        gate: jev::FINDING,
+                        mode: "shadow",
+                        rubric: Some(jev::FINDING),
+                        rubric_version: None,
+                        questions: "{}",
+                        answers: Some(r#"{"real":{"type":"noul","noul":0.9}}"#),
+                        thresholds: Some(thresholds),
+                        outcome: "pass",
+                        cost_usd: 0.0,
+                        latency_ms: 1,
+                        state_digest: "d:1",
+                        failure: None,
+                    },
+                    crate::deciding::now(),
+                )
+                .expect("logged");
+            store.label_decision(&id, "pass", "kept").expect("labelled");
+        }
+    };
+    confirmed_under(r#"{"real":{"min":0.7},"inDiff":{"min":0.6}}"#);
+    assert_eq!(
+        jev.judge(jev::FINDING, &state).mode,
+        Mode::Shadow,
+        "an older version's decisions say nothing of this one"
+    );
+    confirmed_under(&json!(current.thresholds).to_string());
+    assert_eq!(jev.judge(jev::FINDING, &state).mode, Mode::Enforce);
 }

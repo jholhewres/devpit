@@ -100,7 +100,6 @@ fn not_real_and_milder() -> (Value, Value) {
             "real": { "verdict": "fail", "value": 0.1 },
             "severity": { "verdict": "pass", "value": 0.8 },
             "duplicate": { "verdict": "pass", "value": 0.05 },
-            "inDiff": { "verdict": "pass", "value": 0.9 },
         }),
         json!({ "severity": { "type": "choice", "choice": "low" } }),
     )
@@ -208,4 +207,37 @@ fn decisions_is_off_without_use_then_without_a_key_then_failing_on_the_last_call
         "a reply names it as the panel reads it"
     );
     assert_eq!(json!(no_key)["state"], "no_key");
+}
+
+/// Where a finding sits is a fact Jev is told, not a question it answers:
+/// out of the diff is said and, acting, sets nothing aside on its own; and a
+/// severity one step from the reviewer's is within what Jev is sure of.
+#[test]
+fn the_anchor_is_told_to_jev_and_says_whether_a_finding_is_in_the_diff() {
+    let mut outside = finding("src/b.rs", 7, "medium", "a caller the change broke");
+    outside["anchor"] = json!("not_in_diff");
+    let state = finding_state(&outside, &[], &[], &[]);
+    assert_eq!(state["finding"]["anchor"], "not_in_diff");
+    let rubric: Value = serde_json::from_str(BUILT_IN[0].1).expect("json");
+    assert!(rubric["questions"].get("inDiff").is_none());
+    assert_eq!(rubric["version"], "3");
+
+    let real_but_milder = (
+        json!({
+            "real": { "verdict": "pass", "value": 0.9 },
+            "severity": { "verdict": "pass", "value": 0.81 },
+            "duplicate": { "verdict": "pass", "value": 0.05 },
+        }),
+        json!({ "severity": { "type": "choice", "choice": "low" } }),
+    );
+    let enforced = said(Mode::Enforce, real_but_milder.0, real_but_milder.1);
+    on_finding(&mut outside, &enforced);
+    assert_eq!(outside["jev"]["in_diff"], false);
+    assert!(outside["jev"].get("set_aside").is_none(), "{outside}");
+    assert_eq!(outside["severity"], "medium", "one step is within the band");
+
+    let mut added = finding("src/a.rs", 3, "low", "x");
+    added["anchor"] = json!("context");
+    assert_eq!(in_diff(&added), Some(true));
+    assert_eq!(in_diff(&finding("src/a.rs", 3, "low", "x")), None);
 }

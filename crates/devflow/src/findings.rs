@@ -580,6 +580,26 @@ pub fn carried(merged: &mut [Value], earlier: &[Value]) {
     }
 }
 
+/// The person's word on a finding: a false positive, or taking that back,
+/// which also overrules Jev setting it aside. Kept beside Jev's word as
+/// `person_verdict`, `fail` or `pass` on its being real, so the two compare.
+pub fn person_said(finding: &mut Value, false_positive: bool) {
+    if false_positive {
+        finding["false_positive"] = json!(true);
+    } else if let Some(fields) = finding.as_object_mut() {
+        fields.remove("false_positive");
+    }
+    let Some(jev) = finding.get_mut("jev").and_then(Value::as_object_mut) else {
+        return;
+    };
+    if !false_positive && jev.get("set_aside") == Some(&json!(true)) {
+        jev.insert("set_aside".to_owned(), json!(false));
+        jev.insert("overruled".to_owned(), json!(true));
+    }
+    let verdict = if false_positive { "fail" } else { "pass" };
+    jev.insert("person_verdict".to_owned(), json!(verdict));
+}
+
 /// Whether a finding still stands: not a false positive, as the person
 /// said, nor set aside by Jev acting.
 pub fn standing(finding: &Value) -> bool {

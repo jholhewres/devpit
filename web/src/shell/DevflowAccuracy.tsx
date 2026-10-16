@@ -16,6 +16,7 @@ export function accuracyLine(one: RubricAccuracy): string {
     said += ` — try min ${one.suggestedMin}${one.suggestedGrey == null ? '' : `, grey ${one.suggestedGrey}`}`
     if (one.suggestedAccuracy != null) said += ` (${percent(one.suggestedAccuracy)})`
   } else if (one.note) said += ` — ${one.note}`
+  if (one.held) said += `; enforce keeps it in shadow: ${one.held}`
   return `${said}.`
 }
 

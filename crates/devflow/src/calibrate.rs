@@ -135,6 +135,39 @@ pub fn calibrated(labelled: &[Labelled]) -> Calibration {
     }
 }
 
+/// The decisions the person confirmed before a rubric that sets findings
+/// aside may act: fewer says nothing about what it would drop.
+pub const ENFORCE_AFTER: usize = 20;
+/// The most of those it may have failed: in 0.43 it failed half of them.
+pub const ENFORCE_MOST_FAILING: f64 = 0.10;
+
+/// Of the decisions the person confirmed, how many Jev failed, and of how many.
+pub fn failing_confirmed(labelled: &[Labelled]) -> (usize, usize) {
+    let confirmed: Vec<&Labelled> = labelled
+        .iter()
+        .filter(|one| one.truth && decided(&one.outcome))
+        .collect();
+    let failed = confirmed.iter().filter(|one| one.outcome == "fail").count();
+    (failed, confirmed.len())
+}
+
+/// Whether a rubric may act in enforce: `Err` says why it stays in shadow.
+pub fn enforceable(labelled: &[Labelled]) -> Result<(), String> {
+    let (failed, confirmed) = failing_confirmed(labelled);
+    if confirmed < ENFORCE_AFTER {
+        return Err(format!(
+            "enforce waits for {ENFORCE_AFTER} decisions you confirmed, and has {confirmed}"
+        ));
+    }
+    if failed as f64 > confirmed as f64 * ENFORCE_MOST_FAILING {
+        return Err(format!(
+            "it failed {failed} of {confirmed} findings you confirmed, more than {}%",
+            (ENFORCE_MOST_FAILING * 100.0).round()
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "calibrate_tests.rs"]
 mod tests;

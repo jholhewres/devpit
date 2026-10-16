@@ -289,8 +289,8 @@ fn a_gate_judges_the_answers_or_says_it_skipped() {
             "done".to_owned(),
             Threshold {
                 min: Some(0.8),
-                max: None,
                 grey: Some(0.5),
+                ..Threshold::default()
             },
         )]
         .into(),

@@ -630,3 +630,27 @@ fn the_comment_names_one_place_once_across_its_axes() {
         ]
     );
 }
+
+/// The person's word is kept beside Jev's, so calibration compares the two;
+/// bringing back a finding Jev set aside overrules it.
+#[test]
+fn the_persons_word_on_a_finding_is_kept_beside_jevs() {
+    let mut judged = finding("src/a.rs", 3, "low", "x");
+    judged["jev"] = json!({ "decision": "dcn_1", "outcome": "fail", "set_aside": true });
+    person_said(&mut judged, true);
+    assert_eq!(judged["false_positive"], true);
+    assert_eq!(judged["jev"]["person_verdict"], "fail");
+    person_said(&mut judged, false);
+    assert!(judged.get("false_positive").is_none());
+    assert_eq!(judged["jev"]["person_verdict"], "pass");
+    assert_eq!(judged["jev"]["set_aside"], false);
+    assert_eq!(judged["jev"]["overruled"], true);
+    assert!(standing(&judged));
+
+    let mut unjudged = finding("src/a.rs", 3, "low", "x");
+    person_said(&mut unjudged, true);
+    assert!(
+        unjudged.get("jev").is_none(),
+        "nothing of Jev's to sit beside"
+    );
+}

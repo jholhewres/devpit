@@ -1,7 +1,7 @@
 {
   "name": "devflow-finding",
-  "version": "2",
-  "description": "Whether one code-review finding holds up: a real problem, at the severity it deserves, said once, about the change under review. Asked of each finding a Devflow review consolidates; the state is the finding, the others at its place, the lines its file changed and the card's criteria, never the diff.",
+  "version": "3",
+  "description": "Whether one code-review finding holds up: a real problem, at the severity it deserves, said once, about the change under review. Asked of each finding a Devflow review consolidates; the state is the finding with its anchor in the diff as devpit read it, the others at its place, the lines its file changed and the card's criteria, never the diff. Whether it is in the diff is that anchor, not a question.",
   "questions": {
     "real": {
       "type": "noul",
@@ -26,16 +26,11 @@
     "duplicate": {
       "type": "noul",
       "instructions": "Does the finding describe the same problem, with the same cause, as one of the other findings at its place (others_here)?"
-    },
-    "inDiff": {
-      "type": "noul",
-      "instructions": "Is the finding about code this change added or altered: its line inside the changed ranges of its file, or a problem the change causes?"
     }
   },
   "thresholds": {
     "real": { "min": 0.7, "grey": 0.4 },
-    "severity": { "min": 0.5 },
-    "duplicate": { "max": 0.3, "grey": 0.6 },
-    "inDiff": { "min": 0.6, "grey": 0.35 }
+    "severity": { "min": 0.5, "adjacent": true },
+    "duplicate": { "max": 0.3, "grey": 0.6 }
   }
 }

@@ -97,6 +97,10 @@ pub struct RubricAccuracy {
     pub suggested_accuracy: Option<f64>,
     /// Why nothing is suggested yet.
     pub note: Option<String>,
+    /// Why it stays in shadow under enforce: devpit's finding rubric acts
+    /// only once it keeps the findings the person confirmed.
+    #[serde(default)]
+    pub held: Option<String>,
 }
 
 /// Response of `devflow.calibration`: each rubric the project was judged by.

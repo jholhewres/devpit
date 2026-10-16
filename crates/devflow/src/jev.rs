@@ -3,8 +3,8 @@
 //! each is asked about, and what an answer does. In `shadow` it is recorded
 //! and nothing else; in `enforce`, the person's click, it acts.
 //!
-//! Never the diff and never a conversation: a finding with the others at its
-//! place and the lines its file changed, the criteria with a summary of their
+//! Never the diff and never a conversation: a finding with its anchor in the
+//! diff, the others at its place and the lines its file changed, the criteria with a summary of their
 //! evidence, the brief as its fields, the plan as its cards.
 //!
 //! Pure: asking Decisions is the app's.
@@ -162,8 +162,9 @@ fn texts(value: &Value, keys: &[&str]) -> Value {
     Value::Object(kept)
 }
 
-/// What Jev is asked about one finding: the finding, the others at its
-/// place, the lines its file changed, and the card's criteria.
+/// What Jev is asked about one finding: the finding with its anchor, a fact
+/// devpit read from the diff, the others at its place, the lines its file
+/// changed, and the card's criteria.
 pub fn finding_state(
     finding: &Value,
     others: &[&Value],
@@ -172,7 +173,7 @@ pub fn finding_state(
 ) -> Value {
     capped(&json!({
         "finding": texts(finding, &[
-            "file", "line", "end_line", "axis", "severity", "title", "description",
+            "file", "line", "end_line", "anchor", "axis", "severity", "title", "description",
             "evidence", "poc", "suggestion",
         ]),
         "others_here": others.iter().map(|other| texts(other, &[
@@ -297,10 +298,31 @@ pub fn finding_key(finding: &Value) -> String {
         .join("|")
 }
 
+/// Whether a finding is in the diff, from its anchor: `None` without one.
+pub fn in_diff(finding: &Value) -> Option<bool> {
+    match finding["anchor"].as_str()? {
+        "added" | "context" => Some(true),
+        _ => Some(false),
+    }
+}
+
+/// Two severities one step apart: within the band an adjacent threshold
+/// passes, so neither is sure enough to replace the other.
+fn neighbours(one: &str, other: &str) -> bool {
+    let at = |word: &str| {
+        crate::config::Severity::ALL
+            .iter()
+            .position(|one| one.word() == word)
+    };
+    matches!((at(one), at(other)), (Some(one), Some(other)) if one.abs_diff(other) == 1)
+}
+
 /// Jev's word on a finding, kept on it as `jev`. Acting, a finding that is
-/// not real or not about the change is set aside and holds nothing, and a
-/// severity Jev is sure of replaces the reviewer's — never raised to
-/// critical or high without the PoC those need.
+/// not real is set aside and holds nothing, and a severity Jev is sure of
+/// replaces the reviewer's when more than a step from it — never raised to
+/// critical or high without the PoC those need. Whether it is in the diff
+/// is the anchor's, and sets nothing aside: a missing test or a caller the
+/// change broke sits outside the hunks.
 pub fn on_finding(finding: &mut Value, said: &Said) {
     let mut jev = json!({
         "decision": said.decision,
@@ -309,7 +331,7 @@ pub fn on_finding(finding: &mut Value, said: &Said) {
         "real": said.value("real"),
         "severity": said.choice("severity"),
         "duplicate": said.value("duplicate"),
-        "in_diff": said.value("inDiff"),
+        "in_diff": in_diff(finding),
     });
     if let Some(skipped) = &said.skipped {
         jev["skipped"] = json!(skipped);
@@ -318,8 +340,6 @@ pub fn on_finding(finding: &mut Value, said: &Said) {
     if said.acts() {
         if said.verdict("real") == Some("fail") {
             acted.push("set aside: not a real problem".to_owned());
-        } else if said.verdict("inDiff") == Some("fail") {
-            acted.push("set aside: not about this change".to_owned());
         }
         if !acted.is_empty() {
             jev["set_aside"] = json!(true);
@@ -331,6 +351,7 @@ pub fn on_finding(finding: &mut Value, said: &Said) {
         let sure = said.verdict("severity") == Some("pass");
         if let Some(chosen) = said.choice("severity").filter(|chosen| {
             sure && *chosen != now
+                && !neighbours(chosen, &now)
                 && crate::findings::severity_of(chosen).is_some()
                 && (has_poc || !matches!(*chosen, "critical" | "high"))
         }) {

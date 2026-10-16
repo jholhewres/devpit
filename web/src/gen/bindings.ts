@@ -4794,6 +4794,11 @@ export type RubricAccuracy = {
 	suggestedAccuracy: number | null,
 	/**  Why nothing is suggested yet. */
 	note: string | null,
+	/**
+	 *  Why it stays in shadow under enforce: devpit's finding rubric acts
+	 *  only once it keeps the findings the person confirmed.
+	 */
+	held?: string | null,
 };
 
 /**
