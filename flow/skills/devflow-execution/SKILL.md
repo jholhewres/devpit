@@ -140,6 +140,11 @@ Reply with:
 The card stays where it is; finishing belongs to the completion stage. End the
 turn.
 
+**One card per session.** The completion stage closes the card with
+`devpit_handoff`, and the next card of the plan starts in a **fresh session**,
+not this one: it reads the card, the brief and the handoff note, never this
+conversation, so it pays for none of this card's history.
+
 Done when the reply has all four parts and no other card was started.
 
 ## Rationalizations

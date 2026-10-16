@@ -136,6 +136,9 @@ More reviewers are more items of `review.reviewers`, each
 `{ "agent": "codex", "persona": "devflow-spec", "model": "…" }` on that CLI's
 own sign-in; `review.consolidate` says how their findings become one list:
 `jev` (Decisions, else a model pass), `agent` (one model pass) or `none`.
+`review.scale` (off unless set; `true`, or `{ small_lines, sensitive }`)
+sends a small diff that touches no sensitive path to one `devflow-all`
+reviewer instead.
 
 A check's `report` is the file it writes into `$DEVPIT_REPORT_DIR` for devpit
 to read test by test (`junit`, `vitest`, `jest`, `cargo`, `go`); one that writes

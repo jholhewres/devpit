@@ -139,6 +139,24 @@ fn several_reviewers_are_consolidated_by_jev_unless_the_file_says_otherwise() {
 }
 
 #[test]
+fn the_review_is_scaled_only_when_the_file_asks() {
+    let scale = |text: &str| parse(text).expect("valid").review.scale;
+    assert_eq!(scale("version: 2\n"), None);
+    assert_eq!(scale("version: 2\nreview:\n  scale: false\n"), None);
+    assert_eq!(
+        scale("version: 2\nreview:\n  scale: true\n"),
+        Some(crate::scale::Scale::default())
+    );
+    let own =
+        scale("version: 2\nreview:\n  scale:\n    small_lines: 30\n    sensitive: [\"db/**\"]\n")
+            .expect("on");
+    assert_eq!(own.small_lines, 30);
+    assert_eq!(own.sensitive, ["db/**"]);
+    let wrong = refused("version: 2\nreview:\n  scale:\n    small_lines: 0\n");
+    assert_eq!(wrong.field, "review.scale.small_lines");
+}
+
+#[test]
 fn rubrics_are_named_per_stage() {
     let read =
         parse("version: 1\ndecisions:\n  rubrics:\n    completion: devflow-done\n").expect("valid");

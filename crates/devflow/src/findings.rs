@@ -704,7 +704,7 @@ fn push_range(ranges: &mut Vec<(u64, u64)>, line: u64) {
 }
 
 /// `+c,d` of a hunk header: where the new side starts and how many lines.
-fn new_side(header: &str) -> Option<(u64, u64, u64)> {
+pub(crate) fn new_side(header: &str) -> Option<(u64, u64, u64)> {
     let ranges = header.strip_prefix("@@ ")?.split(" @@").next()?;
     let mut parts = ranges.split_whitespace();
     let count = |part: &str| -> Option<(u64, u64)> {

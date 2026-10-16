@@ -22,6 +22,7 @@ use crate::jev::{self, Said};
 use crate::layers::Team;
 use crate::plan::PREFIX;
 use crate::runs;
+use crate::scale::{self, Sized};
 
 /// The fields the tool takes; `project` is an orchestrator's, as on every
 /// board tool.
@@ -131,16 +132,29 @@ pub fn axis_personas() -> Vec<&'static str> {
     crate::setup::PERSONAS
         .iter()
         .map(|(name, _)| *name)
+        .filter(|name| *name != scale::ALL_AXES)
         .collect()
 }
 
 /// The axes' personas nobody has answered for yet: the session's to review.
-pub fn pending(answered: &[Source]) -> Vec<String> {
-    axis_personas()
+/// `devflow-all` answers for every axis; a scaled review nobody answered is
+/// still one reading, not three.
+pub fn pending(answered: &[Source], scaled: bool) -> Vec<String> {
+    if answered
+        .iter()
+        .any(|source| source.persona == scale::ALL_AXES)
+    {
+        return Vec::new();
+    }
+    let left: Vec<String> = axis_personas()
         .into_iter()
         .filter(|persona| !answered.iter().any(|source| source.persona == *persona))
         .map(str::to_owned)
-        .collect()
+        .collect();
+    if scaled && left.len() == axis_personas().len() {
+        return vec![scale::ALL_AXES.to_owned()];
+    }
+    left
 }
 
 /// Where a persona is looked for after the project's own: each team layer
@@ -705,6 +719,8 @@ pub struct Done {
     pub diffed: Option<BTreeMap<String, Diffed>>,
     /// The findings on no line of HEAD, taken out with why.
     pub dropped: Vec<Value>,
+    /// Which way `review.scale` sent the review; `None` with it off.
+    pub scale: Option<Sized>,
 }
 
 impl Done {
@@ -738,6 +754,7 @@ struct Record {
     judged: BTreeMap<String, Value>,
     previous: Option<String>,
     diffed: Option<BTreeMap<String, Diffed>>,
+    scale: Option<Sized>,
 }
 
 fn criteria_of(body: &str) -> Vec<String> {
@@ -808,7 +825,17 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
             Err(why) => Err((why, Some(said))),
         }
     };
-    let outcomes = in_parallel(&given.config.review.reviewers, &one);
+    let scale = given
+        .config
+        .review
+        .scale
+        .as_ref()
+        .map(|scale| scale::sized(scale, git.files, git.diff));
+    let reviewers = scale::reviewers(
+        &given.config.review,
+        scale.as_ref().is_some_and(|scale| scale.one),
+    );
+    let outcomes = in_parallel(&reviewers, &one);
     let mut record = Record {
         base: git.base.to_owned(),
         head: git.head.to_owned(),
@@ -826,8 +853,9 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
                 .take(MOST_CHANGED)
                 .collect(),
         ),
+        scale,
     };
-    for (reviewer, outcome) in given.config.review.reviewers.iter().zip(outcomes) {
+    for (reviewer, outcome) in reviewers.iter().zip(outcomes) {
         let mut ran = Ran {
             agent: reviewer.agent.word().to_owned(),
             persona: reviewer.persona.clone(),
@@ -898,6 +926,10 @@ fn reviewed_again(given: &Given, run: &str) -> Result<(String, PathBuf, Record),
         diffed: kept
             .get("diffed")
             .and_then(|diffed| serde_json::from_value(diffed.clone()).ok()),
+        scale: kept["scale"]["why"].as_str().map(|why| Sized {
+            one: kept["scale"]["one"].as_bool().unwrap_or(false),
+            why: why.to_owned(),
+        }),
     };
     for mut one in ran {
         let answer = one.file.as_deref().and_then(|file| read_json(&path, file));
@@ -1157,7 +1189,10 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         .filter(|ran| ran.file.is_some())
         .map(Ran::source)
         .collect();
-    let pending = pending(&sources);
+    let pending = pending(
+        &sources,
+        record.scale.as_ref().is_some_and(|scale| scale.one),
+    );
     let mut all: Vec<Value> = record
         .answers
         .iter()
@@ -1246,6 +1281,7 @@ pub fn reviewed(given: &Given) -> Result<Done, String> {
         previous: record.previous,
         diffed: record.diffed,
         dropped,
+        scale: record.scale,
     };
     write(&path, RECORD, &pretty(&recorded(&done)))?;
     Ok(done)
@@ -1284,6 +1320,9 @@ pub fn recorded(done: &Done) -> Value {
     }
     if !done.dropped.is_empty() {
         recorded["dropped"] = json!(done.dropped);
+    }
+    if let Some(scale) = &done.scale {
+        recorded["scale"] = json!({ "one": scale.one, "why": scale.why });
     }
     recorded
 }
@@ -1348,6 +1387,9 @@ pub fn comment(done: &Done, links: &[(String, String)]) -> String {
     ));
     for ran in &done.ran {
         text.push_str(&format!("- {}\n", ran_said(ran)));
+    }
+    if let Some(scale) = &done.scale {
+        text.push_str(&format!("\nScale: {}\n", scale.why));
     }
     let consolidated = &done.consolidated;
     if consolidated.from > 0 {
@@ -1452,6 +1494,9 @@ pub fn summary(done: &Done) -> Value {
     }
     if !done.dropped.is_empty() {
         answer["dropped"] = json!(done.dropped.iter().map(dropped_said).collect::<Vec<_>>());
+    }
+    if let Some(scale) = &done.scale {
+        answer["scale"] = json!(scale.why);
     }
     answer
 }

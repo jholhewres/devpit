@@ -179,6 +179,18 @@ fn review(out: &mut String, config: &Config) {
          # model pass), agent (one model pass) or none (merged as they are).\n",
     );
     let _ = writeln!(out, "  consolidate: {}", config.review.consolidate.word());
+    if let Some(scale) = &config.review.scale {
+        out.push_str(
+            "  # A diff of at most small_lines changed lines that touches no\n  \
+             # sensitive path is read by one devflow-all reviewer.\n  \
+             scale:\n",
+        );
+        let _ = writeln!(out, "    small_lines: {}", scale.small_lines);
+        if scale.sensitive != crate::scale::Scale::default().sensitive {
+            let globs: Vec<String> = scale.sensitive.iter().map(|one| scalar(one)).collect();
+            let _ = writeln!(out, "    sensitive: [{}]", globs.join(", "));
+        }
+    }
 
     out.push_str(
         "\n# Decisions (Jev) answers typed questions about the gates. shadow logs\n\

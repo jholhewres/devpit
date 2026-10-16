@@ -12,7 +12,7 @@ use crate::config::Config;
 use crate::folder::{DIR, FILE};
 
 /// The personas and the schema, as this build ships them.
-pub(crate) const PERSONAS: [(&str, &str); 3] = [
+pub(crate) const PERSONAS: [(&str, &str); 4] = [
     (
         "devflow-spec",
         include_str!("../../../flow/personas/devflow-spec.md"),
@@ -24,6 +24,11 @@ pub(crate) const PERSONAS: [(&str, &str); 3] = [
     (
         "devflow-security",
         include_str!("../../../flow/personas/devflow-security.md"),
+    ),
+    // Every axis in one reading, for a review `review.scale` sized down.
+    (
+        "devflow-all",
+        include_str!("../../../flow/personas/devflow-all.md"),
     ),
 ];
 const FINDINGS_SCHEMA: &str = include_str!("../../../flow/schemas/devflow-findings.schema.json");

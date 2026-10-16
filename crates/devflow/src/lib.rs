@@ -32,6 +32,7 @@ pub mod proposal;
 pub mod render;
 pub mod review;
 pub mod runs;
+pub mod scale;
 pub mod setup;
 pub mod skills;
 pub mod stage;

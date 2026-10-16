@@ -39,6 +39,10 @@ fn full() -> Config {
     }];
     config.review.block_on = vec![Severity::Critical];
     config.review.consolidate = crate::config::Consolidate::Agent;
+    config.review.scale = Some(crate::scale::Scale {
+        small_lines: 40,
+        sensitive: vec!["*.sql".into(), ".github/workflows/**".into()],
+    });
     config.decisions.use_ = true;
     config.decisions.mode = Mode::Enforce;
     config.decisions.rubrics = BTreeMap::from([("completion".into(), "devflow-done".into())]);
@@ -47,7 +51,9 @@ fn full() -> Config {
 
 #[test]
 fn what_is_written_reads_back_the_same() {
-    for config in [Config::default(), full()] {
+    let mut scaled = Config::default();
+    scaled.review.scale = Some(crate::scale::Scale::default());
+    for config in [Config::default(), full(), scaled] {
         let text = render(&config);
         assert_eq!(parse(&text), Ok(config), "{text}");
     }

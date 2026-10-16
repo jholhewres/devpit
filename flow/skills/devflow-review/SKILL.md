@@ -17,6 +17,14 @@ rule and build the wrong thing, or build the right thing and break the rules.
 | `standards` | `devflow-standards` | Does it follow this repo's written rules? Then the code smells, as judgement calls; readability, architecture, performance. |
 | `security` | `devflow-security` | Can it be abused? Trust boundaries and STRIDE first, then the OWASP Top 10, and the OWASP Top 10 for LLM applications where a model is involved. |
 
+`devflow-all` covers all three axes in one reading, each finding naming its
+own `axis`. `review.scale` sends it, alone, instead of `review.reviewers` when
+a diff is small (at most `small_lines` changed lines, 80 unless set) and
+touches no sensitive path (auth, routes, migrations, dependency manifests and
+lockfiles, secrets and `.env`, CI workflows; `sensitive` replaces the list).
+Anything else gets the configured reviewers. It is off unless devflow.yaml
+says `scale: true` or sets either field.
+
 ## Ground rules
 
 - **Reviewers get the packet, never the history.** Each reviewer reads the
@@ -46,8 +54,11 @@ branch) and HEAD, writes the packet as
 changed files, the card's criteria, the brief, the standards, the evidence
 and the diff — and runs every reviewer `review.reviewers` lists in
 `devflow.yaml` at once, each headless on its own agent CLI and from that
-packet alone. A CLI that is not installed or not signed in is skipped, and
-the card says so; the review goes on without it. An empty diff ends the
+packet alone. With `review.scale` on, the answer's `scale` says which way it
+went and why ("scaled: small diff, no sensitive path → one reviewer"); a
+scaled review runs the first reviewer's CLI on `devflow-all`. A CLI that is
+not installed or not signed in is skipped, and the card says so; the review
+goes on without it. An empty diff ends the
 review with "nothing to review".
 
 Done when the answer names the run, the packet and `pending`.
@@ -60,9 +71,10 @@ personas as in step 2, and write `findings.json` beside the packet as step
 
 ### 2. Review what is pending yourself
 
-All three axes are reviewed, every time. `pending` lists the axes' personas
-no reviewer answered for: a persona `review.reviewers` does not list, or one
-whose CLI was skipped. They are yours.
+All three axes are reviewed, every time: one `devflow-all` reading counts for
+all three. `pending` lists the axes' personas no reviewer answered for: a
+persona `review.reviewers` does not list, or one whose CLI was skipped — or
+`devflow-all` alone, for a scaled review nobody answered. They are yours.
 
 Start one fresh subagent per pending persona, in parallel. Each gets the
 packet's path and its persona's text from

@@ -261,7 +261,9 @@ no copy, only that the person clicked.
   `review.consolidate` says (`jev`, else one model pass, or titles alike) —
   and `block_on` gives the verdict in `findings.json`, the gate's file. An
   axis nobody answered for stays `pending`, which holds the gate, until the
-  session hands back its own answers. The card's diff draws the findings,
+  session hands back its own answers. With `review.scale` on, a small diff
+  that touches no sensitive path is read once by `devflow-all`, which
+  answers for every axis; the reply says which way it went. The card's diff draws the findings,
   and the person's "false positive" there is kept on the finding, which then
   holds nothing.
 - **A card is done at the gate.** `devpit_devflow_gate` checks what devpit

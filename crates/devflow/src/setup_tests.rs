@@ -58,6 +58,7 @@ fn a_setup_writes_the_folder_and_nothing_before_it_is_asked() {
             (".devpit/devflow/reviewers/devflow-spec.md", "create"),
             (".devpit/devflow/reviewers/devflow-standards.md", "create"),
             (".devpit/devflow/reviewers/devflow-security.md", "create"),
+            (".devpit/devflow/reviewers/devflow-all.md", "create"),
             (".devpit/devflow/devflow-findings.schema.json", "create"),
         ]
     );

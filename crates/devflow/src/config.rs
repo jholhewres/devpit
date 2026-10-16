@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use crate::node::{self, Key, Node, Value};
+use crate::scale::Scale;
 
 /// The schema this build writes.
 pub const VERSION: u64 = 2;
@@ -227,6 +228,9 @@ pub struct Review {
     pub reviewers: Vec<Reviewer>,
     pub block_on: Vec<Severity>,
     pub consolidate: Consolidate,
+    /// One reviewer for a small, unsensitive diff; off when absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scale: Option<Scale>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -279,6 +283,7 @@ impl Default for Config {
                 reviewers: Vec::new(),
                 block_on: vec![Severity::Critical, Severity::High],
                 consolidate: Consolidate::Jev,
+                scale: None,
             },
             decisions: Decisions {
                 use_: false,
@@ -888,12 +893,43 @@ pub(crate) fn review(node: &Node, path: &str) -> Result<Review, Invalid> {
         )?,
         None => Config::default().review.consolidate,
     };
+    let scale = match fields.get("scale") {
+        Some((node, path)) => scale(node, &path)?,
+        None => None,
+    };
     fields.done()?;
     Ok(Review {
         reviewers,
         block_on,
         consolidate,
+        scale,
     })
+}
+
+/// `scale: true` for the defaults, `false` for off, or a map of either field.
+fn scale(node: &Node, path: &str) -> Result<Option<Scale>, Invalid> {
+    if matches!(node.value, Value::Scalar(..)) {
+        let on = boolean(Some((node, path.to_owned())), false)?;
+        return Ok(on.then(Scale::default));
+    }
+    let mut fields = Fields::of(node, path)?;
+    let mut scale = Scale::default();
+    if let Some((node, path)) = fields.get("small_lines") {
+        scale.small_lines = match scalar(node, &path, "a number of lines")? {
+            (given, true) => given.parse().ok().filter(|lines| *lines > 0),
+            _ => None,
+        }
+        .ok_or_else(|| Invalid::at(node.line(), &path, "expected a number of lines above 0"))?;
+    }
+    if let Some((node, path)) = fields.get("sensitive") {
+        scale.sensitive = items(node, &path)?
+            .iter()
+            .enumerate()
+            .map(|(index, item)| text(item, &format!("{path}.{index}"), 200))
+            .collect::<Result<_, _>>()?;
+    }
+    fields.done()?;
+    Ok(Some(scale))
 }
 
 fn reviewer(node: &Node, path: &str) -> Result<Reviewer, Invalid> {

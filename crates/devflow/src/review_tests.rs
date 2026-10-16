@@ -37,8 +37,27 @@ fn every_axis_not_answered_for_is_the_sessions() {
         agent: "codex".into(),
         persona: "devflow-security".into(),
     }];
-    assert_eq!(pending(&answered), ["devflow-spec", "devflow-standards"]);
-    assert_eq!(pending(&[]).len(), 3);
+    assert_eq!(
+        pending(&answered, false),
+        ["devflow-spec", "devflow-standards"]
+    );
+    assert_eq!(pending(&[], false).len(), 3);
+}
+
+#[test]
+fn one_reading_by_devflow_all_answers_for_every_axis() {
+    let all = [findings::Source {
+        agent: "claude".into(),
+        persona: "devflow-all".into(),
+    }];
+    assert!(pending(&all, true).is_empty());
+    assert!(pending(&all, false).is_empty());
+    assert_eq!(pending(&[], true), ["devflow-all"]);
+    assert_eq!(
+        axis_personas().len(),
+        3,
+        "devflow-all is no axis of its own"
+    );
 }
 
 #[test]
@@ -1074,4 +1093,120 @@ fn the_sessions_reports_are_anchored_and_one_past_the_end_is_dropped_with_why() 
     assert!(summary(&done)["dropped"][0]
         .as_str()
         .is_some_and(|said| said.ends_with(why)));
+}
+
+/// A diff that adds `lines` lines to `file`.
+fn added(file: &str, lines: usize) -> String {
+    format!(
+        "diff --git a/{file} b/{file}\n--- a/{file}\n+++ b/{file}\n@@ -0,0 +1,{lines} @@\n{}",
+        "+a line\n".repeat(lines)
+    )
+}
+
+#[cfg(unix)]
+#[test]
+fn a_scaled_review_runs_one_reviewer_on_docs_and_the_configured_ones_on_a_migration() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let on = |axis: &str, line: u64, severity: &str| {
+        let mut one = finding(
+            "docs/guide.md",
+            line,
+            severity,
+            &format!("A {axis} problem"),
+        );
+        one["axis"] = json!(axis);
+        one
+    };
+    let every_axis = answer(
+        "claude",
+        "devflow-all",
+        vec![
+            on("spec", 1, "medium"),
+            on("standards", 2, "low"),
+            on("security", 3, "info"),
+        ],
+    );
+    let claude = fake_cli(root, "claude-fake", &every_axis, "{}", "0");
+    let codex = fake_cli(
+        root,
+        "codex-fake",
+        &answer("codex", "devflow-security", Vec::new()),
+        "{}",
+        "0",
+    );
+    let reach = move |agent: Agent| match agent {
+        Agent::Claude => Ok(claude.clone()),
+        Agent::Codex => Ok(codex.clone()),
+        _ => Err("not installed".to_owned()),
+    };
+    let mut config = config_with(
+        vec![
+            reviewer(Agent::Claude, "devflow-spec"),
+            reviewer(Agent::Codex, "devflow-security"),
+        ],
+        Consolidate::Nothing,
+    );
+    config.review.scale = Some(crate::scale::Scale::default());
+    let ran = |config: &Config, files: &[&str], diff: &str| {
+        let files: Vec<String> = files.iter().map(|one| (*one).to_owned()).collect();
+        Ran {
+            root,
+            config,
+            asked: fresh(),
+            reach: &reach,
+            jev: None,
+        }
+        .review_of(git(&files, diff), None)
+        .expect("reviewed")
+    };
+    let personas =
+        |done: &Done| -> Vec<String> { done.ran.iter().map(|ran| ran.persona.clone()).collect() };
+
+    let docs = added("docs/guide.md", 5) + &added("tests/a_guide_reads.rs", 5);
+    let done = ran(&config, &["docs/guide.md", "tests/a_guide_reads.rs"], &docs);
+    assert_eq!(personas(&done), ["devflow-all"]);
+    assert_eq!(done.ran[0].agent, "claude", "the first reviewer's CLI");
+    assert!(done.pending.is_empty(), "{:?}", done.pending);
+    let findings = done.findings.as_ref().expect("findings.json");
+    let axes: Vec<&str> = findings["findings"]
+        .as_array()
+        .expect("findings")
+        .iter()
+        .filter_map(|one| one["axis"].as_str())
+        .collect();
+    assert_eq!(axes, ["spec", "standards", "security"]);
+    assert_eq!(findings["pending"], json!([]));
+    let why = summary(&done)["scale"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    assert!(
+        why.starts_with("scaled: small diff (10 changed lines)"),
+        "{why}"
+    );
+    assert!(comment(&done, &[]).contains(&format!("Scale: {why}")));
+    let kept: Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join(&done.folder).join(RECORD)).expect("review.json"),
+    )
+    .expect("json");
+    assert_eq!(kept["scale"]["one"], true);
+
+    let migration = "db/migrations/0003_add_owner.sql";
+    let done = ran(&config, &[migration], &added(migration, 3));
+    assert_eq!(personas(&done), ["devflow-spec", "devflow-security"]);
+    assert_eq!(done.pending, ["devflow-standards"]);
+    assert!(done.scale.as_ref().is_some_and(|scale| !scale.one));
+
+    let large = added("docs/guide.md", 200);
+    let done = ran(&config, &["docs/guide.md"], &large);
+    assert_eq!(personas(&done), ["devflow-spec", "devflow-security"]);
+
+    // Off, a small docs diff is reviewed as it always was, and nothing says scale.
+    config.review.scale = None;
+    let done = ran(&config, &["docs/guide.md", "tests/a_guide_reads.rs"], &docs);
+    assert_eq!(personas(&done), ["devflow-spec", "devflow-security"]);
+    assert_eq!(done.scale, None);
+    assert!(summary(&done).get("scale").is_none());
+    assert!(!comment(&done, &[]).contains("Scale:"));
 }
