@@ -18,6 +18,8 @@ fn names_in(folder: &Path) -> Vec<String> {
 
 /// devpit's folder for the runs, and a checkout, under `base`.
 fn runs_in(base: &Path) -> Runs {
+    // As devpit resolves its folders: a temporary dir under a symlink on macOS.
+    let base = base.canonicalize().expect("base");
     let checkout = base.join("checkout");
     std::fs::create_dir_all(&checkout).expect("checkout");
     Runs {
