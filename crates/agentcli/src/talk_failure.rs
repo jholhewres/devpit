@@ -27,10 +27,15 @@ pub(crate) fn ending(
     read: Option<JoinHandle<String>>,
     on_part: &mut impl FnMut(Part),
 ) -> Ending {
-    let said = read.and_then(|read| read.join().ok()).unwrap_or_default();
-    if ended.is_none() && !succeeded && !said.trim().is_empty() {
+    // Joined only when read: a process the CLI left behind may hold the pipe.
+    let failed = ended.is_none() && !succeeded;
+    let said = read
+        .filter(|_| failed)
+        .and_then(|read| read.join().ok())
+        .unwrap_or_default();
+    if !said.trim().is_empty() {
         on_part(Part::Text {
-            text: format!("The agent stopped: {}", said.trim()),
+            text: format!("\n\nThe agent stopped: {}", said.trim()),
             parent: None,
         });
     }
@@ -48,10 +53,13 @@ pub(crate) fn ending(
 fn tail_of(mut pipe: impl Read) -> String {
     let mut kept: Vec<u8> = Vec::new();
     let mut chunk = [0u8; 8192];
-    while let Ok(read) = pipe.read(&mut chunk) {
-        if read == 0 {
-            break;
-        }
+    loop {
+        let read = match pipe.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(read) => read,
+            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
+        };
         kept.extend_from_slice(&chunk[..read]);
         if kept.len() > KEPT {
             kept.drain(..kept.len() - KEPT);

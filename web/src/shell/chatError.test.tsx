@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ChatPane } from './ChatPane'
@@ -36,7 +36,7 @@ const chat = {
 }
 
 vi.mock('./useChat', () => ({ useChat: () => chat }))
-vi.mock('./useSlash', () => ({ useSlash: () => ({ keyDown: () => false }) }))
+vi.mock('./useSlash', () => ({ useSlash: () => ({ keyDown: () => false, ran: () => false }) }))
 vi.mock('./useStop', () => ({ useStop: () => false }))
 vi.mock('./useShell', () => ({
   useShell: () => ({ active: { id: 'conv_1' }, project: { id: 'p1', name: 'devpit' }, rename: vi.fn(), drafted: taken }),
@@ -59,5 +59,19 @@ describe('a turn the chat could not run', () => {
     expect(said.textContent).toContain('already has a turn running')
     const last = screen.getAllByTestId('turn').at(-1)!
     expect(last.compareDocumentPosition(said) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
+describe('a send the chat refused', () => {
+  it('gives the words back to the composer', async () => {
+    // Refused after the send left, as the app answers: on a later tick.
+    said.mockImplementation((prompt: string, back?: (prompt: string) => void) => void Promise.resolve().then(() => back?.(prompt)))
+    chat.error = null as unknown as string
+    render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
+    const field = screen.getByPlaceholderText(/^Do anything…/) as HTMLTextAreaElement
+    fireEvent.change(field, { target: { value: 'ship it' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    expect(said).toHaveBeenCalled()
+    await waitFor(() => expect(field.value).toBe('ship it'))
   })
 })

@@ -295,3 +295,48 @@ fn a_cli_that_fails_says_why_in_the_answer() {
     let shown = format!("{heard:?}");
     assert!(shown.contains("No conversation found"), "{shown}");
 }
+
+/// A CLI that writes more to stderr than a pipe holds still finishes its
+/// turn: nobody reading it used to stop the CLI, and the turn with it.
+#[cfg(unix)]
+#[test]
+fn a_cli_that_floods_stderr_still_finishes_its_turn() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join("fake-claude");
+    std::fs::write(
+        &cli,
+        "#!/bin/sh\nread -r _prompt\nhead -c 200000 /dev/zero | tr '\\0' x >&2\n\
+         printf '{\"type\":\"result\",\"subtype\":\"success\",\"session_id\":\"s\",\"total_cost_usd\":0}\\n'\n",
+    )
+    .expect("script");
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let command = cli.to_string_lossy().into_owned();
+    let cwd = dir.path().to_path_buf();
+    let (tell, hear) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let turn = Say {
+            command: &command,
+            cwd: &cwd,
+            ..turn(None)
+        };
+        let said = (0..5).find_map(|_| {
+            match crate::talk::say(&crate::driver::Claude::default(), &turn, |_| {}, |_| {}) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                }
+                other => Some(other.map(|said| said.end.is_error)),
+            }
+        });
+        let _ = tell.send(said);
+    });
+    let said = hear
+        .recv_timeout(std::time::Duration::from_secs(20))
+        .expect("the turn hung on a full stderr pipe");
+    assert!(
+        !said.expect("started").expect("a turn"),
+        "the turn ended as an error"
+    );
+}

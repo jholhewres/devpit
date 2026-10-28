@@ -93,7 +93,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (!ready(prompt, false, chat.profileId)) return
     if (sendDraft(prompt) || slash.ran(prompt)) return setPrompt('')
     if (chat.sending) queue.add(prompt)
-    else chat.say(prompt)
+    else chat.say(prompt, (back) => setPrompt((was) => was || back))
     setPrompt('')
     follow.toEnd()
   }

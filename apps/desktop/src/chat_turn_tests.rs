@@ -92,3 +92,37 @@ fn a_failed_turn_ends_as_an_error() {
     assert_eq!(end.turn_id, "turn_1");
     assert_eq!(end.stop_reason.as_deref(), Some("error"));
 }
+
+/// A turn that failed after it began keeps what it said, as an answer that
+/// is over; one refused before it began writes nothing.
+#[test]
+fn a_failed_turn_keeps_what_it_said_before_failing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let file = dir.path().join("conversation.jsonl");
+    let (_, opened) = messages("turn_1", "hi", 0.0);
+    let parts = std::sync::Arc::new(std::sync::Mutex::new(vec![devpit_rpc::Part::Text {
+        text: "half an answer".to_owned(),
+        parent: None,
+    }]));
+    let frames = std::sync::Arc::new(std::sync::Mutex::new(0));
+    let counted = frames.clone();
+    let on_frame = tauri::ipc::Channel::new(move |_| {
+        *counted.lock().expect("count") += 1;
+        Ok(())
+    });
+    let refused: Result<(), devpit_rpc::RpcError> = Err(devpit_rpc::RpcError::internal("boom"));
+
+    assert!(or_failed(refused.clone(), "turn_1", &file, None, &opened, &on_frame).is_err());
+    assert!(!file.exists(), "a turn that never began wrote an answer");
+
+    assert!(or_failed(refused, "turn_1", &file, Some(&parts), &opened, &on_frame).is_err());
+    let (kept, _) = devpit_agentcli::store::read(&file);
+    assert_eq!(kept.len(), 1);
+    assert!(!kept[0].streaming);
+    assert!(format!("{:?}", kept[0].parts).contains("half an answer"));
+    assert_eq!(
+        *frames.lock().expect("count"),
+        2,
+        "each failure ends its answer"
+    );
+}

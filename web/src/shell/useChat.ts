@@ -61,7 +61,8 @@ export interface Chat {
   rewind: (turnId: string) => void
   detach: (path: string) => void
   answer: (id: string, said: Said) => void
-  say: (prompt: string) => void
+  /** `back` gets the words of a send refused before it opened, to give back. */
+  say: (prompt: string, back?: (prompt: string) => void) => void
   /** Into the turn in flight; whether it took it. */
   steer: (prompt: string) => Promise<boolean>
   stop: () => void
@@ -254,7 +255,7 @@ export function useChat(conversationId: string): Chat {
   )
 
   const say = useCallback(
-    (prompt: string) => {
+    (prompt: string, back?: (prompt: string) => void) => {
       if (!project || !profileId) return
       const turn: Ask = {
         projectId: project.id,
@@ -269,8 +270,10 @@ export function useChat(conversationId: string): Chat {
       }
       const now = opened.current
       const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
+      let heard = false
       const started = send(turn, (frame) => {
         if (!now.open()) return
+        heard ||= frame.type === 'opened'
         if (frame.type === 'session') setSession(frame.session_id)
         else push(frame)
       })
@@ -303,7 +306,12 @@ export function useChat(conversationId: string): Chat {
             },
           )
         })
-        .catch((thrown: { message?: string }) => now.open() && setError(thrown.message ?? 'the turn failed'))
+        .catch((thrown: { message?: string }) => {
+          if (!now.open()) return
+          setError(thrown.message ?? 'the turn failed')
+          /* Refused before it opened: nothing on screen holds the words. */
+          if (!heard) back?.(prompt)
+        })
         .finally(() => {
           now.sending = false
           if (!now.open()) return
