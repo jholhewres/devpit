@@ -664,3 +664,40 @@ fn a_review_whose_comments_github_did_not_name_is_never_posted_twice() {
     assert_eq!(host.reviews.borrow().len(), 1, "a second review was posted");
     assert_eq!(host.inline.borrow().len(), 7);
 }
+
+#[test]
+fn a_change_to_a_comment_github_did_not_name_says_where_to_make_it() {
+    let mut kept = review_like_a_real_one();
+    let run = run_with(&kept);
+    let host = FakeGitHub::of(change());
+    host.unnamed.set(true);
+    shown_then_applied(run.path(), &host);
+
+    kept["findings"][6]["suggestion"] = json!("Use UTC for the settlement date.");
+    std::fs::write(
+        run.path().join(review::FINDINGS),
+        serde_json::to_string(&kept).expect("json"),
+    )
+    .expect("findings");
+    respond(
+        run.path(),
+        &asked_for(json!({})),
+        &github(),
+        Verify::Advise,
+        Ok(&host),
+    )
+    .expect("drafted");
+    let refused = respond(
+        run.path(),
+        &asked_for(json!({ "apply": true })),
+        &github(),
+        Verify::Advise,
+        Ok(&host),
+    )
+    .expect_err("an edit it cannot make");
+    assert!(
+        refused.contains("change it on the pull request"),
+        "{refused}"
+    );
+    assert_eq!(host.reviews.borrow().len(), 1, "a second review was posted");
+}
