@@ -159,22 +159,27 @@ impl Gh {
 /// order. A review's own listing names no line at all (#248).
 pub(crate) fn ids_of(wanted: &[Inline], kept: &[Value], review: u64) -> Vec<Option<u64>> {
     let mut taken = vec![false; kept.len()];
-    wanted
-        .iter()
-        .map(|one| {
-            // `original_line` is where it was posted; `line` is where the
-            // pull request's head shows it now.
+    let mut ids = vec![None; wanted.len()];
+    // `original_line` is where it was posted, so every comment is matched on
+    // it first; `line`, where the head shows it now, only for those left.
+    for field in ["original_line", "line"] {
+        for (slot, one) in wanted.iter().enumerate() {
+            if ids[slot].is_some() {
+                continue;
+            }
             let at = kept.iter().enumerate().position(|(at, had)| {
-                let on = |field: &str| had[field].as_u64() == Some(one.line);
                 !taken[at]
                     && had["pull_request_review_id"].as_u64() == Some(review)
                     && had["path"] == one.file.as_str()
-                    && (on("original_line") || on("line"))
-            })?;
-            taken[at] = true;
-            kept[at]["id"].as_u64()
-        })
-        .collect()
+                    && had[field].as_u64() == Some(one.line)
+            });
+            if let Some(at) = at {
+                taken[at] = true;
+                ids[slot] = kept[at]["id"].as_u64();
+            }
+        }
+    }
+    ids
 }
 
 /// What `review` posted, from the listing read back after it. The review is

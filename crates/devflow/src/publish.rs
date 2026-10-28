@@ -708,10 +708,15 @@ pub fn published(folder: &Path, draft: &Value, host: &dyn Host) -> Result<Value,
         "unnamed": unnamed,
         "by_hand": by_hand,
     });
+    let mut notes = Vec::new();
+    if !unnamed.is_empty() {
+        notes.push("Every comment was posted, but GitHub's answer did not name those in `unnamed`: they are on the pull request, and publishing again will not post them twice; a later change to one is made there by hand.");
+    }
     if !by_hand.is_empty() {
-        said["note"] = json!("The comments in `by_hand` changed, but GitHub never named them, so devpit cannot edit them: change it on the pull request. Everything else was published.");
-    } else if !unnamed.is_empty() {
-        said["note"] = json!("Every comment was posted, but GitHub's answer did not name those in `unnamed`: they are on the pull request, and publishing again will not post them twice; a later change to one is made there by hand.");
+        notes.push("The comments in `by_hand` changed, but GitHub never named them, so devpit cannot edit them: change it on the pull request. Everything else was published.");
+    }
+    if !notes.is_empty() {
+        said["note"] = json!(notes.join(" "));
     }
     Ok(said)
 }

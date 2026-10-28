@@ -192,3 +192,20 @@ fn a_review_posted_whose_comments_cannot_be_read_back_is_kept_as_posted() {
         }
     );
 }
+
+/// A comment posted at 3 that the pull request now shows at 9 never takes
+/// the id of the one posted at 9: a later edit would change the wrong one.
+#[test]
+fn a_comment_that_moved_onto_anothers_line_keeps_its_own_id() {
+    let at = |line: u64| Inline {
+        file: "app/A.php".to_owned(),
+        line,
+        body: String::new(),
+    };
+    let listed = json!([
+        { "id": 30, "pull_request_review_id": 8, "path": "app/A.php", "line": 9, "original_line": 3 },
+        { "id": 90, "pull_request_review_id": 8, "path": "app/A.php", "line": 15, "original_line": 9 },
+    ]);
+    let listed = listed.as_array().expect("a list");
+    assert_eq!(ids_of(&[at(9), at(3)], listed, 8), [Some(90), Some(30)]);
+}
