@@ -168,7 +168,27 @@ fn the_comments_a_review_posted_are_found_by_the_line_github_lists_them_on() {
         { "id": 1, "pull_request_review_id": 7, "path": "app/RateLimitingServiceProvider.php", "line": 106, "original_line": 106 },
         { "id": 2, "pull_request_review_id": 8, "path": "app/RateLimitingServiceProvider.php", "line": 106, "original_line": 106 },
         { "id": 3, "pull_request_review_id": 8, "path": "app/Old.php", "line": null, "original_line": 12 },
+        { "id": 4, "pull_request_review_id": 8, "path": "app/Gone.php", "line": 9, "original_line": 3 },
     ]);
     let listed = listed.as_array().expect("a list");
-    assert_eq!(ids_of(&wanted, listed, 8), [Some(2), Some(3), None]);
+    assert_eq!(ids_of(&wanted, listed, 8), [Some(2), Some(3), Some(4)]);
+}
+
+/// #248: GitHub took the review but its comments could not be read back:
+/// the review is still kept as posted, so a retry does not post it again.
+#[test]
+fn a_review_posted_whose_comments_cannot_be_read_back_is_kept_as_posted() {
+    let wanted = [Inline {
+        file: "app/A.php".to_owned(),
+        line: 1,
+        body: "a".to_owned(),
+    }];
+    let posted = posted_from(8, &wanted, Err("gh api timed out".to_owned()));
+    assert_eq!(
+        posted,
+        Posted {
+            review: 8,
+            ids: vec![None]
+        }
+    );
 }

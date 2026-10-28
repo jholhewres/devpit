@@ -624,6 +624,7 @@ pub fn published(folder: &Path, draft: &Value, host: &dyn Host) -> Result<Value,
     }
     let event = Event::of(text(draft, "event")).unwrap_or(Event::Comment);
     let mut edited = 0;
+    let mut by_hand = Vec::new();
     let mut new = Vec::new();
     let drafted = draft["inline"].as_array().map_or(&[][..], Vec::as_slice);
     for one in drafted {
@@ -635,14 +636,15 @@ pub fn published(folder: &Path, draft: &Value, host: &dyn Host) -> Result<Value,
         match had {
             Some(had) if text(had, "body") == body => {}
             Some(had) => {
-                let id = had["id"].as_u64().ok_or_else(|| {
-                    format!(
-                        "GitHub did not name the comment on {file}:{line} when it was posted, so it cannot be edited from here: change it on the pull request"
-                    )
-                })?;
-                host.edit_inline(id, body)?;
+                match had["id"].as_u64() {
+                    Some(id) => {
+                        host.edit_inline(id, body)?;
+                        edited += 1;
+                    }
+                    // Kept as changed, so the same draft does not ask again.
+                    None => by_hand.push(format!("{file}:{line}")),
+                }
                 had["body"] = json!(body);
-                edited += 1;
                 write(folder, PUBLISHED, &kept)?;
             }
             None => new.push(Inline {
@@ -674,6 +676,8 @@ pub fn published(folder: &Path, draft: &Value, host: &dyn Host) -> Result<Value,
                 if id.is_none() {
                     unnamed.push(format!("{}:{}", one.file, one.line));
                 }
+                // The review a comment GitHub did not name is under, to
+                // find it on the pull request by hand.
                 list.push(json!({
                     "file": one.file, "line": one.line, "id": id,
                     "review": posted.review, "body": one.body,
@@ -702,8 +706,11 @@ pub fn published(folder: &Path, draft: &Value, host: &dyn Host) -> Result<Value,
         "general": general,
         "left": left,
         "unnamed": unnamed,
+        "by_hand": by_hand,
     });
-    if !unnamed.is_empty() {
+    if !by_hand.is_empty() {
+        said["note"] = json!("The comments in `by_hand` changed, but GitHub never named them, so devpit cannot edit them: change it on the pull request. Everything else was published.");
+    } else if !unnamed.is_empty() {
         said["note"] = json!("Every comment was posted, but GitHub's answer did not name those in `unnamed`: they are on the pull request, and publishing again will not post them twice; a later change to one is made there by hand.");
     }
     Ok(said)

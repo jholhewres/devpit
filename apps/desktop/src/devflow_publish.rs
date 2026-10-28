@@ -162,19 +162,38 @@ pub(crate) fn ids_of(wanted: &[Inline], kept: &[Value], review: u64) -> Vec<Opti
     wanted
         .iter()
         .map(|one| {
+            // `original_line` is where it was posted; `line` is where the
+            // pull request's head shows it now.
             let at = kept.iter().enumerate().position(|(at, had)| {
-                let line = had["line"]
-                    .as_u64()
-                    .or_else(|| had["original_line"].as_u64());
+                let on = |field: &str| had[field].as_u64() == Some(one.line);
                 !taken[at]
                     && had["pull_request_review_id"].as_u64() == Some(review)
                     && had["path"] == one.file.as_str()
-                    && line == Some(one.line)
+                    && (on("original_line") || on("line"))
             })?;
             taken[at] = true;
             kept[at]["id"].as_u64()
         })
         .collect()
+}
+
+/// What `review` posted, from the listing read back after it. The review is
+/// on GitHub whatever the listing says, so a failed read names no comment
+/// rather than failing: a failure here was what posted reviews twice.
+pub(crate) fn posted_from(
+    review: u64,
+    comments: &[Inline],
+    listed: Result<Value, String>,
+) -> Posted {
+    let listed = listed.unwrap_or_default();
+    Posted {
+        review,
+        ids: ids_of(
+            comments,
+            listed.as_array().map_or(&[][..], Vec::as_slice),
+            review,
+        ),
+    }
 }
 
 impl Host for Gh {
@@ -208,18 +227,15 @@ impl Host for Gh {
             });
         }
         // Newest first, so the review just posted is on the first page.
-        let kept = self.api(
+        let listed = self.api(
             "GET",
             &self.repo(&format!(
                 "pulls/{}/comments?per_page=100&sort=created&direction=desc",
                 self.pr
             )),
             None,
-        )?;
-        Ok(Posted {
-            review: id,
-            ids: ids_of(comments, kept.as_array().map_or(&[][..], Vec::as_slice), id),
-        })
+        );
+        Ok(posted_from(id, comments, listed))
     }
 
     fn edit_inline(&self, id: u64, body: &str) -> Result<(), String> {
