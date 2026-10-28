@@ -1464,3 +1464,41 @@ fn a_reviewers_model_tier_is_the_engines_model_for_it() {
         Some("claude-haiku-4-5")
     );
 }
+
+/// Card 7a: whoever starts a turn — a reviewer or the consolidation pass —
+/// starts it on the tier's model, never on the tier's name.
+#[cfg(unix)]
+#[test]
+fn a_turn_starts_its_cli_on_the_tiers_model() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let seen = dir.path().join("argv");
+    let cli = dir.path().join("claude-fake");
+    let script = format!(
+        "#!/bin/sh\necho \"$@\" > '{}'\ncat > /dev/null\n",
+        seen.display()
+    );
+    let done = std::process::Command::new("sh")
+        .args([
+            "-c",
+            "printf '%s' \"$1\" > \"$2\" && chmod 755 \"$2\"",
+            "sh",
+            &script,
+        ])
+        .arg(&cli)
+        .status()
+        .expect("sh");
+    assert!(done.success());
+    let program = cli.display().to_string();
+    let reach = move |_: Agent| Ok(program.clone());
+    let _ = turn(
+        Agent::Claude,
+        Some("small"),
+        &reach,
+        "review",
+        dir.path(),
+        &[],
+        Duration::from_secs(10),
+    );
+    let argv = std::fs::read_to_string(&seen).expect("the CLI ran");
+    assert!(argv.contains("--model sonnet"), "{argv}");
+}

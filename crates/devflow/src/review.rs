@@ -689,6 +689,7 @@ pub fn model_for(agent: Agent, said: Option<&str>) -> Option<String> {
 }
 
 /// One headless turn on `agent`'s CLI: its text, cost and time, or why not.
+/// `model` is as devflow.yaml says it, a tier or an id ([`model_for`]).
 pub fn turn(
     agent: Agent,
     model: Option<&str>,
@@ -699,13 +700,14 @@ pub fn turn(
     deadline: Duration,
 ) -> Result<reviewing::Reviewed, String> {
     let program = reach(agent)?;
+    let model = model_for(agent, model);
     let cli = Cli::of(agent.word()).ok_or("devpit does not run this CLI headless")?;
     reviewing::review(&reviewing::Review {
         cli,
         program: &program,
         prompt,
         cwd,
-        model,
+        model: model.as_deref(),
         env,
         deadline,
     })
@@ -951,10 +953,9 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
         let agent = reviewer.agent.word();
         let asked = prompt(&persona, &packet, agent, &reviewer.persona);
         let env = env_of(given.env, git, &packet_at, &reviewer.persona);
-        let model = model_for(reviewer.agent, reviewer.model.as_deref());
         let said = turn(
             reviewer.agent,
-            model.as_deref(),
+            reviewer.model.as_deref(),
             given.reach,
             &asked,
             given.root,
