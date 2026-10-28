@@ -187,3 +187,6 @@ DEVPIT_APP_DIR=../devpit-app DATABASE_URL=postgres://…/devpit_app_test \
 - **A project's memory** arrives the same way: a namespace per project, its
   blob named through the key, and nothing else to build in the round or on
   devpit.app.
+- **The workspace** — orchestrators, agent profiles, files and agent memory —
+  is designed in [`sync-workspace.md`](sync-workspace.md)
+  ([ADR 0001](adr/0001-sync-the-persons-workspace.md)), not built yet.
