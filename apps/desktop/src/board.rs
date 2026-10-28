@@ -53,16 +53,16 @@ pub(crate) fn card_of(store: &Store, id: &str, steps: &[Step]) -> Result<Card, R
         .card(id)?
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such card"))?;
     let tally = store.card_tally(id)?;
-    card_from(store, row, tally, steps)
+    let runs = runs_of(store, &row.id, steps)?;
+    card_from(row, tally, runs)
 }
 
 /// A card from its row and what its tile counts, which a board reads for every
 /// card at once.
 fn card_from(
-    store: &Store,
     row: devpit_core::CardRow,
     tally: CardTally,
-    steps: &[Step],
+    runs: Vec<Run>,
 ) -> Result<Card, RpcError> {
     Ok(Card {
         // What was heard, without asking the CLI: a card answered alone does
@@ -76,7 +76,7 @@ fn card_from(
         plan_waiting: 0,
         superseded_by: None,
         cut: false,
-        runs: runs_of(store, &row.id, steps)?,
+        runs,
         id: row.id,
         column_id: row.column_id,
         title: row.title,
@@ -119,8 +119,11 @@ pub(crate) fn live_sessions(store: &Store, project_id: &str) -> Vec<devpit_agent
 }
 
 pub(crate) fn runs_of(store: &Store, card_id: &str, steps: &[Step]) -> Result<Vec<Run>, RpcError> {
-    Ok(store
-        .runs(card_id)?
+    runs_from(store.runs(card_id)?, steps)
+}
+
+fn runs_from(rows: Vec<devpit_core::RunRow>, steps: &[Step]) -> Result<Vec<Run>, RpcError> {
+    Ok(rows
         .into_iter()
         .map(|row| Run {
             step_name: steps
@@ -193,7 +196,9 @@ fn board_read(project_id: String, live_too: bool) -> Result<Board, RpcError> {
     let mut cards = Vec::new();
     for row in store.cards(&project_id)? {
         let tally = tallies.get(&row.id).copied().unwrap_or_default();
-        let mut card = card_from(&store, row, tally, &steps)?;
+        // Every card's runs without their output, which only the card shows.
+        let runs = runs_from(store.runs_brief(&row.id)?, &steps)?;
+        let mut card = card_from(row, tally, runs)?;
         if live_too {
             let sessions = card_sessions(&store, &project_id, &card.id, &live, &snapshot(&card.id));
             background_read(&card.id, &sessions);

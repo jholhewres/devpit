@@ -24,6 +24,8 @@ release notes are taken from here when a version is tagged.
   status of every checkout of every project, seconds on a machine with many;
   it now reads only the project in front, the only one whose status shows,
   and the orchestrator's boards are not read again for the same projects.
+- **A board is lighter to read.** It lists every card's runs without their
+  output, which only the card itself shows.
 
 ### Removed
 

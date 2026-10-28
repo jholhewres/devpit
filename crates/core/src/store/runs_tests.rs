@@ -232,3 +232,24 @@ fn a_second_running_run_on_a_card_is_refused() {
     let project = store.card(&card).expect("card").expect("there").column_id;
     let _ = project;
 }
+
+/// #215: a board lists every card's runs, so it reads them without their
+/// output, which only the card itself shows.
+#[test]
+fn a_board_reads_a_cards_runs_without_their_output() {
+    let (_dir, store, card, step, _column) = seeded();
+    let run = store.start_run(&card, &step, None).expect("start");
+    let said = "a long log ".repeat(1000);
+    store
+        .finish_run(&run, "ok", Some(&said), None, None, Some(0))
+        .expect("finish");
+    let brief = store.runs_brief(&card).expect("runs");
+    assert_eq!(
+        (brief[0].state.as_str(), brief[0].output.as_deref()),
+        ("ok", None)
+    );
+    assert_eq!(
+        store.runs(&card).expect("runs")[0].output.as_deref(),
+        Some(said.as_str())
+    );
+}

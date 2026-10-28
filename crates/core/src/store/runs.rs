@@ -180,11 +180,21 @@ impl Store {
 
     /// A card's runs, most recent first.
     pub fn runs(&self, card_id: &str) -> Result<Vec<RunRow>, StoreError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, card_id, step_id, state, output, exit_code, cost_usd, duration_ms, \
+        self.runs_reading(card_id, "output")
+    }
+
+    /// [`Store::runs`] without their output, for a board that lists every
+    /// card's runs and shows none of it.
+    pub fn runs_brief(&self, card_id: &str) -> Result<Vec<RunRow>, StoreError> {
+        self.runs_reading(card_id, "NULL")
+    }
+
+    fn runs_reading(&self, card_id: &str, output: &str) -> Result<Vec<RunRow>, StoreError> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT id, card_id, step_id, state, {output}, exit_code, cost_usd, duration_ms, \
              started_at FROM run WHERE card_id = ?1 \
-             ORDER BY started_at DESC, rowid DESC",
-        )?;
+             ORDER BY started_at DESC, rowid DESC"
+        ))?;
         let rows = stmt
             .query_map([card_id], |row| {
                 Ok(RunRow {
