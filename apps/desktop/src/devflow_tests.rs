@@ -68,7 +68,7 @@ fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
     std::fs::write(dir.path().join("Makefile"), "test:\n\ttrue\n").expect("makefile");
     let here = project("prj_devflow_setup", dir.path());
     let ask = |method: &str, params: Value| {
-        respond(None, method, &here, dir.path(), &params).expect(method)
+        respond_from(None, method, &here, dir.path(), None, &params).expect(method)
     };
 
     let status = ask("devflow_status", json!({}));
@@ -151,7 +151,7 @@ fn the_offer_says_who_asks_and_an_orchestrator_is_offered_no_flow() {
     let dir = tempfile::tempdir().expect("tempdir");
     let mut here = project("prj_offer_seat", dir.path());
     let offer = |here: &Project| {
-        respond(None, "devflow_offer", here, dir.path(), &json!({})).expect("offer")
+        respond_from(None, "devflow_offer", here, dir.path(), None, &json!({})).expect("offer")
     };
     let plain = offer(&here);
     assert_eq!(plain["offer"], "setup");
@@ -220,11 +220,12 @@ fn a_change_that_weakens_what_the_team_locked_is_refused_before_it_is_written() 
     devpit_devflow::pinning::approve(&root, &layer, &shown.to_commit, &home()).expect("approved");
     let here = project("prj_devflow_locked", &root);
 
-    let refused = respond(
+    let refused = respond_from(
         None,
         "devflow_set",
         &here,
         &root,
+        None,
         &json!({ "path": "review.reviewers", "value": [], "apply": true }),
     )
     .expect_err("the team locked it");
@@ -287,7 +288,7 @@ fn a_setup_apply_writes_nothing_when_the_setup_changed_since_the_preview() {
     std::fs::write(dir.path().join("Makefile"), "test:\n\ttrue\n").expect("makefile");
     let here = project("prj_devflow_setup_moved", dir.path());
     let ask = |method: &str, params: Value| {
-        respond(None, method, &here, dir.path(), &params).expect(method)
+        respond_from(None, method, &here, dir.path(), None, &params).expect(method)
     };
     let setup = |apply: bool| {
         ask(

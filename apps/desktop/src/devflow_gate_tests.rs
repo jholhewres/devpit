@@ -46,7 +46,7 @@ fn devflow_on(dir: &Path, extra: &str) -> (Store, Project, String) {
 }
 
 fn ask(project: &Project, root: &Path, method: &str, params: Value) -> Value {
-    crate::devflow::respond(None, method, project, root, &params).expect(method)
+    crate::devflow::respond_from(None, method, project, root, None, &params).expect(method)
 }
 
 fn evidence(project: &Project, root: &Path, card: &str) -> Value {

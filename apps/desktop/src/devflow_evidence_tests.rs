@@ -55,16 +55,15 @@ fn running_a_cards_checks_keeps_the_run_and_attaches_it_to_the_card() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().canonicalize().expect("root");
     let (store, project, card) = devflow_on(&root);
-    let said = crate::devflow::respond(
+    let said = crate::devflow::respond_from(
         None,
         "devflow_evidence",
         &project,
-        &root,
+        &root, None,
         &json!({
             "card": card,
             "criteria": [{ "criterion": "rename changes the title", "tests": ["rename changes the title"] }]
-        }),
-    )
+        }))
     .expect("evidence");
 
     assert_eq!(said["green"], true, "{said}");
@@ -130,11 +129,12 @@ fn a_card_of_another_project_is_not_this_ones_to_run() {
     let theirs = store
         .create_card(&elsewhere, &lane, "Theirs", "")
         .expect("card");
-    let refused = crate::devflow::respond(
+    let refused = crate::devflow::respond_from(
         None,
         "devflow_evidence",
         &project,
         &root,
+        None,
         &json!({ "card": theirs }),
     )
     .expect_err("not on this board");

@@ -108,6 +108,9 @@ pub const DEVFLOW_ON: &str = "devflow.switched_on";
 /// The projects whose Devflow Decisions the person moved to enforce, as a
 /// JSON array.
 pub const DEVFLOW_ENFORCED: &str = "devflow.enforced";
+/// The profile each project's Devflow reviewers run as, as a JSON object of
+/// project id to profile id. A project not in it follows the asking session.
+pub const DEVFLOW_PROFILES: &str = "devflow.profiles";
 /// Which events reach which channels, quiet hours and grouping, as JSON.
 pub const CHANNEL_RULES: &str = "channels.rules";
 /// Whether notices also go through devpit.app's hub (e-mail, push). Off unless turned on.

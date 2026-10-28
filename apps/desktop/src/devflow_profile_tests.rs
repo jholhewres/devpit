@@ -135,3 +135,76 @@ fn a_projects_profile_is_kept_and_cleared() {
     set_named(&store, "prj_a", None).expect("cleared");
     assert_eq!(named(&store, "prj_a"), None);
 }
+
+fn listed(declared: &[Declared], shell_functions: &[&str]) -> Vec<Profile> {
+    let base = |id: &str| {
+        Some(devpit_agentcli::profile::Base {
+            program: id.to_owned(),
+            driver: id.to_owned(),
+        })
+    };
+    let knows = shell_functions
+        .iter()
+        .map(|one| (*one).to_owned())
+        .collect();
+    devpit_agentcli::profile::profiles(declared, base, &knows)
+}
+
+#[test]
+fn a_reviewer_starts_a_profiles_program_only_when_devpit_can_spawn_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let program = dir.path().join("claude-work");
+    std::fs::write(&program, "#!/bin/sh\n").expect("program");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755))
+            .expect("executable");
+    }
+    let runnable = Declared {
+        command: program.display().to_string(),
+        ..profile("work", None)
+    };
+    let function = Declared {
+        command: "claude2".to_owned(),
+        ..profile("fn", None)
+    };
+    let codex = Declared {
+        base: "codex".to_owned(),
+        ..runnable.clone()
+    };
+    let all = listed(&[runnable, function, codex], &["claude2"]);
+    assert_eq!(
+        program_from(&all[0]).as_deref(),
+        Some(program.to_str().expect("utf-8"))
+    );
+    assert_eq!(
+        program_from(&all[1]),
+        None,
+        "a shell function is not spawned"
+    );
+    assert_eq!(program_from(&all[2]), None, "not a Claude profile");
+}
+
+#[test]
+fn the_screen_says_why_and_forgets_a_deleted_profile() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("store");
+    crate::agent_profiles::save(&store, &declared()).expect("profiles");
+
+    let none = shown(&store, "prj_a");
+    assert_eq!(
+        (none.named, none.runs_as, none.from),
+        (None, None, DevflowProfileFrom::Default)
+    );
+    assert_eq!(none.choices.len(), 3);
+
+    set_named(&store, "prj_a", Some("glm")).expect("named");
+    let named = shown(&store, "prj_a");
+    assert_eq!(named.named.as_deref(), Some("glm"));
+    assert_eq!(named.from, DevflowProfileFrom::Project);
+
+    set_named(&store, "prj_a", Some("deleted")).expect("named");
+    let gone = shown(&store, "prj_a");
+    assert_eq!((gone.named, gone.from), (None, DevflowProfileFrom::Default));
+}

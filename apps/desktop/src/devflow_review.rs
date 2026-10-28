@@ -36,22 +36,31 @@ pub(crate) fn respond(
     params: &Value,
     profile: Option<&Declared>,
 ) -> Result<Value, String> {
-    let reach = |agent: Agent| reach_as(agent, profile);
+    let program = program_for(profile);
+    let reach = |agent: Agent| reach_as(agent, profile, program.as_deref());
     respond_with(app, project, config, cwd, params, &reach, profile)
 }
 
+/// The resolved program `profile` starts, when devpit can spawn it.
+pub(crate) fn program_for(profile: Option<&Declared>) -> Option<String> {
+    let store = crate::projects::store().ok()?;
+    crate::devflow_profile::program_of(&store, profile?)
+}
+
 /// The CLI on this machine that runs `agent` as `profile`, or why there is
-/// none.
-pub(crate) fn reach_as(agent: Agent, profile: Option<&Declared>) -> Result<String, String> {
+/// none. `program` is the profile's own, resolved by [`program_for`].
+pub(crate) fn reach_as(
+    agent: Agent,
+    profile: Option<&Declared>,
+    program: Option<&str>,
+) -> Result<String, String> {
     let cli = devpit_agentcli::reviewing::Cli::of(agent.word())
         .ok_or("devpit does not run this CLI headless")?;
-    let own = profile
-        .filter(|one| agent == Agent::Claude && one.base == "claude" && !one.command.is_empty())
-        .map(|one| one.command.as_str());
-    let program = own.unwrap_or(cli.program());
-    if !crate::shell_launch::shell_knows().contains(program) && !Path::new(program).is_file() {
-        return Err("not installed".to_owned());
-    }
+    let program = match program.filter(|_| agent == Agent::Claude) {
+        Some(own) => own,
+        None if crate::shell_launch::shell_knows().contains(cli.program()) => cli.program(),
+        None => return Err("not installed".to_owned()),
+    };
     if agent == Agent::Claude && crate::devflow::claude_signed_in(profile) == Some(false) {
         return Err("not signed in".to_owned());
     }

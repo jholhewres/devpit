@@ -2952,11 +2952,7 @@ export type DevflowProfile = {
 	named: string | null,
 	/**  The label of the profile they run as; `None` is the machine's default. */
 	runsAs: string | null,
-	/**
-	 *  Why: `project`, `orchestrator` (every orchestrator linked to the
-	 *  project speaks as it) or `default`.
-	 */
-	from: string,
+	from: DevflowProfileFrom,
 	/**  The Claude profiles the project can name. */
 	choices: DevflowProfileChoice[],
 };
@@ -2965,6 +2961,15 @@ export type DevflowProfileChoice = {
 	id: string,
 	label: string,
 };
+
+/**  Why the reviewers run as that account. */
+export type DevflowProfileFrom = 
+/**  The project names it. */
+"project" | 
+/**  Every orchestrator linked to the project speaks as it. */
+"orchestrator" | 
+/**  None of them: the machine's default account. */
+"default";
 
 /**  One reviewer of a card's newest review. */
 export type DevflowReviewed = {

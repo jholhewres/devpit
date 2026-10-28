@@ -272,11 +272,21 @@ pub struct DevflowProfile {
     pub named: Option<String>,
     /// The label of the profile they run as; `None` is the machine's default.
     pub runs_as: Option<String>,
-    /// Why: `project`, `orchestrator` (every orchestrator linked to the
-    /// project speaks as it) or `default`.
-    pub from: String,
+    pub from: DevflowProfileFrom,
     /// The Claude profiles the project can name.
     pub choices: Vec<DevflowProfileChoice>,
+}
+
+/// Why the reviewers run as that account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum DevflowProfileFrom {
+    /// The project names it.
+    Project,
+    /// Every orchestrator linked to the project speaks as it.
+    Orchestrator,
+    /// None of them: the machine's default account.
+    Default,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]

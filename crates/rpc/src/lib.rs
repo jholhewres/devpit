@@ -81,9 +81,9 @@ pub use devflow::{
 pub use devflow_screen::{
     DevflowCardEvidence, DevflowCheck, DevflowCli, DevflowCodexInstalled, DevflowConfig,
     DevflowDetected, DevflowError, DevflowFileChange, DevflowFound, DevflowGated, DevflowHint,
-    DevflowPrefs, DevflowPreview, DevflowProfile, DevflowProfileChoice, DevflowReviewed,
-    DevflowReviewer, DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage, DevflowState,
-    DevflowTeam, DevflowTeamChange, DevflowTeamChanges,
+    DevflowPrefs, DevflowPreview, DevflowProfile, DevflowProfileChoice, DevflowProfileFrom,
+    DevflowReviewed, DevflowReviewer, DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage,
+    DevflowState, DevflowTeam, DevflowTeamChange, DevflowTeamChanges,
 };
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};

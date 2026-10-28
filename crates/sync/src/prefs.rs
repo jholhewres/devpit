@@ -86,6 +86,10 @@ pub const LOCAL: &[(&str, &str)] = &[
         "a yes to run code, given on this machine",
     ),
     (key::DEVFLOW_ENFORCED, "a click on this machine"),
+    (
+        key::DEVFLOW_PROFILES,
+        "by project and profile id of this machine",
+    ),
     (key::CHANNEL_RULES, "the channels set up on this machine"),
     (
         key::CHANNEL_HUB,

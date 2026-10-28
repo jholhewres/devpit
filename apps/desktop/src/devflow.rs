@@ -84,19 +84,6 @@ pub(crate) fn state_word(state: &State, active: bool) -> &'static str {
     }
 }
 
-/// One of Devflow's methods, asked by the agent standing in `cwd`, for a
-/// test that has no asking session's account to give.
-#[cfg(test)]
-pub(crate) fn respond(
-    app: Option<&AppHandle>,
-    method: &str,
-    project: &Project,
-    cwd: &Path,
-    params: &Value,
-) -> Result<Value, String> {
-    respond_from(app, method, project, cwd, None, params)
-}
-
 /// One of Devflow's methods, asked by the agent standing in `cwd`, from a
 /// session whose `CLAUDE_CONFIG_DIR` is `config_dir`.
 pub(crate) fn respond_from(

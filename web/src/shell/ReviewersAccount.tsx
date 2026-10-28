@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { DevflowProfile } from '../gen/bindings'
+import type { DevflowProfile, DevflowProfileFrom } from '../gen/bindings'
 import { ask, commands } from './live'
 
 /*
@@ -9,7 +9,7 @@ import { ask, commands } from './live'
  * machine's default. A session on another account still reviews as its own.
  */
 
-const FROM: Record<string, string> = {
+const FROM: Record<DevflowProfileFrom, string> = {
   project: 'named by this project',
   orchestrator: 'the account of the orchestrators linked to this project',
   default: "this machine's default account",
@@ -45,7 +45,7 @@ export function ReviewersAccount({ projectId }: { projectId: string }): React.JS
         </select>
       </label>
       <span className="dfblock__d">
-        {profile.runsAs ?? 'Default account'}: {FROM[profile.from] ?? profile.from}. A session on another account reviews as its own.
+        {profile.runsAs ?? 'Default account'}: {FROM[profile.from]}. A session on another declared profile reviews as that profile.
       </span>
       {problem && <span className="dfblock__d">{problem}</span>}
     </div>

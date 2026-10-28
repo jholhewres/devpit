@@ -255,11 +255,12 @@ fn the_brief_and_the_plan_wait_for_the_persons_click_on_devflow() {
     )
     .expect("yaml");
     for method in ["devflow_brief", "devflow_plan", "devflow_evidence"] {
-        let refused = crate::devflow::respond(
+        let refused = crate::devflow::respond_from(
             None,
             method,
             &project,
             dir.path(),
+            None,
             &json!({ "title": "x", "card": "card_1", "epic": "card_1" }),
         );
         assert!(refused.expect_err(method).contains("not on"), "{method}");
@@ -391,7 +392,7 @@ fn a_plan_without_an_epic_is_a_preview_alone_and_needs_no_setup() {
     let dir = tempfile::tempdir().expect("tempdir");
     let (store, project) = project(dir.path());
     let ask = |params: Value| {
-        crate::devflow::respond(None, "devflow_plan", &project, dir.path(), &params)
+        crate::devflow::respond_from(None, "devflow_plan", &project, dir.path(), None, &params)
     };
 
     let said = ask(json!({ "cards": cards() })).expect("a preview");

@@ -96,11 +96,12 @@ fn one_click_recommended_setup_writes_what_devpit_devflow_setup_writes() {
     )
     .expect("created");
     for apply in [false, true] {
-        devflow::respond(
+        devflow::respond_from(
             None,
             "devflow_setup",
             &by_tool,
             tool_dir.path(),
+            None,
             &json!({ "preset": "recommended", "apply": apply }),
         )
         .expect("set up");

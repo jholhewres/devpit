@@ -203,11 +203,12 @@ fn one_reviewer_on_a_fake_cli_reviews_the_card_and_its_critical_finding_holds_th
         "{comment}"
     );
 
-    let gate = crate::devflow::respond(
+    let gate = crate::devflow::respond_from(
         None,
         "devflow_gate",
         &project,
         &root,
+        None,
         &json!({ "card": card }),
     )
     .expect("the gate");
@@ -231,11 +232,12 @@ fn one_reviewer_on_a_fake_cli_reviews_the_card_and_its_critical_finding_holds_th
     mark(&store, &review.run_id, 0, true).expect("a false positive");
     let heard = crate::checkpoint_findings::of_card(&store, &card).expect("findings");
     assert_eq!(heard.reviews[0].dismissed, vec![0]);
-    let gate = crate::devflow::respond(
+    let gate = crate::devflow::respond_from(
         None,
         "devflow_gate",
         &project,
         &root,
+        None,
         &json!({ "card": card }),
     )
     .expect("the gate");
@@ -363,11 +365,12 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
     assert_eq!(kept["findings"][0]["title"], "Vague opener name");
     assert_eq!(kept["findings"][0]["carried_from"], json!(run));
 
-    let gate = crate::devflow::respond(
+    let gate = crate::devflow::respond_from(
         None,
         "devflow_gate",
         &project,
         &root,
+        None,
         &json!({ "card": card }),
     )
     .expect("the gate");

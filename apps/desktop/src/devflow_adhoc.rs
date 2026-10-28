@@ -45,7 +45,8 @@ pub(crate) fn respond(
     asked: Standalone,
     profile: Option<&Declared>,
 ) -> Result<Value, String> {
-    let reach = |agent| crate::devflow_review::reach_as(agent, profile);
+    let program = crate::devflow_review::program_for(profile);
+    let reach = |agent| crate::devflow_review::reach_as(agent, profile, program.as_deref());
     respond_with(project, state, asked, &reach, &pull, profile)
 }
 

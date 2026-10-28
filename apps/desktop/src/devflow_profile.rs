@@ -6,20 +6,30 @@
 
 use std::path::{Path, PathBuf};
 
+use devpit_core::preference::DEVFLOW_PROFILES;
 use devpit_core::Store;
-use devpit_rpc::{Declared, DevflowProfile, DevflowProfileChoice, ErrorCode, RpcError};
+use devpit_rpc::{
+    Declared, DevflowProfile, DevflowProfileChoice, DevflowProfileFrom, ErrorCode, Profile,
+    RpcError,
+};
+use serde_json::{Map, Value};
 
-fn key(project_id: &str) -> String {
-    format!("project.profile:{project_id}")
+fn all_named(store: &Store) -> Map<String, Value> {
+    store
+        .preference(DEVFLOW_PROFILES)
+        .ok()
+        .flatten()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
 }
 
 /// The profile `project_id` names for its reviewers, if it names one.
 pub(crate) fn named(store: &Store, project_id: &str) -> Option<String> {
-    store
-        .preference(&key(project_id))
-        .ok()
-        .flatten()
+    all_named(store)
+        .get(project_id)
+        .and_then(Value::as_str)
         .filter(|id| !id.is_empty())
+        .map(str::to_owned)
 }
 
 /// Names the project's profile; `None` goes back to the rule in [`chosen`].
@@ -28,8 +38,13 @@ pub(crate) fn set_named(
     project_id: &str,
     profile: Option<&str>,
 ) -> Result<(), String> {
+    let mut all = all_named(store);
+    match profile {
+        Some(id) => all.insert(project_id.to_owned(), Value::from(id)),
+        None => all.remove(project_id),
+    };
     store
-        .set_preference(&key(project_id), profile.unwrap_or_default())
+        .set_preference(DEVFLOW_PROFILES, &Value::Object(all).to_string())
         .map_err(|err| err.to_string())
 }
 
@@ -91,6 +106,25 @@ pub(crate) fn env_of(profile: Option<&Declared>) -> Vec<(String, String)> {
         .unwrap_or_default()
 }
 
+/// The program a Claude profile starts, resolved to its path, when devpit can
+/// spawn it: a shell function, or a command that resolves nowhere, leaves the
+/// reviewer on the plain CLI with the profile's environment.
+pub(crate) fn program_from(profile: &Profile) -> Option<String> {
+    // `path` is set only when the command resolves to a file.
+    (profile.base == "claude")
+        .then(|| profile.path.clone())
+        .flatten()
+}
+
+/// [`program_from`], for a declared profile of this machine.
+pub(crate) fn program_of(store: &Store, profile: &Declared) -> Option<String> {
+    crate::agent_profiles::all(store)
+        .ok()?
+        .iter()
+        .find(|one| one.id == profile.id)
+        .and_then(program_from)
+}
+
 /// Where the reviewers' Claude Code keeps its sign-in, `inherited` being
 /// this process's `CLAUDE_CONFIG_DIR`, which a profile's own replaces.
 pub(crate) fn config_dir(
@@ -126,7 +160,11 @@ fn linked(store: &Store, project_id: &str) -> Vec<String> {
 pub(crate) fn of(store: &Store, project_id: &str, asker_config: Option<&Path>) -> Option<Declared> {
     let named = named(store, project_id);
     let linked = linked(store, project_id);
-    let declared = crate::agent_profiles::declared(store);
+    // Only a Claude profile changes the reviewers, so only one is chosen.
+    let declared: Vec<Declared> = crate::agent_profiles::declared(store)
+        .into_iter()
+        .filter(|one| one.base == "claude")
+        .collect();
     chosen(
         &declared,
         &Asked {
@@ -140,18 +178,20 @@ pub(crate) fn of(store: &Store, project_id: &str, asker_config: Option<&Path>) -
 
 /// What the Devflow screen says about the account the reviewers run as.
 pub(crate) fn shown(store: &Store, project_id: &str) -> DevflowProfile {
-    let named = named(store, project_id);
     let runs_as = of(store, project_id, None);
+    // A named profile since deleted names nothing.
+    let named =
+        named(store, project_id).filter(|id| runs_as.as_ref().is_some_and(|one| &one.id == id));
     let from = match (&named, &runs_as) {
-        (Some(_), Some(_)) => "project",
-        (None, Some(_)) => "orchestrator",
-        _ => "default",
+        (Some(_), _) => DevflowProfileFrom::Project,
+        (None, Some(_)) => DevflowProfileFrom::Orchestrator,
+        (None, None) => DevflowProfileFrom::Default,
     };
     DevflowProfile {
         project_id: project_id.to_owned(),
         named,
         runs_as: runs_as.map(|one| one.label),
-        from: from.to_owned(),
+        from,
         choices: crate::agent_profiles::declared(store)
             .into_iter()
             .filter(|one| one.base == "claude")
