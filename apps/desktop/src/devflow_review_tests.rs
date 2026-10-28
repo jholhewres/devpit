@@ -430,3 +430,21 @@ fn the_reviewers_run_on_the_account_of_the_projects_profile() {
         "/home/p/.claude-claudin"
     );
 }
+
+#[test]
+fn a_claude_reviewer_runs_its_profiles_program_and_another_cli_its_own() {
+    let knows = |program: &str| program == "codex";
+    assert_eq!(
+        picked(Agent::Claude, Some("/x/claude-work"), &knows),
+        Ok("/x/claude-work")
+    );
+    assert_eq!(
+        picked(Agent::Codex, Some("/x/claude-work"), &knows),
+        Ok("codex")
+    );
+    assert_eq!(
+        picked(Agent::Claude, None, &knows),
+        Err("not installed".to_owned()),
+        "no profile program and no plain CLI"
+    );
+}

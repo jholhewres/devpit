@@ -45,7 +45,8 @@ export function ReviewersAccount({ projectId }: { projectId: string }): React.JS
         </select>
       </label>
       <span className="dfblock__d">
-        {profile.runsAs ?? 'Default account'}: {FROM[profile.from]}. A session on another declared profile reviews as that profile.
+        {profile.runsAs ?? 'Default account'}: {FROM[profile.from]}.
+        {profile.from !== 'project' && ' A session on another declared profile reviews as that profile.'}
       </span>
       {problem && <span className="dfblock__d">{problem}</span>}
     </div>

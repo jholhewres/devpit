@@ -5,6 +5,7 @@
 //! so a personal project's reviews ran on the company's account (#249).
 
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use devpit_core::preference::DEVFLOW_PROFILES;
 use devpit_core::Store;
@@ -38,6 +39,10 @@ pub(crate) fn set_named(
     project_id: &str,
     profile: Option<&str>,
 ) -> Result<(), String> {
+    // One map for every project, read and written whole: two at once would
+    // each write back a map without the other's change.
+    static NAMING: Mutex<()> = Mutex::new(());
+    let _one_at_a_time = NAMING.lock();
     let mut all = all_named(store);
     match profile {
         Some(id) => all.insert(project_id.to_owned(), Value::from(id)),
@@ -46,6 +51,12 @@ pub(crate) fn set_named(
     store
         .set_preference(DEVFLOW_PROFILES, &Value::Object(all).to_string())
         .map_err(|err| err.to_string())
+}
+
+/// Whether a profile changes the reviewers: only a Claude one does, since the
+/// reviewers it would start are Claude Code's.
+fn reviews(base: &str) -> bool {
+    base == "claude"
 }
 
 /// What decides the profile.
@@ -68,8 +79,9 @@ fn same_dir(a: &Path, b: &Path) -> bool {
 /// project speaks as. `None` is the machine's default, as before.
 pub(crate) fn chosen<'a>(declared: &'a [Declared], asked: &Asked) -> Option<&'a Declared> {
     let by_id = |id: &str| declared.iter().find(|one| one.id == id);
-    if let Some(named) = asked.named {
-        return by_id(named);
+    // A named profile since deleted names nothing.
+    if let Some(named) = asked.named.and_then(by_id) {
+        return Some(named);
     }
     if let Some(asker) = asked.asker_config {
         let mut same = declared.iter().filter(|one| {
@@ -96,7 +108,7 @@ pub(crate) fn chosen<'a>(declared: &'a [Declared], asked: &Asked) -> Option<&'a 
 /// the reviewers it would change are Claude Code's.
 pub(crate) fn env_of(profile: Option<&Declared>) -> Vec<(String, String)> {
     profile
-        .filter(|one| one.base == "claude")
+        .filter(|one| reviews(&one.base))
         .map(|one| {
             one.env
                 .iter()
@@ -111,7 +123,7 @@ pub(crate) fn env_of(profile: Option<&Declared>) -> Vec<(String, String)> {
 /// reviewer on the plain CLI with the profile's environment.
 pub(crate) fn program_from(profile: &Profile) -> Option<String> {
     // `path` is set only when the command resolves to a file.
-    (profile.base == "claude")
+    reviews(&profile.base)
         .then(|| profile.path.clone())
         .flatten()
 }
@@ -163,7 +175,7 @@ pub(crate) fn of(store: &Store, project_id: &str, asker_config: Option<&Path>) -
     // Only a Claude profile changes the reviewers, so only one is chosen.
     let declared: Vec<Declared> = crate::agent_profiles::declared(store)
         .into_iter()
-        .filter(|one| one.base == "claude")
+        .filter(|one| reviews(&one.base))
         .collect();
     chosen(
         &declared,
@@ -194,7 +206,7 @@ pub(crate) fn shown(store: &Store, project_id: &str) -> DevflowProfile {
         from,
         choices: crate::agent_profiles::declared(store)
             .into_iter()
-            .filter(|one| one.base == "claude")
+            .filter(|one| reviews(&one.base))
             .map(|one| DevflowProfileChoice {
                 id: one.id,
                 label: one.label,
@@ -229,7 +241,7 @@ pub async fn devflow_profile_set(
         if let Some(id) = &wanted {
             let known = crate::agent_profiles::declared(&store)
                 .iter()
-                .any(|one| &one.id == id && one.base == "claude");
+                .any(|one| &one.id == id && reviews(&one.base));
             if !known {
                 return Err(RpcError::new(
                     ErrorCode::Invalid,

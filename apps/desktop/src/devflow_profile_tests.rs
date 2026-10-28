@@ -208,3 +208,14 @@ fn the_screen_says_why_and_forgets_a_deleted_profile() {
     let gone = shown(&store, "prj_a");
     assert_eq!((gone.named, gone.from), (None, DevflowProfileFrom::Default));
 }
+
+#[test]
+fn a_named_profile_since_deleted_falls_through_to_the_asking_session() {
+    let all = declared();
+    let asked = Asked {
+        named: Some("deleted"),
+        asker_config: Some(Path::new("/home/p/.claude-claudin")),
+        linked: &[],
+    };
+    assert_eq!(id(chosen(&all, &asked)), Some("claudin"));
+}

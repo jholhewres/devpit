@@ -54,17 +54,28 @@ pub(crate) fn reach_as(
     profile: Option<&Declared>,
     program: Option<&str>,
 ) -> Result<String, String> {
-    let cli = devpit_agentcli::reviewing::Cli::of(agent.word())
-        .ok_or("devpit does not run this CLI headless")?;
-    let program = match program.filter(|_| agent == Agent::Claude) {
-        Some(own) => own,
-        None if crate::shell_launch::shell_knows().contains(cli.program()) => cli.program(),
-        None => return Err("not installed".to_owned()),
-    };
+    let known = crate::shell_launch::shell_knows();
+    let program = picked(agent, program, &|one| known.contains(one))?;
     if agent == Agent::Claude && crate::devflow::claude_signed_in(profile) == Some(false) {
         return Err("not signed in".to_owned());
     }
     Ok(program.to_owned())
+}
+
+/// The program a reviewer on `agent` starts: a Claude profile's own, else
+/// the plain CLI when the shell knows it.
+pub(crate) fn picked<'a>(
+    agent: Agent,
+    own: Option<&'a str>,
+    knows: &dyn Fn(&str) -> bool,
+) -> Result<&'a str, String> {
+    let cli = devpit_agentcli::reviewing::Cli::of(agent.word())
+        .ok_or("devpit does not run this CLI headless")?;
+    match own.filter(|_| agent == Agent::Claude) {
+        Some(own) => Ok(own),
+        None if knows(cli.program()) => Ok(cli.program()),
+        None => Err("not installed".to_owned()),
+    }
 }
 
 /// A card of this project's board, by id.
