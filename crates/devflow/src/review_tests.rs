@@ -1438,3 +1438,29 @@ fn a_retro_review_follows_up_what_would_have_held_it_and_never_asks_for_changes(
     let refused = handed.review().expect_err("refused");
     assert!(refused.contains("needs an `impact`"), "{refused}");
 }
+
+/// Card 7a: a reviewer's `model` is a tier or a model id; a tier is the
+/// engine's own model for it, and the CLI's default where it names none.
+#[test]
+fn a_reviewers_model_tier_is_the_engines_model_for_it() {
+    assert_eq!(
+        model_for(Agent::Claude, Some("small")).as_deref(),
+        Some("sonnet")
+    );
+    assert_eq!(
+        model_for(Agent::Claude, Some("large")).as_deref(),
+        Some("opus")
+    );
+    assert_eq!(model_for(Agent::Claude, Some("default")), None);
+    assert_eq!(model_for(Agent::Claude, None), None);
+    // Codex names its models per account: a tier is its default, an id is kept.
+    assert_eq!(model_for(Agent::Codex, Some("small")), None);
+    assert_eq!(
+        model_for(Agent::Codex, Some("gpt-5-codex")).as_deref(),
+        Some("gpt-5-codex")
+    );
+    assert_eq!(
+        model_for(Agent::Claude, Some("claude-haiku-4-5")).as_deref(),
+        Some("claude-haiku-4-5")
+    );
+}

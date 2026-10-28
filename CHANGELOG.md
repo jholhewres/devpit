@@ -27,6 +27,12 @@ release notes are taken from here when a version is tagged.
 - **A board is lighter to read.** It lists every card's runs without their
   output, which only the card itself shows.
 
+### New
+
+- **A reviewer's model can be a tier.** `model: small` runs a Claude reviewer
+  on Sonnet and `large` on Opus; any other value is a model id, as before.
+  Other CLIs keep their own default for a tier.
+
 ### Removed
 
 - **Devflow's autopilot is gone.** It started each card's session as the

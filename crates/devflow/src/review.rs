@@ -675,6 +675,19 @@ pub fn in_parallel<T: Sync, R: Send>(
     })
 }
 
+/// The model a reviewer's `model` names: a tier (`small`, `default`, `large`)
+/// is the engine's own model for it, anything else a model id kept as said.
+/// Codex names its models per account, so its tiers leave its default.
+pub fn model_for(agent: Agent, said: Option<&str>) -> Option<String> {
+    match (agent, said?) {
+        (_, "default") => None,
+        (Agent::Claude, "small") => Some("sonnet".to_owned()),
+        (Agent::Claude, "large") => Some("opus".to_owned()),
+        (_, "small" | "large") => None,
+        (_, id) => Some(id.to_owned()),
+    }
+}
+
 /// One headless turn on `agent`'s CLI: its text, cost and time, or why not.
 pub fn turn(
     agent: Agent,
@@ -938,9 +951,10 @@ fn reviewed_anew(given: &Given) -> Result<(String, PathBuf, Record), String> {
         let agent = reviewer.agent.word();
         let asked = prompt(&persona, &packet, agent, &reviewer.persona);
         let env = env_of(given.env, git, &packet_at, &reviewer.persona);
+        let model = model_for(reviewer.agent, reviewer.model.as_deref());
         let said = turn(
             reviewer.agent,
-            reviewer.model.as_deref(),
+            model.as_deref(),
             given.reach,
             &asked,
             given.root,

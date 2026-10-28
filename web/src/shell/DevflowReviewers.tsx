@@ -17,7 +17,7 @@ function ModelField({ model, onSave }: { model: string | null; onSave: (model: s
     <input
       className="dfinput"
       aria-label="Model"
-      placeholder="CLI's default"
+      placeholder="small, large or a model id"
       value={said}
       onChange={(event) => setSaid(event.target.value)}
       onBlur={() => (said.trim() || null) !== model && onSave(said.trim() || null)}
