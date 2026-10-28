@@ -39,6 +39,9 @@ pub(crate) struct Asked {
     /// The agent's own id when devpit started it and said so; signs comments.
     #[serde(default)]
     pub author: String,
+    /// The asking session's `CLAUDE_CONFIG_DIR`, when it has one.
+    #[serde(default, rename = "configDir")]
+    pub config_dir: Option<String>,
 }
 
 /// The methods this build answers, for an agent asking what it can do.
@@ -212,6 +215,7 @@ fn respond_in(
         params: crate::agent_aliases::aliased(&asked.method, asked.params.clone()),
         cwd: asked.cwd.clone(),
         author: asked.author.clone(),
+        config_dir: asked.config_dir.clone(),
     };
     let text = |name: &str| {
         asked
@@ -392,6 +396,7 @@ fn respond_in(
         method: asked.method.clone(),
         cwd: asked.cwd.clone(),
         author: asked.author.clone(),
+        config_dir: asked.config_dir.clone(),
     };
     let text = |name: &str| {
         asked
@@ -406,11 +411,12 @@ fn respond_in(
                 return Err(why);
             }
         }
-        return crate::devflow::respond(
+        return crate::devflow::respond_from(
             app,
             &asked.method,
             project,
             Path::new(&asked.cwd),
+            asked.config_dir.as_deref().map(Path::new),
             &asked.params,
         );
     }

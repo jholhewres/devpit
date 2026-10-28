@@ -86,7 +86,7 @@ fn a_pull_requests_review_is_published_on_it_only_after_the_yes() {
         .expect("asked")
         .expect("no card");
     let reviewed =
-        crate::devflow_adhoc::respond_with(&project, &one_reading(), asked, &reach, &github)
+        crate::devflow_adhoc::respond_with(&project, &one_reading(), asked, &reach, &github, None)
             .expect("reviewed");
     let review = format!("pr-7/{}", reviewed["run"].as_str().expect("run"));
     assert!(

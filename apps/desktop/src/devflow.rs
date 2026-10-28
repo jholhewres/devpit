@@ -84,12 +84,27 @@ pub(crate) fn state_word(state: &State, active: bool) -> &'static str {
     }
 }
 
-/// One of Devflow's methods, asked by the agent standing in `cwd`.
+/// One of Devflow's methods, asked by the agent standing in `cwd`, for a
+/// test that has no asking session's account to give.
+#[cfg(test)]
 pub(crate) fn respond(
     app: Option<&AppHandle>,
     method: &str,
     project: &Project,
     cwd: &Path,
+    params: &Value,
+) -> Result<Value, String> {
+    respond_from(app, method, project, cwd, None, params)
+}
+
+/// One of Devflow's methods, asked by the agent standing in `cwd`, from a
+/// session whose `CLAUDE_CONFIG_DIR` is `config_dir`.
+pub(crate) fn respond_from(
+    app: Option<&AppHandle>,
+    method: &str,
+    project: &Project,
+    cwd: &Path,
+    config_dir: Option<&Path>,
     params: &Value,
 ) -> Result<Value, String> {
     let store = crate::projects::store().map_err(|err| err.message)?;
@@ -118,7 +133,8 @@ pub(crate) fn respond(
             on_demand_here(&store, project, &state)?;
             let asked = devpit_devflow::adhoc::standalone(params)?
                 .ok_or("a card's review is asked with its card")?;
-            crate::devflow_adhoc::respond(app, project, &state, asked)
+            let profile = crate::devflow_profile::of(&store, &project.id, config_dir);
+            crate::devflow_adhoc::respond(app, project, &state, asked, profile.as_ref())
         }
         "devflow_publish" => {
             on_demand_here(&store, project, &state)?;
@@ -145,7 +161,15 @@ pub(crate) fn respond(
                         crate::devflow_evidence::respond(app, project, config, cwd, params)
                     }
                     "devflow_review" => {
-                        crate::devflow_review::respond(app, project, config, cwd, params)
+                        let profile = crate::devflow_profile::of(&store, &project.id, config_dir);
+                        crate::devflow_review::respond(
+                            app,
+                            project,
+                            config,
+                            cwd,
+                            params,
+                            profile.as_ref(),
+                        )
                     }
                     _ => crate::devflow_plan::respond(app, method, project, params),
                 }
@@ -637,6 +661,7 @@ fn settled(
 /// The reviewer CLIs on this machine, and the Decisions key, as the app
 /// already knows them.
 pub(crate) fn machine(store: &Store, project_id: &str) -> Machine {
+    let profile = crate::devflow_profile::of(store, project_id, None);
     let knows = crate::shell_launch::shell_knows();
     let clis = Agent::ALL
         .iter()
@@ -651,7 +676,7 @@ pub(crate) fn machine(store: &Store, project_id: &str) -> Machine {
                 name: *agent,
                 installed,
                 signed_in: (installed && *agent == Agent::Claude)
-                    .then(claude_signed_in)
+                    .then(|| claude_signed_in(profile.as_ref()))
                     .flatten(),
             }
         })
@@ -712,10 +737,13 @@ fn installed_skills() -> Vec<String> {
         .collect()
 }
 
-/// The sign-in this process's Claude Code runs on, read as the footer reads
-/// it. devpit has no such check for the other CLIs, so they say nothing.
-pub(crate) fn claude_signed_in() -> Option<bool> {
-    let directory = devpit_agentcli::cli_config::config_dir()?;
+/// Whether Claude Code is signed in where `profile` keeps its sign-in, read
+/// as the footer reads it. devpit has no such check for the other CLIs, so
+/// they say nothing.
+pub(crate) fn claude_signed_in(profile: Option<&devpit_rpc::Declared>) -> Option<bool> {
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from)?;
+    let inherited = std::env::var("CLAUDE_CONFIG_DIR").ok();
+    let directory = crate::devflow_profile::config_dir(profile, &home, inherited.as_deref());
     match devpit_agentcli::cli_config::sign_in_at(&directory) {
         Credentials::Saved => Some(true),
         Credentials::Missing | Credentials::Expired => Some(false),

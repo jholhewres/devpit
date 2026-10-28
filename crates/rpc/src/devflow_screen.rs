@@ -263,6 +263,29 @@ pub struct DevflowCodexInstalled {
     pub said: String,
 }
 
+/// The account a project's Claude Code reviewers run as (#249).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowProfile {
+    pub project_id: String,
+    /// The profile the project names, by id.
+    pub named: Option<String>,
+    /// The label of the profile they run as; `None` is the machine's default.
+    pub runs_as: Option<String>,
+    /// Why: `project`, `orchestrator` (every orchestrator linked to the
+    /// project speaks as it) or `default`.
+    pub from: String,
+    /// The Claude profiles the project can name.
+    pub choices: Vec<DevflowProfileChoice>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowProfileChoice {
+    pub id: String,
+    pub label: String,
+}
+
 /// One reviewer of a card's newest review.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

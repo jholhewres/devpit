@@ -11,6 +11,7 @@ import { DevflowStages } from './DevflowStages'
 import { DevflowTeams } from './DevflowTeams'
 import { inOrder } from './inOrder'
 import { ask, commands } from './live'
+import { ReviewersAccount } from './ReviewersAccount'
 import { useShell } from './useShell'
 import { onCarried } from './window'
 
@@ -217,6 +218,7 @@ export function DevflowPane(): React.JSX.Element {
             <DevflowStages config={config} edit={edit} projectId={screen.projectId} arrange />
             <div className="acc__sub">Review</div>
             <DevflowReviewers config={config} edit={edit} />
+            <ReviewersAccount projectId={screen.projectId} />
             <div className="acc__sub">Jev</div>
             <DevflowJev config={config} edit={edit} projectId={screen.projectId} onEnforce={() => askFor('enforce')} />
           </>

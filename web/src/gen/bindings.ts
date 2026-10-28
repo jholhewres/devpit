@@ -300,6 +300,13 @@ export const commands = {
 	 *  pane, or its tab when it is the last one, and whatever runs in it.
 	 */
 	terminalClose: (projectId: string, paneId: string) => typedError<null, RpcError>(__TAURI_INVOKE("terminal_close", { projectId, paneId })),
+	/**  `devflow.profile` — the account a project's Claude Code reviewers run as. */
+	devflowProfile: (projectId: string) => typedError<DevflowProfile, RpcError>(__TAURI_INVOKE("devflow_profile", { projectId })),
+	/**
+	 *  `devflow.profile_set` — the profile the project's reviewers run as, by
+	 *  id; `None` goes back to the orchestrator's or the machine's default.
+	 */
+	devflowProfileSet: (projectId: string, profileId: string | null) => typedError<DevflowProfile, RpcError>(__TAURI_INVOKE("devflow_profile_set", { projectId, profileId })),
 	/**  `orchestrator.links` — the projects this orchestrator is linked to. */
 	orchestratorLinks: (projectId: string) => typedError<string[], RpcError>(__TAURI_INVOKE("orchestrator_links", { projectId })),
 	/**
@@ -2936,6 +2943,27 @@ export type DevflowPrefs = {
 export type DevflowPreview = {
 	yaml: string,
 	files: DevflowFileChange[],
+};
+
+/**  The account a project's Claude Code reviewers run as (#249). */
+export type DevflowProfile = {
+	projectId: string,
+	/**  The profile the project names, by id. */
+	named: string | null,
+	/**  The label of the profile they run as; `None` is the machine's default. */
+	runsAs: string | null,
+	/**
+	 *  Why: `project`, `orchestrator` (every orchestrator linked to the
+	 *  project speaks as it) or `default`.
+	 */
+	from: string,
+	/**  The Claude profiles the project can name. */
+	choices: DevflowProfileChoice[],
+};
+
+export type DevflowProfileChoice = {
+	id: string,
+	label: string,
 };
 
 /**  One reviewer of a card's newest review. */

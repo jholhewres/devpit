@@ -15,7 +15,7 @@ use devpit_devflow::evidence::Card;
 use devpit_devflow::review::{self, Asked, Given, Reach};
 use devpit_devflow::runs::{self, Runs};
 use devpit_devflow::{layers, Config, State};
-use devpit_rpc::Project;
+use devpit_rpc::{Declared, Project};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tauri::AppHandle;
@@ -43,8 +43,10 @@ pub(crate) fn respond(
     project: &Project,
     state: &State,
     asked: Standalone,
+    profile: Option<&Declared>,
 ) -> Result<Value, String> {
-    respond_with(project, state, asked, &crate::devflow_review::reach, &pull)
+    let reach = |agent| crate::devflow_review::reach_as(agent, profile);
+    respond_with(project, state, asked, &reach, &pull, profile)
 }
 
 /// A pull request of the project's GitHub repository; other hosts are not read.
@@ -157,8 +159,10 @@ pub(crate) fn respond_with(
     asked: Standalone,
     reach: Reach,
     ask: Ask,
+    profile: Option<&Declared>,
 ) -> Result<Value, String> {
     let config = config_of(state)?;
+    let env = crate::devflow_profile::env_of(profile);
     let root = Path::new(&project.root_path);
     let store = crate::projects::store().map_err(|err| err.message)?;
     let home = crate::projects::project_home(&project.id).map_err(|err| err.message)?;
@@ -252,7 +256,7 @@ pub(crate) fn respond_with(
         },
         brief: None,
         evidence: None,
-        env: &[],
+        env: &env,
         at,
         budget: devpit_agentapi::client::wait_for("devflow_review").saturating_sub(SPARE),
         reach,

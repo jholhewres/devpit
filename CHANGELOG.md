@@ -5,6 +5,14 @@ release notes are taken from here when a version is tagged.
 
 ## 0.1.45 — unreleased
 
+### Fixed
+
+- **Devflow's reviewers run on the project's account.** They used to start
+  Claude Code on the machine's default account, so a personal project's
+  review could run on a company account. They now run as the profile the
+  project names (Devflow → Review), else as the session that asked, else as
+  the orchestrators linked to the project, and the screen says which.
+
 ### Removed
 
 - **Devflow's autopilot is gone.** It started each card's session as the

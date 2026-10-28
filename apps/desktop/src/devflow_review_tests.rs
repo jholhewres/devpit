@@ -148,6 +148,7 @@ fn a_review_says_where_decisions_stands_in_each_standing() {
             &root,
             &json!({ "card": card }),
             &reach,
+            None,
         )
         .expect("reviewed");
         assert_eq!(said["verdict"], "request_changes", "{standing:?}: {said}");
@@ -174,6 +175,7 @@ fn one_reviewer_on_a_fake_cli_reviews_the_card_and_its_critical_finding_holds_th
         &root,
         &json!({ "card": card }),
         &reach,
+        None,
     )
     .expect("reviewed");
     assert_eq!(said["verdict"], "request_changes", "{said}");
@@ -319,6 +321,7 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
         &root,
         &json!({ "card": card, "base": start }),
         &reach,
+        None,
     )
     .expect("the first review");
     assert_eq!(before["verdict"], "request_changes", "{before}");
@@ -340,6 +343,7 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
         &root,
         &json!({ "card": card, "previous": run }),
         &reach,
+        None,
     )
     .expect("the re-review");
     assert_eq!(after["base"], json!(read), "{after}");
@@ -370,4 +374,56 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
     let missing = gate["missing"].to_string();
     assert!(!missing.contains("the review read"), "{missing}");
     assert!(!missing.contains("Shell injection"), "{missing}");
+}
+
+/// #249: a review in a project whose reviewers run as a profile starts its
+/// Claude Code on that profile's account, not the machine's default.
+#[cfg(unix)]
+#[test]
+fn the_reviewers_run_on_the_account_of_the_projects_profile() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let scripts = tempfile::tempdir().expect("scripts");
+    let root = dir.path().canonicalize().expect("root");
+    let (_store, project, card) = reviewed_project(&root);
+    let claude = fake_claude(scripts.path());
+    let seen = scripts.path().join("seen");
+    let noting = scripts.path().join("claude-noting");
+    written_apart(
+        &noting,
+        &format!(
+            "#!/bin/sh\nprintf '%s' \"$CLAUDE_CONFIG_DIR\" > '{}'\nexec '{claude}' \"$@\"\n",
+            seen.display()
+        ),
+    );
+    let noting = noting.display().to_string();
+    let reach = move |agent: Agent| match agent {
+        Agent::Claude => Ok(noting.clone()),
+        _ => Err("not installed".to_owned()),
+    };
+    let claudin = Declared {
+        id: "claudin".to_owned(),
+        label: "Claudin".to_owned(),
+        base: "claude".to_owned(),
+        command: String::new(),
+        args: Vec::new(),
+        env: vec![devpit_rpc::EnvVar {
+            name: "CLAUDE_CONFIG_DIR".to_owned(),
+            value: "/home/p/.claude-claudin".to_owned(),
+        }],
+        models: Vec::new(),
+    };
+    respond_with(
+        None,
+        &project,
+        &config_of(&root),
+        &root,
+        &json!({ "card": card }),
+        &reach,
+        Some(&claudin),
+    )
+    .expect("reviewed");
+    assert_eq!(
+        std::fs::read_to_string(&seen).expect("the reviewer ran"),
+        "/home/p/.claude-claudin"
+    );
 }

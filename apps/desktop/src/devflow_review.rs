@@ -14,7 +14,7 @@ use devpit_devflow::config::Agent;
 use devpit_devflow::evidence::Card;
 use devpit_devflow::review::{self, Git, Given, Reach};
 use devpit_devflow::{runs, Config};
-use devpit_rpc::{CardReview, Finding, Found, Project, Review, Severity};
+use devpit_rpc::{CardReview, Declared, Finding, Found, Project, Review, Severity};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
@@ -34,19 +34,25 @@ pub(crate) fn respond(
     config: &Config,
     cwd: &Path,
     params: &Value,
+    profile: Option<&Declared>,
 ) -> Result<Value, String> {
-    respond_with(app, project, config, cwd, params, &reach)
+    let reach = |agent: Agent| reach_as(agent, profile);
+    respond_with(app, project, config, cwd, params, &reach, profile)
 }
 
-/// The CLI on this machine that runs `agent`, or why there is none.
-pub(crate) fn reach(agent: Agent) -> Result<String, String> {
+/// The CLI on this machine that runs `agent` as `profile`, or why there is
+/// none.
+pub(crate) fn reach_as(agent: Agent, profile: Option<&Declared>) -> Result<String, String> {
     let cli = devpit_agentcli::reviewing::Cli::of(agent.word())
         .ok_or("devpit does not run this CLI headless")?;
-    let program = cli.program();
-    if !crate::shell_launch::shell_knows().contains(program) {
+    let own = profile
+        .filter(|one| agent == Agent::Claude && one.base == "claude" && !one.command.is_empty())
+        .map(|one| one.command.as_str());
+    let program = own.unwrap_or(cli.program());
+    if !crate::shell_launch::shell_knows().contains(program) && !Path::new(program).is_file() {
         return Err("not installed".to_owned());
     }
-    if agent == Agent::Claude && crate::devflow::claude_signed_in() == Some(false) {
+    if agent == Agent::Claude && crate::devflow::claude_signed_in(profile) == Some(false) {
         return Err("not signed in".to_owned());
     }
     Ok(program.to_owned())
@@ -107,6 +113,7 @@ pub(crate) fn respond_with(
     cwd: &Path,
     params: &Value,
     reach: Reach,
+    profile: Option<&Declared>,
 ) -> Result<Value, String> {
     let asked = review::asked(params)?;
     let store = crate::projects::store().map_err(|err| err.message)?;
@@ -134,7 +141,7 @@ pub(crate) fn respond_with(
         (Some(_), _) => None,
     };
     let branch = devpit_git::branch_at(&root).unwrap_or_default();
-    let env = context_of(
+    let mut env = context_of(
         &card,
         Some(Checkout {
             path: &root,
@@ -144,6 +151,7 @@ pub(crate) fn respond_with(
     )
     .for_a_command()
     .environment();
+    env.extend(crate::devflow_profile::env_of(profile));
     let secrets = crate::kept_out::what_devpit_gave(&store);
     let redact = |text: &str| crate::kept_out::kept_out(text, &secrets);
     let evidence = crate::devflow_gate::newest(&runs, &card.id, "evidence.json");
