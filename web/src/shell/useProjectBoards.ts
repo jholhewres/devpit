@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Board, Project } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -20,8 +20,14 @@ export function useProjectBoards(projects: readonly Project[]): {
   const [failed, setFailed] = useState<string | null>(null)
   const [asked, setAsked] = useState(0)
   const reload = useCallback(() => setAsked((was) => was + 1), [])
+  /* A new list of the same projects comes with every project switch: the
+     boards are read again only when which projects changes. */
+  const latest = useRef(projects)
+  latest.current = projects
+  const ids = projects.map((project) => project.id).join('\n')
 
   useEffect(() => {
+    const projects = latest.current
     let dropped = false
     if (projects.length === 0) {
       setBoards([])
@@ -50,7 +56,7 @@ export function useProjectBoards(projects: readonly Project[]): {
     return () => {
       dropped = true
     }
-  }, [projects, asked])
+  }, [ids, asked])
 
   return { boards, failed, reload }
 }

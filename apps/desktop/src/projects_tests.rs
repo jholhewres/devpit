@@ -69,3 +69,29 @@ fn a_project_opens_when_its_place_in_the_list_cannot_be_written() {
 
     opened(&store, &id).expect("opened all the same");
 }
+
+/// #219: a project's status is read only for the one in front; switching
+/// to it does not run `git status` in every other checkout.
+#[test]
+fn the_list_reads_the_status_of_the_project_in_front_alone() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("store");
+    let checkout = |name: &str| {
+        let root = dir.path().join(name);
+        std::fs::create_dir_all(&root).expect("checkout");
+        crate::devflow_review::tests::git(&root, &["init", "-q", "-b", "main"]);
+        std::fs::write(root.join("new.txt"), "dirty").expect("a file");
+        store.add_project(&root, None).expect("project")
+    };
+    let (front, behind) = (checkout("front"), checkout("behind"));
+    let listed = listed_in(&store, Some(&front)).expect("listed").projects;
+    let dirty = |id: &str| {
+        listed
+            .iter()
+            .find(|one| one.id == id)
+            .and_then(|one| one.worktrees.first())
+            .map(|tree| tree.dirty_files)
+    };
+    assert_eq!(dirty(&front), Some(Some(1)), "the project in front");
+    assert_eq!(dirty(&behind), Some(None), "read without its status");
+}

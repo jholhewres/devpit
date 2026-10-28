@@ -111,7 +111,37 @@ pub async fn project_list() -> Result<ProjectList, RpcError> {
 
 /// [`project_list`], on the calling thread.
 pub(crate) fn project_list_now() -> Result<ProjectList, RpcError> {
-    listed(devpit_git::worktrees)
+    let store = store()?;
+    let front = front_of(&store);
+    listed_in(&store, front.as_deref())
+}
+
+/// The project in front: the one opened last, which `projects` lists first.
+pub(crate) fn front_of(store: &Store) -> Option<String> {
+    store
+        .projects()
+        .ok()?
+        .into_iter()
+        .find(|row| row.last_opened_at.is_some())
+        .map(|row| row.id)
+}
+
+/// Every project, with the status of `front`'s checkouts alone: the screen
+/// shows no other's, and reading every checkout took seconds per switch.
+pub(crate) fn listed_in(store: &Store, front: Option<&str>) -> Result<ProjectList, RpcError> {
+    let projects = store
+        .projects()?
+        .into_iter()
+        .map(|row| {
+            let listing: Listing = if front == Some(row.id.as_str()) {
+                devpit_git::worktrees
+            } else {
+                devpit_git::worktrees_unread
+            };
+            drawn_with(store, row, listing)
+        })
+        .collect();
+    Ok(ProjectList { projects })
 }
 
 /// Every project with where its checkouts are, but not their status: one git
@@ -198,8 +228,9 @@ pub async fn project_open(project_id: String) -> Result<ProjectList, RpcError> {
 
 /// [`project_open`], on the calling thread.
 pub(crate) fn project_open_now(project_id: String) -> Result<ProjectList, RpcError> {
-    opened(&store()?, &project_id)?;
-    project_list_now()
+    let store = store()?;
+    opened(&store, &project_id)?;
+    listed_in(&store, Some(&project_id))
 }
 
 /// Whether the project can be opened. The touch only orders the list, so a

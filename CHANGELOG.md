@@ -18,6 +18,13 @@ release notes are taken from here when a version is tagged.
   publishing again posted a second review. Every comment a review carried
   is now kept as posted, and publishing again only edits.
 
+### Better at what it already did
+
+- **Switching projects is quick again.** Opening a project read the git
+  status of every checkout of every project, seconds on a machine with many;
+  it now reads only the project in front, the only one whose status shows,
+  and the orchestrator's boards are not read again for the same projects.
+
 ### Removed
 
 - **Devflow's autopilot is gone.** It started each card's session as the
