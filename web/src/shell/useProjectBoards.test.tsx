@@ -25,6 +25,10 @@ describe("the linked projects' boards", () => {
     await new Promise((done) => setTimeout(done, 20))
     expect(boardGet).toHaveBeenCalledTimes(2)
 
+    rerender({ list: [{ ...project('a'), name: 'renamed' }, project('b')] })
+    expect(result.current.boards?.[0]?.project.name).toBe('renamed')
+    expect(boardGet).toHaveBeenCalledTimes(2)
+
     rerender({ list: [project('a'), project('b'), project('c')] })
     await waitFor(() => expect(result.current.boards?.length).toBe(3))
   })

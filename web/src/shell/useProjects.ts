@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -31,10 +31,13 @@ export function useProjects(): Projects {
 
   /* A repository that cannot be read still comes back, marked. Missing from
      the list would read as never having been added. */
+  /* The project on screen is the one whose checkouts' status is read. */
+  const current = useRef(open.current)
+  current.current = open.current
   const reloadProjects = useCallback(() => {
     /* Nothing to reload from: the stand-in is the whole list. */
     if (previewing()) return
-    void ask(() => commands.projectList()).then((asked) => {
+    void ask(() => commands.projectList(current.current)).then((asked) => {
       setProjectsError(asked.error)
       const list = asked.data?.projects
       if (!list) return

@@ -17,9 +17,10 @@ export const commands = {
 	 * 
 	 *  A repository that cannot be read does not drop out of the list; it comes
 	 *  back with `unreadable` set and no worktrees. A project missing from the
-	 *  list would read as one that was never added.
+	 *  list would read as one that was never added. `front` is the project the
+	 *  screen shows: only its checkouts' status is read.
 	 */
-	projectList: () => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_list")),
+	projectList: (front: string | null) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_list", { front })),
 	/**  `project.add` — registers a folder, or opens the one already registered. */
 	projectAdd: (rootPath: string) => typedError<Project, RpcError>(__TAURI_INVOKE("project_add", { rootPath })),
 	/**

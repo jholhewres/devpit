@@ -95,3 +95,29 @@ fn the_list_reads_the_status_of_the_project_in_front_alone() {
     assert_eq!(dirty(&front), Some(Some(1)), "the project in front");
     assert_eq!(dirty(&behind), Some(None), "read without its status");
 }
+
+/// The project in front is the one opened last, read in the order the store
+/// lists them, so a project opened after another is the front.
+#[test]
+fn the_project_opened_last_is_in_front() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("store");
+    let add = |name: &str| {
+        let root = dir.path().join(name);
+        std::fs::create_dir_all(&root).expect("folder");
+        store.add_project(&root, None).expect("project")
+    };
+    let (older, newer) = (add("older"), add("newer"));
+    // Seconds apart, as two opens a person makes are.
+    let opened = |id: &str, at: i64| {
+        store
+            .conn()
+            .execute_batch(&format!(
+                "UPDATE project SET last_opened_at = {at} WHERE id = '{id}'"
+            ))
+            .expect("opened");
+    };
+    opened(&newer, 100);
+    opened(&older, 200);
+    assert_eq!(front_of(&store), Some(older));
+}

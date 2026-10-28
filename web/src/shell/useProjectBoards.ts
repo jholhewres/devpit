@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Board, Project } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -58,5 +58,12 @@ export function useProjectBoards(projects: readonly Project[]): {
     }
   }, [ids, asked])
 
-  return { boards, failed, reload }
+  /* A rename keeps the ids, so the board is not read again: it is drawn with
+     the project as the list has it now. */
+  const drawn = useMemo(() => {
+    const now = new Map(projects.map((project) => [project.id, project]))
+    return boards?.map((one) => ({ ...one, project: now.get(one.project.id) ?? one.project })) ?? null
+  }, [boards, projects])
+
+  return { boards: drawn, failed, reload }
 }

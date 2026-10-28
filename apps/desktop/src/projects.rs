@@ -102,17 +102,24 @@ fn drawn_with(store: &Store, row: devpit_core::ProjectRow, listing: Listing) -> 
 ///
 /// A repository that cannot be read does not drop out of the list; it comes
 /// back with `unreadable` set and no worktrees. A project missing from the
-/// list would read as one that was never added.
+/// list would read as one that was never added. `front` is the project the
+/// screen shows: only its checkouts' status is read.
 #[tauri::command]
 #[specta::specta]
-pub async fn project_list() -> Result<ProjectList, RpcError> {
-    crate::off_main::blocking(project_list_now).await
+pub async fn project_list(front: Option<String>) -> Result<ProjectList, RpcError> {
+    crate::off_main::blocking(move || listed_with_front(front)).await
 }
 
 /// [`project_list`], on the calling thread.
 pub(crate) fn project_list_now() -> Result<ProjectList, RpcError> {
+    listed_with_front(None)
+}
+
+/// Every project, with the status of `front`'s checkouts: the one the screen
+/// says it shows, else the one opened last.
+fn listed_with_front(front: Option<String>) -> Result<ProjectList, RpcError> {
     let store = store()?;
-    let front = front_of(&store);
+    let front = front.or_else(|| front_of(&store));
     listed_in(&store, front.as_deref())
 }
 
