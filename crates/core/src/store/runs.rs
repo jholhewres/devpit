@@ -180,16 +180,17 @@ impl Store {
 
     /// A card's runs, most recent first.
     pub fn runs(&self, card_id: &str) -> Result<Vec<RunRow>, StoreError> {
-        self.runs_reading(card_id, "output")
+        self.runs_reading(card_id, true)
     }
 
     /// [`Store::runs`] without their output, for a board that lists every
     /// card's runs and shows none of it.
     pub fn runs_brief(&self, card_id: &str) -> Result<Vec<RunRow>, StoreError> {
-        self.runs_reading(card_id, "NULL")
+        self.runs_reading(card_id, false)
     }
 
-    fn runs_reading(&self, card_id: &str, output: &str) -> Result<Vec<RunRow>, StoreError> {
+    fn runs_reading(&self, card_id: &str, with_output: bool) -> Result<Vec<RunRow>, StoreError> {
+        let output = if with_output { "output" } else { "NULL" };
         let mut stmt = self.conn.prepare(&format!(
             "SELECT id, card_id, step_id, state, {output}, exit_code, cost_usd, duration_ms, \
              started_at FROM run WHERE card_id = ?1 \

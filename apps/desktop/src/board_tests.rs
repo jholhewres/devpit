@@ -58,3 +58,30 @@ fn a_word_this_build_does_not_know_lands_on_the_cautious_answer() {
     assert_eq!(state_of("something-newer"), RunState::Running);
     assert_eq!(state_of(""), RunState::Running);
 }
+
+/// #215: the board lists every card's runs without their output, which only
+/// the card itself shows.
+#[test]
+fn the_board_leaves_a_runs_output_to_the_card() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = crate::projects::store().expect("store");
+    let project = store.add_project(dir.path(), None).expect("project");
+    store.ensure_board(&project).expect("board");
+    let first = store.columns(&project).expect("columns")[0].id.clone();
+    let card = store
+        .create_card(&project, &first, "a card", "")
+        .expect("card");
+    let step = store
+        .create_step(&project, "command", "tests", "{}", false)
+        .expect("step");
+    let run = store.start_run(&card, &step, None).expect("run");
+    store
+        .finish_run(&run, "ok", Some("a long log"), None, None, Some(0))
+        .expect("finish");
+
+    let board = board_still_now(project.clone()).expect("board");
+    let tile = board.cards.iter().find(|one| one.id == card).expect("tile");
+    assert_eq!(tile.runs[0].output, None, "the board carried the output");
+    let detail = crate::cards::detail_of(project, card).expect("detail");
+    assert_eq!(detail.runs[0].output.as_deref(), Some("a long log"));
+}
