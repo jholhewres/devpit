@@ -1,7 +1,8 @@
 # ADR 0001 — Sync the person's workspace, not their machine
 
-- Status: **proposed** (waiting on the open questions in
-  [`docs/sync-workspace.md`](../sync-workspace.md#open-questions))
+- Status: **accepted** 2026-10-28, with every recommendation in
+  [`docs/sync-workspace.md`](../sync-workspace.md#decisions) and file
+  contents on S3
 - Date: 2026-10-28
 - Builds on: [`docs/sync.md`](../sync.md) (M-10, shipped in 0.1.41)
 
@@ -55,7 +56,13 @@ env values hold tokens; "project memory" does not exist yet as a feature.
 4. **devpit does not sync the anchored memory DB.** It is another tool's
    store, gigabytes in size, with its own remote. devpit's bootstrap points
    at anchored's remote instead.
-5. **A new machine is bootstrapped, not cloned.** Pair, then a guided
+5. **File contents live in S3, reached only through devpit.app.** A private
+   bucket on the company's AWS account holds the sealed objects; devpit.app
+   keeps the quota and hands out short-lived presigned URLs, so no machine
+   ever holds an AWS credential and devpit.app never carries the bytes.
+   Records and the current manifests stay in devpit.app's Postgres, where
+   the version check (409) already lives.
+6. **A new machine is bootstrapped, not cloned.** Pair, then a guided
    *Set up this computer*: pick the orchestrator, map each linked project to
    a local folder (found by origin, cloned, or skipped), fill each profile's
    missing secrets and sign its CLI in.
@@ -63,14 +70,16 @@ env values hold tokens; "project memory" does not exist yet as a feature.
 ## Consequences
 
 - devpit.app needs an object store with its own quota next to the blob
-  store; the 1 MiB / 16 MiB caps stay for records.
+  store; the 1 MiB / 16 MiB caps stay for records. The bucket is
+  `devpit-prod-sync-objects-377781325796` (us-east-1); devpit-app gets an
+  IAM user scoped to its `v1/` prefix, whose key is made at deploy time.
 - An orchestrator's link preference must move from a path key and local ids
   to a sync id and origin hashes, with a store migration.
 - `origin_hash` normalisation must be fixed (userinfo, ports) and recomputed
   when a remote changes, because it becomes the only project identity that
   crosses machines.
-- Large `artifacts/` either count against a quota or stay local by default:
-  one of the open questions.
+- `artifacts/` files up to 5 MB sync, behind devpit Plus; larger ones and
+  folders marked *keep local* stay on their machine.
 - Work in progress on machine A cannot be resumed as the same agent session
   on machine B; it is continued from its handoff. That is a product promise
   the UI must state plainly.
@@ -88,5 +97,11 @@ env values hold tokens; "project memory" does not exist yet as a feature.
   for pairing only. It stays an option for large artifacts.
 - **Syncing whole CLAUDE_CONFIG_DIRs.** Rejected: gigabytes, absolute paths
   in every transcript, credentials and hooks with machine paths inside.
+- **Cloudflare R2** instead of S3. Cheaper egress, but the company's AWS
+  account is where its other buckets, billing and access already are; the
+  object routes hide the provider, so moving later is a copy.
+- **The client talking to S3 with its own credentials** (as the Remotely
+  Save plugin for Obsidian does). Rejected: a credential on every machine,
+  no quota, and no server to keep objects immutable.
 - **Syncing the anchored DB through devpit.** Rejected: size, embeddings tied
   to a local model, and a tool that already has its own sync.
