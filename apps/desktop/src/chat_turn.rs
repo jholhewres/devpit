@@ -86,6 +86,44 @@ pub(crate) fn spawnable(profile_id: &str) -> Result<(devpit_rpc::Profile, String
     Ok((profile, path))
 }
 
+/// How a turn that failed ends: an error, so the screen stops waiting on it.
+pub(crate) fn failed_end(turn_id: &str) -> devpit_rpc::TurnEnd {
+    devpit_rpc::TurnEnd {
+        turn_id: turn_id.to_owned(),
+        cost_usd: None,
+        duration_ms: None,
+        stop_reason: Some("error".to_owned()),
+        is_error: true,
+        context: None,
+    }
+}
+
+/// A turn as it came back. One that failed keeps what it said before
+/// failing, when it began, and its answer is said to be over, so nothing is
+/// left "working" and a reload no longer claims the app closed mid-turn.
+pub(crate) fn or_failed<T>(
+    said: Result<T, RpcError>,
+    turn_id: &str,
+    file: &std::path::Path,
+    kept: Option<&std::sync::Arc<std::sync::Mutex<Vec<devpit_rpc::Part>>>>,
+    opened: &devpit_rpc::Message,
+    on_frame: &tauri::ipc::Channel<devpit_rpc::Frame>,
+) -> Result<T, RpcError> {
+    if said.is_err() {
+        if let Some(parts) = kept {
+            let answered = devpit_rpc::Message {
+                parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
+                streaming: false,
+                ..opened.clone()
+            };
+            let _ = devpit_agentcli::store::append(file, &answered);
+        }
+        let end = failed_end(turn_id);
+        let _ = on_frame.send(devpit_rpc::Frame::Ended { end });
+    }
+    said
+}
+
 #[cfg(test)]
 #[path = "chat_turn_tests.rs"]
 mod tests;

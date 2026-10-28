@@ -33,3 +33,14 @@ describe('what the agent did, folded', () => {
     expect(screen.getAllByText('d.rs').length).toBeGreaterThan(0)
   })
 })
+
+describe('a subagent', () => {
+  it('takes its first part without breaking the row that started it', () => {
+    const call: Part = { kind: 'tool_call', id: 'sub', name: 'Task', input: JSON.stringify({ description: 'look around' }), state: 'running', parent: null }
+    const { rerender } = render(<Acts parts={[call]} live />)
+    const child: Part = { kind: 'tool_call', id: 'c1', name: 'Read', input: JSON.stringify({ file_path: 'deep.rs' }), state: 'running', parent: 'sub' }
+    rerender(<Acts parts={[call, child]} live />)
+    // The row is still on screen: a hook-order error unmounts the whole tree.
+    expect(screen.getByText('look around')).toBeTruthy()
+  })
+})

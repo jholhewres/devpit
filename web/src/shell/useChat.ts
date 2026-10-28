@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
-import { applied, ASKS, batched, fixedTo, MODES, opening, rejoin, send, steered, withFiles, type Opening } from './chat'
+import { applied, ASKS, batched, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
@@ -310,6 +310,7 @@ export function useChat(conversationId: string): Chat {
           /* Whatever is still waiting for a frame is in before the turn is
              said to be over. */
           flush()
+          setMessages(settled)
           setSending(false)
           /* A question the turn left behind has nobody waiting on it now. */
           setAsked([])

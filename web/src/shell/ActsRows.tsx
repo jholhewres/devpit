@@ -82,8 +82,12 @@ function GroupRow({ group }: { group: Group }): React.JSX.Element {
 
 function Row({ act }: { act: Act }): React.JSX.Element {
   /* A subagent is a stack of its own, folded until asked for: its reads and
-     searches are its business, and the thread is about what it came back with. */
-  if (act.children.length > 0) return <AgentRow act={act} />
+     searches are its business, and the thread is about what it came back with.
+     Two components, so the row that gains its first child keeps its hooks. */
+  return act.children.length > 0 ? <AgentRow act={act} /> : <LeafRow act={act} />
+}
+
+function LeafRow({ act }: { act: Act }): React.JSX.Element {
   const parts = sections(act)
   /* An edit shows what it changed as soon as it is on screen: the diff is the
      point of the row, and a chevron in front of it is a click for nothing. */

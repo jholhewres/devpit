@@ -134,11 +134,11 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         ) : (
           <AppsScopeContext.Provider value={scope}>
             <div className="thread">
-              {chat.error && <div className="exempty__t">{chat.error}</div>}
               {chat.messages.map((message) => (
                 <Turn key={message.id} message={message} folder={chat.folder} onOpen={setPeek} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
               ))}
               {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
+              {chat.error && <div className="exempty__t" role="alert">{chat.error}</div>}
             </div>
           </AppsScopeContext.Provider>
         )}

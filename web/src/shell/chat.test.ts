@@ -15,6 +15,7 @@ import {
   ready,
   withFiles,
   unanswered,
+  settled,
 } from './chat'
 
 const message = (id: string, streaming = true): Message =>
@@ -263,5 +264,14 @@ describe('a message sent into the turn in flight', () => {
     const said = { ...message('u2', false), role: 'user' as const }
     expect(steered([asked, message('a1')], said).map((one) => one.id)).toEqual(['u1', 'u2', 'a1'])
     expect(steered([message('a0', false)], said).map((one) => one.id)).toEqual(['a0', 'u2'])
+  })
+})
+
+describe('a turn that is over', () => {
+  it('leaves no answer still streaming, whatever ended it', () => {
+    const was = [message('asked', false), message('answer', true)]
+    const after = settled(was)
+    expect(after.map((m) => m.streaming)).toEqual([false, false])
+    expect(settled(after)).toBe(after)
   })
 })

@@ -77,7 +77,7 @@ pub struct Said {
 pub fn say(
     driver: &dyn Driver,
     turn: &Say<'_>,
-    on_part: impl FnMut(Part),
+    mut on_part: impl FnMut(Part),
     mut on_start: impl FnMut(u32),
 ) -> Result<Said, AgentError> {
     let argv = argv(turn);
@@ -97,6 +97,7 @@ pub fn say(
         .map_err(|_| AgentError::NotInstalled)?;
 
     on_start(child.id());
+    let stderr = crate::talk_failure::read_apart(&mut child);
 
     let stdin = child.stdin.take().ok_or(AgentError::NotInstalled)?;
     let control = turn.control.cloned().unwrap_or_default();
@@ -113,7 +114,7 @@ pub fn say(
         BufReader::new(stdout).lines().map_while(Result::ok),
         &control,
         turn.on_session,
-        on_part,
+        &mut on_part,
     );
 
     // Whatever ended the stream, stdin is not needed any more.
@@ -122,16 +123,7 @@ pub fn say(
         .wait()
         .map_err(|err| AgentError::Unreadable(err.to_string()))?;
 
-    let ending = heard.ended.unwrap_or_else(|| {
-        // No end frame means the turn was stopped, not that it finished. A
-        // conversation that shows those the same way is lying about one.
-        crate::talk_stream::Ending {
-            stop_reason: Some("interrupted".to_owned()),
-            cost_usd: None,
-            is_error: !status.success(),
-            context: None,
-        }
-    });
+    let ending = crate::talk_failure::ending(heard.ended, status.success(), stderr, &mut on_part);
 
     Ok(Said {
         end: TurnEnd {

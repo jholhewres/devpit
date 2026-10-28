@@ -118,6 +118,14 @@ export function steered(messages: readonly Message[], said: Message): readonly M
 
 /* The profile a conversation is tied to, or nothing before its first turn.
    Fixed on purpose: one transcript, one account. */
+/* A turn that is over, however it ended, leaves nothing streaming: a refused
+   or failed turn sent no frame that would say so, and its answer kept the
+   working dots until a reload. The same list when nothing changes. */
+export function settled(messages: readonly Message[]): readonly Message[] {
+  if (!messages.some((one) => one.streaming)) return messages
+  return messages.map((one) => (one.streaming ? { ...one, streaming: false } : one))
+}
+
 export function fixedTo(conversation: Conversation | null): string | null {
   return conversation?.profile ? conversation.profile : null
 }

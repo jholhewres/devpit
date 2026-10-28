@@ -12,6 +12,12 @@ release notes are taken from here when a version is tagged.
   review could run on a company account. They now run as the profile the
   project names (Devflow → Review), else as the session that asked, else as
   the orchestrators linked to the project, and the screen says which.
+- **A chat turn that fails says so, and stops working.** A turn refused
+  (another one running, an update coming) or failed mid-way no longer leaves
+  its answer "working" until a reload; what it said before failing is kept;
+  the CLI's own reason (a session it cannot resume, say) shows in the answer
+  instead of an empty "interrupted"; and the error shows at the end of the
+  thread, not at its top.
 - **Publishing a review no longer reports a false error, nor posts it
   twice.** devpit read back the review's comments where GitHub lists them
   without their lines, so a comment that was there was called missing, and

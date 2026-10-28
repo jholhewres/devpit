@@ -250,3 +250,48 @@ fn a_named_turn_is_started_under_that_name() {
     assert_eq!(said[at + 1], "orchestrator-workspace");
     assert!(!argv(&turn(None)).iter().any(|a| a == "--name"));
 }
+
+/// A CLI that fails before it answers — a session it cannot resume, say —
+/// says why on stderr. The turn shows that line and ends as an error, rather
+/// than an empty answer called "interrupted".
+#[cfg(unix)]
+#[test]
+fn a_cli_that_fails_says_why_in_the_answer() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join("fake-claude");
+    std::fs::write(
+        &cli,
+        "#!/bin/sh\nread -r _prompt\necho 'No conversation found with session ID: abc' >&2\nexit 1\n",
+    )
+    .expect("script");
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let command = cli.to_string_lossy().into_owned();
+    let turn = Say {
+        command: &command,
+        cwd: dir.path(),
+        ..turn(None)
+    };
+    let mut heard = Vec::new();
+    let said = (0..5)
+        .find_map(|_| {
+            match crate::talk::say(
+                &crate::driver::Claude::default(),
+                &turn,
+                |part| heard.push(part),
+                |_| {},
+            ) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                }
+                other => Some(other),
+            }
+        })
+        .expect("the stand-in never started")
+        .expect("a turn");
+    assert!(said.end.is_error);
+    let shown = format!("{heard:?}");
+    assert!(shown.contains("No conversation found"), "{shown}");
+}

@@ -165,6 +165,16 @@ pub async fn chat_send(
     let file = conversation_path(&sessions, &conversation_id);
     let turn_id = id("turn");
 
+    // Claimed before anything is written or sent, and released by the guard
+    // however this returns. Nothing new once an update is about to go in: a
+    // turn started here would die with the process at the commit.
+    if let Some(updating) = app.try_state::<crate::update::Updating>() {
+        if let Some(why) = crate::update::starting_refused(&updating.state()) {
+            return Err(RpcError::new(ErrorCode::Busy, why.to_owned()));
+        }
+    }
+    let guard = state.begin(&conversation_id, &steering)?;
+
     // Written before the turn runs: an interrupted first turn still leaves the
     // conversation tied to the account that opened it.
     let opening = crate::chat_turn::opening(
@@ -218,16 +228,6 @@ pub async fn chat_send(
     let beginning = began.clone();
     let transcript = file.clone();
 
-    // Claimed before anything is spawned, and released by the guard however
-    // this returns.
-    // Nothing new once an update is about to go in: a turn started here would
-    // die with the process at the commit, halfway through an answer.
-    if let Some(updating) = app.try_state::<crate::update::Updating>() {
-        if let Some(why) = crate::update::starting_refused(&updating.state()) {
-            return Err(RpcError::new(ErrorCode::Busy, why.to_owned()));
-        }
-    }
-    let guard = state.begin(&conversation_id, &steering)?;
     let control = steering.hold(&conversation_id);
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
     let noticed = (project_id.clone(), profile_id.clone(), from);
@@ -290,9 +290,12 @@ pub async fn chat_send(
     .await;
     // Before the answer is looked at: a turn that failed is not still working.
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Done);
-    let said = said
-        .map_err(|err| RpcError::internal(err.to_string()))?
-        .map_err(crate::chat_resident::turn_refused)?;
+    let said = said.map_err(|err| RpcError::internal(err.to_string()));
+    let said = said.and_then(|said| said.map_err(crate::chat_resident::turn_refused));
+    let kept = began
+        .load(std::sync::atomic::Ordering::SeqCst)
+        .then_some(&parts);
+    let said = crate::chat_turn::or_failed(said, &turn_id, &file, kept, &opened, &on_frame)?;
 
     // The guard does both when it goes, including on the `?` above.
     drop(guard);

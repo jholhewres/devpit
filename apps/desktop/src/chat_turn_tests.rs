@@ -83,3 +83,12 @@ fn a_turn_ending_after_a_woken_one_keeps_what_that_one_wrote() {
     assert_eq!(now.cost_usd, 0.75);
     assert_eq!(now.session_id.as_deref(), Some("s_woken"));
 }
+
+/// A turn that failed ends as an error, so the answer stops "working".
+#[test]
+fn a_failed_turn_ends_as_an_error() {
+    let end = failed_end("turn_1");
+    assert!(end.is_error);
+    assert_eq!(end.turn_id, "turn_1");
+    assert_eq!(end.stop_reason.as_deref(), Some("error"));
+}
