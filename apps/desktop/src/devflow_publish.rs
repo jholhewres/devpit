@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
-use devpit_devflow::publish::{self, Destination, Event, Host, Inline};
+use devpit_devflow::publish::{self, Destination, Event, Host, Inline, Posted};
 use devpit_devflow::review::Personas;
 use devpit_devflow::{adhoc, State};
 use devpit_rpc::Project;
@@ -154,9 +154,10 @@ impl Gh {
     }
 }
 
-/// Each comment of `wanted` matched to the one GitHub kept for it, by file
-/// and line: the ids in `wanted`'s order.
-pub(crate) fn ids_of(wanted: &[Inline], kept: &[Value]) -> Result<Vec<u64>, String> {
+/// Each comment of `wanted` matched to the one `review` posted, as GitHub
+/// lists a pull request's comments, by file and line: the ids in `wanted`'s
+/// order. A review's own listing names no line at all (#248).
+pub(crate) fn ids_of(wanted: &[Inline], kept: &[Value], review: u64) -> Vec<Option<u64>> {
     let mut taken = vec![false; kept.len()];
     wanted
         .iter()
@@ -165,18 +166,13 @@ pub(crate) fn ids_of(wanted: &[Inline], kept: &[Value]) -> Result<Vec<u64>, Stri
                 let line = had["line"]
                     .as_u64()
                     .or_else(|| had["original_line"].as_u64());
-                !taken[at] && had["path"] == one.file.as_str() && line == Some(one.line)
-            });
-            let at = at.ok_or_else(|| {
-                format!(
-                    "GitHub did not keep the comment on {}:{}",
-                    one.file, one.line
-                )
+                !taken[at]
+                    && had["pull_request_review_id"].as_u64() == Some(review)
+                    && had["path"] == one.file.as_str()
+                    && line == Some(one.line)
             })?;
             taken[at] = true;
-            kept[at]["id"]
-                .as_u64()
-                .ok_or_else(|| "GitHub answered a comment without an id".to_owned())
+            kept[at]["id"].as_u64()
         })
         .collect()
 }
@@ -188,7 +184,7 @@ impl Host for Gh {
         event: Event,
         body: &str,
         comments: &[Inline],
-    ) -> Result<Vec<u64>, String> {
+    ) -> Result<Posted, String> {
         let asked = json!({
             "commit_id": commit,
             "event": event.api(),
@@ -202,21 +198,28 @@ impl Host for Gh {
             &self.repo(&format!("pulls/{}/reviews", self.pr)),
             Some(&asked),
         )?;
-        if comments.is_empty() {
-            return Ok(Vec::new());
-        }
         let id = review["id"]
             .as_u64()
             .ok_or("GitHub answered a review without an id")?;
+        if comments.is_empty() {
+            return Ok(Posted {
+                review: id,
+                ids: Vec::new(),
+            });
+        }
+        // Newest first, so the review just posted is on the first page.
         let kept = self.api(
             "GET",
             &self.repo(&format!(
-                "pulls/{}/reviews/{id}/comments?per_page=100",
+                "pulls/{}/comments?per_page=100&sort=created&direction=desc",
                 self.pr
             )),
             None,
         )?;
-        ids_of(comments, kept.as_array().map_or(&[][..], Vec::as_slice))
+        Ok(Posted {
+            review: id,
+            ids: ids_of(comments, kept.as_array().map_or(&[][..], Vec::as_slice), id),
+        })
     }
 
     fn edit_inline(&self, id: u64, body: &str) -> Result<(), String> {

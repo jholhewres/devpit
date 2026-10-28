@@ -32,7 +32,7 @@ impl Host for Seen {
         event: Event,
         _body: &str,
         comments: &[Inline],
-    ) -> Result<Vec<u64>, String> {
+    ) -> Result<Posted, String> {
         let at: Vec<String> = comments
             .iter()
             .map(|one| format!("{}:{}", one.file, one.line))
@@ -40,7 +40,10 @@ impl Host for Seen {
         self.0
             .borrow_mut()
             .push(format!("review {commit} {} {}", event.api(), at.join(",")));
-        Ok((1..=comments.len() as u64).collect())
+        Ok(Posted {
+            review: 99,
+            ids: (1..=comments.len() as u64).map(Some).collect(),
+        })
     }
 
     fn edit_inline(&self, id: u64, _body: &str) -> Result<(), String> {
@@ -137,4 +140,35 @@ fn a_pull_requests_review_is_published_on_it_only_after_the_yes() {
         &hosting,
     );
     assert!(elsewhere.is_err());
+}
+
+/// #248: the comments as GitHub lists them for the pull request — a line,
+/// or only an original line once outdated — matched to the review that
+/// posted them, never to another review's comment on the same line.
+#[test]
+fn the_comments_a_review_posted_are_found_by_the_line_github_lists_them_on() {
+    let wanted = [
+        Inline {
+            file: "app/RateLimitingServiceProvider.php".to_owned(),
+            line: 106,
+            body: "a".to_owned(),
+        },
+        Inline {
+            file: "app/Old.php".to_owned(),
+            line: 12,
+            body: "b".to_owned(),
+        },
+        Inline {
+            file: "app/Gone.php".to_owned(),
+            line: 3,
+            body: "c".to_owned(),
+        },
+    ];
+    let listed = json!([
+        { "id": 1, "pull_request_review_id": 7, "path": "app/RateLimitingServiceProvider.php", "line": 106, "original_line": 106 },
+        { "id": 2, "pull_request_review_id": 8, "path": "app/RateLimitingServiceProvider.php", "line": 106, "original_line": 106 },
+        { "id": 3, "pull_request_review_id": 8, "path": "app/Old.php", "line": null, "original_line": 12 },
+    ]);
+    let listed = listed.as_array().expect("a list");
+    assert_eq!(ids_of(&wanted, listed, 8), [Some(2), Some(3), None]);
 }

@@ -12,6 +12,11 @@ release notes are taken from here when a version is tagged.
   review could run on a company account. They now run as the profile the
   project names (Devflow → Review), else as the session that asked, else as
   the orchestrators linked to the project, and the screen says which.
+- **Publishing a review no longer reports a false error, nor posts it
+  twice.** devpit read back the review's comments where GitHub lists them
+  without their lines, so a comment that was there was called missing, and
+  publishing again posted a second review. Every comment a review carried
+  is now kept as posted, and publishing again only edits.
 
 ### Removed
 
