@@ -84,7 +84,17 @@ fn the_list_reads_the_status_of_the_project_in_front_alone() {
         store.add_project(&root, None).expect("project")
     };
     let (front, behind) = (checkout("front"), checkout("behind"));
-    let listed = listed_in(&store, Some(&front)).expect("listed").projects;
+    // `behind` was opened last, but the screen names `front`: the screen wins.
+    store
+        .conn()
+        .execute_batch(&format!(
+            "UPDATE project SET last_opened_at = 100 WHERE id = '{front}';
+             UPDATE project SET last_opened_at = 200 WHERE id = '{behind}';"
+        ))
+        .expect("opened");
+    let listed = listed_with_front(&store, Some(front.clone()))
+        .expect("listed")
+        .projects;
     let dirty = |id: &str| {
         listed
             .iter()
@@ -109,7 +119,7 @@ fn the_project_opened_last_is_in_front() {
     };
     let (older, newer) = (add("older"), add("newer"));
     // Seconds apart, as two opens a person makes are.
-    let opened = |id: &str, at: i64| {
+    let opened_at = |id: &str, at: i64| {
         store
             .conn()
             .execute_batch(&format!(
@@ -117,7 +127,7 @@ fn the_project_opened_last_is_in_front() {
             ))
             .expect("opened");
     };
-    opened(&newer, 100);
-    opened(&older, 200);
+    opened_at(&newer, 100);
+    opened_at(&older, 200);
     assert_eq!(front_of(&store), Some(older));
 }

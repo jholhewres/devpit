@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project } from '../gen/bindings'
 import { ask, commands } from './live'
 import { previewing, STANDIN } from './preview'
-import { found, type Open } from './projects'
+import { adopted, found, type Open } from './projects'
 import { onEvent } from './window'
 
 /* The project list, apart from the rest of the shell state: it is the only
@@ -29,11 +29,12 @@ export function useProjects(): Projects {
   )
   const [projectsError, setProjectsError] = useState<string | null>(null)
 
-  /* A repository that cannot be read still comes back, marked. Missing from
-     the list would read as never having been added. */
   /* The project on screen is the one whose checkouts' status is read. */
   const current = useRef(open.current)
   current.current = open.current
+
+  /* A repository that cannot be read still comes back, marked. Missing from
+     the list would read as never having been added. */
   const reloadProjects = useCallback(() => {
     /* Nothing to reload from: the stand-in is the whole list. */
     if (previewing()) return
@@ -67,7 +68,7 @@ export function useProjects(): Projects {
       setProjectsError(asked.error)
       if (!asked.data) return
       setOpen((was) => ({
-        projects: asked.data!.projects,
+        projects: adopted(was, asked.data!.projects),
         current: was.current === id ? (asked.data!.projects[0]?.id ?? null) : was.current,
       }))
     })
@@ -78,7 +79,7 @@ export function useProjects(): Projects {
      twice. */
   const renameProject = useCallback(async (id: string, name: string): Promise<string | null> => {
     const asked = await ask(() => commands.projectRename(id, name))
-    if (asked.data) setOpen((was) => ({ ...was, projects: asked.data!.projects }))
+    if (asked.data) setOpen((was) => ({ ...was, projects: adopted(was, asked.data!.projects) }))
     return asked.error
   }, [])
 

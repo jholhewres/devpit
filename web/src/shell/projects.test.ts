@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Project } from '../gen/bindings'
-import { forgotten, found, remote, since, type Open } from './projects'
+import { adopted, forgotten, found, remote, since, type Open } from './projects'
 
 const project = (id: string): Project =>
   ({ id, name: id, rootPath: `/tmp/${id}`, group: null, accent: '#000', worktrees: [], unreadable: null,
@@ -91,5 +91,17 @@ describe('the remote a project came from', () => {
     expect(remote('git@github.com:owner/name.git')).toBe(one)
     expect(remote('ssh://git@github.com/owner/name')).toBe(one)
     expect(remote('https://token@github.com/owner/name/')).toBe(one)
+  })
+})
+
+describe('a list answered by a rename or a forget', () => {
+  it("keeps the status of the project on screen, which that list does not read", () => {
+    const tree = { id: 'w', branch: 'main', folder: 'a', path: '/tmp/a', ahead: 2, behind: 0, dirtyFiles: 3, origin: 'user', current: true }
+    const was: Open = { projects: [{ ...project('a'), worktrees: [tree] as Project['worktrees'] }, project('b')], current: 'a' }
+    const next = [{ ...project('a'), name: 'renamed', worktrees: [{ ...tree, ahead: 0, dirtyFiles: null }] as Project['worktrees'] }, project('b')]
+    const kept = adopted(was, next)
+    expect(kept[0]?.name).toBe('renamed')
+    expect(kept[0]?.worktrees[0]?.dirtyFiles).toBe(3)
+    expect(kept[0]?.worktrees[0]?.ahead).toBe(2)
   })
 })

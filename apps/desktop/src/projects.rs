@@ -107,20 +107,21 @@ fn drawn_with(store: &Store, row: devpit_core::ProjectRow, listing: Listing) -> 
 #[tauri::command]
 #[specta::specta]
 pub async fn project_list(front: Option<String>) -> Result<ProjectList, RpcError> {
-    crate::off_main::blocking(move || listed_with_front(front)).await
+    crate::off_main::blocking(move || listed_with_front(&store()?, front)).await
 }
 
 /// [`project_list`], on the calling thread.
 pub(crate) fn project_list_now() -> Result<ProjectList, RpcError> {
-    listed_with_front(None)
+    listed_with_front(&store()?, None)
 }
 
-/// Every project, with the status of `front`'s checkouts: the one the screen
-/// says it shows, else the one opened last.
-fn listed_with_front(front: Option<String>) -> Result<ProjectList, RpcError> {
-    let store = store()?;
-    let front = front.or_else(|| front_of(&store));
-    listed_in(&store, front.as_deref())
+/// [`listed_in`], with the front the screen names, else the one opened last.
+pub(crate) fn listed_with_front(
+    store: &Store,
+    front: Option<String>,
+) -> Result<ProjectList, RpcError> {
+    let front = front.or_else(|| front_of(store));
+    listed_in(store, front.as_deref())
 }
 
 /// The project in front: the one opened last, which `projects` lists first.

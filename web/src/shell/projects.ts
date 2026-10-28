@@ -17,6 +17,13 @@ export function forgotten(open: Open, id: string): Open {
   }
 }
 
+/* A list a rename or a forget answers reads no checkout's status, so the
+   project on screen keeps the checkouts it had. */
+export function adopted(was: Open, next: readonly Project[]): readonly Project[] {
+  const shown = was.projects.find((project) => project.id === was.current)
+  return next.map((project) => (shown && project.id === shown.id ? { ...project, worktrees: shown.worktrees } : project))
+}
+
 export const found = (open: Open): Project | null =>
   open.projects.find((project) => project.id === open.current) ?? null
 
