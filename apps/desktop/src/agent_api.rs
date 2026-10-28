@@ -42,7 +42,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 50] = [
+pub(crate) const METHODS: [&str; 49] = [
     "context",
     "board",
     "card",
@@ -92,7 +92,6 @@ pub(crate) const METHODS: [&str; 50] = [
     "devflow_gate",
     "devflow_session",
     "devflow_stage",
-    "devflow_autopilot",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -574,16 +573,13 @@ fn respond_in(
         "finish_card" => {
             on_board(&board, &card_id)?;
             crate::devflow_gate::may_finish(project, &card_id, Path::new(&asked.cwd))?;
-            let finished = crate::card_follows::finish(
+            crate::card_follows::finish(
                 app,
                 &board,
                 &card_id,
                 &text("summary").unwrap_or_default(),
                 &asked.author,
-            )?;
-            // A card of a running autopilot finished: the next may start.
-            crate::devflow_autopilot::heard(app, &board.project_id);
-            finished
+            )?
         }
         // No card: a session of its own, in the project's folder.
         "start" if card_id.is_empty() => {

@@ -24,7 +24,7 @@
     "should_trigger": true
   },
   {
-    "query": "Autopilot: take the first unblocked [devflow] card and implement it.",
+    "query": "Take the first unblocked [devflow] card and implement it.",
     "should_trigger": true
   },
   {

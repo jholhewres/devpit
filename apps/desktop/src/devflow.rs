@@ -21,7 +21,7 @@ use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
 
-pub(crate) const METHODS: [&str; 15] = [
+pub(crate) const METHODS: [&str; 14] = [
     "devflow_offer",
     "devflow_status",
     "devflow_setup",
@@ -36,7 +36,6 @@ pub(crate) const METHODS: [&str; 15] = [
     "devflow_gate",
     "devflow_session",
     "devflow_stage",
-    "devflow_autopilot",
 ];
 
 /// The stages a method of a stage's own belongs to: it answers where one of
@@ -104,17 +103,12 @@ pub(crate) fn respond(
         // Answered where the stage is off too: a hook there says nothing.
         "devflow_gate" => crate::devflow_gate::respond(app, &store, project, &state, cwd, params),
         "devflow_session" => crate::devflow_gate::session(&store, project, &state, cwd, params),
-        "devflow_stage" | "devflow_autopilot" => {
+        "devflow_stage" => {
             stages_on(&store, project, &state)?;
             let State::Valid(_, config) = &state else {
                 return Err("devflow.yaml does not read: devpit_devflow_status says why".to_owned());
             };
-            match method {
-                "devflow_stage" => {
-                    crate::devflow_stage::respond(app, &store, project, config, cwd, params)
-                }
-                _ => crate::devflow_autopilot::respond(app, &store, project, params),
-            }
+            crate::devflow_stage::respond(app, &store, project, config, cwd, params)
         }
         "devflow_skill" => {
             on_demand_here(&store, project, &state)?;

@@ -476,15 +476,6 @@ export const commands = {
 	 *  commits it.
 	 */
 	devflowTeamApprove: (projectId: string, git: string, commit: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_team_approve", { projectId, git, commit })),
-	/**  `devflow.autopilot` — the epic's autopilot as it stands. */
-	devflowAutopilot: (projectId: string) => typedError<DevflowAutopilot, RpcError>(__TAURI_INVOKE("devflow_autopilot", { projectId })),
-	/**  `devflow.autopilot_start` — the person's click on the epic: its cards run. */
-	devflowAutopilotStart: (projectId: string, epicId: string) => typedError<DevflowAutopilot, RpcError>(__TAURI_INVOKE("devflow_autopilot_start", { projectId, epicId })),
-	/**
-	 *  `devflow.autopilot_stop` — the person stops it; the card at work goes on
-	 *  in its own session, and nothing starts after it.
-	 */
-	devflowAutopilotStop: (projectId: string) => typedError<DevflowAutopilot, RpcError>(__TAURI_INVOKE("devflow_autopilot_stop", { projectId })),
 	/**
 	 *  `devflow.plan_keep` — the person moved, cut or edited a waiting plan on
 	 *  the board.
@@ -2754,8 +2745,8 @@ export type DevflowAsk = {
 	/**  Seconds since the epoch. */
 	askedAt: number | null,
 	/**
-	 *  What the click is about, for a command or an autopilot: the command
-	 *  and where it came from, or the epic.
+	 *  What the click is about, for a command: the command and where it came
+	 *  from.
 	 */
 	detail: string | null,
 };
@@ -2763,16 +2754,6 @@ export type DevflowAsk = {
 /**  A list, so tomorrow's field has somewhere to go. */
 export type DevflowAsks = {
 	asks: DevflowAsk[],
-};
-
-/**  An epic's autopilot: whether it runs, and what it last did or waits for. */
-export type DevflowAutopilot = {
-	projectId: string,
-	epicId: string | null,
-	running: boolean,
-	said: string | null,
-	/**  The plan's cards in the order it runs them, by title. */
-	order: string[],
 };
 
 /**  Response of `devflow.calibration`: each rubric the project was judged by. */
@@ -2810,9 +2791,7 @@ export type DevflowChange =
  *  A gate command a team layer brought, run for the first time since it
  *  or its commit changed.
  */
-"command" | 
-/**  The cards of an approved plan run one after another. */
-"autopilot";
+"command";
 
 export type DevflowCheck = {
 	name: string,

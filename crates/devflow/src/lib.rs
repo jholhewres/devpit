@@ -11,7 +11,6 @@
 //! the person's click are the app's.
 
 pub mod adhoc;
-pub mod autopilot;
 pub mod available;
 pub mod brief;
 pub mod calibrate;

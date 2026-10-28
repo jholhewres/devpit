@@ -124,13 +124,6 @@ That shape is deliberate. Orchestration that keeps itself going is
 orchestration you cannot see, and the problem this project attacks is losing
 sight of what is happening.
 
-Devflow's autopilot is set up the same way, by the person and one epic at a
-time: their click on the epic, never an agent's call. It starts the plan's
-next card when one finishes or is moved, one session at a time and each in
-its card's own terminal, and stops for the person at a card others wait on,
-at a stage that asks their approval and at a session waiting on them. It is
-held in memory, so a restart stops it.
-
 ## An orchestrator is a chat you drive
 
 The orchestrator is you — or a chat you drive, whose every session is on the

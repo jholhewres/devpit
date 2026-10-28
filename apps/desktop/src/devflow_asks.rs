@@ -27,8 +27,8 @@ pub(crate) const CHANGED: &str = "devflow:changed";
 #[derive(Default)]
 struct Held {
     waiting: Vec<DevflowAsk>,
-    /// What a command's or an autopilot's click is for, by the ask's id: the
-    /// command's fingerprint, or the epic.
+    /// What a command's click is for, by the ask's id: the command's
+    /// fingerprint.
     keys: Vec<(String, String)>,
     /// Dropped by the person, so not raised again by itself until a restart.
     dropped: Vec<(String, DevflowChange)>,
@@ -51,7 +51,7 @@ fn ask_of(change: DevflowChange) -> Option<Ask> {
     match change {
         DevflowChange::Enable => Some(Ask::Enable),
         DevflowChange::Enforce => Some(Ask::Enforce),
-        DevflowChange::Command | DevflowChange::Autopilot => None,
+        DevflowChange::Command => None,
     }
 }
 
@@ -105,7 +105,7 @@ pub(crate) fn raise(
     }
 }
 
-/// Asks the person to run a layer's command, or to start an autopilot:
+/// Asks the person to run a layer's command:
 /// `detail` is what they read, `key` what their yes is kept as. The same
 /// key asked again is the one already waiting.
 pub(crate) fn raise_for(
@@ -347,11 +347,7 @@ pub async fn devflow_answer(
         if yes {
             match (ask_of(one.change), key.as_deref()) {
                 (Some(ask), _) => made_now(&one.project_id, ask)?,
-                (None, Some(print)) if one.change == DevflowChange::Command => {
-                    confirm(&crate::projects::store()?, print)?
-                }
-                (None, Some(epic)) => crate::devflow_autopilot::start(&app, &one.project_id, epic)
-                    .map_err(|why| RpcError::new(ErrorCode::Invalid, why))?,
+                (None, Some(print)) => confirm(&crate::projects::store()?, print)?,
                 (None, None) => return Err(lost()),
             }
         }

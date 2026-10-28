@@ -461,3 +461,25 @@ fn an_orchestrator_is_offered_the_plan_wherever_it_stands() {
     let planning = Offer::Active(vec!["plan".to_owned()]);
     assert!(named(&planning, &orchestrator).is_empty(), "listed once");
 }
+
+#[test]
+fn no_stage_offers_an_autopilot() {
+    let every = Offer::Active(
+        [
+            "briefing",
+            "context",
+            "plan",
+            "execution",
+            "review",
+            "completion",
+        ]
+        .map(String::from)
+        .to_vec(),
+    );
+    let offered: Vec<&str> = every.tools(&STAGED).iter().map(|tool| tool.name).collect();
+    assert!(offered.contains(&"devpit_devflow_plan"));
+    assert!(
+        !offered.iter().any(|name| name.contains("autopilot")),
+        "{offered:?}"
+    );
+}

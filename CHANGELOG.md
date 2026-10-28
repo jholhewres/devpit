@@ -3,6 +3,16 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.45 — unreleased
+
+### Removed
+
+- **Devflow's autopilot is gone.** It started each card's session as the
+  default agent, not the project's or the orchestrator's profile, so work
+  could run on another account. Card sessions are started by the person or
+  the orchestrator, as before it existed. It kept nothing on disk, so there
+  is nothing to clean up.
+
 ## 0.1.44 — 2026-10-16
 
 ### Fixed

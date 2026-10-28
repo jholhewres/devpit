@@ -4,7 +4,6 @@ import { Attachments } from './Attachments'
 import { savesBeforeRestart } from './beforeRestart'
 import { CardCriteria } from './CardCriteria'
 import { CardDescription } from './CardDescription'
-import { CardAutopilot } from './CardAutopilot'
 import { CardDevflow } from './CardDevflow'
 import { CardDiff } from './CardDiff'
 import { CardElsewhere } from './CardElsewhere'
@@ -288,8 +287,6 @@ export function CardPane({
               <CardTies detail={detail} />
 
               <CardDevflow cardId={cardId} />
-
-              <CardAutopilot epicId={cardId} cards={detail.children?.length ?? 0} />
 
               <CardWork
                 cardId={cardId}

@@ -19,7 +19,7 @@ pub(crate) fn card_key(method: &str) -> Option<&'static str> {
     match method {
         "devflow_brief" | "devflow_evidence" | "devflow_review" | "devflow_gate"
         | "devflow_stage" => Some("card"),
-        "devflow_plan" | "devflow_autopilot" => Some("epic"),
+        "devflow_plan" => Some("epic"),
         "card" | "comment" | "update" | "move" | "start_card" | "finish_card" | "handoff"
         | "repo" | "remind" | "resolve_reminder" | "decide" | "rubric_run" | "start" => {
             Some("cardId")

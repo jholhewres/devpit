@@ -338,18 +338,8 @@ fn cards_that_differ_from_the_preview_are_a_new_preview_even_with_the_persons_wo
     assert_eq!(titles(&store, &project).len(), 1);
 }
 
-/// Sessions that only count what the autopilot started.
-struct Started(std::cell::RefCell<Vec<String>>);
-
-impl crate::devflow_autopilot::Sessions for Started {
-    fn start(&self, _: &devpit_rpc::Board, card_id: &str, _: &str) -> Result<(), String> {
-        self.0.borrow_mut().push(card_id.to_owned());
-        Ok(())
-    }
-}
-
 #[test]
-fn a_plan_waits_on_a_card_of_another_epic_and_the_autopilot_waits_with_it() {
+fn a_plan_waits_on_a_card_of_another_epic() {
     let dir = tempfile::tempdir().expect("tempdir");
     let (store, project) = project(dir.path());
     let lane = waiting_lane(&store, &project.id).expect("a lane");
@@ -392,14 +382,6 @@ fn a_plan_waits_on_a_card_of_another_epic_and_the_autopilot_waits_with_it() {
         "{:?}",
         shown.blocked_by
     );
-    let sessions = Started(std::cell::RefCell::default());
-    let (next, said) =
-        crate::devflow_autopilot::stepped(&board, &epic, false, &sessions).expect("stepped");
-    assert!(
-        matches!(next, devpit_devflow::autopilot::Next::Blocked { .. }),
-        "{said}"
-    );
-    assert!(sessions.0.borrow().is_empty(), "it started a blocked card");
 }
 
 /// With no epic the plan runs on demand, devflow.yaml or not: the cards are

@@ -163,7 +163,6 @@ card, file or stage was started in this turn.
 
 ## When nobody can answer
 
-In a run with no person to reply (a step, an autopilot, a scheduled run, or a
-question tool that answers with an error), leave
-the decisions to the person: post the open round as a `[devflow] Questions`
+In a run with no person to reply (a step, a scheduled run, or a question tool
+that answers with an error), leave the decisions to the person: post the open round as a `[devflow] Questions`
 comment on the card with `devpit_comment`, and end.

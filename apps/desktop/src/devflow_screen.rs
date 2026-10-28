@@ -533,8 +533,8 @@ pub async fn devflow_ask(
         let ask = match change {
             DevflowChange::Enable => Ask::Enable,
             DevflowChange::Enforce => Ask::Enforce,
-            // Asked about where they come from: a stage's gate, an epic.
-            DevflowChange::Command | DevflowChange::Autopilot => {
+            // Asked about where it comes from: a stage's gate.
+            DevflowChange::Command => {
                 return Err(RpcError::new(
                     ErrorCode::Invalid,
                     "only switching Devflow on or enforcing is asked from here",

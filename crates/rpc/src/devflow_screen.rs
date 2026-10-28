@@ -263,18 +263,6 @@ pub struct DevflowCodexInstalled {
     pub said: String,
 }
 
-/// An epic's autopilot: whether it runs, and what it last did or waits for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct DevflowAutopilot {
-    pub project_id: String,
-    pub epic_id: Option<String>,
-    pub running: bool,
-    pub said: Option<String>,
-    /// The plan's cards in the order it runs them, by title.
-    pub order: Vec<String>,
-}
-
 /// One reviewer of a card's newest review.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

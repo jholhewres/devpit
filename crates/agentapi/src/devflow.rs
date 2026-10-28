@@ -137,7 +137,7 @@ pub(crate) fn context_reply(answer: &Value) -> Option<String> {
 
 /// The tools only an active project gets: each under the stages one of which
 /// must be switched on for it, or none for any. The stages' own cards add theirs.
-pub(crate) static STAGED: [(&[&str], Tool); 9] = [
+pub(crate) static STAGED: [(&[&str], Tool); 8] = [
     (
         &[],
         Tool {
@@ -285,17 +285,6 @@ pub(crate) static STAGED: [(&[&str], Tool); 9] = [
                 "stage": { "type": "string", "description": "The stage's name: what follows the last / of its uses." },
                 "card": { "type": "string", "description": "The card to pass the stage's gate for. Leave it out to read the stage's skill." }
             }, "required": ["stage"] }),
-        },
-    ),
-    (
-        &["plan"],
-        Tool {
-            name: "devpit_devflow_autopilot",
-            method: "devflow_autopilot",
-            description: "Devflow: after the person approved an epic's plan, the order its cards would run in, one session per card through the gate, and a request to the person to start it. It starts only on their click in the app, never from this tool; once started it stops for the person at a card others wait on until they checked it, at a stage with approve: person, and at a session waiting on them.",
-            input: || json!({ "type": "object", "properties": {
-                "epic": { "type": "string", "description": "The epic's card id." }
-            }, "required": ["epic"] }),
         },
     ),
 ];

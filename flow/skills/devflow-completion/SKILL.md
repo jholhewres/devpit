@@ -137,8 +137,7 @@ line per criterion and its evidence. Reply with the table and the word
 
 The session ends with its card: the handoff note of step 5 closes it. The
 next card starts in a **fresh session**, never in this one: it reads the card,
-the brief and the handoff, not this conversation. The autopilot already starts
-each card that way; by hand, do the same.
+the brief and the handoff, not this conversation.
 
 Done when the card was finished after a passing gate, or left in place after a
 failing one, and the reply says which.

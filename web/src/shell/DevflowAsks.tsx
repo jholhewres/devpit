@@ -31,12 +31,6 @@ export function devflowQuestion(one: DevflowAsk): { question: string; why: strin
         why: `${one.detail ?? ''} — code from outside the project, asked again whenever it or its commit changes.`,
         yes: 'Run it',
       }
-    case 'autopilot':
-      return {
-        question: `Start the autopilot in ${one.project}?`,
-        why: `${one.detail ?? ''} — one session per card, each through the gate; it stops for you at a card others wait on.`,
-        yes: 'Start',
-      }
   }
 }
 

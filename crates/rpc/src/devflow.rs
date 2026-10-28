@@ -14,8 +14,6 @@ pub enum DevflowChange {
     /// A gate command a team layer brought, run for the first time since it
     /// or its commit changed.
     Command,
-    /// The cards of an approved plan run one after another.
-    Autopilot,
 }
 
 /// One change waiting for the person's click.
@@ -28,8 +26,8 @@ pub struct DevflowAsk {
     pub change: DevflowChange,
     /// Seconds since the epoch.
     pub asked_at: f64,
-    /// What the click is about, for a command or an autopilot: the command
-    /// and where it came from, or the epic.
+    /// What the click is about, for a command: the command and where it came
+    /// from.
     pub detail: Option<String>,
 }
 
