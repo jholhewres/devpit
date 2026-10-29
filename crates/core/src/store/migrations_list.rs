@@ -7,7 +7,10 @@
 use super::{Before, Migration};
 
 /// The Rust run before a version's SQL, by version.
-pub(super) const BEFORE: &[(i64, Before)] = &[(13, crate::store::plugins::export_drawings)];
+pub(super) const BEFORE: &[(i64, Before)] = &[
+    (13, crate::store::plugins::export_drawings),
+    (32, crate::store::projects::rehash_origins),
+];
 
 /// Migration 001 — the core tables.
 pub(super) const MIGRATIONS: &[Migration] = &[
@@ -807,6 +810,15 @@ CREATE TABLE card_superseded (
     at         INTEGER NOT NULL,
     CHECK (card_id != by_card_id)
 );
+"#,
+    },
+    // Migration 032 — origins hashed by the normalisation sync relies on.
+    Migration {
+        version: 32,
+        sql: r#"
+-- The work is `rehash_origins`, in Rust, just before this (`BEFORE`): each
+-- origin kept without a password or token, and hashed host/path only.
+SELECT 1;
 "#,
     },
 ];

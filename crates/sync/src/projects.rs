@@ -21,6 +21,9 @@ pub const ICON: &str = "icon";
 pub const COLOR: &str = "color";
 /// `true` when the project's state is never sent to Decisions.
 pub const DECISIONS_NEVER: &str = "decisions.never";
+/// The repository's address without a password or token, so a machine
+/// without the project can offer to clone it. Read only from this machine's git.
+pub const ORIGIN_URL: &str = "origin.url";
 /// `plugin.<id>`: `on`, `off` or `removed`.
 pub const PLUGIN: &str = "plugin.";
 
@@ -62,6 +65,11 @@ pub fn fits(field: &str, value: Option<&str>) -> bool {
                 && color[1..].chars().all(|c| c.is_ascii_hexdigit())
         }),
         (DECISIONS_NEVER, Some(flag)) => matches!(flag, "true" | "false"),
+        (ORIGIN_URL, url) => url.is_none_or(|url| {
+            url.len() <= 512
+                && !url.chars().any(|c| c.is_whitespace() || c.is_control())
+                && devpit_core::origin::shareable(url) == url
+        }),
         (field, Some(state)) => {
             plugin_of(field).is_some() && matches!(state, "on" | "off" | "removed")
         }
@@ -134,6 +142,7 @@ impl Namespace for Projects<'_> {
             put(GROUP, project.group.clone(), None);
             put(ICON, project.icon.clone(), None);
             put(COLOR, project.color.clone(), None);
+            put(ORIGIN_URL, project.origin_url.clone(), None);
             put(
                 DECISIONS_NEVER,
                 Some(never.contains(&project.id).to_string()),
@@ -173,6 +182,7 @@ impl Namespace for Projects<'_> {
         let failed = |err: devpit_core::StoreError| err.to_string();
         let mut edited = project.clone();
         match field {
+            ORIGIN_URL => return Ok(()),
             NAME => edited.name = value.unwrap_or_default().trim().to_owned(),
             GROUP => edited.group = value.map(str::to_owned),
             ICON => edited.icon = value.map(str::to_owned),

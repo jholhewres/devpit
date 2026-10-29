@@ -125,3 +125,41 @@ fn what_a_project_shows_is_read_and_written_by_its_record() {
         Some("false")
     );
 }
+
+#[test]
+fn a_record_carries_its_origin_without_a_token_and_another_machine_cannot_move_it() {
+    let (dir, store) = store();
+    let project = store
+        .add_project(
+            &dir.path().join("a"),
+            Some("https://jhol:<REDACTED>@github.com/someone/thing.git"),
+        )
+        .expect("add");
+    let record = record_of(&store, &project);
+    let projects = Projects { store: &store };
+
+    let here = projects.here().expect("here");
+    assert_eq!(
+        here[&record][ORIGIN_URL].value.as_deref(),
+        Some("https://github.com/someone/thing.git")
+    );
+    let sent = format!("{here:?}");
+    assert!(
+        !sent.contains("REDACTED") && !sent.contains("jhol:"),
+        "{sent}"
+    );
+
+    projects
+        .write(&record, ORIGIN_URL, Some("https://evil.example/x.git"))
+        .expect("ignored");
+    let kept = store.synced_projects().expect("list");
+    assert_eq!(
+        kept[0].origin_url.as_deref(),
+        Some("https://github.com/someone/thing.git"),
+        "this machine's git says where its clone comes from"
+    );
+    assert!(fits(ORIGIN_URL, Some("git@github.com:someone/thing.git")));
+    assert!(!fits(ORIGIN_URL, Some("https://u:p@host/x")));
+    assert!(!fits(ORIGIN_URL, Some("line\nbreak")));
+    assert!(!fits(ORIGIN_URL, Some(&"h".repeat(513))));
+}

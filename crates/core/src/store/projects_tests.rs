@@ -147,6 +147,77 @@ fn the_two_shapes_of_one_origin_hash_the_same() {
 }
 
 #[test]
+fn a_project_whose_origin_changed_takes_the_new_identity() {
+    let (dir, store) = store();
+    let root = dir.path().join("project");
+    std::fs::create_dir_all(&root).expect("create");
+    let id = store
+        .add_project(&root, Some("git@github.com:old/repo.git"))
+        .expect("add");
+
+    let moved = store
+        .refresh_origin(&id, Some("git@github.com:new/repo.git"))
+        .expect("refresh");
+
+    assert!(moved, "a changed origin was not taken");
+    let synced = store.synced_projects().expect("synced");
+    assert_eq!(
+        synced[0].origin_hash.as_deref(),
+        Some(origin_hash("https://github.com/new/repo").as_str())
+    );
+    assert_eq!(
+        synced[0].origin_url.as_deref(),
+        Some("git@github.com:new/repo.git")
+    );
+    assert!(!store
+        .refresh_origin(&id, Some("https://github.com/new/repo"))
+        .expect("same repository"));
+}
+
+#[test]
+fn an_origin_with_a_token_is_kept_without_it() {
+    let (dir, store) = store();
+    let root = dir.path().join("project");
+    std::fs::create_dir_all(&root).expect("create");
+    store
+        .add_project(&root, Some("https://jhol:<REDACTED>@github.com/o/r.git"))
+        .expect("add");
+
+    let synced = store.synced_projects().expect("synced");
+    assert_eq!(
+        synced[0].origin_url.as_deref(),
+        Some("https://github.com/o/r.git")
+    );
+}
+
+#[test]
+fn an_older_hash_is_recomputed_when_the_store_opens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("state.db");
+    let root = dir.path().join("project");
+    std::fs::create_dir_all(&root).expect("create");
+    {
+        let store = Store::open(&path).expect("open");
+        store
+            .add_project(&root, Some("https://github.com:443/o/r.git"))
+            .expect("add");
+        // As a devpit before this normalisation left it.
+        store
+            .conn
+            .execute_batch("UPDATE project SET origin_hash = 'old'; PRAGMA user_version = 31;")
+            .expect("age it");
+    }
+
+    let store = Store::open(&path).expect("reopen");
+
+    let synced = store.synced_projects().expect("synced");
+    assert_eq!(
+        synced[0].origin_hash.as_deref(),
+        Some(origin_hash("git@github.com:o/r.git").as_str())
+    );
+}
+
+#[test]
 fn a_project_carries_its_workspace_colour() {
     let (dir, store) = store();
     let root = dir.path().join("project");

@@ -9,6 +9,13 @@ use std::path::Path;
 
 use crate::GitError;
 
+/// `remote.origin.url`, which is what makes two clones one project.
+pub fn origin_url(root: &Path) -> Option<String> {
+    let url = crate::invoke::run(root, &["config", "--get", "remote.origin.url"]).ok()?;
+    let url = url.trim();
+    (!url.is_empty()).then(|| url.to_owned())
+}
+
 /// Brings down what the remote has, and forgets branches it deleted.
 pub fn fetch(root: &Path) -> Result<(), GitError> {
     talk(root, &["fetch", "--prune"])

@@ -12,6 +12,8 @@ pub struct SyncedProject {
     pub id: String,
     /// The normalised git origin, hashed: the same on every clone.
     pub origin_hash: Option<String>,
+    /// The origin as another machine may see it: no password or token.
+    pub origin_url: Option<String>,
     pub created_at: i64,
     pub name: String,
     pub group: Option<String>,
@@ -51,7 +53,7 @@ impl Store {
     /// Every project still listed, oldest first.
     pub fn synced_projects(&self) -> Result<Vec<SyncedProject>, StoreError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, origin_hash, created_at, name, group_name, icon, color FROM project \
+            "SELECT id, origin_hash, created_at, name, group_name, icon, color, origin_url FROM project \
              WHERE archived_at IS NULL ORDER BY created_at, id",
         )?;
         let rows = stmt
@@ -64,6 +66,7 @@ impl Store {
                     group: row.get(4)?,
                     icon: row.get(5)?,
                     color: row.get(6)?,
+                    origin_url: row.get(7)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

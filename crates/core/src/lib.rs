@@ -12,6 +12,7 @@ pub mod bus;
 pub mod criteria;
 pub mod data_files;
 pub mod home;
+pub mod origin;
 pub mod paths;
 #[cfg(test)]
 mod paths_guard_tests;

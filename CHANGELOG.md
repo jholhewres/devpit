@@ -23,6 +23,12 @@ release notes are taken from here when a version is tagged.
   without their lines, so a comment that was there was called missing, and
   publishing again posted a second review. Every comment a review carried
   is now kept as posted, and publishing again only edits.
+- **One repository is one project on every machine, however it was
+  cloned.** A clone over https with a user, a token or a port, or over
+  `ssh://` with a port, now matches its `git@` twin; a project whose remote
+  moved to another repository takes the new one when it is opened; and a
+  token in an origin is no longer kept, nor sent with the project's synced
+  settings, which now carry its address so another machine can clone it.
 
 ### Better at what it already did
 

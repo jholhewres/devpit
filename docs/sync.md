@@ -76,7 +76,7 @@ write over it.
 | namespace | record | fields |
 |---|---|---|
 | `prefs` | `app` | the allowlist in `crates/sync/src/prefs.rs`: theme, the terminal's stop confirmation and contrast, rebound keys, focus mode, agent hooks, folder trust and the agents kept out of menus, the transcription language, Decisions' provider, model, address, daily cap and modes |
-| `projects` | `origin:<hash>` | name, group, icon, colour, each plugin's state, whether Decisions may read it |
+| `projects` | `origin:<hash>` | name, group, icon, colour, each plugin's state, whether Decisions may read it, and the origin's address without a password or token (read only from each machine's own git) |
 | `machines` | the machine's id | its name, and to the hour when it last synced |
 
 Everything else stays on its machine, and the allowlist says why for every

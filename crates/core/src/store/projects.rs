@@ -7,6 +7,7 @@ use std::path::Path;
 
 use rusqlite::OptionalExtension;
 
+use crate::origin::{origin_hash, shareable};
 use crate::store::{Store, StoreError};
 
 /// A project row, before git fills in what it knows.
@@ -151,7 +152,7 @@ impl Store {
                 DEFAULT_WORKSPACE,
                 name,
                 root_path,
-                origin_url,
+                origin_url.map(shareable),
                 origin_url.map(origin_hash),
                 now(),
                 folder,
@@ -159,6 +160,29 @@ impl Store {
         )?;
 
         Ok(id)
+    }
+
+    /// Takes the origin git has now, when it is another repository than the
+    /// one kept: a project's identity across machines follows its remote.
+    pub fn refresh_origin(&self, id: &str, url: Option<&str>) -> Result<bool, StoreError> {
+        let kept: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT origin_hash FROM project WHERE id = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        let hash = url.map(origin_hash);
+        if kept == hash {
+            return Ok(false);
+        }
+        self.conn.execute(
+            "UPDATE project SET origin_url = ?2, origin_hash = ?3 WHERE id = ?1",
+            rusqlite::params![id, url.map(shareable), hash],
+        )?;
+        Ok(true)
     }
 
     /// Takes a project out of the list without touching the folder.
@@ -245,32 +269,23 @@ impl Store {
     }
 }
 
-/// The normalised git origin, hashed.
-///
-/// Keyed on this rather than on a path so two clones of the same repository on
-/// different machines agree about which project they are. Normalisation is
-/// what makes that true: `git@host:org/repo.git` and
-/// `https://host/org/repo` are the same repository and must hash the same.
-fn origin_hash(url: &str) -> String {
-    use sha2::{Digest, Sha256};
-
-    let normalised = url
-        .trim()
-        .trim_end_matches('/')
-        .trim_end_matches(".git")
-        .replace("git@", "")
-        .replace("ssh://", "")
-        .replace("https://", "")
-        .replace("http://", "")
-        .replacen(':', "/", 1)
-        .to_lowercase();
-
-    let digest = Sha256::digest(normalised.as_bytes());
-    digest
-        .iter()
-        .take(16)
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+/// Migration 032: every origin hashed and kept as this build reads it, so
+/// a clone over https with a port or a user joins its ssh twin.
+pub(super) fn rehash_origins(conn: &rusqlite::Connection, _root: &Path) -> Result<(), StoreError> {
+    let mut stmt =
+        conn.prepare("SELECT id, origin_url FROM project WHERE origin_url IS NOT NULL")?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    for (id, url) in rows {
+        conn.execute(
+            "UPDATE project SET origin_url = ?2, origin_hash = ?3 WHERE id = ?1",
+            rusqlite::params![id, shareable(&url), origin_hash(&url)],
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,0 +1,76 @@
+use super::*;
+
+/// Every spelling of one repository a clone may carry.
+const ONE_REPOSITORY: &[&str] = &[
+    "git@github.com:jholhewres/devpit.git",
+    "git@github.com:jholhewres/devpit",
+    "https://github.com/jholhewres/devpit",
+    "https://github.com/jholhewres/devpit.git",
+    "https://github.com/jholhewres/devpit.git/",
+    "https://github.com/JholHewres/devpit/",
+    "https://jhol@github.com/jholhewres/devpit.git",
+    "https://jhol:<REDACTED>@github.com/jholhewres/devpit.git",
+    "https://github.com:443/jholhewres/devpit.git",
+    "http://github.com/jholhewres/devpit",
+    "ssh://git@github.com/jholhewres/devpit.git",
+    "ssh://git@github.com:22/jholhewres/devpit.git",
+    "git://github.com/jholhewres/devpit.git",
+    "  git@github.com:jholhewres/devpit.git\n",
+];
+
+#[test]
+fn every_spelling_of_one_repository_hashes_the_same() {
+    for url in ONE_REPOSITORY {
+        assert_eq!(normalised(url), "github.com/jholhewres/devpit", "{url}");
+    }
+}
+
+#[test]
+fn the_hash_of_a_plain_origin_is_the_one_devpit_already_keeps() {
+    // Kept by every install since projects had origins: moving it would
+    // orphan the synced record of every project.
+    assert_eq!(
+        origin_hash("git@github.com:jholhewres/devpit.git"),
+        "da3b9997c45194efc9a8998be0ac81b3"
+    );
+}
+
+#[test]
+fn different_repositories_hash_apart() {
+    assert_ne!(
+        origin_hash("git@github.com:jholhewres/devpit.git"),
+        origin_hash("git@github.com:jholhewres/devpit-app.git")
+    );
+    assert_ne!(
+        origin_hash("git@github.com:jholhewres/devpit.git"),
+        origin_hash("git@gitlab.com:jholhewres/devpit.git")
+    );
+}
+
+#[test]
+fn a_shared_origin_keeps_no_password_or_token() {
+    assert_eq!(
+        shareable("https://jhol:<REDACTED>@github.com/jholhewres/devpit.git"),
+        "https://github.com/jholhewres/devpit.git"
+    );
+    assert_eq!(
+        shareable("https://x-access-token:<REDACTED>@github.com/o/r"),
+        "https://github.com/o/r"
+    );
+    assert_eq!(
+        shareable("https://jhol@github.com/o/r"),
+        "https://github.com/o/r"
+    );
+}
+
+#[test]
+fn a_shared_ssh_origin_keeps_what_cloning_needs() {
+    assert_eq!(
+        shareable("git@github.com:jholhewres/devpit.git"),
+        "git@github.com:jholhewres/devpit.git"
+    );
+    assert_eq!(
+        shareable("ssh://git@host.example:2222/o/r.git"),
+        "ssh://git@host.example:2222/o/r.git"
+    );
+}

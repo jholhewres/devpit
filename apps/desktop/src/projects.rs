@@ -212,7 +212,7 @@ pub(crate) fn project_add_now(root_path: String) -> Result<Project, RpcError> {
         .map_err(|err| RpcError::internal(err.to_string()))?;
 
     let store = store()?;
-    let origin = origin_url(&root);
+    let origin = devpit_git::remote::origin_url(&root);
     let id = store.add_project(&root, origin.as_deref())?;
     // Adding the folder is the consent the CLI's trust question asks for.
     crate::folder_trust::trust(&[&root]);
@@ -244,7 +244,13 @@ pub(crate) fn project_open_now(project_id: String) -> Result<ProjectList, RpcErr
 /// Whether the project can be opened. The touch only orders the list, so a
 /// store too busy to take it costs that order, not the project.
 pub(crate) fn opened(store: &Store, project_id: &str) -> Result<(), RpcError> {
-    locate(store, project_id)?;
+    let (_, root) = locate(store, project_id)?;
+    // A remote moved to another repository moves the project's identity too.
+    if let Some(url) = devpit_git::remote::origin_url(&root) {
+        if let Err(err) = store.refresh_origin(project_id, Some(&url)) {
+            eprintln!("devpit: {project_id} kept its old origin: {err}");
+        }
+    }
     if let Err(err) = store.touch_project(project_id) {
         eprintln!("devpit: {project_id} opened without moving up the list: {err}");
     }
@@ -414,19 +420,6 @@ pub(crate) fn checkout(root: &Path, worktree_id: Option<&str>) -> PathBuf {
     worktree_id
         .and_then(|id| devpit_git::worktree_path(root, id).ok().flatten())
         .unwrap_or_else(|| root.to_path_buf())
-}
-
-/// Reads `remote.origin.url`, which is what makes two clones one project.
-fn origin_url(root: &Path) -> Option<String> {
-    let output = devpit_pty::host_env::command("git")
-        .arg("-C")
-        .arg(root)
-        .args(["config", "--get", "remote.origin.url"])
-        .output()
-        .ok()?;
-
-    let url = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    (!url.is_empty()).then_some(url)
 }
 
 /// Expands a leading `~`, which is how people type a path.

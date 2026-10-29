@@ -131,3 +131,33 @@ fn the_project_opened_last_is_in_front() {
     opened_at(&older, 200);
     assert_eq!(front_of(&store), Some(older));
 }
+
+/// A clone whose remote moved to another repository is that repository's
+/// project from the next open on, here and in what sync sends.
+#[test]
+fn opening_a_project_takes_the_origin_its_git_has_now() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("store");
+    let root = dir.path().join("clone");
+    std::fs::create_dir_all(&root).expect("checkout");
+    let git = |args: &[&str]| crate::devflow_review::tests::git(&root, args);
+    git(&["init", "-q", "-b", "main"]);
+    git(&["remote", "add", "origin", "git@github.com:old/repo.git"]);
+    let id = store
+        .add_project(&root, Some("git@github.com:old/repo.git"))
+        .expect("project");
+
+    git(&[
+        "remote",
+        "set-url",
+        "origin",
+        "https://github.com/new/repo.git",
+    ]);
+    opened(&store, &id).expect("opened");
+
+    let synced = store.synced_projects().expect("synced");
+    assert_eq!(
+        synced[0].origin_hash.as_deref(),
+        Some(devpit_core::origin::origin_hash("git@github.com:new/repo").as_str())
+    );
+}
