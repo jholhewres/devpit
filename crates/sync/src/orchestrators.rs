@@ -52,6 +52,8 @@ struct Local {
     /// What its id is minted from: its folder's name, or its path under
     /// `orchestrator/` when two here share a name.
     path: String,
+    /// The id it keeps, or the one it is minted now.
+    sync_id: String,
 }
 
 /// The record of the orchestrator with this sync id.
@@ -139,6 +141,7 @@ impl Orchestrators<'_> {
                     name: row.name,
                     folder,
                     path,
+                    sync_id: String::new(),
                 })
             })
             .collect();
@@ -150,6 +153,29 @@ impl Orchestrators<'_> {
             if names.iter().filter(|one| *one == name).count() == 1 {
                 local.path = name.clone();
             }
+        }
+        // An id kept is kept; one minted now never takes an id another
+        // orchestrator here already holds.
+        let kept: Vec<Option<String>> = locals
+            .iter()
+            .map(|one| {
+                let settings = self.store.orchestrator_settings(&one.folder).ok()?;
+                settings[SYNC_ID]
+                    .as_str()
+                    .filter(|id| plain_id(id))
+                    .map(str::to_owned)
+            })
+            .collect();
+        let mut taken: BTreeSet<String> = kept.iter().flatten().cloned().collect();
+        for (local, kept) in locals.iter_mut().zip(kept) {
+            local.sync_id = kept.unwrap_or_else(|| {
+                let mut id = minted(&local.path);
+                if taken.contains(&id) {
+                    id = minted(&format!("/{}", local.folder.display()));
+                }
+                taken.insert(id.clone());
+                id
+            });
         }
         let mut clones: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for project in self
@@ -192,14 +218,6 @@ impl Orchestrators<'_> {
         Ok(())
     }
 
-    fn sync_id(&self, local: &Local, settings: &Value) -> String {
-        settings[SYNC_ID]
-            .as_str()
-            .filter(|id| plain_id(id))
-            .map(str::to_owned)
-            .unwrap_or_else(|| minted(&local.path))
-    }
-
     /// The settings as they stand after the person's own changes are read:
     /// a link made here is on, an unlink here is a tombstone, a repository
     /// that left this machine waits as elsewhere.
@@ -207,10 +225,10 @@ impl Orchestrators<'_> {
         &self,
         local: &Local,
         look: &Look,
-    ) -> Result<(Value, BTreeSet<String>, BTreeSet<String>), String> {
+    ) -> Result<(BTreeSet<String>, BTreeSet<String>), String> {
         let was = self.settings(local)?;
         let mut now = was.clone();
-        now[SYNC_ID] = json!(self.sync_id(local, &was));
+        now[SYNC_ID] = json!(local.sync_id);
         let mut linked = strings::<Vec<String>>(&was, LINKED);
         let mut elsewhere: BTreeSet<String> = strings(&was, ELSEWHERE);
         // A linked clone forgotten here: its link moves to another clone, or
@@ -281,7 +299,7 @@ impl Orchestrators<'_> {
         now[LINKS_ON] = json!(on);
         now[LINKS_OFF] = json!(off);
         self.keep(local, &was, &now)?;
-        Ok((now, on, off))
+        Ok((on, off))
     }
 
     /// A link or an unlink that arrived, applied to every clone here.
@@ -338,7 +356,7 @@ impl Namespace for Orchestrators<'_> {
                 .map_err(|err| err.to_string())?
                 .and_then(|seconds| u64::try_from(seconds).ok())
                 .map(|seconds| seconds * 1000);
-            let (settings, on, off) = self.settled(local, &look)?;
+            let (on, off) = self.settled(local, &look)?;
             let mut fields = BTreeMap::new();
             if fits(NAME, Some(&local.name)) {
                 fields.insert(NAME.to_owned(), Seen::of(Some(local.name.clone()), None));
@@ -353,7 +371,7 @@ impl Namespace for Orchestrators<'_> {
                     Seen::of(Some(state.to_owned()), at),
                 );
             }
-            here.insert(identity(&self.sync_id(local, &settings)), fields);
+            here.insert(identity(&local.sync_id), fields);
         }
         Ok(here)
     }
@@ -363,14 +381,11 @@ impl Namespace for Orchestrators<'_> {
             return Ok(());
         }
         let look = self.look()?;
-        let mut found = None;
-        for local in &look.locals {
-            if identity(&self.sync_id(local, &self.settings(local)?)) == record {
-                found = Some(local);
-                break;
-            }
-        }
-        let Some(local) = found else {
+        let Some(local) = look
+            .locals
+            .iter()
+            .find(|local| identity(&local.sync_id) == record)
+        else {
             return Ok(());
         };
         let value = value.unwrap_or_default();

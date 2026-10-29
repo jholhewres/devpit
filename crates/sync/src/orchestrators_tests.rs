@@ -46,3 +46,25 @@ fn an_orchestrator_is_its_folder_one_or_two_deep_and_nothing_under_it() {
     assert!(here.contains_key(&identity(&minted("work"))));
     assert!(here.contains_key(&identity(&minted("alice/work"))));
 }
+
+#[test]
+fn an_orchestrator_made_later_never_takes_an_id_another_kept() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let add = |path: &str| {
+        let folder = dir.path().join(path);
+        std::fs::create_dir_all(&folder).expect("folder");
+        store.add_project(&folder, None).expect("add")
+    };
+    let space = Orchestrators {
+        store: &store,
+        root: dir.path(),
+    };
+    add("orchestrator/acct/work");
+    assert_eq!(space.here().expect("here").len(), 1);
+
+    add("orchestrator/work");
+    let here = space.here().expect("here");
+
+    assert_eq!(here.len(), 2, "{:?}", here.keys());
+}
