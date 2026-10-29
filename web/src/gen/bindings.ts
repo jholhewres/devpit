@@ -766,7 +766,7 @@ export const commands = {
 	 *  `agent.profile_settle` — takes what another machine changed in a profile,
 	 *  or one it made, or keeps this machine's own.
 	 */
-	agentProfileSettle: (id: string, take: boolean) => typedError<ProfilesWaiting, RpcError>(__TAURI_INVOKE("agent_profile_settle", { id, take })),
+	agentProfileSettle: (id: string, field: string | null, value: string | null, take: boolean) => typedError<ProfilesWaiting, RpcError>(__TAURI_INVOKE("agent_profile_settle", { id, field, value, take })),
 	/**
 	 *  `chat.attach` — a dropped file, as something the agent can be pointed at.
 	 * 

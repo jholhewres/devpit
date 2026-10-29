@@ -169,6 +169,23 @@ fn linked(store: &Store, project_id: &str) -> Vec<String> {
 
 /// The profile `project_id`'s reviewers run as, asked from a session whose
 /// `CLAUDE_CONFIG_DIR` is `asker_config`.
+/// [`of`], refused when the profile it chose waits for the person here: the
+/// reviewers then run on nothing rather than on another account.
+pub(crate) fn runnable(
+    store: &Store,
+    project_id: &str,
+    asker_config: Option<&Path>,
+) -> Result<Option<Declared>, String> {
+    let chosen = of(store, project_id, asker_config);
+    match chosen
+        .as_ref()
+        .and_then(|one| crate::profile_waiting::blocked(store, &one.id))
+    {
+        Some(why) => Err(format!("the reviewers' account cannot run yet: {why}")),
+        None => Ok(chosen),
+    }
+}
+
 pub(crate) fn of(store: &Store, project_id: &str, asker_config: Option<&Path>) -> Option<Declared> {
     let named = named(store, project_id);
     let linked = linked(store, project_id);
@@ -176,8 +193,6 @@ pub(crate) fn of(store: &Store, project_id: &str, asker_config: Option<&Path>) -
     let declared: Vec<Declared> = crate::agent_profiles::declared(store)
         .into_iter()
         .filter(|one| reviews(&one.base))
-        // One that waits for the person here runs nothing, reviewers included.
-        .filter(|one| crate::profile_waiting::blocked(store, &one.id).is_none())
         .collect();
     chosen(
         &declared,

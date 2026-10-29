@@ -21,8 +21,9 @@ export function ProfilesWaiting(): React.JSX.Element | null {
   }, [])
   useEffect(refresh, [refresh])
 
-  const settle = (id: string, take: boolean): void => {
-    void ask(() => commands.agentProfileSettle(id, take)).then((answer) => {
+  /* One change at a time, named by the value shown: a yes covers what was seen. */
+  const settle = (id: string, take: boolean, change?: { name: string; value: string }): void => {
+    void ask(() => commands.agentProfileSettle(id, change?.name ?? null, change?.value ?? null, take)).then((answer) => {
       setError(answer.error)
       if (answer.data) setWaiting(answer.data.profiles)
       if (!answer.error) profilesChanged()
@@ -37,9 +38,11 @@ export function ProfilesWaiting(): React.JSX.Element | null {
           {one.arrived && (
             <p>
               <strong>{one.label}</strong> came from another computer. Look it over below before it runs here.{' '}
-              <button className="btn" onClick={() => settle(one.id, true)}>
-                Take it
-              </button>
+              {one.changed.length === 0 && (
+                <button className="btn" onClick={() => settle(one.id, true)}>
+                  Take it
+                </button>
+              )}
             </p>
           )}
           {one.needs.length > 0 && (
@@ -48,13 +51,13 @@ export function ProfilesWaiting(): React.JSX.Element | null {
               Edit it below to fill it in.
             </p>
           )}
-          {!one.arrived && one.changed.map((change) => (
+          {one.changed.map((change) => (
             <p key={change.name}>
               <strong>{one.label}</strong>&apos;s {change.name.replace(/^env\./, '')} was changed on another computer to <code>{change.value}</code>.{' '}
-              <button className="btn" onClick={() => settle(one.id, true)}>
+              <button className="btn" onClick={() => settle(one.id, true, change)}>
                 Use it
               </button>{' '}
-              <button className="btn" onClick={() => settle(one.id, false)}>
+              <button className="btn" onClick={() => settle(one.id, false, change)}>
                 Keep this one
               </button>
             </p>

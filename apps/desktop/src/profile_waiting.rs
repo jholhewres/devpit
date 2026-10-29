@@ -64,9 +64,17 @@ pub(crate) fn blocked(store: &Store, id: &str) -> Option<String> {
     })
 }
 
-/// [`agent_profile_settle`], on a given store: takes what another machine
-/// set, or keeps this machine's own. Either way the answer is the person's.
-pub(crate) fn settle(store: &Store, id: &str, take: bool) -> Result<(), RpcError> {
+/// [`agent_profile_settle`], on a given store. With no field it takes a
+/// profile that arrived, as the editor shows it; with a field, it takes or
+/// keeps that one change, and only while it is still the value the person
+/// saw. The answer is the person's either way.
+pub(crate) fn settle(
+    store: &Store,
+    id: &str,
+    field: Option<&str>,
+    value: Option<&str>,
+    take: bool,
+) -> Result<(), RpcError> {
     let _held = PROFILES_WRITE
         .lock()
         .map_err(|err| RpcError::internal(err.to_string()))?;
@@ -74,40 +82,60 @@ pub(crate) fn settle(store: &Store, id: &str, take: bool) -> Result<(), RpcError
     let Some(held) = kept.profiles.get_mut(id) else {
         return Ok(());
     };
-    let asked: Vec<(String, String)> = held
+    let Some(field) = field else {
+        if take {
+            held.arrived = false;
+        }
+        keep(store, &kept).map_err(RpcError::internal)?;
+        crate::sync::nudge();
+        return Ok(());
+    };
+    let seen = held
         .shadow
-        .iter()
-        .filter(|(_, shadow)| shadow.ask)
-        .map(|(field, shadow)| (field.clone(), shadow.value.clone()))
-        .collect();
-    held.shadow.retain(|_, shadow| !shadow.ask);
+        .get(field)
+        .filter(|shadow| shadow.ask && Some(shadow.value.as_str()) == value)
+        .map(|shadow| shadow.value.clone());
+    let Some(seen) = seen else {
+        return Err(RpcError::new(
+            devpit_rpc::ErrorCode::Conflict,
+            "that change is no longer the one shown — look again",
+        ));
+    };
+    let mut list = crate::agent_profiles::to_edit(store)?;
+    let Some(one) = list.iter_mut().find(|one| one.id == id) else {
+        return Ok(());
+    };
+    let name = field.strip_prefix(ENV);
+    let here = name.is_some_and(|name| one.env.iter().any(|var| var.name == name));
     if take {
-        held.arrived = false;
-        let home = crate::installations::home()?;
-        let home = home.to_string_lossy();
-        let mut list = crate::agent_profiles::to_edit(store)?;
-        if let Some(one) = list.iter_mut().find(|one| one.id == id) {
-            for (field, value) in asked {
-                match field.as_str() {
-                    BASE => one.base = value,
-                    COMMAND => one.command = value,
-                    field => {
-                        let Some(name) = field.strip_prefix(ENV) else {
-                            continue;
-                        };
-                        let value = devpit_agentcli::declaring::at_home_value(&value, &home);
-                        match one.env.iter_mut().find(|var| var.name == name) {
-                            Some(var) => var.value = value,
-                            None => one.env.push(EnvVar {
-                                name: name.to_owned(),
-                                value,
-                            }),
-                        }
-                    }
+        held.shadow.remove(field);
+        match (field, name) {
+            (BASE, _) => one.base = seen,
+            (COMMAND, _) => one.command = seen,
+            (_, Some(name)) => {
+                let home = crate::installations::home()?;
+                let seen =
+                    devpit_agentcli::declaring::at_home_value(&seen, &home.to_string_lossy());
+                match one.env.iter_mut().find(|var| var.name == name) {
+                    Some(var) => var.value = seen,
+                    None => one.env.push(EnvVar {
+                        name: name.to_owned(),
+                        value: seen,
+                    }),
                 }
             }
+            _ => {}
         }
         crate::agent_profiles::save(store, &list)?;
+    } else if name.is_some() && !here {
+        // Kept out: a variable this machine never had stays out, and the
+        // other machine's value stays beside it so no round asks again.
+        if let Some(shadow) = held.shadow.get_mut(field) {
+            shadow.ask = false;
+        }
+    } else {
+        // Kept: this machine's value travels back as the person's answer.
+        held.shadow.remove(field);
     }
     keep(store, &kept).map_err(RpcError::internal)?;
     crate::sync::nudge();
@@ -130,10 +158,15 @@ pub async fn agent_profiles_waiting() -> Result<ProfilesWaiting, RpcError> {
 /// or one it made, or keeps this machine's own.
 #[tauri::command]
 #[specta::specta]
-pub async fn agent_profile_settle(id: String, take: bool) -> Result<ProfilesWaiting, RpcError> {
+pub async fn agent_profile_settle(
+    id: String,
+    field: Option<String>,
+    value: Option<String>,
+    take: bool,
+) -> Result<ProfilesWaiting, RpcError> {
     crate::off_main::blocking(move || {
         let store = crate::projects::store()?;
-        settle(&store, &id, take)?;
+        settle(&store, &id, field.as_deref(), value.as_deref(), take)?;
         Ok(ProfilesWaiting {
             profiles: waiting(&store),
         })

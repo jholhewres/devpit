@@ -39,6 +39,11 @@ fn a_value_from_elsewhere_is_held_to_its_rules() {
     assert!(fits(COMMAND, Some("")));
     assert!(!fits(COMMAND, Some("/usr/bin/claude")));
     assert!(!fits(COMMAND, Some("rm -rf")));
+    assert!(
+        !fits(COMMAND, Some("claude;id")),
+        "the editor's rule: one word"
+    );
+    assert!(!fits(COMMAND, Some("claude$IFS")));
     assert!(fits(MODELS, Some(r#"["glm-5"]"#)));
     assert!(
         !fits("args", Some(r#"["--x","y"]"#)),

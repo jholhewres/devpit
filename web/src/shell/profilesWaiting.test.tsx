@@ -13,7 +13,9 @@ vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
     agentProfilesWaiting: () => ({ profiles: waiting }),
-    agentProfileSettle: (id: string, take: boolean) => (settled(id, take), { profiles: [] }),
+    agentProfileSettle: (id: string, field: string | null, value: string | null, take: boolean) => (
+      settled(id, field, value, take), { profiles: [] }
+    ),
   },
 }))
 
@@ -39,15 +41,24 @@ describe('a profile from another computer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Keep this one' }))
 
-    await waitFor(() => expect(settled).toHaveBeenCalledWith('p1', false))
+    await waitFor(() =>
+      expect(settled).toHaveBeenCalledWith('p1', 'env.ANTHROPIC_BASE_URL', 'https://elsewhere.example/api', false),
+    )
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
   })
 
   it('asks to take a profile that came from another computer before it runs', async () => {
-    waiting = [{ id: 'p1', label: 'GLM', arrived: true, needs: [], changed: [{ name: 'command', value: 'claude' }] }]
+    waiting = [{ id: 'p1', label: 'GLM', arrived: true, needs: [], changed: [] }]
     render(<ProfilesWaiting />)
     fireEvent.click(await screen.findByRole('button', { name: 'Take it' }))
-    await waitFor(() => expect(settled).toHaveBeenCalledWith('p1', true))
+    await waitFor(() => expect(settled).toHaveBeenCalledWith('p1', null, null, true))
+  })
+
+  it('shows what changed in a profile that arrived, and takes nothing it did not show', async () => {
+    waiting = [{ id: 'p1', label: 'GLM', arrived: true, needs: [], changed: [{ name: 'command', value: 'claudex' }] }]
+    render(<ProfilesWaiting />)
+    expect(await screen.findByText('claudex')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Take it' })).toBeNull()
   })
 
   it('shows nothing when no profile waits', async () => {

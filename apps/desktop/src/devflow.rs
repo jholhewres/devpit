@@ -148,7 +148,8 @@ pub(crate) fn respond_from(
                         crate::devflow_evidence::respond(app, project, config, cwd, params)
                     }
                     "devflow_review" => {
-                        let profile = crate::devflow_profile::of(&store, &project.id, config_dir);
+                        let profile =
+                            crate::devflow_profile::runnable(&store, &project.id, config_dir)?;
                         crate::devflow_review::respond(
                             app,
                             project,

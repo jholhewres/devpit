@@ -387,3 +387,126 @@ fn take(home: &Home, id: &str) {
         .set_preference(key::AGENT_PROFILES_SYNCED, &kept.to_string())
         .expect("taken");
 }
+
+/// A no to a base URL this machine never had stays a no: the other
+/// machine's value sits beside, unused, and the round does not ask again.
+#[tokio::test]
+async fn a_base_url_kept_out_here_is_not_asked_again() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut homes = [home("m_a", &made), home("m_b", &made)];
+    let mut list = glm(&homes[0]);
+    list[0]["env"] = json!([{"name": "ANTHROPIC_API_KEY", "value": "sk-SECRETONA"}]);
+    set_profiles(&homes[0], list);
+    rounds(&mut homes, &stand, 3).await;
+    take(&homes[1], "01KGLMPROFILE");
+    edit(&homes[0], |profile| {
+        set_env(
+            profile,
+            "ANTHROPIC_BASE_URL",
+            "https://elsewhere.example/api",
+        )
+    });
+    rounds(&mut homes, &stand, 3).await;
+
+    // What "Keep this one" does to a variable this machine does not have.
+    let mut kept: Value = serde_json::from_str(
+        &homes[1]
+            .pref(key::AGENT_PROFILES_SYNCED)
+            .unwrap_or_default(),
+    )
+    .expect("kept");
+    kept["profiles"]["01KGLMPROFILE"]["shadow"]["env.ANTHROPIC_BASE_URL"]["ask"] = json!(false);
+    homes[1]
+        .store
+        .set_preference(key::AGENT_PROFILES_SYNCED, &kept.to_string())
+        .expect("kept");
+    rounds(&mut homes, &stand, 2).await;
+
+    assert_eq!(asked(&homes[1], "01KGLMPROFILE"), json!({}));
+    assert_eq!(env_of(&profiles(&homes[1])[0], "ANTHROPIC_BASE_URL"), None);
+}
+
+#[tokio::test]
+async fn a_config_folder_changed_elsewhere_waits_too() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut homes = [home("m_a", &made), home("m_b", &made)];
+    set_profiles(&homes[0], glm(&homes[0]));
+    rounds(&mut homes, &stand, 3).await;
+    take(&homes[1], "01KGLMPROFILE");
+
+    let other = homes[0].root().join(".claude-other");
+    edit(&homes[0], |profile| {
+        set_env(profile, "CLAUDE_CONFIG_DIR", &other.to_string_lossy())
+    });
+    rounds(&mut homes, &stand, 3).await;
+
+    assert_eq!(
+        env_of(&profiles(&homes[1])[0], "CLAUDE_CONFIG_DIR"),
+        Some(
+            homes[1]
+                .root()
+                .join(".claude-glm")
+                .to_string_lossy()
+                .into_owned()
+        ),
+        "the account this profile spends stays until the person says"
+    );
+    assert_eq!(
+        asked(&homes[1], "01KGLMPROFILE"),
+        json!({"env.CLAUDE_CONFIG_DIR": "~/.claude-other"})
+    );
+}
+
+#[tokio::test]
+async fn a_removed_profile_settles_and_stops_writing() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut homes = [home("m_a", &made), home("m_b", &made)];
+    set_profiles(&homes[0], glm(&homes[0]));
+    rounds(&mut homes, &stand, 3).await;
+    set_profiles(&homes[0], json!([]));
+    rounds(&mut homes, &stand, 3).await;
+
+    for one in homes.iter_mut() {
+        let outcome = one.sync(&stand).await.expect("round");
+        let mentions = |list: &[String]| list.iter().any(|space| space == "profiles");
+        assert!(
+            !mentions(&outcome.sent) && !mentions(&outcome.written),
+            "{outcome:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_profile_a_step_here_uses_is_not_deleted_from_elsewhere() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut homes = [home("m_a", &made), home("m_b", &made)];
+    set_profiles(&homes[0], glm(&homes[0]));
+    rounds(&mut homes, &stand, 3).await;
+    let board = homes[1]
+        .store
+        .add_project(&homes[1].root().join("board"), None)
+        .expect("project");
+    homes[1]
+        .store
+        .create_step(
+            &board,
+            "agent",
+            "Review",
+            r#"{"profile":"01KGLMPROFILE"}"#,
+            false,
+        )
+        .expect("step");
+
+    set_profiles(&homes[0], json!([]));
+    rounds(&mut homes, &stand, 3).await;
+
+    assert_eq!(
+        profiles(&homes[1]).len(),
+        1,
+        "a step here still runs under it"
+    );
+}

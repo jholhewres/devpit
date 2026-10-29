@@ -61,21 +61,9 @@ impl std::fmt::Display for Refused {
     }
 }
 
-/// Whether a string is one word a shell would not interpret.
-///
-/// The same rule the "Open in" apps use for their program, and the same
-/// reasoning: anything a shell treats as punctuation is refused, and so is
-/// whitespace, because a field that holds one thing holds one thing.
-pub fn is_one_word(word: &str) -> bool {
-    let word = word.trim();
-    !word.is_empty()
-        && word.len() <= 512
-        && !word.chars().any(|letter| {
-            letter.is_whitespace()
-                || letter.is_control()
-                || ";|&$`<>()[]{}*?!#'\"\\\n".contains(letter)
-        })
-}
+/// Whether a string is one word a shell would not interpret: kept in core so
+/// a profile arriving through sync is held to the editor's rule.
+pub use devpit_core::words::is_one_word;
 
 /// Whether a name is one a shell would accept for a variable.
 pub fn is_a_variable_name(name: &str) -> bool {

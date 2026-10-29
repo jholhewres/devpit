@@ -40,9 +40,10 @@ pub const REMOVED: &str = "removed";
 pub struct Kept {
     #[serde(default)]
     pub profiles: BTreeMap<String, Held>,
-    /// Profiles removed here or elsewhere.
+    /// Profiles removed here or elsewhere, with the fields their record held,
+    /// cleared so no round writes them again.
     #[serde(default)]
-    pub removed: BTreeSet<String>,
+    pub removed: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// What sync keeps about one profile.
@@ -63,6 +64,21 @@ pub struct Held {
     pub env: BTreeSet<String>,
     #[serde(default)]
     pub cleared: BTreeSet<String>,
+}
+
+impl Held {
+    /// Every field a record of this profile may hold, to clear on removal.
+    fn fields(&self) -> BTreeSet<String> {
+        let mut fields: BTreeSet<String> = [LABEL, BASE, COMMAND, MODELS]
+            .iter()
+            .map(|field| (*field).to_owned())
+            .collect();
+        for name in self.env.iter().chain(&self.cleared) {
+            fields.insert(format!("{ENV}{name}"));
+        }
+        fields.extend(self.shadow.keys().cloned());
+        fields
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,12 +133,13 @@ pub fn shared(name: &str) -> bool {
             || name.contains("_MODEL"))
 }
 
-/// A field whose change decides what runs or where a token is sent.
+/// A field whose change decides what runs, where a token is sent, or which
+/// account (config folder) a profile spends.
 pub fn guarded(field: &str) -> bool {
     matches!(field, BASE | COMMAND)
         || field
             .strip_prefix(ENV)
-            .is_some_and(|name| name.ends_with("_BASE_URL"))
+            .is_some_and(|name| name.ends_with("_BASE_URL") || name == "CLAUDE_CONFIG_DIR")
 }
 
 fn plain(id: &str) -> bool {
@@ -155,11 +172,13 @@ fn list_of(value: &str) -> Option<Vec<String>> {
     (list.len() <= 64 && list.iter().all(|one| clean(one, 256))).then_some(list)
 }
 
+/// A program named, not pathed, and one word to a shell: the editor's rule,
+/// since it is typed into a terminal as it stands.
 fn bare(command: &str) -> bool {
     command.is_empty()
-        || (clean(command, 128)
-            && !command.contains(['/', '\\'])
-            && !command.chars().any(char::is_whitespace))
+        || (devpit_core::words::is_one_word(command)
+            && command.len() <= 128
+            && !command.contains(['/', '\\']))
 }
 
 /// Whether `value` may be written as `field`.
@@ -300,8 +319,10 @@ impl Profiles<'_> {
             .filter(|(_, value)| self.portable(value).is_some())
             .map(|(name, _)| format!("{ENV}{name}"))
             .collect();
-        held.shadow
-            .retain(|field, one| one.ask || !portable.contains(field));
+        let bare_here = bare(&text(profile, COMMAND));
+        held.shadow.retain(|field, one| {
+            one.ask || !(portable.contains(field) || (field == COMMAND && bare_here))
+        });
 
         for (name, value) in &env {
             let field = format!("{ENV}{name}");
@@ -349,8 +370,8 @@ impl Namespace for Profiles<'_> {
             .cloned()
             .collect();
         for id in gone {
-            kept.profiles.remove(&id);
-            kept.removed.insert(id);
+            let held = kept.profiles.remove(&id).unwrap_or_default();
+            kept.removed.insert(id, held.fields());
         }
         let mut here = Here::new();
         for profile in &list {
@@ -359,15 +380,18 @@ impl Namespace for Profiles<'_> {
             if !plain(&id)
                 || !fits(LABEL, Some(&text(profile, LABEL)))
                 || !fits(BASE, Some(&text(profile, BASE)))
-                || kept.removed.contains(&id)
+                || kept.removed.contains_key(&id)
             {
                 continue;
             }
             let held = kept.profiles.entry(id.clone()).or_default();
             here.insert(identity(&id), self.fields(profile, held));
         }
-        for id in &kept.removed {
-            let mut fields = BTreeMap::new();
+        for (id, held) in &kept.removed {
+            let mut fields: BTreeMap<String, Seen> = held
+                .iter()
+                .map(|field| (field.clone(), Seen::of(None, None)))
+                .collect();
             fields.insert(REMOVED.to_owned(), Seen::of(Some("1".to_owned()), None));
             here.insert(identity(id), fields);
         }
@@ -390,13 +414,29 @@ impl Namespace for Profiles<'_> {
         };
         let mut kept = kept(self.store);
         if field == REMOVED {
-            list.retain(|one| one["id"] != id);
-            kept.profiles.remove(id);
-            kept.removed.insert(id.to_owned());
-            self.keep_list(&list)?;
+            let held = kept.profiles.remove(id).unwrap_or_default();
+            let mut fields = held.fields();
+            if let Some(profile) = list.iter().find(|one| one["id"] == id) {
+                fields.extend(
+                    vars(profile)
+                        .into_iter()
+                        .map(|(name, _)| format!("{ENV}{name}")),
+                );
+            }
+            kept.removed.insert(id.to_owned(), fields);
+            // A step here still runs under it: it stays on this machine, out
+            // of sync, rather than leave the step naming nothing.
+            let used = self
+                .store
+                .steps_using_profile(id)
+                .map_err(|err| err.to_string())?;
+            if used.is_empty() {
+                list.retain(|one| one["id"] != id);
+                self.keep_list(&list)?;
+            }
             return keep(self.store, &kept);
         }
-        if kept.removed.contains(id) {
+        if kept.removed.contains_key(id) {
             return Ok(());
         }
         let at = match list.iter().position(|one| one["id"] == id) {

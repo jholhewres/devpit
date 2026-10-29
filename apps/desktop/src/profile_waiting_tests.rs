@@ -80,7 +80,7 @@ fn a_profile_that_arrived_waits_for_a_yes() {
 
     assert!(blocked(&store, "p1").is_some_and(|why| why.contains("another computer")));
 
-    settle(&store, "p1", true).expect("take");
+    settle(&store, "p1", None, None, true).expect("take");
 
     assert_eq!(blocked(&store, "p1"), None);
 }
@@ -95,7 +95,25 @@ fn a_base_url_changed_elsewhere_waits_until_taken() {
     let why = blocked(&store, "p1").expect("blocked");
     assert!(why.contains("ANTHROPIC_BASE_URL"), "{why}");
 
-    settle(&store, "p1", true).expect("take");
+    assert!(
+        settle(
+            &store,
+            "p1",
+            Some("env.ANTHROPIC_BASE_URL"),
+            Some("https://swapped.example/api"),
+            true
+        )
+        .is_err(),
+        "a value the person did not see is not taken"
+    );
+    settle(
+        &store,
+        "p1",
+        Some("env.ANTHROPIC_BASE_URL"),
+        Some("https://elsewhere.example/api"),
+        true,
+    )
+    .expect("take");
 
     assert!(blocked(&store, "p1").is_none());
     assert_eq!(
@@ -108,8 +126,46 @@ fn a_base_url_changed_elsewhere_waits_until_taken() {
 fn keeping_this_machines_own_clears_the_wait_and_changes_nothing() {
     let (_dir, store) = store("sk-<REDACTED>", asked("command", "sh"));
 
-    settle(&store, "p1", false).expect("keep");
+    settle(&store, "p1", Some("command"), Some("sh"), false).expect("keep");
 
     assert!(waiting(&store).is_empty());
     assert_eq!(crate::agent_profiles::declared(&store)[0].command, "");
+}
+
+#[test]
+fn keeping_out_a_base_url_this_machine_never_had_stays_kept_out() {
+    let (_dir, store) = store(
+        "sk-<REDACTED>",
+        asked("env.OTHER_BASE_URL", "https://elsewhere.example/api"),
+    );
+
+    settle(
+        &store,
+        "p1",
+        Some("env.OTHER_BASE_URL"),
+        Some("https://elsewhere.example/api"),
+        false,
+    )
+    .expect("keep");
+
+    assert!(waiting(&store).is_empty());
+    let held = kept(&store).profiles["p1"].clone();
+    assert!(
+        !held.shadow["env.OTHER_BASE_URL"].ask,
+        "beside, unused, not asked again"
+    );
+}
+
+#[test]
+fn the_reviewers_do_not_run_on_another_account_while_theirs_waits() {
+    let (_dir, store) = store(
+        "sk-<REDACTED>",
+        asked("env.ANTHROPIC_BASE_URL", "https://elsewhere.example/api"),
+    );
+    let project = store.add_project(_dir.path(), None).expect("project");
+    crate::devflow_profile::set_named(&store, &project, Some("p1")).expect("named");
+
+    let refused = crate::devflow_profile::runnable(&store, &project, None);
+
+    assert!(refused.is_err_and(|why| why.contains("ANTHROPIC_BASE_URL")));
 }
