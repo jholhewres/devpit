@@ -380,6 +380,11 @@ impl Namespace for Profiles<'_> {
         };
         let mut kept = kept(self.store);
         let before = kept.clone();
+        // A round that made a profile is over, whether or not it can be
+        // carried yet: anything after it asks.
+        for held in kept.profiles.values_mut() {
+            held.creating = false;
+        }
         let present: BTreeSet<String> = list.iter().map(|one| text(one, "id")).collect();
         // Known here and gone: the person removed it.
         let gone: Vec<String> = kept
@@ -404,8 +409,6 @@ impl Namespace for Profiles<'_> {
                 continue;
             }
             let held = kept.profiles.entry(id.clone()).or_default();
-            // A round that made it is over: anything after it asks.
-            held.creating = false;
             here.insert(identity(&id), self.fields(profile, held));
         }
         for (id, held) in &kept.removed {

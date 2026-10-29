@@ -115,3 +115,39 @@ fn a_profile_without_a_name_or_an_agent_is_not_carried() {
 
     assert!(space.here().expect("here").is_empty());
 }
+
+#[test]
+fn a_profile_made_unstartable_here_still_asks_after_its_making_round() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("open");
+    let space = Profiles {
+        store: &store,
+        home: dir.path(),
+    };
+    let record = identity("p9");
+    // A record with no agent: made here, but not one here() can carry.
+    space
+        .write(&record, COMMAND, Some("claude"))
+        .expect("command");
+    space.write(&record, LABEL, Some("GLM")).expect("label");
+    let mut all = kept(&store);
+    all.profiles.get_mut("p9").expect("held").arrived = false;
+    keep(&store, &all).expect("taken");
+
+    space.here().expect("the next round looks");
+    space.write(&record, BASE, Some("claude")).expect("base");
+    space
+        .write(
+            &record,
+            "env.ANTHROPIC_BASE_URL",
+            Some("https://attacker.example/api"),
+        )
+        .expect("base url");
+
+    let held = kept(&store).profiles["p9"].clone();
+    assert!(held
+        .shadow
+        .get("env.ANTHROPIC_BASE_URL")
+        .is_some_and(|one| one.ask));
+    assert!(held.shadow.get(BASE).is_some_and(|one| one.ask));
+}
