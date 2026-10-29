@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ProfileWaiting } from '../gen/bindings'
 import { ask, commands } from './live'
 import { profilesChanged } from './profiles'
+import { onEvent } from './window'
 
 /*
  * Profiles another computer made or changed, and what each waits for here.
@@ -20,6 +21,8 @@ export function ProfilesWaiting(): React.JSX.Element | null {
     void ask(() => commands.agentProfilesWaiting()).then((answer) => setWaiting(answer.data?.profiles ?? []))
   }, [])
   useEffect(refresh, [refresh])
+  /* A round may have changed what waits while the pane was open. */
+  useEffect(() => onEvent('sync:written', refresh), [refresh])
 
   /* One change at a time, named by the value shown: a yes covers what was seen. */
   const settle = (id: string, take: boolean, change?: { name: string; value: string }): void => {

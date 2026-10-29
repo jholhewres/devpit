@@ -60,6 +60,10 @@ pub struct Held {
     /// Made here from another machine and not yet taken by the person.
     #[serde(default)]
     pub arrived: bool,
+    /// Made by the round still running: its fields fill it without asking,
+    /// since there is nothing here yet to protect. The next look ends it.
+    #[serde(default)]
+    pub creating: bool,
     /// Its variables' names as last seen, and those removed since.
     #[serde(default)]
     pub env: BTreeSet<String>,
@@ -400,6 +404,8 @@ impl Namespace for Profiles<'_> {
                 continue;
             }
             let held = kept.profiles.entry(id.clone()).or_default();
+            // A round that made it is over: anything after it asks.
+            held.creating = false;
             here.insert(identity(&id), self.fields(profile, held));
         }
         for (id, held) in &kept.removed {
@@ -463,7 +469,9 @@ impl Namespace for Profiles<'_> {
                     "id": id, "label": "", "base": "", "command": "",
                     "args": [], "env": [], "models": []
                 }));
-                kept.profiles.entry(id.to_owned()).or_default().arrived = true;
+                let held = kept.profiles.entry(id.to_owned()).or_default();
+                held.arrived = true;
+                held.creating = true;
                 list.len() - 1
             }
         };
@@ -476,7 +484,7 @@ impl Namespace for Profiles<'_> {
                 let now = text(profile, field);
                 if now == value {
                     held.shadow.remove(field);
-                } else if held.arrived && now.is_empty() {
+                } else if held.creating && now.is_empty() {
                     profile[field] = json!(value);
                 } else {
                     // A program named by its path here stays; any other
@@ -531,8 +539,8 @@ impl Namespace for Profiles<'_> {
                             );
                         } else if guarded(field)
                             && now.as_deref() != Some(local.as_str())
-                            // Made here just now: there is nothing to protect yet.
-                            && !(held.arrived && now.as_deref().is_none_or(str::is_empty))
+                            // Made by this round: there is nothing to protect yet.
+                            && !(held.creating && now.as_deref().is_none_or(str::is_empty))
                         {
                             held.shadow.insert(
                                 field.to_owned(),

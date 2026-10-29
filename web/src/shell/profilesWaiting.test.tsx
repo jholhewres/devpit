@@ -9,6 +9,8 @@ afterEach(cleanup)
 let waiting: ProfileWaiting[] = []
 const settled = vi.fn()
 
+vi.mock('./window', () => ({ onEvent: () => () => undefined }))
+
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {

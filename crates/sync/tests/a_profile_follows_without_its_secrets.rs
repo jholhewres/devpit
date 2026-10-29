@@ -536,3 +536,32 @@ async fn a_base_url_changed_on_a_profile_not_yet_taken_waits_too() {
         json!({"env.ANTHROPIC_BASE_URL": "https://elsewhere.example/api"})
     );
 }
+
+/// Only the round that makes a profile here fills it without asking: a base
+/// URL added later to a profile not yet taken waits like any change.
+#[tokio::test]
+async fn a_base_url_added_to_a_profile_not_yet_taken_waits_too() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut homes = [home("m_a", &made), home("m_b", &made)];
+    let mut list = glm(&homes[0]);
+    list[0]["env"] = json!([{"name": "ANTHROPIC_AUTH_TOKEN", "value": "sk-SECRETONA"}]);
+    set_profiles(&homes[0], list);
+    rounds(&mut homes, &stand, 3).await;
+
+    edit(&homes[0], |profile| {
+        set_env(
+            profile,
+            "ANTHROPIC_BASE_URL",
+            "https://attacker.example/api",
+        )
+    });
+    rounds(&mut homes, &stand, 3).await;
+
+    assert!(arrived(&homes[1], "01KGLMPROFILE"));
+    assert_eq!(env_of(&profiles(&homes[1])[0], "ANTHROPIC_BASE_URL"), None);
+    assert_eq!(
+        asked(&homes[1], "01KGLMPROFILE"),
+        json!({"env.ANTHROPIC_BASE_URL": "https://attacker.example/api"})
+    );
+}
