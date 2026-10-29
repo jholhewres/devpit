@@ -760,6 +760,13 @@ export const commands = {
 	 *  and nowhere near the symptom.
 	 */
 	agentProfileRemove: (id: string) => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profile_remove", { id })),
+	/**  `agent.profiles_waiting` — the profiles that wait for the person here. */
+	agentProfilesWaiting: () => typedError<ProfileWaiting[], RpcError>(__TAURI_INVOKE("agent_profiles_waiting")),
+	/**
+	 *  `agent.profile_settle` — takes what another machine changed in a profile,
+	 *  or keeps this machine's own.
+	 */
+	agentProfileSettle: (id: string, take: boolean) => typedError<ProfileWaiting[], RpcError>(__TAURI_INVOKE("agent_profile_settle", { id, take })),
 	/**
 	 *  `chat.attach` — a dropped file, as something the agent can be pointed at.
 	 * 
@@ -4322,6 +4329,20 @@ export type Profile = {
 	 *  nothing off for them.
 	 */
 	enabled?: boolean,
+};
+
+/**
+ *  A profile that came from another machine and waits for the person here
+ *  before it can start: values only this machine may hold, or a base URL
+ *  changed elsewhere that would send its token somewhere new.
+ */
+export type ProfileWaiting = {
+	id: string,
+	label: string,
+	/**  Variables with no value on this machine. */
+	needs: string[],
+	/**  What another machine set, to take or to leave. */
+	changed: EnvVar[],
 };
 
 /**  An epic's cards: how many there are, and how many are done. */

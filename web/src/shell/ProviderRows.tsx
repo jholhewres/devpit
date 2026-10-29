@@ -8,6 +8,7 @@ import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from '
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
 import { ProfileEditor } from './ProfileEditor'
+import { ProfilesWaiting } from './ProfilesWaiting'
 import { blank, declaredFrom, draftOf, profilesChanged, type Draft } from './profiles'
 import { useKnownAgents } from './useKnownAgents'
 
@@ -147,6 +148,7 @@ export function ProviderRows(): React.JSX.Element {
 
   return (
     <>
+      <ProfilesWaiting />
       <div className="card2">
         <div className="card2__top">
           <div style={{ flex: '1', minWidth: '0' }}>

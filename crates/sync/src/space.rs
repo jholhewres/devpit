@@ -39,4 +39,11 @@ pub trait Namespace {
     /// has. A field outside the allowlist, or a value that does not fit, is
     /// left alone: whatever arrives is checked again here.
     fn write(&self, record: &str, field: &str, value: Option<&str>) -> Result<(), String>;
+
+    /// Whether a record this machine does not have is made here when it
+    /// arrives, its fields written one by one. Most namespaces only follow
+    /// what a machine already has: a project is not cloned by a round.
+    fn welcomes(&self, _record: &str) -> bool {
+        false
+    }
 }

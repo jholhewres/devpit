@@ -90,15 +90,25 @@ async fn a_secret_kept_in_a_projects_vault_never_syncs() {
     let mut state = devpit_sync::State::new();
     let machine = state.machine.clone();
     let devpit_home = dir.path().to_path_buf();
-    let (prefs, projects, machines, orchestrators) =
-        namespaces(&store, &devpit_home, &machine, "laptop", now_ms());
-    let spaces: [&dyn Namespace; 4] = [&prefs, &projects, &machines, &orchestrators];
+    let spaces = namespaces(
+        &store,
+        &devpit_home,
+        &devpit_home,
+        &machine,
+        "laptop",
+        now_ms(),
+    );
+    let spaces = spaces.all();
     devpit_sync::round(&kept, &key, &mut state, &spaces, now_ms())
         .await
         .expect("round");
 
     let blobs = kept.0.lock().unwrap().clone();
-    assert_eq!(blobs.len(), 4, "prefs, projects, machines, orchestrators");
+    assert_eq!(
+        blobs.len(),
+        5,
+        "prefs, projects, machines, orchestrators, profiles"
+    );
     let mut words = String::new();
     for (name, (version, bytes)) in &blobs {
         for secret in ["VAULTSENTINEL", "STRIPE_KEY", "sk_live"] {

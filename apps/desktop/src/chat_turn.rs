@@ -67,6 +67,9 @@ pub(crate) fn spawnable(profile_id: &str) -> Result<(devpit_rpc::Profile, String
             format!("no profile called {profile_id}"),
         ));
     };
+    if let Some(why) = crate::profile_waiting::blocked(&crate::projects::store()?, profile_id) {
+        return Err(RpcError::new(ErrorCode::Conflict, why));
+    }
     // Spawned, not typed, so a name only the shell knows is no use here — and
     // saying so beats "not on the PATH" about something the person watches
     // their terminal run every day.

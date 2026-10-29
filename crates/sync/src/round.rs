@@ -258,9 +258,12 @@ pub(crate) fn settle(
     }
 
     let mut written = false;
+    let none = BTreeMap::new();
     for (record, fields) in &settled.records {
-        let Some(holds) = here.get(record) else {
-            continue;
+        let holds = match here.get(record) {
+            Some(holds) => holds,
+            None if ns.welcomes(record) => &none,
+            None => continue,
         };
         for (field, cell) in fields {
             let now = holds.get(field).map(|seen| &seen.value);

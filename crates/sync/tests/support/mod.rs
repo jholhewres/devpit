@@ -12,6 +12,7 @@ use devpit_core::Store;
 use devpit_sync::machines::Machines;
 use devpit_sync::orchestrators::Orchestrators;
 use devpit_sync::prefs::Prefs;
+use devpit_sync::profiles::Profiles;
 use devpit_sync::projects::Projects;
 use devpit_sync::{
     files, round, Blobs, Listed, Namespace, Outcome, State, SyncError, SyncKey, MOST_BLOB,
@@ -160,7 +161,11 @@ impl Home {
             store: &self.store,
             root: &root,
         };
-        let spaces: [&dyn Namespace; 4] = [&prefs, &projects, &machines, &orchestrators];
+        let profiles = Profiles {
+            store: &self.store,
+            home: &root,
+        };
+        let spaces: [&dyn Namespace; 5] = [&prefs, &projects, &machines, &orchestrators, &profiles];
         let outcome = round(blobs, &key, &mut state, &spaces, now_ms).await;
         files::keep_state(&self.root(), &state).expect("keep state");
         outcome

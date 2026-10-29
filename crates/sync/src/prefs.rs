@@ -43,6 +43,10 @@ pub const LOCAL: &[(&str, &str)] = &[
         key::AGENT_PROFILES,
         "config folders on this machine, and tokens",
     ),
+    (
+        key::AGENT_PROFILES_PENDING,
+        "what another machine gave a profile, waiting for the person here",
+    ),
     (key::AGENT_DEFAULT, "names a profile of this machine"),
     (key::SIDEBAR_WIDTH, "window state"),
     (key::FILES_WIDTH, "window state"),

@@ -57,7 +57,7 @@ fn editable(store: &Store) -> Result<Option<Vec<Declared>>, RpcError> {
 }
 
 /// [`editable`], refusing to go on when the list cannot be read.
-fn to_edit(store: &Store) -> Result<Vec<Declared>, RpcError> {
+pub(crate) fn to_edit(store: &Store) -> Result<Vec<Declared>, RpcError> {
     editable(store)?.ok_or_else(|| {
         RpcError::internal(
             "the stored agent profiles cannot be read, so nothing was changed — fix or clear them first",
@@ -250,6 +250,9 @@ pub(crate) fn runner_for(
         .into_iter()
         .find(|one| one.id == id)
         .ok_or_else(|| format!("this step runs under a profile that no longer exists: {id}"))?;
+    if let Some(why) = crate::profile_waiting::blocked(store, id) {
+        return Err(why);
+    }
     if !found.spawnable() {
         // A shell function has nothing to spawn, and saying so here beats a
         // process that fails to start with the operating system's word for it.

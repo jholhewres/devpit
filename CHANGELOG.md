@@ -15,6 +15,13 @@ release notes are taken from here when a version is tagged.
   cloned, and a link to a folder without a git origin stays where it was
   made. Its name travels with it; the account it speaks as stays each
   machine's own choice.
+- **Agent profiles follow you, without their secrets.** With sync on, a
+  profile made on one machine shows up on the others with its name, agent,
+  arguments, models and the names of its variables. Tokens and keys never
+  travel: Settings → Providers says what a profile needs on this computer,
+  and it does not start until it is filled. A base URL changed on another
+  machine waits there for you to use it or keep yours, since it decides
+  where the profile's token is sent.
 
 ## 0.1.45 — 2026-10-28
 

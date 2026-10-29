@@ -84,6 +84,20 @@ pub struct Declared {
     pub models: Vec<String>,
 }
 
+/// A profile that came from another machine and waits for the person here
+/// before it can start: values only this machine may hold, or a base URL
+/// changed elsewhere that would send its token somewhere new.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileWaiting {
+    pub id: String,
+    pub label: String,
+    /// Variables with no value on this machine.
+    pub needs: Vec<String>,
+    /// What another machine set, to take or to leave.
+    pub changed: Vec<EnvVar>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {

@@ -9,16 +9,14 @@ use devpit_core::preference as key;
 use devpit_sync::{files, SyncKey};
 use support::{holds, opened, Home, Stand};
 
-const LOCAL: [(&str, &str); 9] = [
+// Agent profiles travel without their secrets now: that is held, token by
+// token, in `a_profile_follows_without_its_secrets.rs`.
+const LOCAL: [(&str, &str); 8] = [
     (key::REMOTE, "true"),
     (key::REMOTE_VIA, "relay"),
     (
         key::CALENDAR_LINK,
         "https://devpit.app/cal/CALENDARSECRET0123456789.ics",
-    ),
-    (
-        key::AGENT_PROFILES,
-        r#"[{"id":"work","env":{"ANTHROPIC_AUTH_TOKEN":"sk-profile-token-0123"}}]"#,
     ),
     (key::WORKTREE_BASE, "/home/jo/only-on-this-machine"),
     (key::SIDEBAR_WIDTH, "333"),

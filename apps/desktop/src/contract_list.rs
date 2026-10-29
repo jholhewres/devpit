@@ -19,12 +19,13 @@ use crate::{
     front, happening, heads_down, history, in_flight, index, installations, island, island_answer,
     island_checks, live_answer, live_sessions, mcp, mcp_apps, mcp_health, media, moving, notices,
     openers, opening, orchestrator, orchestrator_links, outside_sessions, pane_asking, pane_screen,
-    panels, panes, pasting, paths, pausing, plan_limits, plugin_data, plugins, project_naming,
-    project_proposals, projects, reading_path, rebound, receipts, recipes, regrouping, reminders,
-    remote, reply_drafts, reveal, rewinding, runs_list, saves, search, session_cost,
-    session_search, session_window, sessions, settings, shell_launch, sign_ins, skills, slash,
-    sources, spend_history, staging, stall_watch, steering, steps, stopping, threads, transcribe,
-    tray, update, watching, workspace, worktree_base, worktree_setup, worktrees, wsfiles,
+    panels, panes, pasting, paths, pausing, plan_limits, plugin_data, plugins, profile_waiting,
+    project_naming, project_proposals, projects, reading_path, rebound, receipts, recipes,
+    regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves, search,
+    session_cost, session_search, session_window, sessions, settings, shell_launch, sign_ins,
+    skills, slash, sources, spend_history, staging, stall_watch, steering, steps, stopping,
+    threads, transcribe, tray, update, watching, workspace, worktree_base, worktree_setup,
+    worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -191,6 +192,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         claude_plugin::claude_plugin_state,
         claude_plugin::claude_plugin_install,
         agent_profiles::agent_profile_remove,
+        profile_waiting::agent_profiles_waiting,
+        profile_waiting::agent_profile_settle,
         attaching_chat::chat_attach,
         agent_profiles::agent_signed_in,
         pasting::chat_paste,

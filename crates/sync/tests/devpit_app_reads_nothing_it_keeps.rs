@@ -62,7 +62,11 @@ async fn sent_by_one_machine() -> (Stand, Home, SyncKey) {
 async fn a_captured_blob_carries_none_of_the_words_that_went_in() {
     let (stand, _a, made) = sent_by_one_machine().await;
     let sent = stand.sent.lock().unwrap().clone();
-    assert_eq!(sent.len(), 4, "prefs, projects, machines and orchestrators");
+    assert_eq!(
+        sent.len(),
+        5,
+        "prefs, projects, machines, orchestrators and profiles"
+    );
     for (name, _, bytes) in &sent {
         assert_eq!(name.len(), 32, "a name drawn from the key: {name}");
         for word in WORDS {

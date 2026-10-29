@@ -23,6 +23,7 @@ pub mod machines;
 pub mod orchestrators;
 pub mod pairing;
 pub mod prefs;
+pub mod profiles;
 pub mod projects;
 pub mod round;
 pub mod seal;

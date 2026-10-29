@@ -17,6 +17,7 @@ use devpit_rpc::{ErrorCode, RpcError, SyncMachine, SyncRecovery, SyncStatus};
 use devpit_sync::machines::{self, Machines};
 use devpit_sync::orchestrators::Orchestrators;
 use devpit_sync::prefs::Prefs;
+use devpit_sync::profiles::Profiles;
 use devpit_sync::projects::Projects;
 use devpit_sync::{files, Blobs, DevpitApp, Namespace, SyncError, SyncKey};
 use tauri::{AppHandle, Emitter};
@@ -175,24 +176,48 @@ fn round_now() -> Result<bool, String> {
 }
 
 /// What syncs from this machine: its preferences, its projects' settings,
-/// itself among the account's machines, and its orchestrators.
+/// itself among the account's machines, its orchestrators, and its agent
+/// profiles without their secrets. `home` is the person's home folder, which
+/// a profile's config folder is written relative to.
+pub(crate) struct Spaces<'a> {
+    pub prefs: Prefs<'a>,
+    pub projects: Projects<'a>,
+    pub machines: Machines<'a>,
+    pub orchestrators: Orchestrators<'a>,
+    pub profiles: Profiles<'a>,
+}
+
+impl Spaces<'_> {
+    pub(crate) fn all(&self) -> [&dyn Namespace; 5] {
+        [
+            &self.prefs,
+            &self.projects,
+            &self.machines,
+            &self.orchestrators,
+            &self.profiles,
+        ]
+    }
+}
+
 pub(crate) fn namespaces<'a>(
     store: &'a Store,
     root: &'a std::path::Path,
+    home: &'a std::path::Path,
     machine: &'a str,
     name: &'a str,
     now_ms: u64,
-) -> (Prefs<'a>, Projects<'a>, Machines<'a>, Orchestrators<'a>) {
-    (
-        Prefs { store },
-        Projects { store },
-        Machines {
+) -> Spaces<'a> {
+    Spaces {
+        prefs: Prefs { store },
+        projects: Projects { store },
+        machines: Machines {
             id: machine,
             name,
             now_ms,
         },
-        Orchestrators { store, root },
-    )
+        orchestrators: Orchestrators { store, root },
+        profiles: Profiles { store, home },
+    }
 }
 
 fn run(
@@ -206,8 +231,9 @@ fn run(
     let machine = state.machine.clone();
     let name = crate::remote_conn::machine_name();
     let now = now_ms();
-    let (prefs, projects, machines, orchestrators) = namespaces(store, root, &machine, &name, now);
-    let spaces: [&dyn Namespace; 4] = [&prefs, &projects, &machines, &orchestrators];
+    let home = crate::installations::home().map_err(|err| SyncError::Local(err.message))?;
+    let spaces = namespaces(store, root, &home, &machine, &name, now);
+    let spaces = spaces.all();
     // A runtime of the worker's own: the round holds the store across its
     // waits, which no task of the app's runtime may.
     let runtime = tokio::runtime::Builder::new_current_thread()
