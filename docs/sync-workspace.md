@@ -305,8 +305,8 @@ sequenceDiagram
 | Keys | `v1/<account id>/o/<object name>`; devpit.app only ever signs keys under the caller's own account |
 | devpit.app's access | IAM user `devpit-app-sync-objects`: get, put, delete and list under `v1/` only. Its access key is made at deploy time and lives in the server's `.env` (`SYNC_OBJECTS_BUCKET`, `SYNC_OBJECTS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) |
 | Immutability | a presigned PUT signs the length, the SHA-256 of the sealed bytes and `If-None-Match: *`: S3 refuses a body that differs and any write over an existing object |
-| Quota | a `sync_object` table in Postgres (account, name, size, reserved/landed, last kept). Reservations not landed in an hour are dropped |
-| Collection | a machine reports each tree's live set (every object any kept snapshot reaches) with `POST /v1/sync/objects/keep`; rows no live set has named for 7 days are deleted from the bucket |
+| Quota | a `sync_objects` table in Postgres (account, name, size, reserved/landed, since when unnamed). A reservation counts at the most it was signed for and never shrinks; landed, at the size S3 reports. One not landed in an hour is asked about once more (HEAD): counted if S3 holds it, dropped if not. 512 MiB in 20,000 files free, 10 GiB in 200,000 with Plus |
+| Collection | a machine reports each tree's live set (every object any kept snapshot reaches) with `POST /v1/sync/objects/keep`, under an opaque tree id; an empty set forgets the tree. A row no tree's current set names for 7 days is deleted from the bucket, then here, under the account's lock — a tree whose machines are away keeps its set, so a week off does not collect another machine's files. `DELETE /v1/sync` deletes every object too |
 | Tests | the store is a trait in devpit-app; tests use an in-memory one that serves its own signed URLs on a local port, so CI never reaches AWS |
 
 **Manifests and snapshots.** A tree's manifest is itself a sealed object.
@@ -395,7 +395,8 @@ Security notes from the design's review, for the cards that build it:
    the base URL confirmation.
 4. devpit-app: the S3 object store (put, landed, get, keep), the quota table,
    Plus for `artifacts/`, the in-memory store for tests, the deploy step for
-   the IAM key.
+   the IAM key. **Built** (devpit-app `crates/api/src/objects/`,
+   `routes/objects.rs`, migration `0013_sync_objects`).
 5. The file tree engine in `crates/sync`: index, manifests as objects and the
    pointer, snapshots and retention, the merge (journals, three-way notes,
    conflict copies), the deletion guard, the live set; tests in the style of

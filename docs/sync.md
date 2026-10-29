@@ -140,6 +140,15 @@ makes at most 600 sync requests in ten minutes. A machine refuses to send a
 blob past 1 MiB before a byte leaves it, and reads no answer past its
 ceiling. The table is devpit-app's migration `0010_sync`.
 
+Synced files go to an S3 bucket instead, and devpit.app never carries their
+bytes: `POST /v1/sync/objects/put` reserves room and signs a PUT that writes
+exactly the sealed bytes named (length, SHA-256, `If-None-Match: *`), once;
+`/landed` counts what S3 holds; `/get` signs reads of the account's own;
+`/keep` takes one tree's live set and deletes what no tree named for a week.
+Every key is under the caller's own account. The design and its limits are in
+[`sync-workspace.md`](sync-workspace.md#objects-on-s3); the table is
+devpit-app's migration `0013_sync_objects`.
+
 ## Where it is
 
 | | |
@@ -149,6 +158,7 @@ ceiling. The table is devpit-app's migration `0010_sync`.
 | `apps/desktop/src/sync.rs`, `sync_pairing.rs` | the rounds' thread, the commands, offers and joining |
 | `web/src/shell/SyncSettings.tsx` | Settings → Account → Sync |
 | devpit-app `crates/api/src/routes/sync.rs`, `crates/db/src/sync.rs` | the blob store |
+| devpit-app `crates/api/src/objects/`, `routes/objects.rs`, `crates/db/src/objects.rs` | synced files: the bucket (S3, and one in memory for tests) and the room |
 
 No primitive is devpit's own: XChaCha20-Poly1305 and HKDF/HMAC-SHA256 are
 RustCrypto's, the handshake is `snow`'s.
@@ -194,5 +204,6 @@ DEVPIT_APP_DIR=../devpit-app DATABASE_URL=postgres://…/devpit_app_test \
   devpit.app.
 - **The rest of the workspace** — files and agent memory —
   is designed in [`sync-workspace.md`](sync-workspace.md)
-  ([ADR 0001](adr/0001-sync-the-persons-workspace.md)), not built yet;
-  orchestrators and agent profiles sync (above).
+  ([ADR 0001](adr/0001-sync-the-persons-workspace.md)); devpit.app's bucket
+  for it is built, the machines do not send files yet. Orchestrators and
+  agent profiles sync (above).
