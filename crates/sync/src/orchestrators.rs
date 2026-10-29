@@ -34,6 +34,9 @@ const ELSEWHERE: &str = "elsewhere";
 /// The repositories this machine last knew as linked, and those unlinked.
 const LINKS_ON: &str = "links_on";
 const LINKS_OFF: &str = "links_off";
+/// The repository each linked project is a clone of, so a link outlives the
+/// clone being forgotten.
+const LINK_ORIGINS: &str = "link_origins";
 
 /// The orchestrators namespace, over this machine's store and home.
 pub struct Orchestrators<'a> {
@@ -46,7 +49,8 @@ struct Local {
     id: String,
     name: String,
     folder: PathBuf,
-    /// Its folder under `orchestrator/`: `work`, or `<profile>/work`.
+    /// What its id is minted from: its folder's name, or its path under
+    /// `orchestrator/` when two here share a name.
     path: String,
 }
 
@@ -66,6 +70,10 @@ pub fn minted(path: &str) -> String {
         .collect()
 }
 
+fn last(path: &str) -> String {
+    path.rsplit('/').next().unwrap_or(path).to_owned()
+}
+
 fn hash_of(field: &str) -> Option<&str> {
     field
         .strip_prefix(LINK)
@@ -81,21 +89,10 @@ pub fn fits(field: &str, value: Option<&str>) -> bool {
     }
 }
 
-fn strings(settings: &Value, name: &str) -> BTreeSet<String> {
+/// A list of strings in the settings: links as a `Vec`, in the order the
+/// person made them; the rest as sets.
+fn strings<C: FromIterator<String> + Default>(settings: &Value, name: &str) -> C {
     settings[name]
-        .as_array()
-        .map(|all| {
-            all.iter()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// Links as the person set them, kept in the order they were made.
-fn linked_of(settings: &Value) -> Vec<String> {
-    settings[LINKED]
         .as_array()
         .map(|all| {
             all.iter()
@@ -122,7 +119,7 @@ impl Orchestrators<'_> {
             .unwrap_or_else(|_| self.root.to_path_buf())
             .join("orchestrator");
         let rows = self.store.projects().map_err(|err| err.to_string())?;
-        let locals: Vec<Local> = rows
+        let mut locals: Vec<Local> = rows
             .into_iter()
             .filter_map(|row| {
                 let folder = PathBuf::from(&row.root_path);
@@ -135,15 +132,25 @@ impl Orchestrators<'_> {
                     .filter_map(|part| part.as_os_str().to_str())
                     .collect();
                 // As `home::orchestrator_of` reads it: `<name>` or `<profile>/<name>`.
-                let fits = matches!(parts.len(), 1 | 2) && parts.iter().all(|one| plain_id(one));
-                fits.then_some(Local {
+                let shaped = matches!(parts.len(), 1 | 2) && parts.iter().all(|one| plain_id(one));
+                let path = parts.join("/");
+                shaped.then_some(Local {
                     id: row.id,
                     name: row.name,
-                    folder: folder.clone(),
-                    path: parts.join("/"),
+                    folder,
+                    path,
                 })
             })
             .collect();
+        // Minted from the folder's name, which an account's folder above it
+        // does not change; from the whole path only where two share a name.
+        let names: Vec<String> = locals.iter().map(|one| last(&one.path)).collect();
+        for (at, local) in locals.iter_mut().enumerate() {
+            let name = &names[at];
+            if names.iter().filter(|one| *one == name).count() == 1 {
+                local.path = name.clone();
+            }
+        }
         let mut clones: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for project in self
             .store
@@ -168,7 +175,14 @@ impl Orchestrators<'_> {
 
     /// Writes the settings that changed, and only those.
     fn keep(&self, local: &Local, was: &Value, now: &Value) -> Result<(), String> {
-        for name in [SYNC_ID, LINKED, ELSEWHERE, LINKS_ON, LINKS_OFF] {
+        for name in [
+            SYNC_ID,
+            LINKED,
+            ELSEWHERE,
+            LINKS_ON,
+            LINKS_OFF,
+            LINK_ORIGINS,
+        ] {
             if was[name] != now[name] {
                 self.store
                     .set_orchestrator_setting(&local.folder, name, now[name].clone())
@@ -192,31 +206,64 @@ impl Orchestrators<'_> {
     fn settled(
         &self,
         local: &Local,
-        seen: &Look,
+        look: &Look,
     ) -> Result<(Value, BTreeSet<String>, BTreeSet<String>), String> {
         let was = self.settings(local)?;
         let mut now = was.clone();
         now[SYNC_ID] = json!(self.sync_id(local, &was));
-        let mut linked = linked_of(&was);
-        let mut elsewhere = strings(&was, ELSEWHERE);
+        let mut linked = strings::<Vec<String>>(&was, LINKED);
+        let mut elsewhere: BTreeSet<String> = strings(&was, ELSEWHERE);
+        // A linked clone forgotten here: its link moves to another clone, or
+        // waits as elsewhere. The person unlinked nothing.
+        let live: BTreeMap<&String, &String> = look
+            .clones
+            .iter()
+            .flat_map(|(hash, ids)| ids.iter().map(move |id| (id, hash)))
+            .collect();
+        let mut origins = was[LINK_ORIGINS].as_object().cloned().unwrap_or_default();
+        for id in linked.clone() {
+            if let Some(hash) = live.get(&id) {
+                origins.insert(id, json!(hash));
+                continue;
+            }
+            let Some(hash) = origins
+                .remove(&id)
+                .and_then(|hash| hash.as_str().map(str::to_owned))
+            else {
+                continue;
+            };
+            linked.retain(|one| one != &id);
+            match look.clones.get(&hash) {
+                Some(ids) if !ids.iter().any(|one| linked.contains(one)) => {
+                    linked.push(ids[0].clone());
+                    origins.insert(ids[0].clone(), json!(hash));
+                }
+                Some(_) => {}
+                None => {
+                    elsewhere.insert(hash);
+                }
+            }
+        }
+        origins.retain(|id, _| linked.contains(id));
+        now[LINK_ORIGINS] = Value::Object(origins);
         // Cloned here since: the wait is over.
         for hash in elsewhere.clone() {
-            if let Some(ids) = seen.clones.get(&hash) {
+            if let Some(ids) = look.clones.get(&hash) {
                 if !ids.iter().any(|id| linked.contains(id)) {
                     linked.push(ids[0].clone());
                 }
                 elsewhere.remove(&hash);
             }
         }
-        let mut on: BTreeSet<String> = seen
+        let mut on: BTreeSet<String> = look
             .clones
             .iter()
             .filter(|(_, ids)| ids.iter().any(|id| linked.contains(id)))
             .map(|(hash, _)| hash.clone())
             .collect();
-        let mut off = strings(&was, LINKS_OFF);
-        for hash in strings(&was, LINKS_ON).difference(&on) {
-            match seen.clones.contains_key(hash) {
+        let mut off: BTreeSet<String> = strings(&was, LINKS_OFF);
+        for hash in strings::<BTreeSet<String>>(&was, LINKS_ON).difference(&on) {
+            match look.clones.contains_key(hash) {
                 // Unlinked here by the person.
                 true => {
                     off.insert(hash.clone());
@@ -238,14 +285,14 @@ impl Orchestrators<'_> {
     }
 
     /// A link or an unlink that arrived, applied to every clone here.
-    fn link(&self, local: &Local, seen: &Look, hash: &str, on: bool) -> Result<(), String> {
+    fn link(&self, local: &Local, look: &Look, hash: &str, on: bool) -> Result<(), String> {
         let was = self.settings(local)?;
         let mut now = was.clone();
-        let mut linked = linked_of(&was);
-        let mut elsewhere = strings(&was, ELSEWHERE);
-        let mut links_on = strings(&was, LINKS_ON);
-        let mut links_off = strings(&was, LINKS_OFF);
-        let clones = seen.clones.get(hash);
+        let mut linked = strings::<Vec<String>>(&was, LINKED);
+        let mut elsewhere: BTreeSet<String> = strings(&was, ELSEWHERE);
+        let mut links_on: BTreeSet<String> = strings(&was, LINKS_ON);
+        let mut links_off: BTreeSet<String> = strings(&was, LINKS_OFF);
+        let clones = look.clones.get(hash);
         if on {
             match clones {
                 Some(ids) if !ids.iter().any(|id| linked.contains(id)) => {
@@ -280,9 +327,9 @@ impl Namespace for Orchestrators<'_> {
     }
 
     fn here(&self) -> Result<Here, String> {
-        let seen = self.look()?;
+        let look = self.look()?;
         let mut here = Here::new();
-        for local in &seen.locals {
+        for local in &look.locals {
             // Read before anything is written: a change made offline is
             // placed by when the person made it, not by this round.
             let at = self
@@ -291,7 +338,7 @@ impl Namespace for Orchestrators<'_> {
                 .map_err(|err| err.to_string())?
                 .and_then(|seconds| u64::try_from(seconds).ok())
                 .map(|seconds| seconds * 1000);
-            let (settings, on, off) = self.settled(local, &seen)?;
+            let (settings, on, off) = self.settled(local, &look)?;
             let mut fields = BTreeMap::new();
             if fits(NAME, Some(&local.name)) {
                 fields.insert(NAME.to_owned(), Seen::of(Some(local.name.clone()), None));
@@ -315,9 +362,9 @@ impl Namespace for Orchestrators<'_> {
         if !fits(field, value) {
             return Ok(());
         }
-        let seen = self.look()?;
+        let look = self.look()?;
         let mut found = None;
-        for local in &seen.locals {
+        for local in &look.locals {
             if identity(&self.sync_id(local, &self.settings(local)?)) == record {
                 found = Some(local);
                 break;
@@ -347,7 +394,7 @@ impl Namespace for Orchestrators<'_> {
                     .map(|_| ())
                     .map_err(|err| err.to_string())
             }
-            (_, Some(hash)) => self.link(local, &seen, hash, value == "on"),
+            (_, Some(hash)) => self.link(local, &look, hash, value == "on"),
             _ => Ok(()),
         }
     }

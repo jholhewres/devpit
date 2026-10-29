@@ -272,3 +272,73 @@ async fn the_account_an_orchestrator_speaks_as_stays_on_its_machine() {
         "a local profile id synced"
     );
 }
+
+/// Forgetting the clone that carried a link is not an unlink: the link moves
+/// to the clone still here, or waits as elsewhere when none is.
+#[tokio::test]
+async fn forgetting_a_linked_clone_keeps_the_link() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut machines = [Machine::new("m_a", &made), Machine::new("m_b", &made)];
+    let pa = machines[0].project("p", Some(P));
+    let qa = machines[0].project("q", Some(Q));
+    let older = machines[1].project("p", Some(P));
+    let younger = machines[1].project("p-again", Some(P));
+    let qb = machines[1].project("q", Some(Q));
+    machines[1].link(&[&younger, &qb]);
+    rounds(&mut machines, &stand, 3).await;
+
+    machines[1]
+        .home
+        .store
+        .forget_project(&younger)
+        .expect("forget");
+    machines[1].home.store.forget_project(&qb).expect("forget");
+    rounds(&mut machines, &stand, 3).await;
+
+    assert_eq!(
+        machines[0].linked(),
+        sorted(vec![&pa, &qa]),
+        "nothing was unlinked"
+    );
+    assert!(
+        machines[1].linked().contains(&older),
+        "{:?}",
+        machines[1].linked()
+    );
+    assert_eq!(machines[1].settings()["elsewhere"], json!([origin_hash(Q)]));
+}
+
+/// An older orchestrator kept under its account's folder is the same one on
+/// every machine, whatever that account's id is on each.
+#[tokio::test]
+async fn an_orchestrator_under_its_accounts_folder_meets_its_twin() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut machines = [Machine::new("m_a", &made), Machine::new("m_b", &made)];
+    for (machine, account) in machines.iter_mut().zip(["01KACCOUNTA", "01KACCOUNTB"]) {
+        // Only the older layout on these machines.
+        let plain = machine.home.store.projects().expect("list")[0].id.clone();
+        machine.home.store.forget_project(&plain).expect("forget");
+        let folder = machine
+            .home
+            .root()
+            .join("orchestrator")
+            .join(account)
+            .join("work");
+        std::fs::create_dir_all(&folder).expect("folder");
+        machine
+            .home
+            .store
+            .add_project(&folder, None)
+            .expect("orchestrator");
+        machine.orchestrator = folder;
+    }
+    let pa = machines[0].project("p", Some(P));
+    let pb = machines[1].project("p", Some(P));
+    machines[0].link(&[&pa]);
+
+    rounds(&mut machines, &stand, 3).await;
+
+    assert_eq!(machines[1].linked(), vec![pb]);
+}
