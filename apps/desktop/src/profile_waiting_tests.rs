@@ -169,3 +169,13 @@ fn the_reviewers_do_not_run_on_another_account_while_theirs_waits() {
 
     assert!(refused.is_err_and(|why| why.contains("ANTHROPIC_BASE_URL")));
 }
+
+#[test]
+fn a_profile_that_arrived_is_not_taken_while_a_change_to_it_still_asks() {
+    let mut held = asked("env.ANTHROPIC_BASE_URL", "https://elsewhere.example/api");
+    held.arrived = true;
+    let (_dir, store) = store("sk-<REDACTED>", held);
+
+    assert!(settle(&store, "p1", None, None, true).is_err());
+    assert!(blocked(&store, "p1").is_some());
+}

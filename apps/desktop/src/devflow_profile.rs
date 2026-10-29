@@ -167,8 +167,6 @@ fn linked(store: &Store, project_id: &str) -> Vec<String> {
         .collect()
 }
 
-/// The profile `project_id`'s reviewers run as, asked from a session whose
-/// `CLAUDE_CONFIG_DIR` is `asker_config`.
 /// [`of`], refused when the profile it chose waits for the person here: the
 /// reviewers then run on nothing rather than on another account.
 pub(crate) fn runnable(
@@ -186,6 +184,8 @@ pub(crate) fn runnable(
     }
 }
 
+/// The profile `project_id`'s reviewers run as, asked from a session whose
+/// `CLAUDE_CONFIG_DIR` is `asker_config`.
 pub(crate) fn of(store: &Store, project_id: &str, asker_config: Option<&Path>) -> Option<Declared> {
     let named = named(store, project_id);
     let linked = linked(store, project_id);

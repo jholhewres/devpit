@@ -8,8 +8,9 @@
 //! name that reads as a secret. Every other value arrives empty and is asked
 //! for on each machine; a value filled here is never emptied from elsewhere.
 //!
-//! What decides what runs or where a token goes — the agent, the program, a
-//! base URL — never changes here on another machine's word: it waits in the
+//! What decides what runs, where a token goes or which account is spent —
+//! the agent, the program (one word to a shell), a base URL, the config
+//! folder — never changes here on another machine's word: it waits in the
 //! profile's `shadow` for the person's yes, and a profile that arrived from
 //! another machine does not start until they take it. A value this machine
 //! keeps its own (a config folder outside home) stays, and the synced one is
@@ -78,6 +79,20 @@ impl Held {
         }
         fields.extend(self.shadow.keys().cloned());
         fields
+    }
+}
+
+/// The person kept this machine's own against a change from elsewhere: a
+/// variable this machine never had stays out, the other machine's value
+/// beside it so no round asks again; any other field is this machine's to
+/// send back, as the person's answer.
+pub fn keep_out(held: &mut Held, field: &str, here: bool) {
+    match held.shadow.get_mut(field) {
+        Some(shadow) if field.starts_with(ENV) && !here => shadow.ask = false,
+        Some(_) => {
+            held.shadow.remove(field);
+        }
+        None => {}
     }
 }
 
@@ -414,7 +429,7 @@ impl Namespace for Profiles<'_> {
         };
         let mut kept = kept(self.store);
         if field == REMOVED {
-            let held = kept.profiles.remove(id).unwrap_or_default();
+            let held = kept.profiles.get(id).cloned().unwrap_or_default();
             let mut fields = held.fields();
             if let Some(profile) = list.iter().find(|one| one["id"] == id) {
                 fields.extend(
@@ -430,7 +445,9 @@ impl Namespace for Profiles<'_> {
                 .store
                 .steps_using_profile(id)
                 .map_err(|err| err.to_string())?;
+            // What it waits for here stays with it.
             if used.is_empty() {
+                kept.profiles.remove(id);
                 list.retain(|one| one["id"] != id);
                 self.keep_list(&list)?;
             }
@@ -513,8 +530,9 @@ impl Namespace for Profiles<'_> {
                                 },
                             );
                         } else if guarded(field)
-                            && !held.arrived
                             && now.as_deref() != Some(local.as_str())
+                            // Made here just now: there is nothing to protect yet.
+                            && !(held.arrived && now.as_deref().is_none_or(str::is_empty))
                         {
                             held.shadow.insert(
                                 field.to_owned(),

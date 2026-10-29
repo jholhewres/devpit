@@ -409,18 +409,11 @@ async fn a_base_url_kept_out_here_is_not_asked_again() {
     });
     rounds(&mut homes, &stand, 3).await;
 
-    // What "Keep this one" does to a variable this machine does not have.
-    let mut kept: Value = serde_json::from_str(
-        &homes[1]
-            .pref(key::AGENT_PROFILES_SYNCED)
-            .unwrap_or_default(),
-    )
-    .expect("kept");
-    kept["profiles"]["01KGLMPROFILE"]["shadow"]["env.ANTHROPIC_BASE_URL"]["ask"] = json!(false);
-    homes[1]
-        .store
-        .set_preference(key::AGENT_PROFILES_SYNCED, &kept.to_string())
-        .expect("kept");
+    // "Keep this one", as the person answers it here.
+    let mut kept = devpit_sync::profiles::kept(&homes[1].store);
+    let held = kept.profiles.get_mut("01KGLMPROFILE").expect("held");
+    devpit_sync::profiles::keep_out(held, "env.ANTHROPIC_BASE_URL", false);
+    devpit_sync::profiles::keep(&homes[1].store, &kept).expect("kept");
     rounds(&mut homes, &stand, 2).await;
 
     assert_eq!(asked(&homes[1], "01KGLMPROFILE"), json!({}));
@@ -508,5 +501,38 @@ async fn a_profile_a_step_here_uses_is_not_deleted_from_elsewhere() {
         profiles(&homes[1]).len(),
         1,
         "a step here still runs under it"
+    );
+    assert!(
+        devpit_sync::profiles::kept(&homes[1].store)
+            .profiles
+            .get("01KGLMPROFILE")
+            .is_some_and(|held| held.arrived),
+        "and it still waits for a yes before it runs"
+    );
+}
+
+/// A profile that arrived and was not yet taken still asks before a change
+/// elsewhere to where its token goes: the person takes what they were shown.
+#[tokio::test]
+async fn a_base_url_changed_on_a_profile_not_yet_taken_waits_too() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut homes = [home("m_a", &made), home("m_b", &made)];
+    set_profiles(&homes[0], glm(&homes[0]));
+    rounds(&mut homes, &stand, 3).await;
+
+    edit(&homes[0], |profile| {
+        set_env(
+            profile,
+            "ANTHROPIC_BASE_URL",
+            "https://elsewhere.example/api",
+        )
+    });
+    rounds(&mut homes, &stand, 3).await;
+
+    assert!(arrived(&homes[1], "01KGLMPROFILE"));
+    assert_eq!(
+        asked(&homes[1], "01KGLMPROFILE"),
+        json!({"env.ANTHROPIC_BASE_URL": "https://elsewhere.example/api"})
     );
 }

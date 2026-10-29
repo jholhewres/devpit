@@ -120,7 +120,7 @@ pub(crate) fn respond_from(
             on_demand_here(&store, project, &state)?;
             let asked = devpit_devflow::adhoc::standalone(params)?
                 .ok_or("a card's review is asked with its card")?;
-            let profile = crate::devflow_profile::of(&store, &project.id, config_dir);
+            let profile = crate::devflow_profile::runnable(&store, &project.id, config_dir)?;
             crate::devflow_adhoc::respond(app, project, &state, asked, profile.as_ref())
         }
         "devflow_publish" => {

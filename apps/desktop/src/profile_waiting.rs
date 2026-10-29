@@ -83,6 +83,13 @@ pub(crate) fn settle(
         return Ok(());
     };
     let Some(field) = field else {
+        // Taken as shown: not while a change to it still asks.
+        if held.shadow.values().any(|shadow| shadow.ask) {
+            return Err(RpcError::new(
+                devpit_rpc::ErrorCode::Conflict,
+                "a change to this profile still waits — answer it first",
+            ));
+        }
         if take {
             held.arrived = false;
         }
@@ -127,15 +134,8 @@ pub(crate) fn settle(
             _ => {}
         }
         crate::agent_profiles::save(store, &list)?;
-    } else if name.is_some() && !here {
-        // Kept out: a variable this machine never had stays out, and the
-        // other machine's value stays beside it so no round asks again.
-        if let Some(shadow) = held.shadow.get_mut(field) {
-            shadow.ask = false;
-        }
     } else {
-        // Kept: this machine's value travels back as the person's answer.
-        held.shadow.remove(field);
+        devpit_sync::profiles::keep_out(held, field, here);
     }
     keep(store, &kept).map_err(RpcError::internal)?;
     crate::sync::nudge();
