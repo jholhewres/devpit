@@ -165,3 +165,110 @@ async fn an_orchestrator_settles_and_stops_sending() {
         );
     }
 }
+
+/// Two machines that each linked something before they synced keep both.
+#[tokio::test]
+async fn a_machine_that_joins_keeps_the_links_it_already_had() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut machines = [Machine::new("m_a", &made), Machine::new("m_b", &made)];
+    let (pa, qa) = (
+        machines[0].project("p", Some(P)),
+        machines[0].project("q", Some(Q)),
+    );
+    let (pb, qb) = (
+        machines[1].project("p", Some(P)),
+        machines[1].project("q", Some(Q)),
+    );
+    machines[0].link(&[&pa]);
+    machines[1].link(&[&qb]);
+
+    rounds(&mut machines, &stand, 3).await;
+
+    assert_eq!(machines[0].linked(), sorted(vec![&pa, &qa]));
+    assert_eq!(machines[1].linked(), sorted(vec![&pb, &qb]));
+}
+
+/// A repository only one machine has, linked and then unlinked there, does
+/// not keep the other machine writing every round.
+#[tokio::test]
+async fn an_unlink_of_a_repository_the_other_machine_lacks_settles() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut machines = [Machine::new("m_a", &made), Machine::new("m_b", &made)];
+    let (pa, qa) = (
+        machines[0].project("p", Some(P)),
+        machines[0].project("q", Some(Q)),
+    );
+    machines[1].project("p", Some(P));
+    machines[0].link(&[&pa, &qa]);
+    rounds(&mut machines, &stand, 2).await;
+    machines[0].link(&[&pa]);
+    rounds(&mut machines, &stand, 3).await;
+
+    assert_eq!(machines[1].settings()["elsewhere"], json!([]));
+    for one in machines.iter_mut() {
+        let outcome = one.home.sync(&stand).await.expect("round");
+        let mentions = |list: &[String]| list.iter().any(|space| space == "orchestrators");
+        assert!(
+            !mentions(&outcome.sent) && !mentions(&outcome.written),
+            "{outcome:?}"
+        );
+    }
+}
+
+/// Two clones of one repository on a machine: the link is the repository's,
+/// whichever clone carries it, and an unlink elsewhere takes both.
+#[tokio::test]
+async fn a_link_is_the_repositorys_whichever_clone_carries_it() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut machines = [Machine::new("m_a", &made), Machine::new("m_b", &made)];
+    let pa = machines[0].project("p", Some(P));
+    let older = machines[1].project("p", Some(P));
+    let younger = machines[1].project("p-again", Some(P));
+    machines[1].link(&[&younger]);
+
+    rounds(&mut machines, &stand, 3).await;
+
+    assert_eq!(machines[0].linked(), vec![pa.clone()]);
+    assert_eq!(
+        machines[1].linked(),
+        vec![younger.clone()],
+        "the clone the person chose, not another"
+    );
+
+    machines[0].link(&[]);
+    rounds(&mut machines, &stand, 3).await;
+    assert!(
+        machines[1].linked().is_empty(),
+        "{:?} {older}",
+        machines[1].linked()
+    );
+}
+
+/// The account an orchestrator speaks as is a profile of each machine's own:
+/// it stays where it was chosen.
+#[tokio::test]
+async fn the_account_an_orchestrator_speaks_as_stays_on_its_machine() {
+    let stand = Stand::default();
+    let made = SyncKey::generate().expect("key");
+    let mut machines = [Machine::new("m_a", &made), Machine::new("m_b", &made)];
+    for (machine, profile) in machines.iter().zip(["01KACCOUNTONA", "01KACCOUNTONB"]) {
+        machine
+            .home
+            .store
+            .set_orchestrator_setting(&machine.orchestrator, "profile", json!(profile))
+            .expect("profile");
+    }
+
+    rounds(&mut machines, &stand, 3).await;
+
+    assert_eq!(machines[0].settings()["profile"], json!("01KACCOUNTONA"));
+    assert_eq!(machines[1].settings()["profile"], json!("01KACCOUNTONB"));
+    let sealed = opened(&made, &stand.kept());
+    assert!(
+        !sealed.contains("01KACCOUNTON"),
+        "a local profile id synced"
+    );
+}

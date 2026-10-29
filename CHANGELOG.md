@@ -13,7 +13,8 @@ release notes are taken from here when a version is tagged.
   or unlinking a project on one machine does the same on the other, a link
   to a repository the other machine does not have waits there until it is
   cloned, and a link to a folder without a git origin stays where it was
-  made. Its name and the profile it speaks as travel with it.
+  made. Its name travels with it; the account it speaks as stays each
+  machine's own choice.
 
 ## 0.1.45 — 2026-10-28
 

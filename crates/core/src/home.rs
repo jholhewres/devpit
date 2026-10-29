@@ -411,7 +411,7 @@ fn refused_in_a_name(letter: char) -> bool {
 }
 
 /// One path segment, from the alphabet ids are made of.
-fn plain_id(id: &str) -> bool {
+pub fn plain_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id

@@ -121,7 +121,10 @@ pub async fn orchestrator_link(project_id: String, linked: Vec<String>) -> Resul
                 format!("{stray} is not a project that can be linked"),
             ));
         }
-        set_in(&store, &root, "projects", json!(linked))
+        set_in(&store, &root, "projects", json!(linked))?;
+        // Links sync: the other machines hear of it in seconds.
+        crate::sync::nudge();
+        Ok(())
     })
     .await
 }

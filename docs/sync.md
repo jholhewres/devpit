@@ -78,7 +78,7 @@ write over it.
 | `prefs` | `app` | the allowlist in `crates/sync/src/prefs.rs`: theme, the terminal's stop confirmation and contrast, rebound keys, focus mode, agent hooks, folder trust and the agents kept out of menus, the transcription language, Decisions' provider, model, address, daily cap and modes |
 | `projects` | `origin:<hash>` | name, group, icon, colour, each plugin's state, whether Decisions may read it, and the origin's address without a password or token (read only from each machine's own git) |
 | `machines` | the machine's id | its name, and to the hour when it last synced |
-| `orchestrators` | `orch:<id minted from its folder's name>` | its name, the profile it speaks as, and each link as `link.<origin hash>` on or off; a link to a repository this machine lacks is kept as *elsewhere* and taken up when it is cloned, and a link to a folder without an origin stays on its machine |
+| `orchestrators` | `orch:<id minted from its folder under orchestrator/>` | its name, and each link the person made or undid as `link.<origin hash>` on or off; a repository nobody linked sends nothing, a link to a repository this machine lacks waits as *elsewhere* until it is cloned, and a link to a folder without an origin stays on its machine. The account it speaks as is a profile of each machine and stays there |
 
 Everything else stays on its machine, and the allowlist says why for every
 preference: paths, window and tray state, remote access, the calendar's
@@ -144,7 +144,7 @@ ceiling. The table is devpit-app's migration `0010_sync`.
 | | |
 |---|---|
 | `crates/sync` | the key, sealing, the clock, the merge, a round, the namespaces, the client for devpit.app, and the offer through the relay |
-| `crates/core/src/store/synced.rs` | the rows a namespace reads and writes |
+| `crates/core/src/store/synced.rs`, `store/orchestrators.rs` | the rows and settings a namespace reads and writes |
 | `apps/desktop/src/sync.rs`, `sync_pairing.rs` | the rounds' thread, the commands, offers and joining |
 | `web/src/shell/SyncSettings.tsx` | Settings → Account → Sync |
 | devpit-app `crates/api/src/routes/sync.rs`, `crates/db/src/sync.rs` | the blob store |
@@ -160,6 +160,8 @@ The tests that hold it, in `make test`:
 | `devpit_app_reads_nothing_it_keeps.rs` | every blob sent, captured and searched for the words that went in; opened with other keys; changed, rolled back, written beside |
 | `what_belongs_to_one_machine_stays_there.rs` | machine-specific preferences and a project's vault files |
 | `concurrent_edits_settle_the_same_everywhere.rs` | two machines changing the same things apart, synced in both orders |
+| `an_orchestrator_follows_the_person.rs` | one orchestrator on two homes: links settle by repository, a joining machine keeps its own, clones, unlinks of a repository one machine lacks, the account staying where it was chosen |
+| `one_repository_cloned_two_ways_settles.rs` | an https clone and an ssh clone of one repository settle on one address |
 | `size_caps_are_kept.rs` | a preference past 64 KiB, a namespace past 1 MiB, the client's refusal |
 | `pairing_tests.rs` | the key handed over a Noise session; a wrong secret; an impostor never told the secret |
 | `apps/desktop/src/sync_tests.rs` | a secret kept through the vault's own write, absent from every blob |
@@ -188,6 +190,7 @@ DEVPIT_APP_DIR=../devpit-app DATABASE_URL=postgres://…/devpit_app_test \
 - **A project's memory** arrives the same way: a namespace per project, its
   blob named through the key, and nothing else to build in the round or on
   devpit.app.
-- **The workspace** — orchestrators, agent profiles, files and agent memory —
+- **The rest of the workspace** — agent profiles, files and agent memory —
   is designed in [`sync-workspace.md`](sync-workspace.md)
-  ([ADR 0001](adr/0001-sync-the-persons-workspace.md)), not built yet.
+  ([ADR 0001](adr/0001-sync-the-persons-workspace.md)), not built yet;
+  orchestrators sync their name and links (above).
