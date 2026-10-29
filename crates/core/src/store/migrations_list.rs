@@ -9,7 +9,7 @@ use super::{Before, Migration};
 /// The Rust run before a version's SQL, by version.
 pub(super) const BEFORE: &[(i64, Before)] = &[
     (13, crate::store::plugins::export_drawings),
-    (32, crate::store::projects::rehash_origins),
+    (32, crate::store::origins::rehash_origins),
 ];
 
 /// Migration 001 — the core tables.

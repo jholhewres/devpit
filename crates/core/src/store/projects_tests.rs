@@ -4,6 +4,7 @@
 //! is the rules, and this is the evidence that they hold.
 
 use super::*;
+use crate::origin::origin_hash;
 
 fn store() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -156,7 +157,7 @@ fn a_project_whose_origin_changed_takes_the_new_identity() {
         .expect("add");
 
     let moved = store
-        .refresh_origin(&id, Some("git@github.com:new/repo.git"))
+        .refresh_origin(&id, "git@github.com:new/repo.git")
         .expect("refresh");
 
     assert!(moved, "a changed origin was not taken");
@@ -170,7 +171,7 @@ fn a_project_whose_origin_changed_takes_the_new_identity() {
         Some("git@github.com:new/repo.git")
     );
     assert!(!store
-        .refresh_origin(&id, Some("https://github.com/new/repo"))
+        .refresh_origin(&id, "https://github.com/new/repo")
         .expect("same repository"));
 }
 
@@ -204,7 +205,11 @@ fn an_older_hash_is_recomputed_when_the_store_opens() {
         // As a devpit before this normalisation left it.
         store
             .conn
-            .execute_batch("UPDATE project SET origin_hash = 'old'; PRAGMA user_version = 31;")
+            .execute_batch(
+                "UPDATE project SET origin_hash = 'old', \
+                 origin_url = 'https://jhol:tok@github.com:443/o/r.git'; \
+                 PRAGMA user_version = 31;",
+            )
             .expect("age it");
     }
 
@@ -214,6 +219,11 @@ fn an_older_hash_is_recomputed_when_the_store_opens() {
     assert_eq!(
         synced[0].origin_hash.as_deref(),
         Some(origin_hash("git@github.com:o/r.git").as_str())
+    );
+    assert_eq!(
+        synced[0].origin_url.as_deref(),
+        Some("https://github.com:443/o/r.git"),
+        "an older build's token is not kept"
     );
 }
 

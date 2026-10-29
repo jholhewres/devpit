@@ -16,12 +16,20 @@ pub fn origin_hash(url: &str) -> String {
         .collect()
 }
 
-/// `host/path`, lowercased: no scheme, user, password, port or `.git`.
+/// The hash a project is known by, or none for an origin that names nothing.
+pub fn identity(url: &str) -> Option<String> {
+    (!normalised(url).is_empty()).then(|| origin_hash(url))
+}
+
+/// `host/path`, lowercased: no scheme, user, password, port or `.git`. A
+/// local path keeps its leading `/`, as every build before kept it.
 pub fn normalised(url: &str) -> String {
-    let (_, userinfo_host, path) = parts(url.trim());
-    let host = userinfo_host.rsplit('@').next().unwrap_or_default();
-    let host = host.split(':').next().unwrap_or_default();
-    let path = path.trim_matches('/');
+    let (_, authority, path) = parts(url.trim());
+    let host = host_of(authority);
+    let path = match host {
+        "" => path.trim_end_matches('/'),
+        _ => path.trim_matches('/'),
+    };
     let path = path
         .strip_suffix(".git")
         .unwrap_or(path)
@@ -32,21 +40,50 @@ pub fn normalised(url: &str) -> String {
     }
 }
 
-/// The origin as another machine may see it: a user or password in an http
-/// address, or any password, is taken out; an ssh user stays, cloning needs it.
+/// The origin as another machine may see it: a password goes everywhere,
+/// and a user too except over ssh, where cloning needs it.
 pub fn shareable(url: &str) -> String {
     let url = url.trim();
     let (scheme, authority, path) = parts(url);
     let Some((userinfo, host)) = authority.rsplit_once('@') else {
         return url.to_owned();
     };
-    let web = matches!(scheme, Some("http" | "https"));
-    if !web && !userinfo.contains(':') {
-        return url.to_owned();
-    }
+    let ssh = scheme.is_none_or(|scheme| scheme.eq_ignore_ascii_case("ssh"));
+    let user = userinfo.split(':').next().unwrap_or_default();
+    let host = match ssh && !user.is_empty() {
+        true => format!("{user}@{host}"),
+        false => host.to_owned(),
+    };
     match scheme {
         Some(scheme) => format!("{scheme}://{host}{path}"),
         None => format!("{host}:{path}"),
+    }
+}
+
+/// Whether another machine could clone from it with git's plain transports:
+/// http(s), ssh, git or the scp shape. Never a local path, a command
+/// transport (`ext::`) or anything git would read as an option.
+pub fn clonable(url: &str) -> bool {
+    if url.starts_with('-') || url.contains("::") {
+        return false;
+    }
+    match parts(url) {
+        (Some(scheme), authority, _) => {
+            ["https", "http", "ssh", "git"]
+                .iter()
+                .any(|known| scheme.eq_ignore_ascii_case(known))
+                && !host_of(authority).is_empty()
+        }
+        (None, authority, _) => !host_of(authority).is_empty(),
+    }
+}
+
+/// The host of an authority, without user, password or port.
+fn host_of(authority: &str) -> &str {
+    let host = authority.rsplit('@').next().unwrap_or_default();
+    match host.strip_prefix('[') {
+        Some(_) => host.split_inclusive(']').next().unwrap_or(host),
+        None => host.split(':').next().unwrap_or_default(),
     }
 }
 
@@ -57,8 +94,13 @@ fn parts(url: &str) -> (Option<&str>, &str, &str) {
         let at = rest.find('/').unwrap_or(rest.len());
         return (Some(scheme), &rest[..at], &rest[at..]);
     }
-    match url.split_once(':') {
-        Some((authority, path)) if !authority.contains('/') => (None, authority, path),
+    // The host's colon comes after the user, who may carry one of their own.
+    let from = url
+        .find('@')
+        .filter(|at| !url[..*at].contains('/'))
+        .unwrap_or(0);
+    match url[from..].find(':').map(|at| from + at) {
+        Some(at) if !url[..at].contains('/') => (None, &url[..at], &url[at + 1..]),
         _ => (None, "", url),
     }
 }

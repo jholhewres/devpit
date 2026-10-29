@@ -162,4 +162,19 @@ fn a_record_carries_its_origin_without_a_token_and_another_machine_cannot_move_i
     assert!(!fits(ORIGIN_URL, Some("https://u:p@host/x")));
     assert!(!fits(ORIGIN_URL, Some("line\nbreak")));
     assert!(!fits(ORIGIN_URL, Some(&"h".repeat(513))));
+    for not_a_clone in [
+        "ext::evil",
+        "fd::3",
+        "file:///home/someone/.ssh",
+        "/etc",
+        "--upload-pack=touch",
+        "-oProxyCommand=x@host:r",
+    ] {
+        assert!(!fits(ORIGIN_URL, Some(not_a_clone)), "{not_a_clone}");
+    }
+    assert!(fits(
+        ORIGIN_URL,
+        Some("ssh://git@host.example:2222/o/r.git")
+    ));
+    assert!(fits(ORIGIN_URL, Some("HTTPS://github.com/o/r")));
 }

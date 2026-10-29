@@ -247,7 +247,7 @@ pub(crate) fn opened(store: &Store, project_id: &str) -> Result<(), RpcError> {
     let (_, root) = locate(store, project_id)?;
     // A remote moved to another repository moves the project's identity too.
     if let Some(url) = devpit_git::remote::origin_url(&root) {
-        if let Err(err) = store.refresh_origin(project_id, Some(&url)) {
+        if let Err(err) = store.refresh_origin(project_id, &url) {
             eprintln!("devpit: {project_id} kept its old origin: {err}");
         }
     }

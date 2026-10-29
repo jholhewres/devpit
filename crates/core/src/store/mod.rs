@@ -15,6 +15,7 @@ mod lanes;
 mod layouts;
 mod migrations;
 mod orchestrators;
+mod origins;
 pub mod pane_agents;
 mod plans;
 mod plugins;

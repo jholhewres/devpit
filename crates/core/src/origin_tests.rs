@@ -74,3 +74,53 @@ fn a_shared_ssh_origin_keeps_what_cloning_needs() {
         "ssh://git@host.example:2222/o/r.git"
     );
 }
+
+#[test]
+fn two_ipv6_hosts_are_two_repositories() {
+    assert_ne!(
+        normalised("ssh://git@[2001:db8::1]:22/o/r.git"),
+        normalised("ssh://git@[2001:db8::2]/o/r.git")
+    );
+    assert_eq!(
+        normalised("ssh://git@[2001:db8::1]:22/o/r.git"),
+        "[2001:db8::1]/o/r"
+    );
+}
+
+#[test]
+fn an_origin_that_names_nothing_is_no_identity() {
+    for url in ["", "  ", "/", ".git", "file://", "https://"] {
+        assert_eq!(identity(url), None, "{url:?}");
+    }
+    assert_eq!(
+        identity("git@github.com:jholhewres/devpit.git").as_deref(),
+        Some("da3b9997c45194efc9a8998be0ac81b3")
+    );
+}
+
+#[test]
+fn a_local_path_origin_keeps_the_hash_it_had() {
+    assert_eq!(
+        origin_hash("/srv/git/repo.git"),
+        "5e32d59440204430af7768db4a5b99c0"
+    );
+}
+
+#[test]
+fn a_token_as_a_user_leaves_on_no_scheme() {
+    for (url, shared) in [
+        (
+            "HTTPS://tok@github.com/o/r.git",
+            "HTTPS://github.com/o/r.git",
+        ),
+        ("ftps://tok@host/o/r.git", "ftps://host/o/r.git"),
+        ("git://tok@host/o/r.git", "git://host/o/r.git"),
+        (
+            "ssh://deploy:<REDACTED>@host/o/r.git",
+            "ssh://deploy@host/o/r.git",
+        ),
+        ("git:<REDACTED>@host:o/r.git", "git@host:o/r.git"),
+    ] {
+        assert_eq!(shareable(url), shared, "{url}");
+    }
+}
