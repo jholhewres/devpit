@@ -3,7 +3,7 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
-## 0.1.45 — unreleased
+## 0.1.45 — 2026-10-28
 
 ### Fixed
 
