@@ -67,4 +67,10 @@ fn an_orchestrator_made_later_never_takes_an_id_another_kept() {
     let here = space.here().expect("here");
 
     assert_eq!(here.len(), 2, "{:?}", here.keys());
+    assert!(
+        here.contains_key(&identity(&minted("work"))),
+        "the first keeps its id"
+    );
+    let again: Vec<_> = space.here().expect("here").into_keys().collect();
+    assert_eq!(again, here.into_keys().collect::<Vec<_>>(), "and both stay");
 }

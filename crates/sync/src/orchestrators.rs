@@ -1,8 +1,9 @@
 //! An orchestrator on every machine the person uses: its name and the
 //! projects linked to it.
 //!
-//! Its record is `orch:<sync id>`, the id minted once from its folder's path
-//! under `orchestrator/` and kept in its settings: the same orchestrator set
+//! Its record is `orch:<sync id>`, the id minted once from its folder's name
+//! (from its whole folder when another here holds that id) and kept in its
+//! settings: the same orchestrator set
 //! up on another machine under the same name is the same record. A link
 //! travels as the repository it names, `link.<origin hash>`, so a project's
 //! local id and its folder never leave.
@@ -156,16 +157,18 @@ impl Orchestrators<'_> {
         }
         // An id kept is kept; one minted now never takes an id another
         // orchestrator here already holds.
-        let kept: Vec<Option<String>> = locals
+        // A settings read that fails stops the round: minting over a kept
+        // id would give the orchestrator another identity.
+        let kept = locals
             .iter()
             .map(|one| {
-                let settings = self.store.orchestrator_settings(&one.folder).ok()?;
-                settings[SYNC_ID]
+                let settings = self.settings(one)?;
+                Ok(settings[SYNC_ID]
                     .as_str()
                     .filter(|id| plain_id(id))
-                    .map(str::to_owned)
+                    .map(str::to_owned))
             })
-            .collect();
+            .collect::<Result<Vec<Option<String>>, String>>()?;
         let mut taken: BTreeSet<String> = kept.iter().flatten().cloned().collect();
         for (local, kept) in locals.iter_mut().zip(kept) {
             local.sync_id = kept.unwrap_or_else(|| {
