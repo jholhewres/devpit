@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use devpit_core::Store;
 use devpit_sync::machines::Machines;
+use devpit_sync::orchestrators::Orchestrators;
 use devpit_sync::prefs::Prefs;
 use devpit_sync::projects::Projects;
 use devpit_sync::{
@@ -154,7 +155,12 @@ impl Home {
             name: &self.name,
             now_ms,
         };
-        let spaces: [&dyn Namespace; 3] = [&prefs, &projects, &machines];
+        let root = self.root();
+        let orchestrators = Orchestrators {
+            store: &self.store,
+            root: &root,
+        };
+        let spaces: [&dyn Namespace; 4] = [&prefs, &projects, &machines, &orchestrators];
         let outcome = round(blobs, &key, &mut state, &spaces, now_ms).await;
         files::keep_state(&self.root(), &state).expect("keep state");
         outcome

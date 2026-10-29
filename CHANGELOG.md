@@ -3,6 +3,18 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## Unreleased
+
+### New
+
+- **An orchestrator's links follow you to another machine.** With sync on,
+  an orchestrator set up under the same name on two machines keeps one set
+  of linked projects, matched by repository rather than by folder: linking
+  or unlinking a project on one machine does the same on the other, a link
+  to a repository the other machine does not have waits there until it is
+  cloned, and a link to a folder without a git origin stays where it was
+  made. Its name and the profile it speaks as travel with it.
+
 ## 0.1.45 — 2026-10-28
 
 ### Fixed

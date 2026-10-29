@@ -53,6 +53,12 @@ impl Store {
         Ok(brought)
     }
 
+    /// When the settings of the orchestrator in `folder` last changed, in
+    /// seconds: what sync orders a change to them by.
+    pub fn orchestrator_settings_at(&self, folder: &Path) -> Result<Option<i64>, StoreError> {
+        Ok(self.preference_stamped(&key_of(folder))?.map(|(_, at)| at))
+    }
+
     /// One setting of the orchestrator in `folder` changed, the rest kept.
     pub fn set_orchestrator_setting(
         &self,

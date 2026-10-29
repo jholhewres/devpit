@@ -11,7 +11,7 @@ use devpit_sync::seal::{open, Unsealed};
 use devpit_sync::{files, SyncError, SyncKey};
 use support::{holds, opened, Home, Stand};
 
-const WORDS: [&str; 9] = [
+const WORDS: [&str; 11] = [
     "light",
     "appearance.theme",
     "Quarterly Secret Project",
@@ -21,6 +21,8 @@ const WORDS: [&str; 9] = [
     "Jo's laptop",
     "machines",
     "prefs",
+    "orchestrators",
+    "Skunkworks Desk",
 ];
 
 async fn sent_by_one_machine() -> (Stand, Home, SyncKey) {
@@ -43,6 +45,15 @@ async fn sent_by_one_machine() -> (Stand, Home, SyncKey) {
         )
         .expect("edit");
     a.store.install_plugin(&project, "notes").expect("plugin");
+    let desk = a.root().join("orchestrator").join("desk");
+    std::fs::create_dir_all(&desk).expect("orchestrator");
+    let orchestrator = a.store.add_project(&desk, None).expect("orchestrator");
+    a.store
+        .edit_project(&orchestrator, "Skunkworks Desk", None, None, None)
+        .expect("name");
+    a.store
+        .set_orchestrator_setting(&desk, "projects", serde_json::json!([project]))
+        .expect("link");
     a.sync(&stand).await.expect("sync");
     (stand, a, made)
 }
@@ -51,7 +62,7 @@ async fn sent_by_one_machine() -> (Stand, Home, SyncKey) {
 async fn a_captured_blob_carries_none_of_the_words_that_went_in() {
     let (stand, _a, made) = sent_by_one_machine().await;
     let sent = stand.sent.lock().unwrap().clone();
-    assert_eq!(sent.len(), 3, "prefs, projects and machines");
+    assert_eq!(sent.len(), 4, "prefs, projects, machines and orchestrators");
     for (name, _, bytes) in &sent {
         assert_eq!(name.len(), 32, "a name drawn from the key: {name}");
         for word in WORDS {

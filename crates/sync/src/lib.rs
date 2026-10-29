@@ -20,6 +20,7 @@ pub mod error;
 pub mod files;
 pub mod key;
 pub mod machines;
+pub mod orchestrators;
 pub mod pairing;
 pub mod prefs;
 pub mod projects;
