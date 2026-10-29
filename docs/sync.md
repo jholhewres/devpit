@@ -79,7 +79,7 @@ write over it.
 | `projects` | `origin:<hash>` | name, group, icon, colour, each plugin's state, whether Decisions may read it, and the origin's address without a password or token (read only from each machine's own git) |
 | `machines` | the machine's id | its name, and to the hour when it last synced |
 | `orchestrators` | `orch:<id minted from its folder under orchestrator/>` | its name, and each link the person made or undid as `link.<origin hash>` on or off; a repository nobody linked sends nothing, a link to a repository this machine lacks waits as *elsewhere* until it is cloned, and a link to a folder without an origin stays on its machine. The account it speaks as is a profile of each machine and stays there |
-| `profiles` | `profile:<id minted when it was made>` | label, agent, program when it is a bare name, arguments, models, and every environment variable's name; a value only for `CLAUDE_CONFIG_DIR` (as `~/…`), `*_BASE_URL`, `*_MODEL*` and `API_TIMEOUT_MS`. Every other value arrives empty, is asked for here, and a value filled here is never emptied from elsewhere. A base URL changed on another machine waits in `agents.profiles.pending` until the person takes it or keeps their own; a profile waiting for either cannot start |
+| `profiles` | `profile:<id minted when it was made>` | label, agent, program when it is a bare name, models, and every environment variable's name; a value only for `CLAUDE_CONFIG_DIR` (as `~/…`), a `*_BASE_URL` without credentials, a `*_MODEL*` name and `API_TIMEOUT_MS`, never for a name that reads as a secret. Arguments stay where they were typed. Every other value arrives empty and is asked for here; one filled here is never emptied from elsewhere. A profile that arrives runs nothing until the person takes it; a change elsewhere to its agent, program or base URL waits for their yes; a value kept here (a config folder outside home) stays. A profile or variable removed is a tombstone. What sync keeps of each is `agents.profiles.synced` |
 
 Everything else stays on its machine, and the allowlist says why for every
 preference: paths, window and tray state, remote access, the calendar's
@@ -162,7 +162,7 @@ The tests that hold it, in `make test`:
 | `what_belongs_to_one_machine_stays_there.rs` | machine-specific preferences and a project's vault files |
 | `concurrent_edits_settle_the_same_everywhere.rs` | two machines changing the same things apart, synced in both orders |
 | `an_orchestrator_follows_the_person.rs` | one orchestrator on two homes: links settle by repository, a joining machine keeps its own, clones, unlinks of a repository one machine lacks, the account staying where it was chosen |
-| `a_profile_follows_without_its_secrets.rs` | a profile arrives on another home without its tokens; a token filled there stays; a path to a program stays; a base URL changed elsewhere waits |
+| `a_profile_follows_without_its_secrets.rs` | a profile arrives on another home without its tokens and waits to be taken; a token filled there stays; a program by path, a config folder outside home and secret-looking values stay; a base URL or program changed or added elsewhere waits; a deleted profile or variable stays deleted |
 | `one_repository_cloned_two_ways_settles.rs` | an https clone and an ssh clone of one repository settle on one address |
 | `size_caps_are_kept.rs` | a preference past 64 KiB, a namespace past 1 MiB, the client's refusal |
 | `pairing_tests.rs` | the key handed over a Noise session; a wrong secret; an impostor never told the secret |

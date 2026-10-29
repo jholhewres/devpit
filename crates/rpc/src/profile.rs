@@ -92,10 +92,20 @@ pub struct Declared {
 pub struct ProfileWaiting {
     pub id: String,
     pub label: String,
-    /// Variables with no value on this machine.
+    /// Made on another machine and not yet taken here.
+    pub arrived: bool,
+    /// Variables that arrived with no value, to fill here.
     pub needs: Vec<String>,
-    /// What another machine set, to take or to leave.
+    /// What another machine changed, by field (`command`, `base`,
+    /// `env.<NAME>`), to take or to leave.
     pub changed: Vec<EnvVar>,
+}
+
+/// The profiles that wait for the person on this machine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfilesWaiting {
+    pub profiles: Vec<ProfileWaiting>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]

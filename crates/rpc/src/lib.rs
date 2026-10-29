@@ -110,7 +110,8 @@ pub use plugins::{
 pub use plus::PlusStatus;
 pub use prime::WorktreeSetup;
 pub use profile::{
-    Credentials, Declared, EnvVar, Profile, ProfileWaiting, Reach, ReadCommand, SignedIn,
+    Credentials, Declared, EnvVar, Profile, ProfileWaiting, ProfilesWaiting, Reach, ReadCommand,
+    SignedIn,
 };
 pub use project::{
     Change, Commit, FileNode, GitStatus, Project, ProjectChanges, ProjectHistory, ProjectList,

@@ -761,12 +761,12 @@ export const commands = {
 	 */
 	agentProfileRemove: (id: string) => typedError<Profile[], RpcError>(__TAURI_INVOKE("agent_profile_remove", { id })),
 	/**  `agent.profiles_waiting` — the profiles that wait for the person here. */
-	agentProfilesWaiting: () => typedError<ProfileWaiting[], RpcError>(__TAURI_INVOKE("agent_profiles_waiting")),
+	agentProfilesWaiting: () => typedError<ProfilesWaiting, RpcError>(__TAURI_INVOKE("agent_profiles_waiting")),
 	/**
 	 *  `agent.profile_settle` — takes what another machine changed in a profile,
-	 *  or keeps this machine's own.
+	 *  or one it made, or keeps this machine's own.
 	 */
-	agentProfileSettle: (id: string, take: boolean) => typedError<ProfileWaiting[], RpcError>(__TAURI_INVOKE("agent_profile_settle", { id, take })),
+	agentProfileSettle: (id: string, take: boolean) => typedError<ProfilesWaiting, RpcError>(__TAURI_INVOKE("agent_profile_settle", { id, take })),
 	/**
 	 *  `chat.attach` — a dropped file, as something the agent can be pointed at.
 	 * 
@@ -4339,10 +4339,20 @@ export type Profile = {
 export type ProfileWaiting = {
 	id: string,
 	label: string,
-	/**  Variables with no value on this machine. */
+	/**  Made on another machine and not yet taken here. */
+	arrived: boolean,
+	/**  Variables that arrived with no value, to fill here. */
 	needs: string[],
-	/**  What another machine set, to take or to leave. */
+	/**
+	 *  What another machine changed, by field (`command`, `base`,
+	 *  `env.<NAME>`), to take or to leave.
+	 */
 	changed: EnvVar[],
+};
+
+/**  The profiles that wait for the person on this machine. */
+export type ProfilesWaiting = {
+	profiles: ProfileWaiting[],
 };
 
 /**  An epic's cards: how many there are, and how many are done. */

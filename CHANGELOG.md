@@ -17,11 +17,12 @@ release notes are taken from here when a version is tagged.
   machine's own choice.
 - **Agent profiles follow you, without their secrets.** With sync on, a
   profile made on one machine shows up on the others with its name, agent,
-  arguments, models and the names of its variables. Tokens and keys never
-  travel: Settings → Providers says what a profile needs on this computer,
-  and it does not start until it is filled. A base URL changed on another
-  machine waits there for you to use it or keep yours, since it decides
-  where the profile's token is sent.
+  program, models and the names of its variables; its arguments stay where
+  you typed them. Tokens and keys never travel: Settings → Providers says
+  what a profile needs on this computer. Nothing another machine sent runs
+  without your yes: a profile that arrived waits to be taken, and a change
+  elsewhere to its agent, program or base URL waits for you to use it or
+  keep yours. A profile or a variable you remove stays removed everywhere.
 
 ## 0.1.45 — 2026-10-28
 

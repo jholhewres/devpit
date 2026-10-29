@@ -579,6 +579,9 @@ pub(crate) fn to_start_in(id: &str, project_id: Option<&str>) -> Result<String, 
     if let Ok(store) = crate::projects::store() {
         if let Ok(profiles) = crate::agent_profiles::all(&store) {
             if let Some(found) = profiles.iter().find(|one| one.id == id && one.mine) {
+                if let Some(why) = crate::profile_waiting::blocked(&store, id) {
+                    return Err(RpcError::new(devpit_rpc::ErrorCode::Conflict, why));
+                }
                 let flag = devpit_pty::agents::known(&found.base).and_then(|one| one.settings_flag);
                 let said = devpit_agentcli::running::line(&devpit_agentcli::running::runner(found));
                 return Ok(launch_line(&said, &found.base, flag, project_id));

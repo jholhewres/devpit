@@ -12,14 +12,14 @@ const settled = vi.fn()
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
-    agentProfilesWaiting: () => waiting,
-    agentProfileSettle: (id: string, take: boolean) => (settled(id, take), []),
+    agentProfilesWaiting: () => ({ profiles: waiting }),
+    agentProfileSettle: (id: string, take: boolean) => (settled(id, take), { profiles: [] }),
   },
 }))
 
 describe('a profile from another computer', () => {
   it('says which values it needs here before it can start', async () => {
-    waiting = [{ id: 'p1', label: 'GLM', needs: ['ANTHROPIC_AUTH_TOKEN'], changed: [] }]
+    waiting = [{ id: 'p1', label: 'GLM', arrived: false, needs: ['ANTHROPIC_AUTH_TOKEN'], changed: [] }]
     render(<ProfilesWaiting />)
     expect(await screen.findByText(/needs ANTHROPIC_AUTH_TOKEN here before it can start/)).toBeTruthy()
   })
@@ -29,8 +29,9 @@ describe('a profile from another computer', () => {
       {
         id: 'p1',
         label: 'GLM',
+        arrived: false,
         needs: [],
-        changed: [{ name: 'ANTHROPIC_BASE_URL', value: 'https://elsewhere.example/api' }],
+        changed: [{ name: 'env.ANTHROPIC_BASE_URL', value: 'https://elsewhere.example/api' }],
       },
     ]
     render(<ProfilesWaiting />)
@@ -40,6 +41,13 @@ describe('a profile from another computer', () => {
 
     await waitFor(() => expect(settled).toHaveBeenCalledWith('p1', false))
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+  })
+
+  it('asks to take a profile that came from another computer before it runs', async () => {
+    waiting = [{ id: 'p1', label: 'GLM', arrived: true, needs: [], changed: [{ name: 'command', value: 'claude' }] }]
+    render(<ProfilesWaiting />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Take it' }))
+    await waitFor(() => expect(settled).toHaveBeenCalledWith('p1', true))
   })
 
   it('shows nothing when no profile waits', async () => {

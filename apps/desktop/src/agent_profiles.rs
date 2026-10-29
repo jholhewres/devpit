@@ -155,6 +155,9 @@ pub(crate) fn agent_profile_save_now(declared: Declared) -> Result<Vec<Profile>,
 
 /// Puts one profile on the stored list, in place when its id is already there.
 fn upsert(store: &Store, declared: Declared) -> Result<(), RpcError> {
+    let _held = devpit_core::PROFILES_WRITE
+        .lock()
+        .map_err(|err| RpcError::internal(err.to_string()))?;
     let mut list = to_edit(store)?;
     match list.iter_mut().find(|one| one.id == declared.id) {
         Some(existing) => *existing = declared,
@@ -184,6 +187,9 @@ pub(crate) fn agent_profile_remove_now(id: String) -> Result<Vec<Profile>, RpcEr
 
 /// Takes one profile off the stored list, unless a step still names it.
 fn remove(store: &Store, id: &str) -> Result<(), RpcError> {
+    let _held = devpit_core::PROFILES_WRITE
+        .lock()
+        .map_err(|err| RpcError::internal(err.to_string()))?;
     let used = store.steps_using_profile(id)?;
     if !used.is_empty() {
         // Named, with their boards: "a step uses it" on a machine with six

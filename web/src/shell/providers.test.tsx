@@ -41,7 +41,7 @@ vi.mock('./live', () => ({
     agentTrustSet: (on: boolean) => (trusting(on), { ...choice, trust: on }),
     agentProfileSave: (declared: Declared) => (saved(declared), listed),
     agentProfileRemove: (id: string) => (removed(id), listed),
-    agentProfilesWaiting: () => [],
+    agentProfilesWaiting: () => ({ profiles: [] }),
     agentProfileRead: (command: string) => readBack(command),
     agentSignedIn: (dir: string) => (asked.push(dir), { state: signIn }),
   },

@@ -1,22 +1,26 @@
 //! The person's agent profiles on every machine, without their secrets.
 //!
 //! A profile is a record, `profile:<id>`, by the id minted once when it was
-//! made. Its label, agent, program, arguments and models travel. Of its
-//! environment every name travels, so another machine knows what to ask
-//! for, and a value only for names on an allowlist: the account's config
-//! folder (as `~/…`), base URLs, model names and the timeout. Every other
-//! value arrives empty and is filled on each machine; a value filled here is
-//! never overwritten by an empty one.
+//! made. Its label, agent, program (a bare name), models and the names of
+//! its variables travel; its arguments stay where they were typed. A
+//! variable's value travels only for a config folder (as `~/…`), a base URL
+//! without credentials in it, a model name and the timeout, and never for a
+//! name that reads as a secret. Every other value arrives empty and is asked
+//! for on each machine; a value filled here is never emptied from elsewhere.
 //!
-//! A base URL decides where a profile's token is sent, so one changed on
-//! another machine does not replace this machine's: it waits in
-//! `agents.profiles.pending`, apart from the profile so an edit does not drop
-//! it, until the person takes it here or keeps their own.
+//! What decides what runs or where a token goes — the agent, the program, a
+//! base URL — never changes here on another machine's word: it waits in the
+//! profile's `shadow` for the person's yes, and a profile that arrived from
+//! another machine does not start until they take it. A value this machine
+//! keeps its own (a config folder outside home) stays, and the synced one is
+//! kept beside it. A profile or a variable removed here is a tombstone, so
+//! a round never brings it back. All of this is `agents.profiles.synced`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use devpit_core::{preference as key, Store};
+use devpit_core::{preference as key, Store, PROFILES_WRITE};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::space::{Here, Namespace, Seen};
@@ -24,10 +28,66 @@ use crate::space::{Here, Namespace, Seen};
 pub const LABEL: &str = "label";
 pub const BASE: &str = "base";
 pub const COMMAND: &str = "command";
-pub const ARGS: &str = "args";
 pub const MODELS: &str = "models";
-/// `env.<NAME>`: the value when the name is on the allowlist, else empty.
+/// `env.<NAME>`: the value when it may travel, else empty; cleared when the
+/// variable was removed.
 pub const ENV: &str = "env.";
+/// Set when the profile was removed: it is not made again anywhere.
+pub const REMOVED: &str = "removed";
+
+/// What sync keeps about this machine's profiles.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Kept {
+    #[serde(default)]
+    pub profiles: BTreeMap<String, Held>,
+    /// Profiles removed here or elsewhere.
+    #[serde(default)]
+    pub removed: BTreeSet<String>,
+}
+
+/// What sync keeps about one profile.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Held {
+    /// A field's synced value that this machine does not use: one waiting
+    /// for the person's yes (`ask`), or one beside a value kept here.
+    #[serde(default)]
+    pub shadow: BTreeMap<String, Shadow>,
+    /// Variables that arrived empty, to be filled here.
+    #[serde(default)]
+    pub needs: BTreeSet<String>,
+    /// Made here from another machine and not yet taken by the person.
+    #[serde(default)]
+    pub arrived: bool,
+    /// Its variables' names as last seen, and those removed since.
+    #[serde(default)]
+    pub env: BTreeSet<String>,
+    #[serde(default)]
+    pub cleared: BTreeSet<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Shadow {
+    pub value: String,
+    #[serde(default)]
+    pub ask: bool,
+}
+
+/// What sync keeps, read from the store; empty when it cannot be read.
+pub fn kept(store: &Store) -> Kept {
+    store
+        .preference(key::AGENT_PROFILES_SYNCED)
+        .ok()
+        .flatten()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
+}
+
+pub fn keep(store: &Store, kept: &Kept) -> Result<(), String> {
+    let raw = serde_json::to_string(kept).map_err(|err| err.to_string())?;
+    store
+        .set_preference(key::AGENT_PROFILES_SYNCED, &raw)
+        .map_err(|err| err.to_string())
+}
 
 /// The profiles namespace, over this machine's store and home folder.
 pub struct Profiles<'a> {
@@ -40,17 +100,29 @@ pub fn identity(id: &str) -> String {
     format!("profile:{id}")
 }
 
+/// A name that reads as a secret, whatever else it says.
+fn secret_like(name: &str) -> bool {
+    let name = name.to_ascii_uppercase();
+    ["TOKEN", "KEY", "SECRET", "PASSWORD", "AUTH"]
+        .iter()
+        .any(|word| name.contains(word))
+}
+
 /// Whether a variable's value travels: what names an account's folder, a
 /// gateway or a model, never what proves who the person is.
 pub fn shared(name: &str) -> bool {
-    matches!(name, "CLAUDE_CONFIG_DIR" | "API_TIMEOUT_MS")
-        || name.ends_with("_BASE_URL")
-        || name.contains("_MODEL")
+    !secret_like(name)
+        && (matches!(name, "CLAUDE_CONFIG_DIR" | "API_TIMEOUT_MS")
+            || name.ends_with("_BASE_URL")
+            || name.contains("_MODEL"))
 }
 
-/// A variable whose change decides where the profile's token goes.
-fn guarded(name: &str) -> bool {
-    name.ends_with("_BASE_URL")
+/// A field whose change decides what runs or where a token is sent.
+pub fn guarded(field: &str) -> bool {
+    matches!(field, BASE | COMMAND)
+        || field
+            .strip_prefix(ENV)
+            .is_some_and(|name| name.ends_with("_BASE_URL"))
 }
 
 fn plain(id: &str) -> bool {
@@ -69,32 +141,77 @@ fn clean(text: &str, longest: usize) -> bool {
     text.chars().count() <= longest && !text.chars().any(char::is_control)
 }
 
+/// A URL with a user, a password or a query in it carries what may be a
+/// secret, and does not travel.
+fn credentialed(value: &str) -> bool {
+    value.split_once("://").is_some_and(|(_, rest)| {
+        let authority = rest.split('/').next().unwrap_or_default();
+        authority.contains('@') || rest.contains('?')
+    })
+}
+
 fn list_of(value: &str) -> Option<Vec<String>> {
     let list: Vec<String> = serde_json::from_str(value).ok()?;
-    (list.len() <= 64 && list.iter().all(|one| clean(one, 4096))).then_some(list)
+    (list.len() <= 64 && list.iter().all(|one| clean(one, 256))).then_some(list)
+}
+
+fn bare(command: &str) -> bool {
+    command.is_empty()
+        || (clean(command, 128)
+            && !command.contains(['/', '\\'])
+            && !command.chars().any(char::is_whitespace))
 }
 
 /// Whether `value` may be written as `field`.
 pub fn fits(field: &str, value: Option<&str>) -> bool {
+    if let Some(name) = field.strip_prefix(ENV) {
+        return env_name(name)
+            && match value {
+                None => true,
+                Some(value) if shared(name) => clean(value, 4096) && !credentialed(value),
+                Some(value) => value.is_empty(),
+            };
+    }
     let Some(value) = value else {
         return false;
     };
     match field {
         LABEL => !value.trim().is_empty() && clean(value, 120),
         BASE => plain(value),
-        COMMAND => {
-            value.is_empty()
-                || (clean(value, 128)
-                    && !value.contains(['/', '\\'])
-                    && !value.chars().any(char::is_whitespace))
-        }
-        ARGS | MODELS => list_of(value).is_some(),
-        field => match field.strip_prefix(ENV) {
-            Some(name) if env_name(name) && shared(name) => clean(value, 4096),
-            Some(name) if env_name(name) => value.is_empty(),
-            _ => false,
-        },
+        COMMAND => bare(value),
+        MODELS => list_of(value).is_some(),
+        REMOVED => value == "1",
+        _ => false,
     }
+}
+
+fn text(profile: &Value, name: &str) -> String {
+    profile[name].as_str().unwrap_or_default().to_owned()
+}
+
+fn vars(profile: &Value) -> Vec<(String, String)> {
+    profile["env"]
+        .as_array()
+        .map(|all| {
+            all.iter()
+                .filter_map(|var| Some((var["name"].as_str()?.to_owned(), text(var, "value"))))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn set_var(profile: &mut Value, name: &str, value: Option<&str>) {
+    let mut kept: Vec<Value> = profile["env"].as_array().cloned().unwrap_or_default();
+    let at = kept.iter().position(|var| var["name"] == name);
+    match (at, value) {
+        (Some(at), Some(value)) => kept[at]["value"] = json!(value),
+        (None, Some(value)) => kept.push(json!({"name": name, "value": value})),
+        (Some(at), None) => {
+            kept.remove(at);
+        }
+        (None, None) => {}
+    }
+    profile["env"] = Value::Array(kept);
 }
 
 impl Profiles<'_> {
@@ -102,8 +219,12 @@ impl Profiles<'_> {
         self.home.to_string_lossy().trim_end_matches('/').to_owned()
     }
 
-    /// A value as another machine may read it: under the home folder as `~`.
+    /// A value as another machine may read it: under the home folder as `~`;
+    /// `None` for a path elsewhere on this machine or a URL with credentials.
     fn portable(&self, value: &str) -> Option<String> {
+        if credentialed(value) {
+            return None;
+        }
         let home = self.home();
         if value == home {
             return Some("~".to_owned());
@@ -111,12 +232,11 @@ impl Profiles<'_> {
         if let Some(rest) = value.strip_prefix(&format!("{home}/")) {
             return Some(format!("~/{rest}"));
         }
-        // A path elsewhere on this machine means nothing on another.
         (!value.starts_with('/')).then(|| value.to_owned())
     }
 
     /// A value from another machine, under this one's home.
-    fn local(&self, value: &str) -> String {
+    pub fn local(&self, value: &str) -> String {
         match value.strip_prefix("~/") {
             Some(rest) => format!("{}/{rest}", self.home()),
             None if value == "~" => self.home(),
@@ -138,56 +258,74 @@ impl Profiles<'_> {
         Ok(serde_json::from_str::<Vec<Value>>(&raw).ok())
     }
 
-    /// What waits for the person, by profile id and name.
-    pub fn pending(&self) -> Result<BTreeMap<String, BTreeMap<String, String>>, String> {
-        let raw = self
-            .store
-            .preference(key::AGENT_PROFILES_PENDING)
-            .map_err(|err| err.to_string())?
-            .unwrap_or_default();
-        Ok(serde_json::from_str(&raw).unwrap_or_default())
-    }
-
-    fn keep_pending(&self, all: &BTreeMap<String, BTreeMap<String, String>>) -> Result<(), String> {
-        self.store
-            .set_preference(key::AGENT_PROFILES_PENDING, &json!(all).to_string())
-            .map_err(|err| err.to_string())
-    }
-
-    fn keep(&self, list: &[Value]) -> Result<(), String> {
+    fn keep_list(&self, list: &[Value]) -> Result<(), String> {
         self.store
             .set_preference(key::AGENT_PROFILES, &Value::from(list.to_vec()).to_string())
             .map_err(|err| err.to_string())
     }
-}
 
-fn text(profile: &Value, name: &str) -> String {
-    profile[name].as_str().unwrap_or_default().to_owned()
-}
+    fn fields(&self, profile: &Value, held: &mut Held) -> BTreeMap<String, Seen> {
+        let mut fields = BTreeMap::new();
+        let mut put = |field: String, value: Option<String>| {
+            if fits(&field, value.as_deref()) {
+                fields.insert(field, Seen::of(value, None));
+            }
+        };
+        let shadowed = |field: &str| held.shadow.get(field).map(|one| one.value.clone());
+        put(LABEL.to_owned(), Some(text(profile, LABEL)));
+        put(
+            BASE.to_owned(),
+            Some(shadowed(BASE).unwrap_or_else(|| text(profile, BASE))),
+        );
+        let command = text(profile, COMMAND);
+        let command = shadowed(COMMAND).unwrap_or(if bare(&command) {
+            command
+        } else {
+            String::new()
+        });
+        put(COMMAND.to_owned(), Some(command));
+        let models = profile[MODELS].as_array().cloned().unwrap_or_default();
+        put(MODELS.to_owned(), Some(Value::from(models).to_string()));
 
-fn vars(profile: &Value, name: &str) -> Vec<(String, String)> {
-    profile[name]
-        .as_array()
-        .map(|all| {
-            all.iter()
-                .filter_map(|var| Some((var["name"].as_str()?.to_owned(), text(var, "value"))))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn set_var(profile: &mut Value, list: &str, name: &str, value: Option<&str>) {
-    let mut kept: Vec<Value> = profile[list].as_array().cloned().unwrap_or_default();
-    let at = kept.iter().position(|var| var["name"] == name);
-    match (at, value) {
-        (Some(at), Some(value)) => kept[at]["value"] = json!(value),
-        (None, Some(value)) => kept.push(json!({"name": name, "value": value})),
-        (Some(at), None) => {
-            kept.remove(at);
+        let env = vars(profile);
+        let now: BTreeSet<String> = env.iter().map(|(name, _)| name.clone()).collect();
+        for gone in held.env.difference(&now) {
+            held.cleared.insert(gone.clone());
         }
-        (None, None) => {}
+        held.cleared.retain(|name| !now.contains(name));
+        held.env = now;
+        // A value kept here that can travel again is this machine's to send.
+        let portable: BTreeSet<String> = env
+            .iter()
+            .filter(|(_, value)| self.portable(value).is_some())
+            .map(|(name, _)| format!("{ENV}{name}"))
+            .collect();
+        held.shadow
+            .retain(|field, one| one.ask || !portable.contains(field));
+
+        for (name, value) in &env {
+            let field = format!("{ENV}{name}");
+            let value = match (shared(name), held.shadow.get(&field)) {
+                (false, _) => Some(String::new()),
+                (true, Some(one)) => Some(one.value.clone()),
+                (true, None) => self.portable(value),
+            };
+            if value.is_some() {
+                put(field, value);
+            }
+        }
+        // A value that waits for a variable this machine does not have yet.
+        let have: BTreeSet<String> = env.iter().map(|(name, _)| format!("{ENV}{name}")).collect();
+        for (field, one) in &held.shadow {
+            if field.starts_with(ENV) && !have.contains(field) {
+                put(field.clone(), Some(one.value.clone()));
+            }
+        }
+        for name in &held.cleared {
+            put(format!("{ENV}{name}"), None);
+        }
+        fields
     }
-    profile[list] = Value::Array(kept);
 }
 
 impl Namespace for Profiles<'_> {
@@ -196,76 +334,71 @@ impl Namespace for Profiles<'_> {
     }
 
     fn here(&self) -> Result<Here, String> {
+        let _held = PROFILES_WRITE.lock().map_err(|err| err.to_string())?;
+        let Some(list) = self.list()? else {
+            return Ok(Here::new());
+        };
+        let mut kept = kept(self.store);
+        let before = kept.clone();
+        let present: BTreeSet<String> = list.iter().map(|one| text(one, "id")).collect();
+        // Known here and gone: the person removed it.
+        let gone: Vec<String> = kept
+            .profiles
+            .keys()
+            .filter(|id| !present.contains(*id))
+            .cloned()
+            .collect();
+        for id in gone {
+            kept.profiles.remove(&id);
+            kept.removed.insert(id);
+        }
         let mut here = Here::new();
-        let waiting = self.pending()?;
-        for profile in self.list()?.unwrap_or_default() {
-            let id = text(&profile, "id");
+        for profile in &list {
+            let id = text(profile, "id");
             // Not a profile anyone could start: nothing to carry.
             if !plain(&id)
-                || !fits(LABEL, Some(&text(&profile, LABEL)))
-                || !fits(BASE, Some(&text(&profile, BASE)))
+                || !fits(LABEL, Some(&text(profile, LABEL)))
+                || !fits(BASE, Some(&text(profile, BASE)))
+                || kept.removed.contains(&id)
             {
                 continue;
             }
+            let held = kept.profiles.entry(id.clone()).or_default();
+            here.insert(identity(&id), self.fields(profile, held));
+        }
+        for id in &kept.removed {
             let mut fields = BTreeMap::new();
-            let mut put = |field: String, value: String| {
-                if fits(&field, Some(&value)) {
-                    fields.insert(field, Seen::of(Some(value), None));
-                }
-            };
-            put(LABEL.to_owned(), text(&profile, LABEL));
-            put(BASE.to_owned(), text(&profile, BASE));
-            let command = text(&profile, COMMAND);
-            put(
-                COMMAND.to_owned(),
-                if fits(COMMAND, Some(&command)) {
-                    command
-                } else {
-                    String::new()
-                },
-            );
-            put(
-                ARGS.to_owned(),
-                profile[ARGS]
-                    .as_array()
-                    .map(|all| Value::from(all.clone()).to_string())
-                    .unwrap_or_else(|| "[]".to_owned()),
-            );
-            put(
-                MODELS.to_owned(),
-                profile[MODELS]
-                    .as_array()
-                    .map(|all| Value::from(all.clone()).to_string())
-                    .unwrap_or_else(|| "[]".to_owned()),
-            );
-            let none = BTreeMap::new();
-            let pending = waiting.get(&id).unwrap_or(&none);
-            for (name, value) in vars(&profile, "env") {
-                if !shared(&name) {
-                    put(format!("{ENV}{name}"), String::new());
-                    continue;
-                }
-                // What waits for the person here is what settled.
-                let value = pending.get(&name).unwrap_or(&value);
-                if let Some(portable) = self.portable(value) {
-                    put(format!("{ENV}{name}"), portable);
-                }
-            }
-            here.insert(identity(&id), fields);
+            fields.insert(REMOVED.to_owned(), Seen::of(Some("1".to_owned()), None));
+            here.insert(identity(id), fields);
+        }
+        if kept != before {
+            keep(self.store, &kept)?;
         }
         Ok(here)
     }
 
     fn write(&self, record: &str, field: &str, value: Option<&str>) -> Result<(), String> {
-        let (Some(id), Some(value)) = (record.strip_prefix("profile:"), value) else {
+        let _held = PROFILES_WRITE.lock().map_err(|err| err.to_string())?;
+        let Some(id) = record.strip_prefix("profile:").filter(|id| plain(id)) else {
             return Ok(());
         };
-        if !plain(id) || !fits(field, Some(value)) {
+        if !fits(field, value) {
             return Ok(());
         }
         let Some(mut list) = self.list()? else {
             return Ok(());
         };
+        let mut kept = kept(self.store);
+        if field == REMOVED {
+            list.retain(|one| one["id"] != id);
+            kept.profiles.remove(id);
+            kept.removed.insert(id.to_owned());
+            self.keep_list(&list)?;
+            return keep(self.store, &kept);
+        }
+        if kept.removed.contains(id) {
+            return Ok(());
+        }
         let at = match list.iter().position(|one| one["id"] == id) {
             Some(at) => at,
             None => {
@@ -273,48 +406,94 @@ impl Namespace for Profiles<'_> {
                     "id": id, "label": "", "base": "", "command": "",
                     "args": [], "env": [], "models": []
                 }));
+                kept.profiles.entry(id.to_owned()).or_default().arrived = true;
                 list.len() - 1
             }
         };
+        let held = kept.profiles.entry(id.to_owned()).or_default();
         let profile = &mut list[at];
-        match field {
-            LABEL | BASE | COMMAND => profile[field] = json!(value),
-            ARGS | MODELS => profile[field] = json!(list_of(value).unwrap_or_default()),
-            field => {
+        match (field, value) {
+            (LABEL, Some(value)) => profile[LABEL] = json!(value),
+            (MODELS, Some(value)) => profile[MODELS] = json!(list_of(value).unwrap_or_default()),
+            (BASE | COMMAND, Some(value)) => {
+                let now = text(profile, field);
+                if now == value {
+                    held.shadow.remove(field);
+                } else if held.arrived && now.is_empty() {
+                    profile[field] = json!(value);
+                } else {
+                    // A program named by its path here stays; any other
+                    // change to what runs waits for the person.
+                    let ask = field != COMMAND || bare(&now);
+                    held.shadow.insert(
+                        field.to_owned(),
+                        Shadow {
+                            value: value.to_owned(),
+                            ask,
+                        },
+                    );
+                }
+            }
+            (field, value) => {
                 let Some(name) = field.strip_prefix(ENV) else {
                     return Ok(());
                 };
-                let now = vars(profile, "env")
+                let now = vars(profile)
                     .into_iter()
                     .find(|(one, _)| one == name)
                     .map(|(_, value)| value);
-                if !shared(name) {
-                    // A secret: named here so it can be asked for, never
-                    // emptied once this machine has it.
-                    if now.is_none() {
-                        set_var(profile, "env", name, Some(""));
+                match value {
+                    None => {
+                        set_var(profile, name, None);
+                        held.env.remove(name);
+                        held.needs.remove(name);
+                        held.shadow.remove(field);
+                        held.cleared.insert(name.to_owned());
                     }
-                } else {
-                    let value = self.local(value);
-                    let mut waiting = self.pending()?;
-                    let mine = waiting.entry(id.to_owned()).or_default();
-                    match now {
-                        Some(now) if guarded(name) && !now.is_empty() && now != value => {
-                            mine.insert(name.to_owned(), value);
-                        }
-                        _ => {
-                            set_var(profile, "env", name, Some(&value));
-                            mine.remove(name);
+                    Some(_) if !shared(name) => {
+                        held.cleared.remove(name);
+                        // A secret: named so it can be asked for, never
+                        // emptied once this machine has it.
+                        if now.is_none() {
+                            set_var(profile, name, Some(""));
+                            held.env.insert(name.to_owned());
+                            held.needs.insert(name.to_owned());
                         }
                     }
-                    waiting.retain(|_, names| !names.is_empty());
-                    if waiting != self.pending()? {
-                        self.keep_pending(&waiting)?;
+                    Some(value) => {
+                        held.cleared.remove(name);
+                        let local = self.local(value);
+                        let mine = now.as_deref().filter(|now| !now.is_empty());
+                        if mine.is_some_and(|now| self.portable(now).is_none()) {
+                            held.shadow.insert(
+                                field.to_owned(),
+                                Shadow {
+                                    value: value.to_owned(),
+                                    ask: false,
+                                },
+                            );
+                        } else if guarded(field)
+                            && !held.arrived
+                            && now.as_deref() != Some(local.as_str())
+                        {
+                            held.shadow.insert(
+                                field.to_owned(),
+                                Shadow {
+                                    value: value.to_owned(),
+                                    ask: true,
+                                },
+                            );
+                        } else {
+                            set_var(profile, name, Some(&local));
+                            held.env.insert(name.to_owned());
+                            held.shadow.remove(field);
+                        }
                     }
                 }
             }
         }
-        self.keep(&list)
+        self.keep_list(&list)?;
+        keep(self.store, &kept)
     }
 
     fn welcomes(&self, record: &str) -> bool {

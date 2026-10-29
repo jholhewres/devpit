@@ -21,9 +21,10 @@ pub const OPEN_IN_APPS: &str = "apps.open_in";
 pub const WORKTREES_HIDDEN: &str = "worktrees.hidden";
 /// The agent profiles the person declared, as JSON.
 pub const AGENT_PROFILES: &str = "agents.profiles";
-/// Values another machine gave a profile that wait for the person here, as
-/// JSON `{profile id: [{name, value}]}`: a base URL decides where a token goes.
-pub const AGENT_PROFILES_PENDING: &str = "agents.profiles.pending";
+/// What sync keeps about each profile on this machine: values another
+/// machine gave it that wait for the person's yes or stay apart from this
+/// machine's own, profiles and variables removed here, and which arrived.
+pub const AGENT_PROFILES_SYNCED: &str = "agents.profiles.synced";
 /// What a new terminal opens, by agent or profile id. Empty is a shell.
 pub const AGENT_DEFAULT: &str = "agents.default";
 /// The ids kept out of the menus, as a JSON array.

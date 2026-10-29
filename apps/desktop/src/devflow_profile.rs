@@ -176,6 +176,8 @@ pub(crate) fn of(store: &Store, project_id: &str, asker_config: Option<&Path>) -
     let declared: Vec<Declared> = crate::agent_profiles::declared(store)
         .into_iter()
         .filter(|one| reviews(&one.base))
+        // One that waits for the person here runs nothing, reviewers included.
+        .filter(|one| crate::profile_waiting::blocked(store, &one.id).is_none())
         .collect();
     chosen(
         &declared,

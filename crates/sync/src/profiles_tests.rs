@@ -39,8 +39,18 @@ fn a_value_from_elsewhere_is_held_to_its_rules() {
     assert!(fits(COMMAND, Some("")));
     assert!(!fits(COMMAND, Some("/usr/bin/claude")));
     assert!(!fits(COMMAND, Some("rm -rf")));
-    assert!(fits(ARGS, Some(r#"["--x","y"]"#)));
-    assert!(!fits(ARGS, Some("--x")));
+    assert!(fits(MODELS, Some(r#"["glm-5"]"#)));
+    assert!(
+        !fits("args", Some(r#"["--x","y"]"#)),
+        "arguments stay where they were typed"
+    );
+    assert!(
+        !fits("env.AZURE_MODEL_API_KEY", Some("x")),
+        "a secret's name wins"
+    );
+    assert!(!fits("env.GW_BASE_URL", Some("https://u:p@h/x")));
+    assert!(!fits("env.GW_BASE_URL", Some("https://h/x?key=1")));
+    assert!(fits("env.ANTHROPIC_MODEL", None), "a removed variable");
     assert!(!fits(BASE, Some("../x")));
     assert!(!fits(LABEL, Some(" ")));
     assert!(!fits("other", Some("x")));
@@ -73,7 +83,7 @@ fn an_empty_value_from_elsewhere_never_empties_a_secret_filled_here() {
 
     let list = space.list().expect("list").expect("readable");
     assert_eq!(
-        vars(&list[0], "env"),
+        vars(&list[0]),
         vec![
             ("ANTHROPIC_AUTH_TOKEN".to_owned(), "sk-HERE".to_owned()),
             ("OTHER_TOKEN".to_owned(), String::new()),

@@ -31,3 +31,8 @@ pub use store::{
     Store, StoreError, SyncedProject, DEFAULT_COLUMNS, DEV_ROOT, RELEASE_ROOT, ROOT_NAME,
 };
 pub use tree::TreeError;
+
+/// Held by whatever reads, changes and writes back the agent profiles or
+/// what sync keeps about them: each is one preference written whole, and two
+/// writers at once would each drop the other's change.
+pub static PROFILES_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());

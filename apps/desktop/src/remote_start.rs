@@ -46,6 +46,9 @@ pub(crate) fn session(
     let profiles = crate::agent_profiles::all(&store).map_err(|err| err.message)?;
     let profile = self::profile(&crate::agent_choice::default_id(&store), &profiles)
         .ok_or("no Claude Code account is set up on this machine")?;
+    if let Some(why) = crate::profile_waiting::blocked(&store, &profile) {
+        return Err(why);
+    }
     let projects = crate::projects::project_list_unread_now()
         .map_err(|err| err.message)?
         .projects;
