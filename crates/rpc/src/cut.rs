@@ -48,6 +48,13 @@ pub fn cut_output(output: &str) -> Option<String> {
     let Ok(Value::Array(mut blocks)) = serde_json::from_str::<Value>(output) else {
         return cut_text(output);
     };
+    // Content blocks, as the window reads them, are every item typed; anything else is text.
+    if !blocks
+        .iter()
+        .all(|block| block.get("type").and_then(Value::as_str).is_some())
+    {
+        return cut_text(output);
+    }
     let mut changed = false;
     for block in &mut blocks {
         let Some(kind) = block.get("type").and_then(Value::as_str) else {

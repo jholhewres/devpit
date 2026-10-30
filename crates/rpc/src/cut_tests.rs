@@ -129,6 +129,27 @@ fn an_image_beside_a_large_block_of_another_kind_does_not_carry_it_whole() {
 }
 
 #[test]
+fn an_array_with_an_untyped_item_is_cut_as_text_so_the_window_sees_the_cut() {
+    let output = serde_json::json!([
+        { "type": "text", "text": "x".repeat(20_000) },
+        "loose",
+    ])
+    .to_string();
+    let cut = cut_part(&result(output.clone())).expect("cut");
+    assert!(output_of(&cut).contains(&format!("\n{CUT_MARK}{} bytes in all]\n", output.len())));
+}
+
+#[test]
+fn long_blocks_with_nothing_to_name_or_cut_are_cut_as_text() {
+    let output = serde_json::json!([
+        { "type": "resource", "resource": { "uri": "file:///a", "text": "r".repeat(20_000) } },
+    ])
+    .to_string();
+    let cut = cut_part(&result(output.clone())).expect("cut");
+    assert!(output_of(&cut).len() < WHOLE);
+}
+
+#[test]
 fn a_tool_call_and_the_answer_go_whole() {
     let call = Part::ToolCall {
         id: "call_1".to_owned(),

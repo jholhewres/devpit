@@ -25,7 +25,7 @@ function blocksOf(output: string): readonly Record<string, unknown>[] | null {
 
 /* An image block that still carries its data. */
 const carriesImage = (block: Record<string, unknown>): boolean =>
-  Boolean(block.source) && typeof (block.source as { data?: unknown }).data === 'string'
+  block.type === 'image' && Boolean(block.source) && typeof (block.source as { data?: unknown }).data === 'string'
 
 /* Whether the window got this output cut: the backend's line in a text, or an
    image named instead of carried. An output that merely mentions either is

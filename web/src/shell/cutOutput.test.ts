@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isCut, textOf } from './cutOutput'
+import { imagesOf, isCut, textOf } from './cutOutput'
 
 const cut = 'head\n… [cut: 9000 bytes in all]\ntail'
 
@@ -30,6 +30,15 @@ describe('an output the window got cut', () => {
     expect(textOf('["a","b"]')).toBe('["a","b"]')
     const mixed = JSON.stringify([{ type: 'text', text: 'x' }, 'loose', 7])
     expect(textOf(mixed)).toBe(mixed)
+  })
+
+  it('draws only image blocks as images, a document beside them kept as text', () => {
+    const whole = JSON.stringify([
+      { type: 'document', source: { media_type: 'application/pdf', data: 'JVBERi0x' } },
+      { type: 'image', source: { media_type: 'image/png', data: 'AAAA' } },
+    ])
+    expect(imagesOf(whole)).toEqual(['data:image/png;base64,AAAA'])
+    expect(textOf(whole)).toContain('application/pdf')
   })
 
   it('shows the other blocks of a whole output rather than dropping them', () => {
