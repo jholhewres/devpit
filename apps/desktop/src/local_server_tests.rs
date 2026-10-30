@@ -2,7 +2,14 @@ use std::collections::HashMap;
 
 use super::*;
 
-const PORT: u16 = 41234;
+const NAME: &str = "0123456789abcdef0123456789abcdef.devpit.localhost";
+
+fn place() -> Place {
+    Place {
+        port: 41234,
+        name: NAME.to_owned(),
+    }
+}
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const SESSION: &str = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
 
@@ -30,15 +37,27 @@ fn signed_in(path: &str) -> Request {
 #[test]
 fn without_the_cookie_or_with_a_wrong_one_the_door_says_401() {
     let bare = asked("POST", "/rpc/project_list", &[("host", "127.0.0.1:41234")]);
-    assert_eq!(door(&bare, "", PORT, TOKEN, SESSION), Door::Unauthorized);
+    assert_eq!(
+        door(&bare, "", &place(), TOKEN, SESSION),
+        Door::Unauthorized
+    );
     let wrong = asked(
         "POST",
         "/rpc/project_list",
         &[("host", "127.0.0.1:41234"), ("cookie", "devpit_local=nope")],
     );
-    assert_eq!(door(&wrong, "", PORT, TOKEN, SESSION), Door::Unauthorized);
     assert_eq!(
-        door(&signed_in("/rpc/project_list"), "", PORT, TOKEN, SESSION),
+        door(&wrong, "", &place(), TOKEN, SESSION),
+        Door::Unauthorized
+    );
+    assert_eq!(
+        door(
+            &signed_in("/rpc/project_list"),
+            "",
+            &place(),
+            TOKEN,
+            SESSION
+        ),
         Door::In
     );
     let token_as_cookie = asked(
@@ -50,7 +69,7 @@ fn without_the_cookie_or_with_a_wrong_one_the_door_says_401() {
         ],
     );
     assert_eq!(
-        door(&token_as_cookie, "", PORT, TOKEN, SESSION),
+        door(&token_as_cookie, "", &place(), TOKEN, SESSION),
         Door::Unauthorized,
         "the cookie is this run's session, never the token in the home"
     );
@@ -69,9 +88,15 @@ fn a_foreign_host_or_origin_is_refused_whatever_it_carries() {
         ("127.0.0.1:41234", Some("http://evil.example")),
         ("127.0.0.1:41234", Some("http://127.0.0.1:9999")),
         ("localhost:41234", Some("https://localhost:41234")),
+        ("devpit.localhost:41234", None),
+        ("evil.devpit.localhost:41234", None),
         (
-            "devpit.localhost:41234",
-            Some("http://devpit.localhost:9999"),
+            "0123456789abcdef0123456789abcdef.devpit.localhost:9999",
+            None,
+        ),
+        (
+            "0123456789abcdef0123456789abcdef.devpit.localhost:41234",
+            Some("http://0123456789abcdef0123456789abcdef.devpit.localhost:9999"),
         ),
     ] {
         let mut headers = vec![("host", host), ("cookie", cookie.as_str())];
@@ -80,7 +105,7 @@ fn a_foreign_host_or_origin_is_refused_whatever_it_carries() {
         }
         let request = asked("POST", "/rpc/project_list", &headers);
         assert_eq!(
-            door(&request, "", PORT, TOKEN, SESSION),
+            door(&request, "", &place(), TOKEN, SESSION),
             Door::Foreign,
             "{host} {origin:?}"
         );
@@ -94,32 +119,39 @@ fn a_foreign_host_or_origin_is_refused_whatever_it_carries() {
             ("cookie", cookie.as_str()),
         ],
     );
-    assert_eq!(door(&named, "", PORT, TOKEN, SESSION), Door::In);
+    assert_eq!(door(&named, "", &place(), TOKEN, SESSION), Door::In);
 }
 
-/// The token is traded only under devpit's own name, so the cookie is kept
-/// for that name and not for 127.0.0.1, which every loopback server shares.
+/// The token is traded only under this install's own random name, so the
+/// cookie is kept for a name no other loopback server, on any port, answers.
 #[test]
 fn the_token_is_traded_for_the_cookie_once_and_only_when_it_is_right() {
     for host in ["127.0.0.1:41234", "localhost:41234"] {
         let elsewhere = asked("GET", "/auth", &[("host", host)]);
         assert_eq!(
-            door(&elsewhere, &format!("t={TOKEN}"), PORT, TOKEN, SESSION),
+            door(&elsewhere, &format!("t={TOKEN}"), &place(), TOKEN, SESSION),
             Door::Unauthorized,
             "{host}"
         );
     }
-    let auth = asked("GET", "/auth", &[("host", "devpit.localhost:41234")]);
+    let host = format!("{NAME}:41234");
+    let auth = asked("GET", "/auth", &[("host", host.as_str())]);
     assert_eq!(
-        door(&auth, &format!("t={TOKEN}"), PORT, TOKEN, SESSION),
+        door(&auth, &format!("t={TOKEN}"), &place(), TOKEN, SESSION),
         Door::Admit
     );
     assert_eq!(
-        door(&auth, "t=wrong", PORT, TOKEN, SESSION),
+        door(&auth, "t=wrong", &place(), TOKEN, SESSION),
         Door::Unauthorized
     );
-    assert_eq!(door(&auth, "", PORT, TOKEN, SESSION), Door::Unauthorized);
-    assert_eq!(door(&auth, "x=1", PORT, TOKEN, SESSION), Door::Unauthorized);
+    assert_eq!(
+        door(&auth, "", &place(), TOKEN, SESSION),
+        Door::Unauthorized
+    );
+    assert_eq!(
+        door(&auth, "x=1", &place(), TOKEN, SESSION),
+        Door::Unauthorized
+    );
 }
 
 #[test]
@@ -162,30 +194,41 @@ fn the_token_is_made_once_owner_only_and_kept() {
 #[test]
 fn the_server_binds_loopback_alone_and_keeps_its_port() {
     let home = tempfile::tempdir().expect("home");
-    let listener = bound(home.path()).expect("bound");
+    let (listener, place) = bound(home.path()).expect("bound");
     let address = listener.local_addr().expect("address");
+    assert!(is_own_name(&place.name), "{}", place.name);
     assert!(address.ip().is_loopback(), "{address}");
     let kept: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(home.path().join(PORT_FILE)).expect("port kept"),
     )
     .expect("json");
     assert_eq!(kept["port"], address.port());
+    assert_eq!(kept["name"], place.name.as_str());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(home.path().join(PORT_FILE))
+            .expect("kept")
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "the name is a secret");
+    }
     drop(listener);
-    assert_eq!(
-        bound(home.path())
-            .expect("again")
-            .local_addr()
-            .expect("address")
-            .port(),
-        address.port()
+    let (_again, again) = bound(home.path()).expect("again");
+    assert_eq!(again, place, "the port and the name are kept");
+    let other = tempfile::tempdir().expect("other home");
+    let (_other, elsewhere) = bound(other.path()).expect("other");
+    assert_ne!(
+        elsewhere.name, place.name,
+        "each install has a name of its own"
     );
 }
 
 #[test]
 fn the_sign_in_link_goes_to_loopback() {
     assert_eq!(
-        sign_in_url(PORT, "t0k"),
-        "http://devpit.localhost:41234/auth?t=t0k"
+        sign_in_url(&place(), "t0k"),
+        format!("http://{NAME}:41234/auth?t=t0k")
     );
 }
 

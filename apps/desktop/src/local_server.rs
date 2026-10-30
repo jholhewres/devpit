@@ -1,12 +1,11 @@
 //! devpit on loopback: the same app in a browser at `127.0.0.1:<port>`.
 //!
-//! **Loopback alone, and a cookie at the door.** It never binds anything but
-//! `127.0.0.1`. A browser earns the cookie once, from a token written
-//! owner-only in the home (`/auth?t=…`, then a redirect that takes the token
-//! out of the URL). Every request and every WebSocket upgrade must name this
-//! port on `127.0.0.1` or `localhost` as its `Host`, and a same-port `Origin`
-//! when it has one: a page elsewhere that resolves its own name to 127.0.0.1
-//! (DNS rebinding) is refused before anything runs.
+//! **Loopback alone, and a cookie at the door.** It binds only `127.0.0.1`.
+//! A browser trades the token kept owner-only in the home (`/auth?t=…`) for a
+//! session cookie made per run, under a name of this install's own
+//! (`<random>.localhost`), since a cookie is kept per name and not per port.
+//! `Host` and `Origin` must be this port under that name, `127.0.0.1` or
+//! `localhost`, which refuses DNS rebinding before anything runs.
 //!
 //! **One way in for every command.** `POST /rpc/<command>` hands the call to
 //! the main webview's own invoke handler, as the window's IPC does, so a
@@ -24,15 +23,12 @@ use std::time::Duration;
 
 use crate::remote_http::{read_up_to, reply, Request};
 
-/// The port, in the home, so "open in Chrome" and a restart find it.
+/// The port and the name, owner-only in the home, so "open in Chrome" and a
+/// restart find them.
 pub(crate) const PORT_FILE: &str = "local.json";
 /// The token a browser trades for its cookie, owner-only in the home.
 pub(crate) const TOKEN_FILE: &str = "local-token";
 const COOKIE: &str = "devpit_local";
-/// The name the browser is sent to. A cookie is kept per host, not per port,
-/// so on `127.0.0.1` every other loopback server would be sent it too; a
-/// `*.localhost` name resolves to loopback and is this server's alone.
-pub(crate) const HOST: &str = "devpit.localhost";
 /// The largest call a browser sends: a pasted picture (8 MiB, as base64) or a
 /// saved file, with room for the JSON around it.
 const MOST_BODY: usize = 16 * 1024 * 1024;
@@ -59,25 +55,41 @@ pub(crate) fn desktop_only(command: &str) -> bool {
             .any(|family| command.starts_with(family))
 }
 
-/// The hosts this server answers for, on its own port.
-fn ours(host: &str, port: u16) -> bool {
-    ["127.0.0.1", "localhost", HOST]
-        .iter()
-        .any(|name| host == format!("{name}:{port}"))
+/// Where this server is: its port, and the name it signs a browser in under.
+/// A cookie is kept per name, not per port, so the name is this install's own
+/// and random: no other loopback server is ever reached by it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Place {
+    pub port: u16,
+    pub name: String,
+}
+
+impl Place {
+    /// `host:port` under the name the cookie is kept for.
+    fn signed_in_host(&self) -> String {
+        format!("{}:{}", self.name, self.port)
+    }
+
+    fn ours(&self, host: &str) -> bool {
+        host == self.signed_in_host()
+            || ["127.0.0.1", "localhost"]
+                .iter()
+                .any(|name| host == format!("{name}:{}", self.port))
+    }
 }
 
 /// The `Host` a request must carry: this port on loopback, by number or name.
-pub(crate) fn host_allowed(host: Option<&str>, port: u16) -> bool {
-    host.is_some_and(|host| ours(host, port))
+pub(crate) fn host_allowed(host: Option<&str>, place: &Place) -> bool {
+    host.is_some_and(|host| place.ours(host))
 }
 
 /// No `Origin` (a top-level navigation, curl) or this very origin.
-pub(crate) fn origin_allowed(origin: Option<&str>, port: u16) -> bool {
+pub(crate) fn origin_allowed(origin: Option<&str>, place: &Place) -> bool {
     match origin {
         None => true,
         Some(origin) => origin
             .strip_prefix("http://")
-            .is_some_and(|host| ours(host, port)),
+            .is_some_and(|host| place.ours(host)),
     }
 }
 
@@ -122,16 +134,22 @@ pub(crate) enum Door {
 
 /// `token` is the one in the home, traded once per browser at `/auth`;
 /// `session` is the cookie it is traded for, made for this run of the app.
-pub(crate) fn door(request: &Request, query: &str, port: u16, token: &str, session: &str) -> Door {
-    if !host_allowed(request.header("host"), port)
-        || !origin_allowed(request.header("origin"), port)
+pub(crate) fn door(
+    request: &Request,
+    query: &str,
+    place: &Place,
+    token: &str,
+    session: &str,
+) -> Door {
+    if !host_allowed(request.header("host"), place)
+        || !origin_allowed(request.header("origin"), place)
     {
         return Door::Foreign;
     }
     if request.method == "GET" && request.path == "/auth" {
-        /* Signed in only under its own name, so the cookie is never kept for
-        127.0.0.1, where every other loopback server would be sent it. */
-        if request.header("host") != Some(&format!("{HOST}:{port}")) {
+        /* Signed in only under this install's own name: a cookie kept for
+        127.0.0.1 or a shared name would reach every other server there. */
+        if request.header("host") != Some(&place.signed_in_host()) {
             return Door::Unauthorized;
         }
         return match token_in_query(query) {
@@ -147,7 +165,11 @@ pub(crate) fn door(request: &Request, query: &str, port: u16, token: &str, sessi
 
 /// 32 random bytes, as hex.
 pub(crate) fn secret() -> std::io::Result<String> {
-    let mut bytes = [0u8; 32];
+    random_hex::<32>()
+}
+
+fn random_hex<const N: usize>() -> std::io::Result<String> {
+    let mut bytes = [0u8; N];
     getrandom::fill(&mut bytes).map_err(|err| std::io::Error::other(err.to_string()))?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
@@ -162,49 +184,74 @@ pub(crate) fn token_in(home: &Path) -> std::io::Result<String> {
         }
     }
     let token = secret()?;
+    owner_only(&path, &token)?;
+    Ok(token)
+}
+
+/// Writes `text` to `path`, readable by its owner alone from the first byte.
+fn owner_only(path: &Path, text: &str) -> std::io::Result<()> {
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    let mut file = options.open(&path)?;
+    let mut file = options.open(path)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
     }
-    file.write_all(token.as_bytes())?;
-    Ok(token)
+    file.write_all(text.as_bytes())
 }
 
-/// The listener on loopback: the port kept in the home when it is free, else
-/// any, written back for next time.
-pub(crate) fn bound(home: &Path) -> std::io::Result<TcpListener> {
-    let kept: Option<u16> = std::fs::read_to_string(home.join(PORT_FILE))
+/// A name this install signs in under: random, so no other server shares it,
+/// and under `.localhost`, which a browser resolves to loopback.
+fn is_own_name(name: &str) -> bool {
+    name.strip_suffix(".devpit.localhost").is_some_and(|label| {
+        label.len() == 32
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    })
+}
+
+/// The listener on loopback, and where it is: the port and name kept in the
+/// home, the port when it is still free, written back for next time.
+pub(crate) fn bound(home: &Path) -> std::io::Result<(TcpListener, Place)> {
+    let kept: serde_json::Value = std::fs::read_to_string(home.join(PORT_FILE))
         .ok()
-        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-        .and_then(|value| value["port"].as_u64())
-        .and_then(|port| u16::try_from(port).ok());
-    let listener = kept
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default();
+    let listener = kept["port"]
+        .as_u64()
+        .and_then(|port| u16::try_from(port).ok())
         .and_then(|port| TcpListener::bind(("127.0.0.1", port)).ok())
         .map_or_else(|| TcpListener::bind(("127.0.0.1", 0)), Ok)?;
-    let port = listener.local_addr()?.port();
-    let _ = std::fs::write(
-        home.join(PORT_FILE),
-        serde_json::json!({ "port": port }).to_string(),
+    let name = match kept["name"].as_str().filter(|name| is_own_name(name)) {
+        Some(name) => name.to_owned(),
+        None => format!("{}.devpit.localhost", random_hex::<16>()?),
+    };
+    let place = Place {
+        port: listener.local_addr()?.port(),
+        name,
+    };
+    /* Owner-only: the name is what keeps the cookie from other servers. */
+    let _ = owner_only(
+        &home.join(PORT_FILE),
+        &serde_json::json!({ "port": place.port, "name": place.name }).to_string(),
     );
-    Ok(listener)
+    Ok((listener, place))
 }
 
 /// Where the browser is sent to sign in, token and all: for "open in Chrome".
-pub(crate) fn sign_in_url(port: u16, token: &str) -> String {
-    format!("http://{HOST}:{port}/auth?t={token}")
+pub(crate) fn sign_in_url(place: &Place, token: &str) -> String {
+    format!("http://{}/auth?t={token}", place.signed_in_host())
 }
 
-static PORT: Mutex<Option<u16>> = Mutex::new(None);
+static PLACE: Mutex<Option<Place>> = Mutex::new(None);
 
-/// The port the server is on, once it is.
-pub(crate) fn port() -> Option<u16> {
-    *PORT.lock().ok()?
+/// Where the server is, once it is.
+pub(crate) fn place() -> Option<Place> {
+    PLACE.lock().ok()?.clone()
 }
 
 /// Starts the server on loopback, its door kept by `token`. Each request
@@ -212,21 +259,22 @@ pub(crate) fn port() -> Option<u16> {
 pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> {
     let token = token_in(home)?;
     let session = secret()?;
-    let listener = bound(home)?;
-    let port = listener.local_addr()?.port();
-    if let Ok(mut kept) = PORT.lock() {
-        *kept = Some(port);
+    let (listener, place) = bound(home)?;
+    let port = place.port;
+    if let Ok(mut kept) = PLACE.lock() {
+        *kept = Some(place.clone());
     }
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
-            let (app, token, session) = (app.clone(), token.clone(), session.clone());
-            std::thread::spawn(move || serve(app, stream, port, &token, &session));
+            let (app, place, token, session) =
+                (app.clone(), place.clone(), token.clone(), session.clone());
+            std::thread::spawn(move || serve(app, stream, &place, &token, &session));
         }
     });
     Ok(port)
 }
 
-fn serve(app: tauri::AppHandle, mut stream: TcpStream, port: u16, token: &str, session: &str) {
+fn serve(app: tauri::AppHandle, mut stream: TcpStream, place: &Place, token: &str, session: &str) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
     let Some(reader) = stream.try_clone().ok() else {
         return;
@@ -236,7 +284,7 @@ fn serve(app: tauri::AppHandle, mut stream: TcpStream, port: u16, token: &str, s
         reply(&mut stream, "400 Bad Request", "text/plain", b"");
         return;
     };
-    match door(&request, &query, port, token, session) {
+    match door(&request, &query, place, token, session) {
         Door::Foreign => reply(
             &mut stream,
             "403 Forbidden",
@@ -308,14 +356,14 @@ pub(crate) fn opener(found: impl Fn(&str) -> bool) -> (&'static str, bool) {
 /// window's thread. The token goes on the command line of a process the
 /// person's own user runs, and leaves the URL at the first redirect.
 pub(crate) fn open_in_browser() {
-    let (Some(port), Ok(home)) = (port(), devpit_core::Store::root()) else {
+    let (Some(place), Ok(home)) = (place(), devpit_core::Store::root()) else {
         return;
     };
     let Ok(token) = token_in(&home) else {
         return;
     };
     std::thread::spawn(move || {
-        let url = sign_in_url(port, &token);
+        let url = sign_in_url(&place, &token);
         let path = devpit_pty::login_path::search_path();
         let (program, app) = opener(|name| {
             devpit_pty::host_env::found_on(path, std::ffi::OsStr::new(name)).is_some()
