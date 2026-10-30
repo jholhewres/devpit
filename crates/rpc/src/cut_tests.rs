@@ -65,6 +65,17 @@ fn a_cut_inside_a_character_moves_to_its_edge() {
 }
 
 #[test]
+fn a_small_image_loses_its_data_too() {
+    let output = serde_json::json!([
+        { "type": "image", "source": { "type": "base64", "media_type": "image/jpeg", "data": "/9j/AAAA" } },
+    ])
+    .to_string();
+    assert!(output.len() < WHOLE);
+    let cut = cut_part(&result(output)).expect("named");
+    assert!(!output_of(&cut).contains("/9j/"));
+}
+
+#[test]
 fn an_image_is_named_with_its_size_and_loses_its_data() {
     let data = "A".repeat(400_000);
     let output = serde_json::json!([
@@ -143,7 +154,20 @@ fn a_real_transcript_crosses_under_thirteen_megabytes() {
         cut_message(&mut message);
         let said = serde_json::to_string(&message).expect("json");
         images += said.matches(r#"\"cut\":true"#).count();
-        assert!(!said.contains("iVBORw0KGgo"), "a PNG's data crossed");
+        for part in &message.parts {
+            let Part::ToolResult { output, .. } = part else {
+                continue;
+            };
+            let Ok(Value::Array(blocks)) = serde_json::from_str::<Value>(output) else {
+                continue;
+            };
+            assert!(
+                blocks
+                    .iter()
+                    .all(|block| block["type"] != "image" || block.get("source").is_none()),
+                "an image's data crossed"
+            );
+        }
         cut += said.len();
     }
     eprintln!("whole {whole} bytes, cut {cut} bytes, {images} images named");

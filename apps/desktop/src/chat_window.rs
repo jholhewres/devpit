@@ -31,13 +31,17 @@ pub async fn chat_history(
 #[tauri::command]
 #[specta::specta]
 pub async fn chat_part_full(
+    relay: tauri::State<'_, crate::chat_relay::Relay>,
     project_id: String,
     conversation_id: String,
     message_id: String,
     call_id: String,
 ) -> Result<Part, RpcError> {
+    conversation(&conversation_id)?;
+    if let Some(part) = relay.running_output(&conversation_id, &message_id, &call_id) {
+        return Ok(part);
+    }
     crate::off_main::blocking(move || {
-        conversation(&conversation_id)?;
         let sessions = crate::projects::project_home(&project_id)?.sessions();
         let file = conversation_path(&sessions, &conversation_id);
         whole_output(read(&file).0, &message_id, &call_id).ok_or_else(|| {

@@ -44,9 +44,7 @@ pub fn cut_text(text: &str) -> Option<String> {
 /// blocks: an image keeps its kind and size and loses its data, and each text
 /// is cut on its own. Anything else is text.
 pub fn cut_output(output: &str) -> Option<String> {
-    if output.len() <= WHOLE {
-        return None;
-    }
+    // Blocks are looked into at any length: an image is never carried, however small.
     let Ok(Value::Array(mut blocks)) = serde_json::from_str::<Value>(output) else {
         return cut_text(output);
     };

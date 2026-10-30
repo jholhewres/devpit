@@ -64,7 +64,7 @@ export const Turn = memo(function Turn({
       <Acts parts={doing} live={message.streaming} messageId={message.id} />
       <TurnDelegations parts={message.parts} />
       <TurnDrafts parts={message.parts} />
-      <TurnApps parts={message.parts} />
+      <TurnApps parts={message.parts} messageId={message.id} />
       {said.map((content, at) => (
         <pre className="said__cmd" key={`c${at}`}>
           {content}

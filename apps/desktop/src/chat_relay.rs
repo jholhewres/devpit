@@ -244,6 +244,33 @@ impl Relay {
         Some(heard)
     }
 
+    /// The output answering `call_id` in message `message_id` of a turn still
+    /// running, as the agent sent it: a running turn is not in the transcript
+    /// yet, and its frames are kept whole here.
+    pub(crate) fn running_output(
+        &self,
+        conversation: &str,
+        message_id: &str,
+        call_id: &str,
+    ) -> Option<Part> {
+        let all = self.0.lock().ok()?;
+        all.by_conversation
+            .get(conversation)?
+            .iter()
+            .find_map(|turn| {
+                turn.frames.iter().find_map(|frame| match frame {
+                    Frame::Part {
+                        message_id: of,
+                        part:
+                            part @ Part::ToolResult {
+                                call_id: answers, ..
+                            },
+                    } if of == message_id && answers == call_id => Some(part.clone()),
+                    _ => None,
+                })
+            })
+    }
+
     /// Whether a turn runs, or waits to, in this conversation.
     pub(crate) fn running(&self, conversation: &str) -> bool {
         self.0

@@ -207,3 +207,29 @@ fn a_window_is_sent_a_long_output_cut_and_the_relay_keeps_it_whole() {
     };
     assert_eq!(kept, long);
 }
+
+/// A turn still running is not in the transcript yet: its whole outputs are
+/// read from what the relay kept.
+#[test]
+fn a_running_turns_output_is_found_whole_in_the_relay() {
+    let relay = Relay::default();
+    let (window, _) = heard();
+    let (turn, _running) = relay.open("conv", super::for_window(window));
+    let long = "y".repeat(50_000);
+    turn.send(Frame::Part {
+        message_id: "m".to_owned(),
+        part: Part::ToolResult {
+            call_id: "c".to_owned(),
+            output: long.clone(),
+            is_error: false,
+            parent: None,
+        },
+    })
+    .unwrap();
+    let Some(Part::ToolResult { output, .. }) = relay.running_output("conv", "m", "c") else {
+        panic!("the output");
+    };
+    assert_eq!(output, long);
+    assert_eq!(relay.running_output("conv", "m", "other"), None);
+    assert_eq!(relay.running_output("elsewhere", "m", "c"), None);
+}
