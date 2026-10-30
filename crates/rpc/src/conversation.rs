@@ -41,6 +41,8 @@ pub struct Conversation {
     /// ties a permission question back to the conversation that raised it.
     pub session_id: Option<String>,
     pub messages: Vec<Message>,
+    /// Whether messages older than these are left, when a page was asked for.
+    pub older: bool,
     pub cost_usd: f64,
     /// How full the context was when the last turn ended.
     #[serde(default)]

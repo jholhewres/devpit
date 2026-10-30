@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use devpit_agentcli::driver::driver;
 use devpit_agentcli::head::{head_path, read_head, remaining, settled, write_head};
-use devpit_agentcli::store::{append, conversation_path, read};
+use devpit_agentcli::store::{append, conversation_path};
 use devpit_agentcli::talk::{Said, Say};
 use devpit_rpc::{Ask, Conversation, ErrorCode, Frame, Message, RpcError, TurnEnd};
 use tauri::ipc::Channel;
@@ -45,45 +45,7 @@ pub(crate) fn chat_history_now(
     project_id: String,
     conversation_id: String,
 ) -> Result<Conversation, RpcError> {
-    let sessions = crate::projects::project_home(&project_id)?.sessions();
-    let file = conversation_path(&sessions, &conversation_id);
-    let (messages, skipped) = read(&file);
-    if skipped > 0 {
-        // Reported rather than hidden: a conversation missing a line should
-        // say so, not quietly show less than happened.
-        eprintln!("{conversation_id}: {skipped} unreadable line(s)");
-    }
-    let head = read_head(&head_path(&sessions, &conversation_id));
-    let messages =
-        crate::adopted_history::or_backfilled(messages, head.as_ref(), &project_id, &file);
-    let card = crate::card_chat::conversation_card(&crate::projects::store()?, &conversation_id)?;
-    let told = crate::chat_window::conversation_head(head.as_ref());
-    Ok(Conversation {
-        id: conversation_id,
-        project_id,
-        card_id: card.id,
-        card_title: card.title,
-        card_on_board: card.on_board,
-        // Empty until the first turn settles it: a conversation nobody has
-        // spoken in belongs to no account yet.
-        profile: head
-            .as_ref()
-            .map(|head| head.profile.clone())
-            .unwrap_or_default(),
-        model: head.as_ref().and_then(|head| head.model.clone()),
-        permission: head.as_ref().and_then(|head| head.permission.clone()),
-        effort: head.as_ref().and_then(|head| head.effort.clone()),
-        cwd: head.as_ref().and_then(|head| head.cwd.clone()),
-        session_id: told.session_id,
-        cost_usd: told.cost_usd,
-        context: told.context,
-        rewindable: told.rewindable,
-        created_at: head
-            .map(|head| head.created_at)
-            .or_else(|| messages.first().map(|first| first.created_at))
-            .unwrap_or_else(now),
-        messages,
-    })
+    crate::chat_window::chat_page_now(project_id, conversation_id, None)
 }
 
 /// `chat.send` — one turn, streamed as it happens.

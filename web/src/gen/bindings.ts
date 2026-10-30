@@ -74,8 +74,11 @@ export const commands = {
 	 *  An empty name takes them out of the group.
 	 */
 	projectGroupRename: (from: string, to: string) => typedError<ProjectList, RpcError>(__TAURI_INVOKE("project_group_rename", { from, to })),
-	/**  `chat.history` — everything said in this conversation, in order. */
-	chatHistory: (projectId: string, conversationId: string) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId })),
+	/**
+	 *  `chat.history` — what was said in this conversation, in order: all of it,
+	 *  or with `limit` the last that many before `before`, and whether older are left.
+	 */
+	chatHistory: (projectId: string, conversationId: string, limit: number | null, before: string | null) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId, limit, before })),
 	/**
 	 *  `chat.part_full` — a tool's output as the transcript keeps it, uncut, found
 	 *  by the call it answers in the message that holds it.
@@ -2625,6 +2628,8 @@ export type Conversation = {
 	 */
 	sessionId: string | null,
 	messages: Message[],
+	/**  Whether messages older than these are left, when a page was asked for. */
+	older: boolean,
 	costUsd: number | null,
 	/**  How full the context was when the last turn ended. */
 	context?: Context | null,

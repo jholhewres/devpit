@@ -386,6 +386,7 @@ fn conversation(messages: Vec<Message>) -> Conversation {
         cwd: None,
         session_id: None,
         messages,
+        older: false,
         cost_usd: 0.0,
         context: None,
         rewindable: Vec::new(),

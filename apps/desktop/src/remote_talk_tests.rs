@@ -44,6 +44,7 @@ fn conversation(profile: &str, messages: Vec<Message>) -> Conversation {
         cwd: (!profile.is_empty()).then(|| "/home/me/.devpit/orchestrator/work".to_owned()),
         session_id: None,
         messages,
+        older: false,
         cost_usd: 0.0,
         context: None,
         rewindable: Vec::new(),

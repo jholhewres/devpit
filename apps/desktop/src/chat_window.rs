@@ -7,26 +7,89 @@ use devpit_rpc::{
     Conversation, ConversationAfter, ConversationHead, ErrorCode, Message, Part, RpcError,
 };
 
-use crate::chat::chat_history_now;
-
-/// `chat.history` — everything said in this conversation, in order.
+/// `chat.history` — what was said in this conversation, in order: all of it,
+/// or with `limit` the last that many before `before`, and whether older are left.
 #[tauri::command]
 #[specta::specta]
 pub async fn chat_history(
     project_id: String,
     conversation_id: String,
+    limit: Option<u32>,
+    before: Option<String>,
 ) -> Result<Conversation, RpcError> {
     crate::off_main::blocking(move || {
         conversation(&conversation_id)?;
+        let page = limit.map(|most| (most.max(1) as usize, before.as_deref()));
         // The window gets long outputs cut; the transcript keeps them whole,
         // and `chat_part_full` hands one back when it is opened.
-        let mut read = chat_history_now(project_id, conversation_id)?;
+        let mut read = chat_page_now(project_id, conversation_id, page)?;
         read.messages
             .iter_mut()
             .for_each(devpit_rpc::cut::cut_message);
         Ok(read)
     })
     .await
+}
+
+/// The conversation with all its messages, or with one page of them: up to
+/// `most` before the one named `before`, read from the end of the file.
+pub(crate) fn chat_page_now(
+    project_id: String,
+    conversation_id: String,
+    page: Option<(usize, Option<&str>)>,
+) -> Result<Conversation, RpcError> {
+    let sessions = crate::projects::project_home(&project_id)?.sessions();
+    let file = conversation_path(&sessions, &conversation_id);
+    let (messages, older, skipped) = match page {
+        None => {
+            let (messages, skipped) = read(&file);
+            (messages, false, skipped)
+        }
+        Some((most, before)) => {
+            let page = devpit_agentcli::store_page::read_page(&file, before, most);
+            (page.messages, page.older, page.skipped)
+        }
+    };
+    if skipped > 0 {
+        // Reported rather than hidden: a conversation missing a line should
+        // say so, not quietly show less than happened.
+        eprintln!("{conversation_id}: {skipped} unreadable line(s)");
+    }
+    let head = read_head(&head_path(&sessions, &conversation_id));
+    // Only an empty transcript is backfilled, and a page before a message is never one.
+    let messages = match page {
+        Some((_, Some(_))) => messages,
+        _ => crate::adopted_history::or_backfilled(messages, head.as_ref(), &project_id, &file),
+    };
+    let card = crate::card_chat::conversation_card(&crate::projects::store()?, &conversation_id)?;
+    let told = crate::chat_window::conversation_head(head.as_ref());
+    Ok(Conversation {
+        id: conversation_id,
+        project_id,
+        card_id: card.id,
+        card_title: card.title,
+        card_on_board: card.on_board,
+        // Empty until the first turn settles it: a conversation nobody has
+        // spoken in belongs to no account yet.
+        profile: head
+            .as_ref()
+            .map(|head| head.profile.clone())
+            .unwrap_or_default(),
+        model: head.as_ref().and_then(|head| head.model.clone()),
+        permission: head.as_ref().and_then(|head| head.permission.clone()),
+        effort: head.as_ref().and_then(|head| head.effort.clone()),
+        cwd: head.as_ref().and_then(|head| head.cwd.clone()),
+        session_id: told.session_id,
+        cost_usd: told.cost_usd,
+        context: told.context,
+        rewindable: told.rewindable,
+        created_at: head
+            .map(|head| head.created_at)
+            .or_else(|| messages.first().map(|first| first.created_at))
+            .unwrap_or_else(crate::chat::now),
+        messages,
+        older,
+    })
 }
 
 /// What a conversation's head says of it: its session, what it cost, how

@@ -20,7 +20,7 @@ import { useTaking } from './useTaking'
 import { Turn } from './Turn'
 import { SkillPills } from './SkillPills'
 import { OwnCommand } from './OwnCommand'
-import { useFollow } from './useFollow'
+import { useThread } from './useOlder'
 import { useDraft } from './useDraft'
 import { JumpToEnd } from './JumpToEnd'
 import { ComposerFiles } from './ComposerFiles'
@@ -61,8 +61,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   /* A chat opened from a card starts with the card in the composer, unsent. */
   const [prompt, setPrompt] = useDraft(tab.id, tab.draft)
   const slash = useSlash(chat.profileId, prompt, setPrompt, Boolean(project?.orchestrator))
-  /* New output belongs at the bottom, where the eye already is — unless it went up to read. */
-  const follow = useFollow<HTMLDivElement>(chat.messages)
+  const follow = useThread(project?.id ?? null, tab.id, chat)
   const field = useRef<HTMLTextAreaElement>(null)
   const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
 
@@ -135,6 +134,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         ) : (
           <AppsScopeContext.Provider value={scope}>
             <WholeFrom conversationId={tab.id}><div className="thread">
+              {chat.older && <div ref={follow.top} className="thread__older" aria-hidden />}
               {chat.messages.map((message) => (
                 <Turn key={message.id} message={message} folder={chat.folder} onOpen={setPeek} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
               ))}

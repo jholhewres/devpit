@@ -74,3 +74,47 @@ fn what_came_after_a_message_is_read_cut_and_all_of_it_when_the_message_is_gone(
     );
     assert_eq!(ids(&messages_after(messages, None)), ["m1", "m2", "m3"]);
 }
+
+#[test]
+fn the_history_asked_without_a_page_is_all_of_it_and_with_one_the_last_page() {
+    use devpit_agentcli::store::{append, conversation_path};
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let store = crate::projects::store().expect("store");
+    let project = store.add_project(&root, None).expect("project");
+    let sessions = crate::projects::project_home(&project)
+        .expect("home")
+        .sessions();
+    let id = "conv_paged_history";
+    for at in 0..5 {
+        let text = Part::Text {
+            text: format!("said {at}"),
+            parent: None,
+        };
+        append(
+            &conversation_path(&sessions, id),
+            &message(&format!("m{at}"), vec![text]),
+        )
+        .expect("append");
+    }
+    let ids = |read: &devpit_rpc::Conversation| {
+        read.messages
+            .iter()
+            .map(|one| one.id.clone())
+            .collect::<Vec<_>>()
+    };
+
+    // As every caller before paging asked: the whole conversation, none left.
+    let all = crate::chat::chat_history_now(project.clone(), id.to_owned()).expect("all");
+    assert_eq!(ids(&all), ["m0", "m1", "m2", "m3", "m4"]);
+    assert!(!all.older);
+
+    let last =
+        super::chat_page_now(project.clone(), id.to_owned(), Some((2, None))).expect("last page");
+    assert_eq!(ids(&last), ["m3", "m4"]);
+    assert!(last.older);
+    let before =
+        super::chat_page_now(project, id.to_owned(), Some((2, Some("m3")))).expect("page before");
+    assert_eq!(ids(&before), ["m1", "m2"]);
+    assert!(before.older);
+}

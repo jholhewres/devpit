@@ -5,6 +5,7 @@ import type { Said } from './Asked'
 import { applied, appended, ASKS, batched, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
+import { PAGE } from './useOlder'
 import { KEPT_BYTES } from './pasting'
 import { withSkills } from './pills'
 import { offers, onProfilesChanged } from './profiles'
@@ -56,6 +57,9 @@ export interface Chat {
   readonly previews: Readonly<Record<string, string>>
   /** The CLI's id for this conversation, once it has one. */
   readonly session: string | null
+  /** Whether older messages are left to load, and how a page of them goes in. */
+  readonly older: boolean
+  took: (page: readonly Message[], older: boolean) => void
   /** Turns a new conversation can go on from, forked at that turn. */
   readonly rewindable: readonly string[]
   rewind: (turnId: string) => void
@@ -76,6 +80,12 @@ const pickable = (all: readonly Profile[], belongs: string | null): Profile[] =>
 export function useChat(conversationId: string): Chat {
   const { project, show } = useShellPick((shell) => ({ project: shell.project, show: shell.show }))
   const [messages, setMessages] = useState<readonly Message[]>([])
+  /* Whether messages older than the first one drawn are left in the transcript. */
+  const [older, setOlder] = useState(false)
+  const took = useCallback((page: readonly Message[], more: boolean) => {
+    setMessages((was) => [...page.filter((one) => !was.some((drawn) => drawn.id === one.id)), ...was])
+    setOlder(more)
+  }, [])
   /* What is drawn, for a join to know the last message it need not read again. */
   const shown = useRef<readonly Message[]>([])
   useEffect(() => {
@@ -156,13 +166,14 @@ export function useChat(conversationId: string): Chat {
     if (!project) return now.close
     void (async () => {
       const [past, found] = await Promise.all([
-        ask(() => commands.chatHistory(project.id, conversationId)),
+        ask(() => commands.chatHistory(project.id, conversationId, PAGE, null)),
         ask(() => commands.agentProfiles()),
       ])
       if (!now.open()) return
       const belongs = past.data ? fixedTo(past.data) : null
       if (past.data) {
         setMessages(past.data.messages)
+        setOlder(past.data.older)
         setFixed(belongs)
         setProfileId(belongs)
         setModel(past.data.model)
@@ -471,6 +482,8 @@ export function useChat(conversationId: string): Chat {
     skills,
     setSkills,
     session,
+    older,
+    took,
     rewindable,
     rewind,
     detach,
