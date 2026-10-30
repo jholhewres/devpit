@@ -86,3 +86,29 @@ fn a_full_ring_is_cut_at_its_oldest_byte() {
     let tail = history.tail(REPLAYED);
     assert_eq!(tail, b"rest-of-it");
 }
+
+/// Paging a ring that has wrapped ends: its oldest page says none is left,
+/// even when the cut at the ring's start leaves it empty.
+#[test]
+fn paging_a_wrapped_ring_ends() {
+    let mut history = History::new(16);
+    history.write(b"\x1b[31mabcdefgh\nrest-of-it");
+    let have = history.tail(REPLAYED).len();
+    let (page, left) = history.older(have);
+    assert_eq!(left, 0);
+    assert!(page.is_empty(), "{page:?}");
+
+    let mut long = History::new(4 * PAGE);
+    for n in 0..60_000 {
+        long.write(format!("\x1b[32mline {n}\x1b[0m\r\n").as_bytes());
+    }
+    let mut have = long.tail(REPLAYED).len();
+    for round in 0.. {
+        assert!(round < 32, "paging never ended");
+        let (page, left) = long.older(have);
+        have += page.len();
+        if left == 0 {
+            break;
+        }
+    }
+}

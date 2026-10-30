@@ -6,23 +6,32 @@ use super::*;
 fn the_socket_is_in_the_runtime_dir_and_else_in_devpits_home() {
     let runtime = tempfile::tempdir().expect("runtime");
     let home = Path::new("/home/someone/.devpit");
-    assert_eq!(
-        path(Some(runtime.path()), home),
-        runtime.path().join(name())
-    );
-    assert_eq!(path(None, home), home.join(name()));
-    assert_eq!(path(Some(Path::new("relative")), home), home.join(name()));
-    assert_eq!(
-        path(Some(Path::new("/no/such/dir")), home),
-        home.join(name())
-    );
+    let in_runtime = path(Some(runtime.path()), home);
+    assert_eq!(in_runtime.parent(), Some(runtime.path()));
+    assert_eq!(path(None, home), home.join(NAME));
+    assert_eq!(path(Some(Path::new("relative")), home), home.join(NAME));
+    assert_eq!(path(Some(Path::new("/no/such/dir")), home), home.join(NAME));
 }
 
-/// A test build is a development build: its daemon never takes the
-/// installed devpit's socket, even in the shared runtime directory.
+/// Two homes never meet in the runtime dir: not the installed devpit and a
+/// development build, not the installed one and an e2e run's home.
 #[test]
-fn a_development_build_has_a_socket_of_its_own() {
-    assert_eq!(name(), "devpit-ptyd-dev.sock");
+fn each_home_has_a_socket_of_its_own_and_keeps_it() {
+    let runtime = tempfile::tempdir().expect("runtime");
+    let release = path(Some(runtime.path()), Path::new("/home/someone/.devpit"));
+    let dev = path(Some(runtime.path()), Path::new("/home/someone/.devpit-dev"));
+    let e2e = path(
+        Some(runtime.path()),
+        Path::new("/repo/target/e2e-home/.devpit"),
+    );
+    assert_ne!(release, dev);
+    assert_ne!(release, e2e);
+    assert_eq!(
+        release,
+        path(Some(runtime.path()), Path::new("/home/someone/.devpit")),
+        "the same home finds the same daemon on every run"
+    );
+    assert!(release.as_os_str().len() < 108, "{}", release.display());
 }
 
 #[test]

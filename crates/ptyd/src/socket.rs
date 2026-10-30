@@ -16,22 +16,31 @@ use crate::frame::{self, Frame, Kind};
 /// The protocol the daemon speaks. Raised only when the wire changes: a
 /// desktop update that keeps it keeps the daemon, and its terminals, alive.
 pub const PROTOCOL: u32 = 1;
-/// The socket's name, by build profile: a development build and the
-/// installed devpit share nothing of devpit's, their terminals included.
-pub fn name() -> &'static str {
-    if devpit_core::ROOT_NAME == devpit_core::DEV_ROOT {
-        "devpit-ptyd-dev.sock"
-    } else {
-        "devpit-ptyd.sock"
+/// The socket's name in a home of its own.
+pub const NAME: &str = "devpit-ptyd.sock";
+
+/// The socket's path. Under `$XDG_RUNTIME_DIR` it is named for the home it
+/// serves — devpits on different homes share nothing, their terminals
+/// included, and the home already tells a development build from the
+/// installed one. Without a runtime dir it is `<devpit home>/devpit-ptyd.sock`.
+pub fn path(runtime_dir: Option<&Path>, devpit_home: &Path) -> PathBuf {
+    match runtime_dir.filter(|dir| dir.is_absolute() && dir.is_dir()) {
+        Some(dir) => dir.join(format!("devpit-ptyd-{:016x}.sock", home_hash(devpit_home))),
+        None => devpit_home.join(NAME),
     }
 }
 
-/// The socket's path: `$XDG_RUNTIME_DIR/<name>`, else `<devpit home>/<name>`.
-pub fn path(runtime_dir: Option<&Path>, devpit_home: &Path) -> PathBuf {
-    match runtime_dir.filter(|dir| dir.is_absolute() && dir.is_dir()) {
-        Some(dir) => dir.join(name()),
-        None => devpit_home.join(name()),
-    }
+/// FNV-1a over the home's path: stable across builds and runs, unlike std's
+/// hasher, and short enough to keep the socket path under the ~108 bytes a
+/// unix socket allows.
+fn home_hash(home: &Path) -> u64 {
+    use std::os::unix::ffi::OsStrExt;
+    home.as_os_str()
+        .as_bytes()
+        .iter()
+        .fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+        })
 }
 
 /// Listens at `path`, owner-only from creation. A socket left by a daemon
