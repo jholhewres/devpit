@@ -116,6 +116,7 @@ mod devflow_screen;
 mod devflow_skills;
 mod devflow_stage;
 mod devflow_team;
+mod devflow_work;
 mod diagnostics;
 mod diffs;
 mod draft_sending;

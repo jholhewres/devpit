@@ -91,3 +91,34 @@ fn a_card_closes_into_another_open_card_of_its_project_or_is_cut() {
     assert_eq!(store.card_closed(&cards[1]).expect("read"), None);
     assert_eq!(store.card_closed(&cards[0]).expect("read"), Some(None));
 }
+
+/// Sabotage: commit before the waits, and a refused card stays on the board.
+#[test]
+fn a_tied_card_lands_under_its_epic_waiting_on_its_blockers_or_not_at_all() {
+    let (_dir, store, project, cards) = seeded();
+    let column = store.columns(&project).expect("columns")[0].id.clone();
+    let made = store
+        .create_tied_card(
+            &project,
+            &column,
+            "d",
+            "",
+            Some(&cards[0]),
+            &[cards[1].clone()],
+        )
+        .expect("tied");
+    assert_eq!(
+        store.card_parent(&made).expect("parent"),
+        Some(cards[0].clone())
+    );
+    assert_eq!(
+        store.card_blockers(&made).expect("blockers"),
+        vec![cards[1].clone()]
+    );
+
+    let before = store.cards(&project).expect("cards").len();
+    let nowhere = ["card_nowhere".to_owned()];
+    let refused = store.create_tied_card(&project, &column, "e", "", None, &nowhere);
+    assert!(matches!(refused, Err(StoreError::Circle)));
+    assert_eq!(store.cards(&project).expect("cards").len(), before);
+}

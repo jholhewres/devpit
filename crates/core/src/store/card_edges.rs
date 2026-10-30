@@ -87,6 +87,69 @@ impl Store {
         Ok(true)
     }
 
+    /// A card at the end of `column_id`, under `parent` and waiting on
+    /// `waits_on` — all of it or none. A wait that would circle or cross
+    /// projects is refused as [`StoreError::Circle`].
+    pub fn create_tied_card(
+        &self,
+        project_id: &str,
+        column_id: &str,
+        title: &str,
+        body: &str,
+        parent: Option<&str>,
+        waits_on: &[String],
+    ) -> Result<String, StoreError> {
+        let tx = self.writing()?;
+        let id = format!("card_{}", ulid::Ulid::generate());
+        let position: i64 = tx.query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM card WHERE column_id = ?1",
+            [column_id],
+            |row| row.get(0),
+        )?;
+        let at = crate::store::board::now();
+        tx.execute(
+            super::card_numbers::INSERT,
+            rusqlite::params![id, project_id, column_id, title, body, position, at],
+        )?;
+        if let Some(parent) = parent {
+            tx.execute(
+                "INSERT INTO card_parent (card_id, parent_id) \
+                 SELECT ?1, id FROM card WHERE id = ?2 AND project_id = ?3",
+                rusqlite::params![id, parent, project_id],
+            )?;
+        }
+        for on in waits_on {
+            if !wait_on(&tx, &id, on, at)? {
+                return Err(StoreError::Circle);
+            }
+        }
+        tx.commit()?;
+        Ok(id)
+    }
+
+    /// The epic `card` belongs to, if any.
+    pub fn card_parent(&self, card: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT parent_id FROM card_parent WHERE card_id = ?1",
+                [card],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+
+    /// The cards `card` waits on, oldest edge first.
+    pub fn card_blockers(&self, card: &str) -> Result<Vec<String>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT blocked_by FROM card_blocker WHERE card_id = ?1 ORDER BY created_at, blocked_by",
+        )?;
+        let rows = stmt
+            .query_map([card], |row| row.get(0))?
+            .collect::<Result<Vec<String>, _>>()?;
+        Ok(rows)
+    }
+
     /// How `card` was closed, when it was: `Some(None)` cut, `Some(Some(id))`
     /// merged into `id`.
     pub fn card_closed(&self, card: &str) -> Result<Option<Option<String>>, StoreError> {

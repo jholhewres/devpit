@@ -8,6 +8,9 @@
 //! only the plan the person last saw.
 
 use std::path::Path;
+use std::time::SystemTime;
+
+use devflow_engine::work::WorkItems;
 
 use devflow_engine::brief::{self, Brief};
 use devflow_engine::jev::{self, Said};
@@ -237,11 +240,15 @@ fn briefed(
             (card.id, false)
         }
         None => {
-            let lane = waiting_lane(store, project_id)?;
-            let id = store
-                .create_card(project_id, &lane, &title, &body)
-                .map_err(|err| err.to_string())?;
-            (id, true)
+            let board = crate::devflow_work::Board { store, project_id };
+            let epic = devflow_engine::work::New {
+                title: title.clone(),
+                kind: devflow_engine::work::Kind::Epic,
+                parent: None,
+                depends_on: Vec::new(),
+                body,
+            };
+            (board.create(&epic, SystemTime::now())?.id, true)
         }
     };
     Ok(json!({
