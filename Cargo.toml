@@ -5,6 +5,7 @@ members = [
     "crates/rpc",
     "crates/git",
     "crates/pty",
+    "crates/ptyd",
     "crates/tmux",
     "crates/agentcli",
     "crates/cookies",
@@ -29,6 +30,7 @@ devpit-core = { path = "crates/core" }
 devpit-rpc = { path = "crates/rpc" }
 devpit-git = { path = "crates/git" }
 devpit-pty = { path = "crates/pty" }
+devpit-ptyd = { path = "crates/ptyd" }
 devpit-tmux = { path = "crates/tmux" }
 devpit-agentcli = { path = "crates/agentcli" }
 devpit-steps = { path = "crates/steps" }

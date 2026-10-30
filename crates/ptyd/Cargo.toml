@@ -1,0 +1,25 @@
+[package]
+name = "devpit-ptyd"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# The daemon that holds devpit's terminals, apart from the desktop: it outlives
+# a restart, a crash or an update of the window. A library, so the desktop
+# speaks its protocol from the same code, and a binary, so it runs detached.
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "devpit-ptyd"
+path = "src/main.rs"
+
+[dependencies]
+devpit-pty = { path = "../pty" }
+portable-pty = "0.9.0"
+tempfile = "3.27.0"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+

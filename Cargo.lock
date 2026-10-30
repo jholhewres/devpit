@@ -1204,6 +1204,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "devpit-ptyd"
+version = "0.1.45"
+dependencies = [
+ "devpit-pty",
+ "libc",
+ "portable-pty",
+ "tempfile",
+]
+
+[[package]]
 name = "devpit-remote"
 version = "0.1.45"
 dependencies = [
