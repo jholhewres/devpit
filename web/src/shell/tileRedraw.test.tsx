@@ -82,7 +82,8 @@ describe('a tile on the board', () => {
     const working: CardHappening = { cardId: 'a', activity: 'working', sessions: [] }
     act(() => handlers['card:happening']!(working))
 
-    expect(screen.getAllByRole('button', { name: /working/i })).toHaveLength(1)
+    /* Awaited: on a loaded machine the tile can paint a frame after the act. */
+    expect(await screen.findAllByRole('button', { name: /working/i })).toHaveLength(1)
     expect(drawn).toHaveBeenCalledTimes(1)
   })
 
