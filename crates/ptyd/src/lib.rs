@@ -7,10 +7,16 @@
 //! Output waits on acknowledgement past 1 MiB ([`pane::MOST_UNACKED`]), which
 //! keeps memory flat under a flood and lets Ctrl+C through.
 
+// Unix sockets and ptys: on Windows devpit's terminals stay on psmux, and
+// only the wire format and the history are built there.
+#[cfg(unix)]
 pub mod client;
+#[cfg(unix)]
 pub mod daemon;
 pub mod frame;
 pub mod history;
 pub mod modes;
+#[cfg(unix)]
 pub mod pane;
+#[cfg(unix)]
 pub mod socket;

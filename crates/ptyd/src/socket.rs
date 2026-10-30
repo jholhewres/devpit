@@ -16,14 +16,21 @@ use crate::frame::{self, Frame, Kind};
 /// The protocol the daemon speaks. Raised only when the wire changes: a
 /// desktop update that keeps it keeps the daemon, and its terminals, alive.
 pub const PROTOCOL: u32 = 1;
-const NAME: &str = "devpit-ptyd.sock";
+/// The socket's name, by build profile: a development build and the
+/// installed devpit share nothing of devpit's, their terminals included.
+pub fn name() -> &'static str {
+    if devpit_core::ROOT_NAME == devpit_core::DEV_ROOT {
+        "devpit-ptyd-dev.sock"
+    } else {
+        "devpit-ptyd.sock"
+    }
+}
 
-/// The socket's path: `$XDG_RUNTIME_DIR/devpit-ptyd.sock`, else
-/// `<devpit home>/devpit-ptyd.sock`.
+/// The socket's path: `$XDG_RUNTIME_DIR/<name>`, else `<devpit home>/<name>`.
 pub fn path(runtime_dir: Option<&Path>, devpit_home: &Path) -> PathBuf {
     match runtime_dir.filter(|dir| dir.is_absolute() && dir.is_dir()) {
-        Some(dir) => dir.join(NAME),
-        None => devpit_home.join(NAME),
+        Some(dir) => dir.join(name()),
+        None => devpit_home.join(name()),
     }
 }
 
@@ -67,6 +74,7 @@ pub fn peer_uid(stream: &UnixStream) -> io::Result<u32> {
             gid: 0,
         };
         let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+        // SAFETY: `len` is the size of `cred`, which outlives the call.
         let done = unsafe {
             libc::getsockopt(
                 stream.as_raw_fd(),
@@ -84,6 +92,7 @@ pub fn peer_uid(stream: &UnixStream) -> io::Result<u32> {
     #[cfg(not(target_os = "linux"))]
     {
         let (mut uid, mut gid) = (0, 0);
+        // SAFETY: both out-pointers are this frame's own u32s.
         if unsafe { libc::getpeereid(stream.as_raw_fd(), &mut uid, &mut gid) } != 0 {
             return Err(io::Error::last_os_error());
         }
@@ -97,6 +106,7 @@ pub fn admitted(peer: u32, own: u32) -> bool {
 }
 
 pub fn own_uid() -> u32 {
+    // SAFETY: getuid takes nothing and cannot fail.
     unsafe { libc::getuid() }
 }
 

@@ -16,8 +16,11 @@ name = "devpit-ptyd"
 path = "src/main.rs"
 
 [dependencies]
+devpit-core = { path = "../core" }
 devpit-pty = { path = "../pty" }
 portable-pty = "0.9.0"
+# The socket is bound in a 0700 directory of its own and renamed into place,
+# so it is never reachable by others; this makes that directory safely.
 tempfile = "3.27.0"
 
 [target.'cfg(unix)'.dependencies]

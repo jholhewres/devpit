@@ -8,17 +8,21 @@ fn the_socket_is_in_the_runtime_dir_and_else_in_devpits_home() {
     let home = Path::new("/home/someone/.devpit");
     assert_eq!(
         path(Some(runtime.path()), home),
-        runtime.path().join("devpit-ptyd.sock")
+        runtime.path().join(name())
     );
-    assert_eq!(path(None, home), home.join("devpit-ptyd.sock"));
-    assert_eq!(
-        path(Some(Path::new("relative")), home),
-        home.join("devpit-ptyd.sock")
-    );
+    assert_eq!(path(None, home), home.join(name()));
+    assert_eq!(path(Some(Path::new("relative")), home), home.join(name()));
     assert_eq!(
         path(Some(Path::new("/no/such/dir")), home),
-        home.join("devpit-ptyd.sock")
+        home.join(name())
     );
+}
+
+/// A test build is a development build: its daemon never takes the
+/// installed devpit's socket, even in the shared runtime directory.
+#[test]
+fn a_development_build_has_a_socket_of_its_own() {
+    assert_eq!(name(), "devpit-ptyd-dev.sock");
 }
 
 #[test]

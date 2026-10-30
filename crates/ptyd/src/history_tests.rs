@@ -6,12 +6,8 @@ fn a_tail_never_starts_inside_an_escape_sequence() {
     history.write(b"\x1b[38;5;196mred line\r\n\x1b[0mplain");
     // A cut that lands in the middle of the first SGR moves to the next ESC
     // or line start, whichever is first.
-    let tail = history.tail(30);
-    assert!(
-        tail.starts_with(b"\x1b") || tail.starts_with(b"\x1b[0m"),
-        "{tail:?}"
-    );
-    assert!(tail.ends_with(b"plain"));
+    // 25 bytes back lands inside `\x1b[38;5;196m`'s line: the next ESC wins.
+    assert_eq!(history.tail(25), b"\x1b[0mplain");
 }
 
 #[test]
@@ -68,4 +64,25 @@ fn the_history_keeps_its_last_two_megabytes() {
         history.write(&chunk);
     }
     assert_eq!(history.len(), 2 * 1024 * 1024);
+}
+
+/// A history that never filled its ring is the whole stream: replayed whole,
+/// first line included, whatever it starts with.
+#[test]
+fn a_short_history_is_replayed_whole() {
+    let mut history = History::new(1024);
+    history.write(b"first line\nsecond\n");
+    assert_eq!(history.tail(REPLAYED), b"first line\nsecond\n");
+    let mut no_newline = History::new(1024);
+    no_newline.write(b"$ prompt \x1b[1mbold");
+    assert_eq!(no_newline.tail(REPLAYED), b"$ prompt \x1b[1mbold");
+}
+
+/// A full ring starts wherever the oldest overwrite left it: that start is cut.
+#[test]
+fn a_full_ring_is_cut_at_its_oldest_byte() {
+    let mut history = History::new(16);
+    history.write(b"\x1b[31mabcdefgh\nrest-of-it");
+    let tail = history.tail(REPLAYED);
+    assert_eq!(tail, b"rest-of-it");
 }

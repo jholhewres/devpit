@@ -10,12 +10,14 @@ pub const PAGE: usize = 256 * 1024;
 
 pub struct History {
     ring: RingBuffer,
+    capacity: usize,
 }
 
 impl History {
     pub fn new(capacity: usize) -> History {
         History {
             ring: RingBuffer::new(capacity),
+            capacity,
         }
     }
 
@@ -35,7 +37,7 @@ impl History {
     pub fn tail(&self, most: usize) -> Vec<u8> {
         let all = self.ring.contents();
         let from = all.len().saturating_sub(most);
-        let cut = safe_start(&all[from..]);
+        let cut = self.cut_at(from, &all[from..]);
         all[from + cut..].to_vec()
     }
 
@@ -45,12 +47,22 @@ impl History {
         let all = self.ring.contents();
         let end = all.len().saturating_sub(have);
         let from = end.saturating_sub(PAGE);
-        let cut = if from == 0 {
+        let cut = self.cut_at(from, &all[from..end]);
+        (all[from + cut..end].to_vec(), from + cut)
+    }
+}
+
+impl History {
+    /// How far into `bytes`, which start at `from`, a terminal can begin. The
+    /// very start of the stream needs no cut; the start of a full ring was cut
+    /// by the ring, mid-whatever, and does.
+    fn cut_at(&self, from: usize, bytes: &[u8]) -> usize {
+        let at_the_start = from == 0 && self.ring.len() < self.capacity;
+        if at_the_start {
             0
         } else {
-            safe_start(&all[from..end])
-        };
-        (all[from + cut..end].to_vec(), from + cut)
+            safe_start(bytes)
+        }
     }
 }
 

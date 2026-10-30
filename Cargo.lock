@@ -1207,6 +1207,7 @@ dependencies = [
 name = "devpit-ptyd"
 version = "0.1.45"
 dependencies = [
+ "devpit-core",
  "devpit-pty",
  "libc",
  "portable-pty",

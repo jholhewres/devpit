@@ -418,6 +418,7 @@ fn readable_now(fd: i32) -> bool {
         events: libc::POLLIN,
         revents: 0,
     };
+    // SAFETY: one pollfd on this stack, for an fd the pane keeps open.
     unsafe { libc::poll(&mut poll, 1, 0) > 0 && poll.revents & libc::POLLIN != 0 }
 }
 

@@ -1,18 +1,17 @@
 //! `devpit-ptyd`: listens at the socket [`devpit_ptyd::socket::path`] names
 //! and serves devpit's terminals until it is killed. Started detached by the
-//! desktop; one per user.
+//! desktop; one per user and build profile.
 
+#[cfg(unix)]
 fn main() {
     let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from);
-    let home = std::env::var_os("DEVPIT_HOME")
-        .filter(|home| !home.is_empty())
-        .map(std::path::PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| std::path::Path::new(&home).join(".devpit"))
-        });
-    let Some(home) = home else {
-        eprintln!("devpit-ptyd: no HOME to find devpit's home in");
-        std::process::exit(2);
+    // devpit's own rule for its home: DEVPIT_HOME, else the profile's root.
+    let home = match devpit_core::Store::root() {
+        Ok(home) => home,
+        Err(err) => {
+            eprintln!("devpit-ptyd: no home for devpit: {err}");
+            std::process::exit(2);
+        }
     };
     let path = std::env::args_os()
         .nth(1)
@@ -26,4 +25,11 @@ fn main() {
         }
     };
     devpit_ptyd::daemon::Daemon::new().serve(listener);
+}
+
+/// Terminals there stay on psmux; the daemon is unix sockets and ptys.
+#[cfg(not(unix))]
+fn main() {
+    eprintln!("devpit-ptyd runs on Linux and macOS only");
+    std::process::exit(2);
 }
