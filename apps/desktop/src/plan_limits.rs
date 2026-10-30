@@ -21,10 +21,10 @@ use devpit_agentcli::spend_scan::epoch_of;
 use devpit_rpc::{PlanLimits, PlanWindow, RpcError};
 use serde_json::Value;
 
-const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
+pub(crate) const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 /// The endpoint refuses a request without it.
-const OAUTH_BETA: &str = "oauth-2025-04-20";
-const USER_AGENT: &str = "claude-code/2.1.0";
+pub(crate) const OAUTH_BETA: &str = "oauth-2025-04-20";
+pub(crate) const USER_AGENT: &str = "claude-code/2.1.0";
 const FRESH_FOR: Duration = Duration::from_secs(5 * 60);
 
 /// The saved sign-in, as much of it as the request and the label need.

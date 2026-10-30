@@ -13,9 +13,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use devpit_rpc::{AccountQuota, AccountQuotas, ClaudeAccount, PlanWindow, QuotaState, RpcError};
 use serde_json::Value;
 
-const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
-const OAUTH_BETA: &str = "oauth-2025-04-20";
-const USER_AGENT: &str = "claude-code/2.1.0";
+use crate::plan_limits::{OAUTH_BETA, USAGE_URL, USER_AGENT};
+
 /// A read is kept this long; the screen asks more often than that.
 pub(crate) const FRESH_FOR: Duration = Duration::from_secs(60);
 /// After a 429 the endpoint is left alone this long.
