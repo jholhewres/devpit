@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
-import { applied, appended, ASKS, batched, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
+import { applied, appended, ASKS, batched, prepended, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { PAGE } from './useOlder'
@@ -83,7 +83,7 @@ export function useChat(conversationId: string): Chat {
   /* Whether messages older than the first one drawn are left in the transcript. */
   const [older, setOlder] = useState(false)
   const took = useCallback((page: readonly Message[], more: boolean) => {
-    setMessages((was) => [...page.filter((one) => !was.some((drawn) => drawn.id === one.id)), ...was])
+    setMessages((was) => prepended(was, page))
     setOlder(more)
   }, [])
   /* What is drawn, for a join to know the last message it need not read again. */
@@ -145,8 +145,13 @@ export function useChat(conversationId: string): Chat {
             ask(() => commands.chatHead(projectId, conversationId)),
           ]).then(([after, head]) => {
             if (!now.open()) return
-            const saved = after.data?.messages
-            if (saved) setMessages((was) => appended(was, saved))
+            const saved = after.data
+            if (saved?.found) setMessages((was) => appended(was, saved.messages))
+            else if (saved) {
+              /* Its place was never saved: the last page takes the place of what was drawn. */
+              setMessages(saved.messages)
+              setOlder(true)
+            }
             if (!head.data) return
             setCost(head.data.costUsd ?? 0)
             setContext(head.data.context)

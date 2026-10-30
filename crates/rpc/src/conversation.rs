@@ -130,4 +130,7 @@ pub struct ConversationHead {
 #[serde(rename_all = "camelCase")]
 pub struct ConversationAfter {
     pub messages: Vec<crate::chat::Message>,
+    /// Whether the message named was in the transcript. When it was not, the
+    /// messages are the conversation's last page, to take the place of what is drawn.
+    pub found: bool,
 }

@@ -40,6 +40,12 @@ export function applied(messages: readonly Message[], frame: Frame): readonly Me
   }
 }
 
+/* An older page goes above what is drawn; a message already drawn is not drawn twice. */
+export function prepended(messages: readonly Message[], page: readonly Message[]): readonly Message[] {
+  const drawn = new Set(messages.map((one) => one.id))
+  return [...page.filter((one) => !drawn.has(one.id)), ...messages]
+}
+
 /* Saved messages replace the streamed ones of the same id; new ones go last. */
 export function appended(messages: readonly Message[], saved: readonly Message[]): readonly Message[] {
   const by = new Map(saved.map((one) => [one.id, one]))

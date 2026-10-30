@@ -35,7 +35,7 @@ const message = (id: string, text = id): Message =>
   ({ id, turnId: null, role: 'assistant', parts: [{ kind: 'text', text, parent: null }], createdAt: 0, streaming: false }) as Message
 
 /* What the transcript holds, and what it was asked. */
-const saved: { messages: Message[]; after: Message[] } = { messages: [], after: [] }
+const saved: { messages: Message[]; after: Message[]; found: boolean } = { messages: [], after: [], found: true }
 const calls = {
   chatHistory: vi.fn(),
   chatHead: vi.fn(),
@@ -45,6 +45,7 @@ const calls = {
 afterEach(() => {
   saved.messages = []
   saved.after = []
+  saved.found = true
   Object.values(calls).forEach((one) => one.mockClear())
 })
 
@@ -70,7 +71,7 @@ vi.mock('./live', () => ({
     ),
     chatAfter: (projectId: string, id: string, after: string | null) => (
       calls.chatAfter(projectId, id, after),
-      { messages: saved.after }
+      { messages: saved.after, found: saved.found }
     ),
     chatRewind: (projectId: string, id: string, turnId: string) => (calls.chatRewind(projectId, id, turnId), 'conv_fork'),
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
@@ -196,6 +197,20 @@ describe("a chat's reads of the transcript", () => {
     await act(async () => joins[1]!.ends(true))
     expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_1')
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_woken'))
+  })
+
+  it('after a rejoin whose place was never saved, take the last page in place of what was drawn', async () => {
+    saved.messages = [message('msg_1'), message('msg_2')]
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
+    act(() => joins[0]!.onFrame(said('never_saved')))
+    await waitFor(() => expect(result.current.messages).toHaveLength(3))
+
+    saved.found = false
+    saved.after = [message('msg_2'), message('msg_3')]
+    await act(async () => joins[0]!.ends(true))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_2', 'msg_3']))
+    expect(result.current.older).toBe(true)
   })
 
   it('leave rewind working: the head names the turns, and rewinding forks', async () => {

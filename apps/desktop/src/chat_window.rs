@@ -7,6 +7,9 @@ use devpit_rpc::{
     Conversation, ConversationAfter, ConversationHead, ErrorCode, Message, Part, RpcError,
 };
 
+/// The most messages one page may ask for.
+const MOST: u32 = 500;
+
 /// `chat.history` — what was said in this conversation, in order: all of it,
 /// or with `limit` the last that many before `before`, and whether older are left.
 #[tauri::command]
@@ -19,7 +22,7 @@ pub async fn chat_history(
 ) -> Result<Conversation, RpcError> {
     crate::off_main::blocking(move || {
         conversation(&conversation_id)?;
-        let page = limit.map(|most| (most.max(1) as usize, before.as_deref()));
+        let page = limit.map(|most| (most.clamp(1, MOST) as usize, before.as_deref()));
         // The window gets long outputs cut; the transcript keeps them whole,
         // and `chat_part_full` hands one back when it is opened.
         let mut read = chat_page_now(project_id, conversation_id, page)?;
@@ -62,7 +65,7 @@ pub(crate) fn chat_page_now(
         _ => crate::adopted_history::or_backfilled(messages, head.as_ref(), &project_id, &file),
     };
     let card = crate::card_chat::conversation_card(&crate::projects::store()?, &conversation_id)?;
-    let told = crate::chat_window::conversation_head(head.as_ref());
+    let told = conversation_head(head.as_ref());
     Ok(Conversation {
         id: conversation_id,
         project_id,
@@ -143,20 +146,25 @@ pub async fn chat_after(
         conversation(&conversation_id)?;
         let sessions = crate::projects::project_home(&project_id)?.sessions();
         let read = read(&conversation_path(&sessions, &conversation_id)).0;
-        Ok(ConversationAfter {
-            messages: messages_after(read, after.as_deref()),
-        })
+        Ok(messages_after(read, after.as_deref()))
     })
     .await
 }
 
-/// The messages after `after`, cut; all of them when it is not among them.
-fn messages_after(mut messages: Vec<Message>, after: Option<&str>) -> Vec<Message> {
-    if let Some(at) = after.and_then(|id| messages.iter().position(|message| message.id == id)) {
-        messages.drain(..=at);
-    }
+/// What a chat that lost its place reads instead: the last page, as it opens on.
+const AFTER_PAGE: usize = 50;
+
+/// The messages after `after`, cut. When it is not among them, the last page:
+/// a chat holding a page must not be handed the whole conversation below it.
+fn messages_after(mut messages: Vec<Message>, after: Option<&str>) -> ConversationAfter {
+    let found = after.and_then(|id| messages.iter().position(|message| message.id == id));
+    let from = found.map_or(messages.len().saturating_sub(AFTER_PAGE), |at| at + 1);
+    let mut messages = messages.split_off(from);
     messages.iter_mut().for_each(devpit_rpc::cut::cut_message);
-    messages
+    ConversationAfter {
+        messages,
+        found: found.is_some(),
+    }
 }
 
 /// `chat.part_full` — a tool's output as the transcript keeps it, uncut, found

@@ -2644,6 +2644,11 @@ export type Conversation = {
 /**  The messages saved after the last one a chat had drawn. */
 export type ConversationAfter = {
 	messages: Message[],
+	/**
+	 *  Whether the message named was in the transcript. When it was not, the
+	 *  messages are the conversation's last page, to take the place of what is drawn.
+	 */
+	found: boolean,
 };
 
 /**  What a turn's end needs to know of the conversation: its head, not its messages. */

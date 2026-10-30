@@ -2,6 +2,7 @@ import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message } from '../gen/bindings'
+import { prepended } from './frames'
 import { PAGE, useOlder } from './useOlder'
 
 const asked: unknown[][] = []
@@ -9,7 +10,7 @@ const pages: { messages: Message[]; older: boolean }[] = []
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
   commands: {
-    chatHistory: (...args: unknown[]) => (asked.push(args), { messages: pages.shift()?.messages ?? [], older: false }),
+    chatHistory: (...args: unknown[]) => (asked.push(args), pages.shift() ?? { messages: [], older: false }),
   },
 }))
 
@@ -49,7 +50,7 @@ function thread(first: Message[], older: boolean): { box: HTMLDivElement; shown:
       messages,
       more,
       (page, left) => {
-        messages = [...page, ...messages]
+        messages = [...prepended(messages, page)]
         more = left
         height += 400 * page.length
         redraw()
@@ -95,6 +96,21 @@ describe("a chat's older messages", () => {
     await act(async () => seen([{ isIntersecting: true }]))
     // 800 px went in above: what was at the top is now 800 px down.
     await waitFor(() => expect(box.scrollTop).toBe(800))
+  })
+
+  it('are asked for again, from the new first one, while the backend says more are left', async () => {
+    pages.push({ messages: [message('m3')], older: true }, { messages: [message('m1'), message('m2')], older: false })
+    const { shown } = thread([message('m4')], true)
+    await act(async () => seen([{ isIntersecting: true }]))
+    await waitFor(() => expect(shown()).toEqual(['m3', 'm4']))
+    await act(async () => seen([{ isIntersecting: true }]))
+    await waitFor(() => expect(shown()).toEqual(['m1', 'm2', 'm3', 'm4']))
+    expect(asked.map((one) => one[3])).toEqual(['m4', 'm3'])
+  })
+
+  it('go in once, a message already drawn not drawn again', () => {
+    const drawn = [message('m3'), message('m4')]
+    expect(prepended(drawn, [message('m2'), message('m3')]).map((one) => one.id)).toEqual(['m2', 'm3', 'm4'])
   })
 
   it('are not asked for when none are left', async () => {

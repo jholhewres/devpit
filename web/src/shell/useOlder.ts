@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import type { Message } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -34,8 +34,8 @@ export function useOlder(
     })
   }, [where, first, box, took])
 
-  /* Back where it was, once the page above is drawn. */
-  useEffect(() => {
+  /* Back where it was before the page above is painted, not a frame after. */
+  useLayoutEffect(() => {
     const scroll = box.current
     if (!scroll || below.current === null) return
     scroll.scrollTop = scroll.scrollHeight - below.current

@@ -10,6 +10,15 @@ use devpit_rpc::Message;
 
 /// How much is read at a time, from the end towards the start.
 pub const BLOCK: usize = 64 * 1024;
+/// A line longer than this is passed over, not held: one runaway output must
+/// not take the memory a chat opens with.
+pub const LONGEST: usize = 64 * 1024 * 1024;
+
+/// Only what finding the anchor needs: a message's id, not its parts.
+#[derive(serde::Deserialize)]
+struct Id {
+    id: String,
+}
 
 /// A page: up to `most` messages, oldest first, whether older ones are left,
 /// and how many lines it passed over that did not load.
@@ -29,17 +38,23 @@ pub fn read_page(path: &Path, before: Option<&str>, most: usize) -> Page {
     };
     let mut found = before.is_none();
     while let Some(line) = lines.next_line() {
-        if line.iter().all(u8::is_ascii_whitespace) {
-            continue;
-        }
-        let Ok(message) = serde_json::from_slice::<Message>(&line) else {
+        let Some(line) = line else {
+            // Longer than LONGEST: passed over, said so.
             page.skipped += usize::from(found);
             continue;
         };
-        if !found {
-            found = before == Some(message.id.as_str());
+        if line.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
+        if !found {
+            found = serde_json::from_slice::<Id>(&line)
+                .is_ok_and(|one| before == Some(one.id.as_str()));
+            continue;
+        }
+        let Ok(message) = serde_json::from_slice::<Message>(&line) else {
+            page.skipped += 1;
+            continue;
+        };
         if page.messages.len() == most {
             page.older = true;
             break;
@@ -57,8 +72,12 @@ struct Backwards {
     at: u64,
     /// Bytes read that begin no line yet, in file order.
     pending: VecDeque<Vec<u8>>,
-    /// Lines found in the current block, ready to hand out, last first.
-    ready: Vec<Vec<u8>>,
+    /// How many bytes `pending` holds, and whether the line went past LONGEST.
+    held: usize,
+    too_long: bool,
+    /// Lines found in the current block, ready to hand out, last first;
+    /// `None` for one that was too long to keep.
+    ready: Vec<Option<Vec<u8>>>,
 }
 
 impl Backwards {
@@ -69,23 +88,24 @@ impl Backwards {
             file,
             at,
             pending: VecDeque::new(),
+            held: 0,
+            too_long: false,
             ready: Vec::new(),
         })
     }
 
-    fn next_line(&mut self) -> Option<Vec<u8>> {
+    /// The next line back, `Some(None)` for one too long to keep.
+    fn next_line(&mut self) -> Option<Option<Vec<u8>>> {
         loop {
             if let Some(line) = self.ready.pop() {
                 return Some(line);
             }
             if self.at == 0 {
                 // What is left is the file's first line.
-                return (!self.pending.is_empty()).then(|| {
-                    std::mem::take(&mut self.pending)
-                        .into_iter()
-                        .flatten()
-                        .collect()
-                });
+                if self.pending.is_empty() && !self.too_long {
+                    return None;
+                }
+                return Some(self.carried(Vec::new()));
             }
             let start = self.at.saturating_sub(BLOCK as u64);
             let mut block = vec![0; (self.at - start) as usize];
@@ -100,24 +120,48 @@ impl Backwards {
                 .rev();
             let Some(last) = newlines.next() else {
                 // No line ends here: the whole block is the middle of one.
-                self.pending.push_front(block);
+                self.hold_front(block);
                 continue;
             };
             // The bytes after the last newline end the line carried so far.
-            let mut carried = std::mem::take(&mut self.pending);
-            carried.push_front(block[last + 1..].to_vec());
-            let mut lines = vec![carried.into_iter().flatten().collect::<Vec<u8>>()];
+            let mut lines = vec![self.carried(block[last + 1..].to_vec())];
             let mut end = last;
             for newline in newlines {
-                lines.push(block[newline + 1..end].to_vec());
+                lines.push(Some(block[newline + 1..end].to_vec()));
                 end = newline;
             }
             // Before the first newline, a line that may begin in an earlier block.
-            self.pending.push_back(block[..end].to_vec());
+            self.hold_front(block[..end].to_vec());
             // Handed out last first: `pop` takes from the end.
             lines.reverse();
             self.ready = lines;
         }
+    }
+
+    /// Keeps bytes that begin no line yet, unless the line is already too long.
+    fn hold_front(&mut self, bytes: Vec<u8>) {
+        if self.too_long {
+            return;
+        }
+        self.held += bytes.len();
+        if self.held > LONGEST {
+            self.too_long = true;
+            self.pending.clear();
+            self.held = 0;
+            return;
+        }
+        self.pending.push_front(bytes);
+    }
+
+    /// The line carried so far, ended by `head`, and the carry emptied.
+    fn carried(&mut self, head: Vec<u8>) -> Option<Vec<u8>> {
+        let pending = std::mem::take(&mut self.pending);
+        let too_long = std::mem::replace(&mut self.too_long, false);
+        self.held = 0;
+        if too_long || head.len() + pending.iter().map(Vec::len).sum::<usize>() > LONGEST {
+            return None;
+        }
+        Some(std::iter::once(head).chain(pending).flatten().collect())
     }
 }
 

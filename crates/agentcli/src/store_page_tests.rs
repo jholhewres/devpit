@@ -130,3 +130,19 @@ fn the_last_page_of_a_real_transcript_is_quick_and_light() {
     assert_eq!(page.messages.len(), 50);
     assert!(bytes < 5_000_000, "{bytes} bytes");
 }
+
+#[test]
+fn a_line_longer_than_the_ceiling_is_passed_over_and_counted() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let path = conversation_path(home.path(), "c1");
+    append(&path, &message("m0", "zero")).expect("append");
+    // A message, valid, one line past the ceiling, between two that are not:
+    // kept, it would load; passed over, it is counted instead.
+    append(&path, &message("big", &"z".repeat(super::LONGEST + 10))).expect("append");
+    append(&path, &message("m2", "two")).expect("append");
+    let page = read_page(&path, None, 10);
+    assert_eq!(ids(&page.messages), ["m0", "m2"]);
+    assert_eq!(page.skipped, 1);
+    // Paging from the message after it still finds the one before.
+    assert_eq!(ids(&read_page(&path, Some("m2"), 10).messages), ["m0"]);
+}
