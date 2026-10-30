@@ -8,6 +8,7 @@ import type {
   Profile,
   TurnEnd,
 } from '../gen/bindings'
+import { inBrowser } from '../transport'
 import { inTauri } from './window'
 
 /* chat.send streams over a Channel, like the pty, so it is hand-written for
@@ -17,7 +18,8 @@ export interface Sent {
 }
 
 export function send(ask: Ask, onFrame: (frame: Frame) => void): Sent | null {
-  if (!inTauri()) return null
+  /* Streamed over a Tauri channel: in a browser, not yet (R3). */
+  if (!inTauri() || inBrowser()) return null
   const channel = new Channel<Frame>()
   channel.onmessage = onFrame
   return { end: invoke('chat_send', { ask, onFrame: channel }) as Promise<TurnEnd> }
@@ -34,7 +36,8 @@ export interface Joined {
 }
 
 export function rejoin(conversationId: string, onFrame: (frame: Frame) => void): Joined | null {
-  if (!inTauri()) return null
+  /* Streamed over a Tauri channel: in a browser, not yet (R3). */
+  if (!inTauri() || inBrowser()) return null
   const channel = new Channel<Frame>()
   channel.onmessage = onFrame
   return {

@@ -1,3 +1,7 @@
+/* First, for its side effect: in a browser on loopback, the stand-in for Tauri
+   goes in before any module below calls the backend or reads
+   `__TAURI_INTERNALS__`. Imports run in order, so it runs before theirs. */
+import './transportInstalled'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'

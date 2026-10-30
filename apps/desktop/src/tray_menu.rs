@@ -90,15 +90,18 @@ pub(crate) enum Act {
     Pause,
     Resume,
     Settings,
+    /// The same app in a browser, on loopback.
+    Browser,
     Quit,
 }
 
-const ACTS: [(Act, &str); 6] = [
+const ACTS: [(Act, &str); 7] = [
     (Act::Open, "open"),
     (Act::Terminal, "terminal"),
     (Act::Pause, "pause"),
     (Act::Resume, "resume"),
     (Act::Settings, "settings"),
+    (Act::Browser, "browser"),
     (Act::Quit, "quit"),
 ];
 
@@ -211,6 +214,7 @@ pub(crate) fn said(waiting: &[Waiting], recent: &[Recent], paused: bool) -> Said
         act("Pause for an hour", Act::Pause)
     });
     entries.push(act("Settings…", Act::Settings));
+    entries.push(act("Open in browser", Act::Browser));
     entries.push(Entry::Line);
     entries.push(act("Quit devpit", Act::Quit));
 

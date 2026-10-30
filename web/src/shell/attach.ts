@@ -1,6 +1,7 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 
 import { commands } from '../gen/bindings'
+import { inBrowser } from '../transport'
 import { reason } from './reason'
 import { inTauri } from './window'
 
@@ -26,7 +27,8 @@ export function attach(
   onFrame: (bytes: Uint8Array) => void,
   onEnd?: (error: string | null) => void,
 ): Attached | null {
-  if (!inTauri()) return null
+  /* Its bytes stream over a Tauri channel, which a browser does not have. */
+  if (!inTauri() || inBrowser()) return null
 
   /* One id per attach, not one per window. Two mounts of the same pane under
      one id are indistinguishable to the backend: the older one's detach

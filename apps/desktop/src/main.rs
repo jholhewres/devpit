@@ -144,6 +144,10 @@ mod kinds;
 mod leftovers;
 mod listener;
 mod live;
+mod local_events;
+mod local_files;
+mod local_rpc;
+mod local_server;
 mod mcp;
 mod mcp_cache;
 mod mcp_health;
@@ -396,6 +400,13 @@ fn main() {
             hub::listen();
             // Card dates on devpit.app's calendar, when it is on.
             calendar::keep_sent();
+            // The same app in a browser, on loopback, behind a cookie.
+            local_events::listen(app.handle());
+            if let Ok(root) = devpit_core::Store::root() {
+                if let Err(err) = local_server::start(app.handle().clone(), &root) {
+                    eprintln!("devpit could not serve itself on loopback: {err}");
+                }
+            }
             // The account's other machines, sealed through devpit.app, when on.
             sync::keep_synced(app.handle());
             // The window rebuilt around a container that can hold a page

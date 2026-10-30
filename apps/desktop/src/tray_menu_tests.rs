@@ -239,6 +239,7 @@ fn a_menu_id_reads_back_as_its_target() {
         Act::Pause,
         Act::Resume,
         Act::Settings,
+        Act::Browser,
         Act::Quit,
     ] {
         assert_eq!(Act::from_id(act.id()), Some(act));

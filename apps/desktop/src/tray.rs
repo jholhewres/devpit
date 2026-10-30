@@ -308,6 +308,7 @@ fn chosen(app: &AppHandle, id: &str) {
         // A store write, never on the window's thread: a slow disk froze it.
         Some(Act::Pause) => off_the_window(app, crate::pausing::for_an_hour),
         Some(Act::Resume) => off_the_window(app, crate::pausing::resume),
+        Some(Act::Browser) => crate::local_server::open_in_browser(),
         Some(Act::Quit) => quit(app),
         None => {}
     }

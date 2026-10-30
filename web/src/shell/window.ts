@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import type { AgentHealth, Happening, Question } from '../gen/bindings'
+import { inBrowser } from '../transport'
 
 /*
  * The window, for a window that draws its own frame.
@@ -16,8 +17,12 @@ import type { AgentHealth, Happening, Question } from '../gen/bindings'
 export const inTauri = (): boolean =>
   typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
+/* The desktop's own window: not there for a page in a browser, whose frame is
+   the browser's. */
+const inDesktop = (): boolean => inTauri() && !inBrowser()
+
 const onWindow = async (act: (win: ReturnType<typeof getCurrentWindow>) => Promise<unknown>): Promise<void> => {
-  if (!inTauri()) return
+  if (!inDesktop()) return
   try {
     await act(getCurrentWindow())
   } catch {
@@ -54,7 +59,7 @@ export const startResize = (edge: Edge): void =>
 
 /** True while the window fills the screen, so the corners can square off. */
 export async function isMaximized(): Promise<boolean> {
-  if (!inTauri()) return false
+  if (!inDesktop()) return false
   try {
     return await getCurrentWindow().isMaximized()
   } catch {
@@ -64,7 +69,7 @@ export async function isMaximized(): Promise<boolean> {
 
 /** Calls back whenever the window is resized, so the corners keep up. */
 export function onResized(then: () => void): () => void {
-  if (!inTauri()) return () => {}
+  if (!inDesktop()) return () => {}
   /* Registering is asynchronous, so the caller can be gone before the
      listener exists. Dropping it then has to be remembered, or the listener
      arrives with nobody left to unsubscribe it. */
