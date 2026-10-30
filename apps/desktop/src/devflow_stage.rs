@@ -10,10 +10,10 @@
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
+use devflow_engine::config::{StageGate, Step};
+use devflow_engine::layers::Layered;
+use devflow_engine::{runs, skills, stage, Config};
 use devpit_core::Store;
-use devpit_devflow::config::{StageGate, Step};
-use devpit_devflow::layers::Layered;
-use devpit_devflow::{runs, skills, stage, Config};
 use devpit_rpc::{DevflowChange, Project};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
@@ -91,7 +91,7 @@ pub(crate) fn respond(
     }
     let headline = format!(
         "{}stage {name}: {}",
-        devpit_devflow::plan::PREFIX,
+        devflow_engine::plan::PREFIX,
         if passed { "passed" } else { "failed" }
     );
     let comment = match said.first() {
@@ -281,12 +281,12 @@ fn judged(
             )],
         );
     };
-    let state = devpit_devflow::jev::capped(&json!({
+    let state = devflow_engine::jev::capped(&json!({
         "card": { "id": card.id, "title": card.title, "body": card.body },
         "stage": name,
     }));
     let said = jev.judge(rubric, &state);
-    let holds = said.mode == devpit_devflow::config::Mode::Enforce && said.outcome == "fail";
+    let holds = said.mode == devflow_engine::config::Mode::Enforce && said.outcome == "fail";
     let mut lines = vec![format!("{rubric}: {} ({})", said.outcome, said.mode.word())];
     lines.extend(said.skipped.clone());
     if said.skipped.is_none() {

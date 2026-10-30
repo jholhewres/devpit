@@ -1,4 +1,4 @@
-use devpit_devflow::Ask;
+use devflow_engine::Ask;
 use serde_json::Value;
 
 use super::*;
@@ -42,11 +42,11 @@ fn codex_gets_its_hooks_and_their_trust_on_the_line_and_its_skills_as_a_marketpl
 fn the_hooks_call_the_tool_the_server_lists_and_follow_the_same_cap() {
     assert_eq!(
         devpit_agentapi::devflow::GATE_TOOL,
-        devpit_devflow::plugin::GATE_TOOL
+        devflow_engine::plugin::launch::GATE_TOOL
     );
     assert_eq!(
         devpit_agentapi::devflow::CAP_ENV,
-        devpit_devflow::gate::CAP_ENV
+        devflow_engine::gate::CAP_ENV
     );
 }
 

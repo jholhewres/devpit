@@ -214,8 +214,8 @@ fn a_write_is_waited_for_longer_than_the_store_waits_for_its_lock() {
 /// the hook fails instead of hearing why.
 #[test]
 fn a_hooks_question_is_answered_inside_the_hooks_own_timeout() {
+    use devflow_engine::plugin::launch::{CONTEXT_WAITS, GATE_WAITS};
     use devpit_agentapi::client::wait_for;
-    use devpit_devflow::plugin::{CONTEXT_WAITS, GATE_WAITS};
     use std::time::Duration;
     assert!(wait_for("devflow_gate") < Duration::from_secs(GATE_WAITS));
     assert!(wait_for("devflow_session") < Duration::from_secs(CONTEXT_WAITS));

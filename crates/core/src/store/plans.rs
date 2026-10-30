@@ -1,7 +1,7 @@
 //! A Devflow plan previewed for an epic: kept until the person creates its
 //! cards, on the board or through an agent after their yes, or drops it.
 //!
-//! The cards are a payload `devpit-devflow` shapes; the store keeps the text
+//! The cards are a payload `devflow-engine` shapes; the store keeps the text
 //! and makes creating them one transaction, so a yes counted twice cannot
 //! make the cards twice.
 
@@ -17,7 +17,7 @@ pub const MOST_PLAN: usize = 256 * 1024;
 
 pub struct PlanRow {
     pub epic_id: String,
-    /// The planned cards, as `devpit-devflow` wrote them.
+    /// The planned cards, as `devflow-engine` wrote them.
     pub cards: String,
     /// The person changed it on the board.
     pub edited: bool,

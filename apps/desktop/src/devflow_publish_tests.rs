@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use devpit_devflow::config::Agent;
+use devflow_engine::config::Agent;
 
 use super::*;
 use crate::devflow_adhoc::tests::checkout_with_a_feature;
@@ -11,7 +11,7 @@ use crate::devflow_review::tests::{fake_claude, project_at};
 /// Devflow set up with one reviewer reading every axis, so nothing is pending.
 fn one_reading() -> State {
     let yaml = "version: 1\nenabled: false\nreview:\n  reviewers:\n    - agent: claude\n      persona: devflow-all\n";
-    let config = devpit_devflow::config::parse(yaml).expect("yaml");
+    let config = devflow_engine::config::parse(yaml).expect("yaml");
     State::Valid(yaml.to_owned(), Box::new(config))
 }
 

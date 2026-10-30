@@ -18,10 +18,14 @@ pub struct TestCommand {
 /// language's own runner. One detector, so the recipe and a Devflow setup
 /// never disagree about a project.
 pub(crate) fn detected(root: &Path) -> TestCommand {
-    let first = devpit_devflow::detect::detected(root, Default::default())
-        .test
-        .into_iter()
-        .next();
+    let first = devflow_engine::detect::detected_in(
+        &crate::devflow_dialect::DEVPIT,
+        root,
+        Default::default(),
+    )
+    .test
+    .into_iter()
+    .next();
     TestCommand {
         from: first.as_ref().map(|found| {
             let file = found.source.rsplit_once(':').map_or("", |(file, _)| file);

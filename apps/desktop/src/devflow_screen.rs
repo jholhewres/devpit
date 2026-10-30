@@ -5,13 +5,13 @@
 
 use std::path::{Path, PathBuf};
 
+use devflow_engine::config::{Config, StageGate, Step};
+use devflow_engine::detect::{self, Detected};
+use devflow_engine::folder::State;
+use devflow_engine::layers::Layered;
+use devflow_engine::preset::{self, Preset};
+use devflow_engine::{skills, Ask};
 use devpit_core::{preference, Store};
-use devpit_devflow::config::{Config, StageGate, Step};
-use devpit_devflow::detect::{self, Detected};
-use devpit_devflow::folder::{State, FILE};
-use devpit_devflow::layers::Layered;
-use devpit_devflow::preset::{self, Preset};
-use devpit_devflow::{skills, Ask};
 use devpit_rpc::{
     DevflowAsks, DevflowChange, DevflowCheck, DevflowCli, DevflowConfig, DevflowDetected,
     DevflowError, DevflowFileChange, DevflowFound, DevflowHint, DevflowPrefs, DevflowPreview,
@@ -87,14 +87,21 @@ pub(crate) fn screen(app: Option<&AppHandle>, store: &Store, project: &Project) 
         }
     };
     let detected = matches!(state, State::Missing).then(|| {
-        let found = detect::detected(root, devflow::machine(store, &project.id));
+        let found = detect::detected_in(
+            &crate::devflow_dialect::DEVPIT,
+            root,
+            devflow::machine(store, &project.id),
+        );
         detected_view(&found)
     });
     DevflowScreen {
         project_id: project.id.clone(),
         state: state_of(&state, active),
         globally_on: globally,
-        file: root.join(FILE).display().to_string(),
+        file: root
+            .join(crate::devflow_dialect::file())
+            .display()
+            .to_string(),
         yaml,
         config,
         error,
@@ -143,7 +150,13 @@ fn stage_skill(step: &Step, places: &SkillsIn) -> DevflowSkill {
             let name = format!("devflow-{stage}");
             skill_view(
                 &name,
-                skills::resolve_with(places.root, places.personal, teams, &name),
+                skills::resolve_with_in(
+                    &crate::devflow_dialect::DEVPIT,
+                    places.root,
+                    places.personal,
+                    teams,
+                    &name,
+                ),
             )
         }
         None => {
@@ -183,7 +196,7 @@ pub(crate) fn view(
     sources: &[(String, String)],
 ) -> DevflowConfig {
     let stages = &config.stages;
-    let check = |one: &devpit_devflow::config::Check| DevflowCheck {
+    let check = |one: &devflow_engine::config::Check| DevflowCheck {
         name: one.name.clone(),
         run: one.run.clone(),
         report: one.report.word().to_owned(),
@@ -328,7 +341,7 @@ pub(crate) fn detected_view(found: &Detected) -> DevflowDetected {
 }
 
 /// How the repository already works, one kind each.
-fn hints_said(hints: &devpit_devflow::detect::Hints) -> Vec<DevflowHint> {
+fn hints_said(hints: &devflow_engine::detect::Hints) -> Vec<DevflowHint> {
     [
         ("Guides", &hints.guides),
         ("Pull request templates", &hints.pr_templates),
@@ -557,8 +570,14 @@ pub async fn devflow_skill_text(
     crate::off_main::blocking(move || {
         let store = crate::projects::store()?;
         let project = project_here(&store, &project_id)?;
-        let skill =
-            skills::resolve(Path::new(&project.root_path), &personal(), &name).map_err(refused)?;
+        let skill = skills::resolve_with_in(
+            &crate::devflow_dialect::DEVPIT,
+            Path::new(&project.root_path),
+            &personal(),
+            &[],
+            &name,
+        )
+        .map_err(refused)?;
         Ok(DevflowSkillText {
             text: skill.text.clone(),
             skill: skill_view(&name, Ok(skill)),

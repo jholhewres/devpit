@@ -5,24 +5,51 @@
 //! with them, which Settings shows.
 //!
 //! The rubrics, their states and what an answer does are
-//! `devpit_devflow::jev`'s; the thresholds a rubric would agree best at are
+//! `devflow_engine::jev`'s; the thresholds a rubric would agree best at are
 //! `calibrate`'s.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use devflow_engine::calibrate::{self, Labelled};
+use devflow_engine::config::{Mode, GATE};
+use devflow_engine::jev::{self, Said};
+use devflow_engine::{Ask, Config};
 use devpit_core::store::decisions::DecisionRow;
 use devpit_core::Store;
-use devpit_devflow::calibrate::{self, Labelled};
-use devpit_devflow::config::{Mode, GATE};
-use devpit_devflow::jev::{self, Said};
-use devpit_devflow::{Ask, Config};
-use devpit_rpc::{DevflowCalibration, DevflowDecisions, Project, RpcError, RubricAccuracy};
+use devpit_rpc::{
+    DecisionsState, DevflowCalibration, DevflowDecisions, Project, RpcError, RubricAccuracy,
+};
 use serde_json::{json, Value};
 
 use crate::deciding::{Asking, Conf, Decided, Skip};
 use crate::rubric::Rubric;
+
+/// Where Decisions stands, in devpit's words and its contract's type.
+pub(crate) fn decisions_state(
+    used: bool,
+    opted_out: bool,
+    key: bool,
+    failed: Option<&str>,
+) -> DevflowDecisions {
+    let said = jev::decisions_state_in(
+        &crate::devflow_dialect::DEVPIT,
+        used,
+        opted_out,
+        key,
+        failed,
+    );
+    DevflowDecisions {
+        state: match said.state {
+            jev::DecisionsState::On => DecisionsState::On,
+            jev::DecisionsState::Off => DecisionsState::Off,
+            jev::DecisionsState::NoKey => DecisionsState::NoKey,
+            jev::DecisionsState::Failing => DecisionsState::Failing,
+        },
+        reason: said.reason,
+    }
+}
 
 /// The Decisions settings a test gives a project in place of the key file's,
 /// which every test shares.
@@ -58,13 +85,18 @@ pub(crate) fn mode_of(store: &Store, project_id: &str, config: &Config) -> Mode 
 /// else devpit's — `devflow-done` asked once per criterion — else a rubric
 /// of the project's `.devpit/rubrics/`, as `devpit_rubric_run` reads them.
 pub(crate) fn rubric(root: &Path, name: &str, criteria: &[String]) -> Result<Rubric, String> {
-    if let Some(text) = crate::agent_decide::rubric_text_in(root, jev::DIR, name)? {
+    if let Some(text) = crate::agent_decide::rubric_text_in(root, &jev::dir(root), name)? {
         return crate::agent_decide::rubric_of(name, &text);
     }
     if name == GATE {
         return Ok(crate::devflow_gate::done_per_criterion(criteria));
     }
-    match jev::BUILT_IN.iter().find(|(built, _)| *built == name) {
+    match crate::devflow_dialect::DEVPIT
+        .assets
+        .rubrics
+        .iter()
+        .find(|(built, _)| *built == name)
+    {
         Some((_, text)) => crate::agent_decide::rubric_of(name, text),
         None => crate::agent_decide::rubric_named(root, name),
     }
@@ -144,7 +176,7 @@ impl Jev {
                 .ok()
                 .flatten()
         });
-        jev::decisions_state(
+        decisions_state(
             true,
             self.conf.opted_out.contains(&self.project_id),
             self.conf.key.is_some(),
@@ -238,7 +270,7 @@ impl Jev {
 /// Where Decisions stands for a reply, with the Jev it asked, if any.
 pub(crate) fn decisions_of(config: &Config, jev: Option<&Jev>) -> Value {
     let state = jev.map_or_else(
-        || jev::decisions_state(config.decisions.use_, false, false, None),
+        || decisions_state(config.decisions.use_, false, false, None),
         Jev::state,
     );
     json!(state)
@@ -248,12 +280,12 @@ pub(crate) fn decisions_of(config: &Config, jev: Option<&Jev>) -> Value {
 /// say it: its devflow.yaml, the settings and its last call.
 pub(crate) fn standing(store: &Store, project_id: &str, root: &Path) -> DevflowDecisions {
     let used = match crate::devflow::read(root) {
-        devpit_devflow::State::Valid(_, config) => config.decisions.use_,
+        devflow_engine::State::Valid(_, config) => config.decisions.use_,
         _ => false,
     };
     let conf = conf_for(store, project_id).unwrap_or_default();
     let failed = store.decision_failed_last(project_id).ok().flatten();
-    jev::decisions_state(
+    decisions_state(
         used,
         conf.opted_out.iter().any(|out| out == project_id),
         conf.key.is_some(),
@@ -264,7 +296,7 @@ pub(crate) fn standing(store: &Store, project_id: &str, root: &Path) -> DevflowD
 /// The rubric a project's completion is judged by.
 fn completion_rubric(root: &Path) -> String {
     match crate::devflow::read(root) {
-        devpit_devflow::State::Valid(_, config) => {
+        devflow_engine::State::Valid(_, config) => {
             jev::rubric_for(&config, "completion").unwrap_or_else(|| GATE.to_owned())
         }
         _ => GATE.to_owned(),
@@ -328,7 +360,7 @@ pub(crate) fn moved(store: &Store, project_id: &str, card_id: &str, from: Option
             continue;
         };
         if unlabelled.iter().any(|id| id == decision) {
-            let standing = devpit_devflow::findings::standing(finding);
+            let standing = devflow_engine::findings::standing(finding);
             label(store, decision, standing, "finished");
         }
     }

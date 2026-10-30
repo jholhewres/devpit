@@ -9,8 +9,8 @@
 
 use std::path::{Path, PathBuf};
 
+use devflow_engine::plugin::launch::{self as plugin, Cli};
 use devpit_core::Store;
-use devpit_devflow::plugin::{self, Cli};
 
 /// Where devpit keeps Devflow's plugin for each CLI, in its own home.
 pub(crate) fn folder(root: &Path, cli: Cli) -> PathBuf {
@@ -49,7 +49,10 @@ pub(crate) fn flags_for(cli: Cli, root: &Path, exe: &str) -> Option<String> {
     match cli {
         Cli::Claude => {
             let base = folder(root, cli);
-            written(&base, &plugin::claude(exe))?;
+            written(
+                &base,
+                &plugin::claude_in(&crate::devflow_dialect::DEVPIT, exe),
+            )?;
             let path = base.to_str()?;
             // `=`, as the MCP file's flag: a list option takes the next word too.
             (!path.contains('\'')).then(|| format!("--plugin-dir='{path}'"))
@@ -57,7 +60,10 @@ pub(crate) fn flags_for(cli: Cli, root: &Path, exe: &str) -> Option<String> {
         Cli::Codex => {
             // Codex installs a plugin into every session it starts, so its
             // skills are left for the person to add; the hooks ride this line.
-            let _ = written(&folder(root, cli), &plugin::codex(exe));
+            let _ = written(
+                &folder(root, cli),
+                &plugin::codex_in(&crate::devflow_dialect::DEVPIT, exe),
+            );
             // Codex keys a `-c` hook's trust by a path it spells for POSIX.
             if cfg!(windows) {
                 return None;

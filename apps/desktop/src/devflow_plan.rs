@@ -9,11 +9,11 @@
 
 use std::path::Path;
 
+use devflow_engine::brief::{self, Brief};
+use devflow_engine::jev::{self, Said};
+use devflow_engine::plan::{self, Slice, PREFIX};
+use devflow_engine::Config;
 use devpit_core::{NewCard, Store};
-use devpit_devflow::brief::{self, Brief};
-use devpit_devflow::jev::{self, Said};
-use devpit_devflow::plan::{self, Slice, PREFIX};
-use devpit_devflow::Config;
 use devpit_rpc::{DevflowPlan, DevflowPlanCreated, ErrorCode, PlannedCard, Project, RpcError};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
@@ -55,7 +55,7 @@ pub(crate) fn respond(
     let (config, jev) = judging(project, text(params, "epic").as_deref());
     // A plan for a tracker devpit cannot write yet is refused before anything is made.
     if let (Some(config), "devflow_plan") = (&config, method) {
-        plan::published(config)?;
+        plan::published_in(&crate::devflow_dialect::DEVPIT, config)?;
     }
     let mut answer = respond_judged(app, method, project, params, config.as_ref(), jev.as_ref())?;
     if let (Some(config), "devflow_plan") = (&config, method) {
@@ -68,7 +68,7 @@ pub(crate) fn respond(
 fn judging(project: &Project, epic: Option<&str>) -> (Option<Config>, Option<Jev>) {
     let root = Path::new(&project.root_path);
     let config = match crate::devflow::read(root) {
-        devpit_devflow::State::Valid(_, config) => Some(*config),
+        devflow_engine::State::Valid(_, config) => Some(*config),
         _ => None,
     };
     let jev = config
@@ -263,7 +263,10 @@ pub(crate) fn previewed(params: &Value) -> Result<Value, String> {
     if params.get("apply").and_then(Value::as_bool) == Some(true) {
         return Err("cards are created under their epic: pass `epic`".to_owned());
     }
-    let slices = plan::read(params.get("cards").unwrap_or(&Value::Null))?;
+    let slices = plan::read_in(
+        &crate::devflow_dialect::DEVPIT,
+        params.get("cards").unwrap_or(&Value::Null),
+    )?;
     Ok(json!({
         "applied": false,
         "epic": Value::Null,
@@ -322,7 +325,10 @@ fn planned(
             .as_ref()
             .map(|row| slices_of(&row.cards))
             .ok_or("there is no preview on this epic to apply: send the cards first")?,
-        cards => plan::read(cards.unwrap_or(&Value::Null))?,
+        cards => plan::read_in(
+            &crate::devflow_dialect::DEVPIT,
+            cards.unwrap_or(&Value::Null),
+        )?,
     };
     outside_cards(store, project_id, &slices)?;
     // Before planning: whether the brief can be planned from.
@@ -590,7 +596,7 @@ pub(crate) fn kept_on_board(
     let invalid = |why: String| RpcError::new(ErrorCode::Invalid, why);
     let slices: Vec<Slice> = cards.into_iter().map(slice_of).collect();
     let cards = serde_json::to_value(slices).map_err(|err| invalid(err.to_string()))?;
-    let slices = plan::read(&cards).map_err(invalid)?;
+    let slices = plan::read_in(&crate::devflow_dialect::DEVPIT, &cards).map_err(invalid)?;
     outside_cards(store, project_id, &slices).map_err(invalid)?;
     keep(store, epic_id, &slices, true).map_err(invalid)?;
     waiting(store, epic_id).ok_or_else(|| RpcError::new(ErrorCode::NotFound, "the plan is gone"))

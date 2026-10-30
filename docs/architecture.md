@@ -12,7 +12,6 @@ crates/rpc       the contract; frontend types are generated from it
 crates/tmux      the sessions that outlive the window
 crates/agentcli  the agent catalogue, headless turns, hooks
 crates/steps     what a column runs, and the runner that runs it
-crates/devflow   devflow.yaml, its detection, setup and evidence; flow/ ships inside it
 crates/remote    the Remote through the relay: Noise, frames, the relay client, MCP between machines
 crates/sync      sync between machines: the key, sealing, the clock, the merge, the namespaces
 apps/desktop     the shell — the only crate allowed to know it
@@ -182,6 +181,15 @@ Devflow — briefing, context, plan, execution, review, completion — is a
 module of devpit's MCP. A project configures it in
 `.devpit/devflow/devflow.yaml`, which is the source of truth: the store keeps
 no copy, only that the person clicked.
+
+The rules are [devflow](https://github.com/jholhewres/devflow)'s engine,
+`devflow-engine`, the same one devflow's own MCP server runs. devpit passes
+it its words and its `flow/` (`devflow_dialect.rs`: a card where the engine
+says item, the `devpit_devflow_*` tools, `DEVPIT_*` variables), pins every
+project's folder to `.devpit/devflow/`, and keeps cards on its board as the
+engine's work items (`devflow_work.rs`). The board, the clicks, the gate on
+`devpit_finish_card`, the Stop hook, the autopilot, runs attached to cards,
+Jev's decision log and the Devflow screen stay devpit's.
 
 - **Three levels.** Settings switches it off everywhere, and then the MCP
   lists exactly what it did before Devflow. Otherwise every project gets

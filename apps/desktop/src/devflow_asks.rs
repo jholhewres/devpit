@@ -10,9 +10,9 @@
 
 use std::sync::{Mutex, OnceLock};
 
+use devflow_engine::preset::Preset;
+use devflow_engine::{folder, proposal, setup, Ask, Proposal};
 use devpit_core::{preference, Store};
-use devpit_devflow::preset::Preset;
-use devpit_devflow::{folder, proposal, setup, Ask, Proposal};
 use devpit_rpc::{DevflowAsk, DevflowAsks, DevflowChange, ErrorCode, RpcError};
 use tauri::{AppHandle, Emitter};
 
@@ -373,8 +373,12 @@ pub async fn devflow_answer(
 fn made_now(project_id: &str, ask: Ask) -> Result<(), RpcError> {
     let store = crate::projects::store()?;
     let (_, root) = crate::projects::locate(&store, project_id)?;
-    let switched = proposal::switched(&folder::read(&root), ask)
-        .map_err(|why| RpcError::new(ErrorCode::Invalid, why.to_string()))?;
+    let switched = proposal::switched_in(
+        &crate::devflow_dialect::layout(),
+        &folder::read_in(&crate::devflow_dialect::DEVPIT, &root),
+        ask,
+    )
+    .map_err(|why| RpcError::new(ErrorCode::Invalid, why.to_string()))?;
     setup::write(&root, &switched.files).map_err(|why| {
         RpcError::new(
             ErrorCode::Invalid,

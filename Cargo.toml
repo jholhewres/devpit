@@ -11,7 +11,6 @@ members = [
     "crates/cookies",
     "crates/steps",
     "crates/agentapi",
-    "crates/devflow",
     "crates/remote",
     "crates/sync",
     "apps/desktop",
@@ -35,7 +34,9 @@ devpit-tmux = { path = "crates/tmux" }
 devpit-agentcli = { path = "crates/agentcli" }
 devpit-steps = { path = "crates/steps" }
 devpit-cookies = { path = "crates/cookies" }
-devpit-devflow = { path = "crates/devflow" }
+# ponytail: a path while v0.2.0 is a local tag only; becomes
+# `git = "https://github.com/jholhewres/devflow", tag = "v0.2.0"` once it is pushed (card M).
+devflow-engine = { path = "/home/jhol/Workspace/private/devflow/crates/engine" }
 devpit-remote = { path = "crates/remote" }
 devpit-sync = { path = "crates/sync" }
 

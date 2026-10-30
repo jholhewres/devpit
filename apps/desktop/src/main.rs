@@ -102,6 +102,7 @@ mod devflow_adhoc;
 mod devflow_asks;
 mod devflow_card;
 mod devflow_codex;
+mod devflow_dialect;
 mod devflow_evidence;
 mod devflow_gate;
 mod devflow_jev;
@@ -275,6 +276,9 @@ fn main() {
 
     // `devpit agent …` and `devpit mcp` are an agent reaching the running
     // app, not a second window: answered here, before anything starts GTK.
+    // Before the engine reads any project: devpit's folder, devpit's spawner.
+    devflow_dialect::pinned();
+
     if let Some(code) = agent_door() {
         std::process::exit(code);
     }

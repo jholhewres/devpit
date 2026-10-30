@@ -3,17 +3,17 @@
 //! signed on the card — and a Devflow review's findings in the card's diff,
 //! where the person can call one a false positive.
 //!
-//! The rules are `devpit_devflow::review`'s and `findings`'s; this adds the
+//! The rules are `devflow_engine::review`'s and `findings`'s; this adds the
 //! board, git, the CLIs on this machine and the window.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use devflow_engine::config::Agent;
+use devflow_engine::evidence::Card;
+use devflow_engine::review::{self, Git, Given, Reach};
+use devflow_engine::{runs, Config};
 use devpit_core::Store;
-use devpit_devflow::config::Agent;
-use devpit_devflow::evidence::Card;
-use devpit_devflow::review::{self, Git, Given, Reach};
-use devpit_devflow::{runs, Config};
 use devpit_rpc::{CardReview, Declared, Finding, Found, Project, Review, Severity};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
@@ -110,20 +110,20 @@ fn pinned_from(root: &Path, base: String) -> Result<Pinned, String> {
 /// there: what a later review without a base diffs from.
 pub(crate) fn began(project: &Project, cwd: &Path, card: &str) {
     let root = checkout(project, cwd);
-    if !root.join(devpit_devflow::folder::FILE).is_file() {
+    if !root.join(crate::devflow_dialect::file()).is_file() {
         return;
     }
     let (Ok(head), Ok(runs)) = (devpit_git::head_of(&root), runs_of(&project.id, &root)) else {
         return;
     };
-    let _ = devpit_devflow::started::keep_start(&runs, card, &head);
+    let _ = devflow_engine::started::keep_start(&runs, card, &head);
 }
 
 /// The brief of the epic the card was planned under.
-fn brief_of(store: &Store, project: &Project, card: &str) -> Option<devpit_devflow::brief::Brief> {
+fn brief_of(store: &Store, project: &Project, card: &str) -> Option<devflow_engine::brief::Brief> {
     let edges = store.card_edges(&project.id).ok()?;
     let (_, epic) = edges.parents.iter().find(|(child, _)| child == card)?;
-    devpit_devflow::brief::read(&store.card(epic).ok()??.body)
+    devflow_engine::brief::read(&store.card(epic).ok()??.body)
 }
 
 pub(crate) fn respond_with(
@@ -135,18 +135,18 @@ pub(crate) fn respond_with(
     reach: Reach,
     profile: Option<&Declared>,
 ) -> Result<Value, String> {
-    let asked = review::asked(params)?;
+    let asked = review::asked_in(&crate::devflow_dialect::DEVPIT, params)?;
     let store = crate::projects::store().map_err(|err| err.message)?;
     let card = card_here(&store, project, &asked.card)?;
     let root = checkout(project, cwd);
     let runs = runs_of(&project.id, &root)?;
     // The card's own base, else where it was started here, else the default
     // branch: a card worked in the project's folder has only the second.
-    let started = devpit_devflow::started::start_of(&runs, &card.id);
+    let started = devflow_engine::started::start_of(&runs, &card.id);
     let previous = asked
         .previous
         .as_deref()
-        .map(|run| review::previous_of(&runs, &card.id, run))
+        .map(|run| review::previous_of_in(&crate::devflow_dialect::DEVPIT, &runs, &card.id, run))
         .transpose()?;
     let pinned = match (&asked.run, &previous) {
         (None, Some(previous)) => Some(pinned_from(&root, previous.head.clone())?),
@@ -217,6 +217,7 @@ pub(crate) fn respond_with(
         redact: &redact,
         jev: judging.as_ref().map(|judge| judge as review::Judge),
         personas: review::Personas {
+            dialect: &crate::devflow_dialect::DEVPIT,
             personal: personal.as_deref(),
             teams: &teams,
         },
@@ -250,7 +251,7 @@ pub(crate) fn respond_with(
     let mut answer = review::summary(&done);
     let commits = pinned.as_ref().map_or(0, |pinned| pinned.4);
     let ranged = asked.base.is_some() || previous.is_some();
-    if let Some(warning) = review::wide(commits, ranged) {
+    if let Some(warning) = review::wide_in(&crate::devflow_dialect::DEVPIT, commits, ranged) {
         answer["warning"] = json!(warning);
     }
     answer["attached"] =
@@ -319,7 +320,7 @@ pub(crate) fn card_review(store: &Store, card_id: &str) -> Option<CardReview> {
     let dismissed = list
         .iter()
         .enumerate()
-        .filter(|(_, finding)| !devpit_devflow::findings::standing(finding))
+        .filter(|(_, finding)| !devflow_engine::findings::standing(finding))
         .filter_map(|(at, _)| u32::try_from(at).ok())
         .collect();
     Some(CardReview {
@@ -364,12 +365,12 @@ pub(crate) fn mark(
         .get_mut(at as usize)
         .filter(|finding| finding.is_object())
         .ok_or("no such finding")?;
-    devpit_devflow::findings::person_said(finding, false_positive);
+    devflow_engine::findings::person_said(finding, false_positive);
     crate::devflow_jev::finding_marked(store, finding, false_positive);
     let config = crate::devflow::read(&root);
-    if let devpit_devflow::State::Valid(_, config) = config {
+    if let devflow_engine::State::Valid(_, config) = config {
         let list = kept["findings"].as_array().cloned().unwrap_or_default();
-        kept["verdict"] = json!(devpit_devflow::findings::verdict(
+        kept["verdict"] = json!(devflow_engine::findings::verdict(
             &list,
             &config.review.block_on,
             config.review.verify

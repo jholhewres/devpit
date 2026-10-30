@@ -8,18 +8,19 @@
 
 use std::path::Path;
 
+use devflow_engine::config::Agent;
+use devflow_engine::detect::{self, Cli, Machine};
+use devflow_engine::folder::{self, State};
+use devflow_engine::layers::{self, Home, Layered};
+use devflow_engine::preset::{self, Preset};
+use devflow_engine::{proposal, setup, Ask, Proposal};
 use devpit_core::{preference, Store};
-use devpit_devflow::config::Agent;
-use devpit_devflow::detect::{self, Cli, Machine};
-use devpit_devflow::folder::{self, State, FILE};
-use devpit_devflow::layers::{self, Home, Layered};
-use devpit_devflow::preset::{self, Preset};
-use devpit_devflow::{proposal, setup, Ask, Proposal};
 use devpit_rpc::{Credentials, Project};
 use serde_json::{json, Map, Value};
 use tauri::AppHandle;
 
 use crate::devflow_asks::{self as asks, globally_on, made};
+use crate::devflow_dialect::{file, layout, DEVPIT};
 
 pub(crate) const METHODS: [&str; 14] = [
     "devflow_offer",
@@ -118,7 +119,7 @@ pub(crate) fn respond_from(
         }
         "devflow_review" if params.get("card").is_none_or(Value::is_null) => {
             on_demand_here(&store, project, &state)?;
-            let asked = devpit_devflow::adhoc::standalone(params)?
+            let asked = devflow_engine::adhoc::standalone_in(&DEVPIT, params)?
                 .ok_or("a card's review is asked with its card")?;
             let profile = crate::devflow_profile::runnable(&store, &project.id, config_dir)?;
             crate::devflow_adhoc::respond(app, project, &state, asked, profile.as_ref())
@@ -176,6 +177,7 @@ pub(crate) fn respond_from(
 
 /// Where this devpit keeps the layers a project's Devflow is read over.
 pub(crate) fn home() -> Home {
+    crate::devflow_dialect::pinned();
     Home::under(&Store::root().unwrap_or_default())
 }
 
@@ -183,8 +185,9 @@ pub(crate) fn home() -> Home {
 /// the teams it extends at their approved commits — which is what the flow
 /// runs on. The text stays the project's own file, which a change edits.
 pub(crate) fn read(root: &Path) -> State {
-    match folder::read(root) {
-        State::Valid(text, _) => match layers::layered(root, &text, &home()) {
+    crate::devflow_dialect::pinned();
+    match folder::read_in(&DEVPIT, root) {
+        State::Valid(text, _) => match layers::layered_in(&DEVPIT, root, &text, &home()) {
             Ok(layered) => State::Valid(text, Box::new(layered.config)),
             Err(invalid) => State::Invalid(Some(text), invalid),
         },
@@ -194,8 +197,8 @@ pub(crate) fn read(root: &Path) -> State {
 
 /// The layers as they stand, when the project's file reads.
 pub(crate) fn layered(root: &Path) -> Option<Layered> {
-    match folder::read(root) {
-        State::Valid(text, _) => layers::layered(root, &text, &home()).ok(),
+    match folder::read_in(&DEVPIT, root) {
+        State::Valid(text, _) => layers::layered_in(&DEVPIT, root, &text, &home()).ok(),
         _ => None,
     }
 }
@@ -203,7 +206,7 @@ pub(crate) fn layered(root: &Path) -> Option<Layered> {
 /// A change refused when the file it leaves would not read over its layers:
 /// the project may not weaken what a layer locked.
 fn layered_as(root: &Path, proposal: &Proposal) -> Result<(), String> {
-    layers::layered(root, &proposal.yaml, &home())
+    layers::layered_in(&DEVPIT, root, &proposal.yaml, &home())
         .map(|_| ())
         .map_err(|invalid| format!("{invalid}"))
 }
@@ -290,7 +293,7 @@ fn offer(store: &Store, project: &Project, root: &Path, state: &State) -> Value 
     json!({
         "offer": word,
         "stages": stages,
-        "watch": root.join(FILE).display().to_string(),
+        "watch": root.join(file()).display().to_string(),
         // What else the server lists: an orchestrator's tools, and Decisions'.
         "orchestrator": orchestrator,
         "decisions": crate::decisions::key().is_some(),
@@ -298,7 +301,7 @@ fn offer(store: &Store, project: &Project, root: &Path, state: &State) -> Value 
 }
 
 /// The fields a newer devpit wrote, left out here rather than refused.
-pub(crate) fn unread_note(unread: &[devpit_devflow::Invalid]) -> Option<String> {
+pub(crate) fn unread_note(unread: &[devflow_engine::Invalid]) -> Option<String> {
     let named: Vec<String> = unread.iter().map(ToString::to_string).collect();
     (!named.is_empty()).then(|| {
         format!(
@@ -313,14 +316,14 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
     let switched_on = made(store, &project.id, Ask::Enable);
     let globally = globally_on(store);
     let active = matches!(offered(globally, state, switched_on), Offered::Active(_));
-    let detected = detect::detected(root, machine(store, &project.id));
+    let detected = detect::detected_in(&DEVPIT, root, machine(store, &project.id));
     let waiting: Vec<&str> = asks::waiting_in(&project.id)
         .into_iter()
         .map(Ask::word)
         .collect();
     let mut said = json!({
         "state": state_word(state, active),
-        "file": FILE,
+        "file": file(),
         "yaml": Value::Null,
         "recommended_checks": preset::checks(&detected),
         "open": detect::open(&detected),
@@ -359,7 +362,7 @@ fn status(store: &Store, project: &Project, root: &Path, state: &State) -> Value
         State::Valid(text, config) => {
             said["yaml"] = json!(text);
             said["config"] = config.to_json();
-            let unread = devpit_devflow::config::unread(text);
+            let unread = devflow_engine::config::unread(text);
             said["unread"] = json!(unread);
             let waiting = (config.enabled && !switched_on).then(|| {
                 "devflow.yaml says enabled: true, but the person has not switched Devflow on \
@@ -473,9 +476,9 @@ pub(crate) fn setup_of(
         Some(Value::Object(set)) => set.clone(),
         Some(_) => return Err("`set` is an object of dotted path to value".to_owned()),
     };
-    let detected = detect::detected(root, machine(store, &project.id));
-    let proposal =
-        proposal::setup(state, preset, &set, &detected).map_err(|why| why.to_string())?;
+    let detected = detect::detected_in(&DEVPIT, root, machine(store, &project.id));
+    let proposal = proposal::setup_in(&layout(), state, preset, &set, &detected)
+        .map_err(|why| why.to_string())?;
     layered_as(root, &proposal)?;
     let asked = params.get("apply").and_then(Value::as_bool) == Some(true);
     // The person's yes was to a preview: a setup that moved since then (a
@@ -505,7 +508,7 @@ pub(crate) fn setup_of(
             })
         })
         .collect();
-    let planned = setup::with_unused(root, &proposal.config, proposal.files.clone());
+    let planned = setup::with_unused_in(&DEVPIT, root, &proposal.config, proposal.files.clone());
     let files = if apply {
         setup::write(root, &planned)?
     } else {
@@ -564,7 +567,8 @@ pub(crate) fn set_of(
     let value = params
         .get("value")
         .ok_or("pass the new `value` for the field")?;
-    let proposal = proposal::set(state, path, value).map_err(|why| why.to_string())?;
+    let proposal =
+        proposal::set_in(&layout(), state, path, value).map_err(|why| why.to_string())?;
     layered_as(root, &proposal)?;
     let apply = params.get("apply").and_then(Value::as_bool) == Some(true);
     let before = match state {
@@ -572,7 +576,7 @@ pub(crate) fn set_of(
         _ => Value::Null,
     };
     let written = apply && !proposal.changes.is_empty();
-    let planned = setup::with_unused(root, &proposal.config, proposal.files.clone());
+    let planned = setup::with_unused_in(&DEVPIT, root, &proposal.config, proposal.files.clone());
     let files = if written {
         setup::write(root, &planned)?
     } else {

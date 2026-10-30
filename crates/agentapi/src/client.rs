@@ -23,7 +23,7 @@ const STARTING: Duration = Duration::from_secs(90);
 /// a plan asks it twice, about the brief and then the cards.
 const DECIDING: Duration = Duration::from_secs(45);
 /// The gate may ask Decisions too, but a stop hook calls it and gives up at
-/// thirty seconds (`devpit_devflow::plugin::GATE_WAITS`): it answers first.
+/// thirty seconds (`devflow_engine::plugin::launch::GATE_WAITS`): it answers first.
 const GATING: Duration = Duration::from_secs(25);
 /// A fetch over the network, a whole transcript parsed, a large file copied.
 const READING: Duration = Duration::from_secs(60);

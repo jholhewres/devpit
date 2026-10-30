@@ -2,8 +2,8 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex as Shared, OnceLock};
 
+use devflow_engine::config::Mode;
 use devpit_core::store::decisions::DecisionWrite;
-use devpit_devflow::config::Mode;
 
 use super::*;
 
@@ -212,13 +212,13 @@ fn the_four_rubrics_are_asked_with_no_retention_and_judged_by_their_thresholds()
         "description": "d", "evidence": "e", "poc": "p", "agent": "claude", "persona": "devflow-security",
         "anchor": "added",
     });
-    let brief = devpit_devflow::brief::Brief {
+    let brief = devflow_engine::brief::Brief {
         goal: Some("open links".into()),
         success: Some("tasks open 1 opens it".into()),
         out_of_scope: Some(vec!["previews".into()]),
         ..Default::default()
     };
-    let slices: Vec<devpit_devflow::plan::Slice> = serde_json::from_value(json!([
+    let slices: Vec<devflow_engine::plan::Slice> = serde_json::from_value(json!([
         { "key": "s1", "title": "Open a link", "criteria": ["opens it"] }
     ]))
     .expect("a plan");
@@ -298,9 +298,10 @@ fn a_projects_own_rubric_in_its_devflow_folder_overrides_devpits() {
         "the old place is not read"
     );
 
-    std::fs::create_dir_all(root.join(jev::DIR)).expect("dir");
+    std::fs::create_dir_all(root.join(jev::dir(root))).expect("dir");
     for name in [jev::DONE, jev::BRIEF] {
-        std::fs::write(root.join(jev::DIR).join(format!("{name}.json")), ours).expect("write");
+        std::fs::write(root.join(jev::dir(root)).join(format!("{name}.json")), ours)
+            .expect("write");
         let read = rubric(root, name, &[]).expect("ours");
         assert_eq!(read.name, name);
         assert!(read.questions.get("short").is_some());
@@ -515,7 +516,7 @@ fn the_panel_says_failing_with_why_until_a_call_is_answered() {
     Standing::Answering.said_in(&reply(standing(&store, &project.id, &root)));
     let ask = |given: Standing| {
         given.give(&project.id);
-        let devpit_devflow::State::Valid(_, config) = crate::devflow::read(&root) else {
+        let devflow_engine::State::Valid(_, config) = crate::devflow::read(&root) else {
             panic!("devflow.yaml reads");
         };
         let jev = Jev::of(&project, &config, &root, None, &[]).expect("used");

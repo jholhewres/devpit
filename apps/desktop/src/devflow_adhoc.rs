@@ -10,11 +10,11 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use devpit_devflow::adhoc::{self, Standalone, Subject};
-use devpit_devflow::evidence::Card;
-use devpit_devflow::review::{self, Asked, Given, Reach};
-use devpit_devflow::runs::{self, Runs};
-use devpit_devflow::{layers, Config, State};
+use devflow_engine::adhoc::{self, Standalone, Subject};
+use devflow_engine::evidence::Card;
+use devflow_engine::review::{self, Asked, Given, Reach};
+use devflow_engine::runs::{self, Runs};
+use devflow_engine::{layers, Config, State};
 use devpit_rpc::{Declared, Project};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -215,6 +215,7 @@ pub(crate) fn respond_with(
     let runs = Runs {
         home: home.devflow_reviews(),
         checkout: reading.clone(),
+        dialect: &crate::devflow_dialect::DEVPIT,
     };
     let secrets = crate::kept_out::what_devpit_gave(&store);
     let redact = |text: &str| crate::kept_out::kept_out(text, &secrets);
@@ -264,6 +265,7 @@ pub(crate) fn respond_with(
         redact: &redact,
         jev: None,
         personas: review::Personas {
+            dialect: &crate::devflow_dialect::DEVPIT,
             personal: personal.as_deref(),
             teams: &teams,
         },
@@ -289,7 +291,8 @@ pub(crate) fn respond_with(
         fields.remove("card");
     }
     answer["reviewed"] = json!(label);
-    answer["next"] = json!(adhoc::next(
+    answer["next"] = json!(adhoc::next_in(
+        &crate::devflow_dialect::DEVPIT,
         &asked.subject,
         &label,
         &done.stamp,

@@ -334,7 +334,7 @@ fn a_stop_hooks_call_carries_the_pane_and_the_cap_of_its_session() {
 }
 
 /// An agent is shown the card and its kind alone: the fields devpit's own
-/// stop hooks fill are still taken (`devpit_devflow::gate::FIELDS`), but
+/// stop hooks fill are still taken (`devflow_engine::gate::FIELDS`), but
 /// listing them cost every turn and invited an agent to fake a stop. A hook
 /// names no card, so none is required.
 #[test]
@@ -385,7 +385,7 @@ fn the_review_runs_on_demand_and_takes_what_its_skill_sends() {
         .keys()
         .collect();
     keys.sort();
-    // devpit_devflow::review::FIELDS, which the app holds every call to.
+    // devflow_engine::review::FIELDS, which the app holds every call to.
     assert_eq!(
         keys,
         [

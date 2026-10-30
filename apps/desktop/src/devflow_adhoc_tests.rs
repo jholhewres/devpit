@@ -1,4 +1,4 @@
-use devpit_devflow::config::Agent;
+use devflow_engine::config::Agent;
 
 use super::*;
 use crate::devflow_review::tests::{fake_claude, git, project_at};
@@ -46,7 +46,7 @@ pub(crate) fn checkout_with_a_feature(root: &Path) -> String {
 /// Devflow set up but not switched on: the review still runs on its file.
 fn not_switched_on() -> State {
     let yaml = "version: 1\nenabled: false\nreview:\n  reviewers:\n    - agent: claude\n      persona: devflow-security\n";
-    let config = devpit_devflow::config::parse(yaml).expect("yaml");
+    let config = devflow_engine::config::parse(yaml).expect("yaml");
     State::Valid(yaml.to_owned(), Box::new(config))
 }
 
@@ -68,7 +68,7 @@ fn a_range_is_reviewed_without_a_card_and_the_persons_checkout_never_moves() {
         Agent::Claude => Ok(claude.clone()),
         _ => Err("not installed".to_owned()),
     };
-    let asked = devpit_devflow::adhoc::standalone(&json!({
+    let asked = devflow_engine::adhoc::standalone(&json!({
         "base": "main", "head": "feature", "criteria": ["links open safely"]
     }))
     .expect("asked")
@@ -118,7 +118,7 @@ fn a_pull_request_is_read_in_a_worktree_of_devpits_and_held_to_its_body() {
         })
     };
     let nobody = |_: Agent| Err("not installed".to_owned());
-    let asked = devpit_devflow::adhoc::standalone(&json!({ "pr": "#7" }))
+    let asked = devflow_engine::adhoc::standalone(&json!({ "pr": "#7" }))
         .expect("asked")
         .expect("no card");
 

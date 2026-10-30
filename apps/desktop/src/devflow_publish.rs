@@ -1,7 +1,7 @@
 //! `devflow_publish`: a review without a card drafted for its pull request,
 //! and posted there with `gh` once the person said yes to that draft.
 //!
-//! The rules are `devpit_devflow::publish`'s; this adds the run's folder in
+//! The rules are `devflow_engine::publish`'s; this adds the run's folder in
 //! devpit's home, the layers a template is read from, and GitHub.
 
 use std::io::{Read, Write};
@@ -9,9 +9,9 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
-use devpit_devflow::publish::{self, Destination, Event, Host, Inline, Posted};
-use devpit_devflow::review::Personas;
-use devpit_devflow::{adhoc, State};
+use devflow_engine::publish::{self, Destination, Event, Host, Inline, Posted};
+use devflow_engine::review::Personas;
+use devflow_engine::{adhoc, State};
 use devpit_rpc::Project;
 use serde_json::{json, Value};
 
@@ -38,7 +38,7 @@ pub(crate) fn respond_with(
     params: &Value,
     hosting: Hosting,
 ) -> Result<Value, String> {
-    let asked = publish::asked(params)?;
+    let asked = publish::asked_in(&crate::devflow_dialect::DEVPIT, params)?;
     let home = crate::projects::project_home(&project.id).map_err(|err| err.message)?;
     let folder = devpit_core::tree::resolve(&home.devflow_reviews(), &asked.review())
         .ok()
@@ -60,6 +60,7 @@ pub(crate) fn respond_with(
     let template = publish::template(
         root,
         Personas {
+            dialect: &crate::devflow_dialect::DEVPIT,
             personal: personal.as_deref(),
             teams: &teams,
         },

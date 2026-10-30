@@ -7,9 +7,9 @@
 //! apply, the change waits for the person's yes: without `apply` it only says
 //! what would change.
 
+use devflow_engine::plan::PREFIX;
 use devpit_core::store::card_numbers::card_number_of;
 use devpit_core::{CardRow, Store};
-use devpit_devflow::plan::PREFIX;
 use serde_json::{json, Value};
 
 /// Whether the call changes cards that exist rather than an epic's plan.

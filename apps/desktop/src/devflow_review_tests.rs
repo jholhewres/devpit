@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use devpit_devflow::Ask;
+use devflow_engine::Ask;
 use serde_json::json;
 
 use super::*;
@@ -114,8 +114,8 @@ fn fake_claude_finding(dir: &Path, name: &str, findings: Vec<Value>) -> String {
 }
 
 fn config_of(root: &Path) -> Config {
-    match devpit_devflow::folder::read(root) {
-        devpit_devflow::State::Valid(_, config) => *config,
+    match devflow_engine::folder::read(root) {
+        devflow_engine::State::Valid(_, config) => *config,
         other => panic!("{other:?}"),
     }
 }
@@ -266,15 +266,15 @@ fn a_card_started_in_a_devflow_checkout_keeps_where_it_began() {
     began(&project, root, &card);
     let runs = runs_of(&project.id, root).expect("runs");
     assert_eq!(
-        devpit_devflow::started::start_of(&runs, &card),
+        devflow_engine::started::start_of(&runs, &card),
         Some(head.clone())
     );
-    assert!(!root.join(devpit_devflow::runs::RUNS).exists());
+    assert!(!root.join(devflow_engine::runs::RUNS).exists());
 
     // A second start, after more commits, does not move where it began.
     git(root, &["commit", "-q", "-am", "more"]);
     began(&project, root, &card);
-    assert_eq!(devpit_devflow::started::start_of(&runs, &card), Some(head));
+    assert_eq!(devflow_engine::started::start_of(&runs, &card), Some(head));
 }
 
 #[test]

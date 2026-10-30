@@ -3,15 +3,15 @@
 //! what it left attached to the card — among the project's artifacts and
 //! linked from a comment, so a screenshot or a video opens on the card.
 //!
-//! The rules are `devpit_devflow::evidence`'s and `runs`'s; this adds the
+//! The rules are `devflow_engine::evidence`'s and `runs`'s; this adds the
 //! board, the secrets devpit knows and the window.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use devpit_devflow::evidence::{self, Card, Given};
-use devpit_devflow::runs::{self, Runs};
-use devpit_devflow::Config;
+use devflow_engine::evidence::{self, Card, Given};
+use devflow_engine::runs::{self, Runs};
+use devflow_engine::Config;
 use devpit_rpc::Project;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter};
@@ -32,7 +32,7 @@ pub(crate) fn respond(
     cwd: &Path,
     params: &Value,
 ) -> Result<Value, String> {
-    let asked = evidence::asked(params)?;
+    let asked = evidence::asked_in(&crate::devflow_dialect::DEVPIT, params)?;
     let store = crate::projects::store().map_err(|err| err.message)?;
     let on_board = store
         .project_id_of_card(&asked.card)
@@ -45,19 +45,22 @@ pub(crate) fn respond(
 
     let root = checkout(project, cwd);
     let branch = devpit_git::branch_at(&root).unwrap_or_default();
-    let context = context_of(
-        &card,
-        Some(Checkout {
-            path: &root,
-            branch: &branch,
-        }),
-        Some(&project.root_path),
-    )
-    .for_a_command();
+    let context = engine_context(
+        context_of(
+            &card,
+            Some(Checkout {
+                path: &root,
+                branch: &branch,
+            }),
+            Some(&project.root_path),
+        )
+        .for_a_command(),
+    );
     let secrets = crate::kept_out::what_devpit_gave(&store);
     let redact = |text: &str| crate::kept_out::kept_out(text, &secrets);
     let home = crate::projects::project_home(&project.id).map_err(|err| err.message)?;
     let found = evidence::gathered(&Given {
+        dialect: &crate::devflow_dialect::DEVPIT,
         root: &root,
         runs: &runs_of(&project.id, &root)?,
         locks: &home.devflow_locks(),
@@ -106,6 +109,7 @@ pub(crate) fn runs_of(project_id: &str, checkout: &Path) -> Result<Runs, String>
     Ok(Runs {
         home: home.devflow_runs(),
         checkout: checkout.to_path_buf(),
+        dialect: &crate::devflow_dialect::DEVPIT,
     })
 }
 
@@ -117,6 +121,22 @@ pub(crate) fn runs_of_card(
 ) -> Option<Runs> {
     let project = store.project_id_of_card(card_id).ok()??;
     runs_of(&project, checkout).ok()
+}
+
+/// devpit's step context as the engine's runner takes it.
+pub(crate) fn engine_context(devpit: devpit_steps::Context) -> devflow_engine::runner::Context {
+    devflow_engine::runner::Context {
+        project: devpit.project,
+        project_path: devpit.project_path,
+        worktree_path: devpit.worktree_path,
+        branch: devpit.branch,
+        base_ref: devpit.base_ref,
+        item: devpit.card,
+        item_title: devpit.card_title,
+        report_dir: devpit.report_dir,
+        shared: devpit.shared,
+        locks: devpit.locks,
+    }
 }
 
 /// The project's root or worktree the agent stands in — where its work is —

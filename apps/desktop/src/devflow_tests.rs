@@ -1,5 +1,6 @@
-use devpit_devflow::config::parse;
-use devpit_devflow::Invalid;
+use devflow_engine::config::parse;
+use devflow_engine::locate::DEVPIT as FILE;
+use devflow_engine::Invalid;
 
 use super::*;
 
@@ -212,12 +213,12 @@ fn a_change_that_weakens_what_the_team_locked_is_refused_before_it_is_written() 
     std::fs::create_dir_all(root.join(".devpit/devflow")).expect("folder");
     let text = format!("version: 2\nextends:\n  - git: {url}\n    ref: v1\n");
     std::fs::write(root.join(FILE), &text).expect("yaml");
-    let layer = devpit_devflow::config::Extend {
+    let layer = devflow_engine::config::Extend {
         git: url,
         reference: "v1".into(),
     };
-    let shown = devpit_devflow::pinning::fetched(&root, &layer, &home()).expect("fetched");
-    devpit_devflow::pinning::approve(&root, &layer, &shown.to_commit, &home()).expect("approved");
+    let shown = devflow_engine::pinning::fetched(&root, &layer, &home()).expect("fetched");
+    devflow_engine::pinning::approve(&root, &layer, &shown.to_commit, &home()).expect("approved");
     let here = project("prj_devflow_locked", &root);
 
     let refused = respond_from(
@@ -242,7 +243,7 @@ fn a_change_that_weakens_what_the_team_locked_is_refused_before_it_is_written() 
 
 #[test]
 fn a_field_this_devpit_does_not_read_is_said_in_the_status_note() {
-    let unread = devpit_devflow::config::unread("version: 2\nreview:\n  quorum: 2\n");
+    let unread = devflow_engine::config::unread("version: 2\nreview:\n  quorum: 2\n");
     let note = unread_note(&unread).expect("a note");
     assert!(note.contains("review.quorum"), "{note}");
     assert!(note.contains("line 3"), "{note}");
@@ -305,8 +306,8 @@ fn a_setup_apply_writes_nothing_when_the_setup_changed_since_the_preview() {
     let shown = setup(false);
     let store = crate::projects::store().expect("store");
     let clicked =
-        devpit_devflow::proposal::switched(&read(dir.path()), Ask::Enable).expect("clicked");
-    devpit_devflow::setup::write(dir.path(), &clicked.files).expect("written");
+        devflow_engine::proposal::switched(&read(dir.path()), Ask::Enable).expect("clicked");
+    devflow_engine::setup::write(dir.path(), &clicked.files).expect("written");
     asks::remember(&store, &here.id, Ask::Enable, true).expect("kept");
     let text = std::fs::read_to_string(dir.path().join(FILE)).expect("yaml");
 

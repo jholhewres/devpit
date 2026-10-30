@@ -91,7 +91,7 @@ pub(crate) const STAGE_METHODS: [(&str, &str); 7] = [
 pub const GATE_TOOL: &str = "devpit_devflow_gate";
 
 /// Where Claude Code reads how many stops in a row a hook may send back;
-/// the gate follows it (`devpit_devflow::gate::CAP_ENV`).
+/// the gate follows it (`devflow_engine::gate::CAP_ENV`).
 pub const CAP_ENV: &str = "CLAUDE_CODE_STOP_HOOK_BLOCK_CAP";
 
 /// What only this process can add to a stop hook's call to the gate: the

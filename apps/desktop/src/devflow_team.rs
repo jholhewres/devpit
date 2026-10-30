@@ -5,8 +5,8 @@
 
 use std::path::Path;
 
-use devpit_devflow::folder::{self, State};
-use devpit_devflow::pinning::{self, Change};
+use devflow_engine::folder::{self, State};
+use devflow_engine::pinning::{self, Change};
 use devpit_rpc::{DevflowScreen, DevflowTeamChange, DevflowTeamChanges, ErrorCode, RpcError};
 use tauri::AppHandle;
 
@@ -32,8 +32,8 @@ fn change_of(change: Change) -> DevflowTeamChange {
 }
 
 /// The layers the project's own file extends.
-fn extends(root: &Path) -> Result<Vec<devpit_devflow::config::Extend>, RpcError> {
-    match folder::read(root) {
+fn extends(root: &Path) -> Result<Vec<devflow_engine::config::Extend>, RpcError> {
+    match folder::read_in(&crate::devflow_dialect::DEVPIT, root) {
         State::Valid(_, own) => Ok(own.extends),
         _ => Err(refused(
             "devflow.yaml does not read: fix it before its layers".to_owned(),

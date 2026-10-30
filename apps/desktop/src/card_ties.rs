@@ -8,9 +8,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+use devflow_engine::config::UnblockOn;
 use devpit_core::store::column_roles::role_of;
 use devpit_core::{CardEdges, Store};
-use devpit_devflow::config::UnblockOn;
 use devpit_rpc::{Card, CardRef, Criterion, ErrorCode, Progress, RpcError};
 
 /// The role of the lane where finished work sits.
@@ -152,7 +152,7 @@ fn gates_passed(store: &Store, project_id: &str, asked: &HashSet<&str>) -> HashS
         return HashSet::new();
     };
     let root = Path::new(&row.root_path);
-    let devpit_devflow::State::Valid(_, config) = crate::devflow::read(root) else {
+    let devflow_engine::State::Valid(_, config) = crate::devflow::read(root) else {
         return HashSet::new();
     };
     if config.unblock_on() != UnblockOn::Gate {

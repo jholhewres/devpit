@@ -3,7 +3,7 @@
 //! — and `devflow_session`, the card a session starts on. A failing gate
 //! also holds `devpit_finish_card`.
 //!
-//! The rules are `devpit_devflow::gate`'s; this reads the run, the review
+//! The rules are `devflow_engine::gate`'s; this reads the run, the review
 //! and the checkout, asks Decisions, keeps each session's streak, and tells
 //! the card and the person.
 
@@ -12,12 +12,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
+use devflow_engine::config::{Mode, GATE};
+use devflow_engine::folder::State;
+use devflow_engine::gate::{self, Event, Gate, Hook, Judged, Looked, Review, Run, Said, Streak};
+use devflow_engine::runs::{self, Runs};
+use devflow_engine::Config;
 use devpit_core::Store;
-use devpit_devflow::config::{Mode, GATE};
-use devpit_devflow::folder::State;
-use devpit_devflow::gate::{self, Event, Gate, Hook, Judged, Looked, Review, Run, Said, Streak};
-use devpit_devflow::runs::{self, Runs};
-use devpit_devflow::Config;
 use devpit_rpc::{Board, Project};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
@@ -49,7 +49,7 @@ pub(crate) fn respond(
     cwd: &Path,
     params: &Value,
 ) -> Result<Value, String> {
-    let asked = gate::asked(params)?;
+    let asked = gate::asked_in(&crate::devflow_dialect::DEVPIT, params)?;
     let config = gating(store, project, state);
     if let Some(hook) = &asked.hook {
         // Where the gate is off — Devflow switched off since the session
@@ -152,7 +152,7 @@ fn read(runs: &Runs, card: &str, config: &Config) -> Read {
         .iter()
         .map(|step| {
             let name = step.name().to_owned();
-            let seen = newest(runs, card, &devpit_devflow::stage::file_of(&name));
+            let seen = newest(runs, card, &devflow_engine::stage::file_of(&name));
             (name, seen)
         })
         .collect();
@@ -212,6 +212,7 @@ fn looked<'a>(
     read: &'a Read,
 ) -> Looked<'a> {
     Looked {
+        dialect: &crate::devflow_dialect::DEVPIT,
         config,
         card,
         criteria,
@@ -377,8 +378,8 @@ fn judged(
     card: &devpit_core::store::CardRow,
     checked: &gate::Checked,
 ) -> Judged {
-    let name = devpit_devflow::jev::rubric_for(config, "completion").unwrap_or_else(|| GATE.into());
-    let state = devpit_devflow::jev::capped(&json!({
+    let name = devflow_engine::jev::rubric_for(config, "completion").unwrap_or_else(|| GATE.into());
+    let state = devflow_engine::jev::capped(&json!({
         "card": { "id": card.id, "title": card.title },
         "criteria": checked.rows.iter().enumerate().map(|(at, row)| json!({
             "id": format!("criterion{}", at + 1), "criterion": row.criterion,

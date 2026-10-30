@@ -3,8 +3,8 @@
 //! global configuration, so it runs only on the person's click and their yes
 //! to what it will do — never on a launch.
 
+use devflow_engine::plugin::launch::{self as plugin, Cli, MARKETPLACE, NAME};
 use devpit_core::Store;
-use devpit_devflow::plugin::{self, Cli, MARKETPLACE, NAME};
 use devpit_rpc::{DevflowCodexInstalled, RpcError};
 
 /// How long one `codex` call is given: one that stops to ask, with nobody at
@@ -46,8 +46,11 @@ fn install_now() -> Result<DevflowCodexInstalled, RpcError> {
     let exe = crate::agent_reach::exe()
         .ok_or_else(|| RpcError::internal("devpit could not find its own binary"))?;
     let folder = crate::devflow_launch::folder(&root, Cli::Codex);
-    crate::devflow_launch::written(&folder, &plugin::codex(&exe.display().to_string()))
-        .ok_or_else(|| RpcError::internal("the plugin folder could not be written"))?;
+    crate::devflow_launch::written(
+        &folder,
+        &plugin::codex_in(&crate::devflow_dialect::DEVPIT, &exe.display().to_string()),
+    )
+    .ok_or_else(|| RpcError::internal("the plugin folder could not be written"))?;
     let shown = folder.display().to_string();
     for step in steps(&shown) {
         codex(&step)?;

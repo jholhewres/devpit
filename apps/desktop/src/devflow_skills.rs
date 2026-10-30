@@ -6,8 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
-use devpit_devflow::layers::Team;
-use devpit_devflow::skills;
+use devflow_engine::layers::Team;
+use devflow_engine::skills;
 use serde_json::{json, Value};
 
 pub(crate) fn respond(
@@ -38,7 +38,8 @@ pub(crate) fn personal() -> Result<PathBuf, String> {
 fn listed(root: &Path, personal: &Path, teams: &[Team], stages: &[&str]) -> Value {
     let (mut skills, mut refused) = (Vec::new(), Vec::new());
     for name in skills::offered(stages) {
-        match skills::resolve_with(root, personal, teams, name) {
+        match skills::resolve_with_in(&crate::devflow_dialect::DEVPIT, root, personal, teams, name)
+        {
             Ok(skill) => skills.push(skill.to_json()),
             Err(why) => refused.push(json!({ "name": name, "why": why })),
         }
@@ -59,7 +60,8 @@ fn one(root: &Path, personal: &Path, teams: &[Team], params: &Value) -> Result<V
             skills::names().collect::<Vec<_>>().join(", ")
         )
     })?;
-    let skill = skills::resolve_with(root, personal, teams, name)?;
+    let skill =
+        skills::resolve_with_in(&crate::devflow_dialect::DEVPIT, root, personal, teams, name)?;
     let mut said = skill.to_json();
     said["text"] = json!(skill.text);
     Ok(said)

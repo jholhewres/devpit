@@ -258,7 +258,9 @@ fn a_choice_that_does_not_say_what_its_options_mean_is_refused_before_it_is_sent
 /// mean nothing to Decisions is refused on every call (devflow-finding was).
 #[test]
 fn every_rubric_devpit_ships_says_what_each_option_of_a_choice_means() {
-    let shipped = devpit_devflow::jev::BUILT_IN
+    let shipped = crate::devflow_dialect::DEVPIT
+        .assets
+        .rubrics
         .iter()
         .chain(crate::agent_decide::BUILT_IN.iter());
     for (name, text) in shipped {

@@ -23,15 +23,15 @@ fn a_board_tool_reads_a_card_sent_as_card_or_epic() {
 /// left beside the key, or `cardId` would be refused after all.
 #[test]
 fn devflows_strict_tools_take_a_card_sent_as_card_id() {
-    let gate = devpit_devflow::gate::asked(&aliased("devflow_gate", json!({ "cardId": "c1" })))
+    let gate = devflow_engine::gate::asked(&aliased("devflow_gate", json!({ "cardId": "c1" })))
         .expect("the gate takes it");
     assert_eq!(gate.card.as_deref(), Some("c1"));
     let review =
-        devpit_devflow::review::asked(&aliased("devflow_review", json!({ "cardId": "c1" })))
+        devflow_engine::review::asked(&aliased("devflow_review", json!({ "cardId": "c1" })))
             .expect("the review takes it");
     assert_eq!(review.card, "c1");
     let evidence =
-        devpit_devflow::evidence::asked(&aliased("devflow_evidence", json!({ "cardId": "c1" })))
+        devflow_engine::evidence::asked(&aliased("devflow_evidence", json!({ "cardId": "c1" })))
             .expect("the evidence takes it");
     assert_eq!(evidence.card, "c1");
     assert_eq!(
