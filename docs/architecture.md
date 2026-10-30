@@ -191,13 +191,16 @@ engine's work items (`devflow_work.rs`). The board, the clicks, the gate on
 `devpit_finish_card`, the Stop hook, the autopilot, runs attached to cards,
 Jev's decision log and the Devflow screen stay devpit's.
 
-- **Three levels.** Settings switches it off everywhere, and then the MCP
-  lists exactly what it did before Devflow. Otherwise every project gets
-  `devpit_devflow_status`, `_setup` and `_set`, which is how it is set up,
-  and `_skill`, `_plan` (a preview without an epic) and `_review`, which
-  run a stage on demand without a card, as `devpit agent devflow <stage>`
-  does from a shell;
-  the tools of its stages come only where it is on, stage by stage.
+- **Off until activated.** A project with no devflow.yaml, or one that says
+  `enabled: false`, gets exactly what devpit listed before Devflow: no
+  tools, no plugin folder, no Stop hook, no gate on `devpit_finish_card`.
+  So does every project while Settings switches it off. The person starts
+  it with Activate Devflow on the project's Devflow screen. A file waiting
+  for that click, or one that does not read, gets `devpit_devflow_status`,
+  `_setup` and `_set`, and `_skill`, `_plan` (a preview without an epic)
+  and `_review`, which run a stage on demand without a card, as
+  `devpit agent devflow <stage>` does from a shell; the tools of its stages
+  come only where it is on, stage by stage.
 - **Agents write files, people switch it on.** Setup and set preview unless
   told to apply, and never commit. `enabled: true` and Decisions in
   `enforce` are never written by a tool: they wait for the person's click on
