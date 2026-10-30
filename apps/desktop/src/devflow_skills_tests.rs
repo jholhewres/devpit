@@ -28,6 +28,9 @@ fn an_active_project_gets_its_skills_its_own_layer_first() {
     std::fs::create_dir_all(dir.path().join(".devpit/devflow")).expect("folder");
     std::fs::write(dir.path().join(".devpit/devflow/devflow.yaml"), yaml).expect("yaml");
     let here = project("prj_devflow_skills", dir.path());
+    // The store is the developer's own: a run stopped half way left the click.
+    let store = crate::projects::store().expect("store");
+    crate::devflow_asks::remember(&store, &here.id, Ask::Enable, false).expect("forgot");
     let ask = |method: &str, params: Value| {
         crate::devflow::respond_from(None, method, &here, dir.path(), None, &params)
     };
@@ -39,7 +42,6 @@ fn an_active_project_gets_its_skills_its_own_layer_first() {
     let asked = ask("devflow_skill", json!({ "name": "devflow-review" })).expect("on demand");
     assert_eq!(asked["layer"], "built-in");
 
-    let store = crate::projects::store().expect("store");
     crate::devflow_asks::remember(&store, &here.id, Ask::Enable, true).expect("clicked");
 
     let listed = ask("devflow_skills", json!({})).expect("listed");
