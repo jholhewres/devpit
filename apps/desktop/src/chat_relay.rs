@@ -80,6 +80,8 @@ struct Turn {
 
 struct Joined {
     channel: Channel<Frame>,
+    /// What `chat_leave` names it by: the window's channel, not a wrapper's.
+    id: u32,
     /// Told when the turn ends; dropped unsent when the joiner leaves.
     ended: oneshot::Sender<()>,
 }
@@ -222,7 +224,12 @@ impl Relay {
     /// Joins the turn that has had the process longest — or, when none has,
     /// the first waiting for it: what it has sent so far, then the rest.
     /// `None` when nothing runs in this conversation.
-    fn join(&self, conversation: &str, channel: Channel<Frame>) -> Option<oneshot::Receiver<()>> {
+    fn join(
+        &self,
+        conversation: &str,
+        channel: Channel<Frame>,
+        id: u32,
+    ) -> Option<oneshot::Receiver<()>> {
         let mut all = self.0.lock().ok()?;
         let turn = all
             .by_conversation
@@ -233,7 +240,7 @@ impl Relay {
             let _ = channel.send(frame.clone());
         }
         let (ended, heard) = oneshot::channel();
-        turn.joined.push(Joined { channel, ended });
+        turn.joined.push(Joined { channel, id, ended });
         Some(heard)
     }
 
@@ -247,8 +254,19 @@ impl Relay {
     /// Every turn running in this conversation, joined one after the other
     /// until the last ends or the joiner leaves; whether one was running.
     pub(crate) async fn rejoin(&self, conversation: &str, channel: Channel<Frame>) -> bool {
+        let id = channel.id();
+        self.rejoin_as(conversation, channel, id).await
+    }
+
+    /// [`Relay::rejoin`] for a channel that `chat_leave` knows by another id.
+    pub(crate) async fn rejoin_as(
+        &self,
+        conversation: &str,
+        channel: Channel<Frame>,
+        id: u32,
+    ) -> bool {
         let mut any = false;
-        while let Some(ended) = self.join(conversation, channel.clone()) {
+        while let Some(ended) = self.join(conversation, channel.clone(), id) {
             any = true;
             // Dropped unsent: the joiner left, and hears nothing more.
             if ended.await.is_err() {
@@ -268,7 +286,7 @@ impl Relay {
             .into_iter()
             .flatten()
         {
-            turn.joined.retain(|one| one.channel.id() != channel);
+            turn.joined.retain(|one| one.id != channel);
         }
     }
 }
@@ -284,7 +302,11 @@ pub async fn chat_rejoin(
     conversation_id: String,
     on_frame: Channel<Frame>,
 ) -> Result<bool, RpcError> {
-    Ok(relay.rejoin(&conversation_id, for_window(on_frame)).await)
+    // Left by the window's own channel id, which the cutting wrapper does not keep.
+    let id = on_frame.id();
+    Ok(relay
+        .rejoin_as(&conversation_id, for_window(on_frame), id)
+        .await)
 }
 
 /// A window's channel that is sent each frame cut, as the history it read was.

@@ -86,11 +86,13 @@ fn an_image_is_named_with_its_size_and_loses_its_data() {
 fn a_long_text_block_beside_an_image_is_cut_on_its_own() {
     let output = serde_json::json!([
         { "type": "text", "text": "x".repeat(20_000) },
+        { "type": "image", "source": { "media_type": "image/png", "data": "A".repeat(8_000) } },
     ])
     .to_string();
     let cut = cut_part(&result(output)).expect("cut");
     let blocks: Value = serde_json::from_str(output_of(&cut)).expect("still blocks");
     assert!(blocks[0]["text"].as_str().expect("text").contains(CUT_MARK));
+    assert_eq!(blocks[1]["cut"], true);
 }
 
 #[test]

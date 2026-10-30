@@ -14,6 +14,7 @@ pub async fn chat_history(
     conversation_id: String,
 ) -> Result<Conversation, RpcError> {
     crate::off_main::blocking(move || {
+        conversation(&conversation_id)?;
         // The window gets long outputs cut; the transcript keeps them whole,
         // and `chat_part_full` hands one back when it is opened.
         let mut read = chat_history_now(project_id, conversation_id)?;
@@ -36,6 +37,7 @@ pub async fn chat_part_full(
     call_id: String,
 ) -> Result<Part, RpcError> {
     crate::off_main::blocking(move || {
+        conversation(&conversation_id)?;
         let sessions = crate::projects::project_home(&project_id)?.sessions();
         let file = conversation_path(&sessions, &conversation_id);
         whole_output(read(&file).0, &message_id, &call_id).ok_or_else(|| {
@@ -62,6 +64,19 @@ fn whole_output(
         .find(
             |part| matches!(part, Part::ToolResult { call_id: answers, .. } if answers == call_id),
         )
+}
+
+/// A conversation id is one plain path segment: it names a file in the
+/// project's sessions folder and must not reach out of it.
+fn conversation(id: &str) -> Result<(), RpcError> {
+    if devpit_core::home::plain_id(id) {
+        Ok(())
+    } else {
+        Err(RpcError::new(
+            ErrorCode::Invalid,
+            "that is not a conversation",
+        ))
+    }
 }
 
 #[cfg(test)]

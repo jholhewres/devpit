@@ -40,3 +40,11 @@ fn the_whole_output_is_the_one_answering_that_call_in_that_message() {
     assert_eq!(whole_output(messages.clone(), "m2", "call_9"), None);
     assert_eq!(whole_output(messages, "m9", "call_1"), None);
 }
+
+#[test]
+fn a_conversation_id_that_reaches_out_of_its_folder_is_refused() {
+    assert!(super::conversation("8ee138cc-6ff4-4421-bf59-80570ca59450").is_ok());
+    for bad in ["../other/sessions/x", "/etc/passwd", "a/b", "", "a.b"] {
+        assert!(super::conversation(bad).is_err(), "{bad}");
+    }
+}

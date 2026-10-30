@@ -31,7 +31,7 @@ fn a_late_joiner_hears_what_came_before_and_what_comes_after() {
     turn.send(frame("one")).unwrap();
 
     let (late, to_late) = heard();
-    assert!(relay.join("conv", late).is_some());
+    assert!(relay.join("conv", late.clone(), late.id()).is_some());
     turn.send(frame("two")).unwrap();
 
     assert_eq!(*to_first.lock().unwrap(), ["one", "two"]);
@@ -45,7 +45,7 @@ fn nothing_to_join_once_the_turn_is_over() {
     let (_turn, running) = relay.open("conv", first);
     drop(running);
     let (late, _) = heard();
-    assert!(relay.join("conv", late).is_none());
+    assert!(relay.join("conv", late.clone(), late.id()).is_none());
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn a_refused_second_turn_does_not_take_the_running_ones_place() {
 
     turn.send(frame("still")).unwrap();
     let (late, to_late) = heard();
-    assert!(relay.join("conv", late).is_some());
+    assert!(relay.join("conv", late.clone(), late.id()).is_some());
     assert_eq!(*to_late.lock().unwrap(), ["still"]);
 }
 
@@ -74,14 +74,14 @@ fn a_turn_woken_while_the_persons_waits_is_heard_first_and_the_persons_after() {
     woken.send(frame("woke")).unwrap();
 
     let (late, to_late) = heard();
-    let mut ended = relay.join("conv", late.clone()).unwrap();
+    let mut ended = relay.join("conv", late.clone(), late.id()).unwrap();
     assert_eq!(*to_late.lock().unwrap(), ["woke"]);
     drop(woke);
     assert!(ended.try_recv().is_ok());
 
     waiting.begin();
     person.send(frame("answered")).unwrap();
-    assert!(relay.join("conv", late).is_some());
+    assert!(relay.join("conv", late.clone(), late.id()).is_some());
     assert_eq!(*to_late.lock().unwrap(), ["woke", "asked", "answered"]);
 }
 
@@ -91,12 +91,33 @@ fn a_chat_that_left_is_sent_nothing_more() {
     let (first, _) = heard();
     let (turn, _running) = relay.open("conv", first);
     let (gone, to_gone) = heard();
-    let mut ended = relay.join("conv", gone.clone()).unwrap();
+    let mut ended = relay.join("conv", gone.clone(), gone.id()).unwrap();
     relay.leave("conv", gone.id());
     turn.send(frame("after")).unwrap();
 
     assert!(to_gone.lock().unwrap().is_empty());
     // Left, not ended: the rejoin stops instead of waiting for the next turn.
+    assert!(matches!(
+        ended.try_recv(),
+        Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+    ));
+}
+
+/// The window rejoins through the cutting wrapper and leaves by its own
+/// channel's id, which is the one the page knows.
+#[test]
+fn a_chat_that_rejoined_cut_and_left_is_sent_nothing_more() {
+    let relay = Relay::default();
+    let (first, _) = heard();
+    let (turn, _running) = relay.open("conv", first);
+    let (window, to_window) = heard();
+    let id = window.id();
+    let mut ended = relay.join("conv", super::for_window(window), id).unwrap();
+    turn.send(frame("before")).unwrap();
+    relay.leave("conv", id);
+    turn.send(frame("after")).unwrap();
+
+    assert_eq!(to_window.lock().unwrap().len(), 1);
     assert!(matches!(
         ended.try_recv(),
         Err(tokio::sync::oneshot::error::TryRecvError::Closed)

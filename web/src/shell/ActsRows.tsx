@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
-import { imagesOf, isCut, namedImages, WholeContext } from './cutOutput'
+import { imagesOf, isCut, namedImages, textOf, WholeContext } from './cutOutput'
 import { ask, commands } from './live'
 import { acts, actionLabel, grouped, groupTarget, headline, isGroup, type Act, type Group, type Kind } from './acts'
 import type { Part } from '../gen/bindings'
@@ -148,7 +148,7 @@ function Whole({ callId, output }: { callId: string; output: string }): React.JS
     return (
       <>
         {shown.map((src, at) => <img className="asec__img" key={at} src={src} alt={`Image ${at + 1} of the output`} />)}
-        {shown.length === 0 && <Section label="Output, in full" body={whole} />}
+        {textOf(whole).trim() && <Section label="Output, in full" body={textOf(whole)} />}
       </>
     )
   }

@@ -6,11 +6,22 @@ import { createContext } from 'react'
  * for it by the call it answers.
  */
 
-/* The line the backend writes where it left text out (`crates/rpc/src/cut.rs`). */
-const CUT_MARK = '… [cut: '
+/* The line the backend writes where it left text out (`crates/rpc/src/cut.rs`):
+   on a line of its own, between the head and the tail. */
+const CUT_LINE = /\n\u2026 \[cut: \d+ bytes in all\]\n/
 
+/* Whether the window got this output cut: the backend's line in a text, or an
+   image named instead of carried. An output that merely mentions either is
+   not. */
 export function isCut(output: string): boolean {
-  return output.includes(CUT_MARK) || output.includes('"cut":true')
+  if (CUT_LINE.test(output)) return true
+  if (namedImages(output).length > 0) return true
+  try {
+    const blocks = JSON.parse(output) as unknown
+    return Array.isArray(blocks) && blocks.some((block) => block && typeof block.text === 'string' && CUT_LINE.test(block.text))
+  } catch {
+    return false
+  }
 }
 
 /* Where a row's message is, to ask for its whole output. */
@@ -56,3 +67,16 @@ export function imagesOf(output: string): readonly string[] {
     return []
   }
 }
+
+/* The text of a whole output beside its images: its text blocks, or all of it
+   when it is not blocks. */
+export function textOf(output: string): string {
+  try {
+    const blocks = JSON.parse(output) as unknown
+    if (!Array.isArray(blocks)) return output
+    return blocks.flatMap((block) => (block && typeof block.text === 'string' ? [block.text] : [])).join('\n')
+  } catch {
+    return output
+  }
+}
+
