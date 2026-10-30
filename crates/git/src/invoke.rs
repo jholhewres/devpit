@@ -128,12 +128,17 @@ pub(crate) mod fixture {
 
     pub fn commit(dir: &Path, message: &str) {
         for args in [vec!["add", "-A"], vec!["commit", "-q", "-m", message]] {
-            devpit_pty::host_env::command("git")
+            let out = devpit_pty::host_env::command("git")
                 .arg("-C")
                 .arg(dir)
                 .args(&args)
                 .output()
                 .expect("run git");
+            assert!(
+                out.status.success(),
+                "git {args:?} failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
         }
     }
 }
