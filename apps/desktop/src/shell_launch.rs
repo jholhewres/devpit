@@ -584,7 +584,8 @@ pub(crate) fn to_start_in(id: &str, project_id: Option<&str>) -> Result<String, 
                 }
                 let flag = devpit_pty::agents::known(&found.base).and_then(|one| one.settings_flag);
                 let said = devpit_agentcli::running::line(&devpit_agentcli::running::runner(found));
-                return Ok(launch_line(&said, &found.base, flag, project_id));
+                let line = launch_line(&said, &found.base, flag, project_id);
+                return Ok(in_account(line, &found.driver, project_id));
             }
         }
     }
@@ -594,12 +595,20 @@ pub(crate) fn to_start_in(id: &str, project_id: Option<&str>) -> Result<String, 
             format!("{id} is not an agent this build knows"),
         )
     })?;
-    Ok(launch_line(
-        agent.launch,
-        agent.id,
-        agent.settings_flag,
-        project_id,
-    ))
+    let line = launch_line(agent.launch, agent.id, agent.settings_flag, project_id);
+    Ok(in_account(line, agent.id, project_id))
+}
+
+/// `line` in the Claude Code account the project's sessions open in, when it
+/// has one. Only Claude Code reads the variable; any other agent is left be.
+fn in_account(line: String, driver: &str, project_id: Option<&str>) -> String {
+    match project_id
+        .filter(|_| driver == crate::claude_accounts::DRIVER)
+        .and_then(crate::claude_accounts::dir_of_project)
+    {
+        Some(dir) => crate::claude_accounts::in_dir(&line, &dir),
+        None => line,
+    }
 }
 
 /// Where the hook settings live, written if they are not there yet.

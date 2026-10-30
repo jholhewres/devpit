@@ -8,6 +8,7 @@
 //! tomorrow an HTTP server and a CLI do the same over the same types.
 
 pub mod account;
+pub mod accounts;
 pub mod agents;
 pub mod blocks;
 pub mod board;
@@ -58,6 +59,9 @@ pub mod vault;
 pub mod voice;
 
 pub use account::{Account, Membership, SignIn, SignInState};
+pub use accounts::{
+    AccountQuota, AccountQuotas, Accounts, ClaudeAccount, ProjectAccount, QuotaState,
+};
 pub use agents::{Agent, Agents, RejectedAgent};
 pub use blocks::{BlockChanged, CommandBlock, FolderGlance, PaneBlocks};
 pub use board::{Board, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};

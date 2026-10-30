@@ -57,6 +57,17 @@ pub(crate) fn start_again(store: &Store, session: &str, leaf_id: &str) {
 
 fn resume_line(agent: &PaneAgent) -> Result<String, devpit_rpc::RpcError> {
     let start = to_start(&agent.launch)?;
+    // The account it ran in, whatever its project says now: a session keeps
+    // its account, and resuming elsewhere would find no conversation.
+    let start = match agent
+        .transcript_path
+        .as_deref()
+        .and_then(crate::claude_accounts::dir_of_transcript)
+        .filter(|dir| crate::claude_accounts::is_account_dir(dir))
+    {
+        Some(dir) => crate::claude_accounts::in_dir(&start, &dir),
+        None => start,
+    };
     // Resuming a session that never wrote a line fails in the CLI; starting fresh does not.
     let written = agent
         .transcript_path

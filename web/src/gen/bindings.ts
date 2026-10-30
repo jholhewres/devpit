@@ -111,6 +111,12 @@ export const commands = {
 	chatAdopt: (projectId: string, sessionId: string, profileId: string, title: string | null, cardId: string | null) => typedError<string, RpcError>(__TAURI_INVOKE("chat_adopt", { projectId, sessionId, profileId, title, cardId })),
 	/**  `plan.limits` — the quota windows of an installation's plan. */
 	planLimits: (installation: string | null) => typedError<PlanLimits, RpcError>(__TAURI_INVOKE("plan_limits", { installation })),
+	/**  `accounts.read` — the accounts and each project's default. */
+	accountsRead: () => typedError<Accounts, RpcError>(__TAURI_INVOKE("accounts_read")),
+	/**  `accounts.save` — the whole list, as the screen holds it. */
+	accountsSave: (accounts: Accounts) => typedError<Accounts, RpcError>(__TAURI_INVOKE("accounts_save", { accounts })),
+	/**  `accounts.quota` — every registered account's quota windows. */
+	accountsQuota: () => typedError<AccountQuotas, RpcError>(__TAURI_INVOKE("accounts_quota")),
 	/**
 	 *  `update.check` — ask the feed whether there is a newer devpit.
 	 * 
@@ -1885,6 +1891,26 @@ export type Account = {
 	createdAt: string,
 };
 
+/**  One account's quota windows. */
+export type AccountQuota = {
+	name: string,
+	configDir: string,
+	state: QuotaState,
+	windows: PlanWindow[],
+	/**
+	 *  The 5-hour window is past the point where a new session should go
+	 *  to another account.
+	 */
+	nearlyOut: boolean,
+	/**  Unix seconds. */
+	readAt: number | null,
+};
+
+/**  Response of `accounts.quota`. */
+export type AccountQuotas = {
+	accounts: AccountQuota[],
+};
+
 /**  One account of the agent CLI: a configuration directory and its sign-in. */
 export type AccountSignIn = {
 	/**  The profiles that run against it; `Claude Code` for the one none names. */
@@ -1895,6 +1921,12 @@ export type AccountSignIn = {
 	until: number | null,
 	/**  The command that signs it in again. */
 	fix: string,
+};
+
+/**  Response of `accounts.read`. */
+export type Accounts = {
+	accounts: ClaudeAccount[],
+	projects?: ProjectAccount[],
 };
 
 /**  What an agent asked a page to do. */
@@ -2463,6 +2495,12 @@ export type Checkout = {
 	dirtyFiles: number | null,
 	/**  False when the row names a folder that is no longer there. */
 	exists: boolean,
+};
+
+/**  One account: what the person calls it, and its configuration directory. */
+export type ClaudeAccount = {
+	name: string,
+	configDir: string,
 };
 
 export type ClaudePluginInstallation = {
@@ -4446,6 +4484,12 @@ export type Project = {
 	color: string | null,
 };
 
+/**  The account a project's new sessions open in. */
+export type ProjectAccount = {
+	projectId: string,
+	account: string,
+};
+
 export type ProjectChanges = {
 	changes: Change[],
 	/**
@@ -4538,6 +4582,15 @@ export type QuietHours = {
 	 */
 	offsetMinutes: number,
 };
+
+/**  Why an account's quota has a number or does not. */
+export type QuotaState = "read" | 
+/**  The endpoint failed, refused or is cooling down after a 429. */
+"unavailable" | 
+/**  The saved access token lapsed; devpit never renews it, a session does. */
+"expired" | 
+/**  No Claude sign-in in that directory. */
+"signed_out";
 
 /**
  *  How far this machine can get with a command.
