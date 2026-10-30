@@ -6,17 +6,13 @@ import type { Attachment, Frame, Message, Part } from '../gen/bindings'
  * read a turn this way, and the Remote has no Tauri to reach.
  */
 
-/* What the parts of an open message become as frames arrive. A function, so
-   the test calls the rule instead of restating it. */
+/* One frame at a time, for the Remote, which applies them as they come. */
 export function applied(messages: readonly Message[], frame: Frame): readonly Message[] {
   return appliedAll(messages, [frame])
 }
 
-/*
- * A batch of frames at once: the list is copied once, not once a frame, and
- * the message a part goes to is found from the end, where the open one is.
- * Text that runs on is gathered and joined once per message, not per piece.
- */
+/* What the parts of an open message become as a paint's frames arrive: once per
+   batch, because a long thread was copied, and its text rejoined, for every delta. */
 export function appliedAll(messages: readonly Message[], frames: readonly Frame[]): readonly Message[] {
   let out: Message[] | null = null
   const list = (): Message[] => (out ??= [...messages])
@@ -47,8 +43,7 @@ export function appliedAll(messages: readonly Message[], frames: readonly Frame[
         const message = current()[at]!
         const last = message.parts[message.parts.length - 1]
         const next = frame.part
-        /* Consecutive text from one speaker is one paragraph, not one part per chunk. */
-        if (last?.kind === 'text' && next.kind === 'text' && last.parent === next.parent) {
+        if (runsOn(last, next)) {
           const pieces = pending.get(at)
           if (pieces) pieces.push(next.text)
           else pending.set(at, [next.text])
@@ -114,9 +109,13 @@ export const joined = (parts: readonly Part[]): Part[] => parts.reduce<Part[]>(m
 
 /* Consecutive text is one paragraph, not one part per chunk — unless the two
    came from different speakers: a subagent's words are not the agent's. */
+type Text = Extract<Part, { kind: 'text' }>
+const runsOn = (last: Part | undefined, next: Part): next is Text =>
+  last?.kind === 'text' && next.kind === 'text' && last.parent === next.parent
+
 function merged(parts: readonly Part[], next: Part): Part[] {
   const last = parts[parts.length - 1]
-  if (last?.kind === 'text' && next.kind === 'text' && last.parent === next.parent) {
+  if (last?.kind === 'text' && runsOn(last, next)) {
     return [...parts.slice(0, -1), { kind: 'text', text: last.text + next.text, parent: last.parent }]
   }
   return [...parts, next]

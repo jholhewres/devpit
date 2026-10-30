@@ -50,6 +50,19 @@ describe('a long turn streaming into a long thread', () => {
     expect(moved[0]).toBe(answered)
   })
 
+  it('looks at each message of the thread about once a batch, not once a frame', () => {
+    /* Every read of an answered message's fields is counted. */
+    let reads = 0
+    const watched = thread(2000).map(
+      (message) => new Proxy(message, { get: (target, key, receiver) => ((reads += 1), Reflect.get(target, key, receiver)) }),
+    )
+    const start = appliedAll(watched, turn(1).slice(0, 1))
+    reads = 0
+    appliedAll(start, turn(60).slice(1))
+    // One walk is 2000 reads; a walk per frame would be 60 of them.
+    expect(reads).toBeLessThan(3 * 2000)
+  })
+
   it('costs each batch of frames well under five milliseconds on 2000 messages', () => {
     const frames = turn(4000)
     let messages: readonly Message[] = appliedAll(thread(2000), frames.slice(0, 1))

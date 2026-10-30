@@ -328,7 +328,7 @@ async function answer(prompt) {
     // A long turn with tools, at the pace the CLI streams one: text in small
     // deltas, a tool call and its result every few hundred, for the profiler.
     const event = (body) => console.log(JSON.stringify({ type: 'stream_event', event: body, parent_tool_use_id: null, session_id: session }))
-    const rounds = Number(/\blong turn (\d+)/.exec(prompt)?.[1] ?? 20)
+    const rounds = Math.min(500, Number(/\blong turn (\d+)/.exec(prompt)?.[1] ?? 20))
     for (let round = 0; round < rounds; round += 1) {
       const id = `long-${round}-${Date.now()}`
       event({ type: 'message_start', message: { id, role: 'assistant', content: [] } })
