@@ -141,11 +141,18 @@ fn a_pull_request_is_read_in_a_worktree_of_devpits_and_held_to_its_body() {
 }
 
 #[test]
-fn a_review_without_a_card_is_offered_only_where_devflow_is_on_in_settings() {
+fn a_review_without_a_card_is_offered_only_where_the_projects_devflow_is() {
     use crate::devflow::{offered, on_demand};
     assert!(!on_demand(&offered(false, &State::Missing, true)));
-    assert!(on_demand(&offered(true, &State::Missing, false)));
-    assert!(on_demand(&offered(true, &not_switched_on(), false)));
+    // Off until the person activates it: no file, or one that says so.
+    assert!(!on_demand(&offered(true, &State::Missing, false)));
+    assert!(!on_demand(&offered(true, &not_switched_on(), false)));
+    let waiting = "version: 1\nenabled: true\n";
+    let waiting = State::Valid(
+        waiting.to_owned(),
+        Box::new(devflow_engine::config::parse(waiting).expect("yaml")),
+    );
+    assert!(on_demand(&offered(true, &waiting, false)));
 }
 
 #[cfg(unix)]

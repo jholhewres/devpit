@@ -134,7 +134,24 @@ function Detected({ detected }: { detected: DevflowDetected }): React.JSX.Elemen
   )
 }
 
+/** A project without Devflow: off, and one button away from today's setup. */
+export function DevflowOff({ onActivate }: { onActivate: () => void }): React.JSX.Element {
+  return (
+    <div className="pref dfstate" data-tone="off">
+      <span className="dfstate__dot" aria-hidden />
+      <span className="pref__body">
+        <span className="pref__t">Devflow is off in this project</span>
+        <span className="pref__d">Its agents get none of Devflow&rsquo;s tools, skills or hooks. Activating it shows what devpit found here and the setup it would write, before anything is written.</span>
+      </span>
+      <button className="btn btn--go" onClick={onActivate}>
+        Activate Devflow
+      </button>
+    </div>
+  )
+}
+
 export function DevflowSetup({ screen, onScreen }: { screen: DevflowScreen; onScreen: (next: DevflowScreen, note: string) => void }): React.JSX.Element {
+  const [started, setStarted] = useState(false)
   const [custom, setCustom] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const detected = screen.detected
@@ -146,6 +163,7 @@ export function DevflowSetup({ screen, onScreen }: { screen: DevflowScreen; onSc
       setProblem(answer.error)
     })
 
+  if (!started) return <DevflowOff onActivate={() => setStarted(true)} />
   if (custom && detected) {
     return <DevflowCustom projectId={screen.projectId} start={detected.recommended} onCreated={(next) => onScreen(next, created)} onCancel={() => setCustom(false)} />
   }

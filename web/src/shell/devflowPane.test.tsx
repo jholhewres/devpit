@@ -143,8 +143,11 @@ afterEach(() => {
 })
 
 describe('the Devflow screen', () => {
-  it('sets up from what was detected, asking nothing first', async () => {
+  it('is off until activated, and the setup it then shows asks nothing first', async () => {
     render(<DevflowPane />)
+    expect(await screen.findByText('Devflow is off in this project')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Use recommended' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Activate Devflow' }))
     expect(await screen.findByText('make test')).toBeTruthy()
     expect(screen.getByText(/Makefile:1/)).toBeTruthy()
     expect(screen.getByText('make lint').closest('.dfcmd')?.getAttribute('title')).toBe('`phpstan` is not installed')
@@ -195,6 +198,7 @@ describe('the Devflow screen', () => {
 
   it('writes the recommended setup in one click, as the setup tool would, and says to commit it', async () => {
     render(<DevflowPane />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Activate Devflow' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Use recommended' }))
     await waitFor(() => expect(called).toHaveBeenCalledWith('create', 'prj_api', 'recommended', '{}'))
     expect(await screen.findByText(/commit these files yourself/)).toBeTruthy()
@@ -203,6 +207,7 @@ describe('the Devflow screen', () => {
 
   it('walks a Custom setup through four steps, previews the commented file, then creates what was chosen', async () => {
     render(<DevflowPane />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Activate Devflow' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Customize' }))
     fireEvent.click(screen.getByRole('switch', { name: 'Context' }))
     for (const step of ['Checks', 'Reviewers', 'Jev']) {

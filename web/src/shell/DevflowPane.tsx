@@ -209,7 +209,7 @@ export function DevflowPane(): React.JSX.Element {
                 Open in the editor
               </button>
               <button className="btn" onClick={() => edit('enabled', false)}>
-                Switch off
+                Deactivate
               </button>
             </div>
             <Waiting asks={screen.waiting} onAnswer={answer} />

@@ -385,15 +385,24 @@ fn a_plan_waits_on_a_card_of_another_epic() {
     );
 }
 
-/// With no epic the plan runs on demand, devflow.yaml or not: the cards are
-/// checked as an epic's are, and nothing is created or kept.
+/// With no epic the plan runs on demand, before the person's click: the
+/// cards are checked as an epic's are, and nothing is created or kept. With
+/// no devflow.yaml at all, Devflow is off and so is the plan.
 #[test]
-fn a_plan_without_an_epic_is_a_preview_alone_and_needs_no_setup() {
+fn a_plan_without_an_epic_is_a_preview_alone_and_needs_no_click() {
     let dir = tempfile::tempdir().expect("tempdir");
     let (store, project) = project(dir.path());
     let ask = |params: Value| {
         crate::devflow::respond_from(None, "devflow_plan", &project, dir.path(), None, &params)
     };
+    let off = ask(json!({ "cards": cards() })).expect_err("off");
+    assert!(off.contains("off in this project"), "{off}");
+    std::fs::create_dir_all(dir.path().join(".devpit/devflow")).expect("folder");
+    std::fs::write(
+        dir.path().join(".devpit/devflow/devflow.yaml"),
+        "version: 1\nenabled: true\n",
+    )
+    .expect("yaml");
 
     let said = ask(json!({ "cards": cards() })).expect("a preview");
     assert_eq!(said["applied"], false);

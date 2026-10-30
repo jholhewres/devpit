@@ -56,22 +56,27 @@ pub(crate) fn stage_of(method: &str) -> Option<&'static [&'static str]> {
 /// What the MCP server lists for a project.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Offered {
-    /// Devflow switched off in Settings: the list devpit had before it.
+    /// Devflow off here — no devflow.yaml, `enabled: false`, or switched off
+    /// in Settings: the list devpit had before it.
     Off,
-    /// The three tools that set it up.
+    /// The three tools that set it up, where a file waits for the person's
+    /// click or does not read.
     Setup,
     /// Those, and the tools of the stages switched on.
     Active(Vec<&'static str>),
 }
 
-/// The offer, from the global switch, the file, and the person's click.
+/// The offer, from the global switch, the file, and the person's click. A
+/// project is off until the person activates it on the Devflow screen.
 pub(crate) fn offered(globally: bool, state: &State, switched_on: bool) -> Offered {
     match state {
         _ if !globally => Offered::Off,
         State::Valid(_, config) if config.enabled && switched_on => {
             Offered::Active(config.stages_on())
         }
-        _ => Offered::Setup,
+        State::Valid(_, config) if config.enabled => Offered::Setup,
+        State::Invalid(..) => Offered::Setup,
+        State::Missing | State::Valid(..) => Offered::Off,
     }
 }
 
@@ -241,20 +246,23 @@ pub(crate) fn stages_on(
 }
 
 /// Whether a stage may be run on demand — a review without a card, a plan
-/// without an epic, any stage's skill: wherever Devflow is on in Settings,
-/// devflow.yaml or not.
+/// without an epic, any stage's skill: wherever this project's Devflow is
+/// offered at all.
 pub(crate) fn on_demand(offer: &Offered) -> bool {
     !matches!(offer, Offered::Off)
 }
 
 fn on_demand_here(store: &Store, project: &Project, state: &State) -> Result<(), String> {
-    let offer = offered(
-        globally_on(store),
-        state,
-        made(store, &project.id, Ask::Enable),
-    );
+    let globally = globally_on(store);
+    let offer = offered(globally, state, made(store, &project.id, Ask::Enable));
     if project.orchestrator.is_some() || !on_demand(&offer) {
-        return Err("Devflow is switched off in devpit's Settings.".to_owned());
+        return Err(match globally {
+            false => "Devflow is switched off in devpit's Settings.",
+            true => {
+                "Devflow is off in this project: the person activates it on its Devflow screen."
+            }
+        }
+        .to_owned());
     }
     Ok(())
 }

@@ -23,11 +23,20 @@ fn devflow_is_offered_only_where_the_file_and_the_click_both_say_so() {
     );
     // The file alone is a hand edit or a clone: the person has not clicked.
     assert_eq!(offered(true, &on, false), Offered::Setup);
+    // Off until activated: no file, or a file that says enabled: false.
     assert_eq!(
-        offered(true, &valid("version: 1\nenabled: false\n"), true),
-        Offered::Setup
+        offered(
+            true,
+            &valid(
+                "version: 1
+enabled: false
+"
+            ),
+            true
+        ),
+        Offered::Off
     );
-    assert_eq!(offered(true, &State::Missing, false), Offered::Setup);
+    assert_eq!(offered(true, &State::Missing, false), Offered::Off);
     let invalid = State::Invalid(None, parse("version: 9\n").expect_err("invalid"));
     assert_eq!(offered(true, &invalid, true), Offered::Setup);
     // Off in Settings: what devpit offered before Devflow, file or not.
@@ -78,8 +87,8 @@ fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
     assert_eq!(status["recommended_checks"][0]["run"], "make test");
     assert_eq!(
         ask("devflow_offer", json!({}))["offer"],
-        "setup",
-        "the setup tools are offered with no file"
+        "off",
+        "a project without Devflow gets none of its tools"
     );
 
     let preview = ask("devflow_setup", json!({ "preset": "recommended" }));
@@ -117,7 +126,7 @@ fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
     );
     assert_eq!(refused["applied"], false);
     assert_eq!(text(), before);
-    assert_eq!(ask("devflow_offer", json!({}))["offer"], "setup");
+    assert_eq!(ask("devflow_offer", json!({}))["offer"], "off");
 
     let changed = ask(
         "devflow_set",
@@ -155,7 +164,7 @@ fn the_offer_says_who_asks_and_an_orchestrator_is_offered_no_flow() {
         respond_from(None, "devflow_offer", here, dir.path(), None, &json!({})).expect("offer")
     };
     let plain = offer(&here);
-    assert_eq!(plain["offer"], "setup");
+    assert_eq!(plain["offer"], "off");
     assert_eq!(plain["orchestrator"], false);
     assert!(plain["decisions"].is_boolean());
     here.orchestrator = Some("claude".to_owned());

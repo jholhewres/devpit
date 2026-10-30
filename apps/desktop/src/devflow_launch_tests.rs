@@ -1,5 +1,5 @@
 use devflow_engine::Ask;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use super::*;
 
@@ -48,6 +48,37 @@ fn the_hooks_call_the_tool_the_server_lists_and_follow_the_same_cap() {
         devpit_agentapi::devflow::CAP_ENV,
         devflow_engine::gate::CAP_ENV
     );
+}
+
+/// A project nobody set Devflow up in starts its sessions as before Devflow:
+/// no tools listed, no plugin folder, no Stop hook. One already on stays on.
+/// Sabotage: offer the setup tools where there is no file, and this fails.
+#[test]
+fn a_project_without_devflow_gets_none_of_it_and_one_with_it_keeps_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let store = crate::projects::store().expect("store");
+    let id = store.add_project(&root, None).expect("project");
+    let here = crate::devflow_screen::project_here(&store, &id).expect("project");
+    let offer = || {
+        crate::devflow::respond_from(None, "devflow_offer", &here, &root, None, &json!({}))
+            .expect("offer")["offer"]
+            .clone()
+    };
+    assert_eq!(offer(), "off");
+    assert_eq!(flags("claude", &id), None);
+    assert_eq!(flags("codex", &id), None);
+
+    // Set up and switched on before this release: nothing to do again.
+    std::fs::create_dir_all(root.join(".devpit/devflow")).expect("folder");
+    std::fs::write(
+        root.join(".devpit/devflow/devflow.yaml"),
+        "version: 1\nenabled: true\n",
+    )
+    .expect("yaml");
+    crate::devflow_asks::remember(&store, &id, Ask::Enable, true).expect("clicked");
+    assert_eq!(offer(), "active");
+    assert!(flags("claude", &id).is_some_and(|flag| flag.starts_with("--plugin-dir=")));
 }
 
 /// Switched on, a session of the project starts with Devflow's hooks;
