@@ -51,23 +51,36 @@ pub struct Asked {
     pub cols: u16,
     pub cwd: String,
     pub argv: Vec<String>,
+    /// Set on the shell over the daemon's own, which is kept bare on purpose:
+    /// what a pane needs, it is handed here.
+    pub env: Vec<(String, String)>,
 }
 
 impl Asked {
-    /// `rows u16, cols u16`, then the cwd and each argv word NUL-terminated.
+    /// `rows u16, cols u16, argc u16`, then the cwd, `argc` argv words and
+    /// the environment as `KEY=value`, each NUL-terminated.
     pub fn parse(bytes: &[u8]) -> Option<Asked> {
         let rows = u16::from_le_bytes([*bytes.first()?, *bytes.get(1)?]);
         let cols = u16::from_le_bytes([*bytes.get(2)?, *bytes.get(3)?]);
-        let mut words = bytes[4..]
+        let argc = usize::from(u16::from_le_bytes([*bytes.get(4)?, *bytes.get(5)?]));
+        let mut words = bytes[6..]
             .split(|b| *b == 0)
             .map(|word| String::from_utf8_lossy(word).into_owned());
         let cwd = words.next()?;
-        let argv: Vec<String> = words.filter(|word| !word.is_empty()).collect();
-        (!argv.is_empty() && rows > 0 && cols > 0).then_some(Asked {
+        let argv: Vec<String> = words.by_ref().take(argc).collect();
+        let env = words
+            .filter_map(|word| {
+                let (key, value) = word.split_once('=')?;
+                (!key.is_empty()).then(|| (key.to_owned(), value.to_owned()))
+            })
+            .collect();
+        let whole = argv.len() == argc && argv.iter().all(|word| !word.is_empty());
+        (argc > 0 && whole && rows > 0 && cols > 0).then_some(Asked {
             rows,
             cols,
             cwd,
             argv,
+            env,
         })
     }
 
@@ -75,7 +88,12 @@ impl Asked {
         let mut out = Vec::new();
         out.extend_from_slice(&self.rows.to_le_bytes());
         out.extend_from_slice(&self.cols.to_le_bytes());
-        for word in std::iter::once(&self.cwd).chain(&self.argv) {
+        out.extend_from_slice(&(self.argv.len() as u16).to_le_bytes());
+        let env = self.env.iter().map(|(key, value)| format!("{key}={value}"));
+        for word in std::iter::once(self.cwd.clone())
+            .chain(self.argv.iter().cloned())
+            .chain(env)
+        {
             out.extend_from_slice(word.as_bytes());
             out.push(0);
         }
@@ -111,6 +129,9 @@ impl Pane {
         devpit_pty::host_env::scrub_pty(&mut command);
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
+        for (key, value) in &asked.env {
+            command.env(key, value);
+        }
         let child = pty
             .slave
             .spawn_command(command)

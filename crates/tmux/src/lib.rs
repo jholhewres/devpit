@@ -25,7 +25,7 @@ mod windows;
 pub use error::TmuxError;
 pub use pane::{copy_to, Key};
 pub use scratch::Scratch;
-pub use shell::{parse_running, Running, Shell};
+pub use shell::{parse_running, Running, Shell, PANE_ENV};
 
 /// One tmux server, addressed by a socket we own.
 pub struct Server {

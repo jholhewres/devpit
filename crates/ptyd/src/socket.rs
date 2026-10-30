@@ -143,6 +143,29 @@ pub fn greet(stream: &mut UnixStream) -> io::Result<()> {
     }
 }
 
+/// A client's connection to the daemon at `path`: its own user's, of this
+/// protocol. Another version is `Unsupported`, which a caller tells apart from
+/// a daemon that is not there: one is replaced, the other started.
+pub fn connect(path: &Path) -> io::Result<UnixStream> {
+    let mut stream = UnixStream::connect(path)?;
+    if !admitted(peer_uid(&stream)?, own_uid()) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "the socket is another user's",
+        ));
+    }
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
+    let theirs = hello(&mut stream, PROTOCOL)?;
+    if theirs != PROTOCOL {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            format!("devpit-ptyd speaks protocol {theirs}, not {PROTOCOL}"),
+        ));
+    }
+    stream.set_read_timeout(None)?;
+    Ok(stream)
+}
+
 /// The client's side: says its version, returns the daemon's.
 pub fn hello(stream: &mut UnixStream, protocol: u32) -> io::Result<u32> {
     frame::write(

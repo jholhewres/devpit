@@ -9,6 +9,7 @@ fn asked(script: &str) -> Asked {
         cols: 80,
         cwd: std::env::temp_dir().to_string_lossy().into_owned(),
         argv: vec!["/bin/sh".into(), "-c".into(), script.into()],
+        env: vec![("DEVPIT_PANE".into(), "leaf_x".into())],
     }
 }
 

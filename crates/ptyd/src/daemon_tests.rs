@@ -58,6 +58,7 @@ fn shell() -> Asked {
         cols: 80,
         cwd: std::env::temp_dir().to_string_lossy().into_owned(),
         argv: vec!["/bin/sh".into()],
+        env: Vec::new(),
     }
 }
 
