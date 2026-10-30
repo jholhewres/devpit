@@ -117,6 +117,18 @@ fn a_long_json_array_that_is_not_blocks_is_cut_as_text() {
 }
 
 #[test]
+fn an_image_beside_a_large_block_of_another_kind_does_not_carry_it_whole() {
+    let output = serde_json::json!([
+        { "type": "image", "source": { "media_type": "image/png", "data": "AAAA" } },
+        { "type": "resource", "resource": { "uri": "file:///a", "blob": "A".repeat(100_000) } },
+    ])
+    .to_string();
+    let cut = cut_part(&result(output)).expect("cut");
+    assert!(output_of(&cut).len() < WHOLE);
+    assert!(!output_of(&cut).contains(&"A".repeat(5_000)));
+}
+
+#[test]
 fn a_tool_call_and_the_answer_go_whole() {
     let call = Part::ToolCall {
         id: "call_1".to_owned(),

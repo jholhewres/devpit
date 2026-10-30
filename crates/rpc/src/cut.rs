@@ -86,7 +86,9 @@ pub fn cut_output(output: &str) -> Option<String> {
         // Not content blocks, or none to name or cut: long, it is cut as text.
         return cut_text(output);
     }
-    serde_json::to_string(&blocks).ok()
+    let named = serde_json::to_string(&blocks).ok()?;
+    // Blocks of other kinds are not looked into: still long, the lot is cut as text.
+    Some(cut_text(&named).unwrap_or(named))
 }
 
 /// The part as the window gets it; `None` when it goes whole. A tool call's

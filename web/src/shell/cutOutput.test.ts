@@ -24,6 +24,14 @@ describe('an output the window got cut', () => {
     expect(textOf('plain')).toBe('plain')
   })
 
+  it('shows a whole array that is not content blocks as it is', () => {
+    const numbers = JSON.stringify(Array.from({ length: 2000 }, (_, at) => at))
+    expect(textOf(numbers)).toBe(numbers)
+    expect(textOf('["a","b"]')).toBe('["a","b"]')
+    const mixed = JSON.stringify([{ type: 'text', text: 'x' }, 'loose', 7])
+    expect(textOf(mixed)).toBe(mixed)
+  })
+
   it('shows the other blocks of a whole output rather than dropping them', () => {
     const whole = JSON.stringify([
       { type: 'text', text: 'the page' },

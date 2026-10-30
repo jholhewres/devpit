@@ -10,15 +10,22 @@ import { createContext } from 'react'
    on a line of its own, between the head and the tail. */
 const CUT_LINE = /\n\u2026 \[cut: \d+ bytes in all\]\n/
 
-/* The output's content blocks, or `null` when it is not blocks. */
+/* The output's content blocks, or `null` when it is not an array of them:
+   every item an object with a string `type`. */
 function blocksOf(output: string): readonly Record<string, unknown>[] | null {
   try {
     const blocks = JSON.parse(output) as unknown
-    return Array.isArray(blocks) ? blocks.filter((block) => block && typeof block === 'object') : null
+    return Array.isArray(blocks) && blocks.every((block) => block && typeof block === 'object' && typeof block.type === 'string')
+      ? blocks
+      : null
   } catch {
     return null
   }
 }
+
+/* An image block that still carries its data. */
+const carriesImage = (block: Record<string, unknown>): boolean =>
+  Boolean(block.source) && typeof (block.source as { data?: unknown }).data === 'string'
 
 /* Whether the window got this output cut: the backend's line in a text, or an
    image named instead of carried. An output that merely mentions either is
@@ -53,20 +60,18 @@ export function namedImages(output: string): readonly NamedImage[] {
 
 /* Images of a whole output, as data URLs, in order. */
 export function imagesOf(output: string): readonly string[] {
-  return (blocksOf(output) ?? []).flatMap((block) => {
-    const source = block.source as { data?: unknown; media_type?: unknown } | null | undefined
-    return source && typeof source.data === 'string'
-      ? [`data:${typeof source.media_type === 'string' ? source.media_type : 'image/png'};base64,${source.data}`]
-      : []
+  return (blocksOf(output) ?? []).filter(carriesImage).map((block) => {
+    const source = block.source as { data: string; media_type?: unknown }
+    return `data:${typeof source.media_type === 'string' ? source.media_type : 'image/png'};base64,${source.data}`
   })
 }
 
 /* A whole output beside its images: its text blocks, the other blocks as they
-   are, or all of it when it is not blocks. */
+   are, or all of it when it is not content blocks. */
 export function textOf(output: string): string {
   const blocks = blocksOf(output)
   if (!blocks) return output
-  const rest = blocks.filter((block) => !(block.source && typeof (block.source as { data?: unknown }).data === 'string'))
+  const rest = blocks.filter((block) => !carriesImage(block))
   return rest.every((block) => typeof block.text === 'string')
     ? rest.map((block) => block.text).join('\n')
     : JSON.stringify(rest, null, 2)
