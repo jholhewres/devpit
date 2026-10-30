@@ -1,6 +1,6 @@
 use devpit_rpc::{Message, Part, Role};
 
-use super::{read_page, BLOCK};
+use super::{read_after, read_page, read_page_within, BLOCK};
 use crate::store::{append, conversation_path, read};
 
 fn message(id: &str, text: &str) -> Message {
@@ -135,14 +135,41 @@ fn the_last_page_of_a_real_transcript_is_quick_and_light() {
 fn a_line_longer_than_the_ceiling_is_passed_over_and_counted() {
     let home = tempfile::tempdir().expect("tempdir");
     let path = conversation_path(home.path(), "c1");
+    // The ceiling made small, so the line past it spans several blocks.
+    let longest = 3 * BLOCK;
     append(&path, &message("m0", "zero")).expect("append");
-    // A message, valid, one line past the ceiling, between two that are not:
+    // A message, valid, past the ceiling, between two that are not:
     // kept, it would load; passed over, it is counted instead.
-    append(&path, &message("big", &"z".repeat(super::LONGEST + 10))).expect("append");
+    append(&path, &message("big", &"z".repeat(longest + 10))).expect("append");
     append(&path, &message("m2", "two")).expect("append");
-    let page = read_page(&path, None, 10);
+    let page = read_page_within(&path, None, 10, longest);
     assert_eq!(ids(&page.messages), ["m0", "m2"]);
     assert_eq!(page.skipped, 1);
     // Paging from the message after it still finds the one before.
-    assert_eq!(ids(&read_page(&path, Some("m2"), 10).messages), ["m0"]);
+    assert_eq!(
+        ids(&read_page_within(&path, Some("m2"), 10, longest).messages),
+        ["m0"]
+    );
+    // At the start of the file, and at its end without a newline, the same.
+    let start = conversation_path(home.path(), "c2");
+    append(&start, &message("big", &"z".repeat(longest + 10))).expect("append");
+    append(&start, &message("m1", "one")).expect("append");
+    assert_eq!(
+        ids(&read_page_within(&start, None, 10, longest).messages),
+        ["m1"]
+    );
+}
+
+#[test]
+fn what_came_after_a_message_is_read_from_the_end_and_the_last_page_when_it_is_gone() {
+    let (_home, path) = written(7);
+    let (after, found) = read_after(&path, "m4", 3);
+    assert!(found);
+    assert_eq!(ids(&after), ["m5", "m6"]);
+    let (last, found) = read_after(&path, "m6", 3);
+    assert!(found);
+    assert!(last.is_empty());
+    let (page, found) = read_after(&path, "gone", 3);
+    assert!(!found);
+    assert_eq!(ids(&page), ["m4", "m5", "m6"]);
 }

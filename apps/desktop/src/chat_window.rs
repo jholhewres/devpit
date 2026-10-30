@@ -3,9 +3,8 @@
 
 use devpit_agentcli::head::{head_path, read_head};
 use devpit_agentcli::store::{conversation_path, read};
-use devpit_rpc::{
-    Conversation, ConversationAfter, ConversationHead, ErrorCode, Message, Part, RpcError,
-};
+use devpit_agentcli::store_page::read_page;
+use devpit_rpc::{Conversation, ConversationAfter, ConversationHead, ErrorCode, Part, RpcError};
 
 /// The most messages one page may ask for.
 const MOST: u32 = 500;
@@ -134,37 +133,29 @@ pub async fn chat_head(
 
 /// `chat.after` — the messages saved after `after`, cut as the history is:
 /// what a chat that rejoined a turn appends, instead of reading it all again.
-/// Every message when `after` is not among them.
+/// When `after` is not among them, the last `limit` and `found: false`.
 #[tauri::command]
 #[specta::specta]
 pub async fn chat_after(
     project_id: String,
     conversation_id: String,
     after: Option<String>,
+    limit: Option<u32>,
 ) -> Result<ConversationAfter, RpcError> {
     crate::off_main::blocking(move || {
         conversation(&conversation_id)?;
         let sessions = crate::projects::project_home(&project_id)?.sessions();
-        let read = read(&conversation_path(&sessions, &conversation_id)).0;
-        Ok(messages_after(read, after.as_deref()))
+        let file = conversation_path(&sessions, &conversation_id);
+        let most = limit.map_or(MOST, |most| most.clamp(1, MOST)) as usize;
+        let (mut messages, found) = match after.as_deref() {
+            Some(after) => devpit_agentcli::store_page::read_after(&file, after, most),
+            // Nothing drawn yet: the last page is all a chat needs.
+            None => (read_page(&file, None, most).messages, false),
+        };
+        messages.iter_mut().for_each(devpit_rpc::cut::cut_message);
+        Ok(ConversationAfter { messages, found })
     })
     .await
-}
-
-/// What a chat that lost its place reads instead: the last page, as it opens on.
-const AFTER_PAGE: usize = 50;
-
-/// The messages after `after`, cut. When it is not among them, the last page:
-/// a chat holding a page must not be handed the whole conversation below it.
-fn messages_after(mut messages: Vec<Message>, after: Option<&str>) -> ConversationAfter {
-    let found = after.and_then(|id| messages.iter().position(|message| message.id == id));
-    let from = found.map_or(messages.len().saturating_sub(AFTER_PAGE), |at| at + 1);
-    let mut messages = messages.split_off(from);
-    messages.iter_mut().for_each(devpit_rpc::cut::cut_message);
-    ConversationAfter {
-        messages,
-        found: found.is_some(),
-    }
 }
 
 /// `chat.part_full` — a tool's output as the transcript keeps it, uncut, found

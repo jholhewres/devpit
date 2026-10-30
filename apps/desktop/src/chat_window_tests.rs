@@ -1,6 +1,6 @@
 use devpit_rpc::{Message, Part, Role};
 
-use super::{messages_after, whole_output};
+use super::whole_output;
 
 fn result(call: &str, output: &str) -> Part {
     Part::ToolResult {
@@ -47,43 +47,6 @@ fn a_conversation_id_that_reaches_out_of_its_folder_is_refused() {
     for bad in ["../other/sessions/x", "/etc/passwd", "a/b", "", "a.b"] {
         assert!(super::conversation(bad).is_err(), "{bad}");
     }
-}
-
-#[test]
-fn what_came_after_a_message_is_read_cut_and_the_last_page_when_the_message_is_gone() {
-    let long = "w".repeat(9_000);
-    let messages = vec![
-        message("m1", vec![]),
-        message("m2", vec![]),
-        message("m3", vec![result("call_1", &long)]),
-    ];
-    let ids = |read: &devpit_rpc::ConversationAfter| {
-        read.messages
-            .iter()
-            .map(|one| one.id.clone())
-            .collect::<Vec<_>>()
-    };
-    let after = messages_after(messages.clone(), Some("m2"));
-    assert_eq!(ids(&after), ["m3"]);
-    assert!(after.found);
-    let Part::ToolResult { output, .. } = &after.messages[0].parts[0] else {
-        panic!("the result");
-    };
-    assert!(output.len() < long.len(), "cut as the history is");
-    assert_eq!(
-        ids(&messages_after(messages.clone(), Some("m3"))),
-        Vec::<String>::new()
-    );
-    // Gone, the last page, said so: a chat holding a page takes it in place of what it drew.
-    let gone = messages_after(messages.clone(), Some("gone"));
-    assert_eq!(ids(&gone), ["m1", "m2", "m3"]);
-    assert!(!gone.found);
-    let many: Vec<_> = (0..120)
-        .map(|at| message(&format!("n{at}"), vec![]))
-        .collect();
-    let page = messages_after(many, Some("gone"));
-    assert_eq!(page.messages.len(), super::AFTER_PAGE);
-    assert_eq!(page.messages[0].id, "n70");
 }
 
 #[test]

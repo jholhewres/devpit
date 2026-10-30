@@ -46,6 +46,12 @@ export function prepended(messages: readonly Message[], page: readonly Message[]
   return [...page.filter((one) => !drawn.has(one.id)), ...messages]
 }
 
+/* A last page in place of what was drawn, keeping what was drawn since the
+   read began (a turn sent meanwhile), which the page cannot hold yet. */
+export function retaken(page: readonly Message[], drawn: readonly Message[], before: ReadonlySet<string>): readonly Message[] {
+  return appended(page, drawn.filter((one) => !before.has(one.id)))
+}
+
 /* Saved messages replace the streamed ones of the same id; new ones go last. */
 export function appended(messages: readonly Message[], saved: readonly Message[]): readonly Message[] {
   const by = new Map(saved.map((one) => [one.id, one]))

@@ -32,8 +32,18 @@ pub struct Page {
 /// Up to `most` messages before the one named `before`, or before the end
 /// when `None`. A `before` that is not in the file gives an empty page.
 pub fn read_page(path: &Path, before: Option<&str>, most: usize) -> Page {
+    read_page_within(path, before, most, LONGEST)
+}
+
+/// [`read_page`], passing over lines longer than `longest`.
+pub(crate) fn read_page_within(
+    path: &Path,
+    before: Option<&str>,
+    most: usize,
+    longest: usize,
+) -> Page {
     let mut page = Page::default();
-    let Ok(mut lines) = Backwards::open(path) else {
+    let Ok(mut lines) = Backwards::open(path, longest) else {
         return page;
     };
     let mut found = before.is_none();
@@ -65,6 +75,35 @@ pub fn read_page(path: &Path, before: Option<&str>, most: usize) -> Page {
     page
 }
 
+/// The messages after the one named `after`, oldest first, and whether it was
+/// found; when it was not, the last `most`. Read from the end, so what came
+/// after a recent message costs those messages, not the file.
+pub fn read_after(path: &Path, after: &str, most: usize) -> (Vec<Message>, bool) {
+    let Ok(mut lines) = Backwards::open(path, LONGEST) else {
+        return (Vec::new(), false);
+    };
+    let mut newest_first = Vec::new();
+    let mut found = false;
+    while let Some(line) = lines.next_line() {
+        let Some(line) = line.filter(|line| !line.iter().all(u8::is_ascii_whitespace)) else {
+            continue;
+        };
+        let Ok(message) = serde_json::from_slice::<Message>(&line) else {
+            continue;
+        };
+        if message.id == after {
+            found = true;
+            break;
+        }
+        newest_first.push(message);
+    }
+    if !found {
+        newest_first.truncate(most);
+    }
+    newest_first.reverse();
+    (newest_first, found)
+}
+
 /// A file's lines, last first, each read once however many blocks it spans.
 struct Backwards {
     file: File,
@@ -75,13 +114,15 @@ struct Backwards {
     /// How many bytes `pending` holds, and whether the line went past LONGEST.
     held: usize,
     too_long: bool,
+    /// The longest line kept; past it, a line is handed out as `None`.
+    longest: usize,
     /// Lines found in the current block, ready to hand out, last first;
     /// `None` for one that was too long to keep.
     ready: Vec<Option<Vec<u8>>>,
 }
 
 impl Backwards {
-    fn open(path: &Path) -> std::io::Result<Self> {
+    fn open(path: &Path, longest: usize) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let at = file.metadata()?.len();
         Ok(Self {
@@ -90,6 +131,7 @@ impl Backwards {
             pending: VecDeque::new(),
             held: 0,
             too_long: false,
+            longest,
             ready: Vec::new(),
         })
     }
@@ -144,7 +186,7 @@ impl Backwards {
             return;
         }
         self.held += bytes.len();
-        if self.held > LONGEST {
+        if self.held > self.longest {
             self.too_long = true;
             self.pending.clear();
             self.held = 0;
@@ -158,7 +200,7 @@ impl Backwards {
         let pending = std::mem::take(&mut self.pending);
         let too_long = std::mem::replace(&mut self.too_long, false);
         self.held = 0;
-        if too_long || head.len() + pending.iter().map(Vec::len).sum::<usize>() > LONGEST {
+        if too_long || head.len() + pending.iter().map(Vec::len).sum::<usize>() > self.longest {
             return None;
         }
         Some(std::iter::once(head).chain(pending).flatten().collect())

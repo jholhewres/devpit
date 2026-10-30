@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
-import { applied, appended, ASKS, batched, prepended, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
+import { applied, appended, ASKS, batched, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { PAGE } from './useOlder'
@@ -140,16 +140,18 @@ export function useChat(conversationId: string): Chat {
           if (!was && !woken) return
           setSending(false)
           /* Only what came after the join is read; the rest stays as drawn. */
+          const reading = new Set(shown.current.map((one) => one.id))
           void Promise.all([
-            ask(() => commands.chatAfter(projectId, conversationId, before)),
+            ask(() => commands.chatAfter(projectId, conversationId, before, PAGE)),
             ask(() => commands.chatHead(projectId, conversationId)),
           ]).then(([after, head]) => {
             if (!now.open()) return
             const saved = after.data
             if (saved?.found) setMessages((was) => appended(was, saved.messages))
             else if (saved) {
-              /* Its place was never saved: the last page takes the place of what was drawn. */
-              setMessages(saved.messages)
+              /* Its place was never saved: the last page takes the place of what was drawn,
+                 but not of a turn sent while it was read. */
+              setMessages((was) => retaken(saved.messages, was, reading))
               setOlder(true)
             }
             if (!head.data) return

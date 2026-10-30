@@ -35,7 +35,12 @@ const message = (id: string, text = id): Message =>
   ({ id, turnId: null, role: 'assistant', parts: [{ kind: 'text', text, parent: null }], createdAt: 0, streaming: false }) as Message
 
 /* What the transcript holds, and what it was asked. */
-const saved: { messages: Message[]; after: Message[]; found: boolean } = { messages: [], after: [], found: true }
+const saved: { messages: Message[]; after: Message[]; found: boolean; hold: Promise<void> | null } = {
+  messages: [],
+  after: [],
+  found: true,
+  hold: null,
+}
 const calls = {
   chatHistory: vi.fn(),
   chatHead: vi.fn(),
@@ -46,6 +51,7 @@ afterEach(() => {
   saved.messages = []
   saved.after = []
   saved.found = true
+  saved.hold = null
   Object.values(calls).forEach((one) => one.mockClear())
 })
 
@@ -69,10 +75,13 @@ vi.mock('./live', () => ({
       calls.chatHead(projectId, id),
       { sessionId: 'ses_1', rewindable: ['turn_1'], costUsd: 0.5, context: null }
     ),
-    chatAfter: (projectId: string, id: string, after: string | null) => (
-      calls.chatAfter(projectId, id, after),
-      { messages: saved.after, found: saved.found }
-    ),
+    chatAfter: async (projectId: string, id: string, after: string | null) => {
+      calls.chatAfter(projectId, id, after)
+      // Read as it stood when asked, however long the answer takes.
+      const answer = { messages: saved.after, found: saved.found }
+      await saved.hold
+      return answer
+    },
     chatRewind: (projectId: string, id: string, turnId: string) => (calls.chatRewind(projectId, id, turnId), 'conv_fork'),
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
     permissionAskFromNow: () => null,
@@ -211,6 +220,27 @@ describe("a chat's reads of the transcript", () => {
     await act(async () => joins[0]!.ends(true))
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_2', 'msg_3']))
     expect(result.current.older).toBe(true)
+  })
+
+  it('after a lost place, keep a turn sent while the last page was being read', async () => {
+    saved.messages = [message('msg_1'), message('msg_2')]
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    act(() => joins[0]!.onFrame(said('never_saved')))
+    await waitFor(() => expect(result.current.messages).toHaveLength(3))
+
+    saved.found = false
+    saved.after = [message('msg_1'), message('msg_2')]
+    let release: () => void = () => {}
+    saved.hold = new Promise<void>((done) => (release = done))
+    await act(async () => joins[0]!.ends(true))
+    // Sent while the read is still on its way.
+    act(() => result.current.say('hello'))
+    act(() => joins[0]!.onFrame(said('msg_sent')))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_sent'))
+    await act(async () => release())
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).not.toContain('never_saved'))
+    expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_sent'])
   })
 
   it('leave rewind working: the head names the turns, and rewinding forks', async () => {

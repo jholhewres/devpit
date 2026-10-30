@@ -89,9 +89,9 @@ export const commands = {
 	/**
 	 *  `chat.after` — the messages saved after `after`, cut as the history is:
 	 *  what a chat that rejoined a turn appends, instead of reading it all again.
-	 *  Every message when `after` is not among them.
+	 *  When `after` is not among them, the last `limit` and `found: false`.
 	 */
-	chatAfter: (projectId: string, conversationId: string, after: string | null) => typedError<ConversationAfter, RpcError>(__TAURI_INVOKE("chat_after", { projectId, conversationId, after })),
+	chatAfter: (projectId: string, conversationId: string, after: string | null, limit: number | null) => typedError<ConversationAfter, RpcError>(__TAURI_INVOKE("chat_after", { projectId, conversationId, after, limit })),
 	/**
 	 *  `chat.list` — every conversation this project has had.
 	 * 
