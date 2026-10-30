@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
-import { applied, appended, ASKS, batched, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
+import { appended, appliedAll, ASKS, batched, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { PAGE } from './useOlder'
@@ -124,7 +124,7 @@ export function useChat(conversationId: string): Chat {
   const rejoined = useCallback(
     (projectId: string, woken = false, before = shown.current.at(-1)?.id ?? null): void => {
       const now = opened.current
-      const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
+      const { push, flush } = batched((frames) => setMessages((was) => appliedAll(was, frames)))
       const joined = now.join(
         rejoin(conversationId, (frame) => {
           if (!now.open()) return
@@ -301,7 +301,7 @@ export function useChat(conversationId: string): Chat {
       const now = opened.current
       /* A turn woken while this one waits is saved before it: read from here. */
       const drawn = shown.current.at(-1)?.id ?? null
-      const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
+      const { push, flush } = batched((frames) => setMessages((was) => appliedAll(was, frames)))
       let heard = false
       const started = send(turn, (frame) => {
         if (!now.open()) return

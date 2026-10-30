@@ -324,6 +324,33 @@ async function answer(prompt) {
     console.log(JSON.stringify(said))
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'here is the page', session_id: session }))
+  } else if (/\blong turn\b/.test(prompt)) {
+    // A long turn with tools, at the pace the CLI streams one: text in small
+    // deltas, a tool call and its result every few hundred, for the profiler.
+    const event = (body) => console.log(JSON.stringify({ type: 'stream_event', event: body, parent_tool_use_id: null, session_id: session }))
+    const rounds = Number(/\blong turn (\d+)/.exec(prompt)?.[1] ?? 20)
+    for (let round = 0; round < rounds; round += 1) {
+      const id = `long-${round}-${Date.now()}`
+      event({ type: 'message_start', message: { id, role: 'assistant', content: [] } })
+      event({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+      let text = ''
+      for (let piece = 0; piece < 300; piece += 1) {
+        const word = `word${piece} `
+        text += word
+        event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: word } })
+        await new Promise((done) => setTimeout(done, 8))
+      }
+      event({ type: 'content_block_stop', index: 0 })
+      const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+      said.session_id = session
+      said.message.id = id
+      said.message.content = [{ type: 'text', text }, { type: 'tool_use', id: `toolu_long${round}`, name: 'Bash', input: { command: `echo ${round}` } }]
+      console.log(JSON.stringify(said))
+      event({ type: 'message_stop' })
+      console.log(JSON.stringify({ type: 'user', session_id: session, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `toolu_long${round}`, content: `${round}\n`.repeat(200) }] } }))
+    }
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'the long turn is done', session_id: session }))
   } else if (/\bstream\b/.test(prompt)) {
     // Text in deltas, as `--include-partial-messages` writes it, then the whole block.
     const event = (body) => console.log(JSON.stringify({ type: 'stream_event', event: body, parent_tool_use_id: null, session_id: session }))

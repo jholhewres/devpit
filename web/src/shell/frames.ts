@@ -9,35 +9,84 @@ import type { Attachment, Frame, Message, Part } from '../gen/bindings'
 /* What the parts of an open message become as frames arrive. A function, so
    the test calls the rule instead of restating it. */
 export function applied(messages: readonly Message[], frame: Frame): readonly Message[] {
-  switch (frame.type) {
-    case 'opened':
-      /* A rejoined turn repeats the message the transcript already holds. */
-      return messages.some((one) => one.id === frame.message.id) ? messages : [...messages, frame.message]
-    case 'part':
-      return messages.map((message) =>
-        message.id === frame.message_id
-          ? { ...message, parts: merged(message.parts, frame.part) }
-          : message,
-      )
-    case 'call_state':
-      /* Only a message still arriving has calls that move: an answered one
-         is left as it is, rather than walked on every frame of a long thread. */
-      return messages.map((message) => !message.streaming ? message : ({
-        ...message,
-        parts: message.parts.map((part) =>
-          part.kind === 'tool_call' && part.id === frame.call_id
-            ? { ...part, state: frame.state }
-            : part,
-        ),
-      }))
-    case 'ended':
-      /* The turn is over, so nothing is still arriving. */
-      /* Only the ones that were: a finished message keeps its identity, so
-         its memoized turn does not draw again. */
-      return messages.map((message) => (message.streaming ? { ...message, streaming: false } : message))
-    default:
-      return messages
+  return appliedAll(messages, [frame])
+}
+
+/*
+ * A batch of frames at once: the list is copied once, not once a frame, and
+ * the message a part goes to is found from the end, where the open one is.
+ * Text that runs on is gathered and joined once per message, not per piece.
+ */
+export function appliedAll(messages: readonly Message[], frames: readonly Frame[]): readonly Message[] {
+  let out: Message[] | null = null
+  const list = (): Message[] => (out ??= [...messages])
+  const current = (): readonly Message[] => out ?? messages
+  /* Text pieces waiting to be joined, by the index of their message. */
+  const pending = new Map<number, string[]>()
+  const settle = (at: number): void => {
+    const pieces = pending.get(at)
+    if (!pieces) return
+    pending.delete(at)
+    const message = list()[at]!
+    const last = message.parts[message.parts.length - 1]
+    if (last?.kind !== 'text') return
+    list()[at] = { ...message, parts: [...message.parts.slice(0, -1), { ...last, text: last.text + pieces.join('') }] }
   }
+  const settleAll = (): void => {
+    for (const at of [...pending.keys()]) settle(at)
+  }
+  for (const frame of frames) {
+    switch (frame.type) {
+      case 'opened':
+        /* A rejoined turn repeats the message the transcript already holds. */
+        if (!current().some((one) => one.id === frame.message.id)) list().push(frame.message)
+        break
+      case 'part': {
+        const at = current().findLastIndex((one) => one.id === frame.message_id)
+        if (at < 0) break
+        const message = current()[at]!
+        const last = message.parts[message.parts.length - 1]
+        const next = frame.part
+        /* Consecutive text from one speaker is one paragraph, not one part per chunk. */
+        if (last?.kind === 'text' && next.kind === 'text' && last.parent === next.parent) {
+          const pieces = pending.get(at)
+          if (pieces) pieces.push(next.text)
+          else pending.set(at, [next.text])
+        } else {
+          settle(at)
+          list()[at] = { ...current()[at]!, parts: [...current()[at]!.parts, next] }
+        }
+        break
+      }
+      case 'call_state': {
+        settleAll()
+        /* Only a message still arriving has calls that move: an answered one
+           is left as it is, rather than walked on every frame of a long thread. */
+        current().forEach((message, at) => {
+          if (!message.streaming || !message.parts.some((part) => part.kind === 'tool_call' && part.id === frame.call_id)) return
+          list()[at] = {
+            ...message,
+            parts: message.parts.map((part) =>
+              part.kind === 'tool_call' && part.id === frame.call_id ? { ...part, state: frame.state } : part,
+            ),
+          }
+        })
+        break
+      }
+      case 'ended':
+        settleAll()
+        /* Only the ones that were: a finished message keeps its identity, so
+           its memoized turn does not draw again. */
+        current().forEach((message, at) => {
+          if (message.streaming) list()[at] = { ...message, streaming: false }
+        })
+        break
+      default:
+        break
+    }
+  }
+  settleAll()
+  return out ?? messages
 }
 
 /* An older page goes above what is drawn; a message already drawn is not drawn twice. */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Message } from '../gen/bindings'
 import { elapsed, running, tasksOf } from './backgroundTasks'
@@ -20,10 +20,13 @@ export function ComposerStatus({
   conversationId: string
   messages: readonly Message[]
 }): React.JSX.Element | null {
-  const latest = [...messages].reverse().find((one) => one.role === 'assistant')
-  const parts = latest?.parts ?? []
-  const tasks = tasksOf(parts).filter(running)
-  const list = checklistOf(parts)
+  /* Read from the end, and only when the messages change: the clock below
+     ticks every second and must not walk the thread each time. */
+  const latest = messages.findLast((one) => one.role === 'assistant')
+  const { tasks, list } = useMemo(() => {
+    const parts = latest?.parts ?? []
+    return { tasks: tasksOf(parts).filter(running), list: checklistOf(parts) }
+  }, [latest])
 
   /* When each task was first seen here. The CLI sends no start time, and
      "running for" is the question a person glancing at the strip is asking. */
