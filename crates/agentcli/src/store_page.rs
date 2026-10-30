@@ -119,8 +119,8 @@ pub(crate) fn read_after_within(
     if found {
         newest_first.extend(
             beyond
-                .iter()
-                .filter_map(|line| serde_json::from_slice::<Message>(line).ok()),
+                .into_iter()
+                .filter_map(|line| serde_json::from_slice::<Message>(&line).ok()),
         );
     }
     newest_first.reverse();

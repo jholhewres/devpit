@@ -88,7 +88,7 @@ export function useChat(conversationId: string): Chat {
   }, [])
   /* What is drawn, for a join to know the last message it need not read again. */
   const shown = useRef<readonly Message[]>([])
-  /* The messages this chat's own sends opened, which a page read meanwhile cannot hold. */
+  /* The messages this chat drew itself — a send's, a steer's, a receipt — which a page read meanwhile cannot hold. */
   const sent = useRef(new Set<string>())
   useEffect(() => {
     shown.current = messages
@@ -277,7 +277,7 @@ export function useChat(conversationId: string): Chat {
            nobody's turn ever heard. */
         if (answered.error || !question || !project) return
         void ask(() => commands.chatReceipt(project.id, conversationId, question.tool, question.input, allow)).then(
-          (kept) => kept.data && setMessages((was) => [...was, kept.data!]),
+          (kept) => kept.data && (sent.current.add(kept.data.id), setMessages((was) => [...was, kept.data!])),
         )
       })
     },
@@ -445,7 +445,10 @@ export function useChat(conversationId: string): Chat {
     async (prompt: string): Promise<boolean> => {
       if (!project) return false
       const said = await ask(() => commands.chatSteer(project.id, conversationId, prompt))
-      if (said.data) setMessages((was) => steered(was, said.data!))
+      if (said.data) {
+        sent.current.add(said.data.id)
+        setMessages((was) => steered(was, said.data!))
+      }
       return said.data !== null
     },
     [project, conversationId],

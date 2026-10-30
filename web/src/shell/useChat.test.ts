@@ -87,6 +87,7 @@ vi.mock('./live', () => ({
       await saved.hold
       return answer
     },
+    chatSteer: () => ({ ...message('msg_steered'), role: 'user' }),
     chatRewind: (projectId: string, id: string, turnId: string) => (calls.chatRewind(projectId, id, turnId), 'conv_fork'),
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
     permissionAskFromNow: () => null,
@@ -246,6 +247,44 @@ describe("a chat's reads of the transcript", () => {
     await act(async () => release())
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).not.toContain('never_saved'))
     expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_sent'])
+  })
+
+  it('after a lost place, keep a message steered in while the last page was being read', async () => {
+    saved.messages = [message('msg_1'), message('msg_2')]
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    saved.found = false
+    saved.after = [message('msg_1'), message('msg_2')]
+    let release: () => void = () => {}
+    saved.hold = new Promise<void>((done) => (release = done))
+    await act(async () => joins[0]!.ends(true))
+    act(() => result.current.say('hello'))
+    act(() => sending.onFrame(said('msg_sent')))
+    await act(async () => void (await result.current.steer('more')))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_steered'))
+    await act(async () => release())
+    await waitFor(() => expect(calls.chatAfter).toHaveBeenCalled())
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_sent'))
+    expect(result.current.messages.map((one) => one.id)).toContain('msg_steered')
+  })
+
+  it('after a lost place, drop a message sent before the read began and never saved', async () => {
+    saved.messages = [message('msg_1')]
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    act(() => result.current.say('hello'))
+    act(() => sending.onFrame(said('msg_unsaved')))
+    await act(async () =>
+      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null }),
+    )
+    await waitFor(() => expect(result.current.sending).toBe(false))
+
+    saved.found = false
+    saved.after = [message('msg_1')]
+    act(() => woke.handler?.('conv_a'))
+    await waitFor(() => expect(joins).toHaveLength(2))
+    await act(async () => joins[1]!.ends(true))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1']))
   })
 
   it('after a lost place, drop what streamed and was never saved, and an older page loaded meanwhile', async () => {
