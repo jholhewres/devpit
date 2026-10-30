@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Frame, Message, TurnEnd } from '../gen/bindings'
 import { useChat } from './useChat'
+import { PAGE } from './useOlder'
 
 afterEach(() => {
   cleanup()
@@ -19,6 +20,8 @@ const joins: {
 }[] = []
 const woke: { handler: ((conversationId: string) => void) | null } = { handler: null }
 let ending: (end: TurnEnd) => void = () => {}
+/* What the chat's own send is told, frame by frame. */
+const sending: { onFrame: (frame: Frame) => void } = { onFrame: () => {} }
 
 vi.mock('./chat', async (actual) => ({
   ...(await actual<typeof import('./chat')>()),
@@ -29,7 +32,9 @@ vi.mock('./chat', async (actual) => ({
     joins.push({ conversationId, onFrame, leave, ends })
     return { running, leave }
   },
-  send: () => ({ end: new Promise<TurnEnd>((resolve) => (ending = resolve)) }),
+  send: (_ask: unknown, onFrame: (frame: Frame) => void) => (
+    (sending.onFrame = onFrame), { end: new Promise<TurnEnd>((resolve) => (ending = resolve)) }
+  ),
 }))
 const message = (id: string, text = id): Message =>
   ({ id, turnId: null, role: 'assistant', parts: [{ kind: 'text', text, parent: null }], createdAt: 0, streaming: false }) as Message
@@ -75,8 +80,8 @@ vi.mock('./live', () => ({
       calls.chatHead(projectId, id),
       { sessionId: 'ses_1', rewindable: ['turn_1'], costUsd: 0.5, context: null }
     ),
-    chatAfter: async (projectId: string, id: string, after: string | null) => {
-      calls.chatAfter(projectId, id, after)
+    chatAfter: async (projectId: string, id: string, after: string | null, limit: number | null) => {
+      calls.chatAfter(projectId, id, after, limit)
       // Read as it stood when asked, however long the answer takes.
       const answer = { messages: saved.after, found: saved.found }
       await saved.hold
@@ -165,7 +170,7 @@ describe("a chat's reads of the transcript", () => {
     saved.after = [message('msg_3', 'as saved'), message('msg_4')]
     await act(async () => joins[0]!.ends(true))
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_3', 'msg_4']))
-    expect(calls.chatAfter).toHaveBeenCalledWith('p', 'conv_a', 'msg_2')
+    expect(calls.chatAfter).toHaveBeenCalledWith('p', 'conv_a', 'msg_2', PAGE)
     expect(calls.chatHistory).toHaveBeenCalledTimes(1)
     // Not replaced: what was drawn before the join is the same objects.
     expect(result.current.messages[0]).toBe(before[0])
@@ -184,7 +189,7 @@ describe("a chat's reads of the transcript", () => {
     saved.after = [message('msg_3')]
     await act(async () => joins[1]!.ends(true))
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_3']))
-    expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_2')
+    expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_2', PAGE)
     expect(result.current.messages[0]).toBe(before[0])
     expect(result.current.messages[1]).toBe(before[1])
   })
@@ -204,7 +209,7 @@ describe("a chat's reads of the transcript", () => {
     )
     await waitFor(() => expect(joins).toHaveLength(2))
     await act(async () => joins[1]!.ends(true))
-    expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_1')
+    expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_1', PAGE)
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_woken'))
   })
 
@@ -236,11 +241,29 @@ describe("a chat's reads of the transcript", () => {
     await act(async () => joins[0]!.ends(true))
     // Sent while the read is still on its way.
     act(() => result.current.say('hello'))
-    act(() => joins[0]!.onFrame(said('msg_sent')))
+    act(() => sending.onFrame(said('msg_sent')))
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_sent'))
     await act(async () => release())
     await waitFor(() => expect(result.current.messages.map((one) => one.id)).not.toContain('never_saved'))
     expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_sent'])
+  })
+
+  it('after a lost place, drop what streamed and was never saved, and an older page loaded meanwhile', async () => {
+    saved.messages = [message('msg_1'), message('msg_2')]
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
+    saved.found = false
+    saved.after = [message('msg_1'), message('msg_2')]
+    let release: () => void = () => {}
+    saved.hold = new Promise<void>((done) => (release = done))
+    // The last batch and the end arrive together, before a render.
+    await act(async () => {
+      joins[0]!.onFrame(said('never_saved'))
+      joins[0]!.ends(true)
+    })
+    act(() => result.current.took([message('old_0')], true))
+    await act(async () => release())
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
   })
 
   it('leave rewind working: the head names the turns, and rewinding forks', async () => {

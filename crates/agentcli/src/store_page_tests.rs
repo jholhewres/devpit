@@ -1,6 +1,6 @@
 use devpit_rpc::{Message, Part, Role};
 
-use super::{read_after, read_page, read_page_within, BLOCK};
+use super::{read_after, read_after_within, read_page, read_page_within, BLOCK};
 use crate::store::{append, conversation_path, read};
 
 fn message(id: &str, text: &str) -> Message {
@@ -150,7 +150,7 @@ fn a_line_longer_than_the_ceiling_is_passed_over_and_counted() {
         ids(&read_page_within(&path, Some("m2"), 10, longest).messages),
         ["m0"]
     );
-    // At the start of the file, and at its end without a newline, the same.
+    // At the start of the file, the same.
     let start = conversation_path(home.path(), "c2");
     append(&start, &message("big", &"z".repeat(longest + 10))).expect("append");
     append(&start, &message("m1", "one")).expect("append");
@@ -172,4 +172,30 @@ fn what_came_after_a_message_is_read_from_the_end_and_the_last_page_when_it_is_g
     let (page, found) = read_after(&path, "gone", 3);
     assert!(!found);
     assert_eq!(ids(&page), ["m4", "m5", "m6"]);
+}
+
+#[test]
+fn what_came_after_skips_blank_bad_and_too_long_lines_and_reads_past_most() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let path = conversation_path(home.path(), "c1");
+    let longest = 2 * BLOCK;
+    append(&path, &message("a", "anchor")).expect("append");
+    std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .and_then(|mut file| std::io::Write::write_all(&mut file, b"\n  \n{ not json\n"))
+        .expect("write");
+    append(&path, &message("big", &"z".repeat(longest + 10))).expect("append");
+    for at in 0..5 {
+        append(&path, &message(&format!("m{at}"), "after")).expect("append");
+    }
+    // More after the anchor than `most`: all of them, since the anchor is there.
+    let (after, found) = read_after_within(&path, "a", 2, longest);
+    assert!(found);
+    assert_eq!(ids(&after), ["m0", "m1", "m2", "m3", "m4"]);
+    let (page, found) = read_after_within(&path, "gone", 2, longest);
+    assert!(!found);
+    assert_eq!(ids(&page), ["m3", "m4"]);
+    let (none, found) = read_after(&conversation_path(home.path(), "never"), "a", 2);
+    assert!(!found && none.is_empty());
 }

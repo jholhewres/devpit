@@ -88,6 +88,8 @@ export function useChat(conversationId: string): Chat {
   }, [])
   /* What is drawn, for a join to know the last message it need not read again. */
   const shown = useRef<readonly Message[]>([])
+  /* The messages this chat's own sends opened, which a page read meanwhile cannot hold. */
+  const sent = useRef(new Set<string>())
   useEffect(() => {
     shown.current = messages
   }, [messages])
@@ -140,7 +142,7 @@ export function useChat(conversationId: string): Chat {
           if (!was && !woken) return
           setSending(false)
           /* Only what came after the join is read; the rest stays as drawn. */
-          const reading = new Set(shown.current.map((one) => one.id))
+          sent.current.clear()
           void Promise.all([
             ask(() => commands.chatAfter(projectId, conversationId, before, PAGE)),
             ask(() => commands.chatHead(projectId, conversationId)),
@@ -151,7 +153,7 @@ export function useChat(conversationId: string): Chat {
             else if (saved) {
               /* Its place was never saved: the last page takes the place of what was drawn,
                  but not of a turn sent while it was read. */
-              setMessages((was) => retaken(saved.messages, was, reading))
+              setMessages((was) => retaken(saved.messages, was, sent.current))
               setOlder(true)
             }
             if (!head.data) return
@@ -304,6 +306,7 @@ export function useChat(conversationId: string): Chat {
       const started = send(turn, (frame) => {
         if (!now.open()) return
         heard ||= frame.type === 'opened'
+        if (frame.type === 'opened') sent.current.add(frame.message.id)
         if (frame.type === 'session') setSession(frame.session_id)
         else push(frame)
       })

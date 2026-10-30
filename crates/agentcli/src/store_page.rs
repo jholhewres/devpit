@@ -79,26 +79,49 @@ pub(crate) fn read_page_within(
 /// found; when it was not, the last `most`. Read from the end, so what came
 /// after a recent message costs those messages, not the file.
 pub fn read_after(path: &Path, after: &str, most: usize) -> (Vec<Message>, bool) {
-    let Ok(mut lines) = Backwards::open(path, LONGEST) else {
+    read_after_within(path, after, most, LONGEST)
+}
+
+/// [`read_after`], passing over lines longer than `longest`.
+pub(crate) fn read_after_within(
+    path: &Path,
+    after: &str,
+    most: usize,
+    longest: usize,
+) -> (Vec<Message>, bool) {
+    let Ok(mut lines) = Backwards::open(path, longest) else {
         return (Vec::new(), false);
     };
+    // Kept whole up to `most`; past it only the id is read, and what lies
+    // between is kept as lines, parsed once the anchor turns out to be there.
     let mut newest_first = Vec::new();
+    let mut beyond: Vec<Vec<u8>> = Vec::new();
     let mut found = false;
     while let Some(line) = lines.next_line() {
         let Some(line) = line.filter(|line| !line.iter().all(u8::is_ascii_whitespace)) else {
             continue;
         };
-        let Ok(message) = serde_json::from_slice::<Message>(&line) else {
+        let Ok(one) = serde_json::from_slice::<Id>(&line) else {
             continue;
         };
-        if message.id == after {
+        if one.id == after {
             found = true;
             break;
         }
-        newest_first.push(message);
+        if newest_first.len() < most {
+            if let Ok(message) = serde_json::from_slice::<Message>(&line) {
+                newest_first.push(message);
+            }
+        } else {
+            beyond.push(line);
+        }
     }
-    if !found {
-        newest_first.truncate(most);
+    if found {
+        newest_first.extend(
+            beyond
+                .iter()
+                .filter_map(|line| serde_json::from_slice::<Message>(line).ok()),
+        );
     }
     newest_first.reverse();
     (newest_first, found)
