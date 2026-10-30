@@ -73,7 +73,9 @@ pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd
 pub use checkpoint::{
     validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, Whose, WouldRun,
 };
-pub use conversation::{Ask, Attachment, Conversation, OutsideSession, TurnFrom};
+pub use conversation::{
+    Ask, Attachment, Conversation, ConversationAfter, ConversationHead, OutsideSession, TurnFrom,
+};
 pub use decisions::{Deciding, DecisionTried};
 pub use devflow::{
     DecisionsState, DevflowAsk, DevflowAsks, DevflowCalibration, DevflowChange, DevflowDecisions,

@@ -40,6 +40,13 @@ export function applied(messages: readonly Message[], frame: Frame): readonly Me
   }
 }
 
+/* Saved messages replace the streamed ones of the same id; new ones go last. */
+export function appended(messages: readonly Message[], saved: readonly Message[]): readonly Message[] {
+  const by = new Map(saved.map((one) => [one.id, one]))
+  const drawn = new Set(messages.map((one) => one.id))
+  return [...messages.map((one) => by.get(one.id) ?? one), ...saved.filter((one) => !drawn.has(one.id))]
+}
+
 /* The parts as they are drawn: text that runs on is one text, however many
    pieces it was kept in. */
 export const joined = (parts: readonly Part[]): Part[] => parts.reduce<Part[]>(merged, [])

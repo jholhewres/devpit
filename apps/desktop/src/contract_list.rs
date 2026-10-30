@@ -42,6 +42,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         project_naming::project_group_rename,
         chat_window::chat_history,
         chat_window::chat_part_full,
+        chat_window::chat_head,
+        chat_window::chat_after,
         threads::chat_list,
         outside_sessions::chat_outside,
         adopting::chat_adopt,

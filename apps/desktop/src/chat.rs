@@ -76,22 +76,25 @@ pub(crate) fn chat_history_now(
         session_id: head.as_ref().and_then(|head| head.session_id.clone()),
         cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
         context: head.as_ref().and_then(|head| head.context),
-        rewindable: head
-            .as_ref()
-            .map(|head| {
-                head.rewind
-                    .anchors
-                    .iter()
-                    .map(|at| at.turn_id.clone())
-                    .collect()
-            })
-            .unwrap_or_default(),
+        rewindable: rewindable(head.as_ref()),
         created_at: head
             .map(|head| head.created_at)
             .or_else(|| messages.first().map(|first| first.created_at))
             .unwrap_or_else(now),
         messages,
     })
+}
+
+/// The turns a conversation can be rewound to, from its head.
+pub(crate) fn rewindable(head: Option<&devpit_agentcli::head::Head>) -> Vec<String> {
+    head.map(|head| {
+        head.rewind
+            .anchors
+            .iter()
+            .map(|at| at.turn_id.clone())
+            .collect()
+    })
+    .unwrap_or_default()
 }
 
 /// `chat.send` — one turn, streamed as it happens.

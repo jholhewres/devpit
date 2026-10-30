@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
-import { applied, ASKS, batched, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
+import { applied, appended, ASKS, batched, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { KEPT_BYTES } from './pasting'
@@ -76,6 +76,11 @@ const pickable = (all: readonly Profile[], belongs: string | null): Profile[] =>
 export function useChat(conversationId: string): Chat {
   const { project, show } = useShellPick((shell) => ({ project: shell.project, show: shell.show }))
   const [messages, setMessages] = useState<readonly Message[]>([])
+  /* What is drawn, for a join to know the last message it need not read again. */
+  const shown = useRef<readonly Message[]>([])
+  useEffect(() => {
+    shown.current = messages
+  }, [messages])
   const [rewindable, setRewindable] = useState<readonly string[]>([])
   const [skills, setSkills] = useState<readonly string[]>([])
   const [profiles, setProfiles] = useState<readonly Profile[]>([])
@@ -105,7 +110,7 @@ export function useChat(conversationId: string): Chat {
   /* A turn still running when this chat opens — it was left, or the window
      reloaded — is joined where it is, instead of being said to have died. */
   const rejoined = useCallback(
-    (projectId: string, woken = false): void => {
+    (projectId: string, woken = false, before = shown.current.at(-1)?.id ?? null): void => {
       const now = opened.current
       const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
       const joined = now.join(
@@ -124,13 +129,18 @@ export function useChat(conversationId: string): Chat {
              answer to a message. It was written down; read it from there. */
           if (!was && !woken) return
           setSending(false)
-          // The transcript holds the answer as it was saved, costs and all.
-          void ask(() => commands.chatHistory(projectId, conversationId)).then((past) => {
-            if (!now.open() || !past.data) return
-            setMessages(past.data.messages)
-            setCost(past.data.costUsd ?? 0)
-            setContext(past.data.context ?? null)
-            setRewindable(past.data.rewindable ?? [])
+          /* Only what came after the join is read; the rest stays as drawn. */
+          void Promise.all([
+            ask(() => commands.chatAfter(projectId, conversationId, before)),
+            ask(() => commands.chatHead(projectId, conversationId)),
+          ]).then(([after, head]) => {
+            if (!now.open()) return
+            const saved = after.data?.messages
+            if (saved) setMessages((was) => appended(was, saved))
+            if (!head.data) return
+            setCost(head.data.costUsd ?? 0)
+            setContext(head.data.context)
+            setRewindable(head.data.rewindable)
           })
         })
         /* `chat_rejoin` never refuses; only the window going rejects it, and
@@ -164,7 +174,7 @@ export function useChat(conversationId: string): Chat {
         const { cardId, cardTitle, cardOnBoard } = past.data
         setCard(cardId ? { id: cardId, title: cardTitle, onBoard: cardOnBoard } : null)
         setRewindable(past.data.rewindable ?? [])
-        rejoined(project.id)
+        rejoined(project.id, false, past.data.messages.at(-1)?.id ?? null)
       }
       const installed = pickable(found.data ?? [], belongs)
       setProfiles(installed)
@@ -295,16 +305,15 @@ export function useChat(conversationId: string): Chat {
           flush()
           setCost((was) => was + (end.costUsd ?? 0))
           if (end.context) setContext(end.context)
-          /* A turn's place in the CLI's transcript is known once it has run. */
-          void ask(() => commands.chatHistory(project.id, conversationId)).then(
-            (past) => {
-              if (!now.open() || !past.data) return
-              setRewindable(past.data.rewindable ?? [])
-              /* A new conversation learns its session from its first turn; until
-                 then nothing could tell it to stop and ask. */
-              setSession(past.data.sessionId)
-            },
-          )
+          /* A turn's place in the CLI's transcript is known once it has run.
+             Only the head is read: the turn's messages are already drawn. */
+          void ask(() => commands.chatHead(project.id, conversationId)).then((head) => {
+            if (!now.open() || !head.data) return
+            setRewindable(head.data.rewindable)
+            /* A new conversation learns its session from its first turn; until
+               then nothing could tell it to stop and ask. */
+            setSession(head.data.sessionId)
+          })
         })
         .catch((thrown: { message?: string }) => {
           if (!now.open()) return

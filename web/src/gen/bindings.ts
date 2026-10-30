@@ -81,6 +81,14 @@ export const commands = {
 	 *  by the call it answers in the message that holds it.
 	 */
 	chatPartFull: (projectId: string, conversationId: string, messageId: string, callId: string) => typedError<Part, RpcError>(__TAURI_INVOKE("chat_part_full", { projectId, conversationId, messageId, callId })),
+	/**  `chat.head` — what a turn's end needs, without reading the conversation. */
+	chatHead: (projectId: string, conversationId: string) => typedError<ConversationHead, RpcError>(__TAURI_INVOKE("chat_head", { projectId, conversationId })),
+	/**
+	 *  `chat.after` — the messages saved after `after`, cut as the history is:
+	 *  what a chat that rejoined a turn appends, instead of reading it all again.
+	 *  Every message when `after` is not among them.
+	 */
+	chatAfter: (projectId: string, conversationId: string, after: string | null) => typedError<ConversationAfter, RpcError>(__TAURI_INVOKE("chat_after", { projectId, conversationId, after })),
 	/**
 	 *  `chat.list` — every conversation this project has had.
 	 * 
@@ -2626,6 +2634,19 @@ export type Conversation = {
 	 */
 	rewindable?: string[],
 	createdAt: number | null,
+};
+
+/**  The messages saved after the last one a chat had drawn. */
+export type ConversationAfter = {
+	messages: Message[],
+};
+
+/**  What a turn's end needs to know of the conversation: its head, not its messages. */
+export type ConversationHead = {
+	sessionId: string | null,
+	rewindable: string[],
+	costUsd: number | null,
+	context: Context | null,
 };
 
 export type Conversations = {

@@ -107,7 +107,7 @@ export function batched(apply: (frames: readonly Frame[]) => void): { push: (fra
   return { push, flush }
 }
 
-export { applied, joined, withFiles, withHeard } from './frames'
+export { applied, appended, joined, withFiles, withHeard } from './frames'
 
 /* A message sent into the turn in flight sits before the answer still being
    written, where the transcript keeps it. */

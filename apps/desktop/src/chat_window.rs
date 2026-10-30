@@ -1,10 +1,13 @@
 //! What of a conversation the window reads: its history with long outputs
 //! cut, and one of those outputs whole when a row is opened.
 
+use devpit_agentcli::head::{head_path, read_head};
 use devpit_agentcli::store::{conversation_path, read};
-use devpit_rpc::{Conversation, ErrorCode, Part, RpcError};
+use devpit_rpc::{
+    Conversation, ConversationAfter, ConversationHead, ErrorCode, Message, Part, RpcError,
+};
 
-use crate::chat::chat_history_now;
+use crate::chat::{chat_history_now, rewindable};
 
 /// `chat.history` — everything said in this conversation, in order.
 #[tauri::command]
@@ -24,6 +27,57 @@ pub async fn chat_history(
         Ok(read)
     })
     .await
+}
+
+/// `chat.head` — what a turn's end needs, without reading the conversation.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_head(
+    project_id: String,
+    conversation_id: String,
+) -> Result<ConversationHead, RpcError> {
+    crate::off_main::blocking(move || {
+        conversation(&conversation_id)?;
+        let sessions = crate::projects::project_home(&project_id)?.sessions();
+        let head = read_head(&head_path(&sessions, &conversation_id));
+        Ok(ConversationHead {
+            session_id: head.as_ref().and_then(|head| head.session_id.clone()),
+            cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
+            context: head.as_ref().and_then(|head| head.context),
+            rewindable: rewindable(head.as_ref()),
+        })
+    })
+    .await
+}
+
+/// `chat.after` — the messages saved after `after`, cut as the history is:
+/// what a chat that rejoined a turn appends, instead of reading it all again.
+/// Every message when `after` is not among them.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_after(
+    project_id: String,
+    conversation_id: String,
+    after: Option<String>,
+) -> Result<ConversationAfter, RpcError> {
+    crate::off_main::blocking(move || {
+        conversation(&conversation_id)?;
+        let sessions = crate::projects::project_home(&project_id)?.sessions();
+        let read = read(&conversation_path(&sessions, &conversation_id)).0;
+        Ok(ConversationAfter {
+            messages: messages_after(read, after.as_deref()),
+        })
+    })
+    .await
+}
+
+/// The messages after `after`, cut; all of them when it is not among them.
+fn messages_after(mut messages: Vec<Message>, after: Option<&str>) -> Vec<Message> {
+    if let Some(at) = after.and_then(|id| messages.iter().position(|message| message.id == id)) {
+        messages.drain(..=at);
+    }
+    messages.iter_mut().for_each(devpit_rpc::cut::cut_message);
+    messages
 }
 
 /// `chat.part_full` — a tool's output as the transcript keeps it, uncut, found

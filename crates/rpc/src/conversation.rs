@@ -112,3 +112,20 @@ pub struct OutsideSession {
     /// Unix seconds.
     pub last_at: f64,
 }
+
+/// What a turn's end needs to know of the conversation: its head, not its messages.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationHead {
+    pub session_id: Option<String>,
+    pub rewindable: Vec<String>,
+    pub cost_usd: f64,
+    pub context: Option<crate::frame::Context>,
+}
+
+/// The messages saved after the last one a chat had drawn.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationAfter {
+    pub messages: Vec<crate::chat::Message>,
+}
