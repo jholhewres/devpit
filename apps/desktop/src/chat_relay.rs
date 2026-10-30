@@ -329,11 +329,15 @@ pub async fn chat_rejoin(
     conversation_id: String,
     on_frame: Channel<Frame>,
 ) -> Result<bool, RpcError> {
-    // Left by the window's own channel id, which the cutting wrapper does not keep.
-    let id = on_frame.id();
-    Ok(relay
-        .rejoin_as(&conversation_id, for_window(on_frame), id)
-        .await)
+    let (channel, id) = window_channel(on_frame);
+    Ok(relay.rejoin_as(&conversation_id, channel, id).await)
+}
+
+/// A window's channel wrapped to cut, and the id `chat_leave` knows it by:
+/// the window's own, which the wrapper does not keep.
+fn window_channel(window: Channel<Frame>) -> (Channel<Frame>, u32) {
+    let id = window.id();
+    (for_window(window), id)
 }
 
 /// A window's channel that is sent each frame cut, as the history it read was.

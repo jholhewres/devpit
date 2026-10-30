@@ -21,11 +21,12 @@ export function useWholeOutput(messageId: string, callId: string, output: string
     if (!cut || !where) return
     let gone = false
     void ask(() => commands.chatPartFull(where.projectId, where.conversationId, messageId, callId)).then((asked) => {
-      if (!gone && asked.data?.kind === 'tool_result') setWhole(asked.data.output)
+      // Unreadable whole, the page gets the cut one rather than waiting forever.
+      if (!gone) setWhole(asked.data?.kind === 'tool_result' ? asked.data.output : output)
     })
     return () => {
       gone = true
     }
-  }, [cut, where, messageId, callId])
+  }, [cut, where, messageId, callId, output])
   return cut ? whole : output
 }

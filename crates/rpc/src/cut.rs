@@ -83,7 +83,8 @@ pub fn cut_output(output: &str) -> Option<String> {
         }
     }
     if !changed {
-        return None;
+        // Not content blocks, or none to name or cut: long, it is cut as text.
+        return cut_text(output);
     }
     serde_json::to_string(&blocks).ok()
 }

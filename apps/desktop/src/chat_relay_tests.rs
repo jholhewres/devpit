@@ -111,10 +111,12 @@ fn a_chat_that_rejoined_cut_and_left_is_sent_nothing_more() {
     let (first, _) = heard();
     let (turn, _running) = relay.open("conv", first);
     let (window, to_window) = heard();
-    let id = window.id();
-    let mut ended = relay.join("conv", super::for_window(window), id).unwrap();
+    // What the page sends to chat_leave: its own channel's id.
+    let page_knows = window.id();
+    let (cut, id) = super::window_channel(window);
+    let mut ended = relay.join("conv", cut, id).unwrap();
     turn.send(frame("before")).unwrap();
-    relay.leave("conv", id);
+    relay.leave("conv", page_knows);
     turn.send(frame("after")).unwrap();
 
     assert_eq!(to_window.lock().unwrap().len(), 1);

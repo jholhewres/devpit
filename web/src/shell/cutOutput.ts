@@ -10,18 +10,23 @@ import { createContext } from 'react'
    on a line of its own, between the head and the tail. */
 const CUT_LINE = /\n\u2026 \[cut: \d+ bytes in all\]\n/
 
+/* The output's content blocks, or `null` when it is not blocks. */
+function blocksOf(output: string): readonly Record<string, unknown>[] | null {
+  try {
+    const blocks = JSON.parse(output) as unknown
+    return Array.isArray(blocks) ? blocks.filter((block) => block && typeof block === 'object') : null
+  } catch {
+    return null
+  }
+}
+
 /* Whether the window got this output cut: the backend's line in a text, or an
    image named instead of carried. An output that merely mentions either is
    not. */
 export function isCut(output: string): boolean {
   if (CUT_LINE.test(output)) return true
-  if (namedImages(output).length > 0) return true
-  try {
-    const blocks = JSON.parse(output) as unknown
-    return Array.isArray(blocks) && blocks.some((block) => block && typeof block.text === 'string' && CUT_LINE.test(block.text))
-  } catch {
-    return false
-  }
+  const blocks = blocksOf(output) ?? []
+  return blocks.some((block) => (block.type === 'image' && block.cut === true) || (typeof block.text === 'string' && CUT_LINE.test(block.text)))
 }
 
 /* Where a row's message is, to ask for its whole output. */
@@ -39,44 +44,30 @@ export interface NamedImage {
 }
 
 export function namedImages(output: string): readonly NamedImage[] {
-  try {
-    const blocks = JSON.parse(output) as unknown
-    if (!Array.isArray(blocks)) return []
-    return blocks.flatMap((block) =>
-      block && typeof block === 'object' && block.type === 'image' && block.cut === true
-        ? [{ mime: typeof block.mime === 'string' ? block.mime : null, bytes: Number(block.bytes) || 0 }]
-        : [],
-    )
-  } catch {
-    return []
-  }
+  return (blocksOf(output) ?? []).flatMap((block) =>
+    block.type === 'image' && block.cut === true
+      ? [{ mime: typeof block.mime === 'string' ? block.mime : null, bytes: Number(block.bytes) || 0 }]
+      : [],
+  )
 }
 
 /* Images of a whole output, as data URLs, in order. */
 export function imagesOf(output: string): readonly string[] {
-  try {
-    const blocks = JSON.parse(output) as unknown
-    if (!Array.isArray(blocks)) return []
-    return blocks.flatMap((block) => {
-      const source = block && typeof block === 'object' ? block.source : null
-      return source && typeof source.data === 'string'
-        ? [`data:${typeof source.media_type === 'string' ? source.media_type : 'image/png'};base64,${source.data}`]
-        : []
-    })
-  } catch {
-    return []
-  }
+  return (blocksOf(output) ?? []).flatMap((block) => {
+    const source = block.source as { data?: unknown; media_type?: unknown } | null | undefined
+    return source && typeof source.data === 'string'
+      ? [`data:${typeof source.media_type === 'string' ? source.media_type : 'image/png'};base64,${source.data}`]
+      : []
+  })
 }
 
-/* The text of a whole output beside its images: its text blocks, or all of it
-   when it is not blocks. */
+/* A whole output beside its images: its text blocks, the other blocks as they
+   are, or all of it when it is not blocks. */
 export function textOf(output: string): string {
-  try {
-    const blocks = JSON.parse(output) as unknown
-    if (!Array.isArray(blocks)) return output
-    return blocks.flatMap((block) => (block && typeof block.text === 'string' ? [block.text] : [])).join('\n')
-  } catch {
-    return output
-  }
+  const blocks = blocksOf(output)
+  if (!blocks) return output
+  const rest = blocks.filter((block) => !(block.source && typeof (block.source as { data?: unknown }).data === 'string'))
+  return rest.every((block) => typeof block.text === 'string')
+    ? rest.map((block) => block.text).join('\n')
+    : JSON.stringify(rest, null, 2)
 }
-

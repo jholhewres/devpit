@@ -145,10 +145,11 @@ function Whole({ callId, output }: { callId: string; output: string }): React.JS
   if (!where || !messageId) return null
   if (whole !== null) {
     const shown = imagesOf(whole)
+    const text = textOf(whole)
     return (
       <>
         {shown.map((src, at) => <img className="asec__img" key={at} src={src} alt={`Image ${at + 1} of the output`} />)}
-        {textOf(whole).trim() && <Section label="Output, in full" body={textOf(whole)} />}
+        {text.trim() && <Section label="Output, in full" body={text} />}
       </>
     )
   }

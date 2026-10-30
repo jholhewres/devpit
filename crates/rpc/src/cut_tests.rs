@@ -107,6 +107,16 @@ fn a_long_text_block_beside_an_image_is_cut_on_its_own() {
 }
 
 #[test]
+fn a_long_json_array_that_is_not_blocks_is_cut_as_text() {
+    let numbers = serde_json::to_string(&(0..10_000).collect::<Vec<_>>()).expect("json");
+    assert!(numbers.len() > WHOLE);
+    let cut = cut_part(&result(numbers.clone())).expect("cut");
+    assert!(output_of(&cut).contains(&format!("{CUT_MARK}{} bytes in all]", numbers.len())));
+    let small = serde_json::json!([{ "type": "text", "text": "ok" }]).to_string();
+    assert_eq!(cut_part(&result(small)), None);
+}
+
+#[test]
 fn a_tool_call_and_the_answer_go_whole() {
     let call = Part::ToolCall {
         id: "call_1".to_owned(),

@@ -5,8 +5,10 @@ import { WholeContext } from './cutOutput'
 import { useWholeOutput } from './WholeFrom'
 
 const asked: unknown[][] = []
+const missing = { now: false }
 vi.mock('./live', () => ({
-  ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
+  ask: async (call: () => unknown) =>
+    missing.now ? { data: null, error: 'gone', loading: false } : { data: await call(), error: null, loading: false },
   commands: {
     chatPartFull: (...args: unknown[]) => {
       asked.push(args)
@@ -26,6 +28,14 @@ describe("the output an MCP tool's page gets", () => {
     expect(result.current).toBeNull()
     await waitFor(() => expect(result.current).toBe('{"rows":[1,2,3]}'))
     expect(asked).toEqual([['p1', 'v1', 'm1', 'c1']])
+  })
+
+  it('is the cut one when the whole cannot be read, rather than nothing for ever', async () => {
+    missing.now = true
+    const cut = '{"rows":[1,\n… [cut: 9000 bytes in all]\n,3]}'
+    const { result } = renderHook(() => useWholeOutput('m1', 'c1', cut), { wrapper })
+    await waitFor(() => expect(result.current).toBe(cut))
+    missing.now = false
   })
 
   it('is the output itself when it went whole, asked of nobody', () => {

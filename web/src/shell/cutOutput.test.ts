@@ -23,4 +23,13 @@ describe('an output the window got cut', () => {
     expect(textOf(whole)).toBe('the page')
     expect(textOf('plain')).toBe('plain')
   })
+
+  it('shows the other blocks of a whole output rather than dropping them', () => {
+    const whole = JSON.stringify([
+      { type: 'text', text: 'the page' },
+      { type: 'resource', resource: { uri: 'file:///a' } },
+    ])
+    expect(textOf(whole)).toContain('file:///a')
+    expect(textOf(whole)).toContain('the page')
+  })
 })
