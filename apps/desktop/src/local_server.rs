@@ -22,13 +22,20 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::remote_http::{read, reply, Request};
+use crate::remote_http::{read_up_to, reply, Request};
 
 /// The port, in the home, so "open in Chrome" and a restart find it.
 pub(crate) const PORT_FILE: &str = "local.json";
 /// The token a browser trades for its cookie, owner-only in the home.
 pub(crate) const TOKEN_FILE: &str = "local-token";
 const COOKIE: &str = "devpit_local";
+/// The name the browser is sent to. A cookie is kept per host, not per port,
+/// so on `127.0.0.1` every other loopback server would be sent it too; a
+/// `*.localhost` name resolves to loopback and is this server's alone.
+pub(crate) const HOST: &str = "devpit.localhost";
+/// The largest call a browser sends: a pasted picture (8 MiB, as base64) or a
+/// saved file, with room for the JSON around it.
+const MOST_BODY: usize = 16 * 1024 * 1024;
 
 /// Commands a browser may not run here: each streams over a Tauri channel
 /// (the browser gets that stream over the events socket), or opens UI on the
@@ -52,21 +59,25 @@ pub(crate) fn desktop_only(command: &str) -> bool {
             .any(|family| command.starts_with(family))
 }
 
+/// The hosts this server answers for, on its own port.
+fn ours(host: &str, port: u16) -> bool {
+    ["127.0.0.1", "localhost", HOST]
+        .iter()
+        .any(|name| host == format!("{name}:{port}"))
+}
+
 /// The `Host` a request must carry: this port on loopback, by number or name.
 pub(crate) fn host_allowed(host: Option<&str>, port: u16) -> bool {
-    host.is_some_and(|host| {
-        host == format!("127.0.0.1:{port}") || host == format!("localhost:{port}")
-    })
+    host.is_some_and(|host| ours(host, port))
 }
 
 /// No `Origin` (a top-level navigation, curl) or this very origin.
 pub(crate) fn origin_allowed(origin: Option<&str>, port: u16) -> bool {
     match origin {
         None => true,
-        Some(origin) => {
-            origin == format!("http://127.0.0.1:{port}")
-                || origin == format!("http://localhost:{port}")
-        }
+        Some(origin) => origin
+            .strip_prefix("http://")
+            .is_some_and(|host| ours(host, port)),
     }
 }
 
@@ -109,22 +120,36 @@ pub(crate) enum Door {
     In,
 }
 
-pub(crate) fn door(request: &Request, query: &str, port: u16, token: &str) -> Door {
+/// `token` is the one in the home, traded once per browser at `/auth`;
+/// `session` is the cookie it is traded for, made for this run of the app.
+pub(crate) fn door(request: &Request, query: &str, port: u16, token: &str, session: &str) -> Door {
     if !host_allowed(request.header("host"), port)
         || !origin_allowed(request.header("origin"), port)
     {
         return Door::Foreign;
     }
     if request.method == "GET" && request.path == "/auth" {
+        /* Signed in only under its own name, so the cookie is never kept for
+        127.0.0.1, where every other loopback server would be sent it. */
+        if request.header("host") != Some(&format!("{HOST}:{port}")) {
+            return Door::Unauthorized;
+        }
         return match token_in_query(query) {
             Some(said) if same_secret(said, token) => Door::Admit,
             _ => Door::Unauthorized,
         };
     }
     match cookie_of(request.header("cookie")) {
-        Some(said) if same_secret(said, token) => Door::In,
+        Some(said) if same_secret(said, session) => Door::In,
         _ => Door::Unauthorized,
     }
+}
+
+/// 32 random bytes, as hex.
+pub(crate) fn secret() -> std::io::Result<String> {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).map_err(|err| std::io::Error::other(err.to_string()))?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
 /// The token, made once: 32 random bytes as hex, owner-only from its first byte.
@@ -136,9 +161,7 @@ pub(crate) fn token_in(home: &Path) -> std::io::Result<String> {
             return Ok(kept.to_owned());
         }
     }
-    let mut bytes = [0u8; 32];
-    getrandom::fill(&mut bytes).map_err(|err| std::io::Error::other(err.to_string()))?;
-    let token: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let token = secret()?;
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -174,7 +197,7 @@ pub(crate) fn bound(home: &Path) -> std::io::Result<TcpListener> {
 
 /// Where the browser is sent to sign in, token and all: for "open in Chrome".
 pub(crate) fn sign_in_url(port: u16, token: &str) -> String {
-    format!("http://127.0.0.1:{port}/auth?t={token}")
+    format!("http://{HOST}:{port}/auth?t={token}")
 }
 
 static PORT: Mutex<Option<u16>> = Mutex::new(None);
@@ -188,6 +211,7 @@ pub(crate) fn port() -> Option<u16> {
 /// runs on its own thread; `serve` decides what it is.
 pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> {
     let token = token_in(home)?;
+    let session = secret()?;
     let listener = bound(home)?;
     let port = listener.local_addr()?.port();
     if let Ok(mut kept) = PORT.lock() {
@@ -195,14 +219,14 @@ pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> 
     }
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
-            let (app, token) = (app.clone(), token.clone());
-            std::thread::spawn(move || serve(app, stream, port, &token));
+            let (app, token, session) = (app.clone(), token.clone(), session.clone());
+            std::thread::spawn(move || serve(app, stream, port, &token, &session));
         }
     });
     Ok(port)
 }
 
-fn serve(app: tauri::AppHandle, mut stream: TcpStream, port: u16, token: &str) {
+fn serve(app: tauri::AppHandle, mut stream: TcpStream, port: u16, token: &str, session: &str) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
     let Some(reader) = stream.try_clone().ok() else {
         return;
@@ -212,7 +236,7 @@ fn serve(app: tauri::AppHandle, mut stream: TcpStream, port: u16, token: &str) {
         reply(&mut stream, "400 Bad Request", "text/plain", b"");
         return;
     };
-    match door(&request, &query, port, token) {
+    match door(&request, &query, port, token, session) {
         Door::Foreign => reply(
             &mut stream,
             "403 Forbidden",
@@ -225,7 +249,7 @@ fn serve(app: tauri::AppHandle, mut stream: TcpStream, port: u16, token: &str) {
             "text/plain",
             b"sign in from devpit",
         ),
-        Door::Admit => admitted(&mut stream, token),
+        Door::Admit => admitted(&mut stream, session),
         Door::In => match (request.method.as_str(), request.path.as_str()) {
             ("POST", path) if path.starts_with("/rpc/") => {
                 crate::local_rpc::call(&app, &mut stream, &path["/rpc/".len()..], &request.body)
@@ -237,9 +261,8 @@ fn serve(app: tauri::AppHandle, mut stream: TcpStream, port: u16, token: &str) {
     }
 }
 
-/// The request and its query string, which [`read`] drops.
-fn read_with_query(reader: &mut BufReader<TcpStream>) -> Option<(Request, String)> {
-    use std::io::BufRead;
+/// The request and its query string, which [`read_up_to`] drops.
+pub(crate) fn read_with_query(reader: &mut impl std::io::BufRead) -> Option<(Request, String)> {
     let first = reader.fill_buf().ok()?;
     let line_end = first
         .iter()
@@ -252,14 +275,14 @@ fn read_with_query(reader: &mut BufReader<TcpStream>) -> Option<(Request, String
         .and_then(|target| target.split_once('?'))
         .map(|(_, query)| query.to_owned())
         .unwrap_or_default();
-    Some((read(reader)?, query))
+    Some((read_up_to(reader, MOST_BODY)?, query))
 }
 
 /// The cookie set, and the browser sent on to the app without the token.
-fn admitted(stream: &mut TcpStream, token: &str) {
+fn admitted(stream: &mut TcpStream, session: &str) {
     let head = format!(
         "HTTP/1.1 303 See Other\r\nlocation: /\r\n\
-         set-cookie: {COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/\r\n\
+         set-cookie: {COOKIE}={session}; HttpOnly; SameSite=Strict; Path=/\r\n\
          cache-control: no-store\r\nreferrer-policy: no-referrer\r\n\
          content-length: 0\r\nconnection: close\r\n\r\n"
     );

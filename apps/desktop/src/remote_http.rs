@@ -26,7 +26,13 @@ impl Request {
     }
 }
 
-pub(crate) fn read(mut reader: impl BufRead) -> Option<Request> {
+pub(crate) fn read(reader: impl BufRead) -> Option<Request> {
+    read_up_to(reader, MOST_BODY)
+}
+
+/// [`read`], with a body up to `most_body` bytes, kept as it arrives rather
+/// than allocated from what `content-length` claims.
+pub(crate) fn read_up_to(mut reader: impl BufRead, most_body: usize) -> Option<Request> {
     let mut first = String::new();
     line(&mut reader, &mut first)?;
     let mut words = first.split_whitespace();
@@ -51,11 +57,16 @@ pub(crate) fn read(mut reader: impl BufRead) -> Option<Request> {
         Some(length) => length.parse().ok()?,
         None => 0,
     };
-    if length > MOST_BODY {
+    if length > most_body {
         return None;
     }
-    let mut body = vec![0u8; length];
-    reader.read_exact(&mut body).ok()?;
+    let mut body = Vec::new();
+    Read::take(reader.by_ref(), length as u64)
+        .read_to_end(&mut body)
+        .ok()?;
+    if body.len() != length {
+        return None;
+    }
     Some(Request {
         method,
         path,

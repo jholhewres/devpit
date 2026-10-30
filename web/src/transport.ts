@@ -157,7 +157,7 @@ export function installBrowserTransport(): void {
   if (typeof window === 'undefined' || window.__TAURI_INTERNALS__) return
   if (!/^https?:$/.test(window.location.protocol)) return
   const host = window.location.hostname
-  if (host !== '127.0.0.1' && host !== 'localhost') return
+  if (host !== '127.0.0.1' && host !== 'localhost' && host !== 'devpit.localhost') return
   window.__DEVPIT_BROWSER__ = true
   const events = new Events(() => new WebSocket(`ws://${window.location.host}/events`))
   window.__TAURI_INTERNALS__ = browserInternals(events)
