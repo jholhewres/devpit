@@ -1,0 +1,190 @@
+//! Attaching a window to a pane devpit-ptyd holds.
+//!
+//! The counterpart of the `tmux attach` in [`crate::panes::session_attach`]:
+//! the same claim, the same frames on the same channel, but the bytes come
+//! from the daemon's socket and nothing is spawned. Each output frame is
+//! acknowledged once it is handed to the window, which is what keeps the
+//! daemon reading the pty — and a flood from filling memory on either side.
+//!
+//! What the pane says about itself is heard here, while a window is on it:
+//! its blocks, its folder, its title. With no window, the daemon keeps the
+//! history and the next attach replays it; hearing it then too is R2b-2's.
+
+use std::os::unix::net::UnixStream;
+use std::sync::{Arc, Mutex};
+
+use devpit_ptyd::frame::{self, Frame, Kind};
+use devpit_rpc::{ErrorCode, RpcError};
+use portable_pty::PtySize;
+use tauri::ipc::{Channel, InvokeResponseBody};
+use tauri::{Emitter, State};
+
+use crate::claims::Live;
+use crate::live::Ends;
+use crate::sessions::SessionState;
+
+/// What the drain hands on: bytes for the window, and whether they are new
+/// (heard, acknowledged) or the replay of what was printed before.
+enum Heard {
+    Fresh(Vec<u8>),
+    Replay(Vec<u8>),
+    Folder(String),
+    Ended,
+}
+
+pub(crate) async fn attach(
+    webview: &tauri::Webview,
+    state: &State<'_, SessionState>,
+    pane_id: String,
+    client_id: String,
+    rows: u16,
+    cols: u16,
+    on_frame: Channel<InvokeResponseBody>,
+) -> Result<(), RpcError> {
+    let home = devpit_core::Store::root()?;
+    let pane = crate::ptyd_link::pane_number(&pane_id);
+    let stream = crate::ptyd_link::connect(&home).map_err(|err| {
+        RpcError::new(
+            ErrorCode::Unsupported,
+            format!("devpit-ptyd, which holds this terminal, did not answer: {err}"),
+        )
+    })?;
+    let reading = stream
+        .try_clone()
+        .map_err(|err| RpcError::internal(err.to_string()))?;
+
+    let claimed = state.claims.take_for(&pane_id, &client_id)?;
+    if let Some(previous) = claimed.replaced {
+        let _ = previous.stop();
+    }
+    let ring = Arc::new(Mutex::new(devpit_pty::RingBuffer::new(
+        devpit_pty::RING_BYTES,
+    )));
+    let live = Arc::new(Live {
+        client_id: client_id.clone(),
+        webview: webview.label().to_owned(),
+        ends: Ends::Ptyd {
+            pane,
+            stream: Mutex::new(stream),
+            size: Mutex::new(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            }),
+        },
+        ring: Arc::clone(&ring),
+    });
+    if !state
+        .claims
+        .install(&pane_id, claimed.generation, Arc::clone(&live))?
+    {
+        live.stop()?;
+        return Err(RpcError::new(
+            ErrorCode::Conflict,
+            "a newer client already owns that pane",
+        ));
+    }
+
+    let begun = (|| {
+        let Ends::Ptyd { stream, .. } = &live.ends else {
+            return Err(RpcError::internal("not a ptyd pane"));
+        };
+        let mut stream = stream
+            .lock()
+            .map_err(|_| RpcError::internal("ptyd stream lock"))?;
+        for one in [
+            Frame::new(pane, Kind::Attach, Vec::new()),
+            Frame::new(pane, Kind::Resize, size_bytes(rows, cols)),
+        ] {
+            frame::write(&mut *stream, &one).map_err(|err| RpcError::internal(err.to_string()))?;
+        }
+        Ok(())
+    })();
+    if let Err(err) = begun {
+        state.claims.forget_exactly(&pane_id, &live);
+        let _ = state.claims.release(&pane_id, &client_id);
+        return Err(err);
+    }
+
+    let (heard_tx, mut heard) = tokio::sync::mpsc::channel::<Heard>(64);
+    std::thread::spawn(move || drain(reading, pane, heard_tx));
+
+    let app = state.app().clone();
+    let mut scanner = devpit_pty::Scanner::new();
+    while let Some(one) = heard.recv().await {
+        let bytes = match one {
+            Heard::Fresh(bytes) => {
+                crate::blocks::heard(&app, &pane_id, &bytes);
+                // The clipboard is the attached side's to hear, as with tmux.
+                scanner.scan(&bytes, |told| {
+                    if !crate::tap::heard_by_tap(&told) {
+                        let _ =
+                            app.emit("terminal:happening", crate::happening::said(&pane_id, told));
+                    }
+                });
+                let _ = acknowledge(&live, pane, bytes.len());
+                bytes
+            }
+            Heard::Replay(bytes) => bytes,
+            Heard::Folder(cwd) => {
+                crate::tap::report(&app, &pane_id, devpit_pty::Told::Cwd(cwd));
+                continue;
+            }
+            Heard::Ended => break,
+        };
+        if let Ok(mut ring) = ring.lock() {
+            ring.write(&bytes);
+        }
+        if on_frame.send(InvokeResponseBody::Raw(bytes)).is_err() {
+            break;
+        }
+    }
+
+    live.stop()?;
+    state.claims.forget_exactly(&pane_id, &live);
+    let _ = state.claims.release(&pane_id, &client_id);
+    Ok(())
+}
+
+fn size_bytes(rows: u16, cols: u16) -> Vec<u8> {
+    let mut bytes = rows.to_le_bytes().to_vec();
+    bytes.extend_from_slice(&cols.to_le_bytes());
+    bytes
+}
+
+fn acknowledge(live: &Live, pane: u32, bytes: usize) -> std::io::Result<()> {
+    let Ends::Ptyd { stream, .. } = &live.ends else {
+        return Ok(());
+    };
+    let mut stream = stream
+        .lock()
+        .map_err(|_| std::io::Error::other("ptyd stream lock"))?;
+    frame::write(
+        &mut *stream,
+        &Frame::new(pane, Kind::Ack, (bytes as u32).to_le_bytes().to_vec()),
+    )
+}
+
+/// The socket's frames for `pane`, until it ends or the connection does.
+fn drain(mut stream: UnixStream, pane: u32, heard: tokio::sync::mpsc::Sender<Heard>) {
+    loop {
+        let one = match frame::read(&mut stream) {
+            Ok(Some(one)) if one.pane == pane => one,
+            Ok(Some(_)) => continue,
+            Ok(None) | Err(_) => break,
+        };
+        let passed = match one.kind() {
+            Some(Kind::Output) => Heard::Fresh(one.bytes),
+            Some(Kind::Replay) => Heard::Replay(one.bytes),
+            Some(Kind::Cwd) => Heard::Folder(String::from_utf8_lossy(&one.bytes).into_owned()),
+            Some(Kind::Exited | Kind::Refused) => Heard::Ended,
+            _ => continue,
+        };
+        let ended = matches!(passed, Heard::Ended);
+        if heard.blocking_send(passed).is_err() || ended {
+            return;
+        }
+    }
+    let _ = heard.blocking_send(Heard::Ended);
+}

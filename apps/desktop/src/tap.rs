@@ -368,9 +368,13 @@ pub(crate) fn listen(state: &State<SessionState>, project_id: &str, layout: &Ses
     };
     let session = devpit_tmux::Server::session_name(project_id);
     let blocks = tauri::Manager::try_state::<crate::blocks::Blocks>(state.app());
-    for (leaf_id, _) in layout.tree.leaves() {
+    for (leaf_id, target) in layout.tree.leaves() {
         if let Some(blocks) = &blocks {
             blocks.belongs(leaf_id, project_id);
+        }
+        // Heard on its attach instead: there is no tmux window to pipe.
+        if crate::ptyd_link::is_ptyd(target) {
+            continue;
         }
         let target = devpit_tmux::Server::target(&session, leaf_id);
         state

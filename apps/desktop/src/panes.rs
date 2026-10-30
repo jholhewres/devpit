@@ -11,7 +11,6 @@
 //! front's to break. It is written down in `06-o-que-o-layout-pediu.md` for
 //! the step that joins the two.
 
-use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use devpit_rpc::{ErrorCode, PaneSize, RpcError};
@@ -36,16 +35,10 @@ pub fn session_write(
     data: String,
 ) -> Result<PaneWritten, RpcError> {
     let live = state.claims.live(&pane_id)?;
-    let mut writer = live
-        .writer
-        .lock()
-        .map_err(|_| RpcError::internal("writer lock"))?;
-    let bytes = data.len() as u32;
-    writer
-        .write_all(data.as_bytes())
-        .and_then(|_| writer.flush())
-        .map_err(|err| RpcError::internal(err.to_string()))?;
-    Ok(PaneWritten { bytes })
+    live.write(data.as_bytes())?;
+    Ok(PaneWritten {
+        bytes: data.len() as u32,
+    })
 }
 
 /// Response of `session.write`.
@@ -68,25 +61,7 @@ pub fn session_resize(
     rows: u16,
     cols: u16,
 ) -> Result<PaneSize, RpcError> {
-    let live = state.claims.live(&pane_id)?;
-    let master = live
-        .master
-        .lock()
-        .map_err(|_| RpcError::internal("master lock"))?;
-    master
-        .resize(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|err| RpcError::internal(err.to_string()))?;
-
-    // Asked back rather than echoed: the kernel is what decides, and it is
-    // the only thing that can be asked honestly.
-    let applied = master
-        .get_size()
-        .map_err(|err| RpcError::internal(err.to_string()))?;
+    let applied = state.claims.live(&pane_id)?.resize(rows, cols)?;
     Ok(PaneSize {
         rows: applied.rows,
         cols: applied.cols,
@@ -194,7 +169,14 @@ pub async fn session_attach(
     // Kept by webview label: a reload of that page ends this attach.
     let state = tauri::Manager::state::<SessionState>(&webview);
     // Which tab draws it does not matter here; that it is this project's does.
-    crate::sessions::holding(&project_id, &pane_id)?;
+    let layout = crate::sessions::holding(&project_id, &pane_id)?;
+    #[cfg(unix)]
+    if crate::ptyd_link::leaf_is_ptyd(&layout, &pane_id) {
+        return crate::ptyd_attach::attach(
+            &webview, &state, pane_id, client_id, rows, cols, on_frame,
+        )
+        .await;
+    }
 
     let argv = crate::sessions::attach_argv(&project_id, &pane_id)?;
     let mut builder = CommandBuilder::new(&argv[0]);
@@ -258,21 +240,19 @@ pub async fn session_attach(
     let live = Arc::new(Live {
         client_id: client_id.clone(),
         webview: webview.label().to_owned(),
-        writer: Mutex::new(io.writer),
-        master: Mutex::new(io.master),
-        killer: Mutex::new(io.killer),
+        ends: crate::live::Ends::Pty {
+            writer: Mutex::new(io.writer),
+            master: Mutex::new(io.master),
+            killer: Mutex::new(io.killer),
+            pid: io.pid,
+        },
         ring,
-        pid: io.pid,
     });
     if !state
         .claims
         .install(&pane_id, claimed.generation, Arc::clone(&live))?
     {
-        let _ = live
-            .killer
-            .lock()
-            .map_err(|_| RpcError::internal("killer lock"))?
-            .kill();
+        live.stop()?;
         return Err(RpcError::new(
             ErrorCode::Conflict,
             "a newer client already owns that pane",

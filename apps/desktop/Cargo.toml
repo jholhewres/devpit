@@ -9,6 +9,7 @@ license.workspace = true
 devpit-core = { path = "../../crates/core" }
 devpit-git = { path = "../../crates/git" }
 devpit-pty = { path = "../../crates/pty" }
+devpit-ptyd = { path = "../../crates/ptyd" }
 devpit-rpc = { path = "../../crates/rpc" }
 devpit-tmux = { path = "../../crates/tmux" }
 devpit-agentcli = { path = "../../crates/agentcli" }

@@ -137,13 +137,15 @@ fn live_of(client_id: &str, webview: &str) -> Arc<Live> {
     Arc::new(Live {
         client_id: client_id.to_owned(),
         webview: webview.to_owned(),
-        writer: Mutex::new(Box::new(std::io::sink())),
-        master: Mutex::new(Box::new(Nowhere)),
-        killer: Mutex::new(Box::new(Nowhere)),
+        ends: crate::live::Ends::Pty {
+            writer: Mutex::new(Box::new(std::io::sink())),
+            master: Mutex::new(Box::new(Nowhere)),
+            killer: Mutex::new(Box::new(Nowhere)),
+            pid: None,
+        },
         ring: Arc::new(Mutex::new(devpit_pty::RingBuffer::new(
             devpit_pty::RING_BYTES,
         ))),
-        pid: None,
     })
 }
 

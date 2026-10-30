@@ -57,15 +57,36 @@ pub(crate) fn session_split_now(
     }
     // Where the pane it splits from stands: a card's tab is in its worktree,
     // and the project root would put the new pane on another branch.
-    let cwd = match server
-        .pane_path(&session, &leaf_id)
-        .filter(|path| path.is_dir())
-    {
+    let from_ptyd = crate::ptyd_link::leaf_is_ptyd(&current, &leaf_id);
+    let stood = match from_ptyd {
+        true => crate::blocks::last_cwd(state.app(), &project_id, &leaf_id),
+        false => server.pane_path(&session, &leaf_id),
+    };
+    let cwd = match stood.filter(|path| path.is_dir()) {
         Some(path) => path,
         None => locate_cwd(&project_id, worktree_id.as_deref())?,
     };
 
     let new_id = format!("leaf_{}", Ulid::generate());
+    // A split of a plain terminal in devpit-ptyd is one too, while the
+    // person keeps it on.
+    let in_ptyd = from_ptyd
+        .then(|| {
+            let store = store().ok()?;
+            crate::sessions::in_ptyd(&store, &project_id, &new_id, &cwd)
+        })
+        .flatten();
+    if let Some(target) = in_ptyd {
+        return split_into(
+            &project_id,
+            &tab_id,
+            current,
+            &leaf_id,
+            direction,
+            &new_id,
+            target,
+        );
+    }
     let server = match devpit_core::Store::open_default() {
         Ok(store) => {
             server.with_window_env(crate::checkout::shared_env_at(&store, &project_id, &cwd))
@@ -86,21 +107,40 @@ pub(crate) fn session_split_now(
     if let Some(blocks) = tauri::Manager::try_state::<crate::blocks::Blocks>(state.app()) {
         blocks.belongs(&new_id, &project_id);
     }
-    let new_leaf = LayoutNode::leaf(
-        new_id.clone(),
-        devpit_tmux::Server::target(&session, &new_id),
-    );
+    let target = devpit_tmux::Server::target(&session, &new_id);
+    split_into(
+        &project_id,
+        &tab_id,
+        current,
+        &leaf_id,
+        direction,
+        &new_id,
+        target,
+    )
+}
+
+/// The tree with `leaf_id` split and `new_id` beside it, kept and answered.
+fn split_into(
+    project_id: &str,
+    tab_id: &str,
+    current: SessionLayout,
+    leaf_id: &str,
+    direction: SplitDirection,
+    new_id: &str,
+    target: String,
+) -> Result<SessionLayout, RpcError> {
+    let new_leaf = LayoutNode::leaf(new_id.to_owned(), target);
     let tree = current
         .tree
-        .split_leaf(&leaf_id, direction, new_leaf)
+        .split_leaf(leaf_id, direction, new_leaf)
         .ok_or_else(|| RpcError::internal("the leaf vanished while splitting"))?;
 
     let layout = SessionLayout {
-        project_id,
-        focused_id: new_id,
+        project_id: project_id.to_owned(),
+        focused_id: new_id.to_owned(),
         tree,
     };
-    persist(&store()?, &tab_id, &layout)?;
+    persist(&store()?, tab_id, &layout)?;
     Ok(layout)
 }
 
@@ -157,6 +197,10 @@ pub(crate) fn session_close_leaf_now(
 
     // The window goes after the tree is known to be closable, so a refusal
     // never leaves a session whose layout and tmux disagree.
+    if crate::ptyd_link::leaf_is_ptyd(&current, &leaf_id) {
+        crate::ptyd_link::close(std::slice::from_ref(&leaf_id));
+        return closed_leaf(app, &project_id, &tab_id, current, &leaf_id, tree);
+    }
     let session = devpit_tmux::Server::session_name(&project_id);
     let server = tmux_server()?;
     // Stop listening before the window goes: the tap holds a fifo and a
@@ -168,10 +212,23 @@ pub(crate) fn session_close_leaf_now(
     );
     crate::tap::stop_whatever_runs(&server, &session, &[leaf_id.as_str()]);
     server.kill_window(&session, &leaf_id).map_err(tmux_err)?;
-    crate::blocks::closed(&app, &project_id, &leaf_id);
+    closed_leaf(app, &project_id, &tab_id, current, &leaf_id, tree)
+}
+
+/// What closing a leaf leaves behind once its terminal is gone, whichever
+/// held it: its blocks, its agent, and the tree without it.
+fn closed_leaf(
+    app: tauri::AppHandle,
+    project_id: &str,
+    tab_id: &str,
+    current: SessionLayout,
+    leaf_id: &str,
+    tree: LayoutNode,
+) -> Result<SessionLayout, RpcError> {
+    crate::blocks::closed(&app, project_id, leaf_id);
     // A pane closed on purpose is not one to start an agent in again.
-    let _ = store()?.forget_pane_agent(&leaf_id);
-    crate::card_activity::panes_closed(&app, std::slice::from_ref(&leaf_id));
+    let _ = store()?.forget_pane_agent(leaf_id);
+    crate::card_activity::panes_closed(&app, &[leaf_id.to_owned()]);
 
     // Focus follows the tree when it pointed at what just left.
     let focused_id = if current.focused_id == leaf_id {
@@ -180,11 +237,11 @@ pub(crate) fn session_close_leaf_now(
         current.focused_id
     };
     let layout = SessionLayout {
-        project_id,
+        project_id: project_id.to_owned(),
         focused_id,
         tree,
     };
-    persist(&store()?, &tab_id, &layout)?;
+    persist(&store()?, tab_id, &layout)?;
     Ok(layout)
 }
 
@@ -292,9 +349,19 @@ pub(crate) fn close_tab(
         .into_iter()
         .map(|(leaf, _)| leaf.to_owned())
         .collect();
+    let ptyd = crate::ptyd_link::ptyd_leaves(&layout);
+    crate::ptyd_link::close(&ptyd);
+    for leaf_id in &ptyd {
+        crate::blocks::closed(state.app(), project_id, leaf_id);
+        let _ = store()?.forget_pane_agent(leaf_id);
+    }
     let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(project_id);
-    let leaves: Vec<&str> = closed.iter().map(String::as_str).collect();
+    let leaves: Vec<&str> = closed
+        .iter()
+        .filter(|leaf| !ptyd.contains(leaf))
+        .map(String::as_str)
+        .collect();
     for leaf_id in &leaves {
         let target = devpit_tmux::Server::target(&session, leaf_id);
         state.taps.forget(&server, leaf_id, &target);

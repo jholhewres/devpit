@@ -177,6 +177,9 @@ mod profile_waiting;
 mod project_naming;
 mod project_proposals;
 mod projects;
+#[cfg(unix)]
+mod ptyd_attach;
+mod ptyd_link;
 mod question;
 mod reading_path;
 mod rebound;
@@ -532,6 +535,10 @@ fn agent_door() -> Option<i32> {
     // `devpit hook` is how an agent's hooks reach the app on Windows, where
     // the `curl` line the settings carry elsewhere has nothing to run on.
     let hook = cfg!(windows) && first == "hook";
+    // The terminal daemon, run from the copy devpit installs of itself.
+    if first == "ptyd" {
+        return Some(devpit_ptyd::run(std::env::args_os().nth(2)));
+    }
     if first != "agent" && first != "mcp" && !hook {
         return None;
     }

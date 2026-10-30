@@ -37,6 +37,7 @@ pub const LOCAL: &[(&str, &str)] = &[
     (key::ONBOARDED_AT, "this machine's first run"),
     (key::AUTO_UPDATE, "how this install updates itself"),
     (key::WORKTREE_BASE, "a path on this machine"),
+    (key::TERMINAL_BACKEND, "a daemon running on this machine"),
     (key::OPEN_IN_APPS, "the apps installed here"),
     (key::WORKTREES_HIDDEN, "this machine's worktrees"),
     (
