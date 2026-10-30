@@ -179,6 +179,25 @@ describe("a chat's reads of the transcript", () => {
     expect(result.current.messages[1]).toBe(before[1])
   })
 
+  it('after a turn woken behind the chat’s own, read from before that turn: the woken one was saved first', async () => {
+    saved.messages = [message('msg_1')]
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    act(() => result.current.say('hello'))
+    act(() => woke.handler?.('conv_a'))
+    act(() => joins[0]!.onFrame(said('msg_mine')))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_mine'))
+
+    saved.after = [message('msg_woken'), message('msg_mine')]
+    await act(async () =>
+      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null }),
+    )
+    await waitFor(() => expect(joins).toHaveLength(2))
+    await act(async () => joins[1]!.ends(true))
+    expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_1')
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_woken'))
+  })
+
   it('leave rewind working: the head names the turns, and rewinding forks', async () => {
     const { result } = renderHook(() => useChat('conv_a'))
     await waitFor(() => expect(result.current.profileId).toBe('claude'))

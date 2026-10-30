@@ -57,6 +57,7 @@ pub(crate) fn chat_history_now(
     let messages =
         crate::adopted_history::or_backfilled(messages, head.as_ref(), &project_id, &file);
     let card = crate::card_chat::conversation_card(&crate::projects::store()?, &conversation_id)?;
+    let told = crate::chat_window::conversation_head(head.as_ref());
     Ok(Conversation {
         id: conversation_id,
         project_id,
@@ -73,28 +74,16 @@ pub(crate) fn chat_history_now(
         permission: head.as_ref().and_then(|head| head.permission.clone()),
         effort: head.as_ref().and_then(|head| head.effort.clone()),
         cwd: head.as_ref().and_then(|head| head.cwd.clone()),
-        session_id: head.as_ref().and_then(|head| head.session_id.clone()),
-        cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
-        context: head.as_ref().and_then(|head| head.context),
-        rewindable: rewindable(head.as_ref()),
+        session_id: told.session_id,
+        cost_usd: told.cost_usd,
+        context: told.context,
+        rewindable: told.rewindable,
         created_at: head
             .map(|head| head.created_at)
             .or_else(|| messages.first().map(|first| first.created_at))
             .unwrap_or_else(now),
         messages,
     })
-}
-
-/// The turns a conversation can be rewound to, from its head.
-pub(crate) fn rewindable(head: Option<&devpit_agentcli::head::Head>) -> Vec<String> {
-    head.map(|head| {
-        head.rewind
-            .anchors
-            .iter()
-            .map(|at| at.turn_id.clone())
-            .collect()
-    })
-    .unwrap_or_default()
 }
 
 /// `chat.send` — one turn, streamed as it happens.

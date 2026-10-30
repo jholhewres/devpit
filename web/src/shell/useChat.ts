@@ -279,6 +279,8 @@ export function useChat(conversationId: string): Chat {
         effort,
       }
       const now = opened.current
+      /* A turn woken while this one waits is saved before it: read from here. */
+      const drawn = shown.current.at(-1)?.id ?? null
       const { push, flush } = batched((frames) => setMessages((was) => frames.reduce(applied, was)))
       let heard = false
       const started = send(turn, (frame) => {
@@ -335,7 +337,7 @@ export function useChat(conversationId: string): Chat {
           setFixed(profileId)
           if (now.woke) {
             now.woke = false
-            rejoined(project.id, true)
+            rejoined(project.id, true, drawn)
           }
         })
     },

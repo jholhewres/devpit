@@ -28,7 +28,7 @@ fn an_active_project_gets_its_skills_its_own_layer_first() {
     std::fs::create_dir_all(dir.path().join(".devpit/devflow")).expect("folder");
     std::fs::write(dir.path().join(".devpit/devflow/devflow.yaml"), yaml).expect("yaml");
     let here = project("prj_devflow_skills", dir.path());
-    // The store is the developer's own: a run stopped half way left the click.
+    // The store is shared with earlier runs, which leave this switch-on behind.
     let store = crate::projects::store().expect("store");
     crate::devflow_asks::remember(&store, &here.id, Ask::Enable, false).expect("forgot");
     let ask = |method: &str, params: Value| {

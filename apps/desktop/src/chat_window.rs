@@ -7,7 +7,7 @@ use devpit_rpc::{
     Conversation, ConversationAfter, ConversationHead, ErrorCode, Message, Part, RpcError,
 };
 
-use crate::chat::{chat_history_now, rewindable};
+use crate::chat::chat_history_now;
 
 /// `chat.history` — everything said in this conversation, in order.
 #[tauri::command]
@@ -29,6 +29,27 @@ pub async fn chat_history(
     .await
 }
 
+/// What a conversation's head says of it: its session, what it cost, how
+/// full its context was, and the turns it can be rewound to.
+pub(crate) fn conversation_head(
+    head: Option<&devpit_agentcli::head::Head>,
+) -> devpit_rpc::ConversationHead {
+    devpit_rpc::ConversationHead {
+        session_id: head.and_then(|head| head.session_id.clone()),
+        cost_usd: head.map(|head| head.cost_usd).unwrap_or_default(),
+        context: head.and_then(|head| head.context),
+        rewindable: head
+            .map(|head| {
+                head.rewind
+                    .anchors
+                    .iter()
+                    .map(|at| at.turn_id.clone())
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
+}
+
 /// `chat.head` — what a turn's end needs, without reading the conversation.
 #[tauri::command]
 #[specta::specta]
@@ -40,12 +61,7 @@ pub async fn chat_head(
         conversation(&conversation_id)?;
         let sessions = crate::projects::project_home(&project_id)?.sessions();
         let head = read_head(&head_path(&sessions, &conversation_id));
-        Ok(ConversationHead {
-            session_id: head.as_ref().and_then(|head| head.session_id.clone()),
-            cost_usd: head.as_ref().map(|head| head.cost_usd).unwrap_or_default(),
-            context: head.as_ref().and_then(|head| head.context),
-            rewindable: rewindable(head.as_ref()),
-        })
+        Ok(conversation_head(head.as_ref()))
     })
     .await
 }
