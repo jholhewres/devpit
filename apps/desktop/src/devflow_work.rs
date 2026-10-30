@@ -204,3 +204,7 @@ impl WorkItems for Board<'_> {
 #[cfg(test)]
 #[path = "devflow_work_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "devflow_flow_tests.rs"]
+mod flow_tests;
