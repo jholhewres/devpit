@@ -1799,6 +1799,13 @@ export const commands = {
 	 *  has to predict what a write did to the rest of it.
 	 */
 	settingsWrite: (theme: "system" | "light" | "dark" | null, automaticUpdates: boolean | null, confirmStop: boolean | null, terminalContrast: number | null, focusMode: boolean | null, errorReports: boolean | null, island: boolean | null) => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_write", { theme, automaticUpdates, confirmStop, terminalContrast, focusMode, errorReports, island })),
+	/**  `terminal.daemon` — whether new plain terminals go to devpit-ptyd here. */
+	terminalDaemonRead: () => typedError<boolean, RpcError>(__TAURI_INVOKE("terminal_daemon_read")),
+	/**
+	 *  `terminal.daemon_set` — turns it on or off for new terminals; the ones
+	 *  already open stay where they are.
+	 */
+	terminalDaemonSet: (on: boolean) => typedError<boolean, RpcError>(__TAURI_INVOKE("terminal_daemon_set", { on })),
 	/**
 	 *  `settings.finish_onboarding` — the first run is done.
 	 * 

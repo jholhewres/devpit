@@ -34,6 +34,29 @@ pub(crate) fn wanted(store: &Store) -> bool {
             .is_some_and(|value| value.trim() == BACKEND)
 }
 
+/// `terminal.daemon` — whether new plain terminals go to devpit-ptyd here.
+#[tauri::command]
+#[specta::specta]
+pub async fn terminal_daemon_read() -> Result<bool, devpit_rpc::RpcError> {
+    crate::off_main::blocking(|| Ok(wanted(&Store::open_default()?))).await
+}
+
+/// `terminal.daemon_set` — turns it on or off for new terminals; the ones
+/// already open stay where they are.
+#[tauri::command]
+#[specta::specta]
+pub async fn terminal_daemon_set(on: bool) -> Result<bool, devpit_rpc::RpcError> {
+    crate::off_main::blocking(move || {
+        let store = Store::open_default()?;
+        store.set_preference(
+            preference::TERMINAL_BACKEND,
+            if on { BACKEND } else { "tmux" },
+        )?;
+        Ok(wanted(&store))
+    })
+    .await
+}
+
 /// The target a ptyd pane is kept under in the layout.
 pub(crate) fn target(leaf_id: &str) -> String {
     format!("{TARGET_PREFIX}{leaf_id}")

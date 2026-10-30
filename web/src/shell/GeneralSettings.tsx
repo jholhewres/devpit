@@ -9,6 +9,7 @@ import { OpenApps } from './OpenApps'
 import { PauseSettings } from './PauseSettings'
 import { PrefSwitch } from './PrefSwitch'
 import { RemoteSettings } from './RemoteSettings'
+import { TerminalDaemonSetting } from './TerminalDaemonSetting'
 import type { Flag } from './settingsFlags'
 import { UpdateSettings } from './UpdateSettings'
 import { VoiceSettings } from './VoiceSettings'
@@ -58,6 +59,7 @@ export function GeneralSettings({ on, set }: { on: (field: Flag) => boolean; set
       <div className="acc__sub">On this desktop</div>
       <DeskSettings />
       <PrefSwitch on={on('confirmStop')} onFlip={flip('confirmStop')} title="Ask before stopping a terminal" said={<>A terminal still running something asks before it is closed. Its &ldquo;Don&rsquo;t ask again&rdquo; turns this off; this turns it back on.</>} />
+      <TerminalDaemonSetting />
       <OpenApps />
 
       <div className="acc__sub">Chats</div>
