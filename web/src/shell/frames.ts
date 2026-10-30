@@ -43,7 +43,7 @@ export function appliedAll(messages: readonly Message[], frames: readonly Frame[
         const message = current()[at]!
         const last = message.parts[message.parts.length - 1]
         const next = frame.part
-        if (runsOn(last, next)) {
+        if (next.kind === 'text' && runsOn(last, next)) {
           const pieces = pending.get(at)
           if (pieces) pieces.push(next.text)
           else pending.set(at, [next.text])
@@ -110,12 +110,11 @@ export const joined = (parts: readonly Part[]): Part[] => parts.reduce<Part[]>(m
 /* Consecutive text is one paragraph, not one part per chunk — unless the two
    came from different speakers: a subagent's words are not the agent's. */
 type Text = Extract<Part, { kind: 'text' }>
-const runsOn = (last: Part | undefined, next: Part): next is Text =>
-  last?.kind === 'text' && next.kind === 'text' && last.parent === next.parent
+const runsOn = (last: Part | undefined, next: Text): last is Text => last?.kind === 'text' && last.parent === next.parent
 
 function merged(parts: readonly Part[], next: Part): Part[] {
   const last = parts[parts.length - 1]
-  if (last?.kind === 'text' && runsOn(last, next)) {
+  if (next.kind === 'text' && runsOn(last, next)) {
     return [...parts.slice(0, -1), { kind: 'text', text: last.text + next.text, parent: last.parent }]
   }
   return [...parts, next]

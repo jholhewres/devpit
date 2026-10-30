@@ -59,8 +59,46 @@ describe('a long turn streaming into a long thread', () => {
     const start = appliedAll(watched, turn(1).slice(0, 1))
     reads = 0
     appliedAll(start, turn(60).slice(1))
-    // One walk is 2000 reads; a walk per frame would be 60 of them.
-    expect(reads).toBeLessThan(3 * 2000)
+    // A walk is 2000 reads, and each tool call's update is one; a walk per frame would be 60.
+    const calls = turn(60).filter((frame) => frame.type === 'call_state').length
+    expect(reads).toBeLessThan((calls + 1) * 2000)
+  })
+
+  it('copies the thread once a batch, not once a frame', () => {
+    const start = appliedAll(thread(2000), turn(1).slice(0, 1))
+    /* Every copy of a long list iterates it; count those of the thread's length or more. */
+    const iterate = Array.prototype[Symbol.iterator]
+    let copies = 0
+    Array.prototype[Symbol.iterator] = function (this: unknown[]) {
+      if (this.length >= 2000) copies += 1
+      return iterate.call(this)
+    }
+    try {
+      appliedAll(start, turn(60).slice(1))
+    } finally {
+      Array.prototype[Symbol.iterator] = iterate
+    }
+    expect(copies).toBe(1)
+  })
+
+  it('joins the text that runs on once a batch, not once a piece', () => {
+    const live = appliedAll([], [turn(1)[0]!, { type: 'part', message_id: 'live', part: { kind: 'text', text: 'first ', parent: null } } as Frame])
+    /* Every join rebuilds the live message's parts without their last; count those. */
+    const slice = Array.prototype.slice
+    let rebuilt = 0
+    Array.prototype.slice = function (this: unknown[], ...range: [number?, number?]) {
+      if (range[0] === 0 && range[1] === -1) rebuilt += 1
+      return slice.apply(this, range)
+    }
+    const pieces = Array.from({ length: 40 }, () => ({ type: 'part', message_id: 'live', part: { kind: 'text', text: 'word ', parent: null } }) as Frame)
+    let after: readonly Message[]
+    try {
+      after = appliedAll(live, pieces)
+    } finally {
+      Array.prototype.slice = slice
+    }
+    expect(after.at(-1)?.parts).toEqual([{ kind: 'text', text: `first ${'word '.repeat(40)}`, parent: null }])
+    expect(rebuilt).toBe(1)
   })
 
   it('costs each batch of frames well under five milliseconds on 2000 messages', () => {
