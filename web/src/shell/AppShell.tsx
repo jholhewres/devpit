@@ -8,6 +8,7 @@ import { Overlays } from './Overlays'
 import { ProjectRail } from './ProjectRail'
 import { Panes } from './Panes'
 import { RemindersBanner } from './RemindersBanner'
+import { QuotaBanner } from './QuotaBanner'
 import { ResizeEdges } from './ResizeEdges'
 import { RightPanel } from './RightPanel'
 import { Sidebar } from './Sidebar'
@@ -105,6 +106,7 @@ function Window(): React.JSX.Element {
       <ContextMenu />
       <TopBar onAddProject={() => setAdding(true)} maximized={maximized} />
       <RemindersBanner />
+      <QuotaBanner />
       <DevflowAsks />
 
       <div className="win" data-side={side ? 'open' : 'closed'} data-files={files ? 'open' : 'closed'}>

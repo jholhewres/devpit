@@ -31,6 +31,7 @@ export type PrefsPane =
   | 'storage'
   | 'worktrees'
   | 'usage'
+  | 'accounts'
   | 'decisions'
   | 'devflow'
   | 'channels'

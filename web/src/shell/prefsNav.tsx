@@ -159,6 +159,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
         ),
       },
       {
+        id: 'accounts',
+        label: 'Accounts',
+        about: 'claude config directory quota limit switch five hour weekly remote control',
+        icon: (
+          <svg {...stroke}><circle cx="9" cy="8" r="3" /><path d="M3 20v-1a5 5 0 0 1 10 0v1" /><circle cx="17" cy="9" r="2.5" /><path d="M15 20v-1a4 4 0 0 1 6-3.5" /></svg>
+        ),
+      },
+      {
         id: 'usage',
         label: 'Usage',
         about: 'spend cost tokens budget limits',

@@ -11,6 +11,7 @@ import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
 import { ProviderRows } from './ProviderRows'
 import { flagOn, type Flag } from './settingsFlags'
+import { AccountsSettings } from './AccountsSettings'
 import { ChannelsPane } from './ChannelsPane'
 import { DecisionsSettings } from './DecisionsSettings'
 import { DevflowSettings } from './DevflowSettings'
@@ -190,9 +191,8 @@ export function Settings({
           <section className="prefs__in prefs__in--wide" hidden={pane !== 'skills'}>
             <SkillsPane />
           </section>
-          <section className="prefs__in" hidden={pane !== 'usage'}>
-            <Usage />
-          </section>
+          <section className="prefs__in" hidden={pane !== 'usage'}><Usage /></section>
+          <section className="prefs__in" hidden={pane !== 'accounts'}><AccountsSettings /></section>
       </div>
     </div>
   )
