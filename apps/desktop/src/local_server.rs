@@ -93,12 +93,14 @@ pub(crate) fn origin_allowed(origin: Option<&str>, place: &Place) -> bool {
     }
 }
 
-/// The cookie's value in a `Cookie` header, if it is there.
-pub(crate) fn cookie_of(header: Option<&str>) -> Option<&str> {
-    header?
+/// Every value of the cookie in a `Cookie` header: a sibling `.localhost`
+/// server can plant one of the same name, so the first is not always ours.
+pub(crate) fn cookies_of(header: Option<&str>) -> impl Iterator<Item = &str> {
+    header
+        .unwrap_or_default()
         .split(';')
         .map(str::trim)
-        .find_map(|pair| pair.strip_prefix(&format!("{COOKIE}=")))
+        .filter_map(|pair| pair.strip_prefix(COOKIE)?.strip_prefix('='))
 }
 
 /// Two secrets compared without leaking where they first differ.
@@ -157,9 +159,10 @@ pub(crate) fn door(
             _ => Door::Unauthorized,
         };
     }
-    match cookie_of(request.header("cookie")) {
-        Some(said) if same_secret(said, session) => Door::In,
-        _ => Door::Unauthorized,
+    if cookies_of(request.header("cookie")).any(|said| same_secret(said, session)) {
+        Door::In
+    } else {
+        Door::Unauthorized
     }
 }
 

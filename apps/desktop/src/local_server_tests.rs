@@ -60,6 +60,17 @@ fn without_the_cookie_or_with_a_wrong_one_the_door_says_401() {
         ),
         Door::In
     );
+    let planted = format!("{COOKIE}=attacker; {COOKIE}={SESSION}");
+    let shadowed = asked(
+        "POST",
+        "/rpc/project_list",
+        &[("host", "127.0.0.1:41234"), ("cookie", planted.as_str())],
+    );
+    assert_eq!(
+        door(&shadowed, "", &place(), TOKEN, SESSION),
+        Door::In,
+        "a cookie planted first under the same name does not sign the browser out"
+    );
     let token_as_cookie = asked(
         "POST",
         "/rpc/project_list",
