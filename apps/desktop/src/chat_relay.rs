@@ -284,7 +284,17 @@ pub async fn chat_rejoin(
     conversation_id: String,
     on_frame: Channel<Frame>,
 ) -> Result<bool, RpcError> {
-    Ok(relay.rejoin(&conversation_id, on_frame).await)
+    Ok(relay.rejoin(&conversation_id, for_window(on_frame)).await)
+}
+
+/// A window's channel that is sent each frame cut, as the history it read was.
+pub(crate) fn for_window(window: Channel<Frame>) -> Channel<Frame> {
+    Channel::new(move |body: InvokeResponseBody| {
+        if let Ok(frame) = body.deserialize::<Frame>() {
+            let _ = window.send(devpit_rpc::cut::cut_frame(frame));
+        }
+        Ok(())
+    })
 }
 
 /// `chat.leave` — stops sending a chat that has gone what it joined.

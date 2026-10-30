@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use devpit_rpc::Frame;
+use devpit_rpc::{Frame, Part};
 use tauri::ipc::{Channel, InvokeResponseBody};
 
 use super::Relay;
@@ -146,4 +146,43 @@ fn a_streamed_answer_is_relayed_whole_to_a_late_joiner() {
         panic!("not a part")
     };
     assert_eq!(part, &text("abc", None));
+}
+
+#[test]
+fn a_window_is_sent_a_long_output_cut_and_the_relay_keeps_it_whole() {
+    let heard = Arc::new(Mutex::new(Vec::<Frame>::new()));
+    let into = heard.clone();
+    let window = Channel::new(move |body: InvokeResponseBody| {
+        into.lock()
+            .unwrap()
+            .push(body.deserialize::<Frame>().unwrap());
+        Ok(())
+    });
+    let long = "y".repeat(50_000);
+    let frame = Frame::Part {
+        message_id: "m".to_owned(),
+        part: Part::ToolResult {
+            call_id: "c".to_owned(),
+            output: long.clone(),
+            is_error: false,
+            parent: None,
+        },
+    };
+    super::for_window(window).send(frame.clone()).unwrap();
+    let Frame::Part {
+        part: Part::ToolResult { output, .. },
+        ..
+    } = &heard.lock().unwrap()[0]
+    else {
+        panic!("a tool result");
+    };
+    assert!(output.len() < 5_000 && output.contains(devpit_rpc::cut::CUT_MARK));
+    let Frame::Part {
+        part: Part::ToolResult { output: kept, .. },
+        ..
+    } = frame
+    else {
+        unreachable!()
+    };
+    assert_eq!(kept, long);
 }

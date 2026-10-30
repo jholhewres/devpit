@@ -61,7 +61,7 @@ export const Turn = memo(function Turn({
 
   return (
     <article className="turn">
-      <Acts parts={doing} live={message.streaming} />
+      <Acts parts={doing} live={message.streaming} messageId={message.id} />
       <TurnDelegations parts={message.parts} />
       <TurnDrafts parts={message.parts} />
       <TurnApps parts={message.parts} />

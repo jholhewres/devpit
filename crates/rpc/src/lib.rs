@@ -16,6 +16,7 @@ pub mod channels;
 pub mod chat;
 pub mod checkpoint;
 pub mod conversation;
+pub mod cut;
 pub mod decisions;
 pub mod devflow;
 pub mod devflow_screen;

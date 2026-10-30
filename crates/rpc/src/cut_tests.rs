@@ -1,0 +1,150 @@
+use super::*;
+use crate::chat::{CallState, Role};
+
+fn result(output: String) -> Part {
+    Part::ToolResult {
+        call_id: "call_1".to_owned(),
+        output,
+        is_error: false,
+        parent: None,
+    }
+}
+
+fn output_of(part: &Part) -> &str {
+    let Part::ToolResult { output, .. } = part else {
+        panic!("a tool result");
+    };
+    output
+}
+
+#[test]
+fn a_short_output_goes_whole() {
+    let small = "test passed\n".repeat(100);
+    assert!(small.len() <= WHOLE);
+    assert_eq!(cut_text(&small), None);
+    assert_eq!(cut_part(&result(small.clone())), None);
+    // A text block inside a long output is cut only when it is long itself.
+    let blocks = serde_json::json!([
+        { "type": "text", "text": small },
+        { "type": "image", "source": { "media_type": "image/png", "data": "A".repeat(8_000) } },
+    ])
+    .to_string();
+    let cut = cut_part(&result(blocks)).expect("the image is named");
+    let kept: Value = serde_json::from_str(output_of(&cut)).expect("blocks");
+    assert_eq!(kept[0]["text"], small);
+}
+
+#[test]
+fn a_long_text_keeps_its_head_and_tail_and_says_how_long_it_was() {
+    let long = format!(
+        "{}{}{}",
+        "a".repeat(HEAD),
+        "m".repeat(10_000),
+        "z".repeat(TAIL)
+    );
+    let cut = cut_part(&result(long.clone())).expect("cut");
+    let said = output_of(&cut);
+    assert!(said.starts_with(&"a".repeat(HEAD)));
+    assert!(said.ends_with(&"z".repeat(TAIL)));
+    assert!(!said.contains('m'));
+    assert!(said.contains(&format!("{CUT_MARK}{} bytes in all]", long.len())));
+    assert!(said.len() < WHOLE);
+}
+
+#[test]
+fn a_cut_inside_a_character_moves_to_its_edge() {
+    // Three-byte characters, so byte HEAD lands inside one and so does the tail.
+    let long = "€".repeat(WHOLE);
+    assert!(!long.is_char_boundary(HEAD) || !long.is_char_boundary(long.len() - TAIL));
+    let said = cut_text(&long).expect("cut");
+    // Valid UTF-8 by construction of `String`; the head and tail are whole euros.
+    let (head, rest) = said.split_once('\n').expect("head");
+    assert!(head.chars().all(|c| c == '€'));
+    let tail = rest.rsplit_once('\n').expect("tail").1;
+    assert!(tail.chars().all(|c| c == '€'));
+}
+
+#[test]
+fn an_image_is_named_with_its_size_and_loses_its_data() {
+    let data = "A".repeat(400_000);
+    let output = serde_json::json!([
+        { "type": "image", "source": { "type": "base64", "media_type": "image/png", "data": data } },
+        { "type": "text", "text": "the screen" },
+    ])
+    .to_string();
+    let cut = cut_part(&result(output)).expect("cut");
+    let blocks: Value = serde_json::from_str(output_of(&cut)).expect("still blocks");
+    assert_eq!(
+        blocks[0],
+        serde_json::json!({ "type": "image", "mime": "image/png", "bytes": 300_000, "cut": true })
+    );
+    assert_eq!(blocks[1]["text"], "the screen");
+    assert!(output_of(&cut).len() < 200);
+}
+
+#[test]
+fn a_long_text_block_beside_an_image_is_cut_on_its_own() {
+    let output = serde_json::json!([
+        { "type": "text", "text": "x".repeat(20_000) },
+    ])
+    .to_string();
+    let cut = cut_part(&result(output)).expect("cut");
+    let blocks: Value = serde_json::from_str(output_of(&cut)).expect("still blocks");
+    assert!(blocks[0]["text"].as_str().expect("text").contains(CUT_MARK));
+}
+
+#[test]
+fn a_tool_call_and_the_answer_go_whole() {
+    let call = Part::ToolCall {
+        id: "call_1".to_owned(),
+        name: "Edit".to_owned(),
+        input: "y".repeat(50_000),
+        state: CallState::Ok,
+        parent: None,
+    };
+    assert_eq!(cut_part(&call), None);
+    let said = Part::Text {
+        text: "z".repeat(50_000),
+        parent: None,
+    };
+    assert_eq!(cut_part(&said), None);
+}
+
+#[test]
+fn a_message_is_cut_part_by_part() {
+    let mut message = Message {
+        id: "m".to_owned(),
+        turn_id: None,
+        role: Role::Assistant,
+        parts: vec![result("w".repeat(9_000)), result("ok".to_owned())],
+        created_at: 0.0,
+        streaming: false,
+    };
+    cut_message(&mut message);
+    assert!(output_of(&message.parts[0]).contains(CUT_MARK));
+    assert_eq!(output_of(&message.parts[1]), "ok");
+}
+
+/// The real transcript that froze the window, cut as `chat_history` cuts it.
+/// Local only: `CUT_FIXTURE=<path to a .jsonl>`; the file is never versioned.
+#[test]
+#[ignore = "needs CUT_FIXTURE, a transcript kept outside the repository"]
+fn a_real_transcript_crosses_under_thirteen_megabytes() {
+    let path = std::env::var("CUT_FIXTURE").expect("CUT_FIXTURE");
+    let text = std::fs::read_to_string(&path).expect("the fixture");
+    let mut whole = 0;
+    let mut cut = 0;
+    let mut images = 0;
+    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+        let mut message: Message = serde_json::from_str(line).expect("a message");
+        whole += serde_json::to_string(&message).expect("json").len();
+        cut_message(&mut message);
+        let said = serde_json::to_string(&message).expect("json");
+        images += said.matches(r#"\"cut\":true"#).count();
+        assert!(!said.contains("iVBORw0KGgo"), "a PNG's data crossed");
+        cut += said.len();
+    }
+    eprintln!("whole {whole} bytes, cut {cut} bytes, {images} images named");
+    assert!(cut < 13_000_000, "{cut} bytes");
+    assert!(images > 0);
+}

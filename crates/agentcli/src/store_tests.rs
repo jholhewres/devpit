@@ -55,3 +55,38 @@ fn a_conversation_that_was_never_written_is_empty_rather_than_an_error() {
     assert!(messages.is_empty());
     assert_eq!(skipped, 0);
 }
+
+#[test]
+fn an_old_transcript_with_whole_outputs_reads_cut_and_is_not_rewritten() {
+    // A line as devpit wrote it before outputs were cut for the window: a
+    // screenshot's base64 inside a tool result.
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().join("c.jsonl");
+    let image = serde_json::json!([
+        { "type": "image", "source": { "type": "base64", "media_type": "image/png", "data": "A".repeat(200_000) } }
+    ])
+    .to_string();
+    let old = serde_json::json!({
+        "id": "m1", "turnId": "t1", "role": "assistant", "createdAt": 1.0, "streaming": false,
+        "parts": [
+            { "kind": "tool_call", "id": "call_1", "name": "Screenshot", "input": "{}", "state": "ok" },
+            { "kind": "tool_result", "call_id": "call_1", "output": image, "is_error": false }
+        ]
+    });
+    std::fs::write(&path, format!("{old}\n")).expect("write");
+    let before = std::fs::read(&path).expect("read");
+
+    let (mut messages, skipped) = read(&path);
+    assert_eq!(skipped, 0);
+    messages.iter_mut().for_each(devpit_rpc::cut::cut_message);
+    let devpit_rpc::Part::ToolResult { output, .. } = &messages[0].parts[1] else {
+        panic!("the result");
+    };
+    assert!(output.len() < 200 && output.contains(r#""cut":true"#));
+
+    assert_eq!(
+        std::fs::read(&path).expect("read"),
+        before,
+        "the transcript was rewritten"
+    );
+}

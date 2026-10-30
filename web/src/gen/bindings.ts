@@ -77,6 +77,11 @@ export const commands = {
 	/**  `chat.history` — everything said in this conversation, in order. */
 	chatHistory: (projectId: string, conversationId: string) => typedError<Conversation, RpcError>(__TAURI_INVOKE("chat_history", { projectId, conversationId })),
 	/**
+	 *  `chat.part_full` — a tool's output as the transcript keeps it, uncut, found
+	 *  by the call it answers in the message that holds it.
+	 */
+	chatPartFull: (projectId: string, conversationId: string, messageId: string, callId: string) => typedError<Part, RpcError>(__TAURI_INVOKE("chat_part_full", { projectId, conversationId, messageId, callId })),
+	/**
 	 *  `chat.list` — every conversation this project has had.
 	 * 
 	 *  The transcripts were always on disk; nothing listed them, so closing a tab

@@ -82,6 +82,7 @@ mod chat_remote;
 mod chat_resident;
 mod chat_running;
 mod chat_turn;
+mod chat_window;
 mod checkout;
 mod checkpoint;
 mod checkpoint_findings;

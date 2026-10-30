@@ -40,17 +40,7 @@ fn id(prefix: &str) -> String {
     format!("{prefix}_{}", ulid::Ulid::generate())
 }
 
-/// `chat.history` — everything said in this conversation, in order.
-#[tauri::command]
-#[specta::specta]
-pub async fn chat_history(
-    project_id: String,
-    conversation_id: String,
-) -> Result<Conversation, RpcError> {
-    crate::off_main::blocking(move || chat_history_now(project_id, conversation_id)).await
-}
-
-/// [`chat_history`], on the calling thread.
+/// [`crate::chat_window::chat_history`], whole, on the calling thread.
 pub(crate) fn chat_history_now(
     project_id: String,
     conversation_id: String,
@@ -202,6 +192,8 @@ pub async fn chat_send(
     );
     // Every frame goes through the relay, so a chat reopened mid-turn can join.
     // A turn on a resident process may wait for a woken one: it is heard after it.
+    // The relay keeps frames whole for the Remote, which cuts its own way.
+    let on_frame = crate::chat_relay::for_window(on_frame);
     let (on_frame, relaying) = match staying {
         Some(_) => relay.waiting(&conversation_id, on_frame),
         None => relay.open(&conversation_id, on_frame),

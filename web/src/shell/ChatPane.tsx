@@ -13,6 +13,7 @@ import { CopySession } from './CopySession'
 import { DocPeek } from './DocPeek'
 import { useDraftShortcut } from './draftShortcut'
 import { AppsScopeContext } from './mcpApps'
+import { WholeFrom } from './WholeFrom'
 import { DropTarget } from './DropTarget'
 import { PaneCorner } from './PaneCorner'
 import { useTaking } from './useTaking'
@@ -133,13 +134,13 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => (setPrompt(text), field.current?.focus())} />
         ) : (
           <AppsScopeContext.Provider value={scope}>
-            <div className="thread">
+            <WholeFrom conversationId={tab.id}><div className="thread">
               {chat.messages.map((message) => (
                 <Turn key={message.id} message={message} folder={chat.folder} onOpen={setPeek} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
               ))}
               {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
               {chat.error && <div className="exempty__t" role="alert">{chat.error}</div>}
-            </div>
+            </div></WholeFrom>
           </AppsScopeContext.Provider>
         )}
       </div>

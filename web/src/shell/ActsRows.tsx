@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
+import { imagesOf, isCut, namedImages, WholeContext } from './cutOutput'
+import { ask, commands } from './live'
 import { acts, actionLabel, grouped, groupTarget, headline, isGroup, type Act, type Group, type Kind } from './acts'
 import type { Part } from '../gen/bindings'
 import { editDiff } from './editCard'
@@ -13,7 +15,10 @@ import { Markdown } from './MarkdownView'
  * is done, because by then the answer is what you came for.
  */
 
-export function Acts({ parts, live }: { parts: readonly Part[]; live: boolean }): React.JSX.Element | null {
+/* The message the rows are of, to ask for an output the window got cut. */
+const MessageContext = createContext<string | null>(null)
+
+export function Acts({ parts, live, messageId = null }: { parts: readonly Part[]; live: boolean; messageId?: string | null }): React.JSX.Element | null {
   const rows = acts(parts)
   const [open, setOpen] = useState(live)
   useEffect(() => setOpen(live), [live])
@@ -21,6 +26,7 @@ export function Acts({ parts, live }: { parts: readonly Part[]; live: boolean })
   if (rows.length === 0) return null
 
   return (
+    <MessageContext.Provider value={messageId}>
     <div className="acts">
       <button className="acts__h" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
         <span className="acts__t">{headline(rows, live)}</span>
@@ -34,6 +40,7 @@ export function Acts({ parts, live }: { parts: readonly Part[]; live: boolean })
         </div>
       )}
     </div>
+    </MessageContext.Provider>
   )
 }
 
@@ -116,13 +123,57 @@ function LeafRow({ act }: { act: Act }): React.JSX.Element {
               <Markdown source={act.output} />
             </div>
           ) : (
-            parts.map((part) => <Section key={part.label} label={part.label} body={part.body} />)
+            <>
+              {parts.map((part) => <Section key={part.label} label={part.label} body={part.body} />)}
+              {isCut(act.output) && <Whole callId={act.id} output={act.output} />}
+            </>
           )}
         </div>
       )}
     </div>
   )
 }
+
+/* An output the window got cut, whole on a click: the text in full, and the
+   images it named, drawn only then. */
+function Whole({ callId, output }: { callId: string; output: string }): React.JSX.Element | null {
+  const where = useContext(WholeContext)
+  const messageId = useContext(MessageContext)
+  const [whole, setWhole] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const images = namedImages(output)
+  if (!where || !messageId) return null
+  if (whole !== null) {
+    const shown = imagesOf(whole)
+    return (
+      <>
+        {shown.map((src, at) => <img className="asec__img" key={at} src={src} alt={`Image ${at + 1} of the output`} />)}
+        {shown.length === 0 && <Section label="Output, in full" body={whole} />}
+      </>
+    )
+  }
+  const said = images.length ? `Show ${images.length === 1 ? 'the image' : `${images.length} images`} (${kb(images)})` : 'Show it all'
+  return (
+    <div className="asec">
+      <button
+        className="btn"
+        onClick={() => {
+          setError(null)
+          void ask(() => commands.chatPartFull(where.projectId, where.conversationId, messageId, callId)).then((asked) => {
+            if (asked.data?.kind === 'tool_result') setWhole(asked.data.output)
+            else setError(asked.error ?? 'that output is not in the transcript')
+          })
+        }}
+      >
+        {said}
+      </button>
+      {error && <span role="alert">{error}</span>}
+    </div>
+  )
+}
+
+const kb = (images: readonly { bytes: number }[]): string =>
+  `${Math.round(images.reduce((all, one) => all + one.bytes, 0) / 1024)} KB`
 
 /* What opens under a row. A command shows the command it ran and what came
    back; anything else shows the arguments it was given. Both are worth

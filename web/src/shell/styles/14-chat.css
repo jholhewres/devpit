@@ -128,6 +128,7 @@
 .asec__h { display: flex; align-items: center; justify-content: space-between; height: 20px; font-size: 10.5px; font-weight: 500; color: var(--text-3); }
 .asec__c { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; color: var(--ghost); }
 .asec__c:hover { background: var(--overlay); color: var(--text-2); }
+.asec__img { max-width: 100%; max-height: 420px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border); }
 
 .ascroll { position: relative; min-width: 0; overflow: hidden; }
 .ascroll__v { margin: 0; padding: 2px 8px 2px 0; max-height: 320px; overflow: auto; overscroll-behavior: contain; font-family: var(--mono); font-size: 10.5px; line-height: 1.55; color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
