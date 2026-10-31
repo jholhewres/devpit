@@ -83,7 +83,7 @@ describe('Settings → Accounts', () => {
     await waitFor(() => expect(saved).toHaveBeenCalled())
     expect(saved.mock.calls[0][0].accounts.at(-1)).toEqual({ name: 'third', configDir: '~/.cfg-3' })
     fireEvent.change(screen.getByLabelText('Account for api'), { target: { value: 'home' } })
-    await waitFor(() => expect(accountOf(saved.mock.calls.at(-1)[0], 'prj_a')).toBe('home'))
+    await waitFor(() => expect(accountOf(saved.mock.calls.at(-1)?.[0], 'prj_a')).toBe('home'))
   })
 })
 

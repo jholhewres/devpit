@@ -14,13 +14,13 @@ export const SAID: Record<Exclude<QuotaState, 'read'>, string> = {
 
 /** The account a project's new sessions open in, or none. */
 export function accountOf(accounts: Accounts, projectId: string): string | null {
-  const name = accounts.projects.find((one) => one.projectId === projectId)?.account ?? null
+  const name = (accounts.projects ?? []).find((one) => one.projectId === projectId)?.account ?? null
   return name !== null && accounts.accounts.some((one) => one.name === name) ? name : null
 }
 
 /** The list with `projectId` opening in `name`; none takes the default away. */
 export function withDefault(accounts: Accounts, projectId: string, name: string | null): Accounts {
-  const projects = accounts.projects.filter((one) => one.projectId !== projectId)
+  const projects = (accounts.projects ?? []).filter((one) => one.projectId !== projectId)
   return { ...accounts, projects: name === null ? projects : [...projects, { projectId, account: name }] }
 }
 
@@ -28,7 +28,7 @@ export function withDefault(accounts: Accounts, projectId: string, name: string 
 export function without(accounts: Accounts, name: string): Accounts {
   return {
     accounts: accounts.accounts.filter((one) => one.name !== name),
-    projects: accounts.projects.filter((one) => one.account !== name),
+    projects: (accounts.projects ?? []).filter((one) => one.account !== name),
   }
 }
 
