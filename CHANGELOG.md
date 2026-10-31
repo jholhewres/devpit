@@ -23,6 +23,23 @@ release notes are taken from here when a version is tagged.
   without your yes: a profile that arrived waits to be taken, and a change
   elsewhere to its agent, program or base URL waits for you to use it or
   keep yours. A profile or a variable you remove stays removed everywhere.
+- **Open devpit in your browser.** The tray's "Open in browser" serves
+  devpit's own page on this machine, signed in for this run only and under a
+  name that is this install's own. Nothing listens beyond loopback.
+- **Claude Code accounts, per project, with their quota.** Settings →
+  Accounts lists the Claude Code config folders you use and how much of each
+  account's 5-hour and weekly limits is left. A project can name its account,
+  and the sessions devpit starts there open in it. When an account is nearly
+  out, a banner offers to start the next session in another; the sessions
+  already running stay where they are. The account's token is only read on
+  this machine and never reaches the window.
+
+### Faster
+
+- **Long chats open and scroll without freezing.** A chat opens on its last
+  page, read from the end of the transcript. Long tool outputs arrive cut,
+  and arrive whole when you open them. A streamed answer no longer copies the
+  whole thread on every batch.
 
 ## 0.1.45 — 2026-10-28
 

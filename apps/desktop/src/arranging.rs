@@ -73,7 +73,7 @@ pub(crate) fn session_split_now(
     let in_ptyd = from_ptyd
         .then(|| {
             let store = store().ok()?;
-            crate::sessions::in_ptyd(&store, &project_id, &new_id, &cwd)
+            crate::ptyd_link::in_ptyd(&store, &project_id, &new_id, &cwd)
         })
         .flatten();
     if let Some(target) = in_ptyd {

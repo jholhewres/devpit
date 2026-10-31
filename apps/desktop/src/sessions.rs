@@ -180,15 +180,7 @@ fn load_or_create(
         let layout = decode(project_id, &tree, &focused)?;
         for (leaf_id, target) in layout.tree.leaves() {
             if crate::ptyd_link::is_ptyd(target) {
-                // The daemon's, not tmux's: brought back where its shell was
-                // if the daemon lost it.
-                #[cfg(unix)]
-                if let Ok(home) = Store::root() {
-                    let at = was_in(leaf_id);
-                    let at = at.as_deref().unwrap_or(cwd);
-                    let shared = crate::checkout::shared_env_at(&store, project_id, at);
-                    crate::ptyd_link::revive(&home, leaf_id, at, shared);
-                }
+                crate::ptyd_link::revive_at(&store, project_id, leaf_id, was_in(leaf_id), cwd);
                 continue;
             }
             // A window missing before this is one tmux lost with its server,
@@ -208,7 +200,7 @@ fn load_or_create(
 
     let leaf_id = format!("leaf_{}", Ulid::generate());
     let ptyd = plain
-        .then(|| in_ptyd(&store, project_id, &leaf_id, cwd))
+        .then(|| crate::ptyd_link::in_ptyd(&store, project_id, &leaf_id, cwd))
         .flatten();
     let target = match ptyd {
         Some(target) => target,
@@ -226,33 +218,6 @@ fn load_or_create(
     };
     persist(&store, tab_id, &layout)?;
     Ok(layout)
-}
-
-/// A new plain terminal made in devpit-ptyd, when the person turned it on
-/// and the daemon can be had. Nothing, for tmux to make it as it always did.
-pub(crate) fn in_ptyd(
-    store: &Store,
-    project_id: &str,
-    leaf_id: &str,
-    cwd: &Path,
-) -> Option<String> {
-    if !crate::ptyd_link::wanted(store) {
-        return None;
-    }
-    #[cfg(unix)]
-    {
-        let home = Store::root().ok()?;
-        let shared = crate::checkout::shared_env_at(store, project_id, cwd);
-        match crate::ptyd_link::open(&home, leaf_id, cwd, shared) {
-            Ok(target) => return Some(target),
-            Err(why) => {
-                eprintln!("devpit: devpit-ptyd could not take a terminal, tmux does: {why}")
-            }
-        }
-    }
-    #[cfg(not(unix))]
-    let _ = (project_id, leaf_id, cwd);
-    None
 }
 
 pub(crate) fn tmux_err(err: devpit_tmux::TmuxError) -> RpcError {
@@ -282,7 +247,7 @@ pub async fn session_ensure(
     crate::off_main::blocking(move || {
         let state = tauri::Manager::state::<SessionState>(&app);
         let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
-        ensure_plain_at(&state, &project_id, &tab_id, &cwd)
+        ensure(&state, &project_id, &tab_id, &cwd, true)
     })
     .await
 }
@@ -325,18 +290,7 @@ pub(crate) fn ensure_at(
     ensure(state, project_id, tab_id, cwd, false)
 }
 
-/// [`ensure_at`] for a terminal the person opened: one devpit types nothing
-/// into, so it may be made in devpit-ptyd. A tab an agent is started in
-/// stays in tmux, which is what that typing goes through.
-pub(crate) fn ensure_plain_at(
-    state: &State<'_, SessionState>,
-    project_id: &str,
-    tab_id: &str,
-    cwd: &Path,
-) -> Result<SessionLayout, RpcError> {
-    ensure(state, project_id, tab_id, cwd, true)
-}
-
+/// `plain`: a tab devpit types nothing into, which devpit-ptyd may hold.
 fn ensure(
     state: &State<'_, SessionState>,
     project_id: &str,

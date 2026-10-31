@@ -34,29 +34,6 @@ pub(crate) fn wanted(store: &Store) -> bool {
             .is_some_and(|value| value.trim() == BACKEND)
 }
 
-/// `terminal.daemon` — whether new plain terminals go to devpit-ptyd here.
-#[tauri::command]
-#[specta::specta]
-pub async fn terminal_daemon_read() -> Result<bool, devpit_rpc::RpcError> {
-    crate::off_main::blocking(|| Ok(wanted(&Store::open_default()?))).await
-}
-
-/// `terminal.daemon_set` — turns it on or off for new terminals; the ones
-/// already open stay where they are.
-#[tauri::command]
-#[specta::specta]
-pub async fn terminal_daemon_set(on: bool) -> Result<bool, devpit_rpc::RpcError> {
-    crate::off_main::blocking(move || {
-        let store = Store::open_default()?;
-        store.set_preference(
-            preference::TERMINAL_BACKEND,
-            if on { BACKEND } else { "tmux" },
-        )?;
-        Ok(wanted(&store))
-    })
-    .await
-}
-
 /// The target a ptyd pane is kept under in the layout.
 pub(crate) fn target(leaf_id: &str) -> String {
     format!("{TARGET_PREFIX}{leaf_id}")
@@ -242,6 +219,52 @@ pub(crate) fn revive(home: &Path, leaf_id: &str, cwd: &Path, shared: Vec<(String
     if let Err(why) = open(home, leaf_id, cwd, shared) {
         eprintln!("devpit: {leaf_id} could not be started again in devpit-ptyd: {why}");
     }
+}
+
+/// A new plain terminal made in devpit-ptyd, when the person turned it on
+/// and the daemon can be had. Nothing, for tmux to make it as it always did.
+pub(crate) fn in_ptyd(
+    store: &Store,
+    project_id: &str,
+    leaf_id: &str,
+    cwd: &Path,
+) -> Option<String> {
+    if !wanted(store) {
+        return None;
+    }
+    #[cfg(unix)]
+    {
+        let home = Store::root().ok()?;
+        let shared = crate::checkout::shared_env_at(store, project_id, cwd);
+        match open(&home, leaf_id, cwd, shared) {
+            Ok(target) => return Some(target),
+            Err(why) => {
+                eprintln!("devpit: devpit-ptyd could not take a terminal, tmux does: {why}")
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = (project_id, leaf_id, cwd);
+    None
+}
+
+/// A ptyd leaf of a layout being loaded, started again where its shell last
+/// was if the daemon lost it.
+pub(crate) fn revive_at(
+    store: &Store,
+    project_id: &str,
+    leaf_id: &str,
+    was_in: Option<PathBuf>,
+    cwd: &Path,
+) {
+    #[cfg(unix)]
+    if let Ok(home) = Store::root() {
+        let at = was_in.as_deref().unwrap_or(cwd);
+        let shared = crate::checkout::shared_env_at(store, project_id, at);
+        revive(&home, leaf_id, at, shared);
+    }
+    #[cfg(not(unix))]
+    let _ = (store, project_id, leaf_id, was_in, cwd);
 }
 
 #[cfg(test)]
