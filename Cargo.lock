@@ -1066,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-agentapi"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "serde_json",
  "tempfile",
@@ -1074,7 +1074,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-agentcli"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-core",
  "devpit-pty",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-cookies"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "aes",
  "cbc",
@@ -1100,7 +1100,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-core"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "dirs 6.0.0",
  "rusqlite",
@@ -1115,7 +1115,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-desktop"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1164,7 +1164,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-devflow"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-agentcli",
  "devpit-core",
@@ -1181,7 +1181,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-git"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-pty",
  "devpit-rpc",
@@ -1193,7 +1193,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-pty"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "devpit-core",
@@ -1206,7 +1206,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-ptyd"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-core",
  "devpit-pty",
@@ -1217,7 +1217,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-remote"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-agentapi",
  "rustls",
@@ -1230,7 +1230,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-rpc"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-core",
  "serde",
@@ -1241,7 +1241,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-steps"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-pty",
  "devpit-rpc",
@@ -1255,7 +1255,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-sync"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "chacha20poly1305",
  "data-encoding",
@@ -1277,7 +1277,7 @@ dependencies = [
 
 [[package]]
 name = "devpit-tmux"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "devpit-agentcli",
  "devpit-pty",
@@ -7040,7 +7040,7 @@ checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
 
 [[package]]
 name = "xtask"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "base64 0.22.1",
  "minisign-verify",
