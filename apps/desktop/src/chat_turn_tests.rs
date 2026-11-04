@@ -120,6 +120,13 @@ fn a_failed_turn_keeps_what_it_said_before_failing() {
     assert_eq!(kept.len(), 1);
     assert!(!kept[0].streaming);
     assert!(format!("{:?}", kept[0].parts).contains("half an answer"));
+    // What it failed on stays with it, for a reopened chat to show.
+    let ended = kept[0]
+        .ended
+        .as_ref()
+        .expect("the answer keeps how it ended");
+    assert!(ended.is_error);
+    assert_eq!(ended.error.as_deref(), Some("boom"));
     assert_eq!(
         *frames.lock().expect("count"),
         2,

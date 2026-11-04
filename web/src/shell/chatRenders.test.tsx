@@ -6,10 +6,10 @@ import type { Frame, Message } from '../gen/bindings'
 import { ChatThread } from './ChatThread'
 import { appliedAll } from './frames'
 
-/* Every turn drawn starts with its acts, so a turn drawn is an `Acts` drawn. */
+/* Every answer drawn draws its apps, so an answer drawn is a `TurnApps` drawn. */
 const drawn = new Map<string, number>()
-vi.mock('./ActsRows', () => ({
-  Acts: ({ messageId }: { messageId: string }) => (drawn.set(messageId, (drawn.get(messageId) ?? 0) + 1), null),
+vi.mock('./TurnApps', () => ({
+  TurnApps: ({ messageId }: { messageId: string }) => (drawn.set(messageId, (drawn.get(messageId) ?? 0) + 1), null),
 }))
 vi.mock('./TurnDelegations', () => ({ TurnDelegations: () => null }))
 vi.mock('./shellStore', () => ({ useShellPick: () => () => undefined }))

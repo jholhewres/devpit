@@ -19,6 +19,7 @@ fn message(id: &str, parts: Vec<Part>) -> Message {
         parts,
         created_at: 0.0,
         streaming: false,
+        ended: None,
     }
 }
 

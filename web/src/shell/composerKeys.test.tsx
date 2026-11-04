@@ -33,7 +33,7 @@ vi.mock('./useWindow', async (real) => {
   const window = await real<typeof import('./useWindow')>()
   return { ...window, useWindow: (...args: Parameters<typeof window.useWindow>) => (drawn.thread++, window.useWindow(...args)) }
 })
-vi.mock('./ActsRows', () => ({ Acts: () => (drawn.turns++, null) }))
+vi.mock('./TurnApps', () => ({ TurnApps: () => (drawn.turns++, null) }))
 vi.mock('./useSlash', () => ({ useSlash: () => ({ keyDown: () => false, ran: () => false }) }))
 vi.mock('./useStop', () => ({ useStop: () => false }))
 vi.mock('./useShell', () => ({

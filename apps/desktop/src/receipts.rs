@@ -28,6 +28,7 @@ pub(crate) fn receipt(
         }],
         created_at,
         streaming: false,
+        ended: None,
     }
 }
 

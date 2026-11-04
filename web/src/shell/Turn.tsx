@@ -1,17 +1,20 @@
 import { memo, useEffect, useRef, useState } from 'react'
 
 import { Acts } from './ActsRows'
-import { doing } from './acts'
+import { acts, doing, tally, type Act } from './acts'
 import { joined } from './chat'
-import type { Message } from '../gen/bindings'
+import type { Message, Part } from '../gen/bindings'
 import { inFolder } from './markdown'
 import { Markdown } from './MarkdownView'
 import { useShellPick } from './shellStore'
 import { Rewound } from './Rewound'
+import { Said } from './Said'
 import { TurnApps } from './TurnApps'
 import { TurnDelegations } from './TurnDelegations'
 import { TurnDrafts } from './TurnDrafts'
 import { TurnChanges } from './TurnChangesView'
+import { answerOf, millis, outcome, segments, statusOf, took, type Segment } from './turnFold'
+import { useDisclosed } from './useDisclosed'
 import { typed } from './writing'
 
 /*
@@ -45,40 +48,144 @@ export const Turn = memo(function Turn({
   const rewound = message.parts.find((part) => part.kind === 'rewound')
   if (message.role === 'system' && rewound?.kind === 'rewound') return <Rewound part={rewound} />
 
-  if (message.role === 'user') {
-    return (
-      <article className="said">
-        <div className="said__b">{text(message)}</div>
-      </article>
-    )
-  }
+  if (message.role === 'user') return <Said message={message} />
+  return <Answer message={message} rewind={rewind} folder={folder ?? null} onOpen={onOpen} />
+})
 
-  /* A subagent's report is not the answer: it is folded under its call. */
-  const answers = joined(message.parts).filter((part) => part.kind === 'text' && !part.parent)
-  const said = message.parts.flatMap((part) => (part.kind === 'command' ? [part.content] : []))
-  const doing = message.parts.filter((part) => part.kind !== 'text')
+function Answer({
+  message,
+  rewind,
+  folder,
+  onOpen,
+}: {
+  message: Message
+  rewind?: () => void
+  folder: string | null
+  onOpen?: (path: string) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useDisclosed(`${message.id}:turn`, false)
+  const live = message.streaming
+  const every = joined(message.parts)
+  const shown = segments(every)
+  const answer = answerOf(shown)
+  const ended = live ? null : (message.ended ?? null)
+  const failed = ended !== null && outcome(ended) === 'failed'
+  const lastWork = shown.findLastIndex((one) => one.kind === 'work')
+  const rows = (one: Segment): readonly Act[] => (one.kind === 'work' ? acts(one.parts, every) : [])
+  /* What a settled turn folds: the work and earlier prose, never its answer or what a slash command said. A failed one folds nothing. */
+  const hides = !live && !failed && shown.some((one, at) => at !== answer && (one.kind === 'prose' || rows(one).length > 0))
   const changed = message.parts.flatMap((part) => (part.kind === 'changes' ? part.files : []))
 
   return (
-    <article className="turn">
-      <Acts parts={doing} live={message.streaming} messageId={message.id} />
+    <article className="turn" data-ended={ended ? outcome(ended) : undefined}>
+      {!live && !failed && (hides || ended) && (
+        <TurnStatus message={message} work={shown.flatMap(rows)} hides={hides} open={open} toggle={() => setOpen((was) => !was)} />
+      )}
+      <Segments message={message} every={every} shown={shown} answer={answer} folded={hides && !open} lastWork={failed ? lastWork : -1} folder={folder} onOpen={onOpen} />
       <TurnDelegations parts={message.parts} />
       <TurnDrafts parts={message.parts} />
       <TurnApps parts={message.parts} messageId={message.id} />
-      {said.map((content, at) => (
-        <pre className="said__cmd" key={`c${at}`}>
-          {content}
-        </pre>
-      ))}
-      {answers.map((part, at) => (
-        <Reply key={at} source={'text' in part ? part.text : ''} live={message.streaming} folder={folder ?? null} onOpen={onOpen} />
-      ))}
-      {!message.streaming && <TurnChanges files={changed} parts={message.parts} />}
-      {message.streaming && <Working parts={message.parts} />}
-      {!message.streaming && <Foot message={message} rewind={rewind} />}
+      {failed && <Failed message={message} />}
+      {!live && <TurnChanges files={changed} parts={message.parts} />}
+      {live && <Working parts={message.parts} since={millis(message.createdAt)} />}
+      {!live && <Foot message={message} rewind={rewind} />}
     </article>
   )
-})
+}
+
+/* The turn in its order. Folded, only the answer is drawn; the status line above it opens the rest. */
+function Segments({
+  message,
+  every,
+  shown,
+  answer,
+  folded,
+  lastWork,
+  folder,
+  onOpen,
+}: {
+  message: Message
+  every: readonly Part[]
+  shown: readonly Segment[]
+  answer: number
+  folded: boolean
+  /** The work a failed turn ended on, kept open; -1 for none. */
+  lastWork: number
+  folder: string | null
+  onOpen?: (path: string) => void
+}): React.JSX.Element {
+  const live = message.streaming
+  const last = shown.length - 1
+  return (
+    <>
+      {shown.map((one, at) => {
+        if (folded && at !== answer && one.kind !== 'said') return null
+        if (one.kind === 'prose')
+          return <Reply key={one.at} source={one.text} live={live && at === last} folder={folder} onOpen={onOpen} />
+        if (one.kind === 'said')
+          return (
+            <pre className="said__cmd" key={one.at}>
+              {one.content}
+            </pre>
+          )
+        return (
+          <Acts
+            key={one.at}
+            parts={one.parts}
+            every={every}
+            live={live && at === last}
+            messageId={message.id}
+            fold={`acts:${one.at}`}
+            kept={at === lastWork}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+/* "Worked for 1m 30s", and what it came to. A button when it hides the work. */
+function TurnStatus({
+  message,
+  work,
+  hides,
+  open,
+  toggle,
+}: {
+  message: Message
+  work: readonly Act[]
+  hides: boolean
+  open: boolean
+  toggle: () => void
+}): React.JSX.Element {
+  const said = statusOf(message) ?? 'Worked'
+  const counted = work.length > 0 ? tally(work) : ''
+  const inner = (
+    <>
+      <span className="tstat__w">{said}</span>
+      {counted && <span className="tstat__n">· {counted}</span>}
+    </>
+  )
+  if (!hides) return <div className="tstat" data-how={message.ended ? outcome(message.ended) : undefined}>{inner}</div>
+  return (
+    <button className="tstat" data-how={message.ended ? outcome(message.ended) : undefined} aria-expanded={open} onClick={toggle}>
+      {inner}
+      <svg className="tstat__v" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'none' : 'rotate(-90deg)' }}>
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </button>
+  )
+}
+
+/* A failed turn ends on what it failed on, with nothing to open first. */
+function Failed({ message }: { message: Message }): React.JSX.Element {
+  return (
+    <div className="tstat" data-how="failed" role="alert">
+      <span className="tstat__w">{statusOf(message)}</span>
+      {message.ended?.error && <span className="tstat__e">{message.ended.error}</span>}
+    </div>
+  )
+}
 
 /* The answer, written out at a steady pace while it is still arriving. */
 function Reply({
@@ -135,11 +242,12 @@ function useTyping(source: string, live: boolean): number {
   return Math.min(shown, source.length)
 }
 
-/* How long it has been at it. The dots say it is alive; the seconds say
-   whether to keep waiting. */
-function Working({ parts }: { parts: Message['parts'] }): React.JSX.Element {
-  const [since] = useState(() => Date.now())
-  const [now, setNow] = useState(since)
+/* How long it has been at it, counted from when the turn began rather than
+   from when this was drawn: a reload mid-turn does not start again at 0. */
+function Working({ parts, since }: { parts: Message['parts']; since: number | null }): React.JSX.Element {
+  const [mounted] = useState(() => Date.now())
+  const began = since ?? mounted
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     /* Aimed at the next whole second rather than a second from now: an
@@ -154,8 +262,7 @@ function Working({ parts }: { parts: Message['parts'] }): React.JSX.Element {
     return () => window.clearTimeout(timer)
   }, [])
 
-  const seconds = Math.max(0, Math.floor((now - since) / 1000))
-  const said = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+  const said = took(Math.floor(Math.max(0, now - began) / 1000) * 1000)
 
   return (
     <div className="working">
@@ -169,9 +276,6 @@ function Working({ parts }: { parts: Message['parts'] }): React.JSX.Element {
     </div>
   )
 }
-
-const text = (message: Message): string =>
-  message.parts.map((part) => ('text' in part ? part.text : '')).join('')
 
 function Foot({ message, rewind }: { message: Message; rewind?: () => void }): React.JSX.Element | null {
   const [copied, setCopied] = useState(false)

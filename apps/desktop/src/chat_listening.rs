@@ -32,6 +32,8 @@ pub(crate) struct Woken {
     pub turn_id: String,
     pub answer_id: String,
     pub parts: Vec<Part>,
+    /// When it opened, which is when the answer is said to have begun.
+    pub began: f64,
     pub frames: Channel<Frame>,
     pub _relaying: crate::chat_relay::Relaying,
 }
@@ -165,19 +167,20 @@ impl Woken {
             .ok();
     }
 
-    fn written(&self) -> Message {
+    fn written(&self, end: &TurnEnd) -> Message {
         Message {
             id: self.answer_id.clone(),
             turn_id: Some(self.turn_id.clone()),
             role: Role::Assistant,
             parts: self.parts.clone(),
-            created_at: now(),
+            created_at: self.began,
             streaming: false,
+            ended: Some(devpit_rpc::Ended::of(end, now())),
         }
     }
 
     fn finish(self, transcript: &Path, head: &Path, said: Said) {
-        let _ = append(transcript, &self.written());
+        let _ = append(transcript, &self.written(&said.end));
         crate::chat_turn::settle(
             head,
             None,
@@ -196,15 +199,15 @@ impl Woken {
     /// The process died mid-answer: what it had said is kept, and the end
     /// names the turn, so the chat closes the answer it was showing.
     pub(crate) fn gone(self, transcript: &Path) {
-        let _ = append(transcript, &self.written());
         let end = TurnEnd {
-            turn_id: self.turn_id,
+            turn_id: self.turn_id.clone(),
             cost_usd: None,
             duration_ms: None,
             stop_reason: Some("interrupted".to_owned()),
             is_error: true,
             context: None,
         };
+        let _ = append(transcript, &self.written(&end));
         self.frames.send(Frame::Ended { end }).ok();
     }
 }

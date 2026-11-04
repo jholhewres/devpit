@@ -73,7 +73,7 @@ pub use channels::{
     CalendarFeed, ChannelEvent, ChannelInfo, ChannelOrchestrator, ChannelRoute, ChannelRules,
     Channels, HubStatus, Privacy, QuietHours, TelegramStatus,
 };
-pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
+pub use chat::{CallState, ChangedFile, Ended, Message, Part, Role, SessionInit, TurnEnd};
 pub use checkpoint::{
     validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, Whose, WouldRun,
 };

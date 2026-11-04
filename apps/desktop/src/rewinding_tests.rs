@@ -14,6 +14,7 @@ fn said(turn: &str, role: Role, text: &str) -> Message {
         }],
         created_at: 1.0,
         streaming: false,
+        ended: None,
     }
 }
 

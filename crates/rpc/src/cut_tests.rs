@@ -175,6 +175,7 @@ fn a_message_is_cut_part_by_part() {
         parts: vec![result("w".repeat(9_000)), result("ok".to_owned())],
         created_at: 0.0,
         streaming: false,
+        ended: None,
     };
     cut_message(&mut message);
     assert!(output_of(&message.parts[0]).contains(CUT_MARK));

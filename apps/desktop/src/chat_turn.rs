@@ -112,11 +112,15 @@ pub(crate) fn or_failed<T>(
     opened: &devpit_rpc::Message,
     on_frame: &tauri::ipc::Channel<devpit_rpc::Frame>,
 ) -> Result<T, RpcError> {
-    if said.is_err() {
+    if let Err(failed) = &said {
         if let Some(parts) = kept {
             let answered = devpit_rpc::Message {
                 parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
                 streaming: false,
+                ended: Some(devpit_rpc::Ended {
+                    error: Some(failed.message.clone()),
+                    ..devpit_rpc::Ended::of(&failed_end(turn_id), crate::chat_listening::now())
+                }),
                 ..opened.clone()
             };
             let _ = devpit_agentcli::store::append(file, &answered);
@@ -185,6 +189,7 @@ pub(crate) fn messages(
         parts,
         created_at: at,
         streaming,
+        ended: None,
     };
     let said = devpit_rpc::Part::Text {
         text: prompt.to_owned(),

@@ -47,6 +47,7 @@ pub(crate) fn from_transcript(path: &Path, at: f64) -> Vec<Message> {
             }],
             created_at: at,
             streaming: false,
+            ended: None,
         });
     }
     let skip = found.len().saturating_sub(MOST);

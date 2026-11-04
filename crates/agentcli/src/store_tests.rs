@@ -13,6 +13,7 @@ fn message(id: &str, text: &str) -> Message {
         }],
         created_at: 0.0,
         streaming: false,
+        ended: None,
     }
 }
 

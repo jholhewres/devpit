@@ -259,6 +259,10 @@ pub async fn chat_send(
     let answered = Message {
         parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
         streaming: false,
+        ended: Some(devpit_rpc::Ended::of(
+            &said.end,
+            crate::chat_listening::now(),
+        )),
         ..opened
     };
     let _ = append(&file, &answered);

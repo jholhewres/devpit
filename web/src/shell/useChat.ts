@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
-import { appended, appliedAll, ASKS, batched, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
+import { appended, appliedAll, ASKS, batched, failedOn, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { PAGE } from './useOlder'
@@ -303,10 +303,13 @@ export function useChat(conversationId: string): Chat {
       const drawn = shown.current.at(-1)?.id ?? null
       const { push, flush } = batched((frames) => setMessages((was) => appliedAll(was, frames)))
       let heard = false
+      let answer: string | null = null
+      let failed: string | null = null
       const started = send(turn, (frame) => {
         if (!now.open()) return
         heard ||= frame.type === 'opened'
         if (frame.type === 'opened') sent.current.add(frame.message.id)
+        if (frame.type === 'opened' && frame.message.role === 'assistant') answer = frame.message.id
         if (frame.type === 'session') setSession(frame.session_id)
         else push(frame)
       })
@@ -340,7 +343,8 @@ export function useChat(conversationId: string): Chat {
         })
         .catch((thrown: { message?: string }) => {
           if (!now.open()) return
-          setError(thrown.message ?? 'the turn failed')
+          failed = thrown.message ?? 'the turn failed'
+          setError(failed)
           /* Refused before it opened: nothing on screen holds the words. */
           if (!heard) back?.(prompt)
         })
@@ -351,6 +355,7 @@ export function useChat(conversationId: string): Chat {
              said to be over. */
           flush()
           setMessages(settled)
+          if (failed && answer) setMessages((was) => failedOn(was, answer!, failed!))
           setSending(false)
           /* A question the turn left behind has nobody waiting on it now. */
           setAsked([])

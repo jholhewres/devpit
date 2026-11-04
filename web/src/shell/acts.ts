@@ -145,12 +145,12 @@ export function toolName(name: string): string {
    A `tool_result` is not a row: it is the end of the call it answers. Pairing
    them here is what lets the row show `Run cargo test` with the output folded
    underneath, instead of a call and a result sitting apart. */
-export function acts(parts: readonly Part[]): readonly Act[] {
+export function acts(parts: readonly Part[], every: readonly Part[] = parts): readonly Act[] {
   const own = parts.filter((part) => !('parent' in part) || !part.parent)
-  const rows = rowsOf(own, parts)
+  const rows = rowsOf(own, every)
   return rows.map((row) => {
-    const inside = parts.filter((part) => 'parent' in part && part.parent === row.id)
-    return inside.length ? { ...row, children: rowsOf(inside, parts), done: row.done && finished(row.id, parts) } : row
+    const inside = every.filter((part) => 'parent' in part && part.parent === row.id)
+    return inside.length ? { ...row, children: rowsOf(inside, every), done: row.done && finished(row.id, every) } : row
   })
 }
 
@@ -172,7 +172,9 @@ function rowsOf(parts: readonly Part[], every: readonly Part[]): Act[] {
   }
 
   const rows: Act[] = []
-  parts.forEach((part, at) => {
+  /* Placed in the whole message, so a row's id and fold are its own in every segment. */
+  parts.forEach((part) => {
+    const at = every.indexOf(part)
     if (part.kind === 'thinking') {
       rows.push({ id: `t${at}`, kind: 'think', name: 'Thinking', target: oneLine(part.text), input: '', output: part.text, failed: false, done: true, children: [] })
       return
@@ -276,15 +278,20 @@ const NOUNS: Readonly<Record<Kind, readonly [string, string]>> = {
   tool: ['tool call', 'tool calls'],
 }
 
-export function summary(rows: readonly Act[]): string {
+export function tally(rows: readonly Act[]): string {
   const counts = new Map<Kind, number>()
   for (const row of rows) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1)
-  const parts = [...counts].map(([kind, count]) => {
-    const [one, many] = NOUNS[kind]
-    return `${count} ${count === 1 ? one : many}`
-  })
+  return [...counts]
+    .map(([kind, count]) => {
+      const [one, many] = NOUNS[kind]
+      return `${count} ${count === 1 ? one : many}`
+    })
+    .join(' · ')
+}
+
+export function summary(rows: readonly Act[]): string {
   const running = rows.some((row) => !row.done)
-  return `${running ? 'Running' : 'Ran'} ${parts.join(' · ')}`
+  return `${running ? 'Running' : 'Ran'} ${tally(rows)}`
 }
 
 /* The header names the newest row while the work is live — that is what you

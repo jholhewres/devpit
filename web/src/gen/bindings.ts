@@ -821,6 +821,11 @@ export const commands = {
 	agentSignedIn: (dir: string) => typedError<SignedIn, RpcError>(__TAURI_INVOKE("agent_signed_in", { dir })),
 	/**  `chat.paste` — keeps a pasted picture and answers with it as an attachment. */
 	chatPaste: (projectId: string, mediaType: string, data: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_paste", { projectId, mediaType, data })),
+	/**
+	 *  `chat.image` — a picture a sent message names, as a `data:` URL for its
+	 *  thumbnail: a paste kept for the project, or an image in the project.
+	 */
+	chatImage: (projectId: string, path: string) => typedError<string, RpcError>(__TAURI_INVOKE("chat_image", { projectId, path })),
 	/**  `chat.receipt` — records an answered question in the conversation. */
 	chatReceipt: (projectId: string, conversationId: string, tool: string, input: string, allowed: boolean) => typedError<Message, RpcError>(__TAURI_INVOKE("chat_receipt", { projectId, conversationId, tool, input, allowed })),
 	/**
@@ -3288,6 +3293,17 @@ export type ElsewhereFile = {
 	uncommitted: boolean,
 };
 
+/**  When an answer ended and why: the facts, read into words by the screen. */
+export type Ended = {
+	/**  Unix seconds. */
+	at: number | null,
+	/**  The CLI's own word, as [`TurnEnd::stop_reason`]. */
+	stopReason: string | null,
+	isError: boolean,
+	/**  What the turn failed on, when devpit was told. */
+	error?: string | null,
+};
+
 /**  A session of the account that ran and ended, as devpit saw it. */
 export type EndedSession = {
 	sessionId: string,
@@ -3961,6 +3977,11 @@ export type Message = {
 	createdAt: number | null,
 	/**  True while more of it is still arriving. */
 	streaming: boolean,
+	/**
+	 *  How an answer ended, so a reopened conversation still says so. Absent
+	 *  while it streams and in transcripts written before it was kept.
+	 */
+	ended?: Ended | null,
 };
 
 /**  A sign-in a start would go without, and the command that fixes it. */

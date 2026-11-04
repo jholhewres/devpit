@@ -72,6 +72,7 @@ pub(crate) fn rewind(
             }],
             created_at: now,
             streaming: false,
+            ended: None,
         },
     )
     .map_err(internal)?;

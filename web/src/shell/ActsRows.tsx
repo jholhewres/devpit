@@ -25,15 +25,32 @@ function useFoldKey(id: string): string | null {
   return messageId && `${messageId}:${id}`
 }
 
-export function Acts({ parts, live, messageId = null }: { parts: readonly Part[]; live: boolean; messageId?: string | null }): React.JSX.Element | null {
-  const rows = acts(parts)
-  const [open, setOpen] = useDisclosed(messageId && `${messageId}:acts`, live)
+export function Acts({
+  parts,
+  every = parts,
+  live,
+  messageId = null,
+  fold = 'acts',
+  kept = false,
+}: {
+  parts: readonly Part[]
+  /** The whole message, where results and a subagent's parts are looked up. */
+  every?: readonly Part[]
+  live: boolean
+  messageId?: string | null
+  /** This stack's fold within its message. */
+  fold?: string
+  /** Stays open once it settles: the work a failed turn ended on. */
+  kept?: boolean
+}): React.JSX.Element | null {
+  const rows = acts(parts, every)
+  const [open, setOpen] = useDisclosed(messageId && `${messageId}:${fold}`, live || kept)
   /* Open while it runs and folded once done; a turn drawn again keeps what was chosen. */
   const was = useRef(live)
   useEffect(() => {
-    if (was.current !== live) setOpen(live)
+    if (was.current !== live) setOpen(live || kept)
     was.current = live
-  }, [live, setOpen])
+  }, [live, kept, setOpen])
 
   if (rows.length === 0) return null
 

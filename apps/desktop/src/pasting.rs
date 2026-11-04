@@ -108,6 +108,59 @@ pub(crate) fn kept_in(
     })
 }
 
+/// `chat.image` — a picture a sent message names, as a `data:` URL for its
+/// thumbnail: a paste kept for the project, or an image in the project.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_image(project_id: String, path: String) -> Result<String, RpcError> {
+    crate::off_main::blocking(move || {
+        let store = crate::projects::store()?;
+        let (_, root) = crate::projects::locate(&store, &project_id)?;
+        let pasted = crate::projects::project_home(&project_id)?.pasted();
+        picture_in(&[root.as_path(), pasted.as_path()], &path)
+    })
+    .await
+}
+
+/// The picture at `path`, relative to the first root or absolute inside any,
+/// read only when it is an image under the paste ceiling.
+pub(crate) fn picture_in(roots: &[&std::path::Path], path: &str) -> Result<String, RpcError> {
+    let refused = || RpcError::new(ErrorCode::Forbidden, "that picture is not the project's");
+    let wanted = std::path::Path::new(path);
+    let resolved = if wanted.is_absolute() {
+        let found = wanted.canonicalize().map_err(|_| refused())?;
+        roots
+            .iter()
+            .filter_map(|root| root.canonicalize().ok())
+            .any(|root| found.starts_with(root))
+            .then_some(found)
+            .ok_or_else(refused)?
+    } else {
+        let root = roots.first().ok_or_else(refused)?;
+        devpit_core::tree::resolve(root, path).map_err(|_| refused())?
+    };
+    let ext = resolved
+        .extension()
+        .map(|ext| ext.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    let media = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => return Err(RpcError::new(ErrorCode::Invalid, "that is not a picture")),
+    };
+    let size = std::fs::metadata(&resolved).map_err(|_| refused())?.len();
+    if size > MOST_BYTES as u64 {
+        return Err(RpcError::new(
+            ErrorCode::Invalid,
+            "that picture is too big to show",
+        ));
+    }
+    let bytes = std::fs::read(&resolved).map_err(|err| RpcError::internal(err.to_string()))?;
+    Ok(format!("data:{media};base64,{}", BASE64.encode(bytes)))
+}
+
 #[cfg(test)]
 #[path = "pasting_tests.rs"]
 mod tests;

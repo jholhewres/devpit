@@ -1,4 +1,5 @@
 import type { Attachment, Frame, Message, Part } from '../gen/bindings'
+import { endedNow } from './turnFold'
 
 /*
  * A conversation as its frames build it, and what the composer sends into
@@ -73,7 +74,7 @@ export function appliedAll(messages: readonly Message[], frames: readonly Frame[
         /* Only the ones that were: a finished message keeps its identity, so
            its memoized turn does not draw again. */
         current().forEach((message, at) => {
-          if (message.streaming) list()[at] = { ...message, streaming: false }
+          if (message.streaming) list()[at] = { ...message, streaming: false, ended: message.ended ?? endedNow(frame.end) }
         })
         break
       default:
@@ -82,6 +83,15 @@ export function appliedAll(messages: readonly Message[], frames: readonly Frame[
   }
   settleAll()
   return out ?? messages
+}
+
+/* A turn that failed live: its answer says on what, as a saved one does. */
+export function failedOn(messages: readonly Message[], id: string, error: string): readonly Message[] {
+  const at = messages.findIndex((one) => one.id === id)
+  if (at < 0) return messages
+  const one = messages[at]!
+  const ended = { ...(one.ended ?? endedNow({ stopReason: 'error', isError: true })), isError: true, error }
+  return messages.map((each, where) => (where === at ? { ...one, streaming: false, ended } : each))
 }
 
 /* An older page goes above what is drawn; a message already drawn is not drawn twice. */

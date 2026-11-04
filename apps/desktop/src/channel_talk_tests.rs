@@ -425,6 +425,7 @@ fn only_the_words_a_turn_ended_on_go_back() {
         ],
         created_at: 0.0,
         streaming: false,
+        ended: None,
     };
     let read = conversation(vec![answer]);
     assert_eq!(

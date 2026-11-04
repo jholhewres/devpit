@@ -369,13 +369,15 @@ fn woke(app: &AppHandle, conversation: &str, logs: &std::path::Path) -> Woken {
     let (frames, relaying) = relay.open(conversation, Channel::new(|_| Ok(())));
     let turn_id = format!("turn_{}", ulid::Ulid::generate());
     let answer_id = format!("msg_{}", ulid::Ulid::generate());
+    let began = crate::chat_listening::now();
     let opened = Message {
         id: answer_id.clone(),
         turn_id: Some(turn_id.clone()),
         role: Role::Assistant,
         parts: vec![woken_by.clone()],
-        created_at: crate::chat_listening::now(),
+        created_at: began,
         streaming: true,
+        ended: None,
     };
     frames.send(Frame::Opened { message: opened }).ok();
     let _ = app.emit(WOKE, conversation);
@@ -383,6 +385,7 @@ fn woke(app: &AppHandle, conversation: &str, logs: &std::path::Path) -> Woken {
         turn_id,
         answer_id,
         parts: vec![woken_by],
+        began,
         frames,
         _relaying: relaying,
     }

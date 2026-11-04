@@ -13,6 +13,7 @@ fn said(role: Role, text: &str) -> Message {
         }],
         created_at: 0.0,
         streaming: false,
+        ended: None,
     }
 }
 

@@ -32,6 +32,7 @@ fn woken(relay: &Relay) -> (Woken, Arc<Mutex<Vec<Frame>>>) {
         turn_id: "turn_woken".to_owned(),
         answer_id: "msg_woken".to_owned(),
         parts: Vec::new(),
+        began: 100.0,
         frames,
         _relaying: relaying,
     };
@@ -154,6 +155,14 @@ fn a_woken_turn_that_dies_keeps_what_it_said_and_names_itself() {
     assert_eq!(kept.len(), 1);
     assert_eq!(kept[0].turn_id.as_deref(), Some("turn_woken"));
     assert!(matches!(&kept[0].parts[..], [Part::Text { text, .. }] if text == "half an "));
+    // It began when it opened, and it says it was stopped, so a reopened chat does too.
+    assert_eq!(kept[0].created_at, 100.0);
+    let ended = kept[0]
+        .ended
+        .as_ref()
+        .expect("the answer keeps how it ended");
+    assert_eq!(ended.stop_reason.as_deref(), Some("interrupted"));
+    assert!(ended.is_error && ended.at > 100.0);
     let last = frames.lock().unwrap().pop();
     assert!(
         matches!(&last, Some(Frame::Ended { end }) if end.turn_id == "turn_woken"),
