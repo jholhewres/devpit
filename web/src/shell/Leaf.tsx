@@ -32,10 +32,9 @@ import { shellWord, useFileDrop } from './fileDrop'
 /** Said when a view that took a pane from its tab lets it go. */
 export const PANE_FREED = 'devpit:pane-freed'
 
-/* Off screen this long, a pane gives back its xterm and its stream: the pty
-   keeps running and its history waits on the other side for the next attach.
-   A quick look at another tab and back costs nothing. */
-export const HIDDEN_DISPOSE_MS = 2000
+/* Off screen this long, a pane gives back its xterm, its GPU context and its
+   stream; the pty keeps running. Shorter, a switch back pays a rebuild. */
+export const HIDDEN_DISPOSE_MS = 20_000
 
 /* What an attach wrote, kept to rebuild the terminal around an older page.
    Past this, paging ends rather than holding a flood in memory. */
