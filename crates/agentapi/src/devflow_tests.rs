@@ -355,7 +355,14 @@ fn the_gate_lists_only_the_card_an_agent_passes() {
     assert!(schema.get("required").is_none(), "a hook names no card");
 }
 
-const REVIEW: &str = include_str!("../../../flow/skills/devflow-review/SKILL.md");
+const REVIEW: [&str; 6] = [
+    include_str!("../../../flow/skills/devflow-review/SKILL.md"),
+    include_str!("../../../flow/skills/devflow-review/verify.md"),
+    include_str!("../../../flow/skills/devflow-review/without-card.md"),
+    include_str!("../../../flow/skills/devflow-review/retro.md"),
+    include_str!("../../../flow/skills/devflow-review/publish.md"),
+    include_str!("../../../flow/skills/devflow-review/by-hand.md"),
+];
 
 /// The review is listed wherever Devflow is on in Settings, as it runs on
 /// demand without a card, and every call the review skill shows sends only
@@ -395,6 +402,7 @@ fn the_review_runs_on_demand_and_takes_what_its_skill_sends() {
     );
     let mut calls = 0;
     for block in REVIEW
+        .concat()
         .split("```json")
         .skip(1)
         .filter_map(|rest| rest.split("```").next())
@@ -482,4 +490,31 @@ fn no_stage_offers_an_autopilot() {
         !offered.iter().any(|name| name.contains("autopilot")),
         "{offered:?}"
     );
+}
+
+/// The review skill's parts load only when asked: the skill tool takes each
+/// by `part`, and the skill names every one of them.
+#[test]
+fn the_skill_tool_takes_each_part_the_review_skill_points_to() {
+    let (_, tool) = STAGED
+        .iter()
+        .find(|(_, tool)| tool.name == crate::skills::TOOL)
+        .expect("the skill tool");
+    let schema = (tool.input)();
+    let offered: Vec<&str> = schema["properties"]["part"]["enum"]
+        .as_array()
+        .expect("parts")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert_eq!(
+        offered,
+        ["verify", "without-card", "retro", "publish", "by-hand"]
+    );
+    for part in offered {
+        assert!(
+            REVIEW[0].contains(&format!("\"part\": \"{part}\"")),
+            "the review skill points to {part}"
+        );
+    }
 }

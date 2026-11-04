@@ -143,9 +143,10 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: crate::skills::TOOL,
             method: "devflow_skill",
-            description: "The Devflow skill to follow for a stage, as this project resolves it: its own .devpit/devflow/skills/<name>/SKILL.md, else the person's, else devpit's built-in one. Call it before each stage and follow what it returns; devflow-setup is for changing the setup. Any stage's skill is given when asked, to run that stage on demand: also one devflow.yaml switches off, or with no devflow.yaml.",
+            description: "The Devflow skill to follow for a stage, as this project resolves it: its own .devpit/devflow/skills/<name>/SKILL.md, else the person's, else devpit's built-in one. Call it before each stage and follow what it returns; devflow-setup is for changing the setup. Any stage's skill is given when asked, to run that stage on demand: also one devflow.yaml switches off, or with no devflow.yaml. A part the skill says loads only when asked comes with `part`.",
             input: || json!({ "type": "object", "properties": {
-                "name": { "type": "string", "enum": crate::skills::NAMES, "description": "The skill: devflow-<stage>, or devflow-setup." }
+                "name": { "type": "string", "enum": crate::skills::NAMES, "description": "The skill: devflow-<stage>, or devflow-setup." },
+                "part": { "type": "string", "enum": crate::skills::PARTS.map(|(_, part)| part), "description": "A part of the skill that loads only when asked, as the skill names it (devflow-review's verify, without-card, retro, publish, by-hand). Leave out for the skill itself." }
             }, "required": ["name"] }),
         },
     ),

@@ -18,12 +18,9 @@ rule and build the wrong thing, or build the right thing and break the rules.
 | `security` | `devflow-security` | Can it be abused? Trust boundaries and STRIDE first, then the OWASP Top 10, and the OWASP Top 10 for LLM applications where a model is involved. |
 
 `devflow-all` covers all three axes in one reading, each finding naming its
-own `axis`. `review.scale` sends it, alone, instead of `review.reviewers` when
-a diff is small (at most `small_lines` changed lines, 80 unless set) and
-touches no sensitive path (auth, routes, migrations, dependency manifests and
-lockfiles, secrets and `.env`, CI workflows; `sensitive` replaces the list).
-Anything else gets the configured reviewers. It is off unless devflow.yaml
-says `scale: true` or sets either field.
+own `axis`. With `review.scale` on (`scale: true`, or `small_lines` or
+`sensitive` set), a small diff touching no sensitive path gets it alone;
+anything else gets `review.reviewers`.
 
 ## Ground rules
 
@@ -49,25 +46,15 @@ Call `devpit_devflow_review` with the card:
 ```
 
 devpit pins BASE (the card's own base, else where HEAD left the default
-branch) and HEAD, writes the packet as `review-context.md` in the run's folder
-in devpit's home for the project (the answer's `packet`) — BASE, HEAD, the
-changed files, the card's criteria, the brief, the standards, the evidence
-and the diff — and runs every reviewer `review.reviewers` lists in
+branch) and HEAD, writes the packet, `review-context.md` in the run's folder
+(the answer's `packet`), and runs every reviewer `review.reviewers` lists in
 `devflow.yaml` at once, each headless on its own agent CLI and from that
 packet alone. With `review.scale` on, the answer's `scale` says which way it
-went and why ("scaled: small diff, no sensitive path → one reviewer"); a
-scaled review runs the first reviewer's CLI on `devflow-all`. A CLI that is
-not installed or not signed in is skipped, and the card says so; the review
-goes on without it. An empty diff ends the
-review with "nothing to review".
+went and why; a scaled review runs the first reviewer's CLI on `devflow-all`.
+A CLI not installed or signed out is skipped, and the card says so. An empty
+diff ends the review with "nothing to review".
 
 Done when the answer names the run, the packet and `pending`.
-
-When `devpit_devflow_review` is not listed, do its work yourself: pin BASE
-(`git merge-base HEAD <base branch>`) and HEAD (`git rev-parse HEAD`), write
-the packet with the headings above (each filled or "none"), run all three
-personas as in step 2, and write `findings.json` beside the packet as step
-4 describes it.
 
 ### 2. Review what is pending yourself
 
@@ -165,34 +152,9 @@ Done when the answer names the verdict and `findings_file`.
 
 ### 5. Verify the criticals and highs
 
-With `review.verify` at `advise` or `required` in `devflow.yaml`, the
-answer's `next` names the standing criticals and highs by their place in
-`findings.json` (from 0). Run each one's PoC where there is an environment to
-run it in (a local build, a test database, a staging the card names) and
-record what it showed:
-
-```json
-{ "card": "<card id>", "run": "<the run>", "verified": [{ "finding": 0, "result": "confirmed", "evidence": "<the environment, the command and what it answered>" }] }
-```
-
-- `confirmed`: the PoC did what the finding says. `evidence` names where.
-- `refuted`: it did not; the finding then holds nothing under `required`.
-- `not_run`: there was nowhere safe to run it; `evidence` says why.
-
-Never create a file, script or folder on a server: run each step from here.
-A PoC that writes to a database runs in a transaction rolled back at its end
-when the database allows one, and a destructive PoC runs only on a disposable
-copy, else it is `not_run`.
-
-With `required`, a high nobody confirmed counts as `medium` in the verdict,
-and the card's comment says why; a critical still blocks. Each critical and
-high in the comment and in the answer's `findings` reads "confirmed in
-<evidence>", "refuted in <evidence>" or "not verified": use those words when
-drafting the review for a pull request. With `off`, the default, skip this
+With `review.verify` at `advise` or `required`, read the `verify` part: the
+answer's `next` names the PoCs to run. With `off`, the default, skip this
 step.
-
-Done when every standing critical and high has a `verified` result, or
-`review.verify` is `off`.
 
 ### 6. Hand back, then stop
 
@@ -221,75 +183,15 @@ stand: devpit carries them into the new `findings.json`, each with
 `carried_from` naming the run it was found in. Without `previous` the review
 reads from BASE, as in step 1. Steps 2 to 6 are the same.
 
-### Without a card
+### On demand
 
-A pull request, a range or a worktree is reviewed on demand wherever Devflow
-is on in devpit's Settings, with no devflow.yaml needed: pass what to review
-in place of the card.
+These parts load only when asked, from `devpit_devflow_skill` or
+`skill://devflow/devflow-review/<part>.md`:
 
-```json
-{ "pr": 1193, "criteria": ["<a line the change is held to>"] }
-```
-
-```json
-{ "base": "<branch or commit>", "head": "<branch or commit>" }
-```
-
-or `{ "path": "<a worktree of the project>" }`, at its own HEAD against the
-default branch (or `base`). For `pr` devpit asks `gh` for the pull request,
-fetches its head when it is not here, and takes BASE as its merge-base with
-the PR's base branch; its body's checkboxes, else its title and body, join
-the `criteria`. A pull request or a range is read in a detached worktree in
-devpit's home, removed once the review is: never check one out yourself, in
-the project's root or anywhere the person works. With no devflow.yaml the
-reviewers are the person's own layer's, and every persona is otherwise
-`pending`. The run is kept under the project's `reviews/` in devpit's home
-and attached; no card is commented. Steps 2 to 4 and 6 are the same, handing the
-reports back with the same `pr`, `base` and `head`, or `path`, as the
-answer's `next` says; the next stage is the person's to choose, as there is
-no card to move on.
-
-### Retro: code already in production
-
-A range already merged and deployed is reviewed with `mode: "retro"`:
-
-```json
-{ "base": "<the commit before it>", "head": "<the merged commit>", "mode": "retro" }
-```
-
-Nothing can hold it back, so the verdict is `follow_up`, never
-`request_changes`, and there may be no criteria, brief or evidence to hold it
-to: review it against the repo's rules and what it plainly meant to do. Every
-medium or worse defect carries `impact`, the read-only query or log search
-that shows what it touched in production since the deploy (how many records
-it wrote wrong, how many requests took the broken path); devpit refuses an
-answer whose defect has none.
-
-Once the review is done, for each defect, ask the person before running its
-`impact`, then run it **read-only**: a `SELECT`, a log search, a metrics
-query, never a write, a migration or a script left on a server. Tell the
-person what each showed. The draft from `devpit_devflow_publish` carries one
-follow-up ticket per medium or worse finding, each defect with its `impact`,
-for the person to file.
-
-### Publish on the pull request
-
-Once a review without a card is done, `devpit_devflow_publish` drafts it for
-its pull request, never posting by itself:
-
-```json
-{ "review": "pr-1193/<the run>" }
-```
-
-The draft, `publish.json` beside `findings.json`, holds each critical, high
-and medium on a line the diff shows as one short comment per line, whatever
-its axes; and one general comment with the low and info as numbered nits,
-what lies outside the diff (a critical or high there as a separate ticket),
-the verification and what is good. Show the person every comment. Only after
-their explicit yes, call again with `apply: true`: devpit posts that same
-draft with `gh`, as one review that only comments, and the general comment.
-A draft that changed since they saw it is not posted; it comes back to show.
-Approving or requesting changes (`event`) is the person's to ask for, never
-yours. Published again, the comments are edited, not posted twice. A
-`destination` of `gitlab` or `bitbucket` is drafted to paste, and a layer's
-`reviewers/publish/<destination>.md` replaces devpit's template.
+| Ask | When |
+|---|---|
+| `{ "name": "devflow-review", "part": "verify" }` | `review.verify` is `advise` or `required` |
+| `{ "name": "devflow-review", "part": "without-card" }` | a pull request, a range or a worktree |
+| `{ "name": "devflow-review", "part": "retro" }` | a range already in production |
+| `{ "name": "devflow-review", "part": "publish" }` | drafting a review for its pull request |
+| `{ "name": "devflow-review", "part": "by-hand" }` | `devpit_devflow_review` is not listed |

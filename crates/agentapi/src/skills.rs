@@ -27,6 +27,16 @@ pub const NAMES: [&str; 7] = [
     "devflow-setup",
 ];
 
+/// The parts of a skill that load only when asked, beside its SKILL.md, as
+/// the tool's `part` choices: `skill://devflow/<skill>/<part>.md`.
+pub const PARTS: [(&str, &str); 5] = [
+    ("devflow-review", "verify"),
+    ("devflow-review", "without-card"),
+    ("devflow-review", "retro"),
+    ("devflow-review", "publish"),
+    ("devflow-review", "by-hand"),
+];
+
 const MIME: &str = "text/markdown";
 
 /// Where a listed resource carries its entry, under the extension's prefix.
@@ -111,6 +121,13 @@ pub(crate) fn prompt(params: &Value, offer: &Offer, ask: Ask) -> Result<Value, S
 
 /// What the tool says: the SKILL.md as it is, then where it came from.
 pub(crate) fn said(answer: &Value) -> Value {
+    let name = match answer["part"].as_str() {
+        Some(part) => format!(
+            "{}'s part {part}",
+            answer["name"].as_str().unwrap_or("This skill")
+        ),
+        None => answer["name"].as_str().unwrap_or("This skill").to_owned(),
+    };
     let from = match answer["file"].as_str() {
         Some(file) => format!(
             "the {} layer, {file}",
@@ -119,8 +136,7 @@ pub(crate) fn said(answer: &Value) -> Value {
         None => "devpit's built-in skills".to_owned(),
     };
     let about = format!(
-        "{} is from {from}; {}.",
-        answer["name"].as_str().unwrap_or("This skill"),
+        "{name} is from {from}; {}.",
         answer["skill"]["resources"][0]["digest"]
             .as_str()
             .unwrap_or("no digest"),
