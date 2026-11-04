@@ -3,9 +3,10 @@
 //!
 //! Asked for only when the call says how (`limit`, `cursor`, `column`, `epic`,
 //! `text` or `done`): without any of them `board` answers every card, as it
-//! always did. A cursor names the last card read by its place, never by a
-//! count, so a card moved between two pages neither repeats nor pushes
-//! another out of sight.
+//! always did. A cursor names the last card read and the first not read,
+//! each with its place, never a count: the next page starts by whichever of
+//! the two did not move, so a card moved between two pages can repeat or be
+//! missed only itself, never push another out of sight.
 
 use devpit_rpc::{Board, Card, Column};
 use serde_json::{json, Value};
@@ -30,7 +31,7 @@ pub(crate) fn asked(params: &Value) -> bool {
 /// What a page is asked for.
 struct Ask {
     limit: usize,
-    after: Option<(String, i32, String)>,
+    after: Option<Cursor>,
     column: Option<String>,
     epic: Option<String>,
     text: Option<String>,
@@ -81,22 +82,64 @@ impl Ask {
     }
 }
 
-/// `<column>:<position>:<card>`: the last card a page showed.
-fn cursor(column: &str, card: &Card) -> String {
-    format!("{column}:{}:{}", card.position, card.id)
+/// Where a lane's next page starts: the last card read and the first not
+/// read, each with the place it had.
+struct Cursor {
+    column: String,
+    last: (i32, String),
+    next: (i32, String),
 }
 
-fn cursor_of(cursor: &str) -> Result<(String, i32, String), String> {
+/// `<column>:<place>:<last card>:<place>:<next card>`.
+fn cursor(column: &str, last: (i64, &str), next: (i64, &str)) -> String {
+    format!("{column}:{}:{}:{}:{}", last.0, last.1, next.0, next.1)
+}
+
+fn cursor_of(cursor: &str) -> Result<Cursor, String> {
     let refused = || {
         format!("`{cursor}` is not a cursor this board gave: pass a lane's `nextCursor` as it came")
     };
-    let mut parts = cursor.splitn(3, ':');
-    let (Some(column), Some(position), Some(card)) = (parts.next(), parts.next(), parts.next())
-    else {
+    let parts: Vec<&str> = cursor.split(':').collect();
+    let [column, last_at, last, next_at, next] = parts[..] else {
         return Err(refused());
     };
-    let position = position.parse().map_err(|_| refused())?;
-    Ok((column.to_owned(), position, card.to_owned()))
+    let place = |at: &str| at.parse::<i32>().map_err(|_| refused());
+    Ok(Cursor {
+        column: column.to_owned(),
+        last: (place(last_at)?, last.to_owned()),
+        next: (place(next_at)?, next.to_owned()),
+    })
+}
+
+impl Cursor {
+    /// Where in `cards`, as they are now, the next page starts. Each card
+    /// the cursor names says where; when they disagree one of them moved,
+    /// and it is the one whose place changed more. A tie repeats a card
+    /// rather than skip one.
+    fn start(&self, cards: &[&Card]) -> usize {
+        let at = |id: &str| cards.iter().position(|card| card.id == id);
+        let moved = |(was, id): &(i32, String)| {
+            cards
+                .iter()
+                .find(|card| card.id == *id)
+                .map(|card| (card.position - was).abs())
+        };
+        let after_last = at(&self.last.1).map(|at| at + 1);
+        let at_next = at(&self.next.1);
+        match (after_last, at_next) {
+            (Some(one), Some(other)) if one == other => one,
+            (Some(one), Some(other)) => match moved(&self.last).cmp(&moved(&self.next)) {
+                std::cmp::Ordering::Greater => other,
+                std::cmp::Ordering::Less => one,
+                std::cmp::Ordering::Equal => one.min(other),
+            },
+            (Some(one), None) => one,
+            (None, Some(other)) => other,
+            // Both left the lane: by the place the next one had.
+            (None, None) => cards
+                .partition_point(|card| (card.position, &card.id) < (self.next.0, &self.next.1)),
+        }
+    }
 }
 
 /// The page `params` asks for: each lane with its total, its first cards
@@ -111,7 +154,7 @@ pub(crate) fn page(
     let named = ask
         .column
         .as_deref()
-        .or(ask.after.as_ref().map(|(column, _, _)| column.as_str()));
+        .or(ask.after.as_ref().map(|after| after.column.as_str()));
     let lanes: Vec<&Column> = match named {
         Some(named) => vec![board
             .columns
@@ -144,16 +187,8 @@ pub(crate) fn page(
                 lane["counted"] = json!("its cards come with `done: true` or `column`");
                 return lane;
             }
-            // After the card the cursor names, where it is now: moving a card
-            // renumbers the lane it enters. Its old place when it has left.
             let start = match &ask.after {
-                Some((at, position, id)) if *at == column.id => {
-                    match cards.iter().position(|card| card.id == *id) {
-                        Some(at) => at + 1,
-                        None => cards
-                            .partition_point(|card| (card.position, &card.id) <= (*position, id)),
-                    }
-                }
+                Some(after) if after.column == column.id => after.start(&cards),
                 _ => 0,
             };
             let shown = &cards[start..(start + ask.limit).min(total)];
@@ -166,10 +201,12 @@ pub(crate) fn page(
                     listed
                 })
                 .collect::<Vec<_>>());
-            if start + shown.len() < total {
-                if let Some(last) = shown.last() {
-                    lane["nextCursor"] = json!(cursor(&column.id, last));
-                }
+            if let (Some(last), Some(next)) = (shown.last(), cards.get(start + shown.len())) {
+                lane["nextCursor"] = json!(cursor(
+                    &column.id,
+                    (last.position.into(), &last.id),
+                    (next.position.into(), &next.id)
+                ));
             }
             lane
         })

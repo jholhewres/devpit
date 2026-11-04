@@ -158,3 +158,76 @@ fn the_cursor_repeats_nothing_when_a_card_enters_the_lane_and_renumbers_it() {
 fn full_is_the_whole_board_whatever_came_with_it() {
     assert!(!asked(&json!({ "full": true, "column": "doing" })));
 }
+
+/// Read 10 of 30, move a card within the lane as move_card does (renumbering
+/// it), read on: every card is read, and only the one that moved may repeat.
+fn moved_within(card: &str, to: usize) -> Vec<String> {
+    let mut board = board(30);
+    let first = page(&board, &json!({ "column": "backlog", "limit": 10 }), row).expect("page 1");
+    let mut seen = ids(&first["columns"][0]);
+    let cursor = first["columns"][0]["nextCursor"]
+        .as_str()
+        .expect("a cursor")
+        .to_owned();
+    let mut order: Vec<String> = (0..30).map(|at| format!("card_backlog_{at:03}")).collect();
+    order.retain(|id| id != card);
+    order.insert(to, card.to_owned());
+    for one in board
+        .cards
+        .iter_mut()
+        .filter(|one| one.column_id == "backlog")
+    {
+        one.position = order
+            .iter()
+            .position(|id| *id == one.id)
+            .expect("in the lane") as i32;
+    }
+    let next = page(&board, &json!({ "cursor": cursor, "limit": 50 }), row).expect("page 2");
+    seen.extend(ids(&next["columns"][0]));
+    seen
+}
+
+fn every_card_once_but_maybe_missed(seen: &[String], moved: &str) {
+    for at in 0..30 {
+        let id = format!("card_backlog_{at:03}");
+        let times = seen.iter().filter(|one| **one == id).count();
+        assert!(
+            times == 1 || (id == moved && times == 0),
+            "{id} was read {times} times"
+        );
+    }
+}
+
+fn every_card_once_but(seen: &[String], moved: &str) {
+    for at in 0..30 {
+        let id = format!("card_backlog_{at:03}");
+        let times = seen.iter().filter(|one| **one == id).count();
+        assert!(times >= 1, "{id} was skipped");
+        assert!(times == 1 || id == moved, "{id} was read {times} times");
+    }
+}
+
+#[test]
+fn a_read_card_moved_to_the_end_of_its_lane_disturbs_no_other() {
+    let seen = moved_within("card_backlog_009", 29);
+    every_card_once_but(&seen, "card_backlog_009");
+}
+
+#[test]
+fn the_card_the_cursor_names_moved_to_the_top_disturbs_no_other() {
+    let seen = moved_within("card_backlog_010", 0);
+    // Not read yet and now above the cursor: only it may be missed.
+    every_card_once_but_maybe_missed(&seen, "card_backlog_010");
+}
+
+#[test]
+fn the_last_card_read_moved_to_the_top_disturbs_no_other() {
+    let seen = moved_within("card_backlog_009", 0);
+    every_card_once_but(&seen, "card_backlog_009");
+}
+
+#[test]
+fn the_next_card_moved_to_the_end_is_read_once_and_disturbs_no_other() {
+    let seen = moved_within("card_backlog_010", 29);
+    every_card_once_but(&seen, "");
+}

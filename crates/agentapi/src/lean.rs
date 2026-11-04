@@ -195,9 +195,9 @@ fn board(answer: Value) -> Value {
 }
 
 /// A page wider than [`BUDGET`] keeps fewer cards in each lane, and each
-/// lane cut shorter names its last card kept as `nextCursor`, so reading on
-/// skips nothing. Only a page says each card's place; the whole board is
-/// left to [`fitted`].
+/// lane cut shorter names its last card kept and the first left out as
+/// `nextCursor`, so reading on skips nothing. Only a page says each
+/// card's place; the whole board is left to [`fitted`].
 fn fewer(answer: &mut Value) {
     let Some(columns) = answer["columns"].as_array_mut() else {
         return;
@@ -219,13 +219,16 @@ fn fewer(answer: &mut Value) {
             let Some(kept) = column["cards"].as_array_mut() else {
                 continue;
             };
-            kept.truncate(most);
-            let last = &kept[most - 1];
+            let (last, next) = (&kept[most - 1], &kept[most]);
+            // The app's cursor (`board_page::cursor`): the last card kept and the first left out.
             let cursor = format!(
-                "{lane}:{}:{}",
+                "{lane}:{}:{}:{}:{}",
                 last["position"],
-                last["id"].as_str().unwrap_or_default()
+                last["id"].as_str().unwrap_or_default(),
+                next["position"],
+                next["id"].as_str().unwrap_or_default()
             );
+            kept.truncate(most);
             column["nextCursor"] = json!(cursor);
         }
     }
