@@ -1,9 +1,12 @@
+/// <reference types="vitest/config" />
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve, sep } from 'node:path'
 
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+
+import { testReport } from './testReport.ts'
 
 /**
  * 17800 rather than Vite's 5173.
@@ -141,5 +144,6 @@ export default defineConfig({
         remote: resolve(import.meta.dirname, 'remote.html')
       }
     }
-  }
+  },
+  test: testReport(process.env)
 })
