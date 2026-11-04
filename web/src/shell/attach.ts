@@ -2,8 +2,55 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 
 import { commands } from '../gen/bindings'
 import { inBrowser } from '../transport'
+import { PaneSocket, type PaneListener } from './paneSocket'
 import { reason } from './reason'
 import { inTauri } from './window'
+
+/* One live pane, whichever way its bytes travel. */
+export interface Pane {
+  write: (data: string) => void
+  resize: (rows: number, cols: number) => Promise<{ rows: number; cols: number } | null>
+  /** Parsed bytes, so the pty reads on. */
+  ack: (bytes: number) => void
+  /** The page of history before what this attach holds, where there is one. */
+  older: () => Promise<{ left: number; bytes: Uint8Array } | null>
+  detach: () => void
+}
+
+/* Desktop: the URL with its ticket, asked of the window's own IPC once. A
+   browser signed in by cookie opens `/panes` on the page's own host. `null`
+   when the loopback server is not running: the panes fall back to the
+   channel. */
+let socket: Promise<PaneSocket | null> | null = null
+
+function paneSocket(): Promise<PaneSocket | null> {
+  socket ??= (async () => {
+    if (inBrowser()) return new PaneSocket(async () => new WebSocket(`ws://${window.location.host}/panes`))
+    if (!inTauri()) return null
+    const url = (await invoke('panes_socket').catch(() => null)) as string | null
+    return url ? new PaneSocket(async () => new WebSocket(url)) : null
+  })()
+  return socket
+}
+
+/**
+ * Attaches `paneId`: over the panes socket when there is one, else over the
+ * channel, with its scrollback first. The replay of a socket attach comes in
+ * the stream itself, before the first live byte.
+ */
+export async function attachPane(
+  projectId: string,
+  paneId: string,
+  size: { rows: number; cols: number },
+  on: PaneListener,
+): Promise<Pane | null> {
+  const panes = await paneSocket()
+  if (panes) return panes.attach(projectId, paneId, size, on)
+  const past = await scrollback(paneId)
+  if (past) on.output(new TextEncoder().encode(past), true)
+  const attached = attach(projectId, paneId, size, (bytes) => on.output(bytes, false), on.end)
+  return attached && { ...attached, ack: () => undefined, older: async () => null }
+}
 
 /* The pty streams raw bytes over a Channel rather than JSON: a terminal that
    round-trips its output through UTF-8 JSON loses the bytes it exists to
