@@ -1,7 +1,7 @@
 //! What each pane's agent last said through its hooks, so the live sessions
 //! read a pane's screen only when its agent says it waits on a person.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::card_activity::Doing;
@@ -9,9 +9,9 @@ use crate::card_activity::Doing;
 #[derive(Default)]
 pub(crate) struct PaneStates {
     heard: HashMap<String, Doing>,
-    /// Panes read once without a word from their hooks: alive from before the
-    /// app started, or an agent with none.
-    looked: HashSet<String>,
+    /// Panes no hook spoke for, alive from before the app or an agent with
+    /// none: whether their last read showed a prompt.
+    looked: HashMap<String, bool>,
 }
 
 impl PaneStates {
@@ -19,13 +19,20 @@ impl PaneStates {
         self.heard.insert(leaf.to_owned(), doing);
     }
 
+    /// What a read of a pane no hook spoke for showed.
+    pub(crate) fn read(&mut self, leaf: &str, prompt: bool) {
+        if !self.heard.contains_key(leaf) {
+            self.looked.insert(leaf.to_owned(), prompt);
+        }
+    }
+
     /// Whether the screen is worth reading: the agent said it waits, or it has
-    /// said nothing yet and was never read.
+    /// said nothing and was never read or was last seen on a prompt.
     pub(crate) fn should_look(&mut self, leaf: &str) -> bool {
         match self.heard.get(leaf) {
             Some(Doing::Waiting) => true,
             Some(_) => false,
-            None => self.looked.insert(leaf.to_owned()),
+            None => self.looked.get(leaf).copied().unwrap_or(true),
         }
     }
 }
@@ -38,6 +45,12 @@ fn states() -> &'static Mutex<PaneStates> {
 pub(crate) fn heard(leaf: &str, doing: Doing) {
     if let Ok(mut states) = states().lock() {
         states.heard(leaf, doing);
+    }
+}
+
+pub(crate) fn read(leaf: &str, prompt: bool) {
+    if let Ok(mut states) = states().lock() {
+        states.read(leaf, prompt);
     }
 }
 

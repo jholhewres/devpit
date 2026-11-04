@@ -516,7 +516,13 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // Read only where the agent's hooks say it waits on a person.
     let waiting_screen = |target: &str| {
         let leaf = pane_of(target)?.pane_id;
-        crate::pane_said::should_look(&leaf).then(|| screen(target))?
+        if !crate::pane_said::should_look(&leaf) {
+            return None;
+        }
+        let shown = screen(target);
+        let prompt = shown.as_deref().and_then(crate::live_prompt::pending);
+        crate::pane_said::read(&leaf, prompt.is_some());
+        shown
     };
     let windows = windows_now();
     let mut sessions = read(
