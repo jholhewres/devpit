@@ -84,6 +84,18 @@ impl Taps {
         }
     }
 
+    /// Starts reading for a window about to be made, and answers the pipe to
+    /// make it with, so nothing it prints first is missed.
+    pub(crate) fn ahead_of(
+        &self,
+        app: &tauri::AppHandle,
+        project_id: &str,
+        leaf_id: &str,
+    ) -> Option<String> {
+        let mut open = self.open.lock().ok()?;
+        start(&mut open, app, project_id, leaf_id)
+    }
+
     /// Stops listening. The pane keeps running; only the copy ends.
     pub fn forget(&self, server: &devpit_tmux::Server, leaf_id: &str, target: &str) {
         let Ok(mut open) = self.open.lock() else {

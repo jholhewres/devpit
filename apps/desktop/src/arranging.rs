@@ -74,10 +74,23 @@ pub(crate) fn session_split_now(
                 &project_id,
                 &cwd,
             ));
+            let target = devpit_tmux::Server::target(&session, &new_id);
+            // Tapped as it is made where there is a session to add it to, so
+            // its first prompt, and the folder it announces, are not missed.
+            if server.has_session(&session).unwrap_or(false) {
+                let made = match state.taps.ahead_of(state.app(), &project_id, &new_id) {
+                    Some(pipe) => server.new_window_piped(&session, &new_id, &cwd, &pipe),
+                    None => server.new_window(&session, &new_id, &cwd),
+                };
+                if let Err(err) = made {
+                    state.taps.forget(&server, &new_id, &target);
+                    return Err(tmux_err(err));
+                }
+                return Ok(target);
+            }
             server
                 .ensure_session(&session, &new_id, &cwd)
                 .map_err(tmux_err)?;
-            let target = devpit_tmux::Server::target(&session, &new_id);
             // Tapped like every other leaf, or it has no blocks and never says
             // its folder.
             state
