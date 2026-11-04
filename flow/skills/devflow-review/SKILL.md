@@ -19,8 +19,9 @@ rule and build the wrong thing, or build the right thing and break the rules.
 
 `devflow-all` covers all three axes in one reading, each finding naming its
 own `axis`. With `review.scale` on (`scale: true`, or `small_lines` or
-`sensitive` set), a small diff touching no sensitive path gets it alone;
-anything else gets `review.reviewers`.
+`sensitive` set), a first review of a small diff touching no sensitive path
+gets it alone; anything else gets `review.reviewers`. A re-review gets it
+alone unless the file says `scale: false`.
 
 ## Ground rules
 
@@ -67,10 +68,9 @@ Start one fresh subagent per pending persona, in parallel. Each gets the
 packet's path and its persona's text from `persona-<persona>.md` beside the
 packet (the answer's `next` names the folder), and answers with one findings
 object. When you cannot start subagents, review the axes one after another
-yourself, from the packet alone. Never run a suite that a check in
-`devflow.yaml` runs under `exclusive` (a shared test database, say): a card's
-checks may hold that lock, and your run would break theirs. Its evidence is in
-the packet. Then hand the answers to the same run:
+yourself, from the packet alone. Never run a suite a check runs under
+`exclusive` (a shared test database, say): a card's checks may hold that
+lock. Its evidence is in the packet. Then hand the answers to the same run:
 
 ```json
 { "card": "<card id>", "run": "<the run it answered>", "reports": [{ "version": 1, "reviewers": [{ "agent": "claude", "persona": "devflow-spec" }], "verdict": "approve", "findings": [], "done_well": ["<a specific thing the change does well>"], "verification": { "tests": "<what the tests prove>", "evidence": "<the checks on the card>" } }] }
@@ -123,7 +123,8 @@ devpit merges every answer into `findings.json` in the run, the file the gate
 reads. Within an axis, the same problem found by several reviewers — same
 file, lines that meet, same cause — is kept once, the most severe as said,
 with `found_by` and `agreement` ("2 of 3"); `review.consolidate` says who
-judges the cause (`jev`, `agent`: one model pass, `none`: titles alike). A
+judges the cause (`none`, the default: titles alike; `agent`: one model
+pass; `jev`). A
 finding is never moved or re-ranked across axes. Each finding gets an
 `anchor` from the diff and HEAD: `added`, `context`, `outside_hunk`,
 `not_in_diff`, or `beyond_eof` — a line HEAD does not have, which is taken out
@@ -169,18 +170,19 @@ Done when the reply names the verdict and each axis's worst finding (or
 ### After a fix: review the change since
 
 Once execution has fixed a `request_changes`, review again with `previous`:
-the run of the last review, the one whose blocking findings were fixed.
+the run whose blocking findings were fixed.
 
 ```json
 { "card": "<card id>", "previous": "<the last review's run>" }
 ```
 
-The packet then carries that run's blocking findings under "Previous
-findings", and the diff only from its HEAD to the new HEAD. A reviewer reports
-again, at HEAD's lines, any of them that still stands; one not reported again
-is taken as fixed. Its other findings were not read again, so they still
-stand: devpit carries them into the new `findings.json`, each with
-`carried_from` naming the run it was found in. Without `previous` the review
+The packet then carries, under "Previous findings", that run's blocking
+findings and those on lines the delta changed, and the diff only from its
+HEAD to the new HEAD. A reviewer reports again, at HEAD's lines, any that
+still stands; one not reported again is taken as fixed (a non-blocking one is
+listed in `dropped`). The others still stand: devpit carries them into the
+new `findings.json`, each with `carried_from` naming its run. Without
+`previous` the review
 reads from BASE, as in step 1. Steps 2 to 6 are the same.
 
 ### On demand

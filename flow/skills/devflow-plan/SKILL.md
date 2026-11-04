@@ -108,7 +108,10 @@ nothing:
 ```
 
 Show the person the breakdown as a numbered list: title, blocked by, what it
-delivers. Ask whether the granularity is right, whether each edge really
+delivers. When the answer has `advice` (the plan rubric's failing questions),
+show it with the plan: it never holds the plan unless the project names the
+rubric under `decisions.rubrics.plan` and Decisions is in `enforce`, where it
+comes back as `warning`. Ask whether the granularity is right, whether each edge really
 gates, and whether any card should merge or split. Ask them to approve on the
 board, or with an explicit yes here. End the turn.
 

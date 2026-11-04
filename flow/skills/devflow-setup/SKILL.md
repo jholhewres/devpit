@@ -52,12 +52,16 @@ Done when you can say the state and list each detected fact with its source.
 
 Call `devpit_devflow_setup` with `{"preset": "recommended"}` and no `apply`.
 The recommended setup is: briefing and plan approved by the person; the
-detected checks, each as a script under `.devpit/devflow/scripts/`; one
-reviewer, with the security persona; the `devflow-done` gate; Decisions in
-`shadow` when a key exists.
+detected checks, each as a script under `.devpit/devflow/scripts/`, a
+detected E2E command under `stages.execution.release` (run once for a
+release, not for each card); one reviewer, with the security persona, and
+`review.scale: true`; findings merged as they are (`consolidate: none`); the
+`devflow-done` gate; Decisions in `shadow` when a key exists, with no brief
+rubric and the plan rubric as advice.
 
 Show the preview as a short list (stages, each check with its command and the
-file it came from, reviewers, gate, Decisions), then the open decisions from
+file it came from, the release checks apart, reviewers, gate, Decisions), then
+the open decisions from
 step 3, if any. A command found that cannot run here is not recommended: its
 program is not installed, or a `make` target's recipe calls one that is not.
 The preview's `unavailable` says which and why; show each.
@@ -140,10 +144,14 @@ without `apply`:
 More reviewers are more items of `review.reviewers`, each
 `{ "agent": "codex", "persona": "devflow-spec", "model": "…" }` on that CLI's
 own sign-in; `review.consolidate` says how their findings become one list:
-`jev` (Decisions, else a model pass), `agent` (one model pass) or `none`.
-`review.scale` (off unless set; `true`, or `{ small_lines, sensitive }`)
-sends a small diff that touches no sensitive path to one `devflow-all`
-reviewer instead. devpit's personas are read from devpit, never copied: to
+`none` (the default: merged as they are), `agent` (one model pass) or `jev`
+(Decisions, else a model pass). `review.scale` (`true`, as the recommended
+setup writes it, or `{ small_lines, sensitive }`) sends a small diff that
+touches no sensitive path to one `devflow-all` reviewer instead; a re-review
+always goes to one, unless it says `false`. `stages.execution.release` holds
+checks run once for a release, by name, never for a card's evidence or the
+gate. `decisions.rubrics.plan` opts the plan rubric in: only then does
+`enforce` hold a plan; otherwise its answer is advice. devpit's personas are read from devpit, never copied: to
 customize one, write it as `.devpit/devflow/reviewers/<a new name>.md` and
 name that persona in `review.reviewers`. A check added here gets a script
 under `scripts/` of its own, as the setup's do.

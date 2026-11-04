@@ -94,13 +94,18 @@ grep for `[DEBUG-` finds nothing, and the reply names the hypothesis that held.
 
 ### 5. Write the E2E spec, when the project has one
 
-When `devflow.yaml` has a check named `e2e`, write
+When `devflow.yaml` has a check named `e2e`, under `stages.execution.checks`
+or `stages.execution.release`, write
 `.devpit/devflow/e2e/<card id>-<slug>.spec.ts` (`stages.execution.e2e_dir` moves
 the folder), the slug being the card's title in kebab case, in the framework
 that check runs. Give it one test per criterion a person can see, titled with
 the criterion; when the check keeps `screenshots` or `video`, each test ends in
 a screenshot. Run it red, then green, like any test. Tests the project already
 has stay where they are.
+
+An `e2e` only under `stages.execution.release` runs once for a release, not
+for each card: still write the spec, since the release suite runs the specs
+in that folder, and run it alone; leave the check out of `evidence`.
 
 Done when every visible criterion has a test in the spec, or the project has
 no `e2e` check.
