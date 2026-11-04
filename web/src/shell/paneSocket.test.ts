@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { Kind, PaneSocket, frame } from './paneSocket'
+import { Kind, PaneSocket, UNAVAILABLE, frame } from './paneSocket'
 
 /* A socket opened by hand: what the page sent, and frames pushed back. */
 class FakeSocket {
@@ -173,5 +173,22 @@ describe('panes over one binary socket', () => {
     panes.attach('p', 'a', { rows: 1, cols: 1 }, a.on)
     await settle()
     expect(a.ended).toHaveLength(1)
+  })
+
+  it('says the socket is unavailable when it closes before it opens, or cannot be made', async () => {
+    const { panes, sockets } = setup()
+    const a = listener()
+    panes.attach('p', 'a', { rows: 1, cols: 1 }, a.on)
+    await settle()
+    sockets[0].close()
+    expect(a.ended).toEqual([UNAVAILABLE])
+
+    const refused = new PaneSocket(async () => {
+      throw new Error('SecurityError: The operation is insecure.')
+    })
+    const b = listener()
+    refused.attach('p', 'b', { rows: 1, cols: 1 }, b.on)
+    await settle()
+    expect(b.ended).toEqual([UNAVAILABLE])
   })
 })

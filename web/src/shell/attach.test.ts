@@ -9,6 +9,7 @@ const core = vi.hoisted(() => {
     asked,
     invoke: (command: string): Promise<unknown> => {
       asked.push(command)
+      if (command === 'panes_socket') return Promise.resolve('ws://127.0.0.1:1/panes?k=x')
       return command === 'session_attach' ? new Promise(() => {}) : Promise.reject(gone)
     },
     Channel: class {
@@ -18,7 +19,8 @@ const core = vi.hoisted(() => {
 })
 vi.mock('@tauri-apps/api/core', () => core)
 
-import { attach } from './attach'
+import { attach, attachPane } from './attach'
+import { UNAVAILABLE } from './paneSocket'
 
 afterEach(() => {
   delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
@@ -41,6 +43,27 @@ describe('an attached pane', () => {
       expect(loose).not.toHaveBeenCalled()
     } finally {
       process.off('unhandledRejection', loose)
+    }
+  })
+
+  /* A policy or a server that refuses the socket leaves the pane on the
+     channel, not on a blank screen retrying forever. */
+  it('sends the next attach over the channel once the socket could not be opened', async () => {
+    ;(window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {}
+    vi.stubGlobal('WebSocket', function () {
+      throw new Error('SecurityError: The operation is insecure.')
+    })
+    try {
+      const ended: (string | null)[] = []
+      const on = { output: () => {}, end: (why: string | null) => ended.push(why) }
+      await attachPane('p', 'leaf_1', { rows: 24, cols: 80 }, on)
+      await new Promise((settled) => setTimeout(settled, 0))
+      expect(ended).toEqual([UNAVAILABLE])
+      expect(core.asked).not.toContain('session_attach')
+      await attachPane('p', 'leaf_1', { rows: 24, cols: 80 }, on)
+      expect(core.asked).toContain('session_attach')
+    } finally {
+      vi.unstubAllGlobals()
     }
   })
 })

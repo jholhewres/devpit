@@ -60,6 +60,8 @@ interface Open {
 
 /** The end every pane gets when the socket closes under it: worth attaching again. */
 export const LOST = 'the terminal connection closed'
+/** The end every pane gets when the socket could not be opened at all. */
+export const UNAVAILABLE = 'the terminal connection could not be opened'
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
@@ -128,7 +130,7 @@ export class PaneSocket {
       if (!socket) {
         this.opening = null
         this.waiting = []
-        this.endAll('the terminal connection could not be opened')
+        this.endAll(UNAVAILABLE)
         return
       }
       socket.binaryType = 'arraybuffer'
@@ -141,11 +143,12 @@ export class PaneSocket {
       }
       socket.onmessage = (event: MessageEvent) => this.heard(new Uint8Array(event.data as ArrayBuffer))
       socket.onclose = () => {
-        if (this.socket !== socket && this.opening === null) return
+        const opened = this.socket === socket
+        if (!opened && this.opening === null) return
         this.socket = null
         this.opening = null
         this.waiting = []
-        this.endAll(LOST)
+        this.endAll(opened ? LOST : UNAVAILABLE)
       }
     })
   }

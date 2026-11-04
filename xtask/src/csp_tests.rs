@@ -4,7 +4,7 @@ use super::*;
 
 const OURS: &str = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
                     img-src 'self' data: blob:; font-src 'self' data:; \
-                    connect-src 'self' ipc: http://ipc.localhost; worker-src 'self' blob:; \
+                    connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:*; worker-src 'self' blob:; \
                     frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 #[test]
@@ -129,4 +129,21 @@ fn the_media_scheme_reaches_pictures_and_media_only() {
             .any(|why| why.contains("connect-src reaches")),
         "the media scheme was let into connect-src"
     );
+}
+
+/// The panes socket's port is picked at the first run, so connect-src names
+/// any port, on loopback only, and over `ws:` only.
+#[test]
+fn the_one_wildcard_is_the_panes_socket_on_loopback() {
+    for other in [
+        "ws://*:*",
+        "ws://localhost:*",
+        "http://127.0.0.1:*",
+        "wss://127.0.0.1:*",
+    ] {
+        let policy = OURS.replace(PANES_SOCKET, other);
+        assert!(!refusals(&policy, &ALLOWED).is_empty(), "{other}");
+    }
+    let elsewhere = format!("{OURS}; img-src {PANES_SOCKET}");
+    assert!(!refusals(&elsewhere, &ALLOWED).is_empty());
 }

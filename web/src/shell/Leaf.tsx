@@ -4,7 +4,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { attachPane, type Pane } from './attach'
-import { LOST } from './paneSocket'
+import { LOST, UNAVAILABLE } from './paneSocket'
 import { writeBatcher } from './writeBatcher'
 import { gpuWhileShown, measureWideCharacters } from './terminalAddons'
 import { reason } from './reason'
@@ -286,7 +286,8 @@ export function Leaf({
              it is attached again in a moment. */
           end: (failed) => {
             if (dropped) return
-            if (failed === LOST) setTimeout(() => !dropped && setRound((was) => was + 1), 1000)
+            if (failed === LOST || failed === UNAVAILABLE)
+              setTimeout(() => !dropped && setRound((was) => was + 1), failed === LOST ? 1000 : 0)
             else if (failed) setError(failed)
           },
         },

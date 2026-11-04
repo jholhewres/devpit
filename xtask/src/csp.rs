@@ -7,8 +7,8 @@
 //!
 //! Only what the window itself fetches passes through it. `plan_limits` and
 //! the account talk to the network from the Rust side through reqwest, so
-//! `connect-src` has nothing to say about them — the one loopback origin named
-//! there is Tauri's own IPC.
+//! `connect-src` has nothing to say about them — the loopback origins named
+//! there are Tauri's own IPC and the app's panes socket.
 
 use std::path::Path;
 
@@ -24,6 +24,10 @@ const ALLOWED_IN_DEV: [&str; 3] = [
     "http://localhost:17800",
     "ws://localhost:17800",
 ];
+
+/// The panes socket on the app's own loopback server: its port is chosen at
+/// the first run, so this is the one source with a wildcard, and only here.
+const PANES_SOCKET: &str = "ws://127.0.0.1:*";
 
 /// Directives that may name nothing at all.
 const MUST_BE_NONE: [&str; 1] = ["object-src"];
@@ -105,9 +109,6 @@ fn refusals(policy: &str, allowed: &[&str]) -> Vec<String> {
     if policy.contains("unsafe-eval") {
         said.push("'unsafe-eval' turns any injected string into code".to_owned());
     }
-    if policy.contains('*') {
-        said.push("a wildcard source is every host there is".to_owned());
-    }
 
     for directive in policy.split(';') {
         let mut words = directive.split_whitespace();
@@ -134,12 +135,16 @@ fn refusals(policy: &str, allowed: &[&str]) -> Vec<String> {
             continue;
         }
         for source in sources {
+            let panes = name == "connect-src" && source == PANES_SOCKET;
+            if source.contains('*') && !panes {
+                said.push("a wildcard source is every host there is".to_owned());
+            }
             let remote = source.starts_with("http://")
                 || source.starts_with("https://")
                 || source.starts_with("ws://")
                 || source.starts_with("wss://");
             let media = MEDIA_DIRECTIVES.contains(&name) && MEDIA.contains(&source);
-            if remote && !allowed.contains(&source) && !media {
+            if remote && !allowed.contains(&source) && !media && !panes {
                 said.push(format!("{name} reaches {source}"));
             }
             if source == "https:" || source == "http:" {

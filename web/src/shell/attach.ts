@@ -2,7 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 
 import { commands } from '../gen/bindings'
 import { inBrowser } from '../transport'
-import { PaneSocket, type PaneListener } from './paneSocket'
+import { PaneSocket, UNAVAILABLE, type PaneListener } from './paneSocket'
 import { reason } from './reason'
 import { inTauri } from './window'
 
@@ -45,7 +45,15 @@ export async function attachPane(
   on: PaneListener,
 ): Promise<Pane | null> {
   const panes = await paneSocket()
-  if (panes) return panes.attach(projectId, paneId, size, on)
+  if (panes)
+    return panes.attach(projectId, paneId, size, {
+      ...on,
+      end: (why) => {
+        /* Refused (a policy, a server gone): the channel from here on. */
+        if (why === UNAVAILABLE) socket = Promise.resolve(null)
+        on.end(why)
+      },
+    })
   const past = await scrollback(paneId)
   if (past) on.output(new TextEncoder().encode(past), true)
   const attached = attach(projectId, paneId, size, (bytes) => on.output(bytes, false), on.end)
