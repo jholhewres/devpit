@@ -59,14 +59,26 @@ fn keep() -> Arc<Vec<Snapped>> {
 }
 
 fn listed() -> Vec<Snapped> {
-    let Ok(server) = crate::sessions::tmux_server() else {
-        return Vec::new();
-    };
-    // No socket, no server: nothing to ask, and no spawn to ask it.
-    if !server.socket_exists() {
-        return Vec::new();
+    let socket = crate::sessions::socket_path().ok();
+    listed_at(socket.as_deref(), || {
+        crate::sessions::tmux_server()
+            .ok()
+            .and_then(|server| server.snapshot().ok())
+            .unwrap_or_default()
+    })
+}
+
+/// The listing `list` makes, only where tmux's socket is. No socket, no
+/// server: nothing to ask, and not even the tmux helper, whose wrapped shell
+/// a ptyd-only machine would build every two seconds for nothing.
+pub(crate) fn listed_at(
+    socket: Option<&std::path::Path>,
+    list: impl FnOnce() -> Vec<Snapped>,
+) -> Vec<Snapped> {
+    match socket {
+        Some(socket) if socket.exists() => list(),
+        _ => Vec::new(),
     }
-    server.snapshot().unwrap_or_default()
 }
 
 /// A project's panes, once each: its own session and its clients all list

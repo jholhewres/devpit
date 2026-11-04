@@ -1,5 +1,5 @@
 use super::*;
-use crate::ptyd_link::{is_ptyd, new_pane, pane_number, BACKEND};
+use crate::ptyd_link::{is_ptyd, new_pane, pane_number, TMUX};
 
 fn in_tmux(leaf_id: &str) -> Result<String, RpcError> {
     Ok(format!("devpit_x:{leaf_id}"))
@@ -15,19 +15,22 @@ fn a_plain_tab_an_agent_tab_and_a_split_go_to_ptyd_while_wanted_and_to_tmux_othe
     let store = Store::open(&home.join("state.db")).expect("store");
     let project = store.add_project(home, None).expect("project");
     let tabs = ["tab_plain".to_owned(), tab_for_card("card_1")];
+    store
+        .set_preference(devpit_core::preference::TERMINAL_BACKEND, TMUX)
+        .expect("set");
 
     for tab in &tabs {
         let layout = first_layout(&store, Some(home), &project, tab, home, in_tmux).expect("tab");
         let (_, target) = layout.tree.leaves()[0];
-        assert!(!is_ptyd(target), "{tab}: off, tmux makes it");
+        assert!(!is_ptyd(target), "{tab}: tmux makes it");
     }
     let split = new_pane(&store, Some(home), &project, "leaf_s", home, || {
         in_tmux("leaf_s")
     });
-    assert!(!is_ptyd(&split.expect("split")), "a split: off, tmux");
+    assert!(!is_ptyd(&split.expect("split")), "a split: tmux");
 
     store
-        .set_preference(devpit_core::preference::TERMINAL_BACKEND, BACKEND)
+        .set_preference(devpit_core::preference::TERMINAL_BACKEND, "ptyd")
         .expect("set");
     let refused = |_: &str| -> Result<String, RpcError> {
         panic!("tmux was asked while the daemon answered")
@@ -61,9 +64,6 @@ fn a_line_typed_into_a_new_ptyd_tab_runs_in_its_shell() {
     let home = daemon.home.path();
     let store = Store::open(&home.join("state.db")).expect("store");
     let project = store.add_project(home, None).expect("project");
-    store
-        .set_preference(devpit_core::preference::TERMINAL_BACKEND, BACKEND)
-        .expect("set");
     let layout = first_layout(&store, Some(home), &project, "tab_a", home, in_tmux).expect("tab");
     let pane = pane_number(&layout.focused_id);
 

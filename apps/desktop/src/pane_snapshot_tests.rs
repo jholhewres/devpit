@@ -80,3 +80,17 @@ fn a_project_whose_last_pane_closed_is_told_once() {
     assert_eq!(told.changed(HashMap::new()), vec!["p1"]);
     assert!(told.changed(HashMap::new()).is_empty());
 }
+
+/// The two-second loop on a machine with no tmux server: no listing, and
+/// not even the tmux helper is asked for one.
+#[test]
+fn with_no_tmux_socket_nothing_is_listed_or_asked() {
+    let home = tempfile::tempdir().expect("home");
+    let socket = home.path().join("tmux.sock");
+    let asked = || -> Vec<Snapped> { panic!("tmux was asked with no socket") };
+    assert!(listed_at(Some(&socket), asked).is_empty());
+    assert!(listed_at(None, asked).is_empty());
+
+    std::fs::write(&socket, b"").expect("socket");
+    assert_eq!(listed_at(Some(&socket), rows).len(), rows().len());
+}

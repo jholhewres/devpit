@@ -13,7 +13,7 @@ pub const AUTO_UPDATE: &str = "general.automatic_updates";
 pub const CONFIRM_STOP: &str = "terminal.confirm_stop";
 /// The minimum contrast the terminal lifts colours to, as a number from 1 to 21.
 pub const TERMINAL_CONTRAST: &str = "terminal.minimum_contrast";
-/// What holds new plain terminals: `ptyd` for devpit-ptyd, anything else tmux.
+/// What holds new terminals: `tmux` for tmux, anything else devpit-ptyd.
 pub const TERMINAL_BACKEND: &str = "terminal.backend";
 /// Where new worktrees are created. Empty is the devpit workspace.
 pub const WORKTREE_BASE: &str = "worktrees.base";

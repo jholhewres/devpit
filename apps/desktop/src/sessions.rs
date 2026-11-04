@@ -80,7 +80,7 @@ pub(crate) fn tmux_server() -> Result<devpit_tmux::Server, RpcError> {
 /// nowhere near the decision that caused it. Which is why it hangs off the
 /// state root and not off a project's directory, whose name is somebody's
 /// folder and as long as they like.
-fn socket_path() -> Result<PathBuf, RpcError> {
+pub(crate) fn socket_path() -> Result<PathBuf, RpcError> {
     Ok(Store::root()?.join("tmux.sock"))
 }
 

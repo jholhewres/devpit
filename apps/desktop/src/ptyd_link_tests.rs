@@ -36,21 +36,23 @@ fn a_leaf_has_the_same_pane_number_on_every_run_and_never_zero() {
 }
 
 #[test]
-fn it_is_off_unless_the_preference_says_ptyd() {
+fn it_is_on_unless_the_preference_says_tmux() {
     let dir = tempfile::tempdir().expect("dir");
     let store = Store::open(&dir.path().join("state.db")).expect("store");
-    assert!(!wanted(&store), "off by default");
+    assert_eq!(wanted(&store), cfg!(unix), "unset means ptyd");
+    for ptyd in ["", "ptyd", " ptyd "] {
+        store
+            .set_preference(preference::TERMINAL_BACKEND, ptyd)
+            .expect("set");
+        assert_eq!(wanted(&store), cfg!(unix), "{ptyd:?}");
+    }
     store
-        .set_preference(preference::TERMINAL_BACKEND, "tmux")
+        .set_preference(preference::TERMINAL_BACKEND, TMUX)
         .expect("set");
-    assert!(!wanted(&store));
-    store
-        .set_preference(preference::TERMINAL_BACKEND, BACKEND)
-        .expect("set");
-    assert_eq!(wanted(&store), cfg!(unix));
+    assert!(!wanted(&store), "tmux means tmux");
 }
 
-/// With the preference on and no daemon to be had, a new terminal is made
+/// With ptyd wanted and no daemon to be had, a new terminal is made
 /// in tmux as it always was: `in_ptyd_at` answers nothing, and that is the
 /// fallback's whole contract with its callers.
 #[cfg(unix)]
@@ -101,15 +103,18 @@ fn a_new_pane_goes_to_ptyd_while_wanted_and_to_tmux_otherwise() {
     let daemon = serving();
     let home = daemon.home.path();
     let store = Store::open(&home.join("state.db")).expect("store");
+    store
+        .set_preference(preference::TERMINAL_BACKEND, TMUX)
+        .expect("set");
     let in_tmux = || Ok("devpit_p:leaf_t".to_owned());
     assert_eq!(
         new_pane(&store, Some(home), "p", "leaf_t", home, in_tmux).expect("made"),
         "devpit_p:leaf_t",
-        "off: tmux makes it"
+        "tmux: tmux makes it"
     );
 
     store
-        .set_preference(preference::TERMINAL_BACKEND, BACKEND)
+        .set_preference(preference::TERMINAL_BACKEND, "ptyd")
         .expect("set");
     let made = new_pane(&store, Some(home), "p", "leaf_s", home, || {
         panic!("tmux was asked while the daemon answered")

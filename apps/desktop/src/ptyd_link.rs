@@ -1,10 +1,10 @@
-//! Terminals held by devpit-ptyd, when the person turned it on.
+//! Terminals held by devpit-ptyd, unless the person keeps them in tmux.
 //!
-//! Off unless `terminal.backend` is `ptyd`. With it on, a new pane — a tab's
-//! first, an agent's or a card's, or a split — is started in the daemon
-//! instead of a tmux window, and outlives the desktop: a crash, a restart or
-//! an update of the same protocol finds it running and attaches again. Every
-//! pane that was made in tmux stays there until it is closed.
+//! On unless `terminal.backend` is `tmux`. A new pane — a tab's first, an
+//! agent's or a card's, or a split — is started in the daemon instead of a
+//! tmux window, and outlives the desktop: a crash, a restart or an update of
+//! the same protocol finds it running and attaches again. Every pane that
+//! was made in tmux stays there until it is closed.
 //!
 //! Whatever goes wrong on the way — no daemon binary, a daemon that will not
 //! start, one of another protocol — the pane is made in tmux as it always
@@ -21,17 +21,18 @@ use devpit_core::{preference, Store};
 /// What a ptyd pane's target starts with, in place of a tmux session.
 pub(crate) const TARGET_PREFIX: &str = "ptyd:";
 
-/// The preference's value that turns it on.
-pub(crate) const BACKEND: &str = "ptyd";
+/// The preference's value that keeps new terminals in tmux.
+pub(crate) const TMUX: &str = "tmux";
 
-/// Whether new plain terminals go to the daemon.
+/// Whether new terminals go to the daemon: unless the person said tmux.
+/// Unset, empty or `ptyd` all mean the daemon.
 pub(crate) fn wanted(store: &Store) -> bool {
     cfg!(unix)
         && store
             .preference(preference::TERMINAL_BACKEND)
             .ok()
             .flatten()
-            .is_some_and(|value| value.trim() == BACKEND)
+            .is_none_or(|value| value.trim() != TMUX)
 }
 
 /// The target a ptyd pane is kept under in the layout.
@@ -237,8 +238,8 @@ pub(crate) fn revive(
     }
 }
 
-/// A new pane made in the daemon of `home`, when the person turned it on
-/// and the daemon can be had. Nothing, for tmux to make it as it always did.
+/// A new pane made in the daemon of `home`, unless the person keeps tmux,
+/// when the daemon can be had. Nothing, for tmux to make it as it always did.
 fn in_ptyd_at(
     store: &Store,
     home: Option<&Path>,
@@ -269,8 +270,8 @@ fn in_ptyd_at(
     None
 }
 
-/// The target of a new pane: the daemon's while the person keeps it on and
-/// it answers, whatever the pane is for or split from; `in_tmux`'s otherwise.
+/// The target of a new pane: the daemon's while it is wanted and it
+/// answers, whatever the pane is for or split from; `in_tmux`'s otherwise.
 pub(crate) fn new_pane(
     store: &Store,
     home: Option<&Path>,

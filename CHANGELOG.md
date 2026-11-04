@@ -3,6 +3,18 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## Unreleased
+
+### New
+
+- **Terminals outlive the window, with no tmux needed.** New terminals,
+  agents' included, run in devpit's own terminal keeper on macOS and Linux.
+  Quitting, a crash or an update finds them running, with the agent's screen
+  as it left it; a keeper that died brings each terminal back in its folder
+  and starts its agent again. Terminals made in tmux stay there until you
+  close them, and when the keeper cannot start, tmux takes the terminal as
+  before.
+
 ## 0.1.46 — 2026-10-30
 
 ### New
