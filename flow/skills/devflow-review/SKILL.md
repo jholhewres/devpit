@@ -51,7 +51,7 @@ branch) and HEAD, writes the packet, `review-context.md` in the run's folder
 (the answer's `packet`), and runs every reviewer `review.reviewers` lists in
 `devflow.yaml` at once, each headless on its own agent CLI and from that
 packet alone. With `review.scale` on, the answer's `scale` says which way it
-went and why; a scaled review runs the first reviewer's CLI on `devflow-all`.
+went and why.
 A CLI not installed or signed out is skipped, and the card says so. An empty
 diff ends the review with "nothing to review".
 
@@ -125,26 +125,12 @@ file, lines that meet, same cause — is kept once, the most severe as said,
 with `found_by` and `agreement` ("2 of 3"); `review.consolidate` says who
 judges the cause (`none`, the default: titles alike; `agent`: one model
 pass; `jev`). A
-finding is never moved or re-ranked across axes. Each finding gets an
-`anchor` from the diff and HEAD: `added`, `context`, `outside_hunk`,
-`not_in_diff`, or `beyond_eof` — a line HEAD does not have, which is taken out
-and listed in `dropped` with why. The verdict is
+finding is never moved or re-ranked across axes. A finding on a
+line HEAD does not have goes to `dropped`. The verdict is
 `request_changes` when any finding's severity is in `review.block_on`
 (`critical` and `high` when unset), else `approve`. devpit attaches the
-files to the card and comments:
-
-```markdown
-[devflow] review: <n> findings (<x> critical, <y> high) · verdict: <verdict>
-Reviewers: each one's findings, time and cost, or why it was skipped
-## Spec
-- <severity> `file:line` <title> (<agreement>)
-## Standards
-## Security
-```
-
-Findings of different axes at one `file:line` are one item in the comment,
-under the first axis, naming them all (`[spec+standards]`); `findings.json`
-keeps them apart.
+files to the card and comments the verdict and the findings by axis, with
+each reviewer's time and cost.
 
 The person can call a finding a false positive in the card's diff; it then
 holds nothing.
@@ -163,6 +149,16 @@ Reply with the verdict and the worst finding **within each axis**; never pick
 one winner across axes. On `approve`, the next stage is the completion
 (`devflow-completion`); on `request_changes`, execution again, with the blocking
 findings. End the turn.
+
+**An approval closes the review.** Findings below `review.block_on` are not
+fixed in this card: they go under `Left` in the handoff, or into a new card if
+the person says yes. A fix moves HEAD, and the gate then asks for another
+review that finds new nits.
+
+**A blocking finding that comes back is a design question.** When a re-review
+reports a blocking finding of the previous run again, on the same file and
+axis, do not patch it a third time: quote both findings and ask the person to
+choose the design that removes the class.
 
 Done when the reply names the verdict and each axis's worst finding (or
 "none"), and no file in the repo changed.

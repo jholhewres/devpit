@@ -201,3 +201,27 @@ fn a_projects_own_review_skill_serves_its_own_parts_first() {
         .expect("text")
         .starts_with(REVIEW_PARTS[3].1));
 }
+
+/// An approval ends the review loop, and a blocking finding that repeats goes
+/// to the person: both ride in the review skill every card is served.
+#[test]
+fn the_review_skill_closes_on_an_approval_and_asks_about_a_repeated_blocker() {
+    let (dir, here) = enabled_in("prj_devflow_review_closes");
+    let served = crate::devflow::respond_from(
+        None,
+        "devflow_skill",
+        &here,
+        dir.path(),
+        None,
+        &json!({ "name": "devflow-review" }),
+    )
+    .expect("the skill");
+    let text = served["text"].as_str().expect("text");
+    for rule in [
+        "**An approval closes the review.** Findings below `review.block_on` are not\nfixed in this card: they go under `Left` in the handoff",
+        "**A blocking finding that comes back is a design question.**",
+        "do not patch it a third time",
+    ] {
+        assert!(text.contains(rule), "the review skill says: {rule}");
+    }
+}
