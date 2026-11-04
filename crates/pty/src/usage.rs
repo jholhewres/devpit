@@ -39,10 +39,22 @@ pub struct Cost {
 /// Measured on a real pane: `sleep 600 & sleep 700` reported one process to
 /// the foreground reader and two to this one.
 pub fn on_ttys(ttys: &[String]) -> std::collections::HashMap<String, Vec<u32>> {
-    let mut found: std::collections::HashMap<String, Vec<u32>> = std::collections::HashMap::new();
     if ttys.is_empty() {
-        return found;
+        return std::collections::HashMap::new();
     }
+    #[cfg(target_os = "linux")]
+    {
+        crate::proc_tty::on_ttys_in(&crate::proc_tty::table(), ttys)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        on_ttys_by_ps(ttys)
+    }
+}
+
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+fn on_ttys_by_ps(ttys: &[String]) -> std::collections::HashMap<String, Vec<u32>> {
+    let mut found: std::collections::HashMap<String, Vec<u32>> = std::collections::HashMap::new();
     let bare: Vec<String> = ttys
         .iter()
         .map(|tty| tty.strip_prefix("/dev/").unwrap_or(tty).to_owned())

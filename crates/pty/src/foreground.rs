@@ -68,6 +68,18 @@ pub fn looking(ttys: &[String]) -> Vec<Front> {
     if ttys.is_empty() {
         return Vec::new();
     }
+    #[cfg(target_os = "linux")]
+    {
+        crate::proc_tty::fronts_in(&crate::proc_tty::table(), ttys, crate::proc_tty::argv)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        by_ps(ttys)
+    }
+}
+
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+fn by_ps(ttys: &[String]) -> Vec<Front> {
     let Ok(output) = Command::new("ps")
         .args(["-o", "pid=,pgid=,tty=,stat=,args=", "-t", &ttys.join(",")])
         .output()

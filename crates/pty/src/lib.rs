@@ -30,6 +30,7 @@ pub mod host_env;
 pub mod journal;
 pub mod login_path;
 mod osc;
+pub mod proc_tty;
 pub mod process;
 #[cfg(any(windows, test))]
 mod pwsh;
