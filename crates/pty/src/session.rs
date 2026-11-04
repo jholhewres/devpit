@@ -72,28 +72,37 @@ pub fn members(leaders: &[u32]) -> Option<Vec<u32>> {
     Some(members_of(&table, leaders, std::process::id()))
 }
 
-/// The topmost of the processes in `carrying`: those whose parent is not
-/// one of them. Of the processes a pane's name was handed to, its shell.
-pub fn topmost(table: &[Proc], carrying: &[u32]) -> Vec<u32> {
+/// The children of `daemon` that `carry` a pane's name: its shell. A daemon
+/// started from the pane carries the name too, but left it.
+pub fn shells_of(table: &[Proc], daemon: u32, carry: impl Fn(u32) -> bool) -> Vec<u32> {
     table
         .iter()
-        .filter(|one| carrying.contains(&one.pid) && !carrying.contains(&one.ppid))
+        .filter(|one| one.ppid == daemon && carry(one.pid))
         .map(|one| one.pid)
         .collect()
 }
 
-/// The topmost processes started with `name=value` in their environment, or
-/// `None` where nothing here can read the process table. How a ptyd pane's
-/// shell is found: its pid is the daemon's, and the protocol does not say it.
+/// Every process started with `name=value` in its environment, or `None`
+/// where nothing here can read the process table.
 pub fn started_with(name: &str, value: &str) -> Option<Vec<u32>> {
-    let table = table()?;
     let entry = format!("{name}={value}");
-    let carrying: Vec<u32> = table
-        .iter()
-        .map(|one| one.pid)
-        .filter(|pid| environ_has(*pid, entry.as_bytes()))
-        .collect();
-    Some(topmost(&table, &carrying))
+    let table = table()?;
+    Some(
+        (table.iter())
+            .map(|one| one.pid)
+            .filter(|pid| environ_has(*pid, entry.as_bytes()))
+            .collect(),
+    )
+}
+
+/// The children of `daemon` started with `name=value`: how a ptyd pane's
+/// shell is found, since the protocol does not say its pid.
+pub fn started_under(daemon: u32, name: &str, value: &str) -> Option<Vec<u32>> {
+    let entry = format!("{name}={value}");
+    let table = table()?;
+    Some(shells_of(&table, daemon, |pid| {
+        environ_has(pid, entry.as_bytes())
+    }))
 }
 
 #[cfg(target_os = "linux")]

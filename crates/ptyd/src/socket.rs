@@ -109,6 +109,40 @@ pub fn peer_uid(stream: &UnixStream) -> io::Result<u32> {
     }
 }
 
+/// The pid on the other end of `stream`: the daemon's, from a client. Linux
+/// only, where it is how a pane's shell is told from a process that left it.
+pub fn peer_pid(stream: &UnixStream) -> io::Result<u32> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::io::AsRawFd;
+        let mut cred = libc::ucred {
+            pid: 0,
+            uid: 0,
+            gid: 0,
+        };
+        let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+        // SAFETY: `len` is the size of `cred`, which outlives the call.
+        let done = unsafe {
+            libc::getsockopt(
+                stream.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_PEERCRED,
+                (&mut cred as *mut libc::ucred).cast(),
+                &mut len,
+            )
+        };
+        if done != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        u32::try_from(cred.pid).map_err(|_| io::Error::other("no peer pid"))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = stream;
+        Err(io::ErrorKind::Unsupported.into())
+    }
+}
+
 /// Whether a peer may speak to the daemon: the same user, nobody else.
 pub fn admitted(peer: u32, own: u32) -> bool {
     peer == own

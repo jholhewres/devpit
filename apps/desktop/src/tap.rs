@@ -415,16 +415,23 @@ pub(crate) fn stop_whatever_runs(server: &devpit_tmux::Server, session: &str, le
     }
 }
 
-/// [`stop_whatever_runs`] for ptyd panes, whose shells are found by the leaf
-/// name they were started with.
+/// [`stop_whatever_runs`] for the ptyd panes of the daemon at `socket`: its
+/// children started with each leaf's name, never a daemon one of them left.
 ///
 /// Where the process table cannot be read this stops nothing, and the
 /// daemon's `Kill` is only a `SIGHUP` to the shell: an agent that ignores it
 /// outlives the pane, holding its pty open.
-pub(crate) fn stop_whatever_runs_in_ptyd(leaves: &[String]) {
+#[cfg(unix)]
+pub(crate) fn stop_whatever_runs_in_ptyd(socket: &Path, leaves: &[String]) {
+    let Some(daemon) = devpit_ptyd::socket::connect(socket)
+        .and_then(|stream| devpit_ptyd::socket::peer_pid(&stream))
+        .ok()
+    else {
+        return;
+    };
     let shells: Vec<u32> = leaves
         .iter()
-        .filter_map(|leaf| devpit_pty::started_with(devpit_tmux::PANE_ENV, leaf))
+        .filter_map(|leaf| devpit_pty::started_under(daemon, devpit_tmux::PANE_ENV, leaf))
         .flatten()
         .collect();
     if let Some(members) = devpit_pty::session_members(&shells) {

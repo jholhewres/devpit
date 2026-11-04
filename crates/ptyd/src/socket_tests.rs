@@ -66,6 +66,13 @@ fn the_kernel_names_the_peer_and_only_the_same_user_is_admitted() {
     drop(two);
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn the_kernel_names_the_peers_pid() {
+    let (one, _two) = UnixStream::pair().expect("pair");
+    assert_eq!(peer_pid(&one).expect("peer pid"), std::process::id());
+}
+
 #[test]
 fn the_same_protocol_is_welcomed_and_another_is_told_ours() {
     let (mut daemon, mut client) = UnixStream::pair().expect("pair");

@@ -75,7 +75,7 @@ pub(crate) fn close(leaves: &[String]) {
 pub(crate) fn close_at(home: Option<&Path>, leaves: &[String]) {
     #[cfg(unix)]
     if let Some(home) = home {
-        crate::tap::stop_whatever_runs_in_ptyd(leaves);
+        crate::tap::stop_whatever_runs_in_ptyd(&socket_path(home), leaves);
         for leaf in leaves {
             kill(home, pane_number(leaf));
         }

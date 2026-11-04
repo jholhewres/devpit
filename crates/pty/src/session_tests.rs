@@ -83,46 +83,50 @@ fn a_background_job_and_a_setsid_child_are_both_ended() {
 }
 
 #[test]
-fn of_the_processes_a_name_was_handed_to_the_shell_is_the_one_whose_parent_was_not() {
-    let (daemon, shell) = (40, 100);
+fn a_panes_shell_is_the_daemons_child_and_never_a_daemon_that_left_the_pane() {
+    let (daemon, shell, left) = (40, 100, 200);
     let table = [
         proc(daemon, 1, daemon),
         proc(shell, daemon, shell),
         proc(101, shell, shell),
-        // An agent's `setsid` child: its parent carries the name too.
+        // An agent's `setsid` child: under the shell, so one of its members.
         proc(102, 101, 102),
-        proc(300, 1, 300),
+        // A tmux server started in the pane: reparented, still carrying.
+        proc(left, 1, left),
+        proc(201, left, 201),
     ];
-    assert_eq!(topmost(&table, &[shell, 101, 102]), vec![shell]);
-    assert!(topmost(&table, &[]).is_empty());
+    let carrying = [shell, 101, 102, left, 201];
+    let carry = |pid: u32| carrying.contains(&pid);
+    assert_eq!(shells_of(&table, daemon, carry), vec![shell]);
+    assert!(shells_of(&table, daemon, |_| false).is_empty());
 }
 
 #[cfg(target_os = "linux")]
 #[test]
-fn a_shell_is_found_by_the_name_in_its_environment() {
+fn a_shell_is_found_by_the_name_in_its_environment_and_a_daemon_it_started_is_not() {
     let value = format!("leaf_{}", std::process::id());
     let mut shell = std::process::Command::new("sh")
         .arg("-c")
-        .arg("sleep 30 & wait")
+        .arg("setsid -f sleep 30; sleep 30 & wait")
         .env("DEVPIT_TEST_PANE", &value)
         .stdout(std::process::Stdio::null())
         .spawn()
         .expect("spawn");
 
+    // The shell, its sleep and the reparented one all carry the name.
     let deadline = Instant::now() + Duration::from_secs(5);
-    let mut found = Vec::new();
-    while found.is_empty() && Instant::now() < deadline {
-        found = started_with("DEVPIT_TEST_PANE", &value).expect("a process table");
+    let mut carrying = Vec::new();
+    while carrying.len() != 3 && Instant::now() < deadline {
+        carrying = started_with("DEVPIT_TEST_PANE", &value).expect("a process table");
         std::thread::sleep(Duration::from_millis(20));
     }
-    assert_eq!(found, vec![shell.id()], "the sleep's parent carries it too");
-    assert_eq!(
-        started_with("DEVPIT_TEST_PANE", "leaf_nobody"),
-        Some(vec![])
-    );
-
-    let members = members(&found).expect("a process table");
-    stop_members(&members, AGENT_GRACE);
+    let found = started_under(std::process::id(), "DEVPIT_TEST_PANE", &value);
+    let nobody = started_under(std::process::id(), "DEVPIT_TEST_PANE", "leaf_nobody");
+    stop_members(&carrying, AGENT_GRACE);
     let _ = shell.kill();
     let _ = shell.wait();
+
+    assert_eq!(carrying.len(), 3, "{carrying:?}");
+    assert_eq!(found, Some(vec![shell.id()]));
+    assert_eq!(nobody, Some(vec![]));
 }
