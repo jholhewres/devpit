@@ -351,11 +351,10 @@ pub(crate) fn heard_by_tap(told: &Told) -> bool {
 /// arming a pipe is a side effect, and a function that only looks should not
 /// have one. Idempotent, so calling it on every ensure is free.
 pub(crate) fn listen(state: &State<SessionState>, project_id: &str, layout: &SessionLayout) {
-    let Ok(server) = crate::sessions::tmux_server() else {
-        return;
-    };
     let session = devpit_tmux::Server::session_name(project_id);
     let blocks = tauri::Manager::try_state::<crate::blocks::Blocks>(state.app());
+    // Asked for at the first tmux leaf: a tab of ptyd panes needs no tmux.
+    let mut tmux = None;
     for (leaf_id, target) in layout.tree.leaves() {
         if let Some(blocks) = &blocks {
             blocks.belongs(leaf_id, project_id);
@@ -364,10 +363,14 @@ pub(crate) fn listen(state: &State<SessionState>, project_id: &str, layout: &Ses
         if crate::ptyd_link::is_ptyd(target) {
             continue;
         }
+        let server = tmux.get_or_insert_with(|| crate::sessions::tmux_server().ok());
+        let Some(server) = server.as_ref() else {
+            continue;
+        };
         let target = devpit_tmux::Server::target(&session, leaf_id);
         state
             .taps
-            .watch(state.app(), &server, project_id, leaf_id, &target);
+            .watch(state.app(), server, project_id, leaf_id, &target);
     }
 }
 

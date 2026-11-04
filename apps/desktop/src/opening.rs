@@ -121,15 +121,15 @@ pub(crate) fn typed_in(
 ) -> Result<String, RpcError> {
     let state = app.state::<crate::sessions::SessionState>();
     let layout = crate::sessions::ensure_at(&state, project_id, tab_id, cwd)?;
-    let session = devpit_tmux::Server::session_name(project_id);
-    let target = devpit_tmux::Server::target(&session, &layout.focused_id);
-    let _ = crate::shell_launch::settled(&session, &layout.focused_id);
+    let target = crate::pane_io::target_in(&layout, &layout.focused_id);
+    let _ = crate::pane_io::settled(&target);
     // Before the CLI looks: a session stopped on the trust question is not up.
     crate::folder_trust::trust(&[cwd]);
-    crate::sessions::tmux_server()?
-        .send_keys(&target, line)
-        .map_err(|err| RpcError::internal(err.to_string()))?;
-    crate::trust_answer::watch(target);
+    crate::pane_io::send_line(&target, line)?;
+    // It reads tmux's screen; a ptyd pane has none to read yet.
+    if !crate::ptyd_link::is_ptyd(&target) {
+        crate::trust_answer::watch(target);
+    }
     Ok(layout.focused_id)
 }
 

@@ -25,8 +25,8 @@ use crate::{
     regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves, search,
     session_cost, session_search, session_window, sessions, settings, shell_launch, sign_ins,
     skills, slash, sources, spend_history, staging, stall_watch, steering, steps, stopping,
-    threads, transcribe, tray, update, watching, workspace, worktree_base, worktree_setup,
-    worktrees, wsfiles,
+    tab_opening, threads, transcribe, tray, update, watching, workspace, worktree_base,
+    worktree_setup, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -344,7 +344,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         columns::step_update,
         columns::step_delete,
         steps::agents_list,
-        sessions::terminal_attach_agent,
+        tab_opening::terminal_attach_agent,
         sessions::session_ensure,
         sessions::session_focus,
         arranging::session_split,

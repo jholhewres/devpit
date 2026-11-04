@@ -113,3 +113,29 @@ fn a_line_written_to_a_ptyd_pane_runs_in_it() {
         String::from_utf8_lossy(&seen)
     );
 }
+
+#[test]
+fn a_typed_line_goes_as_it_is_then_enter() {
+    assert_eq!(typed("claude --name x"), b"claude --name x\r");
+}
+
+/// A ptyd pane's settle: an idle shell named on consecutive looks is at its
+/// prompt; anything else named is busy; nothing named is not known.
+#[test]
+fn a_ptyd_pane_is_ready_once_the_daemon_names_an_idle_shell_twice() {
+    let quick = std::time::Duration::from_secs(2);
+    let mut said = vec![None, Some("zsh"), Some("zsh")].into_iter();
+    assert!(matches!(
+        settled_on(|| said.next().flatten().map(str::to_owned), quick),
+        Ready::Prompt
+    ));
+    let mut said = vec![Some("zsh"), Some("claude")].into_iter();
+    assert!(matches!(
+        settled_on(|| said.next().flatten().map(str::to_owned), quick),
+        Ready::Busy(program) if program == "claude"
+    ));
+    assert!(matches!(
+        settled_on(|| None, std::time::Duration::from_millis(300)),
+        Ready::Unknown
+    ));
+}

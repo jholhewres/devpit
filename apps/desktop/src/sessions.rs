@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use devpit_core::Store;
 use devpit_git::worktree_path;
-use devpit_rpc::{CardTerminal, ErrorCode, LayoutNode, RpcError, SessionLayout};
+use devpit_rpc::{ErrorCode, LayoutNode, RpcError, SessionLayout};
 use tauri::State;
 use ulid::Ulid;
 
@@ -167,22 +167,30 @@ fn load_or_create(
     cwd: &Path,
     had: &[String],
     was_in: impl Fn(&str) -> Option<PathBuf>,
-    plain: bool,
 ) -> Result<SessionLayout, RpcError> {
     let store = store()?;
-    // A terminal opened in a card's checkout gets what the project's
-    // preparation shares with every command there.
-    let server =
-        tmux_server()?.with_window_env(crate::checkout::shared_env_at(&store, project_id, cwd));
     let session = devpit_tmux::Server::session_name(project_id);
+    // A terminal opened in a card's checkout gets what the project's
+    // preparation shares with every command there. Asked for only for a tmux
+    // leaf: a tab of ptyd panes opens without tmux.
+    let tmux = || {
+        Ok::<_, RpcError>(
+            tmux_server()?.with_window_env(crate::checkout::shared_env_at(&store, project_id, cwd)),
+        )
+    };
 
     if let Some((tree, focused)) = store.pane_layout(project_id, tab_id)? {
         let layout = decode(project_id, &tree, &focused)?;
+        let mut server = None;
         for (leaf_id, target) in layout.tree.leaves() {
             if crate::ptyd_link::is_ptyd(target) {
                 crate::ptyd_link::revive_at(&store, project_id, leaf_id, was_in(leaf_id), cwd);
                 continue;
             }
+            if server.is_none() {
+                server = Some(tmux()?);
+            }
+            let Some(server) = &server else { continue };
             // A window missing before this is one tmux lost with its server,
             // not one closed on purpose — closing forgets the pane's layout
             // too. It comes back where its shell last was, not at the tab's.
@@ -198,26 +206,13 @@ fn load_or_create(
         return Ok(layout);
     }
 
-    let leaf_id = format!("leaf_{}", Ulid::generate());
-    let ptyd = plain
-        .then(|| crate::ptyd_link::in_ptyd(&store, project_id, &leaf_id, cwd))
-        .flatten();
-    let target = match ptyd {
-        Some(target) => target,
-        None => {
-            server
-                .ensure_session(&session, &leaf_id, cwd)
-                .map_err(tmux_err)?;
-            devpit_tmux::Server::target(&session, &leaf_id)
-        }
-    };
-    let layout = SessionLayout {
-        project_id: project_id.to_owned(),
-        focused_id: leaf_id.clone(),
-        tree: LayoutNode::leaf(leaf_id.clone(), target),
-    };
-    persist(&store, tab_id, &layout)?;
-    Ok(layout)
+    let home = Store::root().ok();
+    crate::tab_opening::first_layout(&store, home.as_deref(), project_id, tab_id, cwd, |leaf| {
+        tmux()?
+            .ensure_session(&session, leaf, cwd)
+            .map_err(tmux_err)?;
+        Ok(devpit_tmux::Server::target(&session, leaf))
+    })
 }
 
 pub(crate) fn tmux_err(err: devpit_tmux::TmuxError) -> RpcError {
@@ -247,7 +242,7 @@ pub async fn session_ensure(
     crate::off_main::blocking(move || {
         let state = tauri::Manager::state::<SessionState>(&app);
         let cwd = locate_cwd(&project_id, worktree_id.as_deref())?;
-        ensure(&state, &project_id, &tab_id, &cwd, true)
+        ensure_at(&state, &project_id, &tab_id, &cwd)
     })
     .await
 }
@@ -276,43 +271,32 @@ pub(crate) fn card_of_tab(tab_id: &str) -> Option<&str> {
         .filter(|card| crate::adopting::plain(card))
 }
 
-/// Opens (or reopens) a tab whose panes start in `cwd`.
-///
-/// The body `session_ensure` had, lifted so a card can ask for a terminal in
-/// its own checkout — which is a directory, not a worktree id, and so could
-/// not go through `locate_cwd`.
+/// Opens (or reopens) a tab whose panes start in `cwd`: a directory, so a
+/// card can ask for a terminal in its own checkout, which `locate_cwd`
+/// could not name.
 pub(crate) fn ensure_at(
     state: &State<'_, SessionState>,
     project_id: &str,
     tab_id: &str,
     cwd: &Path,
 ) -> Result<SessionLayout, RpcError> {
-    ensure(state, project_id, tab_id, cwd, false)
-}
-
-/// `plain`: a tab devpit types nothing into, which devpit-ptyd may hold.
-fn ensure(
-    state: &State<'_, SessionState>,
-    project_id: &str,
-    tab_id: &str,
-    cwd: &Path,
-    plain: bool,
-) -> Result<SessionLayout, RpcError> {
     let lock = state.project_lock(project_id)?;
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(project_id);
-    let had = match server.has_session(&session).map_err(tmux_err)? {
-        true => server.list_windows(&session).map_err(tmux_err)?,
-        false => Vec::new(),
+    // No tmux is no windows: a tab of ptyd panes opens all the same.
+    let had = match tmux_server() {
+        Ok(server) if server.has_session(&session).map_err(tmux_err)? => {
+            server.list_windows(&session).map_err(tmux_err)?
+        }
+        _ => Vec::new(),
     };
     // Before anything is made: a tap left by a window that went has to go
     // first, or the window made again under its leaf is never tapped.
     crate::leftovers::tidy(state, project_id, &had);
     let was_in = |leaf: &str| crate::blocks::last_cwd(state.app(), project_id, leaf);
-    let layout = load_or_create(project_id, tab_id, cwd, &had, was_in, plain)?;
+    let layout = load_or_create(project_id, tab_id, cwd, &had, was_in)?;
     listen(state, project_id, &layout);
     Ok(layout)
 }
@@ -354,73 +338,6 @@ pub(crate) fn session_focus_now(
     }
     persist(&store()?, &tab_id, &layout)?;
     Ok(layout)
-}
-
-/// `terminal.attach_agent` — brings a card's background session into the
-/// card's own terminal, in its checkout.
-///
-/// The session that was there keeps running detached; attaching takes up the
-/// screen, not the work. The line is typed into the tab's focused pane, so a
-/// pane running something else is refused rather than typed over — and this is
-/// only ever an action of the interface, never a side effect of a drag.
-#[tauri::command]
-#[specta::specta]
-pub async fn terminal_attach_agent(
-    state: State<'_, SessionState>,
-    project_id: String,
-    card_id: String,
-) -> Result<CardTerminal, RpcError> {
-    let (project, wanted) = (project_id.clone(), card_id.clone());
-    let (short_id, checkout, runner) = tauri::async_runtime::spawn_blocking(move || {
-        let store = store()?;
-        if store.live_card_project(&wanted)?.as_deref() != Some(project.as_str()) {
-            return Err(RpcError::new(
-                ErrorCode::NotFound,
-                "no such card in this project",
-            ));
-        }
-        let link = store
-            .session_link(&wanted)?
-            .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "this card has no session yet"))?;
-        let checkout = crate::checkout::checkout_of(&store, &wanted, |_| {})
-            .map_err(|why| RpcError::new(ErrorCode::Internal, why))?;
-        // Started under a profile, attached under the same one: the binary and
-        // the account are the session's, not this moment's default.
-        let runner = link
-            .profile_id
-            .as_deref()
-            .map(|id| crate::agent_profiles::runner_for(&store, id))
-            .transpose()
-            .map_err(|why| RpcError::new(ErrorCode::NotFound, why))?;
-        Ok::<_, RpcError>((link.short_id, checkout, runner))
-    })
-    .await
-    .map_err(|err| RpcError::internal(err.to_string()))??;
-
-    // The card's own tab, made at its checkout if it is not there yet.
-    let tab_id = tab_for_card(&card_id);
-    let layout = ensure_at(&state, &project_id, &tab_id, &checkout)?;
-    let session = devpit_tmux::Server::session_name(&project_id);
-    let target = devpit_tmux::Server::target(&session, &layout.focused_id);
-
-    // Not under the project lock: a shell reaching its prompt takes seconds.
-    let (waiting, leaf) = (session.clone(), layout.focused_id.clone());
-    let ready =
-        tauri::async_runtime::spawn_blocking(move || crate::shell_launch::settled(&waiting, &leaf))
-            .await
-            .map_err(|err| RpcError::internal(err.to_string()))?;
-    let line = crate::attaching::attach_target(&checkout, &short_id, runner.as_ref(), &ready)?;
-
-    let lock = state.project_lock(&project_id)?;
-    let _guard = lock
-        .lock()
-        .map_err(|_| RpcError::internal("project session lock"))?;
-    tmux_server()?.send_keys(&target, &line).map_err(tmux_err)?;
-    Ok(CardTerminal {
-        layout,
-        tab_id,
-        card_id,
-    })
 }
 
 /// The layout of whichever tab holds this leaf.

@@ -51,7 +51,7 @@ fn it_is_off_unless_the_preference_says_ptyd() {
 }
 
 /// With the preference on and no daemon to be had, a new terminal is made
-/// in tmux as it always was: `in_ptyd` answers nothing, and that is the
+/// in tmux as it always was: `in_ptyd_at` answers nothing, and that is the
 /// fallback's whole contract with its callers.
 #[cfg(unix)]
 #[test]

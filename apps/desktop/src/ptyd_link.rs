@@ -1,10 +1,10 @@
-//! Plain terminals held by devpit-ptyd, when the person turned it on.
+//! Terminals held by devpit-ptyd, when the person turned it on.
 //!
-//! Off unless `terminal.backend` is `ptyd`. With it on, a new plain terminal
-//! — a tab's first pane, or a split — is started in the daemon instead of a
-//! tmux window, and outlives the desktop: a crash, a restart or an update
-//! of the same protocol finds it running and attaches again. Agents stay in
-//! tmux, and so does every pane that was made there, until it is closed.
+//! Off unless `terminal.backend` is `ptyd`. With it on, a new pane — a tab's
+//! first, an agent's or a card's, or a split — is started in the daemon
+//! instead of a tmux window, and outlives the desktop: a crash, a restart or
+//! an update of the same protocol finds it running and attaches again. Every
+//! pane that was made in tmux stays there until it is closed.
 //!
 //! Whatever goes wrong on the way — no daemon binary, a daemon that will not
 //! start, one of another protocol — the pane is made in tmux as it always
@@ -221,19 +221,8 @@ pub(crate) fn revive(home: &Path, leaf_id: &str, cwd: &Path, shared: Vec<(String
     }
 }
 
-/// A new plain terminal made in devpit-ptyd, when the person turned it on
+/// A new pane made in the daemon of `home`, when the person turned it on
 /// and the daemon can be had. Nothing, for tmux to make it as it always did.
-pub(crate) fn in_ptyd(
-    store: &Store,
-    project_id: &str,
-    leaf_id: &str,
-    cwd: &Path,
-) -> Option<String> {
-    let home = Store::root().ok();
-    in_ptyd_at(store, home.as_deref(), project_id, leaf_id, cwd)
-}
-
-/// [`in_ptyd`], against the daemon of `home`.
 fn in_ptyd_at(
     store: &Store,
     home: Option<&Path>,

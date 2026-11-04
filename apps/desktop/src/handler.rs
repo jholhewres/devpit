@@ -23,7 +23,7 @@ use crate::{
     recipes, regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves,
     search, session_cost, session_search, session_window, sessions, settings, shell_launch,
     sign_ins, skills, slash, sources, spend_history, staging, stall_watch, steering, steps,
-    stopping, threads, transcribe, tray, update, watching, workspace, worktree_base,
+    stopping, tab_opening, threads, transcribe, tray, update, watching, workspace, worktree_base,
     worktree_setup, worktrees, wsfiles,
 };
 
@@ -348,7 +348,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         columns::step_update,
         columns::step_delete,
         steps::agents_list,
-        sessions::terminal_attach_agent,
+        tab_opening::terminal_attach_agent,
         sessions::session_ensure,
         sessions::session_focus,
         arranging::session_split,

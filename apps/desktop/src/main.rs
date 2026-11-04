@@ -252,6 +252,7 @@ mod stopping;
 mod stopping_a_run;
 mod sync;
 mod sync_pairing;
+mod tab_opening;
 mod tap;
 mod transcribe;
 // Only Windows copies a pane into a file; tested everywhere.

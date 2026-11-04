@@ -5,9 +5,12 @@
 //! here, so nothing hands tmux a target it has never heard of.
 
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use devpit_rpc::{ErrorCode, RpcError, SessionLayout};
 use devpit_tmux::Key;
+
+use crate::shell_launch::Ready;
 
 /// Who holds a pane, read off its target.
 #[derive(Debug, PartialEq, Eq)]
@@ -54,6 +57,56 @@ pub(crate) fn submit(target: &str, line: &str) -> Result<(), RpcError> {
         Holder::Tmux { .. } => tmux()?.submit(target, line).map_err(internal),
         Holder::Ptyd(pane) => write(pane, submitted(line)),
     }
+}
+
+/// Types `line` at a pane, as it is, and presses Enter.
+pub(crate) fn send_line(target: &str, line: &str) -> Result<(), RpcError> {
+    match holder(target) {
+        Holder::Tmux { .. } => tmux()?
+            .send_keys(target, line)
+            .map_err(crate::sessions::tmux_err),
+        Holder::Ptyd(pane) => write(pane, typed(line)),
+    }
+}
+
+/// Records which profile devpit started in a pane, where it is recorded:
+/// a tmux pane option. Nothing on a ptyd pane; the store keeps the launch
+/// for both, and a missing label is cosmetic.
+pub(crate) fn label(target: &str, profile: &str) {
+    if let (Holder::Tmux { .. }, Ok(server)) = (holder(target), tmux()) {
+        let _ = server.name_pane(target, profile);
+    }
+}
+
+/// Whether a pane is ready to be typed into.
+pub(crate) fn settled(target: &str) -> Ready {
+    match holder(target) {
+        Holder::Tmux { session, window } => crate::shell_launch::settled(session, window),
+        Holder::Ptyd(pane) => settled_on(|| front(pane), crate::shell_launch::AT_MOST),
+    }
+}
+
+/// A ptyd pane's [`settled`], with no screen to find a prompt on yet: the
+/// daemon names what is in front only once the pane has printed and gone
+/// quiet, so an idle shell named on consecutive looks stands for a shell at
+/// its prompt. A shell that never prints is never named, and stays Unknown.
+pub(crate) fn settled_on(mut front: impl FnMut() -> Option<String>, at_most: Duration) -> Ready {
+    let deadline = Instant::now() + at_most;
+    let mut settling = devpit_pty::Settling::new();
+    while Instant::now() < deadline {
+        match front() {
+            Some(program) if !devpit_pty::agents::idle_shell(&program) => {
+                return Ready::Busy(program)
+            }
+            named => {
+                if settling.looked(named.is_some()) {
+                    return Ready::Prompt;
+                }
+            }
+        }
+        std::thread::sleep(crate::shell_launch::BETWEEN_LOOKS);
+    }
+    Ready::Unknown
 }
 
 /// Hands `text` to whatever runs in a pane as one paste, and Enter after it
@@ -175,6 +228,13 @@ fn told_cwd(_pane: u32) -> Option<String> {
 const CLEAR: &[u8] = b"\x05\x15\x0c";
 const PASTE_START: &[u8] = b"\x1b[200~";
 const PASTE_END: &[u8] = b"\x1b[201~";
+
+/// The bytes [`send_line`] types into a ptyd pane.
+pub(crate) fn typed(line: &str) -> Vec<u8> {
+    let mut bytes = line.as_bytes().to_vec();
+    bytes.push(b'\r');
+    bytes
+}
 
 /// The bytes [`submit`] types into a ptyd pane.
 pub(crate) fn submitted(line: &str) -> Vec<u8> {

@@ -438,13 +438,11 @@ pub async fn session_launch_agent(
     // The pane has to be this project's. Reached from a menu, the id comes
     // from the screen, and the screen is not the authority on what is open.
     let layout = crate::sessions::holding(&project_id, &pane_id)?;
-    let session = devpit_tmux::Server::session_name(&layout.project_id);
-    let target = devpit_tmux::Server::target(&session, &pane_id);
+    let target = crate::pane_io::target_in(&layout, &pane_id);
 
     // Not under the project lock: this waits seconds, and holding the lock
     // that long would stall every other thing the project wants to do.
-    let waiting = session.clone();
-    let waited = pane_id.clone();
+    let waiting = target.clone();
     let trusting = layout.project_id.clone();
     let agent = agent_id.clone();
     let (ready, missing, failing) = tauri::async_runtime::spawn_blocking(move || {
@@ -458,7 +456,7 @@ pub async fn session_launch_agent(
         if let Some(root) = &root {
             crate::folder_trust::trust(&[root]);
         }
-        let ready = settled(&waiting, &waited);
+        let ready = crate::pane_io::settled(&waiting);
         let missing = check.and_then(|one| one.join().ok()).unwrap_or_default();
         let failing = root
             .map(|root| crate::sign_ins::failing_at_start(&agent, &trusting, &root))
@@ -483,14 +481,11 @@ pub async fn session_launch_agent(
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let server = crate::sessions::tmux_server()?;
-    server
-        .send_keys(&target, &line)
-        .map_err(crate::sessions::tmux_err)?;
+    crate::pane_io::send_line(&target, &line)?;
     // After the line, and never instead of it: a pane with the agent running
     // and no label is a cosmetic loss, and a label on a pane where the launch
     // failed is a lie.
-    let _ = server.name_pane(&target, &profile_id(&agent_id));
+    crate::pane_io::label(&target, &profile_id(&agent_id));
     // Remembered so the pane can start it again if tmux loses the window.
     if let Ok(store) = crate::sessions::store() {
         let _ = store.remember_pane_launch(&project_id, &pane_id, &agent_id);
@@ -697,10 +692,10 @@ pub(crate) enum Ready {
 /// Generous on purpose. A heavy `.zshrc` is the person's own, and taking a
 /// second and a half to start is not an error to report at them — it is a
 /// second and a half to wait through.
-const AT_MOST: std::time::Duration = std::time::Duration::from_secs(8);
+pub(crate) const AT_MOST: std::time::Duration = std::time::Duration::from_secs(8);
 
 /// How often to look, and how long a rest has to hold before it counts.
-const BETWEEN_LOOKS: std::time::Duration = std::time::Duration::from_millis(90);
+pub(crate) const BETWEEN_LOOKS: std::time::Duration = std::time::Duration::from_millis(90);
 
 pub(crate) fn settled(session: &str, pane_id: &str) -> Ready {
     let Ok(server) = crate::sessions::tmux_server() else {
