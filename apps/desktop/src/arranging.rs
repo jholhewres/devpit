@@ -336,35 +336,66 @@ pub(crate) fn close_tab(
     let Ok(layout) = layout_of(project_id, tab_id) else {
         return Ok(Vec::new());
     };
+    let store = store()?;
+    let home = devpit_core::Store::root().ok();
+    let closed = end_tab_at(&store, home.as_deref(), &layout, tab_id, |leaves| {
+        close_tmux_leaves(state, project_id, leaves)
+    })?;
+    for leaf_id in &closed {
+        crate::blocks::closed(state.app(), project_id, leaf_id);
+    }
+    Ok(closed)
+}
+
+/// Ends every leaf of a tab's `layout` and forgets the tab. The daemon's
+/// panes are ended at `home`; the rest go to `in_tmux`, which is only asked
+/// when there are any, so a tab of ptyd panes closes with no tmux at all.
+pub(crate) fn end_tab_at(
+    store: &devpit_core::Store,
+    home: Option<&std::path::Path>,
+    layout: &SessionLayout,
+    tab_id: &str,
+    in_tmux: impl FnOnce(&[&str]),
+) -> Result<Vec<String>, RpcError> {
     let closed: Vec<String> = layout
         .tree
         .leaves()
         .into_iter()
         .map(|(leaf, _)| leaf.to_owned())
         .collect();
-    let ptyd = crate::ptyd_link::ptyd_leaves(&layout);
-    crate::ptyd_link::close(&ptyd);
-    for leaf_id in &ptyd {
-        crate::blocks::closed(state.app(), project_id, leaf_id);
-        let _ = store()?.forget_pane_agent(leaf_id);
-    }
-    let server = tmux_server()?;
-    let session = devpit_tmux::Server::session_name(project_id);
+    let ptyd = crate::ptyd_link::ptyd_leaves(layout);
+    crate::ptyd_link::close_at(home, &ptyd);
     let leaves: Vec<&str> = closed
         .iter()
         .filter(|leaf| !ptyd.contains(leaf))
         .map(String::as_str)
         .collect();
-    for leaf_id in &leaves {
+    if !leaves.is_empty() {
+        in_tmux(&leaves);
+    }
+    for leaf_id in &closed {
+        let _ = store.forget_pane_agent(leaf_id);
+    }
+    store.forget_pane_layout(&layout.project_id, tab_id)?;
+    Ok(closed)
+}
+
+/// Ends a tab's tmux windows. With no tmux to ask, they are not running.
+fn close_tmux_leaves(state: &SessionState, project_id: &str, leaves: &[&str]) {
+    let Ok(server) = tmux_server() else {
+        return;
+    };
+    let session = devpit_tmux::Server::session_name(project_id);
+    for leaf_id in leaves {
         let target = devpit_tmux::Server::target(&session, leaf_id);
         state.taps.forget(&server, leaf_id, &target);
     }
-    crate::tap::stop_whatever_runs(&server, &session, &leaves);
+    crate::tap::stop_whatever_runs(&server, &session, leaves);
     for leaf_id in leaves {
         let _ = server.kill_window(&session, leaf_id);
-        crate::blocks::closed(state.app(), project_id, leaf_id);
-        let _ = store()?.forget_pane_agent(leaf_id);
     }
-    store()?.forget_pane_layout(project_id, tab_id)?;
-    Ok(closed)
 }
+
+#[cfg(test)]
+#[path = "arranging_tests.rs"]
+mod tests;

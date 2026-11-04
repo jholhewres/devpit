@@ -72,6 +72,41 @@ pub fn members(leaders: &[u32]) -> Option<Vec<u32>> {
     Some(members_of(&table, leaders, std::process::id()))
 }
 
+/// The topmost of the processes in `carrying`: those whose parent is not
+/// one of them. Of the processes a pane's name was handed to, its shell.
+pub fn topmost(table: &[Proc], carrying: &[u32]) -> Vec<u32> {
+    table
+        .iter()
+        .filter(|one| carrying.contains(&one.pid) && !carrying.contains(&one.ppid))
+        .map(|one| one.pid)
+        .collect()
+}
+
+/// The topmost processes started with `name=value` in their environment, or
+/// `None` where nothing here can read the process table. How a ptyd pane's
+/// shell is found: its pid is the daemon's, and the protocol does not say it.
+pub fn started_with(name: &str, value: &str) -> Option<Vec<u32>> {
+    let table = table()?;
+    let entry = format!("{name}={value}");
+    let carrying: Vec<u32> = table
+        .iter()
+        .map(|one| one.pid)
+        .filter(|pid| environ_has(*pid, entry.as_bytes()))
+        .collect();
+    Some(topmost(&table, &carrying))
+}
+
+#[cfg(target_os = "linux")]
+fn environ_has(pid: u32, entry: &[u8]) -> bool {
+    std::fs::read(format!("/proc/{pid}/environ"))
+        .is_ok_and(|environ| environ.split(|byte| *byte == 0).any(|one| one == entry))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn environ_has(_pid: u32, _entry: &[u8]) -> bool {
+    false
+}
+
 /// Asks every member to end, waits up to `grace`, then insists.
 pub fn stop_members(members: &[u32], grace: Duration) -> Stopped {
     if members.is_empty() {

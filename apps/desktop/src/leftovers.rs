@@ -89,11 +89,8 @@ pub(crate) fn closable(at_prompt: bool, under: Option<usize>) -> bool {
 }
 
 /// Ends every terminal of a project that is being forgotten: its tabs, then
-/// whatever else its session held, then the session itself.
+/// whatever else its tmux session held, then the session itself.
 pub(crate) fn end_project(app: &tauri::AppHandle, project_id: &str) -> Result<(), RpcError> {
-    if !devpit_tmux::Server::available() {
-        return Ok(());
-    }
     // Only a project the store knows: session names are sanitised, so an id
     // from the window could otherwise name another project's session.
     let store = store()?;
@@ -106,6 +103,10 @@ pub(crate) fn end_project(app: &tauri::AppHandle, project_id: &str) -> Result<()
         closed.extend(crate::arranging::close_tab(&state, project_id, &tab)?);
     }
     crate::card_activity::panes_closed(app, &closed);
+    // The tabs' ptyd panes are ended above; only tmux's session is left.
+    if !devpit_tmux::Server::available() {
+        return Ok(());
+    }
 
     let lock = state.project_lock(project_id)?;
     let _guard = lock

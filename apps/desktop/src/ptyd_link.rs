@@ -66,14 +66,21 @@ pub(crate) fn ptyd_leaves(layout: &devpit_rpc::SessionLayout) -> Vec<String> {
 
 /// Ends the daemon's panes among `leaves`; the rest are tmux's to close.
 pub(crate) fn close(leaves: &[String]) {
+    close_at(Store::root().ok().as_deref(), leaves);
+}
+
+/// [`close`], for the daemon of `home`: whatever runs in the panes is
+/// stopped first, as a tmux window's is before it goes.
+pub(crate) fn close_at(home: Option<&Path>, leaves: &[String]) {
     #[cfg(unix)]
-    if let Ok(home) = Store::root() {
+    if let Some(home) = home {
+        crate::tap::stop_whatever_runs_in_ptyd(leaves);
         for leaf in leaves {
-            kill(&home, pane_number(leaf));
+            kill(home, pane_number(leaf));
         }
     }
     #[cfg(not(unix))]
-    let _ = leaves;
+    let _ = (home, leaves);
 }
 
 /// The daemon's number for a leaf, stable across runs: the leaf id is what

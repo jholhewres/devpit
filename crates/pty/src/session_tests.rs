@@ -81,3 +81,48 @@ fn a_background_job_and_a_setsid_child_are_both_ended() {
     let _ = shell.kill();
     let _ = shell.wait();
 }
+
+#[test]
+fn of_the_processes_a_name_was_handed_to_the_shell_is_the_one_whose_parent_was_not() {
+    let (daemon, shell) = (40, 100);
+    let table = [
+        proc(daemon, 1, daemon),
+        proc(shell, daemon, shell),
+        proc(101, shell, shell),
+        // An agent's `setsid` child: its parent carries the name too.
+        proc(102, 101, 102),
+        proc(300, 1, 300),
+    ];
+    assert_eq!(topmost(&table, &[shell, 101, 102]), vec![shell]);
+    assert!(topmost(&table, &[]).is_empty());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_shell_is_found_by_the_name_in_its_environment() {
+    let value = format!("leaf_{}", std::process::id());
+    let mut shell = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("sleep 30 & wait")
+        .env("DEVPIT_TEST_PANE", &value)
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .expect("spawn");
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut found = Vec::new();
+    while found.is_empty() && Instant::now() < deadline {
+        found = started_with("DEVPIT_TEST_PANE", &value).expect("a process table");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(found, vec![shell.id()], "the sleep's parent carries it too");
+    assert_eq!(
+        started_with("DEVPIT_TEST_PANE", "leaf_nobody"),
+        Some(vec![])
+    );
+
+    let members = members(&found).expect("a process table");
+    stop_members(&members, AGENT_GRACE);
+    let _ = shell.kill();
+    let _ = shell.wait();
+}
