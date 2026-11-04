@@ -36,7 +36,7 @@ const cardView = (() => {
     const context = await call('devpit_context', project ? { project } : {}).catch(() => null)
     const lanes = ((context && context.columns) || []).filter((one) => !one.runsAStep && one.id !== card.columnId)
     const said = el('p', { class: 'err' })
-    const redraw = async () => render(project, await call('devpit_card', { project, cardId: card.id }), back)
+    const redraw = async () => render(project, await call('devpit_card', { project, cardId: card.id, full: true }), back)
     const note = el('textarea', { placeholder: 'A comment' })
     const move = el('select', {}, el('option', { value: '', text: 'Move to…' }), lanes.map((one) => el('option', { value: one.id, text: one.name })))
     move.addEventListener('change', async () => {

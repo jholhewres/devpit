@@ -47,6 +47,16 @@ fn a_comment_answers_its_card_and_newest_comment_not_the_card() {
 }
 
 #[test]
+fn an_edit_answers_the_comment_it_edited() {
+    let answer = lean(
+        "devpit_comment_edit",
+        json!({ "commentId": "cmt_0" }),
+        detail(3, 10),
+    );
+    assert_eq!(answer["edited"], "cmt_0");
+}
+
+#[test]
 fn a_handoff_answers_like_a_comment() {
     let answer = lean("devpit_handoff", json!({}), detail(2, 10));
     assert_eq!(answer["card"], "card_1");
@@ -91,9 +101,9 @@ fn a_board_card_is_one_short_row() {
     let answer = lean("devpit_board", json!({}), board);
     assert_eq!(
         answer,
-        json!([{ "id": "col_1", "name": "todo", "cards": [{
+        json!({ "columns": [{ "id": "col_1", "name": "todo", "cards": [{
             "id": "card_1", "number": 7, "title": "A card", "blockedBy": ["card_0"], "criteria": "1/3",
-        }] }])
+        }] }] })
     );
 }
 
@@ -127,7 +137,7 @@ fn evidence_lists_only_the_criteria_not_green() {
 }
 
 #[test]
-fn a_review_lists_the_findings_that_can_hold_a_card_and_counts_the_rest() {
+fn a_review_lists_the_findings_that_can_hold_a_card_and_counts_the_rest_and_keeps_its_packet() {
     let answer = lean(
         "devpit_devflow_review",
         json!({}),
@@ -144,7 +154,7 @@ fn a_review_lists_the_findings_that_can_hold_a_card_and_counts_the_rest() {
         json!({
             "verdict": "approve", "run": "r1", "next": "completion",
             "findings": ["medium `a.rs:2` a hole (1 of 1)"], "findings_counted": { "low": 2, "info": 1 },
-            "findings_file": "/runs/r1/findings.json",
+            "findings_file": "/runs/r1/findings.json", "packet": "/runs/r1/packet.md",
             "reviewers": [{ "persona": "devflow-all", "agent": "claude", "result": "answered", "findings": 1 }],
         })
     );
@@ -178,7 +188,13 @@ fn no_answer_passes_the_budget_and_a_cut_one_says_so() {
     assert!(text.len() <= BUDGET, "wide: {}", text.len());
     assert!(text.contains("card_1"));
     let board = json!([{ "id": "col", "name": "done", "cards": (0..500).map(|at| json!({ "id": format!("card_{at}"), "number": at, "title": "t".repeat(60) })).collect::<Vec<_>>() }]);
-    assert!(said("devpit_board", &json!({}), board).len() <= BUDGET);
+    let text = said("devpit_board", &json!({}), board);
+    assert!(text.len() <= BUDGET, "board: {}", text.len());
+    assert!(text.contains("full: true"), "a cut board says so");
+    let cut: Value = serde_json::from_str(&text).expect("json");
+    let cards = cut["columns"][0]["cards"].as_array().expect("cards");
+    let shown = cards.len() - 1;
+    assert_eq!(cards[shown], json!(format!("…and {} more", 500 - shown)));
 }
 
 #[test]

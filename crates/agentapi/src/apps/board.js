@@ -9,12 +9,17 @@ const draw = (columns) =>
         el('div', { class: 'row' }, el('h2', { class: 'grow', text: column.name }), el('span', { class: 'muted', text: String(column.cards.length) })),
         column.cards.map((card) =>
           el('div', { class: 'card' },
-            el('button', { class: 'link', text: card.title, onclick: async () => cardView.render(project, await call('devpit_card', { project, cardId: card.id }), () => draw(columns)) }),
+            el('button', { class: 'link', text: card.title, onclick: async () => cardView.render(project, await call('devpit_card', { project, cardId: card.id, full: true }), () => draw(columns)) }),
             el('div', { class: 'row muted' }, card.comments ? el('span', { text: `${card.comments} comments` }) : null, card.lastRun ? el('span', { class: 'chip', text: card.lastRun }) : null)))))))
+let asked = {}
 devpit.start({
-  input: (args) => (project = args && args.project),
-  result: (result) => {
-    const columns = devpit.parse(result)
+  input: (args) => {
+    asked = args || {}
+    project = asked.project
+  },
+  // The agent was answered a summary; the page reads the board whole.
+  result: async () => {
+    const columns = await devpit.call('devpit_board', { ...asked, full: true }).catch((err) => err.message)
     if (Array.isArray(columns)) draw(columns)
     else devpit.show(el('p', { class: 'err', text: String(columns) }))
   },

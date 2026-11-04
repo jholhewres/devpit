@@ -56,7 +56,7 @@ pub(crate) fn said(tool: &str, arguments: &Value, answer: Value) -> String {
 /// The summary of `answer`, by what `tool` answers.
 fn shaped(tool: &str, arguments: &Value, answer: Value) -> Value {
     match tool {
-        _ if COMMENTED.contains(&tool) => commented(&answer),
+        _ if COMMENTED.contains(&tool) => commented(tool, &answer, arguments),
         "devpit_card" => card(
             answer,
             arguments.get(COMMENTS).and_then(Value::as_bool) == Some(true),
@@ -69,17 +69,24 @@ fn shaped(tool: &str, arguments: &Value, answer: Value) -> Value {
     }
 }
 
-/// After a comment: which card, its newest comment and how many it has.
-fn commented(detail: &Value) -> Value {
+/// After a comment: which card, the comment written (or the newest) and how
+/// many it has.
+fn commented(tool: &str, detail: &Value, arguments: &Value) -> Value {
     let comments = detail["comments"]
         .as_array()
         .map(Vec::as_slice)
         .unwrap_or_default();
-    json!({
+    let mut answer = json!({
         "card": detail["card"]["id"],
         "comments": comments.len(),
         "newest": comments.last().map(|one| &one["id"]),
-    })
+    });
+    match tool {
+        "devpit_comment_edit" => answer["edited"] = arguments["commentId"].clone(),
+        "devpit_comment_delete" => answer["deleted"] = arguments["commentId"].clone(),
+        _ => {}
+    }
+    answer
 }
 
 /// A card without its comments whole: how many, the newest few cut short,
@@ -128,11 +135,12 @@ fn card(mut detail: Value, every_comment: bool) -> Value {
 }
 
 /// Each column with its cards, one short row each.
+/// An object, unlike the app's bare list: where a cut can say so.
 fn board(columns: Value) -> Value {
     let Value::Array(columns) = columns else {
         return columns;
     };
-    json!(columns
+    let columns = json!(columns
         .into_iter()
         .map(|mut column| {
             if let Some(cards) = column["cards"].as_array_mut() {
@@ -147,7 +155,8 @@ fn board(columns: Value) -> Value {
             }
             column
         })
-        .collect::<Vec<_>>())
+        .collect::<Vec<_>>());
+    json!({ "columns": columns })
 }
 
 fn board_card(mut card: Value) -> Value {
@@ -188,7 +197,7 @@ fn evidence(mut answer: Value) -> Value {
 const COUNTED: [&str; 2] = ["low", "info"];
 
 /// The verdict, the findings that can hold a card and how many others, and
-/// each reviewer's result; the packet, the diff's ends and the costs are in
+/// each reviewer's result; the diff's ends and the costs are in
 /// the run's folder.
 fn review(mut answer: Value) -> Value {
     if let Some(reviewers) = answer["reviewers"].as_array_mut() {
@@ -214,10 +223,7 @@ fn review(mut answer: Value) -> Value {
             answer["findings_counted"] = Value::Object(counted);
         }
     }
-    without(
-        answer,
-        &["attached", "packet", "base", "head", "consolidation"],
-    )
+    without(answer, &["attached", "base", "head", "consolidation"])
 }
 
 fn without(mut value: Value, fields: &[&str]) -> Value {
@@ -262,16 +268,22 @@ fn says_nothing(value: &Value) -> bool {
 /// what was cut says so, and `full: true` has it whole.
 fn fitted(value: &mut Value) {
     const STEPS: [(usize, usize); 4] = [(1200, 30), (500, 15), (200, 8), (100, 4)];
+    if value.to_string().len() <= BUDGET {
+        return;
+    }
+    let whole = std::mem::take(value);
+    // Each step cuts the whole answer afresh, so a count of what went is right.
     for (longest, most) in STEPS {
-        if value.to_string().len() <= BUDGET {
-            return;
-        }
+        *value = whole.clone();
         cut(value, longest, most);
         if let Some(fields) = value.as_object_mut() {
             fields.insert(
                 "cut".to_owned(),
                 json!("cut to fit: full: true for the whole answer"),
             );
+        }
+        if value.to_string().len() <= BUDGET {
+            return;
         }
     }
     // Still too wide: the biggest fields go, each saying it went.
@@ -343,7 +355,7 @@ pub(crate) fn given_before(skill: &Value) -> String {
         Some(part) => format!("{name}'s part {part}"),
         None => name.to_owned(),
     };
-    format!("{name} was given earlier in this session and has not changed since: follow that copy. {FULL}: true sends it again.")
+    format!("{name} was given earlier in this session and has not changed since: follow that copy. Without it in your context (a subagent, or after a compaction), call again with {FULL}: true.")
 }
 
 /// The tools whose summary leaves out enough to offer `full` for.
