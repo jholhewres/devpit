@@ -56,12 +56,8 @@ pub(crate) fn session_split_now(
     }
     // Where the pane it splits from stands: a card's tab is in its worktree,
     // and the project root would put the new pane on another branch.
-    let stood = match crate::ptyd_link::leaf_is_ptyd(&current, &leaf_id) {
-        true => crate::blocks::last_cwd(state.app(), &project_id, &leaf_id),
-        false => tmux_server()
-            .ok()
-            .and_then(|server| server.pane_path(&session, &leaf_id)),
-    };
+    let stood = crate::pane_io::cwd(&crate::pane_io::target_in(&current, &leaf_id))
+        .or_else(|| crate::blocks::last_cwd(state.app(), &project_id, &leaf_id));
     let cwd = match stood.filter(|path| path.is_dir()) {
         Some(path) => path,
         None => locate_cwd(&project_id, worktree_id.as_deref())?,

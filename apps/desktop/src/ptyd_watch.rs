@@ -1,5 +1,5 @@
-//! What each ptyd pane runs, told by the daemon as it changes (`Watch`), so
-//! its panes cost no polling at all.
+//! What each ptyd pane runs and where, told by the daemon as it changes
+//! (`Watch`), so its panes cost no polling at all.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -14,6 +14,8 @@ const AGAIN: Duration = Duration::from_secs(5);
 #[derive(Default)]
 pub(crate) struct Fronts {
     programs: HashMap<u32, String>,
+    /// Where each pane's shell last said it stands.
+    cwds: HashMap<u32, String>,
     /// Which project and leaf a pane number is, read off the layouts.
     places: HashMap<u32, (String, String)>,
 }
@@ -29,9 +31,26 @@ impl Fronts {
                 let was = self.programs.insert(frame.pane, program.clone());
                 (was.as_deref() != Some(program.as_str())).then_some(frame.pane)
             }
-            Kind::Exited => self.programs.remove(&frame.pane).map(|_| frame.pane),
+            // Kept, not news: the window hears a folder from the shell itself.
+            Kind::Cwd => {
+                let cwd = String::from_utf8_lossy(&frame.bytes).into_owned();
+                self.cwds.insert(frame.pane, cwd);
+                None
+            }
+            Kind::Exited => {
+                self.cwds.remove(&frame.pane);
+                self.programs.remove(&frame.pane).map(|_| frame.pane)
+            }
             _ => None,
         }
+    }
+
+    pub(crate) fn program_of(&self, pane: u32) -> Option<&str> {
+        self.programs.get(&pane).map(String::as_str)
+    }
+
+    pub(crate) fn cwd_of(&self, pane: u32) -> Option<&str> {
+        self.cwds.get(&pane).map(String::as_str)
     }
 
     pub(crate) fn place(&mut self, places: HashMap<u32, (String, String)>) {
@@ -73,6 +92,7 @@ impl Fronts {
     fn forget_all(&mut self) -> Vec<String> {
         let projects = self.projects();
         self.programs.clear();
+        self.cwds.clear();
         projects
     }
 }
@@ -94,6 +114,18 @@ pub(crate) fn running_in(project_id: &str) -> Vec<PaneRunning> {
         .lock()
         .map(|fronts| fronts.running_in(project_id))
         .unwrap_or_default()
+}
+
+/// What pane `pane` runs in front, as the daemon last said.
+pub(crate) fn program(pane: u32) -> Option<String> {
+    let fronts = fronts().lock().ok()?;
+    fronts.program_of(pane).map(ToOwned::to_owned)
+}
+
+/// Where pane `pane`'s shell stands, as the daemon last said.
+pub(crate) fn cwd(pane: u32) -> Option<String> {
+    let fronts = fronts().lock().ok()?;
+    fronts.cwd_of(pane).map(ToOwned::to_owned)
 }
 
 /// Every ptyd leaf of every project's layouts, by the daemon's number.

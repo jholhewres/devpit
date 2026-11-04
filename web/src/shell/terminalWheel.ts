@@ -24,6 +24,18 @@ export interface Wheel {
   dispose: () => void
 }
 
+/* What a devpit-ptyd pane's target starts with (`ptyd_link::TARGET_PREFIX`). */
+const PTYD = 'ptyd:'
+
+/*
+ * The wheel for a pane by its target. A devpit-ptyd pane has no tmux client
+ * drawing it: xterm holds its history, and xterm's own wheel scrolls it.
+ */
+export function wheelFor(target: string | undefined, terminal: Terminal, box: HTMLElement, projectId: string, paneId: string): Wheel {
+  if (target?.startsWith(PTYD)) return { typed: (data, write) => write(data), dispose: () => undefined }
+  return wheelToTmux(terminal, box, projectId, paneId)
+}
+
 export function wheelToTmux(terminal: Terminal, box: HTMLElement, projectId: string, paneId: string): Wheel {
   let pixels = 0
   let timer: ReturnType<typeof setTimeout> | undefined

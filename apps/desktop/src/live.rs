@@ -202,6 +202,15 @@ impl Live {
         }
     }
 
+    /// The size a ptyd pane was last told, by this window.
+    pub(crate) fn ptyd_size(&self) -> Option<PtySize> {
+        match &self.ends {
+            Ends::Pty { .. } => None,
+            #[cfg(unix)]
+            Ends::Ptyd { size, .. } => size.lock().ok().map(|size| *size),
+        }
+    }
+
     /// Bytes the page parsed: room for the pty to read on.
     pub(crate) fn ack(&self, bytes: u32) {
         match &self.ends {

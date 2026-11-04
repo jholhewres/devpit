@@ -14,7 +14,7 @@ import { clipboardKey, copySelection, pasteClipboard } from './terminalClipboard
 import { TerminalMenu } from './TerminalMenu'
 import { guardComposition } from './terminalIme'
 import { picturesAsPaths } from './terminalPaste'
-import { wheelToTmux } from './terminalWheel'
+import { wheelFor } from './terminalWheel'
 import { useMarks } from './useMarks'
 import { menuPoint } from './menuRules'
 import { useShellPick } from './shellStore'
@@ -49,6 +49,7 @@ export function Leaf({
   onBlocks,
   onSeparate,
   cwd = null,
+  target,
 }: {
   paneId: string
   projectId: string
@@ -62,6 +63,8 @@ export function Leaf({
   onSeparate?: () => void
   /** The shell's folder, when it says so: where a relative path it prints is. */
   cwd?: string | null
+  /** The pane's target in the layout, which says whether tmux draws it. */
+  target?: string
 }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -158,7 +161,7 @@ export function Leaf({
     }
     box.addEventListener('contextmenu', menu, true)
     const unguard = guardComposition(box, (data) => terminal.input(data, true))
-    const wheel = wheelToTmux(terminal, box, projectId, paneId)
+    const wheel = wheelFor(target, terminal, box, projectId, paneId)
 
     /* The pane is `display: none` until its tab is active and animates in on a
        transform, so a fit in this tick measures nothing and xterm ends up with
@@ -370,7 +373,7 @@ export function Leaf({
       delete box.dataset.drawn
       terminal.dispose()
     }
-  }, [projectId, paneId, round, onScreen])
+  }, [projectId, paneId, round, onScreen, target])
 
   useMarks(term, paneId)
   const closeMenu = useCallback(() => setMenuAt(null), [])

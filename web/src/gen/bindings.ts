@@ -1630,7 +1630,7 @@ export const commands = {
 	 *  alternate screen, where a wheel is arrow keys and the shell echoes them.
 	 */
 	sessionScroll: (projectId: string, paneId: string, lines: number) => typedError<null, RpcError>(__TAURI_INVOKE("session_scroll", { projectId, paneId, lines })),
-	/**  `session.redraw` — tmux draws this leaf's screen again, whole. */
+	/**  `session.redraw` — this leaf's screen drawn again, whole. */
 	sessionRedraw: (projectId: string, paneId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("session_redraw", { projectId, paneId })),
 	/**
 	 *  `pane.blocks` — every block this pane has kept, oldest first and the one

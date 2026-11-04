@@ -1,5 +1,5 @@
-//! A leaf's screen, asked of tmux: scrolled through its history, or drawn
-//! again whole. Apart from `panes.rs`, which attaches and feeds the pty.
+//! A leaf's screen: scrolled through its history, or drawn again whole.
+//! Apart from `panes.rs`, which attaches and feeds the pty.
 
 use devpit_rpc::RpcError;
 
@@ -24,25 +24,27 @@ pub(crate) fn session_scroll_now(
     pane_id: String,
     lines: i32,
 ) -> Result<(), RpcError> {
-    crate::sessions::holding(&project_id, &pane_id)?;
-    let session = devpit_tmux::Server::session_name(&project_id);
-    crate::sessions::tmux_server()?
-        .scroll(&devpit_tmux::Server::target(&session, &pane_id), lines)
-        .map_err(|err| RpcError::internal(err.to_string()))
+    let target = crate::pane_io::target_of(&project_id, &pane_id)?;
+    crate::pane_io::scroll(&target, lines)
 }
 
-/// `session.redraw` — tmux draws this leaf's screen again, whole.
+/// `session.redraw` — this leaf's screen drawn again, whole.
 #[tauri::command]
 #[specta::specta]
-pub async fn session_redraw(project_id: String, pane_id: String) -> Result<bool, RpcError> {
-    crate::off_main::blocking(move || session_redraw_now(project_id, pane_id)).await
+pub async fn session_redraw(
+    app: tauri::AppHandle,
+    project_id: String,
+    pane_id: String,
+) -> Result<bool, RpcError> {
+    crate::off_main::blocking(move || session_redraw_now(&app, project_id, pane_id)).await
 }
 
 /// [`session_redraw`], on the calling thread.
-pub(crate) fn session_redraw_now(project_id: String, pane_id: String) -> Result<bool, RpcError> {
-    crate::sessions::holding(&project_id, &pane_id)?;
-    let session = devpit_tmux::Server::session_name(&project_id);
-    crate::sessions::tmux_server()?
-        .redraw(&session, &pane_id)
-        .map_err(|err| RpcError::internal(err.to_string()))
+pub(crate) fn session_redraw_now(
+    app: &tauri::AppHandle,
+    project_id: String,
+    pane_id: String,
+) -> Result<bool, RpcError> {
+    let target = crate::pane_io::target_of(&project_id, &pane_id)?;
+    crate::pane_io::redraw(app, &target)
 }

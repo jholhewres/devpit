@@ -58,3 +58,9 @@ export function nodeAt(node: LayoutNode, id: string): LayoutNode | null {
   if (node.id === id) return node
   return nodeAt(node.first, id) ?? nodeAt(node.second, id)
 }
+
+/** The target a leaf is kept under — tmux's or devpit-ptyd's — or nothing. */
+export function targetOf(node: LayoutNode, id: string): string | undefined {
+  const found = nodeAt(node, id)
+  return found?.type === 'leaf' ? found.tmuxTarget : undefined
+}

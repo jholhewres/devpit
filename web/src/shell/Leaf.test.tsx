@@ -50,7 +50,7 @@ vi.mock('./live', () => ({
 }))
 vi.mock('./terminal', () => ({ contrastFor: () => 1, darkNow: () => true, options: () => ({}), palette: () => ({}) }))
 vi.mock('./terminalPathLinks', () => ({ linkPaths: () => ({ dispose() {} }) }))
-vi.mock('./terminalWheel', () => ({ wheelToTmux: () => ({ dispose() {}, typed() {} }) }))
+vi.mock('./terminalWheel', () => ({ wheelFor: () => ({ dispose() {}, typed() {} }) }))
 vi.mock('./terminalIme', () => ({ guardComposition: () => () => {} }))
 vi.mock('./terminalPaste', () => ({ picturesAsPaths: () => () => {} }))
 vi.mock('./useMarks', () => ({ useMarks() {} }))

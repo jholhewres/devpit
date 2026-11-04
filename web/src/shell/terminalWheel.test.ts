@@ -6,7 +6,7 @@ vi.mock('./live', () => ({
   commands: { sessionScroll: (...args: unknown[]) => scrolled(...args) },
 }))
 
-import { wheelToTmux } from './terminalWheel'
+import { wheelFor, wheelToTmux } from './terminalWheel'
 
 afterEach(() => {
   scrolled.mockReset()
@@ -47,5 +47,25 @@ describe('the wheel over a tmux terminal', () => {
     expect(write).toHaveBeenCalledWith('a')
     wheel.typed('b', write)
     expect(write).toHaveBeenLastCalledWith('b')
+  })
+})
+
+describe('the wheel over a devpit-ptyd terminal', () => {
+  it('is left to xterm, which holds the history, and typing goes straight through', () => {
+    let taken = false
+    const terminal = { rows: 10, attachCustomWheelEventHandler: () => (taken = true) }
+    const wheel = wheelFor('ptyd:leaf', terminal as never, { clientHeight: 200 } as HTMLElement, 'p1', 'leaf')
+    expect(taken).toBe(false)
+    const write = vi.fn()
+    wheel.typed('a', write)
+    expect(write).toHaveBeenCalledWith('a')
+    expect(scrolled).not.toHaveBeenCalled()
+  })
+
+  it('still goes to tmux for a tmux target', () => {
+    let taken = false
+    const terminal = { rows: 10, attachCustomWheelEventHandler: () => (taken = true) }
+    wheelFor('devpit_p1:leaf', terminal as never, { clientHeight: 200 } as HTMLElement, 'p1', 'leaf')
+    expect(taken).toBe(true)
   })
 })

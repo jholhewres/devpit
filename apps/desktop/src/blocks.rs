@@ -262,15 +262,13 @@ pub(crate) fn pane_blocks_now(
     })
 }
 
-/// Where tmux says a pane's shell stands, until the shell has said so itself:
-/// a pane that has not reached its first prompt would show no folder, and so
-/// no branch.
+/// Where tmux or the daemon says a pane's shell stands, until the shell has
+/// said so itself: a pane that has not reached its first prompt would show
+/// no folder, and so no branch.
 fn standing_in(state: &Blocks, pane_id: &str) -> Option<String> {
     let project = state.projects.lock().ok()?.get(pane_id).cloned()?;
-    let session = devpit_tmux::Server::session_name(&project);
-    let path = crate::sessions::tmux_server()
-        .ok()?
-        .pane_path(&session, pane_id)?;
+    let target = crate::pane_io::target_of(&project, pane_id).ok()?;
+    let path = crate::pane_io::cwd(&target)?;
     Some(path.to_string_lossy().into_owned())
 }
 
@@ -429,11 +427,8 @@ pub(crate) fn pane_submit_now(
     pane_id: String,
     line: String,
 ) -> Result<(), RpcError> {
-    crate::sessions::holding(&project_id, &pane_id)?;
-    let session = devpit_tmux::Server::session_name(&project_id);
-    crate::sessions::tmux_server()?
-        .submit(&devpit_tmux::Server::target(&session, &pane_id), &line)
-        .map_err(|err| RpcError::internal(err.to_string()))
+    let target = crate::pane_io::target_of(&project_id, &pane_id)?;
+    crate::pane_io::submit(&target, &line)
 }
 
 /// `folder.glance` — a folder's branch and its difference from `HEAD`, for
@@ -474,11 +469,8 @@ pub(crate) fn pane_compose_now(
     pane_id: String,
     text: String,
 ) -> Result<(), RpcError> {
-    crate::sessions::holding(&project_id, &pane_id)?;
-    let session = devpit_tmux::Server::session_name(&project_id);
-    crate::sessions::tmux_server()?
-        .paste_and_send(&devpit_tmux::Server::target(&session, &pane_id), &text)
-        .map_err(|err| RpcError::internal(err.to_string()))
+    let target = crate::pane_io::target_of(&project_id, &pane_id)?;
+    crate::pane_io::paste(&target, &text, true)
 }
 
 /// How many completions a Tab offers. Past this the word needs more letters.
@@ -628,9 +620,6 @@ pub async fn pane_nudge(project_id: String, pane_id: String) -> Result<bool, Rpc
 
 /// [`pane_nudge`], on the calling thread.
 pub(crate) fn pane_nudge_now(project_id: String, pane_id: String) -> Result<bool, RpcError> {
-    crate::sessions::holding(&project_id, &pane_id)?;
-    let session = devpit_tmux::Server::session_name(&project_id);
-    crate::sessions::tmux_server()?
-        .nudge(&devpit_tmux::Server::target(&session, &pane_id))
-        .map_err(|err| RpcError::internal(err.to_string()))
+    let target = crate::pane_io::target_of(&project_id, &pane_id)?;
+    crate::pane_io::nudge(&target)
 }

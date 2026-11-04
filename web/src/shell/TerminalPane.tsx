@@ -8,7 +8,7 @@ import { usePaneActions } from './paneActions'
 import { PaneCorner } from './PaneCorner'
 import { Split } from './Split'
 import { useShortcut } from './useShortcut'
-import { leaves } from './splits'
+import { leaves, targetOf } from './splits'
 import type { Tab } from './strip'
 import { SessionCost } from './SessionCost'
 import { useShellPick } from './shellStore'
@@ -172,7 +172,15 @@ export function TerminalPane({ tab, projectId }: { tab: Tab; projectId: string }
         onFocus={focus}
         onRatio={settle}
         leaf={(leafId) => (
-          <BlockTerm key={leafId} paneId={leafId} projectId={projectId} onSplit={split} onClosePane={pane.closePane} onSeparate={pane.separate ?? undefined} />
+          <BlockTerm
+            key={leafId}
+            paneId={leafId}
+            projectId={projectId}
+            target={targetOf(tree, leafId)}
+            onSplit={split}
+            onClosePane={pane.closePane}
+            onSeparate={pane.separate ?? undefined}
+          />
         )}
       />
     </>

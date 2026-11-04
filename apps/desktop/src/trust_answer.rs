@@ -63,9 +63,6 @@ pub(crate) fn watch(target: String) {
         return;
     }
     std::thread::spawn(move || {
-        let Ok(server) = crate::sessions::tmux_server() else {
-            return;
-        };
         let mut moves = 0;
         for _ in 0..TRIES {
             let asked = crate::live_sessions::screen_of(&target)
@@ -74,7 +71,7 @@ pub(crate) fn watch(target: String) {
             let key = match asked {
                 None => None,
                 Some(Cursor::OnYes) => {
-                    let _ = server.press(&target, &[Key::Enter]);
+                    let _ = crate::pane_io::press(&target, &[Key::Enter]);
                     return;
                 }
                 Some(Cursor::Above) => Some(Key::Down),
@@ -85,7 +82,7 @@ pub(crate) fn watch(target: String) {
                     return;
                 }
                 moves += 1;
-                let _ = server.press(&target, &[key]);
+                let _ = crate::pane_io::press(&target, &[key]);
             }
             std::thread::sleep(EVERY);
         }

@@ -57,9 +57,12 @@ export function BlockTerm({
   onSplit,
   onClosePane,
   onSeparate,
+  target,
 }: {
   paneId: string
   projectId: string
+  /** The pane's target in the layout (`Leaf`). */
+  target?: string
   onSplit?: (direction: 'horizontal' | 'vertical') => void
   onClosePane?: () => void
   onSeparate?: () => void
@@ -187,6 +190,7 @@ export function BlockTerm({
         <Leaf
           paneId={paneId}
           projectId={projectId}
+          target={target}
           onSplit={onSplit}
           onClosePane={onClosePane}
           onSeparate={onSeparate}

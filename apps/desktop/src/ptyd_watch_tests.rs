@@ -46,3 +46,15 @@ fn output_is_not_news() {
     let mut fronts = placed();
     assert_eq!(fronts.heard(&Frame::new(7, Kind::Output, "hi")), None);
 }
+
+#[test]
+fn a_pane_says_where_it_stands_without_it_being_news() {
+    let mut fronts = placed();
+    assert_eq!(fronts.heard(&Frame::new(7, Kind::Cwd, "/srv/one")), None);
+    assert_eq!(fronts.cwd_of(7), Some("/srv/one"));
+    fronts.heard(&Frame::new(7, Kind::Program, "zsh"));
+    assert_eq!(fronts.program_of(7), Some("zsh"));
+    fronts.heard(&Frame::new(7, Kind::Exited, Vec::new()));
+    assert_eq!(fronts.cwd_of(7), None, "an ended pane stands nowhere");
+    assert_eq!(fronts.program_of(7), None);
+}

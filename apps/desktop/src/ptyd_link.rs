@@ -297,4 +297,4 @@ pub(crate) fn revive_at(
 
 #[cfg(test)]
 #[path = "ptyd_link_tests.rs"]
-mod tests;
+pub(crate) mod tests;
