@@ -118,8 +118,13 @@ impl WorkItems for Board<'_> {
 
     fn list(&self) -> Result<Vec<WorkItem>, String> {
         let mut cards = self.store.cards(self.project_id).map_err(err)?;
-        // A ULID sorts by when it was made.
-        cards.sort_by(|a, b| a.id.cmp(&b.id));
+        // A card's number is the order it was made in; two ULIDs of the same
+        // millisecond are not.
+        let numbers = self.store.card_numbers(self.project_id).map_err(err)?;
+        cards.sort_by_cached_key(|card| {
+            let number = numbers.get(&card.id).copied().unwrap_or(u32::MAX);
+            (number, card.id.clone())
+        });
         cards.into_iter().map(|card| self.item_of(card)).collect()
     }
 
