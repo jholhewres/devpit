@@ -499,23 +499,19 @@ pub(crate) fn setup_of(
     if by == By::Agent {
         asks::previewed(&project.id, (!apply).then_some(&proposal));
     }
-    let checks: Vec<Value> = proposal
-        .config
-        .stages
-        .execution
-        .checks
-        .iter()
-        .map(|check| {
-            let script = proposal.scripts.iter().find(|one| one.name == check.name);
-            json!({
-                "name": check.name,
-                "run": check.run,
-                "command": script.map(|one| one.command.as_str()),
-                "source": script.and_then(|one| one.source.as_deref()),
-                "report": check.report,
-            })
+    let said = |check: &devflow_engine::config::Check| {
+        let script = proposal.scripts.iter().find(|one| one.name == check.name);
+        json!({
+            "name": check.name,
+            "run": check.run,
+            "command": script.map(|one| one.command.as_str()),
+            "source": script.and_then(|one| one.source.as_deref()),
+            "report": check.report,
         })
-        .collect();
+    };
+    let execution = &proposal.config.stages.execution;
+    let checks: Vec<Value> = execution.checks.iter().map(said).collect();
+    let release: Vec<Value> = execution.release.iter().map(said).collect();
     let planned = setup::with_unused_in(&DEVPIT, root, &proposal.config, proposal.files.clone());
     let files = if apply {
         setup::write(root, &planned)?
@@ -532,6 +528,7 @@ pub(crate) fn setup_of(
         "preset": word,
         "yaml": proposal.yaml,
         "checks": checks,
+        "release": release,
         "files": files,
         "open": detect::open(&detected),
         "unavailable": detected

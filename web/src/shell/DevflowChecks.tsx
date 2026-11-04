@@ -4,7 +4,8 @@ import type { DevflowCheck } from '../gen/bindings'
 import { checkOf, REPORTS, type Edit } from './devflowEdit'
 
 /*
- * The execution stage's checks: what devpit runs for a card's evidence. A
+ * The execution stage's checks: what devpit runs for a card's evidence, or,
+ * under `release`, once for a release. A
  * field is sent when it is left, not on every key, so the file is written
  * once per change rather than once per letter.
  */
@@ -36,10 +37,24 @@ function CheckRow({ check, onSave, onRemove }: { check: DevflowCheck; onSave: (n
   )
 }
 
-export function DevflowChecks({ checks, edit }: { checks: readonly DevflowCheck[]; edit: Edit }): React.JSX.Element {
+const EMPTY = {
+  checks: 'No checks: nothing proves a card done until one is added.',
+  release: 'No release checks: a long suite, such as E2E, runs here once for a release, not for each card.',
+}
+
+export function DevflowChecks({
+  checks,
+  edit,
+  list = 'checks',
+}: {
+  checks: readonly DevflowCheck[]
+  edit: Edit
+  list?: keyof typeof EMPTY
+}): React.JSX.Element {
   const [name, setName] = useState('')
   const [run, setRun] = useState('')
-  const save = (next: readonly DevflowCheck[]): void => edit('stages.execution.checks', next.map(checkOf))
+  const noun = list === 'release' ? 'New release check' : 'New check'
+  const save = (next: readonly DevflowCheck[]): void => edit(`stages.execution.${list}`, next.map(checkOf))
   const add = (): void => {
     save([...checks, { name: name.trim(), run: run.trim(), report: 'none', evidence: [], source: null }])
     setName('')
@@ -53,7 +68,7 @@ export function DevflowChecks({ checks, edit }: { checks: readonly DevflowCheck[
         <span>Report</span>
         <span />
       </div>
-      {checks.length === 0 && <span className="dfempty">No checks: nothing proves a card done until one is added.</span>}
+      {checks.length === 0 && <span className="dfempty">{EMPTY[list]}</span>}
       {checks.map((check, at) => (
         <CheckRow
           key={`${check.name}\u0000${check.run}\u0000${check.report}`}
@@ -63,11 +78,11 @@ export function DevflowChecks({ checks, edit }: { checks: readonly DevflowCheck[
         />
       ))}
       <div className="dfcheck dfcheck--new">
-        <input className="dfinput" aria-label="New check name" placeholder="name" value={name} onChange={(event) => setName(event.target.value)} />
-        <input className="dfinput dfinput--mono" aria-label="New check command" placeholder="command, run from the project's root" value={run} onChange={(event) => setRun(event.target.value)} />
+        <input className="dfinput" aria-label={`${noun} name`} placeholder="name" value={name} onChange={(event) => setName(event.target.value)} />
+        <input className="dfinput dfinput--mono" aria-label={`${noun} command`} placeholder="command, run from the project's root" value={run} onChange={(event) => setRun(event.target.value)} />
         <span />
         <button className="btn btn--sm" disabled={!name.trim() || !run.trim()} onClick={add}>
-          Add check
+          {list === 'release' ? 'Add release check' : 'Add check'}
         </button>
       </div>
     </div>

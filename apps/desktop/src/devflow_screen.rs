@@ -251,6 +251,11 @@ pub(crate) fn view(
             } else {
                 Vec::new()
             },
+            release: if builtin == Some("execution") {
+                stages.execution.release.iter().map(check).collect()
+            } else {
+                Vec::new()
+            },
             e2e_dir: (builtin == Some("execution")).then(|| stages.execution.e2e_dir.clone()),
             gate: match (builtin, own.and_then(|own| own.gate.as_ref())) {
                 (Some("completion"), _) => Some(stages.completion.gate.clone()),

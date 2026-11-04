@@ -235,6 +235,30 @@ describe('the Devflow screen', () => {
     expect(await screen.findByText('On here')).toBeTruthy()
   })
 
+  it("shows the release checks apart from each card's, and adds one under release", async () => {
+    const release = [{ name: 'e2e', run: 'make e2e', report: 'none', evidence: [], source: 'Makefile:9' }]
+    current = active(undefined, {
+      stages: config().stages.map((one) => (one.name === 'execution' ? { ...one, release } : one)),
+    })
+    render(<DevflowPane />)
+    expect(await screen.findByText('Release checks')).toBeTruthy()
+    expect(screen.getByDisplayValue('make e2e')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('New release check name'), { target: { value: 'suite' } })
+    fireEvent.change(screen.getByLabelText('New release check command'), { target: { value: 'make suite' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add release check' }))
+    await waitFor(() =>
+      expect(called).toHaveBeenCalledWith(
+        'edit',
+        'prj_api',
+        'stages.execution.release',
+        JSON.stringify([
+          { name: 'e2e', run: 'make e2e', report: 'none' },
+          { name: 'suite', run: 'make suite', report: 'none' },
+        ]),
+      ),
+    )
+  })
+
   it('writes an edit to the file, and does not mistake its own edit for one made outside', async () => {
     current = active()
     render(<DevflowPane />)

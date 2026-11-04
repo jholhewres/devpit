@@ -72,6 +72,59 @@ fn project(id: &str, root: &Path) -> Project {
     .expect("a project")
 }
 
+/// Sabotage: put the release checks back among each card's, and the preview
+/// says `e2e` is run for every card's evidence.
+#[test]
+fn the_recommended_setup_runs_a_detected_e2e_at_release_and_judges_no_brief() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("Makefile"), "test:\n\ttrue\ne2e:\n\ttrue\n").expect("makefile");
+    let here = project("prj_devflow_release", dir.path());
+    let ask = |params: Value| {
+        respond_from(None, "devflow_setup", &here, dir.path(), None, &params).expect("setup")
+    };
+    let names = |said: &Value, key: &str| -> Vec<String> {
+        said[key]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|check| check["name"].as_str().map(str::to_owned))
+            .collect()
+    };
+    let preview = ask(json!({ "preset": "recommended" }));
+    assert_eq!(names(&preview, "checks"), ["unit"], "{preview}");
+    assert_eq!(names(&preview, "release"), ["e2e"], "{preview}");
+    let yaml = preview["yaml"].as_str().expect("yaml");
+    assert!(yaml.contains("consolidate: none"), "{yaml}");
+    assert!(!yaml.contains("devflow-brief"), "{yaml}");
+
+    ask(json!({ "preset": "recommended", "apply": true }));
+    let written = std::fs::read_to_string(dir.path().join(FILE)).expect("yaml");
+    let config = parse(&written).expect("valid");
+    let execution = &config.stages.execution;
+    assert_eq!(
+        execution
+            .checks
+            .iter()
+            .map(|one| one.name.as_str())
+            .collect::<Vec<_>>(),
+        ["unit"]
+    );
+    assert_eq!(
+        execution
+            .release
+            .iter()
+            .map(|one| one.name.as_str())
+            .collect::<Vec<_>>(),
+        ["e2e"]
+    );
+    assert_eq!(
+        config.review.consolidate,
+        devflow_engine::config::Consolidate::Nothing
+    );
+    assert!(config.review.scale.is_some(), "{written}");
+    assert_eq!(devflow_engine::jev::rubric_for(&config, "briefing"), None);
+}
+
 #[test]
 fn a_setup_writes_only_when_applied_and_leaves_switching_on_to_the_click() {
     let dir = tempfile::tempdir().expect("tempdir");

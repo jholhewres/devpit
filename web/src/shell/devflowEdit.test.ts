@@ -43,6 +43,21 @@ describe("Devflow's edits", () => {
     ])
   })
 
+  it('keeps the release checks when a stage moves, and folds an edit of them in', () => {
+    const release = [{ name: 'e2e', run: 'make e2e', report: 'none', evidence: [], source: null }]
+    const withRelease: DevflowConfig = {
+      ...config,
+      stages: config.stages.map((one) => (one.name === 'execution' ? { ...one, release } : one)),
+    }
+    const execution = moved(withRelease, 'plan', -1).find((one) => one.uses === 'builtin/execution')
+    expect(execution?.release).toEqual([{ name: 'e2e', run: 'make e2e', report: 'none' }])
+    expect(moved(config, 'plan', -1).find((one) => one.uses === 'builtin/execution')).not.toHaveProperty('release')
+    const edited = applied(withRelease, 'stages.execution.release', [{ name: 'suite', run: 'make suite' }])
+    const stage = edited.stages.find((one) => one.name === 'execution')
+    expect(stage?.release).toEqual([{ name: 'suite', run: 'make suite', report: 'none', evidence: [], source: null }])
+    expect(stage?.checks.map((one) => one.name)).toEqual(['unit'])
+  })
+
   it('says every choice of a Custom setup as a dotted path', () => {
     const set = customSet(applied(config, 'decisions.use', true))
     expect(set).toMatchObject({

@@ -224,6 +224,14 @@ export function DevflowStages({
               </div>
             </div>
           )}
+          {stage.uses === 'builtin/execution' && withChecks && (
+            <div className="dffield dffield--top">
+              <span className="dffield__l">Release checks</span>
+              <div className="dffield__v">
+                <DevflowChecks checks={stage.release ?? []} edit={edit} list="release" />
+              </div>
+            </div>
+          )}
           {stage.uses === 'builtin/completion' && stage.gate !== null && <GateRow key={stage.gate} gate={stage.gate} edit={edit} />}
           <SkillLine stage={stage} projectId={projectId} />
           {arrange && <Arrange config={config} stage={stage} edit={edit} />}

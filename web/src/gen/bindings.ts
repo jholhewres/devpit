@@ -3169,6 +3169,8 @@ export type DevflowStage = {
 	unblockOn?: string | null,
 	/**  The execution stage's checks. */
 	checks: DevflowCheck[],
+	/**  The execution stage's checks run once for a release, by name. */
+	release?: DevflowCheck[],
 	/**  The execution stage's folder for E2E specs. */
 	e2eDir: string | null,
 	/**  The completion stage's rubric, or an own stage's. */

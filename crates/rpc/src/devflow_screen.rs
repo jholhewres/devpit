@@ -79,6 +79,9 @@ pub struct DevflowStage {
     pub unblock_on: Option<String>,
     /// The execution stage's checks.
     pub checks: Vec<DevflowCheck>,
+    /// The execution stage's checks run once for a release, by name.
+    #[serde(default)]
+    pub release: Vec<DevflowCheck>,
     /// The execution stage's folder for E2E specs.
     pub e2e_dir: Option<String>,
     /// The completion stage's rubric, or an own stage's.

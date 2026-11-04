@@ -49,6 +49,7 @@ export function stageJson(stage: DevflowStage): Record<string, unknown> {
   if (stage.unblockOn) item.unblock_on = stage.unblockOn
   if (stage.uses === 'builtin/execution') {
     item.checks = stage.checks.map(checkOf)
+    if (stage.release?.length) item.release = stage.release.map(checkOf)
     if (stage.e2eDir) item.e2e_dir = stage.e2eDir
   }
   if (stage.uses === 'builtin/completion' && stage.gate) item.gate = stage.gate
@@ -87,7 +88,7 @@ export function rubricsWith(config: DevflowConfig, stage: string, rubric: string
   return rubrics
 }
 
-const stageEdit = /^stages\.([a-z]+)\.(enabled|approve|checks)$/
+const stageEdit = /^stages\.([a-z]+)\.(enabled|approve|checks|release)$/
 
 /** `config` with one edit made, for a setup that is not written yet. */
 export function applied(config: DevflowConfig, path: string, value: unknown): DevflowConfig {
@@ -98,14 +99,15 @@ export function applied(config: DevflowConfig, path: string, value: unknown): De
       if (one.name !== name) return one
       if (field === 'enabled') return { ...one, enabled: value === true }
       if (field === 'approve') return { ...one, approve: String(value) }
+      const had = field === 'release' ? (one.release ?? []) : one.checks
       const checks = (value as Record<string, unknown>[]).map((check) => ({
         name: String(check.name),
         run: String(check.run),
         report: String(check.report ?? 'none'),
         evidence: (check.evidence as string[] | undefined) ?? [],
-        source: one.checks.find((was) => was.run === check.run)?.source ?? null,
+        source: had.find((was) => was.run === check.run)?.source ?? null,
       }))
-      return { ...one, checks }
+      return field === 'release' ? { ...one, release: checks } : { ...one, checks }
     }
     return { ...config, stages: config.stages.map(changed) }
   }
@@ -142,6 +144,7 @@ export function customSet(config: DevflowConfig): Record<string, unknown> {
     set[`stages.${stage.name}.enabled`] = stage.enabled
     if (stage.approve) set[`stages.${stage.name}.approve`] = stage.approve
     if (stage.name === 'execution') set['stages.execution.checks'] = stage.checks.map(checkOf)
+    if (stage.name === 'execution' && stage.release?.length) set['stages.execution.release'] = stage.release.map(checkOf)
   }
   set['review.reviewers'] = config.reviewers.map(reviewerOf)
   set['review.block_on'] = config.blockOn

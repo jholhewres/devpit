@@ -174,3 +174,130 @@ fn a_new_setup_starts_where_settings_say() {
         .expect("kept");
     assert_eq!(prefs_of(&store).preset, "custom");
 }
+
+/// Sabotage: draw the execution stage without `release`, and the screen
+/// shows a release check nowhere, nor lets one be edited.
+#[test]
+fn the_screen_shows_and_edits_the_release_checks_apart_from_each_cards() {
+    let (_home, store) = store();
+    let dir = repo();
+    let here = project("prj_screen_release", dir.path());
+    let execution = |config: &DevflowConfig| {
+        config
+            .stages
+            .iter()
+            .find(|stage| stage.name == "execution")
+            .cloned()
+            .expect("execution")
+    };
+    // A file from before release checks reads as it did: none.
+    write(
+        dir.path(),
+        "version: 1\nstages:\n  execution:\n    checks:\n      - { name: unit, run: make test }\n",
+    );
+    let before = execution(&screen(None, &store, &here).config.expect("valid"));
+    assert_eq!(before.checks.len(), 1);
+    assert!(before.release.is_empty());
+
+    edit_now(
+        None,
+        &store,
+        &here,
+        "stages.execution.release",
+        json!([{ "name": "e2e", "run": "make e2e", "report": "none" }]),
+    )
+    .expect("edited");
+    let after = execution(&screen(None, &store, &here).config.expect("valid"));
+    assert_eq!(
+        after
+            .checks
+            .iter()
+            .map(|one| one.name.as_str())
+            .collect::<Vec<_>>(),
+        ["unit"]
+    );
+    assert_eq!(
+        after
+            .release
+            .iter()
+            .map(|one| one.name.as_str())
+            .collect::<Vec<_>>(),
+        ["e2e"]
+    );
+}
+
+/// What engine v0.2.1's recommended setup wrote, comments trimmed.
+const WRITTEN_BY_0_2_1: &str = "version: 2
+enabled: false
+stages:
+  - uses: builtin/briefing
+    enabled: true
+    approve: person
+  - uses: builtin/context
+    enabled: true
+  - uses: builtin/plan
+    enabled: true
+    approve: person
+    publish: board   # board | jira | linear | github
+  - uses: builtin/execution
+    enabled: true
+    checks:
+      - name: unit
+        run: sh .devpit/devflow/scripts/check-unit.sh
+        report: vitest
+      - name: e2e
+        run: sh .devpit/devflow/scripts/check-e2e.sh
+        report: junit
+        evidence: [screenshots, video]
+      - name: lint
+        run: sh .devpit/devflow/scripts/check-lint.sh
+        report: none
+  - uses: builtin/review
+    enabled: true
+  - uses: builtin/completion
+    enabled: true
+    gate: devflow-done
+review:
+  reviewers: []
+  block_on: [critical, high]
+  consolidate: jev
+decisions:
+  use: false
+  mode: shadow
+";
+
+/// A file v0.2.1 wrote keeps its e2e among each card's checks, its
+/// consolidation and no scale: v0.2.2's defaults are for new files.
+#[test]
+fn a_devflow_yaml_written_with_engine_0_2_1_reads_as_before() {
+    let (_home, store) = store();
+    let dir = repo();
+    let here = project("prj_screen_v021", dir.path());
+    write(dir.path(), WRITTEN_BY_0_2_1);
+    let said = screen(None, &store, &here);
+    assert_eq!(said.state, DevflowState::Disabled, "{:?}", said.error);
+    let config = said.config.expect("valid");
+    let execution = config
+        .stages
+        .iter()
+        .find(|stage| stage.name == "execution")
+        .expect("execution");
+    assert_eq!(
+        execution
+            .checks
+            .iter()
+            .map(|one| one.name.as_str())
+            .collect::<Vec<_>>(),
+        ["unit", "e2e", "lint"]
+    );
+    assert!(execution.release.is_empty());
+    assert_eq!(config.consolidate, "jev");
+    let read = devflow_engine::config::parse(WRITTEN_BY_0_2_1).expect("valid");
+    assert_eq!(read.review.scale, None);
+    assert!(!read.review.scale_off);
+    assert_eq!(
+        read.stages.execution.runnable(None).len(),
+        3,
+        "each card still runs its e2e"
+    );
+}
