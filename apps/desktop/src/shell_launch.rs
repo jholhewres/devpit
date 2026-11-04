@@ -125,16 +125,32 @@ pub async fn session_running(
 }
 
 pub(crate) fn running_in(project_id: &str) -> Result<Vec<PaneRunning>, RpcError> {
-    let Ok(server) = crate::sessions::tmux_server() else {
-        return Ok(Vec::new());
-    };
-    let session = devpit_tmux::Server::session_name(project_id);
-    let Ok(panes) = server.running(&session) else {
-        return Ok(Vec::new());
-    };
+    let rows = crate::pane_snapshot::rows();
+    let mut panes = named_panes(crate::pane_snapshot::in_project(&rows, project_id));
+    #[cfg(unix)]
+    panes.extend(crate::ptyd_watch::running_in(project_id));
+    Ok(panes)
+}
 
-    // One `ps` for every pane at once. A spawn per row, on a two-second
-    // timer, would cost more than the answer is worth.
+/// A ptyd pane, by the program its daemon says is in front.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub(crate) fn named_program(leaf: &str, program: &str) -> PaneRunning {
+    let agent = devpit_pty::agents::recognise(&[program.to_owned()]);
+    PaneRunning {
+        pane_id: leaf.to_owned(),
+        busy: !devpit_pty::agents::idle_shell(program),
+        label: agent.map_or_else(|| program.to_owned(), |one| one.label.to_owned()),
+        agent: agent.map(|one| one.id.to_owned()),
+        command: program.to_owned(),
+    }
+}
+
+/// What each of these tmux panes runs, named.
+pub(crate) fn named_panes(panes: Vec<devpit_tmux::Running>) -> Vec<PaneRunning> {
+    if panes.is_empty() {
+        return Vec::new();
+    }
+    // One read of the process table for every pane at once.
     let ttys: Vec<String> = panes.iter().map(|one| one.tty.clone()).collect();
     let fronts = devpit_pty::looking(&ttys);
 
@@ -146,10 +162,10 @@ pub(crate) fn running_in(project_id: &str) -> Result<Vec<PaneRunning>, RpcError>
         std::collections::HashMap::new()
     };
 
-    Ok(panes
+    panes
         .into_iter()
         .map(|one| named(&fronts, &names, one))
-        .collect())
+        .collect()
 }
 
 /// Every declared profile's name, by id.

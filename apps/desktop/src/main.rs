@@ -166,6 +166,7 @@ mod openers;
 mod outside_sessions;
 mod pane_asking;
 mod pane_screen;
+mod pane_snapshot;
 mod pane_socket;
 mod panels;
 mod panes;
@@ -187,6 +188,8 @@ mod projects;
 #[cfg(unix)]
 mod ptyd_attach;
 mod ptyd_link;
+#[cfg(unix)]
+mod ptyd_watch;
 mod question;
 mod reading_path;
 mod rebound;
@@ -518,6 +521,9 @@ fn main() {
             // What the cards were doing before this process started: asked
             // once, on its own thread, for the project the window opens on.
             card_reconcile::rebuild_on_start(app.handle().clone());
+            pane_snapshot::watch(app.handle().clone());
+            #[cfg(unix)]
+            ptyd_watch::watch(app.handle().clone());
             // Looks for a newer devpit while the switch says to. Started
             // last: it is the one thing here that can wait.
             update::watch(app.handle().clone());

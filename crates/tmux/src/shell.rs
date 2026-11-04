@@ -111,6 +111,54 @@ pub fn parse_running(listed: &str) -> Vec<Running> {
         .collect()
 }
 
+/// One pane of the whole server, as one `list-panes -a` lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Snapped {
+    /// The session the row was listed under: a window shows once per session
+    /// grouped on it.
+    pub session: String,
+    /// tmux's own pane id, `%12`.
+    pub pane_id: String,
+    pub running: Running,
+}
+
+/// Every pane on the server in one spawn, tab-separated so no field can
+/// shift the others.
+pub(crate) const SNAPSHOT_FORMAT: &str =
+    "#{session_name}\t#{pane_id}\t#{window_name}\t#{pane_tty}\t#{pane_current_command}\t#{@devpit_profile}";
+
+/// Reads [`SNAPSHOT_FORMAT`].
+pub fn parse_snapshot(listed: &str) -> Vec<Snapped> {
+    listed
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split('\t');
+            let session = parts.next()?.trim();
+            let pane_id = parts.next()?.trim();
+            let leaf_id = parts.next()?.trim();
+            let tty = parts.next()?.trim();
+            let command = parts.next()?.trim();
+            let profile = parts.next().unwrap_or_default().trim();
+            if [session, pane_id, leaf_id, tty, command]
+                .iter()
+                .any(|part| part.is_empty())
+            {
+                return None;
+            }
+            Some(Snapped {
+                session: session.to_owned(),
+                pane_id: pane_id.to_owned(),
+                running: Running {
+                    leaf_id: leaf_id.to_owned(),
+                    command: command.to_owned(),
+                    tty: tty.to_owned(),
+                    profile: profile.to_owned(),
+                },
+            })
+        })
+        .collect()
+}
+
 /// One line per pane, asked once for a whole session: a sidebar asks this on a
 /// timer, and a process spawn per row would cost more than the answer.
 pub(crate) const RUNNING_FORMAT: &str =

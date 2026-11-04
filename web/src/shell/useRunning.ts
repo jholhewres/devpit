@@ -1,36 +1,29 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from "react";
 
-import type { PaneRunning } from '../gen/bindings'
-import { ask, commands } from './live'
-import { same } from './running'
-import { whileWatched } from './whileWatched'
+import type { PaneRunning } from "../gen/bindings";
+import { ask, commands } from "./live";
+import { same } from "./running";
+import { whileWatched } from "./whileWatched";
+import { inTauri, onCarried } from "./window";
 
 /*
  * What each of a project's panes has in the foreground.
  *
- * Asked of the operating system through tmux rather than reported by the
- * programs themselves: an agent CLI opened in a terminal has no reason to tell
- * this app it exists. The other route is writing hooks into every CLI's own
- * settings file, which reaches further — a status, a session id, a prompt —
- * and edits files this app does not own, in the person's home directory,
- * without being asked. This answers the question the sidebar actually has.
- *
- * Polled, because a foreground process changes with no event to hang on. Two
- * seconds is slow enough to be free and fast enough that starting an agent
- * shows up before you have looked away — and only while the window is on
- * screen, because a minimised devpit asking tmux every two seconds is asking
- * for nobody.
+ * The window asks once, then again when the app says `panes:changed` for the
+ * project: the app reads tmux and the process table once for every caller,
+ * and only while the window is on screen. A page with no app events behind it
+ * asks on a timer instead.
  */
 
-const EVERY_MS = 2000
+const EVERY_MS = 2000;
 
 export function useRunning(projectId: string | null): readonly PaneRunning[] {
-  const [running, setRunning] = useState<readonly PaneRunning[]>([])
+  const [running, setRunning] = useState<readonly PaneRunning[]>([]);
 
   const look = useCallback(() => {
     if (!projectId) {
-      setRunning((was) => (was.length === 0 ? was : []))
-      return
+      setRunning((was) => (was.length === 0 ? was : []));
+      return;
     }
     return ask(() => commands.sessionRunning(projectId)).then((answer) => {
       /* A project with no session yet answers with an empty list rather
@@ -38,12 +31,27 @@ export function useRunning(projectId: string | null): readonly PaneRunning[] {
          a fresh array and the shell's context is rebuilt on a new one, so
          the old one is kept while nothing changed — otherwise everything
          under it redraws every two seconds. */
-      const now = answer.data
-      if (now) setRunning((was) => (same(was, now) ? was : now))
-    })
-  }, [projectId])
+      const now = answer.data;
+      if (now) setRunning((was) => (same(was, now) ? was : now));
+    });
+  }, [projectId]);
 
-  whileWatched(look, EVERY_MS, projectId)
+  const told = inTauri();
+  whileWatched(look, EVERY_MS, projectId, !told);
+  useEffect(() => {
+    if (!told || !projectId) return;
+    void look();
+    const stop = onCarried<string>(
+      "panes:changed",
+      (changed) => changed === projectId && void look(),
+    );
+    const back = (): void => void (!document.hidden && look());
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, [look, projectId, told]);
 
-  return running
+  return running;
 }

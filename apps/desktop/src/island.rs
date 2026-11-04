@@ -533,11 +533,9 @@ fn seeded() {
 
 /// This devpit's terminals with an agent — anything but a shell — in front.
 fn open_panes() -> Option<std::collections::HashSet<String>> {
-    let server = crate::sessions::tmux_server().ok()?;
+    let rows = crate::pane_snapshot::rows();
     Some(
-        server
-            .running_everywhere()
-            .ok()?
+        crate::pane_snapshot::everywhere(&rows)
             .into_iter()
             .filter(|one| !devpit_pty::agents::idle_shell(&one.command))
             .map(|one| one.leaf_id)

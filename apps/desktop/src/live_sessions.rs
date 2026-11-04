@@ -217,10 +217,7 @@ pub(crate) fn remote_of(bridge: Option<&str>) -> devpit_rpc::RemoteState {
 /// Which window each of devpit's panes is in now. Empty when tmux cannot say,
 /// and then no session is placed in a terminal rather than in a wrong one.
 pub(crate) fn windows_now() -> HashMap<String, String> {
-    crate::sessions::tmux_server()
-        .ok()
-        .and_then(|server| server.pane_windows().ok())
-        .unwrap_or_default()
+    crate::pane_snapshot::windows(&crate::pane_snapshot::rows())
 }
 
 /// A devpit terminal's screen as it is now, or nothing when tmux cannot say.
@@ -516,10 +513,7 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // One tmux server for every screen read in this listing.
     let server = crate::sessions::tmux_server().ok();
     let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
-    let windows = server
-        .as_ref()
-        .and_then(|server| server.pane_windows().ok())
-        .unwrap_or_default();
+    let windows = windows_now();
     let mut sessions = read(
         &config_of(profile_id)?.join("sessions"),
         alive,

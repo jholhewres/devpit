@@ -166,7 +166,7 @@ mod unix {
 }
 
 #[cfg(unix)]
-pub(crate) use unix::{connect, kill, running, spawn};
+pub(crate) use unix::{connect, kill, running, socket_path, spawn};
 
 /// The shell a ptyd pane starts: the same wrapped shell tmux's windows run,
 /// with the leaf's name and the project's shared environment handed to it.

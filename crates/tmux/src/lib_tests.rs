@@ -212,6 +212,61 @@ fn the_format_asks_tmux_for_the_option() {
     assert!(crate::shell::RUNNING_FORMAT.contains("@devpit_profile"));
 }
 
+#[test]
+fn one_listing_says_session_pane_window_terminal_program_and_profile() {
+    let rows = crate::shell::parse_snapshot(
+        "devpit_p1\t%3\tleaf_a\t/dev/pts/8\tWeb Content\t01JGLM\ndevpit_p1\t%4\tleaf_b\t/dev/pts/9\tzsh\t\n",
+    );
+    assert_eq!(rows.len(), 2);
+    assert_eq!(
+        (rows[0].session.as_str(), rows[0].pane_id.as_str()),
+        ("devpit_p1", "%3")
+    );
+    assert_eq!(
+        rows[0].running.command, "Web Content",
+        "a space does not shift the fields"
+    );
+    assert_eq!(rows[0].running.profile, "01JGLM");
+    assert_eq!(
+        (
+            rows[1].running.leaf_id.as_str(),
+            rows[1].running.profile.as_str()
+        ),
+        ("leaf_b", "")
+    );
+}
+
+#[test]
+fn a_snapshot_row_missing_a_field_is_dropped() {
+    assert!(crate::shell::parse_snapshot("devpit_p1\t%3\t\t/dev/pts/8\tzsh\n\n").is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn one_spawn_lists_every_pane_of_every_session() {
+    if !Server::available() {
+        return;
+    }
+    let dir = tempfile::tempdir().expect("tempdir");
+    let server = Server::scratch(dir.path().join("tmux.sock"));
+    assert!(!server.socket_exists(), "no server yet");
+    server
+        .ensure_session("devpit_one", "leaf_x", dir.path())
+        .expect("one");
+    server
+        .ensure_session("devpit_two", "leaf_y", dir.path())
+        .expect("two");
+    let rows = server.snapshot().expect("snapshot");
+    let _ = server.kill_server();
+    let seen: Vec<(&str, &str)> = rows
+        .iter()
+        .map(|row| (row.session.as_str(), row.running.leaf_id.as_str()))
+        .collect();
+    assert!(seen.contains(&("devpit_one", "leaf_x")), "{seen:?}");
+    assert!(seen.contains(&("devpit_two", "leaf_y")), "{seen:?}");
+    assert!(rows.iter().all(|row| row.pane_id.starts_with('%')));
+}
+
 /// A window is started with the variables it was given, one `-e` each, and
 /// with none when it was given none.
 #[test]

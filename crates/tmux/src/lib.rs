@@ -25,7 +25,7 @@ mod windows;
 pub use error::TmuxError;
 pub use pane::{copy_to, Key};
 pub use scratch::Scratch;
-pub use shell::{parse_running, Running, Shell, PANE_ENV};
+pub use shell::{parse_running, parse_snapshot, Running, Shell, Snapped, PANE_ENV};
 
 /// One tmux server, addressed by a socket we own.
 pub struct Server {
@@ -179,15 +179,17 @@ impl Server {
         Ok(shell::parse_running(&String::from_utf8_lossy(&out.stdout)))
     }
 
-    /// What is running in every pane on this server, one row per pane: a
-    /// window shows up once per session grouped on it, and is told once.
-    pub fn running_everywhere(&self) -> Result<Vec<Running>, TmuxError> {
-        let out = self.require(&["list-panes", "-a", "-F", shell::RUNNING_FORMAT])?;
-        let mut seen = std::collections::HashSet::new();
-        Ok(shell::parse_running(&String::from_utf8_lossy(&out.stdout))
-            .into_iter()
-            .filter(|one| seen.insert(one.leaf_id.clone()))
-            .collect())
+    /// Every pane on this server, in one spawn: what each runs, its pane id
+    /// and the session it was listed under.
+    pub fn snapshot(&self) -> Result<Vec<Snapped>, TmuxError> {
+        let out = self.require(&["list-panes", "-a", "-F", shell::SNAPSHOT_FORMAT])?;
+        Ok(shell::parse_snapshot(&String::from_utf8_lossy(&out.stdout)))
+    }
+
+    /// Whether this server's socket is there at all: no socket, no server,
+    /// and nothing to spawn tmux for.
+    pub fn socket_exists(&self) -> bool {
+        self.socket.exists()
     }
 
     /// Records which profile devpit started in a pane.

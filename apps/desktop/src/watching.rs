@@ -62,13 +62,10 @@ pub async fn session_usage(project_id: String) -> Result<Usage, RpcError> {
 }
 
 fn usage_in(project_id: &str) -> Result<Usage, RpcError> {
-    let Ok(server) = crate::sessions::tmux_server() else {
+    let panes = crate::pane_snapshot::in_project(&crate::pane_snapshot::rows(), project_id);
+    if panes.is_empty() {
         return Ok(Usage::default());
-    };
-    let session = devpit_tmux::Server::session_name(project_id);
-    let Ok(panes) = server.running(&session) else {
-        return Ok(Usage::default());
-    };
+    }
 
     let ttys: Vec<String> = panes.iter().map(|one| one.tty.clone()).collect();
     let fronts = devpit_pty::looking(&ttys);
