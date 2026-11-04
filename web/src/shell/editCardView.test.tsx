@@ -65,3 +65,23 @@ describe('an edit in the thread', () => {
   })
 })
 
+
+describe('a long edit', () => {
+  const many = Array.from({ length: 60 }, (_, at) => `line ${at}`).join('\n')
+
+  it('opens folded, and shows the rest on a click', () => {
+    render(<Acts parts={edit({ file_path: '/work/demo/big.txt', content: many })} live />)
+    expect(screen.getByText('line 23')).toBeTruthy()
+    expect(screen.queryByText('line 24')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show 36 more lines' }))
+    expect(screen.getByText('line 59')).toBeTruthy()
+  })
+
+  it('copies the whole diff, signed line by line', async () => {
+    const writeText = vi.fn(async () => undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    render(<Acts parts={edit({ file_path: '/work/demo/notes.txt', old_string: 'alpha', new_string: 'beta' })} live />)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy diff' }))
+    expect(writeText).toHaveBeenCalledWith('--- /work/demo/notes.txt\n+++ /work/demo/notes.txt\n-alpha\n+beta\n')
+  })
+})

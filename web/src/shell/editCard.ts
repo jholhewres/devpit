@@ -100,3 +100,9 @@ export function counted(rows: readonly Row[]): { added: number; removed: number 
     removed: rows.filter((row) => row.kind === 'del').length,
   }
 }
+
+const SIGNS = { add: '+', del: '-', same: ' ' } as const
+
+/* The rows as a person pastes a diff: one sign per line. */
+export const diffText = (diff: EditDiff): string =>
+  `--- ${diff.path}\n+++ ${diff.path}\n${diff.rows.map((row) => `${SIGNS[row.kind]}${row.text}`).join('\n')}\n`

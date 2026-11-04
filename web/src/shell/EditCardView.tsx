@@ -1,4 +1,6 @@
-import { counted, type EditDiff } from './editCard'
+import { useState } from 'react'
+
+import { counted, diffText, type EditDiff } from './editCard'
 import { ofPath } from './languages'
 import { Painted } from './Painted'
 import { useShell } from './useShell'
@@ -11,6 +13,9 @@ import { useShell } from './useShell'
  * be refused by the reader behind it — so that path is shown, not offered.
  */
 
+/* Past this many rows the card opens folded: one edit should not fill the thread. */
+const FOLD_ROWS = 24
+
 export function EditCard({ diff, failed, error }: { diff: EditDiff; failed: boolean; error: string }): React.JSX.Element {
   const { project, show } = useShell()
   const root = project?.rootPath ? `${project.rootPath.replace(/\/$/, '')}/` : null
@@ -18,6 +23,10 @@ export function EditCard({ diff, failed, error }: { diff: EditDiff; failed: bool
   const relative = inside ?? (diff.path.startsWith('/') ? null : diff.path)
   const { added, removed } = counted(diff.rows)
   const language = ofPath(diff.path)
+  const [whole, setWhole] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const long = diff.rows.length > FOLD_ROWS && !whole
+  const rows = long ? diff.rows.slice(0, FOLD_ROWS) : diff.rows
 
   return (
     <div className="ecard" data-failed={failed || undefined}>
@@ -34,17 +43,35 @@ export function EditCard({ diff, failed, error }: { diff: EditDiff; failed: bool
             <span className="ecard__add">+{added}</span> <span className="ecard__del">−{removed}</span>
           </span>
         )}
+        {!failed && (
+          <button
+            className="ecard__c"
+            onClick={() =>
+              void navigator.clipboard?.writeText(diffText(diff)).then(() => {
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 1400)
+              })
+            }
+          >
+            {copied ? 'Copied' : 'Copy diff'}
+          </button>
+        )}
       </div>
       {failed ? (
         <pre className="ecard__err">{error || 'The edit did not apply.'}</pre>
       ) : (
         <div className="diff ecard__b">
-          {diff.rows.map((row, at) => (
+          {rows.map((row, at) => (
             <div className="diff__l" data-d={row.kind} key={at}>
               {row.text ? <Painted text={row.text} language={language} /> : ' '}
             </div>
           ))}
-          {diff.hidden > 0 && <div className="diff__at">{diff.hidden} more lines</div>}
+          {long && (
+            <button className="diff__at ecard__more" onClick={() => setWhole(true)}>
+              Show {diff.rows.length - FOLD_ROWS} more lines
+            </button>
+          )}
+          {!long && diff.hidden > 0 && <div className="diff__at">{diff.hidden} more lines</div>}
         </div>
       )}
     </div>

@@ -11,6 +11,10 @@ button.ecard__p:hover { color: var(--text); text-decoration: underline; }
 .ecard__del { color: var(--danger); }
 .ecard__b { margin: 0; max-height: 320px; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 .ecard__err { margin: 0; padding: 8px 10px; font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; color: var(--danger); }
+.ecard__c { flex: none; padding: 0 4px; border-radius: 4px; font-family: var(--ui); font-size: 11px; color: var(--text-3); }
+.ecard__c:hover { color: var(--text); background: var(--overlay-strong); }
+.ecard__more { display: block; width: 100%; text-align: left; font-family: inherit; font-size: inherit; }
+.ecard__more:hover { color: var(--text); }
 
 /* ── What a turn changed ─────────────────────────────────────────────
    Under the turn and quieter than it: this is the receipt, not the work. */
