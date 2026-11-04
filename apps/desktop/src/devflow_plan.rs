@@ -308,6 +308,13 @@ fn judge(
     Some(jev.judge(&rubric, &state()))
 }
 
+/// Why Jev holds `stage`'s work: a plan only when devflow.yaml opted its
+/// rubric in, else its answer is advice.
+fn held(judged: Option<(&Config, &Jev)>, stage: &str, said: Option<&Said>) -> Option<String> {
+    let (config, _) = judged?;
+    jev::holds_in(config, stage, said?)
+}
+
 fn jev_said(brief: Option<&Said>, plan: Option<&Said>) -> Value {
     json!({
         "brief": brief.map(Said::to_json),
@@ -345,7 +352,7 @@ fn planned(
             &brief::read(&epic_card.body).unwrap_or_default(),
         )
     });
-    if let Some(held) = brief.as_ref().and_then(jev::holds) {
+    if let Some(held) = held(judged, "briefing", brief.as_ref()) {
         return Err(format!(
             "{held}: write the brief's goal, out of scope and success with devpit_devflow_brief \
              (devflow-briefing), then plan again"
@@ -361,7 +368,7 @@ fn planned(
         if row.edited || shown == slices {
             // Before the cards are made: whether they are ready to be.
             let plan = judge(judged, "plan", || jev::plan_state(&shown));
-            if let Some(held) = plan.as_ref().and_then(jev::holds) {
+            if let Some(held) = held(judged, "plan", plan.as_ref()) {
                 return Err(format!(
                     "{held}: nothing was created. Make each card a vertical slice with testable \
                      criteria and the cards it waits on, then show the plan again; the person \
@@ -385,9 +392,14 @@ fn planned(
     keep(store, &epic, &slices, false)?;
     // Asked of the preview too, so a plan enforce would hold is fixed before the yes.
     let plan = judge(judged, "plan", || jev::plan_state(&slices));
-    let warning = plan.as_ref().and_then(jev::holds).map(|held| {
+    let warning = held(judged, "plan", plan.as_ref()).map(|held| {
         format!("{held}: applied as it is, nothing would be created; fix the cards first")
     });
+    let advice = warning
+        .is_none()
+        .then(|| plan.as_ref().and_then(jev::failing))
+        .flatten()
+        .map(|failing| format!("{failing}: advice, the plan is not held by it"));
     let note = if apply {
         "Nothing was created: the person has not seen these cards, so they are now the preview. \
          Show them, and apply once the person says yes to them."
@@ -407,6 +419,9 @@ fn planned(
     }
     if let Some(warning) = warning {
         said["warning"] = json!(warning);
+    }
+    if let Some(advice) = advice {
+        said["advice"] = json!(advice);
     }
     Ok(said)
 }
@@ -623,7 +638,7 @@ pub(crate) fn created_on_board(
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no plan waits on that card"))?;
     let slices = slices_of(&row.cards);
     let plan = judge(judged, "plan", || jev::plan_state(&slices));
-    if let Some(held) = plan.as_ref().and_then(jev::holds) {
+    if let Some(held) = held(judged, "plan", plan.as_ref()) {
         return Err(RpcError::new(
             ErrorCode::Invalid,
             format!(

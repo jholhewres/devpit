@@ -338,14 +338,35 @@ fn epic_of(project: &Project) -> String {
     said["cardId"].as_str().expect("an id").to_owned()
 }
 
-/// The same plan, the same answer: in shadow Jev's "fail" is recorded and
-/// the cards are made; acting, it holds them, and says why.
-#[test]
-fn shadow_records_the_plans_fail_and_enforce_holds_its_cards() {
-    let (base, _heard) = provider(untestable_plan);
+/// The plans that hold under enforce: only one whose rubric devflow.yaml
+/// names; otherwise the answer is advice shown with the plan.
+const PLAN_STANDINGS: [(Mode, bool); 3] = [
+    (Mode::Shadow, false),
+    (Mode::Enforce, false),
+    (Mode::Enforce, true),
+];
+
+fn plan_config(opted_in: bool) -> Config {
     let mut config = Config::default();
     config.decisions.use_ = true;
-    for mode in [Mode::Shadow, Mode::Enforce] {
+    if opted_in {
+        config
+            .decisions
+            .rubrics
+            .insert("plan".to_owned(), jev::PLAN.to_owned());
+    }
+    config
+}
+
+/// The same plan, the same answer: Jev's "fail" is shown with the plan and
+/// the cards are made, unless the project opted the plan rubric in and Jev
+/// acts: then it holds them, and says why.
+#[test]
+fn the_plans_fail_is_advice_unless_the_project_opts_in_and_enforce_holds_it() {
+    let (base, _heard) = provider(untestable_plan);
+    for (mode, opted_in) in PLAN_STANDINGS {
+        let config = plan_config(opted_in);
+        let held = mode == Mode::Enforce && opted_in;
         let dir = tempfile::tempdir().expect("tempdir");
         let (store, project) = project(dir.path());
         let epic = epic_of(&project);
@@ -381,38 +402,41 @@ fn shadow_records_the_plans_fail_and_enforce_holds_its_cards() {
             preview["warning"]
                 .as_str()
                 .is_some_and(|warning| warning.contains("testable")),
-            mode == Mode::Enforce,
-            "{preview}"
+            held,
+            "{mode:?}, opted in {opted_in}: {preview}"
+        );
+        assert_eq!(
+            preview["advice"]
+                .as_str()
+                .is_some_and(|advice| advice.contains("testable")),
+            !held,
+            "the answer is shown with the plan: {preview}"
         );
         let applied = plan(true);
         let cards = store.cards(&project.id).expect("cards").len();
-        match mode {
-            Mode::Shadow => {
-                let said = applied.expect("made");
-                assert_eq!(said["jev"]["plan"]["outcome"], "fail", "{said}");
-                assert_eq!(cards, 2, "the epic and its card");
-            }
-            Mode::Enforce => {
-                let why = applied.expect_err("held");
-                assert!(
-                    why.contains("testable") && why.contains("nothing was created"),
-                    "{why}"
-                );
-                assert_eq!(cards, 1, "only the epic");
-            }
+        if held {
+            let why = applied.expect_err("held");
+            assert!(
+                why.contains("testable") && why.contains("nothing was created"),
+                "{why}"
+            );
+            assert_eq!(cards, 1, "only the epic");
+        } else {
+            let said = applied.expect("made");
+            assert_eq!(said["jev"]["plan"]["outcome"], "fail", "{said}");
+            assert_eq!(cards, 2, "{mode:?}: the epic and its card");
         }
     }
 }
 
-/// The person's click on the board is judged as an agent's apply is: in
-/// shadow the plan rubric is asked and the cards are made; in enforce its
-/// "fail" refuses them, with why.
+/// The person's click on the board is judged as an agent's apply is: the
+/// plan rubric is asked and the cards are made, unless the project opted it
+/// in and enforce refuses them, with why.
 #[test]
-fn the_board_create_runs_the_plan_rubric_and_enforce_refuses_with_its_reason() {
+fn the_board_create_runs_the_plan_rubric_and_only_an_opted_in_enforce_refuses() {
     let (base, _heard) = provider(untestable_plan);
-    let mut config = Config::default();
-    config.decisions.use_ = true;
-    for mode in [Mode::Shadow, Mode::Enforce] {
+    for (mode, opted_in) in PLAN_STANDINGS {
+        let config = plan_config(opted_in);
         let dir = tempfile::tempdir().expect("tempdir");
         let (store, project) = project(dir.path());
         let epic = epic_of(&project);
@@ -449,19 +473,16 @@ fn the_board_create_runs_the_plan_rubric_and_enforce_refuses_with_its_reason() {
             .len();
         assert_eq!(asked, 1, "{mode:?}: the plan rubric, asked on the click");
         let cards = store.cards(&project.id).expect("cards").len();
-        match mode {
-            Mode::Shadow => {
-                assert_eq!(created.expect("made").card_ids.len(), 1);
-                assert_eq!(cards, 2, "the epic and its card");
-            }
-            Mode::Enforce => {
-                let why = created.expect_err("refused").message;
-                assert!(
-                    why.contains("testable") && why.contains("nothing was created"),
-                    "{why}"
-                );
-                assert_eq!(cards, 1, "only the epic");
-            }
+        if mode == Mode::Enforce && opted_in {
+            let why = created.expect_err("refused").message;
+            assert!(
+                why.contains("testable") && why.contains("nothing was created"),
+                "{why}"
+            );
+            assert_eq!(cards, 1, "only the epic");
+        } else {
+            assert_eq!(created.expect("made").card_ids.len(), 1, "{mode:?}");
+            assert_eq!(cards, 2, "the epic and its card");
         }
     }
 }
