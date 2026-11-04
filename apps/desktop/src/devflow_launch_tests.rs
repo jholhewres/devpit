@@ -81,6 +81,71 @@ fn a_project_without_devflow_gets_none_of_it_and_one_with_it_keeps_it() {
     assert!(flags("claude", &id).is_some_and(|flag| flag.starts_with("--plugin-dir=")));
 }
 
+/// The devflow.yaml devpit's own repository kept before the engine, as it
+/// was written: version 2, its own check script, no reviewers.
+const BEFORE_THE_ENGINE: &str = "version: 2
+enabled: true
+stages:
+  - uses: builtin/briefing
+    enabled: true
+    approve: person
+  - uses: builtin/context
+    enabled: true
+  - uses: builtin/plan
+    enabled: true
+    approve: person
+    publish: board   # board | jira | linear | github
+  - uses: builtin/execution
+    enabled: true
+    checks:
+      - name: unit
+        run: sh .devpit/devflow/scripts/check-unit.sh
+        report: none
+  - uses: builtin/review
+    enabled: true
+  - uses: builtin/completion
+    enabled: true
+    gate: devflow-done
+review:
+  reviewers: []
+  block_on: [critical, high]
+  consolidate: jev
+decisions:
+  use: true
+  mode: shadow
+";
+
+/// A `.devpit/devflow/` set up and switched on before the engine is read as
+/// it is: still on, the same check, the file untouched.
+/// Sabotage: read the folder from another path, and the offer is off.
+#[test]
+fn a_devflow_folder_from_before_the_engine_stays_on_without_a_migration() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let store = crate::projects::store().expect("store");
+    let id = store.add_project(&root, None).expect("project");
+    let here = crate::devflow_screen::project_here(&store, &id).expect("project");
+    let file = root.join(".devpit/devflow/devflow.yaml");
+    std::fs::create_dir_all(file.parent().expect("folder")).expect("folder");
+    std::fs::write(&file, BEFORE_THE_ENGINE).expect("yaml");
+    crate::devflow_asks::remember(&store, &id, Ask::Enable, true).expect("clicked");
+    let ask = |method: &str| {
+        crate::devflow::respond_from(None, method, &here, &root, None, &json!({})).expect(method)
+    };
+
+    assert_eq!(ask("devflow_offer")["offer"], "active");
+    let status = ask("devflow_status");
+    assert_eq!(status["state"], "active");
+    let checks = &status["config"]["stages"][3]["checks"];
+    assert_eq!(checks[0]["name"], "unit");
+    assert_eq!(checks[0]["run"], "sh .devpit/devflow/scripts/check-unit.sh");
+    assert!(flags("claude", &id).is_some_and(|flag| flag.starts_with("--plugin-dir=")));
+    assert_eq!(
+        std::fs::read_to_string(&file).expect("yaml"),
+        BEFORE_THE_ENGINE
+    );
+}
+
 /// Switched on, a session of the project starts with Devflow's hooks;
 /// switched off, the next one starts without them.
 #[test]
