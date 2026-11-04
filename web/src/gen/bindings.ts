@@ -1562,7 +1562,7 @@ export const commands = {
 	/**  `session.focus` — persists which leaf receives the next split or action. */
 	sessionFocus: (projectId: string, tabId: string, leafId: string) => typedError<SessionLayout, RpcError>(__TAURI_INVOKE("session_focus", { projectId, tabId, leafId })),
 	/**
-	 *  `session.split` — a new tmux window and a split node in the tree.
+	 *  `session.split` — a new pane and a split node in the tree.
 	 * 
 	 *  Off the main thread: it waits on tmux, and a split that held the window
 	 *  still for it looked like a window that had hung.

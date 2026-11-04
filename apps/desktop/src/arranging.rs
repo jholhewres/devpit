@@ -11,7 +11,7 @@ use ulid::Ulid;
 
 use crate::sessions::{layout_of, locate_cwd, persist, store, tmux_err, tmux_server, SessionState};
 
-/// `session.split` — a new tmux window and a split node in the tree.
+/// `session.split` — a new pane and a split node in the tree.
 ///
 /// Off the main thread: it waits on tmux, and a split that held the window
 /// still for it looked like a window that had hung.
@@ -45,7 +45,6 @@ pub(crate) fn session_split_now(
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    let server = tmux_server()?;
     let session = devpit_tmux::Server::session_name(&project_id);
 
     let current = layout_of(&project_id, &tab_id)?;
@@ -57,10 +56,11 @@ pub(crate) fn session_split_now(
     }
     // Where the pane it splits from stands: a card's tab is in its worktree,
     // and the project root would put the new pane on another branch.
-    let from_ptyd = crate::ptyd_link::leaf_is_ptyd(&current, &leaf_id);
-    let stood = match from_ptyd {
+    let stood = match crate::ptyd_link::leaf_is_ptyd(&current, &leaf_id) {
         true => crate::blocks::last_cwd(state.app(), &project_id, &leaf_id),
-        false => server.pane_path(&session, &leaf_id),
+        false => tmux_server()
+            .ok()
+            .and_then(|server| server.pane_path(&session, &leaf_id)),
     };
     let cwd = match stood.filter(|path| path.is_dir()) {
         Some(path) => path,
@@ -68,46 +68,30 @@ pub(crate) fn session_split_now(
     };
 
     let new_id = format!("leaf_{}", Ulid::generate());
-    // A split of a plain terminal in devpit-ptyd is one too, while the
-    // person keeps it on.
-    let in_ptyd = from_ptyd
-        .then(|| {
-            let store = store().ok()?;
-            crate::ptyd_link::in_ptyd(&store, &project_id, &new_id, &cwd)
-        })
-        .flatten();
-    if let Some(target) = in_ptyd {
-        return split_into(
-            &project_id,
-            &tab_id,
-            current,
-            &leaf_id,
-            direction,
-            &new_id,
-            target,
-        );
-    }
-    let server = match devpit_core::Store::open_default() {
-        Ok(store) => {
-            server.with_window_env(crate::checkout::shared_env_at(&store, &project_id, &cwd))
-        }
-        Err(_) => server,
-    };
-    // Tapped as it is made, like every other leaf, or it has no blocks and
-    // never says its folder.
-    let made = match state.taps.ahead_of(state.app(), &project_id, &new_id) {
-        Some(pipe) => server.new_window_piped(&session, &new_id, &cwd, &pipe),
-        None => server.new_window(&session, &new_id, &cwd),
-    };
-    if let Err(err) = made {
-        let target = devpit_tmux::Server::target(&session, &new_id);
-        state.taps.forget(&server, &new_id, &target);
-        return Err(tmux_err(err));
-    }
+    let store = store()?;
+    let home = devpit_core::Store::root().ok();
+    let target =
+        crate::ptyd_link::new_pane(&store, home.as_deref(), &project_id, &new_id, &cwd, || {
+            // tmux only now: a tab of ptyd panes may have no session to add to.
+            let server = tmux_server()?.with_window_env(crate::checkout::shared_env_at(
+                &store,
+                &project_id,
+                &cwd,
+            ));
+            server
+                .ensure_session(&session, &new_id, &cwd)
+                .map_err(tmux_err)?;
+            let target = devpit_tmux::Server::target(&session, &new_id);
+            // Tapped like every other leaf, or it has no blocks and never says
+            // its folder.
+            state
+                .taps
+                .watch(state.app(), &server, &project_id, &new_id, &target);
+            Ok(target)
+        })?;
     if let Some(blocks) = tauri::Manager::try_state::<crate::blocks::Blocks>(state.app()) {
         blocks.belongs(&new_id, &project_id);
     }
-    let target = devpit_tmux::Server::target(&session, &new_id);
     split_into(
         &project_id,
         &tab_id,

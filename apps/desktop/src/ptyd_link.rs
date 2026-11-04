@@ -229,14 +229,26 @@ pub(crate) fn in_ptyd(
     leaf_id: &str,
     cwd: &Path,
 ) -> Option<String> {
+    let home = Store::root().ok();
+    in_ptyd_at(store, home.as_deref(), project_id, leaf_id, cwd)
+}
+
+/// [`in_ptyd`], against the daemon of `home`.
+fn in_ptyd_at(
+    store: &Store,
+    home: Option<&Path>,
+    project_id: &str,
+    leaf_id: &str,
+    cwd: &Path,
+) -> Option<String> {
     if !wanted(store) {
         return None;
     }
     #[cfg(unix)]
     {
-        let home = Store::root().ok()?;
+        let home = home?;
         let shared = crate::checkout::shared_env_at(store, project_id, cwd);
-        match open(&home, leaf_id, cwd, shared) {
+        match open(home, leaf_id, cwd, shared) {
             Ok(target) => return Some(target),
             Err(why) => {
                 eprintln!("devpit: devpit-ptyd could not take a terminal, tmux does: {why}")
@@ -244,8 +256,24 @@ pub(crate) fn in_ptyd(
         }
     }
     #[cfg(not(unix))]
-    let _ = (project_id, leaf_id, cwd);
+    let _ = (home, project_id, leaf_id, cwd);
     None
+}
+
+/// The target of a new pane: the daemon's while the person keeps it on and
+/// it answers, whatever the pane is for or split from; `in_tmux`'s otherwise.
+pub(crate) fn new_pane(
+    store: &Store,
+    home: Option<&Path>,
+    project_id: &str,
+    leaf_id: &str,
+    cwd: &Path,
+    in_tmux: impl FnOnce() -> Result<String, devpit_rpc::RpcError>,
+) -> Result<String, devpit_rpc::RpcError> {
+    match in_ptyd_at(store, home, project_id, leaf_id, cwd) {
+        Some(target) => Ok(target),
+        None => in_tmux(),
+    }
 }
 
 /// A ptyd leaf of a layout being loaded, started again where its shell last
