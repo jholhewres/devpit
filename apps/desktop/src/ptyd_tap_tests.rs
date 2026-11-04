@@ -149,19 +149,104 @@ fn the_split_of_a_ptyd_pane_starts_where_its_shell_said_it_stands() {
     assert!(told, "{:?}", crate::pane_io::cwd(&target));
 }
 
+/// A daemon of the test's own, to ask what it holds: the socket, and the
+/// daemon itself.
+fn own_daemon(home: &Path) -> (PathBuf, Arc<devpit_ptyd::daemon::Daemon>) {
+    let socket = crate::ptyd_link::socket_path(home);
+    let listener = devpit_ptyd::socket::listen(&socket).expect("listen");
+    let daemon = devpit_ptyd::daemon::Daemon::new();
+    let serving = Arc::clone(&daemon);
+    std::thread::spawn(move || serving.serve(listener));
+    (socket, daemon)
+}
+
+/// Drawn before the tap was there: all it has is the replay, which leaves
+/// the program in the alternate screen with its arrows in application mode.
+#[test]
+fn a_screen_seeded_from_a_replay_is_the_alternate_screen_the_program_left_it_in() {
+    let home = tempfile::tempdir().expect("home");
+    let home = home.path();
+    let (socket, daemon) = own_daemon(home);
+    let leaf = "leaf_tap_alt";
+    let pane = pane_number(leaf);
+    let script = r#"printf 'on the primary
+[?1049h[?1h[Hin the alt screen'; sleep 30"#;
+    crate::ptyd_link::spawn(home, pane, &sh(home, script)).expect("spawn");
+    let printed = || {
+        let held = daemon
+            .pane(pane)
+            .map(|one| one.older(0))
+            .unwrap_or_default();
+        held.windows(10).any(|w| w == b"alt screen")
+    };
+    assert!(until(printed), "the pane never printed");
+
+    let (tap, ears) = (Arc::new(Tap::default()), Arc::new(Heard::default()));
+    listening(&tap, &ears, home);
+    tap.heed("p", leaf);
+    let drawn = until(|| {
+        tap.screen(pane)
+            .is_some_and(|shown| shown.contains("in the alt screen"))
+    });
+    crate::ptyd_link::kill(home, pane);
+    hang_up(&tap);
+    let _ = std::fs::remove_file(&socket);
+
+    assert!(drawn, "{:?}", tap.screen(pane));
+    let shown = tap.screen(pane).unwrap_or_default();
+    assert!(!shown.contains("on the primary"), "{shown}");
+    assert!(tap
+        .modes(pane)
+        .is_some_and(|modes| modes.application_cursor));
+    assert_eq!(
+        ears.bytes.load(Ordering::SeqCst),
+        0,
+        "a replay is not heard"
+    );
+}
+
+/// The question an agent is stopped on, read off a ptyd pane's screen as it
+/// is off tmux's capture.
+#[test]
+fn the_question_on_a_ptyd_pane_is_read_off_its_screen() {
+    let daemon = crate::ptyd_link::tests::serving();
+    let home = daemon.home.path();
+    let asked = " Bash command\r\n   git push origin main\r\n Do you want to proceed?\r\n   1. Yes\r\n \u{276f} 2. Yes, and don't ask again\r\n   3. No (esc)\r\n";
+    std::fs::write(home.join("asked"), asked).expect("asked");
+    let (tap, ears) = (Arc::new(Tap::default()), Arc::new(Heard::default()));
+    listening(&tap, &ears, home);
+    let leaf = "leaf_tap_prompt";
+    let pane = pane_number(leaf);
+    crate::ptyd_link::spawn(home, pane, &sh(home, "sleep 0.3; cat asked; sleep 30"))
+        .expect("spawn");
+    tap.heed("p", leaf);
+    let read = || {
+        tap.screen(pane)
+            .as_deref()
+            .and_then(crate::live_prompt::pending)
+    };
+    let found = until(|| read().is_some());
+    crate::ptyd_link::kill(home, pane);
+    hang_up(&tap);
+
+    assert!(found, "{:?}", tap.screen(pane));
+    let prompt = read().expect("a question");
+    assert_eq!(
+        prompt.question,
+        "Bash command git push origin main Do you want to proceed?"
+    );
+    assert_eq!(prompt.options.len(), 3);
+    assert_eq!(prompt.cursor, 1);
+}
+
 /// The count the daemon keeps per pane: the tap takes from it alone while no
 /// window is on the pane, leaves it to the window while one is, and clears
 /// what the window left when it goes.
 #[test]
 fn the_tap_acks_a_pane_no_window_is_on_and_takes_over_when_the_window_goes() {
-    use devpit_ptyd::daemon::Daemon;
     let home = tempfile::tempdir().expect("home");
     let home = home.path();
-    let socket = crate::ptyd_link::socket_path(home);
-    let listener = devpit_ptyd::socket::listen(&socket).expect("listen");
-    let daemon = Daemon::new();
-    let serving = Arc::clone(&daemon);
-    std::thread::spawn(move || serving.serve(listener));
+    let (socket, daemon) = own_daemon(home);
     let (tap, ears) = (Arc::new(Tap::default()), Arc::new(Heard::default()));
     listening(&tap, &ears, home);
 

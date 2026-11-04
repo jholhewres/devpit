@@ -19,7 +19,9 @@ use std::time::Duration;
 
 use devpit_ptyd::frame::{self, Frame, Kind};
 
+use crate::pane_io::Modes;
 use crate::ptyd_link::pane_number;
+use crate::ptyd_screens::Screens;
 use crate::ptyd_watch::Fronts;
 
 /// The first wait before asking for a daemon that was not there again, and
@@ -79,6 +81,7 @@ impl Link {
 #[derive(Default)]
 pub(crate) struct Tap {
     pub(crate) fronts: Mutex<Fronts>,
+    screens: Mutex<Screens>,
     link: Mutex<Option<Link>>,
     /// Typing's own connection, and the home it is to: input that blocks on
     /// a pane that is not reading must not hold up the acks on `link`.
@@ -137,6 +140,9 @@ impl Tap {
     /// Listens to the daemon of `home` for as long as the app runs: whenever
     /// it is there, and never starting it.
     pub(crate) fn serve(&self, home: &Path, ears: &dyn Ears) {
+        if let Ok(mut screens) = self.screens.lock() {
+            screens.keep_at(home.join(crate::ptyd_screens::SIZES));
+        }
         let socket = crate::ptyd_link::socket_path(home);
         let mut wait = SOON;
         loop {
@@ -242,17 +248,30 @@ impl Tap {
     fn heard(&self, one: Frame, ears: &dyn Ears, owed: &mut HashSet<u32>) {
         match one.kind() {
             Some(Kind::Output) => {
+                if let Ok(mut screens) = self.screens.lock() {
+                    screens.output(one.pane, &one.bytes);
+                }
                 if self.output(one.pane, &one.bytes, ears) {
                     owed.insert(one.pane);
                 }
                 return;
             }
+            // Drawn, never heard again: it was cut into blocks when printed.
+            Some(Kind::Replay) => {
+                if let Ok(mut screens) = self.screens.lock() {
+                    screens.replay(one.pane, &one.bytes);
+                }
+                return;
+            }
             // Attached again when it is opened again.
-            Some(Kind::Exited | Kind::Refused) => {
+            Some(kind @ (Kind::Exited | Kind::Refused)) => {
                 if let Ok(mut link) = self.link.lock() {
                     if let Some(link) = link.as_mut() {
                         link.attached.remove(&one.pane);
                     }
+                }
+                if let (Kind::Exited, Ok(mut screens)) = (kind, self.screens.lock()) {
+                    screens.ended(one.pane);
                 }
             }
             _ => {}
@@ -291,6 +310,23 @@ impl Tap {
         };
         self.ack(pane, bytes);
         true
+    }
+
+    /// What pane `pane` shows, as text.
+    pub(crate) fn screen(&self, pane: u32) -> Option<String> {
+        self.screens.lock().ok()?.contents(pane)
+    }
+
+    /// How the program in pane `pane` wants its keys and pastes.
+    pub(crate) fn modes(&self, pane: u32) -> Option<Modes> {
+        self.screens.lock().ok()?.modes(pane)
+    }
+
+    /// The size devpit just told the daemon pane `pane` is: it never says.
+    pub(crate) fn sized(&self, pane: u32, rows: u16, cols: u16) {
+        if let Ok(mut screens) = self.screens.lock() {
+            screens.sized(pane, rows, cols);
+        }
     }
 
     /// Bytes into pane `pane` of the daemon of `home`, on the connection kept

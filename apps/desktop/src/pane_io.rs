@@ -55,7 +55,7 @@ pub(crate) fn target_in(layout: &SessionLayout, leaf_id: &str) -> String {
 pub(crate) fn submit(target: &str, line: &str) -> Result<(), RpcError> {
     match holder(target) {
         Holder::Tmux { .. } => tmux()?.submit(target, line).map_err(internal),
-        Holder::Ptyd(pane) => write(pane, submitted(line)),
+        Holder::Ptyd(pane) => write(pane, submitted(line, bracketing(modes(pane), line))),
     }
 }
 
@@ -82,14 +82,14 @@ pub(crate) fn label(target: &str, profile: &str) {
 pub(crate) fn settled(target: &str) -> Ready {
     match holder(target) {
         Holder::Tmux { session, window } => crate::shell_launch::settled(session, window),
-        Holder::Ptyd(pane) => settled_on(|| front(pane), crate::shell_launch::AT_MOST),
+        Holder::Ptyd(_) => settled_on(|| front(target), crate::shell_launch::AT_MOST),
     }
 }
 
-/// A ptyd pane's [`settled`], with no screen to find a prompt on yet: the
-/// daemon names what is in front only once the pane has printed and gone
-/// quiet, so an idle shell named on consecutive looks stands for a shell at
-/// its prompt. A shell that never prints is never named, and stays Unknown.
+/// A ptyd pane's [`settled`]: the daemon names what is in front only once
+/// the pane has printed and gone quiet, so an idle shell named on
+/// consecutive looks stands for a shell at its prompt. A shell that never
+/// prints is never named, and stays Unknown.
 pub(crate) fn settled_on(mut front: impl FnMut() -> Option<String>, at_most: Duration) -> Ready {
     let deadline = Instant::now() + at_most;
     let mut settling = devpit_pty::Settling::new();
@@ -115,7 +115,7 @@ pub(crate) fn paste(target: &str, text: &str, enter: bool) -> Result<(), RpcErro
     match holder(target) {
         Holder::Tmux { .. } if enter => tmux()?.paste_and_send(target, text).map_err(internal),
         Holder::Tmux { .. } => tmux()?.paste(target, text).map_err(internal),
-        Holder::Ptyd(pane) => write(pane, pasted(text, enter)),
+        Holder::Ptyd(pane) => write(pane, pasted(text, enter, bracketing(modes(pane), text))),
     }
 }
 
@@ -123,7 +123,10 @@ pub(crate) fn paste(target: &str, text: &str, enter: bool) -> Result<(), RpcErro
 pub(crate) fn press(target: &str, keys: &[Key]) -> Result<(), RpcError> {
     match holder(target) {
         Holder::Tmux { .. } => tmux()?.press(target, keys).map_err(internal),
-        Holder::Ptyd(pane) => write(pane, pressed(keys)),
+        Holder::Ptyd(pane) => {
+            let application = modes(pane).is_some_and(|modes| modes.application_cursor);
+            write(pane, pressed(keys, application))
+        }
     }
 }
 
@@ -131,7 +134,7 @@ pub(crate) fn press(target: &str, keys: &[Key]) -> Result<(), RpcError> {
 pub(crate) fn shell_in_front(target: &str) -> Result<bool, RpcError> {
     match holder(target) {
         Holder::Tmux { .. } => tmux()?.shell_in_front(target).map_err(internal),
-        Holder::Ptyd(pane) => Ok(front(pane)
+        Holder::Ptyd(_) => Ok(front(target)
             .as_deref()
             .is_some_and(devpit_pty::agents::idle_shell)),
     }
@@ -202,14 +205,65 @@ fn jiggle(app: &tauri::AppHandle, leaf: &str) -> Result<bool, RpcError> {
     Ok(true)
 }
 
-/// What is in front of a ptyd pane, as the daemon last said.
+/// What a pane runs in front: the program tmux finds on its tty, or the one
+/// the daemon last named.
+pub(crate) fn front(target: &str) -> Option<String> {
+    match holder(target) {
+        Holder::Tmux { session, window } => {
+            let panes = tmux().ok()?.running(session).ok()?;
+            let pane = panes.into_iter().find(|one| one.leaf_id == window)?;
+            let fronts = devpit_pty::looking(std::slice::from_ref(&pane.tty));
+            let program = devpit_pty::front_on(&fronts, &pane.tty)
+                .and_then(|front| devpit_pty::agents::program_of(&front.argv));
+            Some(program.unwrap_or(pane.command))
+        }
+        Holder::Ptyd(pane) => told_front(pane),
+    }
+}
+
+/// A pane's screen as it is now, as text: tmux's capture, or what the ptyd
+/// tap has drawn. Nothing when neither can say.
+pub(crate) fn screen(target: &str) -> Option<String> {
+    match holder(target) {
+        Holder::Tmux { .. } => tmux().ok()?.capture_pane(target).ok(),
+        Holder::Ptyd(pane) => drawn(pane),
+    }
+}
+
+/// What a program asked of its terminal, which says how to type into it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Modes {
+    pub(crate) application_cursor: bool,
+    pub(crate) bracketed_paste: bool,
+}
+
 #[cfg(unix)]
-fn front(pane: u32) -> Option<String> {
+fn told_front(pane: u32) -> Option<String> {
     crate::ptyd_watch::program(pane)
 }
 
 #[cfg(not(unix))]
-fn front(_pane: u32) -> Option<String> {
+fn told_front(_pane: u32) -> Option<String> {
+    None
+}
+
+#[cfg(unix)]
+fn drawn(pane: u32) -> Option<String> {
+    crate::ptyd_tap::tap().screen(pane)
+}
+
+#[cfg(not(unix))]
+fn drawn(_pane: u32) -> Option<String> {
+    None
+}
+
+#[cfg(unix)]
+fn modes(pane: u32) -> Option<Modes> {
+    crate::ptyd_tap::tap().modes(pane)
+}
+
+#[cfg(not(unix))]
+fn modes(_pane: u32) -> Option<Modes> {
     None
 }
 
@@ -237,27 +291,32 @@ pub(crate) fn typed(line: &str) -> Vec<u8> {
 }
 
 /// The bytes [`submit`] types into a ptyd pane.
-pub(crate) fn submitted(line: &str) -> Vec<u8> {
+pub(crate) fn submitted(line: &str, bracketed: bool) -> Vec<u8> {
     let mut bytes = CLEAR.to_vec();
-    bytes.extend(pasted(line, true));
+    bytes.extend(pasted(line, true, bracketed));
     bytes
 }
 
-/// The bytes [`paste`] types into a ptyd pane. Bracketed only when it is
-/// several lines: with no screen to read whether the program asked for
-/// bracketed paste, a single line goes as typed, which every program takes.
-pub(crate) fn pasted(text: &str, enter: bool) -> Vec<u8> {
+/// Whether a paste goes bracketed: as the program asked, as tmux's
+/// `paste-buffer -p` does. With no screen yet to say, when it is several
+/// lines, so a shell does not run them one by one.
+pub(crate) fn bracketing(modes: Option<Modes>, text: &str) -> bool {
+    modes.map_or(text.contains('\n'), |modes| modes.bracketed_paste)
+}
+
+/// The bytes [`paste`] types into a ptyd pane.
+pub(crate) fn pasted(text: &str, enter: bool, bracketed: bool) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(text.len() + 16);
-    match text.contains('\n') {
+    // As tmux's paste-buffer does: a line ends in CR at a terminal.
+    let lines = text.replace("\r\n", "\n").replace('\n', "\r");
+    match bracketed {
         true => {
             // A pasted end marker would end the paste early and run the rest.
-            let text = text.replace("\x1b[201~", "");
             bytes.extend_from_slice(PASTE_START);
-            // As tmux's paste-buffer does: a line ends in CR at a terminal.
-            bytes.extend(text.replace("\r\n", "\n").replace('\n', "\r").bytes());
+            bytes.extend(lines.replace("\x1b[201~", "").bytes());
             bytes.extend_from_slice(PASTE_END);
         }
-        false => bytes.extend_from_slice(text.as_bytes()),
+        false => bytes.extend(lines.bytes()),
     }
     if enter {
         bytes.push(b'\r');
@@ -265,16 +324,17 @@ pub(crate) fn pasted(text: &str, enter: bool) -> Vec<u8> {
     bytes
 }
 
-/// The bytes a terminal sends for `keys`. Arrows in their normal-mode form:
-/// with no screen there is no knowing a program asked for application mode,
-/// and the programs that do take both.
-pub(crate) fn pressed(keys: &[Key]) -> Vec<u8> {
+/// The bytes a terminal sends for `keys`: the arrows in application mode
+/// (`DECCKM`) when the program asked for it, as a full-screen one does.
+pub(crate) fn pressed(keys: &[Key], application_cursor: bool) -> Vec<u8> {
     keys.iter()
-        .flat_map(|key| match key {
-            Key::Up => b"\x1b[A".as_slice(),
-            Key::Down => b"\x1b[B",
-            Key::Enter => b"\r",
-            Key::Escape => b"\x1b",
+        .flat_map(|key| match (key, application_cursor) {
+            (Key::Up, false) => b"\x1b[A".as_slice(),
+            (Key::Down, false) => b"\x1b[B",
+            (Key::Up, true) => b"\x1bOA",
+            (Key::Down, true) => b"\x1bOB",
+            (Key::Enter, _) => b"\r",
+            (Key::Escape, _) => b"\x1b",
         })
         .copied()
         .collect()

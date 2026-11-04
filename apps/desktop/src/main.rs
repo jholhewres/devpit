@@ -191,6 +191,8 @@ mod projects;
 mod ptyd_attach;
 mod ptyd_link;
 #[cfg(unix)]
+mod ptyd_screens;
+#[cfg(unix)]
 mod ptyd_tap;
 #[cfg(unix)]
 mod ptyd_watch;

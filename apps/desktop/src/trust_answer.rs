@@ -65,7 +65,7 @@ pub(crate) fn watch(target: String) {
     std::thread::spawn(move || {
         let mut moves = 0;
         for _ in 0..TRIES {
-            let asked = crate::live_sessions::screen_of(&target)
+            let asked = crate::pane_io::screen(&target)
                 .as_deref()
                 .and_then(plain_trust);
             let key = match asked {

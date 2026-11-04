@@ -126,10 +126,7 @@ pub(crate) fn typed_in(
     // Before the CLI looks: a session stopped on the trust question is not up.
     crate::folder_trust::trust(&[cwd]);
     crate::pane_io::send_line(&target, line)?;
-    // It reads tmux's screen; a ptyd pane has none to read yet.
-    if !crate::ptyd_link::is_ptyd(&target) {
-        crate::trust_answer::watch(target);
-    }
+    crate::trust_answer::watch(target);
     Ok(layout.focused_id)
 }
 

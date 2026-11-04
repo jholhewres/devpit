@@ -105,6 +105,7 @@ pub(crate) async fn attach(
         ] {
             frame::write(&mut *stream, &one).map_err(|err| RpcError::internal(err.to_string()))?;
         }
+        crate::ptyd_tap::tap().sized(pane, rows, cols);
         Ok(())
     })();
     if let Err(err) = begun {

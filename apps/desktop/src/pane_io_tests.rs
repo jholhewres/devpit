@@ -40,34 +40,47 @@ fn a_tmux_leaf_is_reached_by_its_names_and_a_ptyd_leaf_by_its_target() {
 
 #[test]
 fn a_submitted_line_clears_the_line_and_screen_then_runs() {
-    assert_eq!(submitted("ls -la"), b"\x05\x15\x0cls -la\r");
+    assert_eq!(submitted("ls -la", false), b"\x05\x15\x0cls -la\r");
     assert_eq!(
-        submitted("for x in 1 2\ndo echo $x; done"),
+        submitted("for x in 1 2\ndo echo $x; done", true),
         b"\x05\x15\x0c\x1b[200~for x in 1 2\rdo echo $x; done\x1b[201~\r"
     );
 }
 
 #[test]
-fn only_several_lines_go_as_a_bracketed_paste() {
-    assert_eq!(pasted("one line", false), b"one line");
-    assert_eq!(pasted("one line", true), b"one line\r");
-    assert_eq!(pasted("a\r\nb", true), b"\x1b[200~a\rb\x1b[201~\r");
+fn a_paste_is_bracketed_as_the_program_asked_or_when_unknown_when_it_is_several_lines() {
+    let asked = |bracketed_paste| {
+        Some(Modes {
+            bracketed_paste,
+            ..Modes::default()
+        })
+    };
+    assert!(bracketing(asked(true), "one line"));
+    assert!(!bracketing(asked(false), "a\nb"));
+    assert!(!bracketing(None, "one line"));
+    assert!(bracketing(None, "a\nb"));
+    assert_eq!(pasted("one line", false, false), b"one line");
+    assert_eq!(
+        pasted("one line", true, true),
+        b"\x1b[200~one line\x1b[201~\r"
+    );
+    assert_eq!(pasted("a\r\nb", true, false), b"a\rb\r");
+    assert_eq!(pasted("a\r\nb", true, true), b"\x1b[200~a\rb\x1b[201~\r");
 }
 
 #[test]
 fn a_paste_cannot_end_its_own_bracket() {
     assert_eq!(
-        pasted("a\x1b[201~\nrm -rf ~", false),
+        pasted("a\x1b[201~\nrm -rf ~", false, true),
         b"\x1b[200~a\rrm -rf ~\x1b[201~"
     );
 }
 
 #[test]
-fn keys_are_the_bytes_a_terminal_sends_for_them() {
-    assert_eq!(
-        pressed(&[Key::Up, Key::Down, Key::Enter, Key::Escape]),
-        b"\x1b[A\x1b[B\r\x1b"
-    );
+fn keys_are_the_bytes_a_terminal_sends_for_them_in_the_mode_it_is_in() {
+    let keys = [Key::Up, Key::Down, Key::Enter, Key::Escape];
+    assert_eq!(pressed(&keys, false), b"\x1b[A\x1b[B\r\x1b");
+    assert_eq!(pressed(&keys, true), b"\x1bOA\x1bOB\r\x1b");
 }
 
 /// Over the real socket: what is written reaches the pane's program, with
@@ -94,7 +107,7 @@ fn a_line_written_to_a_ptyd_pane_runs_in_it() {
         .set_read_timeout(Some(std::time::Duration::from_secs(5)))
         .expect("timeout");
 
-    write_at(home, pane, &pasted("echo pane-io-$((40+2))", true)).expect("written");
+    write_at(home, pane, &pasted("echo pane-io-$((40+2))", true, false)).expect("written");
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     let mut seen = Vec::new();
     while std::time::Instant::now() < deadline && !seen.windows(10).any(|w| w == b"pane-io-42") {

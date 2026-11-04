@@ -195,6 +195,7 @@ impl Live {
                     .map_err(|_| RpcError::internal("ptyd stream lock"))?;
                 frame::write(&mut *stream, &Frame::new(*pane, Kind::Resize, bytes))
                     .map_err(|err| RpcError::internal(err.to_string()))?;
+                crate::ptyd_tap::tap().sized(*pane, rows, cols);
                 let mut size = size.lock().map_err(|_| RpcError::internal("size lock"))?;
                 *size = wanted;
                 Ok(wanted)

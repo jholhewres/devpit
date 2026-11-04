@@ -80,10 +80,13 @@ tempfile = "3.27.0"
 # fake in for a pty whose ends the rule never touches.
 anyhow = "1.0.104"
 
-# Only for `mkfifo`, and only where a fifo exists. The tap's Windows half is
-# the daemon, not this.
+# Only for `mkfifo` and the ptyd tap's `poll`, and only where a fifo exists.
+# The tap's Windows half is the daemon, not this.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+# A ptyd pane's screen, kept with no window on it: the daemon keeps bytes,
+# and reading the question an agent is stopped on needs the screen they draw.
+vt100 = "0.18.1"
 
 # Placing a browser pane's page, and nothing else. The page is a second webview
 # inside this window, and on GTK neither tauri nor wry will put it where it
