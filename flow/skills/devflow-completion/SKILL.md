@@ -27,8 +27,9 @@ card stays where it is and you say what is missing.
 
 ### 1. Read the card
 
-Read the card with `devpit_card`: its criteria, the `[devflow]` comments (the
-evidence runs, the review and its verdict) and the files it names.
+Read the card with `devpit_card` and `comments: true`: its criteria, the
+`[devflow]` comments (the evidence runs, the review and its verdict) and the
+files it names.
 
 Done when you can list every criterion and every piece of evidence on the card
 with its time.

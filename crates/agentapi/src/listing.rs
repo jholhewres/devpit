@@ -92,6 +92,7 @@ pub(crate) fn listed(tool: &Tool, seat: &Seat) -> Option<Value> {
             properties.remove("project");
         }
     }
+    crate::lean::offered(tool.name, &mut input);
     let mut listed = json!({
         "name": tool.name,
         "description": tool.description,

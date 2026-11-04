@@ -376,3 +376,19 @@ fn another_call_is_answered_while_evidence_runs() {
         .unwrap_or_default()
         .contains("\"ran\""));
 }
+
+/// A tool's answer reaches the agent as its compact summary, not pretty JSON.
+#[test]
+fn a_tool_answers_with_its_summary_compact() {
+    let detail =
+        json!({ "card": { "id": "card_1" }, "comments": [{ "id": "cmt_1", "body": "hi" }] });
+    let ask = |_: &str, _: Value| Ok(detail.clone());
+    let said = reply(
+        r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"devpit_comment","arguments":{"cardId":"card_1","body":"hi"}}}"#,
+        &ask,
+    );
+    assert_eq!(
+        said["result"]["content"][0]["text"],
+        r#"{"card":"card_1","comments":1,"newest":"cmt_1"}"#
+    );
+}

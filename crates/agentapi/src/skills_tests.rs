@@ -161,3 +161,35 @@ fn the_skill_tool_is_listed_in_an_active_project_and_says_the_skill_as_markdown(
     let off = |_: &str, _: Value| -> Result<Value, String> { Err("Devflow is not on".into()) };
     assert_eq!(answer(call, &Offer::Setup, &off)["result"]["isError"], true);
 }
+
+/// One session, one `Given`: the second ask of the same skill points back.
+#[test]
+fn a_skill_asked_again_in_a_session_points_to_the_copy_given() {
+    let given = crate::lean::Given::default();
+    let ask = |arguments: &str| -> String {
+        let line = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"devpit_devflow_skill","arguments":{arguments}}}}}"#
+        );
+        let said: Value = serde_json::from_str(
+            &crate::mcp::handle_giving(
+                &line,
+                &app,
+                true,
+                &active(),
+                &crate::listing::Seat::default(),
+                &given,
+            )
+            .expect("an answer"),
+        )
+        .expect("json");
+        said["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned()
+    };
+    assert!(ask(r#"{"name":"devflow-plan"}"#).contains("Do devflow-plan."));
+    let again = ask(r#"{"name":"devflow-plan"}"#);
+    assert!(!again.contains("Do devflow-plan."));
+    assert!(again.contains("given earlier in this session"));
+    assert!(ask(r#"{"name":"devflow-plan","full":true}"#).contains("Do devflow-plan."));
+}
