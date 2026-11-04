@@ -217,14 +217,23 @@ pub(crate) fn open(
 
 /// Brings a ptyd pane back where its shell last was, when the daemon lost it
 /// — it died, or the machine restarted. The scrollback is gone; the folder
-/// is not.
+/// is not. Answers whether it started a fresh shell.
 #[cfg(unix)]
-pub(crate) fn revive(home: &Path, leaf_id: &str, cwd: &Path, shared: Vec<(String, String)>) {
+pub(crate) fn revive(
+    home: &Path,
+    leaf_id: &str,
+    cwd: &Path,
+    shared: Vec<(String, String)>,
+) -> bool {
     if running(home, pane_number(leaf_id)) {
-        return;
+        return false;
     }
-    if let Err(why) = open(home, leaf_id, cwd, shared) {
-        eprintln!("devpit: {leaf_id} could not be started again in devpit-ptyd: {why}");
+    match open(home, leaf_id, cwd, shared) {
+        Ok(_) => true,
+        Err(why) => {
+            eprintln!("devpit: {leaf_id} could not be started again in devpit-ptyd: {why}");
+            false
+        }
     }
 }
 
@@ -277,23 +286,29 @@ pub(crate) fn new_pane(
 }
 
 /// A ptyd leaf of a layout being loaded, started again where its shell last
-/// was if the daemon lost it.
+/// was if the daemon of `home` lost it, with the agent devpit had started in
+/// it typed in again. Answers whether it was started again.
 pub(crate) fn revive_at(
     store: &Store,
+    home: Option<&Path>,
     project_id: &str,
     leaf_id: &str,
     was_in: Option<PathBuf>,
     cwd: &Path,
-) {
+) -> bool {
     #[cfg(unix)]
-    if let Ok(home) = Store::root() {
+    if let Some(home) = home {
         let at = was_in.as_deref().unwrap_or(cwd);
         let shared = crate::checkout::shared_env_at(store, project_id, at);
-        revive(&home, leaf_id, at, shared);
+        let revived = revive(home, leaf_id, at, shared);
         crate::ptyd_tap::tap().heed(project_id, leaf_id);
+        if revived {
+            crate::restoring::start_again(store, Some(home), &target(leaf_id), leaf_id);
+        }
+        return revived;
     }
-    #[cfg(not(unix))]
-    let _ = (store, project_id, leaf_id, was_in, cwd);
+    let _ = (store, home, project_id, leaf_id, was_in, cwd);
+    false
 }
 
 #[cfg(test)]

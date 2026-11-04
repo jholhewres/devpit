@@ -69,11 +69,22 @@ pub(crate) fn submit(target: &str, line: &str) -> Result<(), RpcError> {
 
 /// Types `line` at a pane, as it is, and presses Enter.
 pub(crate) fn send_line(target: &str, line: &str) -> Result<(), RpcError> {
-    match holder(target) {
-        Holder::Tmux { .. } => tmux()?
+    send_line_at(None, target, line)
+}
+
+/// [`send_line`], a ptyd pane's to the daemon of `home` when one is given.
+pub(crate) fn send_line_at(
+    home: Option<&std::path::Path>,
+    target: &str,
+    line: &str,
+) -> Result<(), RpcError> {
+    match (holder(target), home) {
+        (Holder::Tmux { .. }, _) => tmux()?
             .send_keys(target, line)
             .map_err(crate::sessions::tmux_err),
-        Holder::Ptyd(pane) => write(pane, typed(line)),
+        #[cfg(unix)]
+        (Holder::Ptyd(pane), Some(home)) => write_at(home, pane, &typed(line)),
+        (Holder::Ptyd(pane), _) => write(pane, typed(line)),
     }
 }
 

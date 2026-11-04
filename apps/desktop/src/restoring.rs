@@ -1,16 +1,18 @@
-//! Starting an agent again in a pane tmux lost.
+//! Starting an agent again in a pane tmux or devpit-ptyd lost.
 //!
-//! tmux keeps a pane's processes while the app is closed, so most of the time
+//! Both keep a pane's processes while the app is closed, so most of the time
 //! there is nothing to do. After a reboot, or a server that died, the layout
-//! still names the pane and the window comes back as a fresh shell. The agent
+//! still names the pane and it comes back as a fresh shell. The agent
 //! devpit had started there is typed in again, continuing its session when the
 //! CLI can resume one.
+
+use std::path::Path;
 
 use devpit_agentcli::{Event, Happening};
 use devpit_core::store::pane_agents::PaneAgent;
 use devpit_core::Store;
 
-use crate::shell_launch::{profile_id, settled, to_start, Ready};
+use crate::shell_launch::{profile_id, to_start, Ready};
 
 /// What restoring the pane later needs, from the agent's own hooks.
 pub(crate) fn remember(store: &Store, pane: &str, happening: &Happening) {
@@ -28,31 +30,35 @@ pub(crate) fn remember(store: &Store, pane: &str, happening: &Happening) {
     };
 }
 
-/// Types the agent back into a window tmux just made for this leaf.
+/// Types the agent back into a pane just made again for this leaf: a window
+/// tmux lost, or a ptyd pane whose daemon died. `home` is the daemon's, for
+/// a ptyd target.
 ///
 /// On its own thread: a fresh shell takes a second or more to reach its
 /// prompt, and the layout it belongs to is being opened while someone waits.
-pub(crate) fn start_again(store: &Store, session: &str, leaf_id: &str) {
+pub(crate) fn start_again(store: &Store, home: Option<&Path>, target: &str, leaf_id: &str) {
     let Ok(Some(agent)) = store.pane_agent(leaf_id) else {
         return;
     };
     let Ok(line) = resume_line(&agent) else {
         return;
     };
-    let session = session.to_owned();
-    let leaf = leaf_id.to_owned();
-    std::thread::spawn(move || {
-        if let Ready::Busy(_) = settled(&session, &leaf) {
-            return;
-        }
-        let Ok(server) = crate::sessions::tmux_server() else {
-            return;
-        };
-        let target = devpit_tmux::Server::target(&session, &leaf);
-        if server.send_keys(&target, &line).is_ok() {
-            let _ = server.name_pane(&target, &profile_id(&agent.launch));
-        }
-    });
+    let profile = profile_id(&agent.launch);
+    let (home, target) = (home.map(Path::to_path_buf), target.to_owned());
+    std::thread::spawn(move || type_again(home.as_deref(), &target, &line, &profile));
+}
+
+/// Types `line` at the pane once its shell settles, unless something else
+/// already runs there. Answers whether it typed it.
+pub(crate) fn type_again(home: Option<&Path>, target: &str, line: &str, profile: &str) -> bool {
+    if let Ready::Busy(_) = crate::pane_io::settled(target) {
+        return false;
+    }
+    let typed = crate::pane_io::send_line_at(home, target, line).is_ok();
+    if typed {
+        crate::pane_io::label(target, profile);
+    }
+    typed
 }
 
 fn resume_line(agent: &PaneAgent) -> Result<String, devpit_rpc::RpcError> {
@@ -111,7 +117,7 @@ pub(crate) fn with_resume(start: &str, flag: Option<&str>, session: Option<&str>
 
 #[cfg(test)]
 mod tests {
-    use super::{base_or, with_resume};
+    use super::{base_or, type_again, with_resume};
 
     /// The account discovered as `claude` has no base of its own, and resumed nothing.
     #[test]
@@ -151,5 +157,67 @@ mod tests {
                 "{id}"
             );
         }
+    }
+
+    /// The resume line, typed into a ptyd shell the daemon started afresh,
+    /// once the tap hears its shell in front, and never over an agent.
+    #[cfg(unix)]
+    #[test]
+    fn an_agent_is_typed_again_into_a_fresh_ptyd_shell_and_never_over_one_that_runs() {
+        use devpit_ptyd::frame::{self, Frame, Kind};
+
+        let daemon = crate::ptyd_link::tests::serving();
+        let home = daemon.home.path();
+        let leaf = "leaf_typed_again";
+        let pane = crate::ptyd_link::pane_number(leaf);
+        // Prints what it is given instead of running it: the line is an agent's.
+        let script = r#"printf 'ready\r\n'; read line; printf 'typed:%s\r\n' "$line"; sleep 30"#;
+        let asked = devpit_ptyd::pane::Asked {
+            rows: 24,
+            cols: 80,
+            cwd: home.to_string_lossy().into_owned(),
+            argv: vec!["/bin/sh".into(), "-c".into(), script.into()],
+            env: Vec::new(),
+        };
+        crate::ptyd_link::spawn(home, pane, &asked).expect("spawn");
+        let target = crate::ptyd_link::target(leaf);
+        // What the tap is pushed once the pane goes quiet.
+        let in_front = |program: &str| {
+            let told = Frame::new(pane, Kind::Program, program.as_bytes().to_vec());
+            let _ = crate::ptyd_tap::tap()
+                .fronts
+                .lock()
+                .expect("fronts")
+                .heard(&told);
+        };
+        let line = "claude --resume 94e3457c";
+
+        in_front("claude");
+        assert!(!type_again(Some(home), &target, line, "claude"));
+        in_front("sh");
+        assert!(type_again(Some(home), &target, line, "claude"));
+
+        let mut watching = crate::ptyd_link::connect(home).expect("connect");
+        frame::write(&mut watching, &Frame::new(pane, Kind::Attach, Vec::new())).expect("attach");
+        watching
+            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+            .expect("timeout");
+        let wanted = format!("typed:{line}");
+        let mut seen = Vec::new();
+        while !String::from_utf8_lossy(&seen).contains(&wanted) {
+            match frame::read(&mut watching) {
+                Ok(Some(one)) if matches!(one.kind(), Some(Kind::Output | Kind::Replay)) => {
+                    seen.extend(one.bytes)
+                }
+                Ok(Some(_)) => {}
+                _ => break,
+            }
+        }
+        crate::ptyd_link::kill(home, pane);
+        assert!(
+            String::from_utf8_lossy(&seen).contains(&wanted),
+            "{}",
+            String::from_utf8_lossy(&seen)
+        );
     }
 }

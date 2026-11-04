@@ -182,9 +182,11 @@ fn load_or_create(
     if let Some((tree, focused)) = store.pane_layout(project_id, tab_id)? {
         let layout = decode(project_id, &tree, &focused)?;
         let mut server = None;
+        let home = Store::root().ok();
         for (leaf_id, target) in layout.tree.leaves() {
             if crate::ptyd_link::is_ptyd(target) {
-                crate::ptyd_link::revive_at(&store, project_id, leaf_id, was_in(leaf_id), cwd);
+                let was = was_in(leaf_id);
+                crate::ptyd_link::revive_at(&store, home.as_deref(), project_id, leaf_id, was, cwd);
                 continue;
             }
             if server.is_none() {
@@ -200,7 +202,8 @@ fn load_or_create(
                 .ensure_session(&session, leaf_id, at.as_deref().unwrap_or(cwd))
                 .map_err(tmux_err)?;
             if lost {
-                crate::restoring::start_again(&store, &session, leaf_id);
+                let target = devpit_tmux::Server::target(&session, leaf_id);
+                crate::restoring::start_again(&store, None, &target, leaf_id);
             }
         }
         return Ok(layout);

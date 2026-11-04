@@ -119,3 +119,20 @@ fn a_new_pane_goes_to_ptyd_while_wanted_and_to_tmux_otherwise() {
     assert!(running(home, pane_number("leaf_s")));
     kill(home, pane_number("leaf_s"));
 }
+
+/// What says whether the agent is typed in again: a pane the daemon still
+/// holds is left as it is, and only one it lost is started afresh.
+#[cfg(unix)]
+#[test]
+fn a_pane_is_started_again_only_when_the_daemon_lost_it() {
+    let daemon = serving();
+    let home = daemon.home.path();
+    let leaf = "leaf_revived";
+    assert!(revive(home, leaf, home, Vec::new()), "lost: started again");
+    assert!(running(home, pane_number(leaf)));
+    assert!(
+        !revive(home, leaf, home, Vec::new()),
+        "running: left as it is"
+    );
+    kill(home, pane_number(leaf));
+}

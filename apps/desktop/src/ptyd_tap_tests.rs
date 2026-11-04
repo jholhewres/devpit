@@ -285,3 +285,64 @@ fn the_tap_acks_a_pane_no_window_is_on_and_takes_over_when_the_window_goes() {
     hang_up(&tap);
     let _ = std::fs::remove_file(&socket);
 }
+
+/// The desktop killed with `kill -9`: every connection it had closes with
+/// it and everything it knew is gone, but the daemon and the agent are not.
+/// Started again, it finds the pane running and starts nothing in its place,
+/// and its tap reads the agent's alternate screen back off the replay.
+#[test]
+fn an_agent_outlives_the_desktop_killed_and_comes_back_in_its_alternate_screen() {
+    use devpit_ptyd::frame::{self, Frame, Kind};
+
+    let home = tempfile::tempdir().expect("home");
+    let home = home.path();
+    let (socket, daemon) = own_daemon(home);
+    let leaf = format!("leaf_kill9_{}", std::process::id());
+    let pane = pane_number(&leaf);
+    let script =
+        r#"printf 'on the primary\r\n\033[?1049h\033[?1h\033[Hhello from the agent'; sleep 30"#;
+    let mut asked = sh(home, script);
+    asked.env = vec![(devpit_tmux::PANE_ENV.to_owned(), leaf.clone())];
+    crate::ptyd_link::spawn(home, pane, &asked).expect("spawn");
+
+    // The desktop before: its tap on the pane, and a window attached to it.
+    let (tap, ears) = (Arc::new(Tap::default()), Arc::new(Heard::default()));
+    listening(&tap, &ears, home);
+    tap.heed("p", &leaf);
+    let shows = |tap: &Tap| {
+        tap.screen(pane)
+            .is_some_and(|shown| shown.contains("hello from the agent"))
+    };
+    assert!(until(|| shows(&tap)), "{:?}", tap.screen(pane));
+    let mut window = crate::ptyd_link::connect(home).expect("connect");
+    frame::write(&mut window, &Frame::new(pane, Kind::Attach, Vec::new())).expect("attach");
+
+    // `kill -9`: the process's sockets close with it, and its state is gone.
+    hang_up(&tap);
+    drop((tap, ears, window));
+
+    let store = devpit_core::Store::open(&home.join("state.db")).expect("store");
+    let project = store.add_project(home, None).expect("project");
+    let revived = crate::ptyd_link::revive_at(&store, Some(home), &project, &leaf, None, home);
+    let (tap, ears) = (Arc::new(Tap::default()), Arc::new(Heard::default()));
+    listening(&tap, &ears, home);
+    tap.heed(&project, &leaf);
+    let drawn = until(|| shows(&tap));
+    let shown = tap.screen(pane).unwrap_or_default();
+    let modes = tap.modes(pane);
+    #[cfg(target_os = "linux")]
+    let alive = devpit_pty::started_with(devpit_tmux::PANE_ENV, &leaf)
+        .is_some_and(|found| !found.is_empty());
+    #[cfg(not(target_os = "linux"))]
+    let alive = crate::ptyd_link::running(home, pane);
+    crate::ptyd_link::kill(home, pane);
+    hang_up(&tap);
+    let _ = std::fs::remove_file(&socket);
+
+    assert!(!revived, "a running pane was started again");
+    assert!(daemon.pane(pane).is_some());
+    assert!(alive, "the agent did not outlive the desktop");
+    assert!(drawn, "{shown}");
+    assert!(!shown.contains("on the primary"), "{shown}");
+    assert!(modes.is_some_and(|modes| modes.application_cursor));
+}
