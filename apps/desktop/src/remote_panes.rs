@@ -1,5 +1,10 @@
-//! The terminals a viewer watches: each one a tmux client of its own,
-//! running in a pty here, its bytes put on the viewer's queue.
+//! The terminals a viewer watches, their bytes put on the viewer's queue:
+//! a tmux pane through a tmux client of its own, running in a pty here; a
+//! ptyd pane attached over the daemon's socket.
+//!
+//! A ptyd watcher never resizes the pane, so a phone does not shrink the
+//! desk's, and never acks: the daemon keeps one count per pane, and the
+//! window on it or the tap ([`crate::ptyd_tap`]) acks it whole.
 
 use std::collections::HashMap;
 use std::sync::mpsc::Sender;
@@ -19,9 +24,17 @@ pub(crate) struct Watching {
     open: HashMap<String, Open>,
 }
 
-struct Open {
-    session: String,
-    pty: devpit_pty::Session,
+enum Open {
+    Tmux {
+        session: String,
+        pty: devpit_pty::Session,
+    },
+    #[cfg(unix)]
+    Ptyd {
+        home: std::path::PathBuf,
+        number: u32,
+        stream: std::os::unix::net::UnixStream,
+    },
 }
 
 impl Watching {
@@ -44,6 +57,11 @@ impl Watching {
         self.close(pane);
         if self.open.len() >= MOST {
             return Err(format!("at most {MOST} terminals at once"));
+        }
+        #[cfg(unix)]
+        if let Some(number) = ptyd_number(project, pane) {
+            let home = devpit_core::Store::root().map_err(|err| err.to_string())?;
+            return self.open_ptyd_at(&home, pane, number, out);
         }
         let server = crate::sessions::tmux_server().map_err(|err| err.message)?;
         let session = devpit_tmux::Server::session_name(project);
@@ -80,7 +98,40 @@ impl Watching {
             }
             let _ = out.send(RemoteOut::PaneClosed { pane: named });
         });
-        self.open.insert(pane.to_owned(), Open { session, pty });
+        self.open
+            .insert(pane.to_owned(), Open::Tmux { session, pty });
+        Ok(())
+    }
+
+    /// Watches ptyd pane `number`, leaf `pane`, of the daemon of `home`:
+    /// attached, and asked nothing else.
+    #[cfg(unix)]
+    pub(crate) fn open_ptyd_at(
+        &mut self,
+        home: &std::path::Path,
+        pane: &str,
+        number: u32,
+        out: Sender<RemoteOut>,
+    ) -> Result<(), String> {
+        use devpit_ptyd::frame::{self, Frame, Kind};
+        let socket = crate::ptyd_link::socket_path(home);
+        let mut stream = devpit_ptyd::socket::connect(&socket).map_err(|err| {
+            format!("devpit-ptyd, which holds that terminal, did not answer: {err}")
+        })?;
+        let reading = stream.try_clone().map_err(|err| err.to_string())?;
+        frame::write(&mut stream, &Frame::new(number, Kind::Attach, Vec::new()))
+            .map_err(|err| err.to_string())?;
+        let named = pane.to_owned();
+        std::thread::spawn(move || forward(reading, number, &named, &out));
+        let home = home.to_path_buf();
+        self.open.insert(
+            pane.to_owned(),
+            Open::Ptyd {
+                home,
+                number,
+                stream,
+            },
+        );
         Ok(())
     }
 
@@ -91,15 +142,34 @@ impl Watching {
             .open
             .get_mut(pane)
             .ok_or("that terminal is not open here")?;
-        open.pty.write(bytes).map_err(|err| err.to_string())
+        match open {
+            Open::Tmux { pty, .. } => pty.write(bytes).map_err(|err| err.to_string()),
+            #[cfg(unix)]
+            Open::Ptyd { home, number, .. } => {
+                crate::pane_io::write_at(home, *number, bytes).map_err(|err| err.message)
+            }
+        }
     }
 
     pub(crate) fn close(&mut self, pane: &str) {
-        if let Some(open) = self.open.remove(pane) {
-            if let Ok(server) = crate::sessions::tmux_server() {
-                server.end_viewer(&open.session, pane, &self.viewer);
+        match self.open.remove(pane) {
+            Some(Open::Tmux { session, pty }) => {
+                if let Ok(server) = crate::sessions::tmux_server() {
+                    server.end_viewer(&session, pane, &self.viewer);
+                }
+                drop(pty);
             }
-            drop(open.pty);
+            // Detached, then closed: the forwarding thread hears the end
+            // and tells the viewer the pane is closed, as a tmux one's does.
+            #[cfg(unix)]
+            Some(Open::Ptyd {
+                number, mut stream, ..
+            }) => {
+                use devpit_ptyd::frame::{self, Frame, Kind};
+                let _ = frame::write(&mut stream, &Frame::new(number, Kind::Detach, Vec::new()));
+                let _ = stream.shutdown(std::net::Shutdown::Both);
+            }
+            None => {}
         }
     }
 
@@ -110,3 +180,50 @@ impl Watching {
         }
     }
 }
+
+/// The daemon's number for `pane` of `project`, when the daemon holds it.
+#[cfg(unix)]
+fn ptyd_number(project: &str, pane: &str) -> Option<u32> {
+    let target = crate::pane_io::target_of(project, pane).ok()?;
+    match crate::pane_io::holder(&target) {
+        crate::pane_io::Holder::Ptyd(number) => Some(number),
+        crate::pane_io::Holder::Tmux { .. } => None,
+    }
+}
+
+/// Pane `number`'s frames to the viewer as `pane`'s bytes, in the shapes a
+/// tmux pane's take, until it ends or the connection does. Nothing goes back.
+#[cfg(unix)]
+pub(crate) fn forward(
+    mut reading: impl std::io::Read,
+    number: u32,
+    pane: &str,
+    out: &Sender<RemoteOut>,
+) {
+    use devpit_ptyd::frame::{self, Kind};
+    while let Ok(Some(one)) = frame::read(&mut reading) {
+        if one.pane != number {
+            continue;
+        }
+        match one.kind() {
+            Some(Kind::Output | Kind::Replay) => {
+                let said = RemoteOut::PaneBytes {
+                    pane: pane.to_owned(),
+                    b64: BASE64.encode(&one.bytes),
+                };
+                if out.send(said).is_err() {
+                    return;
+                }
+            }
+            Some(Kind::Exited | Kind::Refused) => break,
+            _ => {}
+        }
+    }
+    let _ = out.send(RemoteOut::PaneClosed {
+        pane: pane.to_owned(),
+    });
+}
+
+#[cfg(all(test, unix))]
+#[path = "remote_panes_tests.rs"]
+mod tests;

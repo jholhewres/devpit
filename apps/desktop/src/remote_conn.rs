@@ -290,20 +290,10 @@ fn answer(
             if text.trim().is_empty() {
                 return None;
             }
-            let Some(project) = watched_project(&pane) else {
+            let Some(target) = watched_target(&pane) else {
                 return failed("that terminal is not open");
             };
-            let sent = crate::sessions::tmux_server()
-                .map_err(|err| err.message)
-                .and_then(|server| {
-                    let target = devpit_tmux::Server::target(
-                        &devpit_tmux::Server::session_name(&project),
-                        &pane,
-                    );
-                    server
-                        .paste_and_send(&target, &text)
-                        .map_err(|err| err.to_string())
-                });
+            let sent = crate::pane_io::paste(&target, &text, true).map_err(|err| err.message);
             crate::remote::note(root, device, &format!("sent a line to {pane}"));
             sent.err().and_then(failed)
         }
@@ -575,15 +565,46 @@ fn settle(app: &tauri::AppHandle, id: &str, allow: bool) -> Result<(), String> {
         .ok_or_else(|| "that question is no longer waiting".to_owned())
 }
 
-/// The project a pane belongs to, by its session.
-fn watched_project(pane: &str) -> Option<String> {
+/// Where an open pane is typed into: its tmux window, by the session it runs
+/// in, or the daemon's pane, by the project the tap placed it in.
+fn watched_target(pane: &str) -> Option<String> {
     let projects = crate::projects::project_list_now().ok()?.projects;
-    let server = crate::sessions::tmux_server().ok()?;
-    projects.into_iter().map(|one| one.id).find(|id| {
-        server
-            .running(&devpit_tmux::Server::session_name(id))
-            .is_ok_and(|running| running.iter().any(|one| one.leaf_id == pane))
-    })
+    let in_tmux = crate::sessions::tmux_server().ok().and_then(|server| {
+        projects.iter().map(|one| one.id.as_str()).find(|id| {
+            server
+                .running(&devpit_tmux::Server::session_name(id))
+                .is_ok_and(|running| running.iter().any(|one| one.leaf_id == pane))
+        })
+    });
+    if let Some(project) = in_tmux {
+        let session = devpit_tmux::Server::session_name(project);
+        return Some(devpit_tmux::Server::target(&session, pane));
+    }
+    projects
+        .iter()
+        .any(|one| {
+            crate::ptyd_watch::running_in(&one.id)
+                .iter()
+                .any(|running| running.pane_id == pane)
+        })
+        .then(|| crate::ptyd_link::target(pane))
+}
+
+/// A project's open terminals for a viewer, tmux's and then the daemon's, in
+/// the one shape an old viewer already reads.
+pub(crate) fn terminals(
+    tmux: Vec<devpit_tmux::Running>,
+    ptyd: Vec<devpit_rpc::PaneRunning>,
+) -> Vec<RemoteTerminal> {
+    let tmux = tmux.into_iter().map(|running| RemoteTerminal {
+        pane: running.leaf_id,
+        command: running.command,
+    });
+    let ptyd = ptyd.into_iter().map(|running| RemoteTerminal {
+        pane: running.pane_id,
+        command: running.command,
+    });
+    tmux.chain(ptyd).collect()
 }
 
 /// Every project and its open terminals.
@@ -596,20 +617,15 @@ fn projects() -> Result<Vec<RemoteProject>, String> {
         .into_iter()
         .filter(|one| one.orchestrator.is_none())
         .map(|one| {
-            let terminals = server
+            let in_tmux = server
                 .as_ref()
                 .and_then(|server| {
                     server
                         .running(&devpit_tmux::Server::session_name(&one.id))
                         .ok()
                 })
-                .unwrap_or_default()
-                .into_iter()
-                .map(|running| RemoteTerminal {
-                    pane: running.leaf_id,
-                    command: running.command,
-                })
-                .collect();
+                .unwrap_or_default();
+            let terminals = terminals(in_tmux, crate::ptyd_watch::running_in(&one.id));
             RemoteProject {
                 id: one.id,
                 name: one.name,
@@ -619,3 +635,7 @@ fn projects() -> Result<Vec<RemoteProject>, String> {
         })
         .collect())
 }
+
+#[cfg(test)]
+#[path = "remote_conn_tests.rs"]
+mod tests;
