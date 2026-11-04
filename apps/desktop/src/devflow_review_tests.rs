@@ -301,8 +301,9 @@ fn rev(at: &Path, name: &str) -> String {
     String::from_utf8_lossy(&done.stdout).trim().to_owned()
 }
 
-/// After a fix, a review with `previous` pins the diff from the HEAD that
-/// run read, carries what did not block, and the gate takes it as current.
+/// After a fix, a review with `previous` (a run v0.2.1 wrote) is read once by
+/// devflow-all from the HEAD that run read, drops a touched finding not
+/// reported again, carries the untouched one, and the gate takes it.
 #[cfg(unix)]
 #[test]
 fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
@@ -323,7 +324,16 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
     vague["line"] = json!(7);
     vague["evidence"] = json!("app.py:7 `opener = link`");
     vague.as_object_mut().expect("finding").remove("poc");
-    let first = fake_claude_finding(scripts.path(), "first", vec![shell_injection(), vague]);
+    // On a line the fix rewrites: read again, and gone once not reported.
+    let mut unquoted = vague.clone();
+    unquoted["title"] = json!("Unquoted link");
+    unquoted["line"] = json!(2);
+    unquoted["evidence"] = json!("app.py:2 `os.system(link)`");
+    let first = fake_claude_finding(
+        scripts.path(),
+        "first",
+        vec![shell_injection(), vague, unquoted],
+    );
     let reach = move |_: Agent| Ok(first.clone());
     let config = config_of(&root);
     let before = respond_with(
@@ -339,6 +349,15 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
     assert_eq!(before["verdict"], "request_changes", "{before}");
     let run = before["run"].as_str().expect("its run").to_owned();
     let read = rev(&root, "HEAD");
+    // The previous run as engine v0.2.1 wrote it: none of v0.2.2's fields.
+    let first_file = root.join(before["findings_file"].as_str().expect("file"));
+    let mut first: Value =
+        serde_json::from_str(&std::fs::read_to_string(&first_file).expect("findings.json"))
+            .expect("json");
+    for newer in ["touched", "scale"] {
+        first.as_object_mut().expect("object").remove(newer);
+    }
+    std::fs::write(&first_file, first.to_string()).expect("as v0.2.1 wrote it");
 
     std::fs::write(
         root.join("app.py"),
@@ -367,13 +386,49 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
     assert!(packet.contains("+subprocess.run"), "{packet}");
     assert!(!packet.contains("+import os"), "only the delta: {packet}");
     assert!(packet.contains("Shell injection"), "{packet}");
+    assert!(
+        packet.contains("Unquoted link"),
+        "a touched finding is asked again: {packet}"
+    );
+    // No `scale` in devflow.yaml: the delta is read once, by devflow-all.
+    let personas: Vec<&str> = after["reviewers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|ran| ran["persona"].as_str())
+        .collect();
+    assert_eq!(personas, ["devflow-all"], "{after}");
+    assert!(
+        after["scale"]
+            .as_str()
+            .is_some_and(|why| why.contains(&format!("re-review of run {run}"))),
+        "{after}"
+    );
     let kept: Value = serde_json::from_str(
         &std::fs::read_to_string(root.join(after["findings_file"].as_str().expect("file")))
             .expect("findings.json"),
     )
     .expect("json");
-    assert_eq!(kept["findings"][0]["title"], "Vague opener name");
+    let titles: Vec<&str> = kept["findings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|finding| finding["title"].as_str())
+        .collect();
+    assert_eq!(titles, ["Vague opener name"], "{kept}");
     assert_eq!(kept["findings"][0]["carried_from"], json!(run));
+    assert!(
+        after["dropped"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|said| {
+                said.as_str().is_some_and(|said| {
+                    said.contains("Unquoted link") && said.contains("fixed in the delta")
+                })
+            }),
+        "{after}"
+    );
 
     let gate = crate::devflow::respond_from(
         None,
@@ -387,6 +442,68 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
     let missing = gate["missing"].to_string();
     assert!(!missing.contains("the review read"), "{missing}");
     assert!(!missing.contains("Shell injection"), "{missing}");
+}
+
+/// With `review.scale` on, a first review of a diff touching a sensitive path,
+/// or over `small_lines`, still runs every configured persona; a small one
+/// elsewhere is read once by devflow-all.
+#[cfg(unix)]
+#[test]
+fn a_first_review_of_a_sensitive_or_large_diff_runs_the_configured_personas() {
+    let cases: [(&str, &str, &[&str]); 3] = [
+        (
+            "scale: true",
+            ".github/workflows/ci.yml",
+            &["devflow-security", "devflow-spec"],
+        ),
+        (
+            "scale: { small_lines: 1 }",
+            "app.py",
+            &["devflow-security", "devflow-spec"],
+        ),
+        ("scale: true", "app.py", &["devflow-all"]),
+    ];
+    for (scale, file, ran) in cases {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let scripts = tempfile::tempdir().expect("scripts");
+        let root = dir.path().canonicalize().expect("root");
+        let (_store, project, card) = reviewed_project(&root);
+        git(&root, &["checkout", "-q", "--", "app.py"]);
+        let start = rev(&root, "HEAD");
+        std::fs::write(
+            root.join(".devpit/devflow/devflow.yaml"),
+            format!(
+                "version: 1\nenabled: true\nreview:\n  {scale}\n  reviewers:\n    \
+                 - {{ agent: claude, persona: devflow-security }}\n    \
+                 - {{ agent: claude, persona: devflow-spec }}\n"
+            ),
+        )
+        .expect("yaml");
+        let path = root.join(file);
+        std::fs::create_dir_all(path.parent().expect("folder")).expect("folder");
+        std::fs::write(&path, "one = 1\ntwo = 2\n").expect("change");
+        git(&root, &["add", "-A", "--", file]);
+        git(&root, &["commit", "-q", "-m", "change"]);
+        let fake = fake_claude_finding(scripts.path(), "none", Vec::new());
+        let reach = move |_: Agent| Ok(fake.clone());
+        let answer = respond_with(
+            None,
+            &project,
+            &config_of(&root),
+            &root,
+            &json!({ "card": card, "base": start }),
+            &reach,
+            None,
+        )
+        .expect("the review");
+        let personas: Vec<&str> = answer["reviewers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|one| one["persona"].as_str())
+            .collect();
+        assert_eq!(personas, ran, "{scale}, {file}: {answer}");
+    }
 }
 
 /// #249: a review in a project whose reviewers run as a profile starts its
