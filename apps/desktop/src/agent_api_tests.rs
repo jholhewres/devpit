@@ -314,3 +314,43 @@ fn an_agent_changes_only_the_comments_it_wrote() {
     assert!(theirs.contains("person"), "{theirs}");
     assert!(may_change_comment("codex", "claude").is_err());
 }
+
+/// `devpit_log` writes a preference to the log, a rule only when asked, and
+/// a project's rule under that project's own heading.
+#[test]
+fn a_logged_preference_goes_where_the_call_says() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join("orch");
+    std::fs::create_dir_all(root.join("context")).expect("context");
+    let rules_last = "## Rules for sessions\n- Never push to main.\n";
+    std::fs::write(root.join("context/preferences.md"), rules_last).expect("prefs");
+    let projects = vec![
+        project("prj_billing", &dir.path().join("billing"), &[]),
+        orchestrator("prj_orch", &root),
+    ];
+    let log = |params: Value| {
+        let asked: Asked = serde_json::from_value(json!({
+            "method": "log", "params": params, "cwd": "",
+        }))
+        .expect("asked");
+        respond_in(None, &projects, &projects[1], &asked)
+    };
+    log(json!({ "log": "preferences", "text": "likes short reports" })).expect("log");
+    log(
+        json!({ "log": "preferences", "text": "Deploy after the gate.", "project": "PRJ_BILLING" }),
+    )
+    .expect("project");
+    log(json!({ "log": "preferences", "text": "Write in English.", "section": "rules" }))
+        .expect("rules");
+    let written = std::fs::read_to_string(root.join("context/preferences.md")).expect("read");
+    let rules = crate::orchestrator_notes::rules_in(&written).expect("rules");
+    assert!(rules.starts_with("- Never push to main.\n- "), "{written}");
+    assert!(rules.ends_with("— Write in English."), "{written}");
+    assert!(!rules.contains("likes short reports"), "{written}");
+    assert!(
+        written.contains("## Rules for sessions: prj_billing\n\n- "),
+        "{written}"
+    );
+    assert!(log(json!({ "log": "preferences", "text": "x", "project": "nowhere" })).is_err());
+    assert!(log(json!({ "log": "preferences", "text": "x", "section": "other" })).is_err());
+}

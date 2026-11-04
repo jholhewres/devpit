@@ -73,9 +73,13 @@ conversation starts where this one ended:
   for once and will want again (how reports read, which projects come first,
   what never to do, how sessions are started). Write it down the moment they
   say it, and read it at the start of every conversation. What it keeps
-  under a `## Rules for sessions` heading devpit adds to the brief of every
-  session you start, so a standing rule ("never push to main") need not be
-  repeated in each brief.
+  under a `## Rules for sessions` heading, up to the next heading, devpit
+  adds to the brief of every session you start, so a standing rule ("never
+  push to main") need not be repeated in each brief; what it keeps under
+  `## Rules for sessions: <project>` (its name or id, several separated by
+  commas) goes only with that project's sessions. `devpit_log` writes a
+  preference to the log, never into those rules: pass `section: "rules"`
+  for a rule every session keeps, or `project` for one project's.
 - `decisions/<yyyy-mm-dd>-<slug>.md` — one decision each: the question, what
   was chosen, why, and what was ruled out. Decided with the person, never
   alone.

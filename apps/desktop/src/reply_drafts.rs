@@ -110,7 +110,12 @@ pub(crate) fn kept_sent(profile: &str, name: &str, drafted: &str, sent: &str, fr
         return;
     };
     let entry = sent_entry(name, drafted, sent, from);
-    if let Err(why) = crate::orchestrator_notes::note(&folder, "sessions", &entry) {
+    if let Err(why) = crate::orchestrator_notes::note(
+        &folder,
+        "sessions",
+        &entry,
+        crate::orchestrator_notes::Section::Log,
+    ) {
         devpit_core::reports::background("draft record", &why);
     }
 }

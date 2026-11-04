@@ -351,11 +351,34 @@ fn respond_in(
         }
         "log" => {
             orchestrating(here)?;
+            use crate::orchestrator_notes::{ProjectName, Section};
             let log = text("log").unwrap_or_else(|| "sessions".to_owned());
+            let named = text("project").filter(|named| !named.trim().is_empty());
+            let whose = named
+                .as_deref()
+                .map(|named| reached(projects, here, Some(named)))
+                .transpose()?;
+            let into = match (whose, text("section").as_deref()) {
+                (Some(one), None | Some("rules")) => Section::Project(ProjectName {
+                    id: &one.id,
+                    name: &one.name,
+                }),
+                (None, None | Some("log")) => Section::Log,
+                (None, Some("rules")) => Section::Rules,
+                (Some(_), Some("log")) => {
+                    return Err(
+                        "a project's entry goes to its rules: leave `section` out".to_owned()
+                    )
+                }
+                (_, Some(other)) => {
+                    return Err(format!("`section` is log or rules, not `{other}`"))
+                }
+            };
             let wrote = crate::orchestrator_notes::note(
                 Path::new(&here.root_path),
                 &log,
                 &text("text").unwrap_or_default(),
+                into,
             )?;
             return Ok(json!({ "wrote": wrote }));
         }
@@ -597,6 +620,10 @@ fn respond_in(
                 &crate::orchestrator_notes::briefed(
                     Path::new(&here.root_path),
                     &text("prompt").unwrap_or_default(),
+                    Some(crate::orchestrator_notes::ProjectName {
+                        id: &project.id,
+                        name: &project.name,
+                    }),
                 ),
                 text("name").as_deref(),
             )
@@ -610,6 +637,10 @@ fn respond_in(
             &crate::orchestrator_notes::briefed(
                 Path::new(&here.root_path),
                 &text("prompt").unwrap_or_default(),
+                Some(crate::orchestrator_notes::ProjectName {
+                    id: &project.id,
+                    name: &project.name,
+                }),
             ),
             text("name").as_deref(),
             // Its own checkout unless told otherwise: the project's folder is

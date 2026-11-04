@@ -160,8 +160,8 @@ pub(crate) const TOOLS: [Tool; 34] = [
     Tool {
         name: "devpit_log",
         method: "log",
-        description: "Orchestrator only: appends a dated entry to your own log — `sessions` (which session was given what and how it ended) or `preferences` (how the person likes to work). Answers with the line written. Use it rather than editing those files by hand.",
-        input: || json!({ "type": "object", "properties": { "log": { "type": "string", "enum": ["sessions", "preferences"], "description": "Which log. Defaults to sessions." }, "text": { "type": "string", "description": "The entry." } }, "required": ["text"] }),
+        description: "Orchestrator only: appends a dated entry to your own log — `sessions` (which session was given what and how it ended) or `preferences` (how the person likes to work). A preference never lands under `## Rules for sessions`, which goes with every session's brief: it lands in the log, or with `section: rules` in those rules, or with `project` under `## Rules for sessions: <project>`, which goes only with that project's sessions. Answers with the line written. Use it rather than editing those files by hand.",
+        input: || json!({ "type": "object", "properties": { "log": { "type": "string", "enum": ["sessions", "preferences"], "description": "Which log. Defaults to sessions." }, "text": { "type": "string", "description": "The entry." }, "section": { "type": "string", "enum": ["log", "rules"], "description": "Preferences only: `rules` for a standing rule every session is briefed with, when the person asked for one. Defaults to log." }, "project": { "type": "string", "description": "Preferences only: a rule for that project's sessions alone, by id or name." } }, "required": ["text"] }),
     },
     Tool {
         name: "devpit_start_session",
