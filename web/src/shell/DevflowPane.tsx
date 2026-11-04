@@ -7,6 +7,7 @@ import { type Edit } from './devflowEdit'
 import { DevflowJev } from './DevflowJev'
 import { DevflowReviewers } from './DevflowReviewers'
 import { DevflowSetup } from './DevflowSetup'
+import { DevflowBinaryRow, DevflowPluginRow } from './DevflowStandalone'
 import { DevflowStages } from './DevflowStages'
 import { DevflowTeams } from './DevflowTeams'
 import { inOrder } from './inOrder'
@@ -252,6 +253,13 @@ export function DevflowPane(): React.JSX.Element {
         )}
         {problem && <p className="pref__d voice__bad">{problem}</p>}
         {body()}
+        {screen && (
+          <>
+            <div className="acc__sub">devflow outside devpit</div>
+            <DevflowPluginRow projectId={screen.projectId} devpitOn={screen.state === 'active'} onDeactivate={() => edit('enabled', false)} />
+            <DevflowBinaryRow />
+          </>
+        )}
       </div>
     </div>
   )

@@ -263,6 +263,49 @@ pub struct DevflowCodexInstalled {
     pub said: String,
 }
 
+/// The standalone devflow's Claude Code plugin, `devflow@devflow`, in the
+/// profile a project's sessions run as.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowPlugin {
+    pub project_id: String,
+    /// The Claude Code configuration directory it is read from and installed in.
+    pub directory: String,
+    /// The profile's label; `None` is the machine's default.
+    pub profile: Option<String>,
+    /// The version installed there, if any.
+    pub version: Option<String>,
+    pub enabled: bool,
+    /// The release devpit is built against.
+    pub known: String,
+    /// On, while devpit's own Devflow is on in the project too: the tools twice.
+    pub twice: bool,
+}
+
+/// What the Devflow screen's plugin buttons do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum DevflowPluginAction {
+    Install,
+    Update,
+    Remove,
+    Enable,
+    Disable,
+}
+
+/// The standalone devflow binary in `~/.local/bin`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowBinary {
+    pub path: String,
+    /// What `devflow --version` says, when it is there and runs.
+    pub version: Option<String>,
+    /// The release devpit downloads.
+    pub known: String,
+    /// `devflow doctor`'s lines, after an install.
+    pub doctor: Vec<String>,
+}
+
 /// The account a project's Claude Code reviewers run as (#249).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

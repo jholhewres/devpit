@@ -86,11 +86,12 @@ pub use devflow::{
     DevflowPlan, DevflowPlanCreated, PlannedCard, RubricAccuracy,
 };
 pub use devflow_screen::{
-    DevflowCardEvidence, DevflowCheck, DevflowCli, DevflowCodexInstalled, DevflowConfig,
-    DevflowDetected, DevflowError, DevflowFileChange, DevflowFound, DevflowGated, DevflowHint,
-    DevflowPrefs, DevflowPreview, DevflowProfile, DevflowProfileChoice, DevflowProfileFrom,
-    DevflowReviewed, DevflowReviewer, DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage,
-    DevflowState, DevflowTeam, DevflowTeamChange, DevflowTeamChanges,
+    DevflowBinary, DevflowCardEvidence, DevflowCheck, DevflowCli, DevflowCodexInstalled,
+    DevflowConfig, DevflowDetected, DevflowError, DevflowFileChange, DevflowFound, DevflowGated,
+    DevflowHint, DevflowPlugin, DevflowPluginAction, DevflowPrefs, DevflowPreview, DevflowProfile,
+    DevflowProfileChoice, DevflowProfileFrom, DevflowReviewed, DevflowReviewer, DevflowScreen,
+    DevflowSkill, DevflowSkillText, DevflowStage, DevflowState, DevflowTeam, DevflowTeamChange,
+    DevflowTeamChanges,
 };
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};

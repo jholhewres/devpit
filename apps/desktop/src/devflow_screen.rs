@@ -51,15 +51,27 @@ pub(crate) fn state_of(state: &State, active: bool) -> DevflowState {
     }
 }
 
+/// Whether `state` is on for the project: on in Settings, in the file and by
+/// the person's click.
+fn active_in(store: &Store, project: &Project, globally: bool, state: &State) -> bool {
+    matches!(
+        devflow::offered(globally, state, made(store, &project.id, Ask::Enable)),
+        Offered::Active(_)
+    )
+}
+
+/// Whether devpit's Devflow is on in `project`, as its screen says it.
+pub(crate) fn active_here(store: &Store, project: &Project) -> bool {
+    let state = devflow::read(Path::new(&project.root_path));
+    active_in(store, project, globally_on(store), &state)
+}
+
 /// The screen for `project`, read now.
 pub(crate) fn screen(app: Option<&AppHandle>, store: &Store, project: &Project) -> DevflowScreen {
     let root = Path::new(&project.root_path);
     let state = devflow::looked(app, store, project, root);
     let globally = globally_on(store);
-    let active = matches!(
-        devflow::offered(globally, &state, made(store, &project.id, Ask::Enable)),
-        Offered::Active(_)
-    );
+    let active = active_in(store, project, globally, &state);
     let (yaml, config, error) = match &state {
         State::Missing => (None, None, None),
         State::Invalid(text, invalid) => (

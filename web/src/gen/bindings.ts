@@ -493,6 +493,20 @@ export const commands = {
 	 *  skills added to Codex for every session it starts.
 	 */
 	devflowCodexInstall: () => typedError<DevflowCodexInstalled, RpcError>(__TAURI_INVOKE("devflow_codex_install")),
+	/**  `devflow.plugin` — the standalone devflow's plugin in the project's profile. */
+	devflowPlugin: (projectId: string) => typedError<DevflowPlugin, RpcError>(__TAURI_INVOKE("devflow_plugin", { projectId })),
+	/**
+	 *  `devflow.plugin_do` — the person's click: install, update, remove, enable
+	 *  or disable the plugin in the project's profile.
+	 */
+	devflowPluginDo: (projectId: string, action: DevflowPluginAction) => typedError<DevflowPlugin, RpcError>(__TAURI_INVOKE("devflow_plugin_do", { projectId, action })),
+	/**  `devflow.binary` — the standalone devflow in `~/.local/bin`. */
+	devflowBinary: () => typedError<DevflowBinary, RpcError>(__TAURI_INVOKE("devflow_binary")),
+	/**
+	 *  `devflow.binary_install` — the person's click, after their yes: devflow
+	 *  `KNOWN` downloaded, checked and installed, then `devflow doctor` run.
+	 */
+	devflowBinaryInstall: () => typedError<DevflowBinary, RpcError>(__TAURI_INVOKE("devflow_binary_install")),
 	/**  `devflow.card_evidence` — the card's newest gate, reviewers and files. */
 	devflowCardEvidence: (projectId: string, cardId: string) => typedError<DevflowCardEvidence, RpcError>(__TAURI_INVOKE("devflow_card_evidence", { projectId, cardId })),
 	/**
@@ -2845,6 +2859,17 @@ export type DevflowAsks = {
 	asks: DevflowAsk[],
 };
 
+/**  The standalone devflow binary in `~/.local/bin`. */
+export type DevflowBinary = {
+	path: string,
+	/**  What `devflow --version` says, when it is there and runs. */
+	version: string | null,
+	/**  The release devpit downloads. */
+	known: string,
+	/**  `devflow doctor`'s lines, after an install. */
+	doctor: string[],
+};
+
 /**  Response of `devflow.calibration`: each rubric the project was judged by. */
 export type DevflowCalibration = {
 	projectId: string,
@@ -3012,6 +3037,28 @@ export type DevflowPlan = {
 export type DevflowPlanCreated = {
 	cardIds: string[],
 };
+
+/**
+ *  The standalone devflow's Claude Code plugin, `devflow@devflow`, in the
+ *  profile a project's sessions run as.
+ */
+export type DevflowPlugin = {
+	projectId: string,
+	/**  The Claude Code configuration directory it is read from and installed in. */
+	directory: string,
+	/**  The profile's label; `None` is the machine's default. */
+	profile: string | null,
+	/**  The version installed there, if any. */
+	version: string | null,
+	enabled: boolean,
+	/**  The release devpit is built against. */
+	known: string,
+	/**  On, while devpit's own Devflow is on in the project too: the tools twice. */
+	twice: boolean,
+};
+
+/**  What the Devflow screen's plugin buttons do. */
+export type DevflowPluginAction = "install" | "update" | "remove" | "enable" | "disable";
 
 /**  Devflow's preferences on this machine. */
 export type DevflowPrefs = {
