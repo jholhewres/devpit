@@ -1066,8 +1066,8 @@ dependencies = [
 
 [[package]]
 name = "devflow-engine"
-version = "0.2.0"
-source = "git+https://github.com/jholhewres/devflow?rev=890abce#890abcede799c717a7a13a82b7ac37ca3284ce58"
+version = "0.2.1"
+source = "git+https://github.com/jholhewres/devflow?tag=v0.2.1#13514a0b3aafba89b5d2fef3ecf5db1d950c33a3"
 dependencies = [
  "libc",
  "quick-xml",
