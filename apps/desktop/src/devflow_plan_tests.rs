@@ -186,7 +186,7 @@ fn a_plan_is_a_preview_until_the_persons_yes_and_then_cards_that_wait_on_each_ot
     );
     assert!(edges.parents.iter().all(|(_, parent)| parent == &epic));
     let body = store.card(&ids[0]).expect("read").expect("card").body;
-    assert_eq!(devpit_core::criteria::criteria(&body).len(), 2, "{body}");
+    assert_eq!(devflow_engine::criteria::criteria(&body).len(), 2, "{body}");
     let said = store.comments(&epic).expect("comments");
     assert!(
         said[0]

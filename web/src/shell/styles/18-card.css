@@ -40,6 +40,7 @@
 .crit__one { display: flex; align-items: flex-start; gap: 9px; padding: 6px 10px; border-radius: 8px; background: var(--raised); font-size: 13px; line-height: 1.45; color: var(--text); }
 .crit__one input { margin-top: 3px; accent-color: var(--accent); }
 .crit__one[data-done='true'] span { color: var(--text-3); text-decoration: line-through; }
+.crit__note { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--raised); font-size: 13px; line-height: 1.45; color: var(--text-2); }
 
 /* A Devflow plan waiting on its epic: cards that do not exist yet. */
 .dplan__note { margin: -4px 0 10px; font-size: 12px; color: var(--text-3); }

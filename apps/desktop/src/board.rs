@@ -69,6 +69,7 @@ fn card_from(
         // not pay for a process. `board_get` and `card_detail` add the rest.
         activity: snapshot(&row.id).activity,
         criteria: crate::card_ties::criteria_of(&row.body),
+        criteria_unread: crate::card_ties::unread_of(&row.body),
         // What ties it to other cards is read for the whole board at once.
         parent_id: None,
         blocked_by: Vec::new(),

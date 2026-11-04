@@ -9,7 +9,6 @@
 //! shells costs days instead of months.
 
 pub mod bus;
-pub mod criteria;
 pub mod data_files;
 pub mod home;
 pub mod origin;

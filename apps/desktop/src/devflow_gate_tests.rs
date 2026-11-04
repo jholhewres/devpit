@@ -103,6 +103,7 @@ fn with_the_evidence_the_gate_passes_keeps_gate_json_in_the_run_and_attaches_it(
     let (store, project, card) = devflow_on(&root, "");
     let ran = evidence(&project, &root, &card);
     assert_eq!(ran["green"], true, "{ran}");
+    assert!(ran.get("criteria_unread").is_none(), "{ran}");
 
     let said = ask(&project, &root, "devflow_gate", json!({ "card": card }));
     assert_eq!(said["result"], "passed", "{said}");
@@ -127,6 +128,46 @@ fn with_the_evidence_the_gate_passes_keeps_gate_json_in_the_run_and_attaches_it(
         "{comment}"
     );
     assert!(comment.ends_with("Passed."), "{comment}");
+}
+
+/// A board that writes its criteria under `## Critérios de aceite`: the
+/// evidence says none were read, and the gate names the heading to rename.
+#[test]
+fn checkboxes_under_a_localized_heading_are_flagged_by_the_evidence_and_the_gate() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (store, project, card) = devflow_on(&root, "");
+    let row = store.card(&card).expect("read").expect("the card");
+    let localized =
+        "## Critérios de aceite\n- [ ] rename changes the title\n- [ ] the old title is gone\n";
+    store
+        .update_card(&card, &row.title, localized)
+        .expect("localized");
+
+    let ran = evidence(&project, &root, &card);
+    assert_eq!(
+        ran["criteria_unread"]["heading"], "Critérios de aceite",
+        "{ran}"
+    );
+    assert_eq!(ran["criteria_unread"]["count"], 2, "{ran}");
+    assert!(
+        ran["criteria_unread"]["said"]
+            .as_str()
+            .is_some_and(|said| said.contains("were not read as criteria")),
+        "{ran}"
+    );
+
+    let said = ask(&project, &root, "devflow_gate", json!({ "card": card }));
+    assert_eq!(said["result"], "failed", "{said}");
+    assert!(
+        said["missing"]
+            .as_array()
+            .is_some_and(|missing| missing
+                .iter()
+                .any(|one| one.as_str().is_some_and(|one| one
+                    .contains("rename `## Critérios de aceite` to `## Acceptance criteria`")))),
+        "{said}"
+    );
 }
 
 /// The acceptance in Claude Code: saying "done" without the checks run is

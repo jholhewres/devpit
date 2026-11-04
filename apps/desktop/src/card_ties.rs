@@ -11,7 +11,7 @@ use std::path::Path;
 use devflow_engine::config::UnblockOn;
 use devpit_core::store::column_roles::role_of;
 use devpit_core::{CardEdges, Store};
-use devpit_rpc::{Card, CardRef, Criterion, ErrorCode, Progress, RpcError};
+use devpit_rpc::{Card, CardRef, Criterion, ErrorCode, Progress, RpcError, UnreadCriteria};
 
 /// The role of the lane where finished work sits.
 const DONE: &str = "done";
@@ -184,13 +184,29 @@ pub(crate) fn tied(store: &Store, project_id: &str, mut card: Card) -> Result<Ca
 
 /// The criteria of a body, as a card carries them.
 pub(crate) fn criteria_of(body: &str) -> Vec<Criterion> {
-    devpit_core::criteria::criteria(body)
+    devflow_engine::criteria::criteria(body)
         .into_iter()
         .map(|one| Criterion {
             text: one.text,
             done: one.done,
         })
         .collect()
+}
+
+/// With no criteria read, the heading holding the most unread checkboxes,
+/// the first of equals: what the engine's evidence names.
+pub(crate) fn unread_of(body: &str) -> Option<UnreadCriteria> {
+    if !devflow_engine::criteria::criteria(body).is_empty() {
+        return None;
+    }
+    devflow_engine::criteria::unread(body)
+        .into_iter()
+        .rev()
+        .max_by_key(|group| group.count)
+        .map(|group| UnreadCriteria {
+            heading: group.heading,
+            count: u32::try_from(group.count).unwrap_or(u32::MAX),
+        })
 }
 
 /// `card.criterion_tick` — the person ticks, or unticks, one of a card's
@@ -211,7 +227,7 @@ pub async fn card_criterion_tick(
                 store.project_id_of_card(&card_id).ok().flatten().as_deref() == Some(&project_id)
             })
             .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "no such card"))?;
-        let body = devpit_core::criteria::ticked(&row.body, at as usize, done)
+        let body = devflow_engine::criteria::ticked(&row.body, at as usize, done)
             .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "the card has no such criterion"))?;
         crate::board::card_update_now(project_id, card_id, row.title, body)
     })

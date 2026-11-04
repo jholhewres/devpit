@@ -45,6 +45,10 @@ pub struct Card {
     /// The checkboxes of its `## Acceptance criteria`, read from the body.
     #[serde(default)]
     pub criteria: Vec<Criterion>,
+    /// With no criteria read, the heading holding the most checkboxes that
+    /// are not read as criteria: the card says to rename it.
+    #[serde(default)]
+    pub criteria_unread: Option<UnreadCriteria>,
     /// How many cards a Devflow plan waiting on this epic would make; 0 for none.
     #[serde(default)]
     pub plan_waiting: u32,
@@ -99,6 +103,15 @@ pub struct Progress {
 pub struct Criterion {
     pub text: String,
     pub done: bool,
+}
+
+/// Checkboxes under a heading other than `## Acceptance criteria`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UnreadCriteria {
+    /// Empty when no heading is above them.
+    pub heading: String,
+    pub count: u32,
 }
 
 /// What a session is doing, as its agent last said.

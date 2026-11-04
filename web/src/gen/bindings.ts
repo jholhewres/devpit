@@ -2236,6 +2236,11 @@ export type Card = {
 	progress?: Progress | null,
 	/**  The checkboxes of its `## Acceptance criteria`, read from the body. */
 	criteria?: Criterion[],
+	/**
+	 *  With no criteria read, the heading holding the most checkboxes that
+	 *  are not read as criteria: the card says to rename it.
+	 */
+	criteriaUnread?: UnreadCriteria | null,
 	/**  How many cards a Devflow plan waiting on this epic would make; 0 for none. */
 	planWaiting?: number,
 	/**
@@ -5791,6 +5796,13 @@ export type TurnFrom =
 { kind: "remote" } | 
 /**  The chat paired with devpit on a channel, by the channel's id. */
 { kind: "channel"; id: string };
+
+/**  Checkboxes under a heading other than `## Acceptance criteria`. */
+export type UnreadCriteria = {
+	/**  Empty when no heading is above them. */
+	heading: string,
+	count: number,
+};
 
 /**  One thing an update is waiting for. */
 export type UpdateBlocking = {

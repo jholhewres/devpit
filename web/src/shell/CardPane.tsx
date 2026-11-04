@@ -202,6 +202,7 @@ export function CardPane({
               {/* What was typed is kept first: a tick rewrites the body. */}
               <CardCriteria
                 criteria={detail.card.criteria ?? []}
+                unread={detail.card.criteriaUnread}
                 onTick={(at, done) =>
                   void save().then((refused) => {
                     if (refused === null) void card.tick(at, done)

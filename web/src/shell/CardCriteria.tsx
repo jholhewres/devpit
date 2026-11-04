@@ -1,4 +1,4 @@
-import type { Criterion } from '../gen/bindings'
+import type { Criterion, UnreadCriteria } from '../gen/bindings'
 
 /*
  * A card's acceptance criteria, ticked where they live: the `## Acceptance
@@ -7,12 +7,14 @@ import type { Criterion } from '../gen/bindings'
  */
 export function CardCriteria({
   criteria,
+  unread,
   onTick,
 }: {
   criteria: readonly Criterion[]
+  unread?: UnreadCriteria | null
   onTick: (at: number, done: boolean) => void
 }): React.JSX.Element | null {
-  if (criteria.length === 0) return null
+  if (criteria.length === 0) return unread ? <Unread unread={unread} /> : null
   const done = criteria.filter((one) => one.done).length
   return (
     <section aria-label="Acceptance criteria">
@@ -30,5 +32,16 @@ export function CardCriteria({
         ))}
       </ul>
     </section>
+  )
+}
+
+/* Checkboxes the engine does not read: the gate holds the card until they move. */
+function Unread({ unread }: { unread: UnreadCriteria }): React.JSX.Element {
+  const under = unread.heading ? `under ## ${unread.heading}` : 'under no heading'
+  const fix = unread.heading ? 'rename it to' : 'put them under'
+  return (
+    <p className="crit__note" role="note">
+      {unread.count} checkboxes {under} are not read as acceptance criteria: {fix} ## Acceptance criteria.
+    </p>
   )
 }

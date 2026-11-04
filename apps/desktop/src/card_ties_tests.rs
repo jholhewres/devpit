@@ -110,6 +110,26 @@ fn a_card_with_no_children_has_no_progress() {
 }
 
 #[test]
+fn checkboxes_under_a_localized_heading_are_not_criteria_and_the_card_says_so() {
+    let body = "Build it.\n\n## Critérios de aceite\n- [ ] one\n- [ ] two\n";
+    assert_eq!(criteria_of(body), []);
+    assert_eq!(
+        unread_of(body),
+        Some(UnreadCriteria {
+            heading: "Critérios de aceite".into(),
+            count: 2
+        })
+    );
+}
+
+#[test]
+fn a_card_with_acceptance_criteria_says_nothing_is_unread() {
+    let body = "## Acceptance criteria\n- [ ] one\n\n## Notes\n- [ ] a to-do\n";
+    assert_eq!(criteria_of(body).len(), 1);
+    assert_eq!(unread_of(body), None);
+}
+
+#[test]
 fn a_cards_criteria_are_read_from_its_body() {
     let body = "Build it.\n\n## Acceptance criteria\n- [x] one\n- [ ] two\n";
     assert_eq!(

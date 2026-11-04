@@ -118,8 +118,16 @@ describe('acceptance criteria', () => {
       />,
     )
     expect(screen.getByText('Acceptance criteria · 1 of 2')).toBeTruthy()
+    expect(screen.queryByRole('note')).toBeNull()
     fireEvent.click(screen.getByLabelText('an empty query finds nothing'))
     expect(ticked).toHaveBeenCalledWith(1, true)
+  })
+
+  it('say when the checkboxes sit under a heading that is not read as criteria', () => {
+    render(<CardCriteria criteria={[]} unread={{ heading: 'Critérios de aceite', count: 2 }} onTick={vi.fn()} />)
+    expect(screen.getByRole('note').textContent).toBe(
+      '2 checkboxes under ## Critérios de aceite are not read as acceptance criteria: rename it to ## Acceptance criteria.',
+    )
   })
 })
 

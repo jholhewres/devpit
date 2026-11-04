@@ -219,7 +219,7 @@ fn looked<'a>(
 }
 
 fn criteria_of(body: &str) -> Vec<String> {
-    devpit_core::criteria::criteria(body)
+    devflow_engine::criteria::criteria(body)
         .into_iter()
         .map(|one| one.text)
         .collect()
