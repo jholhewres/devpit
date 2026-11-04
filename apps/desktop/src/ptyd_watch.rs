@@ -1,14 +1,10 @@
 //! What each ptyd pane runs and where, told by the daemon as it changes
-//! (`Watch`), so its panes cost no polling at all.
+//! (`Watch`) to [`crate::ptyd_tap`], so its panes cost no polling at all.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::Duration;
 
 use devpit_rpc::PaneRunning;
-
-/// How long to wait before asking a daemon that was not there again.
-const AGAIN: Duration = Duration::from_secs(5);
 
 /// What each pane, by the daemon's number, has in front.
 #[derive(Default)]
@@ -53,12 +49,24 @@ impl Fronts {
         self.cwds.get(&pane).map(String::as_str)
     }
 
+    /// Adds to what is known, never takes away: a pane opened a moment ago
+    /// is placed before its layout is stored.
     pub(crate) fn place(&mut self, places: HashMap<u32, (String, String)>) {
-        self.places = places;
+        self.places.extend(places);
     }
 
     pub(crate) fn placed(&self, pane: u32) -> bool {
         self.places.contains_key(&pane)
+    }
+
+    /// Which project and leaf pane `pane` is.
+    pub(crate) fn place_of(&self, pane: u32) -> Option<&(String, String)> {
+        self.places.get(&pane)
+    }
+
+    /// Every pane placed, by number.
+    pub(crate) fn panes(&self) -> Vec<u32> {
+        self.places.keys().copied().collect()
     }
 
     pub(crate) fn project_of(&self, pane: u32) -> Option<&str> {
@@ -89,7 +97,7 @@ impl Fronts {
         found
     }
 
-    fn forget_all(&mut self) -> Vec<String> {
+    pub(crate) fn forget_all(&mut self) -> Vec<String> {
         let projects = self.projects();
         self.programs.clear();
         self.cwds.clear();
@@ -98,8 +106,7 @@ impl Fronts {
 }
 
 fn fronts() -> &'static Mutex<Fronts> {
-    static FRONTS: std::sync::OnceLock<Mutex<Fronts>> = std::sync::OnceLock::new();
-    FRONTS.get_or_init(Mutex::default)
+    &crate::ptyd_tap::tap().fronts
 }
 
 pub(crate) fn projects() -> Vec<String> {
@@ -129,7 +136,7 @@ pub(crate) fn cwd(pane: u32) -> Option<String> {
 }
 
 /// Every ptyd leaf of every project's layouts, by the daemon's number.
-fn places(store: &devpit_core::Store) -> HashMap<u32, (String, String)> {
+pub(crate) fn places(store: &devpit_core::Store) -> HashMap<u32, (String, String)> {
     let mut found = HashMap::new();
     for project in store.projects().unwrap_or_default() {
         for tab in store.pane_layout_tabs(&project.id).unwrap_or_default() {
@@ -146,60 +153,6 @@ fn places(store: &devpit_core::Store) -> HashMap<u32, (String, String)> {
         }
     }
     found
-}
-
-/// Listens to the daemon while ptyd terminals are on, never starting one,
-/// and tells the window `panes:changed` as a pane's program changes.
-pub(crate) fn watch(app: tauri::AppHandle) {
-    use tauri::Emitter;
-    std::thread::spawn(move || loop {
-        std::thread::sleep(AGAIN);
-        let Ok(store) = crate::projects::store() else {
-            continue;
-        };
-        if !crate::ptyd_link::wanted(&store) {
-            continue;
-        }
-        let Ok(home) = devpit_core::Store::root() else {
-            continue;
-        };
-        let socket = crate::ptyd_link::socket_path(&home);
-        // Connected only, never started: a daemon nobody asked for stays off.
-        let Ok(mut stream) = devpit_ptyd::socket::connect(&socket) else {
-            continue;
-        };
-        let watch = devpit_ptyd::frame::Frame::new(0, devpit_ptyd::frame::Kind::Watch, Vec::new());
-        if devpit_ptyd::frame::write(&mut stream, &watch).is_err() {
-            continue;
-        }
-        if let Ok(mut fronts) = fronts().lock() {
-            fronts.place(places(&store));
-        }
-        while let Ok(Some(frame)) = devpit_ptyd::frame::read(&mut stream) {
-            let Ok(mut fronts) = fronts().lock() else {
-                break;
-            };
-            let Some(pane) = fronts.heard(&frame) else {
-                continue;
-            };
-            if !fronts.placed(pane) {
-                if let Ok(store) = crate::projects::store() {
-                    fronts.place(places(&store));
-                }
-            }
-            if let Some(project) = fronts.project_of(pane).map(ToOwned::to_owned) {
-                drop(fronts);
-                let _ = app.emit("panes:changed", project);
-            }
-        }
-        let gone = fronts()
-            .lock()
-            .map(|mut fronts| fronts.forget_all())
-            .unwrap_or_default();
-        for project in gone {
-            let _ = app.emit("panes:changed", project);
-        }
-    });
 }
 
 #[cfg(test)]

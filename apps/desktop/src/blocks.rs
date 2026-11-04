@@ -194,11 +194,18 @@ pub(crate) fn heard(app: &tauri::AppHandle, pane_id: &str, chunk: &[u8]) {
     }
 }
 
+/// A command that ended after long enough that you went to do something
+/// else, and was not a screen you were looking at.
+pub(crate) fn worth_telling(head: &Head) -> bool {
+    head.ended_at.is_some_and(|ended| {
+        ended.saturating_sub(head.started_at) >= WORTH_TELLING_MS && !head.interactive
+    })
+}
+
 /// Rings the bell for a long command that ended while the window was not in
 /// front — which is when a finished build would otherwise go unnoticed.
 fn told_if_long(app: &tauri::AppHandle, blocks: &Blocks, pane_id: &str, head: &Head) {
-    let Some(ended) = head.ended_at else { return };
-    if ended.saturating_sub(head.started_at) < WORTH_TELLING_MS || head.interactive {
+    if !worth_telling(head) {
         return;
     }
     let focused =

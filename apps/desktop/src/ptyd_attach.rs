@@ -7,9 +7,9 @@
 //! which is what keeps the daemon reading the pty — and a flood from filling
 //! memory on either side.
 //!
-//! What the pane says about itself is heard here, while a window is on it:
-//! its blocks, its folder, its title. With no window, the daemon keeps the
-//! history and the next attach replays it; hearing it then too is R2b-2's.
+//! What the pane prints is cut into blocks by [`crate::ptyd_tap`], which
+//! hears it with or without a window; here only the clipboard, which is the
+//! attached side's to answer, as with tmux.
 
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::Ordering;
@@ -122,8 +122,6 @@ pub(crate) async fn attach(
     while let Some(one) = heard.recv().await {
         let (out, bytes) = match one {
             Heard::Fresh(bytes) => {
-                crate::blocks::heard(&app, &pane_id, &bytes);
-                // The clipboard is the attached side's to hear, as with tmux.
                 scanner.scan(&bytes, |told| {
                     if !crate::tap::heard_by_tap(&told) {
                         let _ =
@@ -166,6 +164,7 @@ pub(crate) async fn attach(
     live.stop()?;
     state.claims.forget_exactly(&pane_id, &live);
     let _ = state.claims.release(&pane_id, &client_id);
+    crate::ptyd_tap::tap().let_go(&pane_id, state.claims.live(&pane_id).is_ok());
     Ok(())
 }
 

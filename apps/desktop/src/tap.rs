@@ -359,7 +359,7 @@ pub(crate) fn listen(state: &State<SessionState>, project_id: &str, layout: &Ses
         if let Some(blocks) = &blocks {
             blocks.belongs(leaf_id, project_id);
         }
-        // Heard on its attach instead: there is no tmux window to pipe.
+        // Heard by `ptyd_tap` instead: there is no tmux window to pipe.
         if crate::ptyd_link::is_ptyd(target) {
             continue;
         }

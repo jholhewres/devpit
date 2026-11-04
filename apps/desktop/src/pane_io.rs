@@ -280,35 +280,23 @@ pub(crate) fn pressed(keys: &[Key]) -> Vec<u8> {
         .collect()
 }
 
-/// A frame's worth of input at most, so a long paste is several frames
-/// rather than one the daemon refuses as too long.
-#[cfg(unix)]
-const INPUT_CHUNK: usize = 64 * 1024;
-
-/// Bytes into a ptyd pane, over a connection of their own.
+/// Bytes into a ptyd pane, on the tap's connection for typing.
 #[cfg(unix)]
 fn write(pane: u32, bytes: Vec<u8>) -> Result<(), RpcError> {
     write_at(&devpit_core::Store::root()?, pane, &bytes)
 }
 
-/// [`write`], to the daemon of `home`. Connected only, never started: a
-/// daemon that is not there holds no pane to type into. Nothing is waited
-/// for — `Input` has no answer, and keys waited on are keys typed slowly.
+/// [`write`], to the daemon of `home`.
 #[cfg(unix)]
 pub(crate) fn write_at(home: &std::path::Path, pane: u32, bytes: &[u8]) -> Result<(), RpcError> {
-    use devpit_ptyd::frame::{self, Frame, Kind};
-    let socket = crate::ptyd_link::socket_path(home);
-    let mut stream = devpit_ptyd::socket::connect(&socket).map_err(|err| {
-        RpcError::new(
-            ErrorCode::Unsupported,
-            format!("devpit-ptyd, which holds this terminal, did not answer: {err}"),
-        )
-    })?;
-    for chunk in bytes.chunks(INPUT_CHUNK) {
-        frame::write(&mut stream, &Frame::new(pane, Kind::Input, chunk.to_vec()))
-            .map_err(|err| RpcError::internal(err.to_string()))?;
-    }
-    Ok(())
+    crate::ptyd_tap::tap()
+        .type_into(home, pane, bytes)
+        .map_err(|err| {
+            RpcError::new(
+                ErrorCode::Unsupported,
+                format!("devpit-ptyd, which holds this terminal, did not take it: {err}"),
+            )
+        })
 }
 
 #[cfg(not(unix))]

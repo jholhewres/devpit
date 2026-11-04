@@ -238,7 +238,11 @@ fn in_ptyd_at(
         let home = home?;
         let shared = crate::checkout::shared_env_at(store, project_id, cwd);
         match open(home, leaf_id, cwd, shared) {
-            Ok(target) => return Some(target),
+            Ok(target) => {
+                // Heard from its first prompt, which is also what says it settled.
+                crate::ptyd_tap::tap().heed(project_id, leaf_id);
+                return Some(target);
+            }
             Err(why) => {
                 eprintln!("devpit: devpit-ptyd could not take a terminal, tmux does: {why}")
             }
@@ -279,6 +283,7 @@ pub(crate) fn revive_at(
         let at = was_in.as_deref().unwrap_or(cwd);
         let shared = crate::checkout::shared_env_at(store, project_id, at);
         revive(&home, leaf_id, at, shared);
+        crate::ptyd_tap::tap().heed(project_id, leaf_id);
     }
     #[cfg(not(unix))]
     let _ = (store, project_id, leaf_id, was_in, cwd);

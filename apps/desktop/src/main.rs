@@ -191,6 +191,8 @@ mod projects;
 mod ptyd_attach;
 mod ptyd_link;
 #[cfg(unix)]
+mod ptyd_tap;
+#[cfg(unix)]
 mod ptyd_watch;
 mod question;
 mod reading_path;
@@ -526,7 +528,7 @@ fn main() {
             card_reconcile::rebuild_on_start(app.handle().clone());
             pane_snapshot::watch(app.handle().clone());
             #[cfg(unix)]
-            ptyd_watch::watch(app.handle().clone());
+            ptyd_tap::watch(app.handle().clone());
             // Looks for a newer devpit while the switch says to. Started
             // last: it is the one thing here that can wait.
             update::watch(app.handle().clone());
