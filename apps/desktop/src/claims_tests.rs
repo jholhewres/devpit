@@ -146,6 +146,8 @@ fn live_of(client_id: &str, webview: &str) -> Arc<Live> {
         ring: Arc::new(Mutex::new(devpit_pty::RingBuffer::new(
             devpit_pty::RING_BYTES,
         ))),
+        flow: Default::default(),
+        held: Default::default(),
     })
 }
 

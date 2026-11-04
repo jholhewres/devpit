@@ -1,26 +1,27 @@
 //! Attaching a window to a pane devpit-ptyd holds.
 //!
 //! The counterpart of the `tmux attach` in [`crate::panes::session_attach`]:
-//! the same claim, the same frames on the same channel, but the bytes come
-//! from the daemon's socket and nothing is spawned. Each output frame is
-//! acknowledged once it is handed to the window, which is what keeps the
-//! daemon reading the pty — and a flood from filling memory on either side.
+//! the same claim, the same sink, but the bytes come from the daemon's socket
+//! and nothing is spawned. Output is acknowledged to the daemon when the page
+//! says it parsed it (the panes socket), or as it is handed on (the channel),
+//! which is what keeps the daemon reading the pty — and a flood from filling
+//! memory on either side.
 //!
 //! What the pane says about itself is heard here, while a window is on it:
 //! its blocks, its folder, its title. With no window, the daemon keeps the
 //! history and the next attach replays it; hearing it then too is R2b-2's.
 
 use std::os::unix::net::UnixStream;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use devpit_ptyd::frame::{self, Frame, Kind};
 use devpit_rpc::{ErrorCode, RpcError};
 use portable_pty::PtySize;
-use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::{Emitter, State};
 
 use crate::claims::Live;
-use crate::live::Ends;
+use crate::live::{Ends, Out, Sink};
 use crate::sessions::SessionState;
 
 /// What the drain hands on: bytes for the window, and whether they are new
@@ -28,18 +29,21 @@ use crate::sessions::SessionState;
 enum Heard {
     Fresh(Vec<u8>),
     Replay(Vec<u8>),
+    Older(Vec<u8>),
     Folder(String),
     Ended,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn attach(
-    webview: &tauri::Webview,
+    app: &tauri::AppHandle,
+    label: String,
     state: &State<'_, SessionState>,
     pane_id: String,
     client_id: String,
     rows: u16,
     cols: u16,
-    on_frame: Channel<InvokeResponseBody>,
+    sink: Arc<dyn Sink>,
 ) -> Result<(), RpcError> {
     let home = devpit_core::Store::root()?;
     let pane = crate::ptyd_link::pane_number(&pane_id);
@@ -62,7 +66,7 @@ pub(crate) async fn attach(
     )));
     let live = Arc::new(Live {
         client_id: client_id.clone(),
-        webview: webview.label().to_owned(),
+        webview: label,
         ends: Ends::Ptyd {
             pane,
             stream: Mutex::new(stream),
@@ -74,6 +78,8 @@ pub(crate) async fn attach(
             }),
         },
         ring: Arc::clone(&ring),
+        flow: Default::default(),
+        held: Default::default(),
     });
     if !state
         .claims
@@ -110,10 +116,11 @@ pub(crate) async fn attach(
     let (heard_tx, mut heard) = tokio::sync::mpsc::channel::<Heard>(64);
     std::thread::spawn(move || drain(reading, pane, heard_tx));
 
-    let app = state.app().clone();
+    let app = app.clone();
+    let acks = sink.acks();
     let mut scanner = devpit_pty::Scanner::new();
     while let Some(one) = heard.recv().await {
-        let bytes = match one {
+        let (out, bytes) = match one {
             Heard::Fresh(bytes) => {
                 crate::blocks::heard(&app, &pane_id, &bytes);
                 // The clipboard is the attached side's to hear, as with tmux.
@@ -123,10 +130,25 @@ pub(crate) async fn attach(
                             app.emit("terminal:happening", crate::happening::said(&pane_id, told));
                     }
                 });
-                let _ = acknowledge(&live, pane, bytes.len());
-                bytes
+                if !acks {
+                    let _ = acknowledge(&live, pane, bytes.len());
+                }
+                live.held.fetch_add(bytes.len() as u64, Ordering::AcqRel);
+                (Out::Output, bytes)
             }
-            Heard::Replay(bytes) => bytes,
+            Heard::Replay(bytes) => {
+                // Modes, then the tail: the last replay is the history held.
+                live.held.store(bytes.len() as u64, Ordering::Release);
+                (Out::Replay, bytes)
+            }
+            Heard::Older(bytes) => {
+                let page = bytes.len().saturating_sub(8) as u64;
+                live.held.fetch_add(page, Ordering::AcqRel);
+                if !sink.send(Out::Older, bytes) {
+                    break;
+                }
+                continue;
+            }
             Heard::Folder(cwd) => {
                 crate::tap::report(&app, &pane_id, devpit_pty::Told::Cwd(cwd));
                 continue;
@@ -136,7 +158,7 @@ pub(crate) async fn attach(
         if let Ok(mut ring) = ring.lock() {
             ring.write(&bytes);
         }
-        if on_frame.send(InvokeResponseBody::Raw(bytes)).is_err() {
+        if !sink.send(out, bytes) {
             break;
         }
     }
@@ -177,6 +199,7 @@ fn drain(mut stream: UnixStream, pane: u32, heard: tokio::sync::mpsc::Sender<Hea
         let passed = match one.kind() {
             Some(Kind::Output) => Heard::Fresh(one.bytes),
             Some(Kind::Replay) => Heard::Replay(one.bytes),
+            Some(Kind::Older) => Heard::Older(one.bytes),
             Some(Kind::Cwd) => Heard::Folder(String::from_utf8_lossy(&one.bytes).into_owned()),
             Some(Kind::Exited | Kind::Refused) => Heard::Ended,
             _ => continue,

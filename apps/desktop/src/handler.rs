@@ -18,13 +18,13 @@ use crate::{
     front, happening, heads_down, history, in_flight, index, installations, island, island_answer,
     island_checks, live_answer, live_sessions, mcp, mcp_apps, mcp_health, media, moving, notices,
     openers, opening, orchestrator, orchestrator_links, outside_sessions, pane_asking, pane_screen,
-    panels, panes, pasting, paths, pausing, plan_limits, plugin_data, plugins, profile_waiting,
-    project_naming, project_proposals, projects, reading_path, rebound, receipts, recipes,
-    regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves, search,
-    session_cost, session_search, session_window, sessions, settings, shell_launch, sign_ins,
-    skills, slash, sources, spend_history, staging, stall_watch, steering, steps, stopping,
-    threads, transcribe, tray, update, watching, workspace, worktree_base, worktree_setup,
-    worktrees, wsfiles,
+    pane_socket, panels, panes, pasting, paths, pausing, plan_limits, plugin_data, plugins,
+    profile_waiting, project_naming, project_proposals, projects, reading_path, rebound, receipts,
+    recipes, regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves,
+    search, session_cost, session_search, session_window, sessions, settings, shell_launch,
+    sign_ins, skills, slash, sources, spend_history, staging, stall_watch, steering, steps,
+    stopping, threads, transcribe, tray, update, watching, workspace, worktree_base,
+    worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -374,6 +374,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         panes::pane_scrollback,
         panes::session_detach,
         panes::session_attach,
+        pane_socket::panes_socket,
         shell_launch::session_running,
         watching::session_usage,
         shell_launch::agents_known,

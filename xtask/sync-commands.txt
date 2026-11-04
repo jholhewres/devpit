@@ -39,6 +39,7 @@ chat_cancel signals the turn already running
 app_info answers from the build and a path it computes
 
 # Answers from memory.
+panes_socket answers from memory: the URL the loopback server kept when it started
 presence_seen stores one number in an atomic
 chat_remote_state reads a map in memory and never waits
 orchestrator_proposals reads a few proposals held in memory

@@ -40,6 +40,7 @@ const DESKTOP_ONLY: &[&str] = &[
     "chat_send",
     "chat_rejoin",
     "session_attach",
+    "panes_socket",
     "chat_transcribe",
     "path_open",
     "path_reveal",
@@ -251,6 +252,13 @@ pub(crate) fn sign_in_url(place: &Place, token: &str) -> String {
 }
 
 static PLACE: Mutex<Option<Place>> = Mutex::new(None);
+/// The desktop window's panes socket, ticket and all, for this run.
+static PANES_URL: Mutex<Option<String>> = Mutex::new(None);
+
+/// Where the desktop window opens its panes socket, once the server is up.
+pub(crate) fn panes_url() -> Option<String> {
+    PANES_URL.lock().ok()?.clone()
+}
 
 /// Where the server is, once it is.
 pub(crate) fn place() -> Option<Place> {
@@ -262,22 +270,38 @@ pub(crate) fn place() -> Option<Place> {
 pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> {
     let token = token_in(home)?;
     let session = secret()?;
+    let ticket = secret()?;
     let (listener, place) = bound(home)?;
     let port = place.port;
     if let Ok(mut kept) = PLACE.lock() {
         *kept = Some(place.clone());
     }
+    if let Ok(mut kept) = PANES_URL.lock() {
+        *kept = Some(format!("ws://127.0.0.1:{port}/panes?k={ticket}"));
+    }
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
-            let (app, place, token, session) =
-                (app.clone(), place.clone(), token.clone(), session.clone());
-            std::thread::spawn(move || serve(app, stream, &place, &token, &session));
+            let (app, place, token, session, ticket) = (
+                app.clone(),
+                place.clone(),
+                token.clone(),
+                session.clone(),
+                ticket.clone(),
+            );
+            std::thread::spawn(move || serve(app, stream, &place, &token, &session, &ticket));
         }
     });
     Ok(port)
 }
 
-fn serve(app: tauri::AppHandle, mut stream: TcpStream, place: &Place, token: &str, session: &str) {
+fn serve(
+    app: tauri::AppHandle,
+    mut stream: TcpStream,
+    place: &Place,
+    token: &str,
+    session: &str,
+    ticket: &str,
+) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
     let Some(reader) = stream.try_clone().ok() else {
         return;
@@ -287,7 +311,9 @@ fn serve(app: tauri::AppHandle, mut stream: TcpStream, place: &Place, token: &st
         reply(&mut stream, "400 Bad Request", "text/plain", b"");
         return;
     };
-    match door(&request, &query, place, token, session) {
+    let entry = crate::pane_socket::ticket_door(&request, &query, place, ticket)
+        .unwrap_or_else(|| door(&request, &query, place, token, session));
+    match entry {
         Door::Foreign => reply(
             &mut stream,
             "403 Forbidden",
@@ -306,6 +332,11 @@ fn serve(app: tauri::AppHandle, mut stream: TcpStream, place: &Place, token: &st
                 crate::local_rpc::call(&app, &mut stream, &path["/rpc/".len()..], &request.body)
             }
             ("GET", "/events") => crate::local_events::upgrade(stream, &request),
+            ("GET", "/panes") => crate::pane_socket::serve(
+                stream,
+                &request,
+                std::sync::Arc::new(crate::pane_socket::AppPanes(app)),
+            ),
             ("GET", path) => crate::local_files::serve(&app, &mut stream, path),
             _ => reply(&mut stream, "404 Not Found", "text/plain", b""),
         },

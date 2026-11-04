@@ -166,6 +166,7 @@ mod openers;
 mod outside_sessions;
 mod pane_asking;
 mod pane_screen;
+mod pane_socket;
 mod panels;
 mod panes;
 mod pasting;

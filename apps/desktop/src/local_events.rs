@@ -106,25 +106,25 @@ pub(crate) fn listen(app: &tauri::AppHandle) {
     }
 }
 
-pub(crate) fn upgrade(mut stream: TcpStream, request: &Request) {
+/// Answers a WebSocket upgrade; false (and a 400) for anything else.
+pub(crate) fn handshake(stream: &mut TcpStream, request: &Request) -> bool {
     let Some(key) = request.header("sec-websocket-key").filter(|_| {
         request
             .header("upgrade")
             .is_some_and(|word| word.eq_ignore_ascii_case("websocket"))
     }) else {
-        reply(
-            &mut stream,
-            "400 Bad Request",
-            "text/plain",
-            b"a WebSocket only",
-        );
-        return;
+        reply(stream, "400 Bad Request", "text/plain", b"a WebSocket only");
+        return false;
     };
     let accept = tungstenite::handshake::derive_accept_key(key.as_bytes());
     let head = format!(
         "HTTP/1.1 101 Switching Protocols\r\nupgrade: websocket\r\nconnection: Upgrade\r\nsec-websocket-accept: {accept}\r\n\r\n"
     );
-    if std::io::Write::write_all(&mut stream, head.as_bytes()).is_err() {
+    std::io::Write::write_all(stream, head.as_bytes()).is_ok()
+}
+
+pub(crate) fn upgrade(mut stream: TcpStream, request: &Request) {
+    if !handshake(&mut stream, request) {
         return;
     }
     let config = tungstenite::protocol::WebSocketConfig::default()

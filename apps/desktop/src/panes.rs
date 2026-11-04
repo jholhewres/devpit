@@ -20,6 +20,7 @@ use tauri::{Emitter, State};
 
 use crate::claims::Live;
 use crate::happening::said;
+use crate::live::Sink;
 use crate::sessions::SessionState;
 
 /// `session.write` — bytes into the attached client of a leaf.
@@ -155,7 +156,8 @@ pub(crate) fn session_detach_now(
 /// Attaches a client pty to the tmux window for this leaf and streams frames.
 ///
 /// Not in the generated contract: the binary channel cannot be described by
-/// specta, so its wrapper is hand-written, next to the xterm host.
+/// specta, so its wrapper is hand-written, next to the xterm host. The window
+/// uses it only when the panes socket ([`crate::pane_socket`]) is not there.
 #[tauri::command]
 pub async fn session_attach(
     webview: tauri::Webview,
@@ -166,14 +168,40 @@ pub async fn session_attach(
     cols: u16,
     on_frame: Channel<InvokeResponseBody>,
 ) -> Result<(), RpcError> {
-    // Kept by webview label: a reload of that page ends this attach.
-    let state = tauri::Manager::state::<SessionState>(&webview);
+    let app = tauri::Manager::app_handle(&webview).clone();
+    let sink: Arc<dyn Sink> = Arc::new(crate::pane_socket::ChannelSink(on_frame));
+    let label = webview.label().to_owned();
+    attach_with(
+        &app,
+        label,
+        project_id,
+        pane_id,
+        client_id,
+        (rows, cols),
+        sink,
+    )
+    .await
+}
+
+/// One attach, until its pane ends or its sink goes: a `tmux attach` of the
+/// desktop's own, or the pane devpit-ptyd holds. `label` is whose page it is,
+/// so a reload of that page ends it.
+pub(crate) async fn attach_with(
+    app: &tauri::AppHandle,
+    label: String,
+    project_id: String,
+    pane_id: String,
+    client_id: String,
+    (rows, cols): (u16, u16),
+    sink: Arc<dyn Sink>,
+) -> Result<(), RpcError> {
+    let state = tauri::Manager::state::<SessionState>(app);
     // Which tab draws it does not matter here; that it is this project's does.
     let layout = crate::sessions::holding(&project_id, &pane_id)?;
     #[cfg(unix)]
     if crate::ptyd_link::leaf_is_ptyd(&layout, &pane_id) {
         return crate::ptyd_attach::attach(
-            &webview, &state, pane_id, client_id, rows, cols, on_frame,
+            app, label, &state, pane_id, client_id, rows, cols, sink,
         )
         .await;
     }
@@ -239,7 +267,7 @@ pub async fn session_attach(
     };
     let live = Arc::new(Live {
         client_id: client_id.clone(),
-        webview: webview.label().to_owned(),
+        webview: label,
         ends: crate::live::Ends::Pty {
             writer: Mutex::new(io.writer),
             master: Mutex::new(io.master),
@@ -247,6 +275,8 @@ pub async fn session_attach(
             pid: io.pid,
         },
         ring,
+        flow: Default::default(),
+        held: Default::default(),
     });
     if !state
         .claims
@@ -259,11 +289,7 @@ pub async fn session_attach(
         ));
     }
 
-    while let Some(frame) = session.frames.recv().await {
-        if on_frame.send(InvokeResponseBody::Raw(frame)).is_err() {
-            break;
-        }
-    }
+    crate::live::pump(&mut session.frames, &live, sink.as_ref()).await;
 
     state.claims.forget_exactly(&pane_id, &live);
     let _ = state.claims.release(&pane_id, &client_id);
