@@ -156,3 +156,32 @@ fn a_client_of_another_protocol_is_told_the_daemons_and_served_nothing() {
         "closed after the welcome"
     );
 }
+
+/// A watcher hears what every pane runs and its end, spawned before or
+/// after it asked, and never a byte of output.
+#[test]
+fn a_watcher_hears_each_panes_program_and_end_but_not_its_output() {
+    let (_dir, at) = listening(socket::own_uid());
+    let mut owner = connected(&at);
+    send(&mut owner, 3, Kind::Spawn, shell().encode());
+    let mut watcher = connected(&at);
+    send(&mut watcher, 0, Kind::Watch, Vec::new());
+    send(&mut owner, 4, Kind::Spawn, shell().encode());
+    send(&mut owner, 4, Kind::Input, b"sleep 30\n".to_vec());
+    let program = |got: &[Frame]| {
+        got.iter()
+            .any(|f| f.pane == 4 && f.kind() == Some(Kind::Program) && f.bytes == b"sleep")
+    };
+    let heard = read_until(&mut watcher, program);
+    assert!(program(&heard), "the watcher never heard pane 4 run sleep");
+    assert!(printed(&heard).is_empty(), "output reached a watcher");
+    send(&mut owner, 3, Kind::Kill, Vec::new());
+    let end = |got: &[Frame]| {
+        got.iter()
+            .any(|f| f.pane == 3 && f.kind() == Some(Kind::Exited))
+    };
+    let ended = read_until(&mut watcher, end);
+    assert!(end(&ended), "the watcher never heard pane 3 end");
+    assert!(printed(&ended).is_empty());
+    send(&mut owner, 4, Kind::Kill, Vec::new());
+}

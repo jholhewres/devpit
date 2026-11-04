@@ -13,6 +13,8 @@ use crate::socket;
 #[derive(Default)]
 pub struct Daemon {
     panes: Mutex<HashMap<u32, Arc<Pane>>>,
+    /// Clients that sent `Watch`: every pane, including those spawned later.
+    observers: Mutex<Vec<Arc<Client>>>,
 }
 
 impl Daemon {
@@ -54,6 +56,14 @@ impl Daemon {
         for pane in attached {
             pane.detach(&client);
         }
+        if let Ok(mut observers) = self.observers.lock() {
+            observers.retain(|one| !Arc::ptr_eq(one, &client));
+        }
+        for id in self.panes() {
+            if let Some(pane) = self.pane(id) {
+                pane.unobserve(&client);
+            }
+        }
     }
 
     /// One frame from `client`. Unknown kinds and unknown panes are refused,
@@ -69,6 +79,9 @@ impl Daemon {
         };
         if one.kind() == Some(Kind::Spawn) {
             return self.spawn(client, one.pane, &one.bytes);
+        }
+        if one.kind() == Some(Kind::Watch) {
+            return self.watch(client);
         }
         let Some(pane) = self.pane(one.pane) else {
             return refuse("no such pane");
@@ -137,9 +150,28 @@ impl Daemon {
             }
         }) {
             Ok(pane) => {
+                if let Ok(observers) = self.observers.lock() {
+                    for one in observers.iter() {
+                        pane.observe(one);
+                    }
+                }
                 panes.insert(id, pane);
             }
             Err(why) => refuse(why),
+        }
+    }
+
+    fn watch(&self, client: &Arc<Client>) {
+        if let Ok(mut observers) = self.observers.lock() {
+            if observers.iter().any(|one| Arc::ptr_eq(one, client)) {
+                return;
+            }
+            observers.push(Arc::clone(client));
+        }
+        for id in self.panes() {
+            if let Some(pane) = self.pane(id) {
+                pane.observe(client);
+            }
         }
     }
 

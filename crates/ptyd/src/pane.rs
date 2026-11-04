@@ -37,6 +37,8 @@ struct State {
     history: History,
     modes: Modes,
     watchers: Vec<Arc<Client>>,
+    /// Hear what the pane runs, where and its end, never its output.
+    observers: Vec<Arc<Client>>,
     cwd: Option<String>,
     program: Option<String>,
     ended: bool,
@@ -148,6 +150,7 @@ impl Pane {
                 history: History::new(KEPT),
                 modes: Modes::new(),
                 watchers: Vec::new(),
+                observers: Vec::new(),
                 cwd: None,
                 program: None,
                 ended: false,
@@ -212,6 +215,32 @@ impl Pane {
             client.send(&exited(self.id, state.code));
         } else {
             state.watchers.push(Arc::clone(client));
+        }
+    }
+
+    /// Tells `client` what the pane runs and where, then each change and its
+    /// end, but none of its output.
+    pub fn observe(&self, client: &Arc<Client>) {
+        let Ok(mut state) = self.state.lock() else {
+            return;
+        };
+        if let Some(program) = state.program.clone() {
+            client.send(&Frame::new(self.id, Kind::Program, program));
+        }
+        if let Some(cwd) = state.cwd.clone() {
+            client.send(&Frame::new(self.id, Kind::Cwd, cwd));
+        }
+        state.observers.retain(|one| !Arc::ptr_eq(one, client));
+        if state.ended {
+            client.send(&exited(self.id, state.code));
+        } else {
+            state.observers.push(Arc::clone(client));
+        }
+    }
+
+    pub fn unobserve(&self, client: &Arc<Client>) {
+        if let Ok(mut state) = self.state.lock() {
+            state.observers.retain(|one| !Arc::ptr_eq(one, client));
         }
     }
 
@@ -337,6 +366,7 @@ impl Pane {
         if let Some(cwd) = moved.filter(|cwd| state.cwd.as_ref() != Some(cwd)) {
             let told = Frame::new(self.id, Kind::Cwd, cwd.clone());
             state.watchers.retain(|client| client.send(&told));
+            state.observers.retain(|client| client.send(&told));
             state.cwd = Some(cwd);
         }
         drop(state);
@@ -354,7 +384,9 @@ impl Pane {
         state.ended = true;
         state.code = code;
         let told = exited(self.id, code);
-        for client in state.watchers.drain(..) {
+        let mut told_to: Vec<Arc<Client>> = state.watchers.drain(..).collect();
+        told_to.append(&mut state.observers);
+        for client in told_to {
             client.send(&told);
         }
         drop(state);
@@ -416,6 +448,7 @@ impl Pane {
         }
         let told = Frame::new(self.id, Kind::Program, name.clone());
         state.watchers.retain(|client| client.send(&told));
+        state.observers.retain(|client| client.send(&told));
         state.program = Some(name);
     }
 }

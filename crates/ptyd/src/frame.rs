@@ -50,6 +50,9 @@ pub enum Kind {
     Exited = 16,
     /// Daemon → client: a request was refused (UTF-8 reason).
     Refused = 17,
+    /// Client → daemon: send every pane's `Program`, `Cwd` and `Exited`, now
+    /// and from here on, without its output. The pane id is ignored.
+    Watch = 18,
 }
 
 impl Kind {
@@ -73,6 +76,7 @@ impl Kind {
             15 => Program,
             16 => Exited,
             17 => Refused,
+            18 => Watch,
             _ => return None,
         })
     }
