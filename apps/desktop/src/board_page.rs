@@ -20,9 +20,11 @@ const PAGING: [&str; 6] = ["limit", "cursor", "column", "epic", "text", "done"];
 
 /// Whether `params` asks for a page rather than the whole board.
 pub(crate) fn asked(params: &Value) -> bool {
-    PAGING
-        .iter()
-        .any(|name| params.get(name).is_some_and(|value| !value.is_null()))
+    // `full: true` is the whole board, whatever else came with it.
+    params.get("full").and_then(Value::as_bool) != Some(true)
+        && PAGING
+            .iter()
+            .any(|name| params.get(name).is_some_and(|value| !value.is_null()))
 }
 
 /// What a page is asked for.
@@ -142,14 +144,28 @@ pub(crate) fn page(
                 lane["counted"] = json!("its cards come with `done: true` or `column`");
                 return lane;
             }
+            // After the card the cursor names, where it is now: moving a card
+            // renumbers the lane it enters. Its old place when it has left.
             let start = match &ask.after {
                 Some((at, position, id)) if *at == column.id => {
-                    cards.partition_point(|card| (card.position, &card.id) <= (*position, id))
+                    match cards.iter().position(|card| card.id == *id) {
+                        Some(at) => at + 1,
+                        None => cards
+                            .partition_point(|card| (card.position, &card.id) <= (*position, id)),
+                    }
                 }
                 _ => 0,
             };
             let shown = &cards[start..(start + ask.limit).min(total)];
-            lane["cards"] = json!(shown.iter().map(|card| row(card)).collect::<Vec<_>>());
+            // Each row says its place, so a page cut shorter can name its own cursor.
+            lane["cards"] = json!(shown
+                .iter()
+                .map(|card| {
+                    let mut listed = row(card);
+                    listed["position"] = json!(card.position);
+                    listed
+                })
+                .collect::<Vec<_>>());
             if start + shown.len() < total {
                 if let Some(last) = shown.last() {
                     lane["nextCursor"] = json!(cursor(&column.id, last));

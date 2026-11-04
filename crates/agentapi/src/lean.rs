@@ -48,7 +48,9 @@ const PAGING: [&str; 6] = ["limit", "cursor", "column", "epic", "text", "done"];
 pub(crate) fn asked(tool: &str, mut arguments: Value) -> Value {
     if tool == "devpit_board"
         && !wants_full(&arguments)
-        && PAGING.iter().all(|name| arguments.get(name).is_none())
+        && PAGING
+            .iter()
+            .all(|name| arguments.get(name).is_none_or(Value::is_null))
     {
         if let Some(fields) = arguments.as_object_mut() {
             fields.insert("limit".to_owned(), json!(BOARD_PAGE));
@@ -177,7 +179,56 @@ fn board(answer: Value) -> Value {
             }
         }
     }
+    fewer(&mut answer);
+    if let Some(columns) = answer["columns"].as_array_mut() {
+        for card in columns
+            .iter_mut()
+            .filter_map(|column| column["cards"].as_array_mut())
+            .flatten()
+        {
+            if let Some(card) = card.as_object_mut() {
+                card.remove("position");
+            }
+        }
+    }
     answer
+}
+
+/// A page wider than [`BUDGET`] keeps fewer cards in each lane, and each
+/// lane cut shorter names its last card kept as `nextCursor`, so reading on
+/// skips nothing. Only a page says each card's place; the whole board is
+/// left to [`fitted`].
+fn fewer(answer: &mut Value) {
+    let Some(columns) = answer["columns"].as_array_mut() else {
+        return;
+    };
+    let cards = |column: &Value| column["cards"].as_array().map_or(0, Vec::len);
+    let placed = columns
+        .iter()
+        .filter_map(|column| column["cards"].as_array())
+        .flatten()
+        .all(|card| card["position"].is_i64());
+    if !placed {
+        return;
+    }
+    let mut most = columns.iter().map(cards).max().unwrap_or(0);
+    while most > 1 && json!(columns).to_string().len() > BUDGET {
+        most = (most * 3 / 4).max(1);
+        for column in columns.iter_mut().filter(|column| cards(column) > most) {
+            let lane = column["id"].as_str().unwrap_or_default().to_owned();
+            let Some(kept) = column["cards"].as_array_mut() else {
+                continue;
+            };
+            kept.truncate(most);
+            let last = &kept[most - 1];
+            let cursor = format!(
+                "{lane}:{}:{}",
+                last["position"],
+                last["id"].as_str().unwrap_or_default()
+            );
+            column["nextCursor"] = json!(cursor);
+        }
+    }
 }
 
 fn board_card(mut card: Value) -> Value {

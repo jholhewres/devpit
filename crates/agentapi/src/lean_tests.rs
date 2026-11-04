@@ -261,3 +261,40 @@ fn a_paged_board_keeps_each_columns_total_and_cursor() {
             "cards": [{ "id": "card_1", "number": 1, "title": "A card" }] }] })
     );
 }
+
+/// Twenty wide cards in each of three lanes do not fit: each lane keeps
+/// fewer, and its cursor names the last one kept.
+#[test]
+fn a_page_too_wide_keeps_fewer_cards_and_its_cursor_follows_the_last_kept() {
+    let lane = |id: &str| {
+        json!({ "id": id, "name": id, "total": 40, "nextCursor": format!("{id}:19:{id}_card_19"),
+        "cards": (0..20).map(|at| json!({ "id": format!("{id}_card_{at}"), "position": at, "title": "t".repeat(60) })).collect::<Vec<_>>() })
+    };
+    let text = said(
+        "devpit_board",
+        &json!({}),
+        json!({ "columns": [lane("a"), lane("b"), lane("c")] }),
+    );
+    assert!(text.len() <= BUDGET, "{}", text.len());
+    let answer: Value = serde_json::from_str(&text).expect("json");
+    for column in answer["columns"].as_array().expect("lanes") {
+        let cards = column["cards"].as_array().expect("cards");
+        assert!(
+            cards.len() < 20 && cards.iter().all(Value::is_object),
+            "kept fewer, no marker"
+        );
+        let last = cards.last().expect("a card");
+        let id = column["id"].as_str().expect("id");
+        let at = last["id"]
+            .as_str()
+            .expect("card id")
+            .rsplit('_')
+            .next()
+            .expect("n");
+        assert_eq!(
+            column["nextCursor"],
+            format!("{id}:{at}:{}", last["id"].as_str().expect("card id"))
+        );
+        assert!(last.get("position").is_none(), "the place is not shown");
+    }
+}

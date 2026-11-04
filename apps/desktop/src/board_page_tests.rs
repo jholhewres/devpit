@@ -122,3 +122,39 @@ fn a_cursor_the_board_did_not_give_is_refused_and_says_so() {
     let why = page(&board(1), &json!({ "cursor": "nonsense" }), row).expect_err("refused");
     assert!(why.contains("nextCursor"));
 }
+
+/// Moving a card into a lane renumbers it from 0: the cursor still resumes
+/// after the card it names.
+#[test]
+fn the_cursor_repeats_nothing_when_a_card_enters_the_lane_and_renumbers_it() {
+    let mut board = board(30);
+    let first = page(&board, &json!({ "column": "backlog", "limit": 10 }), row).expect("page 1");
+    let mut seen = ids(&first["columns"][0]);
+    let cursor = first["columns"][0]["nextCursor"]
+        .as_str()
+        .expect("a cursor")
+        .to_owned();
+    let mut entering = card("card_from_doing", "backlog", 0);
+    entering.position = 0;
+    board.cards.retain(|card| card.id != "card_doing_000");
+    for card in board
+        .cards
+        .iter_mut()
+        .filter(|card| card.column_id == "backlog")
+    {
+        card.position += 1;
+    }
+    board.cards.push(entering);
+    let next = page(&board, &json!({ "cursor": cursor, "limit": 50 }), row).expect("page 2");
+    seen.extend(ids(&next["columns"][0]));
+    let mut unique = seen.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), seen.len(), "no card twice");
+    assert_eq!(seen.len(), 30, "every card that was in the lane");
+}
+
+#[test]
+fn full_is_the_whole_board_whatever_came_with_it() {
+    assert!(!asked(&json!({ "full": true, "column": "doing" })));
+}
