@@ -51,6 +51,7 @@ fn a_live_session_is_placed_on_its_project_and_card() {
         &worktrees,
         &HashMap::new(),
         |_| None,
+        |_| None,
     );
     let names: Vec<_> = found
         .iter()
@@ -89,6 +90,7 @@ fn a_dead_session_and_the_orchestrators_own_are_left_out() {
         &[project("orch", &orch, Some("claude"))],
         dir.path(),
         &HashMap::new(),
+        |_| None,
         |_| None,
     );
     assert!(
@@ -166,6 +168,7 @@ fn a_session_in_a_devpit_terminal_says_the_question_it_is_stopped_on() {
         &[],
         dir.path(),
         &HashMap::new(),
+        |_| None,
         |target| (target == "devpit_prj_1:leaf_1").then(|| screen.to_owned()),
     );
     let waiting = found[0].waiting.as_ref().expect("waiting on a question");
@@ -252,6 +255,7 @@ fn a_listing_says_whether_remote_control_is_on() {
         dir.path(),
         &HashMap::new(),
         |_| None,
+        |_| None,
     );
     let remote: Vec<_> = found
         .iter()
@@ -263,5 +267,58 @@ fn a_listing_says_whether_remote_control_is_on() {
             ("dropped", false, None),
             ("reached", true, Some("https://claude.ai/code/session_01Q"))
         ]
+    );
+}
+
+/// A ptyd pane has no `$TMUX`, so its listing names no client: the session
+/// is found by the id its hooks stored against the leaf, and its question is
+/// read off that pane's screen.
+#[test]
+fn a_session_in_a_ptyd_pane_is_found_by_its_session_id() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sessions = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions).expect("mkdir");
+    let body = json!({ "pid": 31, "name": "in-ptyd", "status": "idle", "kind": "interactive",
+        "cwd": dir.path().display().to_string(), "sessionId": "sess-ptyd" });
+    std::fs::write(sessions.join("31.json"), body.to_string()).expect("listing");
+
+    let in_ptyd = |session: &str| {
+        (session == "sess-ptyd").then(|| devpit_rpc::LivePane {
+            project_id: "prj_1".into(),
+            pane_id: "leaf_p".into(),
+        })
+    };
+    let screen = "Proceed?\n❯ 1. Yes\n  2. No\n";
+    let found = read(
+        &sessions,
+        |_| true,
+        &[],
+        dir.path(),
+        &HashMap::new(),
+        in_ptyd,
+        |target| (target == crate::ptyd_link::target("leaf_p")).then(|| screen.to_owned()),
+    );
+    assert!(found[0].in_devpit);
+    assert_eq!(
+        found[0].pane.as_ref().map(|pane| pane.pane_id.as_str()),
+        Some("leaf_p")
+    );
+    assert_eq!(
+        found[0].waiting.as_ref().expect("waiting").question,
+        "Proceed?"
+    );
+
+    let unknown = read(
+        &sessions,
+        |_| true,
+        &[],
+        dir.path(),
+        &HashMap::new(),
+        |_| None,
+        |_| None,
+    );
+    assert!(
+        !unknown[0].in_devpit,
+        "no hook named it: in no devpit terminal"
     );
 }

@@ -33,6 +33,14 @@ pub(crate) fn holder(target: &str) -> Holder<'_> {
     }
 }
 
+/// The leaf a target names: tmux's window, or the ptyd pane's leaf.
+pub(crate) fn leaf_of(target: &str) -> &str {
+    match target.strip_prefix(crate::ptyd_link::TARGET_PREFIX) {
+        Some(leaf) => leaf,
+        None => target.split_once(':').map_or("", |(_, window)| window),
+    }
+}
+
 /// The target of `leaf_id`, in whichever of the project's tabs holds it.
 pub(crate) fn target_of(project_id: &str, leaf_id: &str) -> Result<String, RpcError> {
     let layout = crate::sessions::holding(project_id, leaf_id)?;

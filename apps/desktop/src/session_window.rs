@@ -129,18 +129,14 @@ pub async fn orchestrator_rename(
             ));
         }
         let target = crate::live_sessions::terminal_of(&profile_id, &name)?;
-        let tmux = crate::sessions::tmux_server()?;
-        if tmux
-            .shell_in_front(&target)
-            .map_err(|err| RpcError::internal(err.to_string()))?
-        {
+        if crate::pane_io::shell_in_front(&target)? {
             return Err(RpcError::new(
                 ErrorCode::Conflict,
                 "the agent is not in front in that terminal — open it to see why",
             ));
         }
         // Typed into a question, the keys would answer it.
-        let asking = crate::live_sessions::screen_of(&target)
+        let asking = crate::pane_io::screen(&target)
             .and_then(|shown| crate::live_prompt::pending(&shown))
             .is_some();
         if asking {
@@ -149,8 +145,7 @@ pub async fn orchestrator_rename(
                 "it is asking you something — answer it first",
             ));
         }
-        tmux.paste_and_send(&target, &format!("/rename {to}"))
-            .map_err(|err| RpcError::internal(err.to_string()))
+        crate::pane_io::paste(&target, &format!("/rename {to}"), true)
     })
     .await
 }

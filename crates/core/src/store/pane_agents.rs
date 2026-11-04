@@ -74,6 +74,22 @@ impl Store {
             .optional()?)
     }
 
+    /// The project and pane a session was last seen in, if one was: how a
+    /// session in a pane with no tmux to say so is found.
+    pub fn place_of_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<(String, String)>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT project_id, leaf_id FROM pane_agent WHERE session_id = ?1",
+                [session_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?)
+    }
+
     pub fn pane_agent(&self, leaf_id: &str) -> Result<Option<PaneAgent>, StoreError> {
         Ok(self
             .conn

@@ -103,10 +103,9 @@ pub(crate) fn changed(app: &tauri::AppHandle, session: &IslandSession, was: Opti
         .to_owned(),
         actions: Vec::new(),
         asking: match (tell, &session.project_id, &session.pane_id) {
-            (Tell::Waiting, Some(project), Some(pane)) => Some(devpit_tmux::Server::target(
-                &devpit_tmux::Server::session_name(project),
-                pane,
-            )),
+            (Tell::Waiting, Some(project), Some(pane)) => {
+                crate::pane_io::target_of(project, pane).ok()
+            }
             _ => None,
         },
         about: Some(crate::channel_escalation::About::Session {

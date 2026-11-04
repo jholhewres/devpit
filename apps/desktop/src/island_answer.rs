@@ -9,23 +9,23 @@
 
 use devpit_rpc::{ErrorCode, PendingPrompt, RpcError};
 
-/// The terminal a session of the island runs in, as tmux points at it.
+/// The terminal a session of the island runs in, whichever holds it.
 fn target_of(session_id: &str) -> Result<String, RpcError> {
-    let pane = crate::island_feed::registry()
+    let (project, pane) = crate::island_feed::registry()
         .lock()
         .ok()
-        .and_then(|sessions| sessions.get(session_id)?.pane_id.clone())
+        .and_then(|sessions| {
+            let one = sessions.get(session_id)?;
+            Some((one.project_id.clone()?, one.pane_id.clone()?))
+        })
         .ok_or_else(|| {
             RpcError::new(
                 ErrorCode::NotFound,
                 "that session is in no terminal of devpit",
             )
         })?;
-    let session = crate::sessions::tmux_server()?
-        .session_of_window(&pane)
-        .map_err(|err| RpcError::internal(err.to_string()))?
-        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "its terminal is closed"))?;
-    Ok(devpit_tmux::Server::target(&session, &pane))
+    crate::pane_io::target_of(&project, &pane)
+        .map_err(|_| RpcError::new(ErrorCode::NotFound, "its terminal is closed"))
 }
 
 /// `island.prompt` — the question a session's terminal shows, if it shows one.
@@ -34,8 +34,7 @@ fn target_of(session_id: &str) -> Result<String, RpcError> {
 pub async fn island_prompt(session_id: String) -> Result<Option<PendingPrompt>, RpcError> {
     crate::off_main::blocking(move || {
         let target = target_of(&session_id)?;
-        Ok(crate::live_sessions::screen_of(&target)
-            .and_then(|shown| crate::live_prompt::pending(&shown)))
+        Ok(crate::pane_io::screen(&target).and_then(|shown| crate::live_prompt::pending(&shown)))
     })
     .await
 }
@@ -60,18 +59,13 @@ pub async fn island_reply(session_id: String, text: String) -> Result<(), RpcErr
             ));
         }
         let target = target_of(&session_id)?;
-        let tmux = crate::sessions::tmux_server()?;
-        if tmux
-            .shell_in_front(&target)
-            .map_err(|err| RpcError::internal(err.to_string()))?
-        {
+        if crate::pane_io::shell_in_front(&target)? {
             return Err(RpcError::new(
                 ErrorCode::Conflict,
                 "the agent is not in front in that terminal — open it to see why",
             ));
         }
-        tmux.paste_and_send(&target, text)
-            .map_err(|err| RpcError::internal(err.to_string()))
+        crate::pane_io::paste(&target, text, true)
     })
     .await
 }

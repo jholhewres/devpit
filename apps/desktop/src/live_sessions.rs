@@ -53,6 +53,7 @@ pub(crate) fn read(
     projects: &[Project],
     worktrees: &Path,
     windows: &HashMap<String, String>,
+    in_ptyd: impl Fn(&str) -> Option<devpit_rpc::LivePane>,
     screen: impl Fn(&str) -> Option<String>,
 ) -> Vec<LiveSession> {
     let Ok(entries) = std::fs::read_dir(sessions) else {
@@ -81,12 +82,15 @@ pub(crate) fn read(
                 return None;
             }
             // The screen only of a session that is listed, and read once.
-            let target = listed
-                .tmux
-                .as_deref()
-                .and_then(|tmux| pane_target(tmux, windows));
-            let in_devpit = target.is_some();
-            let pane = target.as_deref().and_then(pane_of);
+            let found = terminal_in(
+                listed.tmux.as_deref(),
+                listed.session_id.as_deref(),
+                windows,
+                &in_ptyd,
+            );
+            let in_devpit = found.is_some();
+            let (target, pane) = found.unzip();
+            let pane = pane.flatten();
             let waiting = target
                 .and_then(|target| screen(&target))
                 .and_then(|shown| crate::live_prompt::pending(&shown));
@@ -177,6 +181,49 @@ pub(crate) fn pane_target(listed: &str, windows: &HashMap<String, String>) -> Op
     (window.starts_with("leaf_") && plain(window)).then(|| format!("{session}:{window}"))
 }
 
+/// A listed session's terminal and its pane. The CLI writes the tmux pane it
+/// runs in; a ptyd pane has no `$TMUX`, and is found by the session id its
+/// hooks stored against the leaf instead.
+fn terminal_listed(
+    listed: &Listed,
+    windows: &HashMap<String, String>,
+    in_ptyd: impl Fn(&str) -> Option<devpit_rpc::LivePane>,
+) -> Option<(String, Option<devpit_rpc::LivePane>)> {
+    terminal_in(
+        listed.tmux.as_deref(),
+        listed.session_id.as_deref(),
+        windows,
+        in_ptyd,
+    )
+}
+
+/// [`terminal_listed`], from the listing's `tmux` and `sessionId`.
+pub(crate) fn terminal_in(
+    tmux: Option<&str>,
+    session_id: Option<&str>,
+    windows: &HashMap<String, String>,
+    in_ptyd: impl Fn(&str) -> Option<devpit_rpc::LivePane>,
+) -> Option<(String, Option<devpit_rpc::LivePane>)> {
+    if let Some(target) = tmux.and_then(|tmux| pane_target(tmux, windows)) {
+        let pane = pane_of(&target);
+        return Some((target, pane));
+    }
+    let pane = in_ptyd(session_id?)?;
+    Some((crate::ptyd_link::target(&pane.pane_id), Some(pane)))
+}
+
+/// The ptyd pane a session's hooks said it started in, while that pane is
+/// still in its project's layout.
+pub(crate) fn ptyd_pane_of(session_id: &str) -> Option<devpit_rpc::LivePane> {
+    let store = crate::projects::store().ok()?;
+    let (project_id, pane_id) = store.place_of_session(session_id).ok()??;
+    let target = crate::pane_io::target_of(&project_id, &pane_id).ok()?;
+    crate::ptyd_link::is_ptyd(&target).then_some(devpit_rpc::LivePane {
+        project_id,
+        pane_id,
+    })
+}
+
 /// The project and pane a devpit terminal's target names:
 /// `devpit_<project>:<leaf>`.
 pub(crate) fn pane_of(target: &str) -> Option<devpit_rpc::LivePane> {
@@ -220,14 +267,6 @@ pub(crate) fn windows_now() -> HashMap<String, String> {
     crate::pane_snapshot::windows(&crate::pane_snapshot::rows())
 }
 
-/// A devpit terminal's screen as it is now, or nothing when tmux cannot say.
-pub(crate) fn screen_of(target: &str) -> Option<String> {
-    crate::sessions::tmux_server()
-        .ok()?
-        .capture_pane(target)
-        .ok()
-}
-
 /// The end of a session's screen and the question it is stopped on, for an
 /// orchestrator to read — never to answer. `None` for a session that is not in
 /// a devpit terminal.
@@ -235,11 +274,10 @@ pub(crate) fn screen_for(
     profile_id: &str,
     name: &str,
 ) -> Result<Option<(String, Option<devpit_rpc::PendingPrompt>)>, RpcError> {
-    let client = client_named(profile_id, name)?;
-    let Some(target) = pane_target(&client, &windows_now()) else {
+    let Some(target) = terminal_named(profile_id, name)? else {
         return Ok(None);
     };
-    let Some(shown) = screen_of(&target) else {
+    let Some(shown) = crate::pane_io::screen(&target) else {
         return Err(RpcError::new(
             ErrorCode::NotFound,
             format!("{name}'s terminal could not be read"),
@@ -290,20 +328,15 @@ pub(crate) fn reply_now(
         ));
     }
     let target = terminal_of(profile_id, name)?;
-    let tmux = crate::sessions::tmux_server()?;
     // A session suspended or exited leaves its shell in front, and the
     // reply would run there as a command.
-    if tmux
-        .shell_in_front(&target)
-        .map_err(|err| RpcError::internal(err.to_string()))?
-    {
+    if crate::pane_io::shell_in_front(&target)? {
         return Err(RpcError::new(
             ErrorCode::Conflict,
             "the agent is not in front in that terminal — open it to see why",
         ));
     }
-    tmux.paste_and_send(&target, text)
-        .map_err(|err| RpcError::internal(err.to_string()))?;
+    crate::pane_io::paste(&target, text, true)?;
     // Sent as the person: whatever was drafted for it has been said.
     if let Some(drafted) = crate::reply_drafts::drafted(profile_id, name) {
         crate::reply_drafts::kept_sent(
@@ -321,32 +354,32 @@ pub(crate) fn reply_now(
 /// The devpit terminal a session of this account runs in, by its name: the
 /// only place the window types or presses anything for the person.
 pub(crate) fn terminal_of(profile_id: &str, name: &str) -> Result<String, RpcError> {
-    let client = match client_named(profile_id, name) {
-        Ok(client) => client,
-        // One started here that the CLI does not list yet: its terminal is
-        // the one devpit typed it into.
-        Err(err) => return crate::starting::target_of(profile_id, name).ok_or(err),
-    };
-    pane_target(&client, &windows_now()).ok_or_else(|| {
-        RpcError::new(
+    match terminal_named(profile_id, name) {
+        Ok(Some(target)) => Ok(target),
+        Ok(None) => Err(RpcError::new(
             ErrorCode::Invalid,
             format!("{name} is not in a devpit terminal"),
-        )
-    })
+        )),
+        // One started here that the CLI does not list yet: its terminal is
+        // the one devpit typed it into.
+        Err(err) => crate::starting::target_of(profile_id, name).ok_or(err),
+    }
 }
 
-/// The tmux client of this account's session called `name`.
-fn client_named(profile_id: &str, name: &str) -> Result<String, RpcError> {
-    listed_clients(&config_of(profile_id)?.join("sessions"))
+/// The terminal of this account's session called `name`: none for one
+/// that is not in a devpit terminal, an error for one that is not running.
+fn terminal_named(profile_id: &str, name: &str) -> Result<Option<String>, RpcError> {
+    let listed = listed_running(&config_of(profile_id)?.join("sessions"))
         .into_iter()
-        .find(|(named, _)| named == name)
-        .map(|(_, client)| client)
+        .find(|listed| listed.name.as_deref() == Some(name))
         .ok_or_else(|| {
             RpcError::new(
                 ErrorCode::NotFound,
                 format!("no session called {name} is running"),
             )
-        })
+        })?;
+    let found = terminal_listed(&listed, &windows_now(), ptyd_pane_of);
+    Ok(found.map(|(target, _)| target))
 }
 
 /// One live session of an account, as stopping it needs it.
@@ -378,12 +411,7 @@ pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>
         .filter(|listed| listed.name.as_deref() == Some(name) && listed.running())
         .map(|listed| Running {
             pid: listed.pid.unwrap_or_default(),
-            pane: listed
-                .tmux
-                .as_deref()
-                .and_then(|tmux| pane_target(tmux, &windows))
-                .as_deref()
-                .and_then(pane_of),
+            pane: terminal_listed(&listed, &windows, ptyd_pane_of).and_then(|(_, pane)| pane),
             job: listed
                 .job_id
                 .filter(|_| listed.kind.as_deref() == Some("bg")),
@@ -401,8 +429,8 @@ pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>
     Ok(found)
 }
 
-/// Each live listing's name and tmux client, for the one reply that needs it.
-fn listed_clients(sessions: &Path) -> Vec<(String, String)> {
+/// Each live listing, for the one reply that needs it.
+fn listed_running(sessions: &Path) -> Vec<Listed> {
     let Ok(entries) = std::fs::read_dir(sessions) else {
         return Vec::new();
     };
@@ -413,7 +441,6 @@ fn listed_clients(sessions: &Path) -> Vec<(String, String)> {
         .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
         .filter_map(|text| serde_json::from_str::<Listed>(&text).ok())
         .filter(Listed::running)
-        .filter_map(|listed| Some((listed.name?, listed.tmux?)))
         .collect()
 }
 
@@ -510,18 +537,16 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
         .ok()
         .and_then(|root| root.join("worktrees").canonicalize().ok())
         .unwrap_or_default();
-    // One tmux server for every screen read in this listing.
-    let server = crate::sessions::tmux_server().ok();
-    let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
+    let screen = crate::pane_io::screen;
     // Read only where the agent's hooks say it waits on a person.
     let waiting_screen = |target: &str| {
-        let leaf = pane_of(target)?.pane_id;
-        if !crate::pane_said::should_look(&leaf) {
+        let leaf = crate::pane_io::leaf_of(target);
+        if !crate::pane_said::should_look(leaf) {
             return None;
         }
         let shown = screen(target);
         let prompt = shown.as_deref().and_then(crate::live_prompt::pending);
-        crate::pane_said::read(&leaf, prompt.is_some());
+        crate::pane_said::read(leaf, prompt.is_some());
         shown
     };
     let windows = windows_now();
@@ -531,6 +556,7 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
         &projects,
         &worktrees,
         &windows,
+        ptyd_pane_of,
         waiting_screen,
     );
     // Started here and stopped before the CLI lists it — on the folder's

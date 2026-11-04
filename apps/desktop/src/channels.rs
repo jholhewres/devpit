@@ -262,7 +262,7 @@ fn choices(target: Option<&str>) -> Vec<Action> {
     let Some(target) = target else {
         return Vec::new();
     };
-    let Some(seen) = crate::live_sessions::screen_of(target)
+    let Some(seen) = crate::pane_io::screen(target)
         .as_deref()
         .and_then(crate::live_prompt::pending)
     else {

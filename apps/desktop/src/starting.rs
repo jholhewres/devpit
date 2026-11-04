@@ -27,11 +27,15 @@ pub(crate) struct Starting {
 }
 
 impl Starting {
+    /// Its pane's target, tmux's or the daemon's; tmux's spelling for a
+    /// leaf no stored layout holds.
     fn target(&self) -> String {
-        devpit_tmux::Server::target(
-            &devpit_tmux::Server::session_name(&self.project_id),
-            &self.pane_id,
-        )
+        crate::pane_io::target_of(&self.project_id, &self.pane_id).unwrap_or_else(|_| {
+            devpit_tmux::Server::target(
+                &devpit_tmux::Server::session_name(&self.project_id),
+                &self.pane_id,
+            )
+        })
     }
 }
 

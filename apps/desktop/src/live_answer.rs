@@ -11,7 +11,7 @@ use std::time::Duration;
 use devpit_rpc::{ErrorCode, PendingPrompt, RpcError};
 use devpit_tmux::Key;
 
-use crate::live_sessions::{screen_of, terminal_of};
+use crate::live_sessions::terminal_of;
 
 /// How long the cursor is given to reach the choice before nothing is taken.
 const CURSOR_TRIES: u32 = 20;
@@ -80,13 +80,9 @@ pub(crate) fn answer_in(
     seen: &PendingPrompt,
     choice: Option<u32>,
 ) -> Result<(), RpcError> {
-    let server = crate::sessions::tmux_server()?;
-    let read = || screen_of(target).and_then(|shown| crate::live_prompt::pending(&shown));
-    let press = |key: Key| {
-        server
-            .press(target, &[key])
-            .map_err(|err| RpcError::internal(err.to_string()))
-    };
+    let read =
+        || crate::pane_io::screen(target).and_then(|shown| crate::live_prompt::pending(&shown));
+    let press = |key: Key| crate::pane_io::press(target, &[key]);
     still_asked(read().as_ref(), seen, choice)?;
     let Some(at) = choice else {
         return press(Key::Escape);

@@ -63,3 +63,19 @@ fn a_new_launch_starts_clean_and_forgetting_removes_it() {
     store.forget_pane_agent("leaf_1").expect("forget");
     assert_eq!(store.pane_agent("leaf_1").expect("read"), None);
 }
+
+#[test]
+fn a_session_is_found_in_the_project_and_pane_its_hooks_named() {
+    let (_dir, store, project) = opened();
+    store
+        .remember_pane_launch(&project, "leaf_1", "prof_glm")
+        .expect("launch");
+    assert_eq!(store.place_of_session("abc").expect("read"), None);
+    store
+        .remember_pane_session("leaf_1", "abc", None)
+        .expect("session");
+    assert_eq!(
+        store.place_of_session("abc").expect("read"),
+        Some((project, "leaf_1".to_owned()))
+    );
+}

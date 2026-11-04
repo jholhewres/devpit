@@ -747,20 +747,14 @@ pub async fn island_drop(session_id: String, text: String) -> Result<(), RpcErro
                 "that session is not in one of devpit's terminals",
             ));
         };
-        let tmux = crate::sessions::tmux_server()?;
-        let target =
-            devpit_tmux::Server::target(&devpit_tmux::Server::session_name(&project_id), &pane_id);
-        if tmux
-            .shell_in_front(&target)
-            .map_err(|err| RpcError::internal(err.to_string()))?
-        {
+        let target = crate::pane_io::target_of(&project_id, &pane_id)?;
+        if crate::pane_io::shell_in_front(&target)? {
             return Err(RpcError::new(
                 ErrorCode::Conflict,
                 "the agent is not in front in that terminal",
             ));
         }
-        tmux.paste(&target, &text)
-            .map_err(|err| RpcError::internal(err.to_string()))
+        crate::pane_io::paste(&target, &text, false)
     })
     .await
 }
