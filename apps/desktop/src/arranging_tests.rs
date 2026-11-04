@@ -72,7 +72,23 @@ fn a_tab_of_ptyd_panes_closes_with_no_tmux_and_ends_what_ignores_a_hangup() {
     assert_eq!(closed, std::slice::from_ref(&leaf));
     assert_eq!(store.pane_layout(&project, "tab_1").expect("read"), None);
     assert!(gone(&leaf), "the agent outlived its pane");
-    assert!(!running(home, pane_number(&leaf)));
+    assert!(
+        closed_in_daemon(home, &leaf),
+        "the daemon still holds the pane"
+    );
+}
+
+/// The daemon reaps a killed pane on its own time: wait for it, as `gone` does.
+#[cfg(target_os = "linux")]
+fn closed_in_daemon(home: &std::path::Path, leaf: &str) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while std::time::Instant::now() < deadline {
+        if !running(home, pane_number(leaf)) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    false
 }
 
 #[cfg(unix)]
