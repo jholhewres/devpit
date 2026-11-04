@@ -165,6 +165,7 @@ mod off_main;
 mod openers;
 mod outside_sessions;
 mod pane_asking;
+mod pane_said;
 mod pane_screen;
 mod pane_snapshot;
 mod pane_socket;

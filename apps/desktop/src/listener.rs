@@ -203,6 +203,9 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     if let Some(pane) = posted.pane.as_deref() {
         if crate::pane_asking::is_permission_request(body) {
             trace(&format!("post seq={seq} permission"));
+            // The dialog is about to show: waiting, before any notification.
+            crate::pane_said::heard(pane, crate::card_activity::Doing::Waiting);
+            let _ = app.emit("terminal:happening", agent_said(pane, "waiting"));
             let said = crate::pane_asking::hold(&app, body, pane);
             reply(&mut stream, &said);
             return;
@@ -303,6 +306,9 @@ fn heard(
         return heard_without_pane(sink, happening, seq);
     };
     let doing = state_of_event(&happening.event);
+    if let Some(doing) = doing {
+        crate::pane_said::heard(pane, doing);
+    }
     let state = pane_word(doing);
     // One Store for the event. Resolved before `remember`, which forgets the
     // pane's agent on SessionEnded — the end has to reach the card too.

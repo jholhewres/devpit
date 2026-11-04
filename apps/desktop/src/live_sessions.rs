@@ -513,6 +513,11 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     // One tmux server for every screen read in this listing.
     let server = crate::sessions::tmux_server().ok();
     let screen = |target: &str| server.as_ref()?.capture_pane(target).ok();
+    // Read only where the agent's hooks say it waits on a person.
+    let waiting_screen = |target: &str| {
+        let leaf = pane_of(target)?.pane_id;
+        crate::pane_said::should_look(&leaf).then(|| screen(target))?
+    };
     let windows = windows_now();
     let mut sessions = read(
         &config_of(profile_id)?.join("sessions"),
@@ -520,7 +525,7 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
         &projects,
         &worktrees,
         &windows,
-        screen,
+        waiting_screen,
     );
     // Started here and stopped before the CLI lists it — on the folder's
     // trust question, most often.
