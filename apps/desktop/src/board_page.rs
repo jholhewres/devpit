@@ -3,13 +3,18 @@
 //!
 //! Asked for only when the call says how (`limit`, `cursor`, `column`, `epic`,
 //! `text` or `done`): without any of them `board` answers every card, as it
-//! always did. A cursor names the last card read and the first not read,
-//! each with its place, never a count: the next page starts by whichever of
-//! the two did not move, so a card moved between two pages can repeat or be
-//! missed only itself, never push another out of sight.
+//! always did. The first page of a lane fixes its order in memory, a reading:
+//! the pages after it read that order, less the cards that left the lane,
+//! then the cards that entered it, so a card moved between two pages is read
+//! once and pushes no other out of sight. A cursor whose reading is gone (the
+//! app restarted, or it expired) resumes by the last card read and the first
+//! not read, each with its place.
 
 use devpit_rpc::{Board, Card, Column};
 use serde_json::{json, Value};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 /// How many cards a lane shows when the call does not say.
 pub(crate) const LIMIT: usize = 20;
@@ -83,16 +88,20 @@ impl Ask {
 }
 
 /// Where a lane's next page starts: the last card read and the first not
-/// read, each with the place it had.
+/// read, each with the place it had, and the reading they belong to.
 struct Cursor {
     column: String,
-    last: (i32, String),
-    next: (i32, String),
+    last: (i64, String),
+    next: (i64, String),
+    reading: Option<String>,
 }
 
-/// `<column>:<place>:<last card>:<place>:<next card>`.
-fn cursor(column: &str, last: (i64, &str), next: (i64, &str)) -> String {
-    format!("{column}:{}:{}:{}:{}", last.0, last.1, next.0, next.1)
+/// `<column>:<place>:<last card>:<place>:<next card>:<reading>`.
+fn cursor(column: &str, last: (i64, &str), next: (i64, &str), reading: &str) -> String {
+    format!(
+        "{column}:{}:{}:{}:{}:{reading}",
+        last.0, last.1, next.0, next.1
+    )
 }
 
 fn cursor_of(cursor: &str) -> Result<Cursor, String> {
@@ -100,29 +109,40 @@ fn cursor_of(cursor: &str) -> Result<Cursor, String> {
         format!("`{cursor}` is not a cursor this board gave: pass a lane's `nextCursor` as it came")
     };
     let parts: Vec<&str> = cursor.split(':').collect();
-    let [column, last_at, last, next_at, next] = parts[..] else {
-        return Err(refused());
+    let (column, last_at, last, next_at, next, reading) = match parts[..] {
+        [column, last_at, last, next_at, next] => (column, last_at, last, next_at, next, None),
+        [column, last_at, last, next_at, next, reading] => (
+            column,
+            last_at,
+            last,
+            next_at,
+            next,
+            Some(reading.to_owned()),
+        ),
+        _ => return Err(refused()),
     };
-    let place = |at: &str| at.parse::<i32>().map_err(|_| refused());
+    let place = |at: &str| at.parse::<i64>().map_err(|_| refused());
     Ok(Cursor {
         column: column.to_owned(),
         last: (place(last_at)?, last.to_owned()),
         next: (place(next_at)?, next.to_owned()),
+        reading,
     })
 }
 
 impl Cursor {
-    /// Where in `cards`, as they are now, the next page starts. Each card
-    /// the cursor names says where; when they disagree one of them moved,
-    /// and it is the one whose place changed more. A tie repeats a card
-    /// rather than skip one.
+    /// Where in `cards`, as they are now, the next page starts, when the
+    /// reading is gone (the app restarted, or it expired). Each card the
+    /// cursor names says where; when they disagree one of them moved, and it
+    /// is the one whose place changed more. A tie repeats a card rather than
+    /// skip one.
     fn start(&self, cards: &[&Card]) -> usize {
         let at = |id: &str| cards.iter().position(|card| card.id == id);
-        let moved = |(was, id): &(i32, String)| {
+        let moved = |(was, id): &(i64, String)| {
             cards
                 .iter()
                 .find(|card| card.id == *id)
-                .map(|card| (card.position - was).abs())
+                .map(|card| i64::from(card.position).abs_diff(*was))
         };
         let after_last = at(&self.last.1).map(|at| at + 1);
         let at_next = at(&self.next.1);
@@ -136,10 +156,116 @@ impl Cursor {
             (Some(one), None) => one,
             (None, Some(other)) => other,
             // Both left the lane: by the place the next one had.
-            (None, None) => cards
-                .partition_point(|card| (card.position, &card.id) < (self.next.0, &self.next.1)),
+            (None, None) => cards.partition_point(|card| {
+                (i64::from(card.position), card.id.as_str()) < (self.next.0, self.next.1.as_str())
+            }),
         }
     }
+}
+
+/// How long a reading is kept after its last page.
+const KEPT: Duration = Duration::from_secs(30 * 60);
+/// The most readings kept at once; past it the oldest goes.
+const READINGS: usize = 1024;
+
+/// A lane being read page by page: its order as the first page saw it,
+/// the cards that entered since at its end, and which were read.
+#[derive(Clone)]
+struct Reading {
+    at: Instant,
+    order: Vec<String>,
+    read: HashSet<String>,
+    page: Vec<String>,
+}
+
+fn readings() -> &'static Mutex<HashMap<String, Reading>> {
+    static READINGS: OnceLock<Mutex<HashMap<String, Reading>>> = OnceLock::new();
+    READINGS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn kept(name: &str) -> Option<Reading> {
+    let readings = readings()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    readings
+        .get(name)
+        .filter(|reading| reading.at.elapsed() < KEPT)
+        .cloned()
+}
+
+fn keep(reading: Reading) -> String {
+    let name = ulid::Ulid::generate().to_string();
+    let mut readings = readings()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    forget_old(&mut readings, Instant::now());
+    readings.insert(name.clone(), reading);
+    name
+}
+
+fn forget_old(readings: &mut HashMap<String, Reading>, now: Instant) {
+    readings.retain(|_, reading| now.saturating_duration_since(reading.at) < KEPT);
+    while readings.len() >= READINGS {
+        let Some(oldest) = readings
+            .iter()
+            .min_by_key(|(_, reading)| reading.at)
+            .map(|(name, _)| name.clone())
+        else {
+            break;
+        };
+        readings.remove(&oldest);
+    }
+}
+
+/// The lane's cards not read yet, in the order the reading fixed: the lane
+/// as the first page saw it, less the cards that left, then the cards that
+/// entered since. With no reading (the first page, or one forgotten), the
+/// lane as it is now, from where the cursor's cards say.
+fn unread<'a>(cards: &[&'a Card], after: Option<&Cursor>) -> (Reading, Vec<&'a Card>) {
+    let earlier = after.and_then(|after| {
+        let reading = kept(after.reading.as_deref()?)?;
+        Some((reading, &after.last.1))
+    });
+    let (order, read) = match earlier {
+        Some((reading, last)) => {
+            let mut read = reading.read;
+            let upto = reading
+                .page
+                .iter()
+                .position(|id| id == last)
+                .map_or(reading.page.len(), |at| at + 1);
+            read.extend(reading.page[..upto].iter().cloned());
+            let mut order = reading.order;
+            let known: HashSet<String> = order.iter().cloned().collect();
+            order.extend(
+                cards
+                    .iter()
+                    .filter(|card| !known.contains(&card.id))
+                    .map(|card| card.id.clone()),
+            );
+            (order, read)
+        }
+        None => {
+            let start = after.map_or(0, |after| after.start(cards));
+            let order = cards.iter().map(|card| card.id.clone()).collect();
+            let read = cards[..start].iter().map(|card| card.id.clone()).collect();
+            (order, read)
+        }
+    };
+    let here: HashMap<&str, &'a Card> =
+        cards.iter().map(|card| (card.id.as_str(), *card)).collect();
+    let rest = order
+        .iter()
+        .filter(|id| !read.contains(*id))
+        .filter_map(|id| here.get(id.as_str()).copied())
+        .collect();
+    let reading = Reading {
+        at: Instant::now(),
+        order,
+        read,
+        page: Vec::new(),
+    };
+    (reading, rest)
 }
 
 /// The page `params` asks for: each lane with its total, its first cards
@@ -187,11 +313,9 @@ pub(crate) fn page(
                 lane["counted"] = json!("its cards come with `done: true` or `column`");
                 return lane;
             }
-            let start = match &ask.after {
-                Some(after) if after.column == column.id => after.start(&cards),
-                _ => 0,
-            };
-            let shown = &cards[start..(start + ask.limit).min(total)];
+            let after = ask.after.as_ref().filter(|after| after.column == column.id);
+            let (mut reading, rest) = unread(&cards, after);
+            let shown = &rest[..ask.limit.min(rest.len())];
             // Each row says its place, so a page cut shorter can name its own cursor.
             lane["cards"] = json!(shown
                 .iter()
@@ -201,13 +325,21 @@ pub(crate) fn page(
                     listed
                 })
                 .collect::<Vec<_>>());
-            if let (Some(last), Some(next)) = (shown.last(), cards.get(start + shown.len())) {
+            if shown.is_empty() {
+                return lane;
+            }
+            reading.page = shown.iter().map(|card| card.id.clone()).collect();
+            let name = keep(reading);
+            if let (Some(last), Some(next)) = (shown.last(), rest.get(shown.len())) {
                 lane["nextCursor"] = json!(cursor(
                     &column.id,
                     (last.position.into(), &last.id),
-                    (next.position.into(), &next.id)
+                    (next.position.into(), &next.id),
+                    &name
                 ));
             }
+            // Where a page cut shorter resumes the same reading.
+            lane["reading"] = json!(name);
             lane
         })
         .collect();

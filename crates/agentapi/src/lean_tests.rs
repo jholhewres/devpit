@@ -263,12 +263,17 @@ fn a_paged_board_keeps_each_columns_total_and_cursor() {
 }
 
 /// Twenty wide cards in each of three lanes do not fit: each lane keeps
-/// fewer, and its cursor names the last kept and the first left out.
+/// fewer, and its cursor names the last kept, the first left out and the
+/// reading, when the app gave one (lane `c` comes from an app without them).
 #[test]
 fn a_page_too_wide_keeps_fewer_cards_and_its_cursor_names_the_last_kept_and_the_first_left_out() {
     let lane = |id: &str| {
-        json!({ "id": id, "name": id, "total": 40, "nextCursor": format!("{id}:19:{id}_card_19:20:{id}_card_20"),
-        "cards": (0..20).map(|at| json!({ "id": format!("{id}_card_{at}"), "position": at, "title": "t".repeat(60) })).collect::<Vec<_>>() })
+        let mut lane = json!({ "id": id, "name": id, "total": 40, "nextCursor": format!("{id}:19:{id}_card_19:20:{id}_card_20"),
+        "cards": (0..20).map(|at| json!({ "id": format!("{id}_card_{at}"), "position": at, "title": "t".repeat(60) })).collect::<Vec<_>>() });
+        if id != "c" {
+            lane["reading"] = json!(format!("R{id}"));
+        }
+        lane
     };
     let text = said(
         "devpit_board",
@@ -285,10 +290,16 @@ fn a_page_too_wide_keeps_fewer_cards_and_its_cursor_names_the_last_kept_and_the_
         );
         let id = column["id"].as_str().expect("id");
         let (last, next) = (cards.len() - 1, cards.len());
+        let reading = if id == "c" {
+            String::new()
+        } else {
+            format!(":R{id}")
+        };
         assert_eq!(
             column["nextCursor"],
-            format!("{id}:{last}:{id}_card_{last}:{next}:{id}_card_{next}")
+            format!("{id}:{last}:{id}_card_{last}:{next}:{id}_card_{next}{reading}")
         );
+        assert!(column.get("reading").is_none(), "the reading is not shown");
         assert!(cards[0].get("position").is_none(), "the place is not shown");
     }
 }

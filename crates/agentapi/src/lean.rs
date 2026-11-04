@@ -181,6 +181,9 @@ fn board(answer: Value) -> Value {
     }
     fewer(&mut answer);
     if let Some(columns) = answer["columns"].as_array_mut() {
+        for column in columns.iter_mut().filter_map(Value::as_object_mut) {
+            column.remove("reading");
+        }
         for card in columns
             .iter_mut()
             .filter_map(|column| column["cards"].as_array_mut())
@@ -216,18 +219,23 @@ fn fewer(answer: &mut Value) {
         most = (most * 3 / 4).max(1);
         for column in columns.iter_mut().filter(|column| cards(column) > most) {
             let lane = column["id"].as_str().unwrap_or_default().to_owned();
+            let reading = column["reading"].as_str().map(str::to_owned);
             let Some(kept) = column["cards"].as_array_mut() else {
                 continue;
             };
             let (last, next) = (&kept[most - 1], &kept[most]);
-            // The app's cursor (`board_page::cursor`): the last card kept and the first left out.
-            let cursor = format!(
+            // The app's cursor (`board_page::cursor`): the last card kept, the
+            // first left out and the reading they belong to.
+            let mut cursor = format!(
                 "{lane}:{}:{}:{}:{}",
                 last["position"],
                 last["id"].as_str().unwrap_or_default(),
                 next["position"],
                 next["id"].as_str().unwrap_or_default()
             );
+            if let Some(reading) = reading.as_deref() {
+                cursor = format!("{cursor}:{reading}");
+            }
             kept.truncate(most);
             column["nextCursor"] = json!(cursor);
         }

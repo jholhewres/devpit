@@ -123,8 +123,8 @@ fn a_cursor_the_board_did_not_give_is_refused_and_says_so() {
     assert!(why.contains("nextCursor"));
 }
 
-/// Moving a card into a lane renumbers it from 0: the cursor still resumes
-/// after the card it names.
+/// Moving a card into a lane renumbers it from 0: the reading still resumes
+/// after the card it names, and the card that entered comes at the end.
 #[test]
 fn the_cursor_repeats_nothing_when_a_card_enters_the_lane_and_renumbers_it() {
     let mut board = board(30);
@@ -151,7 +151,12 @@ fn the_cursor_repeats_nothing_when_a_card_enters_the_lane_and_renumbers_it() {
     unique.sort();
     unique.dedup();
     assert_eq!(unique.len(), seen.len(), "no card twice");
-    assert_eq!(seen.len(), 30, "every card that was in the lane");
+    assert_eq!(seen.len(), 31, "every card that was in the lane");
+    assert_eq!(
+        seen.last().map(String::as_str),
+        Some("card_from_doing"),
+        "the card that entered, at the end"
+    );
 }
 
 #[test]
@@ -159,19 +164,32 @@ fn full_is_the_whole_board_whatever_came_with_it() {
     assert!(!asked(&json!({ "full": true, "column": "doing" })));
 }
 
-/// Read 10 of 30, move a card within the lane as move_card does (renumbering
-/// it), read on: every card is read, and only the one that moved may repeat.
-fn moved_within(card: &str, to: usize) -> Vec<String> {
-    let mut board = board(30);
-    let first = page(&board, &json!({ "column": "backlog", "limit": 10 }), row).expect("page 1");
-    let mut seen = ids(&first["columns"][0]);
+/// The cursor without its reading, as after the app restarted.
+fn forgotten(cursor: &str) -> String {
+    cursor.rsplit_once(':').expect("a reading").0.to_owned()
+}
+
+fn first_page(board: &Board, limit: usize) -> (Vec<String>, String) {
+    let first = page(board, &json!({ "column": "backlog", "limit": limit }), row).expect("page 1");
     let cursor = first["columns"][0]["nextCursor"]
         .as_str()
         .expect("a cursor")
         .to_owned();
-    let mut order: Vec<String> = (0..30).map(|at| format!("card_backlog_{at:03}")).collect();
-    order.retain(|id| id != card);
-    order.insert(to, card.to_owned());
+    (ids(&first["columns"][0]), cursor)
+}
+
+fn read_on(board: &Board, mut seen: Vec<String>, cursor: String) -> Vec<String> {
+    let mut cursor = Some(cursor);
+    while let Some(at) = cursor {
+        let next = page(board, &json!({ "cursor": at, "limit": 7 }), row).expect("next page");
+        seen.extend(ids(&next["columns"][0]));
+        cursor = next["columns"][0]["nextCursor"].as_str().map(str::to_owned);
+    }
+    seen
+}
+
+/// Renumbers the lane from 0 in `order`, as move_card does.
+fn renumber(board: &mut Board, order: &[String]) {
     for one in board
         .cards
         .iter_mut()
@@ -182,9 +200,153 @@ fn moved_within(card: &str, to: usize) -> Vec<String> {
             .position(|id| *id == one.id)
             .expect("in the lane") as i32;
     }
-    let next = page(&board, &json!({ "cursor": cursor, "limit": 50 }), row).expect("page 2");
+}
+
+fn backlog(of: usize) -> Vec<String> {
+    (0..of).map(|at| format!("card_backlog_{at:03}")).collect()
+}
+
+fn moved(order: &mut Vec<String>, card: &str, to: usize) {
+    order.retain(|id| id != card);
+    order.insert(to, card.to_owned());
+}
+
+/// Read 10 of 30, move a card within the lane as move_card does (renumbering
+/// it), read on.
+fn moved_within(card: &str, to: usize, restart: bool) -> Vec<String> {
+    let mut board = board(30);
+    let (seen, cursor) = first_page(&board, 10);
+    let mut order = backlog(30);
+    moved(&mut order, card, to);
+    renumber(&mut board, &order);
+    let cursor = if restart { forgotten(&cursor) } else { cursor };
+    read_on(&board, seen, cursor)
+}
+
+fn every_card_once(seen: &[String], of: usize) {
+    for id in backlog(of) {
+        let times = seen.iter().filter(|one| **one == id).count();
+        assert_eq!(times, 1, "{id} was read {times} times");
+    }
+}
+
+#[test]
+fn a_card_moved_within_its_lane_between_pages_is_read_once_and_disturbs_no_other() {
+    for (card, to) in [(9, 29), (10, 0), (9, 0), (10, 29), (25, 2), (3, 20)] {
+        let seen = moved_within(&format!("card_backlog_{card:03}"), to, false);
+        every_card_once(&seen, 30);
+        assert_eq!(seen.len(), 30, "{card} to {to}");
+    }
+}
+
+/// The finding of the last review: a lane with gaps in its places, one drag
+/// renumbers it; then two drags in a dense lane.
+#[test]
+fn drags_in_a_lane_with_gaps_skip_no_card_that_never_moved() {
+    let mut board = board(30);
+    for one in board.cards.iter_mut() {
+        one.position *= 10;
+    }
+    let (seen, cursor) = first_page(&board, 10);
+    let mut order = backlog(30);
+    moved(&mut order, "card_backlog_002", 15);
+    renumber(&mut board, &order);
+    let next = page(&board, &json!({ "cursor": cursor, "limit": 10 }), row).expect("page 2");
+    let mut seen = seen;
     seen.extend(ids(&next["columns"][0]));
-    seen
+    let cursor = next["columns"][0]["nextCursor"]
+        .as_str()
+        .expect("a cursor")
+        .to_owned();
+    moved(&mut order, "card_backlog_028", 0);
+    moved(&mut order, "card_backlog_012", 29);
+    renumber(&mut board, &order);
+    let seen = read_on(&board, seen, cursor);
+    every_card_once(&seen, 30);
+}
+
+#[test]
+fn a_card_that_leaves_the_lane_and_comes_back_unread_is_read_once() {
+    let mut board = board(30);
+    let (seen, cursor) = first_page(&board, 10);
+    let away = board
+        .cards
+        .iter()
+        .position(|card| card.id == "card_backlog_015")
+        .expect("the card");
+    board.cards[away].column_id = "doing".into();
+    let next = page(&board, &json!({ "cursor": cursor, "limit": 10 }), row).expect("page 2");
+    let mut seen = seen;
+    seen.extend(ids(&next["columns"][0]));
+    let cursor = next["columns"][0]["nextCursor"]
+        .as_str()
+        .expect("a cursor")
+        .to_owned();
+    board.cards[away].column_id = "backlog".into();
+    let seen = read_on(&board, seen, cursor);
+    every_card_once(&seen, 30);
+}
+
+/// The relay cuts a page shorter and names its own cursor in the same reading.
+#[test]
+fn a_page_cut_shorter_resumes_its_reading_after_the_last_card_kept() {
+    let board = board(30);
+    let first = page(&board, &json!({ "column": "backlog", "limit": 10 }), row).expect("page 1");
+    let lane = &first["columns"][0];
+    let reading = lane["reading"].as_str().expect("a reading");
+    let kept: Vec<String> = ids(lane).into_iter().take(4).collect();
+    let cursor = cursor("backlog", (3, &kept[3]), (4, "card_backlog_004"), reading);
+    let seen = read_on(&board, kept, cursor);
+    every_card_once(&seen, 30);
+}
+
+/// After a restart the cursor resumes by the places it names: only the card
+/// that moved may repeat or be missed.
+#[test]
+fn a_cursor_whose_reading_is_gone_resumes_by_its_cards() {
+    let seen = moved_within("card_backlog_009", 29, true);
+    every_card_once_but(&seen, "card_backlog_009");
+    let seen = moved_within("card_backlog_010", 0, true);
+    every_card_once_but_maybe_missed(&seen, "card_backlog_010");
+    let seen = moved_within("card_backlog_010", 29, true);
+    every_card_once_but(&seen, "");
+}
+
+#[test]
+fn a_crafted_cursor_with_extreme_places_is_answered_not_a_panic() {
+    let cursor = format!("backlog:{}:card_x:{}:card_y", i64::MAX, i64::MIN);
+    page(&board(5), &json!({ "cursor": cursor }), row).expect("a page");
+    let cursor = format!(
+        "backlog:{}:card_backlog_001:{}:card_backlog_003",
+        i64::MIN,
+        i64::MAX
+    );
+    page(&board(5), &json!({ "cursor": cursor }), row).expect("a page");
+}
+
+#[test]
+fn a_reading_is_forgotten_once_it_expires_or_too_many_are_kept() {
+    let now = Instant::now() + KEPT * 2;
+    let reading = |at: Instant| Reading {
+        at,
+        order: Vec::new(),
+        read: HashSet::new(),
+        page: Vec::new(),
+    };
+    let mut readings = HashMap::new();
+    readings.insert("old".to_owned(), reading(now - KEPT));
+    readings.insert("new".to_owned(), reading(now));
+    forget_old(&mut readings, now);
+    assert_eq!(readings.keys().collect::<Vec<_>>(), ["new"]);
+    for at in 0..READINGS {
+        readings.insert(
+            format!("r{at}"),
+            reading(now + Duration::from_millis(at as u64 + 1)),
+        );
+    }
+    forget_old(&mut readings, now);
+    assert_eq!(readings.len(), READINGS - 1);
+    assert!(!readings.contains_key("new"), "the oldest went");
 }
 
 fn every_card_once_but_maybe_missed(seen: &[String], moved: &str) {
@@ -205,29 +367,4 @@ fn every_card_once_but(seen: &[String], moved: &str) {
         assert!(times >= 1, "{id} was skipped");
         assert!(times == 1 || id == moved, "{id} was read {times} times");
     }
-}
-
-#[test]
-fn a_read_card_moved_to_the_end_of_its_lane_disturbs_no_other() {
-    let seen = moved_within("card_backlog_009", 29);
-    every_card_once_but(&seen, "card_backlog_009");
-}
-
-#[test]
-fn the_card_the_cursor_names_moved_to_the_top_disturbs_no_other() {
-    let seen = moved_within("card_backlog_010", 0);
-    // Not read yet and now above the cursor: only it may be missed.
-    every_card_once_but_maybe_missed(&seen, "card_backlog_010");
-}
-
-#[test]
-fn the_last_card_read_moved_to_the_top_disturbs_no_other() {
-    let seen = moved_within("card_backlog_009", 0);
-    every_card_once_but(&seen, "card_backlog_009");
-}
-
-#[test]
-fn the_next_card_moved_to_the_end_is_read_once_and_disturbs_no_other() {
-    let seen = moved_within("card_backlog_010", 29);
-    every_card_once_but(&seen, "");
 }
