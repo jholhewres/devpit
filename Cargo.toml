@@ -34,9 +34,8 @@ devpit-tmux = { path = "crates/tmux" }
 devpit-agentcli = { path = "crates/agentcli" }
 devpit-steps = { path = "crates/steps" }
 devpit-cookies = { path = "crates/cookies" }
-# ponytail: a path while v0.2.0 is a local tag only; becomes
-# `git = "https://github.com/jholhewres/devflow", tag = "v0.2.0"` once it is pushed (card M).
-devflow-engine = { path = "/home/jhol/Workspace/private/devflow/crates/engine" }
+# Provisional rev: v0.2.0 lacks 890abce (no preserve_order); becomes tag = "v0.2.1".
+devflow-engine = { git = "https://github.com/jholhewres/devflow", rev = "890abce" }
 devpit-remote = { path = "crates/remote" }
 devpit-sync = { path = "crates/sync" }
 

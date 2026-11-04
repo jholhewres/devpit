@@ -1065,6 +1065,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "devflow-engine"
+version = "0.2.0"
+source = "git+https://github.com/jholhewres/devflow?rev=890abce#890abcede799c717a7a13a82b7ac37ca3284ce58"
+dependencies = [
+ "libc",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "sha2",
+ "yaml-rust2",
+]
+
+[[package]]
 name = "devpit-agentapi"
 version = "0.1.46"
 dependencies = [
@@ -1119,11 +1132,11 @@ version = "0.1.46"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "devflow-engine",
  "devpit-agentapi",
  "devpit-agentcli",
  "devpit-cookies",
  "devpit-core",
- "devpit-devflow",
  "devpit-git",
  "devpit-pty",
  "devpit-ptyd",
@@ -1160,23 +1173,6 @@ dependencies = [
  "tungstenite",
  "ulid",
  "webkit2gtk",
-]
-
-[[package]]
-name = "devpit-devflow"
-version = "0.1.46"
-dependencies = [
- "devpit-agentcli",
- "devpit-core",
- "devpit-git",
- "devpit-pty",
- "devpit-rpc",
- "devpit-steps",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "yaml-rust2",
 ]
 
 [[package]]
