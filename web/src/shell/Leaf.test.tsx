@@ -2,7 +2,9 @@ import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fake = vi.hoisted(() => {
-  const terms: { disposed: boolean; written: unknown[] }[] = []
+  const terms: { disposed: boolean; written: unknown[]; scrolled: ((top: number) => void) | null }[] = []
+  const pages: { left: number; bytes: Uint8Array }[] = []
+  let asked = 0
   const attaches: { paneId: string; detached: boolean; on: { output: (b: Uint8Array, r: boolean) => void } }[] = []
   class Terminal {
     rows = 24
@@ -23,7 +25,9 @@ const fake = vi.hoisted(() => {
     onData() {
       return { dispose() {} }
     }
-    onScroll() {
+    scrolled: ((top: number) => void) | null = null
+    onScroll(run: (top: number) => void) {
+      this.scrolled = run
       return { dispose() {} }
     }
     refresh() {}
@@ -33,7 +37,7 @@ const fake = vi.hoisted(() => {
       this.disposed = true
     }
   }
-  return { terms, attaches, Terminal }
+  return { terms, attaches, Terminal, pages, asked: () => asked, ask: () => (asked += 1) }
 })
 
 vi.mock('@xterm/xterm', () => ({ Terminal: fake.Terminal }))
@@ -60,7 +64,10 @@ vi.mock('./attach', () => ({
       write() {},
       resize: async () => null,
       ack() {},
-      older: async () => null,
+      older: async () => {
+        fake.ask()
+        return fake.pages.shift() ?? null
+      },
       detach: () => {
         one.detached = true
       },
@@ -139,5 +146,19 @@ describe('a terminal off screen', () => {
     act(() => fake.attaches[0].on.output(replay, true))
     expect(fake.terms[0].written).toEqual([replay])
     expect(container.querySelector<HTMLElement>('.termhost')?.dataset.drawn).toBe('true')
+  })
+
+  it('scrolled to the top, writes the older page and what it held again, until there is none', async () => {
+    render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    await settle()
+    const term = fake.terms[0]
+    act(() => fake.attaches[0].on.output(Uint8Array.from([66]), true))
+    fake.pages.push({ left: 0, bytes: Uint8Array.from([65]) })
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    expect(term.written.slice(1)).toEqual(['\x1bc', Uint8Array.from([65]), Uint8Array.from([66]), new Uint8Array()])
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    expect(fake.asked()).toBe(1)
   })
 })

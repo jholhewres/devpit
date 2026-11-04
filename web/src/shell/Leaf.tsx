@@ -246,9 +246,15 @@ export function Leaf({
       held.unshift(got.bytes)
       heldBytes += got.bytes.length
       batch.flush()
+      /* The reset scrolls to the top too: no page is asked for until the
+         rewrite is in. */
+      paging = true
       terminal.write('\x1bc')
       for (const one of held) terminal.write(one)
-      terminal.write(new Uint8Array(), () => terminal.scrollToLine(Math.max(0, terminal.buffer.active.length - lines)))
+      terminal.write(new Uint8Array(), () => {
+        terminal.scrollToLine(Math.max(0, terminal.buffer.active.length - lines))
+        paging = false
+      })
       if (heldBytes > HELD_MOST) held = null
     }
     const scrolled = terminal.onScroll((top) => {
