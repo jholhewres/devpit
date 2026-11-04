@@ -371,7 +371,10 @@ fn shadow_records_the_plans_fail_and_enforce_holds_its_cards() {
             )
         };
         let preview = plan(false).expect("a preview");
-        assert_eq!(preview["jev"]["brief"]["outcome"], "pass", "{preview}");
+        assert!(
+            preview["jev"]["brief"].is_null(),
+            "no brief rubric by default: {preview}"
+        );
         // The preview is judged too: enforce warns there, and refuses nothing yet.
         assert_eq!(preview["jev"]["plan"]["outcome"], "fail", "{preview}");
         assert_eq!(

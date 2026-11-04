@@ -239,6 +239,26 @@ fn the_evidence_comes_with_execution_and_takes_what_its_skills_send() {
     assert_eq!(schema["required"], json!(["card"]));
 }
 
+/// The evidence tool lists each field devflow-engine's evidence takes, so an
+/// agent can ask for a fresh run instead of the reused one.
+#[test]
+fn the_evidence_takes_every_field_of_the_engines_and_fresh_runs_the_checks_again() {
+    let (_, tool) = STAGED
+        .iter()
+        .find(|(_, tool)| tool.name == "devpit_devflow_evidence")
+        .expect("the evidence tool");
+    let schema = (tool.input)();
+    let listed: Vec<&str> = schema["properties"]
+        .as_object()
+        .expect("properties")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(listed, ["card", "checks", "criteria", "fresh", "red"]);
+    assert_eq!(schema["properties"]["fresh"]["type"], "boolean");
+    assert!(tool.description.contains("reused"), "{}", tool.description);
+}
+
 /// The fields the briefing and plan skills fill, by name: a tool that renamed
 /// one would answer a shape no skill sends.
 #[test]

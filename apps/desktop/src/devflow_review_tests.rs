@@ -132,7 +132,10 @@ fn a_review_says_where_decisions_stands_in_each_standing() {
         let root = dir.path().canonicalize().expect("root");
         let (_store, project, card) = reviewed_project(&root);
         let yaml = root.join(".devpit/devflow/devflow.yaml");
-        let mut text = std::fs::read_to_string(&yaml).expect("yaml");
+        // Decisions is asked only when Jev consolidates the findings.
+        let mut text = std::fs::read_to_string(&yaml)
+            .expect("yaml")
+            .replace("review:\n", "review:\n  consolidate: jev\n");
         text.push_str(standing.yaml());
         std::fs::write(&yaml, text).expect("yaml");
         standing.give(&project.id);
@@ -307,11 +310,18 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
     let scripts = tempfile::tempdir().expect("scripts");
     let root = dir.path().canonicalize().expect("root");
     let (_store, project, card) = reviewed_project(&root);
+    std::fs::write(
+        root.join("app.py"),
+        "import os\nos.system(link)\n\n\n\n\nopener = link\n",
+    )
+    .expect("a line the fix leaves alone");
     git(&root, &["commit", "-q", "-am", "open links"]);
     let start = rev(&root, "HEAD~1");
     let mut vague = shell_injection();
     vague["severity"] = json!("low");
     vague["title"] = json!("Vague opener name");
+    vague["line"] = json!(7);
+    vague["evidence"] = json!("app.py:7 `opener = link`");
     vague.as_object_mut().expect("finding").remove("poc");
     let first = fake_claude_finding(scripts.path(), "first", vec![shell_injection(), vague]);
     let reach = move |_: Agent| Ok(first.clone());
@@ -332,7 +342,7 @@ fn a_rereview_pins_the_change_since_the_previous_run_and_the_gate_takes_it() {
 
     std::fs::write(
         root.join("app.py"),
-        "import subprocess\nsubprocess.run(['xdg-open', link])\n",
+        "import subprocess\nsubprocess.run(['xdg-open', link])\n\n\n\n\nopener = link\n",
     )
     .expect("the fix");
     git(&root, &["commit", "-q", "-am", "no shell"]);

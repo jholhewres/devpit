@@ -206,7 +206,7 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
         Tool {
             name: "devpit_devflow_evidence",
             method: "devflow_evidence",
-            description: "Devflow: run a card's checks from .devpit/devflow/devflow.yaml in the checkout you stand in, each through devpit's step runner with the card in its environment; keep the reports, screenshots and video in devpit's own folder for the project, never the repository (the newest 5 runs per card; the answer's `run` says where); attach them to the card as artifacts with a comment linking each; and answer with a short summary: each check passed, failed, inconclusive or not run (a check set to write a report that left none devpit reads is inconclusive; one set to `report: none` is judged by its exit code, 127 meaning its command was not found; one whose `requires` probe failed is not run, and checks naming the same `exclusive` lock never overlap), its counts, the failures, and the paths. It records each criterion's tests and how they ended, and the red tests you saw and whether they are green now. Leave `checks` out to run all of them. Takes as long as the checks do.",
+            description: "Devflow: run a card's checks from .devpit/devflow/devflow.yaml in the checkout you stand in, each through devpit's step runner with the card in its environment; keep the reports, screenshots and video in devpit's own folder for the project, never the repository (the newest 5 runs per card; the answer's `run` says where); attach them to the card as artifacts with a comment linking each; and answer with a short summary: each check passed, failed, inconclusive or not run (a check set to write a report that left none devpit reads is inconclusive; one set to `report: none` is judged by its exit code, 127 meaning its command was not found; one whose `requires` probe failed is not run, and checks naming the same `exclusive` lock never overlap), its counts, the failures, and the paths. It records each criterion's tests and how they ended, and the red tests you saw and whether they are green now. A green run at the same commit and tracked files is reused, its checks not run again (the answer's `reused_from` names it), unless `fresh`. Leave `checks` out to run all of them. Takes as long as the checks do.",
             input: || json!({ "type": "object", "properties": {
                 "card": { "type": "string", "description": "The card's id." },
                 "checks": { "type": "array", "items": { "type": "string" }, "description": "Checks by their name in devflow.yaml. Leave out to run all." },
@@ -221,7 +221,8 @@ pub(crate) static STAGED: [(&[&str], Tool); 8] = [
                 "red": { "type": "array", "items": { "type": "object", "properties": {
                     "test": { "type": "string" },
                     "failure": { "type": "string", "description": "The failing line you saw, secrets redacted." }
-                }, "required": ["test", "failure"] } }
+                }, "required": ["test", "failure"] } },
+                "fresh": { "type": "boolean", "description": "Run the checks even when the newest run was green at the same commit and tracked files, whose results are otherwise reused." }
             }, "required": ["card"] }),
         },
     ),

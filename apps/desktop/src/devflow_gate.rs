@@ -27,8 +27,6 @@ use crate::devflow_jev::Jev;
 
 /// The most of evidence.json or findings.json read.
 const MOST_READ: u64 = 4 * 1024 * 1024;
-/// The changed files a look at the checkout stats, at most.
-const MOST_LOOKED: usize = 5_000;
 /// Sessions whose streak is kept; past it they start again from none.
 const MOST_STREAKS: usize = 256;
 
@@ -133,7 +131,14 @@ pub(crate) fn gate_passed(runs: &Runs, card: &str) -> bool {
 
 fn read(runs: &Runs, card: &str, config: &Config) -> Read {
     let root = runs.checkout.as_path();
-    let run = newest(runs, card, "evidence.json");
+    // Each proof is looked for again now: one written after the run counts.
+    let run = runs
+        .newest_with(card, "evidence.json")
+        .and_then(|(name, at)| {
+            let evidence = json_at(&at)?;
+            let rechecked = devflow_engine::evidence::rechecked(&evidence, at.parent()?, root);
+            Some((name, rechecked))
+        });
     let review = newest(runs, card, "findings.json").map(|(name, value)| {
         // When the review was made: review.json, which the person's "not a
         // problem" on a finding leaves alone, else findings.json.
@@ -146,7 +151,6 @@ fn read(runs: &Runs, card: &str, config: &Config) -> Read {
             .map_or(name, runs::stamp);
         (written, value)
     });
-    let since = run.as_ref().and_then(|(name, _)| runs::seconds_of(name));
     let stages = config
         .own_on()
         .iter()
@@ -159,8 +163,15 @@ fn read(runs: &Runs, card: &str, config: &Config) -> Read {
     let unreviewed = review
         .as_ref()
         .and_then(|(_, findings)| unreviewed_since(root, findings));
+    // Never code: the runs an older devpit kept in the checkout.
+    let runs_folder = format!("{}/", runs::RUNS);
     Read {
-        changed: changed_at(root, since),
+        changed: devflow_engine::fresh::changed_at(
+            root,
+            run.as_ref()
+                .map(|(name, evidence)| (name.as_str(), evidence)),
+            &[&runs_folder],
+        ),
         run,
         review,
         stages,
@@ -179,30 +190,6 @@ fn unreviewed_since(root: &Path, findings: &Value) -> Option<String> {
     let head = devpit_git::head_of(root).ok()?;
     (read != head && devpit_git::code_changed_between(root, read, &head).ok()?)
         .then(|| read.to_owned())
-}
-
-/// When the checkout's code last changed: the newest of the files git says
-/// differ from HEAD and those committed since the run began, each by when
-/// it was written — a commit is not a change to the code. `None` outside
-/// git, or with nothing changed: then a green run is enough.
-fn changed_at(root: &Path, since: Option<u64>) -> Option<String> {
-    let status = devpit_git::status(root).ok()?;
-    let committed = since.map_or_else(Vec::new, |since| devpit_git::touched_since(root, since));
-    let runs_folder = format!("{}/", runs::RUNS);
-    status
-        .paths
-        .keys()
-        .chain(&committed)
-        .filter(|path| !path.starts_with(&runs_folder))
-        .take(MOST_LOOKED)
-        .filter_map(|path| {
-            std::fs::symlink_metadata(root.join(path))
-                .ok()?
-                .modified()
-                .ok()
-        })
-        .max()
-        .map(runs::stamp)
 }
 
 fn looked<'a>(

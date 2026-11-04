@@ -526,3 +526,170 @@ fn a_card_merged_into_another_finishes_on_its_evidence_and_a_cut_one_on_none() {
     may_finish(&project, &dropped, &root).expect("closes without evidence");
     assert!(startable(&project, &after));
 }
+
+/// `git` in `root`, with no global config and a fixed author.
+fn git_in(root: &Path, args: &[&str]) {
+    let done = std::process::Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_AUTHOR_NAME", "t")
+        .env("GIT_AUTHOR_EMAIL", "t@t")
+        .env("GIT_COMMITTER_NAME", "t")
+        .env("GIT_COMMITTER_EMAIL", "t@t")
+        .output()
+        .expect("git");
+    assert!(done.status.success(), "git {args:?}: {done:?}");
+}
+
+/// [`devflow_on`] in a git checkout with `cli.rs` and devflow.yaml committed.
+fn committed(root: &Path) -> (Store, Project, String) {
+    git_in(root, &["init", "-q", "-b", "main"]);
+    let made = devflow_on(root, "");
+    std::fs::write(root.join("cli.rs"), "fn main() {}\n").expect("code");
+    git_in(root, &["add", "-A"]);
+    git_in(root, &["commit", "-q", "-m", "first"]);
+    made
+}
+
+fn with_proof(project: &Project, root: &Path, card: &str) -> Value {
+    ask(
+        project,
+        root,
+        "devflow_evidence",
+        json!({ "card": card, "criteria": [{ "criterion": "rename changes the title", "proof": { "kind": "screenshot", "path": "shot.png" } }] }),
+    )
+}
+
+#[test]
+fn a_proof_written_after_the_run_counts_when_head_has_not_changed() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (_store, project, card) = committed(&root);
+    let ran = with_proof(&project, &root, &card);
+    assert_eq!(
+        ran["criteria_green"], "0 of 1",
+        "the proof is not there yet: {ran}"
+    );
+    let gate = |root: &Path| ask(&project, root, "devflow_gate", json!({ "card": card }));
+    assert_eq!(gate(&root)["result"], "failed");
+
+    std::fs::write(root.join("shot.png"), "png").expect("the proof");
+    let said = gate(&root);
+    assert_eq!(said["result"], "passed", "{said}");
+}
+
+#[test]
+fn a_code_change_after_the_run_is_stale_whatever_the_clocks_say() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (_store, project, card) = committed(&root);
+    evidence(&project, &root, &card);
+    let gate = || ask(&project, &root, "devflow_gate", json!({ "card": card }));
+    assert_eq!(gate()["result"], "passed");
+
+    std::fs::write(root.join("cli.rs"), "fn main() { todo!() }\n").expect("code");
+    let an_hour_ago = SystemTime::now() - std::time::Duration::from_secs(3600);
+    std::fs::File::options()
+        .write(true)
+        .open(root.join("cli.rs"))
+        .and_then(|file| file.set_modified(an_hour_ago))
+        .expect("an old clock");
+    let said = gate();
+    assert_eq!(said["result"], "failed", "{said}");
+    assert!(said["missing"][0]
+        .as_str()
+        .is_some_and(|missing| missing.contains("changed after run")));
+}
+
+#[test]
+fn evidence_asked_again_at_the_same_head_reuses_the_green_run_unless_fresh() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (_store, project, card) = committed(&root);
+    let first = evidence(&project, &root, &card);
+    assert_eq!(first["green"], true, "{first}");
+    assert!(first.get("reused_from").is_none(), "{first}");
+    let stamp = |ran: &Value| {
+        ran["run"]
+            .as_str()
+            .and_then(|run| run.rsplit('/').next())
+            .map(str::to_owned)
+    };
+
+    let again = evidence(&project, &root, &card);
+    assert_eq!(again["green"], true, "{again}");
+    assert_eq!(
+        again["reused_from"].as_str().map(str::to_owned),
+        stamp(&first)
+    );
+    assert_eq!(
+        ask(&project, &root, "devflow_gate", json!({ "card": card }))["result"],
+        "passed"
+    );
+
+    let forced = ask(
+        &project,
+        &root,
+        "devflow_evidence",
+        json!({ "card": card, "fresh": true, "criteria": [{ "criterion": "rename changes the title", "tests": ["rename changes the title"] }] }),
+    );
+    assert_eq!(forced["green"], true, "{forced}");
+    assert!(forced.get("reused_from").is_none(), "{forced}");
+}
+
+/// `ran`'s evidence.json as engine v0.2.1 wrote it: no commit, no tree.
+fn as_v0_2_1(ran: &Value) {
+    let at = PathBuf::from(ran["evidence"].as_str().expect("evidence.json"));
+    let mut recorded: Value =
+        serde_json::from_str(&std::fs::read_to_string(&at).expect("read")).expect("json");
+    let fields = recorded.as_object_mut().expect("an object");
+    assert!(fields.remove("head").is_some() && fields.remove("tree").is_some());
+    std::fs::write(&at, recorded.to_string()).expect("written back");
+}
+
+fn written_at(path: &Path, at: SystemTime) {
+    std::fs::File::options()
+        .write(true)
+        .open(path)
+        .and_then(|file| file.set_modified(at))
+        .expect("its clock");
+}
+
+/// A run engine v0.2.1 recorded names no commit or tree: its proofs are not
+/// looked for again, and the code is judged by when each file was written.
+#[test]
+fn a_run_recorded_by_engine_v0_2_1_is_judged_as_before() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().canonicalize().expect("root");
+    let (_store, project, card) = committed(&root);
+    let gate = || ask(&project, &root, "devflow_gate", json!({ "card": card }));
+    as_v0_2_1(&with_proof(&project, &root, &card));
+    std::fs::write(root.join("shot.png"), "png").expect("the proof");
+    let said = gate();
+    assert_eq!(said["result"], "failed", "{said}");
+    assert_eq!(said["criteria"], "0 of 1", "{said}");
+
+    let ran = evidence(&project, &root, &card);
+    assert!(ran.get("reused_from").is_none(), "{ran}");
+    as_v0_2_1(&ran);
+    std::fs::write(root.join("cli.rs"), "fn main() { todo!() }\n").expect("code");
+    written_at(
+        &root.join("cli.rs"),
+        SystemTime::now() - std::time::Duration::from_secs(3600),
+    );
+    assert_eq!(
+        gate()["result"],
+        "passed",
+        "an old clock was never a change"
+    );
+    written_at(
+        &root.join("cli.rs"),
+        SystemTime::now() + std::time::Duration::from_secs(5),
+    );
+    let said = gate();
+    assert_eq!(said["result"], "failed", "{said}");
+    assert!(said["missing"][0]
+        .as_str()
+        .is_some_and(|missing| missing.contains("changed after run")));
+}
