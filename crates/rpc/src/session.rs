@@ -142,3 +142,14 @@ pub struct KnownAgent {
     #[serde(default)]
     pub homepage: String,
 }
+
+/// A pane opened in tmux, for `pane.open_in_tmux`: what to run over ssh to
+/// reach it from another terminal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PaneInTmux {
+    /// The tmux session the pane is shown in.
+    pub session: String,
+    /// The whole `tmux … attach` line, quoted for a shell.
+    pub attach: String,
+}

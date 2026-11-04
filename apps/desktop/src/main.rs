@@ -170,6 +170,7 @@ mod pane_said;
 mod pane_screen;
 mod pane_snapshot;
 mod pane_socket;
+mod pane_tmux;
 mod panels;
 mod panes;
 mod pasting;
@@ -561,6 +562,10 @@ fn agent_door() -> Option<i32> {
     // The terminal daemon, run from the copy devpit installs of itself.
     if first == "ptyd" {
         return Some(devpit_ptyd::run(std::env::args_os().nth(2)));
+    }
+    // A ptyd pane on this terminal, which is how tmux shows one.
+    if first == "ptyd-attach" {
+        return Some(pane_tmux::attach_here(args.get(1).map(String::as_str)));
     }
     if first != "agent" && first != "mcp" && !hook {
         return None;

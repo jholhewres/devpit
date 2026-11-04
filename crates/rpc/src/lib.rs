@@ -139,8 +139,8 @@ pub use review::{
 pub use runs::{ProjectRun, RunCursor, RunsPage, RunsQuery};
 pub use search::{SearchFile, SearchHits, SearchLine};
 pub use session::{
-    AgentPresence, KnownAgent, LayoutNode, PaneKind, PaneRunning, PaneSize, SessionLayout,
-    SplitDirection,
+    AgentPresence, KnownAgent, LayoutNode, PaneInTmux, PaneKind, PaneRunning, PaneSize,
+    SessionLayout, SplitDirection,
 };
 pub use settings::{ErrorReportsPreview, Settings, Theme};
 pub use sign_ins::{AccountSignIn, AgentLaunch, MissingSignIn, NeededSignIn, SignIns};

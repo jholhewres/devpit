@@ -1,6 +1,8 @@
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import type { Terminal } from '@xterm/xterm'
 
 import { Clipboard, Close, Columns, Copy, Plus, Rows, SelectAll } from './GitIcons'
+import { ask, commands } from './live'
 import { Menu, MenuItem, MenuRule } from './Menu'
 import { copySelection, pasteClipboard } from './terminalClipboard'
 import { useKeys } from './useShortcut'
@@ -18,10 +20,24 @@ import { useKeys } from './useShortcut'
  * rows it believes are still there, and the pane comes apart.
  */
 
+/* The pane in a tmux session, and the line that attaches to it copied: what
+   reaches a devpit terminal from another machine over ssh. Answers what to
+   tell the person. */
+export async function openInTmux(projectId: string, paneId: string): Promise<string> {
+  const opened = await ask(() => commands.paneOpenInTmux(projectId, paneId))
+  if (!opened.data) return opened.error ?? 'the pane could not be opened in tmux'
+  const line = opened.data.attach
+  return writeText(line).then(
+    () => `Copied: ${line}`,
+    () => `Run: ${line}`,
+  )
+}
+
 export function TerminalMenu({
   at,
   terminal,
   projectId,
+  paneId,
   onClose,
   onFailed,
   onSplit,
@@ -32,6 +48,8 @@ export function TerminalMenu({
   at: { readonly x: number; readonly y: number }
   terminal: Terminal
   projectId: string
+  /** Absent where the pane has no leaf of its own to open elsewhere. */
+  paneId?: string
   onClose: () => void
   onFailed: (why: string | null) => void
   onSplit?: (direction: 'horizontal' | 'vertical') => void
@@ -63,6 +81,12 @@ export function TerminalMenu({
         <>
           <MenuRule />
           <MenuItem label="Show as blocks" glyph={<Rows />} onPick={run(onBlocks)} />
+        </>
+      )}
+      {paneId && (
+        <>
+          <MenuRule />
+          <MenuItem label="Open in tmux" glyph={<Copy />} onPick={run(() => openInTmux(projectId, paneId).then(onFailed))} />
         </>
       )}
       {(onClosePane || onSeparate) && <MenuRule />}

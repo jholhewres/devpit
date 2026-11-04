@@ -54,6 +54,37 @@ impl Server {
         ])
     }
 
+    /// A detached session `session` of its own running `argv`, unless there
+    /// is one: how a terminal tmux does not hold is reached through tmux.
+    /// Matched by its exact name, never as a prefix of another's.
+    pub fn ensure_view(
+        &self,
+        session: &str,
+        env: &[(String, String)],
+        argv: &[String],
+    ) -> Result<(), TmuxError> {
+        if self.has_session(&format!("={session}"))? {
+            return Ok(());
+        }
+        if let Some(parent) = self.socket.parent() {
+            std::fs::create_dir_all(parent).map_err(|err| TmuxError::Failed {
+                command: "mkdir".to_owned(),
+                stderr: err.to_string(),
+            })?;
+        }
+        let mut args: Vec<String> = ["new-session", "-d", "-s", session]
+            .iter()
+            .map(|part| (*part).to_owned())
+            .collect();
+        for (key, value) in env {
+            args.extend(["-e".to_owned(), format!("{key}={value}")]);
+        }
+        args.push("--".to_owned());
+        args.extend(argv.iter().cloned());
+        self.require(&args.iter().map(String::as_str).collect::<Vec<_>>())?;
+        Ok(())
+    }
+
     /// Ends a viewer's client session. Gone already is not an error.
     pub fn end_viewer(&self, session: &str, window: &str, viewer: &str) {
         let _ = self.run(&[

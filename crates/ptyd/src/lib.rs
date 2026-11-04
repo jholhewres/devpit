@@ -10,6 +10,8 @@
 // Unix sockets and ptys: on Windows devpit's terminals stay on psmux, and
 // only the wire format and the history are built there.
 #[cfg(unix)]
+pub mod attach;
+#[cfg(unix)]
 pub mod client;
 #[cfg(unix)]
 pub mod daemon;

@@ -388,7 +388,7 @@ export function Leaf({
       {pasteFailed && <div className="exempty__t">{pasteFailed}</div>}
       <div className="termhost" ref={host} data-drop={hovering ? 'true' : undefined} />
       {menuAt && term && (
-        <TerminalMenu at={menuAt} terminal={term} projectId={projectId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} onBlocks={onBlocks} onSeparate={onSeparate} />
+        <TerminalMenu at={menuAt} terminal={term} projectId={projectId} paneId={paneId} onClose={closeMenu} onFailed={setPasteFailed} onSplit={onSplit} onClosePane={onClosePane} onBlocks={onBlocks} onSeparate={onSeparate} />
       )}
     </>
   )

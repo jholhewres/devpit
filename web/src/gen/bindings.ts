@@ -1633,6 +1633,11 @@ export const commands = {
 	/**  `session.redraw` — this leaf's screen drawn again, whole. */
 	sessionRedraw: (projectId: string, paneId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("session_redraw", { projectId, paneId })),
 	/**
+	 *  `pane.open_in_tmux` — a pane made reachable from tmux, and the line that
+	 *  attaches to it.
+	 */
+	paneOpenInTmux: (projectId: string, paneId: string) => typedError<PaneInTmux, RpcError>(__TAURI_INVOKE("pane_open_in_tmux", { projectId, paneId })),
+	/**
 	 *  `pane.blocks` — every block this pane has kept, oldest first and the one
 	 *  still running last, with where its shell stands.
 	 */
@@ -4085,6 +4090,17 @@ export type PaneCost = {
 	 *  knowing about even when the memory looks ordinary.
 	 */
 	processes: number,
+};
+
+/**
+ *  A pane opened in tmux, for `pane.open_in_tmux`: what to run over ssh to
+ *  reach it from another terminal.
+ */
+export type PaneInTmux = {
+	/**  The tmux session the pane is shown in. */
+	session: string,
+	/**  The whole `tmux … attach` line, quoted for a shell. */
+	attach: string,
 };
 
 /**  What a leaf shows. Only `terminal` in this slice. */
