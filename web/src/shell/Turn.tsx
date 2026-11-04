@@ -99,6 +99,7 @@ function Reply({
     <div className="reply" data-live={live || undefined}>
       <Markdown
         source={source.slice(0, shown)}
+        live={live}
         opens={(here) => {
           const path = inFolder(folder, here)
           if (onOpen) onOpen(path)

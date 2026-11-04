@@ -53,9 +53,21 @@ function alignOf(mark: string): Align {
 }
 
 export function blocks(source: string): Block[] {
-  const lines = source.split('\n')
-  const out: Block[] = []
-  let at = 0
+  return read(source.split('\n'), 0).map((one) => one.block)
+}
+
+/* Where a block ended: the line reading goes on from, and the last line it looked at. */
+type Read = { readonly block: Block; readonly next: number; readonly seen: number }
+
+function read(lines: readonly string[], from: number): Read[] {
+  const out: Read[] = []
+  let at = from
+  const push = (block: Block): void => {
+    /* A fence, a heading or a rule stops at its own last line; the others
+       stopped at the line after them, and past it when that line is not blank. */
+    const own = block.kind === 'code' || block.kind === 'heading' || block.kind === 'rule'
+    out.push({ block, next: at, seen: own ? at - 1 : lines[at]?.trim() === '' ? at : at + 1 })
+  }
 
   while (at < lines.length) {
     const line = lines[at]
@@ -77,20 +89,20 @@ export function blocks(source: string): Block[] {
         at += 1
       }
       at += 1
-      out.push({ kind: 'code', language, text: body.join('\n') })
+      push({ kind: 'code', language, text: body.join('\n') })
       continue
     }
 
     const heading = /^(#{1,6})\s+(.*)$/.exec(line)
     if (heading) {
-      out.push({ kind: 'heading', level: heading[1].length, text: heading[2].trim() })
       at += 1
+      push({ kind: 'heading', level: heading[1].length, text: heading[2].trim() })
       continue
     }
 
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
-      out.push({ kind: 'rule' })
       at += 1
+      push({ kind: 'rule' })
       continue
     }
 
@@ -100,7 +112,7 @@ export function blocks(source: string): Block[] {
         body.push(lines[at].replace(/^>\s?/, ''))
         at += 1
       }
-      out.push({ kind: 'quote', text: body.join('\n') })
+      push({ kind: 'quote', text: body.join('\n') })
       continue
     }
 
@@ -116,7 +128,7 @@ export function blocks(source: string): Block[] {
         rows.push(head.map((_, column) => row[column] ?? ''))
         at += 1
       }
-      out.push({ kind: 'table', head, align, rows })
+      push({ kind: 'table', head, align, rows })
       continue
     }
 
@@ -128,7 +140,7 @@ export function blocks(source: string): Block[] {
         items.push(lines[at].replace(bullet, ''))
         at += 1
       }
-      out.push({ kind: 'list', ordered, items })
+      push({ kind: 'list', ordered, items })
       continue
     }
 
@@ -143,10 +155,49 @@ export function blocks(source: string): Block[] {
       body.push(lines[at])
       at += 1
     }
-    out.push({ kind: 'paragraph', text: body.join('\n') })
+    push({ kind: 'paragraph', text: body.join('\n') })
   }
 
   return out
+}
+
+/* A text parsed as it grows: an answer being written only ever gains text at
+   its end, so the blocks closed before its last line are not read again. */
+export type Parsed = {
+  readonly source: string
+  readonly blocks: readonly Block[]
+  readonly read: readonly Read[]
+  readonly lines: number
+}
+
+export function grown(was: Parsed | null, source: string): Parsed {
+  if (!was || !source.startsWith(was.source)) {
+    const lines = source.split('\n')
+    /* Edited rather than grown: a block that reads the same is still the one drawn. */
+    const all = read(lines, 0).map((one, at) => {
+      const same = was?.blocks[at]
+      return same && JSON.stringify(same) === JSON.stringify(one.block) ? { ...one, block: same } : one
+    })
+    return { source, blocks: all.map((one) => one.block), read: all, lines: lines.length }
+  }
+  /* Settled: every line it looked at came before the old last line, the only one that can still grow. */
+  let kept = 0
+  while (kept < was.read.length && was.read[kept]!.seen < was.lines - 1) kept += 1
+  const from = kept > 0 ? was.read[kept - 1]!.next : 0
+  const lines = source.split('\n')
+  const all = [...was.read.slice(0, kept), ...read(lines, from)]
+  return { source, blocks: [...was.blocks.slice(0, kept), ...all.slice(kept).map((one) => one.block)], read: all, lines: lines.length }
+}
+
+/* What a block being written shows: a bold or a code span it has opened and
+   not yet closed is closed, so the marks do not flash as text until it is. */
+export function mended(block: Block): Block {
+  if (block.kind !== 'paragraph' && block.kind !== 'heading' && block.kind !== 'quote') return block
+  const ticks = (block.text.match(/`/g) ?? []).length % 2 === 1
+  const plain = ticks ? block.text : block.text.replace(/`[^`]*`/g, '')
+  const stars = (plain.match(/\*\*/g) ?? []).length % 2 === 1
+  if (!ticks && !stars) return block
+  return { ...block, text: `${block.text}${ticks ? '`' : ''}${stars ? '**' : ''}` }
 }
 
 export type Span =

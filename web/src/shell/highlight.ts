@@ -50,6 +50,30 @@ const isWordStart = (letter: string): boolean =>
 
 const isWord = (letter: string): boolean => isWordStart(letter) || isDigit(letter)
 
+/* A block coloured as it grows. */
+export type Painting = { readonly text: string; readonly tokens: readonly Token[]; readonly language: Language | null }
+
+/* Only the lines after the last token that opened a line are coloured again:
+   a token at a line's start began with nothing carried from before it. */
+export function grownTokens(was: Painting | null, text: string, language: Language | null): Painting {
+  if (!was || was.language !== language || !text.startsWith(was.text) || text.length > TOO_BIG) {
+    return { text, tokens: tokens(text, language), language }
+  }
+  let start = was.text.length
+  let kept = was.tokens.length
+  for (let at = was.tokens.length - 1; at >= 0; at -= 1) {
+    start -= was.tokens[at]!.text.length
+    if (at < was.tokens.length - 1 && (start === 0 || was.text[start - 1] === '\n')) {
+      kept = at
+      break
+    }
+    if (at === 0) kept = 0
+  }
+  if (kept === was.tokens.length) start = 0
+  const rest = tokens(text.slice(start), language)
+  return { text, tokens: [...was.tokens.slice(0, kept), ...rest], language }
+}
+
 /** The coloured runs of this text, merged so plain stretches are one token. */
 export function tokens(text: string, language: Language | null): readonly Token[] {
   if (!language || text.length > TOO_BIG) {

@@ -1,10 +1,10 @@
-import { createContext, memo, useCallback, useContext, useMemo } from 'react'
+import { createContext, memo, useCallback, useContext, useMemo, useRef } from 'react'
 
 import { Diagram } from './Diagram'
 import { ofName } from './languages'
 import { MdTable } from './MdTable'
 import { Painted } from './Painted'
-import { blocks, external, linkTarget, resolved, spans, type Block, type Span } from './markdown'
+import { external, grown, linkTarget, mended, resolved, spans, type Block, type Parsed, type Span } from './markdown'
 import { Tick } from './MdTick'
 import { ask, commands } from './live'
 import { went } from './problems'
@@ -27,9 +27,12 @@ export function Markdown({
   source,
   path,
   opens,
+  live = false,
 }: {
   source: string
   path?: string
+  /** Still being written: its last block closes what it left open. */
+  live?: boolean
   /* What a link to a file beside this document means. Absent, it is a file in
      the project, which is what every caller but one wants. The exception is a
      `SKILL.md`, which lives outside every project — its neighbours cannot be
@@ -43,13 +46,15 @@ export function Markdown({
     (here: string) => (opens ? opens(here) : show('file', { id: `file:${here}`, path: here })),
     [opens, show],
   )
-  const parsed = useMemo(() => blocks(source), [source])
+  /* Text that only grew is read from its last open block on, not from the top. */
+  const was = useRef<Parsed | null>(null)
+  const parsed = useMemo(() => (was.current = grown(was.current, source)).blocks, [source])
 
   return (
     <div className="md">
       <Opening.Provider value={opener}>
         {parsed.map((block, at) => (
-          <Kept key={at} block={block} path={path ?? ''} />
+          <Kept key={at} block={live && at === parsed.length - 1 ? mended(block) : block} path={path ?? ''} />
         ))}
       </Opening.Provider>
     </div>
@@ -57,11 +62,8 @@ export function Markdown({
 }
 
 /* A block drawn again only when it changed: an answer being written changes
-   its last block, and the ones above it hold still. */
-const Kept = memo(
-  (props: { block: Block; path: string }) => <Piece {...props} />,
-  (was, now) => was.path === now.path && JSON.stringify(was.block) === JSON.stringify(now.block),
-)
+   its last block, and the ones above it are the same objects. */
+const Kept = memo((props: { block: Block; path: string }) => <Piece {...props} />)
 
 function Piece({ block, path }: { block: Block; path: string }): React.JSX.Element | null {
   switch (block.kind) {
