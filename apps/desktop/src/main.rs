@@ -66,6 +66,7 @@ mod card_elsewhere;
 mod card_follows;
 mod card_numbers;
 mod card_reconcile;
+mod card_relay;
 mod card_route;
 mod card_sessions;
 mod card_ties;

@@ -17,6 +17,12 @@ pub const TERMINAL_CONTRAST: &str = "terminal.minimum_contrast";
 pub const TERMINAL_BACKEND: &str = "terminal.backend";
 /// Where new worktrees are created. Empty is the devpit workspace.
 pub const WORKTREE_BASE: &str = "worktrees.base";
+/// Whether a finished card opens the next card of its epic in a session of
+/// its own: `off` stops it.
+pub const SESSION_NEXT_CARD: &str = "sessions.next_card";
+/// The share of the context window, in percent, past which a card's session
+/// hands off to a fresh one: 30 unless set, `off` never.
+pub const SESSION_HANDOFF_PERCENT: &str = "sessions.handoff_at_percent";
 /// The apps offered in "Open in", as JSON.
 pub const OPEN_IN_APPS: &str = "apps.open_in";
 /// Which worktree origins are hidden from the lists, comma-separated.

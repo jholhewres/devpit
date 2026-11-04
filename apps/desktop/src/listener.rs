@@ -252,6 +252,19 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
         return;
     }
 
+    // A card's session past its share of the context window leaves the
+    // handoff before anything else runs.
+    let over = posted.pane.as_deref().and_then(|pane| {
+        let store = crate::projects::store().ok()?;
+        crate::card_relay::over_share(&store, body, pane)
+    });
+    if let Some(said) = over {
+        reply(&mut stream, &said);
+        let settled = hear_post(&app, &posted, seq);
+        trace(&format!("post seq={seq} handoff {settled}"));
+        return;
+    }
+
     // Answered before the payload is looked at. The agent is waiting on this
     // reply with a short budget, and nothing it says changes what we reply
     // with.

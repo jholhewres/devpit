@@ -546,6 +546,9 @@ fn respond_in(
             if let Some(app) = app {
                 let _ = app.emit("board:changed", &project.id);
             }
+            if asked.method == "handoff" {
+                crate::card_relay::handed(app, &project.id, &card_id, asked.config_dir.as_deref());
+            }
         }
         let detail = crate::cards::detail_of(project.id.clone(), card_id).map_err(said)?;
         return serde_json::to_value(detail).map_err(|err| err.to_string());
@@ -605,13 +608,19 @@ fn respond_in(
         "finish_card" => {
             on_board(&board, &card_id)?;
             crate::devflow_gate::may_finish(project, &card_id, Path::new(&asked.cwd))?;
-            crate::card_follows::finish(
+            let mut done = crate::card_follows::finish(
                 app,
                 &board,
                 &card_id,
                 &text("summary").unwrap_or_default(),
                 &asked.author,
-            )?
+            )?;
+            let next =
+                crate::card_relay::finished(app, &board, &card_id, asked.config_dir.as_deref());
+            if let (Some(next), Some(done)) = (next, done.as_object_mut()) {
+                done.insert("nextCard".to_owned(), next);
+            }
+            done
         }
         // No card: a session of its own, in the project's folder.
         "start" if card_id.is_empty() => {
