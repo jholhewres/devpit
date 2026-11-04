@@ -28,6 +28,7 @@ pub(crate) const TOPICS: &[&str] = &[
     "devflow:changed",
     "notice:rang",
     "orchestrator:proposed",
+    "panes:changed",
     "pause:changed",
     "permission:asked",
     "permission:settled",
