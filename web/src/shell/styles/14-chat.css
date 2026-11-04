@@ -250,6 +250,11 @@
 /* The last few always drawn: they are what a conversation opens at, and the
    scroll pinned to its end has to measure them for real. */
 .turn:nth-last-child(-n + 3) { content-visibility: visible; }
+/* In the thread's window every row drawn is measured for its spacer, so none
+   is skipped; the window, not the paint, is what keeps a long one cheap. */
+.trow > .turn { content-visibility: visible; }
+.thread__more { align-self: center; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12px; color: var(--text-3); }
+.thread__more:hover { color: var(--text); }
 
 /* Where the answer is being written, while it is. */
 .reply__caret { display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: var(--text-3); border-radius: 1px; animation: caret 1s steps(2, start) infinite; }

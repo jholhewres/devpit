@@ -1,46 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Asked } from './Asked'
-import { Chips } from './Chips'
-import { ASKS, money, ready, unanswered, withHeard } from './chat'
-import { targetOf } from './stop'
+import { ASKS, money } from './chat'
 import { titleOf, type Tab } from './strip'
 import { ChatCardChip } from './ChatCardChip'
-import { ChatWhere } from './ChatWhere'
+import { ChatThread } from './ChatThread'
+import { Composer, type ComposerHandle } from './Composer'
 import { ContextMeter } from './ContextMeter'
-import { ComposerStatus } from './ComposerStatus'
 import { CopySession } from './CopySession'
 import { DocPeek } from './DocPeek'
-import { useDraftShortcut } from './draftShortcut'
 import { AppsScopeContext } from './mcpApps'
 import { WholeFrom } from './WholeFrom'
 import { DropTarget } from './DropTarget'
 import { PaneCorner } from './PaneCorner'
 import { useTaking } from './useTaking'
-import { Turn } from './Turn'
-import { SkillPills } from './SkillPills'
-import { OwnCommand } from './OwnCommand'
 import { useThread } from './useOlder'
-import { useDraft } from './useDraft'
-import { JumpToEnd } from './JumpToEnd'
-import { ComposerFiles } from './ComposerFiles'
-import { ComposerTools } from './ComposerTools'
 import { ChatBlank } from './ChatBlank'
 import { RemoteToggle } from './RemoteToggle'
-import { SessionsChip, SessionsWaiting } from './OrchestratorChat'
-import { Queued } from './Queued'
-import { SecretWarning } from './SecretWarning'
-import { SendButton } from './SendButton'
-import { useQueue } from './useQueue'
+import { SessionsChip } from './OrchestratorChat'
 import { SessionCost } from './SessionCost'
-import { SlashMenu } from './SlashMenu'
-import { MentionMenu } from './MentionMenu'
-import { useMention } from './useMention'
 import { useChat } from './useChat'
-import { useSlash } from './useSlash'
 import { useShell } from './useShell'
-import { useStop } from './useStop'
-import { committed } from './typing'
 
 /*
  * One conversation, per tab.
@@ -58,12 +37,8 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const { active, project, rename, drafted } = useShell()
   const chat = useChat(tab.id)
   const { pasted, dropped } = useTaking(chat)
-  /* A chat opened from a card starts with the card in the composer, unsent. */
-  const [prompt, setPrompt] = useDraft(tab.id, tab.draft)
-  const slash = useSlash(chat.profileId, prompt, setPrompt, Boolean(project?.orchestrator))
   const follow = useThread(project?.id ?? null, tab.id, chat)
-  const field = useRef<HTMLTextAreaElement>(null)
-  const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
+  const composer = useRef<ComposerHandle>(null)
 
   const mine = active?.id === tab.id
   /* A file an answer names opens beside the conversation, not over it. */
@@ -86,34 +61,6 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (name) rename(tab.id, name)
   }, [rename, said, tab.id, tab.title])
 
-  /* Typed while a turn runs, a message waits for it rather than being refused. */
-  const queue = useQueue(chat.sending, chat.say, chat.steer)
-  const sendDraft = useDraftShortcut(project?.orchestrator ?? null, setPrompt)
-  const send = (): void => {
-    if (!ready(prompt, false, chat.profileId)) return
-    if (sendDraft(prompt) || slash.ran(prompt)) return setPrompt('')
-    if (chat.sending) queue.add(prompt)
-    else chat.say(prompt, (back) => setPrompt((was) => was || back))
-    setPrompt('')
-    follow.toEnd()
-  }
-
-  /* A stop hands what was queued back to the composer: it was meant for a
-     turn that is no longer going to happen as planned. */
-  const halt = (): void => {
-    const back = queue.takeAll()
-    if (back) setPrompt((was) => [back, was].filter(Boolean).join('\n\n'))
-    chat.stop()
-  }
-
-  /* The turn in flight is the one still streaming; arming is tied to it so a
-     press that armed against a finished turn cannot stop the next one. */
-  const showEsc = useStop(
-    chat.sending && mine,
-    targetOf(tab.id, chat.messages.find((one) => one.streaming)?.turnId ?? null),
-    halt,
-  )
-
   const empty = chat.messages.length === 0 && !chat.error
 
   return (
@@ -130,70 +77,17 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
       <DropTarget mine={mine} onDrop={dropped} />
       <div className="scroll" ref={follow.box}>
         {empty ? (
-          <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => (setPrompt(text), field.current?.focus())} />
+          <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => composer.current?.put(text)} />
         ) : (
           <AppsScopeContext.Provider value={scope}>
-            <WholeFrom conversationId={tab.id}><div className="thread">
-              {chat.older && <div ref={follow.top} className="thread__older" aria-hidden />}
-              {chat.messages.map((message) => (
-                <Turn key={message.id} message={message} folder={chat.folder} onOpen={setPeek} onRewind={message.turnId && chat.rewindable.includes(message.turnId) ? chat.rewind : undefined} />
-              ))}
-              {unanswered(chat.messages, chat.sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
-              {chat.error && <div className="exempty__t" role="alert">{chat.error}</div>}
-            </div></WholeFrom>
+            <WholeFrom conversationId={tab.id}>
+              <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onOpen={setPeek} />
+            </WholeFrom>
           </AppsScopeContext.Provider>
         )}
       </div>
 
-      <div className="composer">
-        <div className="composer__col">
-          <JumpToEnd away={follow.away} onJump={follow.toEnd} />
-          {/* The question sits above the composer, where your hands are — not
-              in the thread, where it scrolls away from you. */}
-          {/* A session stopped on the person, answered from here: the one
-              thing about the others that cannot wait for a glance aside. */}
-          {project?.orchestrator && <SessionsWaiting profileId={project.orchestrator} />}
-          <Asked questions={chat.asked} onAnswer={chat.answer} />
-          <ComposerStatus conversationId={tab.id} messages={chat.messages} />
-          <SecretWarning text={prompt} />
-          <Queued queue={queue} />
-
-          <div className="composer__in">
-            <ComposerFiles chat={chat} />
-
-            <SkillPills picked={chat.skills} onChange={chat.setSkills} profile={chat.profiles.find((one) => one.id === chat.profileId)} />
-            <SlashMenu slash={slash} />
-            <MentionMenu menu={mention} />
-            <OwnCommand slash={slash} from={tab.id} profileId={chat.profileId} orchestrator={project?.orchestrator ?? null} onClose={() => (slash.closeOwn(), field.current?.focus())} />
-            <textarea
-              className="composer__ph"
-              placeholder="Do anything… @ for a file, / for a command"
-              ref={field}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              onPaste={pasted}
-              onKeyDown={(event) => {
-                /* Enter sends, Shift+Enter a new line; `committed` keeps an accent's Enter out. */
-                if (slash.keyDown(event) || mention.keyDown(event)) return
-                if (committed(event) && !event.shiftKey) {
-                  event.preventDefault()
-                  send()
-                }
-              }}
-            />
-
-            <div className="composer__row">
-              {/* A control takes focus and gives it back: the cursor was mid-sentence. Cancelling
-                  the press instead would be cheaper and swallow the click that opens the menu. */}
-              <Chips chat={chat} refocus={() => field.current?.focus()} />
-              <ComposerTools chat={chat} onHeard={(text) => (setPrompt((was) => withHeard(was, text)), field.current?.focus())} />
-              <SendButton sending={chat.sending} showEsc={showEsc} can={ready(prompt, chat.sending, chat.profileId)} onSend={send} onStop={halt} />
-            </div>
-          </div>
-
-          <ChatWhere />
-        </div>
-      </div>
+      <Composer tab={tab} chat={chat} project={project ?? null} mine={mine} away={follow.away} toEnd={follow.toEnd} handle={composer} pasted={pasted} />
       {peek && <DocPeek path={peek} onOpen={setPeek} onClose={() => setPeek(null)} />}
     </>
   )

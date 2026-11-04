@@ -53,7 +53,7 @@ describe('an output the window got cut', () => {
     const whole: Part[] = [cut[0]!, { ...cut[1]!, output: 'ok' } as Part]
     render(
       <WholeContext.Provider value={{ projectId: 'p1', conversationId: 'c1' }}>
-        <Acts parts={whole} live={true} messageId="m1" />
+        <Acts parts={whole} live={true} messageId="m2" />
       </WholeContext.Provider>,
     )
     fireEvent.click(screen.getByRole('button', { expanded: false }))

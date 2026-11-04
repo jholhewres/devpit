@@ -7,6 +7,7 @@ import type { Part } from '../gen/bindings'
 import { editDiff } from './editCard'
 import { EditCard } from './EditCardView'
 import { Markdown } from './MarkdownView'
+import { useDisclosed } from './useDisclosed'
 
 /*
  * What the agent did, as a foldable stack of rows.
@@ -18,10 +19,21 @@ import { Markdown } from './MarkdownView'
 /* The message the rows are of, to ask for an output the window got cut. */
 const MessageContext = createContext<string | null>(null)
 
+/* A fold's key: its message and its row, or none outside a message. */
+function useFoldKey(id: string): string | null {
+  const messageId = useContext(MessageContext)
+  return messageId && `${messageId}:${id}`
+}
+
 export function Acts({ parts, live, messageId = null }: { parts: readonly Part[]; live: boolean; messageId?: string | null }): React.JSX.Element | null {
   const rows = acts(parts)
-  const [open, setOpen] = useState(live)
-  useEffect(() => setOpen(live), [live])
+  const [open, setOpen] = useDisclosed(messageId && `${messageId}:acts`, live)
+  /* Open while it runs and folded once done; a turn drawn again keeps what was chosen. */
+  const was = useRef(live)
+  useEffect(() => {
+    if (was.current !== live) setOpen(live)
+    was.current = live
+  }, [live, setOpen])
 
   if (rows.length === 0) return null
 
@@ -45,7 +57,7 @@ export function Acts({ parts, live, messageId = null }: { parts: readonly Part[]
 }
 
 function AgentRow({ act }: { act: Act }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useDisclosed(useFoldKey(act.id), false)
   return (
     <div className="arow">
       <button className="arow__h" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
@@ -67,7 +79,7 @@ function AgentRow({ act }: { act: Act }): React.JSX.Element {
 
 /* A run of one act, closed to its count and open to its rows. */
 function GroupRow({ group }: { group: Group }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useDisclosed(useFoldKey(group.id), false)
   return (
     <div className="arow">
       <button className="arow__h" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
@@ -99,7 +111,7 @@ function LeafRow({ act }: { act: Act }): React.JSX.Element {
   /* An edit shows what it changed as soon as it is on screen: the diff is the
      point of the row, and a chevron in front of it is a click for nothing. */
   const edited = act.kind === 'edit' ? editDiff(act.input) : null
-  const [open, setOpen] = useState(edited !== null)
+  const [open, setOpen] = useDisclosed(useFoldKey(act.id), edited !== null)
 
   return (
     <div className="arow">

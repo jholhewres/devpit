@@ -45,7 +45,7 @@ function thread(first: Message[], older: boolean): { box: HTMLDivElement; shown:
   let height = 1000
   let redraw: () => void = () => {}
   function Thread(): React.JSX.Element {
-    const top = useOlder(
+    const { top, stalled } = useOlder(
       { projectId: 'p', conversationId: 'c' },
       messages,
       more,
@@ -60,6 +60,7 @@ function thread(first: Message[], older: boolean): { box: HTMLDivElement; shown:
     return (
       <div ref={boxRef}>
         <div ref={top} />
+        {stalled && <i>stalled</i>}
         {messages.map((one) => (
           <p key={one.id}>{one.id}</p>
         ))}
@@ -111,6 +112,13 @@ describe("a chat's older messages", () => {
   it('go in once, a message already drawn not drawn again', () => {
     const drawn = [message('m3'), message('m4')]
     expect(prepended(drawn, [message('m2'), message('m3')]).map((one) => one.id)).toEqual(['m2', 'm3', 'm4'])
+  })
+
+  it('offer a way to ask again when a page brought nothing new', async () => {
+    pages.push({ messages: [message('m3')], older: true })
+    const { box } = thread([message('m3'), message('m4')], true)
+    await act(async () => seen([{ isIntersecting: true }]))
+    await waitFor(() => expect(box.querySelector('i')?.textContent).toBe('stalled'))
   })
 
   it('are not asked for when none are left', async () => {
