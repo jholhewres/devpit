@@ -5,6 +5,7 @@ import { playable, type Lane } from './board'
 import { CardMenu } from './CardMenuView'
 import { Tile } from './Lane'
 import { tileAction } from './tileKeys'
+import { useShown } from './useShown'
 import type { CardBoardActs } from './useCardActs'
 import type { Drag } from './useDrag'
 import type { Unread } from './unread'
@@ -68,10 +69,12 @@ export function LaneCards({
     if (title && title !== card.title) rename.current(card.id, title)
   }, [])
   const slot = held && <div className="slot" style={{ height: held.height }} />
+  const list = useRef<HTMLDivElement>(null)
+  const { shown, mark } = useShown(lane.cards.length, list)
 
   return (
-    <div className="blane__list">
-      {lane.cards.map((card, index) => (
+    <div className="blane__list" ref={list}>
+      {lane.cards.slice(0, shown).map((card, index) => (
         <Fragment key={card.id}>
           {dropping && held?.moved && landing?.index === index && slot}
           <div
@@ -118,7 +121,8 @@ export function LaneCards({
           </div>
         </Fragment>
       ))}
-      {dropping && held?.moved && (landing?.index ?? 0) >= lane.cards.length && slot}
+      {dropping && held?.moved && (landing?.index ?? 0) >= shown && slot}
+      {shown < lane.cards.length && <div className="blane__more" ref={mark} aria-hidden="true" />}
 
       {menu && (
         <CardMenu

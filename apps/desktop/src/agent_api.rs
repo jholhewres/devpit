@@ -558,6 +558,9 @@ fn respond_in(
     .map_err(said)?;
     let answer = match asked.method.as_str() {
         "context" => context(project, &board, Path::new(&asked.cwd)),
+        "board" if crate::board_page::asked(&asked.params) => {
+            crate::board_page::page(&board, &asked.params, card_row)?
+        }
         "board" => board_view(&board),
         "create" => {
             let title = text("title")
@@ -981,23 +984,28 @@ pub(crate) fn board_view(board: &Board) -> Value {
             "id": column.id,
             "name": column.name,
             "runsAStep": column.step.is_some(),
-            "cards": board.cards.iter().filter(|card| card.column_id == column.id).map(|card| json!({
-                "id": card.id,
-                "number": card.number,
-                "title": card.title,
-                "comments": card.comments,
-                "lastRun": card.runs.first().map(|run| &run.state),
-                "parentId": card.parent_id,
-                // What still blocks it: a blocker done or released no longer does.
-                "blockedBy": card.blocked_by.iter().filter(|by| by.holds()).map(|by| json!({ "id": by.id, "title": by.title })).collect::<Vec<_>>(),
-                "progress": card.progress,
-                "criteria": (!card.criteria.is_empty()).then(|| json!({
-                    "done": card.criteria.iter().filter(|one| one.done).count(),
-                    "total": card.criteria.len(),
-                })),
-            })).collect::<Vec<_>>(),
+            "cards": board.cards.iter().filter(|card| card.column_id == column.id).map(card_row).collect::<Vec<_>>(),
         }))
         .collect::<Vec<_>>())
+}
+
+/// One card as the board lists it.
+pub(crate) fn card_row(card: &devpit_rpc::Card) -> Value {
+    json!({
+        "id": card.id,
+        "number": card.number,
+        "title": card.title,
+        "comments": card.comments,
+        "lastRun": card.runs.first().map(|run| &run.state),
+        "parentId": card.parent_id,
+        // What still blocks it: a blocker done or released no longer does.
+        "blockedBy": card.blocked_by.iter().filter(|by| by.holds()).map(|by| json!({ "id": by.id, "title": by.title })).collect::<Vec<_>>(),
+        "progress": card.progress,
+        "criteria": (!card.criteria.is_empty()).then(|| json!({
+            "done": card.criteria.iter().filter(|one| one.done).count(),
+            "total": card.criteria.len(),
+        })),
+    })
 }
 
 pub(crate) fn card_view(board: &Board, id: &str) -> Result<Value, String> {

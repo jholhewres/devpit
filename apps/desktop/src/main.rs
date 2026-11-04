@@ -20,6 +20,7 @@ mod attaching;
 mod attaching_chat;
 mod blocks;
 mod board;
+mod board_page;
 mod branches;
 mod browser;
 mod browser_cookies;

@@ -36,6 +36,27 @@ const COMMENTED: [&str; 4] = [
     "devpit_handoff",
 ];
 
+/// How many cards of each lane `devpit_board` asks for when the call says
+/// neither that nor `full` (`apps/desktop/src/board_page.rs`).
+const BOARD_PAGE: u64 = 20;
+
+/// The board's arguments that already say which page.
+const PAGING: [&str; 6] = ["limit", "cursor", "column", "epic", "text", "done"];
+
+/// The arguments the app is asked with: a board a page at a time unless the
+/// call asked for it whole or said which page.
+pub(crate) fn asked(tool: &str, mut arguments: Value) -> Value {
+    if tool == "devpit_board"
+        && !wants_full(&arguments)
+        && PAGING.iter().all(|name| arguments.get(name).is_none())
+    {
+        if let Some(fields) = arguments.as_object_mut() {
+            fields.insert("limit".to_owned(), json!(BOARD_PAGE));
+        }
+    }
+    arguments
+}
+
 /// Whether the call asked for the whole answer.
 pub(crate) fn wants_full(arguments: &Value) -> bool {
     arguments.get(FULL).and_then(Value::as_bool) == Some(true)
@@ -134,15 +155,16 @@ fn card(mut detail: Value, every_comment: bool) -> Value {
     detail
 }
 
-/// Each column with its cards, one short row each.
-/// An object, unlike the app's bare list: where a cut can say so.
-fn board(columns: Value) -> Value {
-    let Value::Array(columns) = columns else {
-        return columns;
+/// Each column with its cards, one short row each. The app answers a page
+/// as `{ columns }`, or the whole board as the bare list an app before pages
+/// gave; either way the summary is an object.
+fn board(answer: Value) -> Value {
+    let mut answer = match answer {
+        Value::Array(columns) => json!({ "columns": columns }),
+        paged => paged,
     };
-    let columns = json!(columns
-        .into_iter()
-        .map(|mut column| {
+    if let Some(columns) = answer["columns"].as_array_mut() {
+        for column in columns.iter_mut() {
             if let Some(cards) = column["cards"].as_array_mut() {
                 for card in cards.iter_mut() {
                     *card = board_card(std::mem::take(card));
@@ -153,10 +175,9 @@ fn board(columns: Value) -> Value {
                     column.remove("runsAStep");
                 }
             }
-            column
-        })
-        .collect::<Vec<_>>());
-    json!({ "columns": columns })
+        }
+    }
+    answer
 }
 
 fn board_card(mut card: Value) -> Value {

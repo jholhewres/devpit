@@ -25,6 +25,8 @@
    or the cards ran on over Add card. The side padding keeps a hovered
    tile's lift and shadow inside the clip. */
 .blane__list { flex: 0 1 auto; min-height: 24px; display: flex; flex-direction: column; gap: 6px; padding: 2px 4px 6px; margin: 0 -4px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+/* Where a long lane draws its next cards, once it comes near the view. */
+.blane__more { flex: none; height: 1px; }
 .blane__fill { flex: 1; min-height: 8px; }
 
 .tile {

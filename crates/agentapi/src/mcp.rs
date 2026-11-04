@@ -41,8 +41,16 @@ pub(crate) const TOOLS: [Tool; 34] = [
     Tool {
         name: "devpit_board",
         method: "board",
-        description: "Every column of the project's board with its cards: id, title, comment count, last run state, the epic it belongs to, the cards still blocking it, an epic's progress and how many criteria are ticked.",
-        input: || json!({ "type": "object", "properties": { "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." } } }),
+        description: "The project's board a page at a time: each column with how many cards it holds, its first 20 (id, number, title, last run state, epic, the cards still blocking it, an epic's progress, criteria ticked) and `nextCursor` while there are more. A column whose role is done is only counted unless `done: true` or `column` names it.",
+        input: || json!({ "type": "object", "properties": {
+            "project": { "type": "string", "description": "Orchestrator only: another project, by id or name." },
+            "limit": { "type": "integer", "description": "Cards per column, at most 200. Defaults to 20." },
+            "cursor": { "type": "string", "description": "A column's nextCursor, for its next page." },
+            "column": { "type": "string", "description": "One column, by id or name." },
+            "epic": { "type": "string", "description": "Only an epic's cards, by its id." },
+            "text": { "type": "string", "description": "Only cards whose title holds this, or #42." },
+            "done": { "type": "boolean", "description": "List the cards of done columns too." }
+        } }),
     },
     Tool {
         name: "devpit_artifacts",
@@ -542,7 +550,7 @@ fn call(
         .unwrap_or_else(|| json!({}));
     let arguments = crate::devflow::hooked(tool.name, arguments, &|name| std::env::var(name).ok());
     let full = lean::wants_full(&arguments);
-    match ask(tool.method, arguments.clone()) {
+    match ask(tool.method, lean::asked(tool.name, arguments.clone())) {
         Ok(answer) if tool.name == crate::skills::TOOL && !full && given.again(&answer) => {
             said(&lean::given_before(&answer), false)
         }

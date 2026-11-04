@@ -233,3 +233,31 @@ fn the_shaped_tools_offer_full_and_the_card_its_comments() {
     offered("devpit_context", &mut context);
     assert_eq!(context["properties"], json!({}));
 }
+
+#[test]
+fn the_board_is_asked_a_page_unless_the_call_wants_it_whole_or_says_which() {
+    assert_eq!(asked("devpit_board", json!({}))["limit"], BOARD_PAGE);
+    assert!(asked("devpit_board", json!({ "full": true }))
+        .get("limit")
+        .is_none());
+    assert_eq!(
+        asked("devpit_board", json!({ "column": "doing" })),
+        json!({ "column": "doing" })
+    );
+    assert_eq!(
+        asked("devpit_card", json!({ "cardId": "c" })),
+        json!({ "cardId": "c" })
+    );
+}
+
+#[test]
+fn a_paged_board_keeps_each_columns_total_and_cursor() {
+    let page = json!({ "columns": [{ "id": "col_1", "name": "todo", "runsAStep": false, "total": 30, "nextCursor": "col_1:19:card_19",
+        "cards": [{ "id": "card_1", "number": 1, "title": "A card", "comments": 2, "blockedBy": [] }] }] });
+    let answer = lean("devpit_board", json!({}), page);
+    assert_eq!(
+        answer,
+        json!({ "columns": [{ "id": "col_1", "name": "todo", "total": 30, "nextCursor": "col_1:19:card_19",
+            "cards": [{ "id": "card_1", "number": 1, "title": "A card" }] }] })
+    );
+}
