@@ -273,8 +273,41 @@ pub fn serve(root: &Path) -> i32 {
             }
         });
     }
-    let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
+    let ask: Ask = {
+        let (root, cwd) = (root.to_path_buf(), cwd.clone());
+        Arc::new(move |method: &str, params| client::ask(&root, method, params, &cwd))
+    };
+    let out: Out = Arc::new(send);
+    answered(
+        std::io::stdin().lock(),
+        &ask,
+        offered,
+        &watch,
+        &initialized,
+        &out,
+    );
+    0
+}
+
+/// The app, asked from any thread.
+pub(crate) type Ask = Arc<dyn Fn(&str, Value) -> Result<Value, String> + Send + Sync>;
+/// Where a whole message goes; `false` once the client is gone.
+pub(crate) type Out = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+
+/// Each message of `lines` answered to `out`, until the client hangs up and
+/// the calls still running have answered. A tool call runs on a thread of its
+/// own, so a slow one — `devflow_evidence` running the checks — holds no
+/// other.
+pub(crate) fn answered(
+    lines: impl BufRead,
+    ask: &Ask,
+    offered: bool,
+    watch: &Mutex<Watch>,
+    initialized: &AtomicBool,
+    out: &Out,
+) {
+    let mut running: Vec<std::thread::JoinHandle<()>> = Vec::new();
+    for line in lines.lines() {
         let Ok(line) = line else { break };
         if line.trim().is_empty() {
             continue;
@@ -283,15 +316,19 @@ pub fn serve(root: &Path) -> i32 {
             .lock()
             .map(|watch| (watch.offer.clone(), watch.seat.clone()))
             .unwrap_or((Offer::Off, Seat::default()));
-        let answer = handle_offering(
-            &line,
-            &|method, params| client::ask(root, method, params, &cwd),
-            offered,
-            &offer,
-            &seat,
-        );
+        if calls_a_tool(&line) {
+            running.retain(|call| !call.is_finished());
+            let (ask, out) = (ask.clone(), out.clone());
+            running.push(std::thread::spawn(move || {
+                if let Some(answer) = handle_offering(&line, &*ask, offered, &offer, &seat) {
+                    out(&answer);
+                }
+            }));
+            continue;
+        }
+        let answer = handle_offering(&line, &**ask, offered, &offer, &seat);
         if let Some(answer) = answer {
-            if !send(&answer) {
+            if !out(&answer) {
                 break;
             }
         }
@@ -299,7 +336,16 @@ pub fn serve(root: &Path) -> i32 {
             initialized.store(true, Ordering::Relaxed);
         }
     }
-    0
+    for call in running {
+        let _ = call.join();
+    }
+}
+
+/// Whether `line` is a `tools/call`, the one request that waits on the app's work.
+fn calls_a_tool(line: &str) -> bool {
+    serde_json::from_str::<Value>(line)
+        .ok()
+        .is_some_and(|message| message.get("method").and_then(Value::as_str) == Some("tools/call"))
 }
 
 /// Whether `line` is the client's `initialize`, answered by now.

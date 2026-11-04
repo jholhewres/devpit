@@ -324,3 +324,55 @@ fn a_decision_is_waited_for_longer_than_a_read() {
         assert!(client::wait_for(method) > client::wait_for("board"));
     }
 }
+
+/// A slow call — the checks of `devflow_evidence` — holds only itself: the
+/// next call of the same session is answered while it runs.
+#[test]
+fn another_call_is_answered_while_evidence_runs() {
+    let (release, released) = std::sync::mpsc::channel::<()>();
+    let released = Mutex::new(released);
+    let ask: Ask = Arc::new(move |method: &str, _| match method {
+        "devflow_evidence" => {
+            let waited = released
+                .lock()
+                .expect("lock")
+                .recv_timeout(std::time::Duration::from_secs(3));
+            Ok(json!({ "evidence": if waited.is_ok() { "ran" } else { "held the rest" } }))
+        }
+        _ => Ok(json!({ "skill": "devflow-execution" })),
+    });
+    let order = Arc::new(Mutex::new(Vec::<Value>::new()));
+    let out: Out = {
+        let (order, release) = (order.clone(), Mutex::new(release));
+        Arc::new(move |message: &str| {
+            let said: Value = serde_json::from_str(message).expect("json");
+            if said["id"] == 2 {
+                let _ = release.lock().expect("lock").send(());
+            }
+            order.lock().expect("lock").push(said);
+            true
+        })
+    };
+    let lines = concat!(
+        r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"devpit_devflow_evidence","arguments":{"card":"crd_1"}}}"#,
+        "\n",
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"devpit_devflow_skill","arguments":{"name":"devflow-execution"}}}"#,
+        "\n",
+    );
+    let home = tempfile::tempdir().expect("home");
+    answered(
+        lines.as_bytes(),
+        &ask,
+        true,
+        &Mutex::new(Watch::new(home.path())),
+        &AtomicBool::new(true),
+        &out,
+    );
+    let order = order.lock().expect("lock");
+    let ids: Vec<&Value> = order.iter().map(|said| &said["id"]).collect();
+    assert_eq!(ids, [&json!(2), &json!(1)]);
+    assert!(order[1]["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("\"ran\""));
+}
