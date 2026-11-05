@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use devpit_remote::noise::{hex, unhex32, Keys};
-use devpit_remote::{Link, Relay, RelayError};
+use devpit_remote::{Link, Received, Relay, RelayError};
 use devpit_rpc::{RemoteIn, RemoteRelay};
 use serde::{Deserialize, Serialize};
 use tungstenite::stream::MaybeTlsStream;
@@ -205,7 +205,7 @@ fn join(app: tauri::AppHandle, root: PathBuf, relay: Relay, keys: Keys, splice: 
     let Ok(socket) = relay.splice(splice) else {
         return;
     };
-    devpit_remote::relay::timeout(&socket, Duration::from_millis(40));
+    devpit_remote::relay::timeout(&socket, crate::remote_conn::LISTEN);
     let Ok(link) = Link::answer(socket, &keys, relay.host(), MOST_MESSAGE, HELLO_WITHIN) else {
         return;
     };
@@ -291,12 +291,13 @@ struct Relayed(Option<RelayLink>);
 impl Wire for Relayed {
     fn hear(&mut self) -> Result<Heard, ()> {
         let link = self.0.as_mut().ok_or(())?;
-        match link.receive().map_err(|_| ())? {
-            devpit_remote::Heard::Message(bytes) => {
+        match link.receive_any().map_err(|_| ())? {
+            Received::Heard(devpit_remote::Heard::Message(bytes)) => {
                 String::from_utf8(bytes).map(Heard::Text).map_err(|_| ())
             }
-            devpit_remote::Heard::Alive => Ok(Heard::Alive),
-            devpit_remote::Heard::Nothing => Ok(Heard::Nothing),
+            Received::Bytes(bytes) => Ok(Heard::Bytes(bytes)),
+            Received::Heard(devpit_remote::Heard::Alive) => Ok(Heard::Alive),
+            Received::Heard(devpit_remote::Heard::Nothing) => Ok(Heard::Nothing),
         }
     }
 
@@ -305,6 +306,16 @@ impl Wire for Relayed {
             .0
             .as_mut()
             .is_some_and(|link| link.send(text.as_bytes()).is_err());
+        if gone {
+            self.end();
+        }
+    }
+
+    fn say_bytes(&mut self, bytes: &[u8]) {
+        let gone = self
+            .0
+            .as_mut()
+            .is_some_and(|link| link.send_bytes(bytes).is_err());
         if gone {
             self.end();
         }

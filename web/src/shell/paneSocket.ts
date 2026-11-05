@@ -37,6 +37,12 @@ export function frame(handle: number, kind: number, bytes: Uint8Array): Uint8Arr
   return wire
 }
 
+/** A frame's parts, or null when it is too short to be one. */
+export function unframe(wire: Uint8Array): { handle: number; kind: number; bytes: Uint8Array } | null {
+  if (wire.length < 5) return null
+  return { handle: new DataView(wire.buffer, wire.byteOffset).getUint32(0, true), kind: wire[4]!, bytes: wire.subarray(5) }
+}
+
 export interface PaneListener {
   output: (bytes: Uint8Array, replay: boolean) => void
   /** Why it ended; `null` for a pane whose program exited. */
@@ -163,12 +169,12 @@ export class PaneSocket {
   }
 
   private heard(wire: Uint8Array): void {
-    if (wire.length < 5) return
-    const handle = new DataView(wire.buffer, wire.byteOffset).getUint32(0, true)
+    const parts = unframe(wire)
+    if (!parts) return
+    const { handle, bytes } = parts
     const open = this.panes.get(handle)
     if (!open) return
-    const bytes = wire.subarray(5)
-    switch (wire[4]) {
+    switch (parts.kind) {
       case Kind.Output:
         return open.on.output(bytes, false)
       case Kind.Replay:

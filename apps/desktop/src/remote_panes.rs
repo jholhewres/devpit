@@ -17,11 +17,50 @@ use portable_pty::{CommandBuilder, PtySize};
 /// The most terminals one connection watches at once.
 const MOST: usize = 4;
 
+/// A terminal's bytes for a viewer that reads them raw, under the handle it
+/// gave the pane.
+pub(crate) struct Raw {
+    pub handle: u32,
+    pub bytes: Vec<u8>,
+}
+
+/// Where a watched pane's bytes go: base64 in JSON for a viewer that reads
+/// only that, raw for one that gave the pane a handle.
+#[derive(Clone)]
+pub(crate) enum Sink {
+    Json(Sender<RemoteOut>),
+    Raw(Sender<Raw>, u32),
+}
+
+impl Sink {
+    /// False once the connection is gone.
+    pub(crate) fn bytes(&self, pane: &str, bytes: Vec<u8>) -> bool {
+        match self {
+            Sink::Json(out) => out
+                .send(RemoteOut::PaneBytes {
+                    pane: pane.to_owned(),
+                    b64: BASE64.encode(&bytes),
+                })
+                .is_ok(),
+            Sink::Raw(out, handle) => out
+                .send(Raw {
+                    handle: *handle,
+                    bytes,
+                })
+                .is_ok(),
+        }
+    }
+}
+
 /// The panes one connection has open.
 #[derive(Default)]
 pub(crate) struct Watching {
     viewer: String,
     open: HashMap<String, Open>,
+    /// Set for a connection that carries raw bytes.
+    pub(crate) raw: Option<Sender<Raw>>,
+    /// The pane each raw handle names.
+    handles: HashMap<u32, String>,
 }
 
 enum Open {
@@ -42,6 +81,16 @@ impl Watching {
         Watching {
             viewer: viewer.to_string(),
             open: HashMap::new(),
+            raw: None,
+            handles: HashMap::new(),
+        }
+    }
+
+    /// The sink for a pane the viewer gave `handle`, or none.
+    pub(crate) fn sink(&self, out: &Sender<RemoteOut>, handle: Option<u32>) -> Sink {
+        match (handle, &self.raw) {
+            (Some(handle), Some(raw)) => Sink::Raw(raw.clone(), handle),
+            _ => Sink::Json(out.clone()),
         }
     }
 
@@ -53,15 +102,37 @@ impl Watching {
         typing: bool,
         size: (u16, u16),
         out: Sender<RemoteOut>,
+        handle: Option<u32>,
     ) -> Result<(), String> {
         self.close(pane);
+        let sink = self.sink(&out, handle);
+        let raw = match &sink {
+            Sink::Raw(_, handle) => Some(*handle),
+            Sink::Json(_) => None,
+        };
+        self.watch(project, pane, typing, size, sink, out)?;
+        if let Some(handle) = raw {
+            self.handles.insert(handle, pane.to_owned());
+        }
+        Ok(())
+    }
+
+    fn watch(
+        &mut self,
+        project: &str,
+        pane: &str,
+        typing: bool,
+        size: (u16, u16),
+        sink: Sink,
+        out: Sender<RemoteOut>,
+    ) -> Result<(), String> {
         if self.open.len() >= MOST {
             return Err(format!("at most {MOST} terminals at once"));
         }
         #[cfg(unix)]
         if let Some(number) = ptyd_number(project, pane) {
             let home = devpit_core::Store::root().map_err(|err| err.to_string())?;
-            return self.open_ptyd_at(&home, pane, number, out);
+            return self.open_ptyd_at(&home, pane, number, sink, out);
         }
         let server = crate::sessions::tmux_server().map_err(|err| err.message)?;
         let session = devpit_tmux::Server::session_name(project);
@@ -88,11 +159,7 @@ impl Watching {
         let named = pane.to_owned();
         std::thread::spawn(move || {
             while let Some(bytes) = frames.blocking_recv() {
-                let said = RemoteOut::PaneBytes {
-                    pane: named.clone(),
-                    b64: BASE64.encode(&bytes),
-                };
-                if out.send(said).is_err() {
+                if !sink.bytes(&named, bytes) {
                     return;
                 }
             }
@@ -111,6 +178,7 @@ impl Watching {
         home: &std::path::Path,
         pane: &str,
         number: u32,
+        sink: Sink,
         out: Sender<RemoteOut>,
     ) -> Result<(), String> {
         use devpit_ptyd::frame::{self, Frame, Kind};
@@ -122,7 +190,7 @@ impl Watching {
         frame::write(&mut stream, &Frame::new(number, Kind::Attach, Vec::new()))
             .map_err(|err| err.to_string())?;
         let named = pane.to_owned();
-        std::thread::spawn(move || forward(reading, number, &named, &out));
+        std::thread::spawn(move || forward(reading, number, &named, &sink, &out));
         let home = home.to_path_buf();
         self.open.insert(
             pane.to_owned(),
@@ -151,7 +219,13 @@ impl Watching {
         }
     }
 
+    /// The pane a viewer's raw handle names.
+    pub(crate) fn pane_of(&self, handle: u32) -> Option<&str> {
+        self.handles.get(&handle).map(String::as_str)
+    }
+
     pub(crate) fn close(&mut self, pane: &str) {
+        self.handles.retain(|_, named| named != pane);
         match self.open.remove(pane) {
             Some(Open::Tmux { session, pty }) => {
                 if let Ok(server) = crate::sessions::tmux_server() {
@@ -198,6 +272,7 @@ pub(crate) fn forward(
     mut reading: impl std::io::Read,
     number: u32,
     pane: &str,
+    sink: &Sink,
     out: &Sender<RemoteOut>,
 ) {
     use devpit_ptyd::frame::{self, Kind};
@@ -207,11 +282,7 @@ pub(crate) fn forward(
         }
         match one.kind() {
             Some(Kind::Output | Kind::Replay) => {
-                let said = RemoteOut::PaneBytes {
-                    pane: pane.to_owned(),
-                    b64: BASE64.encode(&one.bytes),
-                };
-                if out.send(said).is_err() {
+                if !sink.bytes(pane, one.bytes) {
                     return;
                 }
             }

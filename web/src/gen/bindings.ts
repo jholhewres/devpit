@@ -4803,7 +4803,13 @@ export type RemoteIn =
  *  Watch a terminal, sized for the viewer's screen. The desk's own size
  *  does not change.
  */
-{ t: "paneOpen"; project: string; pane: string; cols: number; rows: number } | 
+{ t: "paneOpen"; project: string; pane: string; cols: number; rows: number; 
+/**
+ *  Given by a viewer that reads raw bytes, to a host whose welcome
+ *  said `binary`: its bytes then come as `[u32 handle][u8 kind][bytes]`
+ *  frames, little-endian, instead of `paneBytes`.
+ */
+handle?: number | null } | 
 /**  Keys, as bytes in base64. Only a device allowed to type. */
 { t: "paneInput"; pane: string; b64: string } | 
 /**  A line written and sent, as if pasted and Enter pressed. */
@@ -4871,7 +4877,9 @@ export type RemoteOrchestrator = {
 };
 
 /**  What the host says. */
-export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean } | 
+export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean; 
+/**  The host reads and sends raw terminal bytes; absent from an older one. */
+binary?: boolean } | 
 /**  Said once, then the connection ends. */
 { t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | { t: "drafts"; drafts: RemoteDraft[] } | { t: "agentHealth"; health: AgentHealth } | 
 /**  A session started from here, by the name to find it under. */

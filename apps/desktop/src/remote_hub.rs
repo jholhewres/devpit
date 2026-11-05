@@ -34,7 +34,7 @@ pub(crate) fn join(
 }
 
 /// [`join`], without telling the window.
-fn enter(device: &str) -> (u64, Sender<RemoteOut>, Receiver<RemoteOut>) {
+pub(crate) fn enter(device: &str) -> (u64, Sender<RemoteOut>, Receiver<RemoteOut>) {
     let id = NEXT.fetch_add(1, Ordering::SeqCst);
     let (out, heard) = channel();
     if let Ok(mut conns) = CONNS.lock() {
@@ -62,7 +62,7 @@ pub(crate) fn drop_device(app: &tauri::AppHandle, device: &str) {
 }
 
 /// [`drop_device`], without telling the window.
-fn drop_conns(device: &str) {
+pub(crate) fn drop_conns(device: &str) {
     if let Ok(mut conns) = CONNS.lock() {
         conns.retain(|one| one.device != device);
     }

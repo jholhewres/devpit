@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AgentHealth, Board, Conversations, LivePane, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion, RemoteTalks } from '../gen/bindings'
+import { Kind, unframe } from '../shell/paneSocket'
 import { launcherLink } from '../shell/remoteLauncher'
 import { connectRelay, CLOSED, deviceKey, forgetMachine, keepMachine, machinesKept, offerOpened, type RelayMachine, type RelayPairing } from './relay'
 import { RelayNothing, RelayPair } from './RelayPair'
@@ -10,7 +11,7 @@ import { RemotePair } from './RemotePair'
 import { RemoteSecret } from './RemoteSecret'
 import { RemoteTerminal } from './RemoteTerminal'
 import { RemoteWaiting } from './RemoteWaiting'
-import { connect, keepToken, tokenKept, type Link } from './socket'
+import { bytesOf, connect, keepToken, tokenKept, type Link } from './socket'
 
 /*
  * The viewer: which machine, which project, and its terminals, board,
@@ -32,6 +33,8 @@ export interface Welcome {
   host: string
   typing: boolean
   answering: boolean
+  /** Absent from an older host, which sends only JSON. */
+  binary?: boolean
 }
 
 export function RemoteApp(): React.JSX.Element {
@@ -57,13 +60,15 @@ export function RemoteApp(): React.JSX.Element {
   const [started, setStarted] = useState<string | null>(null)
   const [kept, setKept] = useState<string | null>(null)
   const link = useRef<Link | null>(null)
-  const bytes = useRef<(pane: string, b64: string) => void>(() => {})
+  /* A terminal's bytes, by its pane in JSON or by its handle when raw. */
+  const bytes = useRef<(from: string | number, data: Uint8Array) => void>(() => {})
   /* The chat open now hears what is said about it here. */
   const talk = useRef<(heard: RemoteOut) => void>(() => {})
   const projectRef = useRef(projectId)
   projectRef.current = projectId
 
   const send = useCallback((message: RemoteIn) => link.current?.send(message), [])
+  const sendBytes = useCallback((frame: Uint8Array<ArrayBuffer>) => link.current?.sendBytes(frame), [])
 
   useEffect(() => {
     if (!token && !relay) return
@@ -86,7 +91,7 @@ export function RemoteApp(): React.JSX.Element {
           setProjectId((was) => was ?? message.projects.find((one) => one.terminals.length > 0)?.id ?? message.projects[0]?.id ?? null)
           return
         case 'paneBytes':
-          bytes.current(message.pane, message.b64)
+          bytes.current(message.pane, bytesOf(message.b64))
           return
         case 'paneClosed':
           setPane((was) => (was === message.pane ? null : was))
@@ -136,14 +141,18 @@ export function RemoteApp(): React.JSX.Element {
           return
       }
     }
+    const raw = (frame: Uint8Array): void => {
+      const parts = unframe(frame)
+      if (parts?.kind === Kind.Output) bytes.current(parts.handle, parts.bytes)
+    }
     if (relay) {
       const state = (now: boolean, why?: string, code = 0): void => {
         setUp(now)
         setAway(now || !why ? null : { why, code })
       }
-      link.current = connectRelay(relay, deviceKey(), heard, state, { origin: location.origin, pairing })
+      link.current = connectRelay(relay, deviceKey(), heard, state, { origin: location.origin, pairing, raw })
     } else if (token) {
-      link.current = connect(token, heard, setUp)
+      link.current = connect(token, heard, setUp, raw)
     }
     return () => link.current?.close()
   }, [token, relay, pairing])
@@ -242,7 +251,7 @@ export function RemoteApp(): React.JSX.Element {
                 </button>
               ))}
             </div>
-            {pane && <RemoteTerminal key={pane} project={project.id} pane={pane} typing={welcome?.typing ?? false} send={send} bytes={bytes} />}
+            {pane && <RemoteTerminal key={pane} project={project.id} pane={pane} typing={welcome?.typing ?? false} binary={welcome?.binary ?? false} send={send} sendBytes={sendBytes} bytes={bytes} />}
           </>
         )}
         {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} waiting={questions.length + drafts.length} onWaiting={() => setView('waiting')} send={send} />}

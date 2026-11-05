@@ -29,10 +29,15 @@ pub(crate) const HELLO_WITHIN: Duration = Duration::from_secs(10);
 pub(crate) const MOST_MESSAGE: usize = 256 * 1024;
 /// A connection that says nothing for this long is closed.
 const IDLE: Duration = Duration::from_secs(90);
+/// The longest one read waits: what a pane prints waits at most this long
+/// to go out, so an echo is not held behind a quiet viewer.
+pub(crate) const LISTEN: Duration = Duration::from_millis(8);
 
 /// What one read of a connection brought.
 pub(crate) enum Heard {
     Text(String),
+    /// A raw frame, `[u32 handle][u8 kind][bytes]`.
+    Bytes(Vec<u8>),
     /// A ping, or part of a message: the viewer is there.
     Alive,
     /// Nothing within the read's timeout.
@@ -44,6 +49,8 @@ pub(crate) trait Wire {
     /// One read; an error when the connection is gone.
     fn hear(&mut self) -> Result<Heard, ()>;
     fn say(&mut self, text: &str);
+    /// A raw frame, to a viewer that gave a handle.
+    fn say_bytes(&mut self, bytes: &[u8]);
     /// Ends the connection, and with it whatever keys it held.
     fn end(&mut self);
 }
@@ -56,6 +63,7 @@ impl Wire for Tailnet {
     fn hear(&mut self) -> Result<Heard, ()> {
         match self.0.read() {
             Ok(Message::Text(text)) => Ok(Heard::Text(text.to_string())),
+            Ok(Message::Binary(bytes)) => Ok(Heard::Bytes(bytes.to_vec())),
             Ok(Message::Ping(_) | Message::Pong(_)) => Ok(Heard::Alive),
             Ok(Message::Close(_)) => Err(()),
             Ok(_) => Ok(Heard::Nothing),
@@ -75,6 +83,10 @@ impl Wire for Tailnet {
         let _ = self.0.send(Message::text(text));
     }
 
+    fn say_bytes(&mut self, bytes: &[u8]) {
+        let _ = self.0.send(Message::binary(bytes.to_vec()));
+    }
+
     fn end(&mut self) {
         let _ = self.0.close(None);
         let _ = self.0.flush();
@@ -83,9 +95,7 @@ impl Wire for Tailnet {
 
 /// A tailnet viewer: its hello names the device, then it is served.
 pub(crate) fn run(app: tauri::AppHandle, ws: WebSocket<TcpStream>, root: std::path::PathBuf) {
-    let _ = ws
-        .get_ref()
-        .set_read_timeout(Some(Duration::from_millis(40)));
+    let _ = ws.get_ref().set_read_timeout(Some(LISTEN));
     let mut wire = Tailnet(ws);
     match hello(&mut wire, &root) {
         Some(device) => serve(app, wire, root, device),
@@ -104,8 +114,9 @@ pub(crate) fn serve(
     let (id, out, heard) = crate::remote_hub::join(&app, &device.id);
     crate::remote::note(&root, &device, "connected");
     let mut watching = Watching::new(id);
+    let (raw, raws) = std::sync::mpsc::channel();
+    watching.raw = Some(raw);
     let mut talk = crate::remote_talk::Talk::default();
-    let mut last = Instant::now();
     send(
         &mut wire,
         &RemoteOut::Welcome {
@@ -113,8 +124,45 @@ pub(crate) fn serve(
             host: machine_name(),
             typing: device.typing,
             answering: device.answering,
+            binary: true,
         },
     );
+    converse(
+        &mut wire,
+        id,
+        &mut watching,
+        &heard,
+        &raws,
+        |watching, asked| {
+            typed_raw_or(&device, watching, asked, |watching, asked| {
+                answer(&app, &root, &device, watching, &mut talk, &out, asked)
+            })
+        },
+    );
+    watching.close_all();
+    crate::remote_hub::leave(&app, id);
+    crate::remote::note(&root, &device, "disconnected");
+    wire.end();
+}
+
+/// What one message from the viewer was.
+pub(crate) enum Asked<'a> {
+    Json(RemoteIn),
+    Raw(&'a [u8]),
+}
+
+/// The viewer's messages answered and what the host has for it sent, until
+/// the hub lets the connection go — a device forgotten is cut off here, within
+/// one [`LISTEN`] — or the viewer leaves or goes silent.
+pub(crate) fn converse(
+    wire: &mut impl Wire,
+    id: u64,
+    watching: &mut Watching,
+    heard: &std::sync::mpsc::Receiver<RemoteOut>,
+    raws: &std::sync::mpsc::Receiver<crate::remote_panes::Raw>,
+    mut answer: impl FnMut(&mut Watching, Asked<'_>) -> Option<RemoteOut>,
+) {
+    let mut last = Instant::now();
     loop {
         if !crate::remote_hub::holds(id) {
             break;
@@ -125,20 +173,23 @@ pub(crate) fn serve(
                 if text.len() > MOST_MESSAGE {
                     break;
                 }
-                match serde_json::from_str::<RemoteIn>(&text) {
-                    Ok(asked) => {
-                        let said =
-                            answer(&app, &root, &device, &mut watching, &mut talk, &out, asked);
-                        if let Some(said) = said {
-                            send(&mut wire, &said);
-                        }
-                    }
-                    Err(_) => send(
-                        &mut wire,
-                        &RemoteOut::Failed {
-                            why: "that is not a message devpit reads".to_owned(),
-                        },
-                    ),
+                let said = match serde_json::from_str::<RemoteIn>(&text) {
+                    Ok(asked) => answer(watching, Asked::Json(asked)),
+                    Err(_) => Some(RemoteOut::Failed {
+                        why: "that is not a message devpit reads".to_owned(),
+                    }),
+                };
+                if let Some(said) = said {
+                    send(wire, &said);
+                }
+            }
+            Ok(Heard::Bytes(frame)) => {
+                last = Instant::now();
+                if frame.len() > MOST_MESSAGE {
+                    break;
+                }
+                if let Some(said) = answer(watching, Asked::Raw(&frame)) {
+                    send(wire, &said);
                 }
             }
             Ok(Heard::Alive) => last = Instant::now(),
@@ -148,14 +199,48 @@ pub(crate) fn serve(
         if last.elapsed() > IDLE {
             break;
         }
+        while let Ok(one) = raws.try_recv() {
+            wire.say_bytes(&crate::pane_socket::encode(
+                one.handle,
+                crate::pane_socket::kind::OUTPUT,
+                &one.bytes,
+            ));
+        }
         while let Ok(said) = heard.try_recv() {
-            send(&mut wire, &said);
+            send(wire, &said);
         }
     }
-    watching.close_all();
-    crate::remote_hub::leave(&app, id);
-    crate::remote::note(&root, &device, "disconnected");
-    wire.end();
+}
+
+/// A raw frame answered as keys, anything else by `json`.
+fn typed_raw_or(
+    device: &Device,
+    watching: &mut Watching,
+    asked: Asked<'_>,
+    json: impl FnOnce(&mut Watching, RemoteIn) -> Option<RemoteOut>,
+) -> Option<RemoteOut> {
+    match asked {
+        Asked::Json(asked) => json(watching, asked),
+        Asked::Raw(frame) => typed_raw(device, watching, frame),
+    }
+}
+
+/// A raw frame from the viewer: keys for the pane its handle names, the only
+/// kind it may send. What it may not do is said back, as a JSON request's is.
+pub(crate) fn typed_raw(
+    device: &Device,
+    watching: &mut Watching,
+    frame: &[u8],
+) -> Option<RemoteOut> {
+    let (handle, kind, bytes) = crate::pane_socket::decode(frame)?;
+    if kind != crate::pane_socket::kind::INPUT {
+        return None;
+    }
+    if !device.typing {
+        return failed("this device may only watch — allow it to type on the machine");
+    }
+    let pane = watching.pane_of(handle)?.to_owned();
+    watching.input(&pane, bytes).err().and_then(failed)
 }
 
 /// What this machine is called, as a viewer shows it.
@@ -196,7 +281,7 @@ pub(crate) fn first(wire: &mut impl Wire) -> Option<RemoteIn> {
             Ok(Heard::Text(text)) if text.len() <= MOST_MESSAGE => {
                 return serde_json::from_str::<RemoteIn>(&text).ok();
             }
-            Ok(Heard::Text(_)) | Err(()) => return None,
+            Ok(Heard::Text(_) | Heard::Bytes(_)) | Err(()) => return None,
             Ok(Heard::Alive | Heard::Nothing) => {}
         }
     }
@@ -262,7 +347,15 @@ fn answer(
             pane,
             cols,
             rows,
-        } => match watching.open(&project, &pane, device.typing, (cols, rows), out.clone()) {
+            handle,
+        } => match watching.open(
+            &project,
+            &pane,
+            device.typing,
+            (cols, rows),
+            out.clone(),
+            handle,
+        ) {
             Ok(()) => {
                 crate::remote::note(root, device, &format!("watching {pane}"));
                 None

@@ -1,10 +1,11 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { RemoteIn } from '../gen/bindings'
+import { frame, Kind } from '../shell/paneSocket'
 import { SESSION_COMMANDS } from '../shell/sessionCommands'
-import { base64Of, bytesOf } from './socket'
+import { base64Of } from './socket'
 
 /*
  * One terminal of the machine, watched. Its size here is its own: the
@@ -25,21 +26,40 @@ const KEYS: readonly { label: string; name: string; bytes: string }[] = [
   { label: 'Enter', name: 'Enter', bytes: '\r' },
 ]
 
+/* Each terminal opened gets a handle of its own, so bytes still on the way
+ * for one closed a moment ago never land in the next. */
+let lastHandle = 0
+const words = new TextEncoder()
+
 export function RemoteTerminal({
   project,
   pane,
   typing,
+  binary,
   send,
+  sendBytes,
   bytes,
 }: {
   project: string
   pane: string
   typing: boolean
+  /** The host reads and sends raw bytes: keys and output skip base64 and JSON. */
+  binary: boolean
   send: (message: RemoteIn) => void
-  bytes: React.RefObject<(pane: string, b64: string) => void>
+  sendBytes: (frame: Uint8Array<ArrayBuffer>) => void
+  bytes: React.RefObject<(from: string | number, data: Uint8Array) => void>
 }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [line, setLine] = useState('')
+  const handle = useRef<number | null>(null)
+
+  const type = useCallback(
+    (data: string): void => {
+      if (handle.current !== null) sendBytes(frame(handle.current, Kind.Input, words.encode(data)))
+      else send({ t: 'paneInput', pane, b64: base64Of(data) })
+    },
+    [pane, send, sendBytes],
+  )
 
   useEffect(() => {
     if (!host.current) return
@@ -48,16 +68,19 @@ export function RemoteTerminal({
     term.loadAddon(fit)
     term.open(host.current)
     fit.fit()
-    bytes.current = (from, b64) => from === pane && term.write(bytesOf(b64))
-    send({ t: 'paneOpen', project, pane, cols: term.cols, rows: term.rows })
-    const typed = typing ? term.onData((data) => send({ t: 'paneInput', pane, b64: base64Of(data) })) : null
+    const mine = binary ? ++lastHandle : null
+    handle.current = mine
+    bytes.current = (from, data) => (from === pane || from === mine) && term.write(data)
+    send({ t: 'paneOpen', project, pane, cols: term.cols, rows: term.rows, handle: mine })
+    const typed = typing ? term.onData(type) : null
     return () => {
       typed?.dispose()
+      handle.current = null
       send({ t: 'paneClose', pane })
       bytes.current = () => {}
       term.dispose()
     }
-  }, [project, pane, typing, send, bytes])
+  }, [project, pane, typing, binary, send, bytes, type])
 
   const sendLine = (): void => {
     if (!line.trim()) return
@@ -72,7 +95,7 @@ export function RemoteTerminal({
         <>
           <div className="rm__keys">
             {KEYS.map((key) => (
-              <button key={key.label} className="rm__key" aria-label={key.name} title={key.name} onClick={() => send({ t: 'paneInput', pane, b64: base64Of(key.bytes) })}>
+              <button key={key.label} className="rm__key" aria-label={key.name} title={key.name} onClick={() => type(key.bytes)}>
                 {key.label}
               </button>
             ))}

@@ -147,6 +147,8 @@ export interface RelayOptions {
   /** Sent once the machine proves its key, when the device is not paired yet. */
   pairing?: RelayPairing | null
   open?: Opener
+  /** A raw frame the machine sent: a terminal's bytes under its handle. */
+  raw?: (frame: Uint8Array) => void
 }
 
 const words = new TextEncoder()
@@ -179,6 +181,11 @@ export function connectRelay(
   const send = (message: RemoteIn): void => {
     if (!session || socket?.readyState !== WebSocket.OPEN) return
     for (const frame of session.seal(words.encode(JSON.stringify(message)))) socket.send(outgoing(frame))
+  }
+
+  const sendBytes = (bytes: Uint8Array): void => {
+    if (!session || socket?.readyState !== WebSocket.OPEN) return
+    for (const frame of session.sealBytes(bytes)) socket.send(outgoing(frame))
   }
 
   const end = (why: string): void => {
@@ -214,8 +221,9 @@ export function connectRelay(
           beat = setInterval(() => send({ t: 'ping' }), 30_000)
           return
         }
-        const whole = session.open(frame)
-        if (whole) heard(JSON.parse(reading.decode(whole)) as RemoteOut)
+        const whole = session.openAny(frame)
+        if (whole?.bytes) options.raw?.(whole.whole)
+        else if (whole) heard(JSON.parse(reading.decode(whole.whole)) as RemoteOut)
       } catch (err) {
         // A frame that does not open ends the session; the next one starts over.
         if (err instanceof NoiseError || err instanceof SyntaxError) here.close()
@@ -237,6 +245,7 @@ export function connectRelay(
 
   return {
     send,
+    sendBytes,
     close: () => {
       closed = true
       clearTimeout(again)

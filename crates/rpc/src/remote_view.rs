@@ -39,6 +39,11 @@ pub enum RemoteIn {
         pane: String,
         cols: u16,
         rows: u16,
+        /// Given by a viewer that reads raw bytes, to a host whose welcome
+        /// said `binary`: its bytes then come as `[u32 handle][u8 kind][bytes]`
+        /// frames, little-endian, instead of `paneBytes`.
+        #[serde(default)]
+        handle: Option<u32>,
     },
     /// Keys, as bytes in base64. Only a device allowed to type.
     PaneInput {
@@ -158,6 +163,9 @@ pub enum RemoteOut {
         host: String,
         typing: bool,
         answering: bool,
+        /// The host reads and sends raw terminal bytes; absent from an older one.
+        #[serde(default)]
+        binary: bool,
     },
     /// Said once, then the connection ends.
     Refused {

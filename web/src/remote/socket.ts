@@ -28,6 +28,8 @@ export function keepToken(token: string | null): void {
 
 export interface Link {
   send: (message: RemoteIn) => void
+  /** A raw frame, to a host whose welcome said `binary`. */
+  sendBytes: (frame: Uint8Array<ArrayBuffer>) => void
   close: () => void
 }
 
@@ -36,7 +38,7 @@ export function backoff(tries: number): number {
   return Math.min(15_000, 500 * 2 ** Math.min(tries, 5)) + Math.round(Math.random() * 250)
 }
 
-export function connect(token: string, heard: (message: RemoteOut) => void, state: (up: boolean) => void): Link {
+export function connect(token: string, heard: (message: RemoteOut) => void, state: (up: boolean) => void, raw: (frame: Uint8Array) => void = () => {}): Link {
   let socket: WebSocket | null = null
   let tries = 0
   let closed = false
@@ -46,6 +48,7 @@ export function connect(token: string, heard: (message: RemoteOut) => void, stat
   const open = (): void => {
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:'
     socket = new WebSocket(`${scheme}//${location.host}/api/ws`)
+    socket.binaryType = 'arraybuffer'
     socket.onopen = () => {
       tries = 0
       socket?.send(JSON.stringify({ t: 'hello', token } satisfies RemoteIn))
@@ -53,6 +56,7 @@ export function connect(token: string, heard: (message: RemoteOut) => void, stat
       beat = window.setInterval(() => socket?.send(JSON.stringify({ t: 'ping' } satisfies RemoteIn)), 30_000)
     }
     socket.onmessage = (event) => {
+      if (event.data instanceof ArrayBuffer) return raw(new Uint8Array(event.data))
       try {
         heard(JSON.parse(String(event.data)) as RemoteOut)
       } catch {
@@ -71,6 +75,9 @@ export function connect(token: string, heard: (message: RemoteOut) => void, stat
   return {
     send: (message) => {
       if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
+    },
+    sendBytes: (frame) => {
+      if (socket?.readyState === WebSocket.OPEN) socket.send(frame)
     },
     close: () => {
       closed = true

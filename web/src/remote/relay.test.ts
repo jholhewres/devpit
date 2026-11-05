@@ -45,19 +45,21 @@ const reading = new TextDecoder()
 function setUp(machineKeys = keyPair(), named = machineKeys) {
   const sockets: Wire[] = []
   const heard: RemoteOut[] = []
+  const raws: Uint8Array[] = []
   const states: [boolean, string | undefined, number | undefined][] = []
   const machine: RelayMachine = { host: HOST, key: hex(named.public), name: 'notebook' }
   const device = keyPair()
   const link = connectRelay(machine, device, (said) => heard.push(said), (up, why, code) => states.push([up, why, code]), {
     origin: 'https://devpit.test',
     pairing: { secret: 'ab'.repeat(32), name: 'Pixel' },
+    raw: (frame) => raws.push(frame),
     open: (url) => {
       const socket = new Wire(url)
       sockets.push(socket)
       return socket as unknown as WebSocket
     },
   })
-  return { sockets, heard, states, link, device, machineKeys }
+  return { sockets, heard, raws, states, link, device, machineKeys }
 }
 
 /* The machine's half of a handshake, against what the page sent. */
@@ -110,6 +112,20 @@ describe('the viewer through the relay', () => {
     const welcome = { t: 'welcome', device: 'Pixel', host: 'notebook', typing: false, answering: false }
     for (const frame of session.seal(words.encode(JSON.stringify(welcome)))) wire.deliver(frame)
     expect(heard).toEqual([welcome])
+  })
+
+  it('hears a terminal raw and types into it raw, beside JSON in the same session', () => {
+    const { sockets, heard, raws, link, machineKeys } = setUp()
+    const wire = sockets[0]!
+    wire.open()
+    const session = answer(wire, machineKeys).session()
+    session.open(wire.sent[2]!)
+    const output = Uint8Array.of(7, 0, 0, 0, 0, 0x1b, 0x5b, 0x48)
+    for (const frame of session.sealBytes(output)) wire.deliver(frame)
+    expect(raws).toEqual([output])
+    expect(heard).toEqual([])
+    link.sendBytes(Uint8Array.of(7, 0, 0, 0, 2, 0x6c))
+    expect(session.openAny(wire.sent.at(-1)!)).toEqual({ bytes: true, whole: Uint8Array.of(7, 0, 0, 0, 2, 0x6c) })
   })
 
   it('says nothing of itself to a machine that is not the one it paired with', () => {

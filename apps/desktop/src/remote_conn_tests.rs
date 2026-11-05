@@ -42,7 +42,8 @@ fn an_old_viewers_pane_messages_are_read_unchanged() {
             project: "p".into(),
             pane: "leaf_p".into(),
             cols: 40,
-            rows: 20
+            rows: 20,
+            handle: None,
         }
     );
     assert_eq!(
@@ -64,5 +65,137 @@ fn an_old_viewers_pane_messages_are_read_unchanged() {
         RemoteIn::PaneClose {
             pane: "leaf_p".into()
         }
+    );
+}
+
+/// A viewer that reads raw bytes asks for them with a handle, and an older
+/// host's welcome, with no `binary`, reads as one that does not send them.
+#[test]
+fn a_raw_viewer_names_a_handle_and_an_old_welcome_says_no_raw_bytes() {
+    let asked: RemoteIn = serde_json::from_str(
+        r#"{"t":"paneOpen","project":"p","pane":"leaf_p","cols":40,"rows":20,"handle":7}"#,
+    )
+    .unwrap();
+    assert!(matches!(
+        asked,
+        RemoteIn::PaneOpen {
+            handle: Some(7),
+            ..
+        }
+    ));
+    let old: RemoteOut = serde_json::from_str(
+        r#"{"t":"welcome","device":"phone","host":"desk","typing":true,"answering":false}"#,
+    )
+    .unwrap();
+    assert!(matches!(old, RemoteOut::Welcome { binary: false, .. }));
+}
+
+fn device(typing: bool) -> crate::remote_devices::Device {
+    crate::remote_devices::Device {
+        id: "dev_raw".into(),
+        name: "phone".into(),
+        token_hash: String::new(),
+        key: None,
+        typing,
+        answering: false,
+        mcp: false,
+        paired_at: 0.0,
+        last_seen: None,
+    }
+}
+
+#[test]
+fn raw_keys_from_a_device_that_may_only_watch_are_refused_and_other_kinds_ignored() {
+    let mut watching = crate::remote_panes::Watching::new(11);
+    let keys = crate::pane_socket::encode(1, crate::pane_socket::kind::INPUT, b"ls\r");
+    assert!(matches!(
+        typed_raw(&device(false), &mut watching, &keys),
+        Some(RemoteOut::Failed { .. })
+    ));
+    let ack = crate::pane_socket::encode(1, crate::pane_socket::kind::ACK, &[0, 0, 0, 1]);
+    assert!(typed_raw(&device(true), &mut watching, &ack).is_none());
+    // A handle no pane was opened under types nowhere.
+    assert!(typed_raw(&device(true), &mut watching, &keys).is_none());
+}
+
+/// A viewer that says nothing: each read waits as long as a real one would.
+#[derive(Default)]
+struct Quiet {
+    said: std::sync::Arc<std::sync::Mutex<Vec<Vec<u8>>>>,
+}
+
+impl Wire for Quiet {
+    fn hear(&mut self) -> Result<Heard, ()> {
+        std::thread::sleep(LISTEN);
+        Ok(Heard::Nothing)
+    }
+    fn say(&mut self, text: &str) {
+        self.said.lock().unwrap().push(text.as_bytes().to_vec());
+    }
+    fn say_bytes(&mut self, bytes: &[u8]) {
+        self.said.lock().unwrap().push(bytes.to_vec());
+    }
+    fn end(&mut self) {}
+}
+
+/// Forgetting a device on the machine cuts its connection at once: its loop
+/// sees the hub let it go before its next read, not when the viewer speaks.
+#[test]
+fn a_device_forgotten_loses_its_connection_at_once() {
+    let device = "dev_forgotten_now";
+    let (id, _out, heard) = crate::remote_hub::enter(device);
+    let (_raw, raws) = std::sync::mpsc::channel();
+    let (ended, ends) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut watching = crate::remote_panes::Watching::new(id);
+        converse(
+            &mut Quiet::default(),
+            id,
+            &mut watching,
+            &heard,
+            &raws,
+            |_, _| None,
+        );
+        let _ = ended.send(());
+    });
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    assert!(ends.try_recv().is_err(), "it ended before it was forgotten");
+    let forgotten = Instant::now();
+    crate::remote_hub::drop_conns(device);
+    ends.recv_timeout(std::time::Duration::from_secs(1))
+        .expect("the connection outlived its device");
+    assert!(
+        forgotten.elapsed() < LISTEN * 5,
+        "{:?}",
+        forgotten.elapsed()
+    );
+}
+
+/// A pane's raw bytes leave in the R3 frame under the viewer's handle.
+#[test]
+fn raw_output_goes_out_as_a_frame_under_its_handle() {
+    let device = "dev_raw_output";
+    let (id, _out, heard) = crate::remote_hub::enter(device);
+    let (raw, raws) = std::sync::mpsc::channel();
+    raw.send(crate::remote_panes::Raw {
+        handle: 9,
+        bytes: b"\x1b[1mok".to_vec(),
+    })
+    .unwrap();
+    let wire = Quiet::default();
+    let said = wire.said.clone();
+    let stop = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        crate::remote_hub::drop_conns(device);
+    });
+    let mut wire = wire;
+    let mut watching = crate::remote_panes::Watching::new(id);
+    converse(&mut wire, id, &mut watching, &heard, &raws, |_, _| None);
+    stop.join().unwrap();
+    let said = said.lock().unwrap();
+    let frame = said.first().expect("nothing went out");
+    assert_eq!(
+        crate::pane_socket::decode(frame),
+        Some((9, crate::pane_socket::kind::OUTPUT, &b"\x1b[1mok"[..]))
     );
 }

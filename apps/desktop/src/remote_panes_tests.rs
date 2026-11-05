@@ -63,7 +63,7 @@ fn a_ptyd_panes_bytes_reach_a_remote_watcher_in_the_shapes_a_tmux_panes_do() {
     let (out, heard) = channel();
     let mut watching = Watching::new(7);
     watching
-        .open_ptyd_at(home, leaf, number, out)
+        .open_ptyd_at(home, leaf, number, Sink::Json(out.clone()), out)
         .expect("watching");
 
     watching
@@ -93,7 +93,7 @@ fn a_ptyd_pane_that_ends_is_closed_for_its_watcher() {
     let (out, heard) = channel();
     let mut watching = Watching::new(8);
     watching
-        .open_ptyd_at(home, leaf, number, out)
+        .open_ptyd_at(home, leaf, number, Sink::Json(out.clone()), out)
         .expect("watching");
     watching.input(leaf, b"exit\n").expect("typed");
     let mut seen = String::new();
@@ -101,4 +101,59 @@ fn a_ptyd_pane_that_ends_is_closed_for_its_watcher() {
         heard_until(&heard, leaf, &mut seen, |_, closed| closed),
         "its end was never said"
     );
+}
+
+/// A viewer that gave the pane a handle reads its bytes raw under it, never
+/// as base64, and still hears the pane close in JSON.
+#[test]
+fn a_ptyd_panes_bytes_reach_a_viewer_that_reads_raw_under_its_handle() {
+    let daemon = crate::ptyd_link::tests::serving();
+    let home = daemon.home.path();
+    let leaf = "leaf_remote_raw";
+    let number = pane_number(leaf);
+    crate::ptyd_link::spawn(home, number, &shell(home)).expect("spawn");
+    let (out, heard) = channel();
+    let (raw, bytes) = channel();
+    let mut watching = Watching::new(9);
+    watching.raw = Some(raw);
+    let sink = watching.sink(&out, Some(41));
+    watching
+        .open_ptyd_at(home, leaf, number, sink, out)
+        .expect("watching");
+    watching
+        .input(leaf, b"echo raw-$((40+2))\n")
+        .expect("typed");
+    let mut seen = Vec::new();
+    let until = Instant::now() + Duration::from_secs(10);
+    while !String::from_utf8_lossy(&seen).contains("raw-42") && Instant::now() < until {
+        if let Ok(one) = bytes.recv_timeout(Duration::from_millis(100)) {
+            let one: Raw = one;
+            assert_eq!(one.handle, 41);
+            seen.extend(one.bytes);
+        }
+    }
+    assert!(
+        String::from_utf8_lossy(&seen).contains("raw-42"),
+        "never shown: {seen:?}"
+    );
+    assert!(
+        heard
+            .try_iter()
+            .all(|said| !matches!(said, RemoteOut::PaneBytes { .. })),
+        "bytes went out as base64 too"
+    );
+    watching.close(leaf);
+    let mut text = String::new();
+    assert!(
+        heard_until(&heard, leaf, &mut text, |_, closed| closed),
+        "closing it was never said"
+    );
+    crate::ptyd_link::kill(home, number);
+}
+
+#[test]
+fn a_handle_without_a_raw_connection_keeps_the_json_shape() {
+    let (out, _heard) = channel();
+    let watching = Watching::new(10);
+    assert!(matches!(watching.sink(&out, Some(3)), Sink::Json(_)));
 }
