@@ -588,6 +588,17 @@ fn agent_door() -> Option<i32> {
     if first == "ptyd-attach" {
         return Some(pane_tmux::attach_here(args.get(1).map(String::as_str)));
     }
+    // The orchestrator's hook, on every message: its preferences as they are now.
+    if first == orchestrator_view::SUBCOMMAND {
+        if let (Some(folder), Ok(root)) = (args.get(1), devpit_core::Store::root()) {
+            let under = devpit_core::home::orchestrators(&root);
+            print!(
+                "{}",
+                orchestrator_view::shown_now(std::path::Path::new(folder), &under)
+            );
+        }
+        return Some(0);
+    }
     if first != "agent" && first != "mcp" && !hook {
         return None;
     }

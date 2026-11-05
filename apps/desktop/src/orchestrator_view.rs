@@ -17,7 +17,7 @@ pub(crate) const VIEW: &str = ".devpit/preferences-in-view.md";
 const HEAD: usize = 6000;
 const TAIL: usize = 3000;
 
-/// The hook's command: the copy, or nothing when there is none.
+/// The copy, or nothing when there is none: the hook's fallback.
 const COMMAND: &str =
     "cat \"$CLAUDE_PROJECT_DIR/.devpit/preferences-in-view.md\" 2>/dev/null || true";
 
@@ -81,6 +81,35 @@ pub(crate) fn keep(folder: &Path) -> std::io::Result<()> {
     std::fs::rename(&fresh, &view)
 }
 
+/// The subcommand the hook runs: `devpit preferences-in-view <folder>`.
+pub(crate) const SUBCOMMAND: &str = "preferences-in-view";
+
+/// What the hook prints for the orchestrator's `folder`, which must resolve
+/// under `under`: the copy rebuilt from preferences.md as it is now, so a
+/// hand edit is in view at the next message. Nothing for any other folder.
+pub(crate) fn shown_now(folder: &Path, under: &Path) -> String {
+    let (Ok(folder), Ok(under)) = (folder.canonicalize(), under.canonicalize()) else {
+        return String::new();
+    };
+    if !folder.starts_with(&under) {
+        return String::new();
+    }
+    let _ = keep(&folder);
+    std::fs::read_to_string(folder.join(VIEW)).unwrap_or_default()
+}
+
+/// The hook's command: devpit rebuilds the copy and prints it, and the copy
+/// as it stands is printed when that fails.
+pub(crate) fn hook_command(exe: Option<&Path>) -> String {
+    match exe {
+        Some(exe) => format!(
+            "{} {SUBCOMMAND} \"$CLAUDE_PROJECT_DIR\" 2>/dev/null || {COMMAND}",
+            devpit_agentcli::declaring::quoted(&exe.to_string_lossy())
+        ),
+        None => COMMAND.to_owned(),
+    }
+}
+
 /// Where the hook is set: the folder's local Claude Code settings, which the
 /// orchestrator's chat reads and nobody commits.
 pub(crate) fn settings_file(folder: &Path) -> PathBuf {
@@ -89,7 +118,7 @@ pub(crate) fn settings_file(folder: &Path) -> PathBuf {
 
 /// `settings` with devpit's hook in it, once, and everything else as it was.
 /// None when the file is not a settings object, which is left alone.
-pub(crate) fn hooked(settings: Option<&str>) -> Option<Value> {
+pub(crate) fn hooked(settings: Option<&str>, command: &str) -> Option<Value> {
     let mut settings: Value = match settings {
         Some(text) => serde_json::from_str(text).ok()?,
         None => json!({}),
@@ -103,9 +132,21 @@ pub(crate) fn hooked(settings: Option<&str>) -> Option<Value> {
         .entry("UserPromptSubmit")
         .or_insert_with(|| json!([]))
         .as_array_mut()?;
+    // Ours by the copy it names, whichever devpit wrote it: one, the current one.
     let ours = |entry: &Value| entry.to_string().contains(VIEW);
-    if !on_prompt.iter().any(ours) {
-        on_prompt.push(json!({ "hooks": [{ "type": "command", "command": COMMAND }] }));
+    let current = json!({ "hooks": [{ "type": "command", "command": command }] });
+    match on_prompt.iter().position(ours) {
+        Some(at) => {
+            on_prompt[at] = current;
+            let mut seen = 0;
+            on_prompt.retain(|entry| {
+                !ours(entry) || {
+                    seen += 1;
+                    seen == 1
+                }
+            });
+        }
+        None => on_prompt.push(current),
     }
     Some(settings)
 }
@@ -115,7 +156,8 @@ pub(crate) fn set_up(folder: &Path) -> std::io::Result<()> {
     keep(folder)?;
     let file = settings_file(folder);
     let before = std::fs::read_to_string(&file).ok();
-    let Some(after) = hooked(before.as_deref()) else {
+    let command = hook_command(crate::agent_reach::exe().as_deref());
+    let Some(after) = hooked(before.as_deref(), &command) else {
         return Ok(());
     };
     let after = serde_json::to_string_pretty(&after).map_err(std::io::Error::other)?;

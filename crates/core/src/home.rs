@@ -39,7 +39,12 @@ pub enum HomeError {
 /// An orchestrator's folder, `orchestrator/<name>`: where its conversations
 /// run and its documents are kept. `None` for a name that is not a plain id.
 pub fn orchestrator_dir(root: &Path, name: &str) -> Option<PathBuf> {
-    plain_id(name).then(|| root.join(ORCHESTRATOR).join(name))
+    plain_id(name).then(|| orchestrators(root).join(name))
+}
+
+/// The folder every orchestrator's own folder is under.
+pub fn orchestrators(root: &Path) -> PathBuf {
+    root.join(ORCHESTRATOR)
 }
 
 /// Where an older devpit kept an orchestrator's settings, in its own folder —

@@ -94,6 +94,55 @@ fn a_preference_logged_is_in_view_on_the_next_turn() {
 
 #[test]
 fn settings_that_are_not_an_object_are_left_alone() {
-    assert!(hooked(Some("not json")).is_none());
-    assert!(hooked(Some("[]")).is_none());
+    assert!(hooked(Some("not json"), COMMAND).is_none());
+    assert!(hooked(Some("[]"), COMMAND).is_none());
+}
+
+/// The hook rebuilds the copy before printing it: a hand edit of
+/// preferences.md, by the person or the orchestrator, is in view at the very
+/// next message, with no opening in between.
+#[test]
+fn a_hand_edit_of_the_preferences_is_in_view_at_the_next_message() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let folder = dir.path().join("orchestrator").join("me");
+    std::fs::create_dir_all(folder.join("context")).expect("mkdir");
+    std::fs::write(folder.join("context/preferences.md"), PREFERENCES).expect("prefs");
+    set_up(&folder).expect("set up");
+
+    let edited = PREFERENCES.replace("likes short reports", "likes long reports");
+    std::fs::write(folder.join("context/preferences.md"), edited).expect("hand edit");
+
+    let shown = shown_now(&folder, &dir.path().join("orchestrator"));
+    assert!(shown.contains("likes long reports"), "{shown}");
+    assert!(!shown.contains("likes short reports"), "{shown}");
+    let elsewhere = tempfile::tempdir().expect("tempdir");
+    assert_eq!(
+        shown_now(&folder, elsewhere.path()),
+        "",
+        "only under devpit's own folder"
+    );
+}
+
+/// devpit itself prints the copy, and the copy as it stands is the fallback
+/// when that fails; an older hook is replaced, not doubled.
+#[test]
+fn the_hook_asks_devpit_and_replaces_an_older_one() {
+    let line = hook_command(Some(Path::new("/opt/devpit app/devpit")));
+    assert!(
+        line.starts_with("'/opt/devpit app/devpit' preferences-in-view \"$CLAUDE_PROJECT_DIR\""),
+        "{line}"
+    );
+    assert!(line.ends_with(COMMAND), "{line}");
+    let older = json!({ "hooks": { "UserPromptSubmit": [
+        { "hooks": [{ "type": "command", "command": COMMAND }] },
+        { "hooks": [{ "type": "command", "command": "echo theirs" }] }
+    ] } })
+    .to_string();
+    let settings = hooked(Some(&older), &line).expect("settings");
+    let on_prompt = settings["hooks"]["UserPromptSubmit"]
+        .as_array()
+        .expect("hooks");
+    assert_eq!(on_prompt.len(), 2, "{on_prompt:?}");
+    assert_eq!(on_prompt[0]["hooks"][0]["command"], line.as_str());
+    assert_eq!(on_prompt[1]["hooks"][0]["command"], "echo theirs");
 }
