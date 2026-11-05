@@ -1,5 +1,7 @@
 use super::*;
-use crate::ptyd_link::{pane_number, running, target};
+use crate::ptyd_link::target;
+#[cfg(target_os = "linux")]
+use crate::ptyd_link::{pane_number, running};
 use devpit_core::Store;
 
 fn tab_of(project_id: &str, leaves: &[(&str, String)]) -> SessionLayout {
@@ -23,7 +25,7 @@ fn tab_of(project_id: &str, leaves: &[(&str, String)]) -> SessionLayout {
 
 /// A shell whose child ignores `SIGHUP`, as a TUI agent does: the daemon's
 /// `Kill` alone ends the shell and leaves the child running.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn an_agent_in(home: &std::path::Path, leaf: &str) {
     let asked = devpit_ptyd::pane::Asked {
         rows: 24,

@@ -684,11 +684,22 @@ fn watched_target(pane: &str) -> Option<String> {
     projects
         .iter()
         .any(|one| {
-            crate::ptyd_watch::running_in(&one.id)
+            ptyd_running(&one.id)
                 .iter()
                 .any(|running| running.pane_id == pane)
         })
         .then(|| crate::ptyd_link::target(pane))
+}
+
+/// The daemon's terminals in a project: none where there is no daemon.
+#[cfg(unix)]
+fn ptyd_running(project_id: &str) -> Vec<devpit_rpc::PaneRunning> {
+    crate::ptyd_watch::running_in(project_id)
+}
+
+#[cfg(not(unix))]
+fn ptyd_running(_project_id: &str) -> Vec<devpit_rpc::PaneRunning> {
+    Vec::new()
 }
 
 /// A project's open terminals for a viewer, tmux's and then the daemon's, in
@@ -726,7 +737,7 @@ fn projects() -> Result<Vec<RemoteProject>, String> {
                         .ok()
                 })
                 .unwrap_or_default();
-            let terminals = terminals(in_tmux, crate::ptyd_watch::running_in(&one.id));
+            let terminals = terminals(in_tmux, ptyd_running(&one.id));
             RemoteProject {
                 id: one.id,
                 name: one.name,
