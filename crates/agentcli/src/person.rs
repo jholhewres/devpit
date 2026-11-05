@@ -144,12 +144,13 @@ fn without_notices(mut text: &str) -> (&str, Option<From>) {
     (text, sent_from)
 }
 
-/// Marks that say yes in any language: the yes needs no vocabulary.
-const YES_MARKS: [char; 5] = ['✅', '✔', '☑', '✓', '👍'];
+/// Marks that say yes in any language: the yes needs no vocabulary. No 👍:
+/// it is as often "noted" as "send".
+const YES_MARKS: [char; 4] = ['✅', '✔', '☑', '✓'];
 
-/// Whether `c` only dresses a mark: its emoji presentation or skin tone.
+/// Whether `c` only dresses a mark: its text or emoji presentation.
 fn dresses_a_mark(c: char) -> bool {
-    matches!(c, '\u{FE0E}' | '\u{FE0F}' | '\u{1F3FB}'..='\u{1F3FF}')
+    matches!(c, '\u{FE0E}' | '\u{FE0F}')
 }
 
 /// Punctuation that may hang on a word or a mark without changing it.

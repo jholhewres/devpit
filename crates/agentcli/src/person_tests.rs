@@ -190,7 +190,7 @@ fn a_request_turned_around_is_not_a_yes() {
 
 #[test]
 fn a_yes_mark_alone_lets_the_one_draft_go_in_any_language() {
-    for mark in ["✅", "✔️", "☑", "✓", "👍", "👍🏽", " ✅! ", "envia ✅"] {
+    for mark in ["✅", "✔️", "☑", "✓", " ✅! ", "envia ✅"] {
         assert!(authorises(mark, "noiseless-mvp", 1), "{mark}");
         assert!(!authorises(mark, "noiseless-mvp", 2), "{mark}");
     }
@@ -201,11 +201,18 @@ fn a_yes_mark_alone_lets_the_one_draft_go_in_any_language() {
 }
 
 #[test]
+fn a_thumbs_up_is_noted_not_a_yes() {
+    assert!(!authorises("👍", "noiseless-mvp", 1));
+    assert!(!authorises("👍🏽", "noiseless-mvp", 1));
+    assert!(!authorises("noiseless 👍", "noiseless-mvp", 1));
+}
+
+#[test]
 fn a_yes_mark_beside_the_sessions_name_alone_lets_its_draft_go() {
     for said in [
         "noiseless ✅",
         "✅ noiseless-mvp!",
-        "@noiseless-mvp 👍",
+        "@noiseless-mvp ☑",
         "noiseless✅",
         "Noiseless, ✔️",
     ] {

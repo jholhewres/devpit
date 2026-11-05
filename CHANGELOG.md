@@ -22,7 +22,7 @@ release notes are taken from here when a version is tagged.
   Settings → General → Display chooses Wayland or X11 for the next start, and
   `DEVPIT_GDK_BACKEND` overrides both for one.
 - **A ✅ sends the orchestrator's draft, in any language.** Replying ✅ (or
-  ✔, ☑, ✓, 👍) alone sends the one draft waiting, and beside a session's
+  ✔, ☑, ✓) alone sends the one draft waiting, and beside a session's
   name sends that session's. It needs no word of English or Portuguese, and
   "envie", "send it" and the rest still work. As before, only your own
   message counts, never another session's or a tool's.
