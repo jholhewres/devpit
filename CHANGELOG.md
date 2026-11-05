@@ -3,9 +3,39 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
-## Unreleased
+## 0.1.47 — 2026-11-05
 
-### New
+### Chat
+
+- **Long chats stay smooth while an answer streams.** Only the part of the
+  thread near the view is drawn, the answer being written redraws only its
+  last block, and typing in the composer no longer redraws the chat. Older
+  pages load before you reach them, and what you are reading stays in place
+  when they arrive.
+- **A turn reads in the order it happened.** Prose and the work between it
+  alternate as they came; once over, the work folds behind a line saying how
+  long it took ("Worked for 1m 30s", "Interrupted after…"), and a failed turn
+  stays open on its error. A reload keeps how a turn ended and how long it
+  has been working. Pictures you sent show as thumbnails and other files as
+  chips; an edit's diff can be copied, and one past 24 lines opens folded.
+- **The agent's questions and requests are answered in the chat.** A
+  question shows its options as buttons: pick with 1–9 or the arrows, write
+  your own answer, or tick several and confirm them together. A permission
+  request leads with what it runs, the file it writes or the plan, with
+  every line of a command shown; Enter allows and Escape refuses.
+- **A queue that waits for you.** Messages queued behind a running turn keep
+  their files and skills, and survive closing the tab. Stop, or a turn that
+  fails, holds the queue until you resume it. Mod+Enter steers the running
+  turn with what you typed, Mod+Shift+Enter with the first queued message,
+  and Up and Down in an empty composer bring back what you sent. A paste
+  over 32 KB becomes a text attachment, and the draft is kept with its
+  attachments.
+- **Find, a rail of prompts, and more.** Find searches every page of a chat
+  and opens the fold a match is in. A rail lists your prompts down the side,
+  a code block has a copy button, a stopped turn can be continued, and a tab
+  whose turn ended while you were elsewhere is marked.
+
+### Terminals
 
 - **Terminals outlive the window, with no tmux needed.** New terminals,
   agents' included, run in devpit's own terminal keeper on macOS and Linux.
@@ -13,7 +43,49 @@ release notes are taken from here when a version is tagged.
   as it left it; a keeper that died brings each terminal back in its folder
   and starts its agent again. Terminals made in tmux stay there until you
   close them, and when the keeper cannot start, tmux takes the terminal as
-  before.
+  before. The terminal menu's "Open in tmux" still opens one from a tmux
+  client, and copies the line that attaches to it.
+- **Lighter terminals.** Every terminal's output reaches the window on one
+  connection. A terminal flooding output skips the lines that would only
+  scroll out of its history, so a long build log draws about twice as fast
+  and no longer freezes the window. A terminal out of sight stops reading at
+  once and keeps its screen, so a project you come back to shows its
+  terminals quickly. Whether an agent is working or waiting comes from its
+  own hooks and the terminal keeper, so devpit no longer polls every pane and
+  process to find out.
+- **Closing a tab stops only what runs in it.** A tmux server, a gpg agent or
+  another daemon started from a terminal is no longer stopped with its tab.
+
+### Remote
+
+- **Typing from another device echoes quickly.** A terminal's output reaches the
+  Remote as raw bytes, and is sent every 8 ms instead of waiting up to 40;
+  over the tailnet the rest of an echo no longer waits for the device. Older
+  viewers keep working as they did.
+- **A new device is paired only once you allow it.** A device that enters the
+  pairing code, or scans the QR code, waits while Settings → Remote asks you
+  to Allow or Refuse it; no answer in two minutes refuses it. The code and
+  the QR code are good for ten minutes, once.
+- **A device you forget is cut off at once**, even while one of its terminals
+  is printing.
+
+### Devflow
+
+- **Devflow is optional, and off until you activate it.** A project without
+  it gets none of its tools, hooks or gates, and the Devflow screen leads
+  with Activate Devflow. A project that already had it on stays on.
+- **Devflow is its own project now.** devpit runs it on the standalone
+  devflow engine, and the Devflow screen installs the devflow plugin into
+  the project's Claude Code profile and the standalone binary, checked
+  against its release's checksums.
+- **Fewer rounds to close a card.** An approval closes the review, and a
+  blocking finding that comes back asks you for a design instead of looping.
+  The gate counts a proof written after the checks ran and reuses a green
+  run at the same commit. The plan rubric is advice unless devflow.yaml
+  opts into it, and release checks show in the setup.
+
+### Linux
+
 - **Native Wayland on Linux.** On a Wayland desktop the AppImage opens on
   Wayland instead of going through XWayland. It falls back to X11 when there
   is no compositor, when the desktop's GTK settings are known to crash it, and
@@ -21,6 +93,26 @@ release notes are taken from here when a version is tagged.
   until Wayland is chosen again.
   Settings → General → Display chooses Wayland or X11 for the next start, and
   `DEVPIT_GDK_BACKEND` overrides both for one.
+
+### Board and sessions
+
+- **A big board opens a page at a time.** A long lane draws its first 30
+  cards and the next as you scroll. Agents read the board 20 cards per lane,
+  with the done lane counted rather than listed, and a card moved while they
+  page through is read once.
+- **One card per session.** When a card is finished, the next card of its
+  epic starts in a session of its own, and a card's session past 30% of its
+  context window leaves a handoff and is relieved by a fresh one. Each card
+  starts light instead of paying for every card before it.
+- **devpit's tools answer agents briefly.** The board, a card, evidence and
+  reviews answer a compact summary, with the whole answer one argument away,
+  and a slow call no longer holds an agent's other calls.
+- **Rules for sessions can be per project.** A preference an agent logs no
+  longer lands among the rules every session is briefed with, and a rule can
+  be kept for one project's sessions only.
+
+### Orchestrator
+
 - **A ✅ sends the orchestrator's draft, in any language.** Replying ✅ (or
   ✔, ☑, ✓) alone sends the one draft waiting, and beside a session's
   name sends that session's. It needs no word of English or Portuguese, and
