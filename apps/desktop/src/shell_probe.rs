@@ -69,14 +69,15 @@ exit 0
 /// `None` when it called none of them — an absolute path, a script that does
 /// something else — which is a command this cannot read.
 pub(crate) fn probe(shell: &str, name: &str, programs: &[&str]) -> Result<Option<Probed>, String> {
-    probe_within(shell, name, programs, WAITS)
+    probe_until(shell, name, programs, |waited| waited > WAITS)
 }
 
-fn probe_within(
+/// `gives_up` is asked, with how long the command has run, while it runs.
+fn probe_until(
     shell: &str,
     name: &str,
     programs: &[&str],
-    waits: Duration,
+    gives_up: impl Fn(Duration) -> bool,
 ) -> Result<Option<Probed>, String> {
     if !name
         .chars()
@@ -124,7 +125,7 @@ fn probe_within(
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
-            Ok(None) if started.elapsed() > waits => {
+            Ok(None) if gives_up(started.elapsed()) => {
                 devpit_steps::descendants::end_it_all(&mut child);
                 return Err(format!(
                     "{name} did not finish — it may be waiting for something"
@@ -368,9 +369,12 @@ mod tests {
         )
         .expect("rc");
 
-        // Three seconds, not one: an interactive shell reading its rc on a
-        // loaded machine can take a second before the function even starts.
-        let ended = probe_within(&shell, "slow", &["claude"], Duration::from_secs(3));
+        // Given up once the function runs, not after a time: a loaded machine
+        // took longer than any guess to read the rc and start it.
+        let ended = probe_until(&shell, "slow", &["claude"], |waited| {
+            let written = std::fs::read_to_string(&pid_file).is_ok_and(|pid| pid.ends_with('\n'));
+            written || waited > Duration::from_secs(60)
+        });
         assert!(ended.is_err());
         let pid: i32 = std::fs::read_to_string(&pid_file)
             .expect("the function ran")
