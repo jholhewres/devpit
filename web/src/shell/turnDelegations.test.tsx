@@ -41,6 +41,38 @@ describe('work handed to another session', () => {
     expect(screen.getByText('Update master, build, deploy.')).toBeTruthy()
   })
 
+  /* SendMessage answers a send that did not go with `success: false`, not with an error. */
+  const unreachable = (callId: string): Part => ({
+    kind: 'tool_result',
+    call_id: callId,
+    output: JSON.stringify({ success: false, message: "No agent named 'gatorclaw-82' is reachable.\nUse ListAgents to see everyone you can message." }),
+    is_error: false,
+  })
+  const sentAgain: Part = { ...sent, id: 'toolu_2' } as Part
+  const delivered: Part = { kind: 'tool_result', call_id: 'toolu_2', output: JSON.stringify({ success: true, message: 'sent' }), is_error: false }
+
+  it('shows a send that did not go as not sent, with why', () => {
+    render(
+      <AppsScopeContext.Provider value={{ profileId: 'claude', cwd: '/w' }}>
+        <TurnDelegations parts={[sent, unreachable('toolu_1')]} />
+      </AppsScopeContext.Provider>,
+    )
+    expect(screen.getByText('not sent')).toBeTruthy()
+    expect(screen.queryByText('working')).toBeNull()
+    expect(screen.getByText("No agent named 'gatorclaw-82' is reachable.")).toBeTruthy()
+  })
+
+  it('keeps one card for a send tried again, the one that went', async () => {
+    render(
+      <AppsScopeContext.Provider value={{ profileId: 'claude', cwd: '/w' }}>
+        <TurnDelegations parts={[sent, unreachable('toolu_1'), sentAgain, delivered]} />
+      </AppsScopeContext.Provider>,
+    )
+    expect(screen.getAllByText('→ gatorclaw-82')).toHaveLength(1)
+    expect(screen.queryByText('not sent')).toBeNull()
+    expect(await screen.findByText('working')).toBeTruthy()
+  })
+
   it('is nothing for a turn that sent nothing', () => {
     const { container } = render(<TurnDelegations parts={[]} />)
     expect(container.textContent).toBe('')

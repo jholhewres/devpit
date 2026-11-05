@@ -149,6 +149,7 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .deleg__card[data-state='busy'] .deleg__dot, .deleg__dot[data-state='busy'] { background: var(--accent); }
 .deleg__card[data-state='waiting'] .deleg__dot, .deleg__dot[data-state='waiting'] { background: var(--warning); }
 .deleg__card[data-state='idle'] .deleg__dot, .deleg__dot[data-state='idle'] { background: var(--success); }
+.deleg__card[data-state='failed'] .deleg__dot { background: var(--danger); }
 .deleg__msg { margin: 0; padding: 0 10px 9px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); white-space: pre-wrap; }
 
 /* A session's terminal, opened over the orchestrator's chat: one surface,
