@@ -14,7 +14,7 @@ function setup() {
   }
   let frame: (() => void) | null = null
   const acks: number[] = []
-  const batcher = writeBatcher(term, (bytes) => acks.push(bytes), {
+  const batcher = writeBatcher(term, (bytes) => acks.push(bytes), () => null, {
     frame: (run) => {
       frame = run
       return () => (frame = null)
