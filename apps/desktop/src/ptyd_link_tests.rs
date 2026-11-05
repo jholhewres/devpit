@@ -141,3 +141,44 @@ fn a_pane_is_started_again_only_when_the_daemon_lost_it() {
     );
     kill(home, pane_number(leaf));
 }
+
+/// A daemon that answers, but late: every frame refused after 300 ms.
+#[cfg(unix)]
+fn slow_daemon_refusing_all(home: &Path) {
+    use devpit_ptyd::frame::{self, Frame, Kind};
+
+    let listener = devpit_ptyd::socket::listen(&socket_path(home)).expect("listen");
+    std::thread::spawn(move || {
+        for mut stream in listener.incoming().flatten() {
+            std::thread::spawn(move || {
+                let _ = devpit_ptyd::socket::greet(&mut stream);
+                while let Ok(Some(one)) = frame::read(&mut stream) {
+                    std::thread::sleep(std::time::Duration::from_millis(300));
+                    let no = Frame::new(one.pane, Kind::Refused, "no such pane".to_owned());
+                    let _ = frame::write(&mut stream, &no);
+                }
+            });
+        }
+    });
+}
+
+/// Silence was taken as a yes: a loaded machine made a lost pane look
+/// running, and a refused spawn look made.
+#[cfg(unix)]
+#[test]
+fn a_slow_daemon_is_waited_for_not_taken_at_its_silence() {
+    let home = tempfile::tempdir().expect("home");
+    slow_daemon_refusing_all(home.path());
+    assert!(!running(home.path(), 7), "a refused pane read as running");
+    let asked = devpit_ptyd::pane::Asked {
+        rows: 24,
+        cols: 80,
+        cwd: home.path().to_string_lossy().into_owned(),
+        argv: vec!["/bin/sh".into()],
+        env: Vec::new(),
+    };
+    assert!(
+        spawn(home.path(), 7, &asked).is_err(),
+        "a refused spawn read as made"
+    );
+}

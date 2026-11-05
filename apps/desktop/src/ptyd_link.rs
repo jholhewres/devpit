@@ -132,21 +132,40 @@ mod unix {
     }
 
     /// One request, and the daemon's refusal if it answered with one. A
-    /// request it took is answered by nothing at all, so a short wait that
-    /// hears nothing is the yes.
+    /// request it took is answered by nothing at all, so it is followed by one
+    /// that is always answered: silence was read as a yes from a daemon that
+    /// was only slow, on a loaded machine.
     pub(crate) fn ask(stream: &mut UnixStream, one: Frame) -> io::Result<()> {
         let pane = one.pane;
         frame::write(stream, &one)?;
-        stream.set_read_timeout(Some(std::time::Duration::from_millis(150)))?;
-        let heard = frame::read(stream);
+        let answer = answered(stream, pane);
         stream.set_read_timeout(None)?;
-        match heard {
-            Ok(Some(answer)) if answer.pane == pane && answer.kind() == Some(Kind::Refused) => Err(
-                io::Error::other(String::from_utf8_lossy(&answer.bytes).into_owned()),
-            ),
-            _ => Ok(()),
+        answer
+    }
+
+    /// Asks pane `pane` for no history at all, which the daemon answers in
+    /// order after what this connection sent before: `Older` from a pane it
+    /// holds, a refusal from one it does not.
+    fn answered(stream: &mut UnixStream, pane: u32) -> io::Result<()> {
+        let none = u64::MAX.to_le_bytes().to_vec();
+        frame::write(stream, &Frame::new(pane, Kind::History, none))?;
+        stream.set_read_timeout(Some(ANSWERS_WITHIN))?;
+        loop {
+            match frame::read(stream)? {
+                Some(one) if one.pane == pane && one.kind() == Some(Kind::Refused) => {
+                    return Err(io::Error::other(
+                        String::from_utf8_lossy(&one.bytes).into_owned(),
+                    ))
+                }
+                Some(one) if one.pane == pane && one.kind() == Some(Kind::Older) => return Ok(()),
+                Some(_) => {}
+                None => return Err(io::ErrorKind::UnexpectedEof.into()),
+            }
         }
     }
+
+    /// Past this, a daemon that has not answered is taken as gone.
+    const ANSWERS_WITHIN: std::time::Duration = std::time::Duration::from_secs(10);
 
     /// Starts `asked` as pane `pane` in the daemon.
     pub(crate) fn spawn(home: &Path, pane: u32, asked: &Asked) -> io::Result<()> {
@@ -162,14 +181,13 @@ mod unix {
         }
     }
 
-    /// Whether pane `pane` is running: attached to and asked nothing, a pane
-    /// that is there answers with its replay, one that is not refuses.
+    /// Whether pane `pane` is running, as the daemon answers it.
     pub(crate) fn running(home: &Path, pane: u32) -> bool {
         let at = socket_path(home);
         let Ok(mut stream) = devpit_ptyd::socket::connect(&at) else {
             return false;
         };
-        ask(&mut stream, Frame::new(pane, Kind::Attach, Vec::new())).is_ok()
+        answered(&mut stream, pane).is_ok()
     }
 }
 
