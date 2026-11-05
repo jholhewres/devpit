@@ -234,6 +234,45 @@ pub fn authorises(said: &str, session: &str, waiting: usize) -> bool {
         && !words.iter().any(|word| NOT.contains(word))
 }
 
+/// Verbs that, beside a session's name, ask for it to stop. No "para": in
+/// Portuguese it is as often "for".
+const STOP: [&str; 21] = [
+    "stop",
+    "kill",
+    "close",
+    "quit",
+    "terminate",
+    "pare",
+    "parar",
+    "encerre",
+    "encerra",
+    "encerrar",
+    "feche",
+    "fecha",
+    "fechar",
+    "mate",
+    "mata",
+    "matar",
+    "finalize",
+    "finaliza",
+    "finalizar",
+    "derrube",
+    "derruba",
+];
+
+/// Whether what the person said asks for `session` to be stopped: the
+/// session named beside a stop verb, and nothing turning it around.
+pub fn asks_to_stop(said: &str, session: &str) -> bool {
+    let said = said.trim().to_lowercase();
+    let words: Vec<&str> = said
+        .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '\'')
+        .filter(|word| !word.is_empty())
+        .collect();
+    names(&words, session)
+        && words.iter().any(|word| STOP.contains(word))
+        && !words.iter().any(|word| NOT.contains(word))
+}
+
 /// Whether `said` is a yes mark or a send word alone, which names no session:
 /// it lets one draft go, whichever it is, and so only once.
 pub fn bare(said: &str) -> bool {

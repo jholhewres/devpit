@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use super::{authorises, from_channel, last_said, From, FROM_THE_REMOTE};
+use super::{asks_to_stop, authorises, from_channel, last_said, From, FROM_THE_REMOTE};
 
 /// A log, one entry per line, in the shapes Claude Code 2.1.294 writes.
 fn log(entries: &[serde_json::Value]) -> String {
@@ -242,4 +242,26 @@ fn a_yes_mark_from_another_session_or_a_tool_is_not_the_person() {
     .expect("said");
     assert_eq!(said.text, "o que falta?");
     assert!(!authorises(&said.text, "noiseless-mvp", 1));
+}
+
+#[test]
+fn a_stop_is_asked_by_naming_the_session_beside_a_stop_word() {
+    let session = "devpit-0149-z90e";
+    assert!(asks_to_stop("pare a devpit-0149-z90e", session));
+    assert!(asks_to_stop("Stop z90e, it is done.", session));
+    assert!(asks_to_stop("pode encerrar a devpit-0149-z90e", session));
+    assert!(asks_to_stop("✅ fecha devpit-0149-z90e", session));
+    assert!(
+        !asks_to_stop("não pare a devpit-0149-z90e", session),
+        "turned around"
+    );
+    assert!(
+        !asks_to_stop("como vai a devpit-0149-z90e?", session),
+        "no stop word"
+    );
+    assert!(
+        !asks_to_stop("pare a review-devpit", session),
+        "another session"
+    );
+    assert!(!asks_to_stop("✅", session), "a yes names nothing to stop");
 }

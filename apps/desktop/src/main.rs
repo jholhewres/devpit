@@ -260,6 +260,7 @@ mod starting;
 mod steering;
 mod steps;
 mod still_holds;
+mod stop_asked;
 mod stopping;
 mod stopping_a_run;
 mod sync;

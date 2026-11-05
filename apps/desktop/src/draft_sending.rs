@@ -62,14 +62,7 @@ pub(crate) fn send(project: &str, profile: &str, root: &Path, name: &str) -> Res
             &format!("send the draft to {name}"),
         ));
     }
-    let config = crate::live_sessions::config_of(profile).map_err(|err| err.message)?;
-    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let log = devpit_agentcli::peers::newest(&devpit_agentcli::peers::logs_of(&config, &root))
-        .ok_or(
-            "devpit could not find this conversation's log, so it cannot read what the person said",
-        )?;
-    let said = last_said(&devpit_agentcli::peers::tail(&log))
-        .ok_or("devpit found nothing the person said in this conversation")?;
+    let said = last_word(profile, root)?;
     let waiting = crate::reply_drafts::all()
         .iter()
         .filter(|(whose, _, _)| whose == profile)
@@ -102,8 +95,21 @@ pub(crate) fn send(project: &str, profile: &str, root: &Path, name: &str) -> Res
     Ok(json!({ "sent": name, "from": said.from.label(), "words": drafted }))
 }
 
+/// The person's last message in the log of `profile`'s orchestrator,
+/// standing in `root`.
+pub(crate) fn last_word(profile: &str, root: &Path) -> Result<Said, String> {
+    let config = crate::live_sessions::config_of(profile).map_err(|err| err.message)?;
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let log = devpit_agentcli::peers::newest(&devpit_agentcli::peers::logs_of(&config, &root))
+        .ok_or(
+            "devpit could not find this conversation's log, so it cannot read what the person said",
+        )?;
+    last_said(&devpit_agentcli::peers::tail(&log))
+        .ok_or_else(|| "devpit found nothing the person said in this conversation".to_owned())
+}
+
 /// A message cut to what a record needs.
-fn short(text: &str) -> String {
+pub(crate) fn short(text: &str) -> String {
     let mut cut: String = text.chars().take(80).collect();
     if text.chars().count() > 80 {
         cut.push('…');

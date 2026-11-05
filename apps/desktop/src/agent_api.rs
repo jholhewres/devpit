@@ -308,6 +308,13 @@ fn respond_in(
                     &format!("stop {name}"),
                 ));
             }
+            let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
+            let word = crate::draft_sending::last_word(profile, Path::new(&here.root_path)).ok();
+            crate::stop_asked::allowed(
+                word.as_ref(),
+                &name,
+                crate::stop_asked::swapped(&live.sessions, &name, pid),
+            )?;
             return crate::stopping::stop(app, profile, &name, pid, "orchestrator", force)
                 .map_err(said);
         }
