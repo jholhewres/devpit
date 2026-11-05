@@ -77,7 +77,7 @@ pub fn start(
         .map_err(|err| err.to_string())?
         .is_some();
     let tab_id = crate::handing::tab_to_open(card_tab, taken);
-    let pane_id = crate::opening::typed_in(app, &project_id, &tab_id, &cwd, &line)
+    let pane_id = crate::opening::typed_in(app, &project_id, &tab_id, &cwd, &line, Some(&profile))
         .map_err(|err| err.message)?;
     let _ = tauri::Emitter::emit(
         app,

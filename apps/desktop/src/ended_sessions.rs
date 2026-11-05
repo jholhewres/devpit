@@ -285,7 +285,8 @@ pub(crate) fn resume(
         crate::roots::root_of(&project_id, None)?
     };
     let tab_id = crate::opening::fresh_tab();
-    let pane_id = crate::opening::typed_in(app, &project_id, &tab_id, &cwd, &line)?;
+    let pane_id =
+        crate::opening::typed_in(app, &project_id, &tab_id, &cwd, &line, Some(profile_id))?;
     let _ = app.emit(
         crate::opening::TAB_OPENED,
         json!({ "projectId": project_id, "tabId": tab_id, "paneId": pane_id }),

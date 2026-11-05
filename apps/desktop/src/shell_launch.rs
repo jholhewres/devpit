@@ -481,15 +481,19 @@ pub async fn session_launch_agent(
     let _guard = lock
         .lock()
         .map_err(|_| RpcError::internal("project session lock"))?;
-    crate::pane_io::send_line(&target, &line)?;
+    crate::opening::type_agent(
+        crate::sessions::store().ok().as_ref(),
+        None,
+        &project_id,
+        &pane_id,
+        &target,
+        &line,
+        &agent_id,
+    )?;
     // After the line, and never instead of it: a pane with the agent running
     // and no label is a cosmetic loss, and a label on a pane where the launch
     // failed is a lie.
     crate::pane_io::label(&target, &profile_id(&agent_id));
-    // Remembered so the pane can start it again if tmux loses the window.
-    if let Ok(store) = crate::sessions::store() {
-        let _ = store.remember_pane_launch(&project_id, &pane_id, &agent_id);
-    }
     Ok(AgentLaunch {
         line: Some(line),
         missing: Vec::new(),
