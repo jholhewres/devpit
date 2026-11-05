@@ -1,15 +1,14 @@
-import { useContext, useEffect, useState } from 'react'
-
-import { WholeContext } from './cutOutput'
-import { ask, commands } from './live'
 import type { Message } from '../gen/bindings'
-import { isLong, sentWith, type SentFile } from './said'
+import { isLong, sentWith, type SentFile } from './sentFiles'
+import { useShellPick } from './shellStore'
+import { useStream } from './Streamed'
 import { useDisclosed } from './useDisclosed'
 
 /* What a person said: the files as chips and pictures, then the words. */
 export function Said({ message }: { message: Message }): React.JSX.Element {
   const { files, prompt } = sentWith(message.parts.map((part) => ('text' in part ? part.text : '')).join(''))
   const long = isLong(prompt)
+  const projectId = useShellPick((shell) => shell.project?.id ?? null)
   const [open, setOpen] = useDisclosed(`${message.id}:said`, false)
 
   return (
@@ -17,7 +16,7 @@ export function Said({ message }: { message: Message }): React.JSX.Element {
       <div className="said__b">
         {files.length > 0 && (
           <div className="said__files">
-            {files.map((file) => (file.image ? <Picture key={file.path} file={file} /> : <Chip key={file.path} file={file} />))}
+            {files.map((file) => (file.image ? <Picture key={file.path} file={file} projectId={projectId} /> : <Chip key={file.path} file={file} />))}
           </div>
         )}
         {prompt && (
@@ -42,35 +41,13 @@ const Chip = ({ file }: { file: SentFile }): React.JSX.Element => (
   </span>
 )
 
-/* Read through the backend: a paste lives outside the project, where the page cannot reach. */
-const seen = new Map<string, string>()
-
-function Picture({ file }: { file: SentFile }): React.JSX.Element {
-  const where = useContext(WholeContext)
-  const key = `${where?.projectId ?? ''}:${file.path}`
-  const [src, setSrc] = useState<string | null>(() => seen.get(key) ?? null)
-  const [lost, setLost] = useState(false)
-
-  useEffect(() => {
-    if (src || !where) return
-    let on = true
-    void ask(() => commands.chatImage(where.projectId, file.path)).then((read) => {
-      if (!on) return
-      if (read.data) {
-        if (seen.size > 64) seen.delete(seen.keys().next().value!)
-        seen.set(key, read.data)
-        setSrc(read.data)
-      } else setLost(true)
-    })
-    return () => {
-      on = false
-    }
-  }, [src, where, file.path, key])
-
-  if (lost || !where) return <Chip file={file} />
+/* Streamed by devpit's media scheme: a paste lives outside the project, where the page cannot reach. */
+function Picture({ file, projectId }: { file: SentFile; projectId: string | null }): React.JSX.Element {
+  const { url, error } = useStream(projectId, file.path)
+  if (error) return <Chip file={file} />
   return (
     <span className="said__pic" title={file.path}>
-      {src && <img src={src} alt={file.name} />}
+      {url && <img src={url} alt={file.name} />}
     </span>
   )
 }

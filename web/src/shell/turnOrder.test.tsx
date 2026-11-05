@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Ended, Message, Part } from '../gen/bindings'
 import { appliedAll, withFiles } from './chat'
-import { WholeContext } from './cutOutput'
 import { Turn } from './Turn'
 
 vi.mock('./shellStore', () => ({ useShellPick: () => () => undefined }))
@@ -11,12 +10,13 @@ const pictures: string[] = []
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
   commands: {
-    chatImage: (_project: string, path: string) => {
+    mediaOpen: (_project: string | null, path: string) => {
       pictures.push(path)
-      return 'data:image/png;base64,iVBORw0KGgo='
+      return 'tok1'
     },
   },
 }))
+vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc: (token: string, scheme: string) => `${scheme}://localhost/${token}` }))
 
 afterEach(() => {
   cleanup()
@@ -145,14 +145,10 @@ describe('what a person attached', () => {
       { name: 'pasted-01m6.png', path: pasted, kind: 'png' },
       { name: 'main.rs', path: 'src/main.rs', kind: 'rs' },
     ])
-    const { container } = render(
-      <WholeContext.Provider value={{ projectId: 'p1', conversationId: 'c1' }}>
-        <Turn message={said(sent)} />
-      </WholeContext.Provider>,
-    )
+    const { container } = render(<Turn message={said(sent)} />)
     await act(async () => {})
     const img = container.querySelector<HTMLImageElement>('.said__pic img')!
-    expect(img.src).toMatch(/^data:image\/png;base64,/)
+    expect(img.src).toBe('devpitmedia://localhost/tok1')
     expect(pictures).toContain(pasted)
     expect(screen.getByText('main.rs')).toBeTruthy()
     expect(container.querySelector('.said__t')!.textContent).toBe('what is wrong here?')

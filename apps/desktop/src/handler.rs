@@ -212,7 +212,6 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         attaching_chat::chat_attach,
         agent_profiles::agent_signed_in,
         pasting::chat_paste,
-        pasting::chat_image,
         receipts::chat_receipt,
         slash::chat_slash_commands,
         asking::permission_answer,

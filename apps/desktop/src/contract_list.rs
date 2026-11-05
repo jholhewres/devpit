@@ -208,7 +208,6 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         attaching_chat::chat_attach,
         agent_profiles::agent_signed_in,
         pasting::chat_paste,
-        pasting::chat_image,
         receipts::chat_receipt,
         slash::chat_slash_commands,
         asking::permission_answer,

@@ -21,6 +21,7 @@ pub mod cut;
 pub mod decisions;
 pub mod devflow;
 pub mod devflow_screen;
+pub mod ended;
 pub mod error;
 pub mod file;
 pub mod focus;
@@ -73,7 +74,7 @@ pub use channels::{
     CalendarFeed, ChannelEvent, ChannelInfo, ChannelOrchestrator, ChannelRoute, ChannelRules,
     Channels, HubStatus, Privacy, QuietHours, TelegramStatus,
 };
-pub use chat::{CallState, ChangedFile, Ended, Message, Part, Role, SessionInit, TurnEnd};
+pub use chat::{CallState, ChangedFile, Message, Part, Role, SessionInit, TurnEnd};
 pub use checkpoint::{
     validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, Whose, WouldRun,
 };
@@ -93,6 +94,7 @@ pub use devflow_screen::{
     DevflowSkill, DevflowSkillText, DevflowStage, DevflowState, DevflowTeam, DevflowTeamChange,
     DevflowTeamChanges,
 };
+pub use ended::Ended;
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};

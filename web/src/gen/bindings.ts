@@ -821,11 +821,6 @@ export const commands = {
 	agentSignedIn: (dir: string) => typedError<SignedIn, RpcError>(__TAURI_INVOKE("agent_signed_in", { dir })),
 	/**  `chat.paste` — keeps a pasted picture and answers with it as an attachment. */
 	chatPaste: (projectId: string, mediaType: string, data: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_paste", { projectId, mediaType, data })),
-	/**
-	 *  `chat.image` — a picture a sent message names, as a `data:` URL for its
-	 *  thumbnail: a paste kept for the project, or an image in the project.
-	 */
-	chatImage: (projectId: string, path: string) => typedError<string, RpcError>(__TAURI_INVOKE("chat_image", { projectId, path })),
 	/**  `chat.receipt` — records an answered question in the conversation. */
 	chatReceipt: (projectId: string, conversationId: string, tool: string, input: string, allowed: boolean) => typedError<Message, RpcError>(__TAURI_INVOKE("chat_receipt", { projectId, conversationId, tool, input, allowed })),
 	/**
@@ -3977,10 +3972,7 @@ export type Message = {
 	createdAt: number | null,
 	/**  True while more of it is still arriving. */
 	streaming: boolean,
-	/**
-	 *  How an answer ended, so a reopened conversation still says so. Absent
-	 *  while it streams and in transcripts written before it was kept.
-	 */
+	/**  How an answer ended; absent while it streams and in older transcripts. */
 	ended?: Ended | null,
 };
 

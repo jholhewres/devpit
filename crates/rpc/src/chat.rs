@@ -131,35 +131,9 @@ pub struct Message {
     pub created_at: f64,
     /// True while more of it is still arriving.
     pub streaming: bool,
-    /// How an answer ended, so a reopened conversation still says so. Absent
-    /// while it streams and in transcripts written before it was kept.
+    /// How an answer ended; absent while it streams and in older transcripts.
     #[serde(default)]
-    pub ended: Option<Ended>,
-}
-
-/// When an answer ended and why: the facts, read into words by the screen.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Ended {
-    /// Unix seconds.
-    pub at: f64,
-    /// The CLI's own word, as [`TurnEnd::stop_reason`].
-    pub stop_reason: Option<String>,
-    pub is_error: bool,
-    /// What the turn failed on, when devpit was told.
-    #[serde(default)]
-    pub error: Option<String>,
-}
-
-impl Ended {
-    pub fn of(end: &TurnEnd, at: f64) -> Self {
-        Self {
-            at,
-            stop_reason: end.stop_reason.clone(),
-            is_error: end.is_error,
-            error: None,
-        }
-    }
+    pub ended: Option<crate::Ended>,
 }
 
 /// What a turn cost and why it stopped.
