@@ -182,3 +182,86 @@ fn a_slow_daemon_is_waited_for_not_taken_at_its_silence() {
         "a refused spawn read as made"
     );
 }
+
+#[cfg(unix)]
+fn shell_in(home: &Path) -> devpit_ptyd::pane::Asked {
+    devpit_ptyd::pane::Asked {
+        rows: 24,
+        cols: 80,
+        cwd: home.to_string_lossy().into_owned(),
+        argv: vec!["/bin/sh".into()],
+        env: Vec::new(),
+    }
+}
+
+/// The daemon's first word to `pane` on `stream` after an attach: `None`
+/// when it holds the pane, its refusal when it does not.
+#[cfg(unix)]
+fn refusal_of_attach(stream: &mut std::os::unix::net::UnixStream, pane: u32) -> Option<String> {
+    use devpit_ptyd::frame::{self, Frame, Kind};
+
+    frame::write(stream, &Frame::new(pane, Kind::Attach, Vec::new())).expect("attach");
+    let none = u64::MAX.to_le_bytes().to_vec();
+    frame::write(stream, &Frame::new(pane, Kind::History, none)).expect("history");
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .expect("timeout");
+    loop {
+        let one = frame::read(stream).expect("read").expect("a frame");
+        match one.kind() {
+            Some(Kind::Refused) if one.pane == pane => {
+                return Some(String::from_utf8_lossy(&one.bytes).into_owned())
+            }
+            Some(Kind::Older) if one.pane == pane => return None,
+            _ => {}
+        }
+    }
+}
+
+/// A spawn answers once the daemon holds the pane, so an attach right after
+/// it, on a connection of its own, finds it.
+#[cfg(unix)]
+#[test]
+fn an_attach_right_after_a_spawn_is_never_refused() {
+    let daemon = serving();
+    let home = daemon.home.path();
+    for pane in 1..=20 {
+        spawn(home, pane, &shell_in(home)).expect("spawn");
+        let mut other = connect(home).expect("connect");
+        let refused = refusal_of_attach(&mut other, pane);
+        kill(home, pane);
+        assert_eq!(refused, None, "pane {pane}");
+    }
+}
+
+/// A daemon that takes a spawn without a word and answers `History` in
+/// order, as every protocol version has.
+#[cfg(unix)]
+fn daemon_silent_on_spawn(home: &Path) {
+    use devpit_ptyd::frame::{self, Frame, Kind};
+
+    let listener = devpit_ptyd::socket::listen(&socket_path(home)).expect("listen");
+    std::thread::spawn(move || {
+        for mut stream in listener.incoming().flatten() {
+            std::thread::spawn(move || {
+                let _ = devpit_ptyd::socket::greet(&mut stream);
+                while let Ok(Some(one)) = frame::read(&mut stream) {
+                    if one.kind() == Some(Kind::History) {
+                        let older = Frame::new(one.pane, Kind::Older, 0u64.to_le_bytes().to_vec());
+                        let _ = frame::write(&mut stream, &older);
+                    }
+                }
+            });
+        }
+    });
+}
+
+/// No ack of its own: the spawn is taken on the answer to the `History`
+/// that follows it.
+#[cfg(unix)]
+#[test]
+fn a_daemon_that_says_nothing_to_a_spawn_still_has_it_taken() {
+    let home = tempfile::tempdir().expect("home");
+    daemon_silent_on_spawn(home.path());
+    spawn(home.path(), 7, &shell_in(home.path())).expect("taken");
+}

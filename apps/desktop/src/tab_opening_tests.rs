@@ -91,6 +91,10 @@ fn a_line_typed_into_a_new_ptyd_tab_runs_in_its_shell() {
                     .expect("typed");
                 }
             }
+            Ok(Some(one)) if one.kind() == Some(Kind::Refused) => {
+                crate::ptyd_link::kill(home, pane);
+                panic!("refused: {}", String::from_utf8_lossy(&one.bytes));
+            }
             Ok(Some(_)) => {}
             _ => break,
         }
