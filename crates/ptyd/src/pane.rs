@@ -243,6 +243,9 @@ impl Pane {
         if let Some(cwd) = state.cwd.clone() {
             client.send(&Frame::new(self.id, Kind::Cwd, cwd));
         }
+        if let Some(program) = state.program.clone() {
+            client.send(&Frame::new(self.id, Kind::Program, program));
+        }
         state.watchers.retain(|one| !Arc::ptr_eq(one, client));
         if state.ended {
             client.send(&exited(self.id, state.code));

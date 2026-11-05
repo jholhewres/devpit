@@ -147,6 +147,30 @@ fn the_foreground_program_is_told_once_the_output_settles() {
     pane.kill();
 }
 
+/// A window that attaches after the program settled is told it at once,
+/// as it is told the cwd: no change is coming to say it again.
+#[test]
+fn a_late_attach_is_told_the_foreground_program() {
+    let (first, first_queue) = crate::client::Client::queued();
+    let pane = Pane::spawn(9, &asked("echo start; exec sleep 5"), |_| {}).expect("spawn");
+    pane.attach(&first);
+    gather(&first_queue, Duration::from_secs(5), |got| {
+        got.iter().any(|f| f.kind() == Some(Kind::Program))
+    });
+    let (late, late_queue) = crate::client::Client::queued();
+    pane.attach(&late);
+    let got = gather(&late_queue, Duration::from_millis(500), |got| {
+        got.iter().any(|f| f.kind() == Some(Kind::Program))
+    });
+    pane.kill();
+    assert!(
+        got.iter()
+            .any(|f| f.kind() == Some(Kind::Program) && f.bytes == b"sleep"),
+        "{:?}",
+        got.iter().map(Frame::kind).collect::<Vec<_>>()
+    );
+}
+
 /// Past a megabyte unacknowledged the pty is not read: what is buffered stops
 /// growing however long the program writes, and an ack lets it read on.
 #[test]
