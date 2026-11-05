@@ -228,3 +228,28 @@ fn a_flood_of_500_mb_stays_bounded_and_ctrl_c_stops_it() {
     );
     pane.kill();
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_killed_pane_ends_even_when_what_it_started_ignores_the_hangup() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let started = dir.path().join("started");
+    let script = format!(
+        "sh -c \"trap '' HUP; touch '{}'; exec sleep 300\" & wait",
+        started.display()
+    );
+    let (gone_tx, gone) = std::sync::mpsc::channel();
+    let pane = Pane::spawn(9, &asked(&script), move |id| {
+        let _ = gone_tx.send(id);
+    })
+    .expect("spawn");
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while !started.exists() {
+        assert!(Instant::now() < deadline, "the child never started");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+
+    pane.kill();
+
+    assert_eq!(gone.recv_timeout(ENDS_WITHIN).expect("the pane ended"), 9);
+}

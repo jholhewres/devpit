@@ -22,6 +22,9 @@ pub const SETTLE: Duration = Duration::from_millis(250);
 /// History kept per pane.
 pub const KEPT: usize = devpit_pty::RING_BYTES;
 
+/// How long a killed pane's session is swept before the daemon gives up on it.
+const ENDS_WITHIN: Duration = Duration::from_secs(10);
+
 pub struct Pane {
     pub id: u32,
     state: Mutex<State>,
@@ -31,6 +34,8 @@ pub struct Pane {
     writer: Mutex<Box<dyn Write + Send>>,
     master: Mutex<Box<dyn MasterPty + Send>>,
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    /// The shell's pid, which leads the pane's session.
+    leader: Option<u32>,
 }
 
 struct State {
@@ -162,6 +167,7 @@ impl Pane {
             writer: Mutex::new(writer),
             killer: Mutex::new(child.clone_killer()),
             master: Mutex::new(pty.master),
+            leader: child.process_id(),
         });
         let reading = Arc::clone(&pane);
         std::thread::spawn(move || {
@@ -186,10 +192,37 @@ impl Pane {
             .map_err(|err| err.to_string())
     }
 
-    pub fn kill(&self) {
+    /// Hangs up the shell, then ends what is left of its session until the
+    /// pane is gone: a child that ignores the hangup holds the pty open, and
+    /// the pane with it, for as long as it runs.
+    pub fn kill(self: &Arc<Self>) {
         if let Ok(mut killer) = self.killer.lock() {
             let _ = killer.kill();
         }
+        let Some(leader) = self.leader else { return };
+        let pane = Arc::clone(self);
+        std::thread::spawn(move || pane.end_session(leader));
+    }
+
+    fn end_session(&self, leader: u32) {
+        let deadline = Instant::now() + ENDS_WITHIN;
+        // The leader is this daemon's child and is reaped only once the pane
+        // ends, so its pid still names this session while the loop runs.
+        while Instant::now() < deadline && !self.has_ended() {
+            std::thread::sleep(devpit_pty::GRACE);
+            if self.has_ended() {
+                return;
+            }
+            let Some(mut left) = devpit_pty::session_members(&[leader]) else {
+                return;
+            };
+            left.push(leader);
+            devpit_pty::stop_members(&left, devpit_pty::GRACE);
+        }
+    }
+
+    fn has_ended(&self) -> bool {
+        self.state.lock().map(|state| state.ended).unwrap_or(true)
     }
 
     /// Puts `client` back into the pane's modes, sends the last of its
@@ -405,7 +438,7 @@ impl Pane {
         loop {
             let Ok(mut last) = when.lock() else { return };
             loop {
-                if self.state.lock().map(|state| state.ended).unwrap_or(true) {
+                if self.has_ended() {
                     return;
                 }
                 match *last {
