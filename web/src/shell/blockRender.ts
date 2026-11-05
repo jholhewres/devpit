@@ -93,7 +93,15 @@ const ROWS = 200
 /** The output drawn at `cols` columns, as lines of runs, without the blank rows after it. */
 export async function rendered(output: string, cols: number, theme: ITheme): Promise<readonly Line[]> {
   const { Terminal } = await import('@xterm/headless')
-  const term = new Terminal({ cols: Math.max(cols, 20), rows: ROWS, scrollback: 50_000, allowProposedApi: true, convertEol: false })
+  /* With a screen this tall, an erase-display would wipe up to ROWS printed lines: push them to the scrollback first, as a pane does. */
+  const term = new Terminal({
+    cols: Math.max(cols, 20),
+    rows: ROWS,
+    scrollback: 50_000,
+    scrollOnEraseInDisplay: true,
+    allowProposedApi: true,
+    convertEol: false,
+  })
   await new Promise<void>((done) => term.write(output, done))
   const buffer = term.buffer.active
   const lines: Line[] = []

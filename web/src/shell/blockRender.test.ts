@@ -21,6 +21,12 @@ describe('a block drawn back from its output', () => {
     expect(plain(await rendered(output, 40, theme))).toBe('done earlier\n· Pouncing…\n\nesc to interrupt')
   })
 
+  it('keeps what a clear screen wiped, as a terminal keeps it in its scrollback', async () => {
+    /* `clear` without E3, or a watcher redrawing: home, then erase the screen. */
+    const output = 'first run\r\nfailed\r\n\x1b[H\x1b[2Jsecond run\r\n'
+    expect(plain(await rendered(output, 40, theme))).toBe('first run\nfailed\nsecond run')
+  })
+
   it('wraps at the width it is drawn at', async () => {
     expect((await rendered('x'.repeat(50), 20, theme)).length).toBe(3)
   })
