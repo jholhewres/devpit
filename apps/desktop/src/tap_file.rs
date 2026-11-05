@@ -29,6 +29,8 @@ pub(crate) fn emptied(path: &Path) -> Option<u64> {
 pub(crate) struct Tail {
     file: File,
     at: u64,
+    /// How many times the file was found opened anew.
+    opened: u64,
 }
 
 impl Tail {
@@ -36,6 +38,7 @@ impl Tail {
         Ok(Self {
             file: File::open(path)?,
             at,
+            opened: 0,
         })
     }
 
@@ -45,6 +48,7 @@ impl Tail {
         let len = self.file.metadata()?.len();
         if len < self.at {
             self.at = 0;
+            self.opened += 1;
         }
         if len == self.at {
             return Ok(0);
@@ -70,16 +74,18 @@ pub(crate) fn follow(
     mut rotate: impl FnMut(),
 ) {
     let mut buffer = [0u8; 8192];
-    let mut asked = false;
+    // Once per opening: a pane that never pauses filled the new copy past
+    // the ceiling without the reader resting below it.
+    let mut asked = None;
     while listening.load(Ordering::Relaxed) {
         match tail.read(&mut buffer) {
             Ok(0) => {
                 // At the end, so what a rotation loses is only what arrives
                 // between here and psmux reopening the file.
-                if tail.at > ceiling && !asked {
+                if tail.at > ceiling && asked != Some(tail.opened) {
+                    asked = Some(tail.opened);
                     rotate();
                 }
-                asked = tail.at > ceiling;
                 std::thread::sleep(BETWEEN_LOOKS);
             }
             Ok(read) => heard(&buffer[..read]),

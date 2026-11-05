@@ -125,3 +125,39 @@ fn a_follower_asks_for_one_rotation_per_ceiling_and_stops_when_told() {
     listening.store(false, Ordering::Relaxed);
     following.join().expect("the follower ends");
 }
+
+#[test]
+fn a_copy_filled_past_the_ceiling_before_the_reader_rests_is_rotated_again() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("leaf.log");
+    std::fs::write(&path, b"past the ceiling").expect("write");
+    let tail = Tail::open(&path, 0).expect("open");
+    let listening = Arc::new(AtomicBool::new(true));
+    let (rotated, rotations) = mpsc::channel::<()>();
+
+    let following = {
+        let listening = Arc::clone(&listening);
+        let path = path.clone();
+        std::thread::spawn(move || {
+            follow(
+                tail,
+                &listening,
+                4,
+                |_| {},
+                // What a busy pane does: the copy is opened anew and is past
+                // the ceiling again by the time the reader looks.
+                || {
+                    std::fs::write(&path, b"and again").expect("rewrite");
+                    rotated.send(()).expect("send");
+                },
+            );
+        })
+    };
+
+    let second = Duration::from_secs(5);
+    rotations.recv_timeout(second).expect("the first rotation");
+    let again = rotations.recv_timeout(second);
+    listening.store(false, Ordering::Relaxed);
+    following.join().expect("the follower ends");
+    again.expect("a rotation for the copy opened anew");
+}
