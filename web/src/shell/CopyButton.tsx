@@ -1,19 +1,14 @@
-import { useState } from 'react'
+import { useCopied } from './useCopied'
 
 /* Copies `text`, and says so for a moment where it was clicked. */
 export function CopyButton({ text, className, label = 'Copy' }: { text: string; className: string; label?: string }): React.JSX.Element {
-  const [copied, setCopied] = useState(false)
+  const [copied, copy] = useCopied()
   return (
     <button
       className={className}
       aria-label={copied ? 'Copied' : label}
       title={copied ? 'Copied' : label}
-      onClick={() =>
-        void navigator.clipboard?.writeText(text).then(() => {
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1400)
-        })
-      }
+      onClick={() => copy(text)}
     >
       {copied ? (
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>

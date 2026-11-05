@@ -5,6 +5,7 @@ import { ask, commands } from "./live";
 import { InstallationPicker } from "./InstallationPicker";
 import { useInstallations } from "./useInstallations";
 import { useShell } from "./useShell";
+import { useCopied } from "./useCopied";
 
 /*
  * The MCP servers the agent CLI has, read-only.
@@ -28,7 +29,7 @@ export function McpPane(): React.JSX.Element {
   const [directory, setDirectory] = useState("");
   const [manage, setManage] = useState("claude mcp");
   const [problem, setProblem] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, copyText] = useCopied();
 
   /* Re-read on every look: `claude mcp add` happens in a terminal beside this
      window, and a catalogue fetched once at startup is wrong by then. */
@@ -46,12 +47,7 @@ export function McpPane(): React.JSX.Element {
 
   useEffect(load, [load]);
 
-  const copy = (): void => {
-    void navigator.clipboard?.writeText(manage).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
-    });
-  };
+  const copy = (): void => copyText(manage);
 
   const byScope = (which: string): readonly Server[] =>
     servers.filter((server) => server.scope === which);

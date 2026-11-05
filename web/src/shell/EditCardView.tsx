@@ -4,6 +4,7 @@ import { counted, diffText, type EditDiff } from './editCard'
 import { ofPath } from './languages'
 import { Painted } from './Painted'
 import { useShell } from './useShell'
+import { useCopied } from './useCopied'
 
 /*
  * One edit, as a card: the file, what it gained and lost, and the lines.
@@ -24,7 +25,7 @@ export function EditCard({ diff, failed, error }: { diff: EditDiff; failed: bool
   const { added, removed } = counted(diff.rows)
   const language = ofPath(diff.path)
   const [whole, setWhole] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, copyText] = useCopied()
   const long = diff.rows.length > FOLD_ROWS && !whole
   const rows = long ? diff.rows.slice(0, FOLD_ROWS) : diff.rows
 
@@ -46,12 +47,7 @@ export function EditCard({ diff, failed, error }: { diff: EditDiff; failed: bool
         {!failed && (
           <button
             className="ecard__c"
-            onClick={() =>
-              void navigator.clipboard?.writeText(diffText(diff)).then(() => {
-                setCopied(true)
-                window.setTimeout(() => setCopied(false), 1400)
-              })
-            }
+            onClick={() => copyText(diffText(diff))}
           >
             {copied ? 'Copied' : 'Copy diff'}
           </button>

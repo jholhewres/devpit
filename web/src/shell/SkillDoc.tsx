@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Skill } from '../gen/bindings'
 import { ask, commands } from './live'
 import { Markdown } from './MarkdownView'
+import { useCopied } from './useCopied'
 
 /*
  * One skill, as written.
@@ -24,7 +25,7 @@ export function SkillDoc({
 }): React.JSX.Element {
   const [body, setBody] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, copyText] = useCopied()
 
   useEffect(() => {
     /* Two reads can be in flight when the reader moves down the list, and
@@ -43,12 +44,7 @@ export function SkillDoc({
     }
   }, [skill.name, directory])
 
-  const copy = (): void => {
-    void navigator.clipboard?.writeText(skill.path).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    })
-  }
+  const copy = (): void => copyText(skill.path)
 
   return (
     <>

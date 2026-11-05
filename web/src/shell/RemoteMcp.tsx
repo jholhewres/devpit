@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { RemoteDevice, RemotePairing, RemoteView } from '../gen/bindings'
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
+import { useCopied } from './useCopied'
 
 /*
  * devpit's MCP, read by an MCP client on another computer through
@@ -88,13 +89,9 @@ function McpSteps(): React.JSX.Element {
 /* The command to run on the other computer, with this computer's pairing
    link in it. There is no camera to point there, so no code to scan. */
 function McpPairing({ pairing, onDone }: { pairing: RemotePairing; onDone: () => void }): React.JSX.Element {
-  const [copied, setCopied] = useState(false)
+  const [copied, copyText] = useCopied()
   const command = `devpit mcp --remote pair '${pairing.url}'`
-  const copy = (): void =>
-    void navigator.clipboard?.writeText(command).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    })
+  const copy = (): void => copyText(command)
   return (
     <span className="remote__code">
       <span className="pref__d">Run this on the other computer:</span>

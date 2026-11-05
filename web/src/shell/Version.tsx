@@ -4,6 +4,7 @@ import type { AppInfo } from '../gen/bindings'
 import { ask, commands } from './live'
 import { SHOW_THE_UPDATE } from './UpdateCard'
 import { aNewerOne, useUpdateStatus } from './useUpdateStatus'
+import { useCopied } from './useCopied'
 
 /*
  * Which devpit this is, at the left end of the status strip.
@@ -17,7 +18,7 @@ import { aNewerOne, useUpdateStatus } from './useUpdateStatus'
 export function Version(): React.JSX.Element | null {
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [status] = useUpdateStatus()
-  const [copied, setCopied] = useState(false)
+  const [copied, copyText] = useCopied()
 
   useEffect(() => {
     void ask(() => commands.appInfo()).then((answer) => setInfo(answer.data))
@@ -28,12 +29,7 @@ export function Version(): React.JSX.Element | null {
   const newer = aNewerOne(status)
   const which = status && 'version' in status ? ` ${status.version}` : ''
 
-  const copy = (): void => {
-    void navigator.clipboard?.writeText(named).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    })
-  }
+  const copy = (): void => copyText(named)
 
   return (
     <button

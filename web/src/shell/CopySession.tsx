@@ -1,20 +1,15 @@
-import { useState } from 'react'
+import { useCopied } from './useCopied'
 
 /* The CLI's id for this conversation, one click from the clipboard: it is what
    `claude --resume` takes, and what a bug report about a session needs. */
 export function CopySession({ id }: { id: string }): React.JSX.Element {
-  const [copied, setCopied] = useState(false)
+  const [copied, copy] = useCopied()
   return (
     <button
       className="sq26"
       aria-label={copied ? 'Copied session ID' : 'Copy session ID'}
       title={id}
-      onClick={() =>
-        void navigator.clipboard?.writeText(id).then(() => {
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1400)
-        })
-      }
+      onClick={() => copy(id)}
     >
       {copied ? (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>

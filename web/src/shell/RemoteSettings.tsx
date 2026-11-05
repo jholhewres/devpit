@@ -6,6 +6,7 @@ import { PrefSwitch } from './PrefSwitch'
 import { RemoteMcp } from './RemoteMcp'
 import { launcherLink } from './remoteLauncher'
 import { onCarried } from './window'
+import { useCopied } from './useCopied'
 
 /*
  * Remote: this machine, from the person's other devices — over their
@@ -163,12 +164,8 @@ function RelayState({ view }: { view: RemoteView }): React.JSX.Element {
 /* The code to scan. Through the relay it is the whole pairing: it carries this
    machine's key and a secret too long to type, so there is no code to read. */
 function PairingCode({ pairing, relay, onDone }: { pairing: RemotePairing; relay: boolean; onDone: () => void }): React.JSX.Element {
-  const [copied, setCopied] = useState(false)
-  const copy = (): void =>
-    void navigator.clipboard?.writeText(pairing.url).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    })
+  const [copied, copyText] = useCopied()
+  const copy = (): void => copyText(pairing.url)
   return (
     <span className="remote__pair">
       <span className="remote__qr" dangerouslySetInnerHTML={{ __html: pairing.qrSvg }} />
@@ -198,12 +195,8 @@ function PairingCode({ pairing, relay, onDone }: { pairing: RemotePairing; relay
 /* The address to type on the other device, one click from the clipboard:
    copied by hand off a settings pane, a tailnet name is easy to get wrong. */
 function RemoteAddress({ address, login }: { address: string; login: string | null }): React.JSX.Element {
-  const [copied, setCopied] = useState(false)
-  const copy = (): void =>
-    void navigator.clipboard?.writeText(address).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    })
+  const [copied, copyText] = useCopied()
+  const copy = (): void => copyText(address)
   return (
     <>
       <span className="voice__row">
