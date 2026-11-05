@@ -145,11 +145,14 @@ describe('a paste of a megabyte of text', () => {
     render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
     const megabyte = 'x'.repeat(1024 * 1024)
     const clipboardData = { items: [], getData: (type: string) => (type === 'text/plain' ? megabyte : '') }
+    // The work on this thread, not the wall clock: a loaded machine
+    // stretched the same work past 50 ms while it waited for a core.
     let took = 0
     act(() => {
-      const start = performance.now()
+      const start = process.threadCpuUsage()
       fireEvent.paste(field(), { clipboardData })
-      took = performance.now() - start
+      const spent = process.threadCpuUsage(start)
+      took = (spent.user + spent.system) / 1000
     })
     expect(took).toBeLessThan(50)
     expect(field().value).toBe('')
