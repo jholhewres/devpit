@@ -1,4 +1,5 @@
 import { commands } from '../gen/bindings'
+import { inBrowser } from '../transport'
 import { inTauri } from './window'
 
 /* Tells the app, every few seconds while the window is shown, that the page is
@@ -13,7 +14,7 @@ export function beat(
   every = BEAT_MS,
   said: () => string = doing,
 ): () => void {
-  if (!inTauri()) return () => {}
+  if (!inTauri() || inBrowser()) return () => {}
   const tell = (): void => void send(page.visibilityState === 'visible', said()).catch(() => undefined)
   const timer = setInterval(() => page.visibilityState === 'visible' && tell(), every)
   page.addEventListener('visibilitychange', tell)

@@ -5,6 +5,7 @@ import { BEAT_MS, beat, doing, noteCards, noteView } from './beat'
 afterEach(() => {
   vi.useRealTimers()
   delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+  delete (window as unknown as { __DEVPIT_BROWSER__?: unknown }).__DEVPIT_BROWSER__
 })
 
 /* A page whose visibility the test sets. */
@@ -48,6 +49,15 @@ describe('the beat', () => {
   })
 
   it('does nothing outside the app', () => {
+    const send = vi.fn((_shown: boolean, _on: string) => Promise.resolve())
+    beat(page(), send)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  /* The page in a browser reaches the app's calls too, and its beat would
+     stand for the window's in the app's stall report. */
+  it('does nothing in a browser tab, which is not the window', () => {
+    Object.assign(window, { __TAURI_INTERNALS__: {}, __DEVPIT_BROWSER__: true })
     const send = vi.fn((_shown: boolean, _on: string) => Promise.resolve())
     beat(page(), send)
     expect(send).not.toHaveBeenCalled()
