@@ -50,3 +50,17 @@ fn a_typed_yes_from_a_channel_lets_no_draft_go() {
     // The same words from anywhere else do.
     assert!(lets_go(&said("u2", "envie"), "noiseless-mvp", 1));
 }
+
+#[test]
+fn a_yes_mark_alone_is_spent_whole_and_counts_nowhere_on_a_channel() {
+    let mut held = Vec::new();
+    let go = said("u1", "✅");
+    assert!(lets_go(&go, "noiseless-mvp", 1));
+    assert!(spend(&mut held, key_of("p", &go, "noiseless-mvp")));
+    assert!(!spend(&mut held, key_of("p", &go, "ascbot-lotus")));
+    let on_telegram = Said {
+        from: From::Channel("telegram"),
+        ..go
+    };
+    assert!(!lets_go(&on_telegram, "noiseless-mvp", 1));
+}

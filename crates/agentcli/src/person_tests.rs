@@ -187,3 +187,52 @@ fn a_request_turned_around_is_not_a_yes() {
         1
     ));
 }
+
+#[test]
+fn a_yes_mark_alone_lets_the_one_draft_go_in_any_language() {
+    for mark in ["✅", "✔️", "☑", "✓", "👍", "👍🏽", " ✅! ", "envia ✅"] {
+        assert!(authorises(mark, "noiseless-mvp", 1), "{mark}");
+        assert!(!authorises(mark, "noiseless-mvp", 2), "{mark}");
+    }
+    // A mark the person did not mean as a yes, or a question, is not one.
+    assert!(!authorises("✅ ❌", "noiseless-mvp", 1));
+    assert!(!authorises("✅?", "noiseless-mvp", 1));
+    assert!(!authorises("❌", "noiseless-mvp", 1));
+}
+
+#[test]
+fn a_yes_mark_beside_the_sessions_name_alone_lets_its_draft_go() {
+    for said in [
+        "noiseless ✅",
+        "✅ noiseless-mvp!",
+        "@noiseless-mvp 👍",
+        "noiseless✅",
+        "Noiseless, ✔️",
+    ] {
+        assert!(authorises(said, "noiseless-mvp", 3), "{said}");
+    }
+    // Another session, a short part of the name, or words the mark
+    // cannot read: a sentence in any language is not a yes by its mark.
+    for said in [
+        "ascbot ✅",
+        "mvp ✅",
+        "noiseless travou ✅",
+        "noiseless terminó ✅",
+        "noiseless ✅?",
+        "noiseless ascbot ✅",
+    ] {
+        assert!(!authorises(said, "noiseless-mvp", 3), "{said}");
+    }
+}
+
+#[test]
+fn a_yes_mark_from_another_session_or_a_tool_is_not_the_person() {
+    let said = last_said(&log(&[
+        composer("u1", "o que falta?"),
+        peer("u2", "✅"),
+        tool_result("u3", "noiseless ✅"),
+    ]))
+    .expect("said");
+    assert_eq!(said.text, "o que falta?");
+    assert!(!authorises(&said.text, "noiseless-mvp", 1));
+}

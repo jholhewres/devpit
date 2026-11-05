@@ -144,7 +144,47 @@ fn without_notices(mut text: &str) -> (&str, Option<From>) {
     (text, sent_from)
 }
 
-/// Words that, said alone, send the one draft waiting.
+/// Marks that say yes in any language: the yes needs no vocabulary.
+const YES_MARKS: [char; 5] = ['✅', '✔', '☑', '✓', '👍'];
+
+/// Whether `c` only dresses a mark: its emoji presentation or skin tone.
+fn dresses_a_mark(c: char) -> bool {
+    matches!(c, '\u{FE0E}' | '\u{FE0F}' | '\u{1F3FB}'..='\u{1F3FF}')
+}
+
+/// Punctuation that may hang on a word or a mark without changing it.
+const HANGING: [char; 12] = [
+    '.', ',', '!', ':', ';', '@', '¡', '。', '！', '，', '、', '…',
+];
+
+/// What stands beside the yes marks of a message (a name, a word, `?`, `❌`),
+/// lowercased; `None` when it has no mark.
+fn marked(said: &str) -> Option<Vec<String>> {
+    let mut beside = Vec::new();
+    let mut mark = false;
+    let mut token = String::new();
+    let mut marking = false;
+    for c in said.chars().chain([' ']) {
+        let gap = c.is_whitespace() || HANGING.contains(&c);
+        let of_a_mark = YES_MARKS.contains(&c) || dresses_a_mark(c);
+        if gap || of_a_mark != marking {
+            let held = std::mem::take(&mut token);
+            if held.chars().any(|held| YES_MARKS.contains(&held)) {
+                mark = true;
+            } else if !held.is_empty() {
+                beside.push(held.to_lowercase());
+            }
+        }
+        marking = of_a_mark;
+        if !gap {
+            token.push(c);
+        }
+    }
+    mark.then_some(beside)
+}
+
+/// Words that, said alone, send the one draft waiting: English and Portuguese
+/// shortcuts kept from before the marks, which are the yes of every language.
 const SEND: [&str; 11] = [
     "send",
     "send it",
@@ -171,11 +211,17 @@ const RELAY: [&str; 18] = [
 ];
 
 /// Whether what the person said lets the draft for `session` go, with
-/// `waiting` drafts in all: a bare "send" when it is the only one, or the
-/// session named beside a verb that asks for something to reach it.
+/// `waiting` drafts in all: a bare yes when it is the only one, a yes mark
+/// beside the session's name and nothing else, or the session named beside a
+/// verb that asks for something to reach it.
 pub fn authorises(said: &str, session: &str, waiting: usize) -> bool {
     if bare(said) {
         return waiting == 1;
+    }
+    if marked(said).is_some_and(|beside| {
+        !beside.is_empty() && beside.iter().all(|word| names(&[word.as_str()], session))
+    }) {
+        return true;
     }
     let said = said.trim().to_lowercase();
     let words: Vec<&str> = said
@@ -187,9 +233,12 @@ pub fn authorises(said: &str, session: &str, waiting: usize) -> bool {
         && !words.iter().any(|word| NOT.contains(word))
 }
 
-/// Whether `said` is a send word alone, which names no session: it lets one
-/// draft go, whichever it is, and so only once.
+/// Whether `said` is a yes mark or a send word alone, which names no session:
+/// it lets one draft go, whichever it is, and so only once.
 pub fn bare(said: &str) -> bool {
+    if let Some(beside) = marked(said) {
+        return beside.is_empty() || SEND.contains(&beside.join(" ").as_str());
+    }
     let said = said.trim().to_lowercase();
     SEND.contains(&said.trim_end_matches(['.', '!', ' ']))
 }

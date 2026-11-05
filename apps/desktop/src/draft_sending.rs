@@ -2,7 +2,7 @@
 //!
 //! The orchestrator asks (`devpit_send_draft`); devpit reads the person's last
 //! message in the orchestrator's log itself and sends only when that message
-//! lets this draft go (`devpit_agentcli::person`). So "envie" counts from
+//! lets this draft go (`devpit_agentcli::person`). So a ✅ counts from
 //! wherever the person spoke to the orchestrator — the composer or the Claude
 //! app — and never from another session, a tool or the agent's own account.
 //! One message lets one draft go: a second ask on the same words is refused.
@@ -81,7 +81,7 @@ pub(crate) fn send(project: &str, profile: &str, root: &Path, name: &str) -> Res
                 said.from.label()
             ),
             _ => format!(
-                "not sent: the person's last message («{}») does not ask for the draft to {name} to go. It waits beside the session for their click, or for them to say \"envie\" or name the session.",
+                "not sent: the person's last message («{}») does not ask for the draft to {name} to go. It waits beside the session for their click, or for them to reply ✅, beside the session's name when more than one draft waits.",
                 short(&said.text)
             ),
         });
