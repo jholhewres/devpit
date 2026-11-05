@@ -250,7 +250,19 @@ fn a_chromium_opens_it_as_an_app_and_otherwise_the_desktop_opens_the_link() {
         ("google-chrome", true)
     );
     assert_eq!(opener(|name| name == "chromium"), ("chromium", true));
-    assert_eq!(opener(|_| false), ("xdg-open", false));
+    assert_eq!(
+        opener(|_| false),
+        (link_opener(std::env::consts::OS).0, false)
+    );
+}
+
+/// Without a Chromium the link goes to the desktop's own opener, which is not
+/// xdg-open on macOS or Windows: there the button did nothing.
+#[test]
+fn each_desktop_opens_a_link_with_its_own_opener() {
+    assert_eq!(link_opener("macos"), ("open", &[][..]));
+    assert_eq!(link_opener("windows"), ("cmd", &["/C", "start", ""][..]));
+    assert_eq!(link_opener("linux"), ("xdg-open", &[][..]));
 }
 
 /// A pasted picture or a saved file is a call of megabytes: it is read whole,

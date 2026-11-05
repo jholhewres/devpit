@@ -288,13 +288,7 @@ mod browser {
             return;
         }
 
-        let (program, args): (&str, &[&str]) = if cfg!(target_os = "macos") {
-            ("open", &[])
-        } else if cfg!(target_os = "windows") {
-            ("cmd", &["/C", "start", ""])
-        } else {
-            ("xdg-open", &[])
-        };
+        let (program, args) = crate::local_server::link_opener(std::env::consts::OS);
 
         let opened = devpit_pty::host_env::command(program)
             .args(args)

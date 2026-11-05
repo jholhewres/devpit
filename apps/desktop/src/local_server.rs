@@ -372,6 +372,15 @@ fn admitted(stream: &mut TcpStream, session: &str) {
     let _ = stream.flush();
 }
 
+/// What opens a link on `os` where no Chromium is: the desktop's own opener.
+pub(crate) fn link_opener(os: &str) -> (&'static str, &'static [&'static str]) {
+    match os {
+        "macos" => ("open", &[]),
+        "windows" => ("cmd", &["/C", "start", ""]),
+        _ => ("xdg-open", &[]),
+    }
+}
+
 /// The browser that opens the app as an app: Chromium's `--app`, when one is
 /// installed, else whatever the desktop opens links with.
 pub(crate) fn opener(found: impl Fn(&str) -> bool) -> (&'static str, bool) {
@@ -383,7 +392,9 @@ pub(crate) fn opener(found: impl Fn(&str) -> bool) -> (&'static str, bool) {
     ]
     .into_iter()
     .find(|program| found(program))
-    .map_or(("xdg-open", false), |program| (program, true))
+    .map_or((link_opener(std::env::consts::OS).0, false), |program| {
+        (program, true)
+    })
 }
 
 /// "Open in browser": signs this browser in and opens the app, off the
@@ -406,7 +417,7 @@ pub(crate) fn open_in_browser() {
         if app {
             command.arg(format!("--app={url}"));
         } else {
-            command.arg(url);
+            command.args(link_opener(std::env::consts::OS).1).arg(url);
         }
         if let Ok(child) = command.spawn() {
             devpit_pty::host_env::let_go(child);
