@@ -8,7 +8,7 @@ import { ChatThread } from './ChatThread'
 import { rangesIn } from './chatSearch'
 import { Markdown } from './MarkdownView'
 import { Turn } from './Turn'
-import { disclose } from './useDisclosed'
+import { discloseMessage } from './useDisclosed'
 
 vi.mock('./TurnApps', () => ({ TurnApps: () => null }))
 vi.mock('./TurnDelegations', () => ({ TurnDelegations: () => null }))
@@ -81,7 +81,25 @@ describe('a match in a settled turn', () => {
     } as unknown as Message
     render(<Turn message={narrated} folder={null} />)
     expect(rangesIn(document.body, 'parser')).toHaveLength(0)
-    act(() => disclose('m9:turn'))
+    act(() => discloseMessage('m9'))
     expect(rangesIn(document.body, 'parser')).toHaveLength(1)
+  })
+})
+
+describe('a match in a long prompt', () => {
+  it('is unfolded from under Show more when the search lands in it', () => {
+    const asked = {
+      id: 'u1',
+      turnId: 't1',
+      role: 'user',
+      createdAt: 1,
+      streaming: false,
+      ended: null,
+      parts: [{ kind: 'text', text: Array.from({ length: 20 }, (_, at) => (at === 19 ? 'the parser' : `line ${at}`)).join('\n'), parent: null }],
+    } as unknown as Message
+    render(<Turn message={asked} folder={null} />)
+    expect(document.querySelector('.said__t')!.hasAttribute('data-folded')).toBe(true)
+    act(() => discloseMessage('u1'))
+    expect(document.querySelector('.said__t')!.hasAttribute('data-folded')).toBe(false)
   })
 })

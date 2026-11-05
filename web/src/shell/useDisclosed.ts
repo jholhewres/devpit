@@ -12,8 +12,16 @@ const kept = new Map<string, boolean>()
 /* The folds drawn now, told when something outside them opens one. */
 const drawn = new Map<string, Set<(open: boolean) => void>>()
 
-/* Opens the fold `key`, drawn or not: a search that lands in it shows what it found. */
-export function disclose(key: string): void {
+/* The folds a message's row draws: a turn's earlier work, a long prompt's tail. */
+export const foldOf = (messageId: string, what: 'turn' | 'said'): string => `${messageId}:${what}`
+
+/* Opens every fold of a message, drawn or not: a search that lands in one shows what it found. */
+export function discloseMessage(messageId: string): void {
+  disclose(foldOf(messageId, 'turn'))
+  disclose(foldOf(messageId, 'said'))
+}
+
+function disclose(key: string): void {
   kept.delete(key)
   kept.set(key, true)
   if (kept.size > MOST) kept.delete(kept.keys().next().value!)

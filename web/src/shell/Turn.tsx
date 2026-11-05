@@ -15,7 +15,7 @@ import { TurnDelegations } from './TurnDelegations'
 import { TurnDrafts } from './TurnDrafts'
 import { TurnChanges } from './TurnChangesView'
 import { answerOf, millis, outcome, segments, statusOf, took, type Segment } from './turnFold'
-import { useDisclosed } from './useDisclosed'
+import { foldOf, useDisclosed } from './useDisclosed'
 import { typed } from './writing'
 
 /*
@@ -64,7 +64,7 @@ function Answer({
   folder: string | null
   onOpen?: (path: string) => void
 }): React.JSX.Element {
-  const [open, setOpen] = useDisclosed(`${message.id}:turn`, false)
+  const [open, setOpen] = useDisclosed(foldOf(message.id, 'turn'), false)
   const live = message.streaming
   const every = joined(message.parts)
   const shown = segments(every)

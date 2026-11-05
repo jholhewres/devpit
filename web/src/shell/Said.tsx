@@ -2,14 +2,14 @@ import type { Message } from '../gen/bindings'
 import { isLong, sentWith, type SentFile } from './sentFiles'
 import { useShellPick } from './shellStore'
 import { useStream } from './Streamed'
-import { useDisclosed } from './useDisclosed'
+import { foldOf, useDisclosed } from './useDisclosed'
 
 /* What a person said: the files as chips and pictures, then the words. */
 export function Said({ message }: { message: Message }): React.JSX.Element {
   const { files, prompt } = sentWith(message.parts.map((part) => ('text' in part ? part.text : '')).join(''))
   const long = isLong(prompt)
   const projectId = useShellPick((shell) => shell.project?.id ?? null)
-  const [open, setOpen] = useDisclosed(`${message.id}:said`, false)
+  const [open, setOpen] = useDisclosed(foldOf(message.id, 'said'), false)
 
   return (
     <article className="said">

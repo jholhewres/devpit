@@ -61,7 +61,7 @@ describe('a search over the whole conversation', () => {
 describe('the word where it is drawn', () => {
   it('is found in prose only, ignoring case', () => {
     const root = document.createElement('div')
-    root.innerHTML = '<div class="md"><p>Parser and <b>parser</b></p></div><div class="acts">parser</div><div class="said__t">PARSER</div>'
+    root.innerHTML = '<div class="md"><p>Parser and <b>parser</b></p></div><div class="acts"><div class="md">parser</div></div><div class="said__t">PARSER</div>'
     const ranges = rangesIn(root, 'parser')
     expect(ranges.map((one) => one.toString())).toEqual(['Parser', 'parser', 'PARSER'])
   })
