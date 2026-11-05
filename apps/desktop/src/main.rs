@@ -52,6 +52,7 @@ mod opening;
 mod orchestrator;
 mod orchestrator_links;
 mod orchestrator_notes;
+mod orchestrator_view;
 mod rewinding;
 mod runs_list;
 // Only ever compiled where it is used. The contract exists to generate the

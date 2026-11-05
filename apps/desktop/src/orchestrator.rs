@@ -258,7 +258,7 @@ pub(crate) fn seed(folder: &Path) -> std::io::Result<()> {
         }
         std::fs::write(path, text)?;
     }
-    Ok(())
+    crate::orchestrator_view::set_up(folder)
 }
 
 /// Every orchestrator's brief brought up to this build, and what could not
