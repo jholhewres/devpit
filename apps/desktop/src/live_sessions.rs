@@ -467,6 +467,12 @@ fn listed_running(sessions: &Path) -> Vec<Listed> {
         .collect()
 }
 
+/// Whether a listed process is a session to show: running, and not a
+/// reviewer devpit runs headless, which the CLI lists like any other.
+pub(crate) fn shown(pid: i32, reviewing: &[u32], alive: impl Fn(i32) -> bool) -> bool {
+    alive(pid) && !u32::try_from(pid).is_ok_and(|pid| reviewing.contains(&pid))
+}
+
 /// Whether a process is still there. A listing outlives a CLI that crashed.
 pub(crate) fn alive(pid: i32) -> bool {
     devpit_pty::process::alive(pid)
@@ -573,9 +579,10 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
         shown
     };
     let windows = windows_now();
+    let reviewing = devpit_agentcli::reviewing::running();
     let mut sessions = read(
         &config_of(profile_id)?.join("sessions"),
-        alive,
+        |pid| shown(pid, &reviewing, alive),
         &projects,
         &worktrees,
         &windows,

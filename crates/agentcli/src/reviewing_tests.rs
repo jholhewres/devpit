@@ -174,3 +174,50 @@ fn a_claude_reviewer_loads_no_mcp_server_and_has_a_last_turn() {
     let why = answer_of(Cli::Claude, ran_out).expect_err("no answer");
     assert!(why.contains("turns"), "{why}");
 }
+
+#[cfg(unix)]
+#[test]
+fn a_reviewer_is_known_as_one_while_it_runs_and_forgotten_after() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let pid_file = dir.path().join("pid");
+    let program = fake(
+        dir.path(),
+        "says-its-pid",
+        &format!(
+            r#"cat >/dev/null; echo $$ > '{}'; sleep 1; printf '{{"type":"result","is_error":false,"result":"ok"}}'"#,
+            pid_file.display()
+        ),
+    );
+    let asking = {
+        let program = program.clone();
+        let cwd = dir.path().to_path_buf();
+        std::thread::spawn(move || {
+            review(&Review {
+                cli: Cli::Claude,
+                program: &program,
+                prompt: "p",
+                cwd: &cwd,
+                model: None,
+                env: &[],
+                deadline: Duration::from_secs(20),
+            })
+        })
+    };
+    let began = Instant::now();
+    let pid = loop {
+        if let Some(pid) = std::fs::read_to_string(&pid_file)
+            .ok()
+            .and_then(|text| text.trim().parse::<u32>().ok())
+        {
+            break pid;
+        }
+        assert!(
+            began.elapsed() < Duration::from_secs(10),
+            "the fake never started"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert!(running().contains(&pid), "{pid} not in {:?}", running());
+    asking.join().expect("joined").expect("an answer");
+    assert!(!running().contains(&pid));
+}

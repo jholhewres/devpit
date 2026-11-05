@@ -4,7 +4,7 @@ use std::path::Path;
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{card_of, pane_of, pane_target, place_of, read, remote_of, start_of};
+use super::{card_of, pane_of, pane_target, place_of, read, remote_of, shown, start_of};
 
 /// tmux's answer to which window each pane is in.
 fn windows(panes: &[(&str, &str)]) -> HashMap<String, String> {
@@ -98,6 +98,27 @@ fn a_dead_session_and_the_orchestrators_own_are_left_out() {
         "{:?}",
         found.iter().map(|one| &one.name).collect::<Vec<_>>()
     );
+}
+
+#[test]
+fn a_reviewer_devpit_runs_headless_is_not_a_session() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sessions = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions).expect("mkdir");
+    listing(&sessions, 30, "fitmate-9f", dir.path());
+    listing(&sessions, 31, "fitmate-style", dir.path());
+
+    let found = read(
+        &sessions,
+        |pid| shown(pid, &[30], |_| true),
+        &[],
+        dir.path(),
+        &HashMap::new(),
+        |_, _| None,
+        |_| None,
+    );
+    let names: Vec<_> = found.iter().map(|one| one.name.as_str()).collect();
+    assert_eq!(names, ["fitmate-style"]);
 }
 
 #[test]

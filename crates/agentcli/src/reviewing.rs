@@ -253,6 +253,35 @@ fn drained(from: Option<impl Read + Send + 'static>) -> std::thread::JoinHandle<
     })
 }
 
+/// The reviewers running now, by pid. Claude Code lists each as a live
+/// session, and none is one a person or an orchestrator follows.
+static RUNNING: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(Vec::new());
+
+/// The pids of the reviewers running now.
+pub fn running() -> Vec<u32> {
+    RUNNING.lock().map(|held| held.clone()).unwrap_or_default()
+}
+
+/// Keeps a reviewer's pid in [`running`] until it is dropped.
+struct Held(u32);
+
+impl Held {
+    fn new(pid: u32) -> Self {
+        if let Ok(mut held) = RUNNING.lock() {
+            held.push(pid);
+        }
+        Held(pid)
+    }
+}
+
+impl Drop for Held {
+    fn drop(&mut self) {
+        if let Ok(mut held) = RUNNING.lock() {
+            held.retain(|one| *one != self.0);
+        }
+    }
+}
+
 /// How often a running review is looked at.
 const EVERY: Duration = Duration::from_millis(100);
 
@@ -286,6 +315,7 @@ pub fn review(asked: &Review<'_>) -> Result<Reviewed, Unreviewed> {
             std::io::ErrorKind::NotFound => Unreviewed::Missing,
             _ => Unreviewed::Failed(format!("could not start: {err}")),
         })?;
+    let _held = Held::new(child.id());
     let stdin = child.stdin.take();
     let prompt = on_stdin(asked.cli).then(|| asked.prompt.to_owned());
     // Its own thread: a prompt past the pipe's buffer would block until the
