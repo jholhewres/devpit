@@ -625,7 +625,7 @@ fn respond_in(
         // No card: a session of its own, in the project's folder.
         "start" if card_id.is_empty() => {
             let app = app.ok_or("devpit's window is not running")?;
-            crate::opening::open(
+            let started = crate::opening::open(
                 app,
                 project,
                 orchestrating(here)?,
@@ -639,27 +639,41 @@ fn respond_in(
                 ),
                 text("name").as_deref(),
             )
-            .map_err(said)?
+            .map_err(said)?;
+            let profile = orchestrating(here)?;
+            crate::starting::once_up(
+                started,
+                &crate::starting::listed_in(profile, &project.id),
+                crate::starting::UP_WITHIN,
+            )
         }
-        "start" => crate::handing::hand(
-            app.ok_or("devpit's window is not running")?,
-            &board,
-            orchestrating(here)?,
-            &card_id,
-            &crate::orchestrator_notes::briefed(
-                Path::new(&here.root_path),
-                &text("prompt").unwrap_or_default(),
-                Some(crate::orchestrator_notes::ProjectName {
-                    id: &project.id,
-                    name: &project.name,
-                }),
-            ),
-            text("name").as_deref(),
-            // Its own checkout unless told otherwise: the project's folder is
-            // shared with whatever else runs there.
-            (asked.params.get("checkout").and_then(Value::as_bool) == Some(false))
-                .then(|| Path::new(&project.root_path)),
-        )?,
+        "start" => {
+            let profile = orchestrating(here)?;
+            let started = crate::handing::hand(
+                app.ok_or("devpit's window is not running")?,
+                &board,
+                profile,
+                &card_id,
+                &crate::orchestrator_notes::briefed(
+                    Path::new(&here.root_path),
+                    &text("prompt").unwrap_or_default(),
+                    Some(crate::orchestrator_notes::ProjectName {
+                        id: &project.id,
+                        name: &project.name,
+                    }),
+                ),
+                text("name").as_deref(),
+                // Its own checkout unless told otherwise: the project's folder is
+                // shared with whatever else runs there.
+                (asked.params.get("checkout").and_then(Value::as_bool) == Some(false))
+                    .then(|| Path::new(&project.root_path)),
+            )?;
+            crate::starting::once_up(
+                started,
+                &crate::starting::listed_in(profile, &project.id),
+                crate::starting::UP_WITHIN,
+            )
+        }
         _ => unreachable!("checked against METHODS above"),
     };
     if WRITES.contains(&asked.method.as_str()) {

@@ -31,6 +31,8 @@ struct Listed {
     proc_start: Option<String>,
     /// Remote Control's session, written while connected and nulled after.
     bridge_session_id: Option<String>,
+    /// Where other sessions message it, once it listens.
+    messaging_socket_path: Option<String>,
 }
 
 impl Listed {
@@ -450,6 +452,19 @@ pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>
         ));
     }
     Ok(found)
+}
+
+/// Whether a running session called `name` is listed in `sessions` and, when
+/// the listing names a socket for other sessions to message it at, that
+/// socket is there: before it, a SendMessage to the name is lost.
+pub(crate) fn reachable_in(sessions: &Path, name: &str) -> bool {
+    listed_running(sessions).iter().any(|listed| {
+        listed.name.as_deref() == Some(name)
+            && listed
+                .messaging_socket_path
+                .as_deref()
+                .is_none_or(|socket| Path::new(socket).exists())
+    })
 }
 
 /// Each live listing, for the one reply that needs it.

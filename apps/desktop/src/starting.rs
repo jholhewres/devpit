@@ -7,13 +7,22 @@
 //! tab. devpit opened that terminal, so it reads it from the first second, and
 //! a question there is shown and answered like any other.
 
+use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use devpit_rpc::{LivePane, LiveSession};
+use serde_json::{json, Value};
 
 /// How long a session that never came up is still looked for.
 const LOOKED_FOR: Duration = Duration::from_secs(10 * 60);
+
+/// How long a start waits for its session to be reachable before answering.
+pub(crate) const UP_WITHIN: Duration = Duration::from_secs(30);
+const LOOKED_EVERY: Duration = Duration::from_millis(250);
+
+const UP: &str = "It runs in a terminal tab of the project, where the person can watch it, and is up: message it by this name with SendMessage, and pass notify_when_idle to hear when it is done.";
+const NOT_UP: &str = "It runs in a terminal tab of the project but was not up in time, most often stopped on a question there. A SendMessage before it is up is lost: message it only once devpit_sessions lists it.";
 
 #[derive(Clone)]
 pub(crate) struct Starting {
@@ -107,6 +116,39 @@ pub(crate) fn shown(
             })
         })
         .collect()
+}
+
+/// Where the CLI lists a session `profile` starts in `project_id`: the
+/// profile's own folder, and the project's account when it has one.
+pub(crate) fn listed_in(profile: &str, project_id: &str) -> Vec<PathBuf> {
+    let own = crate::live_sessions::config_of(profile).ok();
+    let account = crate::claude_accounts::dir_of_project(project_id).map(PathBuf::from);
+    own.into_iter()
+        .chain(account)
+        .map(|dir| dir.join("sessions"))
+        .collect()
+}
+
+/// A start's answer once its session can be messaged, or saying it cannot
+/// yet: the first SendMessage after a start used to be lost, and sent twice.
+pub(crate) fn once_up(mut answer: Value, listed_in: &[PathBuf], within: Duration) -> Value {
+    let name = answer["name"].as_str().unwrap_or_default().to_owned();
+    let deadline = Instant::now() + within;
+    let up = loop {
+        if listed_in
+            .iter()
+            .any(|dir| crate::live_sessions::reachable_in(dir, &name))
+        {
+            break true;
+        }
+        if Instant::now() >= deadline {
+            break false;
+        }
+        std::thread::sleep(LOOKED_EVERY);
+    };
+    answer["up"] = json!(up);
+    answer["next"] = json!(if up { UP } else { NOT_UP });
+    answer
 }
 
 /// The terminal of a session started here that the CLI does not list yet.

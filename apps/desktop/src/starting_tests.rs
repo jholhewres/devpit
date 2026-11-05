@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use devpit_rpc::LiveSession;
 
-use super::{shown, Starting};
+use super::{once_up, shown, Starting};
 
 const TRUST: &str = "\
  Do you trust the files in this folder?
@@ -91,4 +91,30 @@ fn a_session_is_let_go_once_listed_or_long_gone() {
         1,
         "another account's session is not this one's to let go"
     );
+}
+
+#[test]
+fn a_start_answers_once_its_session_listens_and_says_to_wait_when_it_does_not() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sessions = dir.path().join("sessions");
+    std::fs::create_dir_all(&sessions).expect("mkdir");
+    let socket = dir.path().join("me.sock");
+    let listing = serde_json::json!({ "pid": std::process::id(), "name": "api-worker",
+        "status": "idle", "kind": "interactive", "cwd": "/w",
+        "messagingSocketPath": socket.display().to_string() });
+    std::fs::write(sessions.join("1.json"), listing.to_string()).expect("listing");
+    let started = || serde_json::json!({ "name": "api-worker", "next": "" });
+
+    // Listed, but not listening yet.
+    let early = once_up(started(), &[sessions.clone()], Duration::ZERO);
+    assert_eq!(early["up"], false);
+    assert!(early["next"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("devpit_sessions"));
+
+    std::fs::write(&socket, "").expect("socket");
+    let up = once_up(started(), &[sessions], Duration::from_secs(5));
+    assert_eq!(up["up"], true);
+    assert!(up["next"].as_str().unwrap_or_default().contains("is up"));
 }
