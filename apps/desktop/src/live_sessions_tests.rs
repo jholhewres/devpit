@@ -357,7 +357,17 @@ fn a_session_its_hooks_never_placed_is_found_by_the_pane_its_process_started_in(
         if let Some(leaf) = leaf {
             sleep.env(devpit_tmux::PANE_ENV, leaf);
         }
-        sleep.spawn().expect("spawn")
+        let child = sleep.spawn().expect("spawn");
+        // Spawn returns during the exec, before the kernel says where the
+        // new environment lies: until then it reads empty.
+        let environ = format!("/proc/{}/environ", child.id());
+        for _ in 0..500 {
+            if std::fs::read(&environ).is_ok_and(|bytes| !bytes.is_empty()) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        child
     };
     let mut in_pane = started(Some("leaf_unplaced"));
     let mut in_no_layout = started(Some("leaf_gone"));

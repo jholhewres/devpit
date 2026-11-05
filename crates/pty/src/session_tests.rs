@@ -131,6 +131,20 @@ fn a_shell_is_found_by_the_name_in_its_environment_and_a_daemon_it_started_is_no
     assert_eq!(nobody, Some(vec![]));
 }
 
+/// Waits for a child spawned this instant to have its environment: spawn
+/// returns during the exec, before the kernel says where the new one lies,
+/// and until then `/proc/<pid>/environ` reads empty.
+#[cfg(target_os = "linux")]
+fn environ_ready(pid: u32) {
+    let path = format!("/proc/{pid}/environ");
+    for _ in 0..500 {
+        if std::fs::read(&path).is_ok_and(|environ| !environ.is_empty()) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn a_process_says_the_value_it_was_started_with_and_nothing_for_a_name_it_lacks() {
@@ -140,6 +154,7 @@ fn a_process_says_the_value_it_was_started_with_and_nothing_for_a_name_it_lacks(
         .env("DEVPIT_TEST_PANE_TOO", "leaf_not_this_one")
         .spawn()
         .expect("spawn");
+    environ_ready(child.id());
     let said = environ_of(child.id(), "DEVPIT_TEST_PANE");
     let lacking = environ_of(child.id(), "DEVPIT_TEST_NOT_SET");
     let _ = child.kill();
