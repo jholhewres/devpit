@@ -3,23 +3,39 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
-## Unreleased
+## 0.1.48 — 2026-11-05
+
+### Sessions
+
+- **devpit no longer starts sessions on its own; turn it on in Settings →
+  Sessions.** Opening the next card of an epic and handing a full session
+  to a fresh one are both off by default. A session is no longer told to
+  stop after one card, so it can take the next card the orchestrator gives
+  it. When the handoff is on, the new session works in the same folder as
+  the one it replaces, and the old one is stopped once the new one is up.
 
 ### Fixes
 
 - **Sessions in a devpit terminal are tied to it again.** An agent devpit
   starts in a pane (from the orchestrator, a handoff or a card) shows "Open
-  its terminal here" in the session list, its questions and permission
-  requests reach "Waiting on you", and the orchestrator can read its screen. 0.1.47 lost this for terminals in devpit's own keeper.
-  Sessions started on 0.1.47 are found again on Linux by the pane they were
-  started in; on macOS they stay unlinked until they are started again.
-  When the keeper dies, a terminal comes back with its agent only for
-  sessions started on 0.1.48, and that agent starts again without the name
-  devpit first gave it.
-- **An agent's spinner no longer floods a finished command.** A command
-  block that ran an agent such as Claude Code showed each redraw of its
-  spinner as new lines, until the block held 50,000 of them. A frame drawn
-  over itself is now kept as one.
+  its terminal here" in the session list, "Send as you" works for its
+  drafts, its questions and permission requests reach "Waiting on you", and
+  the orchestrator can read its screen. 0.1.47 lost this for terminals in
+  devpit's own keeper. Sessions started on 0.1.47 are found again on Linux
+  by the pane they were started in; on macOS they stay unlinked until they
+  are started again. If the keeper stops, only sessions started on 0.1.48
+  come back with their agent.
+- **The orchestrator keeps your preferences in view.** Its preferences
+  reach it on every message, so they hold after a long chat, a compaction
+  or a restart, and a preference it notes applies from the next message.
+- **A message the orchestrator could not deliver says so.** It shows as
+  "not sent" with the reason, instead of a card that looked delivered, and
+  a retry keeps one card. A session the orchestrator starts can be messaged
+  as soon as the start answers, and Devflow's reviewers no longer show up as
+  sessions.
+- **A finished command keeps its output.** An agent's spinner no longer
+  fills the block with 50,000 lines, and a screen cleared during the command
+  no longer erases what was printed before it.
 
 ## 0.1.47 — 2026-11-05
 
