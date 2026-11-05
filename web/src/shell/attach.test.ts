@@ -19,8 +19,8 @@ const core = vi.hoisted(() => {
 })
 vi.mock('@tauri-apps/api/core', () => core)
 
-import { attach, attachPane } from './attach'
-import { UNAVAILABLE } from './paneSocket'
+import { attach, attachPane, retryIn } from './attach'
+import { LOST, UNAVAILABLE } from './paneSocket'
 
 afterEach(() => {
   delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
@@ -62,6 +62,55 @@ describe('an attached pane', () => {
       expect(core.asked).not.toContain('session_attach')
       await attachPane('p', 'leaf_1', { rows: 24, cols: 80 }, on)
       expect(core.asked).toContain('session_attach')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('attaching again after an attach ended', () => {
+  const browser = (yes: boolean): void => {
+    ;(window as unknown as { __DEVPIT_BROWSER__?: boolean }).__DEVPIT_BROWSER__ = yes
+  }
+  afterEach(() => browser(false))
+
+  it('falls back to the channel at once in the window', () => {
+    expect(retryIn(UNAVAILABLE, 0)).toBe(0)
+    expect(retryIn(LOST, 3)).toBe(1000)
+  })
+
+  /* A browser has no channel: the socket is tried again, never in a loop
+     that spins, and never so slowly the terminal seems dead. */
+  it('waits longer each time in a browser, up to a ceiling', () => {
+    browser(true)
+    const waits = [0, 1, 2, 3, 4, 5, 6].map((tries) => retryIn(UNAVAILABLE, tries)!)
+    expect(waits[0]).toBeGreaterThan(0)
+    for (let i = 1; i < waits.length; i += 1) expect(waits[i]).toBeGreaterThanOrEqual(waits[i - 1]!)
+    expect(waits.at(-1)).toBe(waits.at(-2))
+  })
+
+  it('does not try again for a pane that ended or failed for good', () => {
+    expect(retryIn(null, 0)).toBeNull()
+    expect(retryIn('the pane is gone', 0)).toBeNull()
+  })
+
+  it('keeps the socket in a browser, so the next attach tries it again', async () => {
+    browser(true)
+    let opened = 0
+    vi.stubGlobal('WebSocket', function () {
+      opened += 1
+      throw new Error('refused')
+    })
+    try {
+      /* Fresh: the window's tests above left the channel chosen. */
+      vi.resetModules()
+      const fresh = await import('./attach')
+      const on = { output: () => {}, end: () => {} }
+      await fresh.attachPane('p', 'leaf_1', { rows: 24, cols: 80 }, on)
+      await new Promise((settled) => setTimeout(settled, 0))
+      await fresh.attachPane('p', 'leaf_1', { rows: 24, cols: 80 }, on)
+      await new Promise((settled) => setTimeout(settled, 0))
+      expect(opened).toBe(2)
     } finally {
       vi.unstubAllGlobals()
     }

@@ -2,7 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 
 import { commands } from '../gen/bindings'
 import { inBrowser } from '../transport'
-import { PaneSocket, UNAVAILABLE, type PaneListener } from './paneSocket'
+import { LOST, PaneSocket, UNAVAILABLE, type PaneListener } from './paneSocket'
 import { reason } from './reason'
 import { inTauri } from './window'
 
@@ -49,8 +49,9 @@ export async function attachPane(
     return panes.attach(projectId, paneId, size, {
       ...on,
       end: (why) => {
-        /* Refused (a policy, a server gone): the channel from here on. */
-        if (why === UNAVAILABLE) socket = Promise.resolve(null)
+        /* Refused (a policy, a server gone): the channel from here on. A
+           browser has none, and keeps the socket to try again. */
+        if (why === UNAVAILABLE && !inBrowser()) socket = Promise.resolve(null)
         on.end(why)
       },
     })
@@ -58,6 +59,19 @@ export async function attachPane(
   if (past) on.output(new TextEncoder().encode(past), true)
   const attached = attach(projectId, paneId, size, (bytes) => on.output(bytes, false), on.end)
   return attached && { ...attached, ack: () => undefined, older: async () => null }
+}
+
+/**
+ * How long to wait before attaching again after an attach ended with
+ * `failed`; `null` when attaching again would not help. `tries` counts the
+ * attempts since the pane last drew.
+ */
+export function retryIn(failed: string | null, tries: number): number | null {
+  if (failed === LOST) return 1000
+  if (failed !== UNAVAILABLE) return null
+  /* The window has the channel to fall back on at once; a browser waits for
+     the server, longer each time. */
+  return inBrowser() ? Math.min(1000 * 2 ** tries, 15_000) : 0
 }
 
 /* The pty streams raw bytes over a Channel rather than JSON: a terminal that
