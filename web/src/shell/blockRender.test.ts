@@ -12,6 +12,15 @@ describe('a block drawn back from its output', () => {
     expect(lines[2]![0]).toMatchObject({ text: 'fail', fg: '#ff0000', bold: true })
   })
 
+  it('keeps a frame redrawn in place as one frame, not a line per redraw', async () => {
+    /* What Ink (Claude Code's TUI) writes for a spinner: clear the last
+       frame's lines going up, back to the first column, draw the next. */
+    const erase = (lines: number): string => '\x1b[2K' + '\x1b[1A\x1b[2K'.repeat(lines - 1) + '\x1b[G'
+    const frame = (glyph: string): string => `${glyph} Pouncing…\r\n\r\nesc to interrupt\r\n`
+    const output = 'done earlier\r\n' + frame('✻') + ['✶', '✳', '✢', '·'].map((glyph) => erase(4) + frame(glyph)).join('')
+    expect(plain(await rendered(output, 40, theme))).toBe('done earlier\n· Pouncing…\n\nesc to interrupt')
+  })
+
   it('wraps at the width it is drawn at', async () => {
     expect((await rendered('x'.repeat(50), 20, theme)).length).toBe(3)
   })

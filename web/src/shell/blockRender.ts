@@ -84,10 +84,16 @@ function styleOf(cell: Cell, theme: ITheme): Omit<Run, 'text'> {
 const same = (a: Omit<Run, 'text'>, b: Omit<Run, 'text'>): boolean =>
   a.fg === b.fg && a.bg === b.bg && a.bold === b.bold && a.dim === b.dim && a.italic === b.italic && a.underline === b.underline
 
+/* As tall as a pane gets. A TUI that is not on the alternate screen (Claude
+   Code's spinner, a progress bar of several lines) moves the cursor up to
+   redraw its frame in place, and it cannot rise above the screen's top: a
+   screen one row tall would leave every frame below the last. */
+const ROWS = 200
+
 /** The output drawn at `cols` columns, as lines of runs, without the blank rows after it. */
 export async function rendered(output: string, cols: number, theme: ITheme): Promise<readonly Line[]> {
   const { Terminal } = await import('@xterm/headless')
-  const term = new Terminal({ cols: Math.max(cols, 20), rows: 1, scrollback: 50_000, allowProposedApi: true, convertEol: false })
+  const term = new Terminal({ cols: Math.max(cols, 20), rows: ROWS, scrollback: 50_000, allowProposedApi: true, convertEol: false })
   await new Promise<void>((done) => term.write(output, done))
   const buffer = term.buffer.active
   const lines: Line[] = []
