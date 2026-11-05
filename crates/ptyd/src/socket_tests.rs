@@ -55,6 +55,17 @@ fn the_socket_is_owner_only_and_a_dead_one_is_replaced() {
     drop(listener);
 }
 
+/// Only a socket is taken for a dead daemon's: anything else at that path is
+/// somebody's file, and is left where it is.
+#[test]
+fn a_file_that_is_not_a_socket_is_never_removed() {
+    let dir = tempfile::tempdir().expect("dir");
+    let at = dir.path().join("devpit-ptyd.sock");
+    std::fs::write(&at, "notes").expect("a file");
+    assert!(listen(&at).is_err());
+    assert_eq!(std::fs::read_to_string(&at).expect("kept"), "notes");
+}
+
 #[test]
 fn the_kernel_names_the_peer_and_only_the_same_user_is_admitted() {
     let (one, two) = UnixStream::pair().expect("pair");

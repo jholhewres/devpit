@@ -7,7 +7,7 @@
 //! terminal is a shell and a shell is the account.
 
 use std::io;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 
@@ -51,6 +51,12 @@ pub fn listen(path: &Path) -> io::Result<UnixListener> {
             return Err(io::Error::new(
                 io::ErrorKind::AddrInUse,
                 "a devpit-ptyd already listens there",
+            ));
+        }
+        if !std::fs::symlink_metadata(path)?.file_type().is_socket() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "something that is not a socket is where devpit-ptyd listens",
             ));
         }
         std::fs::remove_file(path)?;
