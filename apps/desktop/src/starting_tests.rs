@@ -106,7 +106,7 @@ fn a_start_answers_once_its_session_listens_and_says_to_wait_when_it_does_not() 
     let started = || serde_json::json!({ "name": "api-worker", "next": "" });
 
     // Listed, but not listening yet.
-    let early = once_up(started(), &[sessions.clone()], Duration::ZERO);
+    let early = once_up(started(), std::slice::from_ref(&sessions), Duration::ZERO);
     assert_eq!(early["up"], false);
     assert!(early["next"]
         .as_str()

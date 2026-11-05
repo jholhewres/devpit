@@ -4,7 +4,9 @@ use std::path::Path;
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{card_of, pane_of, pane_target, place_of, read, remote_of, shown, start_of};
+use super::{
+    card_of, in_their_accounts, pane_of, pane_target, place_of, read, remote_of, shown, start_of,
+};
 
 /// tmux's answer to which window each pane is in.
 fn windows(panes: &[(&str, &str)]) -> HashMap<String, String> {
@@ -406,4 +408,44 @@ fn a_session_its_hooks_never_placed_is_found_by_the_pane_its_process_started_in(
     assert_eq!(found, Some((project, "leaf_unplaced".to_owned())));
     assert_eq!(gone, None);
     assert_eq!(nowhere, None);
+}
+
+/// A project with a Claude Code account of its own starts its sessions there:
+/// they are the orchestrator's work all the same, and their state shows.
+#[test]
+fn a_session_in_a_projects_own_account_is_listed_with_the_profiles() {
+    let accounts: devpit_rpc::Accounts = serde_json::from_value(json!({
+        "accounts": [{ "name": "work", "configDir": "/acc/work" }],
+        "projects": [{ "projectId": "prj_w", "account": "work" }],
+    }))
+    .expect("accounts");
+    let session = |name: &str, project: &str| -> devpit_rpc::LiveSession {
+        serde_json::from_value(json!({
+            "name": name, "pid": 1, "job": null, "status": "busy", "kind": "interactive",
+            "cwd": "/w", "projectId": project, "projectName": null, "cardId": null, "since": null,
+            "inDevpit": true, "waiting": null, "pane": null, "sessionId": null, "step": null,
+            "draft": null, "remote": { "on": false, "url": null },
+        }))
+        .expect("a session")
+    };
+    let listing = |dir: &Path| {
+        assert_eq!(dir, Path::new("/acc/work/sessions"));
+        vec![
+            session("led-api", "prj_w"),
+            session("someone-else", "prj_x"),
+        ]
+    };
+    let found = in_their_accounts(&accounts, listing, Path::new("/home/me/.claude"));
+    let names: Vec<_> = found
+        .iter()
+        .map(|one| (one.name.as_str(), one.status.as_str()))
+        .collect();
+    assert_eq!(names, [("led-api", "busy")]);
+    // The profile's own folder is read already, not twice.
+    assert!(in_their_accounts(
+        &accounts,
+        |_| vec![session("led-api", "prj_w")],
+        Path::new("/acc/work")
+    )
+    .is_empty());
 }

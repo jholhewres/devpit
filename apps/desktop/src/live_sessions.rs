@@ -595,15 +595,25 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
     };
     let windows = windows_now();
     let reviewing = devpit_agentcli::reviewing::running();
-    let mut sessions = read(
-        &config_of(profile_id)?.join("sessions"),
-        |pid| shown(pid, &reviewing, alive),
-        &projects,
-        &worktrees,
-        &windows,
-        ptyd_pane_of,
-        waiting_screen,
-    );
+    let listing = |dir: &Path| {
+        read(
+            dir,
+            |pid| shown(pid, &reviewing, alive),
+            &projects,
+            &worktrees,
+            &windows,
+            ptyd_pane_of,
+            waiting_screen,
+        )
+    };
+    let own = config_of(profile_id)?;
+    let mut sessions = listing(&own.join("sessions"));
+    sessions.extend(in_their_accounts(
+        &crate::claude_accounts::read(),
+        listing,
+        &own,
+    ));
+    sessions.sort_by(|a, b| a.name.cmp(&b.name));
     // Started here and stopped before the CLI lists it — on the folder's
     // trust question, most often.
     let early = crate::starting::unlisted(profile_id, &sessions, screen);
@@ -613,6 +623,34 @@ pub(crate) fn orchestrator_sessions_now(profile_id: &str) -> Result<LiveSessions
         one.draft = crate::reply_drafts::drafted(profile_id, &one.name);
     }
     Ok(LiveSessions { sessions })
+}
+
+/// The sessions started in a project's own Claude Code account: a project
+/// with one starts its sessions there, and they are still this profile's
+/// work. Only those of the projects the account is for.
+pub(crate) fn in_their_accounts(
+    accounts: &devpit_rpc::Accounts,
+    listing: impl Fn(&Path) -> Vec<LiveSession>,
+    own: &Path,
+) -> Vec<LiveSession> {
+    let account_of = |project: &str| {
+        crate::claude_accounts::of_project(accounts, project).map(|one| one.config_dir.as_str())
+    };
+    let mut dirs: Vec<&str> = accounts
+        .projects
+        .iter()
+        .filter_map(|one| account_of(&one.project_id))
+        .filter(|dir| Path::new(dir) != own)
+        .collect();
+    dirs.sort_unstable();
+    dirs.dedup();
+    dirs.into_iter()
+        .flat_map(|dir| {
+            listing(&Path::new(dir).join("sessions"))
+                .into_iter()
+                .filter(move |one| one.project_id.as_deref().and_then(account_of) == Some(dir))
+        })
+        .collect()
 }
 
 /// This profile's account's config folder — where its sessions are listed.
