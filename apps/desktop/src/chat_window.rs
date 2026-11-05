@@ -4,7 +4,10 @@
 use devpit_agentcli::head::{head_path, read_head};
 use devpit_agentcli::store::{conversation_path, read};
 use devpit_agentcli::store_page::read_page;
-use devpit_rpc::{Conversation, ConversationAfter, ConversationHead, ErrorCode, Part, RpcError};
+use devpit_rpc::{
+    Conversation, ConversationAfter, ConversationFound, ConversationHead, ConversationPrompts,
+    ErrorCode, Part, RpcError,
+};
 
 /// The most messages one page may ask for.
 const MOST: u32 = 500;
@@ -154,6 +157,42 @@ pub async fn chat_after(
         };
         messages.iter_mut().for_each(devpit_rpc::cut::cut_message);
         Ok(ConversationAfter { messages, found })
+    })
+    .await
+}
+
+/// `chat.find` — where `query` is said in the whole conversation, the pages
+/// the window never loaded included.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_find(
+    project_id: String,
+    conversation_id: String,
+    query: String,
+) -> Result<ConversationFound, RpcError> {
+    crate::off_main::blocking(move || {
+        conversation(&conversation_id)?;
+        let sessions = crate::projects::project_home(&project_id)?.sessions();
+        let (messages, _) = read(&conversation_path(&sessions, &conversation_id));
+        Ok(ConversationFound {
+            hits: devpit_agentcli::store_find::found(&messages, &query),
+        })
+    })
+    .await
+}
+
+/// `chat.prompts` — what the person said in the whole conversation, and where.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_prompts(
+    project_id: String,
+    conversation_id: String,
+) -> Result<ConversationPrompts, RpcError> {
+    crate::off_main::blocking(move || {
+        conversation(&conversation_id)?;
+        let sessions = crate::projects::project_home(&project_id)?.sessions();
+        let (messages, _) = read(&conversation_path(&sessions, &conversation_id));
+        Ok(devpit_agentcli::store_find::prompts(&messages))
     })
     .await
 }

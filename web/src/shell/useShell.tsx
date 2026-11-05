@@ -43,7 +43,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   useOutsideTabs(projects.project?.id ?? null, tabs.show, tabs.close)
   const running = useRunning(projects.project?.id ?? null)
   const doing = useAgents()
-  const unread = useUnread(doing, tabs.active)
+  const { unread, finished } = useUnread(doing, tabs.active)
   const subagents = useSubagents()
   const agentSessions = usePaneSessions()
   const sizing = useWidths()
@@ -85,6 +85,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       running,
       doing,
       unread,
+      finished,
       subagents,
       agentSessions,
       closeNow: tabs.close,
@@ -111,6 +112,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       running,
       doing,
       unread,
+      finished,
       subagents,
       agentSessions,
       sweep,

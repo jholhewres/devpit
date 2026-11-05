@@ -36,6 +36,8 @@
 .tab__x:hover { background: var(--overlay-strong); color: var(--text); }
 .tabs:empty + .tabs__sep { display: none; }
 .tab__dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+/* A chat's turn or an agent finished here while you were elsewhere. */
+.tab__new { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
 .tabs__sep { width: 1px; height: 18px; background: var(--border); margin: 0 6px; flex: none; }
 
 /* A tab can be dragged into a new place. The strip's order is the array

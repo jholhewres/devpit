@@ -63,6 +63,7 @@ const LIST = [
 
   { id: 'attach', does: 'Attach files to the message', scope: 'chat', keys: ['Mod+Shift+A'], inTerminal: false },
   { id: 'stopTurn', does: 'Stop the agent’s turn — press it twice', scope: 'chat', keys: ['Escape'], inTerminal: false, fixed: true },
+  { id: 'findChat', does: 'Find in the conversation', scope: 'chat', keys: ['Mod+F'], inTerminal: false },
 
   { id: 'save', does: 'Save the file', scope: 'file', keys: ['Mod+S'], inTerminal: false },
   { id: 'commit', does: 'Commit, from the message field', scope: 'file', keys: ['Mod+Enter'], inTerminal: false },

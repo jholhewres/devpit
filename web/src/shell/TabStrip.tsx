@@ -5,6 +5,7 @@ import { paneMeta } from './paneList'
 import { Rename } from './Rename'
 import { busyIn, doingIn } from './running'
 import { tabTitle, twice, type Clicked, type Tab } from './strip'
+import { unreadIn } from './unread'
 import { useShell } from './useShell'
 import { useKeys } from './useShortcut'
 
@@ -17,7 +18,7 @@ import { useKeys } from './useShortcut'
  */
 export function TabStrip(): React.JSX.Element {
   const { open, active, focus, close, move, rename, renaming, setRenaming } = useShell()
-  const { running, doing, openPalette } = useShell()
+  const { running, doing, unread, openPalette } = useShell()
   const keys = useKeys()
     const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
@@ -190,6 +191,7 @@ export function TabStrip(): React.JSX.Element {
           {/* Something is running here and it is not an agent. The name stays
               the tab's own; the dot is the whole message. */}
           {busyIn(running, tab)?.agent === null && <i className="tab__dot" aria-hidden="true" />}
+          {unreadIn(unread, tab) && <i className="tab__new" role="img" aria-label="Finished, not seen yet" />}
           <span
             className="tab__x"
             role="button"

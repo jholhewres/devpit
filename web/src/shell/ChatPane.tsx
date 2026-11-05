@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ASKS, money } from './chat'
+import { ASKS, CONTINUE, money } from './chat'
 import { titleOf, type Tab } from './strip'
 import { ChatCardChip } from './ChatCardChip'
+import { ChatFind } from './ChatFind'
 import { ChatThread } from './ChatThread'
 import { Composer, type ComposerHandle } from './Composer'
 import { ContextMeter } from './ContextMeter'
@@ -12,6 +13,7 @@ import { AppsScopeContext } from './mcpApps'
 import { WholeFrom } from './WholeFrom'
 import { DropTarget } from './DropTarget'
 import { PaneCorner } from './PaneCorner'
+import { PromptRail } from './PromptRail'
 import { useTaking } from './useTaking'
 import { useThread } from './useOlder'
 import { ChatBlank } from './ChatBlank'
@@ -19,7 +21,9 @@ import { RemoteToggle } from './RemoteToggle'
 import { SessionsChip } from './OrchestratorChat'
 import { SessionCost } from './SessionCost'
 import { useChat } from './useChat'
+import { useJump, type Reveal } from './useJump'
 import { useShell } from './useShell'
+import { useShortcut } from './useShortcut'
 
 /*
  * One conversation, per tab.
@@ -34,13 +38,21 @@ import { useShell } from './useShell'
  */
 
 export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { active, project, rename, drafted } = useShell()
+  const { active, project, rename, drafted, finished } = useShell()
   const chat = useChat(tab.id)
   const { pasted, dropped } = useTaking(chat)
   const follow = useThread(project?.id ?? null, tab.id, chat)
   const composer = useRef<ComposerHandle>(null)
 
   const mine = active?.id === tab.id
+  const where = useMemo(() => (project ? { projectId: project.id, conversationId: tab.id } : null), [project, tab.id])
+  const reveal = useRef<Reveal | null>(null)
+  const jump = useJump(where, chat, follow.hold, reveal)
+  const [finding, setFinding] = useState(false)
+  useShortcut('findChat', () => {
+    if (!mine || chat.messages.length === 0) return false
+    setFinding(true)
+  })
   /* A file an answer names opens beside the conversation, not over it. */
   const [peek, setPeek] = useState<string | null>(null)
   /* Where a page an MCP tool came with is asked for: this conversation's account, in its folder. */
@@ -60,6 +72,13 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     const name = titleOf(said.parts.map((part) => ('text' in part ? part.text : '')).join(''))
     if (name) rename(tab.id, name)
   }, [rename, said, tab.id, tab.title])
+
+  /* A turn that ends while this tab is behind another marks the tab. */
+  const wasSending = useRef(chat.sending)
+  useEffect(() => {
+    if (wasSending.current && !chat.sending) finished(tab.id)
+    wasSending.current = chat.sending
+  }, [chat.sending, finished, tab.id])
 
   const empty = chat.messages.length === 0 && !chat.error
 
@@ -81,11 +100,14 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         ) : (
           <AppsScopeContext.Provider value={scope}>
             <WholeFrom conversationId={tab.id}>
-              <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onOpen={setPeek} />
+              <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onOpen={setPeek} onContinue={() => chat.say(CONTINUE)} reveal={reveal} />
             </WholeFrom>
           </AppsScopeContext.Provider>
         )}
       </div>
+
+      {!empty && <PromptRail where={where} said={`${chat.messages.filter((one) => one.role === 'user').length}:${chat.sending}`} jump={jump} />}
+      {finding && <ChatFind where={where} box={follow.box} jump={jump} onDone={() => setFinding(false)} />}
 
       <Composer tab={tab} chat={chat} project={project ?? null} mine={mine} away={follow.away} toEnd={follow.toEnd} handle={composer} pasted={pasted} />
       {peek && <DocPeek path={peek} onOpen={setPeek} onClose={() => setPeek(null)} />}

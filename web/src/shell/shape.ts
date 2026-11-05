@@ -77,8 +77,10 @@ export interface Shell {
       different answers: the process table says which agent is open, and only
       the agent says whether it is working or waiting for you. */
   readonly doing: Doing
-  /** The panes whose agent finished while their tab was not in front. */
+  /** The panes whose agent finished, and the chats whose turn ended, while their tab was not in front. */
   readonly unread: Unread
+  /** A chat's turn ended in this tab. */
+  readonly finished: (tabId: string) => void
   /** The subagents each pane's agent started, from its own hooks. */
   readonly subagents: Subagents
   /** The CLI session each pane's agent is in, when its hooks said. */

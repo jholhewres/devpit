@@ -134,3 +134,39 @@ pub struct ConversationAfter {
     /// messages are the conversation's last page, to take the place of what is drawn.
     pub found: bool,
 }
+
+/// Where a word is said in a whole conversation, loaded or not: the messages
+/// whose prose holds it, in order.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationFound {
+    pub hits: Vec<FoundIn>,
+}
+
+/// One message that holds the word, and how many times.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FoundIn {
+    pub message_id: String,
+    pub count: u32,
+}
+
+/// What the person said in a conversation, for the rail beside it.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationPrompts {
+    pub prompts: Vec<Prompt>,
+    /// How many messages the conversation holds, which places each prompt along it.
+    pub total: u32,
+}
+
+/// One message the person sent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Prompt {
+    pub message_id: String,
+    /// Its place in the conversation, from the first message.
+    pub at: u32,
+    /// Its opening words, on one line.
+    pub text: String,
+}

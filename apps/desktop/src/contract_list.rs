@@ -45,6 +45,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         chat_window::chat_part_full,
         chat_window::chat_head,
         chat_window::chat_after,
+        chat_window::chat_find,
+        chat_window::chat_prompts,
         threads::chat_list,
         outside_sessions::chat_outside,
         adopting::chat_adopt,

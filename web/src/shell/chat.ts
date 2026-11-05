@@ -9,6 +9,7 @@ import type {
   TurnEnd,
 } from '../gen/bindings'
 import { inBrowser } from '../transport'
+import { outcome } from './turnFold'
 import { inTauri } from './window'
 
 /* chat.send streams over a Channel, like the pty, so it is hand-written for
@@ -211,3 +212,17 @@ export function unanswered(messages: readonly Message[], sending: boolean): bool
   return last !== undefined && last.role === 'user'
 }
 
+
+/* What "Continue" sends: the agent is asked to look before it goes on, since
+   the step it was on may have half happened. */
+export const CONTINUE = 'Your last turn stopped before it finished. Check what its last step left behind, then carry on from there.'
+
+/* Whether the conversation can be picked up where it stopped: a message with
+   no answer saved, or an answer that was stopped part way. */
+export function continuable(messages: readonly Message[], sending: boolean): boolean {
+  if (sending) return false
+  const last = messages.at(-1)
+  if (!last) return false
+  if (last.role === 'user') return true
+  return last.role === 'assistant' && !last.streaming && last.ended != null && outcome(last.ended) === 'stopped'
+}

@@ -93,6 +93,13 @@ export const commands = {
 	 */
 	chatAfter: (projectId: string, conversationId: string, after: string | null, limit: number | null) => typedError<ConversationAfter, RpcError>(__TAURI_INVOKE("chat_after", { projectId, conversationId, after, limit })),
 	/**
+	 *  `chat.find` — where `query` is said in the whole conversation, the pages
+	 *  the window never loaded included.
+	 */
+	chatFind: (projectId: string, conversationId: string, query: string) => typedError<ConversationFound, RpcError>(__TAURI_INVOKE("chat_find", { projectId, conversationId, query })),
+	/**  `chat.prompts` — what the person said in the whole conversation, and where. */
+	chatPrompts: (projectId: string, conversationId: string) => typedError<ConversationPrompts, RpcError>(__TAURI_INVOKE("chat_prompts", { projectId, conversationId })),
+	/**
 	 *  `chat.list` — every conversation this project has had.
 	 * 
 	 *  The transcripts were always on disk; nothing listed them, so closing a tab
@@ -2719,12 +2726,27 @@ export type ConversationAfter = {
 	found: boolean,
 };
 
+/**
+ *  Where a word is said in a whole conversation, loaded or not: the messages
+ *  whose prose holds it, in order.
+ */
+export type ConversationFound = {
+	hits: FoundIn[],
+};
+
 /**  What a turn's end needs to know of the conversation: its head, not its messages. */
 export type ConversationHead = {
 	sessionId: string | null,
 	rewindable: string[],
 	costUsd: number | null,
 	context: Context | null,
+};
+
+/**  What the person said in a conversation, for the rail beside it. */
+export type ConversationPrompts = {
+	prompts: Prompt[],
+	/**  How many messages the conversation holds, which places each prompt along it. */
+	total: number,
 };
 
 export type Conversations = {
@@ -3509,6 +3531,12 @@ export type Found = {
 	 */
 	now: string | null,
 	rubric: string | null,
+};
+
+/**  One message that holds the word, and how many times. */
+export type FoundIn = {
+	messageId: string,
+	count: number,
 };
 
 /**  What the stream carries, one frame at a time. */
@@ -4664,6 +4692,15 @@ export type ProjectRun = {
 
 export type ProjectTree = {
 	nodes: FileNode[],
+};
+
+/**  One message the person sent. */
+export type Prompt = {
+	messageId: string,
+	/**  Its place in the conversation, from the first message. */
+	at: number,
+	/**  Its opening words, on one line. */
+	text: string,
 };
 
 export type PromptOption = {

@@ -25,6 +25,8 @@ export type Follow<T> = {
   /** Far enough up that the way back to the end should be offered. */
   away: boolean
   toEnd: () => void
+  /** Stops following: the app is about to move the view somewhere on purpose. */
+  hold: () => void
 }
 
 /**
@@ -89,5 +91,9 @@ export function useFollow<T extends HTMLElement>(content: unknown): Follow<T> {
     pin()
   }, [pin])
 
-  return { box, away, toEnd }
+  const hold = useCallback(() => {
+    following.current = false
+  }, [])
+
+  return { box, away, toEnd, hold }
 }

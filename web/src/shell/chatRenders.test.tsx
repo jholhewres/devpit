@@ -46,7 +46,7 @@ function Thread({ messages }: { messages: readonly Message[] }): React.JSX.Eleme
   const top = useRef<HTMLDivElement>(null)
   return (
     <div ref={box}>
-      <ChatThread messages={messages} box={box} top={top} older={false} stalled={false} onMore={nothing} sending error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} />
+      <ChatThread messages={messages} box={box} top={top} older={false} stalled={false} onMore={nothing} sending error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={nothing} />
     </div>
   )
 }

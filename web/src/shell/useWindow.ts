@@ -48,6 +48,16 @@ export type Windowed = {
   /** Height of what is above the drawn rows, and below them. */
   readonly before: number
   readonly after: number
+  /** Draws the message `id`, once it is among the messages, and brings it into view. */
+  readonly reveal: (id: string, then?: (row: HTMLElement) => void) => void
+}
+
+/* The rows drawn to show message `at`: a couple above it, and enough below. */
+export function spanAround(messages: readonly Message[], at: number): Span {
+  const from = Math.max(0, at - 2)
+  const count = Math.max(FIRST, at - from + 1)
+  const tail = from + count >= messages.length
+  return { tail, first: tail ? null : (messages[from]?.id ?? null), count }
 }
 
 export function rangeOf(messages: readonly Message[], span: Span): { from: number; to: number } {
@@ -63,6 +73,13 @@ export function useWindow(messages: readonly Message[], box: React.RefObject<HTM
   latest.current = { messages, span }
   /* A row on screen and where it sat, kept across a move that draws rows above it. */
   const anchor = useRef<{ id: string; at: number } | null>(null)
+  /* A message asked to be shown, waiting for its page or its draw. */
+  const wanted = useRef<{ id: string; then?: (row: HTMLElement) => void; moved: number } | null>(null)
+  const [, nudge] = useState(0)
+  const reveal = useCallback((id: string, then?: (row: HTMLElement) => void) => {
+    wanted.current = { id, then, moved: 0 }
+    nudge((n) => n + 1)
+  }, [])
 
   const height = useCallback((one: Message) => sizes.current.get(one.id) ?? estimate(one), [])
   const { from, to } = rangeOf(messages, span)
@@ -97,6 +114,25 @@ export function useWindow(messages: readonly Message[], box: React.RefObject<HTM
     for (const row of Array.from(scroll.querySelectorAll<HTMLElement>('.trow'))) {
       if (row.dataset.id && row.offsetHeight > 0) sizes.current.set(row.dataset.id, row.offsetHeight + GAP)
     }
+    const want = wanted.current
+    if (want) {
+      const row = Array.from(scroll.querySelectorAll<HTMLElement>('.trow')).find((one) => one.dataset.id === want.id)
+      const at = latest.current.messages.findIndex((one) => one.id === want.id)
+      if (row) {
+        wanted.current = null
+        anchor.current = null
+        scroll.scrollTop += row.getBoundingClientRect().top - scroll.getBoundingClientRect().top - Math.max(0, (scroll.clientHeight - row.offsetHeight) / 3)
+        want.then?.(row)
+        return
+      }
+      // Drawn on the next render; a page still on its way is waited for, a few moves at most.
+      if (at >= 0 && want.moved < 3) {
+        want.moved += 1
+        setSpan(spanAround(latest.current.messages, at))
+        return
+      }
+      if (at >= 0) wanted.current = null
+    }
     const kept = anchor.current
     anchor.current = null
     if (!kept) return
@@ -114,5 +150,5 @@ export function useWindow(messages: readonly Message[], box: React.RefObject<HTM
   /* A page above, or a reply growing, can leave the view short of rows. */
   useEffect(look, [messages.length, look])
 
-  return { from, to, before, after }
+  return { from, to, before, after, reveal }
 }

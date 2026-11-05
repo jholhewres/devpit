@@ -332,6 +332,7 @@ mod sources;
 pub mod spend_prices;
 pub mod spend_scan;
 pub mod store;
+pub mod store_find;
 pub mod store_page;
 #[cfg(test)]
 mod store_tests;

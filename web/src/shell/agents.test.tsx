@@ -381,3 +381,18 @@ describe('a strip with more tabs than room', () => {
     expect(brought).toContain('t7')
   })
 })
+
+describe('a chat whose turn ended behind another tab, in the strip', () => {
+  it('is marked until it is opened', () => {
+    shell.open = [{ id: 'chat_1', kind: 'chat', title: 'Plan' }]
+    shell.running = []
+    shell.unread = new Set(['chat_1'])
+    render(<TabStrip />)
+    expect(screen.getByRole('img', { name: 'Finished, not seen yet' })).toBeTruthy()
+
+    cleanup()
+    shell.unread = new Set()
+    render(<TabStrip />)
+    expect(screen.queryByRole('img', { name: 'Finished, not seen yet' })).toBeNull()
+  })
+})

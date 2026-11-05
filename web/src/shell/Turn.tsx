@@ -3,6 +3,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { Acts } from './ActsRows'
 import { acts, doing, tally, type Act } from './acts'
 import { joined } from './chat'
+import { CopyButton } from './CopyButton'
 import type { Message, Part } from '../gen/bindings'
 import { inFolder } from './markdown'
 import { Markdown } from './MarkdownView'
@@ -278,7 +279,6 @@ function Working({ parts, since }: { parts: Message['parts']; since: number | nu
 }
 
 function Foot({ message, rewind }: { message: Message; rewind?: () => void }): React.JSX.Element | null {
-  const [copied, setCopied] = useState(false)
   const said = message.parts
     .filter((part) => part.kind === 'text')
     .map((part) => ('text' in part ? part.text : ''))
@@ -298,23 +298,7 @@ function Foot({ message, rewind }: { message: Message; rewind?: () => void }): R
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
         </button>
       )}
-      {said && <button
-        className="tfbtn"
-        aria-label={copied ? 'Copied' : 'Copy'}
-        title={copied ? 'Copied' : 'Copy'}
-        onClick={() =>
-          void navigator.clipboard?.writeText(said).then(() => {
-            setCopied(true)
-            window.setTimeout(() => setCopied(false), 1400)
-          })
-        }
-      >
-        {copied ? (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
-        ) : (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-        )}
-      </button>}
+      {said && <CopyButton className="tfbtn" text={said} />}
     </div>
   )
 }

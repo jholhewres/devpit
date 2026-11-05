@@ -1,6 +1,9 @@
+import { useLayoutEffect } from 'react'
+
 import type { Message } from '../gen/bindings'
-import { unanswered } from './chat'
+import { continuable, unanswered } from './chat'
 import { Turn } from './Turn'
+import type { Reveal } from './useJump'
 import { GAP, useWindow } from './useWindow'
 
 /*
@@ -21,6 +24,8 @@ export function ChatThread({
   rewindable,
   onRewind,
   onOpen,
+  onContinue,
+  reveal,
 }: {
   messages: readonly Message[]
   box: React.RefObject<HTMLDivElement | null>
@@ -35,8 +40,15 @@ export function ChatThread({
   rewindable: readonly string[]
   onRewind: (turnId: string) => void
   onOpen: (path: string) => void
+  /** Picks the conversation up where its last turn stopped. */
+  onContinue: () => void
+  /** Where the thread hands up how to bring a message into view. */
+  reveal?: React.RefObject<Reveal | null>
 }): React.JSX.Element {
   const view = useWindow(messages, box)
+  useLayoutEffect(() => {
+    if (reveal) reveal.current = view.reveal
+  }, [reveal, view.reveal])
 
   return (
     <div className="thread" data-windowed="">
@@ -50,6 +62,7 @@ export function ChatThread({
       ))}
       {view.after > 0 && <div className="thread__gap" style={{ height: view.after - GAP }} aria-hidden />}
       {unanswered(messages, sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
+      {continuable(messages, sending) && <button className="thread__go" onClick={onContinue}>Continue</button>}
       {error && <div className="exempty__t" role="alert">{error}</div>}
     </div>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Tab } from './strip'
 import type { AgentState, Doing } from './useAgents'
@@ -8,7 +8,8 @@ import type { AgentState, Doing } from './useAgents'
  *
  * An agent that finished while you were in another tab is news until you go
  * and look; one that finished in the tab you were watching is not. Keyed by
- * pane because that is what the hooks report on, and a split tab has two.
+ * pane because that is what the hooks report on, and a split tab has two; a
+ * chat's turn has no pane, and is keyed by its tab.
  */
 
 export type Unread = ReadonlySet<string>
@@ -38,16 +39,28 @@ export function afterLooking(unread: Unread, inFront: readonly string[]): Unread
   return new Set([...unread].filter((paneId) => !inFront.includes(paneId)))
 }
 
-export function unreadIn(unread: Unread, tab: Tab | null | undefined): boolean {
-  return tab?.panes?.some((paneId) => unread.has(paneId)) ?? false
+/* The keys unread, once a chat's turn ended in tab `tabId`. */
+export function afterFinish(unread: Unread, tabId: string, inFront: readonly string[]): Unread {
+  if (inFront.includes(tabId) || unread.has(tabId)) return unread
+  return new Set(unread).add(tabId)
 }
 
-export function useUnread(doing: Doing, active: Tab | null): Unread {
+export function unreadIn(unread: Unread, tab: Tab | null | undefined): boolean {
+  if (!tab) return false
+  return unread.has(tab.id) || (tab.panes?.some((paneId) => unread.has(paneId)) ?? false)
+}
+
+/* What is in front: the active tab's panes, and the tab itself for a chat. */
+const frontOf = (active: Tab | null): string => (active ? [...(active.panes ?? []), active.id].join(' ') : '')
+
+export function useUnread(doing: Doing, active: Tab | null): { unread: Unread; finished: (tabId: string) => void } {
   const [unread, setUnread] = useState<Unread>(() => new Set())
   const was = useRef<Doing>(doing)
-  const inFront = active?.panes ?? []
   // Compared as a string so a new array holding the same panes is no change.
-  const front = inFront.join(' ')
+  const front = frontOf(active)
+  const shown = useRef(front)
+  shown.current = front
+  const finished = useCallback((tabId: string) => setUnread((held) => afterFinish(held, tabId, shown.current.split(' '))), [])
 
   useEffect(() => {
     const before = was.current
@@ -65,5 +78,5 @@ export function useUnread(doing: Doing, active: Tab | null): Unread {
     setUnread((held) => afterLooking(held, front ? front.split(' ') : []))
   }, [front])
 
-  return unread
+  return { unread, finished }
 }

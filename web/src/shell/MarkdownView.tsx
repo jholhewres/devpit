@@ -1,5 +1,6 @@
 import { createContext, memo, useCallback, useContext, useMemo, useRef } from 'react'
 
+import { CopyButton } from './CopyButton'
 import { Diagram } from './Diagram'
 import { ofName } from './languages'
 import { MdTable } from './MdTable'
@@ -81,11 +82,15 @@ function Piece({ block, path }: { block: Block; path: string }): React.JSX.Eleme
       return block.language === 'mermaid' ? (
         <Diagram source={block.text} />
       ) : (
-        <pre className="md__code">
-          <code>
-            <Painted text={block.text} language={ofName(block.language)} />
-          </code>
-        </pre>
+        <div className="md__block">
+          <pre className="md__code">
+            <code>
+              <Painted text={block.text} language={ofName(block.language)} />
+            </code>
+          </pre>
+          {/* The block's text as parsed: what is between the fences, never them. */}
+          <CopyButton className="md__copy" text={block.text} label="Copy code" />
+        </div>
       )
     case 'list': {
       const Tag = block.ordered ? 'ol' : 'ul'
