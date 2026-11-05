@@ -38,6 +38,8 @@ pub(crate) const TOPICS: &[&str] = &[
     "remote:viewers",
     "run:changed",
     "run:progress",
+    "session:tab-closed",
+    "session:tab-opened",
     "sync:changed",
     "sync:written",
     "terminal:block",

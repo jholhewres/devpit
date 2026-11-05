@@ -93,6 +93,8 @@ fn every_topic_the_web_subscribes_to_is_carried() {
             }
         }
     }
+    // Also a topic listened to from a list of pairs, `['a:b', then]`.
+    collect_pairs(&root_of_web(), &mut named);
     let desktop_only = [
         "browser:driven",
         "browser:menu-did",
@@ -116,4 +118,43 @@ fn every_topic_the_web_subscribes_to_is_carried() {
         })
         .collect();
     assert!(missing.is_empty(), "web topics not carried: {missing:?}");
+}
+
+fn root_of_web() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/src")
+}
+
+/// Topics written as the first item of a pair, `['session:tab-opened', opened]`.
+fn collect_pairs(root: &std::path::Path, named: &mut std::collections::BTreeSet<String>) {
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("web/src").flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            let name = path.to_string_lossy();
+            if !(name.ends_with(".ts") || name.ends_with(".tsx")) || name.contains(".test.") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).expect("source");
+            if !text.contains("listen") {
+                continue;
+            }
+            for piece in text.split("['").skip(1) {
+                if let Some((topic, rest)) = piece.split_once('\'') {
+                    let word = |part: &str| {
+                        !part.is_empty() && part.chars().all(|c| c.is_ascii_lowercase() || c == '-')
+                    };
+                    let pair = topic
+                        .split_once(':')
+                        .is_some_and(|(a, b)| word(a) && word(b));
+                    if pair && rest.trim_start().starts_with(',') {
+                        named.insert(topic.to_owned());
+                    }
+                }
+            }
+        }
+    }
 }
