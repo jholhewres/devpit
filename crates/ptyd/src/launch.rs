@@ -44,6 +44,7 @@ pub const ALLOWED: &[&str] = &[
     "XDG_CACHE_HOME",
     "XDG_STATE_HOME",
     "DISPLAY",
+    "XAUTHORITY",
     "WAYLAND_DISPLAY",
     "DBUS_SESSION_BUS_ADDRESS",
     "SSH_AUTH_SOCK",

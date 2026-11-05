@@ -13,6 +13,7 @@ fn vars(pairs: &[(&str, &str)]) -> Vec<(OsString, OsString)> {
 fn only_the_allowed_names_reach_the_daemon() {
     let kept = allowed(vars(&[
         ("HOME", "/home/someone"),
+        ("XAUTHORITY", "/run/user/1000/gdm/Xauthority"),
         ("LC_TIME", "pt_BR.UTF-8"),
         ("ANTHROPIC_API_KEY", "sk-secret"),
         ("GITHUB_TOKEN", "ghp-secret"),
@@ -23,7 +24,8 @@ fn only_the_allowed_names_reach_the_daemon() {
         .iter()
         .map(|(name, _)| name.to_string_lossy())
         .collect();
-    assert_eq!(names, ["HOME", "LC_TIME"]);
+    // XAUTHORITY: an X11 program started in a pane is refused without it.
+    assert_eq!(names, ["HOME", "XAUTHORITY", "LC_TIME"]);
 }
 
 /// The daemon's process sees the allowlist and nothing else: a secret set in
