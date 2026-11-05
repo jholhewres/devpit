@@ -547,7 +547,13 @@ fn respond_in(
                 let _ = app.emit("board:changed", &project.id);
             }
             if asked.method == "handoff" {
-                crate::card_relay::handed(app, &project.id, &card_id, asked.config_dir.as_deref());
+                crate::card_relay::handed(
+                    app,
+                    &project.id,
+                    &card_id,
+                    asked.config_dir.as_deref(),
+                    &asked.cwd,
+                );
             }
         }
         let detail = crate::cards::detail_of(project.id.clone(), card_id).map_err(said)?;

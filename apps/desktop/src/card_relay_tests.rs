@@ -3,7 +3,7 @@ use serde_json::json;
 
 use super::{
     context_in, first_message, hand_off_reason, handoff_percent, mark, next_card, past_share,
-    relays, relieved, still_allowed,
+    relays, relieved, replaced_id, still_allowed,
 };
 
 fn column(id: &str, position: i32, role: &str) -> serde_json::Value {
@@ -63,15 +63,16 @@ fn a_card_with_no_epic_opens_nothing() {
 }
 
 #[test]
-fn the_handoff_share_is_thirty_percent_unless_set_and_off_switches_it_off() {
-    assert_eq!(handoff_percent(None), Some(30));
-    assert_eq!(handoff_percent(Some(" ")), Some(30));
-    assert_eq!(handoff_percent(Some("45")), Some(45));
+fn devpit_starts_no_session_on_its_own_unless_the_person_turns_it_on() {
+    assert_eq!(handoff_percent(None), None);
+    assert_eq!(handoff_percent(Some(" ")), None);
     assert_eq!(handoff_percent(Some("off")), None);
     assert_eq!(handoff_percent(Some("0")), None);
-    assert_eq!(handoff_percent(Some("lots")), Some(30));
-    assert!(relays(None));
+    assert_eq!(handoff_percent(Some("lots")), None);
+    assert_eq!(handoff_percent(Some("70")), Some(70));
+    assert!(!relays(None));
     assert!(!relays(Some("off")));
+    assert!(relays(Some("on")));
 }
 
 #[test]
@@ -111,19 +112,24 @@ fn a_session_past_its_share_may_still_read_its_card_and_leave_the_handoff() {
 
 #[test]
 fn a_handoff_relieves_the_session_told_to_leave_it_once() {
-    assert!(!relieved("card_relay_never_marked"));
-    mark("card_relay_marked", "/t.jsonl");
-    assert!(relieved("card_relay_marked"));
-    assert!(!relieved("card_relay_marked"));
+    assert_eq!(relieved("card_relay_never_marked"), None);
+    mark("card_relay_marked", "/p/1f3c-session.jsonl");
+    let transcript = relieved("card_relay_marked").expect("relieved");
+    // The relief stops the session it replaces, by the id it is named after.
+    assert_eq!(replaced_id(&transcript), Some("1f3c-session"));
+    assert_eq!(relieved("card_relay_marked"), None);
     // Told again after its handoff, the same session opens no second one.
-    mark("card_relay_marked", "/t.jsonl");
-    assert!(!relieved("card_relay_marked"));
+    mark("card_relay_marked", "/p/1f3c-session.jsonl");
+    assert_eq!(relieved("card_relay_marked"), None);
 }
 
 #[test]
 fn the_next_session_is_told_its_card_and_the_one_finished_before_it() {
     let board = board(vec![card("card_next", "inbox", Some("epic"), 0)]);
-    let said = first_message(&board.cards[0], Some("card_prev"));
+    let said = first_message(&board.cards[0], Some("card_prev"), true);
     assert!(said.contains("card_next") && said.contains("card_prev"));
     assert!(said.contains("One card per session"));
+    // With the next card left to the orchestrator, nothing tells it to stop.
+    let said = first_message(&board.cards[0], None, false);
+    assert!(!said.contains("One card per session") && !said.contains("end the session"));
 }

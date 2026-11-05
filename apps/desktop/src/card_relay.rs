@@ -1,10 +1,11 @@
-//! One card per session.
+//! One card per session, when the person turns it on.
 //!
 //! A session that carried card after card paid for every earlier card on each
-//! turn: 47% of the input billed across 16 measured cards. So a finished card
-//! hands the next card of its epic to a session of its own, and a session past
-//! its share of the context window leaves the handoff and is relieved by a
-//! fresh one on the same card.
+//! turn: 47% of the input billed across 16 measured cards. So, when switched
+//! on in Settings → Sessions, a finished card hands the next card of its epic
+//! to a session of its own, and a session past its share of the context window
+//! leaves the handoff and is relieved by a fresh one in the same folder. Both
+//! are off unless set: devpit starts no session on its own.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek, SeekFrom};
@@ -17,7 +18,6 @@ use serde_json::{json, Value};
 
 /// The window the share is taken of: the 1M sessions devpit starts on Opus.
 const WINDOW: u64 = 1_000_000;
-const DEFAULT_PERCENT: u64 = 30;
 /// How much of a transcript's end is read for its last usage.
 const TAIL: u64 = 256 * 1024;
 
@@ -64,21 +64,14 @@ pub(crate) fn next_card<'a>(board: &'a Board, finished: &str) -> Option<&'a Card
         .min_by_key(|card| card.position)
 }
 
-/// The share of the window past which a card's session hands off; `None`
-/// when the person switched it off with `0` or `off`.
+/// The share of the window past which a card's session hands off; `None`,
+/// the default, unless the person set a share from 1 to 100.
 pub(crate) fn handoff_percent(setting: Option<&str>) -> Option<u64> {
-    match setting.map(str::trim).filter(|value| !value.is_empty()) {
-        None => Some(DEFAULT_PERCENT),
-        Some("off" | "0") => None,
-        // A value that is no share keeps the default rather than switch it off.
-        Some(value) => Some(
-            value
-                .parse::<u64>()
-                .ok()
-                .filter(|n| (1..=100).contains(n))
-                .unwrap_or(DEFAULT_PERCENT),
-        ),
-    }
+    setting?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .filter(|n| (1..=100).contains(n))
 }
 
 /// Whether `context` tokens are past `percent` of the window.
@@ -86,9 +79,9 @@ pub(crate) fn past_share(context: u64, percent: u64) -> bool {
     context * 100 >= WINDOW * percent
 }
 
-/// Whether a finished card opens the next one: on unless the person said off.
+/// Whether a finished card opens the next one: only when the person said on.
 pub(crate) fn relays(setting: Option<&str>) -> bool {
-    setting.map(str::trim) != Some("off")
+    setting.map(str::trim) == Some("on")
 }
 
 /// The context the session last read: the newest main-thread assistant
@@ -177,18 +170,16 @@ fn mark(card_id: &str, transcript: &str) {
     }
 }
 
-/// Takes the mark a session past its share left on `card_id`: true once.
-fn relieved(card_id: &str) -> bool {
-    let Ok(mut held) = RELIEVED.lock() else {
-        return false;
-    };
-    let Some(relief) = held.as_mut() else {
-        return false;
-    };
-    match relief.told.remove(card_id) {
-        Some(transcript) => relief.relieved.insert(transcript),
-        None => false,
-    }
+/// Takes the mark a session past its share left on `card_id`, once: the
+/// transcript of the session to relieve.
+fn relieved(card_id: &str) -> Option<String> {
+    let mut held = RELIEVED.lock().ok()?;
+    let relief = held.as_mut()?;
+    let transcript = relief.told.remove(card_id)?;
+    relief
+        .relieved
+        .insert(transcript.clone())
+        .then_some(transcript)
 }
 
 /// The account the next session runs as: the asking session's, else the
@@ -199,35 +190,95 @@ fn profile_for(store: &Store, project_id: &str, config_dir: Option<&str>) -> Str
         .unwrap_or_else(|| "claude".to_owned())
 }
 
-fn first_message(card: &Card, before: Option<&str>) -> String {
+/// `one_per_session` only while the next card opens on its own: told so
+/// otherwise, a session refused the next card the orchestrator gave it.
+fn first_message(card: &Card, before: Option<&str>, one_per_session: bool) -> String {
     let after = before
         .map(|id| format!(" The card before it, {id}, is finished; its handoff is on that card."))
         .unwrap_or_default();
+    let alone = if one_per_session {
+        " One card per session: once its gate passes and it is finished, end the session."
+    } else {
+        ""
+    };
     format!(
-        "Work on card {} \"{}\": read it with devpit_card and follow Devflow.{after} One card \
-         per session: once its gate passes and it is finished, end the session.",
+        "Work on card {} \"{}\": read it with devpit_card and follow Devflow.{after}{alone}",
         card.id, card.title
     )
 }
 
+/// The session a relief replaces, by the id its transcript is named after.
+fn replaced_id(transcript: &str) -> Option<&str> {
+    Path::new(transcript)
+        .file_stem()?
+        .to_str()
+        .filter(|id| crate::adopting::plain(id))
+}
+
+/// How a session is opened on a card.
+struct Opening {
+    profile: String,
+    before: Option<String>,
+    one_per_session: bool,
+    /// The folder of the session it relieves: the relief works where it did.
+    folder: Option<std::path::PathBuf>,
+    /// The session it relieves, by id: stopped once the new one is up.
+    replaces: Option<String>,
+}
+
 /// Opens `card` in a session of its own, off the caller's thread: a worktree
 /// may have to be made. A session that could not open says why on the card.
-fn open(app: &tauri::AppHandle, board: Board, card: Card, profile: String, before: Option<String>) {
+fn open(app: &tauri::AppHandle, board: Board, card: Card, how: Opening) {
     let app = app.clone();
     std::thread::spawn(move || {
-        let prompt = first_message(&card, before.as_deref());
-        if let Err(why) =
-            crate::handing::hand(&app, &board, &profile, &card.id, &prompt, None, None)
-        {
-            if let Ok(store) = crate::projects::store() {
-                let _ = store.add_comment(
-                    &card.id,
-                    crate::agent_api::signed(""),
-                    &format!("devpit could not open a session on this card: {why}"),
-                );
+        let prompt = first_message(&card, how.before.as_deref(), how.one_per_session);
+        let started = crate::handing::hand(
+            &app,
+            &board,
+            &how.profile,
+            &card.id,
+            &prompt,
+            None,
+            how.folder.as_deref(),
+        );
+        let started = match started {
+            Ok(started) => started,
+            Err(why) => {
+                if let Ok(store) = crate::projects::store() {
+                    let _ = store.add_comment(
+                        &card.id,
+                        crate::agent_api::signed(""),
+                        &format!("devpit could not open a session on this card: {why}"),
+                    );
+                }
+                return;
+            }
+        };
+        if let Some(old) = how.replaces {
+            let up = crate::starting::once_up(
+                started,
+                &crate::starting::listed_in(&how.profile, &board.project_id),
+                crate::starting::UP_WITHIN,
+            );
+            if up["up"] == json!(true) {
+                stop_replaced(&app, &how.profile, &old);
             }
         }
     });
+}
+
+/// Stops the session a relief took over from, by its id.
+fn stop_replaced(app: &tauri::AppHandle, profile: &str, session_id: &str) {
+    let Ok(live) = crate::live_sessions::orchestrator_sessions_now(profile) else {
+        return;
+    };
+    if let Some(old) = live
+        .sessions
+        .iter()
+        .find(|one| one.session_id.as_deref() == Some(session_id))
+    {
+        let _ = crate::stopping::stop(app, profile, &old.name, Some(old.pid), "devpit", true);
+    }
 }
 
 /// After `finish_card`: the next card of the epic opens in a session of its
@@ -254,24 +305,33 @@ pub(crate) fn finished(
         "title": next.title,
         "said": "The next card opens in a session of its own. This session's card is done: end your turn here.",
     });
-    open(app, board.clone(), next, profile, Some(card_id.to_owned()));
+    let how = Opening {
+        profile,
+        before: Some(card_id.to_owned()),
+        one_per_session: true,
+        folder: None,
+        replaces: None,
+    };
+    open(app, board.clone(), next, how);
     Some(answer)
 }
 
 /// After a handoff: a session that was told to hand off is relieved by a
-/// fresh one on the same card. Answers whether one opens.
+/// fresh one on the same card, in `folder`, where it ran; once that one is
+/// up, it is stopped. Answers whether one opens.
 pub(crate) fn handed(
     app: Option<&tauri::AppHandle>,
     project_id: &str,
     card_id: &str,
     config_dir: Option<&str>,
+    folder: &str,
 ) -> bool {
     let Some(app) = app else {
         return false;
     };
-    if !relieved(card_id) {
+    let Some(transcript) = relieved(card_id) else {
         return false;
-    }
+    };
     let Ok(board) = crate::board::board_get_now(project_id.to_owned()) else {
         return false;
     };
@@ -281,9 +341,66 @@ pub(crate) fn handed(
     let Ok(store) = crate::projects::store() else {
         return false;
     };
-    let profile = profile_for(&store, project_id, config_dir);
-    open(app, board, card, profile, None);
+    let how = Opening {
+        profile: profile_for(&store, project_id, config_dir),
+        before: None,
+        one_per_session: relays(
+            store
+                .preference(preference::SESSION_NEXT_CARD)
+                .ok()
+                .flatten()
+                .as_deref(),
+        ),
+        folder: (!folder.is_empty()).then(|| std::path::PathBuf::from(folder)),
+        replaces: replaced_id(&transcript).map(str::to_owned),
+    };
+    open(app, board, card, how);
     true
+}
+
+/// The two switches as the settings screen shows them.
+pub(crate) fn relay_of(next_card: Option<&str>, handoff: Option<&str>) -> devpit_rpc::SessionRelay {
+    devpit_rpc::SessionRelay {
+        next_card: relays(next_card),
+        handoff_at_percent: handoff_percent(handoff).and_then(|n| u32::try_from(n).ok()),
+    }
+}
+
+fn relay_read(store: &Store) -> Result<devpit_rpc::SessionRelay, devpit_rpc::RpcError> {
+    Ok(relay_of(
+        store.preference(preference::SESSION_NEXT_CARD)?.as_deref(),
+        store
+            .preference(preference::SESSION_HANDOFF_PERCENT)?
+            .as_deref(),
+    ))
+}
+
+/// `sessions.relay_read` — whether devpit starts sessions on its own.
+#[tauri::command]
+#[specta::specta]
+pub async fn session_relay_read() -> Result<devpit_rpc::SessionRelay, devpit_rpc::RpcError> {
+    crate::off_main::blocking(|| relay_read(&crate::projects::store()?)).await
+}
+
+/// `sessions.relay_write` — both switches at once, answered as stored.
+#[tauri::command]
+#[specta::specta]
+pub async fn session_relay_write(
+    relay: devpit_rpc::SessionRelay,
+) -> Result<devpit_rpc::SessionRelay, devpit_rpc::RpcError> {
+    crate::off_main::blocking(move || {
+        let store = crate::projects::store()?;
+        let next = if relay.next_card { "on" } else { "off" };
+        store.set_preference(preference::SESSION_NEXT_CARD, next)?;
+        let share = relay
+            .handoff_at_percent
+            .filter(|n| (1..=100).contains(n))
+            .map_or_else(|| "off".to_owned(), |n| n.to_string());
+        store.set_preference(preference::SESSION_HANDOFF_PERCENT, &share)?;
+        crate::sync::nudge();
+        relay_read(&store)
+    })
+    .await
 }
 
 #[cfg(test)]
