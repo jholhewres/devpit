@@ -7,7 +7,7 @@
 //!
 //! One Noise message is at most 65535 bytes, and a board or a chat can be
 //! more, so a message travels as frames: each frame's plaintext is a flag —
-//! more to come, or the last — and a chunk. The nonce of each frame is its
+//! more to come, or the last, of JSON or of raw bytes — and a chunk. The nonce of each frame is its
 //! place in the session, so a frame dropped, repeated or moved by anyone on
 //! the way does not open, and the session ends there.
 
@@ -27,6 +27,17 @@ pub const MOST_FRAMES: u64 = 1 << 48;
 
 const MORE: u8 = 0;
 const LAST: u8 = 1;
+/// The same two for a message of raw bytes: a terminal's output or keys,
+/// sent only to an end that said it reads them.
+const BYTES_MORE: u8 = 2;
+const BYTES_LAST: u8 = 3;
+
+/// A whole message, as its sender sealed it.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Opened {
+    Text(Vec<u8>),
+    Bytes(Vec<u8>),
+}
 
 /// What binds a handshake to devpit's Remote and to one machine.
 pub fn prologue(host: &str) -> Vec<u8> {
@@ -213,6 +224,7 @@ impl Handshake {
             peer,
             most,
             inbox: Vec::new(),
+            coming: None,
         })
     }
 }
@@ -225,6 +237,8 @@ pub struct Session {
     most: usize,
     /// A message whose frames have not all come.
     inbox: Vec<u8>,
+    /// What kind the message in `inbox` is, once its first frame came.
+    coming: Option<bool>,
 }
 
 impl Session {
@@ -234,6 +248,19 @@ impl Session {
 
     /// `message` as the frames that carry it, in order.
     pub fn seal(&mut self, message: &[u8]) -> Result<Vec<Vec<u8>>, Error> {
+        self.seal_as(message, (MORE, LAST))
+    }
+
+    /// Raw bytes as the frames that carry them, which only [`Session::open_any`] reads.
+    pub fn seal_bytes(&mut self, message: &[u8]) -> Result<Vec<Vec<u8>>, Error> {
+        self.seal_as(message, (BYTES_MORE, BYTES_LAST))
+    }
+
+    fn seal_as(
+        &mut self,
+        message: &[u8],
+        (more, last_flag): (u8, u8),
+    ) -> Result<Vec<Vec<u8>>, Error> {
         let chunks: Vec<&[u8]> = if message.is_empty() {
             vec![&[][..]]
         } else {
@@ -247,7 +274,7 @@ impl Session {
                 return Err(Error::Worn);
             }
             plain.clear();
-            plain.push(if at == last { LAST } else { MORE });
+            plain.push(if at == last { last_flag } else { more });
             plain.extend_from_slice(chunk);
             let mut out = vec![0u8; plain.len() + TAG];
             let len = self
@@ -260,8 +287,18 @@ impl Session {
         Ok(frames)
     }
 
-    /// One frame in: the whole message once its last frame is, or nothing yet.
+    /// One frame in: the whole JSON message once its last frame is, or
+    /// nothing yet. Raw bytes are not expected here and break the session.
     pub fn open(&mut self, frame: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        match self.open_any(frame)? {
+            None => Ok(None),
+            Some(Opened::Text(message)) => Ok(Some(message)),
+            Some(Opened::Bytes(_)) => Err(Error::Broken),
+        }
+    }
+
+    /// One frame in: the whole message, of either kind, once its last frame is.
+    pub fn open_any(&mut self, frame: &[u8]) -> Result<Option<Opened>, Error> {
         if frame.len() > MOST_FRAME {
             return Err(Error::TooBig);
         }
@@ -281,12 +318,28 @@ impl Session {
         if self.inbox.len() + chunk.len() > self.most {
             return Err(Error::TooBig);
         }
-        self.inbox.extend_from_slice(chunk);
-        match *flag {
-            LAST => Ok(Some(std::mem::take(&mut self.inbox))),
-            MORE => Ok(None),
-            _ => Err(Error::Broken),
+        let (bytes, done) = match *flag {
+            MORE => (false, false),
+            LAST => (false, true),
+            BYTES_MORE => (true, false),
+            BYTES_LAST => (true, true),
+            _ => return Err(Error::Broken),
+        };
+        // A message is one kind from its first frame to its last.
+        if *self.coming.get_or_insert(bytes) != bytes {
+            return Err(Error::Broken);
         }
+        self.inbox.extend_from_slice(chunk);
+        if !done {
+            return Ok(None);
+        }
+        self.coming = None;
+        let whole = std::mem::take(&mut self.inbox);
+        Ok(Some(if bytes {
+            Opened::Bytes(whole)
+        } else {
+            Opened::Text(whole)
+        }))
     }
 }
 

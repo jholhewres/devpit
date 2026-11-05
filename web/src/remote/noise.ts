@@ -23,6 +23,14 @@ export const MOST_FRAMES = 2 ** 48
 const HASHLEN = 32
 const MORE = 0
 const LAST = 1
+/** The same two for raw bytes: a terminal's output or keys. */
+const BYTES_MORE = 2
+const BYTES_LAST = 3
+
+export interface Opened {
+  bytes: boolean
+  whole: Uint8Array
+}
 
 export type NoiseFault = 'broken' | 'too-big' | 'worn' | 'out-of-turn'
 
@@ -269,6 +277,7 @@ export class Session {
   readonly peer: Uint8Array
   private inbox: Uint8Array[] = []
   private held = 0
+  private coming: boolean | null = null
 
   constructor(sending: CipherState, receiving: CipherState, peer: Uint8Array, most: number) {
     this.sending = sending
@@ -279,19 +288,35 @@ export class Session {
 
   /** `message` as the frames that carry it, in order. */
   seal(message: Uint8Array): Uint8Array[] {
+    return this.sealAs(message, MORE, LAST)
+  }
+
+  /** Raw bytes as the frames that carry them, for an end that reads them. */
+  sealBytes(message: Uint8Array): Uint8Array[] {
+    return this.sealAs(message, BYTES_MORE, BYTES_LAST)
+  }
+
+  private sealAs(message: Uint8Array, more: number, last: number): Uint8Array[] {
     const frames: Uint8Array[] = []
     let at = 0
     do {
       const chunk = message.subarray(at, at + MOST_CHUNK)
       at += chunk.length
-      const flag = at >= message.length ? LAST : MORE
+      const flag = at >= message.length ? last : more
       frames.push(this.sending.encrypt(new Uint8Array(0), concat(Uint8Array.of(flag), chunk)))
     } while (at < message.length)
     return frames
   }
 
-  /** One frame in: the whole message once its last frame is, or null. */
+  /** One frame in: the whole JSON message once its last frame is, or null. */
   open(frame: Uint8Array): Uint8Array | null {
+    const opened = this.openAny(frame)
+    if (opened?.bytes) throw new NoiseError('broken')
+    return opened?.whole ?? null
+  }
+
+  /** One frame in: the whole message of either kind once its last frame is, or null. */
+  openAny(frame: Uint8Array): Opened | null {
     if (frame.length > MOST_FRAME) throw new NoiseError('too-big')
     if (frame.length < TAG + 1) throw new NoiseError('broken')
     const plain = this.receiving.decrypt(new Uint8Array(0), frame)
@@ -299,14 +324,19 @@ export class Session {
     const chunk = plain.subarray(1)
     // Checked before it is kept: the ceiling bounds what the page holds.
     if (this.held + chunk.length > this.most) throw new NoiseError('too-big')
-    if (flag !== MORE && flag !== LAST) throw new NoiseError('broken')
+    if (flag === undefined || flag > BYTES_LAST) throw new NoiseError('broken')
+    const bytes = flag >= BYTES_MORE
+    // A message is one kind from its first frame to its last.
+    if (this.coming !== null && this.coming !== bytes) throw new NoiseError('broken')
+    this.coming = bytes
     this.inbox.push(chunk)
     this.held += chunk.length
-    if (flag === MORE) return null
+    if (flag === MORE || flag === BYTES_MORE) return null
     const whole = concat(...this.inbox)
     this.inbox = []
     this.held = 0
-    return whole
+    this.coming = null
+    return { bytes, whole }
   }
 }
 

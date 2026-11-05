@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use tungstenite::{Message, WebSocket};
 
-use crate::noise::{Error, Handshake, Keys, Session};
+use crate::noise::{Error, Handshake, Keys, Opened, Session};
 
 #[derive(Debug)]
 pub enum LinkError {
@@ -54,6 +54,13 @@ pub enum Heard {
     Alive,
     /// Nothing, within the socket's read timeout.
     Nothing,
+}
+
+/// What one read brought, where raw bytes may come too.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Received {
+    Heard(Heard),
+    Bytes(Vec<u8>),
 }
 
 pub struct Link<S: Read + Write> {
@@ -165,17 +172,36 @@ impl<S: Read + Write> Link<S> {
 
     /// One read: a whole message, a sign of life, or nothing yet.
     pub fn receive(&mut self) -> Result<Heard, LinkError> {
+        match self.receive_any()? {
+            Received::Heard(heard) => Ok(heard),
+            Received::Bytes(_) => Err(LinkError::Noise(Error::Broken)),
+        }
+    }
+
+    /// One read, where the other end may also send raw bytes.
+    pub fn receive_any(&mut self) -> Result<Received, LinkError> {
         match self.ws.read() {
-            Ok(Message::Binary(frame)) => Ok(match self.session.open(&frame)? {
-                Some(message) => Heard::Message(message),
-                None => Heard::Alive,
+            Ok(Message::Binary(frame)) => Ok(match self.session.open_any(&frame)? {
+                Some(Opened::Text(message)) => Received::Heard(Heard::Message(message)),
+                Some(Opened::Bytes(bytes)) => Received::Bytes(bytes),
+                None => Received::Heard(Heard::Alive),
             }),
-            Ok(Message::Ping(_) | Message::Pong(_) | Message::Frame(_)) => Ok(Heard::Alive),
+            Ok(Message::Ping(_) | Message::Pong(_) | Message::Frame(_)) => {
+                Ok(Received::Heard(Heard::Alive))
+            }
             Ok(Message::Text(_)) => Err(LinkError::NotAFrame),
             Ok(Message::Close(frame)) => Err(closed(frame)),
-            Err(err) if waiting(&err) => Ok(Heard::Nothing),
+            Err(err) if waiting(&err) => Ok(Received::Heard(Heard::Nothing)),
             Err(_) => Err(LinkError::Gone),
         }
+    }
+
+    /// Raw bytes, sealed and sent as their frames.
+    pub fn send_bytes(&mut self, bytes: &[u8]) -> Result<(), LinkError> {
+        for frame in self.session.seal_bytes(bytes)? {
+            send_frame(&mut self.ws, frame)?;
+        }
+        Ok(())
     }
 
     /// A message, sealed and sent as its frames.

@@ -11,6 +11,6 @@ pub mod mcp;
 pub mod noise;
 pub mod relay;
 
-pub use link::{Heard, Link, LinkError};
+pub use link::{Heard, Link, LinkError, Received};
 pub use noise::{Keys, Session};
 pub use relay::{Control, Relay, RelayError, Socket};

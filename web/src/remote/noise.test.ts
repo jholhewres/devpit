@@ -73,6 +73,24 @@ describe('the viewer’s Noise', () => {
     expect(device.open(frames[2]!)).toEqual(board)
   })
 
+  it('carries raw bytes as bytes and JSON as JSON in one session', () => {
+    const { device, machine } = pair()
+    const output = new Uint8Array(MOST_CHUNK + 3).fill(0xff)
+    const frames = machine.sealBytes(output)
+    expect(device.openAny(frames[0]!)).toBeNull()
+    expect(device.openAny(frames[1]!)).toEqual({ bytes: true, whole: output })
+    const opened = device.openAny(machine.seal(words.encode('{"t":"pong"}'))[0]!)
+    expect(opened?.bytes).toBe(false)
+    expect(read.decode(opened!.whole)).toBe('{"t":"pong"}')
+    const keys = device.sealBytes(words.encode('ls\r'))
+    expect(machine.openAny(keys[0]!)?.bytes).toBe(true)
+  })
+
+  it('breaks where raw bytes reach a read of JSON alone', () => {
+    const { device, machine } = pair()
+    expect(() => device.open(machine.sealBytes(words.encode('x'))[0]!)).toThrow(NoiseError)
+  })
+
   it('refuses a frame changed, dropped or repeated on the way', () => {
     const fault = (run: () => unknown): string | null => {
       try {

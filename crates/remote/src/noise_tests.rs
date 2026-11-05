@@ -1,4 +1,4 @@
-use super::{Error, Handshake, Keys, Session, MOST_CHUNK, MOST_FRAME};
+use super::{Error, Handshake, Keys, Opened, Session, MOST_CHUNK, MOST_FRAME};
 
 const HOST: &str = "host_01NOISETEST";
 
@@ -129,4 +129,46 @@ fn a_key_never_shows_its_secret_half() {
     let shown = format!("{keys:?}");
     assert!(shown.contains(&super::hex(&keys.public)));
     assert!(!shown.contains(&super::hex(&keys.secret)));
+}
+
+#[test]
+fn raw_bytes_cross_as_bytes_and_json_as_json_in_one_session() {
+    let (mut host, mut device, _, _) = sessions(1 << 20);
+    let output = vec![0x1b, b'[', b'H', 0xff, 0x00];
+    for frame in host.seal_bytes(&output).unwrap() {
+        if let Some(whole) = device.open_any(&frame).unwrap() {
+            assert_eq!(whole, Opened::Bytes(output.clone()));
+        }
+    }
+    let said = host.seal(br#"{"t":"pong"}"#).unwrap().remove(0);
+    assert_eq!(
+        device.open_any(&said).unwrap(),
+        Some(Opened::Text(br#"{"t":"pong"}"#.to_vec()))
+    );
+}
+
+#[test]
+fn raw_bytes_to_an_end_that_reads_only_json_break_the_session() {
+    let (mut host, mut device, _, _) = sessions(1 << 20);
+    let frame = host.seal_bytes(b"ls\r").unwrap().remove(0);
+    assert!(matches!(device.open(&frame), Err(Error::Broken)));
+}
+
+/// One frame with `flag`, as no sealing of a whole message makes it.
+fn frame(from: &mut Session, flag: u8, chunk: &[u8]) -> Vec<u8> {
+    let mut plain = vec![flag];
+    plain.extend_from_slice(chunk);
+    let mut out = vec![0u8; plain.len() + 16];
+    let len = from.transport.write_message(&plain, &mut out).unwrap();
+    out.truncate(len);
+    out
+}
+
+#[test]
+fn a_message_that_changes_kind_halfway_does_not_open() {
+    let (mut host, mut device, _, _) = sessions(1 << 20);
+    let first = frame(&mut host, super::MORE, b"{");
+    let then = frame(&mut host, super::BYTES_LAST, b"x");
+    assert_eq!(device.open_any(&first).unwrap(), None);
+    assert!(matches!(device.open_any(&then), Err(Error::Broken)));
 }
