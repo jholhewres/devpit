@@ -98,6 +98,25 @@ describe('a flood cut down to what can still be seen', () => {
     expect(cut).toEqual(whole)
   })
 
+  /* A region set, or a buffer swapped, by a sequence a write ends inside of:
+     read as one, they stop the cuts that would change rows outside it. */
+  it('reads a sequence split between two writes at any byte as it reads it whole', async () => {
+    /* Numbered, so a row written from the wrong place shows. */
+    const lines = (n: number): string => Array.from({ length: n }, (_, i) => `${i}\r\n`).join('')
+    const floods: [string, string, string][] = [
+      [lines(200), '\x1b[3;6r', lines(200)],
+      [`\x1b[3;6r${lines(200)}`, '\x1b[?1049h', `\x1b[r${lines(200)}\x1b[?1049l\x1b[H${lines(200)}`],
+    ]
+    for (const [before, sequence, after] of floods) {
+      for (let at = 1; at < sequence.length; at += 1) {
+        const chunks = [encode(before + sequence.slice(0, at)), encode(sequence.slice(at) + after)]
+        const { whole, cut, taken } = await bothWays(chunks)
+        expect(cut, `${JSON.stringify(sequence)} split at ${at}`).toEqual(whole)
+        expect(taken).toBeGreaterThan(0)
+      }
+    }
+  })
+
   /* Plain runs long enough to cut, broken by whatever a program prints. */
   it('ends alike for any mix of text and sequences, cut anywhere', async () => {
     const pieces = [

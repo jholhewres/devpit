@@ -26,9 +26,29 @@ export interface Stream {
      and what a cut line left on a row stays there: nothing is cut then. */
   region: number
   alt: boolean
+  /** The CSI being read, which a write may end in the middle of. */
+  csi: Csi
 }
 
-export const ground = (): Stream => ({ state: GROUND, c2: false, region: 0, alt: false })
+/* Colour or erase so far; any parameter; a private marker or intermediate;
+   a `!` among them; a `?` first; the number being read; a buffer switch. */
+interface Csi {
+  plain: boolean
+  params: boolean
+  odd: boolean
+  bang: boolean
+  query: boolean
+  number: number
+  swap: boolean
+}
+
+export const ground = (): Stream => ({
+  state: GROUND,
+  c2: false,
+  region: 0,
+  alt: false,
+  csi: { plain: true, params: false, odd: false, bang: false, query: false, number: -1, swap: false },
+})
 
 const bit = (stream: Stream): number => (stream.alt ? 2 : 1)
 /** The buffers xterm switches with `CSI ? n h` and `l`. */
@@ -81,16 +101,7 @@ export function cutFlood(bytes: Uint8Array, stream: Stream, screen: Screen, ring
   }
   /* Start of the plain run, or -1 outside one. */
   let run = stream.state === GROUND && !stream.c2 ? 0 : -1
-  /* The CSI being read: colour or erase so far; any parameter; a private
-     marker or intermediate; a `!` among them; a `?` first; the number being
-     read; a buffer switch among them. */
-  let plain = true
-  let params = false
-  let odd = false
-  let bang = false
-  let query = false
-  let number = -1
-  let swap = false
+  let { plain, params, odd, bang, query, number, swap } = stream.csi
   const opened = (): void => {
     params = odd = bang = query = swap = false
     number = -1
@@ -183,6 +194,7 @@ export function cutFlood(bytes: Uint8Array, stream: Stream, screen: Screen, ring
         break
     }
   }
+  stream.csi = { plain, params, odd, bang, query, number, swap }
 
   /* The last CR LF with `keep` line feeds after it in the same run. */
   for (let n = feeds - keep; keep > 0 && n >= Math.max(0, feeds - size); n -= 1) {
