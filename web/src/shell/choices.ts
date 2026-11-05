@@ -17,10 +17,11 @@ export type Chosen = readonly (readonly string[])[]
 export const questionsOf = (question: Pick<Question, 'touch'>): readonly IslandAsked[] | null =>
   question.touch?.kind === 'ask' && question.touch.questions.length > 0 ? question.touch.questions : null
 
-/** What a request is about, for its first line: the command, the file, the address. */
+/** What a request is about, for its first line: the command, the file, the address.
+    A command whole: a line after the first is what it would hide. */
 export function subjectOf(question: Pick<Question, 'input' | 'touch'>): string {
   const touch = question.touch
-  if (touch?.kind === 'run') return touch.command.split('\n')[0]!
+  if (touch?.kind === 'run') return touch.command
   if (touch && 'path' in touch) return touch.path
   return receiptSubject(question.input)
 }
