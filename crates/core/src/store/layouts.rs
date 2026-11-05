@@ -106,7 +106,7 @@ impl Store {
     }
 }
 
-/// A tab a card named, and the tree in it.
+/// A stored tab of a project, and the tree in it.
 pub struct TabLayout {
     pub project_id: String,
     pub tab_id: String,

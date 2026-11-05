@@ -184,7 +184,8 @@ pub(crate) fn pane_target(listed: &str, windows: &HashMap<String, String>) -> Op
 
 /// A listed session's terminal and its pane. The CLI writes the tmux pane it
 /// runs in; a ptyd pane has no `$TMUX`, and is found by the session id its
-/// hooks stored against the leaf instead.
+/// hooks stored against the leaf instead, or by the pane its process was
+/// started in.
 fn terminal_listed(
     listed: &Listed,
     windows: &HashMap<String, String>,
