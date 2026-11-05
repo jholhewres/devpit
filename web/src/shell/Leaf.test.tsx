@@ -20,6 +20,8 @@ const fake = vi.hoisted(() => {
     open() {}
     write(data: unknown, done?: () => void) {
       this.written.push(data)
+      /* A reset scrolls to the top, as xterm's does. */
+      if (data === '\x1bc') this.scrolled?.(0)
       done?.()
     }
     onData() {
@@ -152,7 +154,8 @@ describe('a terminal off screen', () => {
     const replay = Uint8Array.from([66])
     act(() => fake.attaches[0].on.output(late, false))
     act(() => fake.attaches[1].on.output(replay, true))
-    expect(fake.terms[0].written).toEqual([Uint8Array.from([65]), '\x1bc', replay])
+    expect(fake.terms[0].written).toEqual([Uint8Array.from([65]), '\x1bc', new Uint8Array(), replay])
+    expect(fake.asked()).toBe(0)
   })
 
   it('attaches nothing while it was never on screen', async () => {

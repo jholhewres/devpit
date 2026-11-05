@@ -284,7 +284,12 @@ export function Leaf({
     const draw = (bytes: Uint8Array, replay: boolean): void => {
       if (stale) {
         stale = false
+        /* The reset scrolls to the top, which is not the person asking for a page. */
+        paging = true
         terminal.write('\x1bc')
+        terminal.write(new Uint8Array(), () => {
+          paging = false
+        })
       }
       hold(bytes)
       /* The replay comes before any live byte and is not acknowledged. */
