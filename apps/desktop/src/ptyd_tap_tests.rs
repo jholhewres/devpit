@@ -335,12 +335,14 @@ fn an_agent_outlives_the_desktop_killed_and_comes_back_in_its_alternate_screen()
         .is_some_and(|found| !found.is_empty());
     #[cfg(not(target_os = "linux"))]
     let alive = crate::ptyd_link::running(home, pane);
+    // Read before the kill below, which the daemon can act on first.
+    let kept = daemon.pane(pane).is_some();
     crate::ptyd_link::kill(home, pane);
     hang_up(&tap);
     let _ = std::fs::remove_file(&socket);
 
     assert!(!revived, "a running pane was started again");
-    assert!(daemon.pane(pane).is_some());
+    assert!(kept, "the daemon lost the pane");
     assert!(alive, "the agent did not outlive the desktop");
     assert!(drawn, "{shown}");
     assert!(!shown.contains("on the primary"), "{shown}");
