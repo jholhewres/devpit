@@ -1,4 +1,4 @@
-import type { IslandChange, IslandQuestion, IslandSession, IslandStep, Question } from '../gen/bindings'
+import type { IslandChange, IslandQuestion, IslandSession, IslandStep, Question, Touch } from '../gen/bindings'
 
 /*
  * What the island draws, worked out from what it heard.
@@ -24,6 +24,8 @@ export interface Ask {
   readonly project: string | null
   /** The terminal offered a rule to keep, so "always" can be answered. */
   readonly keepable: boolean
+  /** What a chat's question touches, as the backend read it. */
+  readonly touch?: Touch | null
 }
 
 export const fromChat = (question: Question): Ask => ({ ...question, from: 'chat', keepable: true, project: null })

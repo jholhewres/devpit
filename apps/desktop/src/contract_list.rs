@@ -10,7 +10,7 @@ use tauri_specta::{collect_commands, Builder};
 
 use crate::{
     account, account_quota, adopting, agent_choice, agent_door, agent_profiles, arranging,
-    artifacts, asking, asking_kept, attaching_chat, blocks, board, branches, browser,
+    artifacts, asking, asking_kept, asking_picks, attaching_chat, blocks, board, branches, browser,
     browser_cookies, browser_driving, browser_menu, card_chat, card_elsewhere, card_ties,
     card_work, cards, chat, chat_queue, chat_remote, chat_window, checkpoint, checkpoint_findings,
     checkpoint_preview, checkpoint_tested, claude_accounts, claude_plugin, cloning, columns,
@@ -219,6 +219,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         slash::chat_slash_commands,
         asking::permission_answer,
         asking_kept::permission_always,
+        asking_picks::permission_pick,
         asking::permission_ask_from_now,
         asking::permission_questions,
         mcp::mcp_list,

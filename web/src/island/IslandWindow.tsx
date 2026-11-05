@@ -125,7 +125,7 @@ export function IslandWindow(): React.JSX.Element {
                   sound={sound}
                   onSound={() => setSound(!sound)}
                 />
-                <Asking question={question} onAnswer={(verdict) => answer(question, verdict)} />
+                <Asking question={question} onAnswer={(verdict, chosen) => answer(question, verdict, chosen)} />
               </>
             )}
             {view === 'session' && chosen && (

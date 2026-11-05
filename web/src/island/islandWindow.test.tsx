@@ -38,6 +38,7 @@ vi.mock('../shell/live', () => ({
     urlOpen: (url: string) => (called('url', url), null),
     permissionAnswer: (id: string, answer: string) => (called('answer', id, answer), null),
     permissionAlways: (id: string, sessionId: string, tool: string) => (called('always', id, sessionId, tool), null),
+    permissionPick: (id: string, chosen: string[][]) => (called('pick', id, chosen), null),
   },
 }))
 vi.mock('../shell/window', () => ({
@@ -214,6 +215,29 @@ describe('the island window', () => {
     act(() => askedChat?.({ id: 'q3', sessionId: 's9', tool: 'Edit', input: '{"file_path":"/w/c.rs"}', cwd: '/w' }))
     fireEvent.click(screen.getByText('Always'))
     expect(called).toHaveBeenCalledWith('always', 'q3', 's9', 'Edit')
+  })
+
+  it('answers a chat’s question to the person by its choice, and puts it away once its chat answered it', async () => {
+    render(<IslandWindow />)
+    await act(async () => {})
+    const asked = (id: string): Question => ({
+      id,
+      sessionId: 's9',
+      tool: 'AskUserQuestion',
+      input: '{}',
+      cwd: '/w',
+      touch: { kind: 'ask', questions: [{ header: null, question: 'Which colour?', options: ['Red', 'Green', 'Blue'], multi: false }] },
+    })
+    act(() => askedChat?.(asked('q1')))
+    expect(screen.queryByText('Always')).toBeNull()
+    fireEvent.click(screen.getByText('Green'))
+    expect(called).toHaveBeenCalledWith('pick', 'q1', [['Green']])
+    expect(screen.queryByText('Which colour?')).toBeNull()
+
+    act(() => askedChat?.(asked('q2')))
+    expect(screen.getByText('Which colour?')).toBeTruthy()
+    say('permission:settled', 'q2')
+    expect(screen.queryByText('Which colour?')).toBeNull()
   })
 
   it('switches its sounds off and on from the head', async () => {

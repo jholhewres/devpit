@@ -25,7 +25,8 @@ export interface IslandState {
   readonly chosen: IslandSession | null
   readonly nudge: (nudge: Nudge) => void
   readonly choose: (sessionId: string | null) => void
-  readonly answer: (question: Ask, verdict: IslandVerdict) => void
+  /** `chosen` answers a chat's question to the person, one list per question. */
+  readonly answer: (question: Ask, verdict: IslandVerdict, chosen?: string[][]) => void
   readonly now: number
   readonly sound: boolean
   readonly setSound: (on: boolean) => void
@@ -145,8 +146,12 @@ export function useIsland(): IslandState {
     return () => window.clearInterval(beat)
   }, [island.mode])
 
-  const answer = useCallback((question: Ask, verdict: IslandVerdict) => {
+  const answer = useCallback((question: Ask, verdict: IslandVerdict, chosen?: string[][]) => {
     setQuestions((was) => was.filter((one) => one.id !== question.id))
+    if (chosen && verdict !== 'deny') {
+      void ask(() => commands.permissionPick(question.id, chosen))
+      return
+    }
     if (question.from === 'terminal') {
       void ask(() => commands.islandDecide(question.id, verdict))
       return

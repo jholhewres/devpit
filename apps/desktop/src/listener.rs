@@ -22,6 +22,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::asking::{decision, Asking};
+use crate::asking_picks::{reply_for, Picks};
 use crate::card_activity::{hear, next_seq, pane_word, state_of_event, Activities, Key, Place};
 use crate::card_route::{card_of_leaf, card_of_session, notice_for, Ring};
 use crate::happening::{agent_said, session_said, subagent_said};
@@ -217,18 +218,26 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
     // leaves the CLI's own permission mode in charge — a board step running
     // where nobody is watching must never wait on a window.
     let held = question_in(body).filter(|question| {
-        crate::question::changes_something(&question.tool)
+        let supervised = crate::question::changes_something(&question.tool)
             && app
                 .try_state::<Asking>()
                 .map(|asking| asking.asks(&question.session_id))
-                .unwrap_or(false)
+                .unwrap_or(false);
+        // A question to the person waits for them in any mode a chat runs in.
+        supervised
+            || app
+                .try_state::<Picks>()
+                .is_some_and(|picks| picks.holds(&question.session_id, &question.tool))
     });
     // Already allowed for the rest of this conversation: answered as the
     // person answered it then, without asking again.
     if let Some(question) = &held {
-        let kept = app
-            .try_state::<crate::asking_kept::Kept>()
-            .is_some_and(|kept| kept.covers(&question.session_id, &question.tool, &question.input));
+        let kept = !crate::asking_picks::to_the_person(&question.tool)
+            && app
+                .try_state::<crate::asking_kept::Kept>()
+                .is_some_and(|kept| {
+                    kept.covers(&question.session_id, &question.tool, &question.input)
+                });
         if kept {
             reply(&mut stream, &decision(crate::asking::Answer::Allow));
             let settled = hear_post(&app, &posted, seq);
@@ -244,7 +253,8 @@ fn serve(app: AppHandle, mut stream: TcpStream, seq: u64) {
         let hear = asking.opened(&question.id);
         let _ = app.emit("permission:asked", &question);
         crate::island_notify::asked(&app, &question.tool, &question.input);
-        let said = decision(asking.wait(&question.id, hear));
+        let answer = asking.wait(&question.id, hear);
+        let said = reply_for(&app.state::<Picks>(), &question.id, &question.input, answer);
         reply(&mut stream, &said);
         // Answered here or anywhere else, or timed out: every window that
         // drew the question puts it away.

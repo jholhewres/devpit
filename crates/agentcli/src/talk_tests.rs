@@ -206,6 +206,26 @@ fn a_turn_carries_devpits_hook_settings_as_one_word() {
         .any(|a| a.starts_with("--settings")));
 }
 
+/// A printing turn is offered `AskUserQuestion` and `ExitPlanMode` only when
+/// something answers its permission prompts (measured on 2.1.318); the hook
+/// in devpit's settings is what answers them.
+#[test]
+fn a_turn_devpit_hears_is_offered_the_questions_it_can_answer() {
+    let with = Say {
+        settings: Some("/home/someone/.devpit/hooks.json"),
+        ..turn(None)
+    };
+    let flags = argv(&with);
+    let at = flags
+        .iter()
+        .position(|a| a == "--permission-prompt-tool")
+        .expect("no prompt tool in the line");
+    assert_eq!(flags[at + 1], "stdio");
+    assert!(!argv(&turn(None))
+        .iter()
+        .any(|a| a == "--permission-prompt-tool"));
+}
+
 /// A chat has the board's tools the way a terminal does: devpit's MCP file,
 /// as one word so it cannot swallow the flag after it.
 #[test]
@@ -294,6 +314,53 @@ fn a_cli_that_fails_says_why_in_the_answer() {
     assert!(said.end.is_error);
     let shown = format!("{heard:?}");
     assert!(shown.contains("No conversation found"), "{shown}");
+}
+
+/// A permission prompt the hook did not decide is answered on stdin; left
+/// unanswered, the turn would wait on it for good.
+#[cfg(unix)]
+#[test]
+fn a_permission_prompt_the_hook_left_is_answered_and_the_turn_goes_on() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join("fake-claude");
+    std::fs::write(
+        &cli,
+        "#!/bin/sh\nread -r _prompt\n\
+         printf '%s\\n' '{\"type\":\"control_request\",\"request_id\":\"r1\",\"request\":{\"subtype\":\"can_use_tool\",\"tool_name\":\"Bash\",\"input\":{},\"decision_reason\":\"This command requires approval\"}}'\n\
+         read -r reply\nprintf '%s\\n' \"$reply\" > \"$(dirname \"$0\")/reply\"\n\
+         printf '{\"type\":\"result\",\"subtype\":\"success\",\"session_id\":\"s\",\"total_cost_usd\":0}\\n'\n",
+    )
+    .expect("script");
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let command = cli.to_string_lossy().into_owned();
+    let cwd = dir.path().to_path_buf();
+    let (tell, hear) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let turn = Say {
+            command: &command,
+            cwd: &cwd,
+            ..turn(None)
+        };
+        let said = (0..5).find_map(|_| {
+            match crate::talk::say(&crate::driver::Claude::default(), &turn, |_| {}, |_| {}) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                }
+                other => Some(other.is_ok()),
+            }
+        });
+        let _ = tell.send(said);
+    });
+    let said = hear
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("the turn waited on a prompt nobody answered");
+    assert_eq!(said, Some(true));
+    let reply = std::fs::read_to_string(dir.path().join("reply")).expect("a reply");
+    assert!(reply.contains(r#""request_id":"r1""#), "{reply}");
+    assert!(reply.contains(r#""behavior":"deny""#), "{reply}");
 }
 
 /// A CLI that writes more to stderr than a pipe holds still finishes its

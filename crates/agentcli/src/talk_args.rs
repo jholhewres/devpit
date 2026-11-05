@@ -44,6 +44,10 @@ pub(crate) fn argv(turn: &Say<'_>) -> Vec<String> {
         // `=`, because the flag takes several files: written as two words it
         // would swallow whatever came after it.
         argv.push(format!("--settings={settings}"));
+        // Without a prompt tool a printing turn is not offered AskUserQuestion
+        // or ExitPlanMode; the hook answers them, and `control` refuses the rest.
+        argv.push("--permission-prompt-tool".to_owned());
+        argv.push("stdio".to_owned());
     }
     if let Some(config) = turn.mcp_config {
         argv.push(format!("--mcp-config={config}"));

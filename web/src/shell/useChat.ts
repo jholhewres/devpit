@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
+import type { Chosen } from './choices'
 import { appended, appliedAll, ASKS, batched, failedOn, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
@@ -68,7 +69,8 @@ export interface Chat {
   readonly rewindable: readonly string[]
   rewind: (turnId: string) => void
   detach: (path: string) => void
-  answer: (id: string, said: Said) => void
+  /** `chosen` answers a question the agent put, one list of labels per question. */
+  answer: (id: string, said: Said, chosen?: Chosen) => void
   /** `back` gets the words of a send refused before it opened, to give back.
       `given` sends those files and skills instead of the composer's, and leaves the composer's be. */
   say: (prompt: string, back?: (prompt: string) => void, given?: Extras) => void
@@ -271,12 +273,14 @@ export function useChat(conversationId: string): Chat {
   useEffect(() => onPermissionSettled((id) => setAsked((was) => was.filter((one) => one.id !== id))), [])
 
   const answer = useCallback(
-    (id: string, said: Said) => {
+    (id: string, said: Said, chosen?: Chosen) => {
       const question = asked.find((one) => one.id === id)
       const allow = said !== 'deny'
       /* Taken off the list first: the question is answered either way, and a
          row that lingers invites a second click that has nothing to answer. */
       setAsked((was) => was.filter((one) => one.id !== id))
+      /* The answer is in the thread already, as the tool's result. */
+      if (chosen && allow) return void ask(() => commands.permissionPick(id, chosen.map((one) => [...one])))
       const call =
         said === 'always' && question
           ? () => commands.permissionAlways(id, question.sessionId, question.tool, question.input)

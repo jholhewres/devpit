@@ -70,6 +70,10 @@ fn one_turn(
     let mut result_seen = false;
 
     for line in lines {
+        if let Some(refused) = crate::control::refusal(&line) {
+            control.write(&refused);
+            continue;
+        }
         if let Some(seen) = driver.session(&line) {
             if heard.session_id.as_deref() != Some(seen.as_str()) {
                 on_session.inspect(|tell| tell(&seen));

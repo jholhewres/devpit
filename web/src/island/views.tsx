@@ -158,7 +158,38 @@ export function Detail({ session, now }: { session: IslandSession; now: number }
   )
 }
 
-export function Asking({ question, onAnswer }: { question: Ask; onAnswer: (verdict: IslandVerdict) => void }): React.JSX.Element {
+export function Asking({
+  question,
+  onAnswer,
+}: {
+  question: Ask
+  onAnswer: (verdict: IslandVerdict, chosen?: string[][]) => void
+}): React.JSX.Element {
+  const asked = question.touch?.kind === 'ask' ? question.touch.questions : []
+  if (asked.length > 0) {
+    /* One plain choice is answered here; more is its chat's to draw. */
+    const one = asked.length === 1 && !asked[0]!.multi ? asked[0]! : null
+    return (
+      <div className="isl-ask">
+        <code className="isl-ask__what">{asked[0]!.question}</code>
+        <div className="isl-ask__row">
+          {one ? (
+            one.options.map((label, n) => (
+              <button key={n} className="isl-btn" onClick={() => onAnswer('allow', [[label]])}>
+                {label}
+              </button>
+            ))
+          ) : (
+            <span className="isl-ask__note">Answer it in its chat.</span>
+          )}
+          <span className="isl-ask__gap" />
+          <button className="isl-btn" onClick={() => onAnswer('deny')}>
+            Deny
+          </button>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="isl-ask">
       <code className="isl-ask__what">{askedWords(question)}</code>

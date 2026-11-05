@@ -62,3 +62,35 @@ fn a_staying_turn_is_over_at_its_result_even_with_a_task_running() {
     assert!(!turn_over(false, true, &running));
     assert!(!turn_over(true, false, &running));
 }
+
+/// Recorded from 2.1.318 with `--permission-prompt-tool stdio`: a tool the
+/// mode does not allow and no hook decided.
+const ASKED: &str = r#"{"type":"control_request","request_id":"37497bcb","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"python3 -c \"print(6*7)\""},"decision_reason":"This command requires approval","tool_use_id":"toolu_01"}}"#;
+
+/// Refused as a printing turn without a prompt tool refuses it, in the
+/// CLI's own words, so the agent hears what it heard before.
+#[test]
+fn a_permission_prompt_nobody_was_asked_is_refused_in_the_clis_words() {
+    let reply: serde_json::Value =
+        serde_json::from_str(&refusal(ASKED).expect("a reply")).expect("json");
+    assert_eq!(reply["type"], "control_response");
+    assert_eq!(reply["response"]["request_id"], "37497bcb");
+    assert_eq!(reply["response"]["response"]["behavior"], "deny");
+    assert_eq!(
+        reply["response"]["response"]["message"],
+        "This command requires approval"
+    );
+}
+
+#[test]
+fn only_a_permission_prompt_is_answered() {
+    let ours = r#"{"type":"control_response","response":{"subtype":"success","request_id":"interrupt-1"}}"#;
+    assert!(refusal(ours).is_none());
+    assert!(refusal(&interrupt_request()).is_none());
+    let not_asked = r#"{"type":"control_cancel_request","request_id":"r1","request":{"subtype":"can_use_tool"}}"#;
+    assert!(refusal(not_asked).is_none());
+    assert!(refusal(
+        r#"{"type":"assistant","message":{"content":[{"type":"text","text":"can_use_tool"}]}}"#
+    )
+    .is_none());
+}

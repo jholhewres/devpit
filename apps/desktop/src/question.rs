@@ -42,6 +42,9 @@ pub fn question_in(body: &str) -> Option<Question> {
             .and_then(|found| found.as_str())
             .unwrap_or_default()
             .to_owned(),
+        touch: raw
+            .get("tool_input")
+            .and_then(|input| devpit_agentcli::touch_of(raw.get("tool_name")?.as_str()?, input)),
     })
     .filter(|question| !question.id.is_empty())
 }

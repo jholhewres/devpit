@@ -38,6 +38,9 @@ pub struct Question {
     /// shape the provider changes without asking.
     pub input: String,
     pub cwd: String,
+    /// What it touches, as the island reads it: the choices, the command.
+    #[serde(default)]
+    pub touch: Option<devpit_rpc::Touch>,
 }
 
 /// The chat mode that stops to ask — the screen's `ASKS`. A turn started in
@@ -46,17 +49,18 @@ pub struct Question {
 pub const ASKING_MODE: &str = "manual";
 
 /// What a chat turn does with its session id once the stream names it: tells
-/// the screen, and in the asking mode starts holding that session's tools —
+/// the screen, marks it a chat's, and in the asking mode holds its tools —
 /// so the screen that shows the question already knows whose it is.
 pub fn holding(
     mode: Option<&str>,
     app: &tauri::AppHandle,
     frames: tauri::ipc::Channel<devpit_rpc::Frame>,
 ) -> impl Fn(&str) + Sync + Send {
-    let app = (mode == Some(ASKING_MODE)).then(|| app.clone());
+    let (app, asks) = (app.clone(), mode == Some(ASKING_MODE));
     move |session: &str| {
-        if let Some(app) = &app {
-            use tauri::Manager;
+        use tauri::Manager;
+        app.state::<crate::asking_picks::Picks>().draw(session);
+        if asks {
             app.state::<Asking>().ask_from_now(session, true);
         }
         let _ = frames.send(devpit_rpc::Frame::Session {

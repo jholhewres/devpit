@@ -102,6 +102,38 @@ pub fn stop_task_request(task_id: &str) -> String {
     .to_string()
 }
 
+/// The answer to a permission prompt no hook decided: refused in the CLI's
+/// own words, as a printing turn without a prompt tool refuses it.
+pub(crate) fn refusal(line: &str) -> Option<String> {
+    // Every streamed line passes here; only a prompt is worth parsing.
+    if !line.contains("\"can_use_tool\"") {
+        return None;
+    }
+    let asked: serde_json::Value = serde_json::from_str(line).ok()?;
+    let request = asked.get("request")?;
+    if asked.get("type")?.as_str()? != "control_request"
+        || request.get("subtype")?.as_str()? != "can_use_tool"
+    {
+        return None;
+    }
+    let reason = request
+        .get("decision_reason")
+        .and_then(serde_json::Value::as_str)
+        .filter(|reason| !reason.trim().is_empty())
+        .unwrap_or("This command requires approval");
+    Some(
+        serde_json::json!({
+            "type": "control_response",
+            "response": {
+                "subtype": "success",
+                "request_id": asked.get("request_id")?,
+                "response": { "behavior": "deny", "message": reason },
+            },
+        })
+        .to_string(),
+    )
+}
+
 /// The tasks still running, kept current as parts arrive.
 #[derive(Debug, Default)]
 pub struct Running {

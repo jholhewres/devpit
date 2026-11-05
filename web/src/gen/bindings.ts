@@ -858,6 +858,11 @@ export const commands = {
 	 */
 	permissionAlways: (id: string, sessionId: string, tool: string, input: string) => typedError<null, RpcError>(__TAURI_INVOKE("permission_always", { id, sessionId, tool, input })),
 	/**
+	 *  `permission.pick` — the person's choices to an `AskUserQuestion`: one
+	 *  list per question, in the order asked.
+	 */
+	permissionPick: (id: string, chosen: string[][]) => typedError<null, RpcError>(__TAURI_INVOKE("permission_pick", { id, chosen })),
+	/**
 	 *  `permission.ask_from_now` — whether this conversation stops to ask.
 	 * 
 	 *  Per session rather than global: a board step running unattended must not
@@ -4741,6 +4746,8 @@ export type Question = {
 	 */
 	input: string,
 	cwd: string,
+	/**  What it touches, as the island reads it: the choices, the command. */
+	touch?: Touch | null,
 };
 
 /**  One message in a [`ChatQueue`], with what was attached when it was queued. */

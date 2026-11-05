@@ -70,3 +70,29 @@ fn supervised_asks_only_before_a_change() {
         assert!(!changes_something(left), "{left}");
     }
 }
+
+/// Recorded from 2.1.318: an `AskUserQuestion` the model put, with three choices.
+const ASKED: &str = r#"{"session_id":"abc","cwd":"/tmp/p","hook_event_name":"PreToolUse",
+    "tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Which colour?",
+    "header":"Colour","options":[{"label":"Red","description":"Red"},{"label":"Green",
+    "description":"Green"},{"label":"Blue","description":"Blue"}],"multiSelect":false}]},
+    "tool_use_id":"t2"}"#;
+
+/// What the island reads out of a hook, the chat reads out of a question:
+/// the choices, the command, the file.
+#[test]
+fn a_question_says_what_it_touches_as_the_island_reads_it() {
+    let asked = question_in(ASKED).expect("a question");
+    let Some(devpit_rpc::Touch::Ask { questions }) = asked.touch else {
+        panic!("no choices in {:?}", asked.touch);
+    };
+    assert_eq!(questions[0].question, "Which colour?");
+    assert_eq!(questions[0].options, ["Red", "Green", "Blue"]);
+    let run = question_in(PRE_TOOL).expect("a question").touch;
+    assert_eq!(
+        run,
+        Some(devpit_rpc::Touch::Run {
+            command: "rm -rf /".to_owned()
+        })
+    );
+}
