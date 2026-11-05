@@ -165,13 +165,14 @@ first, and a two-word name (`.arow`, `.tleaf`) when the obvious one is taken.
 
 ## Environment toggles
 
-Four, all off by default, none of them a feature:
+Five, all off by default, none of them a feature:
 
 | | |
 |---|---|
 | `DEVPIT_ACCOUNT_ORIGIN` | points the account at another server, so a build can be run against a local one without editing `account.rs` |
 | `DEVPIT_ACCOUNT_NO_BROWSER` | `1` stops sign-in from opening a browser — for tests, and for a machine with none |
 | `DEVPIT_TRACE_HOOKS` | timestamped lines on stderr saying how long each hook took |
+| `DEVPIT_GDK_BACKEND` | `wayland` or `x11`: the display a Linux start opens on, over Settings and the automatic fallback |
 | `DEVPIT_UPDATE_FEED_FILE` | reads the update feed from a file instead of the network. It only replaces where the answer is read from, the card says "test feed" on screen, and nothing it offers can be installed |
 
 ## Tests

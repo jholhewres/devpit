@@ -21,6 +21,7 @@ pub mod cut;
 pub mod decisions;
 pub mod devflow;
 pub mod devflow_screen;
+pub mod display;
 pub mod ended;
 pub mod error;
 pub mod file;
@@ -94,6 +95,7 @@ pub use devflow_screen::{
     DevflowSkill, DevflowSkillText, DevflowStage, DevflowState, DevflowTeam, DevflowTeamChange,
     DevflowTeamChanges,
 };
+pub use display::{Display, DisplayBackend, DisplayWhy};
 pub use ended::Ended;
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};

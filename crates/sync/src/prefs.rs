@@ -65,6 +65,7 @@ pub const LOCAL: &[(&str, &str)] = &[
     (key::TRAY_TOLD, "the tray"),
     (key::ISLAND, "a window of this machine"),
     (key::ISLAND_SCREEN, "a screen of this machine"),
+    (key::DISPLAY_BACKEND, "this machine's display server"),
     (key::ERROR_REPORTS, "consent given on this install"),
     (key::TRANSCRIBE, "the engine installed here"),
     (key::TRANSCRIBE_MODEL, "a file on this machine"),

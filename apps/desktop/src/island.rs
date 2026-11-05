@@ -17,8 +17,8 @@
 //!
 //! **Wayland** cannot place a window or keep it on top: there the island is a
 //! layer where the compositor has layer-shell, and an ordinary window that
-//! never takes focus where it does not (GNOME) — see `island_wayland`. The
-//! AppImage runs through XWayland, and is X11 here.
+//! never takes focus where it does not (GNOME) — see `island_wayland`. Which
+//! of the two a start is on is `display_backend`'s choice.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;

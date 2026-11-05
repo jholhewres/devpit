@@ -70,6 +70,9 @@ pub const TRAY_TOLD: &str = "general.tray_told";
 pub const ISLAND: &str = "island.enabled";
 /// The screen the island was last dragged to, by the name the system gives it.
 pub const ISLAND_SCREEN: &str = "island.screen";
+/// The display GTK opens on Linux: `wayland` or `x11`. Absent is automatic.
+/// This machine's alone: it is not among the synced keys.
+pub const DISPLAY_BACKEND: &str = "display.backend";
 /// Whether devpit keeps its own errors for a report. Off unless turned on.
 pub const ERROR_REPORTS: &str = "telemetry.error_reports";
 /// How a voice message becomes words: `local` (a whisper on this machine),

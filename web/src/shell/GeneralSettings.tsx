@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { IslandDrawn } from '../gen/bindings'
 import { CalendarSettings } from './CalendarSettings'
 import { DeskSettings } from './DeskSettings'
+import { DisplaySettings } from './DisplaySettings'
 import { ErrorReportsPreview } from './ErrorReportsPreview'
 import { commands } from './live'
 import { OpenApps } from './OpenApps'
@@ -57,6 +58,7 @@ export function GeneralSettings({ on, set }: { on: (field: Flag) => boolean; set
 
       <div className="acc__sub">On this desktop</div>
       <DeskSettings />
+      <DisplaySettings />
       <PrefSwitch on={on('confirmStop')} onFlip={flip('confirmStop')} title="Ask before stopping a terminal" said={<>A terminal still running something asks before it is closed. Its &ldquo;Don&rsquo;t ask again&rdquo; turns this off; this turns it back on.</>} />
       <OpenApps />
 

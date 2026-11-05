@@ -123,6 +123,7 @@ mod devflow_team;
 mod devflow_work;
 mod diagnostics;
 mod diffs;
+mod display_backend;
 mod draft_sending;
 mod ended_sessions;
 mod error_reports;
@@ -304,6 +305,8 @@ fn main() {
     // Before anything starts GTK, and before any thread exists.
     #[cfg(target_os = "linux")]
     input_method::use_the_desktops();
+    #[cfg(target_os = "linux")]
+    display_backend::choose();
 
     // Kept only once the switch is on; installed first so none is missed.
     devpit_core::reports::keep_panics();
@@ -409,6 +412,12 @@ fn main() {
         })
         // A reloaded page never detached its terminals: end them here.
         .on_page_load(|webview, payload| {
+            #[cfg(target_os = "linux")]
+            if webview.label() == "main"
+                && matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
+            {
+                display_backend::page_loaded(island_wayland::wayland());
+            }
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if let Some(state) = tauri::Manager::try_state::<sessions::SessionState>(webview) {
                     for live in state.claims.take_all_from(webview.label()) {

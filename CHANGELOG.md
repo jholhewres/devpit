@@ -14,6 +14,12 @@ release notes are taken from here when a version is tagged.
   and starts its agent again. Terminals made in tmux stay there until you
   close them, and when the keeper cannot start, tmux takes the terminal as
   before.
+- **Native Wayland on Linux.** On a Wayland desktop the AppImage opens on
+  Wayland instead of going through XWayland. It falls back to X11 when there
+  is no compositor, when the desktop's GTK settings are known to crash it, or
+  when the last Wayland start of the same version never loaded its window.
+  Settings → General → Display chooses Wayland or X11 for the next start, and
+  `DEVPIT_GDK_BACKEND` overrides both for one.
 
 ## 0.1.46 — 2026-10-30
 

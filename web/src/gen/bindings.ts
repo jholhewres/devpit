@@ -569,6 +569,10 @@ export const commands = {
 	trayRead: () => typedError<Tray, RpcError>(__TAURI_INVOKE("tray_read")),
 	/**  `tray.keep_set` — closing the window leaves devpit in the tray, or quits. */
 	trayKeepSet: (on: boolean) => typedError<Tray, RpcError>(__TAURI_INVOKE("tray_keep_set", { on })),
+	/**  `display.read` — what this start runs on, why, and the choice for the next. */
+	displayRead: () => typedError<Display, RpcError>(__TAURI_INVOKE("display_read")),
+	/**  `display.set` — the display for the next start; null is automatic. */
+	displaySet: (backend: "wayland" | "x11" | null) => typedError<Display, RpcError>(__TAURI_INVOKE("display_set", { backend })),
 	/**
 	 *  `pause.set` — pauses until `until` (seconds since the epoch), until
 	 *  resumed when `forever`, or resumes when neither.
@@ -3253,6 +3257,35 @@ export type Did =
 { did: "grant"; granted: boolean } | 
 /**  Something to tell the person, in the pane's own strip. */
 { did: "said"; said: string };
+
+export type Display = {
+	/**  Whether there is a choice to make: Linux only. */
+	offered: boolean,
+	/**  What GTK opened for this start; null before it did, or off Linux. */
+	running: DisplayBackend | null,
+	/**  The person's choice for the next start; null is automatic. */
+	chosen: DisplayBackend | null,
+	why: DisplayWhy,
+};
+
+export type DisplayBackend = "wayland" | "x11";
+
+/**  Why this start is on the display it is on. */
+export type DisplayWhy = 
+/**  `DEVPIT_GDK_BACKEND` named it. */
+"asked" | 
+/**  Outside the AppImage, `GDK_BACKEND` was already set by whoever started devpit. */
+"inherited" | 
+/**  The session has no Wayland compositor. */
+"noWayland" | 
+/**  GTK would abort on Wayland here: its xsettings schema lacks `antialiasing`. */
+"knownCrash" | 
+/**  The last start on Wayland of this version never got its window up. */
+"failedBefore" | 
+/**  The person chose it in Settings. */
+"chosen" | 
+/**  Wayland where there is one, X11 if GTK cannot reach it. */
+"default";
 
 /**  What a session is doing, as its agent last said. */
 export type Doing = 
