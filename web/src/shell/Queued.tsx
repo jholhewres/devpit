@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import type { QueuedMessage } from '../gen/bindings'
-import { committed } from './typing'
+import { abandoned, committed } from './typing'
 import type { Queue } from './useQueue'
 
 /* The messages waiting for the turn to end, above where you type: each one
@@ -55,7 +55,7 @@ function QueuedEdit({ item, onDone }: { item: QueuedMessage; onDone: (prompt: st
       onChange={(event) => setText(event.target.value)}
       onBlur={() => onDone(text)}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') return (event.preventDefault(), onDone(item.prompt))
+        if (abandoned(event)) return (event.preventDefault(), onDone(item.prompt))
         if (committed(event) && !event.shiftKey) return (event.preventDefault(), onDone(text))
       }}
     />
