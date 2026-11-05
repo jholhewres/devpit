@@ -108,3 +108,15 @@ mod tests {
         assert_eq!(Theme::parse("solarized"), Theme::Dark);
     }
 }
+
+/// Whether devpit starts sessions on its own. Both off unless the person
+/// turns them on: a long context is no reason for a new session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRelay {
+    /// A finished card opens the next card of its epic in a session of its own.
+    pub next_card: bool,
+    /// The share of the context window, from 1 to 100, past which a card's
+    /// session hands off to a fresh one in the same folder. Null is never.
+    pub handoff_at_percent: Option<u32>,
+}

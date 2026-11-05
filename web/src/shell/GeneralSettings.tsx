@@ -10,6 +10,7 @@ import { OpenApps } from './OpenApps'
 import { PauseSettings } from './PauseSettings'
 import { PrefSwitch } from './PrefSwitch'
 import { RemoteSettings } from './RemoteSettings'
+import { SessionRelaySettings } from './SessionRelaySettings'
 import type { Flag } from './settingsFlags'
 import { UpdateSettings } from './UpdateSettings'
 import { VoiceSettings } from './VoiceSettings'
@@ -55,6 +56,9 @@ export function GeneralSettings({ on, set }: { on: (field: Flag) => boolean; set
       <PauseSettings />
       <PrefSwitch on={on('reminders')} onFlip={flip('reminders')} title="Reminders" said="A card's date goes off at its time, as a banner here and a notification." more="A date with no time goes off at nine that morning. An agent can set one when you ask it to remind you." />
       <PrefSwitch on={on('focusMode')} onFlip={flip('focusMode')} title="Focus mode" said="Unfinished. A door for one project: what arrives from another waits until you come out." />
+
+      <div className="acc__sub">Sessions</div>
+      <SessionRelaySettings />
 
       <div className="acc__sub">On this desktop</div>
       <DeskSettings />

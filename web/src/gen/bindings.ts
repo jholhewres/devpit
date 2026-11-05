@@ -1851,6 +1851,10 @@ export const commands = {
 	 *  one is not a first run.
 	 */
 	settingsFinishOnboarding: () => typedError<Settings, RpcError>(__TAURI_INVOKE("settings_finish_onboarding")),
+	/**  `sessions.relay_read` — whether devpit starts sessions on its own. */
+	sessionRelayRead: () => typedError<SessionRelay, RpcError>(__TAURI_INVOKE("session_relay_read")),
+	/**  `sessions.relay_write` — both switches at once, answered as stored. */
+	sessionRelayWrite: (relay: SessionRelay) => typedError<SessionRelay, RpcError>(__TAURI_INVOKE("session_relay_write", { relay })),
 	/**
 	 *  `errors.report` — an error the window caught and nothing else handled.
 	 * 
@@ -5368,6 +5372,20 @@ export type SessionOnCard = {
 	/**  The devpit terminal a running one is in. */
 	pane: LivePane | null,
 	remote: RemoteState,
+};
+
+/**
+ *  Whether devpit starts sessions on its own. Both off unless the person
+ *  turns them on: a long context is no reason for a new session.
+ */
+export type SessionRelay = {
+	/**  A finished card opens the next card of its epic in a session of its own. */
+	nextCard: boolean,
+	/**
+	 *  The share of the context window, from 1 to 100, past which a card's
+	 *  session hands off to a fresh one in the same folder. Null is never.
+	 */
+	handoffAtPercent: number | null,
 };
 
 /**  What a session said last, read from its transcript. */

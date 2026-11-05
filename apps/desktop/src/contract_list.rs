@@ -392,6 +392,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         settings::settings_read,
         settings::settings_write,
         settings::settings_finish_onboarding,
+        crate::card_relay::session_relay_read,
+        crate::card_relay::session_relay_write,
         error_reports::errors_report,
         error_sender::errors_preview,
         error_sender::presence_seen,
