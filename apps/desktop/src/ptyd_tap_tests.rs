@@ -131,8 +131,9 @@ fn a_ptyd_pane_with_no_window_is_cut_into_blocks_and_a_long_command_is_told() {
 fn the_split_of_a_ptyd_pane_starts_where_its_shell_said_it_stands() {
     let daemon = crate::ptyd_link::tests::serving();
     let home = daemon.home.path();
-    let sub = home.join("sub");
-    std::fs::create_dir(&sub).expect("sub");
+    std::fs::create_dir(home.join("sub")).expect("sub");
+    // The shell says the real path: a Mac's temp folder is behind /var -> /private/var.
+    let sub = std::fs::canonicalize(home.join("sub")).expect("sub");
     let ears = Arc::new(Heard::default());
     let socket = crate::ptyd_link::socket_path(home);
     let listening = Arc::clone(&ears);
