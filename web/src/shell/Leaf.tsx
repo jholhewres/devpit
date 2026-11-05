@@ -3,9 +3,10 @@ import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { attachPane, type Pane } from './attach'
-import { LOST, UNAVAILABLE } from './paneSocket'
-import { writeBatcher } from './writeBatcher'
+import { attachPane, retryIn, type Pane } from './attach'
+import { UNAVAILABLE } from './paneSocket'
+import { writeBatcher, type Batcher } from './writeBatcher'
+import type { Screen } from './floodCut'
 import { gpuWhileShown, measureWideCharacters } from './terminalAddons'
 import { reason } from './reason'
 import { ask, commands } from './live'
@@ -32,13 +33,34 @@ import { shellWord, useFileDrop } from './fileDrop'
 /** Said when a view that took a pane from its tab lets it go. */
 export const PANE_FREED = 'devpit:pane-freed'
 
-/* Off screen this long, a pane gives back its xterm, its GPU context and its
-   stream; the pty keeps running. Shorter, a switch back pays a rebuild. */
-export const HIDDEN_DISPOSE_MS = 20_000
+/* Off screen, a pane lets go of its stream at once and the bytes wait in the
+   pty's ring. Off this long, it gives back its rows too, but keeps the
+   terminal and, under the ceiling, its GPU context: building six again took
+   over a second, and six contexts another 200 ms. */
+export const HIDDEN_RELEASE_MS = 20_000
 
 /* What an attach wrote, kept to rebuild the terminal around an older page.
    Past this, paging ends rather than holding a flood in memory. */
 const HELD_MOST = 2 * 1024 * 1024
+
+/* A replay longer than this draws only its end, enough for the screen; the
+   rest is drawn when scrolled to, like an older page. */
+export const REPLAY_FIRST = 64 * 1024
+
+const longReplay = (bytes: Uint8Array): boolean => bytes.length > REPLAY_FIRST
+
+/** Where the end of a long replay starts drawing: at an ESC or after a
+ *  newline, the first past the cut, as the daemon cuts its own history. */
+export function drawFrom(bytes: Uint8Array): number {
+  const from = Math.max(0, bytes.length - REPLAY_FIRST)
+  for (let at = from; at < bytes.length; at += 1) {
+    if (bytes[at] === 0x1b) return at
+    if (bytes[at] === 0x0a) return at + 1
+  }
+  let at = from
+  while (at < bytes.length && (bytes[at]! & 0xc0) === 0x80) at += 1
+  return at
+}
 
 export function Leaf({
   paneId,
@@ -83,24 +105,6 @@ export function Leaf({
     window.addEventListener(PANE_FREED, back)
     return () => window.removeEventListener(PANE_FREED, back)
   }, [paneId])
-  /* Whether the pane is on screen, or was a moment ago: off it, nothing of
-     the terminal is kept but this element. */
-  const [onScreen, setOnScreen] = useState(true)
-  useEffect(() => {
-    const box = host.current
-    if (!box || typeof IntersectionObserver === 'undefined') return
-    let hiding: ReturnType<typeof setTimeout> | undefined
-    const seen = new IntersectionObserver((entries) => {
-      clearTimeout(hiding)
-      if (entries.some((entry) => entry.isIntersecting)) return setOnScreen(true)
-      hiding = setTimeout(() => setOnScreen(false), HIDDEN_DISPOSE_MS)
-    })
-    seen.observe(box)
-    return () => {
-      clearTimeout(hiding)
-      seen.disconnect()
-    }
-  }, [])
   const onTerminalRef = useRef(onTerminal)
   onTerminalRef.current = onTerminal
   /* Where a path clicked in the terminal opens: read at the click, so the
@@ -111,7 +115,7 @@ export function Leaf({
 
   useEffect(() => {
     const box = host.current
-    if (!projectId || !box || !onScreen) return
+    if (!projectId || !box) return
 
     const terminal = new Terminal(options(darkNow()))
     /* The person's contrast, when they chose one. Read after the terminal is
@@ -184,6 +188,7 @@ export function Leaf({
        blank or drawn at a size already gone. */
     let settling: ReturnType<typeof setTimeout> | undefined
     let releasing: ReturnType<typeof setTimeout> | undefined
+    let again: ReturnType<typeof setTimeout> | undefined
     /* At most once a frame: the observer fires for every pixel of a drag or
        of the side panel sliding, and each fit measures the box. */
     let framed = false
@@ -218,10 +223,12 @@ export function Leaf({
     requestAnimationFrame(refit)
 
     /* Live output at most once a frame; parsed bytes acknowledged, which is
-       what lets the pty read on. */
-    const batch = writeBatcher(terminal, (bytes) => live?.ack(bytes))
+       what lets the pty read on. One per attach, so no count crosses over. */
+    let batch: Batcher | null = null
     let held: Uint8Array[] | null = []
     let heldBytes = 0
+    /* The start of a long replay, held but not drawn until scrolled to. */
+    let unseen = false
     const hold = (bytes: Uint8Array): void => {
       if (!held) return
       heldBytes += bytes.length
@@ -230,24 +237,12 @@ export function Leaf({
     }
     let paging = false
     let more = true
-    /* Scrolled to the top of a plain screen: the page before, and the
-       terminal written again around it. xterm cannot prepend, so it is reset
-       in order — after whatever is still waiting — and rewritten whole. */
-    const page = async (): Promise<void> => {
-      if (!live || !held || paging || !more || terminal.buffer.active.type !== 'normal') return
-      paging = true
-      const got = await live.older()
-      paging = false
-      if (dropped || !held) return
-      if (!got || got.bytes.length === 0) {
-        more = false
-        return
-      }
-      more = got.left > 0
+    /* xterm cannot prepend, so it is reset in order — after whatever is still
+       waiting — and written again whole around the older page. */
+    const rewrite = (): void => {
+      if (!held) return
       const lines = terminal.buffer.active.length
-      held.unshift(got.bytes)
-      heldBytes += got.bytes.length
-      batch.flush()
+      batch?.flush()
       /* The reset scrolls to the top too: no page is asked for until the
          rewrite is in. */
       paging = true
@@ -259,60 +254,133 @@ export function Leaf({
       })
       if (heldBytes > HELD_MOST) held = null
     }
+    /* Scrolled to the top of a plain screen: the page before. */
+    const page = async (): Promise<void> => {
+      if (!live || !held || paging || terminal.buffer.active.type !== 'normal') return
+      if (unseen) {
+        unseen = false
+        return rewrite()
+      }
+      if (!more) return
+      paging = true
+      const got = await live.older()
+      paging = false
+      if (dropped || !held) return
+      if (!got || got.bytes.length === 0) {
+        more = false
+        return
+      }
+      more = got.left > 0
+      held.unshift(got.bytes)
+      heldBytes += got.bytes.length
+      rewrite()
+    }
     const scrolled = terminal.onScroll((top) => {
       if (top === 0) void page()
     })
     let drawn = false
+    /* The screen still shows an earlier attach: reset before the next one draws. */
+    let stale = false
     const draw = (bytes: Uint8Array, replay: boolean): void => {
+      if (stale) {
+        stale = false
+        terminal.write('\x1bc')
+      }
       hold(bytes)
       /* The replay comes before any live byte and is not acknowledged. */
-      if (replay) terminal.write(bytes)
-      else batch.push(bytes)
+      if (replay) batch?.direct(longReplay(bytes) ? bytes.subarray(drawFrom(bytes)) : bytes)
+      else batch?.push(bytes)
+      if (replay && longReplay(bytes)) unseen = true
       if (!drawn) {
         drawn = true
+        tries = 0
         box.dataset.drawn = 'true'
+        setError(null)
       }
     }
 
-    void (async () => {
-      const attached = await attachPane(
+    /* A flood is cut only with the view at the bottom: scrolled up, the
+       person is reading rows a cut would move. */
+    const floodScreen = (): Screen => {
+      const { active } = terminal.buffer
+      return active.viewportY === active.baseY ? { rows: terminal.rows, scrollback: terminal.options.scrollback ?? 0 } : null
+    }
+
+    /* On screen, the pane streams; off it, it lets go at once. */
+    let attempt = 0
+    let tries = 0
+    let shownOnce = false
+    let visible = false
+    const connect = (): void => {
+      if (dropped || live || batch) return
+      const mine = ++attempt
+      let pane: Pane | null = null
+      batch = writeBatcher(terminal, (bytes) => pane?.ack(bytes), floodScreen)
+      held = []
+      heldBytes = 0
+      unseen = false
+      more = true
+      void attachPane(
         projectId,
         paneId,
         { rows: terminal.rows, cols: terminal.cols },
         {
           output: (bytes, replay) => {
-            if (!dropped) draw(bytes, replay)
+            if (!dropped && mine === attempt) draw(bytes, replay)
           },
           /* The pane ended. A failure here is the one the person needs to see:
              it is why the terminal is empty. A connection that closed under
              it is attached again in a moment. */
           end: (failed) => {
-            if (dropped) return
-            if (failed === LOST || failed === UNAVAILABLE)
-              setTimeout(() => !dropped && setRound((was) => was + 1), failed === LOST ? 1000 : 0)
-            else if (failed) setError(failed)
+            if (dropped || mine !== attempt) return
+            const wait = retryIn(failed, tries)
+            if (wait === null) return void (failed && setError(failed))
+            disconnect()
+            tries += 1
+            if (failed === UNAVAILABLE && wait > 0) setError(`${failed}; trying again`)
+            again = setTimeout(() => visible && connect(), wait)
           },
         },
+      ).then(
+        (attached) => {
+          /* A mount dropped while that was on its way must not keep the pane:
+             an attach arriving after the live mount's is the newer claim, wins
+             the pane, and is let go at once — leaving the terminal on screen
+             with nobody attached and "a newer client already owns that pane".
+             React mounts twice in development, so there it was every restart. */
+          if (dropped || mine !== attempt) return attached?.detach()
+          pane = attached
+          live = attached
+          told = { rows: terminal.rows, cols: terminal.cols }
+          /* The grid may have been fitted while the attach was on its way. */
+          refit()
+          setTimeout(() => !dropped && redraw(), 150)
+          if (shownOnce) return
+          shownOnce = true
+          setTerm(terminal)
+          onTerminalRef.current?.(terminal)
+        },
+        /* Every step above talks to the backend, and a rejection here used to
+           vanish: the pane mounted, drew a cursor, and never attached. */
+        (thrown: unknown) => {
+          if (!dropped && mine === attempt) setError(reason(thrown, 'the terminal could not be opened'))
+        },
       )
-      /* A mount dropped while that was on its way must not keep the pane: an
-         attach arriving after the live mount's is the newer claim, wins the
-         pane, and is let go at once — leaving the terminal on screen with
-         nobody attached and "a newer client already owns that pane". React
-         mounts twice in development, so there it was every restart. */
-      if (dropped) return attached?.detach()
-      live = attached
-      told = { rows: terminal.rows, cols: terminal.cols }
-      /* The grid may have been fitted while the attach was on its way. */
-      refit()
-      setTimeout(() => !dropped && redraw(), 150)
-      terminal.onData((data) => wheel.typed(data, (typed) => live?.write(typed)))
-      setTerm(terminal)
-      onTerminalRef.current?.(terminal)
-    })().catch((thrown: unknown) => {
-      /* Every step above talks to the backend, and a rejection here used to
-         vanish: the pane mounted, drew a cursor, and never attached. */
-      if (!dropped) setError(reason(thrown, 'the terminal could not be opened'))
-    })
+    }
+    /* Whatever the attach on its way says from here is not heard; the bytes
+       wait in the pty's ring, and coming back draws them over a reset screen. */
+    const disconnect = (): void => {
+      attempt += 1
+      clearTimeout(again)
+      batch?.dispose()
+      batch = null
+      live?.detach()
+      live = null
+      stale ||= drawn
+      drawn = false
+      delete box.dataset.drawn
+    }
+    terminal.onData((data) => wheel.typed(data, (typed) => live?.write(typed)))
 
     /* The theme changes under a live terminal. Repainting the palette is
        enough — rebuilding the pane would drop the scrollback and the process
@@ -338,25 +406,40 @@ export function Leaf({
       typeof IntersectionObserver === 'undefined'
         ? null
         : new IntersectionObserver((entries) => {
-            /* Given back only after a while off screen: a quick look at another
-               tab and back should not rebuild the renderer and its glyphs. */
-            if (!entries.some((entry) => entry.isIntersecting)) {
+            visible = entries.some((entry) => entry.isIntersecting)
+            /* The GPU context stays until a pane on screen needs it; the rows
+               go after a while, and the replay draws them on the way back. */
+            if (!visible) {
+              disconnect()
+              gpu.away()
               clearTimeout(releasing)
-              releasing = setTimeout(() => gpu.hide(), 20_000)
+              releasing = setTimeout(() => {
+                terminal.reset()
+                held = []
+                heldBytes = 0
+                unseen = false
+              }, HIDDEN_RELEASE_MS)
               return
             }
             clearTimeout(releasing)
             gpu.show()
+            connect()
             refit()
             terminal.refresh(0, terminal.rows - 1)
             if (live) redraw(1)
           })
     shown?.observe(box)
+    /* Where nothing can say whether the pane is on screen, it is. */
+    if (!shown) {
+      visible = true
+      connect()
+    }
 
     return () => {
       dropped = true
       clearTimeout(settling)
       clearTimeout(releasing)
+      clearTimeout(again)
       setTerm(null)
       onTerminalRef.current?.(null)
       themed.disconnect()
@@ -368,12 +451,13 @@ export function Leaf({
       unguard()
       linked.dispose()
       live?.detach()
-      batch.dispose()
+      batch?.dispose()
       scrolled.dispose()
       delete box.dataset.drawn
+      gpu.hide()
       terminal.dispose()
     }
-  }, [projectId, paneId, round, onScreen, target])
+  }, [projectId, paneId, round, target])
 
   useMarks(term, paneId)
   const closeMenu = useCallback(() => setMenuAt(null), [])

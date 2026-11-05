@@ -2,14 +2,14 @@ import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fake = vi.hoisted(() => {
-  const terms: { disposed: boolean; written: unknown[]; scrolled: ((top: number) => void) | null }[] = []
+  const terms: { disposed: boolean; cleared: number; written: unknown[]; scrolled: ((top: number) => void) | null }[] = []
   const pages: { left: number; bytes: Uint8Array }[] = []
   let asked = 0
   const attaches: { paneId: string; detached: boolean; on: { output: (b: Uint8Array, r: boolean) => void } }[] = []
   class Terminal {
     rows = 24
     cols = 80
-    options: Record<string, unknown> = {}
+    options: Record<string, unknown> = { scrollback: 100_000 }
     buffer = { active: { type: 'normal', length: 24 } }
     disposed = false
     written: unknown[] = []
@@ -32,6 +32,10 @@ const fake = vi.hoisted(() => {
     }
     refresh() {}
     resize() {}
+    cleared = 0
+    reset() {
+      this.cleared += 1
+    }
     scrollToLine() {}
     dispose() {
       this.disposed = true
@@ -43,7 +47,7 @@ const fake = vi.hoisted(() => {
 vi.mock('@xterm/xterm', () => ({ Terminal: fake.Terminal }))
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }))
-vi.mock('./terminalAddons', () => ({ gpuWhileShown: () => ({ show() {}, hide() {} }), measureWideCharacters() {} }))
+vi.mock('./terminalAddons', () => ({ gpuWhileShown: () => ({ show() {}, hide() {}, away() {} }), measureWideCharacters() {} }))
 vi.mock('./live', () => ({
   ask: () => Promise.resolve({ data: null }),
   commands: { settingsRead: vi.fn(), sessionRedraw: vi.fn() },
@@ -75,7 +79,7 @@ vi.mock('./attach', () => ({
   },
 }))
 
-import { HIDDEN_DISPOSE_MS, Leaf } from './Leaf'
+import { drawFrom, HIDDEN_RELEASE_MS, Leaf, REPLAY_FIRST } from './Leaf'
 
 let seen: ((entries: { isIntersecting: boolean }[]) => void)[] = []
 class Observer {
@@ -104,43 +108,63 @@ afterEach(() => {
 })
 
 describe('a terminal off screen', () => {
-  it('gives back its xterm and its stream once hidden a while, and attaches again when shown', async () => {
+  it('lets its stream go at once and its rows once hidden a while, and attaches again when shown', async () => {
     render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
     await settle()
     expect(fake.terms).toHaveLength(1)
     expect(fake.attaches).toHaveLength(1)
 
     vi.useFakeTimers()
     onScreen(false)
-    act(() => vi.advanceTimersByTime(HIDDEN_DISPOSE_MS - 1))
-    expect(fake.terms[0].disposed).toBe(false)
-    act(() => vi.advanceTimersByTime(1))
-    expect(fake.terms[0].disposed).toBe(true)
     expect(fake.attaches[0].detached).toBe(true)
+    act(() => vi.advanceTimersByTime(HIDDEN_RELEASE_MS - 1))
+    expect(fake.terms[0].cleared).toBe(0)
+    act(() => vi.advanceTimersByTime(1))
+    expect(fake.terms[0].cleared).toBe(1)
     vi.useRealTimers()
 
     onScreen(true)
     await settle()
-    expect(fake.terms).toHaveLength(2)
+    expect(fake.terms).toHaveLength(1)
+    expect(fake.terms[0].disposed).toBe(false)
     expect(fake.attaches).toHaveLength(2)
     expect(fake.attaches[1].detached).toBe(false)
   })
 
-  it('keeps everything through a quick look away', async () => {
+  it('keeps its xterm through a quick look away, and draws the new attach over a reset screen', async () => {
     render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
     await settle()
+    act(() => fake.attaches[0].on.output(Uint8Array.from([65]), true))
     vi.useFakeTimers()
     onScreen(false)
-    act(() => vi.advanceTimersByTime(HIDDEN_DISPOSE_MS / 2))
+    act(() => vi.advanceTimersByTime(HIDDEN_RELEASE_MS / 2))
     onScreen(true)
-    act(() => vi.advanceTimersByTime(HIDDEN_DISPOSE_MS * 2))
+    vi.useRealTimers()
+    await settle()
+
     expect(fake.terms).toHaveLength(1)
     expect(fake.terms[0].disposed).toBe(false)
-    expect(fake.attaches[0].detached).toBe(false)
+    expect(fake.attaches).toHaveLength(2)
+    expect(fake.attaches[0].detached).toBe(true)
+    const late = Uint8Array.from([88])
+    const replay = Uint8Array.from([66])
+    act(() => fake.attaches[0].on.output(late, false))
+    act(() => fake.attaches[1].on.output(replay, true))
+    expect(fake.terms[0].written).toEqual([Uint8Array.from([65]), '\x1bc', replay])
+  })
+
+  it('attaches nothing while it was never on screen', async () => {
+    render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    await settle()
+    expect(fake.terms).toHaveLength(1)
+    expect(fake.attaches).toHaveLength(0)
   })
 
   it('writes the replay straight in and says the pane is drawn', async () => {
     const { container } = render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
     await settle()
     const replay = new Uint8Array(600).fill(65)
     act(() => fake.attaches[0].on.output(replay, true))
@@ -148,8 +172,25 @@ describe('a terminal off screen', () => {
     expect(container.querySelector<HTMLElement>('.termhost')?.dataset.drawn).toBe('true')
   })
 
+  it('draws only the end of a long replay, and the rest once scrolled to, without asking for it', async () => {
+    render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
+    await settle()
+    const term = fake.terms[0]
+    const replay = new TextEncoder().encode('a line of history\r\n'.repeat(Math.ceil((REPLAY_FIRST * 2) / 19)))
+    act(() => fake.attaches[0].on.output(replay, true))
+    expect(term.written).toEqual([replay.subarray(drawFrom(replay))])
+    expect((term.written[0] as Uint8Array).length).toBeLessThanOrEqual(REPLAY_FIRST)
+
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    expect(term.written.slice(1)).toEqual(['\x1bc', replay, new Uint8Array()])
+    expect(fake.asked()).toBe(0)
+  })
+
   it('scrolled to the top, writes the older page and what it held again, until there is none', async () => {
     render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
     await settle()
     const term = fake.terms[0]
     act(() => fake.attaches[0].on.output(Uint8Array.from([66]), true))
