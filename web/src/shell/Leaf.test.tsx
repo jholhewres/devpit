@@ -56,6 +56,7 @@ vi.mock('./live', () => ({
 }))
 vi.mock('./terminal', () => ({ contrastFor: () => 1, darkNow: () => true, options: () => ({}), palette: () => ({}) }))
 vi.mock('./terminalPathLinks', () => ({ linkPaths: () => ({ dispose() {} }) }))
+vi.mock('./terminalFollow', () => ({ followAfterClear: () => ({ dispose() {} }) }))
 vi.mock('./terminalWheel', () => ({ wheelFor: () => ({ dispose() {}, typed() {} }) }))
 vi.mock('./terminalIme', () => ({ guardComposition: () => () => {} }))
 vi.mock('./terminalPaste', () => ({ picturesAsPaths: () => () => {} }))
@@ -204,5 +205,21 @@ describe('a terminal off screen', () => {
     await act(async () => term.scrolled?.(0))
     await settle()
     expect(fake.asked()).toBe(1)
+  })
+
+  it('asks no further page once one drew no rows above, so the view is not pulled to the top again', async () => {
+    render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
+    await settle()
+    const term = fake.terms[0]
+    act(() => fake.attaches[0].on.output(Uint8Array.from([66]), true))
+    fake.pages.push({ left: 5, bytes: Uint8Array.from([65]) }, { left: 4, bytes: Uint8Array.from([67]) })
+    const before = fake.asked()
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    expect(fake.asked() - before).toBe(1)
+    fake.pages.length = 0
   })
 })

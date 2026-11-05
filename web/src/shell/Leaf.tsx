@@ -15,6 +15,7 @@ import { clipboardKey, copySelection, pasteClipboard } from './terminalClipboard
 import { TerminalMenu } from './TerminalMenu'
 import { guardComposition } from './terminalIme'
 import { picturesAsPaths } from './terminalPaste'
+import { followAfterClear } from './terminalFollow'
 import { wheelFor } from './terminalWheel'
 import { useMarks } from './useMarks'
 import { menuPoint } from './menuRules'
@@ -129,6 +130,7 @@ export function Leaf({
     terminal.loadAddon(fit)
     terminal.open(box)
     const linked = linkPaths(terminal, openingRef)
+    const follows = followAfterClear(terminal)
     // After `open`, which is when there is a canvas to take a context from.
     measureWideCharacters(terminal)
     /* tmux sends only what changes, so a screen that was emptied under it —
@@ -249,7 +251,11 @@ export function Leaf({
       terminal.write('\x1bc')
       for (const one of held) terminal.write(one)
       terminal.write(new Uint8Array(), () => {
-        terminal.scrollToLine(Math.max(0, terminal.buffer.active.length - lines))
+        const gained = terminal.buffer.active.length - lines
+        /* Nothing above: older bytes only redraw what a later clear wiped, and
+           each page more would reset the screen and pull the view up again. */
+        if (gained <= 0) more = false
+        terminal.scrollToLine(Math.max(0, gained))
         paging = false
       })
       if (heldBytes > HELD_MOST) held = null
@@ -455,6 +461,7 @@ export function Leaf({
       box.removeEventListener('contextmenu', menu, true)
       unguard()
       linked.dispose()
+      follows.dispose()
       live?.detach()
       batch?.dispose()
       scrolled.dispose()
