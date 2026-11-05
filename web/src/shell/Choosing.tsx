@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 
 import type { IslandAsked } from '../gen/bindings'
 import { keyOn, toggled, useFocused, type Chosen } from './choices'
+import { committed } from './typing'
 
 /*
  * A question the agent put to the person, as buttons: 1-9 picks, the arrows
@@ -74,7 +75,7 @@ export function Choosing({
         placeholder="Or answer in your own words, then Enter"
         onChange={(event) => setOwn(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && own.trim()) answer([own.trim()])
+          if (committed(event) && own.trim()) answer([own.trim()])
         }}
       />
       <div className="asking__row">
