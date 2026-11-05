@@ -346,10 +346,12 @@ fn another_call_is_answered_while_evidence_runs() {
         let (order, release) = (order.clone(), Mutex::new(release));
         Arc::new(move |message: &str| {
             let said: Value = serde_json::from_str(message).expect("json");
-            if said["id"] == 2 {
+            let second = said["id"] == 2;
+            // Kept before the evidence is let go, or its answer can be kept first.
+            order.lock().expect("lock").push(said);
+            if second {
                 let _ = release.lock().expect("lock").send(());
             }
-            order.lock().expect("lock").push(said);
             true
         })
     };
