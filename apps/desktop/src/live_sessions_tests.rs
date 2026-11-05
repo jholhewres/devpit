@@ -4,9 +4,7 @@ use std::path::Path;
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{
-    card_of, in_their_accounts, pane_of, pane_target, place_of, read, remote_of, shown, start_of,
-};
+use super::{card_of, in_their_accounts, pane_of, pane_target, read, remote_of, shown, start_of};
 
 /// tmux's answer to which window each pane is in.
 fn windows(panes: &[(&str, &str)]) -> HashMap<String, String> {
@@ -352,6 +350,7 @@ fn a_session_in_a_ptyd_pane_is_found_by_its_session_id() {
 #[cfg(target_os = "linux")]
 #[test]
 fn a_session_its_hooks_never_placed_is_found_by_the_pane_its_process_started_in() {
+    use super::place_of;
     use devpit_rpc::{LayoutNode, SplitDirection};
 
     let dir = tempfile::tempdir().expect("tempdir");
