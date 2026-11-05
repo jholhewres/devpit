@@ -643,7 +643,10 @@ fn respond_in(
                         name: &project.name,
                     }),
                 ),
-                text("name").as_deref(),
+                crate::opening::Wanted {
+                    name: text("name").as_deref(),
+                    model: text("model").as_deref(),
+                },
             )
             .map_err(said)?;
             let profile = orchestrating(here)?;
@@ -668,7 +671,10 @@ fn respond_in(
                         name: &project.name,
                     }),
                 ),
-                text("name").as_deref(),
+                crate::opening::Wanted {
+                    name: text("name").as_deref(),
+                    model: text("model").as_deref(),
+                },
                 // Its own checkout unless told otherwise: the project's folder is
                 // shared with whatever else runs there.
                 (asked.params.get("checkout").and_then(Value::as_bool) == Some(false))

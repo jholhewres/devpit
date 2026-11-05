@@ -72,11 +72,18 @@ pub(crate) fn session(
         Some(card) => {
             let board =
                 crate::board::board_get_now(project.to_owned()).map_err(|err| err.message)?;
-            crate::handing::hand(app, &board, &profile, card, prompt, None, None)?
+            crate::handing::hand(
+                app,
+                &board,
+                &profile,
+                card,
+                prompt,
+                Default::default(),
+                None,
+            )?
         }
-        None => {
-            crate::opening::open(app, here, &profile, prompt, None).map_err(|err| err.message)?
-        }
+        None => crate::opening::open(app, here, &profile, prompt, Default::default())
+            .map_err(|err| err.message)?,
     };
     Ok(answer["name"].as_str().unwrap_or_default().to_owned())
 }

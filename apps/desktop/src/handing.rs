@@ -23,7 +23,7 @@ pub(crate) fn hand(
     profile_id: &str,
     card_id: &str,
     prompt: &str,
-    named: Option<&str>,
+    wanted: crate::opening::Wanted<'_>,
     in_project: Option<&std::path::Path>,
 ) -> Result<Value, String> {
     let prompt = prompt.trim();
@@ -38,7 +38,7 @@ pub(crate) fn hand(
         .find(|card| card.id == card_id)
         .ok_or("that card is not on this project's board")?;
     let name = unused(
-        session_name(named.unwrap_or(&card.title), card_id),
+        session_name(wanted.name.unwrap_or(&card.title), card_id),
         &live_names(profile_id),
     );
 
@@ -61,8 +61,9 @@ pub(crate) fn hand(
     // The last handoff on the card, so a new session starts where one stopped.
     let comments = store.comments(card_id).map_err(|err| err.to_string())?;
     let prompt = crate::handoff::briefed(prompt, crate::handoff::latest(&comments));
-    let line = crate::opening::launched(profile_id, &board.project_id, &name, &prompt)
-        .map_err(|err| err.message)?;
+    let line =
+        crate::opening::launched(profile_id, &board.project_id, &name, &prompt, wanted.model)
+            .map_err(|err| err.message)?;
     let pane_id = crate::opening::typed_in(
         app,
         &board.project_id,

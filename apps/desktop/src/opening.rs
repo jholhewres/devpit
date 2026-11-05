@@ -13,12 +13,21 @@ pub(crate) const TAB_OPENED: &str = "session:tab-opened";
 /// The longest brief typed: a brief, not a document.
 const LONGEST: usize = 8000;
 
+/// What the one starting a session asked of it beyond its brief.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Wanted<'a> {
+    /// The name to message it by.
+    pub name: Option<&'a str>,
+    /// The model it runs in, for this session alone (`--model`).
+    pub model: Option<&'a str>,
+}
+
 pub(crate) fn open(
     app: &AppHandle,
     project: &Project,
     profile_id: &str,
     prompt: &str,
-    named: Option<&str>,
+    wanted: Wanted<'_>,
 ) -> Result<Value, RpcError> {
     let prompt = prompt.trim();
     if prompt.is_empty() || prompt.chars().count() > LONGEST {
@@ -28,7 +37,8 @@ pub(crate) fn open(
         ));
     }
     let name = crate::handing::unused(
-        named
+        wanted
+            .name
             .map(str::trim)
             .filter(|one| !one.is_empty())
             .map(str::to_owned)
@@ -53,7 +63,7 @@ pub(crate) fn open(
         &project.id,
         &tab_id,
         std::path::Path::new(&project.root_path),
-        &launched(profile_id, &project.id, &name, prompt)?,
+        &launched(profile_id, &project.id, &name, prompt, wanted.model)?,
         Some(profile_id),
     )?;
     let _ = app.emit(
@@ -100,11 +110,26 @@ pub(crate) fn launched(
     project_id: &str,
     name: &str,
     prompt: &str,
+    model: Option<&str>,
 ) -> Result<String, RpcError> {
     typeable(name)?;
     typeable(prompt)?;
+    let model = match model.map(str::trim).filter(|one| !one.is_empty()) {
+        Some(one)
+            if one
+                .chars()
+                .any(|ch| ch.is_whitespace() || ch.is_control() || ch == ';') =>
+        {
+            return Err(RpcError::new(
+                ErrorCode::Invalid,
+                "a model is one word, such as opus or claude-opus-5-5",
+            ))
+        }
+        Some(one) => format!(" --model {}", devpit_agentcli::declaring::quoted(one)),
+        None => String::new(),
+    };
     Ok(format!(
-        "{} --name {} {}",
+        "{} --name {}{model} {}",
         crate::shell_launch::to_start_in(profile_id, Some(project_id))?,
         devpit_agentcli::declaring::quoted(name),
         devpit_agentcli::declaring::quoted(prompt)
@@ -204,7 +229,29 @@ pub async fn session_watch(
 
 #[cfg(test)]
 mod tests {
-    use super::typeable;
+    use super::{launched, typeable};
+
+    /// The orchestrator's choice of model goes on this session's line alone,
+    /// before the brief; without one the profile's own stands.
+    #[test]
+    fn a_session_asked_for_in_a_model_starts_in_it() {
+        let line =
+            launched("claude", "prj_none", "fix-it", "the brief", Some("opus")).expect("line");
+        assert!(
+            line.ends_with(" --name 'fix-it' --model 'opus' 'the brief'"),
+            "{line}"
+        );
+        let line = launched("claude", "prj_none", "fix-it", "the brief", None).expect("line");
+        assert!(!line.contains("--model"), "{line}");
+        assert!(launched(
+            "claude",
+            "prj_none",
+            "fix-it",
+            "the brief",
+            Some("opus; rm -rf ~")
+        )
+        .is_err());
+    }
 
     /// Ctrl-C and Ctrl-U are keys at a terminal: inside a typed brief they end
     /// the quoted argument and run the rest as a command.

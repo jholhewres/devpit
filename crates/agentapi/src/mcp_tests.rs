@@ -394,3 +394,14 @@ fn a_tool_answers_with_its_summary_compact() {
         r#"{"card":"card_1","comments":1,"newest":"cmt_1"}"#
     );
 }
+
+#[test]
+fn a_session_is_started_in_a_model_only_when_one_is_asked_for() {
+    let tool = TOOLS
+        .iter()
+        .find(|tool| tool.name == "devpit_start_session")
+        .expect("the tool");
+    let schema = (tool.input)();
+    assert_eq!(schema["properties"]["model"]["type"], "string");
+    assert_eq!(schema["required"], json!(["project", "prompt"]));
+}

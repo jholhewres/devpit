@@ -238,7 +238,7 @@ fn open(app: &tauri::AppHandle, board: Board, card: Card, how: Opening) {
             &how.profile,
             &card.id,
             &prompt,
-            None,
+            Default::default(),
             how.folder.as_deref(),
         );
         let started = match started {
