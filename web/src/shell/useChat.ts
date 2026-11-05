@@ -7,6 +7,8 @@ import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { PAGE } from './useOlder'
 import { KEPT_BYTES } from './pasting'
+import type { Extras } from './queueing'
+import { keepFiles, keptFiles } from './useDraft'
 import { withSkills } from './pills'
 import { offers, onProfilesChanged } from './profiles'
 import { onChatWoke, onPermissionAsked, onPermissionSettled } from './window'
@@ -40,6 +42,8 @@ export interface Chat {
   /** What the agent is waiting to be allowed to do. */
   readonly asked: readonly Question[]
   readonly sending: boolean
+  /** Whether the last turn this chat sent ended in failure. */
+  readonly failed: boolean
   readonly error: string | null
   pick: (profileId: string) => void
   setModel: (model: string | null) => void
@@ -65,10 +69,13 @@ export interface Chat {
   rewind: (turnId: string) => void
   detach: (path: string) => void
   answer: (id: string, said: Said) => void
-  /** `back` gets the words of a send refused before it opened, to give back. */
-  say: (prompt: string, back?: (prompt: string) => void) => void
+  /** `back` gets the words of a send refused before it opened, to give back.
+      `given` sends those files and skills instead of the composer's, and leaves the composer's be. */
+  say: (prompt: string, back?: (prompt: string) => void, given?: Extras) => void
   /** Into the turn in flight; whether it took it. */
-  steer: (prompt: string) => Promise<boolean>
+  steer: (prompt: string, given?: Extras) => Promise<boolean>
+  /** Takes the composer's files and skills off it: they went somewhere else. */
+  clearExtras: () => void
   stop: () => void
 }
 
@@ -104,7 +111,9 @@ export function useChat(conversationId: string): Chat {
   const [permission, setPermission] = useState(MODES[0].id)
   const [effort, setEffort] = useState<string | null>(null)
   const [folder, setFolder] = useState<string | null>(null)
-  const [files, setFiles] = useState<readonly Attachment[]>([])
+  /* Attached and not yet sent, kept with the draft so a reload does not lose them. */
+  const [files, setFiles] = useState<readonly Attachment[]>(() => keptFiles(conversationId))
+  useEffect(() => keepFiles(conversationId, files), [conversationId, files])
   /* A pasted picture has no path the window can draw, so its preview is kept
      here, by the path the backend gave it. */
   const [previews, setPreviews] = useState<Readonly<Record<string, string>>>({})
@@ -112,6 +121,7 @@ export function useChat(conversationId: string): Chat {
   const [session, setSession] = useState<string | null>(null)
   const [card, setCard] = useState<ChatCard | null>(null)
   const [sending, setSending] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /* This opening of the conversation; the one before it closed with it. */
   const opened = useRef<Opening>(opening())
@@ -284,15 +294,27 @@ export function useChat(conversationId: string): Chat {
     [asked, project, conversationId],
   )
 
+  /* Picked for one message, like the attachments: a skill left on would
+     silently shape every message after it. */
+  const clearExtras = useCallback(() => {
+    setFiles([])
+    setPreviews((was) => {
+      for (const shown of Object.values(was)) URL.revokeObjectURL(shown)
+      return {}
+    })
+    setSkills([])
+  }, [])
+
   const say = useCallback(
-    (prompt: string, back?: (prompt: string) => void) => {
+    (prompt: string, back?: (prompt: string) => void, given?: Extras) => {
       if (!project || !profileId) return
+      const extras = given ?? { files, skills }
       const turn: Ask = {
         projectId: project.id,
         conversationId,
         profileId,
         model,
-        prompt: withSkills(withFiles(prompt, files), skills),
+        prompt: withSkills(withFiles(prompt, extras.files), extras.skills),
         cwd: project.rootPath,
         budgetUsd: null,
         permission,
@@ -316,15 +338,9 @@ export function useChat(conversationId: string): Chat {
       if (!started) return setError('not running in the app')
       now.sending = true
       setSending(true)
+      setFailed(false)
       setError(null)
-      setFiles([])
-      setPreviews((was) => {
-        for (const shown of Object.values(was)) URL.revokeObjectURL(shown)
-        return {}
-      })
-      /* Picked for one turn, like the attachments: a skill left on would
-         silently shape every message after it. */
-      setSkills([])
+      if (!given) clearExtras()
       void started.end
         .then((end) => {
           if (!now.open()) return
@@ -345,6 +361,7 @@ export function useChat(conversationId: string): Chat {
           if (!now.open()) return
           failed = thrown.message ?? 'the turn failed'
           setError(failed)
+          setFailed(true)
           /* Refused before it opened: nothing on screen holds the words. */
           if (!heard) back?.(prompt)
         })
@@ -367,7 +384,7 @@ export function useChat(conversationId: string): Chat {
           }
         })
     },
-    [project, conversationId, profileId, model, permission, effort, files, skills, rejoined],
+    [project, conversationId, profileId, model, permission, effort, files, skills, rejoined, clearExtras],
   )
 
   /* A dropped file is resolved against the project root before it is shown:
@@ -394,8 +411,9 @@ export function useChat(conversationId: string): Chat {
   const paste = useCallback(
     (file: Blob) => {
       if (!project) return
-      // Said here rather than after the whole picture was encoded and sent.
-      if (file.size > KEPT_BYTES) return setError('that picture is over 8 MB, too big to attach')
+      const picture = file.type.startsWith('image/')
+      // Said here rather than after the whole of it was encoded and sent.
+      if (file.size > KEPT_BYTES) return setError(`that ${picture ? 'picture' : 'paste'} is over 8 MB, too big to attach`)
       const reader = new FileReader()
       reader.onload = () => {
         const url = typeof reader.result === 'string' ? reader.result : ''
@@ -405,8 +423,10 @@ export function useChat(conversationId: string): Chat {
           const kept = answer.data
           if (!kept) return
           // Drawn from the blob, not kept as a second copy of it in text.
-          const shown = URL.createObjectURL(file)
-          setPreviews((was) => ({ ...was, [kept.path]: shown }))
+          if (picture) {
+            const shown = URL.createObjectURL(file)
+            setPreviews((was) => ({ ...was, [kept.path]: shown }))
+          }
           setFiles((was) => [...was, kept])
         })
       }
@@ -447,16 +467,19 @@ export function useChat(conversationId: string): Chat {
   }, [conversationId])
 
   const steer = useCallback(
-    async (prompt: string): Promise<boolean> => {
+    async (prompt: string, given?: Extras): Promise<boolean> => {
       if (!project) return false
-      const said = await ask(() => commands.chatSteer(project.id, conversationId, prompt))
+      const extras = given ?? { files, skills }
+      const text = withSkills(withFiles(prompt, extras.files), extras.skills)
+      const said = await ask(() => commands.chatSteer(project.id, conversationId, text))
       if (said.data) {
         sent.current.add(said.data.id)
         setMessages((was) => steered(was, said.data!))
+        if (!given) clearExtras()
       }
       return said.data !== null
     },
-    [project, conversationId],
+    [project, conversationId, files, skills, clearExtras],
   )
 
   return {
@@ -475,6 +498,7 @@ export function useChat(conversationId: string): Chat {
     files,
     asked,
     sending,
+    failed,
     error,
     /* Another account is another installation, whose skills are not these:
        a pill picked on one would name nothing on the other. */
@@ -508,6 +532,7 @@ export function useChat(conversationId: string): Chat {
     answer,
     say,
     steer,
+    clearExtras,
     stop,
   }
 }

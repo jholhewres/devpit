@@ -12,8 +12,10 @@ import { useDraftShortcut } from './draftShortcut'
 import { JumpToEnd } from './JumpToEnd'
 import { MentionMenu } from './MentionMenu'
 import { SessionsWaiting } from './OrchestratorChat'
+import { matches } from './shortcuts'
 import { OwnCommand } from './OwnCommand'
 import { Queued } from './Queued'
+import { useRecall } from './recall'
 import { SecretWarning } from './SecretWarning'
 import { SendButton } from './SendButton'
 import { SkillPills } from './SkillPills'
@@ -25,6 +27,7 @@ import type { Chat } from './useChat'
 import { useDraft } from './useDraft'
 import { useMention } from './useMention'
 import { useQueue } from './useQueue'
+import type { Extras } from './queueing'
 import { useSlash } from './useSlash'
 import { useStop } from './useStop'
 
@@ -61,24 +64,46 @@ export function Composer({
   const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
   useImperativeHandle(handle, () => ({ put: (text) => (setPrompt(text), field.current?.focus()) }), [setPrompt])
 
-  /* Typed while a turn runs, a message waits for it rather than being refused. */
-  const queue = useQueue(chat.sending, chat.say, chat.steer)
+  /* Typed while a turn runs, a message waits for it rather than being
+     refused, and takes what was attached to it along. */
+  const queue = useQueue(project?.id ?? null, tab.id, chat)
   const sendDraft = useDraftShortcut(project?.orchestrator ?? null, setPrompt)
+  const extras = (): Extras => ({ files: chat.files, skills: chat.skills })
   const send = (): void => {
     if (!ready(prompt, false, chat.profileId)) return
     if (sendDraft(prompt) || slash.ran(prompt)) return setPrompt('')
-    if (chat.sending) queue.add(prompt)
-    else chat.say(prompt, (back) => setPrompt((was) => was || back))
+    if (chat.sending) {
+      queue.add(prompt, extras())
+      chat.clearExtras()
+    } else chat.say(prompt, (back) => setPrompt((was) => was || back))
     setPrompt('')
     toEnd()
   }
+  /* Into the turn in flight; refused because it is ending, it goes next instead. */
+  const steerTyped = (): void => {
+    if (!ready(prompt, false, chat.profileId)) return
+    const typed = prompt
+    const given = extras()
+    setPrompt('')
+    chat.clearExtras()
+    void chat.steer(typed, given).then((taken) => taken || queue.add(typed, given))
+    toEnd()
+  }
+  const recall = useRecall(chat.messages, prompt, setPrompt, chat.files.length > 0)
 
-  /* A stop hands what was queued back to the composer: it was meant for a
-     turn that is no longer going to happen as planned. */
+  /* A stop holds the queue: it was meant for a turn that is no longer going
+     to happen as planned, so nothing goes until the person says so. */
   const halt = (): void => {
-    const back = queue.takeAll()
-    if (back) setPrompt((was) => [back, was].filter(Boolean).join('\n\n'))
+    queue.pause()
     chat.stop()
+  }
+  const giveBack = (): void => {
+    const back = queue.takeAll()
+    if (!back) return
+    setPrompt((was) => [back.prompt, was].filter(Boolean).join('\n\n'))
+    for (const file of back.files) chat.keep(file)
+    if (back.skills.length > 0) chat.setSkills([...new Set([...chat.skills, ...back.skills])])
+    field.current?.focus()
   }
 
   /* The turn in flight is the one still streaming; arming is tied to it so a
@@ -101,7 +126,7 @@ export function Composer({
         <Asked questions={chat.asked} onAnswer={chat.answer} />
         <ComposerStatus conversationId={tab.id} messages={chat.messages} />
         <SecretWarning text={prompt} />
-        <Queued queue={queue} />
+        <Queued queue={queue} sending={chat.sending} onBack={giveBack} />
 
         <div className="composer__in">
           <ComposerFiles chat={chat} />
@@ -119,8 +144,12 @@ export function Composer({
             onPaste={pasted}
             onKeyDown={(event) => {
               /* Enter sends, Shift+Enter a new line; `committed` keeps an accent's Enter out. */
-              if (slash.keyDown(event) || mention.keyDown(event)) return
-              if (committed(event) && !event.shiftKey) {
+              if (slash.keyDown(event) || mention.keyDown(event) || recall(event)) return
+              if (!committed(event)) return
+              /* Held down, it would steer the whole queue in, one repeat at a time. */
+              if (matches('steerQueued', event)) return (event.preventDefault(), event.repeat || queue.first())
+              if (matches('steerNow', event)) return (event.preventDefault(), chat.sending ? steerTyped() : send())
+              if (!event.shiftKey) {
                 event.preventDefault()
                 send()
               }

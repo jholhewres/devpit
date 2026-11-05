@@ -13,6 +13,12 @@ export function pastedPicture(data: DataTransfer | null): File | null {
   return null
 }
 
+/* Past this, pasted text is a file the message names rather than typing: a
+   megabyte in the field freezes it on every key. Counted in characters, which
+   is what the field pays for. */
+export const PASTED_TEXT = 32 * 1024
+export const pastedAsFile = (text: string): boolean => text.length > PASTED_TEXT
+
 /* A paste handler that takes a picture as an attachment and lets text through
    to the field, where it is typing. */
 export const picturesTo =

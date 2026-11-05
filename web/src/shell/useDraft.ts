@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+import type { Attachment } from '../gen/bindings'
 
 /*
  * What is typed in a conversation's composer and not yet sent, kept per
@@ -8,6 +10,10 @@ import { useEffect, useState } from 'react'
  */
 
 const KEY = (conversationId: string): string => `devpit.chatDraft.${conversationId}`
+const FILES = (conversationId: string): string => `devpit.chatDraftFiles.${conversationId}`
+
+/** How long after the last key the draft is written: every key would write a long draft whole each time. */
+export const DRAFT_WAIT = 250
 
 export function keptDraft(conversationId: string): string | null {
   try {
@@ -26,9 +32,38 @@ export function keepDraft(conversationId: string, text: string): void {
   }
 }
 
+const isAttachment = (one: unknown): one is Attachment =>
+  typeof one === 'object' && one !== null && ['name', 'path', 'kind'].every((key) => typeof (one as Record<string, unknown>)[key] === 'string')
+
+/** The files attached to the draft and not yet sent. */
+export function keptFiles(conversationId: string): Attachment[] {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(FILES(conversationId)) ?? '[]')
+    return Array.isArray(kept) ? kept.filter(isAttachment) : []
+  } catch {
+    return []
+  }
+}
+
+export function keepFiles(conversationId: string, files: readonly Attachment[]): void {
+  try {
+    if (files.length > 0) localStorage.setItem(FILES(conversationId), JSON.stringify(files))
+    else localStorage.removeItem(FILES(conversationId))
+  } catch {
+    // Refused, as above.
+  }
+}
+
 /** The composer's text: a card's draft first, then what was left unsent. */
 export function useDraft(conversationId: string, given: string | undefined): [string, (text: string | ((was: string) => string)) => void] {
   const [text, setText] = useState(() => given ?? keptDraft(conversationId) ?? '')
-  useEffect(() => keepDraft(conversationId, text), [conversationId, text])
+  const latest = useRef(text)
+  useEffect(() => {
+    latest.current = text
+    const later = setTimeout(() => keepDraft(conversationId, text), DRAFT_WAIT)
+    return () => clearTimeout(later)
+  }, [conversationId, text])
+  /* Leaving writes what the wait had not yet. */
+  useEffect(() => () => keepDraft(conversationId, latest.current), [conversationId])
   return [text, setText]
 }

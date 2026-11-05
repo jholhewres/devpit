@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { Frame, Message, TurnEnd } from '../gen/bindings'
+import type { Ask, Frame, Message, TurnEnd } from '../gen/bindings'
 import { useChat } from './useChat'
 import { PAGE } from './useOlder'
 
@@ -20,8 +20,8 @@ const joins: {
 }[] = []
 const woke: { handler: ((conversationId: string) => void) | null } = { handler: null }
 let ending: (end: TurnEnd) => void = () => {}
-/* What the chat's own send is told, frame by frame. */
-const sending: { onFrame: (frame: Frame) => void } = { onFrame: () => {} }
+/* What the chat's own send is told, frame by frame, and what it was asked. */
+const sending: { onFrame: (frame: Frame) => void; asked: Ask | null } = { onFrame: () => {}, asked: null }
 
 vi.mock('./chat', async (actual) => ({
   ...(await actual<typeof import('./chat')>()),
@@ -32,8 +32,8 @@ vi.mock('./chat', async (actual) => ({
     joins.push({ conversationId, onFrame, leave, ends })
     return { running, leave }
   },
-  send: (_ask: unknown, onFrame: (frame: Frame) => void) => (
-    (sending.onFrame = onFrame), { end: new Promise<TurnEnd>((resolve) => (ending = resolve)) }
+  send: (asked: Ask, onFrame: (frame: Frame) => void) => (
+    (sending.onFrame = onFrame), (sending.asked = asked), { end: new Promise<TurnEnd>((resolve) => (ending = resolve)) }
   ),
 }))
 const message = (id: string, text = id): Message =>
@@ -51,6 +51,8 @@ const calls = {
   chatHead: vi.fn(),
   chatAfter: vi.fn(),
   chatRewind: vi.fn(),
+  chatPaste: vi.fn(),
+  chatSteer: vi.fn(),
 }
 afterEach(() => {
   saved.messages = []
@@ -87,7 +89,10 @@ vi.mock('./live', () => ({
       await saved.hold
       return answer
     },
-    chatSteer: () => ({ ...message('msg_steered'), role: 'user' }),
+    chatSteer: (projectId: string, id: string, prompt: string) => (calls.chatSteer(projectId, id, prompt), { ...message('msg_steered'), role: 'user' }),
+    chatPaste: (projectId: string, type: string, data: string) => (
+      calls.chatPaste(projectId, type, data), { name: 'pasted-1.txt', path: '/h/pasted/pasted-1.txt', kind: 'txt' }
+    ),
     chatRewind: (projectId: string, id: string, turnId: string) => (calls.chatRewind(projectId, id, turnId), 'conv_fork'),
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
     permissionAskFromNow: () => null,
@@ -314,5 +319,41 @@ describe("a chat's reads of the transcript", () => {
     act(() => result.current.rewind('turn_1'))
     await waitFor(() => expect(shell.show).toHaveBeenCalledWith('chat', { id: 'conv_fork' }))
     expect(calls.chatRewind).toHaveBeenCalledWith('p', 'conv_a', 'turn_1')
+  })
+})
+
+describe('a paste of text too long to type', () => {
+  it('goes with the message as a file it names, not as typing', async () => {
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    const megabyte = 'x'.repeat(1024 * 1024)
+    act(() => result.current.paste(new Blob([megabyte], { type: 'text/plain' })))
+    await waitFor(() => expect(result.current.files).toHaveLength(1))
+    expect(calls.chatPaste.mock.calls[0]![1]).toBe('text/plain')
+    expect(atob(calls.chatPaste.mock.calls[0]![2] as string)).toHaveLength(megabyte.length)
+    expect(result.current.previews).toEqual({})
+
+    act(() => result.current.say('read this'))
+    expect(sending.asked?.prompt).toBe('@/h/pasted/pasted-1.txt\nread this')
+    expect(result.current.files).toEqual([])
+  })
+})
+
+describe('a queued message steered into the turn in flight', () => {
+  it('goes with its own files, sits before the answer being written, and leaves the composer’s files be', async () => {
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    act(() => result.current.keep({ name: 'mine.ts', path: 'src/mine.ts', kind: 'ts' }))
+    act(() => result.current.say('hello'))
+    act(() => sending.onFrame(said('msg_answer')))
+    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_answer'))
+
+    const picture = { name: 'pasted-2.png', path: '/h/pasted/pasted-2.png', kind: 'png' }
+    act(() => result.current.keep({ name: 'next.ts', path: 'src/next.ts', kind: 'ts' }))
+    await act(async () => void (await result.current.steer('and this', { files: [picture], skills: [] })))
+    expect(calls.chatSteer).toHaveBeenCalledWith('p', 'conv_a', '@/h/pasted/pasted-2.png\nand this')
+    const ids = result.current.messages.map((one) => one.id)
+    expect(ids.indexOf('msg_steered')).toBeLessThan(ids.indexOf('msg_answer'))
+    expect(result.current.files.map((one) => one.path)).toEqual(['src/next.ts'])
   })
 })

@@ -64,6 +64,10 @@ const LIST = [
   { id: 'attach', does: 'Attach files to the message', scope: 'chat', keys: ['Mod+Shift+A'], inTerminal: false },
   { id: 'stopTurn', does: 'Stop the agent’s turn — press it twice', scope: 'chat', keys: ['Escape'], inTerminal: false, fixed: true },
   { id: 'findChat', does: 'Find in the conversation', scope: 'chat', keys: ['Mod+F'], inTerminal: false },
+  { id: 'steerNow', does: 'Send into the running turn now, instead of after it', scope: 'chat', keys: ['Mod+Enter'], inTerminal: false },
+  { id: 'steerQueued', does: 'Send the first queued message into the running turn', scope: 'chat', keys: ['Mod+Shift+Enter'], inTerminal: false },
+  { id: 'recallPrompt', does: 'Bring back an earlier prompt, in an empty composer', scope: 'chat', keys: ['ArrowUp'], inTerminal: false, fixed: true },
+  { id: 'recallNext', does: 'Go forward through the earlier prompts, back to an empty composer', scope: 'chat', keys: ['ArrowDown'], inTerminal: false, fixed: true },
 
   { id: 'save', does: 'Save the file', scope: 'file', keys: ['Mod+S'], inTerminal: false },
   { id: 'commit', does: 'Commit, from the message field', scope: 'file', keys: ['Mod+Enter'], inTerminal: false },

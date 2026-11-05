@@ -1,11 +1,11 @@
 import { useCallback } from 'react'
 
-import { keptAsPicture, pastedPicture } from './pasting'
+import { keptAsPicture, pastedAsFile, pastedPicture } from './pasting'
 import { clipboardPng } from './terminalClipboard'
 
 /*
- * What the composer takes in besides typing: a pasted picture, and files
- * dropped on the chat.
+ * What the composer takes in besides typing: a pasted picture, text too long
+ * to type, and files dropped on the chat.
  */
 export function useTaking(chat: { paste: (file: Blob) => void; attach: (paths: readonly string[]) => void }): {
   pasted: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
@@ -20,7 +20,14 @@ export function useTaking(chat: { paste: (file: Blob) => void; attach: (paths: r
       event.preventDefault()
       return chat.paste(picture)
     }
-    if (event.clipboardData?.getData('text/plain')) return
+    const text = event.clipboardData?.getData('text/plain') ?? ''
+    /* Kept as a file and attached, never put in the field: the field would
+       lay out every line of it before the paste returned. */
+    if (pastedAsFile(text)) {
+      event.preventDefault()
+      return chat.paste(new Blob([text], { type: 'text/plain' }))
+    }
+    if (text) return
     event.preventDefault()
     void clipboardPng().then((png) => png && chat.paste(png))
   }

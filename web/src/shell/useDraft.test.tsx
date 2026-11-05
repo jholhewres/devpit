@@ -1,11 +1,12 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { keptDraft, useDraft } from './useDraft'
+import { DRAFT_WAIT, keepFiles, keptDraft, keptFiles, useDraft } from './useDraft'
 
 afterEach(() => {
   cleanup()
   localStorage.clear()
+  vi.useRealTimers()
 })
 
 describe('useDraft', () => {
@@ -18,10 +19,23 @@ describe('useDraft', () => {
     expect(again.result.current[0]).toBe('half a thought')
   })
 
+  it('writes a beat after the last key, not on every one', () => {
+    vi.useFakeTimers()
+    const { result } = renderHook(() => useDraft('conv_1', undefined))
+    act(() => result.current[1]('a'))
+    act(() => result.current[1]('ab'))
+    expect(keptDraft('conv_1')).toBeNull()
+    act(() => vi.advanceTimersByTime(DRAFT_WAIT))
+    expect(keptDraft('conv_1')).toBe('ab')
+  })
+
   it('forgets it once the composer is empty again', () => {
+    vi.useFakeTimers()
     const { result } = renderHook(() => useDraft('conv_1', undefined))
     act(() => result.current[1]('sent soon'))
+    act(() => vi.advanceTimersByTime(DRAFT_WAIT))
     act(() => result.current[1](''))
+    act(() => vi.advanceTimersByTime(DRAFT_WAIT))
     expect(keptDraft('conv_1')).toBeNull()
   })
 
@@ -29,5 +43,15 @@ describe('useDraft', () => {
     localStorage.setItem('devpit.chatDraft.conv_1', 'old')
     const { result } = renderHook(() => useDraft('conv_1', 'from the card'))
     expect(result.current[0]).toBe('from the card')
+  })
+
+  it('keeps the files attached to the draft, and only files', () => {
+    const file = { name: 'a.png', path: '/p/a.png', kind: 'png' }
+    keepFiles('conv_1', [file])
+    expect(keptFiles('conv_1')).toEqual([file])
+    localStorage.setItem('devpit.chatDraftFiles.conv_1', JSON.stringify([file, { name: 1 }, 'x']))
+    expect(keptFiles('conv_1')).toEqual([file])
+    keepFiles('conv_1', [])
+    expect(keptFiles('conv_1')).toEqual([])
   })
 })
