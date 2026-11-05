@@ -96,6 +96,8 @@ impl Wire for Tailnet {
 /// A tailnet viewer: its hello names the device, then it is served.
 pub(crate) fn run(app: tauri::AppHandle, ws: WebSocket<TcpStream>, root: std::path::PathBuf) {
     let _ = ws.get_ref().set_read_timeout(Some(LISTEN));
+    // An echo is a few bytes: sent now, not when the kernel has more.
+    let _ = ws.get_ref().set_nodelay(true);
     let mut wire = Tailnet(ws);
     match hello(&mut wire, &root) {
         Some(device) => serve(app, wire, root, device),
@@ -199,14 +201,20 @@ pub(crate) fn converse(
         if last.elapsed() > IDLE {
             break;
         }
-        while let Ok(one) = raws.try_recv() {
+        // At most one LISTEN, and only while the hub holds the connection: a
+        // pane printing faster than the wire writes cannot keep it here.
+        let draining = Instant::now();
+        let more = || draining.elapsed() < LISTEN && crate::remote_hub::holds(id);
+        while more() {
+            let Ok(one) = raws.try_recv() else { break };
             wire.say_bytes(&crate::pane_socket::encode(
                 one.handle,
                 crate::pane_socket::kind::OUTPUT,
                 &one.bytes,
             ));
         }
-        while let Ok(said) = heard.try_recv() {
+        while more() {
+            let Ok(said) = heard.try_recv() else { break };
             send(wire, &said);
         }
     }

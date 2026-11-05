@@ -160,15 +160,53 @@ fn a_device_forgotten_loses_its_connection_at_once() {
     });
     std::thread::sleep(std::time::Duration::from_millis(50));
     assert!(ends.try_recv().is_err(), "it ended before it was forgotten");
-    let forgotten = Instant::now();
     crate::remote_hub::drop_conns(device);
-    ends.recv_timeout(std::time::Duration::from_secs(1))
+    ends.recv_timeout(std::time::Duration::from_millis(500))
         .expect("the connection outlived its device");
-    assert!(
-        forgotten.elapsed() < LISTEN * 5,
-        "{:?}",
-        forgotten.elapsed()
-    );
+}
+
+/// A viewer that reads slowly: each frame sent takes a while.
+struct Slow;
+
+impl Wire for Slow {
+    fn hear(&mut self) -> Result<Heard, ()> {
+        std::thread::sleep(LISTEN);
+        Ok(Heard::Nothing)
+    }
+    fn say(&mut self, _: &str) {}
+    fn say_bytes(&mut self, _: &[u8]) {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    fn end(&mut self) {}
+}
+
+/// A pane printing faster than the viewer reads does not keep a forgotten
+/// device's connection alive: the drain lets go as soon as the hub does.
+#[test]
+fn a_device_forgotten_while_its_pane_floods_loses_its_connection_at_once() {
+    let device = "dev_forgotten_mid_flood";
+    let (id, _out, heard) = crate::remote_hub::enter(device);
+    let (raw, raws) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let flood = || crate::remote_panes::Raw {
+            handle: 1,
+            bytes: vec![b'y'; 64],
+        };
+        while raw.send(flood()).is_ok() {
+            std::thread::sleep(std::time::Duration::from_micros(200));
+        }
+    });
+    let (ended, ends) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut watching = crate::remote_panes::Watching::new(id);
+        converse(&mut Slow, id, &mut watching, &heard, &raws, |_, _| None);
+        let _ = ended.send(());
+    });
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    assert!(ends.try_recv().is_err(), "it ended before it was forgotten");
+    crate::remote_hub::drop_conns(device);
+    ends.recv_timeout(std::time::Duration::from_millis(500))
+        .expect("still connected while its pane floods");
 }
 
 /// A pane's raw bytes leave in the R3 frame under the viewer's handle.
