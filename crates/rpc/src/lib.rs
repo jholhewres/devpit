@@ -92,10 +92,10 @@ pub use devflow::{
 pub use devflow_screen::{
     DevflowBinary, DevflowCardEvidence, DevflowCheck, DevflowCli, DevflowCodexInstalled,
     DevflowConfig, DevflowDetected, DevflowError, DevflowFileChange, DevflowFound, DevflowGated,
-    DevflowHint, DevflowPlugin, DevflowPluginAction, DevflowPrefs, DevflowPreview, DevflowProfile,
-    DevflowProfileChoice, DevflowProfileFrom, DevflowReviewed, DevflowReviewer, DevflowScreen,
-    DevflowSkill, DevflowSkillText, DevflowStage, DevflowState, DevflowTeam, DevflowTeamChange,
-    DevflowTeamChanges,
+    DevflowHint, DevflowMcp, DevflowMcpTool, DevflowPlugin, DevflowPluginAction, DevflowPrefs,
+    DevflowPreview, DevflowProfile, DevflowProfileChoice, DevflowProfileFrom, DevflowReviewed,
+    DevflowReviewer, DevflowScreen, DevflowSkill, DevflowSkillText, DevflowStage, DevflowState,
+    DevflowTeam, DevflowTeamChange, DevflowTeamChanges,
 };
 pub use display::{Display, DisplayBackend, DisplayWhy};
 pub use ended::Ended;

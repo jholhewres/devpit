@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { DevflowBinary, DevflowPlugin, DevflowPluginAction } from '../gen/bindings'
+import type { DevflowBinary, DevflowMcp, DevflowPlugin, DevflowPluginAction } from '../gen/bindings'
 import { ask, commands } from './live'
 
 /*
@@ -177,6 +177,77 @@ export function DevflowBinaryRow(): React.JSX.Element | null {
             {binary.doctor.join('\n')}
           </pre>
         )}
+        {problem && <span className="pref__d voice__bad">{problem}</span>}
+      </div>
+    </div>
+  )
+}
+
+/* devflow as an MCP server in each tool's own configuration, for its sessions
+   outside devpit. A write to another tool's file waits for a yes to the file. */
+export function DevflowMcpRow(): React.JSX.Element | null {
+  const [mcp, setMcp] = useState<DevflowMcp | null>(null)
+  const [sure, setSure] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    void ask(() => commands.devflowMcp()).then((answer) => {
+      if (!live) return
+      setMcp(answer.data)
+      setProblem(answer.error)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
+  if (!mcp) return problem ? <p className="pref__d voice__bad">{problem}</p> : null
+  const set = (tool: string, added: boolean): void => {
+    setBusy(true)
+    void ask(() => commands.devflowMcpSet(tool, added)).then((answer) => {
+      if (answer.data) setMcp(answer.data)
+      setProblem(answer.error)
+      setSure(null)
+      setBusy(false)
+    })
+  }
+  return (
+    <div className="pref pref--stack">
+      <div className="pref__body">
+        <span className="pref__t">devflow as an MCP server in other tools</span>
+        <span className="pref__d">
+          Each tool runs <code>{mcp.command} mcp</code> for its own sessions. devpit&rsquo;s Devflow does not need it.
+        </span>
+        {mcp.tools.map((one) => (
+          <div className="pref" key={one.tool}>
+            <span className="pref__body">
+              <span className="pref__t">{one.label}</span>
+              <span className="pref__d">
+                {one.added ? `Added in ${one.file}.` : sure === one.tool ? `Not added. This writes devflow into ${one.file}, leaving the rest of it as it is.` : 'Not added.'}
+              </span>
+            </span>
+            {one.added ? (
+              <button className="btn" onClick={() => set(one.tool, false)} disabled={busy}>
+                Remove
+              </button>
+            ) : sure === one.tool ? (
+              <>
+                <button className="btn" onClick={() => setSure(null)} disabled={busy}>
+                  Cancel
+                </button>
+                <button className="btn btn--go" onClick={() => set(one.tool, true)} disabled={busy}>
+                  Add
+                </button>
+              </>
+            ) : (
+              <button className="btn" onClick={() => setSure(one.tool)} disabled={busy}>
+                Add…
+              </button>
+            )}
+          </div>
+        ))}
         {problem && <span className="pref__d voice__bad">{problem}</span>}
       </div>
     </div>

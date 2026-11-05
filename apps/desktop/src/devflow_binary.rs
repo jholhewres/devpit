@@ -199,7 +199,7 @@ pub(crate) fn state_of(bin: &Path, doctor: bool) -> DevflowBinary {
     }
 }
 
-fn bin_dir() -> Result<PathBuf, RpcError> {
+pub(crate) fn bin_dir() -> Result<PathBuf, RpcError> {
     std::env::var_os("HOME")
         .map(|home| PathBuf::from(home).join(".local").join("bin"))
         .ok_or_else(|| RpcError::internal("HOME is not set"))

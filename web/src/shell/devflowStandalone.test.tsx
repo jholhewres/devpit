@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { DevflowBinary, DevflowPlugin, DevflowPluginAction } from '../gen/bindings'
+import type { DevflowBinary, DevflowMcp, DevflowPlugin, DevflowPluginAction } from '../gen/bindings'
 
 const missing: DevflowPlugin = {
   projectId: 'p1',
@@ -21,6 +21,17 @@ let binary: DevflowBinary = {
 }
 let offline = false
 const called = vi.fn()
+const tool = (id: string, label: string, file: string) => ({ tool: id, label, file, added: false })
+const noneAdded = (): DevflowMcp => ({
+  command: '/h/.local/bin/devflow',
+  tools: [
+    tool('codex', 'Codex', '/h/.codex/config.toml'),
+    tool('cursor', 'Cursor', '/h/.cursor/mcp.json'),
+    tool('opencode', 'OpenCode', '/h/.config/opencode/opencode.json'),
+    tool('gemini', 'Gemini CLI', '/h/.gemini/settings.json'),
+  ],
+})
+let mcp = noneAdded()
 
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<unknown>) => {
@@ -43,6 +54,12 @@ vi.mock('./live', () => ({
       if (action === 'disable') plugin = { ...plugin, enabled: false, twice: false }
       return plugin
     },
+    devflowMcp: async () => mcp,
+    devflowMcpSet: async (id: string, added: boolean) => {
+      called('mcp', id, added)
+      mcp = { ...mcp, tools: mcp.tools.map((one) => (one.tool === id ? { ...one, added } : one)) }
+      return mcp
+    },
     devflowBinary: async () => binary,
     devflowBinaryInstall: async () => {
       called('binary')
@@ -57,7 +74,7 @@ vi.mock('./live', () => ({
   },
 }))
 
-const { DevflowBinaryRow, DevflowPluginRow } = await import('./DevflowStandalone')
+const { DevflowBinaryRow, DevflowMcpRow, DevflowPluginRow } = await import('./DevflowStandalone')
 
 afterEach(() => {
   cleanup()
@@ -70,6 +87,7 @@ afterEach(() => {
     doctor: [],
   }
   offline = false
+  mcp = noneAdded()
 })
 
 describe('the devflow plugin button', () => {
@@ -122,5 +140,25 @@ describe('the devflow binary button', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
     expect(await screen.findByText(/could not be downloaded/)).toBeTruthy()
     expect(screen.getByText(/Not installed at/)).toBeTruthy()
+  })
+})
+
+describe('devflow as an MCP server in other tools', () => {
+  it('adds it to a tool after a yes to the file it writes, says so, and removes it', async () => {
+    render(<DevflowMcpRow />)
+    for (const label of ['Codex', 'Cursor', 'OpenCode', 'Gemini CLI']) expect(await screen.findByText(label)).toBeTruthy()
+    const cursor = (): HTMLElement => screen.getByText('Cursor').closest('.pref') as HTMLElement
+    expect(within(cursor()).getByText(/Not added/)).toBeTruthy()
+    fireEvent.click(within(cursor()).getByRole('button', { name: 'Add…' }))
+    expect(called).not.toHaveBeenCalled()
+    expect(within(cursor()).getByText(/\/h\/\.cursor\/mcp\.json/)).toBeTruthy()
+    fireEvent.click(within(cursor()).getByRole('button', { name: 'Add' }))
+    expect(await within(cursor()).findByText(/Added in \/h\/\.cursor\/mcp\.json/)).toBeTruthy()
+    fireEvent.click(within(cursor()).getByRole('button', { name: 'Remove' }))
+    expect(await within(cursor()).findByRole('button', { name: 'Add…' })).toBeTruthy()
+    expect(called.mock.calls).toEqual([
+      ['mcp', 'cursor', true],
+      ['mcp', 'cursor', false],
+    ])
   })
 })

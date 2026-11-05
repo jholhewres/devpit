@@ -309,6 +309,27 @@ pub struct DevflowBinary {
     pub doctor: Vec<String>,
 }
 
+/// The standalone devflow as an MCP server (`devflow mcp`) in one tool.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowMcpTool {
+    /// `codex`, `cursor`, `opencode` or `gemini`.
+    pub tool: String,
+    pub label: String,
+    /// The tool's own configuration file, where devpit adds it.
+    pub file: String,
+    pub added: bool,
+}
+
+/// Response of `devflow.mcp` and `devflow.mcp_set`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DevflowMcp {
+    /// The command each tool is given, before `mcp`.
+    pub command: String,
+    pub tools: Vec<DevflowMcpTool>,
+}
+
 /// The account a project's Claude Code reviewers run as (#249).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

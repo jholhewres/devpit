@@ -113,6 +113,7 @@ mod devflow_evidence;
 mod devflow_gate;
 mod devflow_jev;
 mod devflow_launch;
+mod devflow_mcp;
 mod devflow_plan;
 mod devflow_plan_edit;
 mod devflow_plugin;

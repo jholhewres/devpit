@@ -516,6 +516,10 @@ export const commands = {
 	 *  `KNOWN` downloaded, checked and installed, then `devflow doctor` run.
 	 */
 	devflowBinaryInstall: () => typedError<DevflowBinary, RpcError>(__TAURI_INVOKE("devflow_binary_install")),
+	/**  `devflow.mcp` — devflow as an MCP server in each tool, as their files say. */
+	devflowMcp: () => typedError<DevflowMcp, RpcError>(__TAURI_INVOKE("devflow_mcp")),
+	/**  `devflow.mcp_set` — the person's click: devflow added to `tool`, or removed. */
+	devflowMcpSet: (tool: string, added: boolean) => typedError<DevflowMcp, RpcError>(__TAURI_INVOKE("devflow_mcp_set", { tool, added })),
 	/**  `devflow.card_evidence` — the card's newest gate, reviewers and files. */
 	devflowCardEvidence: (projectId: string, cardId: string) => typedError<DevflowCardEvidence, RpcError>(__TAURI_INVOKE("devflow_card_evidence", { projectId, cardId })),
 	/**
@@ -3088,6 +3092,23 @@ export type DevflowGated = {
 export type DevflowHint = {
 	label: string,
 	items: string[],
+};
+
+/**  Response of `devflow.mcp` and `devflow.mcp_set`. */
+export type DevflowMcp = {
+	/**  The command each tool is given, before `mcp`. */
+	command: string,
+	tools: DevflowMcpTool[],
+};
+
+/**  The standalone devflow as an MCP server (`devflow mcp`) in one tool. */
+export type DevflowMcpTool = {
+	/**  `codex`, `cursor`, `opencode` or `gemini`. */
+	tool: string,
+	label: string,
+	/**  The tool's own configuration file, where devpit adds it. */
+	file: string,
+	added: boolean,
 };
 
 /**  A plan previewed for an epic, waiting for the person to create its cards. */
