@@ -162,7 +162,9 @@ export function useBoard(projectId: string | null, inFront = true): UseBoard {
      Only that card's tile changes with it; the board is not read again. */
   const [sessions, setSessions] = useState<Readonly<Record<string, readonly CardSession[]>>>({})
   const onBoard = useRef<ReadonlySet<string>>(new Set())
-  useEffect(() => {
+  /* At commit, not after paint: a report heard between the two was dropped
+     for a card already on screen. */
+  useLayoutEffect(() => {
     onBoard.current = new Set(board?.cards.map((card) => card.id))
   }, [board])
   useEffect(
