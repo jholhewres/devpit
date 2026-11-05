@@ -332,6 +332,8 @@ fn main() {
     // secret, and every session's hooks would post to a dead port.
     if desk::one_copy() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            #[cfg(target_os = "linux")]
+            display_backend::handed_over();
             desk::forward(app);
         }));
     }

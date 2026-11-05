@@ -224,6 +224,15 @@ pub(crate) fn page_loaded(wayland: bool) {
     }
 }
 
+/// A second launch handed over to this one before its page could load: the
+/// record it left is not a failed start when this one is up on Wayland.
+#[cfg(target_os = "linux")]
+pub(crate) fn handed_over() {
+    if let Ok(root) = Store::root() {
+        after_load(&root, RUNNING.get() == Some(&DisplayBackend::Wayland));
+    }
+}
+
 fn now(store: &Store) -> Display {
     Display {
         offered: cfg!(target_os = "linux"),
