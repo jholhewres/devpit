@@ -394,8 +394,9 @@ pub(crate) fn terminal_of(profile_id: &str, name: &str) -> Result<String, RpcErr
 /// The terminal of this account's session called `name`: none for one
 /// that is not in a devpit terminal, an error for one that is not running.
 fn terminal_named(profile_id: &str, name: &str) -> Result<Option<String>, RpcError> {
-    let listed = listed_running(&config_of(profile_id)?.join("sessions"))
-        .into_iter()
+    let listed = listed_dirs(profile_id)?
+        .iter()
+        .flat_map(|dir| listed_running(dir))
         .find(|listed| listed.name.as_deref() == Some(name))
         .ok_or_else(|| {
             RpcError::new(
@@ -423,10 +424,10 @@ pub(crate) struct Running {
 /// Every live session of this account called `name`. More than one is
 /// ordinary: a background job started twice keeps the name it was given.
 pub(crate) fn running_named(profile_id: &str, name: &str) -> Result<Vec<Running>, RpcError> {
-    let sessions = config_of(profile_id)?.join("sessions");
     let windows = windows_now();
-    let found: Vec<Running> = std::fs::read_dir(&sessions)
-        .into_iter()
+    let found: Vec<Running> = listed_dirs(profile_id)?
+        .iter()
+        .flat_map(std::fs::read_dir)
         .flatten()
         .flatten()
         .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
@@ -653,9 +654,25 @@ pub(crate) fn in_their_accounts(
         .collect()
 }
 
+/// Every folder this profile's sessions are listed in: its own account's,
+/// and that of each project with an account of its own, where it starts them.
+fn listed_dirs(profile_id: &str) -> Result<Vec<std::path::PathBuf>, RpcError> {
+    let mut dirs = vec![config_of(profile_id)?.join("sessions")];
+    let accounts = crate::claude_accounts::read();
+    for one in &accounts.projects {
+        if let Some(account) = crate::claude_accounts::of_project(&accounts, &one.project_id) {
+            let dir = Path::new(&account.config_dir).join("sessions");
+            if !dirs.contains(&dir) {
+                dirs.push(dir);
+            }
+        }
+    }
+    Ok(dirs)
+}
+
 /// This profile's account's config folder — where its sessions are listed.
-/// Only its own: an orchestrator sees the sessions of the account it speaks
-/// as, never another's.
+/// A project's own account lists the sessions started there: those are added
+/// by [`in_their_accounts`], and no other account's.
 pub(crate) fn config_of(profile_id: &str) -> Result<std::path::PathBuf, RpcError> {
     let store = crate::projects::store()?;
     crate::agent_profiles::all(&store)?
