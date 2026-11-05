@@ -3,6 +3,35 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## 0.1.49 — 2026-11-05
+
+### Fixes
+
+- **A terminal no longer sticks near the top.** If you had scrolled up
+  and Claude Code redrew its screen, the view stayed at the top and new
+  output did not bring it down. It now follows the end again. The mouse
+  wheel scrolls a session's terminal opened over the orchestrator's chat,
+  inside Claude Code too.
+- **The orchestrator's preferences hold from the next message.** Editing
+  `context/preferences.md` by hand takes effect from your next message,
+  without reopening the orchestrator.
+- **The orchestrator stops a session only when you ask.** It stops one
+  when your last message names it with a word like "stop", or when
+  another session already works on the same card.
+- **Smaller fixes.** An X11 program started in a devpit terminal opens
+  its window. "Open in browser" works on macOS and Windows without
+  Chromium. A browser tab hears about tabs opened in the window. The
+  Devflow screen no longer offers to replace a newer devflow with an
+  older one.
+
+### New
+
+- **A session in the model you choose.** The orchestrator can start a
+  session in a given model, such as Opus, without changing the profile.
+- **devflow in other tools.** The Devflow screen adds the standalone
+  devflow as an MCP server to Codex, Cursor, OpenCode and Gemini CLI,
+  shows where it is added, and removes it.
+
 ## 0.1.48 — 2026-11-05
 
 ### Sessions
