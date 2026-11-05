@@ -76,6 +76,8 @@ tauri-build = { version = "2", features = [] }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# The tests' home, set before the first test runs (`src/test_home.rs`).
+ctor = "0.8.0"
 # The pty traits answer in `anyhow::Result`, and the ownership tests stand a
 # fake in for a pty whose ends the rule never touches.
 anyhow = "1.0.104"

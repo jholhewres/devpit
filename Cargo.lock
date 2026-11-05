@@ -1138,6 +1138,7 @@ version = "0.1.48"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "ctor",
  "devflow-engine",
  "devpit-agentapi",
  "devpit-agentcli",

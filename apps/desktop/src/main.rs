@@ -272,6 +272,8 @@ mod transcribe;
 mod tap_file;
 mod telegram;
 mod telegram_devpit;
+#[cfg(test)]
+mod test_home;
 mod threads;
 mod tray;
 mod tray_look;
