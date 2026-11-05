@@ -92,8 +92,9 @@ pub(crate) fn note(folder: &Path, log: &str, text: &str, into: Section) -> Resul
     std::fs::write(&fresh, after)
         .and_then(|()| std::fs::rename(&fresh, &file))
         .map_err(|err| err.to_string())?;
-    // In view from the orchestrator's next turn.
-    crate::orchestrator_view::keep(folder).map_err(|err| err.to_string())?;
+    // In view from the orchestrator's next turn. The entry is written either
+    // way, and the next opening writes the copy again.
+    let _ = crate::orchestrator_view::keep(folder);
     Ok(line)
 }
 
@@ -165,13 +166,13 @@ fn inserted(lines: &[&str], at: usize, line: &str) -> String {
 /// The heading in `context/preferences.md` whose lines go with every brief.
 const RULES: &str = "## rules for sessions";
 
-/// A rules heading: `Some(None)` for every session's, `Some(Some(label))`
-/// for `## Rules for sessions: <label>`, the projects it names.
 /// Whether `line` heads rules that go to sessions, every project's or one's.
 pub(crate) fn is_rules_heading(line: &str) -> bool {
     rules_heading(line).is_some()
 }
 
+/// A rules heading: `Some(None)` for every session's, `Some(Some(label))`
+/// for `## Rules for sessions: <label>`, the projects it names.
 fn rules_heading(line: &str) -> Option<Option<&str>> {
     let line = line.trim();
     if !line.get(..RULES.len())?.eq_ignore_ascii_case(RULES) {
